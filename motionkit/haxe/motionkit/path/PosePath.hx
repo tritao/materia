@@ -38,6 +38,17 @@ class PosePath implements MotionPath {
   public function length():Float return totalLength;
   public function poseAt(distance:Float):Pose3 return waypointAt(distance).pose;
 
+  public function orientationPolicyAt(distance:Float):OrientationPolicy {
+    if (!Math.isFinite(distance) || distance < 0.0 || distance > totalLength)
+      throw "Pose-path distance outside path";
+    var start = 0.0;
+    for (primitive in primitives) {
+      start += primitive.length();
+      if (distance <= start) return primitive.orientationPolicy();
+    }
+    return primitives[primitives.length-1].orientationPolicy();
+  }
+
   public function waypointAt(distance:Float):PoseWaypoint {
     if (!Math.isFinite(distance) || distance < 0.0 || distance > totalLength)
       throw "Pose-path distance outside path";

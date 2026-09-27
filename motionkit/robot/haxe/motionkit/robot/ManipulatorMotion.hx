@@ -1,0 +1,178 @@
+package motionkit.robot;
+
+import haxe.Int64;
+import motionkit.event.EventValue;
+import motionkit.program.InputPredicate;
+import motionkit.program.MotionProgram;
+import robotkit.world.FiredProcessEvent;
+import robotkit.world.Robot;
+
+/** Runs compiled manipulator blocks and evaluates host-side barriers. */
+class ManipulatorMotion {
+  public final robot:Robot;
+  public final compiler:ProgramCompiler;
+  public var completed(default, null):Bool = false;
+  public var failure(default, null):Null<String> = null;
+  public var running(default, null):Bool = false;
+  final input:String -> Null<EventValue>;
+  final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
+  final executor:PlanExecutor;
+  var compiled:Null<CompiledProgram>;
+  var blockIndex:Int = 0;
+  var planIndex:Int = 0;
+  var barrierElapsed:Float = 0.0;
+  var holding:Bool = false;
+  var planStarted:Bool = false;
+  var nextPlanId:Int64 = Int64.ofInt(1);
+  var events:Array<FiredProcessEvent> = [];
+
+  public function new(robot:Robot, compiler:ProgramCompiler,
+      input:String -> Null<EventValue>,
+      eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool}) {
+    if (robot == null || compiler == null || input == null || eventSource == null)
+      throw "ManipulatorMotion needs a robot, compiler, input and event source";
+    this.robot = robot; this.compiler = compiler;
+    this.input = input; this.eventSource = eventSource;
+    executor = new PlanExecutor(robot);
+    if (robot.description().joints.length != compiler.solver.jointCount())
+      throw "ManipulatorMotion joint count does not match compiler";
+  }
+
+  public function run(program:MotionProgram):Void {
+    if (running) throw "Manipulator program is already running";
+    release(); completed = false; failure = null; events = [];
+    blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; holding = false; planStarted = false;
+    try {
+      compiled = compiler.compile(program, robot.snapshot().positions.toArray(), nextPlanId);
+      for (block in compiled.blocks) nextPlanId = Int64.add(nextPlanId,
+        Int64.ofInt(block.plans.length));
+      running = true;
+      advance(0.0);
+    } catch (error:Dynamic) { fail(Std.string(error)); }
+  }
+
+  public function update(dtSeconds:Float):Void {
+    if (!running) return;
+    if (!Math.isFinite(dtSeconds) || dtSeconds <= 0.0)
+      throw "Manipulator update duration must be finite and positive";
+    try {
+      collectEvents();
+      if (!running) return;
+      var fault = robot.fault();
+      if (fault != null) throw 'Robot fault ${fault.code}: ${fault.message}';
+      if (holding) { executor.sync(); return; }
+      executor.update();
+      if (executor.completed && planStarted) { planIndex++; planStarted = false; }
+      advance(dtSeconds);
+    } catch (error:Dynamic) { fail(Std.string(error)); }
+  }
+
+  public function hold():Void {
+    if (!running || holding) return;
+    holding = true;
+    if (hasPlan()) executor.hold();
+  }
+  public function resume():Void {
+    if (!running || !holding) return;
+    holding = false;
+    if (hasPlan()) executor.resume();
+  }
+  public function abort():Void {
+    if (!running) return;
+    fail("Program aborted");
+  }
+  public function firedEvents():Array<FiredProcessEvent> {
+    collectEvents();
+    return events.copy();
+  }
+  public function progress():ManipulatorProgress {
+    var source = compiled;
+    if (source == null || blockIndex >= source.blocks.length)
+      return new ManipulatorProgress(blockIndex, -1, 0.0);
+    var block = source.blocks[blockIndex];
+    var op = planIndex < block.opIndices.length ? block.opIndices[planIndex] : -1;
+    var distance = 0.0;
+    if (planIndex < block.plans.length) {
+      var plan = block.plans[planIndex];
+      var times = block.pathTimes[planIndex];
+      var distances = block.pathDistances[planIndex];
+      if (times.length > 1) {
+        distance = distances[distances.length - 1];
+        for (index in 1...times.length)
+          if (executor.elapsedSeconds <= times[index]) {
+            var fraction = (executor.elapsedSeconds - times[index - 1]) /
+              (times[index] - times[index - 1]);
+            distance = distances[index - 1] + fraction *
+              (distances[index] - distances[index - 1]);
+            break;
+          }
+      }
+    }
+    return new ManipulatorProgress(blockIndex, op, distance);
+  }
+
+  function advance(dt:Float):Void {
+    var source = compiled;
+    if (source == null) return;
+    while (running && blockIndex < source.blocks.length) {
+      var block = source.blocks[blockIndex];
+      if (planIndex < block.plans.length) {
+        if (!planStarted) {
+          executor.start(block.plans[planIndex], true);
+          planStarted = true;
+        }
+        return;
+      }
+      if (block.barrier != null) {
+        var ready = switch block.barrier {
+          case Dwell(seconds):
+            barrierElapsed += dt;
+            barrierElapsed >= seconds;
+          case WaitInput(channel, predicate, timeoutSeconds):
+            var current = input(channel);
+            var matches = current != null && switch predicate {
+              case Equals(expected): switch [current, expected] {
+                case [Digital(a), Digital(b)]: a == b;
+                case [Analog(a), Analog(b)]: a == b;
+                case [Process(a, x), Process(b, y)]: a == b && x == y;
+                case _: false;
+              };
+            };
+            if (!matches) {
+              barrierElapsed += dt;
+              if (barrierElapsed >= timeoutSeconds)
+                throw 'WaitInput "$channel" timed out after $timeoutSeconds seconds';
+            }
+            matches;
+        };
+        if (!ready) return;
+      }
+      blockIndex++; planIndex = 0; barrierElapsed = 0.0;
+    }
+    if (running) { running = false; completed = true; release(); }
+  }
+
+  function hasPlan():Bool {
+    var source = compiled;
+    return source != null && blockIndex < source.blocks.length &&
+      planIndex < source.blocks[blockIndex].plans.length;
+  }
+  function fail(message:String):Void {
+    if (running) {
+      try executor.abort() catch (_:Dynamic) {}
+    }
+    failure = message; completed = false; running = false;
+    release();
+  }
+  function collectEvents():Void {
+    var batch = eventSource();
+    for (event in batch.events) events.push(event);
+    if (batch.overflow) {
+      if (running) fail("Runtime process event overflow");
+      else { failure = "Runtime process event overflow"; completed = false; }
+    }
+  }
+  function release():Void {
+    if (compiled != null) { compiled.dispose(); compiled = null; }
+  }
+}

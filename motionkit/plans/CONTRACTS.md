@@ -102,7 +102,7 @@ passes the step index as its "timestamp"
 | `MoveJ(target, limits, blend)` | Constrains the endpoint only. `target` is `JointTarget(Array<Float>)` or `PoseTarget(pose, frameId, configurationHint)`. |
 | `MoveL(pose, frameId, feed, blend)` | Straight tool-point line with orientation interpolation (C3 policy). |
 | `MoveC(via, end, frameId, feed, blend)` | Circular arc through `via`. |
-| `FollowPath(path, frameId, timing, events)` | An authored path (lines, arcs, splines, or a process path from Lane B) with its `PathEvent`s. |
+| `FollowPath(path:PosePath, frameId, timing, events)` | An authored pose path (lines, arcs, future pose splines, or a process path from Lane B) with its `PathEvent`s. |
 | `Dwell(seconds)` | Rest in place; it ends the plan block. |
 | `SetOutput(channel, value)` | An event at the end of the previous motion. It does not end the block. |
 | `WaitInput(channel, predicate, timeoutSeconds)` | A barrier. It ends the plan block, and the next block starts from rest. |
