@@ -8,12 +8,18 @@ import app.SceneFileDialogs;
 import app.PerspectiveCamera;
 import app.PerspectiveSceneDrag;
 import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyValue;
 import sys.FileSystem;
 import sys.io.File;
 import haxe.Json;
 
 class SceneDocumentTests {
+  static function property(properties:Array<PropertyDescriptor>, key:String):PropertyDescriptor {
+    for (candidate in properties)
+      if (StringTools.endsWith(candidate.id, ":" + key)) return candidate;
+    throw "Missing property: " + key;
+  }
   static function check(value:Bool, message:String):Void {
     if (!value) throw message;
   }
@@ -26,7 +32,7 @@ class SceneDocumentTests {
   }
   static function edit(session:SceneDocumentSession, value:Float):Void {
     session.scene.select("box");
-    new PropertyBinding(session.scene.properties()[0], session.scene.context()).apply(PropertyValue.Float(value));
+    new PropertyBinding(property(session.scene.properties(), "position-0"), session.scene.context()).apply(PropertyValue.Float(value));
   }
 
   public static function run():Void {
@@ -62,7 +68,7 @@ class SceneDocumentTests {
       check(session.path != originalPath && !session.scene.document.isDirty, "Save As adopts new path");
 
       session.scene.select("tower");
-      new PropertyBinding(session.scene.properties()[2], session.scene.context()).apply(PropertyValue.Bool(false));
+      new PropertyBinding(property(session.scene.properties(), "visible"), session.scene.context()).apply(PropertyValue.Bool(false));
       session.save(second);
       var encoded = SceneCodec.encode(session.scene, session.sensors);
       var oldRevision = session.scene.revision;

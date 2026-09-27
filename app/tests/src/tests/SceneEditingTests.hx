@@ -6,6 +6,7 @@ import nativekit.ui.widgets.text.Text;
 import app.EditorScene;
 import app.EditorSceneTree;
 import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.properties.PropertyEditResult;
 import nativekit.scene.SceneView;
@@ -51,6 +52,11 @@ import materia.project.MaterialLibrary;
 @:access(app.EditorPerspectiveViewport)
 @:access(app.Main.ReferenceEditorApp)
 class SceneEditingTests {
+  static function property(properties:Array<PropertyDescriptor>, key:String):PropertyDescriptor {
+    for (candidate in properties)
+      if (StringTools.endsWith(candidate.id, ":" + key)) return candidate;
+    throw "Missing property: " + key;
+  }
   static function finishLibrarySelection():Void {
     var scene = new EditorScene([]);
     try {
@@ -160,7 +166,7 @@ class SceneEditingTests {
     scene.select(source.id);
     scene.setColour(source.id, 0.2, 0.25, 0.3);
     scene.setFinish(source.id, Appearances.blackOxide());
-    var finish = new PropertyBinding(scene.properties()[7], scene.context());
+    var finish = new PropertyBinding(property(scene.properties(), "finish"), scene.context());
     check(finish.apply(PropertyValue.Enum("component")) == PropertyEditResult.Applied,
       "component finish reset is available in picker");
     var restored = scene.records()[0];
@@ -339,7 +345,7 @@ class SceneEditingTests {
     context.onPropertyEdit = function(edit) {
       if (Reflect.field(edit, "id") != null) edits++;
     };
-    var visibility = new PropertyBinding(scene.properties()[2], context);
+    var visibility = new PropertyBinding(property(scene.properties(), "visible"), context);
     visibility.apply(PropertyValue.Bool(false));
     check(edits == 1, "Inspector binding reports its edit outcome");
     scene.dispose();
@@ -414,28 +420,28 @@ class SceneEditingTests {
       "viewport observes created geometry");
     check(empty.properties().length == 14, "inspector exposes finish and collision properties");
 
-    var name = new PropertyBinding(empty.properties()[3], empty.context());
+    var name = new PropertyBinding(property(empty.properties(), "name"), empty.context());
     check(name.apply(PropertyValue.Text("Hidden panel")) == PropertyEditResult.Applied,
       "rename succeeds through inspector binding");
     var renamed = empty.object(originalId);
     check(renamed != null && renamed.label == "Hidden panel", "hierarchy model observes rename");
-    check(new PropertyBinding(empty.properties()[4], empty.context()).apply(PropertyValue.Float(2.4))
+    check(new PropertyBinding(property(empty.properties(), "width"), empty.context()).apply(PropertyValue.Float(2.4))
       == PropertyEditResult.Applied, "width edit succeeds");
-    check(new PropertyBinding(empty.properties()[5], empty.context()).apply(PropertyValue.Float(0.8))
+    check(new PropertyBinding(property(empty.properties(), "height"), empty.context()).apply(PropertyValue.Float(0.8))
       == PropertyEditResult.Applied, "height edit succeeds");
-    check(new PropertyBinding(empty.properties()[6], empty.context()).apply(PropertyValue.Text("#336699"))
+    check(new PropertyBinding(property(empty.properties(), "colour"), empty.context()).apply(PropertyValue.Text("#336699"))
       == PropertyEditResult.Applied, "colour edit succeeds");
-    check(new PropertyBinding(empty.properties()[7], empty.context()).apply(PropertyValue.Enum("machined-steel"))
+    check(new PropertyBinding(property(empty.properties(), "finish"), empty.context()).apply(PropertyValue.Enum("machined-steel"))
       == PropertyEditResult.Applied, "finish preset edit succeeds");
-    check(new PropertyBinding(empty.properties()[8], empty.context()).apply(PropertyValue.Float(0.7))
+    check(new PropertyBinding(property(empty.properties(), "metallic"), empty.context()).apply(PropertyValue.Float(0.7))
       == PropertyEditResult.Applied, "metallic edit succeeds");
-    check(new PropertyBinding(empty.properties()[10], empty.context()).apply(PropertyValue.Float(0.6))
+    check(new PropertyBinding(property(empty.properties(), "depth"), empty.context()).apply(PropertyValue.Float(0.6))
       == PropertyEditResult.Applied, "collision depth edit succeeds");
-    check(new PropertyBinding(empty.properties()[12], empty.context()).apply(PropertyValue.Bool(true))
+    check(new PropertyBinding(property(empty.properties(), "dynamic"), empty.context()).apply(PropertyValue.Bool(true))
       == PropertyEditResult.Applied, "dynamic collision mode edit succeeds");
-    check(new PropertyBinding(empty.properties()[13], empty.context()).apply(PropertyValue.Float(4.0))
+    check(new PropertyBinding(property(empty.properties(), "mass"), empty.context()).apply(PropertyValue.Float(4.0))
       == PropertyEditResult.Applied, "collision mass edit succeeds");
-    var visible = new PropertyBinding(empty.properties()[2], empty.context());
+    var visible = new PropertyBinding(property(empty.properties(), "visible"), empty.context());
     check(visible.apply(PropertyValue.Bool(false)) == PropertyEditResult.Applied,
       "visibility edit succeeds through inspector binding");
     check(empty.pick(0.0, 0.0) == "scene",
@@ -505,9 +511,9 @@ class SceneEditingTests {
     var scene = new EditorScene();
     try {
       scene.select("box");
-      var width = new PropertyBinding(scene.properties()[4], scene.context());
-      var height = new PropertyBinding(scene.properties()[5], scene.context());
-      var colour = new PropertyBinding(scene.properties()[6], scene.context());
+      var width = new PropertyBinding(property(scene.properties(), "width"), scene.context());
+      var height = new PropertyBinding(property(scene.properties(), "height"), scene.context());
+      var colour = new PropertyBinding(property(scene.properties(), "colour"), scene.context());
       check(switch (width.apply(PropertyValue.Float(0.0))) {
         case PropertyEditResult.Rejected(_): true;
         default: false;
@@ -764,7 +770,7 @@ class SceneEditingTests {
     var documentPath = directory + "/robot.materia.json";
     var recordingPath = directory + "/robot.mcap";
     var session = new SceneDocumentSession();
-    var rate = new PropertyBinding(session.sensors.properties()[2], session.sensors.context());
+    var rate = new PropertyBinding(property(session.sensors.properties(), "rate"), session.sensors.context());
     var mountXProperty = [for (property in session.sensors.properties())
       if (StringTools.endsWith(property.id, ":position-0")) property][0];
     var mountX = new PropertyBinding(mountXProperty, session.sensors.context());
@@ -773,7 +779,7 @@ class SceneEditingTests {
     check(mountX.apply(PropertyValue.Float(0.25)) == PropertyEditResult.Applied,
       "sensor workflow edits mount position");
     check(session.sensors.selectRobot("materia/robot-b"),"sensor workflow adds a second robot target");
-    new PropertyBinding(session.sensors.properties()[2],session.sensors.context()).apply(PropertyValue.Float(10.0));
+    new PropertyBinding(property(session.sensors.properties(), "rate"),session.sensors.context()).apply(PropertyValue.Float(10.0));
     var arm=session.sensors.model.addLink(new Link("Arm","arm"));
     // The COM shares the X-axis joint's Y coordinate below, so gravity does
     // not mask the commanded arm motion with a static torque around that axis.
@@ -907,7 +913,7 @@ class SceneEditingTests {
 
     session.scene.setPositionXY("tower",1.0,3.0);
     session.scene.select("tower");
-    check(new PropertyBinding(session.scene.properties()[12],session.scene.context())
+    check(new PropertyBinding(property(session.scene.properties(), "dynamic"),session.scene.context())
       .apply(PropertyValue.Bool(true))==PropertyEditResult.Applied,
       "physics regression makes the observed obstacle dynamic");
 
@@ -1162,7 +1168,7 @@ class SceneEditingTests {
         "perspective picking after framing");
       var originalTarget = camera.targetX;
       var originalRevision = tree.revision();
-      var x = new PropertyBinding(scene.properties()[0], scene.context());
+      var x = new PropertyBinding(property(scene.properties(), "position-0"), scene.context());
       check(x.apply(PropertyValue.Float(-2.5)) == PropertyEditResult.Applied, "position edit accepted");
       near(scene.info("box").localTransform().element(12), -2.5, "selected object moved");
       near(scene.info("tower").localTransform().element(12), 1.1, "other object unchanged");
@@ -1173,7 +1179,7 @@ class SceneEditingTests {
       check(scene.document.isDirty && scene.document.canUndo, "edit recorded in document");
 
       scene.select("tower");
-      var towerX = new PropertyBinding(scene.properties()[0], scene.context());
+      var towerX = new PropertyBinding(property(scene.properties(), "position-0"), scene.context());
       towerX.apply(PropertyValue.Float(2.0));
       check(scene.document.history.undoCount == 2, "different objects do not coalesce edits");
       scene.document.undo();
@@ -1184,7 +1190,7 @@ class SceneEditingTests {
       scene.document.redo();
       near(scene.info("box").localTransform().element(12), -2.5, "redo original object");
 
-      var visibility = new PropertyBinding(scene.properties()[2], scene.context());
+      var visibility = new PropertyBinding(property(scene.properties(), "visible"), scene.context());
       visibility.apply(PropertyValue.Bool(false));
       check(!scene.info("tower").visible(), "hide selected object");
       check(scene.pick(1.1, 0) == "scene", "hidden object cannot be picked");
