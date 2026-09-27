@@ -7,6 +7,7 @@
 | `LANE_A_VIRTUAL_DEVICE.md` | RKD6 scheduled device protocol, virtual MCU, clock sync, device-side stop, step generation, SimKit loop, transmissions end to end, then retiring RKD5 in favour of a minimal RKD6 profile (A9). |
 | `LANE_B_ARM_PROCESS.md` | Arm toolpaths as validated plans, path-synchronized process events, `ManipulatorMotion`, wall finishing and excavator migration, ProcessKit. |
 | `LANE_C_PLANNING.md` | Native path trajectories and TOPP-RA timing, corner blending, OPW IK, configuration selection, CncKit, virtual CNC end to end. |
+| `LANE_D_REDUNDANCY_SERVO.md` | **Stub, not scheduled.** Native mink-shaped QP differential IK (OSQP), 7-axis redundancy, live Cartesian servoing through the execution session, collision-avoidance limits, coordinated external axes. Uses mink as the design reference and an optional test oracle. |
 
 **Order:** §P0, merged to `main`, then Lanes A, B and C in parallel, each in
 its own worktree.

@@ -332,7 +332,8 @@ Tests (a scenario test in `motionkit/tests` or a new `cnckit/tests`):
   lazy solvers);
 - `G18`/`G19`, cutter compensation (`G41`/`G42`), canned cycles, probing, CAM;
 - external controllers (LinuxCNC, grblHAL backends);
-- 7-axis redundancy (constrained differential IK, OSQP).
+- 7-axis redundancy (constrained differential IK, OSQP) and live servoing:
+  see `LANE_D_REDUNDANCY_SERVO.md` (mink-shaped QP IK).
 
 These are follow-on plans.
 
