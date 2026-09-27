@@ -55,16 +55,10 @@ import app.CadPlateModel.CadPlateHoleEdit;
 import app.CadBracketModel;
 import app.SketchDraftCodec.SketchDraftRecord;
 import app.editor.SelectionModel;
+import app.editor.SceneModel;
+import app.editor.SceneModel.SceneRecordChange;
 import app.editor.ObjectKindRegistry;
 import haxe.io.Path as FilePath;
-
-private typedef SceneRecordChange = {
-  final id:String;
-  final before:Null<SceneObjectData>;
-  final after:Null<SceneObjectData>;
-  final beforeIndex:Int;
-  final afterIndex:Int;
-}
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 @:allow(tests.SceneAtomicityTests)
@@ -89,7 +83,10 @@ class EditorScene {
   public final document:EditorDocument;
   var bridge:SceneBridge;
   var scene(get, never):Scene;
-  var objects:Array<EditorSceneObject>;
+  final model:SceneModel;
+  var objects(get, set):Array<EditorSceneObject>;
+  function get_objects():Array<EditorSceneObject> return model.objects;
+  function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> return model.objects = value;
   var cadSessions:Map<String, CadDocumentSession>;
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
@@ -97,7 +94,9 @@ class EditorScene {
   var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
   /** Optional editor-owned semantic action sink. */
   public var onSemanticAction:Null<String->Dynamic->Void> = null;
-  var nextObjectId:Int = 1;
+  var nextObjectId(get, set):Int;
+  function get_nextObjectId():Int return model.nextObjectId;
+  function set_nextObjectId(value:Int):Int return model.nextObjectId = value;
   var snapshot:SceneSnapshot;
   var spatial:SpatialIndex;
   var presentationStale:Bool = false;
@@ -178,6 +177,7 @@ class EditorScene {
     nextEnvironmentRevision++;
     environmentRevision = nextEnvironmentRevision;
     document = sharedDocument == null ? new EditorDocument("scene") : sharedDocument;
+    model = new SceneModel();
     objects = [];
     cadSessions = new Map();
     bridge = new SceneBridge();
@@ -386,10 +386,10 @@ class EditorScene {
 
   function allocateId(prefix:String="rectangle"):String {
     var id = prefix + "-" + nextObjectId;
-    nextObjectId++;
+    nextObjectId = nextObjectId + 1;
     while (object(id) != null) {
       id = prefix + "-" + nextObjectId;
-      nextObjectId++;
+      nextObjectId = nextObjectId + 1;
     }
     return id;
   }
@@ -1033,7 +1033,7 @@ class EditorScene {
     for (index in 0...objects.length) {
       var item = objects[index];
       if (!afterIds.exists(item.id)) {
-        var previous = recordForObject(item);
+        var previous = SceneModel.recordForObject(item);
         if (isCadKind(previous.type)) previous.cadGraph = currentCadGraph(previous.id);
         changes.push({id: previous.id, before: previous, after: null,
           beforeIndex: index, afterIndex: -1});
@@ -1055,84 +1055,12 @@ class EditorScene {
         else applyObjectChanges(changes, true, selection);
       },
       function() applyObjectChanges(changes, false, previousSelection),
-      null, null, null, estimateSceneChanges(changes)));
+      null, null, null, SceneModel.estimateSceneChanges(changes)));
   }
 
   function applyObjectChanges(changes:Array<SceneRecordChange>, forward:Bool, selection:String):Void {
-    var data = records();
-    var removals:Array<SceneRecordChange> = [];
-    for (change in changes) {
-      var target = forward ? change.after : change.before;
-      if (target == null) removals.push(change);
-    }
-    removals.sort(function(lhs, rhs) {
-      return findRecordIndex(data, rhs.id) - findRecordIndex(data, lhs.id);
-    });
-    for (change in removals) {
-      var index = findRecordIndex(data, change.id);
-      if (index >= 0) data.splice(index, 1);
-    }
-
-    var additions:Array<SceneRecordChange> = [];
-    for (change in changes) {
-      var target = forward ? change.after : change.before;
-      var source = forward ? change.before : change.after;
-      if (target == null) continue;
-      var index = findRecordIndex(data, change.id);
-      if (index >= 0) {
-        data[index] = target;
-      } else if (source == null) {
-        additions.push(change);
-      }
-    }
-    additions.sort(function(lhs, rhs) {
-      var left = forward ? lhs.afterIndex : lhs.beforeIndex;
-      var right = forward ? rhs.afterIndex : rhs.beforeIndex;
-      return left - right;
-    });
-    for (change in additions) {
-      var target = forward ? change.after : change.before;
-      var index = forward ? change.afterIndex : change.beforeIndex;
-      if (index < 0) index = data.length;
-      if (index > data.length) index = data.length;
-      data.insert(index, target);
-    }
-    replaceObjects(data, selection);
+    replaceObjects(SceneModel.applyChanges(records(), changes, forward), selection);
   }
-
-  static function findRecordIndex(data:Array<SceneObjectData>, id:String):Int {
-    for (index in 0...data.length) if (data[index].id == id) return index;
-    return -1;
-  }
-
-  static function recordForObject(item:EditorSceneObject):SceneObjectData {
-    return {id: item.id, label: item.label, type: item.kind,
-      x: item.x, y: item.y, z: item.z,
-      width: item.width, height: item.height, depth: item.depth,
-      collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-      red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
-      visible: item.visible, cadGraph: item.cadGraph,
-      meshSnapshot: item.meshSnapshot, rotation: item.rotation};
-  }
-
-  static function estimateSceneChanges(changes:Array<SceneRecordChange>):Int {
-    var bytes = 96 + changes.length * 48;
-    for (change in changes) {
-      bytes += estimateSceneRecord(change.before);
-      bytes += estimateSceneRecord(change.after);
-    }
-    return bytes;
-  }
-
-  static function estimateSceneRecord(record:Null<SceneObjectData>):Int {
-    if (record == null) return 0;
-    return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) +
-      estimatedStringBytes(record.type) + estimatedStringBytes(record.cadGraph) +
-      estimatedStringBytes(record.sketchDraft);
-  }
-
-  static function estimatedStringBytes(value:Null<String>):Int
-    return value == null ? 0 : value.length * 2;
 
   function applyCadEdit(id:String, label:String, redo:CadDocumentSession->Void,
       undo:CadDocumentSession->Void):Bool {
@@ -2852,19 +2780,7 @@ class EditorScene {
       }, settings);
   }
 
-  public function records():Array<SceneObjectData> {
-    var result:Array<SceneObjectData> = [];
-    for (item in objects) {
-      result.push({id: item.id, label: item.label, type: item.kind,
-        x: item.x, y: item.y, z: item.z,
-        width:item.width,height:item.height,depth:item.depth,collisionEnabled:item.collisionEnabled,
-        dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
-        appearance:item.appearance,
-        visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
-        rotation:item.rotation});
-    }
-    return result;
-  }
+  public function records():Array<SceneObjectData> return model.records();
 
   /** Save boundary: serialize each live authored CAD document only when requested. */
   public function recordsForSave():Array<SceneObjectData> {
