@@ -56,6 +56,7 @@ import app.CadBracketModel;
 import app.SketchDraftCodec.SketchDraftRecord;
 import app.editor.SelectionModel;
 import app.editor.SceneModel;
+import app.editor.ScenePresentation;
 import app.editor.SceneModel.SceneRecordChange;
 import app.editor.ObjectKindRegistry;
 import haxe.io.Path as FilePath;
@@ -63,11 +64,6 @@ import haxe.io.Path as FilePath;
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 @:allow(tests.SceneAtomicityTests)
 class EditorScene {
-  static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>):MaterialData {
-    var finish = appearance == null ? Appearances.neutral() : appearance;
-    return MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
-  }
-
   static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
     return Appearances.same(left, right);
   }
@@ -81,7 +77,10 @@ class EditorScene {
   static var nextVisualRevision:Int = 0;
   static var nextEnvironmentRevision:Int = 0;
   public final document:EditorDocument;
-  var bridge:SceneBridge;
+  final presentation:ScenePresentation;
+  var bridge(get, set):SceneBridge;
+  function get_bridge():SceneBridge return presentation.bridge;
+  function set_bridge(value:SceneBridge):SceneBridge return presentation.bridge = value;
   var scene(get, never):Scene;
   final model:SceneModel;
   var objects(get, set):Array<EditorSceneObject>;
@@ -97,18 +96,39 @@ class EditorScene {
   var nextObjectId(get, set):Int;
   function get_nextObjectId():Int return model.nextObjectId;
   function set_nextObjectId(value:Int):Int return model.nextObjectId = value;
-  var snapshot:SceneSnapshot;
-  var spatial:SpatialIndex;
-  var presentationStale:Bool = false;
-  var fullReconciliationCount:Int = 0;
-  var spatialFullRebuildCount:Int = 0;
-  var pendingRenderChanges:Null<ChangeSet> = null;
-  var renderNeedsRefresh:Bool = false;
-  var selectionMaterial:Material;
-  var hoverMaterial:Material;
-  final faceHoverNodes:Map<String, NodeId> = new Map();
-  final faceHoverGeometries:Map<String, Geometry> = new Map();
-  final faceHoverIndexes:Map<String, Int> = new Map();
+  var snapshot(get, set):SceneSnapshot;
+  function get_snapshot():SceneSnapshot return presentation.snapshot;
+  function set_snapshot(value:SceneSnapshot):SceneSnapshot return presentation.snapshot = value;
+  var spatial(get, set):SpatialIndex;
+  function get_spatial():SpatialIndex return presentation.spatial;
+  function set_spatial(value:SpatialIndex):SpatialIndex return presentation.spatial = value;
+  var presentationStale(get, set):Bool;
+  function get_presentationStale():Bool return presentation.presentationStale;
+  function set_presentationStale(value:Bool):Bool return presentation.presentationStale = value;
+  var fullReconciliationCount(get, set):Int;
+  function get_fullReconciliationCount():Int return presentation.fullReconciliationCount;
+  function set_fullReconciliationCount(value:Int):Int return presentation.fullReconciliationCount = value;
+  var spatialFullRebuildCount(get, set):Int;
+  function get_spatialFullRebuildCount():Int return presentation.spatialFullRebuildCount;
+  function set_spatialFullRebuildCount(value:Int):Int return presentation.spatialFullRebuildCount = value;
+  var pendingRenderChanges(get, set):Null<ChangeSet>;
+  function get_pendingRenderChanges():Null<ChangeSet> return presentation.pendingRenderChanges;
+  function set_pendingRenderChanges(value:Null<ChangeSet>):Null<ChangeSet> return presentation.pendingRenderChanges = value;
+  var renderNeedsRefresh(get, set):Bool;
+  function get_renderNeedsRefresh():Bool return presentation.renderNeedsRefresh;
+  function set_renderNeedsRefresh(value:Bool):Bool return presentation.renderNeedsRefresh = value;
+  var selectionMaterial(get, set):Material;
+  function get_selectionMaterial():Material return presentation.selectionMaterial;
+  function set_selectionMaterial(value:Material):Material return presentation.selectionMaterial = value;
+  var hoverMaterial(get, set):Material;
+  function get_hoverMaterial():Material return presentation.hoverMaterial;
+  function set_hoverMaterial(value:Material):Material return presentation.hoverMaterial = value;
+  var faceHoverNodes(get, never):Map<String, NodeId>;
+  function get_faceHoverNodes():Map<String, NodeId> return presentation.faceHoverNodes;
+  var faceHoverGeometries(get, never):Map<String, Geometry>;
+  function get_faceHoverGeometries():Map<String, Geometry> return presentation.faceHoverGeometries;
+  var faceHoverIndexes(get, never):Map<String, Int>;
+  function get_faceHoverIndexes():Map<String, Int> return presentation.faceHoverIndexes;
   final selection = new SelectionModel();
   public var selectedId(get, never):String;
   function get_selectedId():String return selection.selectedId;
@@ -178,9 +198,9 @@ class EditorScene {
     environmentRevision = nextEnvironmentRevision;
     document = sharedDocument == null ? new EditorDocument("scene") : sharedDocument;
     model = new SceneModel();
+    presentation = new ScenePresentation();
     objects = [];
     cadSessions = new Map();
-    bridge = new SceneBridge();
     try {
       if (data == null) {
         addObject("box", "Blue box", -1.5, 0.0, 0.0, 1.6, 1.2, 0.1, 0.22, 0.52, 0.85);
@@ -335,7 +355,7 @@ class EditorScene {
       }
       if (geometryIndex == null) throw 'No geometry resource was prepared for "${item.id}"';
       geometryIndexes.push(geometryIndex);
-      materialData.push(materialFor(item.red, item.green, item.blue, item.appearance));
+      materialData.push(ScenePresentation.materialFor(item.red, item.green, item.blue, item.appearance));
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
@@ -1244,7 +1264,7 @@ class EditorScene {
   }
 
   function replaceObjects(data:Array<SceneObjectData>, selection:String):Void {
-    fullReconciliationCount++;
+    fullReconciliationCount = fullReconciliationCount + 1;
     var physicsChanged = physicsRecordsChanged(data);
     var previousSelectedId = selectedId;
     var previousSelectedFeatureKey = selectedFeatureKey;
@@ -1311,7 +1331,7 @@ class EditorScene {
           if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
           var material = scene.createMaterial();
           prepared.createdMaterials.push(material);
-          scene.setMaterialData(material, materialFor(record.red, record.green, record.blue, record.appearance));
+          scene.setMaterialData(material, ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance));
           failIfInjected("prepare.new-material");
           var node = prepared.transaction.createNode();
           prepared.transaction.setName(node, record.label);
@@ -1382,7 +1402,7 @@ class EditorScene {
               !sameFinish(item.appearance, record.appearance)) {
             var material = scene.createMaterial();
             prepared.createdMaterials.push(material);
-            scene.setMaterialData(material, materialFor(record.red, record.green, record.blue, record.appearance));
+            scene.setMaterialData(material, ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance));
             prepared.transaction.setMaterial(runtime.node, material);
             prepared.retiredMaterials.push(runtime.material);
             runtime = new EditorSceneRuntimeObject(runtime.node, runtime.geometry, material);
@@ -2209,7 +2229,7 @@ class EditorScene {
     var changes:Null<ChangeSet> = null;
     try {
       material = scene.createMaterial();
-      scene.setMaterialData(material, materialFor(red, green, blue, finish));
+      scene.setMaterialData(material, ScenePresentation.materialFor(red, green, blue, finish));
       transaction.setMaterial(runtime.node, material);
       failIfInjected("prepare.existing-material");
       changes = transaction.commitWithChanges();
@@ -2279,7 +2299,7 @@ class EditorScene {
       failIfInjected("publish.spatial-index");
       if (!spatial.updateNodes(next, updatedNodes == null ? [] : updatedNodes)) {
         nextSpatial = SpatialIndex.create(next);
-        spatialFullRebuildCount++;
+        spatialFullRebuildCount = spatialFullRebuildCount + 1;
       }
     } catch (_:Dynamic) {
       if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {}
@@ -2923,7 +2943,7 @@ class EditorSceneObject {
 }
 
 /** Runtime-only resources associated with one document object. */
-private class SceneBridge {
+class SceneBridge {
   public final scene:Scene;
   var objects:Map<String, EditorSceneRuntimeObject> = new Map();
   var nodeEntries:Map<String, String> = new Map();
