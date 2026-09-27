@@ -4,31 +4,57 @@ import haxe.Json;
 import bimkit.BimCodec;
 import bimkit.BimDocument;
 import materia.project.Appearance;
+import materia.project.Appearance.Appearances;
 
 class SceneCodec {
   public static inline var FORMAT:String = "materia.scene";
-  public static inline var VERSION:Int = 1;
+  public static inline var VERSION:Int = 2;
 
   public static function encode(scene:EditorScene,
     ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
-    ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>):String return Json.stringify(
-      {
-    format: FORMAT,
-    version: VERSION,
-    objects: script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) :[],
-    sensors : script == null && sensors != null ? sensors.records() : null,
-    script : script,
-    project: project,
-    bim : bim == null ? null : Json.parse(BimCodec.encode(bim))
-  },
-    null,
-    "  "
-  ) + "\n";
+    ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>):String {
+    var objects = script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) : [];
+    var encodedObjects:Dynamic = Json.parse(Json.stringify(objects));
+    var values:Array<Dynamic> = encodedObjects;
+    for (object in values)
+      if (!Reflect.hasField(object, "appearance") || Reflect.field(object, "appearance") == null)
+        Reflect.setField(object, "appearance", Appearances.neutral());
+    return Json.stringify({format: FORMAT, version: VERSION, objects: encodedObjects,
+      sensors: script == null && sensors != null ? sensors.records() : null,
+      script: script, project: project,
+      bim: bim == null ? null : Json.parse(BimCodec.encode(bim))}, null, "  ") + "\n";
+  }
 
-  public static function decodeProject(text:String):Null<ProjectSceneRecord> {
+  /** Parse and migrate once before decoding independently validated sections. */
+  public static function parse(text:String):Dynamic {
     var root:Dynamic = Json.parse(text);
-    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
-      throw "Unsupported scene document";
+    if (stringField(root, "format") != FORMAT) throw "This is not a Materia scene document";
+    var version = Std.int(numberField(root, "version"));
+    if (version < 1 || version > VERSION) throw "Unsupported scene document version";
+    while (version < VERSION) {
+      switch (version) {
+        case 1: migrateV1ToV2(root);
+        default: throw "Unsupported scene document version";
+      }
+      version++;
+      Reflect.setField(root, "version", version);
+    }
+    return root;
+  }
+
+  static function migrateV1ToV2(root:Dynamic):Void {
+    var raw:Dynamic = field(root, "objects");
+    if (!Std.isOfType(raw, Array)) throw "Scene objects must be an array";
+    var values:Array<Dynamic> = raw;
+    for (object in values)
+      if (!Reflect.hasField(object, "appearance") || Reflect.field(object, "appearance") == null)
+        Reflect.setField(object, "appearance", Appearances.neutral());
+    // Project version 1 full-object edits are rebased against the regenerated source on load.
+  }
+
+  public static function decodeProject(text:String):Null<ProjectSceneRecord> return decodeProjectRoot(parse(text));
+
+  public static function decodeProjectRoot(root:Dynamic):Null<ProjectSceneRecord> {
     var value:Dynamic = Reflect.field(root, "project");
     if (value == null) return null;
     if (Reflect.field(root, "script") != null) throw "A scene cannot have both script and project owners";
@@ -81,18 +107,19 @@ class SceneCodec {
       if (seen.exists(id) || (object != null && (Reflect.hasField(object, "meshSnapshot") || Reflect.hasField(object, "cadGraph"))))
         throw "Invalid generated project instance";
       seen.set(id, true);
-      instanceRecords.push({sourceId: sourceId, id: id,
-        overrides: projectVersion == 1 ? [] : cast field(item, "overrides"), object: object});
+      if (projectVersion == 1) instanceRecords.push({sourceId: sourceId, id: id,
+        overrides: [], object: object});
+      else instanceRecords.push({sourceId: sourceId, id: id,
+        overrides: cast field(item, "overrides")});
     }
     return {version: projectVersion, reference: reference, overrides: cast overrides,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
   }
 
-  public static function decodeScript(text:String):Null < ScriptOwnershipRecord > {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root,
-      "format") != FORMAT || numberField(root, "version") != VERSION) throw "Unsupported scene document";
+  public static function decodeScript(text:String):Null<ScriptOwnershipRecord> return decodeScriptRoot(parse(text));
+
+  public static function decodeScriptRoot(root:Dynamic):Null<ScriptOwnershipRecord> {
     var value:Dynamic = Reflect.field(root, "script");
     if (value == null) return null;
     var reference = stringField(value, "reference"), version = Std.int(numberField(value, "version"));
@@ -158,10 +185,9 @@ class SceneCodec {
   }
 
   /** Optional versioned BimKit section; absent sections migrate to an empty BIM model. */
-  public static function decodeBim(text:String):BimDocument {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root, "format") != FORMAT || numberField(root, "version") != VERSION)
-      throw "Unsupported scene document";
+  public static function decodeBim(text:String):BimDocument return decodeBimRoot(parse(text));
+
+  public static function decodeBimRoot(root:Dynamic):BimDocument {
     var value:Dynamic = Reflect.field(root, "bim");
     return value == null ? new BimDocument() : BimCodec.decode(Json.stringify(value));
   }
@@ -186,18 +212,16 @@ class SceneCodec {
       throw "Unsupported script override type";
   }
 
-  public static function decodeSensors(text:String):Null < Dynamic > {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root,
-      "format") != FORMAT || numberField(root, "version") != VERSION) throw "Unsupported scene document";
+  public static function decodeSensors(text:String):Null<Dynamic> return decodeSensorsRoot(parse(text));
+
+  public static function decodeSensorsRoot(root:Dynamic):Null<Dynamic> {
     return Reflect.hasField(root, "sensors") ? Reflect.field(root, "sensors") : null;
   }
 
   /** Validate the entire file before allocating native scene resources. */
-  public static function decode(text:String):Array < SceneObjectData > {
-    var root:Dynamic = Json.parse(text);
-    if (stringField(root, "format") != FORMAT) throw "This is not a Materia scene document";
-    if (numberField(root, "version") != VERSION) throw "Unsupported scene document version";
+  public static function decode(text:String):Array<SceneObjectData> return decodeRoot(parse(text));
+
+  public static function decodeRoot(root:Dynamic):Array<SceneObjectData> {
     var raw:Dynamic = field(root, "objects");
     if (!Std.isOfType(raw, Array)) throw "Scene objects must be an array";
     var values:Array<Dynamic> = cast raw;
@@ -213,6 +237,8 @@ class SceneCodec {
       if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" &&
           kind != "cad-part" && kind != "cad-preview")
         throw "Unsupported scene object type: " + kind;
+      if (!Reflect.hasField(value, "appearance") || Reflect.field(value, "appearance") == null)
+        throw "Scene appearance is required";
       var visible:Dynamic = field(value, "visible");
       if (!Std.isOfType(visible, Bool)) throw "Object visibility must be a boolean";
       var visibleValue:Bool = visible;

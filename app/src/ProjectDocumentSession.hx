@@ -112,14 +112,15 @@ class ProjectDocumentSession {
   }
 
   function openContent(absolute:String, text:String):Void {
-    var project = SceneCodec.decodeProject(text);
+    var root = SceneCodec.parse(text);
+    var project = SceneCodec.decodeProjectRoot(root);
     if (project != null) {
-      openProjectDocument(absolute, text, project);
+      openProjectDocument(absolute, root, project);
       return;
     }
-    var script=SceneCodec.decodeScript(text);
+    var script=SceneCodec.decodeScriptRoot(root);
     if(script!=null){
-      var nextBim = SceneCodec.decodeBim(text);
+      var nextBim = SceneCodec.decodeBimRoot(root);
       var nextDocument = createDocument();
       var ownership:Null<ScriptOwnership> = null;
       var materialized:ScriptMaterialization;
@@ -133,14 +134,14 @@ class ProjectDocumentSession {
       }
       replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);return;
     }
-    var data = SceneCodec.decode(text);
+    var data = SceneCodec.decodeRoot(root);
     var nextDocument = createDocument();
     var next = new EditorScene(data, nextDocument);
     var nextSensors:SensorConfiguration = null;
     var nextBim:BimDocument;
     try {
-      nextSensors = new SensorConfiguration(SceneCodec.decodeSensors(text), nextDocument);
-      nextBim = SceneCodec.decodeBim(text);
+      nextSensors = new SensorConfiguration(SceneCodec.decodeSensorsRoot(root), nextDocument);
+      nextBim = SceneCodec.decodeBimRoot(root);
     }
     catch (error:Dynamic) { next.dispose(); if (nextSensors != null) nextSensors.dispose(); throw error; }
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
@@ -195,7 +196,7 @@ class ProjectDocumentSession {
     }
   }
 
-  function openProjectDocument(absolute:String, text:String, project:ProjectSceneRecord):Void {
+  function openProjectDocument(absolute:String, root:Dynamic, project:ProjectSceneRecord):Void {
     var reference = FilePath.isAbsolute(project.reference) ? project.reference
       : FilePath.join([FilePath.directory(absolute), project.reference]);
     reference = FileSystem.fullPath(reference);
@@ -212,14 +213,14 @@ class ProjectDocumentSession {
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
     var diagnostics:Array<String> = [];
-    var data = materializeProject(baseline, project, SceneCodec.decode(text), diagnostics);
+    var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics);
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
       next = new EditorScene(data, nextDocument, null, generated.geometryBySnapshot);
       next.configureComponentFinishes(baseline);
-      nextSensors = new SensorConfiguration(SceneCodec.decodeSensors(text), nextDocument);
-      nextBim = SceneCodec.decodeBim(text);
+      nextSensors = new SensorConfiguration(SceneCodec.decodeSensorsRoot(root), nextDocument);
+      nextBim = SceneCodec.decodeBimRoot(root);
     } catch (error:Dynamic) {
       if (next != null) next.dispose();
       if (nextSensors != null) nextSensors.dispose();
@@ -742,7 +743,7 @@ class ProjectDocumentSession {
     id: item.id, type: item.type, label: item.label, x: item.x, y: item.y, z: item.z,
     width: item.width, height: item.height, depth: item.depth,
     collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
-    red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
+    red: item.red, green: item.green, blue: item.blue, appearance: item.appearance == null ? Appearances.neutral() : item.appearance,
     visible: item.visible, rotation: item.rotation
   };
 
