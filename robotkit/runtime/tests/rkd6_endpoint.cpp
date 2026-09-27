@@ -51,6 +51,12 @@ public:
             std::vector<std::uint8_t> body(state.SIZE +
                 begin.actuator_count * device_wire6::ActuatorState6::SIZE);
             assert(device_wire6::encode(state, std::span(body).first(state.SIZE)));
+            for (std::size_t i = 0; i < begin.actuator_count; ++i) {
+                device_wire6::ActuatorState6 actuator{};
+                actuator.effort = 2.0f;
+                assert(device_wire6::encode(actuator, std::span(body).subspan(
+                    state.SIZE + i * actuator.SIZE, actuator.SIZE)));
+            }
             std::vector<std::uint8_t> framed;
             assert(device_frame6::encode(15, body, framed));
             incoming.push_back(std::move(framed));
@@ -124,7 +130,9 @@ int main() {
     assert(endpoint);
     rk_robot_state state{};
     assert(endpoint->sample(0, state) == RK_OK);
+    assert(state.effort[0] == 2.0);
     assert(endpoint->sample(200'000, state) == RK_OK);
+    assert(state.effort[0] == 2.0);
     assert(endpoint->sample(100'000'000, state) == RK_OK);
     assert(endpoint->sample(100'200'000, state) == RK_OK);
     rk_plan_submission plan{};
@@ -175,6 +183,11 @@ int main() {
     observed->jump_ticks = 10'000;
     assert(endpoint->sample(200'000'000, state) == RK_OK);
     assert(endpoint->sample(200'200'000, state) == RK_OK);
+    assert(endpoint->diagnostic_code() == 0);
+    assert(endpoint->sample(300'000'000, state) == RK_OK);
+    assert(endpoint->sample(300'200'000, state) == RK_OK);
+    assert(endpoint->sample(400'000'000, state) == RK_OK);
+    assert(endpoint->sample(400'200'000, state) == RK_OK);
     assert(endpoint->diagnostic_code() == RK_FAULT_CLOCK_SYNC_LOST);
     assert(std::string(endpoint->fault_reason()) == "clock_sync_lost");
     assert(endpoint->submit_device_plan(plan, 0, 200'200'000, 20'000'000,

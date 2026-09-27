@@ -382,6 +382,8 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
         state_header_.timestamp_ticks * (1e9 / ack_.device_tick_hz));
     state.safety = status_.fault ? RK_SAFETY_FAULT :
         static_cast<rk_safety_state>(state_header_.safety);
+    for (std::size_t joint = 0; joint < joint_count_; ++joint)
+        state.effort[joint] = 0.0;
     for (std::size_t i = 0; i < state_header_.actuator_count; ++i) {
         const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
         state.position[mapping.joint] = actuators_[i].position / mapping.ratio + mapping.offset;
