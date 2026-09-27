@@ -186,7 +186,7 @@ class MateriaProjectRunner {
     runCommand(haxe, arguments, "Could not compile Materia project entrypoint");
   }
 
-  static function runCommand(command:String, arguments:Array<String>, description:String):String {
+  public static function runCommand(command:String, arguments:Array<String>, description:String):String {
     var process:Process;
     try process = Process.run(command, arguments)
     catch (error:Dynamic) throw description + ": " + Std.string(error);
@@ -411,7 +411,7 @@ class MateriaProjectRunner {
     return ProjectPath.join([installationRoot(), "app", "tools"]);
   }
 
-  static function installationRoot():String {
+  public static function installationRoot():String {
     var configured = Sys.getEnv("MATERIA_INSTALL_ROOT");
     var current = configured == null || configured.length == 0
       ? ProjectPath.directory(FileSystem.fullPath(Sys.executablePath()))

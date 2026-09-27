@@ -6,4 +6,5 @@ interface PosePrimitive {
   function startWaypoint():PoseWaypoint;
   function endWaypoint():PoseWaypoint;
   function speedLimit():Float;
+  function orientationPolicy():OrientationPolicy;
 }

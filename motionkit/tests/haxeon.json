@@ -26,6 +26,7 @@
         "../../motionkit/native/src/generator.cpp",
         "../../motionkit/native/src/path.cpp",
         "../../motionkit/native/vendor/ruckig/CMakeLists.txt",
+        "../../motionkit/native/vendor/toppra/cpp/CMakeLists.txt",
         "../../nativekit/CMakeLists.txt",
         "../../simkit/CMakeLists.txt"
       ]

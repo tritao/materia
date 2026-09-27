@@ -10,6 +10,7 @@ import app.editor.TelemetryPanel;
 import app.editor.SensorPanel;
 import app.editor.HierarchyPanel;
 import app.editor.InspectorPanel;
+import app.editor.ProjectUiExtension;
 import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
 import app.editor.SceneViewCommands;
@@ -138,11 +139,13 @@ class Main {
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
-          arg.indexOf("--project=") != 0 && arg != "--record" && arg.indexOf("--record=") != 0) {
+          arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
+          arg != "--record" && arg.indexOf("--record=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
-          "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] [--record[=PATH]]");
+          "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
+          "[--project-action=ID] [--record[=PATH]]");
         return 2;
       }
 
@@ -191,6 +194,8 @@ class Main {
         diagnostics.setupScript, diagnostics.projectPath, diagnostics.recordPath, diagnostics.demo);
       activeEditor = editor;
       liveEditor = editor;
+      for (arg in args) if (arg.indexOf("--project-action=") == 0)
+        editor.projectInitialAction = arg.substr(17);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
@@ -418,6 +423,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sheetPlanSelection:String = "";
   var sheetPieceSelection:String = "";
   var sheetOperationsExpanded:Bool = false;
+  var projectUiExtension:Null<ProjectUiExtension> = null;
+  var projectUiReference:Null<String> = null;
+  var projectUiError:Null<String> = null;
+  public var projectInitialAction:Null<String> = null;
   var framePresentation:Null<ApplicationPresentationSnapshot> = null;
   var refinementFrameSubmitted:Bool = false;
   var cachedSubmitKey:String = "";
@@ -734,6 +743,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function context():UiContext return ui;
 
   public function dispose():Void {
+    if (projectUiExtension != null) projectUiExtension.dispose();
     var saveError = workspaceSaves.close();
     if (saveError != null) log("Workspace save failed: " + saveError);
     simulation.dispose();
@@ -1251,6 +1261,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (bimEditor.model != session.bim) bimEditor = makeBimEditor();
     cancelActiveDrag();
     if (sceneGeneration != session.generation) {
+      if (projectUiExtension != null) projectUiExtension.dispose();
+      projectUiExtension = null;
+      projectUiReference = null;
+      projectUiError = null;
       var ownership=session.scriptOwnership;
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
@@ -1346,11 +1360,65 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function updateCommandContext():Void {
+    if (projectUiExtension != null) try {
+      projectUiExtension.select(scene.selectedId);
+      var requested = projectUiExtension.requestedSelection();
+      if (requested != null && scene.selectedId != requested) {
+        scene.select(requested);
+        return;
+      }
+      commands.refresh();
+    } catch (error:Dynamic) log("Project UI extension: " + Std.string(error));
     var context = scene.context();
     if (semanticRecordPath != null) context.onPropertyEdit = function(edit) {
       recordSemantic("property.edit", edit);
     };
     ui.setCommandContext(context);
+  }
+
+  function projectUiPanel():Null<View> {
+    var reference = session.projectReference;
+    if (reference == null) return null;
+    if (projectUiReference != reference) {
+      if (projectUiExtension != null) projectUiExtension.dispose();
+      projectUiExtension = null;
+      projectUiError = null;
+      projectUiReference = reference;
+      try {
+        projectUiExtension = ProjectUiExtension.open(reference, projectInitialAction);
+        projectInitialAction = null;
+        syncProjectUi();
+      } catch (error:Dynamic) {
+        projectUiError = Std.string(error);
+        log("Project UI extension: " + projectUiError);
+      }
+    }
+    if (projectUiError != null) return new Text("Project UI extension: " + projectUiError);
+    return projectUiExtension == null ? null : projectUiExtension.panel(projectUiAction);
+  }
+
+  function projectUiAction(id:String):Void {
+    if (projectUiExtension == null) return;
+    try {
+      projectUiExtension.action(id);
+      var selected = projectUiExtension.requestedSelection();
+      if (selected != null && scene.selectedId != selected) scene.select(selected);
+      syncProjectUi();
+      commands.refresh();
+    } catch (error:Dynamic) {
+      log("Project UI extension: " + Std.string(error));
+      commands.refresh();
+    }
+  }
+
+  function syncProjectUi():Void {
+    if (projectUiExtension == null) return;
+    for (colour in projectUiExtension.colours()) {
+      var id:String = Reflect.field(colour, "id");
+      if (id != null && scene.object(id) != null)
+        scene.setColour(id, Reflect.field(colour, "r"), Reflect.field(colour, "g"),
+          Reflect.field(colour, "b"));
+    }
   }
 
   function attachSceneRecorder():Void {

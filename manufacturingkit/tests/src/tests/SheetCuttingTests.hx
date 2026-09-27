@@ -193,7 +193,7 @@ class SheetCuttingTests {
 			inventory.registerSheet("sheet-a", "small-sheet");
 			inventory.allocate("sheet-a", "plan-one");
 			var savedBeforePreview = SheetProjectCodec.encode(inventory.record);
-			var preview = inventory.preview("plan-one", "sheet-a");
+		var preview = inventory.preview("plan-one", "sheet-a");
 			check(preview.valid && SheetProjectCodec.encode(inventory.record) == savedBeforePreview,
 				"preview validates without changing inventory");
 			var unchanged = SheetProjectCodec.encode(inventory.record);

@@ -56,12 +56,51 @@ and C2 first.
 - **LC-D3 — Direct machines use identity kinematics.** For XYZ gantries, q(s)
   is the Cartesian path itself mapped through the axis transmissions. The
   same path timing serves gantries and arms.
-- **LC-D4 — Configuration selection is our own dynamic programming.**
-  - Choose one IK candidate per path sample, minimising a joint-motion cost
-    with hard limits on joint jumps: a ladder graph over `sampleCandidates`,
-    solved by DP in Haxe.
-  - Descartes Light is not vendored, to avoid its ROS-flavoured dependency
-    stack.
+- **LC-D4 — Vendor Descartes Light's core, lean, and build on its
+  interfaces.**
+  - Vendor `descartes_light` (Apache-2.0,
+    https://github.com/swri-robotics/descartes_light) as a pinned submodule
+    under `motionkit/native/vendor/`.
+  - **Compatible:** our configuration selection uses Descartes' own types
+    directly, not a parallel copy of them:
+    - `State`;
+    - the `WaypointSampler`, `EdgeEvaluator` and `StateEvaluator` interfaces;
+    - `LadderGraphSolver`.
+
+    Our OPW/IK sampler and our evaluators *are* Descartes subclasses. Its
+    Boost-graph solvers, or a Tesseract pipeline, can then be dropped in
+    later with no changes to callers.
+  - **Lean:** compile only the `core` component's sources, with our own CMake
+    target, and never run its CMakeLists:
+    - no `ros_industrial_cmake_boilerplate`;
+    - no BGL component or Boost;
+    - no required OpenMP;
+    - no `console_bridge` library.
+
+    Two shim headers in `motionkit/native/vendor/shims/`, placed on the
+    include path *after* real system headers, stand in for the missing
+    pieces. **Vendored files are never modified.**
+    - `omp.h` is an empty header, used only when CMake finds no OpenMP. The
+      core uses `#pragma omp` and `#include <omp.h>` but calls no `omp_*`
+      functions. Verify that on the pinned commit, and stop if it's no longer
+      true.
+    - `console_bridge/console.h` provides the `CONSOLE_BRIDGE_log*` macros,
+      `getLogLevel()` and the level enum. It routes them to MotionKit's native
+      diagnostic sink, or to nothing, and is covered by a small test.
+  - **Threads and determinism:**
+    - The selector runs `LadderGraphSolver` with `num_threads = 1` by default,
+      so results are identical on every platform, with or without OpenMP.
+    - More threads is an explicit option, enabled only where OpenMP is found.
+      A test proves the chosen path is identical to the single-thread one.
+  - **Build scope:** use only the `double` instantiations (the `…D` aliases),
+    unless a float path is needed later.
+  - **Record** the pinned commit, the Apache-2.0 licence and NOTICE, the
+    compiled source list and both shims in `motionkit/native/THIRD_PARTY.md`.
+  - If there is no network access, stop and log it. Do not copy it in by
+    hand or reimplement it.
+  - **Later:** enable its BGL (Boost) solvers only when a lazy-evaluation
+    need appears. That means candidates per waypoint regularly above about
+    64, or collision-checked edges. Record which one triggered it.
 
 ---
 
@@ -116,9 +155,14 @@ Do:
 
 Tests:
 - A square path in exact-stop mode stops at each corner.
-- A circle's arc speed is limited by centripetal acceleration and matches
-  the analytic `v = √(a·r)` within 1%.
-- Cycle time is ≤ the old planner's on the existing path tests; record the
+- A circle's arc speed respects the per-joint centripetal acceleration
+  limits. For equal independent X/Y acceleration limits `a`, its instantaneous
+  bound varies with angle: `v²·|cos θ|/r ≤ a` and
+  `v²·|sin θ|/r ≤ a`. Check each joint's acceleration and compare sampled
+  speed with this angle-dependent bound; `√(a·r)` applies at axis-aligned
+  points, not to the peak speed over the whole circle.
+- Cycle time is within 1% of the old planner on analytically optimal straight
+  exact-stop paths. Target no regression on curved paths; record comparative
   numbers in the log.
 - The binding-constraint report names the right joint on a path that
   saturates one axis.
@@ -145,12 +189,23 @@ Tests:
 ## C4 — OPW analytic IK backend (C4 contract)
 
 Do:
-- Implement OPW (Brandstötter, Angerer, Hofbaur 2014) natively in
-  `motionkit/native` from the paper. It is a short closed-form solver, so no
-  third-party code is needed. Record the reference in `THIRD_PARTY.md` as
-  algorithm provenance.
-- The C ABI takes the 7 OPW parameters, joint offsets and sign corrections,
-  and returns up to 8 solutions with validity flags.
+- Vendor `opw_kinematics` (https://github.com/Jmeyer1292/opw_kinematics) as a
+  pinned submodule under `motionkit/native/vendor/`.
+  - It is header-only C++ (Apache-2.0) and depends only on Eigen, which C2
+    already vendors.
+  - Use only its core headers. Don't build its tests, ROS packaging or
+    install targets.
+  - Record the pinned tag or commit, the Apache-2.0 licence and NOTICE, and
+    the audited header list in `motionkit/native/THIRD_PARTY.md`, as for
+    Ruckig.
+  - If there is no network access, stop and log it. Do not vendor by copy or
+    reimplement.
+- Wrap it behind our own C ABI, so nothing outside `motionkit/native`
+  includes it. The ABI takes the 7 OPW parameters, joint offsets and sign
+  corrections (`opw_kinematics::Parameters`). It returns up to 8 solutions,
+  each with a validity flag and a singularity flag. The singularity flag is
+  computed by our wrapper from wrist and shoulder conditioning, because the
+  library doesn't report it.
 - `motionkit.robot.OpwKinematics` implements `KinematicsSolver`:
   - it **extracts** OPW parameters from a `RobotModel` + TCP when the
     geometry qualifies: parallel base, spherical wrist, within a stated
@@ -164,30 +219,56 @@ Tests:
 - Round trip: forward kinematics of random joint vectors, then OPW, contains
   the original within 1e-9.
 - The solutions agree with `ManipulatorKinematics` forward kinematics on the
-  M9 6R arm, if it qualifies. If not, log why and add an ABB/KUKA-style
-  parameter fixture.
+  M9 6R arm, if it qualifies. If not, log why.
+- Use the library's published example parameter sets (ABB, KUKA, Fanuc,
+  Stäubli) as fixtures: `RobotModel`s built from them extract back to the
+  same parameters, and forward kinematics agrees with
+  `ManipulatorKinematics`.
 - Parameter extraction rejects a non-spherical wrist.
-- Near-singular wrist poses return solutions with a singularity flag.
+- Near-singular wrist poses return solutions with the wrapper's singularity flag set.
 
 ## C5 — Configuration selection along a path (LC-D4)
 
-Do:
-- `motionkit.robot.PathConfigurationSelector`:
-  - for each densified path sample, take `sampleCandidates` (OPW, or
-    seeded numerical);
-  - build the ladder graph, with edge cost as joint distance weighted by
-    joint velocity limits, and edges exceeding the joint-jump bound removed;
-  - DP for the minimum-cost continuous sequence;
-  - no valid sequence gives a diagnostic naming the first unreachable or
-    disconnected sample distance.
-- Lane B's `ProgramCompiler` (B3) uses it when the solver provides several
-  candidates. Coordinate through the `KinematicsSolver` interface only.
+Do (`motionkit/native`, C ABI, Haxe wrapper
+`motionkit.robot.PathConfigurationSelector`):
+- **Vendor and build** Descartes' core per LC-D4: submodule, our CMake
+  target, the `omp.h` and `console_bridge` shims, `THIRD_PARTY.md`.
+- **Sampler:** a Descartes `WaypointSampler` subclass. It returns the
+  candidates for one path sample, which the Haxe layer supplies in one bulk
+  call per path (never one call per candidate). They come from OPW (C4)
+  inside native code, or from `KinematicsSolver.sampleCandidates` for other
+  solvers. The sampler filters candidates by joint limits.
+- **Evaluators:**
+  - Prefer Descartes' existing edge and state evaluators where they fit, and
+    compose them.
+  - Add our own `EdgeEvaluator` subclass only for what's missing: joint
+    distance weighted by joint velocity limits, with any per-joint jump above
+    the bound infeasible.
+  - An optional `StateEvaluator` adds a preferred-posture cost.
+- **Solver:** Descartes' `LadderGraphSolver`, single-threaded by default.
+  - When no valid sequence exists, map Descartes' build and search failure
+    information to a diagnostic naming the first unreachable or disconnected
+    sample distance.
+  - Route its log messages through the shim so they appear in that
+    diagnostic, not on stdout.
+- **C ABI:** `mk_select_configurations(candidate sets, joint limits, jump
+  bounds, weights, threads, out sequence, out diagnostic)`. No Descartes
+  types cross the ABI.
+- Lane B's `ProgramCompiler` (B3) uses the selector when the solver provides
+  several candidates. Coordinate through the `KinematicsSolver` interface
+  only.
 
 Tests:
 - A path that the nearest-seed method takes through a wrist flip is solved
   without a flip.
 - A path with no continuous solution fails with the right distance.
-- It is deterministic.
+- It is deterministic, and single- and multi-threaded runs give identical
+  output where OpenMP is available.
+- It builds and runs with the empty `omp.h` shim (force the no-OpenMP
+  configuration in one CI build).
+- Log messages from Descartes are captured into the diagnostic.
+- A 1000-sample path with 8 candidates per sample solves in under 50 ms in a
+  Debug build. Record the time in the log.
 
 ## C6 — CncKit v1: declared G-code subset → `MotionProgram`
 
@@ -241,6 +322,16 @@ Do:
   `VirtualDeviceEndpoint` with virtual steppers.
 - Add feed hold mid-arc (it must stay on the arc) and a link-loss injection
   (device-side controlled stop, when on Lane A's path).
+- **Once Plan C (editor assembly simulation) is on `main`:** also run the demo
+  on the gantry's *physical assembly model* from `AssemblySimulationBridge`.
+  - One link per part, with material-derived mass and couplings in the model
+    (v5).
+  - It is driven through actuators attached from the MachineKit motor parts.
+  - Collision uses the upstream convex hulls.
+
+  This is the intended single model (architecture invariant 1). Record any
+  gap that prevents it (for example missing actuator attachment) in the log
+  instead of working around it.
 
 Tests (a scenario test in `motionkit/tests` or a new `cnckit/tests`):
 - the executed path stays within the declared tolerance of the programmed
@@ -252,10 +343,12 @@ Tests (a scenario test in `motionkit/tests` or a new `cnckit/tests`):
 ## Out of scope for this lane
 
 - Jerk-limited path timing and rolling contour lookahead;
-- OMPL free-space planning and collision checking;
+- OMPL free-space planning and collision checking (and so Descartes' BGL
+  lazy solvers);
 - `G18`/`G19`, cutter compensation (`G41`/`G42`), canned cycles, probing, CAM;
 - external controllers (LinuxCNC, grblHAL backends);
-- 7-axis redundancy (constrained differential IK, OSQP).
+- 7-axis redundancy (constrained differential IK, OSQP) and live servoing:
+  see `LANE_D_REDUNDANCY_SERVO.md` (mink-shaped QP IK).
 
 These are follow-on plans.
 
@@ -288,3 +381,85 @@ subsequent owner cycle could move the position before plan acceptance. The
 lease test now allows 0.02 joint units of start-position difference and keeps
 zero velocity and acceleration tolerances; the unchanged test failed before
 this adjustment and passed after it. Commit: the commit containing this entry.
+
+### C2 planning correction — Exact-stop cycle-time comparison
+
+C2's original strict `new cycle time ≤ old cycle time` test is unattainable
+for a straight exact-stop path where the old trapezoid already reaches the
+analytic minimum. On a two-leg 0.1 m square with 2 m/s² acceleration, the old
+planner takes 0.894427191 s. The native TOPP-RA backend takes 0.896218108 s
+under the same limits (0.20% longer), including the time stretch needed for
+exact validation after nanosecond rounding. Changed only that acceptance bound
+to allow 1% on analytic-optimal straight paths; curved paths retain a
+no-regression target. Stopped C2 implementation here as required by the
+handoff ground rule when a work item shows the plan is wrong. The uncommitted
+C2 implementation in `materia-lane-c` is incomplete and still needs task-space
+reporting, planner replacement tests, full-suite verification and a commit.
+
+### C2 planning correction — Circle speed under independent joint limits
+
+The original circle acceptance expects the peak speed to match `√(a·r)`
+within 1%. That is a vector centripetal acceleration bound, but TOPP-RA's
+contract uses independent per-joint acceleration limits. On a 0.1 m radius
+circle with 1 m/s² limits on X and Y, the sampled peak is 0.333930896 m/s,
+while `√(a·r)` is 0.316227766 m/s. Each joint's sampled acceleration stays
+within 1 m/s²; the peak occurs away from an axis-aligned point, where the
+normal acceleration is shared by the two joints. Changed the acceptance to
+the per-joint, angle-dependent bound. Stopped C2 implementation here under
+the handoff ground rule. The C2 changes remain uncommitted in the Lane C
+worktree; the new test currently fails on the superseded peak-speed assertion.
+
+### C2 — TOPP-RA timing and Cartesian path submission
+
+Vendored the pinned TOPP-RA C++ Seidel solver, added the native reachability
+timing entry point and per-stage binding-constraint report, and exposed it
+through `ToppraPathTiming`. `MotionSystem` now times direct XYZ lines and arcs,
+lowers them to native polynomial segments, checks joint limits exactly, and
+records a sampled task-space deviation report at no worse than 1 ms spacing.
+Path jerk remains unchecked. The old `LineLookaheadPlanner` was removed;
+exact-stop corners, circle joint acceleration, straight-path timing, binding
+joint, long queues, hold/resume and task-space reporting are exercised by the
+MotionKit suite. Commit: the commit containing this entry.
+
+For two 0.1 m straight exact-stop legs at 2 m/s², the old planner takes
+0.894427191 s and TOPP-RA takes 0.896218108 s (0.20% longer). A standalone
+0.1 m radius quarter arc at 0.5 m/s velocity and 1 m/s² per-joint
+acceleration takes 0.811937932 s with TOPP-RA versus 0.966774462 s with
+the old planner. MotionKit passed 5,410 Haxe assertions, RobotKit passed
+4,437 world assertions, all 13 combined native CTests passed, both FFI audits
+passed, and TCP integration passed in default, session and lease modes.
+
+### C3 planning correction — mixed line and arc corners
+
+The first C3 implementation blends planar line-to-line corners and passes the
+90-degree, cycle-time, near-reversal, and runtime execution cases. It emits an
+exact-stop diagnostic for a non-tangent line-to-arc or arc-to-line corner.
+That is short of C3's requirement to replace **each** eligible corner. Added
+a line-to-arc regression assertion to make this gap explicit. The correct
+adjustment is a tangent-continuous fillet for mixed primitives, with distance
+checked against the authored line and arc. C3 remains uncommitted and is not
+ready to merge. Stopped here under the handoff ground rule rather than treat
+the unsupported corner as a completed C3 item. The Haxeon interface-type fix
+is committed locally in its submodule as `560dd069` and has focused tests.
+
+### C3 — Tolerance blending at corners
+
+Planar line-to-line corners use a circular tangent fillet. Mixed line/arc and
+arc/arc corners use a quintic curve matched to endpoint tangent and curvature.
+The mixed curve is accepted only when sampled deviation plus a half-sample
+travel bound fits within the requested tolerance. Junction speeds account for
+curvature within the whole primitive; TOPP-RA samples the quintic at 32 spans
+before polynomial lowering. The runtime receives the resulting polynomial
+segments with nonzero junction speeds. The authored path is checked in task
+space at 1 ms or better, and the report records the requested tolerance.
+Near-reversal corners keep an exact stop and diagnostic.
+
+The first mixed-corner test exposed both an interface `Std.isOfType` error in
+Haxeon and an invalid moving-boundary speed conversion in native TOPP-RA.
+Haxeon now checks the wrapped concrete object for interface values, with a
+focused test in its own submodule commit. The native timing code squares the
+initial path speed as TOPP-RA expects, and preserves moving boundary speeds
+when exact validation cannot accept a law. Commit: the commit containing this
+entry. MotionKit passed 6,430 Haxe assertions; RobotKit passed 4,485 world
+assertions. MotionKit's four native CTests and RobotKit's 13 native CTests,
+both FFI audits, and TCP default, session and lease modes passed.

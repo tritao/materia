@@ -39,6 +39,8 @@ class InspectorPanel {
         new KeyedView("hint", new Text("Select an object to edit its properties."))
       ];
       var sheetWorkflow = SheetWorkflowPanel.build(app);
+      var projectPanel = app.projectUiPanel();
+      if (projectPanel != null) emptyRows.push(new KeyedView("project-ui", projectPanel));
       if (sheetWorkflow != null) emptyRows.push(new KeyedView("sheet-workflow", sheetWorkflow));
       return new Column("inspector-empty", emptyRows, style);
     }
@@ -131,6 +133,8 @@ class InspectorPanel {
     }
     rows.push(new KeyedView("properties",inspector));
     var sheetWorkflow = SheetWorkflowPanel.build(app);
+    var projectPanel = app.projectUiPanel();
+    if (projectPanel != null) rows.push(new KeyedView("project-ui", projectPanel));
     if (sheetWorkflow != null) rows.push(new KeyedView("sheet-workflow", sheetWorkflow));
     return new Column(
       "inspector-panel",

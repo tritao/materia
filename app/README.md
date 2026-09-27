@@ -1,5 +1,7 @@
 # Reference editor shell
 
+Project-owned inspector controls and selection handlers use the [project UI extension protocol](docs/project-ui-extension.md).
+
 This is the app-side integration example for the shared Haxeon UI widgets and
 SceneKit. `src/Main.hx` composes:
 

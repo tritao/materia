@@ -12,6 +12,9 @@
     "projectkit": {
       "path": "../projectkit"
     },
+    "manufacturingkit": {
+      "path": "../manufacturingkit"
+    },
     "nativekit": {
       "path": "../nativekit"
     },

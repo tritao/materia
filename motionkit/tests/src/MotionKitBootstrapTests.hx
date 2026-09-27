@@ -13,13 +13,17 @@ import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
 import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
+import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.ProgramCompiler;
+import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
+import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
@@ -37,12 +41,13 @@ import robotkit.process.ToolpathPoint;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
-import motionkit.planner.LineLookaheadPlanner;
 import motionkit.planner.PathPlanningOptions;
 import motionkit.planner.JointPathSamples;
 import motionkit.planner.PathTimingBackend;
 import motionkit.planner.PathTimingLimits;
 import motionkit.planner.SimplePathTiming;
+import motionkit.planner.ToppraPathTiming;
+import motionkit.planner.BindingConstraint.BindingConstraintKind;
 import motionkit.program.Blend;
 import motionkit.program.InputPredicate;
 import motionkit.program.MotionOp;
@@ -83,6 +88,8 @@ import robotkit.world.RuntimeRobotAdapter;
 import robotkit.world.SensorFrame;
 import robotkit.world.StopMode;
 import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessEventValue;
 import robotkit.world.TrajectorySegment;
 
 class MotionKitBootstrapTests {
@@ -93,13 +100,17 @@ class MotionKitBootstrapTests {
     testMotionEventContracts();
     testKinematicsContract();
     testMotionProgramContracts();
+    testProgramCompiler();
+    testManipulatorMotion();
     testSimplePathTimingContract();
     testNativePathLowering();
+    testToppraPathTiming();
     testGeometricPathPrimitives();
     testNativeTrajectoryRoundTrip();
     testNativeValidationAndPlan();
     testPlannerIsDeterministicAndBounded();
-    testLineLookaheadPlanner();
+    testToppraExactStopsAndBindings();
+    testToppraCircleAcceleration();
     testLinearAxisCompilesToRobotModel();
     testLeadScrewActuatorRateLimitsPlans();
     testTransmissionDerivedAxisMapping();
@@ -121,6 +132,7 @@ class MotionKitBootstrapTests {
     testContinuousJog();
     testLateJogReplacementRejectsLateArrival();
     testPathHoldsStayOnPathWithinLimits();
+    testToleranceBlend();
     testDualMotorAxisChangesStayWithinJointLimits();
     Sys.println('MotionKit bootstrap tests passed ($assertions assertions)');
   }
@@ -142,6 +154,21 @@ class MotionKitBootstrapTests {
     trajectory.dispose();
     law.dispose();
     path.dispose();
+  }
+
+  static function testToppraPathTiming():Void {
+    var path = new JointPathSamples([0.0, 1.0], [[0.0], [1.0]],
+      [[1.0], [1.0]], [[0.0], [0.0]]);
+    var timed = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([0.4], [1.0]));
+    check(timed.trajectory.durationSeconds() > 2.8 &&
+      timed.trajectory.durationSeconds() < 3.1, "TOPP-RA respects velocity limit");
+    near(timed.distanceToTime(1.0), timed.trajectory.durationSeconds(),
+      "TOPP-RA end distance maps to end time", 1e-6);
+    check(timed.bindingConstraints.length > 0,
+      "TOPP-RA reports binding constraints");
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
   }
 
   static function testPoseProcessPath():Void {
@@ -206,6 +233,285 @@ class MotionKitBootstrapTests {
       EventValue.Digital(false)), "timed event rejects a negative path time");
     throws(function() new ChannelDeclaration("sprayer.flow", ChannelKind.Analog,
       EventValue.Digital(false)), "channel declaration rejects a mismatched safe value");
+  }
+
+  static function testProgramCompiler():Void {
+    var fixture = buildContractArmFixture();
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+    var velocity = [for (_ in 0...6) 2.0];
+    var acceleration = [for (_ in 0...6) 4.0];
+    var jerk = [for (_ in 0...6) 20.0];
+    var compiler = new ProgramCompiler(solver, limits, "work", velocity,
+      acceleration, jerk);
+    var start = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
+    var goal = start.copy(); goal[0] += 0.05;
+    var program = new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
+    var compiled = compiler.compile(program, start, Int64.ofInt(100));
+    check(compiled.blocks.length == 1 && compiled.blocks[0].plans.length == 1,
+      "program compiler lowers a joint move to one plan");
+    near(compiled.blocks[0].plans[0].evaluate(
+      compiled.blocks[0].plans[0].durationSeconds).positions[0], goal[0],
+      "program compiler reaches the MoveJ target", 1e-6);
+    compiled.dispose();
+
+    var startPose = solver.forward(start);
+    var endQ = start.copy(); endQ[0] += 0.025;
+    var endPose = solver.forward(endQ);
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(startPose, 0.005, 0.02),
+      new PoseWaypoint(endPose, 0.005, 0.02),
+      OrientationPolicy.Interpolated, 0.1, 0.1)]);
+    var pathProgram = new MotionProgram([
+      MotionOp.FollowPath(path, "work", 0.1,
+        [new PathEvent(path.length() * 0.5, "sprayer.enabled",
+          EventValue.Digital(true))]),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false)),
+      MotionOp.WaitInput("sprayer.ready", InputPredicate.Equals(
+        EventValue.Digital(true)), 2.0),
+      MotionOp.MoveJ(MoveTarget.JointTarget(start), new MotionOptions(),
+        Blend.ExactStop),
+      MotionOp.Dwell(0.1)
+    ]);
+    var lowered = compiler.compile(pathProgram, start, Int64.ofInt(200));
+    check(lowered.blocks.length == 2 && lowered.blocks[0].plans.length == 1 &&
+      lowered.blocks[1].plans.length == 1,
+      "WaitInput splits a path and a return move into separate blocks");
+    var pathPlan = lowered.blocks[0].plans[0];
+    check(pathPlan.events.length == 2, "path event and SetOutput reach the plan");
+    check(Int64.compare(pathPlan.events[0].timeNs, Int64.ofInt(0)) > 0 &&
+      Int64.toFloat(pathPlan.events[0].timeNs) <
+        pathPlan.durationSeconds * 1e9,
+      "path event is placed inside the timed path");
+    near(Int64.toFloat(pathPlan.events[1].timeNs) * 1e-9,
+      pathPlan.durationSeconds, "SetOutput fires at the prior move end", 1e-9);
+    check(pathPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "sampled task-space validation is recorded in the plan");
+    lowered.dispose();
+
+    var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose,
+      "work", 0.1, Blend.ExactStop)]), start, Int64.ofInt(300));
+    check(line.blocks[0].plans[0].report.checks[
+      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "MoveL meets the sampled Cartesian tolerance");
+    line.dispose();
+    var poseMove = compiler.compile(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.PoseTarget(solver.forward([for (_ in 0...6) 0.0]), "work", null),
+      new MotionOptions(), Blend.ExactStop)]), start, Int64.ofInt(301));
+    check(poseMove.blocks[0].plans.length == 1,
+      "MoveJ resolves a reachable 6R pose through candidate IK");
+    poseMove.dispose();
+
+    var branchSolver = new WristBranchSolver();
+    var branchCompiler = new ProgramCompiler(branchSolver, limits, "work", velocity,
+      acceleration, jerk, null, 0.05, 0.5);
+    var branchPath = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
+      new PoseWaypoint(new Pose3(1.0), 0.005, 0.02),
+      OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var branchError = "";
+    try branchCompiler.compile(new MotionProgram([MotionOp.FollowPath(branchPath,
+      "work", 0.1, [])]), [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(400))
+    catch (error:Dynamic) branchError = Std.string(error);
+    check(branchError.indexOf("op 0 IK discontinuity at path distance") >= 0,
+      "a wrist-branch jump is rejected with its op and path distance");
+
+    var linearSolver = new WristBranchSolver(false);
+    var linearCompiler = new ProgramCompiler(linearSolver, limits, "work", velocity,
+      acceleration, jerk, null, 0.05);
+    var linearPath = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
+      new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
+      OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var linearProgram = new MotionProgram([MotionOp.FollowPath(linearPath,
+      "work", 0.1, [new PathEvent(0.05, "sprayer.enabled",
+        EventValue.Digital(true), 0.02)])]);
+    var linearPlan = linearCompiler.compile(linearProgram,
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(500));
+    var reference = new SimplePathTiming().time(new JointPathSamples(
+      [0.0, 0.05, 0.1],
+      [[0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
+       [0.05, 0.0, 0.0, 0.0, 0.1, 0.0],
+       [0.1, 0.0, 0.0, 0.0, 0.1, 0.0]],
+      [for (_ in 0...3) [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
+      [for (_ in 0...3) [for (_ in 0...6) 0.0]]),
+      new PathTimingLimits(velocity, acceleration, [0.1, 0.1]));
+    check(Int64.compare(linearPlan.blocks[0].plans[0].events[0].timeNs,
+      Trajectory.nanoseconds(reference.distanceToTime(0.05) - 0.02)) == 0,
+      "FollowPath event follows the lowered distance-to-time law and lead");
+    reference.trajectory.dispose();
+    linearPlan.dispose();
+    var bounded = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+    bounded.position(0, -0.1, 0.05);
+    var boundedCompiler = new ProgramCompiler(linearSolver, bounded, "work", velocity,
+      acceleration, jerk, null, 0.05);
+    var limitError = "";
+    try boundedCompiler.compile(linearProgram,
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(501))
+    catch (error:Dynamic) limitError = Std.string(error);
+    check(limitError.indexOf("op 0 joint limit 0 at path distance") >= 0,
+      "path joint-limit diagnostics identify the op, joint, and distance");
+    var yaw = new Pose3(0.0, 0.0, 0.0, 0.0, 0.0,
+      Math.sin(Math.PI / 4.0), Math.cos(Math.PI / 4.0));
+    var freePath = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(), 0.005, 0.02),
+      new PoseWaypoint(yaw, 0.005, 0.02),
+      OrientationPolicy.FreeAboutTool, 0.1, 0.1)]);
+    var freePlan = linearCompiler.compile(new MotionProgram([MotionOp.FollowPath(
+      freePath, "work", 0.1, [])]), [0.0, 0.0, 0.0, 0.0, 0.1, 0.0],
+      Int64.ofInt(502));
+    check(freePlan.blocks[0].plans[0].report.checks[
+      MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "FreeAboutTool accepts a free twist about the tool axis");
+    freePlan.dispose();
+  }
+
+  static function testManipulatorMotion():Void {
+    var fixture = buildContractArmFixture();
+    for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
+    var simulation = new Simulation(0.01);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    blueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
+      ProcessEventValue.Digital(false)));
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("program-arm", runtime, fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
+    var compiler = new ProgramCompiler(solver, limits, "work",
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0], [for (_ in 0...6) 20.0]);
+    var unsupported = new RuntimeRobotAdapter("unsupported-arm", runtime,
+      fixture.model.name, [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name], false, false,
+      "simulated runtime fault", false);
+    throws(function() new ManipulatorMotion(unsupported, compiler,
+      function(_) return null, function() return runtime.pollEvents()),
+      "manipulator requires plan support at construction");
+    var ready = false;
+    var motion = new ManipulatorMotion(robot, compiler,
+      function(_) return EventValue.Digital(ready),
+      function() return runtime.pollEvents());
+    motion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget([0.1]), new MotionOptions(), Blend.ExactStop)]));
+    check(!motion.running && motion.failure != null &&
+      motion.failure.indexOf("Motion program op 0") >= 0,
+      "manipulator reports compiler diagnostics");
+    var first = [0.02, 0.0, 0.0, 0.0, 0.0, 0.0];
+    var second = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    motion.run(new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(first), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 3.0),
+      MotionOp.MoveJ(MoveTarget.JointTarget(second), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(false))
+    ]));
+    for (tick in 0...400) {
+      if (tick == 100) ready = true;
+      motion.update(0.01);
+      simulation.step(Int64.ofInt(tick));
+      if (!motion.running) break;
+    }
+    check(motion.completed && motion.failure == null,
+      'manipulator executes two blocks across WaitInput: ${motion.failure}, running=${motion.running}, block=${motion.progress().block}');
+    near(robot.snapshot().positions.get(0), 0.0,
+      "manipulator returns to initial joint position", 1e-3);
+    check(motion.firedEvents().length >= 2,
+      "manipulator reports process events from both blocks");
+    ready = false;
+    motion.run(new MotionProgram([
+      MotionOp.MoveJ(MoveTarget.JointTarget(first), new MotionOptions(), Blend.ExactStop),
+      MotionOp.SetOutput("sprayer.enabled", EventValue.Digital(true)),
+      MotionOp.WaitInput("ready", InputPredicate.Equals(EventValue.Digital(true)), 0.2)
+    ]));
+    for (tick in 0...400) {
+      motion.update(0.01);
+      simulation.step(Int64.ofInt(500 + tick));
+      if (!motion.running) break;
+    }
+    check(!motion.completed && motion.failure != null &&
+      motion.failure.indexOf("timed out") >= 0,
+      "barrier timeout fails the manipulator program with a diagnostic");
+    simulation.step(Int64.ofInt(1000));
+    check(Lambda.exists(motion.firedEvents(), function(event) return switch event.value {
+      case ProcessEventValue.Digital(enabled): !enabled;
+      case _: false;
+    }),
+      "timeout abort produces a safe output transition");
+    simulation.dispose();
+
+    var pathSimulation = new Simulation(0.01);
+    var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model);
+    pathBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
+      ProcessEventValue.Digital(false)));
+    var pathRuntime = pathSimulation.addRobot(pathBlueprint);
+    var pathRobot = new SimulatedRobot("path-arm", pathRuntime, fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var pathMotion = new ManipulatorMotion(pathRobot, compiler,
+      function(_) return null, function() return pathRuntime.pollEvents());
+    var origin = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
+    var destination = origin.copy(); destination[0] = 0.2;
+    destination[0] += 0.2;
+    var pathTick = 0;
+    pathMotion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)]));
+    for (_ in 0...500) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+      if (!pathMotion.running) break;
+    }
+    check(pathMotion.completed, 'arm reaches FollowPath start: ${pathMotion.failure}');
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(solver.forward(origin), 0.01, 0.04),
+      new PoseWaypoint(solver.forward(destination), 0.01, 0.04),
+      OrientationPolicy.Interpolated, 0.1, 0.05)]);
+    pathMotion.run(new MotionProgram([MotionOp.FollowPath(path, "work", 0.05,
+      [new PathEvent(path.length() * 0.95, "sprayer.enabled",
+        EventValue.Digital(true), 0.0, HoldPolicy.SafeWhileHeld)])]));
+    check(pathMotion.running,
+      'FollowPath starts: ${pathMotion.failure}');
+    for (_ in 0...10) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+    }
+    pathMotion.hold();
+    for (_ in 10...50) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+    }
+    var heldDistance = pathMotion.progress().pathDistance;
+    var heldPose = solver.forward(pathRobot.snapshot().positions.toArray());
+    check(motionkit.path.PoseMath.distance(heldPose,
+      path.waypointAt(heldDistance).pose) < 0.02,
+      "held FollowPath remains on the authored path");
+    check(pathMotion.firedEvents().length == 0,
+      "hold delays the later process event");
+    pathMotion.resume();
+    for (_ in 50...500) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+      if (!pathMotion.running) break;
+    }
+    check(pathMotion.completed && pathMotion.firedEvents().length > 0,
+      'held FollowPath completes and fires its event after resume: ${pathMotion.failure}');
+    pathMotion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)]));
+    for (_ in 0...5) {
+      pathMotion.update(0.01);
+      pathSimulation.step(Int64.ofInt(pathTick++));
+    }
+    pathMotion.abort();
+    pathSimulation.step(Int64.ofInt(pathTick++));
+    check(Lambda.exists(pathMotion.firedEvents(), function(event) return switch event.value {
+      case ProcessEventValue.Digital(enabled): !enabled;
+      case _: false;
+    }), "manipulator abort restores the safe process value");
+    pathSimulation.dispose();
   }
 
   static function testKinematicsContract():Void {
@@ -281,8 +587,10 @@ class MotionKitBootstrapTests {
 
   static function testMotionProgramContracts():Void {
     var pose = new Pose3(0.2, 0.1, 0.3);
-    var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
-      new PathPoint(0.1, 0.0, 0.0)]);
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(new Pose3(0.0, 0.0, 0.0), 0.005, 0.02),
+      new PoseWaypoint(new Pose3(0.1, 0.0, 0.0), 0.005, 0.02),
+      OrientationPolicy.Fixed, 0.1, 0.1)]);
     var events = [new PathEvent(0.02, "sprayer.enabled", EventValue.Digital(true)),
       new PathEvent(0.08, "sprayer.enabled", EventValue.Digital(false))];
     var program = new MotionProgram([
@@ -568,79 +876,80 @@ class MotionKitBootstrapTests {
     second.dispose();
   }
 
-  static function testLineLookaheadPlanner():Void {
-    var path = GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0),
-      new PathPoint(0.1, 0.0, 0.0), new PathPoint(0.1, 0.1, 0.0)]);
-    var planner = new LineLookaheadPlanner(0.01);
-    var limits = new MotionLimits(1.0, 2.0, 0.0);
-    var exact = planner.planNativePath(path, limits, PathPlanningOptions.exactStopMode());
-    var blend = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
-    check(exact.durationSeconds() > blend.durationSeconds(),
-      "blending shortens a cornered path without changing its endpoints");
-    for (segment in blend.segments())
-      check(segment.coefficients[0].length == 2,
-        "native lookahead emits degree-1 segments");
-    for (trajectory in [exact, blend]) {
-      for (i in 0...101) {
-        var point = trajectory.evaluate(trajectory.durationSeconds() * i / 100.0).positions;
-        var onFirst = Math.abs(point[1]) <= 1e-7 &&
-          point[0] >= -1e-7 && point[0] <= 0.1000001;
-        var onSecond = Math.abs(point[0] - 0.1) <= 1e-7 &&
-          point[1] >= -1e-7 && point[1] <= 0.1000001;
-        check(onFirst || onSecond, "lookahead stays on the authored polyline");
+  static function testToppraExactStopsAndBindings():Void {
+    var path = new JointPathSamples([0.0, 0.05, 0.1], [[0.0], [0.05], [0.1]],
+      [[1.0], [1.0], [1.0]], [[0.0], [0.0], [0.0]]);
+    var timed = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([0.2], [1.0]));
+    near(timed.trajectory.evaluate(0.0).velocities[0], 0.0,
+      "TOPP-RA exact stop begins at rest", 1e-8);
+    near(timed.trajectory.evaluate(timed.trajectory.durationSeconds()).velocities[0], 0.0,
+      "TOPP-RA exact stop ends at rest", 1e-8);
+    check(timed.bindingConstraints.length > 0,
+      "TOPP-RA records a binding joint constraint");
+    check(Lambda.exists(timed.bindingConstraints, binding ->
+      binding.jointIndex == 0 && binding.kind == BindingConstraintKind.JointVelocity),
+      "TOPP-RA names the saturated joint and velocity limit");
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
+    var sprint = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([10.0], [2.0]));
+    var analyticTwoLegs = 4.0 * Math.sqrt(0.1 / 2.0);
+    var sprintDuration = sprint.trajectory.durationSeconds();
+    check(2.0 * sprintDuration <= analyticTwoLegs * 1.01,
+      "TOPP-RA straight exact stops stay within 1% of analytic minimum");
+    sprint.releaseDistanceMap();
+    sprint.trajectory.dispose();
+    var capped = new ToppraPathTiming(1e-8).time(path,
+      new PathTimingLimits([10.0], [2.0], [0.2, 0.2]));
+    check(capped.trajectory.durationSeconds() > sprintDuration,
+      "TOPP-RA feed cap lengthens a straight move");
+    check(Lambda.exists(capped.bindingConstraints, binding ->
+      binding.kind == BindingConstraintKind.SpeedCap && binding.jointIndex == -1),
+      "TOPP-RA identifies an authored feed cap");
+    capped.releaseDistanceMap();
+    capped.trajectory.dispose();
+  }
+
+  static function testToppraCircleAcceleration():Void {
+    var radius = 0.1;
+    var total = 2.0 * Math.PI * radius;
+    var distances:Array<Float> = [];
+    var positions:Array<Array<Float>> = [];
+    var first:Array<Array<Float>> = [];
+    var second:Array<Array<Float>> = [];
+    for (index in 0...17) {
+      var angle = 2.0 * Math.PI * index / 16.0;
+      distances.push(total * index / 16.0);
+      positions.push([radius * Math.cos(angle), radius * Math.sin(angle)]);
+      first.push([-Math.sin(angle), Math.cos(angle)]);
+      second.push([-Math.cos(angle) / radius, -Math.sin(angle) / radius]);
+    }
+    var timed = new ToppraPathTiming().time(
+      new JointPathSamples(distances, positions, first, second),
+      new PathTimingLimits([2.0, 2.0], [1.0, 1.0]));
+    var peak = 0.0;
+    var peakAngle = 0.0;
+    for (index in 0...201) {
+      var state = timed.trajectory.evaluate(timed.trajectory.durationSeconds() * index / 200.0);
+      var speed = Math.sqrt(state.velocities[0] * state.velocities[0] +
+        state.velocities[1] * state.velocities[1]);
+      if (speed > peak) {
+        peak = speed;
+        peakAngle = Math.atan2(state.positions[1], state.positions[0]);
       }
+      check(Math.abs(state.accelerations[0]) <= 1.001 &&
+        Math.abs(state.accelerations[1]) <= 1.001,
+        "TOPP-RA circle respects both joint acceleration budgets");
     }
-    var repeated = planner.planNativePath(path, limits, PathPlanningOptions.blend(0.01));
-    near(repeated.durationSeconds(), blend.durationSeconds(),
-      "lookahead duration is deterministic");
-    for (i in 0...101) {
-      var time = blend.durationSeconds() * i / 100.0;
-      for (joint in 0...3)
-        near(repeated.evaluate(time).positions[joint], blend.evaluate(time).positions[joint],
-          "lookahead position is deterministic");
-    }
-
-    var shallowAngle = Math.PI / 18.0;
-    var nearReversalAngle = Math.PI * 170.0 / 180.0;
-    function cornerPath(angle:Float):GeometricPath return GeometricPath.lines([
-      new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.1, 0.0, 0.0),
-      new PathPoint(0.1 + 0.1 * Math.cos(angle), 0.1 * Math.sin(angle), 0.0)]);
-    var shallow = planner.planNativePath(cornerPath(shallowAngle), limits,
-      PathPlanningOptions.blend(0.01));
-    var reversal = planner.planNativePath(cornerPath(nearReversalAngle), limits,
-      PathPlanningOptions.blend(0.01));
-    var shallowSpeed = cornerChordSpeed(shallow, 0.1, 0.0);
-    var reversalSpeed = cornerChordSpeed(reversal, 0.1, 0.0);
-    check(shallowSpeed > 0.5, "shallow bend retains high blend speed");
-    check(reversalSpeed < 0.2, "near-reversal bend slows for the corner");
-    check(shallowSpeed > reversalSpeed * 4.0,
-      "corner speed decreases as the interior angle closes");
-
-    var arc = new ArcSegment(new PathPoint(0.1, 0.1, 0.0), 0.1,
-      -Math.PI * 0.5, Math.PI * 0.5);
-    var arcTrajectory = planner.planNativePath(new GeometricPath([arc]),
-      new MotionLimits(0.5, 1.0), PathPlanningOptions.exactStopMode());
-    for (segment in arcTrajectory.segments()) {
-      var point = segment.coefficients;
-      var dx = point[0][0] - 0.1;
-      var dy = point[1][0] - 0.1;
-      near(Math.sqrt(dx * dx + dy * dy), 0.1,
-        "arc knots stay on the authored circle", 1e-5);
-    }
-    near(arcTrajectory.evaluate(arcTrajectory.durationSeconds()).positions[0], 0.2,
-      "arc planner reaches its endpoint");
-    for (trajectory in [exact, blend, repeated, shallow, reversal, arcTrajectory])
-      trajectory.dispose();
+    var peakBound = Math.sqrt(radius /
+      Math.max(Math.abs(Math.cos(peakAngle)), Math.abs(Math.sin(peakAngle))));
+    check(peak <= peakBound * 1.01,
+      'TOPP-RA circle peak speed $peak respects per-joint bound $peakBound');
+    timed.releaseDistanceMap();
+    timed.trajectory.dispose();
   }
 
-  static function cornerChordSpeed(trajectory:Trajectory, x:Float, y:Float):Float {
-    for (segment in trajectory.segments())
-      if (Math.abs(segment.coefficients[0][0] - x) <= 1e-7 &&
-          Math.abs(segment.coefficients[1][0] - y) <= 1e-7)
-        return Math.sqrt(segment.coefficients[0][1] * segment.coefficients[0][1] +
-          segment.coefficients[1][1] * segment.coefficients[1][1]);
-    throw "lookahead trajectory did not emit its corner knot";
-  }
   static function testLinearAxisCompilesToRobotModel():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
@@ -917,7 +1226,7 @@ class MotionKitBootstrapTests {
 
     var cornerPath = GeometricPath.lines([new PathPoint(0.03, 0.02, 0.025),
       new PathPoint(0.04, 0.02, 0.025), new PathPoint(0.04, 0.03, 0.025)]);
-    var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.blend(0.001),
+    var cornerMove = machine.movePath(cornerPath, PathPlanningOptions.exactStopMode(),
       new MotionOptions(0.05, 0.2));
     check(cornerMove.segments().length > 1, "MotionSystem exposes buffered line-path planning");
     runMotion(machine, simulation);
@@ -1281,11 +1590,32 @@ class MotionKitBootstrapTests {
       squareBlueprint.model.name, [for (link in squareBlueprint.model.links) link.name],
       [for (joint in squareBlueprint.model.joints) joint.name]);
     var squareMachine = MotionSystem.fromBlueprint(squareRobot, squareBlueprint);
-    squareMachine.movePath(GeometricPath.lines([
+    var squarePath = squareMachine.movePath(GeometricPath.lines([
       new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.02, 0.0, 0.0),
       new PathPoint(0.02, 0.02, 0.0), new PathPoint(0.0, 0.02, 0.0),
       new PathPoint(0.0, 0.0, 0.0)
     ]), PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.2));
+    var cornerStops = 0;
+    for (segment in squarePath.segments()) {
+      var state = squarePath.evaluate(Int64.toFloat(segment.timeFromStartNs) * 1e-9);
+      for (corner in [new PathPoint(0.02, 0.0), new PathPoint(0.02, 0.02),
+          new PathPoint(0.0, 0.02)])
+        if (Math.abs(state.positions[0] - corner.x) < 1e-8 &&
+            Math.abs(state.positions[1] - corner.y) < 1e-8 &&
+            Math.abs(state.velocities[0]) < 1e-7 && Math.abs(state.velocities[1]) < 1e-7)
+          cornerStops++;
+    }
+    check(cornerStops >= 3, "TOPP-RA square stops at every authored corner");
+    var squareReport = squareMachine.lastPathValidationReport;
+    if (squareReport == null) throw "TOPP-RA path did not record validation";
+    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED &&
+      squareReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].method ==
+      MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED,
+      "TOPP-RA task-space check reports sampled path tolerance");
+    check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+      "TOPP-RA reports jerk as unchecked");
     tick = 0;
     var reachedThirdLeg = false;
     while (squareMachine.isMoving()) {
@@ -1793,6 +2123,124 @@ class MotionKitBootstrapTests {
     return Math.sqrt(px * px + py * py);
   }
 
+  static function testToleranceBlend():Void {
+    var mixedCorner = new GeometricPath([
+      new LineSegment(new PathPoint(0.0, 0.0), new PathPoint(0.05, 0.0)),
+      new ArcSegment(new PathPoint(0.07, 0.0), 0.02, Math.PI, -Math.PI * 0.5)
+    ]);
+    var mixedGeometry = CornerBlender.blend(mixedCorner, 0.0004, Math.PI * 5.0 / 6.0);
+    check(mixedGeometry.path.primitives.length == 3 && mixedGeometry.diagnostics.length == 0,
+      "line-to-arc corner receives a tolerance blend");
+    for (index in 0...2) {
+      var a = mixedGeometry.path.primitives[index];
+      var b = mixedGeometry.path.primitives[index + 1];
+      check(a.pointAt(a.length()).distanceTo(b.pointAt(0.0)) < 1e-8,
+        "mixed blend joins at the same point");
+      var ta = a.tangentAt(a.length()), tb = b.tangentAt(0.0);
+      check(ta[0] * tb[0] + ta[1] * tb[1] > 0.999999,
+        "mixed blend has a continuous tangent");
+    }
+    var mixedBlend = mixedGeometry.path.primitives[1];
+    for (index in 0...501) {
+      var point = mixedBlend.pointAt(mixedBlend.length() * index / 500.0);
+      var lineDistance = segmentDistance(point.x, point.y, 0.0, 0.0, 0.05, 0.0);
+      var angle = Math.max(Math.PI * 0.5,
+        Math.min(Math.PI, Math.atan2(point.y, point.x - 0.07)));
+      var arcDistance = point.distanceTo(new PathPoint(0.07 + 0.02 * Math.cos(angle),
+        0.02 * Math.sin(angle)));
+      check(Math.min(lineDistance, arcDistance) <= 0.0004,
+        "mixed blend stays within authored geometry tolerance");
+    }
+    var arcToLine = new GeometricPath([
+      mixedCorner.primitives[1],
+      new LineSegment(new PathPoint(0.07, 0.02), new PathPoint(0.07, 0.07))
+    ]);
+    var arcToArc = new GeometricPath([
+      mixedCorner.primitives[1],
+      new ArcSegment(new PathPoint(0.09, 0.02), 0.02, Math.PI, -Math.PI * 0.5)
+    ]);
+    check(CornerBlender.blend(arcToLine, 0.0004, Math.PI * 5.0 / 6.0)
+      .path.primitives.length == 3, "arc-to-line corner receives a blend");
+    check(CornerBlender.blend(arcToArc, 0.0004, Math.PI * 5.0 / 6.0)
+      .path.primitives.length == 3, "arc-to-arc corner receives a blend");
+    var mixedRig = gantryRig(true);
+    var mixedTimed = mixedRig.machine.movePath(mixedCorner,
+      PathPlanningOptions.blend(0.0005), new MotionOptions(0.08, 0.4));
+    var mixedReport = mixedRig.machine.lastPathValidationReport;
+    if (mixedReport == null) throw "Mixed blend did not record validation";
+    check(mixedTimed.durationSeconds() > 0.0 &&
+      mixedReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+        MotionKitNativeConstants.MK_CHECK_PASSED,
+      "mixed blend times and validates through the runtime plan");
+    runMotion(mixedRig.machine, mixedRig.simulation);
+    near(mixedRig.robot.snapshot().positions.get(0), 0.07,
+      "mixed blend executes to its X endpoint", 1e-5);
+    near(mixedRig.robot.snapshot().positions.get(1), 0.02,
+      "mixed blend executes to its Y endpoint", 1e-5);
+    mixedRig.simulation.dispose();
+    var path = GeometricPath.lines([new PathPoint(0.0, 0.0),
+      new PathPoint(0.05, 0.0), new PathPoint(0.05, 0.05)]);
+    var exactRig = gantryRig(true);
+    var exact = exactRig.machine.movePath(path, PathPlanningOptions.exactStopMode(),
+      new MotionOptions(0.08, 0.4));
+    var blendedRig = gantryRig(true);
+    var blended = blendedRig.machine.movePath(path, PathPlanningOptions.blend(0.0005),
+      new MotionOptions(0.08, 0.4));
+    check(blended.durationSeconds() < exact.durationSeconds(),
+      '0.5 mm fillet ${blended.durationSeconds()} is faster than exact stop ${exact.durationSeconds()}');
+    var closestCorner = 1.0;
+    var cornerSpeed = 0.0;
+    for (index in 0...501) {
+      var state = blended.evaluate(blended.durationSeconds() * index / 500.0);
+      var x = state.positions[0], y = state.positions[1];
+      var deviation = Math.min(segmentDistance(x, y, 0.0, 0.0, 0.05, 0.0),
+        segmentDistance(x, y, 0.05, 0.0, 0.05, 0.05));
+      check(deviation <= 0.0005 + 1e-5,
+        "0.5 mm fillet stays within its authored path tolerance");
+      var cornerDistance = Math.sqrt((x - 0.05) * (x - 0.05) + y * y);
+      if (cornerDistance < closestCorner) {
+        closestCorner = cornerDistance;
+        cornerSpeed = Math.sqrt(state.velocities[0] * state.velocities[0] +
+          state.velocities[1] * state.velocities[1]);
+      }
+    }
+    check(cornerSpeed > 1e-3, "0.5 mm fillet carries speed through the corner");
+    var blendReport = blendedRig.machine.lastPathValidationReport;
+    if (blendReport == null) throw "Blend path did not record validation";
+    var taskCheck = blendReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
+    check(taskCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
+      Math.abs(taskCheck.limit - 0.0005) < 1e-12,
+      "blend validation checks the authored 0.5 mm tolerance");
+    runMotion(blendedRig.machine, blendedRig.simulation);
+    near(blendedRig.robot.snapshot().positions.get(0), 0.05,
+      "blended path executes to its X endpoint", 1e-5);
+    near(blendedRig.robot.snapshot().positions.get(1), 0.05,
+      "blended path executes to its Y endpoint", 1e-5);
+    exactRig.simulation.dispose();
+    blendedRig.simulation.dispose();
+
+    var reverse = GeometricPath.lines([new PathPoint(0.0, 0.0),
+      new PathPoint(0.05, 0.0),
+      new PathPoint(0.05 + 0.05 * Math.cos(Math.PI * 170.0 / 180.0),
+        0.05 * Math.sin(Math.PI * 170.0 / 180.0))]);
+    var reverseRig = gantryRig(true);
+    var fallback = reverseRig.machine.movePath(reverse, PathPlanningOptions.blend(0.0005),
+      new MotionOptions(0.08, 0.4));
+    check(reverseRig.machine.lastPathPlanningDiagnostics.length > 0 &&
+      reverseRig.machine.lastPathPlanningDiagnostics[0].indexOf("turn angle") >= 0,
+      "near reversal reports an exact-stop fallback");
+    var stoppedAtCorner = false;
+    for (segment in fallback.segments()) {
+      var state = fallback.evaluate(Int64.toFloat(segment.timeFromStartNs) * 1e-9);
+      if (Math.abs(state.positions[0] - 0.05) < 1e-8 &&
+          Math.abs(state.positions[1]) < 1e-8 &&
+          Math.abs(state.velocities[0]) < 1e-7 && Math.abs(state.velocities[1]) < 1e-7)
+        stoppedAtCorner = true;
+    }
+    check(stoppedAtCorner, "near reversal stops at the authored corner");
+    reverseRig.simulation.dispose();
+  }
+
   /**
    * Holding and resuming along a path with an arc, and along a blended
    * corner, stays on the path and within the joint limits.
@@ -1819,9 +2267,9 @@ class MotionKitBootstrapTests {
     var cases:Array<{label:String, begin:MotionSystem -> Void, distance:(Float, Float) -> Float}> = [
       {label: "arc path", distance: arcDistance, begin: machine -> machine.movePath(arcPath(),
         PathPlanningOptions.exactStopMode(), new MotionOptions(0.05, limit))},
-      {label: "blended corner", distance: cornerDistance, begin: machine -> machine.movePath(
+      {label: "exact-stop corner", distance: cornerDistance, begin: machine -> machine.movePath(
         GeometricPath.lines([new PathPoint(0.0, 0.0, 0.0), new PathPoint(0.05, 0.0, 0.0),
-          new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.blend(0.001),
+          new PathPoint(0.05, 0.05, 0.0)]), PathPlanningOptions.exactStopMode(),
         new MotionOptions(0.05, limit))}
     ];
     for (queueSupport in [true]) {
@@ -1956,17 +2404,10 @@ class MotionKitBootstrapTests {
   }
 
   static function peakChordAcceleration(value:Trajectory, joint:Int):Float {
-    var segments = value.segments();
     var peak = 0.0;
-    for (index in 1...segments.length) {
-      var before = segments[index - 1];
-      var after = segments[index];
-      var seconds = 0.5 * (Int64.toFloat(before.durationNs) +
-        Int64.toFloat(after.durationNs)) * 1e-9;
-      if (seconds > 0.0)
-        peak = Math.max(peak, Math.abs(after.coefficients[joint][1] -
-          before.coefficients[joint][1]) / seconds);
-    }
+    for (index in 0...501)
+      peak = Math.max(peak, Math.abs(value.evaluate(
+        value.durationSeconds() * index / 500.0).accelerations[joint]));
     return peak;
   }
 
@@ -1986,6 +2427,26 @@ class MotionKitBootstrapTests {
     try action() catch (_:Dynamic) didThrow = true;
     check(didThrow, message);
   }
+}
+
+/** Deterministic IK branch switch at a synthetic wrist singularity. */
+private class WristBranchSolver implements KinematicsSolver {
+  final jump:Bool;
+  public function new(?jump:Bool = true) this.jump = jump;
+  public function jointCount():Int return 6;
+  public function forward(q:Array<Float>):Pose3 return new Pose3(q[0]);
+  public function solvePose(target:Pose3, seed:Array<Float>,
+      tolerance:IkTolerance):Null<Array<Float>> {
+    var q = seed.copy();
+    q[0] = target.x;
+    q[4] = !jump || target.x < 0.5 ? 0.1 : -2.0;
+    return q;
+  }
+  public function sampleCandidates(target:Pose3, maxCount:Int,
+      tolerance:IkTolerance):Array<Array<Float>>
+    return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
+  public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
+    return [for (_ in 0...6) 0.0];
 }
 
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */
