@@ -3,11 +3,10 @@
 RKD6 is a separate protocol from [RKD5](DEVICE_PROTOCOL.md). Its four-byte
 sync marker is `RKD6`. A frame is marker (4), message type (1), reserved zero
 (1), little-endian payload length (2), payload, then little-endian CRC-32/IEEE
-(4), calculated over every preceding byte. The largest current payload is a
-64-actuator segment (36 + 64 × 25 = 1,636 bytes), so the frame maximum is
-1,648 bytes. A receiver rejects unknown types, wrong lengths, a nonzero
-reserved byte, CRC mismatch, or a malformed segment. Message id 16 is reserved
-for EVENT and cannot be sent until its payload is defined in A8.
+(4), calculated over every preceding byte. The largest current payload is the
+version 9 session record (4,908 bytes), so the frame maximum is 4,920 bytes.
+A receiver rejects unknown types, wrong lengths, a nonzero reserved byte,
+CRC mismatch, or malformed session, segment and event records.
 
 `device_wire6.wire.idl` is the canonical fixed-record schema; `wire6.json`
 generates Rust and C++ codecs. Segment coefficients are `f32` in local seconds,
@@ -28,6 +27,16 @@ The host converts joint polynomials to actuator polynomials before encoding and
 rejects motion faster than either the authored actuator rate or one step per
 device step tick. The no_std device generator uses the configured direction
 setup and minimum step interval, and checks dual-drive skew from step feedback.
+Protocol version 9 declares up to 32 channels in the session, including stable
+IDs, kinds and safe values. An `EVENT` carries its queue revision, plan ID,
+device path tick, channel index, typed value and HOLD policy. The host maps
+each `TimedEvent` from plan-relative path time with the same frozen clock
+mapping as its trajectory segments. The device fires only committed events as
+its path clock crosses their ticks. HOLD makes configured channels safe,
+RESUME restores `RestoreOnResume` values, and STOP or a fault discards future
+events and sets every channel to its declared safe value. Replacement discards
+events at or after the replacement boundary. The virtual event log records
+scheduled path ticks, applied path ticks and device ticks.
 
 No RKD6 hardware has shipped. Before the first hardware release, an in-place
 schema revision is permitted with a `PROTOCOL_VERSION` bump and regenerated
@@ -38,6 +47,7 @@ or negotiate a new version.
 | Quantity | RKD6 bound | Source |
 | --- | ---: | --- |
 | Maximum actuators | 64 | schema |
+| Maximum frame | 4,920 bytes | 8 + 4,908 + 4 |
 | Maximum segment frame | 1,648 bytes | 8 + 36 + 64 × 25 + 4 |
 | Step tick default | 40 kHz | LA-D2; board may configure another rate |
 | Segment queue depth | negotiated | `SESSION_ACK6.segment_capacity` |

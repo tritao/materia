@@ -49,8 +49,7 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
         5 => Some(QueueBegin6::SIZE), 7 => Some(Commit6::SIZE),
         8..=13 => Some(0), 14 => Some(QueueStatus6::SIZE),
         15 | 6 => None,
-        // A8 will define the EVENT payload; it cannot be sent yet.
-        16 => return Err(Frame6Error::BadPayload),
+        16 => Some(Event6::SIZE),
         _ => return Err(Frame6Error::BadType),
     };
     if let Some(size) = exact {
@@ -61,7 +60,8 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             .map_err(|_| Frame6Error::BadPayload)?;
         if head.protocol_version != PROTOCOL_VERSION || head.actuator_count == 0 ||
            head.actuator_count > MAX_ACTUATORS || !head.max_acceleration.is_finite() ||
-           head.max_acceleration <= 0.0 || head.link_loss_timeout_ns == 0 {
+           head.max_acceleration <= 0.0 || head.link_loss_timeout_ns == 0 ||
+           head.channel_count > 32 {
             return Err(Frame6Error::BadPayload);
         }
         for (a, &limit) in head.actuator_max_acceleration[..head.actuator_count as usize].iter().enumerate() {
@@ -71,6 +71,16 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
                head.actuator_joint[a] >= MAX_ACTUATORS ||
                !head.actuator_ratio[a].is_finite() || head.actuator_ratio[a] == 0.0 ||
                !head.dual_drive_skew_bound[a].is_finite() || head.dual_drive_skew_bound[a] < 0.0 {
+                return Err(Frame6Error::BadPayload);
+            }
+        }
+        for channel in 0..head.channel_count as usize {
+            let kind = head.channel_kind[channel];
+            let id = &head.channel_id[channel * 48..(channel + 1) * 48];
+            if !(1..=3).contains(&kind) || id[0] == 0 ||
+               !id.contains(&0) || head.safe_digital[channel] > 1 ||
+               !head.safe_analog[channel].is_finite() ||
+               !head.safe_argument[channel].is_finite() {
                 return Err(Frame6Error::BadPayload);
             }
         }
@@ -89,6 +99,15 @@ fn validate_payload(kind: u8, bytes: &[u8]) -> Result<(), Frame6Error> {
             .map_err(|_| Frame6Error::BadPayload)?;
         if head.actuator_count > MAX_ACTUATORS || head.reserved != 0 ||
            bytes.len() != State6Header::SIZE + head.actuator_count as usize * ActuatorState6::SIZE {
+            return Err(Frame6Error::BadPayload);
+        }
+    }
+    if kind == 16 {
+        let event = Event6::decode(bytes).map_err(|_| Frame6Error::BadPayload)?;
+        if event.plan_id == 0 || event.queue_revision == 0 || event.channel >= 32 ||
+           !(1..=3).contains(&event.kind) || event.hold_policy > 2 ||
+           event.digital > 1 || !event.analog.is_finite() ||
+           !event.argument.is_finite() {
             return Err(Frame6Error::BadPayload);
         }
     }

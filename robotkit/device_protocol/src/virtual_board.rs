@@ -4,7 +4,7 @@ use std::vec::Vec;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Output {
     Position(usize, f32), Velocity(usize, f32), Direction(usize, bool), Step(usize, bool),
-    Digital(usize, bool), Analog(usize, f32), Stop,
+    Digital(usize, bool), Analog(usize, f32), Process(usize, [u8; 48], f32), Stop,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -24,6 +24,7 @@ pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     velocities: [f32; ACTUATORS],
     digital: [bool; CHANNELS],
     analog: [f32; CHANNELS],
+    process_argument: [f32; CHANNELS],
     records: Vec<OutputRecord>,
 }
 
@@ -35,7 +36,8 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
         Self { tick_hz, offset_ticks, drift_ppm, host_ns: 0, ticks: offset_ticks,
             steps_per_unit, steps: [0; A], missed_steps: [0; A],
             targets: [0.0; A], velocities: [0.0; A],
-            digital: [false; C], analog: [0.0; C], records: Vec::new() }
+            digital: [false; C], analog: [0.0; C], process_argument: [0.0; C],
+            records: Vec::new() }
     }
     pub fn advance_host_ns(&mut self, host_ns: u64) {
         assert!(host_ns >= self.host_ns);
@@ -59,6 +61,9 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
     pub fn records(&self) -> &[OutputRecord] { &self.records }
     pub fn digital(&self, i: usize) -> Option<bool> { self.digital.get(i).copied() }
     pub fn analog(&self, i: usize) -> Option<f32> { self.analog.get(i).copied() }
+    pub fn process_argument(&self, i: usize) -> Option<f32> {
+        self.process_argument.get(i).copied()
+    }
     fn record(&mut self, output: Output) { self.records.push(OutputRecord { ticks: self.ticks, output }); }
 }
 
@@ -89,10 +94,15 @@ impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
     fn set_analog(&mut self, i: usize, value: f32) {
         self.analog[i] = value; self.record(Output::Analog(i, value));
     }
+    fn set_process(&mut self, i: usize, command: &[u8; 48], argument: f32) {
+        self.process_argument[i] = argument;
+        self.record(Output::Process(i, *command, argument));
+    }
     fn stop_all(&mut self) {
         self.velocities.fill(0.0);
         self.digital.fill(false);
         self.analog.fill(0.0);
+        self.process_argument.fill(0.0);
         self.record(Output::Stop);
     }
 }
