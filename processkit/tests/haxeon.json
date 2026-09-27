@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "processkit-tests" },
+  "entry": "ProcessKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "processkit": { "path": ".." }
+  },
+  "target": "host",
+  "outputDir": "build"
+}
