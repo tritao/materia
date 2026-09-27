@@ -748,3 +748,22 @@ extreme-jerk test fails under the old uncapped rule and passes with the cap.
 Commit: the commit containing this entry. MotionKit native and Haxe, RobotKit
 native and Haxe, both MotionKit and RobotKit FFI audits, and TCP integration in
 default, session, and lease-timeout modes passed.
+
+### P6 paused — Legacy sample STOP semantics conflict
+
+Stopped before P6 code changes. `trajectory_stop_counts_trajectory_braking` in
+`robotkit/runtime/tests/runtime.cpp` requires the current STOP controller to
+budget the deceleration inferred across adjacent legacy sample chords. A
+degree-1 position segment has zero analytic acceleration inside each segment
+and a velocity step at each knot. Replacing that finite-difference estimate
+with the segment's analytic acceleration would add STOP deceleration to a path
+already braking at its joint limit, violating the unchanged runtime test and
+the P6 degree-1 equivalence promise. Existing queue tests also publish sample
+counts (`trajectory_queue_depth == 3` for three points), while two valid
+positive-duration degree-1 segments represent those three points. The queue
+can store segments, but legacy depth and capacity accounting need an explicit
+compatibility rule. Proposed smallest correction, pending approval: preserve
+legacy point-chunk STOP braking estimates and published queue-depth semantics;
+use analytic velocity/acceleration for native segment chunks, and bound the
+underlying queue by actual segments with conservative reservations for legacy
+submissions. No P6 tests or implementation have been started.
