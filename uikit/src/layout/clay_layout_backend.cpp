@@ -803,6 +803,9 @@ bool LayoutEngine::Impl::layout(const std::vector<LayoutNode> &nodes, float widt
     assign_layers(assign_layers, root, 0);
 
     Clay_SetLayoutDimensions({width, height});
+    // Retire scroll containers that disappeared from the previous layout. Clay
+    // keeps their records across frames and has a fixed 100-record capacity.
+    Clay_UpdateScrollContainers(false, {0.0f, 0.0f}, delta_seconds);
     Clay_BeginLayout();
     append_node(state, root, layers);
     const Clay_RenderCommandArray commands = Clay_EndLayout(delta_seconds);

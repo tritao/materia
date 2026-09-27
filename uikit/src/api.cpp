@@ -2196,8 +2196,11 @@ extern "C" nkui_result nkui_layout_session_submit(nkui_layout_session session,
     nkui::LayoutSnapshot snapshot;
     nkui::LayoutError error{};
     if (!state->engine->layout(nodes, frame->width, frame->height, frame->delta_seconds, snapshot,
-                               &error))
+                               &error)) {
+        std::fprintf(stderr, "UIKit layout rejected node %zu: %s\n", error.node_index,
+                     error.message ? error.message : "unknown layout error");
         return NKUI_ERROR_INVALID_TRANSACTION;
+    }
     state->snapshot = std::move(snapshot);
     state->submitted = true;
     std::lock_guard<std::mutex> lists_lock(lists_mutex);

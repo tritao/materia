@@ -179,6 +179,28 @@ int main(int argc, char **argv) {
         scrolled_row_primitive->transform.ty != -13248.0f)
         return 50;
 
+    // Changing Inspector-like clipped panels must not exhaust Clay's retained
+    // scroll-container records over successive layouts.
+    LayoutNode churn_root = box(1000, -1);
+    churn_root.style.width = {LayoutSizing::Fixed, 300.0f};
+    churn_root.style.height = {LayoutSizing::Fixed, 100.0f};
+    std::vector<LayoutNode> churn_nodes{churn_root};
+    for (uint32_t frame = 0; frame < 150; ++frame) {
+        churn_nodes.resize(1);
+        for (uint32_t panel = 0; panel < 3; ++panel) {
+            LayoutNode clipped = box(2000 + frame * 3 + panel, 0);
+            clipped.style.width = {LayoutSizing::Fixed, 100.0f};
+            clipped.style.height = {LayoutSizing::Fixed, 20.0f};
+            clipped.style.clip_vertical = true;
+            churn_nodes.push_back(clipped);
+        }
+        if (!engine.layout(churn_nodes, 300.0f, 100.0f, 1.0f / 60.0f, snapshot, &error)) {
+            std::cerr << "scroll-container churn failed at frame " << frame << ": "
+                      << (error.message ? error.message : "unknown error") << "\n";
+            return 51;
+        }
+    }
+
     LayoutNode collapsed_root = box(310, -1);
     collapsed_root.style.width = {LayoutSizing::Fixed, 100.0f};
     collapsed_root.style.height = {LayoutSizing::Fixed, 80.0f};
