@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "name": "pty-forklift",
   "collisionApproximation": "bounds-box",
   "links": [
@@ -222,6 +222,7 @@
     }
   ],
   "actuators": [],
+  "couplings": [],
   "frames": [],
   "sensors": [],
   "mobileBase": {

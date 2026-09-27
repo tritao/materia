@@ -60,6 +60,18 @@ class RobotModelCodec {
       if (actuators.exists(actuator.id)) throw 'Duplicate robot actuator ${actuator.id}';
       actuators.set(actuator.id, true);
     }
+    var couplingIds = new Map<String, Bool>();
+    var followerIds = new Map<String, Bool>();
+    for (coupling in model.couplings) {
+      if (coupling == null) throw "Robot joint coupling is null";
+      if (couplingIds.exists(coupling.id)) throw 'Duplicate robot coupling ${coupling.id}';
+      if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
+        throw 'Coupling ${coupling.id} references an unknown joint';
+      if (followerIds.exists(coupling.follower))
+        throw 'Joint ${coupling.follower} has multiple coupling leaders';
+      couplingIds.set(coupling.id, true);
+      followerIds.set(coupling.follower, true);
+    }
     var sensors = new Map<String, Bool>();
     for (sensor in model.sensors) {
       requireText(sensor.id, "sensor id");
@@ -101,6 +113,10 @@ class RobotModelCodec {
         axis: joint.axis
       }],
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
+      couplings: [for (coupling in model.couplings) {
+        id: coupling.id, leader: coupling.leader, follower: coupling.follower,
+        ratio: coupling.ratio, offset: coupling.offset
+      }],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
         position: frame.position, rotation: frame.rotation
@@ -144,7 +160,7 @@ class RobotModelCodec {
     var joints = new Map<String, Bool>();
     for (record in array(root, "joints")) {
       if (Reflect.hasField(record, "drive"))
-        throw "RobotModel v4 does not accept joint.drive; use root actuators";
+        throw "RobotModel v5 does not accept joint.drive; use root actuators";
       var id = text(record, "id");
       if (joints.exists(id)) throw 'Duplicate robot joint $id';
       joints.set(id, true);
@@ -163,6 +179,20 @@ class RobotModelCodec {
       joint.childFramePosition = vectorField(record, "childFramePosition", 3);
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
+    }
+
+    var couplingIds = new Map<String, Bool>();
+    var followers = new Map<String, Bool>();
+    for (record in array(root, "couplings")) {
+      var coupling = new JointCoupling(text(record, "id"), text(record, "leader"),
+        text(record, "follower"), number(record, "ratio"), number(record, "offset"));
+      if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
+        throw 'Coupling ${coupling.id} references an unknown joint';
+      if (couplingIds.exists(coupling.id) || followers.exists(coupling.follower))
+        throw 'Duplicate robot coupling ${coupling.id} or follower';
+      couplingIds.set(coupling.id, true);
+      followers.set(coupling.follower, true);
+      model.addCoupling(coupling);
     }
 
     var actuatorIds = new Map<String, Bool>();

@@ -4,13 +4,15 @@ import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 4;
+  public static inline var CURRENT_VERSION:Int = 5;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
   public final joints:Array<Joint> = [];
   /** Multiple actuators may address one joint through independent transmissions. */
   public final actuators:Array<Actuator> = [];
+  /** Mechanical joint-to-joint relations, independent of actuator transmissions. */
+  public final couplings:Array<JointCoupling> = [];
   public final sensors:Array<Sensor> = [];
   public final frames:Array<Frame> = [];
   public var collisionApproximation:CollisionApproximation = CollisionApproximation.BoundsBox;
@@ -41,6 +43,11 @@ class RobotModel {
   public function addActuator(actuator:Actuator):Actuator {
     actuators.push(actuator);
     return actuator;
+  }
+
+  public function addCoupling(coupling:JointCoupling):JointCoupling {
+    couplings.push(coupling);
+    return coupling;
   }
 
   public function addSensor(sensor:Sensor):Sensor {
@@ -88,6 +95,23 @@ class RobotModel {
           if (!Math.isFinite(ratio) || ratio == 0.0 || !Math.isFinite(offset))
             errors.push('actuator ${actuator.id} has an invalid transmission');
       }
+    }
+    var couplingIds = new Map<String, Bool>();
+    var followers = new Map<String, Bool>();
+    for (coupling in couplings) {
+      if (coupling == null) { errors.push("robot has a null joint coupling"); continue; }
+      if (couplingIds.exists(coupling.id)) errors.push('duplicate joint coupling ID ${coupling.id}');
+      couplingIds.set(coupling.id, true);
+      if (followers.exists(coupling.follower))
+        errors.push('joint ${coupling.follower} has multiple coupling leaders');
+      followers.set(coupling.follower, true);
+      var hasLeader = false, hasFollower = false;
+      for (joint in joints) {
+        if (joint.id == coupling.leader) hasLeader = true;
+        if (joint.id == coupling.follower) hasFollower = true;
+      }
+      if (!hasLeader || !hasFollower)
+        errors.push('joint coupling ${coupling.id} references an unknown joint');
     }
     return errors;
   }

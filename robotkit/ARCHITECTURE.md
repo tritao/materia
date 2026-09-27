@@ -155,7 +155,7 @@ layout and wire schema lock, not mutable semantic model fields.
 
 ### Transmissions (model contract and future execution design)
 
-RobotModel v4 owns actuators independently of joints. Each actuator has a
+RobotModel v5 owns actuators independently of joints. Each actuator has a
 stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
 with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
 `joint = offset + actuator / ratio`: for a motor driving a linear joint,
@@ -165,7 +165,20 @@ logical coordinate and derives the other joint scales and offsets by equating
 actuator coordinates, using the first actuator authored for each joint as its
 mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
-`RobotModelCodec` accepts v4 only; older schemas are rejected, not migrated.
+`RobotModelCodec` accepts v5 only; older schemas are rejected, not migrated.
+
+RobotModel v5 also owns `JointCoupling{id, leader, follower, ratio, offset}`.
+This is a joint-to-joint relation, `follower = ratio * leader + offset`,
+separate from the actuator-to-joint `SimpleTransmission`. The runtime blueprint
+carries these couplings. MotionKit derives logical-axis scales and offsets from
+them, and runtime command and plan validation rejects inconsistent followers.
+SimKit compiles them to MuJoCo joint equalities or enforces them exactly in its
+deterministic backend.
+
+The physical assembly model is intended to become the single RobotModel driven
+by the motion stack. MachineKit motor parts will attach actuators to its joints;
+`MachineKitRobotCompiler` will then only derive those actuators and their
+transmissions, rather than build a second robot topology.
 
 The native runtime and RKD5 devices remain joint-space only in this item. The
 Haxe runtime compiler converts each actuator's rate limit to joint units as
@@ -190,7 +203,7 @@ actuator/channel assignment and transmission ratio/offset; existing RKD5
 fingerprints are unchanged here. Dual-drive feedback will be converted back
 to joint coordinates and compared for skew, with a latched fault on excessive
 disagreement. The skew threshold and fault behavior belong to that later
-runtime/device item, not to RobotModel v4 compilation.
+runtime/device item, not to RobotModel v5 compilation.
 
 Compilation has two deliberate entry points. `RobotRuntimeCompiler.validate()`
 returns every `RobotCompileDiagnostic` with a stable code, field path, and

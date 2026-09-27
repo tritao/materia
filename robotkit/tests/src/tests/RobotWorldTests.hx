@@ -771,6 +771,8 @@ class RobotWorldTests {
       Transmission.SimpleTransmission(source.joints[0].id, 2.0, 0.1)));
     source.addActuator(new Actuator("left-wheel-assist", 45.0, 8.0,
       Transmission.SimpleTransmission(source.joints[0].id, -3.0, 0.1)));
+    source.addCoupling(new robotkit.model.JointCoupling("paired-wheels",
+      source.joints[0].id, source.joints[1].id, -2.0, 0.25));
     source.joints[0].parentFramePosition = [0.0, 0.25, 0.1];
     source.joints[0].parentFrameRotation = [0.0, 0.0, 0.1, 0.99498743710662];
     source.joints[0].axis = [0.0, 1.0, 0.0];
@@ -791,13 +793,16 @@ class RobotWorldTests {
     equal(restored.joints[0].parentFramePosition[1], 0.25,
       "RobotModel codec preserves joint frame transforms");
     equal(restored.actuators.length, 2,
-      "v4 RobotModel accepts two actuators on one joint");
+      "v5 RobotModel accepts two actuators on one joint");
+    equal(restored.couplings.length, 1, "v5 RobotModel preserves joint couplings");
+    equal(restored.couplings[0].offset, 0.25,
+      "v5 RobotModel preserves coupling offset independently of transmissions");
     equal(restored.actuators[0].maxRate, 12.0,
       "RobotModel codec preserves actuator-unit limits");
     check(switch restored.actuators[1].transmission {
       case SimpleTransmission(jointId, ratio, offset):
         jointId == source.joints[0].id && ratio == -3.0 && offset == 0.1;
-    }, "v4 RobotModel preserves independent transmission ratios");
+    }, "v5 RobotModel preserves independent transmission ratios");
     equal(restored.frames[0].link.id, "link/base", "RobotModel codec resolves frame link references");
     check(restored.sensors[0].frame == restored.frames[0],
       "RobotModel codec resolves sensor frame references to shared frame objects");
@@ -831,14 +836,14 @@ class RobotWorldTests {
       "device channel mapping rejects order that differs from semantic model joints");
 
     var oldVersion:Dynamic = haxe.Json.parse(encoded.toString());
-    Reflect.setField(oldVersion, "schemaVersion", 3);
+    Reflect.setField(oldVersion, "schemaVersion", 4);
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
-      "v4-only RobotModel codec rejects old schemas");
+      "v5-only RobotModel codec rejects old schemas");
     var legacyDrive:Dynamic = haxe.Json.parse(encoded.toString());
     var legacyJoints:Array<Dynamic> = cast Reflect.field(legacyDrive, "joints");
     Reflect.setField(legacyJoints[0], "drive", {name: "old-drive"});
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(legacyDrive))),
-      "v4 codec rejects silently ignored joint-drive records");
+      "v5 codec rejects silently ignored joint-drive records");
 
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString('{"schemaVersion":99}')),
       "future RobotModel schema versions are rejected");
