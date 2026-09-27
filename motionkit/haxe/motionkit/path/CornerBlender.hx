@@ -98,7 +98,7 @@ class CornerBlender {
         continue;
       }
       var halfTangent = Math.tan(magnitude * 0.5);
-      var radius = tolerance / (1.0 / Math.sin(magnitude * 0.5) - 1.0);
+      var radius = tolerance / (1.0 / Math.cos(magnitude * 0.5) - 1.0);
       var cut = Math.min(radius * halfTangent,
         0.45 * Math.min(first.length(), second.length()));
       if (cut <= 1e-9) {

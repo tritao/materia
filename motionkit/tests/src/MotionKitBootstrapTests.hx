@@ -423,7 +423,9 @@ class MotionKitBootstrapTests {
     var blendedPlan = blended.blocks[0].plans[0];
     check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
       MotionKitNativeConstants.MK_CHECK_PASSED,
-      "blended Cartesian plan passes task-space validation");
+      "blended Cartesian plan passes authored-corner task-space validation");
+    near(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].limit,
+      0.005, "blended task-space report uses the authored tolerance");
     blended.dispose();
   }
 
@@ -2408,6 +2410,34 @@ class MotionKitBootstrapTests {
   }
 
   static function testToleranceBlend():Void {
+    var tolerance = 0.0005;
+    for (degrees in [10, 45, 90, 135, 150]) {
+      var angle = degrees * Math.PI / 180.0;
+      var corner = new PathPoint(0.1, 0.0);
+      var end = new PathPoint(0.1 + 0.1 * Math.cos(angle),
+        0.1 * Math.sin(angle));
+      var authored = GeometricPath.lines([new PathPoint(), corner, end]);
+      var result = CornerBlender.blend(authored, tolerance, Math.PI * 0.9);
+      check(result.path.primitives.length == 3,
+        '$degrees degree corner receives a circular blend');
+      var fillet = result.path.primitives[1];
+      var middle = fillet.pointAt(fillet.length() * 0.5);
+      var setback = middle.distanceTo(corner);
+      check(setback <= tolerance * 1.01,
+        '$degrees degree corner setback stays within tolerance');
+      if (degrees <= 45)
+        check(setback >= tolerance * 0.9,
+          '$degrees degree corner uses its available tolerance');
+      var worst = 0.0;
+      for (sample in 0...1001) {
+        var point = fillet.pointAt(fillet.length() * sample / 1000.0);
+        worst = Math.max(worst, Math.min(
+          segmentDistance(point.x, point.y, 0.0, 0.0, corner.x, corner.y),
+          segmentDistance(point.x, point.y, corner.x, corner.y, end.x, end.y)));
+      }
+      check(worst <= tolerance * 1.01,
+        '$degrees degree fillet stays within the authored corner polyline');
+    }
     var mixedCorner = new GeometricPath([
       new LineSegment(new PathPoint(0.0, 0.0), new PathPoint(0.05, 0.0)),
       new ArcSegment(new PathPoint(0.07, 0.0), 0.02, Math.PI, -Math.PI * 0.5)

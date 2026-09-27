@@ -4,6 +4,7 @@ import MotionKitNative;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
+import motionkit.robot.OpwKinematics;
 
 /** Chooses one continuous joint configuration per Cartesian path sample. */
 class PathConfigurationSelector {
