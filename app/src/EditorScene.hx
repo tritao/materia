@@ -2139,64 +2139,16 @@ class EditorScene {
     rebuildPresentation(updatedNodes);
   }
 
-  function queueRenderChanges(changes:ChangeSet):Void {
-    if (renderNeedsRefresh) { changes.dispose(); return; }
-    if (pendingRenderChanges != null) {
-      pendingRenderChanges.dispose();
-      pendingRenderChanges = null;
-      changes.dispose();
-      renderNeedsRefresh = true;
-    } else pendingRenderChanges = changes;
-  }
+  function queueRenderChanges(changes:ChangeSet):Void presentation.queueRenderChanges(changes);
 
-  function requireRenderRefresh():Void {
-    if (pendingRenderChanges != null) pendingRenderChanges.dispose();
-    pendingRenderChanges = null;
-    renderNeedsRefresh = true;
-  }
+  function requireRenderRefresh():Void presentation.requireRenderRefresh();
 
-  /** Transfers the one pending change set to the viewport; null requests a refresh. */
-  public function takeRenderChanges():Null<ChangeSet> {
-    if (renderNeedsRefresh) {
-      renderNeedsRefresh = false;
-      return null;
-    }
-    var changes = pendingRenderChanges;
-    pendingRenderChanges = null;
-    return changes;
-  }
+  public function takeRenderChanges():Null<ChangeSet> return presentation.takeRenderChanges();
 
-  /** Derived presentation caches may lag a committed edit and retry on the next access/frame. */
-  function refreshPresentationIfStale():Void {
-    if (presentationStale) rebuildPresentation();
-    if (presentationStale) throw "Scene presentation is unavailable until its derived caches rebuild";
-  }
+  function refreshPresentationIfStale():Void presentation.refreshIfStale(this);
 
-  function rebuildPresentation(?updatedNodes:Array<NodeId>):Void {
-    var next:Null<SceneSnapshot> = null;
-    var nextSpatial:Null<SpatialIndex> = null;
-    try {
-      failIfInjected("publish.snapshot");
-      next = scene.snapshot();
-      failIfInjected("publish.spatial-index");
-      if (!spatial.updateNodes(next, updatedNodes == null ? [] : updatedNodes)) {
-        nextSpatial = SpatialIndex.create(next);
-        spatialFullRebuildCount = spatialFullRebuildCount + 1;
-      }
-    } catch (_:Dynamic) {
-      if (nextSpatial != null) try nextSpatial.dispose() catch (_:Dynamic) {}
-      if (next != null) try next.dispose() catch (_:Dynamic) {}
-      presentationStale = true;
-      return;
-    }
-    var previousSnapshot = snapshot;
-    var previousSpatial = spatial;
-    snapshot = next;
-    if (nextSpatial != null) spatial = nextSpatial;
-    presentationStale = false;
-    if (nextSpatial != null) try previousSpatial.dispose() catch (_:Dynamic) {}
-    try previousSnapshot.dispose() catch (_:Dynamic) {}
-  }
+  function rebuildPresentation(?updatedNodes:Array<NodeId>):Void
+    presentation.rebuild(this, updatedNodes);
 
   function failIfInjected(point:String):Void {
     var injector = failureInjection;
