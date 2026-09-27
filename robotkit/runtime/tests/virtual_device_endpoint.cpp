@@ -75,7 +75,82 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
     return {positions[0], state, endpoint->step_log()};
 }
 
+void dual_drive_layout() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 1;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -1;
+    blueprint.joints[0].upper_limit = 1;
+    blueprint.joints[0].max_velocity = 0.02;
+    blueprint.joints[0].max_acceleration = 1;
+    VirtualDeviceConfig6 config;
+    config.fingerprint.fill(7);
+    config.clock_bound_ns = 5'000'000;
+    config.actuators = {{0, 1.0, 0.0, 400'000.0, 0.02, 2, 4e-6},
+                        {0, 2.0, 0.0, 400'000.0, 0.04, 2, 4e-6}};
+    config.actuators[0].id = "gantry.left";
+    config.actuators[1].id = "gantry.right";
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    auto changed = config;
+    changed.actuators[1].ratio = 3.0;
+    auto other = VirtualDeviceEndpoint::create(blueprint, changed);
+    assert(other && endpoint->fingerprint() != other->fingerprint());
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.plan_id = 50;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.segments.segment_count = 1;
+    auto &segment = plan.segments.segments[0];
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 1;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[1] = 0.01;
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 1'220'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    auto positions = endpoint->actuator_positions();
+    assert(positions.size() == 2);
+    assert(std::abs(positions[0] - 0.01) <= 1.0 / 400'000 + 1e-6);
+    assert(std::abs(positions[1] - 0.02) <= 1.0 / 400'000 + 1e-6);
+    assert(std::abs(state.position[0] - 0.01) <= 1.0 / 400'000 + 1e-6);
+    int first_steps = 0, second_steps = 0;
+    for (const auto &record : endpoint->step_log()) {
+        if (record.actuator == 0) ++first_steps;
+        if (record.actuator == 1) ++second_steps;
+    }
+    assert(std::abs(first_steps - 4'000) <= 1);
+    assert(std::abs(second_steps - 8'000) <= 1);
+
+    auto missed = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(missed);
+    missed->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        missed->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        missed->sample(now, state);
+    assert(missed->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 320'000'000; now += 10'000'000)
+        assert(missed->sample(now, state) == RK_OK);
+    assert(missed->miss_next_steps(1, 100));
+    for (std::uint64_t now = 330'000'000; now <= 380'000'000; now += 10'000'000)
+        assert(missed->sample(now, state) == RK_OK);
+    assert(state.safety == RK_SAFETY_FAULT);
+    assert(missed->diagnostic_code() == RK_FAULT_DUAL_DRIVE_SKEW);
+}
+
 int main() {
+    dual_drive_layout();
     VirtualDeviceConfig6 config;
     config.fingerprint.fill(7);
     config.steps_per_unit = {1'000};

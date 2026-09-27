@@ -33,32 +33,51 @@ std::uint16_t Rkd6Endpoint::minimum_queue_depth(unsigned baud, std::uint8_t actu
 
 Rkd6Endpoint::Rkd6Endpoint(std::unique_ptr<Rkd6Transport> transport,
     device_wire6::SessionAck6 ack, double target_error, std::uint64_t clock_bound_ns,
-    std::uint64_t link_latency_ns)
+    std::uint64_t link_latency_ns, std::vector<DeviceActuator6> layout,
+    std::uint32_t joint_count)
     : transport_(std::move(transport)), ack_(ack), clock_(ack.device_tick_hz, clock_bound_ns),
-      target_error_(target_error), link_latency_ns_(link_latency_ns) {}
+      layout_(std::move(layout)), joint_count_(joint_count), target_error_(target_error),
+      link_latency_ns_(link_latency_ns) {}
 
 std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport> transport,
     const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> fingerprint,
     std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
     std::uint64_t link_latency_ns, std::uint32_t step_tick_hz,
-    std::uint64_t link_loss_timeout_ns) {
+    std::uint64_t link_loss_timeout_ns, std::span<const DeviceActuator6> layout) {
+    const auto actuator_count = layout.empty() ? blueprint.joint_count : layout.size();
     if (!transport || session == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
+        actuator_count == 0 || actuator_count > device_wire6::MAX_ACTUATORS ||
         !std::isfinite(target_error) || target_error < 0 || clock_bound_ns == 0 ||
         step_tick_hz == 0 || link_loss_timeout_ns == 0)
         return {};
+    fingerprint = fingerprint_device_layout6(fingerprint, layout);
     device_wire6::SessionBegin6 begin{};
     begin.session = session;
     begin.protocol_version = device_wire6::PROTOCOL_VERSION;
     begin.model_fingerprint = fingerprint;
-    begin.actuator_count = static_cast<std::uint8_t>(blueprint.joint_count);
+    begin.actuator_count = static_cast<std::uint8_t>(actuator_count);
     begin.max_degree = 5;
     begin.step_tick_hz = step_tick_hz;
     begin.link_loss_timeout_ns = link_loss_timeout_ns;
-    for (std::uint32_t i = 0; i < blueprint.joint_count; ++i) {
-        begin.actuator_max_acceleration[i] = static_cast<float>(blueprint.joints[i].max_acceleration);
+    for (std::size_t i = 0; i < actuator_count; ++i) {
+        const auto mapping = layout.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout[i];
+        if (mapping.joint >= blueprint.joint_count || !std::isfinite(mapping.ratio) ||
+            mapping.ratio == 0 || !std::isfinite(mapping.offset) ||
+            !std::isfinite(mapping.steps_per_unit) || mapping.steps_per_unit <= 0 ||
+            !std::isfinite(mapping.max_rate) || mapping.max_rate < 0 ||
+            !std::isfinite(mapping.dual_drive_skew_bound) || mapping.dual_drive_skew_bound < 0)
+            return {};
+        begin.actuator_max_acceleration[i] = static_cast<float>(
+            std::abs(mapping.ratio) * blueprint.joints[mapping.joint].max_acceleration);
+        begin.steps_per_unit[i] = static_cast<float>(mapping.steps_per_unit);
+        begin.max_rate[i] = static_cast<float>(mapping.max_rate);
+        begin.direction_setup_ticks[i] = mapping.direction_setup_ticks;
+        begin.actuator_joint[i] = mapping.joint;
+        begin.actuator_ratio[i] = static_cast<float>(mapping.ratio);
+        begin.dual_drive_skew_bound[i] = static_cast<float>(mapping.dual_drive_skew_bound);
         begin.max_acceleration = std::max(begin.max_acceleration,
-            static_cast<float>(blueprint.joints[i].max_acceleration));
+            begin.actuator_max_acceleration[i]);
     }
     if (begin.max_acceleration <= 0 || !std::isfinite(begin.max_acceleration)) return {};
     std::vector<std::uint8_t> payload(begin.SIZE);
@@ -78,7 +97,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     }
     if (!acknowledged || ack.session != session || ack.protocol_version != device_wire6::PROTOCOL_VERSION ||
         ack.device_fingerprint != fingerprint || ack.status != 1 ||
-        ack.actuator_count != blueprint.joint_count || ack.device_tick_hz == 0 ||
+        ack.actuator_count != actuator_count || ack.device_tick_hz == 0 ||
         ack.step_tick_hz == 0 || ack.segment_capacity == 0 || ack.max_degree > 5)
         return {};
     const auto period_ns = blueprint.owner_period_ns ? blueprint.owner_period_ns : 10'000'000ULL;
@@ -95,7 +114,8 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
         return {};
     }
     auto endpoint = std::shared_ptr<Rkd6Endpoint>(new Rkd6Endpoint(
-        std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns));
+        std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns,
+        std::vector<DeviceActuator6>(layout.begin(), layout.end()), blueprint.joint_count));
     endpoint->owner_period_ns_ = period_ns;
     return endpoint;
 }
@@ -143,7 +163,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     auto compiled = compile_device_segments6(
         std::span(plan.segments.segments, plan.segments.segment_count), plan.plan_id,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
-        ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_);
+        ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_);
     if (!compiled.ok) return RK_ERROR_LIMIT;
     const auto path_rate = static_cast<double>(compiled.segments.front().header.duration_ticks) /
         static_cast<double>(plan.segments.segments[0].duration_ns);
@@ -170,9 +190,11 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     begin.queue_revision = ++revision_;
     begin.replace_after_ticks = replace_ticks;
     begin.actuator_count = ack_.actuator_count;
-    for (std::uint32_t i = 0; i < blueprint.joint_count; ++i) {
-        begin.expected_position[i] = static_cast<float>(plan.start_position[i]);
-        begin.expected_velocity[i] = static_cast<float>(plan.start_velocity[i]);
+    for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
+        const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
+        begin.expected_position[i] = static_cast<float>(mapping.ratio *
+            (plan.start_position[mapping.joint] - mapping.offset));
+        begin.expected_velocity[i] = static_cast<float>(mapping.ratio * plan.start_velocity[mapping.joint]);
     }
     std::array<std::uint8_t, device_wire6::QueueBegin6::SIZE> body{};
     if (!device_wire6::encode(begin, body) || !send_record(5, body)) return RK_ERROR_BACKEND;
@@ -280,15 +302,16 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
     pump_queue();
     if (!has_state_) return RK_ERROR_STALE_STATE;
     state.struct_size = sizeof(state);
-    state.joint_count = state_header_.actuator_count;
+    state.joint_count = joint_count_;
     state.source_timestamp_ns = static_cast<std::uint64_t>(
         state_header_.timestamp_ticks * (1e9 / ack_.device_tick_hz));
     state.safety = status_.fault ? RK_SAFETY_FAULT :
         static_cast<rk_safety_state>(state_header_.safety);
-    for (std::size_t i = 0; i < state.joint_count; ++i) {
-        state.position[i] = actuators_[i].position;
-        state.velocity[i] = actuators_[i].velocity;
-        state.effort[i] = actuators_[i].effort;
+    for (std::size_t i = 0; i < state_header_.actuator_count; ++i) {
+        const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
+        state.position[mapping.joint] = actuators_[i].position / mapping.ratio + mapping.offset;
+        state.velocity[mapping.joint] = actuators_[i].velocity / mapping.ratio;
+        state.effort[mapping.joint] += actuators_[i].effort * mapping.ratio;
     }
     state.trajectory_queue_depth = ack_.segment_capacity - status_.remaining_segments;
     state.trajectory_active = status_.executing_plan_id != 0 || state.trajectory_queue_depth != 0;

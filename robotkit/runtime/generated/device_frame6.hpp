@@ -70,7 +70,13 @@ inline bool decode(std::span<const std::uint8_t> bytes, Frame &frame) {
         for (std::size_t i = 0; i < header.actuator_count; ++i) {
             const auto limit = header.actuator_max_acceleration[i];
             if (!std::isfinite(limit) || limit <= 0 ||
-                limit > header.max_acceleration) return false;
+                limit > header.max_acceleration ||
+                !std::isfinite(header.steps_per_unit[i]) || header.steps_per_unit[i] <= 0 ||
+                !std::isfinite(header.max_rate[i]) || header.max_rate[i] < 0 ||
+                header.actuator_joint[i] >= device_wire6::MAX_ACTUATORS ||
+                !std::isfinite(header.actuator_ratio[i]) || header.actuator_ratio[i] == 0 ||
+                !std::isfinite(header.dual_drive_skew_bound[i]) ||
+                header.dual_drive_skew_bound[i] < 0) return false;
         }
     }
     if (bytes[4] == 15) {

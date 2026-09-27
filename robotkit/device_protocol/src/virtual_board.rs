@@ -3,7 +3,7 @@ use std::vec::Vec;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Output {
-    Position(usize, f32), Velocity(usize, f32), Step(usize, bool),
+    Position(usize, f32), Velocity(usize, f32), Direction(usize, bool), Step(usize, bool),
     Digital(usize, bool), Analog(usize, f32), Stop,
 }
 
@@ -19,6 +19,7 @@ pub struct VirtualBoard<const ACTUATORS: usize, const CHANNELS: usize> {
     ticks: u64,
     steps_per_unit: [f64; ACTUATORS],
     steps: [i64; ACTUATORS],
+    missed_steps: [u32; ACTUATORS],
     targets: [f32; ACTUATORS],
     velocities: [f32; ACTUATORS],
     digital: [bool; CHANNELS],
@@ -32,7 +33,8 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
         assert!(tick_hz > 0 && drift_ppm > -1_000_000);
         assert!(steps_per_unit.iter().all(|v| v.is_finite() && *v > 0.0));
         Self { tick_hz, offset_ticks, drift_ppm, host_ns: 0, ticks: offset_ticks,
-            steps_per_unit, steps: [0; A], targets: [0.0; A], velocities: [0.0; A],
+            steps_per_unit, steps: [0; A], missed_steps: [0; A],
+            targets: [0.0; A], velocities: [0.0; A],
             digital: [false; C], analog: [0.0; C], records: Vec::new() }
     }
     pub fn advance_host_ns(&mut self, host_ns: u64) {
@@ -43,6 +45,11 @@ impl<const A: usize, const C: usize> VirtualBoard<A, C> {
         self.ticks = self.offset_ticks.saturating_add((scaled / 1_000_000_000_000_000) as u64);
     }
     pub fn step_counts(&self) -> [i64; A] { self.steps }
+    pub fn miss_next_steps(&mut self, actuator: usize, count: u32) -> bool {
+        if actuator >= A { return false; }
+        self.missed_steps[actuator] = count;
+        true
+    }
     pub fn actuator_positions(&self) -> [f64; A] {
         std::array::from_fn(|i| self.steps[i] as f64 / self.steps_per_unit[i])
     }
@@ -65,7 +72,16 @@ impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
         self.velocities[i] = value; self.record(Output::Velocity(i, value));
     }
     fn step_pulse(&mut self, i: usize, forward: bool) {
-        self.steps[i] += if forward { 1 } else { -1 }; self.record(Output::Step(i, forward));
+        self.record(Output::Step(i, forward));
+        if self.missed_steps[i] > 0 {
+            self.missed_steps[i] -= 1;
+        } else {
+            self.steps[i] += if forward { 1 } else { -1 };
+        }
+    }
+    fn step_count(&self, i: usize) -> i64 { self.steps[i] }
+    fn set_direction(&mut self, i: usize, forward: bool) {
+        self.record(Output::Direction(i, forward));
     }
     fn set_digital(&mut self, i: usize, value: bool) {
         self.digital[i] = value; self.record(Output::Digital(i, value));

@@ -564,3 +564,22 @@ native tests, 5,411 MotionKit and 4,492 RobotKit Haxe assertions, runtime,
 SimKit and MotionKit FFI audits, and TCP integration in default, session and
 lease-timeout modes passed. The final virtual-device Rust and native tests
 were rerun after suppressing duplicate zero-time state frames.
+
+### A7 — Step timing and actuator transmissions
+
+Moved position crossing into the no_std step generator. Direction setup and
+minimum step intervals are configured per actuator, and the virtual board can
+inject missed pulses. RKD6 session version 8 carries ordered actuator step
+scales, rates, source joints, ratios and skew bounds. The host converts each
+joint polynomial to actuator coordinates at the device compiler, checks
+actuator rate and step-tick capacity, and maps feedback back to joints.
+Dual-drive skew faults from measured step counts. SimKit drives its joints
+through the same transmission. Tests cover a four-start, 8 mm lead screw at
+400 steps/mm through MotionKit, RKD6 and SimKit, dual-drive proportional
+counts, a missed-step fault, fingerprint changes and direction/rate timing.
+
+Plan C's RobotModel v5 `JointCoupling` is not on `main` at this point. The
+joint-to-actuator conversion loop in `device_compiler6.cpp` has the marked
+extension point for follower derivation and submit-time coupling validation.
+No coupling logic was added elsewhere; transmissions and couplings remain
+separate model concepts.

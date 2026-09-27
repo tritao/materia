@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 7
+      "value": 8
     }
   },
   "enums": {
@@ -345,12 +345,42 @@
           "type": "f32"
         },
         {
+          "length": 64,
+          "name": "steps_per_unit",
+          "type": "f32"
+        },
+        {
+          "length": 64,
+          "name": "max_rate",
+          "type": "f32"
+        },
+        {
+          "length": 64,
+          "name": "direction_setup_ticks",
+          "type": "u16"
+        },
+        {
+          "length": 64,
+          "name": "actuator_joint",
+          "type": "u8"
+        },
+        {
+          "length": 64,
+          "name": "actuator_ratio",
+          "type": "f32"
+        },
+        {
+          "length": 64,
+          "name": "dual_drive_skew_bound",
+          "type": "f32"
+        },
+        {
           "length": 1,
           "name": "link_loss_timeout_ns",
           "type": "u64"
         }
       ],
-      "size": 299
+      "size": 1515
     },
     "State6Header": {
       "endian": "little",

@@ -1,6 +1,7 @@
 #include "device_compiler6.hpp"
 #include "motionkit.h"
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <limits>
 
@@ -29,18 +30,57 @@ CompiledDevicePlan6 failure(const char *message) {
 
 } // namespace
 
+std::array<std::uint8_t, 16> fingerprint_device_layout6(
+    std::array<std::uint8_t, 16> base, std::span<const DeviceActuator6> layout) {
+    if (layout.empty()) return base;
+    std::uint64_t hash = 14695981039346656037ULL;
+    auto mix = [&](std::uint64_t value) {
+        for (int byte = 0; byte < 8; ++byte) {
+            hash ^= static_cast<std::uint8_t>(value >> (8 * byte));
+            hash *= 1099511628211ULL;
+        }
+    };
+    for (auto byte : base) mix(byte);
+    mix(layout.size());
+    for (const auto &a : layout) {
+        for (unsigned char c : a.id) mix(c);
+        mix(0);
+        mix(a.joint); mix(std::bit_cast<std::uint64_t>(a.ratio));
+        mix(std::bit_cast<std::uint64_t>(a.offset));
+        mix(std::bit_cast<std::uint64_t>(a.steps_per_unit));
+        mix(std::bit_cast<std::uint64_t>(a.max_rate));
+        mix(a.direction_setup_ticks);
+        mix(std::bit_cast<std::uint64_t>(a.dual_drive_skew_bound));
+    }
+    for (int i = 0; i < 16; ++i) {
+        hash ^= hash >> 32; hash *= 1099511628211ULL;
+        base[i] = static_cast<std::uint8_t>(hash >> ((i % 8) * 8));
+    }
+    return base;
+}
+
 CompiledDevicePlan6 compile_device_segments6(
     std::span<const rk_trajectory_segment> segments, std::uint64_t plan_id,
     bool ends_at_rest, std::uint64_t host_plan_start_ns,
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
-    std::uint8_t max_degree, double target_error) {
+    std::uint8_t max_degree, double target_error,
+    std::span<const DeviceActuator6> layout) {
     if (!clock.may_commit()) return failure("clock_sync_lost");
     if (segments.empty() || plan_id == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
         device_tick_hz == 0 || step_tick_hz == 0 || max_degree > 5 ||
         !std::isfinite(target_error) || target_error < 0)
         return failure("invalid device compiler input");
+    const auto actuator_count = layout.empty() ? blueprint.joint_count : layout.size();
+    if (actuator_count == 0 || actuator_count > device_wire6::MAX_ACTUATORS)
+        return failure("invalid actuator layout");
+    for (const auto &actuator : layout)
+        if (actuator.joint >= blueprint.joint_count || !std::isfinite(actuator.ratio) ||
+            actuator.ratio == 0 || !std::isfinite(actuator.offset) ||
+            !std::isfinite(actuator.steps_per_unit) || actuator.steps_per_unit <= 0 ||
+            !std::isfinite(actuator.max_rate) || actuator.max_rate < 0)
+            return failure("invalid actuator layout");
     const auto resolution_ns = (1'000'000'000ULL + step_tick_hz - 1) / step_tick_hz;
     const auto base_ticks = clock.map_host_ns(host_plan_start_ns);
     CompiledDevicePlan6 result;
@@ -76,9 +116,9 @@ CompiledDevicePlan6 compile_device_segments6(
         DeviceSegment6 wire;
         wire.header = {0, plan_id, start_ticks, duration_ticks,
                        static_cast<std::uint8_t>(source.degree),
-                       static_cast<std::uint8_t>(source.joint_count),
+                       static_cast<std::uint8_t>(actuator_count),
                        static_cast<std::uint8_t>(ends_at_rest && i + 1 == segments.size()), 0};
-        wire.coefficients.reserve(source.joint_count);
+        wire.coefficients.reserve(actuator_count);
         mk_segment converted{};
         converted.struct_size = sizeof(converted);
         converted.t0_ns = converted_time_ns;
@@ -90,16 +130,30 @@ CompiledDevicePlan6 compile_device_segments6(
         converted.degree = source.degree;
         converted.joint_count = source.joint_count;
         for (std::uint32_t joint = 0; joint < source.joint_count; ++joint) {
+            double factor = 1.0;
+            for (std::uint32_t k = 0; k <= source.degree; ++k) {
+                converted.coefficients[joint].value[k] =
+                    static_cast<float>(source.coefficients[joint].value[k] * factor);
+                factor *= scale;
+            }
+        }
+        // Joint -> actuator transmission conversion lives here. Plan C's
+        // JointCoupling v5 will validate/derive follower joints immediately
+        // before this loop when that model contract lands on main.
+        for (std::size_t actuator = 0; actuator < actuator_count; ++actuator) {
+            const auto joint = layout.empty() ? actuator : layout[actuator].joint;
+            const auto ratio = layout.empty() ? 1.0 : layout[actuator].ratio;
+            const auto offset = layout.empty() ? 0.0 : layout[actuator].offset;
             device_wire6::Segment6Coefficients c{};
-            c.actuator = static_cast<std::uint8_t>(joint);
+            c.actuator = static_cast<std::uint8_t>(actuator);
             float *fields[] = {&c.c0, &c.c1, &c.c2, &c.c3, &c.c4, &c.c5};
             double factor = 1.0;
             for (std::uint32_t k = 0; k <= source.degree; ++k) {
-                const auto value = source.coefficients[joint].value[k] * factor;
+                const auto value = ratio * (source.coefficients[joint].value[k] -
+                    (k == 0 ? offset : 0.0)) * factor;
                 if (!std::isfinite(value) || std::abs(value) > std::numeric_limits<float>::max())
                     return reject("f32 coefficient overflow");
                 *fields[k] = static_cast<float>(value);
-                converted.coefficients[joint].value[k] = *fields[k];
                 factor *= scale;
             }
             wire.coefficients.push_back(c);
@@ -111,13 +165,29 @@ CompiledDevicePlan6 compile_device_segments6(
             const auto host_elapsed_ns = std::min<std::uint64_t>(source.duration_ns, sample * resolution_ns);
             const auto device_elapsed_seconds = static_cast<double>(host_elapsed_ns) / 1e9 / scale;
             const auto host_tau = static_cast<double>(host_elapsed_ns) / 1e9;
-            for (std::uint32_t joint = 0; joint < source.joint_count; ++joint) {
-                const auto actual = static_cast<double>(evaluate_f32(wire.coefficients[joint],
+            for (std::size_t actuator = 0; actuator < actuator_count; ++actuator) {
+                const auto joint = layout.empty() ? actuator : layout[actuator].joint;
+                const auto ratio = layout.empty() ? 1.0 : layout[actuator].ratio;
+                const auto offset = layout.empty() ? 0.0 : layout[actuator].offset;
+                const auto actual = static_cast<double>(evaluate_f32(wire.coefficients[actuator],
                     wire.header.degree, static_cast<float>(device_elapsed_seconds)));
                 const auto exact = evaluate_f64(source.coefficients[joint], wire.header.degree, host_tau);
-                const auto error = std::abs(actual - exact);
+                const auto error = std::abs(actual / ratio + offset - exact);
                 result.worst_position_error = std::max(result.worst_position_error, error);
                 if (error > target_error) return reject("converted trajectory exceeds target_error");
+                if (!layout.empty()) {
+                    double velocity = 0.0;
+                    double power = 1.0;
+                    for (std::uint32_t k = 1; k <= source.degree; ++k) {
+                        velocity += k * source.coefficients[joint].value[k] * power;
+                        power *= host_tau;
+                    }
+                    const auto actuator_rate = std::abs(velocity * ratio);
+                    if ((layout[actuator].max_rate > 0 &&
+                         actuator_rate > layout[actuator].max_rate + 1e-6) ||
+                        actuator_rate * layout[actuator].steps_per_unit > step_tick_hz + 1e-6)
+                        return reject("actuator step-rate limit exceeded");
+                }
             }
         }
         result.segments.push_back(std::move(wire));

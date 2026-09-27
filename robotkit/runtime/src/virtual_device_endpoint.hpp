@@ -22,6 +22,7 @@ struct VirtualDeviceConfig6 {
     std::uint64_t seed = 1;
     std::array<std::uint8_t, 16> fingerprint{};
     std::vector<double> steps_per_unit;
+    std::vector<DeviceActuator6> actuators;
     double target_error = 1e-5;
     std::uint64_t clock_bound_ns = 500'000;
     std::uint64_t link_loss_timeout_ns = 500'000'000;
@@ -48,16 +49,25 @@ public:
         std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
         const rk_robot_runtime_blueprint &) override;
     void cut_link(bool cut);
+    bool miss_next_steps(std::uint32_t actuator, std::uint32_t count);
+    std::array<std::uint8_t, 16> fingerprint() const noexcept { return fingerprint_; }
     std::vector<double> actuator_positions() const;
+    std::vector<double> joint_positions() const;
     std::vector<float> channel_values() const;
     std::vector<VirtualStepRecord6> step_log() const;
 
 private:
     class Link;
-    VirtualDeviceEndpoint(std::shared_ptr<Rkd6Endpoint> inner, Link *link)
-        : inner_(std::move(inner)), link_(link) {}
+    VirtualDeviceEndpoint(std::shared_ptr<Rkd6Endpoint> inner, Link *link,
+        std::vector<DeviceActuator6> actuators, std::uint32_t joint_count,
+        std::array<std::uint8_t, 16> fingerprint)
+        : inner_(std::move(inner)), link_(link), actuators_(std::move(actuators)),
+          joint_count_(joint_count), fingerprint_(fingerprint) {}
     std::shared_ptr<Rkd6Endpoint> inner_;
     Link *link_;
+    std::vector<DeviceActuator6> actuators_;
+    std::uint32_t joint_count_;
+    std::array<std::uint8_t, 16> fingerprint_;
 };
 
 } // namespace robotkit

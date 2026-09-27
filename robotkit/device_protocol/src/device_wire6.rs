@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 7;
+pub const PROTOCOL_VERSION: u8 = 8;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -37,11 +37,17 @@ pub struct SessionBegin6 {
     pub step_tick_hz: u32,
     pub max_acceleration: f32,
     pub actuator_max_acceleration: [f32; 64],
+    pub steps_per_unit: [f32; 64],
+    pub max_rate: [f32; 64],
+    pub direction_setup_ticks: [u16; 64],
+    pub actuator_joint: [u8; 64],
+    pub actuator_ratio: [f32; 64],
+    pub dual_drive_skew_bound: [f32; 64],
     pub link_loss_timeout_ns: u64,
 }
 
 impl SessionBegin6 {
-    pub const SIZE: usize = 299;
+    pub const SIZE: usize = 1515;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -63,6 +69,30 @@ impl SessionBegin6 {
         out[offset..offset + 4].copy_from_slice(&self.max_acceleration.to_le_bytes());
         offset += 4;
         for value in self.actuator_max_acceleration {
+            out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            offset += 4;
+        }
+        for value in self.steps_per_unit {
+            out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            offset += 4;
+        }
+        for value in self.max_rate {
+            out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            offset += 4;
+        }
+        for value in self.direction_setup_ticks {
+            out[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+            offset += 2;
+        }
+        for value in self.actuator_joint {
+            out[offset..offset + 1].copy_from_slice(&value.to_le_bytes());
+            offset += 1;
+        }
+        for value in self.actuator_ratio {
+            out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
+            offset += 4;
+        }
+        for value in self.dual_drive_skew_bound {
             out[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
             offset += 4;
         }
@@ -112,12 +142,54 @@ impl SessionBegin6 {
             *item = f32::from_le_bytes(bytes);
             offset += 4;
         }
+        let mut steps_per_unit = [0 as f32; 64];
+        for item in &mut steps_per_unit {
+            let mut bytes = [0u8; 4];
+            bytes.copy_from_slice(&input[offset..offset + 4]);
+            *item = f32::from_le_bytes(bytes);
+            offset += 4;
+        }
+        let mut max_rate = [0 as f32; 64];
+        for item in &mut max_rate {
+            let mut bytes = [0u8; 4];
+            bytes.copy_from_slice(&input[offset..offset + 4]);
+            *item = f32::from_le_bytes(bytes);
+            offset += 4;
+        }
+        let mut direction_setup_ticks = [0 as u16; 64];
+        for item in &mut direction_setup_ticks {
+            let mut bytes = [0u8; 2];
+            bytes.copy_from_slice(&input[offset..offset + 2]);
+            *item = u16::from_le_bytes(bytes);
+            offset += 2;
+        }
+        let mut actuator_joint = [0 as u8; 64];
+        for item in &mut actuator_joint {
+            let mut bytes = [0u8; 1];
+            bytes.copy_from_slice(&input[offset..offset + 1]);
+            *item = u8::from_le_bytes(bytes);
+            offset += 1;
+        }
+        let mut actuator_ratio = [0 as f32; 64];
+        for item in &mut actuator_ratio {
+            let mut bytes = [0u8; 4];
+            bytes.copy_from_slice(&input[offset..offset + 4]);
+            *item = f32::from_le_bytes(bytes);
+            offset += 4;
+        }
+        let mut dual_drive_skew_bound = [0 as f32; 64];
+        for item in &mut dual_drive_skew_bound {
+            let mut bytes = [0u8; 4];
+            bytes.copy_from_slice(&input[offset..offset + 4]);
+            *item = f32::from_le_bytes(bytes);
+            offset += 4;
+        }
         let mut bytes = [0u8; 8];
         bytes.copy_from_slice(&input[offset..offset + 8]);
         let link_loss_timeout_ns = u64::from_le_bytes(bytes);
         offset += 8;
         let _ = offset;
-        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, link_loss_timeout_ns })
+        Ok(Self { session, protocol_version, model_fingerprint, actuator_count, max_degree, step_tick_hz, max_acceleration, actuator_max_acceleration, steps_per_unit, max_rate, direction_setup_ticks, actuator_joint, actuator_ratio, dual_drive_skew_bound, link_loss_timeout_ns })
     }
 }
 

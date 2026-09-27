@@ -34,7 +34,8 @@ public:
         const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> fingerprint,
         std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
         std::uint64_t link_latency_ns, std::uint32_t step_tick_hz = 40'000,
-        std::uint64_t link_loss_timeout_ns = 500'000'000);
+        std::uint64_t link_loss_timeout_ns = 500'000'000,
+        std::span<const DeviceActuator6> layout = {});
 
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
@@ -42,7 +43,8 @@ public:
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_EMERGENCY_STOP; }
     bool executes_trajectory_queue() const noexcept override { return true; }
     int32_t diagnostic_code() const noexcept override {
-        return clock_.clock_sync_lost() ? RK_FAULT_CLOCK_SYNC_LOST : 0;
+        return clock_.clock_sync_lost() ? RK_FAULT_CLOCK_SYNC_LOST :
+            status_.fault == 4 ? RK_FAULT_DUAL_DRIVE_SKEW : 0;
     }
     rk_result submit_device_plan(const rk_plan_submission &plan, std::uint64_t base_time_ns,
         std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
@@ -52,7 +54,8 @@ public:
 
 private:
     Rkd6Endpoint(std::unique_ptr<Rkd6Transport>, device_wire6::SessionAck6,
-        double target_error, std::uint64_t clock_bound_ns, std::uint64_t link_latency_ns);
+        double target_error, std::uint64_t clock_bound_ns, std::uint64_t link_latency_ns,
+        std::vector<DeviceActuator6> layout, std::uint32_t joint_count);
     bool send_record(std::uint8_t kind, std::span<const std::uint8_t> payload);
     bool send_segment(const DeviceSegment6 &segment);
     bool send_commit(std::uint64_t through_ticks);
@@ -61,6 +64,8 @@ private:
 
     std::unique_ptr<Rkd6Transport> transport_;
     device_wire6::SessionAck6 ack_{};
+    std::vector<DeviceActuator6> layout_;
+    std::uint32_t joint_count_ = 0;
     ClockEstimator6 clock_;
     double target_error_;
     std::uint64_t link_latency_ns_;

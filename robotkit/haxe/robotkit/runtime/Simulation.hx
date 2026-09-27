@@ -59,7 +59,8 @@ class Simulation {
       robotDesc.set_initial_pose(initialPose == null ?
         makePose([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]) : initialPose);
       if (virtualDevice != null) {
-        if (blueprint.jointCount > 64 || virtualDevice.fingerprint.length != 32 ||
+        if (blueprint.jointCount > 64 || virtualDevice.actuators.length > 64 ||
+            virtualDevice.fingerprint.length != 32 ||
             !~/^[0-9a-fA-F]{32}$/.match(virtualDevice.fingerprint) ||
             (virtualDevice.stepsPerUnit.length != 0 &&
              virtualDevice.stepsPerUnit.length != blueprint.jointCount))
@@ -84,6 +85,23 @@ class Simulation {
         robotDesc.set_virtual_device_target_error(virtualDevice.targetError);
         robotDesc.set_virtual_device_clock_bound_ns(virtualDevice.clockBoundNs);
         robotDesc.set_virtual_device_link_loss_timeout_ns(virtualDevice.linkLossTimeoutNs);
+        robotDesc.set_virtual_device_actuator_count(virtualDevice.actuators.length);
+        for (i in 0...virtualDevice.actuators.length) {
+          var actuator = virtualDevice.actuators[i];
+          if (actuator.jointIndex >= blueprint.jointCount)
+            throw "Virtual actuator references an unknown joint";
+          robotDesc.set_virtual_device_actuator_joint(i, actuator.jointIndex);
+          robotDesc.set_virtual_device_actuator_ratio(i, actuator.ratio);
+          robotDesc.set_virtual_device_actuator_offset(i, actuator.offset);
+          robotDesc.set_virtual_device_actuator_steps_per_unit(i, actuator.stepsPerUnit);
+          robotDesc.set_virtual_device_actuator_max_rate(i, actuator.maxRate);
+          robotDesc.set_virtual_device_actuator_direction_setup_ticks(i,
+            actuator.directionSetupTicks);
+          robotDesc.set_virtual_device_actuator_skew_bound(i, actuator.skewBound);
+          for (byte in 0...actuator.id.length)
+            robotDesc.set_virtual_device_actuator_ids(i * 64 + byte,
+              actuator.id.charCodeAt(byte));
+        }
       }
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
