@@ -513,9 +513,14 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                                const double *max_acceleration, uint32_t joint_count,
                                const double *speed_caps, uint32_t speed_cap_count,
                                double start_speed, double end_speed,
-                               mk_time_law_handle *out_law) {
-    if (!out_law) return MK_ERROR_INVALID_ARGUMENT;
+                               double lowering_tolerance,
+                               mk_time_law_handle *out_law,
+                               mk_trajectory_handle *out_trajectory) {
+    if (!out_law || !out_trajectory) return MK_ERROR_INVALID_ARGUMENT;
     out_law->id = 0;
+    out_trajectory->id = 0;
+    if (!std::isfinite(lowering_tolerance) || lowering_tolerance <= 0.0)
+        return MK_ERROR_INVALID_ARGUMENT;
     std::vector<mk_path_sample> samples;
     {
         std::lock_guard lock(mutex);
@@ -639,7 +644,8 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 static_cast<uint32_t>(stages.size()), &created);
             if (result != MK_OK) return result;
             mk_trajectory_handle lowered{};
-            const auto lowered_result = mk_path_lower(path, created, 1e-6, &lowered);
+            const auto lowered_result = mk_path_lower(path, created,
+                lowering_tolerance, &lowered);
             if (lowered_result != MK_OK) {
                 mk_time_law_destroy(created);
                 return lowered_result;
@@ -654,8 +660,8 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             mk_validation_report report{};
             report.struct_size = sizeof(report);
             const auto validation = mk_validate(lowered, &limits, &report);
-            mk_trajectory_destroy(lowered);
             if (validation != MK_OK) {
+                mk_trajectory_destroy(lowered);
                 mk_time_law_destroy(created);
                 return MK_ERROR_GENERATION;
             }
@@ -669,8 +675,10 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                     acceleration_check.limit));
             if (factor <= 1.0) {
                 accepted = true;
+                *out_trajectory = lowered;
                 break;
             }
+            mk_trajectory_destroy(lowered);
             mk_time_law_destroy(created);
             // Uniform stretching would change an authored moving endpoint
             // speed, so report infeasibility instead of returning a law with

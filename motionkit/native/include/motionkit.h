@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 11, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 12, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_PLAN_EVENTS = 256, MK_EVENT_CHANNEL_BYTES = 48, MK_EVENT_COMMAND_BYTES = 48,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
@@ -375,13 +375,14 @@ MK_API mk_result MK_CALL mk_path_distance_to_time(mk_time_law_handle law,
 /** Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema. */
 MK_API mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
     double tolerance, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
-/** Reachability-based TOPP-RA timing with Seidel's two-variable LP solver. */
+/** Reachability-based TOPP-RA timing and its validated lowered trajectory. */
 MK_API mk_result MK_CALL mk_time_path(mk_path_handle path,
     const double *max_velocity MK_IN_ARRAY(joint_count),
     const double *max_acceleration MK_IN_ARRAY(joint_count), uint32_t joint_count,
     const double *speed_caps MK_IN_ARRAY(speed_cap_count), uint32_t speed_cap_count,
-    double start_speed, double end_speed,
-    mk_time_law_handle *out_law MK_OUT MK_OWNED);
+    double start_speed, double end_speed, double lowering_tolerance,
+    mk_time_law_handle *out_law MK_OUT MK_OWNED,
+    mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);
 MK_API mk_result MK_CALL mk_time_law_binding_count(mk_time_law_handle law,
     uint32_t *out_count MK_OUT);
 MK_API mk_result MK_CALL mk_time_law_get_binding(mk_time_law_handle law,

@@ -20,15 +20,16 @@ class ToppraPathTiming implements PathTimingBackend {
       throw "TOPP-RA needs one speed cap per path span";
     var nativePath = new NativeJointPath(path);
     try {
-      var law = nativePath.time(limits);
+      var timed = nativePath.time(limits, loweringTolerance);
+      var law = timed.law;
       try {
-        var trajectory = nativePath.lower(law, loweringTolerance);
         var bindings = law.bindingConstraints();
-        var result = new TimedPath(trajectory, function(distance:Float):Float
+        var result = new TimedPath(timed.trajectory, function(distance:Float):Float
           return law.distanceToTime(distance), bindings, function():Void law.dispose());
         nativePath.dispose();
         return result;
       } catch (error:Dynamic) {
+        timed.trajectory.dispose();
         law.dispose();
         throw error;
       }
