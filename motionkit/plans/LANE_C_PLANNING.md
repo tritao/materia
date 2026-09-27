@@ -317,6 +317,16 @@ Do:
   `VirtualDeviceEndpoint` with virtual steppers.
 - Add feed hold mid-arc (it must stay on the arc) and a link-loss injection
   (device-side controlled stop, when on Lane A's path).
+- **Once Plan C (editor assembly simulation) is on `main`:** also run the demo
+  on the gantry's *physical assembly model* from `AssemblySimulationBridge`.
+  - One link per part, with material-derived mass and couplings in the model
+    (v5).
+  - It is driven through actuators attached from the MachineKit motor parts.
+  - Collision uses the upstream convex hulls.
+
+  This is the intended single model (architecture invariant 1). Record any
+  gap that prevents it (for example missing actuator attachment) in the log
+  instead of working around it.
 
 Tests (a scenario test in `motionkit/tests` or a new `cnckit/tests`):
 - the executed path stays within the declared tolerance of the programmed

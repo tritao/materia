@@ -250,6 +250,21 @@ Tests:
     observed in the snapshot;
   - clock drift of 2000 ppm: stays in sync.
 
+**Plan C interaction (editor assembly simulation).** A separate plan
+(Plan C, run from another session) simulates MachineKit assemblies in the
+editor through `AssemblySimulationBridge`. It uses one link per part, and
+joint → joint couplings such as lead screw → carriage live in the
+`RobotModel` as `JointCoupling` (model schema v5). Once that is on `main`:
+- add an A6 test that runs the virtual-device loop on the bridge's physical
+  assembly model as well as on the `MachineKitRobotCompiler` model;
+- the leader joint is driven through the actuator transmission, and the
+  coupled follower joint must track `offset + ratio × leader` within
+  tolerance.
+
+Until then, the compiler model is enough. Don't build a parallel coupling
+mechanism here: couplings belong to the model, and A7's joint → actuator
+conversion stage is where the runtime applies them.
+
 ## A7 — Step generation (LA-D2) and transmissions end to end
 
 Do:
@@ -269,6 +284,15 @@ Do:
     `dual_drive_skew` fault.
   - Update `robotkit/ARCHITECTURE.md`'s P11 design section from "design" to
     "implemented".
+  - **Couplings:** if Plan C's `JointCoupling` (model v5) is on `main` when
+    this item runs, apply couplings at this same conversion stage:
+    - follower joint targets are derived from their leader;
+    - a plan whose follower trajectory violates a coupling is rejected at
+      submit.
+
+    If it isn't on `main` yet, leave a clearly marked extension point and
+    note it in the log. Transmissions (actuator ↔ joint) and couplings
+    (joint ↔ joint) stay distinct concepts.
 
 Tests:
 - For a lead-screw axis at 200 steps/rev × 16 microsteps with an 8 mm lead,
