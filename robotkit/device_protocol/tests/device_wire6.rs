@@ -1,4 +1,4 @@
-use robotkit_device_protocol::device_wire6::{ActuatorLimit6, SessionBegin6, Segment6Header, TimeSyncRequest};
+use robotkit_device_protocol::device_wire6::{ActuatorLimit6, SessionBegin6, SessionTiming6, Segment6Header, TimeSyncRequest};
 use robotkit_device_protocol::frame6::{decode_frame6, encode_frame6, Frame6Error, MAX_FRAME_SIZE};
 
 #[test]
@@ -49,12 +49,15 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
     let begin = SessionBegin6 { session: 7, protocol_version: 6,
         model_fingerprint: [3; 16], actuator_count: 2, max_degree: 5,
         step_tick_hz: 40_000, link_loss_ticks: 500_000, max_acceleration: 4.0 };
-    let mut body = [0; SessionBegin6::SIZE + 2 * ActuatorLimit6::SIZE];
+    let mut body = [0; SessionBegin6::SIZE + 2 * ActuatorLimit6::SIZE + SessionTiming6::SIZE];
     begin.encode(&mut body[..SessionBegin6::SIZE]).unwrap();
     ActuatorLimit6 { max_acceleration: 2.0 }
         .encode(&mut body[SessionBegin6::SIZE..SessionBegin6::SIZE + ActuatorLimit6::SIZE]).unwrap();
     ActuatorLimit6 { max_acceleration: 4.0 }
-        .encode(&mut body[SessionBegin6::SIZE + ActuatorLimit6::SIZE..]).unwrap();
+        .encode(&mut body[SessionBegin6::SIZE + ActuatorLimit6::SIZE..
+            SessionBegin6::SIZE + 2 * ActuatorLimit6::SIZE]).unwrap();
+    SessionTiming6 { link_loss_timeout_ns: 500_000_000 }
+        .encode(&mut body[SessionBegin6::SIZE + 2 * ActuatorLimit6::SIZE..]).unwrap();
     let mut frame = [0; MAX_FRAME_SIZE];
     let size = encode_frame6(1, &body, &mut frame).unwrap();
     assert_eq!(decode_frame6(&frame[..size]), Ok((1, &body[..])));

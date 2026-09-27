@@ -42,6 +42,7 @@ import robotkit.world.RobotSnapshot;
 import robotkit.world.RobotStatus;
 import robotkit.world.RemoteRobot;
 import robotkit.world.SerialRobot;
+import robotkit.deployment.SerialDeployment;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RecordingRobot;
 import robotkit.world.StopMode;
@@ -206,6 +207,7 @@ class RobotWorldTests {
     testCameraFrameProtocol();
     testExternalSensorRuntime();
     testSerialRobotUnavailableDevice();
+    testSerialDeploymentVersions();
     testProcessChannelDeployment();
     testRuntimeProcessEvents();
     assertions += SpatialTests.run();
@@ -3694,6 +3696,20 @@ class RobotWorldTests {
     partial.fieldOfViewRadians = Math.PI;
     check(hasDiagnostic(diagnostics, "RK_FRAME_POSE"), "non-unit mount rotations rejected");
     check(hasDiagnostic(diagnostics, "RK_SENSOR_RATE"), "negative sample rates rejected");
+  }
+
+  static function testSerialDeploymentVersions():Void {
+    var fixture = Sys.getCwd() + "/robotkit/tests/fixtures/device-deployment/";
+    if (!sys.FileSystem.exists(fixture + "deployment.json"))
+      fixture = Sys.getCwd() + "/fixtures/device-deployment/";
+    var legacy = new SerialDeployment(fixture + "deployment.json");
+    equal(legacy.protocol, "rkd5", "v2 deployment keeps RKD5");
+    var scheduled = new SerialDeployment(fixture + "deployment6.json");
+    equal(scheduled.protocol, "rkd6", "v3 deployment selects RKD6");
+    equal(scheduled.stepTickHz, 40000, "v3 step tick rate");
+    equal(scheduled.clockSyncBoundNs, haxe.Int64.ofInt(500000), "v3 sync bound");
+    throws(function() SerialRobot.fromDeployment("scheduled-probe", fixture + "deployment6.json"),
+      "serial adapter does not route RKD6 through RKD5");
   }
 
   static function testSerialRobotUnavailableDevice():Void {

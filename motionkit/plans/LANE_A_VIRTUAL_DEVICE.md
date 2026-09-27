@@ -484,3 +484,41 @@ RobotKit Haxe assertions, both FFI audits, and TCP integration in default,
 session and lease-timeout modes passed on the lane tree. A final Rust test
 then caught an idle completed plan being mistaken for link loss; it was fixed
 without changing the host-side behavior.
+
+### A5 schema correction — Link-loss timeout units
+
+The host cannot convert a deployment nanosecond timeout to device ticks before
+the session ACK supplies the device tick rate. Added a trailing `SessionTiming6`
+nanosecond timeout record to `SESSION_BEGIN6`; the device converts it using its
+own clock. The fixed header stays locked and its old tick field is zero when
+the trailing record is present. Both frame decoders and shared tests were
+updated before implementing the A5 endpoint.
+
+### A5 — Compile and forward RKD6 plans
+
+Added a C++ device compiler that maps host plan time to device ticks, rescales
+local polynomial coefficients for the mapped duration, converts them to
+`f32`, runs `mk_validate` at the device step-tick resolution, and checks
+sampled execution error against the deployment's `target_error`. The
+`Rkd6Endpoint` negotiates a session over a complete-frame transport, sends
+periodic time-sync requests, forwards queue revisions, segments and commits,
+refills within the device's queue capacity, and maps device status into the
+runtime snapshot. A runtime endpoint capability suppresses host per-cycle
+target streaming for device-owned queues. Added v3 deployment parsing for
+protocol, step-tick, link-loss and clock-sync settings while retaining v2.
+Unqualified serial baud or queue depth fails at construction or submit with
+the required minimum in the diagnostic. `clock_sync_lost` stops new commits
+without discarding already committed motion. Tests were written first for the
+compiler and v3 parser, and mock-link tests cover negotiation, replacement,
+late rejection, status mapping and clock loss. Commit: the commit containing
+this entry.
+
+The plan's A5 in-process device tests depend on the static library and
+SimKit loop specified in A6. A5 uses a deterministic complete-frame mock;
+the full-chain device assertions will land with A6.
+
+The Rust and MCU builds, all 19 native tests, 5,875 MotionKit and 4,442
+RobotKit Haxe assertions, both FFI audits, and all three TCP integration
+modes passed. The first RobotKit run caught an obsolete v3 fixture
+fingerprint after the schema-lock update; the fixture was regenerated and
+the suite passed on rerun.

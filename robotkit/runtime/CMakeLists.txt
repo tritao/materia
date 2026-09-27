@@ -5,7 +5,9 @@ add_library(robotkit_runtime ${RK_LIBRARY_TYPE}
     src/recording.cpp
     src/device_host.cpp
     src/device_serial_endpoint.cpp
-    src/clock_estimator6.cpp)
+    src/clock_estimator6.cpp
+    src/device_compiler6.cpp
+    src/rkd6_endpoint.cpp)
 add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
@@ -76,6 +78,22 @@ if(RK_BUILD_TESTS)
     add_test(NAME robotkit_segment_vectors COMMAND robotkit_segment_vectors_tests
         ${CMAKE_CURRENT_SOURCE_DIR}/../device_protocol/tests/segment_vectors.tsv)
     set_tests_properties(robotkit_segment_vectors PROPERTIES LABELS "robot;wire;motion" TIMEOUT 30)
+
+    add_executable(robotkit_device_compiler6_tests tests/device_compiler6.cpp
+        src/device_compiler6.cpp src/clock_estimator6.cpp)
+    target_compile_features(robotkit_device_compiler6_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_device_compiler6_tests PRIVATE src include generated)
+    target_link_libraries(robotkit_device_compiler6_tests PRIVATE motionkit_core)
+    add_test(NAME robotkit_device_compiler6 COMMAND robotkit_device_compiler6_tests)
+    set_tests_properties(robotkit_device_compiler6 PROPERTIES LABELS "robot;runtime;wire" TIMEOUT 30)
+
+    add_executable(robotkit_rkd6_endpoint_tests tests/rkd6_endpoint.cpp
+        src/rkd6_endpoint.cpp src/device_compiler6.cpp src/clock_estimator6.cpp)
+    target_compile_features(robotkit_rkd6_endpoint_tests PRIVATE cxx_std_20)
+    target_include_directories(robotkit_rkd6_endpoint_tests PRIVATE src include generated)
+    target_link_libraries(robotkit_rkd6_endpoint_tests PRIVATE motionkit_core)
+    add_test(NAME robotkit_rkd6_endpoint COMMAND robotkit_rkd6_endpoint_tests)
+    set_tests_properties(robotkit_rkd6_endpoint PROPERTIES LABELS "robot;runtime;wire" TIMEOUT 30)
 
     add_executable(robotkit_device_protocol_tests tests/device_protocol.cpp)
     target_compile_features(robotkit_device_protocol_tests PRIVATE cxx_std_20)

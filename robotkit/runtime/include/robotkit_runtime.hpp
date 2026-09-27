@@ -74,6 +74,14 @@ public:
     /** Returns true when the endpoint accepts timestamped trajectory chunks. */
     virtual bool supports_trajectory_queue() const noexcept { return true; }
 
+    /** Device-owned polynomial queue: the runtime does not emit sampled targets. */
+    virtual bool executes_trajectory_queue() const noexcept { return false; }
+    virtual int32_t diagnostic_code() const noexcept { return 0; }
+
+    /** Called after host validation, before a submitted plan becomes visible. */
+    virtual rk_result submit_device_plan(const rk_plan_submission &, uint64_t,
+        uint64_t, uint64_t, const rk_robot_runtime_blueprint &) { return RK_ERROR_UNSUPPORTED; }
+
     /**
      * Rolls back command effects staged during a failed simulation tick.
      *
@@ -223,6 +231,7 @@ private:
     rk_robot_runtime_blueprint blueprint_{};
     std::shared_ptr<RobotEndpoint> endpoint_;
     std::chrono::nanoseconds period_;
+    uint64_t last_owner_timestamp_ns_ = 0;
     mutable std::mutex state_mutex_;
     rk_robot_state state_{};
     mutable std::mutex queue_mutex_;

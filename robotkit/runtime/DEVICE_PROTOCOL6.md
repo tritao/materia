@@ -21,6 +21,11 @@ record per actuator. The header's acceleration is the global cap; each
 actuator limit must be positive and no greater than that cap. This trailing
 record keeps the published fixed header compatible while supplying A4's
 per-actuator HOLD and stop limits.
+One `SessionTiming6` record follows the actuator limits. It carries the
+link-loss timeout in nanoseconds because the host learns the device tick rate
+only in `SESSION_ACK6`. The device converts it using its own clock. The older
+fixed header's `link_loss_ticks` field is zero when this trailing record is
+present.
 
 | Quantity | RKD6 bound | Source |
 | --- | ---: | --- |
@@ -45,3 +50,13 @@ time mapping and the extra commit horizon (`link latency + 2 × uncertainty`).
 When a new sample steps outside the deployment bound, it latches
 `clock_sync_lost` and disallows further commits. An RKD6 endpoint sends the
 periodic requests and reports that reason in its runtime snapshot.
+
+The host device compiler maps plan-relative knots to device ticks, converts
+segment-local coefficients to `f32`, and runs `mk_validate` on the converted
+trajectory at the step-tick resolution. It samples the converted `f32` Horner
+evaluation against the original plan at that resolution and rejects a plan
+that exceeds `target_error`. `Rkd6Endpoint` forwards queue revisions, segments
+and commits over a complete-frame transport. It qualifies baud and queue
+depth at construction and checks the shortest submitted segment again before
+sending a plan. The runtime leaves per-cycle target streaming to RKD5
+endpoints; RKD6 snapshots use device queue status.

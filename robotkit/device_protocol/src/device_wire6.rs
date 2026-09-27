@@ -138,6 +138,34 @@ impl ActuatorLimit6 {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SessionTiming6 {
+    pub link_loss_timeout_ns: u64,
+}
+
+impl SessionTiming6 {
+    pub const SIZE: usize = 8;
+
+    pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
+        if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
+        let mut offset = 0usize;
+        out[offset..offset + 8].copy_from_slice(&self.link_loss_timeout_ns.to_le_bytes());
+        offset += 8;
+        Ok(offset)
+    }
+
+    pub fn decode(input: &[u8]) -> Result<Self, Error> {
+        if input.len() != Self::SIZE { return Err(Error::WrongLength); }
+        let mut offset = 0usize;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let link_loss_timeout_ns = u64::from_le_bytes(bytes);
+        offset += 8;
+        let _ = offset;
+        Ok(Self { link_loss_timeout_ns })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SessionAck6 {
     pub session: u64,
     pub protocol_version: u8,
