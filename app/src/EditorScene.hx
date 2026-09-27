@@ -1218,37 +1218,8 @@ class EditorScene {
   }
 
   public function configureRenderView(view:SceneView, viewProjection:Transform,
-      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView {
-    view.setViewProjection(viewProjection);
-    var selected = object(selectedId);
-    var selection = new SelectionSet();
-    if (selected != null) selection.add(runtimeFor(selected.id).node);
-    view.applySelection(selection, selectionMaterial);
-    var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
-      ? null : faceHoverNodes.get(hoveredId);
-    if (faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex) {
-      // The face node is hidden in the scene and shown only in this presentation view.
-      view.setVisibility(faceHoverNode, true);
-      view.setMaterial(faceHoverNode, hoverMaterial);
-      view.applyHover(null, hoverMaterial);
-    } else {
-      var hovered = hoveredId == null ? null : object(hoveredId);
-      view.applyHover(hovered == null ? null : runtimeFor(hovered.id).node, hoverMaterial);
-    }
-    if (poses != null) {
-      var poseNodes:Array<NodeId> = [];
-      var poseTransforms:Array<Transform> = [];
-      for (pose in poses) {
-        var runtime = bridge.runtime(pose.id);
-        if (runtime != null) {
-          poseNodes.push(runtime.node);
-          poseTransforms.push(poseTransform(pose.position, pose.rotation));
-        }
-      }
-      view.replacePoses(poseNodes, poseTransforms);
-    }
-    return view;
-  }
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView
+    return presentation.configureRenderView(this, view, viewProjection, poses, hoveredId, hoveredFaceIndex);
 
   public function selectRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
       directionX:Float, directionY:Float, directionZ:Float,

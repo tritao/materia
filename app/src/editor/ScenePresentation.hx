@@ -2,6 +2,9 @@ package app.editor;
 
 import app.EditorScene.SceneBridge;
 import app.EditorScene;
+import app.ApplicationSimulation.SimulationPoseVisual;
+import nativekit.scene.SceneView;
+import nativekit.scene.SelectionSet;
 import app.EditorScene.EditorSceneObject;
 import CadKit;
 import cadkit.Shape;
@@ -146,6 +149,39 @@ class ScenePresentation {
     if (item.kind == "cad-preview" && item.meshSnapshot != null)
       return owner.previewGeometry(item.meshSnapshot).subelementGeometry(faceIndex);
     return null;
+  }
+
+  public function configureRenderView(owner:EditorScene, view:SceneView, viewProjection:Transform,
+      ?poses:Array<SimulationPoseVisual>, ?hoveredId:String, ?hoveredFaceIndex:Int = -1):SceneView {
+    view.setViewProjection(viewProjection);
+    var selected = owner.object(owner.selectedId);
+    var selection = new SelectionSet();
+    if (selected != null) selection.add(owner.runtimeFor(selected.id).node);
+    view.applySelection(selection, selectionMaterial);
+    var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
+      ? null : faceHoverNodes.get(hoveredId);
+    if (faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex) {
+      // The face node is hidden in the scene and shown only in this presentation view.
+      view.setVisibility(faceHoverNode, true);
+      view.setMaterial(faceHoverNode, hoverMaterial);
+      view.applyHover(null, hoverMaterial);
+    } else {
+      var hovered = hoveredId == null ? null : owner.object(hoveredId);
+      view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, hoverMaterial);
+    }
+    if (poses != null) {
+      var poseNodes:Array<NodeId> = [];
+      var poseTransforms:Array<Transform> = [];
+      for (pose in poses) {
+        var runtime = bridge.runtime(pose.id);
+        if (runtime != null) {
+          poseNodes.push(runtime.node);
+          poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation));
+        }
+      }
+      view.replacePoses(poseNodes, poseTransforms);
+    }
+    return view;
   }
 
   public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>):MaterialData {
