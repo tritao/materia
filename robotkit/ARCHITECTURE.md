@@ -871,7 +871,8 @@ for one suction cup with a dedicated collision piece. After each physics step,
 it reads that piece's contact distances and feeds the selected tool's pressure
 sensor adapter. `EndEffectorRuntimeBridge.addVacuumSensorToBlueprint` authors its
 sensor mount on the robot flange before runtime creation. Attaching the producer
-to `Simulation` publishes one `tool_vacuum_kpa` frame per explicit step, so
+to `Simulation` publishes one `tool_vacuum_kpa` frame per explicit step of its
+private clock or the owning `SimSession` clock, so
 runtime snapshots, RobotWorld recordings, and replay see the same observations.
 These frames use the logical `robotkit.simulation` source clock, which must also
 be used when selecting the tool. An enabled vacuum command and geometric cup

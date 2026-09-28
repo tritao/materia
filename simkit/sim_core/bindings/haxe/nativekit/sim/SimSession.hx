@@ -11,6 +11,8 @@ import nativekit.scene.Scene;
  */
 class SimSession {
     final owner:Ownednksim_session;
+    final stepObservers:Array<{id:Int, callback:Void->Void}> = [];
+    var nextStepObserverId:Int = 1;
     var disposed:Bool = false;
 
     public function new(scene:Scene, world:nksim_world) {
@@ -36,7 +38,30 @@ class SimSession {
         var result = NativeKitSim.nksim_session_step(owner.borrow(),
             ownerTimeNs == null ? haxe.Int64.ofInt(0) : ownerTimeNs, clock);
         SimWorld.check(result.status, "session.step");
+        for (entry in stepObservers.copy()) {
+            var registered = false;
+            for (current in stepObservers)
+                if (current.id == entry.id) registered = true;
+            if (registered) entry.callback();
+        }
         return clock.get_time();
+    }
+
+    /** Runs after each successful explicit step, once the shared contacts are available. */
+    public function addStepObserver(callback:Void->Void):Int {
+        ensureLive();
+        if (callback == null) throw "Simulation session step observer is required";
+        var id = nextStepObserverId++;
+        stepObservers.push({id: id, callback: callback});
+        return id;
+    }
+
+    public function removeStepObserver(id:Int):Void {
+        for (index in 0...stepObservers.length)
+            if (stepObservers[index].id == id) {
+                stepObservers.splice(index, 1);
+                return;
+            }
     }
 
     public function start():Void {
@@ -127,6 +152,7 @@ class SimSession {
     public function dispose():Void {
         if (disposed)
             return;
+        stepObservers.resize(0);
         owner.close();
         disposed = true;
     }
