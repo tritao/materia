@@ -16,6 +16,7 @@ class ExecutionPlanSubmission {
   public final velocityTolerances:ImmutableFloatArray;
   public final accelerationTolerances:ImmutableFloatArray;
   public final endsAtRest:Bool;
+  public final jerkUnchecked:Bool;
   public final segments:Array<TrajectorySegment>;
   public final events:Array<ProcessTimedEvent>;
   public final replaceAfterPlanId:Int64;
@@ -27,7 +28,7 @@ class ExecutionPlanSubmission {
       ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
       ?positionTolerances:Array<Float>, ?velocityTolerances:Array<Float>,
       ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
-      ?events:Array<ProcessTimedEvent>) {
+      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false) {
     if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
         startPosition == null || startVelocity == null || startAcceleration == null ||
         segments == null || segments.length == 0 ||
@@ -67,6 +68,7 @@ class ExecutionPlanSubmission {
     this.velocityTolerances = new ImmutableFloatArray(vTol);
     this.accelerationTolerances = new ImmutableFloatArray(aTol);
     this.endsAtRest = endsAtRest;
+    this.jerkUnchecked = jerkUnchecked;
     this.segments = [for (segment in segments) segment.copy()];
     this.replaceAfterPlanId = replaceAfterPlanId == null ? Int64.ofInt(0) : replaceAfterPlanId;
     this.replaceAfterTimeNs = replaceAfterTimeNs == null ? Int64.ofInt(0) : replaceAfterTimeNs;
@@ -77,5 +79,5 @@ class ExecutionPlanSubmission {
       requiredCapabilities, startPosition.toArray(), startVelocity.toArray(),
       startAcceleration.toArray(), segments, replaceAfterPlanId, replaceAfterTimeNs,
       positionTolerances.toArray(), velocityTolerances.toArray(),
-      accelerationTolerances.toArray(), endsAtRest, events);
+      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked);
 }

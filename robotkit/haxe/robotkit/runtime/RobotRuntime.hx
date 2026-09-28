@@ -190,6 +190,7 @@ class RobotRuntime {
     native.set_calibration_revision(plan.calibrationRevision);
     native.set_required_capabilities(plan.requiredCapabilities);
     native.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
+    native.set_reserved0(plan.jerkUnchecked ? 1 : 0);
     native.set_event_count(plan.events.length);
     for (index in 0...plan.events.length) {
       var authored = plan.events[index];

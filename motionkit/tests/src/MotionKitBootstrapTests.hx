@@ -301,6 +301,7 @@ class MotionKitBootstrapTests {
     var fixture = buildContractArmFixture();
     var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+    for (joint in 0...6) limits.jerk(joint, 20.0);
     var velocity = [for (_ in 0...6) 2.0];
     var acceleration = [for (_ in 0...6) 4.0];
     var jerk = [for (_ in 0...6) 20.0];
@@ -313,6 +314,10 @@ class MotionKitBootstrapTests {
     var compiled = compiler.compile(program, start, Int64.ofInt(100));
     check(compiled.blocks.length == 1 && compiled.blocks[0].plans.length == 1,
       "program compiler lowers a joint move to one plan");
+    check(compiled.blocks[0].plans[0].report.checks[
+      MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED,
+      "Ruckig MoveJ reports jerk checked");
     near(compiled.blocks[0].plans[0].evaluate(
       compiled.blocks[0].plans[0].durationSeconds).positions[0], goal[0],
       "program compiler reaches the MoveJ target", 1e-6);
@@ -446,9 +451,26 @@ class MotionKitBootstrapTests {
     check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
       MotionKitNativeConstants.MK_CHECK_PASSED,
       "blended Cartesian plan passes authored-corner task-space validation");
+    check(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED,
+      "TOPP-RA Cartesian plan reports jerk unchecked");
     near(blendedPlan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].limit,
       0.005, "blended task-space report uses the authored tolerance");
     blended.dispose();
+    // A 150 degree authored corner stresses the fillet setback formula.
+    var turn = Math.PI / 6.0;
+    var shallow = planarCompiler.compile(new MotionProgram([
+        MotionOp.MoveL(new Pose3(0.05, 0.0), "work", 0.1,
+          Blend.ToleranceBlend(0.001)),
+        MotionOp.MoveL(new Pose3(0.05 + 0.05 * Math.cos(turn),
+          0.05 * Math.sin(turn)), "work", 0.1, Blend.ExactStop)
+      ]), [for (_ in 0...6) 0.0], Int64.ofInt(504));
+    var shallowCheck = shallow.blocks[0].plans[0].report.checks[
+      MotionKitNativeConstants.MK_CHECK_TASK_SPACE];
+    check(shallowCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
+      shallowCheck.value <= 0.001 + 1e-9 && shallowCheck.limit == 0.001,
+      "150 degree authored corner is checked against its tolerance");
+    shallow.dispose();
   }
 
   static function testManipulatorMotion():Void {

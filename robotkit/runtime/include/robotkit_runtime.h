@@ -431,6 +431,9 @@ enum {
     RK_PLAN_CAPABILITY_EVENTS = 2u
 };
 
+/** Validation property carried from MotionKit's plan report. */
+enum { RK_PLAN_JERK_UNCHECKED = 1u };
+
 /** Bounded plan. Replacement time is in the active plan's trajectory clock. */
 typedef struct rk_plan_submission {
     uint32_t struct_size RK_STRUCT_SIZE;
@@ -439,7 +442,7 @@ typedef struct rk_plan_submission {
     uint64_t model_revision;
     uint64_t calibration_revision;
     uint32_t required_capabilities;
-    uint32_t reserved0;
+    uint32_t reserved0; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
     uint64_t replace_after_plan_id; /**< Zero means append/start, not replace. */
     uint64_t replace_after_time_ns;
     double start_position[RK_MAX_TRAJECTORY_JOINTS];

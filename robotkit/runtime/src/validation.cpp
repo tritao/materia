@@ -298,6 +298,7 @@ rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
         (plan->struct_size > old_full_size &&
          plan->struct_size < sizeof(*plan)) ||
         plan->sequence == 0 || plan->plan_id == 0 ||
+        (plan->reserved0 & ~RK_PLAN_JERK_UNCHECKED) != 0 ||
         rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
         (plan->replace_after_plan_id == 0 && plan->replace_after_time_ns != 0) ||
         (plan->replace_after_plan_id != 0 && plan->replace_after_time_ns == 0))

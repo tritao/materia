@@ -335,7 +335,7 @@ class ProgramCompiler {
     try {
       if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
       plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
-        limits, id, pending.startQ,
+        pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), tolerances(), tolerances(), tolerances(), pending.events);
       if (pending.path != null) checkTaskSpace(plan, pending.path, pending.distances,
         pending.times, pending.opIndex, pending.authoredPolyline,
@@ -498,11 +498,17 @@ class ProgramCompiler {
     var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
       positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
     var failure:Null<String> = null;
-    for (sample in 0...(distances.length * 2 - 1)) {
-      var left = Std.int(sample / 2);
-      var distance = sample % 2 == 0 ? distances[left] :
-        (distances[left] + distances[left+1]) * 0.5;
-      var time = sample % 2 == 0 ? times[left] : (times[left] + times[left+1]) * 0.5;
+    var samples = authoredPolyline == null ? distances.length * 2 - 1 :
+      Std.int(Math.max(distances.length * 2 - 1,
+        Math.ceil(path.length() / (blendTolerance / 8.0)) + 1));
+    for (sample in 0...samples) {
+      var distance = path.length() * sample / (samples - 1);
+      var left = 0;
+      while (left + 1 < distances.length - 1 && distances[left + 1] < distance)
+        left++;
+      var fraction = (distance - distances[left]) /
+        (distances[left + 1] - distances[left]);
+      var time = times[left] + fraction * (times[left + 1] - times[left]);
       var desired = path.waypointAt(distance);
       var actual = solver.forward(plan.evaluate(time).positions);
       var error = authoredPolyline != null ?

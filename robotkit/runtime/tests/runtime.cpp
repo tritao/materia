@@ -1502,6 +1502,7 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
         robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
         auto plan = make_plan(205, true, false);
+        plan.reserved0 = RK_PLAN_JERK_UNCHECKED;
         for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
             const double sign = joint == 0 ? 1.0 : -1.0;
             auto &segment = plan.segments.segments[0];
@@ -1517,6 +1518,54 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         rk_robot_snapshot snapshot{};
         assert(runtime.snapshot_full(snapshot) == RK_OK);
         assert(snapshot.trajectory_active == 0 && snapshot.fault_code == 0);
+    }
+    {
+        // A checked-jerk plan must finish with zero acceleration.
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto plan = make_plan(206, true, false);
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            const double sign = joint == 0 ? 1.0 : -1.0;
+            auto &segment = plan.segments.segments[0];
+            segment.degree = 4;
+            segment.coefficients[joint].value[1] = 0.0;
+            segment.coefficients[joint].value[2] = 0.0;
+            segment.coefficients[joint].value[3] = sign * 0.08;
+            segment.coefficients[joint].value[4] = sign * -0.06;
+        }
+        assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
+        plan.reserved0 = RK_PLAN_JERK_UNCHECKED;
+        assert(runtime.submit_plan(plan) == RK_OK);
+    }
+    for (bool unchecked : {false, true}) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto first = make_plan(207, false, false);
+        first.segments.segments[0].degree = 2;
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            const double sign = joint == 0 ? 1.0 : -1.0;
+            first.segments.segments[0].coefficients[joint].value[1] = 0.0;
+            first.segments.segments[0].coefficients[joint].value[2] = sign * 0.1;
+            first.start_acceleration[joint] = sign * 0.2;
+            first.acceleration_tolerance[joint] = 0.5;
+        }
+        assert(runtime.submit_plan(first) == RK_OK);
+        auto second = make_plan(208, false, false);
+        second.sequence = 2;
+        second.reserved0 = unchecked ? RK_PLAN_JERK_UNCHECKED : 0;
+        second.segments.segments[0].degree = 2;
+        for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+            const double sign = joint == 0 ? 1.0 : -1.0;
+            second.start_position[joint] = sign * 0.1;
+            second.start_velocity[joint] = sign * 0.2;
+            second.start_acceleration[joint] = sign * 0.4;
+            second.acceleration_tolerance[joint] = 0.5;
+            auto &coefficients = second.segments.segments[0].coefficients[joint].value;
+            coefficients[0] = sign * 0.1;
+            coefficients[1] = sign * 0.2;
+            coefficients[2] = sign * 0.2;
+        }
+        assert(runtime.submit_plan(second) == (unchecked ? RK_OK : RK_ERROR_INVALID_STATE));
     }
     for (bool smooth : {false, true}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);

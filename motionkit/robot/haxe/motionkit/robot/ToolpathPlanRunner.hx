@@ -107,8 +107,9 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
   public function update(dtSeconds:Float):Void {
     var before = motion.progress().op;
     motion.update(dtSeconds);
-    var after = motion.progress().op;
-    cutActive = spanIsOn(after) || (!motion.running && spanIsOn(before));
+    // The observed interval belongs to the move active before advancement.
+    // The next op may be an approach or retract reached exactly at this tick.
+    cutActive = spanIsOn(before);
   }
   function spanIsOn(index:Int):Bool
     return index >= 0 && index < processSpans.length && processSpans[index];

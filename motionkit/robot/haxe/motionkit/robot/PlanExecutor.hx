@@ -34,6 +34,7 @@ class PlanExecutor {
   var chunkEndSeconds:Float = 0.0;
   var references:Map<String, Float> = new Map();
   var endsAtRest:Bool = true;
+  var jerkUnchecked:Bool = false;
   var deferredRefill:Bool = false;
 
   public function new(robot:Robot, ?jointIndices:Array<Int>) {
@@ -54,6 +55,8 @@ class PlanExecutor {
     if (plan.evaluate(0.0).positions.length != jointIndices.length)
       throw "PlanExecutor plan and robot joint map disagree";
     this.endsAtRest = endsAtRest;
+    jerkUnchecked = plan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED;
     elapsedSeconds = 0.0; completed = false; nextSegment = 0;
     finalTag = Int64.ofInt(0); chunkEndSeconds = 0.0;
     references = new Map(); deferredRefill = false;
@@ -111,7 +114,8 @@ class PlanExecutor {
   public static function submitTrajectoryChunk(robot:Robot, trajectory:Trajectory,
       nativeSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
         coefficients:Array<Array<Float>>}>, first:Int, tag:Int64,
-      modelRevision:Int64, calibrationRevision:Int64):Null<{last:Int,
+      modelRevision:Int64, calibrationRevision:Int64,
+      ?jerkUnchecked:Bool = false):Null<{last:Int,
         startSeconds:Float, endSeconds:Float}> {
     var available = 4096 - robot.snapshot().trajectoryQueueDepth;
     // Native chunks also cap the total scalar coefficients. Reserve six per
@@ -143,7 +147,7 @@ class PlanExecutor {
       acceleration = [for (_ in state.positions) 0.0];
     }
     var accelerationTolerance = [for (_ in state.positions) 0.0];
-    if (nativeSegments[first].coefficients[0].length != 2) {
+    if (jerkUnchecked && nativeSegments[first].coefficients[0].length != 2) {
       var previousAcceleration = first == 0 ?
         [for (_ in state.positions) 0.0] :
         trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations;
@@ -154,7 +158,7 @@ class PlanExecutor {
     try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, state.positions, velocity,
       acceleration, segments, null, null, null, null, accelerationTolerance,
-      last == nativeSegments.length))) catch (error:Dynamic)
+      last == nativeSegments.length, null, jerkUnchecked))) catch (error:Dynamic)
       throw 'plan chunk [$first,$last] of ${nativeSegments.length}: $error';
     var end = nativeSegments[last - 1];
     return {last:last, startSeconds:startSeconds,
@@ -267,16 +271,20 @@ class PlanExecutor {
         [for (_ in state.positions) 0.02], tolerance);
       var aTol = expanded(first == 0 ? active.copyAccelerationTolerances() :
         [for (_ in state.positions) 0.02], tolerance);
+      if (!jerkUnchecked && first > 0)
+        aTol = [for (_ in fixedPositions) 1e-6];
       if (segments[0].coefficients[0].length > 2) {
         var precedingAcceleration = first == 0 ? zero : expanded(
           active.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero);
         for (joint in 0...fixedPositions.length) {
           var coefficients = segments[0].coefficients[joint];
           var polynomialAcceleration = 2.0 * coefficients[2];
-          aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5);
-          aTol[joint] = Math.max(aTol[joint],
-            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5);
+          if (jerkUnchecked || first == 0) {
+            aTol[joint] = Math.max(aTol[joint],
+              Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5);
+            aTol[joint] = Math.max(aTol[joint],
+              Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5);
+          }
           startAcceleration[joint] = polynomialAcceleration;
         }
       }
@@ -285,11 +293,11 @@ class PlanExecutor {
       try robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
         active.modelRevision, active.calibrationRevision, 1, positions,
         startVelocity, startAcceleration, segments, null, null, pTol, vTol, aTol,
-        last == planSegments.length && endsAtRest, events))) catch (error:Dynamic)
+        last == planSegments.length && endsAtRest, events, jerkUnchecked))) catch (error:Dynamic)
       {
         var snapshot = robot.snapshot();
         throw 'plan chunk [$first,$last] of ${planSegments.length}, '
-          + 'events=${events.length}, safety=${snapshot.safety}, '
+          + 'events=${events.length}, jerkUnchecked=$jerkUnchecked, safety=${snapshot.safety}, '
           + 'active=${snapshot.trajectoryActive}, queue=${snapshot.trajectoryQueueDepth}: $error';
       }
       references.set(Int64.toStr(tag), startSeconds);

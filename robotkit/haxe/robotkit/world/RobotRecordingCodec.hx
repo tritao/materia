@@ -47,6 +47,7 @@ class RobotRecordingCodec {
             velocityTolerances:plan.velocityTolerances.toArray(),
             accelerationTolerances:plan.accelerationTolerances.toArray(),
             endsAtRest:plan.endsAtRest,
+            jerkUnchecked:plan.jerkUnchecked,
             replaceAfterPlanId:Int64.toStr(plan.replaceAfterPlanId),
             replaceAfterTimeNs:Int64.toStr(plan.replaceAfterTimeNs),
             events:[for (event in plan.events) {
@@ -144,7 +145,8 @@ class RobotRecordingCodec {
               version >= 5 ? [for (item in array(payload,"events"))
                 new ProcessTimedEvent(wide(item,"timeNs"), string(item,"channel"),
                   readEventValue(Reflect.field(item,"value")),
-                  readHoldPolicy(string(item,"holdPolicy")))] : [])));
+                  readHoldPolicy(string(item,"holdPolicy")))] : [],
+              optionalFieldBool(payload, "jerkUnchecked", false))));
           case "hold" if (version >= 4): Command(Hold);
           case "resume" if (version >= 4): Command(Resume);
           case "abort" if (version >= 4): Command(Abort);

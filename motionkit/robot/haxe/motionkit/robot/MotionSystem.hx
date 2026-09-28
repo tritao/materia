@@ -50,6 +50,7 @@ class MotionSystem {
   public final replacementOwnerPeriodSeconds:Float;
   /** Joint and sampled Cartesian checks for the last planned path. */
   public var lastPathValidationReport(default, null):Null<ValidationReport> = null;
+  var pathJerkUnchecked:haxe.ds.ObjectMap<Trajectory, Bool> = new haxe.ds.ObjectMap();
   public var lastPathPlanningDiagnostics(default, null):Array<String> = [];
   /** Native trajectory currently submitted to the runtime queue. */
   var activeTrajectory:Null<Trajectory> = null;
@@ -565,6 +566,8 @@ class MotionSystem {
       : MotionKitNativeConstants.MK_CHECK_FAILED,
       worstTaskDeviation, worstTaskTime, tolerance, Int64.ofInt(1000000));
     lastPathValidationReport = report;
+    pathJerkUnchecked.set(result, report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+      MotionKitNativeConstants.MK_CHECK_UNCHECKED);
     if (report.hasFailure()) {
       for (index in 0...report.checks.length) {
         var check = report.checks[index];
@@ -948,7 +951,9 @@ class MotionSystem {
         trajectoryNextSegmentIndex >= activeSegments.length) return;
     var tag = nextTrajectoryTag;
     var submitted = PlanExecutor.submitTrajectoryChunk(robot, trajectoryValue,
-      activeSegments, trajectoryNextSegmentIndex, tag, modelRevision, calibrationRevision);
+      activeSegments, trajectoryNextSegmentIndex, tag, modelRevision,
+      calibrationRevision, pathJerkUnchecked.exists(trajectoryValue) &&
+      pathJerkUnchecked.get(trajectoryValue) == true);
     if (submitted == null) return;
     nextTrajectoryTag = Int64.add(tag, Int64.ofInt(1));
     trajectorySubmitted = true;
@@ -1007,6 +1012,7 @@ class MotionSystem {
   function completeActiveTrajectory():Void {
     if (activeTrajectory == null) return;
     bufferedCompletedSeconds += activeTrajectory.durationSeconds();
+    pathJerkUnchecked.remove(activeTrajectory);
     activeTrajectory = null;
     activeSegments = [];
     activeStationary = false;
@@ -1015,6 +1021,7 @@ class MotionSystem {
   }
 
   function discardNativeTrajectory(value:Trajectory):Void {
+    pathJerkUnchecked.remove(value);
     value.dispose();
   }
 

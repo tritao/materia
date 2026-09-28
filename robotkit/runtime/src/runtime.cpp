@@ -431,8 +431,12 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                 ? plan.position_tolerance[joint] : default_tolerance;
             const double velocity_tolerance = has_tolerances && plan.velocity_tolerance[joint] > 0.0
                 ? plan.velocity_tolerance[joint] : default_tolerance;
-            const double acceleration_tolerance = has_tolerances && plan.acceleration_tolerance[joint] > 0.0
+            const double requested_acceleration_tolerance = has_tolerances && plan.acceleration_tolerance[joint] > 0.0
                 ? plan.acceleration_tolerance[joint] : default_tolerance;
+            const double acceleration_tolerance = !candidate.empty() &&
+                (plan.reserved0 & RK_PLAN_JERK_UNCHECKED) == 0
+                ? std::min(requested_acceleration_tolerance, default_tolerance)
+                : requested_acceleration_tolerance;
             if (std::abs(plan.start_position[joint] - anchor_position[joint]) > position_tolerance ||
                 (check_anchor_velocity &&
                     std::abs(plan.start_velocity[joint] - anchor_velocity[joint]) > velocity_tolerance) ||
@@ -459,10 +463,11 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             motionkit::evaluate_segment(segment,
                 static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
-                // TOPP-RA bounds acceleration but can reach zero speed with
-                // nonzero acceleration at the final knot. The owner holds
-                // position after that knot, so rest requires zero velocity.
-                if (std::abs(endpoint.velocity[joint]) > 1e-6)
+                // TOPP-RA can stop with nonzero endpoint acceleration. A
+                // checked-jerk plan must also join the held state smoothly.
+                if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
+                    ((plan.reserved0 & RK_PLAN_JERK_UNCHECKED) == 0 &&
+                     std::abs(endpoint.acceleration[joint]) > 1e-6))
                     return RK_ERROR_INVALID_ARGUMENT;
         }
         if (replace) {

@@ -30,6 +30,9 @@ import robotkit.work.EarthworkRegion;
 import robotkit.work.DigCyclePlanner;
 import robotkit.work.DigCyclePlan;
 import robotkit.work.Point2;
+import robotkit.work.BucketSweep;
+import robotkit.process.Toolpath;
+import robotkit.process.ToolpathPoint;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
@@ -47,6 +50,7 @@ class ExcavatorTests {
     assertions = 0;
     testZeroPoseFK();
     testFourDofIkRecoversManifoldTargets();
+    testToolpathProcessSpans();
     testDigCyclePlannerStages();
     testDigTrenchScenario();
     testGradeRegionScenario();
@@ -56,6 +60,59 @@ class ExcavatorTests {
   }
 
   // -- M12 kinematics -----------------------------------------------------
+
+  static function testToolpathProcessSpans():Void {
+    var fixture = buildExcavatorFixture();
+    var simulation = new Simulation(0.02);
+    var robot = new SimulatedRobot("two-pass-toolpath",
+      simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model)),
+      fixture.model.name, [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var seed = [0.0, 0.0, 0.0, 0.0];
+    var points = [for (index in 0...6) new ToolpathPoint(
+      fixture.manipulator.tcpPose([index * 0.04, 0.0, 0.0, 0.0]),
+      0.4, index == 2 || index == 4)];
+    var motion = ToolpathPlanRunner.create(robot, fixture.manipulator,
+      "excavator", 1.0, 1.0, 0.002, 0.01, 300, 0.03);
+    motion.run(new Toolpath("excavator", points), seed);
+    var map = new HeightMap("excavator", -10.0, -10.0, 0.1, 201, 201);
+    var active = false;
+    var first:Null<Point2> = null;
+    var last:Null<Point2> = null;
+    var sweeps = 0;
+    var removed = 0.0;
+    var sawFirstCut = false, sawSecondCut = false, sweptApproach = false;
+    for (tick in 0...10000) {
+      simulation.step(Int64.ofInt(tick));
+      var snapshot = robot.snapshot();
+      var op = motion.motion.progress().op;
+      motion.update(0.02);
+      var cutting = motion.cuttingMoveActive();
+      if (cutting && op == 2) sawFirstCut = true;
+      if (cutting && op == 4) sawSecondCut = true;
+      if (cutting && op != 2 && op != 4) sweptApproach = true;
+      if (cutting) {
+        var q = [for (joint in 0...4) snapshot.positions.get(joint)];
+        var pose = fixture.manipulator.tcpPose(q);
+        var at = new Point2(pose.translation.x, pose.translation.y);
+        if (!active) first = at;
+        last = at;
+      } else if (active) {
+        removed += BucketSweep.apply(map, first, last, 0.4, -0.1).removedVolume;
+        sweeps++;
+      }
+      active = cutting;
+      if (!motion.running()) break;
+    }
+    if (active) {
+      removed += BucketSweep.apply(map, first, last, 0.4, -0.1).removedVolume;
+      sweeps++;
+    }
+    check(motion.completed() && sweeps == 2 && removed > 0.0 &&
+      sawFirstCut && sawSecondCut && !sweptApproach,
+      "two process spans produce exactly two BucketSweep cuts");
+    simulation.dispose();
+  }
 
   static function testZeroPoseFK():Void {
     var fixture = buildExcavatorFixture();

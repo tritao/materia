@@ -22,6 +22,7 @@ class PlanSubmission {
   @:id(13) public var segments:Array<PlanSegment>;
   @:id(14) public var replaceAfterPlanId:Int64;
   @:id(15) public var replaceAfterTimeNs:Int64;
+  @:id(16) public var jerkUnchecked:Bool;
 
   public function new(?robotId:Int64, ?planId:Int64, ?modelRevision:Int64,
       ?calibrationRevision:Int64, ?requiredCapabilities:Int = 0,
@@ -29,7 +30,8 @@ class PlanSubmission {
       ?startAcceleration:Array<Float>, ?positionTolerances:Array<Float>,
       ?velocityTolerances:Array<Float>, ?accelerationTolerances:Array<Float>,
       ?endsAtRest:Bool = true, ?segments:Array<PlanSegment>,
-      ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64) {
+      ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
+      ?jerkUnchecked:Bool = false) {
     this.robotId = robotId == null ? Int64.ofInt(0) : robotId;
     this.planId = planId == null ? Int64.ofInt(0) : planId;
     this.modelRevision = modelRevision == null ? Int64.ofInt(0) : modelRevision;
@@ -42,6 +44,7 @@ class PlanSubmission {
     this.velocityTolerances = velocityTolerances == null ? [] : velocityTolerances;
     this.accelerationTolerances = accelerationTolerances == null ? [] : accelerationTolerances;
     this.endsAtRest = endsAtRest;
+    this.jerkUnchecked = jerkUnchecked;
     this.segments = segments == null ? [] : segments;
     this.replaceAfterPlanId = replaceAfterPlanId == null ? Int64.ofInt(0) : replaceAfterPlanId;
     this.replaceAfterTimeNs = replaceAfterTimeNs == null ? Int64.ofInt(0) : replaceAfterTimeNs;
@@ -58,7 +61,8 @@ class PlanSubmission {
       plan.startPosition.toArray(), plan.startVelocity.toArray(),
       plan.startAcceleration.toArray(), plan.positionTolerances.toArray(),
       plan.velocityTolerances.toArray(), plan.accelerationTolerances.toArray(),
-      plan.endsAtRest, segments, plan.replaceAfterPlanId, plan.replaceAfterTimeNs);
+      plan.endsAtRest, segments, plan.replaceAfterPlanId, plan.replaceAfterTimeNs,
+      plan.jerkUnchecked);
   }
 
   public function toWorld():ExecutionPlanSubmission {
@@ -83,6 +87,7 @@ class PlanSubmission {
     return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
       requiredCapabilities, startPosition, startVelocity, startAcceleration,
       converted, replaceAfterPlanId, replaceAfterTimeNs,
-      positionTolerances, velocityTolerances, accelerationTolerances, endsAtRest);
+      positionTolerances, velocityTolerances, accelerationTolerances, endsAtRest,
+      null, jerkUnchecked);
   }
 }

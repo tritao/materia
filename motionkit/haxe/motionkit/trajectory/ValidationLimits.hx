@@ -65,6 +65,22 @@ class ValidationLimits {
 
   public function nativeValue():mk_limits return native;
 
+  /** Preserve machine claims while leaving path-timed jerk unclaimed. */
+  public function withoutJerk():ValidationLimits {
+    var result = new ValidationLimits(jointCount, modelRevision, calibrationRevision);
+    for (joint in 0...jointCount) {
+      if (native.get_position_claimed(joint) != 0)
+        result.position(joint, native.get_position_lower(joint),
+          native.get_position_upper(joint));
+      result.velocity(joint, native.get_max_velocity(joint));
+      result.acceleration(joint, native.get_max_acceleration(joint));
+    }
+    for (order in 0...3)
+      result.continuity(order, native.get_max_continuity_jump(order));
+    result.timeResolutionNs(native.get_executor_time_resolution_ns());
+    return result;
+  }
+
   function validJoint(joint:Int):Void {
     if (joint < 0 || joint >= jointCount) throw "Validation joint out of range";
   }
