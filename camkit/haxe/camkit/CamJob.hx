@@ -74,6 +74,26 @@ class CamJob {
     if (!Math.isFinite(stepOver) || stepOver <= 0.0 ||
         stepOver > tool.diameter)
       throw "CAM pocket step-over must be positive and no larger than tool diameter";
+    var levels = depthLevels(contour.z, depth, stepDown);
+    if (hasConcaveCorner(contour)) {
+      var radius = tool.diameter * 0.5;
+      var passes = CamPocketPlanner.plan(contour, radius, stepOver);
+      offsetPath(contour, radius, levels[0], false);
+      var span = nextSpan();
+      selectTool(tool, span);
+      for (level in levels) {
+        for (pass in passes) {
+          var start = new CncPoint(pass.left, pass.y, level);
+          var end = new CncPoint(pass.right, pass.y, level);
+          rapid(new CncPoint(start.x, start.y, safeZ), span);
+          feedTo(start, feed, span);
+          feedTo(end, feed, span);
+          rapid(new CncPoint(end.x, end.y, safeZ), span);
+        }
+        cutOffset(contour, radius, level, feed, span, false);
+      }
+      return this;
+    }
     var span = nextSpan();
     selectTool(tool, span);
     var inset = tool.diameter * 0.5;
@@ -96,9 +116,25 @@ class CamJob {
     }
     if (rounds == 0) throw "Tool does not fit inside CAM pocket";
     if (rounds >= 10000) throw "CAM pocket exceeds 10000 clearing rings";
-    for (level in depthLevels(contour.z, depth, stepDown))
+    for (level in levels)
       for (ring in rings) cutLoop(ring, level, feed, span);
     return this;
+  }
+
+  static function hasConcaveCorner(contour:CamContour):Bool {
+    var vertices = contour.vertices;
+    var orientation = contour.signedArea > 0.0 ? 1.0 : -1.0;
+    for (i in 0...vertices.length) {
+      var a = vertices[i], b = vertices[(i + 1) % vertices.length];
+      var c = vertices[(i + 2) % vertices.length];
+      var abx = b.x - a.x, aby = b.y - a.y;
+      var bcx = c.x - b.x, bcy = c.y - b.y;
+      var turn = orientation * (abx * bcy - aby * bcx) /
+        (Math.sqrt(abx * abx + aby * aby) *
+          Math.sqrt(bcx * bcx + bcy * bcy));
+      if (turn < -1e-9) return true;
+    }
+    return false;
   }
 
   /** Expand hole centres into safe rapid, feed, and retract moves. */

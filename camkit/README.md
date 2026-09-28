@@ -1,7 +1,7 @@
 # CamKit
 
 CamKit produces `cnckit.ir.CncOp` directly from CAD or sheet geometry. It
-supports 2.5D outside and inside profiles, convex offset-cleared pockets,
+supports 2.5D outside and inside profiles, pocket clearing,
 and drilled hole centres. Profiles and pockets use configurable depth steps.
 Coordinates are metres; feeds are metres/second.
 `CamProgram.lower(machine)` sends the same operations to MotionKit and returns
@@ -27,8 +27,11 @@ Input adapters:
 
 Inside and outside profiles accept simple concave contours. The cutter path
 rounds exposed corners, trims recessed corners, and rejects offsets that
-collapse a narrow feature or collide with another edge. Pocket clearing still
-requires a convex contour.
+collapse a narrow feature or collide with another edge. Convex pockets use
+inward offset rings. Concave pockets use horizontal passes inside the cutter's
+clearance region, retract between disconnected passes, and finish the inside
+boundary at each depth.
+Pocket input is one boundary; internal islands are not yet represented.
 
 Example:
 
@@ -44,7 +47,8 @@ var linuxCnc = CamGCodeWriter.write(program);
 
 The test project creates its own rectangular, rounded and holed plate fixtures.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
-hole-before-outer ordering, concave profiles, direct lowering and CAM IR → G-code → CncKit IR
+hole-before-outer ordering, concave profiles and pockets, direct lowering and
+CAM IR → G-code → CncKit IR
 round trips. The suite also
 checks the generic manufacturingkit sheet placement adapter using locally
 authored input; it does not depend on a MachineKit example. Run with the cadkit native
