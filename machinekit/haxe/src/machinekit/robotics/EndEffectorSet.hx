@@ -88,6 +88,10 @@ class EndEffectorSet extends EndEffector {
 		var result = new EndEffector();
 		result.include("robot", this);
 		result.include("tool", tool);
+		for (member in components()) if (collisionExcluded(member.id))
+			result.excludeFromCollision(MachineAssembly.join("robot", member.id));
+		for (member in tool.components()) if (tool.collisionExcluded(member.id))
+			result.excludeFromCollision(MachineAssembly.join("tool", member.id));
 		var robotMount = mountReference();
 		var toolMount = tool.mountReference();
 		result.mount(MachineAssembly.join("robot", robotMount.instanceId), robotMount.connectorName);

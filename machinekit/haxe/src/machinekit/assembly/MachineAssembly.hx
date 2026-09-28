@@ -357,14 +357,31 @@ class MachineAssembly {
 
 	/** Sum posed component masses; separately report BOM extras with no mass model. */
 	public function massProperties(?state:AssemblyState):MachineAssemblyMassProperties {
-		var model = new AssemblyModel();
-		addTo(model, "");
+		return massPropertiesFromPoses(solvedPoses(state));
+	}
+
+	/** Solve every member pose with one AssemblyModel, or read them from a supplied state. */
+	public function solvedPoses(?state:AssemblyState):Map<String, AssemblyFrame> {
+		var model:Null<AssemblyModel> = null;
+		if (state == null) {
+			model = new AssemblyModel();
+			addTo(model, "");
+		}
+		var result:Map<String, AssemblyFrame> = [];
+		for (member in members)
+			result.set(member.id, state == null ? model.pose(member.id) : state.worldPose(member.id));
+		return result;
+	}
+
+	/** Mass using poses already solved for this assembly. */
+	public function massPropertiesFromPoses(poses:Map<String, AssemblyFrame>):MachineAssemblyMassProperties {
 		var mass = 0.0, weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
 		var posed:Array<{id:String, properties:machinekit.component.MassProperties, pose:AssemblyFrame,
 			centre:Vector}> = [];
 		for (member in members) {
 			var properties = member.component.massProperties();
-			var pose = state == null ? model.pose(member.id) : state.worldPose(member.id);
+			var pose = poses.get(member.id);
+			if (pose == null) throw 'Missing solved pose for "${member.id}"';
 			var centre = properties.centreOfMass;
 			var world = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
 			posed.push({id: member.id, properties: properties, pose: pose,
@@ -384,7 +401,8 @@ class MachineAssembly {
 				case Point(kg, centre) | Attached(kg, _, centre):
 					var worldCentre = switch entry.mass {
 						case Attached(_, instanceId, _):
-							var pose = state == null ? model.pose(instanceId) : state.worldPose(instanceId);
+							var pose = poses.get(instanceId);
+							if (pose == null) throw 'Missing solved pose for "$instanceId"';
 							var point = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
 							new Vector(point.x, point.y, point.z);
 						case _: centre;

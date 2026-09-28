@@ -13,4 +13,6 @@ enum ToolCollisionShape {
   NoCollision;
   Box(halfExtents:Vec3, ?centre:Vec3);
   Cylinder(radius:Float, height:Float);
+  /** Convex pieces in the flange frame, in metres. */
+  Hulls(pieces:Array<Array<Float>>, padding:Float);
 }

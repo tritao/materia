@@ -33,5 +33,5 @@ class ParallelGripper extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(width, depth, length);
+		return Part.box(detail == Envelope ? width + stroke : width, depth, length);
 }

@@ -2,7 +2,7 @@ package machinekit.component;
 
 /** Geometry fidelity requested from a component generator. */
 enum ComponentDetail {
-	/** Standard outer envelope only: cheap, correct for clearance and packaging. */
+	/** Outer envelope for clearance and packaging; moving parts cover their full travel. */
 	Envelope;
 	/** Recognizable exterior features with simplified internals. */
 	Preview;

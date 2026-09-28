@@ -8,6 +8,7 @@ import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.ChangerCoupling;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
+import machinekit.robotics.ParallelGripper;
 import materia.assembly.AssemblyFrames;
 
 private class TestChangerMaster extends MachineComponent {
@@ -120,6 +121,15 @@ class EndEffectorSetTests {
 	}
 
 	public static function run():Void {
+		var gripper = new ParallelGripper(40, 20, 60, 30);
+		var preview = gripper.geometry(Preview), envelope = gripper.geometry(Envelope);
+		var previewBox = preview.shape.bounds(), envelopeBox = envelope.shape.bounds();
+		close(previewBox.get_max().get_x() - previewBox.get_min().get_x(), 40,
+			"gripper preview width");
+		close(envelopeBox.get_max().get_x() - envelopeBox.get_min().get_x(), 70,
+			"gripper full-open envelope width");
+		preview.close();
+		envelope.close();
 		var set = new EndEffectorSet();
 		set.addComponent("master", new TestChangerMaster());
 		set.mount("master", "mount");

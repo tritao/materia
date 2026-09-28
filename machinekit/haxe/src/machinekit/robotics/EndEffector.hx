@@ -1,6 +1,5 @@
 package machinekit.robotics;
 
-import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
@@ -14,10 +13,16 @@ private typedef WorkingFrame = {
 	var connectorName:String;
 }
 
+typedef EndEffectorSolvedContext = {
+	var poses:Map<String, AssemblyFrame>;
+	var mountWorld:AssemblyFrame;
+}
+
 /** One mountable end effector (EOAT), with mass and frames relative to its mount. */
 class EndEffector extends MachineAssembly {
 	var mountRef:Null<{instanceId:String, connectorName:String}>;
 	final frames:Array<WorkingFrame> = [];
+	final collisionExclusions:Map<String, Bool> = [];
 	public var primaryFrame(default, null):Null<String>;
 
 	public function new() super();
@@ -38,6 +43,16 @@ class EndEffector extends MachineAssembly {
 	}
 
 	public function workingFrameNames():Array<String> return [for (frame in frames) frame.name];
+
+	/** Explicitly omit a member from generated collision geometry. */
+	public function excludeFromCollision(instanceId:String):Void {
+		var found = false;
+		for (member in components()) if (member.id == instanceId) found = true;
+		if (!found) throw 'Unknown end effector member "$instanceId"';
+		collisionExclusions.set(instanceId, true);
+	}
+
+	public function collisionExcluded(instanceId:String):Bool return collisionExclusions.exists(instanceId);
 
 	/** The connector that mates this unit to the robot or changer. */
 	public function mountReference():{instanceId:String, connectorName:String} {
@@ -68,24 +83,27 @@ class EndEffector extends MachineAssembly {
 	}
 
 	/** MachineKit frame in mm, relative to the robot-facing mount connector. */
-	public function mountTFrame(name:String, ?state:AssemblyState):AssemblyFrame {
+	public function mountTFrame(name:String, ?state:AssemblyState,
+			?solved:EndEffectorSolvedContext):AssemblyFrame {
 		if (mountRef == null) throw "End effector needs a mount";
-		var mount = mountRef;
 		var frame:Null<WorkingFrame> = null;
 		for (entry in frames) if (entry.name == name) frame = entry;
 		if (frame == null) throw 'Unknown working frame "$name"';
-		var mountWorld = worldConnector(mount.instanceId, mount.connectorName, state);
-		var frameWorld = worldConnector(frame.instanceId, frame.connectorName, state);
-		return AssemblyFrames.compose(AssemblyFrames.inverse(mountWorld), frameWorld);
+		var context = solved == null ? solve(state) : solved;
+		var pose = context.poses.get(frame.instanceId);
+		if (pose == null) throw 'Missing solved pose for "${frame.instanceId}"';
+		var frameWorld = AssemblyFrames.compose(pose,
+			memberConnectorFrame(frame.instanceId, frame.connectorName));
+		return AssemblyFrames.compose(AssemblyFrames.inverse(context.mountWorld), frameWorld);
 	}
 
 	/** Centre in mm and centroidal inertia in kg mm², both in the mount frame. */
-	public function massPropertiesAtMount(?state:AssemblyState):MachineAssemblyMassProperties {
+	public function massPropertiesAtMount(?state:AssemblyState,
+			?solved:EndEffectorSolvedContext):MachineAssemblyMassProperties {
 		if (mountRef == null) throw "End effector needs a mount";
-		var mount = mountRef;
-		var properties = massProperties(state);
-		var mountWorld = worldConnector(mount.instanceId, mount.connectorName, state);
-		var inverse = AssemblyFrames.inverse(mountWorld);
+		var context = solved == null ? solve(state) : solved;
+		var properties = massPropertiesFromPoses(context.poses);
+		var inverse = AssemblyFrames.inverse(context.mountWorld);
 		var centre = AssemblyFrames.transformPoint(inverse, properties.centreOfMass.x,
 			properties.centreOfMass.y, properties.centreOfMass.z);
 		return {mass: properties.mass, centreOfMass: new Vector(centre.x, centre.y, centre.z),
@@ -95,11 +113,15 @@ class EndEffector extends MachineAssembly {
 			unaccountedInertia: properties.unaccountedInertia.copy()};
 	}
 
-	function worldConnector(instanceId:String, connectorName:String, state:AssemblyState):AssemblyFrame {
-		var local = memberConnectorFrame(instanceId, connectorName);
-		if (state != null) return AssemblyFrames.compose(state.worldPose(instanceId), local);
-		var model = new AssemblyModel();
-		addTo(model, "");
-		return AssemblyFrames.compose(model.pose(instanceId), local);
+	/** Solve all member poses and the mount frame for a single conversion pass. */
+	public function solve(?state:AssemblyState):EndEffectorSolvedContext {
+		if (mountRef == null) throw "End effector needs a mount";
+		var mount = mountRef;
+		var poses = solvedPoses(state);
+		var pose = poses.get(mount.instanceId);
+		if (pose == null) throw 'Missing solved pose for "${mount.instanceId}"';
+		return {poses: poses, mountWorld: AssemblyFrames.compose(pose,
+			memberConnectorFrame(mount.instanceId, mount.connectorName))};
 	}
+
 }

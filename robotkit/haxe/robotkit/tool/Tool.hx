@@ -24,6 +24,10 @@ class Tool {
     this.name = name;
     this.flangeTTcp = flangeTTcp;
     this.collision = collision == null ? ToolCollisionShape.NoCollision : collision;
+    switch this.collision {
+      case NoCollision:
+      case _: ToolCollisionShapes.bounds(this.collision);
+    }
     this.mass = mass;
   }
 }

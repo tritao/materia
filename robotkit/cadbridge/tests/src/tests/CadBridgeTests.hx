@@ -31,6 +31,8 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.MachineAssemblyMassBridge;
 import cadbridge.EndEffectorBridge;
+import cadbridge.EndEffectorCollision;
+import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 import cadbridge.EndEffectorRuntimeBridge;
 import cadbridge.EndEffectorControlBinding;
 import eoat.EndEffectorExample;
@@ -45,6 +47,7 @@ import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import robotkit.tool.ToolCollisionShape;
+import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
@@ -63,6 +66,7 @@ class CadBridgeTests {
 
   public static function main():Void {
     testEnclosingHull();
+    testEndEffectorCollisionPieces();
     testMachineAssemblyMassBridge();
     testEndEffectorBridge();
     testEndEffectorRuntimeBridge();
@@ -73,6 +77,54 @@ class CadBridgeTests {
     testBimFrameHierarchy();
     testBimWallToPatchPlanEndToEnd();
     Sys.println('CadBridge tests passed ($assertions assertions)');
+  }
+
+  static function testEndEffectorCollisionPieces():Void {
+    var effector = new EndEffector();
+    effector.addComponent("bar", new BridgeCollisionBlock(100, 10, 10, 90));
+    effector.addComponent("upright", new BridgeCollisionBlock(10, 10, 100, 0));
+    effector.mount("bar", "mount");
+    effector.addMate("corner", "fixed", "bar", "end", "upright", "mount");
+    effector.workingFrame("tip", "upright", "end", true);
+    var solved = effector.solve();
+    var pose = effector.mountTFrame("tip");
+    var reused = effector.mountTFrame("tip", null, solved);
+    check(approx(pose.x, reused.x, 1e-9) && approx(pose.y, reused.y, 1e-9) &&
+      approx(pose.z, reused.z, 1e-9), "shared solve preserves TCP pose");
+    check(approx(effector.massPropertiesAtMount().mass,
+      effector.massPropertiesAtMount(null, solved).mass, 1e-9),
+      "shared solve preserves mount mass");
+    var collision = EndEffectorCollision.pieces(effector, null, null, solved);
+    check(collision.pieces.length == 2 && collision.excluded.length == 0,
+      "L-shaped effector keeps separate conservative pieces");
+    var tool = EndEffectorBridge.toTool(effector, "tip");
+    var bounds = ToolCollisionShapes.bounds(tool.collision);
+    var point = [0.05, -0.05, 0.005];
+    var insideBox = Math.abs(point[0] - bounds.centre.x) < bounds.halfExtents.x &&
+      Math.abs(point[1] - bounds.centre.y) < bounds.halfExtents.y &&
+      Math.abs(point[2] - bounds.centre.z) < bounds.halfExtents.z;
+    var insidePieceBounds = false;
+    for (piece in collision.pieces) {
+      var pieceBounds = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls([piece.vertices], 0));
+      if (Math.abs(point[0] - pieceBounds.centre.x) < pieceBounds.halfExtents.x &&
+        Math.abs(point[1] - pieceBounds.centre.y) < pieceBounds.halfExtents.y &&
+        Math.abs(point[2] - pieceBounds.centre.z) < pieceBounds.halfExtents.z)
+        insidePieceBounds = true;
+    }
+    check(insideBox && !insidePieceBounds, "empty L corner is clear of every piece");
+    effector.addComponent("screw", new BridgeCollisionBlock(2, 2, 2, 0));
+    effector.addMate("screw-mount", "fixed", "bar", "end", "screw", "mount");
+    var merged = EndEffectorCollision.pieces(effector);
+    check(merged.pieces.length == 2 && merged.merged.indexOf("screw") >= 0,
+      "small member merges into a neighbouring piece");
+    var limited = EndEffectorCollision.pieces(effector, null,
+      new EndEffectorCollisionOptions(0, 1));
+    check(limited.pieces.length == 1 && limited.merged.length == 2,
+      "piece limit merges without dropping members");
+    effector.excludeFromCollision("screw");
+    var excluded = EndEffectorCollision.pieces(effector);
+    check(excluded.excluded.indexOf("screw") >= 0 && excluded.pieces.length == 2,
+      "only explicit exclusion drops a member");
   }
 
   static function testEnclosingHull():Void {
@@ -159,7 +211,10 @@ class CadBridgeTests {
       tool.flangeTTcp.rotation.angularDistance(Quat.identity()) < 1e-9,
       "contact frame converts from connector +Y to robot +Z");
     check(approx(tool.mass, 3, 1e-12), "attached tube contributes to RobotKit tool mass");
-    var boxCorrect = switch tool.collision {
+    check(switch tool.collision { case Hulls(pieces, _): pieces.length == 1; case _: false; },
+      "end effector emits convex hull collision by default");
+    var boxTool = EndEffectorBridge.toTool(endEffector, "contact", null, null, null, true);
+    var boxCorrect = switch boxTool.collision {
       case Box(half, centre): centre != null &&
         approx(centre.x, -0.01, 1e-6) && approx(centre.y, 0, 1e-6) &&
         approx(centre.z, 0.015, 1e-6) &&
@@ -183,10 +238,17 @@ class CadBridgeTests {
     var longTool = EndEffectorBridge.toTool(set.configuration("long"), "contact", null, "long/contact");
     check(shortTool.id == "short/contact" && longTool.id == "long/contact" &&
       shortTool.id != longTool.id, "configuration-qualified RobotKit tool IDs are distinct");
+    var hullBounds = ToolCollisionShapes.bounds(shortTool.collision);
+    check(hullBounds.centre.z - hullBounds.halfExtents.z >= -0.0001 &&
+      hullBounds.centre.z + hullBounds.halfExtents.z <=
+        shortTool.flangeTTcp.translation.z + 0.0001,
+      "tool pieces stay in the forward flange frame");
     var tcpX = shortTool.flangeTTcp.transformVector(new Vec3(1, 0, 0));
     check(approx(tcpX.x, 1, 1e-9) && approx(tcpX.y, 0, 1e-9) &&
       approx(tcpX.z, 0, 1e-9), "cup TCP X retains the flange locating-pin direction");
-    var forwardBox = switch shortTool.collision {
+    var shortBox = EndEffectorBridge.toTool(set.configuration("short"), "contact", null,
+      "short/contact-box", null, true);
+    var forwardBox = switch shortBox.collision {
       case Box(half, centre): centre != null &&
         approx(centre.z - half.z, 0, 1e-6) &&
         approx(centre.z + half.z, shortTool.flangeTTcp.translation.z, 1e-6);
@@ -537,6 +599,25 @@ private class BridgeMassPart extends MachineComponent {
     declareMass(2, new Vector(100, 0, 50), withInertia ?
       new InertiaTensor(2000000, 250000, 0, 3000000, 0, 4000000) : null);
   }
+}
+
+private class BridgeCollisionBlock extends MachineComponent {
+  final width:Float;
+  final depth:Float;
+  final height:Float;
+
+  public function new(width:Float, depth:Float, height:Float, endX:Float) {
+    super("BRIDGE-COLLISION-BLOCK", "collision test block", "steel", true);
+    this.width = width;
+    this.depth = depth;
+    this.height = height;
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    addConnector("end", Mount, AssemblyFrames.translation(endX, 0, 0));
+    declareMass(1, new Vector(), InertiaTensor.zero());
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(width, depth, height);
 }
 
 private class BridgeEndEffectorPart extends MachineComponent {
