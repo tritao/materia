@@ -1,5 +1,6 @@
 import fixtures.ChainFixtures;
 import fixtures.OracleFixtures;
+import fixtures.SampledReferenceFixtures;
 import cnckit.tool.CutterProfile;
 import cnckit.tool.CutterSegment;
 import cnckit.tool.CutterZone;
@@ -8,6 +9,7 @@ class StockKitTests {
   public static function main():Void {
     profiles();
     CutMoveTests.run();
+    SampledReferenceFixtures.run();
     OracleFixtures.run();
     ChainFixtures.run();
     Sys.println('StockKit tests passed (${Assert.count} assertions)');
