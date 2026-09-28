@@ -8,6 +8,7 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Vector;
 import cadkit.modeling.Part;
 import cadkit.InertiaTensor;
+import cadkit.ConvexHullVertices;
 import cadkit.parametric.ElementReference;
 import bimkit.BimDocument;
 import robotkit.spatial.Vec3;
@@ -61,6 +62,7 @@ class CadBridgeTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testEnclosingHull();
     testMachineAssemblyMassBridge();
     testEndEffectorBridge();
     testEndEffectorRuntimeBridge();
@@ -71,6 +73,36 @@ class CadBridgeTests {
     testBimFrameHierarchy();
     testBimWallToPatchPlanEndToEnd();
     Sys.println('CadBridge tests passed ($assertions assertions)');
+  }
+
+  static function testEnclosingHull():Void {
+    var count = 32;
+    var mesh = Bytes.alloc(count * 24);
+    for (index in 0...count) {
+      var angle = index * Math.PI * 2 / count;
+      mesh.setDouble(index * 24, Math.cos(angle) * 10);
+      mesh.setDouble(index * 24 + 8, Math.sin(angle) * 10);
+      mesh.setDouble(index * 24 + 16, index % 2 == 0 ? 2 : -2);
+    }
+    var hull = ConvexHullVertices.enclosingFromMesh(mesh, count, 0.1);
+    check(hull.vertices.length >= 12 && hull.vertices.length <= 192,
+      "enclosing hull respects the convex vertex limit");
+    for (xi in 0...3) for (yi in 0...3) for (zi in 0...3) {
+      var x = xi - 1, y = yi - 1, z = zi - 1;
+      if (x == 0 && y == 0 && z == 0) continue;
+      var meshSupport = Math.NEGATIVE_INFINITY, hullSupport = Math.NEGATIVE_INFINITY;
+      for (index in 0...count) {
+        var at = index * 24;
+        meshSupport = Math.max(meshSupport, x * mesh.getDouble(at) +
+          y * mesh.getDouble(at + 8) + z * mesh.getDouble(at + 16));
+      }
+      for (index in 0...Std.int(hull.vertices.length / 3)) {
+        var at = index * 3;
+        hullSupport = Math.max(hullSupport, x * hull.vertices[at] +
+          y * hull.vertices[at + 1] + z * hull.vertices[at + 2]);
+      }
+      check(hullSupport + 1e-6 >= meshSupport, "k-DOP encloses every sampled mesh support");
+    }
   }
 
   static function testMachineAssemblyMassBridge():Void {
