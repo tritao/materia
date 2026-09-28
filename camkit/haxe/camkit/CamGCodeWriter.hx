@@ -20,6 +20,18 @@ class CamGCodeWriter {
     while (index < program.ops.length) {
       var op = program.ops[index];
       switch op {
+      case SetSetup(id, _):
+        var setupNumber = Std.parseInt(id);
+        if (setupNumber == null || setupNumber < 1 || setupNumber > 6 || Std.string(setupNumber) != id)
+          throw 'CAM G-code export cannot map setup $id to G54-G59';
+        lines.push('G${setupNumber + 53}');
+      case MachineMove(kind, geometry, speed, _, _):
+        switch geometry {
+          case Line(_, end):
+            if (kind == Rapid) lines.push('G53 G0 ${xyz(end)}');
+            else lines.push('G53 G1 F${number(speed * 60000.0)} ${xyz(end)}');
+          case _: throw "CAM G-code export needs a line for machine move";
+        }
       case Move(Rapid, geometry, _, _, _), Move(Link, geometry, _, _, _),
           Move(Retract, geometry, _, _, _):
         switch geometry {

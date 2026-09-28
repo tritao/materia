@@ -6,7 +6,12 @@ import toolpathkit.path.ArcPlane;
 
 /** Controller-independent CNC operations in LinuxCNC block order. */
 enum ToolpathOp {
+  /** Selects a work-coordinate setup. IDs have no controller-specific meaning. */
+  SetSetup(id:String, provenance:Provenance);
   Move(kind:MoveKind, geometry:PathGeometry, feed:Float,
+    tolerance:Float, provenance:Provenance);
+  /** A move authored in absolute machine coordinates. */
+  MachineMove(kind:MoveKind, geometry:PathGeometry, feed:Float,
     tolerance:Float, provenance:Provenance);
   Dwell(seconds:Float, span:Provenance);
   Spindle(direction:SpindleDirection, rpm:Float, provenance:Provenance);

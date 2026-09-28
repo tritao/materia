@@ -3,7 +3,7 @@ package cnckit;
 import toolpathkit.tool.Tool;
 import toolpathkit.tool.ToolLibrary;
 
-/** CNC coordinates, machine-axis binding, and stored offsets, all in metres. */
+/** CNC machine limits and controller configuration, all in metres. */
 class CncMachine {
   public final frameId:String;
   public final xAxisId:String;
@@ -15,11 +15,10 @@ class CncMachine {
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final initialPosition:Array<Float>;
-  final offsets:Map<Int, Array<Float>> = new Map();
   public final toolLibrary:ToolLibrary = new ToolLibrary();
+  public final controller:CncControllerSetup;
   public var travelLower(default, null):Null<Array<Float>> = null;
   public var travelUpper(default, null):Null<Array<Float>> = null;
-  final homes:Map<Int, Array<Float>> = new Map();
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
       zAxisId:String, rapidSpeed:Float, ?initialPosition:Array<Float>,
@@ -52,39 +51,7 @@ class CncMachine {
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.initialPosition = initial.copy();
-    for (code in 54...60) offsets.set(code, [0.0, 0.0, 0.0]);
-    homes.set(28, [0.0, 0.0, 0.0]);
-    homes.set(30, [0.0, 0.0, 0.0]);
-  }
-
-  public function setWorkOffset(code:Int, x:Float, y:Float, z:Float):Void {
-    if (code < 54 || code > 59 || !Math.isFinite(x) || !Math.isFinite(y) ||
-        !Math.isFinite(z)) throw "CNC work offset needs G54-G59 and finite XYZ";
-    offsets.set(code, [x, y, z]);
-  }
-
-  public function workOffset(code:Int):Array<Float> {
-    var result = offsets.get(code);
-    if (result == null) throw 'Unknown CNC work offset G$code';
-    return result.copy();
-  }
-
-  public function setToolLength(h:Int, length:Float):Void {
-    var old:Null<Tool> = try toolLibrary.tool(h) catch (_:Dynamic) null;
-    setTool(old == null ? new Tool(h, length, 0.0) : old.withLength(length));
-  }
-
-  public function toolLength(h:Int):Float {
-    return tool(h).length;
-  }
-
-  public function setTool(tool:Tool):Void {
-    if (tool == null) throw "CNC tool must not be null";
-    toolLibrary.set(tool);
-  }
-
-  public function tool(number:Int):Tool {
-    return toolLibrary.tool(number);
+    controller = new CncControllerSetup(toolLibrary);
   }
 
   public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void {
@@ -98,17 +65,4 @@ class CncMachine {
     travelUpper = upper.copy();
   }
 
-  /** Stored G28/G30 positions are absolute machine coordinates in metres. */
-  public function setHomePosition(code:Int, x:Float, y:Float, z:Float):Void {
-    if ((code != 28 && code != 30) || !Math.isFinite(x) ||
-        !Math.isFinite(y) || !Math.isFinite(z))
-      throw "CNC home needs G28 or G30 and finite XYZ metres";
-    homes.set(code, [x, y, z]);
-  }
-
-  public function homePosition(code:Int):Array<Float> {
-    var result = homes.get(code);
-    if (result == null) throw 'Unknown CNC home G$code';
-    return result.copy();
-  }
 }

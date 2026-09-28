@@ -122,6 +122,8 @@ class MotionKitTestSupport {
       cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
       cnc.positionTolerance, cnc.orientationTolerance,
       cnc.maxBlendTurnAngleRadians);
+    for (code in 54...60)
+      machine.setSetupOffset(cnc.controller.setupId(code), cnc.controller.workOffset(code));
     if (cnc.travelLower != null && cnc.travelUpper != null)
       machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
     var binding = new ToolpathMotionBinding(machine, blueprint);
@@ -138,6 +140,8 @@ class MotionKitTestSupport {
       cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
       cnc.positionTolerance, cnc.orientationTolerance,
       cnc.maxBlendTurnAngleRadians);
+    for (code in 54...60)
+      machine.setSetupOffset(cnc.controller.setupId(code), cnc.controller.workOffset(code));
     if (cnc.travelLower != null && cnc.travelUpper != null)
       machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
     var lowered = ToolpathMotion.lower(parsed.ops, machine);

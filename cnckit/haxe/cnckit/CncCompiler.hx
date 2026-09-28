@@ -4,6 +4,8 @@ import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.interp.CncInterpreter;
 import cnckit.parse.CncLexer;
 import toolpathkit.path.Provenance;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.GeometryOffset;
 import toolpathkit.setup.TravelEnvelope;
 
 /** Parses and interprets G-code into the shared toolpath format. */
@@ -28,13 +30,24 @@ class CncCompiler {
     var interpreter = new CncInterpreter(machine);
     var interpreted = interpreter.interpret(parsed.blocks);
     var compensated = CncCompensator.resolve(interpreted);
-    var ops = compensated.ops;
+    var machineOps = compensated.ops;
     var diagnostics = parsed.diagnostics.concat(interpreter.diagnostics);
     diagnostics = diagnostics.concat(compensated.diagnostics);
     diagnostics = diagnostics.concat([for (violation in
-      TravelEnvelope.check(machine.travelLower, machine.travelUpper, ops))
+      TravelEnvelope.check(machine.travelLower, machine.travelUpper, machineOps))
       new CncDiagnostic(Error, "CNC_TRAVEL", violation.provenance,
         violation.message())]);
+    var ops:Array<ToolpathOp> = [];
+    var offset = machine.controller.workOffset(54);
+    for (op in machineOps) switch op {
+      case SetSetup(id, _):
+        offset = machine.controller.workOffset(Std.parseInt(id) + 53);
+        ops.push(op);
+      case Move(kind, geometry, feed, tolerance, provenance):
+        ops.push(ToolpathOp.Move(kind, GeometryOffset.translate(geometry,
+          [-offset[0], -offset[1], -offset[2]]), feed, tolerance, provenance));
+      case _: ops.push(op);
+    }
     if (ops.length == 0 && diagnostics.length == 0)
       diagnostics.push(new CncDiagnostic(Error, "CNC_EMPTY",
         new Provenance(1, 1, 0), "G-code contains no executable motion or barrier"));

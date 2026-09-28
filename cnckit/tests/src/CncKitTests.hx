@@ -39,8 +39,8 @@ class CncKitTests {
 
   public static function main():Void {
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setWorkOffset(54, 0.1, 0.2, 0.0);
-    machine.setToolLength(2, 0.012);
+    machine.controller.setWorkOffset(54, 0.1, 0.2, 0.0);
+    machine.controller.setToolLength(2, 0.012);
     var source = "G21 G90 G54 G17\nS12000 M3\nG0 X0 Y0 Z10\nF600 G1 Z0\n" +
       "G1 X20\nG1 Y20\nG2 X0 Y20 I-10 J0\nG1 Y0\nM5 M9\nM2\n";
     var program = new CncTestCompiler(machine).compile(source);
@@ -57,6 +57,34 @@ class CncKitTests {
       "G54 applies X offset");
     near(firstPath.poseAt(firstPath.length()).z, 0.01,
       "G0 Z mm converts to metres");
+    var switchingMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    switchingMachine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
+    switchingMachine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
+    var switched = new CncCompiler(switchingMachine).compileDetailed(
+      "G21 G90 G54 G0 X10\nG55 G0 X10\nM2");
+    check(switched.diagnostics.length == 0, "G54/G55 compile without errors");
+    check(switch switched.ops[0] {
+      case ToolpathOp.SetSetup("1", _): true;
+      case _: false;
+    }, "G54 selects setup one");
+    check(switch switched.ops[2] {
+      case ToolpathOp.SetSetup("2", _): true;
+      case _: false;
+    }, "G55 selects setup two");
+    var switchedWork = switch switched.ops[3] {
+      case ToolpathOp.Move(Rapid, PathGeometry.Line(_, end), _, _, _): end;
+      case _: throw "G55 work move missing";
+    };
+    near(switchedWork.x, 0.01, "G55 move stays in work coordinates");
+    var switchedMotion = new CncTestCompiler(switchingMachine).compile(
+      "G21 G90 G54 G0 X10\nG55 G0 X10\nM2");
+    var switchedMachineX = 0.0;
+    for (op in switchedMotion.ops) switch op {
+      case MotionOp.FollowPath(path, _, _, _):
+        switchedMachineX = path.poseAt(path.length()).x;
+      case _:
+    }
+    near(switchedMachineX, 0.21, "G55 adapter applies its setup offset");
     var arcs = 0;
     for (op in program.ops) switch op {
       case MotionOp.FollowPath(path, _, _, _):
@@ -204,7 +232,7 @@ class CncKitTests {
       case ToolLengthOffset(number, length, span): '$number:$length:${span.line}';
       case _: null;
     }].filter(entry -> entry != null);
-    check(offsets.length == 2 && offsets[0] == '2:${machine.toolLength(2)}:1'
+    check(offsets.length == 2 && offsets[0] == '2:${machine.controller.toolLength(2)}:1'
       && offsets[1] == "0:0:3", "G43 and G49 record the tool length they apply");
     var lowercase = new CncTestCompiler(machine).compile(
       "g21 g90 (comment) f600 g1 x1 ; tail\nm30");
@@ -263,8 +291,8 @@ class CncKitTests {
     near(recoveredFeed, 0.01,
       "failed block does not commit its feed change");
     var fixtureMachine = new CncMachine("work", "x", "y", "z", 0.2);
-    fixtureMachine.setToolLength(1, 0.0);
-    fixtureMachine.setToolLength(11, 0.0);
+    fixtureMachine.controller.setToolLength(1, 0.0);
+    fixtureMachine.controller.setToolLength(11, 0.0);
     fixture("freecad-pocket.ngc", fixtureMachine);
     fixture("fusion-drill.ngc", fixtureMachine);
     var compatibility = new CncTestCompiler(fixtureMachine).compileDetailed(
@@ -292,11 +320,11 @@ class CncKitTests {
     };
     check(majorLength > minorLength && majorLength > Math.PI * 0.006,
       "negative R selects the major arc");
-    fixtureMachine.setHomePosition(28, 0.1, 0.2, 0.3);
+    fixtureMachine.controller.setHomePosition(28, 0.1, 0.2, 0.3);
     var home = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G0 X10 Y10 Z10\nG28 X0\nM2");
     var homeLast = switch home.ops[home.ops.length - 2] {
-      case ToolpathOp.Move(Rapid, geometry, _, _, _): GeometryTools.pointAt(geometry,
+      case ToolpathOp.MachineMove(Rapid, geometry, _, _, _): GeometryTools.pointAt(geometry,
         GeometryTools.length(geometry));
       case _: throw "G28 home motion missing";
     };
@@ -441,7 +469,7 @@ class CncKitTests {
       case _: false;
     }, "M2 also turns off active coolant");
     var compensatedMachine = new CncMachine("work", "x", "y", "z", 0.2);
-    compensatedMachine.setTool(new Tool(2, 0.012, 0.002));
+    compensatedMachine.toolLibrary.set(new Tool(2, 0.012, 0.002));
     var compUnsupported = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 G90 F600 T2 M6\nG0 X0 Y0\nG41 D2 G1 X5\nG1 Y5\n" +
       "G28\nG81 X5 Y5 Z-1 R2\nG40 G1 X10\nM2");
@@ -449,12 +477,12 @@ class CncKitTests {
       "G28 under cutter compensation reports its own line");
     check(hasError(compUnsupported, 6, "drilling cycles require G40"),
       "drilling cycle under cutter compensation reports its own line");
-    near(compensatedMachine.toolLength(2), 0.012,
+    near(compensatedMachine.controller.toolLength(2), 0.012,
       "tool table supplies G43 length");
-    near(compensatedMachine.tool(2).diameter, 0.002,
+    near(compensatedMachine.toolLibrary.tool(2).diameter, 0.002,
       "tool table stores cutter diameter");
-    compensatedMachine.setToolLength(2, 0.013);
-    near(compensatedMachine.tool(2).diameter, 0.002,
+    compensatedMachine.controller.setToolLength(2, 0.013);
+    near(compensatedMachine.toolLibrary.tool(2).diameter, 0.002,
       "legacy tool-length setter preserves cutter diameter");
     var inside = new CncTestCompiler(compensatedMachine).compileDetailed(
       File.getContent("fixtures/comp-inside.ngc"));
@@ -540,7 +568,7 @@ class CncKitTests {
     rejects(compensatedMachine,
       "G21 F600 G41 D2 G1 X10\nG3 X20 Y10 I0 J10\nG40 G1 X21 Y10\nM2",
       "lead-out is shorter than tool diameter");
-    compensatedMachine.setTool(new Tool(3, 0.0, 0.022));
+    compensatedMachine.toolLibrary.set(new Tool(3, 0.0, 0.022));
     rejects(compensatedMachine,
       "G21 F600 G41 D3 G1 X30\nG3 X40 Y10 I0 J10\nG40 G1 X40 Y40\nM2",
       "gouges arc radius");
@@ -565,7 +593,8 @@ class CncKitTests {
     var low = [1e9, 1e9, 1e9], high = [-1e9, -1e9, -1e9];
     for (op in result.ops) {
       var geometry = switch op {
-        case ToolpathOp.Move(_, g, _, _, _): g;
+        case ToolpathOp.Move(_, g, _, _, _),
+            ToolpathOp.MachineMove(_, g, _, _, _): g;
         case _: null;
       };
       if (geometry == null) continue;
@@ -597,7 +626,8 @@ class CncKitTests {
     var pathIndex = 0;
     for (op in result.ops) {
       var geometry = switch op {
-        case ToolpathOp.Move(_, g, _, _, _): g;
+        case ToolpathOp.Move(_, g, _, _, _),
+            ToolpathOp.MachineMove(_, g, _, _, _): g;
         case _: null;
       };
       if (geometry == null) continue;

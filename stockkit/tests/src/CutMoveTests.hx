@@ -40,16 +40,16 @@ class CutMoveTests {
     Assert.check(rejected, "a tool with no size has nothing to simulate");
 
     var machine = new CncMachine("cnc", "x", "y", "z", 0.1);
-    machine.setTool(tool);
-    machine.setToolLength(4, 0.07);
-    Assert.check(machine.tool(4).cutter == ball, "setting a tool length keeps its shape");
+    machine.toolLibrary.set(tool);
+    machine.controller.setToolLength(4, 0.07);
+    Assert.check(machine.toolLibrary.tool(4).cutter == ball, "setting a tool length keeps its shape");
   }
 
   static function gcode():Void {
     var machine = new CncMachine("cnc", "x", "y", "z", 0.1);
-    machine.setWorkOffset(54, 0.1, 0.2, 0.3);
+    machine.controller.setWorkOffset(54, 0.1, 0.2, 0.3);
     var ball = CutterProfile.ball(0.006, 0.02);
-    machine.setTool(Tool.shaped(1, 0.05, ball));
+    machine.toolLibrary.set(Tool.shaped(1, 0.05, ball));
     var compiled = new CncCompiler(machine).compileDetailed([
       "G21 G90 G54",
       "G0 X0 Y0 Z50",
@@ -63,8 +63,7 @@ class CutMoveTests {
       "G0 Z10",
       "M2"
     ].join("\n"));
-    var moves = CutMoves.fromOps(compiled.ops, machine.tool,
-      new Point3(0.1, 0.2, 0.3));
+    var moves = CutMoves.fromOps(compiled.ops, machine.toolLibrary.tool);
     Assert.check(moves.length == 5, "moves before the first tool change are skipped");
     Assert.check([for (move in moves) move.span.line].join(",") == "5,6,7,8,10",
       "each move keeps its source line");

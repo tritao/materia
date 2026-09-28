@@ -10,10 +10,10 @@ class CutMoves {
   /**
     Tool-tip moves in the workpiece frame from CNC ops, as produced by CamKit
     or by `CncCompiler.compileDetailed` (cutter compensation already
-    resolved). Op geometry is in machine coordinates and includes the active
-    G43 tool length, so each point is shifted by `-workOrigin` and by the tool
-    length in effect. Tool numbers are resolved with `tools`, for example
-    `machine.tool` or `camProgram.tool`. Moves made before any tool change are
+    resolved). Op geometry is in work coordinates and includes the active
+    G43 tool length. Each point is shifted by the optional stock origin and
+    by the tool length in effect. Tool numbers are resolved with `tools`.
+    Moves made before any tool change are
     skipped: there is no tool in the spindle to simulate.
   **/
   public static function fromOps(ops:Array<ToolpathOp>, tools:Int->Tool,
@@ -34,6 +34,13 @@ class CutMoves {
       case Move(_, geometry, _, _, span):
         if (tool != null) moves.push(new CutMove(tool,
           Path(shift(geometry, origin, toolLength)), false, index, span));
+      case SetSetup(_, _):
+      case MachineMove(Rapid, _, _, _, _),
+          MachineMove(Link, _, _, _, _),
+          MachineMove(Retract, _, _, _, _):
+        // Machine travel does not remove stock in the current work setup.
+      case MachineMove(_, _, _, _, _):
+        throw "stock simulation needs a setup transform for machine-coordinate cuts";
       case Dwell(_, _), Spindle(_, _, _), Coolant(_, _, _), OptionalStop(_),
           ProgramStop(_), End(_):
     }

@@ -44,6 +44,10 @@ class ToolpathLowering {
     pending = []; pendingSpans = [];
     pendingFeed = 0.0; pendingBlend = 0.0;
     for (op in ops) switch op {
+      case SetSetup(_, _):
+        flush();
+      case MachineMove(_, _, _, _, _):
+        throw "machine moves must be projected before lowering";
       case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
           Move(Retract, geometry, _, _, span):
         addMove(primitive(geometry), machine.rapidSpeed, 0.0, span);

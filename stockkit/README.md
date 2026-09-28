@@ -25,9 +25,9 @@ are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 - `stockkit.CutMove` is one tool motion through the stock (tool, motion in the
   workpiece frame, rapid or feed, source op index and span).
   `CutMoves.fromOps(ops, tools, ?workOrigin)` builds them from CamKit programs
-  (`program.tool`) or compiled G-code (`machine.tool`). CNC op geometry is in
-  machine coordinates and includes the active G43 tool length, which the new
-  `CncOp.ToolLengthOffset` records, so the adapter recovers tool-tip positions.
+  (`program.tool`) or compiled G-code (`machine.toolLibrary.tool`). Toolpath
+  geometry is in work coordinates and includes the active G43 tool length,
+  which `ToolpathOp.ToolLengthOffset` records for recovering tool-tip positions.
 - The test project holds the exact reference (`tests/src/oracle/ExactOracle.hx`):
   it builds each move's swept solid with OCCT through CadKit, subtracts it from
   stock, and reads exact material intervals along any ray. It covers

@@ -21,11 +21,13 @@ class CncTestCompiler {
     var program:Null<MotionProgram> = null;
     var sourceMap = new ToolpathSourceMap();
     if (ir.ops.length > 0) try {
-      var lowered = ToolpathMotion.lower(ir.ops,
-        new MachineBinding(machine.frameId, machine.xAxisId,
+      var binding = new MachineBinding(machine.frameId, machine.xAxisId,
           machine.yAxisId, machine.zAxisId, machine.rapidSpeed,
           machine.initialPosition, machine.positionTolerance,
-          machine.orientationTolerance, machine.maxBlendTurnAngleRadians));
+          machine.orientationTolerance, machine.maxBlendTurnAngleRadians);
+      for (code in 54...60)
+        binding.setSetupOffset(machine.controller.setupId(code), machine.controller.workOffset(code));
+      var lowered = ToolpathMotion.lower(ir.ops, binding);
       program = lowered.program;
       sourceMap = lowered.sourceMap;
       for (warning in lowered.diagnostics)

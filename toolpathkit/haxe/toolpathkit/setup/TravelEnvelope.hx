@@ -14,7 +14,8 @@ class TravelEnvelope {
     for (op in ops) {
       var geometry:PathGeometry = null, span:Provenance = null;
       switch op {
-        case Move(_, g, _, _, s): geometry = g; span = s;
+        case Move(_, g, _, _, s), MachineMove(_, g, _, _, s):
+          geometry = g; span = s;
         case _:
       }
       if (geometry == null) continue;

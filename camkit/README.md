@@ -1,16 +1,16 @@
 # CamKit
 
-CamKit produces `cnckit.ir.CncOp` directly from CAD or sheet geometry. It
+CamKit produces `toolpathkit.path.ToolpathOp` directly from CAD or sheet geometry. It
 supports 2.5D outside and inside profiles, pocket clearing,
 and drilled hole centres. Profiles and pockets use configurable depth steps.
 Coordinates are metres; feeds are metres/second.
-`CamProgram.lower(machine)` sends the same operations to MotionKit and returns
-its source map. `CamGCodeWriter.write(program, setup, cncMachine)` validates
-the setup and exports LinuxCNC millimetre G-code. Each CAM operation gets a synthetic source span whose line number is
-the operation number, so editor highlighting works without G-code text.
+`ToolpathMotion.lower(program.ops, binding)` sends the operations to MotionKit.
+`CamGCodeWriter.write(program, setup, cncMachine)` validates
+the setup and exports LinuxCNC millimetre G-code. Each CAM operation carries
+its operation ID and, when available, a CAD feature reference.
 
-`CamSetup` records the stock rectangle, top and bottom, safe Z and optional
-`CamFixture` rectangular keep-outs. All bounds are metres in the program's
+`toolpathkit.setup.Setup` records the stock rectangle, top and bottom, safe Z,
+work origin, and optional `Fixture` rectangular keep-outs. All bounds are metres in the program's
 work coordinates. Export checks machine travel, depth below stock bottom,
 lateral rapids below safe Z and fixture intersections along lines and arcs.
 The fixture check conservatively expands each rectangular keep-out by the
@@ -61,13 +61,13 @@ cutting feed.
 Example:
 
 ```haxe
-var tool = new CncTool(2, 0.0, 0.002);
+var tool = new Tool(2, 0.0, 0.002);
 var contour = CamSheetProfiles.fromPlan(sheetPlan, "gantry-bracket");
+var setup = new Setup(0.0, 0.05, 0.0, 0.05, 0.0, -0.003, 0.005);
 var program = new CamJob(0.005, 12000)
   .profile(contour, tool, -0.002, 0.01)
-  .finish();
-var previewAndExecution = program.lower(cncMachine);
-var setup = new CamSetup(0.0, 0.05, 0.0, 0.05, 0.0, -0.003, 0.005);
+  .finish(setup);
+var previewAndExecution = ToolpathMotion.lower(program.ops, machineBinding);
 var linuxCnc = CamGCodeWriter.write(program, setup, cncMachine);
 ```
 

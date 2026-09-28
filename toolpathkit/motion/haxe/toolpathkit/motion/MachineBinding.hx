@@ -1,5 +1,7 @@
 package toolpathkit.motion;
 
+import toolpathkit.setup.Setup;
+
 /** Machine axes and execution limits, independent of a G-code controller. */
 class MachineBinding {
   public final frameId:String;
@@ -13,6 +15,7 @@ class MachineBinding {
   public final initialPosition:Array<Float>;
   public var travelLower(default, null):Null<Array<Float>> = null;
   public var travelUpper(default, null):Null<Array<Float>> = null;
+  final setupOffsets:Map<String, Array<Float>> = new Map();
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
       zAxisId:String, rapidSpeed:Float, ?initialPosition:Array<Float>,
@@ -40,6 +43,27 @@ class MachineBinding {
     this.orientationTolerance = orientationTolerance;
     this.maxBlendTurnAngleRadians = maxBlendTurnAngleRadians;
     this.initialPosition = initial.copy();
+    setupOffsets.set("1", [0.0, 0.0, 0.0]);
+  }
+
+  public function setSetupOffset(id:String, offset:Array<Float>):Void {
+    if (id == null || id.length == 0 || offset == null || offset.length != 3)
+      throw "setup needs an ID and three coordinates";
+    for (value in offset) if (!Math.isFinite(value))
+      throw "setup coordinates must be finite";
+    setupOffsets.set(id, offset.copy());
+  }
+
+  public function registerSetup(setup:Setup):Void {
+    if (setup == null) throw "machine binding needs a setup";
+    setSetupOffset(setup.id, [setup.workOrigin.x,
+      setup.workOrigin.y, setup.workOrigin.z]);
+  }
+
+  public function setupOffset(id:String):Array<Float> {
+    var result = setupOffsets.get(id);
+    if (result == null) throw 'Unknown setup $id';
+    return result.copy();
   }
 
   public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void {

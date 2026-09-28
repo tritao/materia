@@ -250,7 +250,10 @@ class CncInterpreter {
     }
     if (unitChange >= 0) state.metric = unitChange == 21;
     if (distanceChange >= 0) state.absolute = distanceChange == 90;
-    if (nextWcs >= 0) state.wcs = nextWcs;
+    if (nextWcs >= 0) {
+      state.wcs = nextWcs;
+      emit(ToolpathOp.SetSetup(machine.controller.setupId(nextWcs), block.span));
+    }
     if (state.cutterSide != 0 && cutterChange != 40 && planeChange >= 0 &&
         planeChange != state.plane) fail(line, gWords[0].column,
           "cutter compensation plane cannot change before G40");
@@ -268,7 +271,8 @@ class CncInterpreter {
       if (number < 0) fail(line, gWords[0].column,
         "G41/G42 requires a loaded tool or D number");
       var tool:Tool = null;
-      try tool = machine.tool(number)
+      try tool = d == null ? machine.toolLibrary.tool(number) :
+        machine.controller.toolForD(number)
       catch (error:Dynamic) fail(line, d == null ? gWords[0].column : d.column,
         Std.string(error));
       if (tool.diameter <= 0.0) fail(line, d == null ? gWords[0].column : d.column,
@@ -282,7 +286,7 @@ class CncInterpreter {
     if (setToolOffset) {
       var hWord:CncWord = cast h;
       var number = integer(hWord, line);
-      try state.toolLength = machine.toolLength(number)
+      try state.toolLength = machine.controller.toolLength(number)
       catch (error:Dynamic) fail(line, hWord.column, Std.string(error));
       emit(ToolpathOp.ToolLengthOffset(number, state.toolLength, block.span));
     }
@@ -357,7 +361,7 @@ class CncInterpreter {
       k:Null<CncWord>, r:Null<CncWord>, machineCoordinates:Bool,
       span:Provenance):Void {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
-    var offset = machine.workOffset(state.wcs);
+    var offset = machine.controller.workOffset(state.wcs);
     var words = [x, y, z];
     var target = state.position.copy();
     for (axis in 0...3) {
@@ -376,7 +380,11 @@ class CncInterpreter {
         fail(line, column(i, column(j, column(k, column(r, 1)))),
           "I/J/K/R require G2 or G3");
       if (start.distanceTo(end) <= 1e-12) return;
-      if (mode == 0) emit(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(start, end), 0.0, 0.0, span));
+      if (machineCoordinates)
+        emit(ToolpathOp.MachineMove(mode == 0 ? MoveKind.Rapid : MoveKind.Cut,
+          PathGeometry.Line(start, end), mode == 0 ? 0.0 : feed(line),
+          mode == 0 ? 0.0 : state.blendTolerance, span));
+      else if (mode == 0) emit(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(start, end), 0.0, 0.0, span));
       else emit(ToolpathOp.Move(MoveKind.Cut, PathGeometry.Line(start, end), feed(line), state.blendTolerance, span));
     } else {
       if (machineCoordinates) fail(line, span.column, "G53 requires G0/G1 motion");
@@ -432,7 +440,7 @@ class CncInterpreter {
   function home(code:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, span:Provenance):Void {
     var axes = [x, y, z], intermediate = state.position.copy();
-    var offset = machine.workOffset(state.wcs);
+    var offset = machine.controller.workOffset(state.wcs);
     var anyAxis = false;
     for (axis in 0...3) if (axes[axis] != null) {
       anyAxis = true;
@@ -442,16 +450,16 @@ class CncInterpreter {
         (axis == 2 ? state.toolLength : 0.0) : intermediate[axis] + value;
     }
     if (anyAxis) rapidTo(intermediate, span);
-    var stored = machine.homePosition(code), destination = state.position.copy();
+    var stored = machine.controller.homePosition(code), destination = state.position.copy();
     for (axis in 0...3) if (!anyAxis || axes[axis] != null)
       destination[axis] = stored[axis];
-    rapidTo(destination, span);
+    rapidTo(destination, span, MoveKind.Rapid, true);
   }
 
   function drill(code:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, r:Null<CncWord>, q:Null<CncWord>,
       p:Null<CncWord>, l:Null<CncWord>, span:Provenance, line:Int):Void {
-    var offset = machine.workOffset(state.wcs), scale = unitScale();
+    var offset = machine.controller.workOffset(state.wcs), scale = unitScale();
     if (r != null) state.cycleR = state.absolute ?
       r.value * scale + offset[2] + state.toolLength :
       state.cycleInitialZ + r.value * scale;
@@ -526,11 +534,13 @@ class CncInterpreter {
   }
 
   function rapidTo(target:Array<Float>, span:Provenance,
-      kind:MoveKind = Rapid):Void {
+      kind:MoveKind = Rapid, machineCoordinates:Bool = false):Void {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
     var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      emit(ToolpathOp.Move(kind, PathGeometry.Line(start, end), 0.0, 0.0, span));
+      emit(machineCoordinates ? ToolpathOp.MachineMove(kind,
+        PathGeometry.Line(start, end), 0.0, 0.0, span) :
+        ToolpathOp.Move(kind, PathGeometry.Line(start, end), 0.0, 0.0, span));
     state.position = target.copy();
   }
 

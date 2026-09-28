@@ -81,7 +81,7 @@ class CamGeneratedFixtures {
     catch (_:Dynamic) rejected = true;
     check(rejected, "U pocket rejects a tool wider than its arms");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(tool);
+    machine.toolLibrary.set(tool);
     for (program in [lProgram, uProgram]) {
       check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
         "concave pocket lowers through MotionKit");
@@ -234,7 +234,7 @@ class CamGeneratedFixtures {
         "concave offset follows the contour's winding");
     }
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(tool);
+    machine.toolLibrary.set(tool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "concave profile lowers through MotionKit");
     check(CamTestLowering.lower(inside, machine).diagnostics.length == 0,
@@ -401,7 +401,7 @@ class CamGeneratedFixtures {
     check(lastHoleIndex < firstOutsideIndex && firstOutsideIndex < program.ops.length,
       "face operation finishes both holes before its outer profile");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(tool);
+    machine.toolLibrary.set(tool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "holed plate lowers to MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));

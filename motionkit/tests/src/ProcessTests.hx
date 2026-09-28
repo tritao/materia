@@ -618,7 +618,7 @@ class ProcessTests extends MotionKitTestSupport {
     near(end[0], 0.01, "CNC arc ends at X", 1e-5);
     near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
     result.dispose();
-    cnc.setTool(new Tool(2, 0.0, 0.002));
+    cnc.toolLibrary.set(new Tool(2, 0.0, 0.002));
     var compensated = MotionKitTestSupport.compileCnc(binding, cnc, "G21 G90 F600 G41 D2 G1 X10\n" +
       "G1 X20\nG1 X20 Y10\nG40 G1 X20 Y20\nM2\n",
       [0.0, 0.0, 0.0], Int64.ofInt(925));

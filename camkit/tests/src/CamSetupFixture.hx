@@ -23,11 +23,17 @@ class CamSetupFixture {
     ]);
     var tool = new Tool(7, 0.0, 0.002);
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(tool);
+    machine.toolLibrary.set(tool);
     var program = new CamJob(0.008, 12000)
       .profile(contour, tool, -0.002, 0.01, "on").finish();
     var clear = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.008);
+    var withSetup = new CamJob(0.008, 12000)
+      .profile(contour, tool, -0.002, 0.01, "on").finish(clear);
+    check(switch withSetup.ops[0] {
+      case ToolpathOp.SetSetup("1", _): true;
+      case _: false;
+    }, "CAM job emits its setup switch");
     check(CamGCodeWriter.write(program, clear, machine).indexOf("G1") >= 0,
       "generated plate exports with a clear setup");
     var clamp = new Fixture("edge-clamp", 0.018, 0.022,

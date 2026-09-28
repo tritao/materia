@@ -76,7 +76,7 @@ class CamSafeTravelFixture {
       "mixed job covers profile passes, two holes and two tool switches");
 
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(profileTool); machine.setTool(drillTool);
+    machine.toolLibrary.set(profileTool); machine.toolLibrary.set(drillTool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "mixed tool job lowers through MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(

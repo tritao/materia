@@ -30,7 +30,7 @@ class CamIslandPocketFixture {
     }
     check(hasFaceRef, "face pocket preserves CAD face reference");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(tool);
+    machine.toolLibrary.set(tool);
     var lowered = CamTestLowering.lower(program, machine);
     check(lowered.program != null && lowered.diagnostics.length == 0,
       "island pocket lowers through MotionKit");

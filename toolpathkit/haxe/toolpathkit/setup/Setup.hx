@@ -10,6 +10,9 @@ import toolpathkit.tool.ToolLibrary;
 
 /** Stock, clearance and clamp checks in the same work coordinates as CAM IR. */
 class Setup {
+  public final id:String;
+  /** Translation from work coordinates to machine coordinates, in metres. */
+  public final workOrigin:Point3;
   public final stockMinX:Float;
   public final stockMaxX:Float;
   public final stockMinY:Float;
@@ -21,7 +24,11 @@ class Setup {
 
   public function new(stockMinX:Float, stockMaxX:Float, stockMinY:Float,
       stockMaxY:Float, stockTop:Float, stockBottom:Float, safeZ:Float,
-      ?fixtures:Array<Fixture>) {
+      ?fixtures:Array<Fixture>, ?id:String = "1", ?workOrigin:Point3) {
+    if (id == null || id.length == 0) throw "setup needs an ID";
+    var origin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
+    if (!Math.isFinite(origin.x) || !Math.isFinite(origin.y) ||
+        !Math.isFinite(origin.z)) throw "setup needs a finite work origin";
     for (value in [stockMinX, stockMaxX, stockMinY, stockMaxY,
         stockTop, stockBottom, safeZ])
       if (!Math.isFinite(value)) throw "CAM setup needs finite bounds";
@@ -32,6 +39,8 @@ class Setup {
     this.stockMinY = stockMinY; this.stockMaxY = stockMaxY;
     this.stockTop = stockTop; this.stockBottom = stockBottom;
     this.safeZ = safeZ;
+    this.id = id;
+    this.workOrigin = origin;
     this.fixtures = fixtures == null ? [] : fixtures.copy();
     for (fixture in this.fixtures)
       if (fixture == null || safeZ <= fixture.maxZ)
