@@ -19,8 +19,8 @@ class AdjustableFoot extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Solids.union([Solids.cylinder(diameter / 2, 0, Math.min(8, height)),
-			Solids.cylinder(diameter * 0.22, Math.min(7, height - 1), height)]);
+		return Solids.union([Part.cylinderSpan(diameter / 2, 0, Math.min(8, height)),
+			Part.cylinderSpan(diameter * 0.22, Math.min(7, height - 1), height)]);
 
 	static function fmt(value:Float):String return Std.string(Math.round(value * 10) / 10);
 }
