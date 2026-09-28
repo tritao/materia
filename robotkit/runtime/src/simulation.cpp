@@ -1187,6 +1187,14 @@ rk_result Simulation::step(uint64_t timestamp_ns) {
     return advance(timestamp_ns);
 }
 
+rk_result Simulation::cut_virtual_device_link(uint32_t robot_index, bool cut) {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (robot_index >= virtual_devices_.size() || !virtual_devices_[robot_index])
+        return RK_ERROR_INVALID_ARGUMENT;
+    virtual_devices_[robot_index]->cut_link(cut);
+    return RK_OK;
+}
+
 rk_result Simulation::advance(uint64_t timestamp_ns) {
     if (ensure_host() != RK_OK)
         return RK_ERROR_BACKEND;

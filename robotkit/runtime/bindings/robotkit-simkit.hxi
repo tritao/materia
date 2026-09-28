@@ -47,6 +47,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_create(desc: ptr<const<rk_simulation_desc>>, out_simulation: ptr<rk_simulation> @out @owned) -> rk_result;
 	/**
+	 * Disconnects or reconnects one virtual RKD6 device in a simulation.
+	 */
+	extern fn rk_simulation_cut_virtual_device_link(simulation: rk_simulation, robot_index: u32, cut: u32) -> rk_result;
+	/**
 	 * Destroys a simulation and releases every runtime handle it created.
 	 *
 	 * Callers should stop a realtime simulation first. Destroying an invalid or

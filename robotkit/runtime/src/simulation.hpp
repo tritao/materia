@@ -40,6 +40,7 @@ public:
     rk_result stop();
     /** Applies all robot mailboxes and advances the physics host exactly once. */
     rk_result step(uint64_t timestamp_ns);
+    rk_result cut_virtual_device_link(uint32_t robot_index, bool cut);
     rk_result reset();
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);

@@ -187,6 +187,15 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");
   }
 
+  /** Injects a virtual RKD6 link loss or reconnects the link. */
+  public function cutVirtualDeviceLink(robotIndex:Int, cut:Bool):Void {
+    ensureLive();
+    if (robotIndex < 0 || robotIndex >= robots.length)
+      throw "Simulation virtual-device robot index is out of range";
+    check(RobotKitSimKit.rk_simulation_cut_virtual_device_link(owner.borrow(),
+      robotIndex, cut ? 1 : 0), "simulation.cutVirtualDeviceLink");
+  }
+
   /** Starts the shared realtime clock after topology construction is complete. */
   public function start():Void {
     ensureLive();

@@ -293,6 +293,9 @@ RK_API rk_result RK_CALL rk_simulation_add_robot(
  */
 RK_API rk_result RK_CALL rk_simulation_step(rk_simulation simulation,
                                             uint64_t timestamp_ns);
+/** Disconnects or reconnects one virtual RKD6 device in a simulation. */
+RK_API rk_result RK_CALL rk_simulation_cut_virtual_device_link(
+    rk_simulation simulation, uint32_t robot_index, uint32_t cut);
 /**
  * Starts the simulation's realtime owner thread.
  *

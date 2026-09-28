@@ -107,6 +107,13 @@ rk_result RK_CALL rk_simulation_step(rk_simulation simulation, uint64_t timestam
     const auto value = resolve(simulation);
     return value ? value->step(timestamp_ns) : RK_ERROR_INVALID_HANDLE;
 }
+rk_result RK_CALL rk_simulation_cut_virtual_device_link(
+    rk_simulation simulation, uint32_t robot_index, uint32_t cut) {
+    if (cut > 1) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->cut_virtual_device_link(robot_index, cut != 0) :
+        RK_ERROR_INVALID_HANDLE;
+}
 rk_result RK_CALL rk_simulation_start(rk_simulation simulation) {
     const auto value = resolve(simulation);
     return value ? value->start() : RK_ERROR_INVALID_HANDLE;

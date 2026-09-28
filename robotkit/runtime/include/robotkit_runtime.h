@@ -88,7 +88,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 20 /**< Adds queue revision diagnostics and precise serial errors. */
+    RK_API_VERSION = 21 /**< Adds simulation virtual-device link-loss injection. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
