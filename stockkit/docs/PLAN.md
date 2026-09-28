@@ -48,9 +48,13 @@ arrive as triangle buffers, so the core never links OCCT.
    from box or triangle mesh; bulk submission through the C ABI; per-tile
    material bounds to skip air; tile ownership for deterministic threads.
    X and Y grids return `SK_ERROR_UNSUPPORTED` until phase 6.
-4. **Diagnostics:** live rapid-into-stock, shank/holder engagement against the
-   live stock, removed volume per operation, target comparison per ray with
-   gouge/leftover attribution. CamKit tests adopt it.
+4. **Diagnostics** (done): rapid-into-stock and shank/holder contact against
+   the live stock, per move; removed volume and contact per operation;
+   target comparison per ray with leftover, gouge and the gouging move.
+   CamKit's island-pocket test adopts it. Contact is measured after each
+   move's own cut, so a climbing move whose shank meets material its flutes
+   remove later in the same move is missed. Gouges are measured along Z
+   only until phase 6.
 5. **Preview and editor** (milestone 1): Z-grid mesh, SceneKit colouring by
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
    pick → operation → `CncSpan`.

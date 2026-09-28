@@ -69,6 +69,8 @@ enum { SK_AXIS_X = 0, SK_AXIS_Y = 1, SK_AXIS_Z = 2 };
 
 /** Endpoint source for material that no move has touched. */
 enum { SK_SOURCE_STOCK = 0xFFFFFFFFu };
+/** No surface to attribute: nothing to report, or the stock is gone from the whole stretch. */
+enum { SK_SOURCE_NONE = 0xFFFFFFFEu };
 
 typedef struct sk_tool_handle { uint32_t id; } sk_tool_handle
     SK_HANDLE SK_HANDLE_DESTROY(sk_tool_destroy);
@@ -76,26 +78,44 @@ typedef struct sk_stock_handle { uint32_t id; } sk_stock_handle
     SK_HANDLE SK_HANDLE_DESTROY(sk_stock_destroy);
 
 enum { SK_SEGMENT_LINE = 0, SK_SEGMENT_ARC = 1 };
+enum { SK_ZONE_CUTTING = 0, SK_ZONE_SHANK = 1, SK_ZONE_HOLDER = 2, SK_ZONE_COUNT = 3 };
 
 /**
  * One piece of a tool half-profile, from the tip upwards: r is the distance
  * from the tool axis and z the height above the tip. Arcs are minor arcs
  * about (center_r, center_z). Segments are continuous from (0, 0), heights
  * never decrease, and the solid is closed by a flat top at the last height.
+ * Cutting segments run from the tip; only they remove material. Shank and
+ * holder segments above them are checked for contact with the stock.
  */
 typedef struct sk_profile_segment {
     uint32_t struct_size SK_STRUCT_SIZE;
     uint32_t kind;
+    uint32_t zone;
     double r0, z0, r1, z1;
     double center_r, center_z;
 } sk_profile_segment;
 
-/** Tool info: widest radius and height of the profile. */
+/** Tool info: widest radius and height of the cutting zone and of the whole tool. */
 typedef struct sk_tool_info {
     uint32_t struct_size SK_STRUCT_SIZE;
+    double cutting_radius;
+    double cutting_height;
     double radius;
     double height;
 } sk_tool_info;
+
+/**
+ * What one move did: the volume it removed and, per zone, the volume of the
+ * stock left after its cut that the tool's shank and holder overlapped
+ * (`contact[SK_ZONE_CUTTING]` is always zero). Each ray stands for spacing^2
+ * of area.
+ */
+typedef struct sk_move_result {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    double removed;
+    double contact[SK_ZONE_COUNT];
+} sk_move_result;
 
 /**
  * A lattice of rays along `axis`. For a Z grid, ray (i, j) runs along +Z
@@ -178,7 +198,7 @@ SK_API void SK_CALL sk_tool_destroy(sk_tool_handle tool);
 SK_API sk_result SK_CALL sk_tool_get_info(sk_tool_handle tool, sk_tool_info *out_info SK_OUT);
 
 /**
- * Exact material swept by one move of `tool` along the ray through (u, v)
+ * Exact material swept by one move of `tool`'s cutting zone along the ray through (u, v)
  * on `axis` (Z: u = x, v = y): `out_count` disjoint intervals.
  */
 SK_API sk_result SK_CALL sk_sweep_count_ray(sk_tool_handle tool, const sk_move *move,
@@ -220,14 +240,17 @@ SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info 
 SK_API sk_result SK_CALL sk_stock_set_threads(sk_stock_handle stock, uint32_t threads);
 
 /**
- * Removes the material swept by each move of `tool`, in order, and writes
- * the volume each move removed (each ray stands for spacing^2 of area).
- * `removed_capacity` must be at least `move_count`. Every move is validated
- * before any is cut.
+ * Removes the material swept by each move of `tool`'s cutting zone, in
+ * order, and writes what each move did. `result_capacity` must be at least
+ * `move_count`. Every move is validated before any is cut.
+ *
+ * Contact is measured against the stock left after the move's own cut, so a
+ * shank reaching material the flutes remove later in the same move (possible
+ * only while the tool climbs) is not reported.
  */
 SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool,
     const sk_move *moves SK_IN_ARRAY(move_count), uint32_t move_count,
-    double *out_removed SK_OUT_ARRAY(removed_capacity), uint32_t removed_capacity);
+    sk_move_result *out_results SK_OUT_ARRAY(result_capacity), uint32_t result_capacity);
 
 /**
  * Interval count of each ray in the block [i0, i0 + ni) x [j0, j0 + nj), i
@@ -249,6 +272,32 @@ SK_API sk_result SK_CALL sk_stock_count_intervals(sk_stock_handle stock,
 SK_API sk_result SK_CALL sk_stock_read_intervals(sk_stock_handle stock,
     uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj,
     sk_interval *out_intervals SK_OUT_ARRAY(interval_capacity), uint32_t interval_capacity);
+
+/**
+ * One ray of the stock compared with a target part on the same grid: the
+ * length of stock outside the target (leftover) and of target missing from
+ * the stock (gouge), with the largest stretch of each. `gouge_source` is the
+ * source of the stock surface bounding the largest gouge (the move that cut
+ * too deep there), or SK_SOURCE_NONE.
+ */
+typedef struct sk_ray_comparison {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t gouge_source;
+    double leftover;
+    double gouge;
+    double largest_leftover;
+    double largest_gouge;
+} sk_ray_comparison;
+
+/**
+ * Compares the rays in the block [i0, i0 + ni) x [j0, j0 + nj), i fastest,
+ * with `target`, which must have the same grid (for example a stock cast
+ * from the finished part's mesh). `comparison_capacity` must be at least
+ * ni * nj.
+ */
+SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle target,
+    uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj,
+    sk_ray_comparison *out_comparisons SK_OUT_ARRAY(comparison_capacity), uint32_t comparison_capacity);
 
 #ifdef __cplusplus
 }

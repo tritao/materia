@@ -11,8 +11,8 @@ import haxe.io.Bytes;
   sorted material intervals whose ends record the outward normal and the move
   that made them.
 
-  Only the cutting zone of each tool removes material (the profile up to its
-  flute length); shank and holder contact is a diagnostic for later. Moves
+  Only the cutting zone of each tool removes material; its shank and holder
+  are swept too, and their overlap with the stock is reported per move. Moves
   cut in order; every cut move is kept in `history` and its index there is
   the source recorded on the surfaces it made.
 **/
@@ -77,11 +77,13 @@ class Stock {
     check(StockKitNative.sk_stock_set_threads(owner.borrow(), threads), "stock.setThreads");
   }
 
-  /** Removes the material each move sweeps, in order. */
+  /**
+    Removes the material each move's flutes sweep, in order, and measures
+    the stock each move's shank and holder overlap after its cut.
+  **/
   public function cut(moves:Array<CutMove>):CutReport {
     alive();
-    var removed:Array<Float> = [];
-    var rapids:Array<Int> = [];
+    var outcomes:Array<MoveOutcome> = [];
     var start = 0;
     while (start < moves.length) {
       // One native call per run of moves with the same tool.
@@ -93,14 +95,36 @@ class Stock {
         native, native.length);
       check(result.status, "stock.cut");
       for (index in start...end) {
-        var volume = result.out_removed[index - start];
+        var outcome = result.out_results[index - start];
         history.push(moves[index]);
-        removed.push(volume);
-        if (moves[index].rapid && volume > 0.0) rapids.push(first + index - start);
+        outcomes.push(new MoveOutcome(first + index - start, moves[index], outcome.get_removed(),
+          outcome.get_contact(StockKitNativeConstants.SK_ZONE_SHANK),
+          outcome.get_contact(StockKitNativeConstants.SK_ZONE_HOLDER)));
       }
       start = end;
     }
-    return new CutReport(removed, rapids);
+    return new CutReport(outcomes);
+  }
+
+  /**
+    Compares this stock with `target` ray by ray; `target` must use the same
+    grid, for example `Stock.fromMesh(stock.grid, part.shape.tessellate(...))`.
+  **/
+  public function compare(target:Stock):StockComparison {
+    alive();
+    target.alive();
+    var result = StockKitNative.sk_stock_compare(owner.borrow(), target.owner.borrow(), 0, 0,
+      grid.countX, grid.countY, grid.countX * grid.countY);
+    check(result.status, "stock.compare");
+    var rays = result.out_comparisons;
+    return new StockComparison(grid, [for (ray in rays) ray.get_leftover()],
+      [for (ray in rays) ray.get_gouge()], [for (ray in rays) ray.get_largest_leftover()],
+      [for (ray in rays) ray.get_largest_gouge()],
+      [for (ray in rays) {
+        var source = ray.get_gouge_source();
+        source == StockKitNativeConstants.SK_SOURCE_NONE || source == StockKitNativeConstants.SK_SOURCE_STOCK
+          ? -1 : source;
+      }]);
   }
 
   /** The intervals along ray (i, j), bottom to top. */
@@ -258,7 +282,7 @@ class Stock {
   }
 }
 
-/** A tool's cutting zone registered with the core. */
+/** A tool registered with the core: its flutes cut, its shank and holder are checked for contact. */
 private class NativeTool {
   public final tool:CncTool;
   final owner:Ownedsk_tool_handle;
@@ -266,13 +290,15 @@ private class NativeTool {
 
   public function new(tool:CncTool) {
     this.tool = tool;
-    var profile = tool.profile();
-    var cutting = profile.fluteLength() < profile.height()
-      ? profile.below(profile.fluteLength()) : profile;
     var segments:Array<sk_profile_segment> = [];
-    for (segment in cutting.segments) {
+    for (segment in tool.profile().segments) {
       var native = new sk_profile_segment();
       native.set_struct_size(sk_profile_segment.size());
+      native.set_zone(switch CutterProfile.zoneOf(segment) {
+        case Cutting: StockKitNativeConstants.SK_ZONE_CUTTING;
+        case Shank: StockKitNativeConstants.SK_ZONE_SHANK;
+        case Holder: StockKitNativeConstants.SK_ZONE_HOLDER;
+      });
       switch segment {
         case Line(r0, z0, r1, z1, _):
           native.set_kind(StockKitNativeConstants.SK_SEGMENT_LINE);

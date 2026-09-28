@@ -150,7 +150,7 @@ double Run::envelope(double d, const Piece **piece) const {
     return best;
 }
 
-bool Profile::build(const std::vector<Segment> &segments, Profile &out, std::string &error) {
+bool Profile::build(const std::vector<Segment> &segments, Profile &out, std::string &error, bool from_tip) {
     if (segments.empty()) {
         error = "profile needs at least one segment";
         return false;
@@ -164,10 +164,16 @@ bool Profile::build(const std::vector<Segment> &segments, Profile &out, std::str
             }
             scale = std::max(scale, std::fabs(v));
         }
-    double r = 0, z = 0;
+    double r = from_tip ? 0 : segments.front().r0, z = from_tip ? 0 : segments.front().z0;
+    const double base = z;
+    if (r < 0) {
+        error = "profile radii must be non-negative";
+        return false;
+    }
     for (const Segment &s : segments) {
         if (!near(s.r0, r, scale) || !near(s.z0, z, scale)) {
-            error = "profile segments must be continuous from the tip at (0, 0)";
+            error = from_tip ? "profile segments must be continuous from the tip at (0, 0)"
+                             : "profile segments must be continuous";
             return false;
         }
         if (s.r1 < 0 || s.z1 < s.z0 - 1e-12 * std::max(1.0, scale)) {
@@ -196,13 +202,14 @@ bool Profile::build(const std::vector<Segment> &segments, Profile &out, std::str
         r = s.r1;
         z = s.z1;
     }
-    if (!(z > 0) || !(r > 0)) {
-        error = "profile must end above the tip and away from the axis";
+    if (!(z > base) || !(r > 0)) {
+        error = "profile must end above where it starts and away from the axis";
         return false;
     }
 
     Profile profile;
     profile.segments_ = segments;
+    profile.base_ = base;
     profile.height_ = z;
 
     std::vector<Monotone> monotone;

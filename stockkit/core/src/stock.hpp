@@ -2,6 +2,7 @@
 
 #include "pool.hpp"
 #include "sweep.hpp"
+#include "tool.hpp"
 
 #include <cstdint>
 #include <limits>
@@ -25,6 +26,31 @@ struct Interval {
     float lo_normal[3], hi_normal[3];
     uint32_t lo_source, hi_source;
 };
+
+/** Everything one move sweeps: the cutting solid removes material, the bands only touch it. */
+struct MoveSweep {
+    MoveSweep(const Tool &tool, const Motion &motion, uint32_t source);
+
+    SweptVolume cutting;
+    std::vector<std::pair<uint32_t, SweptVolume>> bands; // zone, sweep
+    uint32_t source;
+    Bounds reach; // union of all the bounds
+};
+
+/** What one move did: material removed, and stock its shank and holder bands overlapped afterwards. */
+struct MoveResult {
+    double removed = 0;
+    double contact[kZoneCount] = {0, 0, 0};
+};
+
+/** One ray of a stock compared with a target; see sk_ray_comparison. */
+struct RayComparison {
+    double leftover = 0, gouge = 0, largest_leftover = 0, largest_gouge = 0;
+    uint32_t gouge_source;
+};
+
+/** Compares two sorted interval lists: `stock` against `target`. */
+RayComparison compare_ray(const std::vector<Interval> &stock, const std::vector<Interval> &target);
 
 struct CutStats {
     uint64_t rays_changed = 0;
@@ -55,16 +81,20 @@ public:
     void pack();
 
     /**
-     * Removes each sweep's material in order, giving the endpoints it creates
-     * `sources[k]`, and writes the volume each removed to `removed[k]`.
+     * Removes each move's cutting sweep in order, giving the endpoints it
+     * creates the move's source, and measures how much of the stock left
+     * after each cut its shank and holder bands overlap.
      *
      * Tiles are split among threads by a fixed ownership pattern; each thread
-     * walks every sweep in order over the tiles it owns, so a ray only ever
-     * sees its moves in program order. Removed volumes are summed per tile,
-     * then over tiles in tile order. Results are bit-identical for any
-     * thread count.
+     * walks every move in order over the tiles it owns, so a ray only ever
+     * sees its moves in program order. Results are summed per tile, then over
+     * tiles in tile order, so they are bit-identical for any thread count.
+     *
+     * Contact is measured after the move's own cut. A band that reaches stock
+     * which the flutes remove later in the same move (only possible while the
+     * tool climbs) is not seen.
      */
-    void cut(const std::vector<SweptVolume> &sweeps, const uint32_t *sources, double *removed);
+    void cut(const std::vector<MoveSweep> &moves, MoveResult *results);
     const CutStats &stats() const { return stats_; }
 
     /** Threads used by `cut`; 0 means one per hardware thread. */
@@ -97,13 +127,17 @@ private:
         std::vector<Span> spans;
         std::vector<Interval> scratch;
         CutStats stats;
-        struct Removal { uint32_t move, tile; double volume; };
-        std::vector<Removal> removals;
+        struct Record { uint32_t move, tile; MoveResult result; };
+        std::vector<Record> records;
     };
+    struct RayRange { int64_t i0, i1, j0, j1; };
 
-    /** Cuts one sweep from the tiles `owner` owns among `owners`. */
-    void cut_owned(const SweptVolume &sweep, uint32_t move, uint32_t source, uint32_t owner, uint32_t owners,
-        Worker &worker);
+    bool ray_range(const Bounds &bounds, RayRange &out) const;
+    /** Cuts one move from the tiles `owner` owns among `owners`. */
+    void cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, Worker &worker);
+    bool cut_tile(Tile &tile, const SweptVolume &sweep, const RayRange &range, uint32_t source, Worker &worker,
+        double &removed_volume);
+    double touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, Worker &worker) const;
     Tile &tile_of(uint32_t i, uint32_t j, uint32_t &local);
     const Tile &tile_of(uint32_t i, uint32_t j, uint32_t &local) const;
     void write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n);

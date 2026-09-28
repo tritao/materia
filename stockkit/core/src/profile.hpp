@@ -55,10 +55,18 @@ struct Run {
 
 class Profile {
 public:
-    /** Validates `segments`; on failure returns false and sets `error`. */
-    static bool build(const std::vector<Segment> &segments, Profile &out, std::string &error);
+    /**
+     * Validates `segments`; on failure returns false and sets `error`. A
+     * profile normally starts at the tip (0, 0). With `from_tip` false it is
+     * a band of a tool starting at its first point: the solid between that
+     * height and the last one, closed by flat discs at both.
+     */
+    static bool build(const std::vector<Segment> &segments, Profile &out, std::string &error,
+        bool from_tip = true);
 
     double radius() const { return radius_; }
+    /** Height of the bottom of the solid above the tip: 0 unless a band. */
+    double base() const { return base_; }
     double height() const { return height_; }
     const std::vector<Run> &runs() const { return runs_; }
     const std::vector<Segment> &segments() const { return segments_; }
@@ -70,6 +78,7 @@ private:
     std::vector<Segment> segments_;
     std::vector<Run> runs_;
     double radius_ = 0;
+    double base_ = 0;
     double height_ = 0;
 };
 

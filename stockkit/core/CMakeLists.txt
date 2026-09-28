@@ -20,6 +20,7 @@ add_library(stockkit_core ${SK_LIBRARY_TYPE}
     src/profile.cpp
     src/stock.cpp
     src/sweep.cpp
+    src/tool.cpp
 )
 target_compile_features(stockkit_core PUBLIC c_std_11 PRIVATE cxx_std_17)
 target_include_directories(stockkit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

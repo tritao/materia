@@ -110,6 +110,8 @@ SweptVolume::SweptVolume(const Profile &profile, const Motion &motion)
         bounds_.min[k] -= reach;
         bounds_.max[k] += reach;
     }
+    tip_low_ = bounds_.min[2];
+    bounds_.min[2] += profile.base();
     bounds_.max[2] += profile.height();
 }
 
@@ -142,7 +144,7 @@ double SweptVolume::floor_bound(double x, double y) const {
         if (d > run.dmax) continue;
         floor = std::min(floor, run.widening ? run.envelope(d) : run.za);
     }
-    return bounds_.min[2] + floor;
+    return tip_low_ + floor;
 }
 
 /** Stretches of t in [0, 1] where the axis is within `reach` of (x, y). */

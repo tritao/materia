@@ -16,8 +16,20 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	const SK_OK = 0;
 	const SK_SEGMENT_ARC = 1;
 	const SK_SEGMENT_LINE = 0;
+	const SK_SOURCE_NONE = -2;
 	const SK_SOURCE_STOCK = -1;
+	const SK_ZONE_COUNT = 3;
+	const SK_ZONE_CUTTING = 0;
+	const SK_ZONE_HOLDER = 2;
+	const SK_ZONE_SHANK = 1;
 	extern fn sk_api_version() -> u32;
+	/**
+	 * Compares the rays in the block [i0, i0 + ni) x [j0, j0 + nj), i fastest,
+	 * with `target`, which must have the same grid (for example a stock cast
+	 * from the finished part's mesh). `comparison_capacity` must be at least
+	 * ni * nj.
+	 */
+	extern fn sk_stock_compare(stock: sk_stock_handle, target: sk_stock_handle, i0: u32, j0: u32, ni: u32, nj: u32, out_comparisons: ptr<sk_ray_comparison> @out_array("comparison_capacity"), comparison_capacity: u32) -> sk_result;
 	/**
 	 * Number of intervals in the same block.
 	 */
@@ -33,12 +45,15 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	 */
 	extern fn sk_stock_create_mesh(grid: ptr<const<sk_grid>>, positions: ptr<const<f64>> @in_array("position_count"), position_count: u32, indices: ptr<const<u32>> @in_array("index_count"), index_count: u32, out_stock: ptr<sk_stock_handle> @out @owned) -> sk_result;
 	/**
-	 * Removes the material swept by each move of `tool`, in order, and writes
-	 * the volume each move removed (each ray stands for spacing^2 of area).
-	 * `removed_capacity` must be at least `move_count`. Every move is validated
-	 * before any is cut.
+	 * Removes the material swept by each move of `tool`'s cutting zone, in
+	 * order, and writes what each move did. `result_capacity` must be at least
+	 * `move_count`. Every move is validated before any is cut.
+	 *
+	 * Contact is measured against the stock left after the move's own cut, so a
+	 * shank reaching material the flutes remove later in the same move (possible
+	 * only while the tool climbs) is not reported.
 	 */
-	extern fn sk_stock_cut(stock: sk_stock_handle, tool: sk_tool_handle, moves: ptr<const<sk_move>> @in_array("move_count"), move_count: u32, out_removed: ptr<f64> @out_array("removed_capacity"), removed_capacity: u32) -> sk_result;
+	extern fn sk_stock_cut(stock: sk_stock_handle, tool: sk_tool_handle, moves: ptr<const<sk_move>> @in_array("move_count"), move_count: u32, out_results: ptr<sk_move_result> @out_array("result_capacity"), result_capacity: u32) -> sk_result;
 	extern fn sk_stock_destroy(stock: sk_stock_handle) -> void;
 	extern fn sk_stock_get_info(stock: sk_stock_handle, out_info: ptr<sk_stock_info> @out) -> sk_result;
 	/**
@@ -60,7 +75,7 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	 */
 	extern fn sk_stock_set_threads(stock: sk_stock_handle, threads: u32) -> sk_result;
 	/**
-	 * Exact material swept by one move of `tool` along the ray through (u, v)
+	 * Exact material swept by one move of `tool`'s cutting zone along the ray through (u, v)
 	 * on `axis` (Z: u = x, v = y): `out_count` disjoint intervals.
 	 */
 	extern fn sk_sweep_count_ray(tool: sk_tool_handle, move: ptr<const<sk_move>>, axis: u32, u: f64, v: f64, out_count: ptr<u32> @out) -> sk_result;
@@ -129,20 +144,49 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		rise: f64 @offset(112);
 	}
 	/**
+	 * What one move did: the volume it removed and, per zone, the volume of the
+	 * stock left after its cut that the tool's shank and holder overlapped
+	 * (`contact[SK_ZONE_CUTTING]` is always zero). Each ray stands for spacing^2
+	 * of area.
+	 */
+	struct sk_move_result @layout(40, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		removed: f64 @offset(8);
+		contact: array<f64, 3> @offset(16);
+	}
+	/**
 	 * One piece of a tool half-profile, from the tip upwards: r is the distance
 	 * from the tool axis and z the height above the tip. Arcs are minor arcs
 	 * about (center_r, center_z). Segments are continuous from (0, 0), heights
 	 * never decrease, and the solid is closed by a flat top at the last height.
+	 * Cutting segments run from the tip; only they remove material. Shank and
+	 * holder segments above them are checked for contact with the stock.
 	 */
-	struct sk_profile_segment @layout(56, 8) {
+	struct sk_profile_segment @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		kind: u32 @offset(4);
-		r0: f64 @offset(8);
-		z0: f64 @offset(16);
-		r1: f64 @offset(24);
-		z1: f64 @offset(32);
-		center_r: f64 @offset(40);
-		center_z: f64 @offset(48);
+		zone: u32 @offset(8);
+		r0: f64 @offset(16);
+		z0: f64 @offset(24);
+		r1: f64 @offset(32);
+		z1: f64 @offset(40);
+		center_r: f64 @offset(48);
+		center_z: f64 @offset(56);
+	}
+	/**
+	 * One ray of the stock compared with a target part on the same grid: the
+	 * length of stock outside the target (leftover) and of target missing from
+	 * the stock (gouge), with the largest stretch of each. `gouge_source` is the
+	 * source of the stock surface bounding the largest gouge (the move that cut
+	 * too deep there), or SK_SOURCE_NONE.
+	 */
+	struct sk_ray_comparison @layout(40, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		gouge_source: u32 @offset(4);
+		leftover: f64 @offset(8);
+		gouge: f64 @offset(16);
+		largest_leftover: f64 @offset(24);
+		largest_gouge: f64 @offset(32);
 	}
 	struct sk_stock_info @layout(112, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -163,12 +207,14 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		threads: u32 @offset(104);
 	}
 	/**
-	 * Tool info: widest radius and height of the profile.
+	 * Tool info: widest radius and height of the cutting zone and of the whole tool.
 	 */
-	struct sk_tool_info @layout(24, 8) {
+	struct sk_tool_info @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;
-		radius: f64 @offset(8);
-		height: f64 @offset(16);
+		cutting_radius: f64 @offset(8);
+		cutting_height: f64 @offset(16);
+		radius: f64 @offset(24);
+		height: f64 @offset(32);
 	}
 	type sk_result = i32;
 	handle sk_stock_handle : u32 @destroy("sk_stock_destroy");

@@ -106,13 +106,13 @@ int main(int argc, char **argv) {
             if (sk_stock_create_box(&grid, &box, &stock) != SK_OK) return 1;
             sk_stock_set_threads(stock, threads);
             auto start = std::chrono::steady_clock::now();
-            std::vector<double> removed(moves.size());
+            std::vector<sk_move_result> removed(moves.size());
             if (sk_stock_cut(stock, tool, moves.data(), uint32_t(moves.size()), removed.data(),
                     uint32_t(removed.size())) != SK_OK)
                 return 1;
             auto end = std::chrono::steady_clock::now();
             double total = 0;
-            for (double r : removed) total += r;
+            for (const sk_move_result &r : removed) total += r.removed;
             sk_stock_info info{};
             info.struct_size = sizeof info;
             sk_stock_get_info(stock, &info);

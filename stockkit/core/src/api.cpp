@@ -4,6 +4,7 @@
 #include "profile.hpp"
 #include "stock.hpp"
 #include "sweep.hpp"
+#include "tool.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -78,8 +79,8 @@ private:
     std::vector<uint32_t> free_;
 };
 
-Table<Profile, kKindTool> &tools() {
-    static Table<Profile, kKindTool> table;
+Table<Tool, kKindTool> &tools() {
+    static Table<Tool, kKindTool> table;
     return table;
 }
 
@@ -178,15 +179,17 @@ SK_API sk_result SK_CALL sk_tool_create(const sk_profile_segment *segments, uint
         out_tool->id = 0;
         if (!segments || segment_count == 0) return SK_ERROR_INVALID_ARGUMENT;
         std::vector<Segment> list;
+        std::vector<uint32_t> zones;
         for (uint32_t k = 0; k < segment_count; ++k) {
             const sk_profile_segment &in = segments[k];
-            if (in.struct_size < sizeof(sk_profile_segment) || in.kind > SK_SEGMENT_ARC)
+            if (in.struct_size < sizeof(sk_profile_segment) || in.kind > SK_SEGMENT_ARC || in.zone >= SK_ZONE_COUNT)
                 return SK_ERROR_INVALID_ARGUMENT;
             list.push_back({in.kind == SK_SEGMENT_ARC, in.r0, in.z0, in.r1, in.z1, in.center_r, in.center_z});
+            zones.push_back(in.zone);
         }
-        auto profile = std::make_unique<Profile>();
+        auto profile = std::make_unique<Tool>();
         std::string error;
-        if (!Profile::build(list, *profile, error)) return SK_ERROR_INVALID_ARGUMENT;
+        if (!Tool::build(list, zones, *profile, error)) return SK_ERROR_INVALID_ARGUMENT;
         uint32_t id = tools().add(std::move(profile));
         if (id == 0) return SK_ERROR_LIMIT;
         out_tool->id = id;
@@ -204,11 +207,17 @@ SK_API void SK_CALL sk_tool_destroy(sk_tool_handle tool) {
 SK_API sk_result SK_CALL sk_tool_get_info(sk_tool_handle tool, sk_tool_info *out_info) {
     return guarded([&]() -> sk_result {
         if (!out_info) return SK_ERROR_INVALID_ARGUMENT;
-        Profile *profile = tools().get(tool.id);
-        if (!profile) return SK_ERROR_INVALID_HANDLE;
+        Tool *t = tools().get(tool.id);
+        if (!t) return SK_ERROR_INVALID_HANDLE;
         out_info->struct_size = sizeof(sk_tool_info);
-        out_info->radius = profile->radius();
-        out_info->height = profile->height();
+        out_info->cutting_radius = t->cutting.radius();
+        out_info->cutting_height = t->cutting.height();
+        out_info->radius = t->cutting.radius();
+        out_info->height = t->cutting.height();
+        for (const Band &band : t->bands) {
+            out_info->radius = std::max(out_info->radius, band.profile.radius());
+            out_info->height = std::max(out_info->height, band.profile.height());
+        }
         return SK_OK;
     });
 }
@@ -217,14 +226,14 @@ namespace {
 
 sk_result sweep_ray(sk_tool_handle tool, const sk_move *move, uint32_t axis, double u, double v,
     std::vector<Span> &spans) {
-    Profile *profile = tools().get(tool.id);
-    if (!profile) return SK_ERROR_INVALID_HANDLE;
+    Tool *t = tools().get(tool.id);
+    if (!t) return SK_ERROR_INVALID_HANDLE;
     Motion motion;
     sk_result result = to_motion(move, motion);
     if (result != SK_OK) return result;
     if (axis > SK_AXIS_Z || !std::isfinite(u) || !std::isfinite(v)) return SK_ERROR_INVALID_ARGUMENT;
     if (axis != SK_AXIS_Z) return SK_ERROR_UNSUPPORTED;
-    SweptVolume(*profile, motion).intersect_z(u, v, spans);
+    SweptVolume(t->cutting, motion).intersect_z(u, v, spans);
     return SK_OK;
 }
 
@@ -366,27 +375,30 @@ SK_API sk_result SK_CALL sk_stock_set_threads(sk_stock_handle stock, uint32_t th
 }
 
 SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool, const sk_move *moves,
-    uint32_t move_count, double *out_removed, uint32_t removed_capacity) {
+    uint32_t move_count, sk_move_result *out_results, uint32_t result_capacity) {
     return guarded([&]() -> sk_result {
-        if ((move_count > 0 && (!moves || !out_removed)) || removed_capacity < move_count)
+        if ((move_count > 0 && (!moves || !out_results)) || result_capacity < move_count)
             return SK_ERROR_INVALID_ARGUMENT;
         Stock *s = stocks().get(stock.id);
-        Profile *profile = tools().get(tool.id);
-        if (!s || !profile) return SK_ERROR_INVALID_HANDLE;
+        Tool *t = tools().get(tool.id);
+        if (!s || !t) return SK_ERROR_INVALID_HANDLE;
         // Validate everything first so a bad move leaves the stock untouched.
         std::vector<Motion> motions(move_count);
         for (uint32_t k = 0; k < move_count; ++k) {
             sk_result result = to_motion(&moves[k], motions[k]);
             if (result != SK_OK) return result;
         }
-        std::vector<SweptVolume> sweeps;
-        std::vector<uint32_t> sources(move_count);
+        std::vector<MoveSweep> sweeps;
         sweeps.reserve(move_count);
+        for (uint32_t k = 0; k < move_count; ++k) sweeps.emplace_back(*t, motions[k], moves[k].source);
+        std::vector<MoveResult> results(move_count);
+        s->cut(sweeps, results.data());
         for (uint32_t k = 0; k < move_count; ++k) {
-            sweeps.emplace_back(*profile, motions[k]);
-            sources[k] = moves[k].source;
+            out_results[k] = sk_move_result{};
+            out_results[k].struct_size = sizeof(sk_move_result);
+            out_results[k].removed = results[k].removed;
+            for (uint32_t z = 0; z < SK_ZONE_COUNT; ++z) out_results[k].contact[z] = results[k].contact[z];
         }
-        s->cut(sweeps, sources.data(), out_removed);
         return SK_OK;
     });
 }
@@ -456,6 +468,39 @@ SK_API sk_result SK_CALL sk_stock_read_intervals(sk_stock_handle stock, uint32_t
             for (uint32_t i = 0; i < ni; ++i) {
                 s->read(i0 + i, j0 + j, ray);
                 for (const Interval &interval : ray) to_interval(interval, out_intervals[at++]);
+            }
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle target, uint32_t i0, uint32_t j0,
+    uint32_t ni, uint32_t nj, sk_ray_comparison *out_comparisons, uint32_t comparison_capacity) {
+    return guarded([&]() -> sk_result {
+        Stock *s = stocks().get(stock.id);
+        Stock *t = stocks().get(target.id);
+        if (!t) return SK_ERROR_INVALID_HANDLE;
+        sk_result result = check_block(s, i0, j0, ni, nj);
+        if (result != SK_OK) return result;
+        const Grid &a = s->grid(), &b = t->grid();
+        if (a.axis != b.axis || a.origin[0] != b.origin[0] || a.origin[1] != b.origin[1] || a.spacing != b.spacing ||
+            a.count[0] != b.count[0] || a.count[1] != b.count[1])
+            return SK_ERROR_INVALID_ARGUMENT;
+        if (comparison_capacity < uint64_t(ni) * nj || (comparison_capacity > 0 && !out_comparisons))
+            return SK_ERROR_INVALID_ARGUMENT;
+        std::vector<Interval> x, y;
+        for (uint32_t j = 0; j < nj; ++j)
+            for (uint32_t i = 0; i < ni; ++i) {
+                s->read(i0 + i, j0 + j, x);
+                t->read(i0 + i, j0 + j, y);
+                RayComparison c = compare_ray(x, y);
+                sk_ray_comparison &out = out_comparisons[size_t(j) * ni + i];
+                out = sk_ray_comparison{};
+                out.struct_size = sizeof(sk_ray_comparison);
+                out.gouge_source = c.gouge_source;
+                out.leftover = c.leftover;
+                out.gouge = c.gouge;
+                out.largest_leftover = c.largest_leftover;
+                out.largest_gouge = c.largest_gouge;
             }
         return SK_OK;
     });

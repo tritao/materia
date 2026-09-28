@@ -15,7 +15,7 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Current state (phases 0–3)
+## Current state (phases 0–4)
 
 - Tool shapes live in CncKit so any `CncTool` can carry one:
   `cnckit.tool.CutterProfile` describes a tool as a surface of revolution from
@@ -74,10 +74,19 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   - Stock comes from a box or from a closed triangle mesh. Mesh casting uses
     exact orientation predicates and a tie rule, so a ray through a shared
     edge or vertex is counted exactly once; open meshes are refused.
-  - Only a tool's cutting zone removes material. Shank and holder contact is
-    phase 4.
-  - `sk_stock_cut` returns the volume each move removed, which is how rapid
-    moves through stock are found.
+  - Tools carry their whole profile with zones. Only the cutting zone, which
+    must run from the tip, removes material. The shank and holder are swept
+    as separate bands, and `sk_stock_cut` reports per move the volume removed
+    and the stock each band overlaps after the move's own cut. Rapid moves
+    through stock show as rapids that removed material. A climbing move whose
+    shank meets material its flutes remove later in the same move is not
+    seen; only upward moves can do that.
+  - `sk_stock_compare` compares the stock with a target part cast on the same
+    grid, ray by ray: leftover (stock outside the target), gouge (target
+    missing from the stock), the largest stretch of each, and the move whose
+    surface bounds the largest gouge. Z rays see floors and ceilings; a wall
+    gouged sideways shows only where a ray falls inside the gouge, until the
+    X and Y grids exist.
   - Cuts run on a pool of threads owned by the core (one per hardware thread
     by default; `sk_stock_set_threads` changes it). Each tile belongs to one
     thread, which applies every move of the batch to its tiles in order, and
@@ -90,7 +99,13 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   triangles or from a CadKit mesh, and cuts `CutMove`s, one native call per
   run of moves with the same tool. It keeps the move history, so an
   interval end's source leads back to its `CutMove`, and from there to the
-  op and `CncSpan`.
+  op and `CncSpan`. `cut` returns a `CutReport` with each move's
+  `MoveOutcome`, rapid contacts, collisions and totals per operation.
+  `compare` returns a `StockComparison` with leftover and gouge volumes,
+  the deepest gouge and the moves that gouged.
+- CamKit's island-pocket test cuts its program with StockKit and requires no
+  gouge, no rapid or shank through stock, and leftover only in the inside
+  corners.
 - `tests/src/oracle/SampledReference.hx` is the second, independent
   reference, for moves the OCCT oracle refuses (ramps, helices). It samples
   tool poses and returns an inner set (the union of the exact sampled tools)
@@ -106,8 +121,9 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   - A deliberate 0.1 µm error in the core fails both kinds of check.
   - `core/tests/core_tests.cpp` adds closed-form checks through the C ABI:
     slots, arcs, plunges, capsule floors of ball ramps, necked tools, mesh
-    tie rules, provenance, handle validation, and bit-identical results with
-    1, 2, 3, 8 and all threads.
+    tie rules, provenance, handle validation, shank and holder contact,
+    target comparison, and bit-identical results with 1, 2, 3, 8 and all
+    threads.
 
 Build the core and run its checks and benchmark:
 

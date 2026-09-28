@@ -43,7 +43,7 @@ public:
     SweptVolume(const Profile &profile, const Motion &motion);
 
     const Bounds &bounds() const { return bounds_; }
-    /** Lowest tip height over the motion. */
+    /** Lowest height the swept solid reaches. */
     double lowest() const { return bounds_.min[2]; }
 
     /**
@@ -70,6 +70,7 @@ private:
     const Profile &profile_;
     Motion motion_;
     Bounds bounds_;
+    double tip_low_ = 0;         // lowest tip height over the motion
     bool level_ = false;         // tip height constant
     bool fixed_distance_ = false; // xy distance to the axis independent of t (plunge, degenerate arc)
     double length_ = 0;          // xy length of a line

@@ -117,11 +117,18 @@ sk_stock_handle box_stock(const sk_grid &g, double x0, double y0, double z0, dou
     return s;
 }
 
+std::vector<sk_move_result> cut_results(sk_stock_handle s, sk_tool_handle t, const std::vector<sk_move> &moves,
+    const std::string &what) {
+    std::vector<sk_move_result> results(moves.size());
+    check(sk_stock_cut(s, t, moves.data(), uint32_t(moves.size()), results.data(), uint32_t(results.size())) == SK_OK,
+        what);
+    return results;
+}
+
 std::vector<double> cut(sk_stock_handle s, sk_tool_handle t, const std::vector<sk_move> &moves,
     const std::string &what) {
-    std::vector<double> removed(moves.size());
-    check(sk_stock_cut(s, t, moves.data(), uint32_t(moves.size()), removed.data(), uint32_t(removed.size())) == SK_OK,
-        what);
+    std::vector<double> removed;
+    for (const sk_move_result &r : cut_results(s, t, moves, what)) removed.push_back(r.removed);
     return removed;
 }
 
@@ -461,7 +468,7 @@ void provenance_and_rapids() {
     moves[1].flags = moves[2].flags = SK_MOVE_RAPID;
     auto removed = cut(s, t, moves, "three moves");
     check(removed[0] > 0 && removed[1] == 0 && removed[2] > 0, "per-move removal shows the rapid through stock");
-    std::vector<double> short_output(2);
+    std::vector<sk_move_result> short_output(2);
     check(sk_stock_cut(s, t, moves.data(), 3, short_output.data(), 2) == SK_ERROR_INVALID_ARGUMENT,
         "cut output shorter than the moves is refused");
     Rays rays = read_all(s);
@@ -498,6 +505,109 @@ void handles() {
     b.max[0] = b.max[1] = b.max[2] = 1;
     sk_stock_handle s{};
     check(sk_stock_create_box(&x, &b, &s) == SK_ERROR_UNSUPPORTED, "X grids are not implemented yet");
+}
+
+sk_profile_segment zoned(sk_profile_segment segment, uint32_t zone) {
+    segment.zone = zone;
+    return segment;
+}
+
+/** Flutes of radius 3 up to 5, a shank of radius 3 up to 25, a holder of radius 10 up to 45. */
+sk_tool_handle held_tool() {
+    return tool({line(0, 0, 3, 0), line(3, 0, 3, 5), zoned(line(3, 5, 3, 25), SK_ZONE_SHANK),
+        zoned(line(3, 25, 10, 25), SK_ZONE_HOLDER), zoned(line(10, 25, 10, 45), SK_ZONE_HOLDER)});
+}
+
+void shank_and_holder_contact() {
+    sk_tool_handle t = held_tool();
+    sk_tool_info info{};
+    check(sk_tool_get_info(t, &info) == SK_OK && info.cutting_radius == 3 && info.cutting_height == 5 &&
+            info.radius == 10 && info.height == 45,
+        "tool info separates flutes from the whole tool");
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    // Sum of `height` over rays within `reach` of the segment (10, 15)-(40, 15): an exact ray-sampled volume.
+    auto footprint = [&](double reach, double height) {
+        double total = 0;
+        for (uint32_t j = 0; j < 61; ++j)
+            for (uint32_t i = 0; i < 101; ++i) {
+                double x = 0.5 * i, y = 0.5 * j, along = std::max(10.0, std::min(40.0, x));
+                if (std::hypot(x - along, y - 15) <= reach) total += height * 0.25;
+            }
+        return total;
+    };
+
+    // Flutes 5 long in a slot 8 deep: the shank rubs the top 3.
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    auto slot = cut_results(s, t, {line_move(10, 15, 12, 40, 15, 12)}, "deep slot");
+    near(slot[0].removed, footprint(3, 5), 1e-9, "flutes remove their own length");
+    near(slot[0].contact[SK_ZONE_SHANK], footprint(3, 3), 1e-9, "shank contact is the stock above the flutes");
+    check(slot[0].contact[SK_ZONE_HOLDER] == 0 && slot[0].contact[SK_ZONE_CUTTING] == 0, "holder clear of the stock");
+    sk_stock_destroy(s);
+
+    // Tip 8 below the stock: the shank passes through 17 of stock, the holder dips 3 into it.
+    s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    auto deep = cut_results(s, t, {line_move(10, 15, -8, 40, 15, -8)}, "holder crash");
+    check(deep[0].removed == 0, "flutes below the stock remove nothing");
+    near(deep[0].contact[SK_ZONE_SHANK], footprint(3, 17), 1e-9, "shank contact through the stock");
+    near(deep[0].contact[SK_ZONE_HOLDER], footprint(10, 3), 1e-9, "holder contact where it dips into the stock");
+    sk_stock_destroy(s);
+
+    // A plunge: the shank follows the flutes into the hole they cut.
+    s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    auto plunge = cut_results(s, t, {line_move(25, 15, 25, 25, 15, 16)}, "plunge with shank");
+    check(plunge[0].removed > 0 && plunge[0].contact[SK_ZONE_SHANK] == 0, "shank in the flutes' own hole is clear");
+    sk_stock_destroy(s);
+
+    // Same results on any thread count.
+    std::vector<sk_move> moves;
+    for (int k = 0; k < 40; ++k) moves.push_back(line_move(5 + k, 5, 14 - 0.6 * k, 6 + k, 25, 14 - 0.6 * k, k));
+    std::vector<sk_move_result> reference;
+    for (uint32_t threads : {1u, 4u, 0u}) {
+        s = box_stock(g, 0, 0, 0, 50, 30, 20);
+        sk_stock_set_threads(s, threads);
+        auto results = cut_results(s, t, moves, "threaded contact");
+        if (threads == 1) reference = results;
+        else
+            check(std::memcmp(results.data(), reference.data(), results.size() * sizeof(sk_move_result)) == 0,
+                "contact is bit-identical with " + std::to_string(threads) + " threads");
+        sk_stock_destroy(s);
+    }
+    check(reference.back().contact[SK_ZONE_SHANK] > 0 && reference.back().contact[SK_ZONE_HOLDER] > 0,
+        "deepening passes reach shank and holder");
+    sk_tool_destroy(t);
+
+    sk_profile_segment gap[] = {line(0, 0, 3, 0), zoned(line(3, 0, 3, 5), SK_ZONE_SHANK), line(3, 5, 3, 10)};
+    sk_tool_handle bad{};
+    check(sk_tool_create(gap, 3, &bad) == SK_ERROR_INVALID_ARGUMENT, "flutes above a shank are refused");
+    sk_profile_segment blunt[] = {zoned(line(0, 0, 3, 0), SK_ZONE_SHANK), zoned(line(3, 0, 3, 5), SK_ZONE_SHANK)};
+    check(sk_tool_create(blunt, 2, &bad) == SK_ERROR_INVALID_ARGUMENT, "a tool without flutes is refused");
+}
+
+void target_comparison() {
+    sk_tool_handle t = flat(6, 20);
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    // The target is a block 15 high; the stock is 20. One pass clears to 15,
+    // then a second slot dips to 14.9.
+    sk_stock_handle target = box_stock(g, 0, 0, 0, 50, 30, 15);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 4), line_move(25, 5, 14.9, 25, 25, 14.9, 9)}, "cut for comparison");
+    std::vector<sk_ray_comparison> rays(101 * 61);
+    check(sk_stock_compare(s, target, 0, 0, 101, 61, rays.data(), uint32_t(rays.size())) == SK_OK, "compare");
+    const sk_ray_comparison &cleared = rays[30 * 101 + 30];  // (15, 15): the first pass only
+    check(cleared.leftover == 0 && cleared.gouge == 0 && cleared.gouge_source == SK_SOURCE_NONE, "cleared to the target");
+    const sk_ray_comparison &uncut = rays[2 * 101 + 2];     // (1, 1)
+    check(uncut.leftover == 5 && uncut.largest_leftover == 5 && uncut.gouge == 0, "uncut stock is leftover");
+    const sk_ray_comparison &dipped = rays[20 * 101 + 50];  // (25, 10): the second slot
+    near(dipped.gouge, 0.1, 1e-12, "the dip is a gouge");
+    check(dipped.gouge_source == 9 && dipped.leftover == 0, "the gouge names the move that dipped");
+    // Grids must match.
+    sk_grid other = grid(0, 0, 0.25, 201, 121);
+    sk_stock_handle fine = box_stock(other, 0, 0, 0, 50, 30, 15);
+    check(sk_stock_compare(s, fine, 0, 0, 1, 1, rays.data(), 1) == SK_ERROR_INVALID_ARGUMENT, "grids must match");
+    sk_stock_destroy(fine);
+    sk_stock_destroy(s);
+    sk_stock_destroy(target);
+    sk_tool_destroy(t);
 }
 
 /** A zig-zag of short lines, arcs, ramps and a helix over several levels, cut at each thread count. */
@@ -552,6 +662,8 @@ int main() {
     provenance_and_rapids();
     handles();
     thread_determinism();
+    shank_and_holder_contact();
+    target_comparison();
     std::printf("%d of %d checks passed\n", checks - failures, checks);
     return failures == 0 ? 0 : 1;
 }
