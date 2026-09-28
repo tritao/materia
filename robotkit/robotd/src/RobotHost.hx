@@ -119,8 +119,9 @@ class RobotHost {
             fingerprint, targetError, baud, stepTickHz,
             linkLossTimeoutNs, clockSyncBoundNs);
         else {
-          serverSimulation = new SimulationHarness();
-          serverRuntime = serverSimulation.simulation.addRobot(blueprint);
+          var newServerSimulation = new SimulationHarness();
+          serverSimulation = newServerSimulation;
+          serverRuntime = newServerSimulation.simulation.addRobot(blueprint);
         }
         if (serverRuntime == null) throw "robotd: failed to create runtime";
         var hostedRuntime:RobotRuntime = serverRuntime;
@@ -144,13 +145,18 @@ class RobotHost {
       return;
     }
     var inMemory = args.indexOf("--in-memory") >= 0;
-    var simulation:Null<SimulationHarness> = inMemory || serialPath != null ? null : new SimulationHarness();
-    var runtime = serialPath != null
-      ? RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud,
-          stepTickHz, linkLossTimeoutNs, clockSyncBoundNs)
-      : inMemory
-        ? RobotRuntime.create(blueprint)
-        : simulation.simulation.addRobot(blueprint);
+    var simulation:Null<SimulationHarness> = null;
+    var runtime:RobotRuntime;
+    if (serialPath != null)
+      runtime = RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud,
+        stepTickHz, linkLossTimeoutNs, clockSyncBoundNs);
+    else if (inMemory)
+      runtime = RobotRuntime.create(blueprint);
+    else {
+      var newSimulation = new SimulationHarness();
+      simulation = newSimulation;
+      runtime = newSimulation.simulation.addRobot(blueprint);
+    }
     runtime.submitPositions([0.5], 1);
     if (simulation == null) {
       runtime.start();
