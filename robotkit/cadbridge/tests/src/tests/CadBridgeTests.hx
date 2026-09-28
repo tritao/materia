@@ -45,6 +45,8 @@ import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolRuntimeSelection;
+import robotkit.tool.SimulatedGripper;
+import robotkit.tool.SimulatedVacuum;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
 import haxe.Int64;
@@ -221,13 +223,21 @@ class CadBridgeTests {
     selected.select(cup, Int64.ofInt(0));
     selected.apply(new FiredProcessEvent(Int64.ofInt(1), "cup.vacuum",
       ProcessEventValue.Digital(true), Int64.ofInt(100), Int64.ofInt(110), 1));
-    check(cup.vacuum.isHolding(), "active vacuum configuration receives its channel");
+    check(cup.vacuum.isEnabled() && !cup.vacuum.isHolding(),
+      "active vacuum command waits for pressure feedback");
+    var cupSensor:SimulatedVacuum = cast cup.vacuum;
+    cupSensor.observeVacuumKpa(45, Int64.ofInt(120));
+    check(cup.vacuum.isHolding(), "active vacuum configuration accepts pressure feedback");
     selected.select(gripper, Int64.ofInt(150));
     check(!cup.vacuum.isHolding() && selected.active() == gripper,
       "switching releases the old tool and selects the new runtime");
     selected.apply(new FiredProcessEvent(Int64.ofInt(2), "gripper.close",
       ProcessEventValue.Digital(true), Int64.ofInt(200), Int64.ofInt(210), 1));
-    check(gripper.gripper.isGrasped(), "selected gripper channel actuates the new configuration");
+    check(!gripper.gripper.isOpen() && !gripper.gripper.isGrasped(),
+      "selected gripper command waits for contact feedback");
+    var gripperSensor:SimulatedGripper = cast gripper.gripper;
+    gripperSensor.observeContact(true, Int64.ofInt(220));
+    check(gripper.gripper.isGrasped(), "selected gripper configuration accepts contact feedback");
     var rejected = false;
     try selected.apply(new FiredProcessEvent(Int64.ofInt(2), "cup.vacuum",
       ProcessEventValue.Digital(true), Int64.ofInt(300), Int64.ofInt(310), 1))
