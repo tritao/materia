@@ -49,10 +49,10 @@ class EndEffectorTests {
 		close(mass.mass, 4, "mass");
 		close(mass.centreOfMass.y, 12.5, "centre y");
 		var robot = EndEffectorFrames.toRobotFrame(tcp);
-		close(robot.position.y, 0.03, "robot metres");
+		close(robot.position.z, 0.03, "robot metres");
 		var approach = EndEffectorFrames.approachYToZ(tcp);
 		var axis = AssemblyFrames.transformVector(approach, 0, 0, 1);
-		close(axis.y, -1, "robot approach rotation");
+		close(axis.z, 1, "robot approach rotation");
 
 		var rotated = new EndEffector();
 		var half = Math.sqrt(0.5);
