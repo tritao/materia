@@ -176,6 +176,7 @@ class RobotWorldTests {
     testModelDrivenConfiguration();
     testRobotModelCodec();
     testMjcfWalkerImport();
+    testUrdfWalkerImport();
     testLocalization();
     testWheelImuLocalization();
     testGnssLocalization();
@@ -959,6 +960,65 @@ class RobotWorldTests {
     var blueprint = RobotRuntimeCompiler.compile(model);
     equal(blueprint.floatingBase, true, "the imported walker compiles with a floating base");
     equal(blueprint.linkCollisionShapes.length, 5, "every imported collision shape compiles");
+  }
+
+  /** UrdfLoader on fixtures/urdf/walker.urdf, checked against the values authored there. */
+  static function testUrdfWalkerImport():Void {
+    var path = Sys.getCwd() + "/robotkit/tests/fixtures/urdf/walker.urdf";
+    if (!sys.FileSystem.exists(path)) path = Sys.getCwd() + "/fixtures/urdf/walker.urdf";
+    var loaded = robotkit.model.urdf.UrdfLoader.load(sys.io.File.getContent(path));
+    var model = loaded.model;
+    equal(model.name, "walker-urdf", "URDF robot name");
+    equal(model.floatingBase, true, "a floating joint from world sets a floating base");
+    equal(model.links.length, 4, "the world link is dropped");
+    equal(model.links[0].id, "link/torso", "URDF link IDs follow RobotModel conventions");
+    equal(model.links[0].visualGeometry, "package://walker/meshes/torso.stl", "visual mesh references are kept");
+    check(switch model.links[0].collisionShapes[0].primitive {
+      case CollisionPrimitive.Box(x, y, z): x == 0.15 && y == 0.1 && z == 0.2;
+      case _: false;
+    }, "a URDF box size becomes half extents");
+    check(switch model.links[1].collisionShapes[0].primitive {
+      case CollisionPrimitive.Cylinder(radius, half): radius == 0.05 && half == 0.2;
+      case _: false;
+    }, "a URDF cylinder length becomes a half-length");
+    equal(model.links[1].collisionShapes[0].position[2], -0.2, "collision origins are kept");
+    equal(model.links[2].collisionShapes.length, 1, "only primitive collision geometry becomes a shape");
+    equal(model.links[2].collisionGeometry, "package://walker/meshes/foot.stl",
+      "a collision mesh is kept as a geometry reference");
+    check(Math.abs(model.links[2].inertiaTensor[0] - 0.001) < 1e-12 &&
+      Math.abs(model.links[2].inertiaTensor[4] - 0.002) < 1e-12,
+      "inertia in a rotated inertial frame is expressed in link axes");
+    equal(model.links[3].mass, robotkit.model.urdf.UrdfLoader.PLACEHOLDER_MASS,
+      "a link without inertial gets a placeholder mass");
+    var hip = model.joints[0], knee = model.joints[1], toe = model.joints[2];
+    equal(hip.axis[1], 1.0, "joint axes are normalised");
+    equal(hip.limits.effort, 40.0, "limit effort is kept");
+    equal(hip.parentFramePosition[1], 0.1, "the joint origin places the child frame in the parent");
+    check(Math.abs(knee.parentFrameRotation[0] - Math.sqrt(0.5)) < 1e-12 &&
+      Math.abs(knee.parentFrameRotation[3] - Math.sqrt(0.5)) < 1e-12,
+      "rpy converts to an xyzw quaternion");
+    equal(knee.childFramePosition[2], 0.0, "the URDF joint frame is the child link frame");
+    equal(model.couplings.length, 1, "mimic becomes a joint coupling");
+    equal(model.couplings[0].leader, knee.id, "the mimicked joint leads");
+    equal(model.couplings[0].follower, toe.id, "the mimic joint follows");
+    equal(model.couplings[0].ratio, 0.5, "mimic multiplier becomes the coupling ratio");
+    equal(model.actuators.length, 1, "a simple transmission becomes an actuator");
+    check(switch model.actuators[0].transmission {
+      case SimpleTransmission(jointId, ratio, _): jointId == hip.id && ratio == 2.0;
+    }, "mechanical reduction becomes the transmission ratio");
+    equal(model.actuators[0].maxEffort, 20.0, "actuator effort is the joint effort over the reduction");
+    var warned = loaded.warnings.join("\n");
+    check(warned.indexOf("dynamics") >= 0 && warned.indexOf("placeholder") >= 0 &&
+      warned.indexOf("foot.stl") >= 0, "skipped and approximated elements are reported");
+    equal(RobotModelCodec.decode(RobotModelCodec.encode(model)).links.length, 4,
+      "a loaded URDF round-trips through the RobotModel codec");
+    equal(RobotRuntimeCompiler.compile(model).linkCollisionShapes.length, 3,
+      "a loaded URDF compiles");
+    throws(function() robotkit.model.urdf.UrdfLoader.load("<robot name='x'><link name='a'/>"),
+      "malformed URDF XML is rejected");
+    throws(function() robotkit.model.urdf.UrdfLoader.load(
+      "<robot><link name='a'/><link name='b'/><joint name='j' type='planar'><parent link='a'/><child link='b'/></joint></robot>"),
+      "unsupported joint types are rejected");
   }
 
   static function testGnssLocalization():Void {

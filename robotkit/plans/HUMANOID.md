@@ -243,3 +243,50 @@ and multi-hull collision decomposition beyond what the G1 model ships with.
 - Not covered yet: the deterministic SimKit backend with a floating base, and
   the editor's own robot records (`SensorConfiguration` in `app/`), which do
   not persist `floatingBase`. The editor gets it with H1's importer or H6.
+
+### H1 — Robot import
+
+- **Collision shapes.** `RobotModel` links carry primitive `collisionShapes`
+  (box, sphere, capsule, cylinder, half-lengths along local Z), sent through a
+  new `link_shapes` tail of `rk_simulation_robot_desc`. SimKit gained a
+  cylinder shape. A description may now omit its initial pose (zero
+  `struct_size`), so shape-only descriptions keep the default placement.
+- **MJCF.** `robotkit_mjcf_import` (built when MuJoCo is) reads MuJoCo's
+  compiled model. Geoms that take part in contact (contype, conaffinity or an
+  explicit pair) become shapes; other meshes merge into one STL per link. The
+  static MuJoCo is linked whole, or its self-registering STL decoder is
+  dropped. The walker fixture's output is checked in and checked twice: byte
+  for byte by the native import test, and semantically by `RobotWorldTests`.
+- **G1.** `tools/humanoid/fetch-g1.sh` fetches Menagerie at a pinned commit
+  and imports `scene_mjx.xml`, not `g1_mjx.xml`: the robot's geoms collide only
+  through the scene's 49 contact pairs. Result: 30 links, 29 joints, 29
+  actuators, 27 collision primitives, 2 IMUs, 33.34 kg. `DropCheck` drops it
+  in MuJoCo through `RobotModel` → compiler → `Simulation`: the first floor
+  contacts are both ankle-roll links at 0.032 s.
+- **URDF.** `robotkit.model.urdf.UrdfLoader` (Haxe, on haxeon's new `Xml`)
+  handles the child-frame joint convention, fixed-axis rpy, inertia in the
+  inertial frame, a `world` root (fixed or floating), box/cylinder/sphere
+  collision, mesh references, `mimic` → couplings and simple transmissions.
+  Links without `inertial` get a 1 g placeholder mass, reported as a warning.
+- **haxeon fixes made on the way:** `Reflect.deleteField`, enum constructors
+  visible through module imports, `Sys.exit`, and the `Xml` stdlib with its
+  compiler fixes. Still open: a comprehension whose block body ends in a
+  filtering `if` does not compile.
+
+Found for H2/H5, not fixed here:
+- G1 cannot stand yet. Within 15 ms of touchdown both knees reach their stop
+  (−0.087 rad), even with every joint held at zero: SimKit's position servo
+  has none of G1's gains (kp 75, kv 2), armature or friction loss, which the
+  importer reads but cannot store until H2.
+- A joint pressed onto its stop goes slightly past it, since MuJoCo's limits
+  are soft, and the runtime latches any observed out-of-limit position as a
+  fault that fails `Simulation.step`. Legged robots rest on stops routinely,
+  so H5 needs a penetration tolerance or a distinct stop state.
+- Contact-pair friction and solver settings, joint armature, damping and
+  friction loss, and actuator gains are reported by the importer as "not yet
+  stored (H2)".
+- Visual meshes are written and referenced, but the editor does not load mesh
+  files yet (see the `gltf-animation` work).
+- Contact pairs are approximated by layer collision: every imported shape
+  collides with the environment and, unless self-collision is off, with
+  other links.
