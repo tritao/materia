@@ -3,6 +3,8 @@
   "package": { "name": "stockkit" },
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
-  "dependencies": {},
+  "dependencies": {
+    "cnckit": { "path": "../cnckit" }
+  },
   "target": "host"
 }

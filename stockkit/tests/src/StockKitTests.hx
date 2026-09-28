@@ -7,6 +7,7 @@ import cnckit.tool.CutterZone;
 class StockKitTests {
   public static function main():Void {
     profiles();
+    CutMoveTests.run();
     OracleFixtures.run();
     ChainFixtures.run();
     Sys.println('StockKit tests passed (${Assert.count} assertions)');

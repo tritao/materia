@@ -8,8 +8,11 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
+import cnckit.CncTool;
 import cnckit.ir.CncGeometry;
 import cnckit.ir.CncPoint;
+import cnckit.parse.CncSpan;
+import stockkit.CutMove;
 import cnckit.tool.CutterProfile;
 
 /**
@@ -88,13 +91,14 @@ class ExactOracle {
     and never add material; a boolean that goes wrong between moves fails at
     the move that caused it rather than skewing the final stock.
   **/
-  public static function cut(stock:Part, profile:CutterProfile,
-      moves:Array<CncGeometry>):Part {
+  public static function cut(stock:Part, moves:Array<CutMove>):Part {
     var current = new Part(stock.shape.cloneShape());
     var volume = current.volume();
     try {
       for (index in 0...moves.length) {
-        var sweep = sweptSolid(profile, moves[index]);
+        var sweep = switch moves[index].motion {
+          case Path(geometry): sweptSolid(moves[index].tool.profile(), geometry);
+        };
         var sweepVolume = sweep.volume();
         var next:Part;
         try {
@@ -119,6 +123,15 @@ class ExactOracle {
       current.close();
       throw error;
     }
+  }
+
+  /** Moves of one tool along plain geometry, for fixtures without a program. */
+  public static function pathMoves(profile:CutterProfile,
+      geometries:Array<CncGeometry>):Array<CutMove> {
+    var tool = CncTool.shaped(1, 0.0, profile);
+    return [for (index in 0...geometries.length)
+      new CutMove(tool, Path(geometries[index]), false, index,
+        new CncSpan(index + 1, 1, 0))];
   }
 
   /**

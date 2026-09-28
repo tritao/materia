@@ -94,7 +94,7 @@ class ChainFixtures {
     var stock = box.translated(origin);
     box.close();
     try {
-      var result = ExactOracle.cut(stock, profile, moves);
+      var result = ExactOracle.cut(stock, ExactOracle.pathMoves(profile, moves));
       var removed = stock.volume() - result.volume();
       result.close();
       stock.close();

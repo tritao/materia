@@ -10,6 +10,8 @@ import cnckit.ir.CncGeometry;
 import cnckit.ir.CncOp;
 import cnckit.ir.CncPoint;
 import oracle.ExactOracle;
+import stockkit.CutMove;
+import stockkit.CutMoves;
 import cnckit.tool.CutterProfile;
 
 /**
@@ -117,18 +119,15 @@ class OracleFixtures {
       new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
       new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
     ]);
-    var tool = new CncTool(2, 0.0, 0.002);
+    var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
     var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
       .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.001)
       .finish();
-    var moves:Array<CncGeometry> = [];
-    for (op in program.ops) switch op {
-      case Rapid(geometry, _) | Feed(geometry, _, _, _):
-        if (lowestPoint(geometry) < 0.0) moves.push(geometry);
-      case _:
-    }
+    // Moves wholly above the stock cannot cut it; skipping them saves booleans.
+    var moves = [for (move in CutMoves.fromOps(program.ops, program.tool))
+      if (switch move.motion { case Path(geometry): lowestPoint(geometry) < 0.0; }) move];
     Assert.check(moves.length > 5, "CAM pocket produces cutting moves");
-    var result = removal(CutterProfile.flat(0.002, 0.02), moves);
+    var result = removalOf(moves);
     // A round cutter leaves a tool-radius fillet in each inside corner.
     var cornerRadius = 0.001;
     relative(result.removed,
@@ -150,10 +149,13 @@ class OracleFixtures {
     };
 
   static function removal(profile:CutterProfile,
-      moves:Array<CncGeometry>):{stock:Part, removed:Float} {
+      moves:Array<CncGeometry>):{stock:Part, removed:Float}
+    return removalOf(ExactOracle.pathMoves(profile, moves));
+
+  static function removalOf(moves:Array<CutMove>):{stock:Part, removed:Float} {
     var blank = Part.box(STOCK_X, STOCK_Y, STOCK_Z, Min, Min, Max);
     try {
-      var stock = ExactOracle.cut(blank, profile, moves);
+      var stock = ExactOracle.cut(blank, moves);
       var removed = blank.volume() - stock.volume();
       blank.close();
       return {stock: stock, removed: removed};

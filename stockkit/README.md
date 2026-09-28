@@ -13,12 +13,21 @@ motion share one stock representation. The phase plan and targets are in
 [`docs/PLAN.md`](docs/PLAN.md); notes on the open-source work this draws on
 are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Current state (phase 0)
+## Current state (phases 0–2)
 
-- `stockkit.tool.CutterProfile` describes a tool as a surface of revolution
-  from its tip upwards, with each segment marked as cutting, shank or holder.
-  Flat, ball, bull-nose, V-bit and tapered-ball constructors are provided, and
-  `withShank`/`withHolder` stack non-cutting sections on top.
+- Tool shapes live in CncKit so any `CncTool` can carry one:
+  `cnckit.tool.CutterProfile` describes a tool as a surface of revolution from
+  its tip upwards, with each segment marked as cutting, shank or holder. Flat,
+  ball, bull-nose, V-bit and tapered-ball constructors are provided,
+  `withShank`/`withHolder` stack non-cutting sections on top, and `below`
+  clips a tool at the stock surface. `CncTool.shaped` builds a tool from a
+  profile; a diameter-only tool simulates as a flat mill.
+- `stockkit.CutMove` is one tool motion through the stock (tool, motion in the
+  workpiece frame, rapid or feed, source op index and span).
+  `CutMoves.fromOps(ops, tools, ?workOrigin)` builds them from CamKit programs
+  (`program.tool`) or compiled G-code (`machine.tool`). CNC op geometry is in
+  machine coordinates and includes the active G43 tool length, which the new
+  `CncOp.ToolLengthOffset` records, so the adapter recovers tool-tip positions.
 - The test project holds the exact reference (`tests/src/oracle/ExactOracle.hx`):
   it builds each move's swept solid with OCCT through CadKit, subtracts it from
   stock, and reads exact material intervals along any ray. It covers
