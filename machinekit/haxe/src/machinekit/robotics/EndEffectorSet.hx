@@ -24,6 +24,9 @@ class EndEffectorSet extends EndEffector {
 		if (name == null || name.length == 0 || portMap == null)
 			throw "Changer needs a name and port map";
 		memberConnectorFrame(instanceId, connector);
+		var master = componentAt(this, instanceId);
+		if (master.couplingKey() != null && connector != master.couplingConnector())
+			throw 'Changer connector "$connector" does not match master coupling connector';
 		var robotPorts:Map<String, Bool> = [], toolPorts:Map<String, Bool> = [];
 		var copied:Array<ChangerPortMap> = [];
 		for (mapping in portMap) {
@@ -51,13 +54,16 @@ class EndEffectorSet extends EndEffector {
 			try tool.port(mapping.tool) catch (_:Dynamic)
 				throw 'Changer tool "$id" does not expose mapped port "${mapping.tool}"';
 		var master = componentAt(this, changer.instanceId);
-		if (Std.isOfType(master, ToolChangerMaster)) {
-			var mount = tool.mountReference();
-			var half = componentAt(tool, mount.instanceId);
-			if (changer.connectorName != "tool" || mount.connectorName != "master" ||
-				!Std.isOfType(half, ToolChangerTool))
-				throw 'Changer tool "$id" needs a matching ToolChangerTool mount';
-			if ((cast master : ToolChangerMaster).interfaceKey() != (cast half : ToolChangerTool).interfaceKey())
+		var mount = tool.mountReference();
+		var half = componentAt(tool, mount.instanceId);
+		var masterCoupled = master.couplingKey() != null;
+		var toolCoupled = half.couplingKey() != null;
+		if (masterCoupled != toolCoupled)
+			throw 'Changer tool "$id" needs a matching coupling interface';
+		if (masterCoupled) {
+			if (changer.connectorName != master.couplingConnector() ||
+				mount.connectorName != half.couplingConnector() ||
+				master.couplingKey() != half.couplingKey())
 				throw 'Changer tool "$id" does not fit the master interface';
 		}
 		tools.set(id, tool);
@@ -67,6 +73,7 @@ class EndEffectorSet extends EndEffector {
 		for (member in assembly.components()) if (member.id == instanceId) return member.component;
 		throw 'Unknown assembly member "$instanceId"';
 	}
+
 
 	public function toolIds():Array<String> return [for (id in tools.keys()) id];
 

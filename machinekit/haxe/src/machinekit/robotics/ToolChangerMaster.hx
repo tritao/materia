@@ -10,13 +10,14 @@ import machinekit.component.PortRole;
 import machinekit.component.Solids;
 
 /** Generic robot-side changer half with bridged air and signal channels. */
-class ToolChangerMaster extends MachineComponent {
+class ToolChangerMaster extends MachineComponent implements ChangerCoupling {
 	public final airChannels:Int;
 	public final diameter:Float;
 	public final thickness:Float;
 
 	/** Generic coupling dimensions shared with the matching tool-side half. */
-	public function interfaceKey():String return 'generic:$airChannels:${Dimension.format(diameter)}';
+	override public function couplingKey():String return 'generic:$airChannels:${Dimension.format(diameter)}';
+	override public function couplingConnector():String return "tool";
 
 	public function new(airChannels:Int, diameter:Float = 60, thickness:Float = 15) {
 		if (airChannels < 1 || !Math.isFinite(diameter) || diameter <= 0 ||

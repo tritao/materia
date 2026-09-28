@@ -5,6 +5,7 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.ChangerCoupling;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
 import materia.assembly.AssemblyFrames;
@@ -21,6 +22,31 @@ private class TestChangerMaster extends MachineComponent {
 		declareMass(5, new Vector(), InertiaTensor.zero());
 	}
 
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+}
+
+private class CoupledMaster extends MachineComponent implements ChangerCoupling {
+	public function new() {
+		super("COUPLED-MASTER", "Coupled master", "steel", true);
+		addConnector("mount", Mount, AssemblyFrames.identity());
+		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
+		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+		declareMass(5, new Vector(), InertiaTensor.zero());
+	}
+	override public function couplingKey():String return "test:master";
+	override public function couplingConnector():String return "couple";
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+}
+
+private class CoupledPlate extends MachineComponent implements ChangerCoupling {
+	public function new() {
+		super("COUPLED-PLATE", "Coupled plate", "steel", true);
+		addConnector("mount", Mount, AssemblyFrames.identity());
+		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
+		declareMass(1, new Vector(), InertiaTensor.zero());
+	}
+	override public function couplingKey():String return "test:tool";
+	override public function couplingConnector():String return "mount";
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -85,6 +111,14 @@ class EndEffectorSetTests {
 		return result;
 	}
 
+	static function coupledTool():EndEffector {
+		var result = new EndEffector();
+		result.addComponent("plate", new CoupledPlate());
+		result.mount("plate", "mount");
+		result.exposePort("air", "plate", "airIn");
+		return result;
+	}
+
 	public static function run():Void {
 		var set = new EndEffectorSet();
 		set.addComponent("master", new TestChangerMaster());
@@ -128,6 +162,17 @@ class EndEffectorSetTests {
 		if (generic.toolIds().indexOf("matching") < 0) throw "Matching generic changer was rejected";
 		fails(() -> generic.addTool("wrong-diameter", genericTool(1, 55)), "does not fit");
 		fails(() -> generic.addTool("wrong-channels", genericTool(2, 60)), "does not fit");
-		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching ToolChangerTool");
+		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching coupling interface");
+		var wrongConnector = new EndEffectorSet();
+		wrongConnector.addComponent("master", new ToolChangerMaster(1, 60));
+		fails(() -> wrongConnector.changer("coupling", "master", "robot", []), "coupling connector");
+
+		var custom = new EndEffectorSet();
+		custom.addComponent("master", new CoupledMaster());
+		custom.mount("master", "mount");
+		custom.exposePort("coupledAir", "master", "airOut");
+		custom.changer("coupling", "master", "couple", [{robot: "coupledAir", tool: "air"}]);
+		fails(() -> custom.addTool("wrong-key", coupledTool()), "does not fit");
+		fails(() -> custom.addTool("mixed", tool(1, 20)), "matching coupling interface");
 	}
 }

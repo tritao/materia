@@ -12,6 +12,9 @@ import materia.project.MaterialLibrary;
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
+	/** Null unless this component provides a changer coupling contract. */
+	public function couplingKey():Null<String> return null;
+	public function couplingConnector():Null<String> return null;
 	public final designation:String;
 	public var materialId:String;
 	/** True when this component was built from explicit, non-catalog specifications. */
