@@ -15,7 +15,10 @@ Input adapters:
   boundary of lines, arcs or a circle.
 - `CamContour.fromEdges(edges)` and `CamContour.fromFace(face)` accept one
   horizontal cadkit boundary. Curves are sampled to a chord tolerance.
-  Faces with multiple boundaries are rejected until hole selection is added.
+- `CamContour.fromFaceBoundaries(face)` returns the outer contour followed by
+  inner contours, so a plate with holes can use an outside profile for its
+  outer boundary and inside profiles for the holes. `fromFace` still requires
+  a single boundary.
 - `CamSheetProfiles.fromPlan(plan, placementId)` turns a manufacturingkit
   rectangular sheet placement into a profile contour.
 
@@ -35,9 +38,11 @@ var previewAndExecution = program.lower(cncMachine);
 var linuxCnc = CamGCodeWriter.write(program);
 ```
 
-The test project checks cadkit sketch and face inputs, manufacturingkit sheet
-input, pocket coverage, round corner geometry, direct lowering and a full
-CAM IR → G-code → CncKit IR round trip. Run with the existing cadkit native
+The test project creates its own rectangular, rounded and holed plate fixtures.
+It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
+direct lowering and CAM IR → G-code → CncKit IR round trips. The suite also
+checks the generic manufacturingkit sheet placement adapter using locally
+authored input; it does not depend on a MachineKit example. Run with the cadkit native
 build on `LD_LIBRARY_PATH`:
 
 ```sh

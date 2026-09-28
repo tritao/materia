@@ -2,6 +2,7 @@ package camkit;
 
 import cadkit.Edge;
 import cadkit.Face;
+import CadKit;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SolvedSketch;
 import cadkit.units.LengthUnits;
@@ -123,16 +124,41 @@ class CamContour {
 
   public static function fromFace(face:Face, ?unit:String = "mm",
       ?chordToleranceMetres:Float = 0.00005):CamContour {
+    var boundaries = fromFaceBoundaries(face, unit, chordToleranceMetres);
+    if (boundaries.length != 1)
+      throw "CAD face has multiple boundaries; select an outer or hole contour";
+    return boundaries[0];
+  }
+
+  /** Returns the outer face contour first, followed by its inner boundaries. */
+  public static function fromFaceBoundaries(face:Face, ?unit:String = "mm",
+      ?chordToleranceMetres:Float = 0.00005):Array<CamContour> {
     if (face == null) throw "CAM needs a face";
-    var shape = face.cloneShape(), edges:Array<Edge> = [];
+    var shape = face.cloneShape(), result:Array<CamContour> = [];
     try {
-      edges = shape.edges().all();
-      var result = fromEdges(edges, unit, chordToleranceMetres);
-      for (edge in edges) edge.close();
+      for (wireIndex in 0...shape.subshapeCount(CadKit.ShapeKind.Wire)) {
+        var wire = shape.subshape(CadKit.ShapeKind.Wire, wireIndex);
+        var edges:Array<Edge> = [];
+        try {
+          for (edgeIndex in 0...wire.subshapeCount(CadKit.ShapeKind.Edge))
+            edges.push(new Edge(wire.subshape(CadKit.ShapeKind.Edge, edgeIndex)));
+          result.push(fromEdges(edges, unit, chordToleranceMetres));
+        } catch (error:Dynamic) {
+          for (edge in edges) edge.close();
+          wire.close();
+          throw error;
+        }
+        for (edge in edges) edge.close();
+        wire.close();
+      }
+      if (result.length == 0) throw "CAD face has no boundaries";
+      result.sort((a, b) -> {
+        var first = Math.abs(a.signedArea), second = Math.abs(b.signedArea);
+        return first > second ? -1 : (first < second ? 1 : 0);
+      });
       shape.close();
       return result;
     } catch (error:Dynamic) {
-      for (edge in edges) edge.close();
       shape.close();
       throw error;
     }
