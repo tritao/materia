@@ -61,6 +61,8 @@ class CamGCodeWriter {
         lines.push(command);
       case Dwell(seconds, _): lines.push('G4 P${number(seconds)}');
       case ToolChange(number, _): lines.push('T$number M6');
+      case ToolLengthOffset(number, _, _):
+        lines.push(number == 0 ? "G49" : 'G43 H$number');
       case OptionalStop(_): lines.push("M1");
       case ProgramStop(_): lines.push("M0");
       case End(_): lines.push("M2");

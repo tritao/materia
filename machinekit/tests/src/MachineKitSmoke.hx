@@ -64,6 +64,7 @@ import machinekit.standard.ParallelKey;
 import machinekit.robotics.EndEffectorPlate;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
+import eoat.EndEffectorExampleChecks;
 import machinekit.standard.RetainingRing;
 import machinekit.standard.ShaftCollar;
 import machinekit.standard.SocketHeadCapScrew;
@@ -2359,6 +2360,10 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		EndEffectorTests.run();
+		EndEffectorSetTests.run();
+		EndEffectorComponentTests.run();
+		EndEffectorExampleChecks.run();
 		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();

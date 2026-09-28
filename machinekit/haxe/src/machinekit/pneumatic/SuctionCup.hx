@@ -1,0 +1,31 @@
+package machinekit.pneumatic;
+
+import cadkit.modeling.Part;
+import machinekit.component.ComponentDetail;
+import machinekit.component.Dimension;
+import machinekit.component.MachineComponent;
+import machinekit.component.PortInterface;
+import machinekit.component.PortKind;
+import machinekit.component.PortRole;
+import machinekit.component.Solids;
+
+/** Generic suction cup with a vacuum input and contact frame. */
+class SuctionCup extends MachineComponent {
+	public final diameter:Float;
+	public final height:Float;
+
+	public function new(diameter:Float, height:Float) {
+		if (!Math.isFinite(diameter) || diameter <= 0 || !Math.isFinite(height) || height <= 0)
+			throw "Suction cup needs positive dimensions";
+		super('SUCTION-CUP-${Dimension.format(diameter)}-${Dimension.format(height)}',
+			"Generic suction cup", "rubber", true);
+		this.diameter = diameter;
+		this.height = height;
+		addConnector("mount", Mount, Solids.axial(0, 0, 0));
+		addConnector("contact", Face, Solids.axial(0, 0, height));
+		addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: PushIn(6), required: true});
+	}
+
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return Part.cylinderSpan(diameter / 2, 0, height);
+}

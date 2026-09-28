@@ -585,6 +585,11 @@ cad_result make_revolved_shape(
         if (operation.Shape().IsNull()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "revolution produced a null shape");
         }
+        // Profiles that meet the axis tangentially revolve into degenerate
+        // surfaces (a horn torus) that OCCT sometimes builds invalid.
+        if (!BRepCheck_Analyzer(operation.Shape()).IsValid()) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "revolution produced invalid topology");
+        }
         return insert_shape(operation.Shape(), out_shape);
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
@@ -656,6 +661,11 @@ cad_result make_revolution_operation(
         BRepPrimAPI_MakeRevol operation(source, axis, angle, true);
         if (operation.Shape().IsNull()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "revolution produced a null shape");
+        }
+        // Profiles that meet the axis tangentially revolve into degenerate
+        // surfaces (a horn torus) that OCCT sometimes builds invalid.
+        if (!BRepCheck_Analyzer(operation.Shape()).IsValid()) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "revolution produced invalid topology");
         }
 
         OperationData data;
@@ -986,6 +996,28 @@ cad_result collect_operation_history(
     return CAD_OK;
 }
 
+// Distinct OCCT alert names from a boolean, as " (warnings: A, B)", or "".
+template <typename Operation>
+std::string boolean_warning_summary(const Operation& operation) {
+    if (!operation.HasWarnings()) {
+        return {};
+    }
+    std::ostringstream dump;
+    operation.DumpWarnings(dump);
+    std::istringstream lines(dump.str());
+    std::vector<std::string> names;
+    for (std::string line; std::getline(lines, line);) {
+        if (!line.empty() && std::find(names.begin(), names.end(), line) == names.end()) {
+            names.push_back(line);
+        }
+    }
+    std::string summary = " (warnings:";
+    for (size_t index = 0; index < names.size(); ++index) {
+        summary += (index == 0 ? " " : ", ") + names[index];
+    }
+    return summary + ")";
+}
+
 template <typename Operation>
 cad_result evaluate_boolean(
     cad_shape first_handle,
@@ -1016,6 +1048,17 @@ cad_result evaluate_boolean(
         operation.Build();
         if (!operation.IsDone() || operation.HasErrors()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
+        }
+        // OCCT can report success for a result with broken topology, notably
+        // when argument surfaces are tangent along a curve. Its warnings do
+        // not separate these cases from correct results (the same alerts
+        // appear on both), so check the result and report the warnings to
+        // help diagnose it. A result can also be valid but wrong; callers that
+        // need certainty must check it against an independent measure.
+        if (!BRepCheck_Analyzer(operation.Shape()).IsValid()) {
+            const auto message = "OCCT boolean produced invalid topology" +
+                boolean_warning_summary(operation);
+            return fail(CAD_ERROR_OPERATION_FAILED, message.c_str());
         }
 
         out_data.result = operation.Shape();

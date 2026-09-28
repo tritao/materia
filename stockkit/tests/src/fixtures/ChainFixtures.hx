@@ -1,0 +1,108 @@
+package fixtures;
+
+import cadkit.modeling.Align;
+import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import cnckit.ir.CncGeometry;
+import cnckit.ir.CncPoint;
+import oracle.ExactOracle;
+import cnckit.tool.CutterProfile;
+
+/**
+  Multi-move toolpaths whose moves join tangentially, cut with the exact
+  oracle across tools, corner radii and stock positions. Their removed volume
+  has a closed form: a tube around a smooth path whose curvature radius is at
+  least the tool radius sweeps its cross-section along the path length
+  (Pappus), plus one whole tool for the two open ends of an open path.
+**/
+class ChainFixtures {
+  static inline final DEPTH_TOLERANCE = 1e-7; // relative volume
+
+  public static function run():Void {
+    var r = 0.003;
+    // Corners at exactly the tool radius are CamKit's outside corners. The
+    // oracle refuses them for tools with a curved edge at that radius, so
+    // those tools use the smallest corners it accepts.
+    var tools:Array<{name:String, profile:CutterProfile, depth:Float, corners:Array<Float>}> = [
+      {name: "flat", profile: CutterProfile.flat(2 * r, 0.02), depth: 0.002, corners: [r, 1.5 * r]},
+      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02), depth: 0.004, corners: [1.01 * r, 1.5 * r]},
+      {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02), depth: 0.002,
+        corners: [1.01 * r, 1.5 * r]},
+      {name: "V-bit", profile: CutterProfile.vee(2 * r, Math.PI / 2, 0.02), depth: 0.002,
+        corners: [r, 1.5 * r]}
+    ];
+    var origins = [new Vector(0, 0, 0), new Vector(0.0137, -0.0213, 0.0041),
+      new Vector(0.25, 0.1, -0.05)];
+    for (tool in tools)
+      for (corner in tool.corners)
+        for (origin in origins) {
+          var label = '${tool.name} corner ${corner} at (${origin.x}, ${origin.y}, ${origin.z})';
+          roundedRectangle(tool.profile, tool.depth, corner, origin, label);
+        }
+    var refused = false;
+    try ExactOracle.sweptSolid(CutterProfile.ball(2 * r, 0.02),
+      Arc(new CncPoint(0, 0, 0), r, 0, Math.PI / 2)).close()
+    catch (_:Dynamic) refused = true;
+    Assert.check(refused, "a ball-mill arc of the ball's own radius is refused");
+    for (tool in tools)
+      sCurve(tool.profile, tool.depth, 1.5 * r, origins[1], '${tool.name} S-curve');
+  }
+
+  /** A closed loop of four lines and four quarter arcs, cut at one depth. */
+  static function roundedRectangle(profile:CutterProfile, depth:Float,
+      corner:Float, origin:Vector, label:String):Void {
+    var a = 0.012, b = 0.007, z = origin.z - depth;
+    var x0 = origin.x + 0.005, y0 = origin.y + 0.005;
+    function p(x:Float, y:Float):CncPoint return new CncPoint(x0 + x, y0 + y, z);
+    var moves:Array<CncGeometry> = [
+      Line(p(corner, 0), p(corner + a, 0)),
+      Arc(p(corner + a, corner), corner, -Math.PI / 2, Math.PI / 2),
+      Line(p(2 * corner + a, corner), p(2 * corner + a, corner + b)),
+      Arc(p(corner + a, corner + b), corner, 0, Math.PI / 2),
+      Line(p(corner + a, 2 * corner + b), p(corner, 2 * corner + b)),
+      Arc(p(corner, corner + b), corner, Math.PI / 2, Math.PI / 2),
+      Line(p(0, corner + b), p(0, corner)),
+      Arc(p(corner, corner), corner, Math.PI, Math.PI / 2)
+    ];
+    var length = 2 * a + 2 * b + 2 * Math.PI * corner;
+    var cut = profile.below(depth);
+    check(profile, moves, origin, 2 * cut.halfSectionArea() * length, label);
+  }
+
+  /** Line, left turn, right turn, line: open, with tangent joins throughout. */
+  static function sCurve(profile:CutterProfile, depth:Float, corner:Float,
+      origin:Vector, label:String):Void {
+    var a = 0.008, z = origin.z - depth;
+    var x0 = origin.x + 0.005, y0 = origin.y + 0.005;
+    function p(x:Float, y:Float):CncPoint return new CncPoint(x0 + x, y0 + y, z);
+    var moves:Array<CncGeometry> = [
+      Line(p(0, 0), p(a, 0)),
+      Arc(p(a, corner), corner, -Math.PI / 2, Math.PI / 2),
+      Arc(p(a + 2 * corner, corner), corner, Math.PI, -Math.PI / 2),
+      Line(p(a + 2 * corner, 2 * corner), p(2 * a + 2 * corner, 2 * corner))
+    ];
+    var length = 2 * a + Math.PI * corner;
+    var cut = profile.below(depth);
+    check(profile, moves, origin,
+      2 * cut.halfSectionArea() * length + cut.volume(), label);
+  }
+
+  static function check(profile:CutterProfile, moves:Array<CncGeometry>,
+      origin:Vector, expected:Float, label:String):Void {
+    var width = 0.04, height = 0.03, thickness = 0.01;
+    var box = Part.box(width, height, thickness, Min, Min, Max);
+    var stock = box.translated(origin);
+    box.close();
+    try {
+      var result = ExactOracle.cut(stock, ExactOracle.pathMoves(profile, moves));
+      var removed = stock.volume() - result.volume();
+      result.close();
+      stock.close();
+      Assert.near(removed / expected, 1.0, '$label removes a tube along its path',
+        DEPTH_TOLERANCE);
+    } catch (error:Dynamic) {
+      stock.close();
+      throw '$label: $error';
+    }
+  }
+}

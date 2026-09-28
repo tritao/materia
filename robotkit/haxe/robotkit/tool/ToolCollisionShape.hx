@@ -3,8 +3,9 @@ package robotkit.tool;
 import robotkit.spatial.Vec3;
 
 /**
- * Simple tool collision approximation, expressed in the tool's own frame
- * (see `Tool.flangeTTcp`'s parent, the flange). `model.CollisionApproximation`
+ * Simple tool collision approximation, centred on the flange frame. Box and
+ * Cylinder have no offset, so displaced geometry needs a conservative shape.
+ * `model.CollisionApproximation`
  * is a link-geometry derivation policy, not a shape; tools need an actual
  * box/cylinder value instead.
  */

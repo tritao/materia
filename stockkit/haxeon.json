@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "stockkit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "cnckit": { "path": "../cnckit" }
+  },
+  "target": "host"
+}

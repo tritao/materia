@@ -278,10 +278,15 @@ class CncInterpreter {
     if (retractChange >= 0) state.retractToInitial = retractChange == 98;
     if (setToolOffset) {
       var hWord:CncWord = cast h;
-      try state.toolLength = machine.toolLength(integer(hWord, line))
+      var number = integer(hWord, line);
+      try state.toolLength = machine.toolLength(number)
       catch (error:Dynamic) fail(line, hWord.column, Std.string(error));
+      ops.push(CncOp.ToolLengthOffset(number, state.toolLength, block.span));
     }
-    if (clearToolOffset) state.toolLength = 0.0;
+    if (clearToolOffset) {
+      state.toolLength = 0.0;
+      ops.push(CncOp.ToolLengthOffset(0, 0.0, block.span));
+    }
     if (setBlend && lineBlend != state.blendTolerance) {
       state.blendTolerance = lineBlend;
     }

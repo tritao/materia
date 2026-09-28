@@ -198,6 +198,14 @@ class CncKitTests {
       case _: throw "relative G49 motion missing";
     };
     near(finalRelative.z, 0.02, "G43/G49 do not shift relative moves");
+    var lengthOps = new CncCompiler(machine).compileDetailed(
+      "G21 G90 G43 H2\nG0 Z10\nG49\nM2").ops;
+    var offsets = [for (op in lengthOps) switch op {
+      case ToolLengthOffset(number, length, span): '$number:$length:${span.line}';
+      case _: null;
+    }].filter(entry -> entry != null);
+    check(offsets.length == 2 && offsets[0] == '2:${machine.toolLength(2)}:1'
+      && offsets[1] == "0:0:3", "G43 and G49 record the tool length they apply");
     var lowercase = new CncCompiler(machine).compile(
       "g21 g90 (comment) f600 g1 x1 ; tail\nm30");
     check(lowercase.ops.length == 1, "lowercase and comments parse");
