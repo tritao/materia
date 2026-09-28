@@ -293,6 +293,16 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     }
     path_maps_.push_back({compiled.segments.front().header.t0_ticks, base_time_ns, path_rate});
     if (plan.replace_after_plan_id) {
+        while (!plan_tags_.empty() && plan_tags_.back().start_ticks >= replace_ticks)
+            plan_tags_.pop_back();
+        if (!plan_tags_.empty() && plan_tags_.back().end_ticks > replace_ticks) {
+            auto &previous = plan_tags_.back();
+            previous.duration_ns = static_cast<std::uint64_t>(std::llround(
+                static_cast<long double>(previous.duration_ns) *
+                (replace_ticks - previous.start_ticks) /
+                (previous.end_ticks - previous.start_ticks)));
+            previous.end_ticks = replace_ticks;
+        }
         while (!pending_.empty() && pending_.back().header.t0_ticks >= replace_ticks)
             pending_.pop_back();
         while (!sent_.empty() && sent_.back().header.t0_ticks >= replace_ticks)
@@ -301,10 +311,16 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         for (auto &segment : pending_)
             segment.header.queue_revision = revision_;
     }
+    const auto plan_start_ticks = compiled.segments.front().header.t0_ticks;
+    const auto plan_end_ticks = compiled.segments.back().header.t0_ticks +
+        compiled.segments.back().header.duration_ticks;
     for (auto &segment : compiled.segments) {
         segment.header.queue_revision = revision_;
         pending_.push_back(std::move(segment));
     }
+    const auto &last_host_segment = plan.segments.segments[plan.segments.segment_count - 1];
+    plan_tags_.push_back({plan.plan_id, plan_start_ticks, plan_end_ticks,
+        last_host_segment.time_from_start_ns + last_host_segment.duration_ns});
     const auto occupied = std::count_if(sent_.begin(), sent_.end(), [&](const auto &row) {
         return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
     });
@@ -371,6 +387,9 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                 while (path_maps_.size() > 1 &&
                        path_maps_[1].device_start_ticks <= status_.path_clock_ticks)
                     path_maps_.erase(path_maps_.begin());
+                while (plan_tags_.size() > 1 &&
+                       plan_tags_[1].start_ticks <= state_header_.path_clock_ticks)
+                    plan_tags_.erase(plan_tags_.begin());
             }
         } else if (decoded.kind == 15) {
             if (decoded.payload.size() < device_wire6::State6Header::SIZE ||
@@ -440,6 +459,22 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
     state.committed_until_ns = path_time_ns(committed_until_ticks_);
     state.trajectory_duration_ns = state.trajectory_active
         ? std::max(state.trajectory_time_ns, state.committed_until_ns) : 0;
+    if (!plan_tags_.empty()) {
+        const auto path_ticks = state_header_.path_clock_ticks;
+        const PlanTag *tag = nullptr;
+        for (const auto &candidate : plan_tags_) {
+            if (candidate.start_ticks > path_ticks) break;
+            tag = &candidate;
+        }
+        if (tag) {
+            state.trajectory_tag = tag->plan_id;
+            const auto elapsed_ticks = std::min(path_ticks, tag->end_ticks) - tag->start_ticks;
+            const auto total_ticks = tag->end_ticks - tag->start_ticks;
+            state.trajectory_tag_time_ns = total_ticks == 0 ? 0 :
+                static_cast<std::uint64_t>(std::llround(
+                    static_cast<long double>(tag->duration_ns) * elapsed_ticks / total_ticks));
+        }
+    }
     state.session_state = status_.rate == 0.0f ? RK_SESSION_HELD :
         (state.trajectory_active ? RK_SESSION_EXECUTING : RK_SESSION_IDLE);
     return RK_OK;

@@ -1562,7 +1562,10 @@ class MotionKitBootstrapTests {
     while (machine.isMoving()) {
       machine.update();
       simulation.step(Int64.ofInt(tick++));
-      if (tick > 2000) throw "MotionKit trajectory did not complete";
+      if (tick > 2000) {
+        var snapshot = machine.robot.snapshot();
+        throw 'MotionKit trajectory did not complete: safety=${snapshot.safety} fault=${snapshot.faultCode} session=${snapshot.sessionState} active=${snapshot.trajectoryActive} queue=${snapshot.trajectoryQueueDepth} time=${snapshot.trajectoryTimeNs} duration=${snapshot.trajectoryDurationNs} committed=${snapshot.committedUntilNs}';
+      }
     }
     for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
   }

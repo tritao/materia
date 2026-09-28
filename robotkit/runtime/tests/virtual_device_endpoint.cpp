@@ -129,6 +129,9 @@ void dual_drive_layout() {
         blueprint) == RK_OK);
     for (std::uint64_t now = 130'000'000; now <= 1'220'000'000; now += 10'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
+    assert(!state.trajectory_active);
+    assert(state.trajectory_tag == 50);
+    assert(state.trajectory_tag_time_ns >= 1'000'000'000);
     auto positions = endpoint->actuator_positions();
     assert(positions.size() == 2);
     assert(std::abs(positions[0] - 0.01) <= 1.0 / 400'000 + 1e-6);
@@ -284,6 +287,8 @@ void minimal_midstream_replacement() {
     for (std::uint64_t now = 330'000'000; now <= 1'700'000'000; now += 10'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
     assert(state.safety == RK_SAFETY_READY);
+    assert(state.trajectory_tag == 71);
+    assert(state.trajectory_tag_time_ns >= 300'000'000);
     assert(std::abs(state.position[0] - (replacement.start_position[0] + 0.15)) < 1e-4);
 }
 

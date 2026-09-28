@@ -97,6 +97,13 @@ private:
         double ticks_per_host_ns;
     };
     std::vector<PathMap> path_maps_;
+    struct PlanTag {
+        std::uint64_t plan_id;
+        std::uint64_t start_ticks;
+        std::uint64_t end_ticks;
+        std::uint64_t duration_ns;
+    };
+    std::vector<PlanTag> plan_tags_;
     std::uint64_t path_time_ns(std::uint64_t device_ticks) const noexcept;
 };
 
