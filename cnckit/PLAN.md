@@ -32,7 +32,7 @@ Create `camkit` for 2.5D profile, offset pocket, and drill operations from cadki
 
 - [x] Phase 0 — CncKit 20 baseline assertions; MotionKit CNC 50 and C7 2,845 assertions after restoring `ObjectMap.remove`. Haxeon launcher rebuilds a mismatched native release pair.
 - [x] Phase 1 — LinuxCNC ordering, indefinite waits, partial-blend warnings and configurable corner limit. CncKit 38 assertions; MotionKit CNC 50 and C7 2,845 assertions.
-- [ ] Phase 2
+- [x] Phase 2 — Parser, transactional modal interpreter, metre-based CNC IR, and MotionKit lowering with distance-aware source map. Structured diagnostics recover at the next line; `compile()` keeps its first-error behavior. CncKit 51, MotionKit CNC 50, and C7 2,845 assertions pass.
 - [ ] Phase 3a
 - [ ] Phase 3b
 - [ ] Phase 3c

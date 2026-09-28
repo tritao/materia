@@ -1,6 +1,9 @@
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
 import cnckit.CncDialect;
+import cnckit.CncDiagnostic.CncSeverity;
+import cnckit.ir.CncGeometryTools;
+import cnckit.ir.CncOp;
 import motionkit.path.ArcSegment;
 import motionkit.program.MotionOp;
 
@@ -187,6 +190,58 @@ class CncKitTests {
       "g21 g90 (comment) f600 g1 x1 ; tail\nm30");
     check(lowercase.ops.length == 1, "lowercase and comments parse");
     rejects(machine, "M30\nG0 X1", "code after M2/M30");
+    var detailed = new CncCompiler(arcMachine).compileDetailed(
+      "G21 G90 G64 P1 F600 G1 X10\nG1 Y10\nG1 Xoops\nG2 X0 Y0 I0 J0\n" +
+      "G1 X20\nM2\nG1 X30");
+    check(detailed.diagnostics.length == 3,
+      "lexer, interpreter, and program-end errors are all reported");
+    check(detailed.diagnostics[0].span.line == 3 &&
+      detailed.diagnostics[1].span.line == 4 &&
+      detailed.diagnostics[2].span.line == 7,
+      "diagnostics retain source order after line recovery");
+    check(detailed.diagnostics[0].severity == CncSeverity.Error &&
+      detailed.diagnostics[0].code == "CNC_LEX",
+      "diagnostics carry severity and stable code");
+    check(detailed.program != null && detailed.ops.length >= 4,
+      "valid lines still produce preview and executable program");
+    var feedGeometry = switch detailed.ops[0] {
+      case CncOp.Feed(geometry, _, _, span):
+        check(span.line == 1, "IR feed keeps its source span");
+        geometry;
+      case _: throw "first preview operation must be feed";
+    };
+    near(CncGeometryTools.length(feedGeometry), 0.01,
+      "IR preview geometry uses metres");
+    var previewEnd = CncGeometryTools.pointAt(feedGeometry,
+      CncGeometryTools.length(feedGeometry));
+    near(previewEnd.x, 0.01, "preview endpoint needs no MotionKit lowering");
+    var recoveredGeometry = switch detailed.ops[2] {
+      case CncOp.Feed(geometry, _, _, _): geometry;
+      case _: throw "recovered move missing";
+    };
+    near(CncGeometryTools.pointAt(recoveredGeometry, 0.0).y, 0.01,
+      "failed arc leaves the modal position at the previous valid line");
+    var firstMap = detailed.sourceMap.spanAt(0, 0.002);
+    var secondMap = detailed.sourceMap.spanAt(0, 0.014);
+    check(firstMap != null && firstMap.line == 1 &&
+      secondMap != null && secondMap.line == 2,
+      "distance along a blended MotionOp maps to the authored lines");
+    check(detailed.sourceMap.spanAt(0, 1.0) == null,
+      "source map rejects distance outside the path");
+    var empty = new CncCompiler(arcMachine).compileDetailed("(nothing)\n");
+    check(empty.program == null && empty.diagnostics.length == 1 &&
+      empty.diagnostics[0].code == "CNC_EMPTY",
+      "empty source has a structured diagnostic");
+    var rollback = new CncCompiler(arcMachine).compileDetailed(
+      "G21 G90 F600 G1 X10\nF1 G2 X20 I0 J0\nG1 X20");
+    check(rollback.diagnostics.length == 1 && rollback.ops.length == 2,
+      "failed block is skipped without discarding later motion");
+    var recoveredFeed = switch rollback.ops[1] {
+      case CncOp.Feed(_, speed, _, _): speed;
+      case _: throw "feed after error missing";
+    };
+    near(recoveredFeed, 0.01,
+      "failed block does not commit its feed change");
     Sys.println('CncKit tests passed ($assertions assertions)');
   }
 }
