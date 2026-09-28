@@ -34,6 +34,7 @@ class Simulation {
   public final fixedTimestepSeconds:Float;
   /** The session this simulation joined, or null when it owns its own. */
   final session:Null<SimSession>;
+  var sessionObserverId:Null<Int>;
   final fixedTimestepNs:Int64;
   var sourceTimeNs:Int64 = Int64.ofInt(0);
   var disposed:Bool = false;
@@ -58,6 +59,7 @@ class Simulation {
       var attached = RobotKitSimKit.rk_simulation_create_in_session(session.nativeHandle());
       check(attached.status, "simulation.createInSession");
       owner = attached.out_simulation;
+      sessionObserverId = session.addStepObserver(afterStep);
       return;
     }
     if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
@@ -409,6 +411,10 @@ class Simulation {
   public function step(timestampNs:Int64):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");
+    afterStep();
+  }
+
+  function afterStep():Void {
     sourceTimeNs = Int64.add(sourceTimeNs, fixedTimestepNs);
     for (entry in stepObservers.copy()) {
       var registered = false;
@@ -761,6 +767,8 @@ class Simulation {
   public function dispose():Void {
     if (disposed) return;
     stop();
+    if (session != null && sessionObserverId != null)
+      session.removeStepObserver(sessionObserverId);
     stepObservers.resize(0);
     for (runtime in robots) runtime.dispose();
     robots.resize(0);

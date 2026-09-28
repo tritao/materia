@@ -68,7 +68,7 @@ class EndEffectorVacuumFeedback implements SimulationStepObserver {
     adapter = EndEffectorRuntimeBridge.bindSensors(selection, bundle);
   }
 
-  /** Register for every explicit simulation step. */
+  /** Register for every explicit private or joined-session step. */
   public function attach(simulation:Simulation):Void {
     if (simulation == null || attached != null)
       throw "Vacuum feedback needs one simulation attachment";

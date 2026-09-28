@@ -17,6 +17,12 @@ import machinekit.pneumatic.VacuumPressureSensor;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import haxe.Int64;
+import nativekit.scene.Scene;
+import nativekit.sim.MotionType;
+import nativekit.sim.MujocoSimWorld;
+import nativekit.sim.SimPose;
+import nativekit.sim.SimSession;
+import nativekit.sim.SimShape;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
@@ -50,6 +56,7 @@ class EndEffectorContactMuJoCo {
   public static function main():Void {
     testCupProximity();
     testVacuumFeedback();
+    testVacuumFeedback(true);
     Sys.println("CadBridge MuJoCo cup proximity and vacuum feedback passed");
   }
 
@@ -79,7 +86,7 @@ class EndEffectorContactMuJoCo {
     simulation.dispose();
   }
 
-  static function testVacuumFeedback():Void {
+  static function testVacuumFeedback(shared:Bool = false):Void {
     var set = new EndEffectorSet();
     set.addComponent("source", new AirSource());
     set.mount("source", "mount");
@@ -114,7 +121,11 @@ class EndEffectorContactMuJoCo {
     if (authored.id != bundle.bindings.vacuumSensorId ||
         authored.kind != "tool_vacuum_kpa" || authored.position.get(2) <= 0)
       throw "EOAT pressure sensor was not mounted on the flange blueprint";
-    var simulation = new Simulation(0.01, 2, 1);
+    var scene = shared ? Scene.create() : null;
+    var world = shared ? MujocoSimWorld.create(scene,
+      {timestep: 0.01, physicsSubsteps: 2}) : null;
+    var session = shared ? new SimSession(scene, world.nativeHandle()) : null;
+    var simulation = shared ? Simulation.inSession(session) : new Simulation(0.01, 2, 1);
     var robot = simulation.addRobotAtPose(blueprint,
       [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
       bundle.runtime.tool.collision, 0, 0, 0.01);
@@ -124,16 +135,25 @@ class EndEffectorContactMuJoCo {
     feedback.attach(simulation);
     selection.apply(new FiredProcessEvent(Int64.ofInt(1), "sensed/tool/generator.enable",
       ProcessEventValue.Digital(true), Int64.ofInt(1), Int64.ofInt(1), 1));
-    simulation.spawnBox([bounds.centre.x, bounds.centre.y,
-      bounds.centre.z + bounds.halfExtents.z + 0.007], [0.005, 0.005, 0.005]);
-    simulation.step(Int64.ofInt(2));
+    var nearbyZ = bounds.centre.z + bounds.halfExtents.z + 0.007;
+    if (shared) session.createObject(MotionType.Static,
+      SimShape.box(0.005, 0.005, 0.005),
+      new SimPose(bounds.centre.x, bounds.centre.y, nearbyZ));
+    if (!shared) simulation.spawnBox([bounds.centre.x, bounds.centre.y, nearbyZ],
+      [0.005, 0.005, 0.005]);
+    if (shared) session.step(); else simulation.step(Int64.ofInt(2));
     var nearbyFrame = pressureFrame(robot, authored.id);
     if (nearbyFrame.values.get(0) != 0 || vacuum.isHolding() ||
         vacuum.vacuumKpa() != 0 || nearbyFrame.sourceClockId != "robotkit.simulation")
       throw "Cup proximity must not produce a seal pressure";
-    var touchingObject = simulation.spawnBox([bounds.centre.x, bounds.centre.y,
-      bounds.centre.z + bounds.halfExtents.z + 0.003], [0.005, 0.005, 0.005]);
-    simulation.step(Int64.ofInt(3));
+    var touchingZ = bounds.centre.z + bounds.halfExtents.z + 0.003;
+    if (shared) session.stop();
+    var touchingObject = shared ? session.createObject(MotionType.Static,
+      SimShape.box(0.005, 0.005, 0.005),
+      new SimPose(bounds.centre.x, bounds.centre.y, touchingZ)) : null;
+    var touchingId = shared ? -1 : simulation.spawnBox(
+      [bounds.centre.x, bounds.centre.y, touchingZ], [0.005, 0.005, 0.005]);
+    if (shared) session.step(); else simulation.step(Int64.ofInt(3));
     var touching = false;
     for (contact in robot.contacts())
       if (contact.toolPieceIndex == cupIndex && contact.distance <= 0) touching = true;
@@ -141,13 +161,16 @@ class EndEffectorContactMuJoCo {
     if (!touching || touchingFrame.values.get(0) != 55 ||
         Int64.compare(touchingFrame.sequence, nearbyFrame.sequence) <= 0 ||
         !vacuum.isHolding() || vacuum.vacuumKpa() != 55)
-      throw "Touching cup must produce simulated pressure feedback";
+      throw 'Touching cup must produce simulated pressure feedback (shared=$shared, touching=$touching, pressure=${touchingFrame.values.get(0)}, holding=${vacuum.isHolding()}, contacts=${robot.contacts().length})';
     var simulatedRobot = new SimulatedRobot("sensed-robot", robot, "sensed robot",
       ["base_link"], []);
     var recording = new RobotRecording();
     recording.recordSnapshot(simulatedRobot.snapshot());
-    simulation.removeObject(touchingObject);
-    simulation.step(Int64.ofInt(4));
+    if (shared) {
+      session.stop();
+      touchingObject.dispose();
+    } else simulation.removeObject(touchingId);
+    if (shared) session.step(); else simulation.step(Int64.ofInt(4));
     var lostFrame = pressureFrame(robot, authored.id);
     if (lostFrame.values.get(0) != 0 || vacuum.isHolding() ||
         vacuum.vacuumKpa() != 0)
@@ -158,17 +181,22 @@ class EndEffectorContactMuJoCo {
         sensorValue(replay.sensors(), authored.id) != 0)
       throw "Recorded pressure frames must replay in order";
     selection.select(null, simulation.sourceTimestampNs(), "robotkit.simulation");
-    simulation.step(Int64.ofInt(5));
+    if (shared) session.step(); else simulation.step(Int64.ofInt(5));
     if (vacuum.isHolding() || pressureFrame(robot, authored.id).values.get(0) != 0)
       throw "Deselecting the tool must release its vacuum state";
     var finalSequence = pressureFrame(robot, authored.id).sequence;
     feedback.detach();
-    simulation.step(Int64.ofInt(6));
+    if (shared) session.step(); else simulation.step(Int64.ofInt(6));
     if (Int64.compare(pressureFrame(robot, authored.id).sequence, finalSequence) != 0)
       throw "Detached vacuum feedback must stop publishing sensor frames";
     replay.close();
     simulatedRobot.close();
     simulation.dispose();
+    if (shared) {
+      session.dispose();
+      world.dispose();
+      scene.dispose();
+    }
   }
 
   static function pressureFrame(robot:RobotRuntime, id:String):SensorFrame {
