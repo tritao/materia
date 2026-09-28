@@ -54,10 +54,15 @@ class LinearBearing extends MachineComponent {
 	public static function metric(designation:String):LinearBearing
 		return new LinearBearing(catalog().get(designation));
 
-	public function new(spec:LinearBearingSpec) {
+	public static function custom(spec:LinearBearingSpec):LinearBearing
+		return new LinearBearing(spec, true);
+
+	private function new(spec:LinearBearingSpec, codeOnly:Bool = false) {
 		if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.length > 0))
 			throw 'Linear bearing ${spec.designation} has inconsistent dimensions';
-		super(spec.designation, 'Linear ball bearing ${spec.designation}', "steel");
+		var customName = '${spec.designation}-D${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.outerDiameter)}x${Dimension.format(spec.length)}';
+		super(codeOnly ? customDesignation(customName) : spec.designation,
+			'Linear ball bearing ${spec.designation}', "steel", codeOnly);
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.length / 2));
@@ -148,10 +153,11 @@ class LinearBearing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().setToken("designation", this.spec.designation);
+		return new ComponentValues().setToken("designation", this.spec.designation)
+			.setToken("material", materialSpec());
 	}
 
 }

@@ -10,7 +10,9 @@ import materia.project.MaterialLibrary;
  */
 class MachineComponent {
 	public final designation:String;
-	public final materialId:String;
+	public var materialId:String;
+	/** True when this component was built from explicit, non-catalog specifications. */
+	public final codeOnly:Bool;
 	public var bom(get, never):BomItem;
 	final description:String;
 	var cachedBom:Null<BomItem>;
@@ -18,11 +20,22 @@ class MachineComponent {
 	public var type(get, never):Null<ComponentType>;
 	final connectorList:Array<Connector> = [];
 
-	function new(designation:String, description:String, ?material:String) {
+	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false) {
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
 		this.designation = designation;
 		materialId = MaterialLibrary.fromSpec(material);
+		this.codeOnly = codeOnly;
 		this.description = description;
+	}
+
+	public static function customDesignation(designation:String):String
+		return StringTools.startsWith(designation, "CUSTOM-") ? designation : 'CUSTOM-$designation';
+
+	public function materialSpec():String return MaterialLibrary.require(materialId).physical.spec;
+
+	public function setMaterial(spec:String):Void {
+		materialId = MaterialLibrary.fromSpec(spec);
+		cachedBom = null;
 	}
 
 	function get_bom():BomItem {

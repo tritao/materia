@@ -50,6 +50,9 @@ class ParallelKey extends MachineComponent {
 	public static function metric(size:String, length:Float):ParallelKey
 		return new ParallelKey(catalog().get(size), length);
 
+	public static function custom(spec:ParallelKeySpec, length:Float):ParallelKey
+		return new ParallelKey(spec, length, true);
+
 	/** Key sized for the smallest DIN 6885-1 range that covers `shaftDiameter`. */
 	public static function forShaft(shaftDiameter:Float, length:Float):ParallelKey {
 		if (!(shaftDiameter > 0)) throw "Key needs a positive shaft diameter";
@@ -60,7 +63,7 @@ class ParallelKey extends MachineComponent {
 		throw 'No DIN 6885-1 key fits shaft diameter $shaftDiameter';
 	}
 
-	public function new(spec:ParallelKeySpec, length:Float) {
+	private function new(spec:ParallelKeySpec, length:Float, codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw "Key needs a positive length";
 		if (spec == null || !Math.isFinite(spec.minShaft) || !Math.isFinite(spec.maxShaft) ||
 			!(spec.minShaft > 0) || !(spec.maxShaft >= spec.minShaft) ||
@@ -68,8 +71,11 @@ class ParallelKey extends MachineComponent {
 			!(spec.shaftDepth <= spec.height) || !(spec.hubDepth <= spec.height))
 			throw "Parallel key specification has inconsistent DIN 6885 dimensions";
 		var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
-		super('DIN6885-B-${size}x${Dimension.format(length)}', 'Form B parallel key $size, ${Dimension.format(length)} mm long',
-			"steel C45");
+		var designation = 'DIN6885-B-${size}x${Dimension.format(length)}';
+		var customName = '${size}x${Dimension.format(length)}-S${Dimension.format(spec.minShaft)}-${Dimension.format(spec.maxShaft)}' +
+			'-D${Dimension.format(spec.shaftDepth)}x${Dimension.format(spec.hubDepth)}';
+		super(codeOnly ? customDesignation(customName) : designation,
+			'Form B parallel key $size, ${Dimension.format(length)} mm long', "steel C45", codeOnly);
 		this.spec = spec;
 		this.length = length;
 		addConnector("seat", Face, Solids.axial(0, 0, length / 2));
@@ -92,12 +98,12 @@ class ParallelKey extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues()
 				.set("size", Token('${Dimension.format(this.spec.width)}x${Dimension.format(this.spec.height)}'))
-				.set("length", Number(this.length));
+				.set("length", Number(this.length)).setToken("material", materialSpec());
 	}
 
 }

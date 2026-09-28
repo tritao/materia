@@ -92,7 +92,10 @@ class PillowBlock extends MachineComponent {
 	public static function metric(designation:String):PillowBlock
 		return new PillowBlock(catalog().get(designation));
 
-	public function new(spec:PillowBlockSpec) {
+	public static function custom(spec:PillowBlockSpec):PillowBlock
+		return new PillowBlock(spec, true);
+
+	private function new(spec:PillowBlockSpec, codeOnly:Bool = false) {
 		if (!(spec.boreDiameter > 0) || !(spec.baseWidth > 0) || !(spec.length > 0) ||
 			!(spec.shaftHeight > spec.baseHeight) || !(spec.overallHeight > spec.shaftHeight) ||
 			!(spec.boltSpacing > 0) || spec.boltSpacing >= spec.length || !(spec.mountHoleDiameter > 0) || spec.mountScrew == null)
@@ -100,7 +103,11 @@ class PillowBlock extends MachineComponent {
 		bearing = DeepGrooveBearing.metric(spec.bearingDesignation);
 		if (Math.abs(bearing.bore - spec.boreDiameter) > 1e-9)
 			throw 'Pillow block bearing "${spec.bearingDesignation}" bore does not match ${spec.boreDiameter} mm';
-		super(spec.designation, '${spec.family} base-mounted pillow block unit', "cast iron");
+		var customName = '${spec.family}-${spec.designation}-${spec.bearingDesignation}-B${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.baseWidth)}x${Dimension.format(spec.length)}' +
+			'-H${Dimension.format(spec.shaftHeight)}x${Dimension.format(spec.baseHeight)}x${Dimension.format(spec.overallHeight)}' +
+			'-P${Dimension.format(spec.boltSpacing)}-D${Dimension.format(spec.mountHoleDiameter)}-M${spec.mountScrew}';
+		super(codeOnly ? customDesignation(customName) : spec.designation,
+			'${spec.family} base-mounted pillow block unit', "cast iron", codeOnly);
 		this.spec = spec;
 		boreDiameter = spec.boreDiameter;
 		baseWidth = spec.baseWidth;
@@ -155,10 +162,11 @@ class PillowBlock extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().setToken("designation", this.spec.designation);
+		return new ComponentValues().setToken("designation", this.spec.designation)
+			.setToken("material", materialSpec());
 	}
 
 }

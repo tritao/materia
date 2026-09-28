@@ -103,10 +103,18 @@ class Pedestal extends MachineComponent {
 			throw "Pedestal leveling feet need positive dimensions";
 		if (!Math.isFinite(actualCablePath) || actualCablePath < 0 || actualCablePath > flange.pilotDiameter)
 			throw "Pedestal cable path must not exceed the flange pilot recess diameter";
-		var detailSuffix = detailDesignation(resolvedDetail);
+		var detailSuffix = detailDesignation({baseThickness: actualBaseThickness,
+			anchorCircleDiameter: actualAnchorCircle, gussetHeight: actualGussetHeight,
+			gussetThickness: actualGussetThickness, gussetCount: actualGussetCount,
+			levelingFootDiameter: actualFootDiameter,
+			levelingFootHeight: actualFootDiameter > 0 ? actualFootHeight : 0,
+			cablePathDiameter: actualCablePath});
+		var hasDetails = actualBaseThickness != Math.max(10, column * 0.2) ||
+			actualAnchorCircle != column + 2 * head || actualGussetHeight > 0 ||
+			actualFootDiameter > 0 || actualCablePath > 0;
 		super('PEDESTAL-${Dimension.format(flange.boltCircleDiameter)}-D${Dimension.format(column)}x${Dimension.format(height)}$detailSuffix',
 			'Pedestal for ${flange.designation}, ${Dimension.format(column)} mm column, ${Dimension.format(height)} mm tall' +
-			(detailSuffix == "" ? "" : ", detailed base and services"),
+			(hasDetails ? ", detailed base and services" : ""),
 			"steel");
 		this.flange = flange;
 		this.height = height;
@@ -237,18 +245,13 @@ class Pedestal extends MachineComponent {
 			gussetCount: null, levelingFootDiameter: null, levelingFootHeight: null, cablePathDiameter: null};
 
 	static function detailDesignation(detail:PedestalDetail):String {
-		var result = "";
-		if (detail.baseThickness != null) result += '-B${Dimension.format(detail.baseThickness)}';
-		if (detail.anchorCircleDiameter != null) result += '-A${Dimension.format(detail.anchorCircleDiameter)}';
-		if (detail.gussetHeight != null) {
-			result += '-G${Dimension.format(detail.gussetHeight)}';
-			if (detail.gussetThickness != null) result += 'x${Dimension.format(detail.gussetThickness)}';
-			if (detail.gussetCount != null) result += 'x${detail.gussetCount}';
-		}
-		if (detail.levelingFootDiameter != null) result += '-F${Dimension.format(detail.levelingFootDiameter)}';
-		if (detail.cablePathDiameter != null) result += '-C${Dimension.format(detail.cablePathDiameter)}';
-		return result;
+		return '-B${Dimension.format(optionalFloat(detail.baseThickness))}-A${Dimension.format(optionalFloat(detail.anchorCircleDiameter))}' +
+			'-G${Dimension.format(optionalFloat(detail.gussetHeight))}x${Dimension.format(optionalFloat(detail.gussetThickness))}x${detail.gussetCount == null ? 0 : detail.gussetCount}' +
+			'-F${Dimension.format(optionalFloat(detail.levelingFootDiameter))}x${Dimension.format(optionalFloat(detail.levelingFootHeight))}' +
+			'-C${Dimension.format(optionalFloat(detail.cablePathDiameter))}';
 	}
+
+	static function optionalFloat(value:Null<Float>):Float return value == null ? 0 : value;
 
 	private static var recipeTypeCache:Null<ComponentType>;
 
@@ -284,7 +287,7 @@ class Pedestal extends MachineComponent {
 				.setInteger("gussetCount", this.gussetCount)
 				.setNumber("levelingFootDiameter", this.levelingFootDiameter)
 				.setNumber("levelingFootHeight", this.levelingFootHeight)
-				.setNumber("cablePathDiameter", this.cablePathDiameter);
+				.setNumber("cablePathDiameter", this.cablePathDiameter).setToken("material", materialSpec());
 	}
 
 }

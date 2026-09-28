@@ -80,15 +80,22 @@ class DeepGrooveBearing extends MachineComponent {
 	public static function metric(designation:String, shielded:Bool = true):DeepGrooveBearing
 		return new DeepGrooveBearing(catalog().get(designation), shielded);
 
-	public function new(spec:DeepGrooveBearingSpec, shielded:Bool = true) {
+	/** Build a bearing from explicit, unverified dimensions without assigning a catalog recipe. */
+	public static function custom(spec:DeepGrooveBearingSpec, shielded:Bool = true):DeepGrooveBearing
+		return new DeepGrooveBearing(spec, shielded, true);
+
+	private function new(spec:DeepGrooveBearingSpec, shielded:Bool = true, codeOnly:Bool = false) {
 		var section = (spec.outside - spec.bore) / 2;
 		if (!(spec.bore > 0) || !(spec.outside > spec.bore) || !(spec.width > 0) ||
 			!(spec.chamfer >= 0) || spec.chamfer >= 0.3 * section || 2 * spec.chamfer >= Math.min(spec.width, section))
 			throw 'Invalid deep groove bearing "${spec.designation}"';
-		super(spec.designation + (shielded ? "-2Z" : ""),
+		var designation = spec.designation + (shielded ? "-2Z" : "");
+		var customName = '${spec.designation}-D${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}-C${Dimension.format(spec.chamfer)}' +
+			(shielded ? "-2Z" : "-OPEN");
+		super(codeOnly ? customDesignation(customName) : designation,
 			'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} ' +
 			'${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}',
-			"bearing steel");
+			"bearing steel", codeOnly);
 		this.spec = spec;
 		this.shielded = shielded;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
@@ -178,11 +185,11 @@ class DeepGrooveBearing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("designation", Token(this.spec.designation))
-				.set("shielded", Boolean(this.shielded));
+				.set("shielded", Boolean(this.shielded)).setToken("material", materialSpec());
 	}
 
 }

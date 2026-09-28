@@ -67,13 +67,21 @@ class HexBolt extends MachineComponent {
 	public static function metric(size:String, length:Float):HexBolt
 		return new HexBolt(catalog().get(size), length);
 
-	public function new(spec:HexBoltSpec, length:Float) {
+	public static function custom(spec:HexBoltSpec, length:Float):HexBolt
+		return new HexBolt(spec, length, true);
+
+	private function new(spec:HexBoltSpec, length:Float, codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw 'Bolt ${spec.size} needs a positive length';
 		if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter) || !(spec.headHeight > 0)
 			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter))
 			throw 'Bolt ${spec.size} has inconsistent dimensions';
 		var name = '${spec.size}x${Dimension.format(length)}';
-		super('ISO4017-$name', 'Hex bolt $name', "steel 8.8");
+		var designation = 'ISO4017-$name';
+		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}-AF${Dimension.format(spec.acrossFlats)}' +
+			'-H${Dimension.format(spec.headHeight)}-TD${Dimension.format(spec.tapDrill)}' +
+			'-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}' +
+			'-L${Dimension.format(length)}';
+		super(codeOnly ? customDesignation(customName) : designation, 'Hex bolt $name', "steel 8.8", codeOnly);
 		this.spec = spec;
 		this.length = length;
 		addConnector("head", Face, Solids.axial(0, 0, 0));
@@ -144,11 +152,11 @@ class HexBolt extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("size", Token(this.spec.size))
-				.set("length", Number(this.length));
+				.set("length", Number(this.length)).setToken("material", materialSpec());
 	}
 
 }

@@ -99,7 +99,7 @@ class FlangeBearingHousing extends MachineComponent {
 	override public function values():ComponentValues {
 		return new ComponentValues().setToken("bearing", this.bearing.spec.designation)
 				.setBoolean("shielded", this.bearing.shielded)
-				.setToken("fit", Std.string(this.fit));
+				.setToken("fit", Std.string(this.fit)).setToken("material", materialSpec());
 	}
 
 }

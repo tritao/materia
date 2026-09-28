@@ -73,6 +73,10 @@ class NemaStepper extends MachineComponent {
 		return new NemaStepper(catalog().get(Std.string(variant.frame)), variant);
 	}
 
+	/** Build a motor from explicit frame and motor dimensions without a named catalog recipe. */
+	public static function custom(spec:NemaFrameInterface, variant:StepperMotorVariant):NemaStepper
+		return new NemaStepper(spec, variant, true);
+
 	/** Default named variant for a frame. A length override creates a generic preview variant. */
 	public static function frame(size:Int, ?bodyLength:Float):NemaStepper {
 		var spec = catalog().get(Std.string(size));
@@ -93,7 +97,7 @@ class NemaStepper extends MachineComponent {
 		return new NemaStepper(spec, custom);
 	}
 
-	public function new(spec:NemaFrameInterface, variant:StepperMotorVariant) {
+	private function new(spec:NemaFrameInterface, variant:StepperMotorVariant, codeOnly:Bool = false) {
 		if (spec.frame != variant.frame) throw "Stepper motor variant frame does not match its mounting interface";
 		if (!(variant.bodyLength > variant.mountHoleDepth) || !(variant.bodyFace > spec.boltSpacing))
 			throw 'NEMA ${spec.frame} motor body is too short or narrow';
@@ -102,7 +106,11 @@ class NemaStepper extends MachineComponent {
 			|| !(variant.shaftLength > variant.pilotHeight) || !(variant.pilotHeight > 0))
 			throw 'NEMA ${spec.frame} interface or motor variant has inconsistent dimensions';
 		SocketHeadCapScrew.catalog().get(variant.mountScrew);
-		super(variant.designation, '${variant.designation} NEMA ${spec.frame} stepper motor', null);
+		var customName = '${variant.designation}-IF${Dimension.format(spec.face)}x${Dimension.format(spec.boltSpacing)}x${Dimension.format(spec.pilotDiameter)}' +
+			'-B${Dimension.format(variant.bodyFace)}x${Dimension.format(variant.bodyLength)}-S${Dimension.format(variant.shaftDiameter)}x${Dimension.format(variant.shaftLength)}' +
+			'-P${Dimension.format(variant.pilotHeight)}-M${variant.mountScrew}-${variant.tappedMount ? "T" : "C"}${Dimension.format(variant.mountHoleDepth)}';
+		super(codeOnly ? customDesignation(customName) : variant.designation,
+			'${variant.designation} NEMA ${spec.frame} stepper motor', null, codeOnly);
 		this.spec = spec;
 		this.variant = variant;
 		bodyLength = variant.bodyLength;
@@ -201,13 +209,14 @@ class NemaStepper extends MachineComponent {
 	}
 
 	override public function componentType():Null<ComponentType>
-		return variant.designation.indexOf("GENERIC-NEMA") == 0 ? genericRecipeType() : namedRecipeType();
+		return codeOnly ? null : variant.designation.indexOf("GENERIC-NEMA") == 0 ? genericRecipeType() : namedRecipeType();
 
 	override public function values():ComponentValues {
 		if (variant.designation.indexOf("GENERIC-NEMA") == 0)
 			return new ComponentValues().setToken("frame", Std.string(this.spec.frame))
-				.setNumber("bodyLength", this.bodyLength);
-		return new ComponentValues().setToken("model", this.variant.designation);
+				.setNumber("bodyLength", this.bodyLength).setToken("material", materialSpec());
+		return new ComponentValues().setToken("model", this.variant.designation)
+			.setToken("material", materialSpec());
 	}
 
 }

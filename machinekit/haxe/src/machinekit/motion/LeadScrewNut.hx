@@ -119,7 +119,8 @@ class LeadScrewNut extends MachineComponent {
 	override public function componentType():Null<ComponentType> return recipeType();
 
 	override public function values():ComponentValues {
-		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount);
+		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount)
+			.setToken("material", materialSpec());
 	}
 
 }

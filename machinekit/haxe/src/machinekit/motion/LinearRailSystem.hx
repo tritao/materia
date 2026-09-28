@@ -62,8 +62,8 @@ class LinearRailSystem {
 		if (!(stroke > 0)) throw "Linear rail guide needs a positive stroke";
 		for (i in 0...blockCount)
 			if (initialTravel(i) > travelMax + 1e-9) throw "Linear rail is too short for the requested blocks";
-		rail = new LinearRail(spec, railLength);
-		blocks = [for (i in 0...blockCount) new LinearRailBlock(spec)];
+		rail = LinearRail.metric(spec.designation, railLength);
+		blocks = [for (i in 0...blockCount) LinearRailBlock.metric(spec.designation)];
 	}
 
 	function initialTravel(index:Int):Float

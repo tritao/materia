@@ -1,6 +1,7 @@
 package machinekit.component;
 
 import machinekit.component.ComponentValue.*;
+import materia.project.MaterialLibrary;
 
 /** Stable recipe for one kind of single part. */
 class ComponentType {
@@ -8,20 +9,41 @@ class ComponentType {
 	final inputs:Array<ComponentParameter>;
 	final build:ComponentValues->MachineComponent;
 	final keepDesignation:Bool;
+	final materialInDesignation:Bool;
+	final defaultMaterial:String;
 
 	public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues->MachineComponent,
-			keepDesignation:Bool = false) {
+			keepDesignation:Bool = false, materialInDesignation:Bool = false) {
 		if (id == null || id.length == 0 || inputs == null || build == null)
 			throw "Incomplete component type";
 		this.id = id;
-		this.inputs = inputs.copy();
-		this.build = build;
 		this.keepDesignation = keepDesignation;
+		this.materialInDesignation = materialInDesignation;
 		var seen:Map<String, Bool> = [];
 		for (input in inputs) {
 			if (seen.exists(input.name)) throw 'Duplicate component input "${input.name}"';
 			seen.set(input.name, true);
 		}
+		var baseline = new ComponentValues();
+		for (input in inputs) baseline.set(input.name, input.defaultValue);
+		var sourceBuild = build;
+		var defaultComponent = sourceBuild(baseline);
+		defaultMaterial = defaultComponent.materialSpec();
+		this.inputs = inputs.copy();
+		if (!seen.exists("material"))
+			this.inputs.push(new ComponentParameter("material", Choice(MaterialLibrary.specs()), Token(defaultMaterial)));
+		else {
+			var declared = switch this.inputs[seenIndex(this.inputs, "material")].defaultValue {
+				case Token(spec): spec;
+				default: "";
+			};
+			if (declared != defaultMaterial) throw 'Component type "$id" material default differs from its generator';
+		}
+		this.build = values -> {
+			var component = sourceBuild(values);
+			component.setMaterial(values.token("material"));
+			return component;
+		};
 	}
 
 	public function parameters():Array<ComponentParameter> return inputs.copy();
@@ -60,6 +82,10 @@ class ComponentType {
 		for (input in inputs) {
 			var value = values == null ? null : values.get(input.name);
 			if (value == null) value = input.defaultValue;
+			if (input.name == "material" && switch value {
+				case Token(spec): spec == defaultMaterial;
+				default: false;
+			}) continue;
 			var text = switch value {
 				case Number(number): switch input.type {
 					case Length: Dimension.format(number);
@@ -77,10 +103,16 @@ class ComponentType {
 	}
 
 	public function partNumber(component:MachineComponent):String
-		return keepDesignation ? component.designation : key(valuesOf(component));
+		return keepDesignation && (component.materialSpec() == defaultMaterial || materialInDesignation)
+			? component.designation : key(valuesOf(component));
 
 	function parameter(name:String):Null<ComponentParameter> {
 		for (input in inputs) if (input.name == name) return input;
 		return null;
+	}
+
+	static function seenIndex(inputs:Array<ComponentParameter>, name:String):Int {
+		for (i in 0...inputs.length) if (inputs[i].name == name) return i;
+		return -1;
 	}
 }

@@ -55,12 +55,19 @@ class RetainingRing extends MachineComponent {
 	public static function forShaft(shaftDiameter:Float):RetainingRing
 		return new RetainingRing(catalog().get(Dimension.format(shaftDiameter)));
 
-	public function new(spec:RetainingRingSpec) {
+	public static function custom(spec:RetainingRingSpec):RetainingRing
+		return new RetainingRing(spec, true);
+
+	private function new(spec:RetainingRingSpec, codeOnly:Bool = false) {
 		if (!(spec.grooveWidth > spec.thickness) || !(spec.thickness > 0) || !(spec.grooveDiameter > 0) || !(spec.grooveDiameter < spec.shaftDiameter)
 			|| !(spec.outerDiameter > spec.shaftDiameter))
 			throw 'Retaining ring for ${Dimension.format(spec.shaftDiameter)} mm shaft has inconsistent dimensions';
 		var shaft = Dimension.format(spec.shaftDiameter);
-		super('DIN471-$shaft', 'External retaining ring for $shaft mm shaft', "spring steel");
+		var designation = 'DIN471-$shaft';
+		var customName = '$shaft-G${Dimension.format(spec.grooveDiameter)}-OD${Dimension.format(spec.outerDiameter)}' +
+			'-W${Dimension.format(spec.grooveWidth)}-T${Dimension.format(spec.thickness)}';
+		super(codeOnly ? customDesignation(customName) : designation,
+			'External retaining ring for $shaft mm shaft', "spring steel", codeOnly);
 		this.spec = spec;
 		addConnector("seat", Axis, Solids.axial(0, 0, spec.thickness / 2));
 	}
@@ -88,10 +95,11 @@ class RetainingRing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().set("shaft", Token(Dimension.format(this.spec.shaftDiameter)));
+		return new ComponentValues().set("shaft", Token(Dimension.format(this.spec.shaftDiameter)))
+			.setToken("material", materialSpec());
 	}
 
 }

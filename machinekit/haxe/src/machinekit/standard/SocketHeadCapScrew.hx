@@ -75,14 +75,28 @@ class SocketHeadCapScrew extends MachineComponent {
 	public static function metric(size:String, length:Float, material:String = "steel 12.9"):SocketHeadCapScrew
 		return new SocketHeadCapScrew(catalog().get(size), length, material);
 
-	public function new(spec:MetricScrewSpec, length:Float, material:String = "steel 12.9") {
+	public static function custom(spec:MetricScrewSpec, length:Float,
+			material:String = "steel 12.9"):SocketHeadCapScrew
+		return new SocketHeadCapScrew(spec, length, material, true);
+
+	private function new(spec:MetricScrewSpec, length:Float, material:String = "steel 12.9",
+			codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw 'Screw ${spec.size} needs a positive length';
 		if (!(spec.diameter > 0) || !(spec.headDiameter > spec.diameter) || !(spec.headHeight > spec.socketDepth)
 			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter)
 			|| !(spec.counterboreDiameter > spec.headDiameter) || !(spec.counterboreDepth > spec.headHeight))
 			throw 'Screw ${spec.size} has inconsistent dimensions';
 		var name = '${spec.size}x${Dimension.format(length)}';
-		super('ISO4762-$name', 'Socket head cap screw $name', material);
+		var materialSuffix = material == "steel 12.9" ? "" : '-${StringTools.replace(material, " ", "-")}';
+		var designation = 'ISO4762-$name$materialSuffix';
+		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}' +
+			'-HD${Dimension.format(spec.headDiameter)}x${Dimension.format(spec.headHeight)}-S${Dimension.format(spec.socketSize)}x${Dimension.format(spec.socketDepth)}' +
+			'-TL${Dimension.format(spec.threadLength)}-TD${Dimension.format(spec.tapDrill)}' +
+			'-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}' +
+			'-CB${Dimension.format(spec.counterboreDiameter)}x${Dimension.format(spec.counterboreDepth)}' +
+			'-L${Dimension.format(length)}-M${StringTools.replace(material, " ", "-")}';
+		super(codeOnly ? customDesignation(customName) : designation,
+			'Socket head cap screw $name$materialSuffix', material, codeOnly);
 		this.spec = spec;
 		this.length = length;
 		addConnector("head", Face, Solids.axial(0, 0, 0));
@@ -158,16 +172,16 @@ class SocketHeadCapScrew extends MachineComponent {
 			[ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"), ComponentRecipeSupport.length("length", 20),
 				ComponentRecipeSupport.choice("material", MaterialLibrary.specs(), "steel 12.9")],
 			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), v.token("material")),
-			true);
+			true, true);
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("size", Token(this.spec.size))
 				.set("length", Number(this.length))
-				.set("material", Token(MaterialLibrary.require(this.materialId).physical.spec));
+				.set("material", Token(materialSpec()));
 	}
 
 }

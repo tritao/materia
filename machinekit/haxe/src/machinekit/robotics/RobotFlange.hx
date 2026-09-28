@@ -200,7 +200,7 @@ class RobotFlange extends MachineComponent {
 
 	override public function values():ComponentValues {
 		return new ComponentValues().setNumber("pitchCircleDiameter", this.spec.pitchCircle)
-				.setInteger("boltCount", this.boltCount);
+				.setInteger("boltCount", this.boltCount).setToken("material", materialSpec());
 	}
 
 }

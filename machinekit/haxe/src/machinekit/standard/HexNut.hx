@@ -51,10 +51,15 @@ class HexNut extends MachineComponent {
 	public static function metric(size:String):HexNut
 		return new HexNut(catalog().get(size));
 
-	public function new(spec:HexNutSpec) {
+	public static function custom(spec:HexNutSpec):HexNut
+		return new HexNut(spec, true);
+
+	private function new(spec:HexNutSpec, codeOnly:Bool = false) {
 		if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter) || !(spec.height > 0))
 			throw 'Hex nut ${spec.size} has inconsistent dimensions';
-		super('ISO4032-${spec.size}', 'Hex nut ${spec.size}', "steel 8");
+		var designation = 'ISO4032-${spec.size}';
+		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-AF${Dimension.format(spec.acrossFlats)}-H${Dimension.format(spec.height)}';
+		super(codeOnly ? customDesignation(customName) : designation, 'Hex nut ${spec.size}', "steel 8", codeOnly);
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.height / 2));
@@ -89,10 +94,10 @@ class HexNut extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().set("size", Token(this.spec.size));
+		return new ComponentValues().set("size", Token(this.spec.size)).setToken("material", materialSpec());
 	}
 
 }

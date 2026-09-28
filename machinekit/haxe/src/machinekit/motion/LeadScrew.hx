@@ -48,7 +48,8 @@ class LeadScrew extends MachineComponent {
 	override public function componentType():Null<ComponentType> return recipeType();
 
 	override public function values():ComponentValues {
-		return ComponentRecipeSupport.threadValues(this.thread).setNumber("length", this.totalLength);
+		return ComponentRecipeSupport.threadValues(this.thread).setNumber("length", this.totalLength)
+			.setToken("material", materialSpec());
 	}
 
 }

@@ -13,6 +13,8 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.catalog.CatalogIndex;
+import machinekit.catalog.FilteredCatalogIndex;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
@@ -129,13 +131,29 @@ class EndEffectorPlate extends MachineComponent {
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;
+	private static var toolScrewCatalogCache:Null<CatalogIndex>;
+
+	static function toolScrewCatalog():CatalogIndex {
+		if (toolScrewCatalogCache == null) {
+			var screws = SocketHeadCapScrew.catalog();
+			var compatible:Array<String> = [];
+			for (designation in screws.designations()) {
+				try {
+					new EndEffectorPlate(new RobotFlange(40, 4), 12, 65, 4, designation);
+					compatible.push(designation);
+				} catch (_:Dynamic) {}
+			}
+			toolScrewCatalogCache = new FilteredCatalogIndex(screws, compatible);
+		}
+		return toolScrewCatalogCache;
+	}
 
 	public static function recipeType():ComponentType {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.robotics.end-effector-plate",
 			[ComponentRecipeSupport.length("flangePitchCircle", 40), ComponentRecipeSupport.count("flangeBoltCount", 4), ComponentRecipeSupport.length("thickness", 12),
 				ComponentRecipeSupport.length("toolBoltCircleDiameter", 65), ComponentRecipeSupport.count("toolBoltCount", 4),
-				ComponentRecipeSupport.catalog("toolMountScrew", SocketHeadCapScrew.catalog(), "M5")],
+				ComponentRecipeSupport.catalog("toolMountScrew", toolScrewCatalog(), "M5")],
 			v -> new EndEffectorPlate(new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
 				v.number("thickness"), v.number("toolBoltCircleDiameter"), v.integer("toolBoltCount"), v.token("toolMountScrew")));
 		return recipeTypeCache;
@@ -149,7 +167,7 @@ class EndEffectorPlate extends MachineComponent {
 				.setNumber("thickness", this.thickness)
 				.setNumber("toolBoltCircleDiameter", this.toolBoltCircleDiameter)
 				.setInteger("toolBoltCount", this.toolBoltCount)
-				.setToken("toolMountScrew", this.toolMountScrew);
+				.setToken("toolMountScrew", this.toolMountScrew).setToken("material", materialSpec());
 	}
 
 }

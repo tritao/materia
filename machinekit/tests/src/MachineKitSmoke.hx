@@ -11,6 +11,7 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
+import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
@@ -29,6 +30,8 @@ import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearGuideSystem;
 import machinekit.motion.LinearRailSystem;
+import machinekit.motion.LinearRail;
+import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.FlangeBearingHousing;
 import machinekit.motion.PillowBlock;
@@ -102,6 +105,34 @@ class MachineKitSmoke {
 		var screwRecipe = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
 		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
 		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
+		check(steelScrew.designation == "ISO4762-M5x20-steel-C45" &&
+			steelScrew.bom.partNumber != screwRecipe.create().bom.partNumber,
+			"non-default screw material has its own designation and BOM identity");
+		var customBearing = DeepGrooveBearing.custom({designation: "608", bore: 8, outside: 22, width: 7, chamfer: 0.3}, false);
+		check(customBearing.componentType() == null && StringTools.startsWith(customBearing.designation, "CUSTOM-608-D8x22x7-C0.3") &&
+			customBearing.bom.partNumber == customBearing.designation && customBearing.bom.typeId == null,
+			"custom catalog dimensions produce a code-only, prefixed component");
+		var customBearingVariant = DeepGrooveBearing.custom({designation: "608", bore: 8.2, outside: 22, width: 7, chamfer: 0.3}, false);
+		check(customBearingVariant.bom.partNumber != customBearing.bom.partNumber,
+			"custom bearing dimensions retain distinct BOM identities");
+		var customMotor = NemaStepper.custom(NemaStepper.catalog().get("17"), {
+			designation: "17HS19-custom", frame: 17, bodyFace: 42, bodyLength: 52,
+			shaftDiameter: 5, shaftLength: 25, pilotHeight: 2, mountScrew: "M3",
+			tappedMount: true, mountHoleDepth: 4.5
+		});
+		check(customMotor.componentType() == null && StringTools.startsWith(customMotor.designation, "CUSTOM-17HS19-custom-IF"),
+			"custom NEMA variants are code-only and prefixed");
+		customCodeOnly(HexBolt.custom(HexBolt.catalog().get("M5"), 20), "hex bolt");
+		customCodeOnly(HexNut.custom(HexNut.catalog().get("M5")), "hex nut");
+		customCodeOnly(FlatWasher.custom(FlatWasher.catalog().get("M5")), "flat washer");
+		customCodeOnly(ParallelKey.custom(ParallelKey.catalog().get("2x2"), 10), "parallel key");
+		customCodeOnly(RetainingRing.custom(RetainingRing.catalog().get("8")), "retaining ring");
+		customCodeOnly(ShaftCollar.custom(ShaftCollar.catalog().get("8")), "shaft collar");
+		customCodeOnly(SocketHeadCapScrew.custom(SocketHeadCapScrew.catalog().get("M5"), 20), "cap screw");
+		customCodeOnly(LinearBearing.custom(LinearBearing.catalog().get("LM8UU")), "linear bearing");
+		customCodeOnly(PillowBlock.custom(PillowBlock.catalog().get("UCP204")), "pillow block");
+		customCodeOnly(LinearRail.custom(LinearRailSystem.catalog().get("MGN12C"), 100), "profile rail");
+		customCodeOnly(LinearRailBlock.custom(LinearRailSystem.catalog().get("MGN12C")), "rail block");
 		var firstLength = screwRecipe.defaults().setNumber("length", 20.0001);
 		var secondLength = screwRecipe.defaults().setNumber("length", 20.0002);
 		check(screwRecipe.key(firstLength) == screwRecipe.key(secondLength), "length keys round to a micrometre");
@@ -110,6 +141,13 @@ class MachineKitSmoke {
 			typeId: "test", valuesKey: "a"});
 		throws(() -> conflicted.add({partNumber: "X", description: "same", quantity: 1,
 			material: "steel", typeId: "test", valuesKey: "b"}), "conflicting");
+	}
+
+	static function customCodeOnly(component:MachineComponent, label:String):Void {
+		check(component.componentType() == null && StringTools.startsWith(component.designation, "CUSTOM-"),
+			'$label custom spec is code-only and prefixed');
+		check(component.bom.partNumber == component.designation && component.bom.typeId == null,
+			'$label custom spec has a code-only BOM line');
 	}
 
 	static function documentRecipes():Void {
@@ -278,7 +316,7 @@ class MachineKitSmoke {
 		for (designation in DeepGrooveBearing.catalog().designations())
 			DeepGrooveBearing.metric(designation, false);
 		throws(() -> DeepGrooveBearing.metric("6299"), 'Unknown deep groove bearing "6299"');
-		throws(() -> new DeepGrooveBearing({designation: "invalid", bore: 10, outside: 20, width: 6, chamfer: 2}, false),
+		throws(() -> DeepGrooveBearing.custom({designation: "invalid", bore: 10, outside: 20, width: 6, chamfer: 2}, false),
 			"Invalid deep groove bearing");
 
 		var envelope = bearing.geometry(Envelope);
@@ -485,7 +523,7 @@ class MachineKitSmoke {
 		throws(() -> ParallelKey.forShaft(100, 10), "No DIN 6885-1 key fits shaft diameter 100");
 		throws(() -> ParallelKey.forShaft(0, 10), "positive shaft diameter");
 		throws(() -> ParallelKey.forShaft(5.9, 10), "No DIN 6885-1 key fits shaft diameter 5.9");
-		throws(() -> new ParallelKey({minShaft: 6, maxShaft: 8, width: 2, height: 2, shaftDepth: 2.1, hubDepth: 1}, 10),
+		throws(() -> ParallelKey.custom({minShaft: 6, maxShaft: 8, width: 2, height: 2, shaftDepth: 2.1, hubDepth: 1}, 10),
 			"inconsistent DIN 6885 dimensions");
 
 		var shaft = new SteppedShaft(
@@ -515,7 +553,8 @@ class MachineKitSmoke {
 		var previewBox = bounds(preview);
 		near(previewBox.maxX, 4, "groove leaves the shaft's outer surface elsewhere");
 		preview.close();
-		check(shaft.designation == "SHAFT-8x51.5-6x8.5", "shaft designation");
+		check(shaft.designation == "SHAFT-8x51.5-6x8.5-F8:bearingA@10-F8:bearingB@43-G4:ring@50x1.2x7.6-K9:outputKey@52:DIN6885-B-2x2x6-S6x8-D1.2x1",
+			"shaft designation includes its faces, keyway and groove");
 		check(new SteppedShaft([{diameter: 6.35, length: 20}]).designation == "SHAFT-6.35x20",
 			"fractional shaft designation is rounded, not a raw float");
 
@@ -535,7 +574,20 @@ class MachineKitSmoke {
 				inputThread: {diameter: 10, pitch: 1.5, length: 6},
 				outputThread: {diameter: 6, pitch: 1, length: 5},
 				shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]});
-		check(detailedShaft.designation == "SHAFT-12x20-8x20-TI10x1.5x6-TO6x1x5", "detailed shaft designation");
+		check(detailedShaft.designation == "SHAFT-12x20-8x20-CI1-CO0.5-S20-R0.5-U2x7.5-TI10x1.5x6-TO6x1x5",
+			"detailed shaft designation includes chamfers, shoulders and threads");
+		var otherDetailedShaft = new SteppedShaft(
+			[{diameter: 12, length: 20}, {diameter: 8, length: 20}], null, null, null,
+			{inputChamfer: 2, outputChamfer: 0.5,
+				inputThread: {diameter: 10, pitch: 1.5, length: 6},
+				outputThread: {diameter: 6, pitch: 1, length: 5},
+				shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]});
+		check(otherDetailedShaft.bom.partNumber != detailedShaft.bom.partNumber,
+			"different shaft features have different BOM part numbers");
+		var shaftBom = new machinekit.component.Bom();
+		shaftBom.addComponent(detailedShaft);
+		shaftBom.addComponent(otherDetailedShaft);
+		check(shaftBom.lines().length == 2, "different shaft features remain separate in the BOM");
 		near(detailedShaft.connector("inputThread").frame.z, 3, "input thread connector");
 		near(detailedShaft.connector("outputThread").frame.z, 37.5, "output thread connector");
 		var detailedEnvelope = detailedShaft.geometry(Envelope);
@@ -1410,6 +1462,8 @@ class MachineKitSmoke {
 	static function catalogExtras():Void {
 		var bushing = new Bushing(8);
 		check(bushing.designation == "BUSHING-8x11x12", "bushing designation");
+		check(Bushing.recipeType().create(bushing.values()).designation == bushing.designation,
+			"bushing designation survives a recipe round trip");
 		throws(() -> new Bushing(-1), "positive bore diameter");
 		var bushingPart = bushing.geometry();
 		solid(bushingPart, "bushing");
@@ -1502,7 +1556,8 @@ class MachineKitSmoke {
 		check(new TimingPulley(T5, 20, 5, 6).designation == "PULLEY-T5-20T", "T5 family has its own designation");
 		near(new TimingPulley(T5, 20, 5, 6).pitchLineDifferential, 0.5, "T5 PLD differs from HTD5M");
 		near(new TimingPulley(XL, 20, 5, 6).outsideDiameter, 5.08 * 20 / Math.PI - 0.508, "explicit PLD");
-		check(new TimingPulley(Custom("CUSTOM2032", 2.032, 0.254), 20, 5, 6).designation == "PULLEY-CUSTOM-CUSTOM2032-P2.032-PLD0.254-20T", "fractional pulley designation");
+		check(new TimingPulley(Custom("CUSTOM", 2.032, 0.254), 20, 5, 6).designation == "PULLEY-CUSTOM-CUSTOM-P2.032-PLD0.254-20T", "fractional pulley designation");
+		throws(() -> new TimingPulley(Custom("CUSTOM2032", 2.032, 0.254), 20, 5, 6), "must be \"CUSTOM\"");
 		throws(() -> new TimingPulley(GT2, 5, 5, 6), "at least 8 teeth");
 		throws(() -> new TimingPulley(GT2, 8, 11, 6), "must clear the bore");
 		var pulleyPart = pulley.geometry();
@@ -1655,7 +1710,7 @@ class MachineKitSmoke {
 			Math.PI * 15.75 * 15.75 * 3, "flange pilot boss reaches into the plate");
 
 		var pedestal = new Pedestal(flange, 300);
-		check(pedestal.designation == "PEDESTAL-50-D70x300", "pedestal designation");
+		check(pedestal.designation == "PEDESTAL-50-D70x300-B14-A102-G0x5.6x4-F0x0-C0", "pedestal designation");
 		near(pedestal.columnDiameter, 70, "pedestal column defaults to the flange diameter");
 		check(pedestal.floorMountScrew == "M10", "pedestal floor screw size");
 		near(pedestal.floorBoltCircleDiameter, 70 + 2 * 16, "pedestal floor bolt circle");
@@ -1676,8 +1731,11 @@ class MachineKitSmoke {
 		var detailedPedestal = new Pedestal(flange, 300, 70, 4,
 			{baseThickness: 18, anchorCircleDiameter: 120, gussetHeight: 80, gussetThickness: 6,
 				gussetCount: 4, levelingFootDiameter: 24, levelingFootHeight: 6, cablePathDiameter: 20});
-		check(detailedPedestal.designation == "PEDESTAL-50-D70x300-B18-A120-G80x6x4-F24-C20",
+		check(detailedPedestal.designation == "PEDESTAL-50-D70x300-B18-A120-G80x6x4-F24x6-C20",
 			"detailed pedestal designation");
+		var pedestalRoundTrip = Pedestal.recipeType().create(pedestal.values());
+		check(pedestalRoundTrip.designation == pedestal.designation,
+			"pedestal designation survives a recipe round trip");
 		near(detailedPedestal.baseThickness, 18, "detailed pedestal base thickness");
 		near(detailedPedestal.floorBoltCircleDiameter, 120, "detailed pedestal anchor circle");
 		near(detailedPedestal.anchorHoleDiameter, 11, "detailed pedestal anchor hole");
@@ -1819,6 +1877,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();
 		documentPreview();

@@ -51,10 +51,15 @@ class FlatWasher extends MachineComponent {
 	public static function metric(size:String):FlatWasher
 		return new FlatWasher(catalog().get(size));
 
-	public function new(spec:FlatWasherSpec) {
+	public static function custom(spec:FlatWasherSpec):FlatWasher
+		return new FlatWasher(spec, true);
+
+	private function new(spec:FlatWasherSpec, codeOnly:Bool = false) {
 		if (!(spec.innerDiameter > 0) || !(spec.outerDiameter > spec.innerDiameter) || !(spec.thickness > 0))
 			throw 'Flat washer ${spec.size} has inconsistent dimensions';
-		super('ISO7089-${spec.size}', 'Flat washer ${spec.size}', "steel");
+		var designation = 'ISO7089-${spec.size}';
+		var customName = '${spec.size}-ID${Dimension.format(spec.innerDiameter)}-OD${Dimension.format(spec.outerDiameter)}-T${Dimension.format(spec.thickness)}';
+		super(codeOnly ? customDesignation(customName) : designation, 'Flat washer ${spec.size}', "steel", codeOnly);
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.thickness / 2));
@@ -80,10 +85,10 @@ class FlatWasher extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().set("size", Token(this.spec.size));
+		return new ComponentValues().set("size", Token(this.spec.size)).setToken("material", materialSpec());
 	}
 
 }
