@@ -256,7 +256,75 @@ static void floating_base_falls_and_settles(bool floating) {
     rk_simulation_destroy(simulation);
 }
 
+// A floating one-link robot stands on a sphere and a sideways capsule placed
+// under opposite ends; it rests level on them at their radius, not on the
+// link's default bounds box.
+static void link_primitives_collide_in_link_frame() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.005;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.floating_base = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    model.links[0].mass = 2.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 0.05;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 0.3;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.link_shape_count = 2;
+    auto &sphere = robot_desc.link_shapes[0];
+    sphere.type = RK_LINK_SHAPE_SPHERE;
+    sphere.size[0] = 0.05;
+    sphere.position[0] = -0.2;
+    sphere.position[2] = -0.1;
+    sphere.rotation[3] = 1.0;
+    auto &capsule = robot_desc.link_shapes[1];
+    capsule.type = RK_LINK_SHAPE_CAPSULE;
+    capsule.size[0] = 0.05;
+    capsule.size[1] = 0.08;
+    capsule.position[0] = 0.2;
+    capsule.position[2] = -0.1;
+    capsule.rotation[0] = std::sqrt(0.5); // Local Z turned onto world Y.
+    capsule.rotation[3] = std::sqrt(0.5);
+
+    rk_robot_runtime robot = 0;
+    auto invalid = robot_desc;
+    invalid.link_shapes[1].link = 1;
+    assert(rk_simulation_add_robot(simulation, &model, &invalid, &robot) != RK_OK);
+    invalid = robot_desc;
+    invalid.link_shapes[0].size[0] = 0.0;
+    assert(rk_simulation_add_robot(simulation, &model, &invalid, &robot) != RK_OK);
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    rk_simulation_object_desc floor{};
+    floor.struct_size = sizeof(floor);
+    floor.rotation[3] = 1.0;
+    floor.position[2] = -0.5;
+    floor.half_extents[0] = floor.half_extents[1] = 5.0;
+    floor.half_extents[2] = 0.5;
+    rk_simulation_object floor_object = 0;
+    assert(rk_simulation_spawn_object(simulation, &floor, &floor_object) == RK_OK);
+    for (int tick = 0; tick < 400; ++tick)
+        assert(rk_simulation_step(simulation, tick) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &pose) == RK_OK);
+    // Primitive centres sit 0.1 m below the link origin and one radius above the floor.
+    assert(std::abs(pose.position[2] - 0.15) < 0.005);
+    assert(std::abs(pose.rotation[3]) > 0.9999);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
+    link_primitives_collide_in_link_frame();
     floating_base_falls_and_settles(false);
     floating_base_falls_and_settles(true);
     convex_link_and_box_link_build();

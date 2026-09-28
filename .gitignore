@@ -6,6 +6,7 @@
 /robotkit/tests/build/
 /robotkit/tests/tool-capabilities/build/
 /robotkit/tests/mujoco/build/
+/robotkit/tools/humanoid/build/
 /robotkit/tests/excavator/build/
 /robotkit/build/
 /robotkit/device_protocol/target/

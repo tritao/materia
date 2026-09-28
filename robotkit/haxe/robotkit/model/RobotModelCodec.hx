@@ -2,6 +2,7 @@ package robotkit.model;
 
 import haxe.Json;
 import haxe.io.Bytes;
+import robotkit.model.CollisionShape;
 import robotkit.model.Transmission;
 
 /** Canonical, versioned JSON artifact for an editable RobotModel. */
@@ -21,6 +22,11 @@ class RobotModelCodec {
       vector(link.centerOfMass, 3, "link centerOfMass");
       vector(link.inertiaTensor, 9, "link inertiaTensor");
       finite(link.mass, "link mass");
+      if (link.collisionShapes == null) throw 'Link ${link.id} has no collision shape list';
+      for (shape in link.collisionShapes) {
+        var error = shape == null ? "collision shape is null" : shape.validate();
+        if (error != null) throw 'Link ${link.id}: $error';
+      }
     }
     var frames = new Map<String, Bool>();
     for (frame in model.frames) {
@@ -99,7 +105,8 @@ class RobotModelCodec {
       links: [for (link in model.links) {
         id: link.id, name: link.name, mass: link.mass,
         centerOfMass: link.centerOfMass, inertiaTensor: link.inertiaTensor,
-        visualGeometry: link.visualGeometry, collisionGeometry: link.collisionGeometry
+        visualGeometry: link.visualGeometry, collisionGeometry: link.collisionGeometry,
+        collisionShapes: [for (shape in link.collisionShapes) encodeCollisionShape(shape)]
       }],
       joints: [for (joint in model.joints) {
         id: joint.id, name: joint.name, type: jointTypeName(joint.type),
@@ -156,6 +163,12 @@ class RobotModelCodec {
       link.inertiaTensor = vectorField(record, "inertiaTensor", 9);
       link.visualGeometry = optionalText(record, "visualGeometry");
       link.collisionGeometry = optionalText(record, "collisionGeometry");
+      for (shape in array(record, "collisionShapes")) {
+        var decoded = readCollisionShape(shape);
+        var error = decoded.validate();
+        if (error != null) throw 'Link $id: $error';
+        link.collisionShapes.push(decoded);
+      }
       links.set(id, link);
     }
 
@@ -247,6 +260,35 @@ class RobotModelCodec {
     var fork:Dynamic = required(root, "forkMechanism");
     if (fork != null) model.forkMechanism = readFork(fork);
     return model;
+  }
+
+  static function encodeCollisionShape(shape:CollisionShape):Dynamic {
+    var kind:String, size:Array<Float>;
+    switch shape.primitive {
+      case Box(x, y, z): kind = "box"; size = [x, y, z];
+      case Sphere(radius): kind = "sphere"; size = [radius];
+      case Capsule(radius, half): kind = "capsule"; size = [radius, half];
+      case Cylinder(radius, half): kind = "cylinder"; size = [radius, half];
+    }
+    return {kind: kind, size: size, position: shape.position, rotation: shape.rotation};
+  }
+
+  static function readCollisionShape(record:Dynamic):CollisionShape {
+    var primitive = switch text(record, "kind") {
+      case "box":
+        var size = vectorField(record, "size", 3);
+        Box(size[0], size[1], size[2]);
+      case "sphere": Sphere(vectorField(record, "size", 1)[0]);
+      case "capsule":
+        var size = vectorField(record, "size", 2);
+        Capsule(size[0], size[1]);
+      case "cylinder":
+        var size = vectorField(record, "size", 2);
+        Cylinder(size[0], size[1]);
+      case other: throw 'Unsupported RobotModel collision shape kind $other';
+    };
+    return new CollisionShape(primitive, vectorField(record, "position", 3),
+      vectorField(record, "rotation", 4));
   }
 
   static function encodeActuator(value:Actuator):Dynamic return {

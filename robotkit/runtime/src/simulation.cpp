@@ -29,6 +29,17 @@ void require_scene(nkscene_result result, const char *operation) {
         throw std::runtime_error(operation);
 }
 
+bool valid_link_shape(const rk_simulation_link_shape &shape, uint32_t link_count) {
+    if (shape.link >= link_count || shape.type < RK_LINK_SHAPE_BOX ||
+        shape.type > RK_LINK_SHAPE_CYLINDER || !valid_pose(shape.position, shape.rotation))
+        return false;
+    const uint32_t sized = shape.type == RK_LINK_SHAPE_BOX ? 3
+        : shape.type == RK_LINK_SHAPE_SPHERE ? 1 : 2;
+    for (uint32_t axis = 0; axis < sized; ++axis)
+        if (!std::isfinite(shape.size[axis]) || shape.size[axis] <= 0.0) return false;
+    return true;
+}
+
 // Minimal rigid-transform (translation + xyzw quaternion) helper for
 // evaluating each link's rest pose. Mirrors robotkit.spatial.Transform3's
 // compose/inverse exactly (ARCHITECTURE.md's a_T_b convention), so this is
@@ -181,7 +192,10 @@ Simulation::~Simulation() {
 rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                                 rk_robot_runtime &out_runtime,
                                 const rk_simulation_robot_desc *robot_desc) {
-    const auto *initial_pose = robot_desc ? &robot_desc->initial_pose : nullptr;
+    // A zero-sized initial pose keeps the default placement, so a descriptor
+    // can carry collision or device settings without choosing a pose.
+    const auto *initial_pose = robot_desc && robot_desc->initial_pose.struct_size != 0
+        ? &robot_desc->initial_pose : nullptr;
     std::lock_guard tick_lock(tick_mutex_);
     bool topology_update = false;
     {
@@ -298,6 +312,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         if (has_tool && (robot_desc->tool_link_index >= blueprint.link_count ||
                          robot_desc->tool_piece_count > 16))
             throw std::invalid_argument("invalid tool attachment link or piece count");
+        const auto link_shape_count = robot_desc && robot_desc->struct_size >=
+            offsetof(rk_simulation_robot_desc, link_shapes) + sizeof(robot_desc->link_shapes)
+            ? robot_desc->link_shape_count : 0;
+        if (link_shape_count > RK_MAX_LINK_SHAPES)
+            throw std::invalid_argument("too many link collision shapes");
+        for (uint32_t index = 0; index < link_shape_count; ++index)
+            if (!valid_link_shape(robot_desc->link_shapes[index], blueprint.link_count))
+                throw std::invalid_argument("invalid link collision shape");
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
@@ -337,14 +359,54 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     desc.shape = link_shape;
                 }
             }
+            // A link with primitive shapes or a tool collides through one
+            // compound of its explicit hull or box, the primitives, and the
+            // tool pieces, each posed in the link frame.
+            std::vector<nksim_shape> children;
+            std::vector<nksim_shape_pose> poses;
+            const auto add_child = [&](nksim_shape child, const double position[3],
+                                       const double rotation[4]) {
+                nksim_shape_pose pose{};
+                std::copy_n(position, 3, pose.position);
+                std::copy_n(rotation, 4, pose.rotation);
+                children.push_back(child);
+                poses.push_back(pose);
+            };
+            constexpr double origin[3] = {0.0, 0.0, 0.0};
+            constexpr double identity[4] = {0.0, 0.0, 0.0, 1.0};
+            for (uint32_t shape_index = 0; shape_index < link_shape_count; ++shape_index) {
+                const auto &source = robot_desc->link_shapes[shape_index];
+                if (source.link != index) continue;
+                if (children.empty() && has_link_shape) add_child(desc.shape, origin, identity);
+                nksim_shape primitive = 0;
+                switch (source.type) {
+                case RK_LINK_SHAPE_BOX:
+                    require_sim(nksim_shape_create_box(world_, source.size, &primitive),
+                                "nksim_shape_create_box(link primitive)");
+                    break;
+                case RK_LINK_SHAPE_SPHERE:
+                    require_sim(nksim_shape_create_sphere(world_, source.size[0], &primitive),
+                                "nksim_shape_create_sphere(link primitive)");
+                    break;
+                case RK_LINK_SHAPE_CAPSULE:
+                    require_sim(nksim_shape_create_capsule(world_, source.size[0],
+                        2.0 * source.size[1], &primitive), "nksim_shape_create_capsule(link primitive)");
+                    break;
+                default:
+                    require_sim(nksim_shape_create_cylinder(world_, source.size[0],
+                        2.0 * source.size[1], &primitive), "nksim_shape_create_cylinder(link primitive)");
+                    break;
+                }
+                link_shapes_.push_back(primitive);
+                add_child(primitive, source.position, source.rotation);
+                has_link_shape = true;
+            }
             if (has_tool && index == robot_desc->tool_link_index) {
                 if (!std::isfinite(robot_desc->tool_margin) ||
                     !std::isfinite(robot_desc->tool_gap) ||
                     robot_desc->tool_margin < 0.0 || robot_desc->tool_gap < 0.0)
                     throw std::invalid_argument("invalid tool contact margin or gap");
-                std::vector<nksim_shape> children{desc.shape};
-                std::vector<nksim_shape_pose> poses(1);
-                poses[0].rotation[3] = 1.0;
+                if (children.empty()) add_child(desc.shape, origin, identity);
                 for (uint32_t piece = 0; piece < robot_desc->tool_piece_count; ++piece) {
                     const auto count = robot_desc->tool_piece_vertex_count[piece];
                     if (count < 4 || count > 64)
@@ -356,18 +418,17 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     require_sim(nksim_shape_set_contact(world_, tool_shape,
                         robot_desc->tool_margin, robot_desc->tool_gap), "nksim_shape_set_contact(tool)");
                     link_shapes_.push_back(tool_shape);
-                    children.push_back(tool_shape);
-                    nksim_shape_pose pose{};
-                    pose.rotation[3] = 1.0;
-                    poses.push_back(pose);
+                    add_child(tool_shape, origin, identity);
                 }
+                has_link_shape = true;
+            }
+            if (!children.empty()) {
                 nksim_shape compound = 0;
                 require_sim(nksim_shape_create_compound(world_, children.data(), poses.data(),
                     static_cast<uint32_t>(children.size()), &compound),
-                    "nksim_shape_create_compound(tool)");
+                    "nksim_shape_create_compound(link)");
                 link_shapes_.push_back(compound);
                 desc.shape = compound;
-                has_link_shape = true;
             }
             // Layer 2 is an opt-out category for a robot's own links. It
             // still collides with ordinary layer-1 environment geometry,

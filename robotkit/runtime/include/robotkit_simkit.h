@@ -90,7 +90,32 @@ typedef struct rk_simulation_closure_desc {
     double axis_parent[3];
 } rk_simulation_closure_desc;
 
-/** Optional initial pose for one robot added to a Simulation. */
+/** Kinds of primitive link collision shape. Sizes are in metres. */
+typedef uint32_t rk_simulation_link_shape_type;
+enum {
+    RK_LINK_SHAPE_BOX = 1,      /**< size: half extents. */
+    RK_LINK_SHAPE_SPHERE = 2,   /**< size[0]: radius. */
+    /** size[0]: radius; size[1]: half-length of the straight part, along local Z. */
+    RK_LINK_SHAPE_CAPSULE = 3,
+    /** size[0]: radius; size[1]: half-length along local Z. */
+    RK_LINK_SHAPE_CYLINDER = 4
+};
+
+enum { RK_MAX_LINK_SHAPES = 256 };
+
+/** One primitive collision shape attached to a robot link, posed in the link frame. */
+typedef struct rk_simulation_link_shape {
+    uint32_t link;
+    uint32_t type; /**< rk_simulation_link_shape_type. */
+    double size[3];
+    double position[3];
+    double rotation[4]; /**< Unit quaternion in x, y, z, w order. */
+} rk_simulation_link_shape;
+
+/**
+ * Optional settings for one robot added to a Simulation. An initial_pose whose
+ * struct_size is zero keeps the default placement.
+ */
 typedef struct rk_simulation_robot_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t reserved0;
@@ -139,6 +164,13 @@ typedef struct rk_simulation_robot_desc {
     double tool_piece_vertices[16 * 64 * 3];
     double tool_margin;
     double tool_gap;
+    /**
+     * Optional primitive collision shapes. A link that has any collides
+     * through them together with its hull or box above, if given, and its
+     * tool pieces; otherwise the link keeps the legacy shape policy.
+     */
+    uint32_t link_shape_count;
+    rk_simulation_link_shape link_shapes[RK_MAX_LINK_SHAPES];
 } rk_simulation_robot_desc;
 
 /**

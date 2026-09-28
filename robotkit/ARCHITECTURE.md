@@ -179,6 +179,15 @@ as `floating_base`. `Simulation` then creates the root as a dynamic body
 and wheel couplings for it. A floating base cannot also have a `mobileBase`.
 See `robotkit/plans/HUMANOID.md`.
 
+RobotModel v6 links also carry `collisionShapes`: boxes, spheres, capsules and
+cylinders, each posed in the link frame, with capsule and cylinder lengths
+given as half-lengths along local Z (MuJoCo's convention). The compiler copies
+them onto the blueprint, and `Simulation` sends them in the robot
+description's `link_shapes` tail. A link with shapes collides through one
+compound of them together with its explicit hull or box and any tool pieces;
+a link without shapes keeps the model's `collisionApproximation`.
+`robotkit_mjcf_import` produces these from MJCF (`robotkit/tools/mjcf_import`).
+
 RobotModel v5 added `JointCoupling{id, leader, follower, ratio, offset}`.
 This is a joint-to-joint relation, `follower = ratio * leader + offset`,
 separate from the actuator-to-joint `SimpleTransmission`. The runtime blueprint

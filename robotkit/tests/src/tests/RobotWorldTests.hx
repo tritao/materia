@@ -29,6 +29,7 @@ import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
 import robotkit.model.RobotForkConfiguration;
 import robotkit.model.RobotModelCodec;
+import robotkit.model.CollisionShape;
 import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
 import robotkit.world.RobotCapabilities;
@@ -174,6 +175,7 @@ class RobotWorldTests {
     testMobileLayer();
     testModelDrivenConfiguration();
     testRobotModelCodec();
+    testMjcfWalkerImport();
     testLocalization();
     testWheelImuLocalization();
     testGnssLocalization();
@@ -782,6 +784,15 @@ class RobotWorldTests {
     source.frames[0].rotation = [0.0, 0.0, 0.38268343236509, 0.923879532511287];
     source.sensors[0].startAngleRadians = -0.4;
     source.sensors[0].fieldOfViewRadians = 2.4;
+    source.links[0].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.05),
+      [0.1, 0.0, -0.2]));
+    source.links[0].collisionShapes.push(new CollisionShape(
+      CollisionPrimitive.Capsule(0.03, 0.12), [0.0, 0.0, 0.0],
+      [0.70710678118654757, 0.0, 0.0, 0.70710678118654757]));
+    source.links[1].collisionShapes.push(new CollisionShape(
+      CollisionPrimitive.Cylinder(0.04, 0.1)));
+    source.links[1].collisionShapes.push(new CollisionShape(
+      CollisionPrimitive.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
 
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
@@ -839,6 +850,32 @@ class RobotWorldTests {
       "device channel mapping rejects order that differs from semantic model joints");
 
     equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
+    equal(restored.links[0].collisionShapes.length, 2, "RobotModel codec preserves link collision shapes");
+    check(switch restored.links[0].collisionShapes[1].primitive {
+      case CollisionPrimitive.Capsule(radius, half): radius == 0.03 && half == 0.12;
+      case _: false;
+    }, "RobotModel codec preserves capsule radius and half-length");
+    equal(restored.links[0].collisionShapes[0].position[2], -0.2,
+      "RobotModel codec preserves collision shape poses");
+    var shapeBlueprint = RobotRuntimeCompiler.compile(restored);
+    equal(shapeBlueprint.linkCollisionShapes.length, 4, "every link collision shape compiles");
+    equal(shapeBlueprint.linkCollisionShapes[3].link, 1,
+      "compiled collision shapes keep their runtime link index");
+    var shapeSimulation = new Simulation(0.02);
+    shapeSimulation.addRobot(shapeBlueprint);
+    shapeSimulation.step(Int64.ofInt(0));
+    shapeSimulation.dispose();
+    var badShape = RobotModelCodec.decode(encoded);
+    badShape.links[1].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.0)));
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape), "RK_COLLISION_SHAPE"),
+      "compiler rejects a non-positive collision shape size");
+    throws(function() RobotModelCodec.encode(badShape), "codec rejects an invalid collision shape");
+    var unknownShape:Dynamic = haxe.Json.parse(encoded.toString());
+    var unknownLinks:Array<Dynamic> = cast Reflect.field(unknownShape, "links");
+    var unknownShapes:Array<Dynamic> = cast Reflect.field(unknownLinks[0], "collisionShapes");
+    Reflect.setField(unknownShapes[0], "kind", "cone");
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(unknownShape))),
+      "codec rejects unknown collision shape kinds");
     var floating = configuredForkliftModel();
     floating.mobileBase = null;
     floating.forkMechanism = null;
@@ -877,6 +914,51 @@ class RobotWorldTests {
     Reflect.setField(brokenJoints[0], "parentLink", "link/missing");
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(brokenReference))),
       "RobotModel codec rejects unresolved link references");
+  }
+
+  /**
+   * robotkit_mjcf_import's output for fixtures/mjcf/walker.xml, checked against
+   * the values authored in that file (the native import test keeps this file
+   * current).
+   */
+  static function testMjcfWalkerImport():Void {
+    var path = Sys.getCwd() + "/robotkit/tests/fixtures/mjcf/walker.robot.json";
+    if (!sys.FileSystem.exists(path)) path = Sys.getCwd() + "/fixtures/mjcf/walker.robot.json";
+    var model = RobotModelCodec.decode(sys.io.File.getBytes(path));
+    equal(model.floatingBase, true, "an MJCF free joint imports as a floating base");
+    equal(model.links.length, 4, "every MJCF body imports as a link");
+    var mass = 0.0;
+    for (link in model.links) mass += link.mass;
+    equal(mass, 15.5, "imported link masses match the MJCF inertials");
+    equal(model.links[0].inertiaTensor[4], 0.2, "diagonal inertia keeps its axes");
+    equal(model.links[0].centerOfMass[2], 0.05, "centre of mass stays in the link frame");
+    var hip = model.joints[0], knee = model.joints[1], foot = model.joints[2];
+    equal(hip.type, JointType.Revolute, "a limited hinge imports as revolute");
+    equal(hip.limits.lower, -Math.PI / 2, "degree ranges convert to radians");
+    equal(hip.limits.effort, 40.0, "actuatorfrcrange from a default class becomes the joint effort");
+    equal(knee.parentFramePosition[2], -0.38, "the joint frame sits at the joint anchor in the parent");
+    equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
+    equal(foot.type, JointType.Fixed, "a jointless body attaches through a fixed joint");
+    var thigh = model.links[1].collisionShapes[0];
+    check(switch thigh.primitive {
+      case CollisionPrimitive.Capsule(radius, half): radius == 0.05 && half == 0.2;
+      case _: false;
+    }, "a fromto capsule keeps its radius and half-length");
+    equal(thigh.position[2], -0.2, "a fromto capsule is centred between its ends");
+    equal(model.links[3].collisionShapes.length, 2,
+      "pair-only geoms collide and a geom that never collides is left out");
+    equal(model.links[0].visualGeometry, "meshes/torso.stl", "visual meshes merge into one file per link");
+    equal(model.actuators.length, 2, "joint actuators import");
+    check(switch model.actuators[0].transmission {
+      case SimpleTransmission(jointId, ratio, _): jointId == hip.id && ratio == 2.0;
+    }, "actuator gear becomes the transmission ratio");
+    equal(model.actuators[0].maxEffort, 20.0, "actuator force range stays in actuator units");
+    equal(model.sensors.length, 1, "one IMU per sensor site");
+    check(model.sensors[0].frame == model.frames[0], "the IMU mounts on its site frame");
+    equal(model.frames[0].position[0], 0.02, "the IMU frame keeps the site position");
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.floatingBase, true, "the imported walker compiles with a floating base");
+    equal(blueprint.linkCollisionShapes.length, 5, "every imported collision shape compiles");
   }
 
   static function testGnssLocalization():Void {

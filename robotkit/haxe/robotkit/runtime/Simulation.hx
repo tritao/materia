@@ -3,6 +3,7 @@ package robotkit.runtime;
 import RobotKitSimKit;
 import haxe.Int64;
 import robotkit.mobile.Pose2;
+import robotkit.model.CollisionShape.CollisionPrimitive;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.spatial.Vec3;
@@ -224,6 +225,39 @@ class Simulation {
             robotDesc.set_tool_piece_vertices(piece * 64 * 3 + index, vertices[index]);
           }
         }
+      }
+    }
+    var shapes = blueprint.linkCollisionShapes;
+    if (shapes.length > 0) {
+      if (shapes.length > RobotKitSimKitConstants.RK_MAX_LINK_SHAPES)
+        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_LINK_SHAPES} link collision shapes';
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      robotDesc.set_link_shape_count(shapes.length);
+      for (index in 0...shapes.length) {
+        var source = shapes[index];
+        var native = new rk_simulation_link_shape();
+        native.set_link(source.link);
+        var size:Array<Float> = switch source.shape.primitive {
+          case CollisionPrimitive.Box(x, y, z):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_BOX);
+            [x, y, z];
+          case CollisionPrimitive.Sphere(radius):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_SPHERE);
+            [radius];
+          case CollisionPrimitive.Capsule(radius, half):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CAPSULE);
+            [radius, half];
+          case CollisionPrimitive.Cylinder(radius, half):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CYLINDER);
+            [radius, half];
+        };
+        for (axis in 0...size.length) native.set_size(axis, size[axis]);
+        for (axis in 0...3) native.set_position(axis, source.shape.position[axis]);
+        for (axis in 0...4) native.set_rotation(axis, source.shape.rotation[axis]);
+        robotDesc.set_link_shapes(index, native);
       }
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);

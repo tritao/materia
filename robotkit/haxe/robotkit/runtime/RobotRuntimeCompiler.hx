@@ -49,6 +49,8 @@ class RobotRuntimeCompiler {
     for (index in 0...robot.links.length) {
       var link = robot.links[index];
       result.links[index] = new RobotRuntimeLinkBlueprint(link.mass, link.centerOfMass, link.inertiaTensor);
+      for (shape in link.collisionShapes)
+        result.linkCollisionShapes.push(new RobotRuntimeLinkShape(index, shape));
     }
     for (index in 0...robot.joints.length) {
       var joint:robotkit.model.Joint = robot.joints[index];
@@ -187,6 +189,16 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_LINK_INERTIA", '$path.inertiaTensor', "inertia tensor must be finite, symmetric, and positive definite"));
       if (!validGeometryReference(link.visualGeometry) || !validGeometryReference(link.collisionGeometry))
         diagnostics.push(new RobotCompileDiagnostic("RK_LINK_GEOMETRY", path, "geometry reference must be null or a non-empty string"));
+      if (link.collisionShapes == null)
+        diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_SHAPE", '$path.collisionShapes',
+          "collision shape list is missing"));
+      else for (shapeIndex in 0...link.collisionShapes.length) {
+        var shape = link.collisionShapes[shapeIndex];
+        var error = shape == null ? "collision shape is null" : shape.validate();
+        if (error != null)
+          diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_SHAPE",
+            '$path.collisionShapes[$shapeIndex]', error));
+      }
     }
 
     var jointIds = new Map<String, Bool>();

@@ -26,6 +26,8 @@ class RobotRuntimeBlueprint {
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
   public var selfCollision:Bool = true;
+  /** Primitive link collision shapes, in link order; Simulation collides through them. */
+  public final linkCollisionShapes:Array<RobotRuntimeLinkShape> = [];
   /** True makes the root link a free six-DOF body in Simulation. */
   public var floatingBase:Bool = false;
   /** Zero uses two owner periods. */
@@ -159,4 +161,15 @@ class RobotRuntimeBlueprint {
     return value;
   }
 
+}
+
+/** One primitive collision shape on the link at a runtime link index. */
+class RobotRuntimeLinkShape {
+  public final link:Int;
+  public final shape:robotkit.model.CollisionShape;
+
+  public function new(link:Int, shape:robotkit.model.CollisionShape) {
+    this.link = link;
+    this.shape = shape;
+  }
 }

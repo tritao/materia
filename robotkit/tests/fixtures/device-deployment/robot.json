@@ -25,7 +25,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     },
     {
       "id": "link/left-wheel",
@@ -48,7 +49,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     },
     {
       "id": "link/right-wheel",
@@ -71,7 +73,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     },
     {
       "id": "link/lift",
@@ -94,7 +97,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     }
   ],
   "joints": [
