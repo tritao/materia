@@ -773,10 +773,10 @@ void preview_mesh() {
     }
     check(matches, "each triangle is coloured by its source");
     std::vector<uint32_t> rays(size_t(90) * 50, 0x123456FFu);
-    check(sk_mesh_color_by_ray(m, rays.data(), uint32_t(rays.size())) == SK_OK, "colour by ray");
+    check(sk_mesh_color_by_ray(m, SK_AXIS_Z, rays.data(), uint32_t(rays.size())) == SK_OK, "colour by ray");
     sk_mesh_destroy(m);
     mesh_of(s, 0, 0, 1, 1, SK_MESH_MERGE, &m);
-    check(sk_mesh_color_by_ray(m, rays.data(), uint32_t(rays.size())) == SK_ERROR_UNSUPPORTED,
+    check(sk_mesh_color_by_ray(m, SK_AXIS_Z, rays.data(), uint32_t(rays.size())) == SK_ERROR_UNSUPPORTED,
         "merged meshes cannot be coloured per ray");
     sk_mesh_destroy(m);
     check(sk_stock_mesh(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0] + 1, 1, 0, &m) == SK_ERROR_INVALID_ARGUMENT, "tile range is checked");
@@ -937,6 +937,108 @@ void contour_mesh() {
         sk_snapshot_destroy(shot);
         sk_stock_destroy(s);
         sk_tool_destroy(t);
+    }
+    // A through-slot 0.4 mm too wide and 0.2 mm too shallow: its walls are
+    // gouged by 0.2 mm between Z rays, which only Y rays see, and its floor
+    // keeps 0.2 mm of leftover. Colouring by deviation marks each surface by
+    // what its own ray finds there.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        sk_stock_handle target = box_stock(g, 0, 0, 0, 50, 30, 20), s = box_stock(g, 0, 0, 0, 50, 30, 20);
+        sk_tool_handle right = flat(6, 20), wide = flat(6.4, 20);
+        cut(target, right, {line_move(-10, 15, 14.8, 60, 15, 14.8, 0)}, "target slot");
+        cut(s, wide, {line_move(-10, 1, 30, 60, 1, 30, 0), line_move(-10, 15, 15, 60, 15, 15, 1)}, "wide slot");
+        sk_stock_info info = info_of(s);
+        double deepest[3] = {0, 0, 0}, thickest[3] = {0, 0, 0};
+        bool named = true;
+        for (uint32_t axis = 0; axis < 3; ++axis) {
+            const sk_grid_info &grid = info.grids[axis];
+            uint32_t n = grid.count[0] * grid.count[1];
+            std::vector<sk_ray_comparison> rays(n);
+            check(sk_stock_compare(s, target, axis, 0, 0, grid.count[0], grid.count[1], rays.data(), n) == SK_OK,
+                "slot comparison");
+            for (const sk_ray_comparison &r : rays) {
+                deepest[axis] = std::max(deepest[axis], r.largest_gouge);
+                thickest[axis] = std::max(thickest[axis], r.largest_leftover);
+                if (r.largest_gouge > 0.1) named = named && r.gouge_source == 1;
+            }
+        }
+        check(deepest[SK_AXIS_Z] == 0 && deepest[SK_AXIS_X] == 0, "wall gouge: no Z or X ray sees it");
+        near(deepest[SK_AXIS_Y], 0.2, 1e-9, "wall gouge: Y rays see 0.2 mm");
+        near(thickest[SK_AXIS_Z], 0.2, 1e-9, "floor leftover: Z rays see 0.2 mm");
+        check(named, "wall gouge: the wide slot's move made it");
+        sk_mesh_handle m{};
+        const uint32_t tiles_x = info.grids[SK_AXIS_Z].tiles[0], tiles_y = info.grids[SK_AXIS_Z].tiles[1];
+        check(sk_stock_mesh(s, 0, 0, tiles_x, tiles_y, SK_MESH_CONTOUR, &m) == SK_OK, "slot mesh");
+        const uint32_t green = 0x00FF00FFu, yellow = 0xFFFF00FFu, red = 0xFF0000FFu;
+        check(sk_mesh_color_by_deviation(m, target, 0.1, green, yellow, red) == SK_OK, "colour by deviation");
+        auto mesh_colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+        auto normals = mesh_stream<float>(m, sk_mesh_copy_normals);
+        auto positions = mesh_stream<float>(m, sk_mesh_copy_positions);
+        int walls = 0, floors = 0, faces = 0, wrong = 0;
+        for (size_t v = 0; v < mesh_colors.size(); ++v) {
+            const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&mesh_colors[v]);
+            uint32_t color = uint32_t(rgba[0]) << 24 | uint32_t(rgba[1]) << 16 | uint32_t(rgba[2]) << 8 | rgba[3];
+            const float *p = &positions[3 * v], *n = &normals[3 * v];
+            bool inner = p[0] > 1 && p[0] < 49;
+            if (inner && std::fabs(n[1]) > 0.99 && p[2] > 15.5 && std::fabs(std::fabs(p[1] - 15) - 3.2) < 0.01) {
+                ++walls; // the slot's walls
+                wrong += color != red;
+            } else if (inner && n[2] > 0.99 && std::fabs(p[2] - 15) < 1e-4 && std::fabs(p[1] - 15) < 2.5) {
+                ++floors; // the slot's floor, away from its walls
+                wrong += color != yellow;
+            } else if (inner && std::fabs(n[1]) > 0.99 && (p[1] < 0.01 || p[1] > 29.99)) {
+                ++faces; // the box's sides, on the same Y rays as the walls
+                wrong += color != green;
+            }
+        }
+        check(walls > 0 && floors > 0 && faces > 0 && wrong == 0, "deviation colours: walls gouged, floor leftover, "
+            "sides on target (" + std::to_string(wrong) + " of " + std::to_string(walls + floors + faces) + " wrong)");
+        // Colouring by ray takes each grid's colours for the quads made from its rays.
+        std::vector<uint32_t> ys(size_t(info.grids[SK_AXIS_Y].count[0]) * info.grids[SK_AXIS_Y].count[1], red);
+        check(sk_mesh_color_by_ray(m, SK_AXIS_Y, ys.data(), uint32_t(ys.size())) == SK_OK, "colour by Y ray");
+        check(sk_mesh_color_by_ray(m, 3, ys.data(), uint32_t(ys.size())) == SK_ERROR_INVALID_ARGUMENT,
+            "colour by ray checks the axis");
+        check(sk_mesh_color_by_ray(m, SK_AXIS_Y, ys.data(), uint32_t(ys.size() - 1)) == SK_ERROR_INVALID_ARGUMENT,
+            "colour by ray needs every ray of the grid");
+        mesh_colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+        bool only_y = true;
+        for (size_t v = 0; v < mesh_colors.size(); ++v) {
+            const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&mesh_colors[v]);
+            bool is_red = rgba[0] == 0xFF && rgba[1] == 0 && rgba[2] == 0;
+            if (std::fabs(normals[3 * v + 2]) > 0.99 && is_red) only_y = false; // Z quads keep their colour
+        }
+        check(only_y, "colour by Y ray leaves Z quads alone");
+        sk_mesh_destroy(m);
+        // A 1.2 mm groove in the top: along the Y rays through it the gouge
+        // ends where the stock resumes across the groove, not where the part does.
+        sk_tool_handle narrow = flat(1.2, 20);
+        cut(s, narrow, {line_move(-10, 5, 19.7, 60, 5, 19.7, 2)}, "groove");
+        check(sk_stock_mesh(s, 0, 0, tiles_x, tiles_y, SK_MESH_CONTOUR, &m) == SK_OK, "groove mesh");
+        check(sk_mesh_color_by_deviation(m, target, 2, green, yellow, red) == SK_OK, "colour the groove");
+        mesh_colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+        normals = mesh_stream<float>(m, sk_mesh_copy_normals);
+        positions = mesh_stream<float>(m, sk_mesh_copy_positions);
+        int groove = 0, gouged = 0;
+        for (size_t v = 0; v < mesh_colors.size(); ++v) {
+            const float *p = &positions[3 * v];
+            if (std::fabs(normals[3 * v + 1]) < 0.99 || p[2] < 19.7 || std::fabs(std::fabs(p[1] - 5) - 0.6) > 0.01) continue;
+            ++groove;
+            const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&mesh_colors[v]);
+            gouged += rgba[1] == 0;
+        }
+        check(groove > 0 && gouged == 0, "groove walls gouge only the groove's width (" + std::to_string(gouged) +
+            " of " + std::to_string(groove) + " marked)");
+        sk_mesh_destroy(m);
+        sk_tool_destroy(narrow);
+        check(sk_stock_mesh(s, 0, 0, 1, 1, 0, &m) == SK_OK &&
+                sk_mesh_color_by_deviation(m, target, 0.1, green, yellow, red) == SK_ERROR_UNSUPPORTED,
+            "colour by deviation needs a contoured mesh");
+        sk_mesh_destroy(m);
+        sk_stock_destroy(s);
+        sk_stock_destroy(target);
+        sk_tool_destroy(right);
+        sk_tool_destroy(wide);
     }
     // Contouring needs all three grids and takes no other flags.
     {

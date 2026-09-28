@@ -208,6 +208,30 @@ class CoreFixtures {
     var culprits = gouged.gougingMoves(1e-6);
     Assert.check(culprits.length == 1 && stock.history[culprits[0]] == stray,
       "the gouge is attributed to the stray move");
+    // A pass 0.1 mm into the pocket's -y wall, between Z rays: only the Y
+    // grid sees it, and a contoured mesh coloured by deviation marks the wall.
+    var sideways = new CutMove(tool, Path(Line(new Point3(0.015, 0.0059, -0.001),
+      new Point3(0.025, 0.0059, -0.001))), Cut, 100, span);
+    stock.cut([sideways]);
+    Assert.near(stock.compare(target).deepestGouge(), 0.0001, "Z rays still see only the dip", 1e-12);
+    var along = stock.compareAll(target);
+    Assert.check(along.length == 3 && along[1].grid.axis == Y, "tri-dexel stock compares along X, Y and Z");
+    Assert.near(along[1].deepestGouge(), 0.0001, "Y rays see the wall 0.1 mm too far", 1e-9);
+    var wallCulprits = along[1].gougingMoves(1e-6);
+    Assert.check(wallCulprits.length == 1 && stock.history[wallCulprits[0]] == sideways,
+      "the wall gouge is attributed to the sideways pass");
+    var gougeColor = 0xFF0000FF;
+    var surface = stock.contour(0, 0, stock.tilesX(), stock.tilesY(),
+      ByDeviation(target, 0.00005, 0x00FF00FF, 0xFFFF00FF, gougeColor));
+    var wall = 0, floor = 0;
+    for (v in 0...surface.vertexCount) {
+      var red = surface.colors.get(4 * v) == 0xFF && surface.colors.get(4 * v + 1) == 0;
+      if (!red) continue;
+      if (Math.abs(surface.normals.getFloat(12 * v + 4)) > 0.99) wall++;
+      if (surface.normals.getFloat(12 * v + 8) > 0.99) floor++;
+    }
+    Assert.check(wall > 0, 'the gouged wall is coloured ($wall vertices)');
+    Assert.check(floor > 0, 'the dip in the floor is coloured ($floor vertices)');
     target.dispose();
     stock.dispose();
   }

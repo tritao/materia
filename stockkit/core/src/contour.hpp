@@ -29,7 +29,8 @@ struct ContourStats {
  * crossings' planes (dropping directions the normals barely constrain, and
  * clamped to the cell), which keeps flat faces flat and edges and corners
  * sharp. Each crossing edge becomes a quad joining the vertices of the four
- * cells around it, with the crossing's normal and source.
+ * cells around it, with the crossing's normal and source; its ray is the
+ * one along the edge.
  *
  * Meshes the Z tiles [tile_x, tile_x + tiles_x) x [tile_y, tile_y + tiles_y).
  * Chunks meshed separately join exactly: the chunk whose rays start at i0
@@ -43,5 +44,17 @@ struct ContourStats {
  */
 void build_contour(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
     PreviewMesh &out, ContourStats *stats = nullptr);
+
+/**
+ * Colours each quad of a contoured mesh of `stock` by the deviation from
+ * `target` (same lattice) at its surface: along the quad's ray, the gouge
+ * (target missing) that begins at the surface on its empty side and the
+ * leftover (stock outside the target) that ends there on its material side.
+ * `colors` are on target, leftover and gouge, as the bytes to store; gouge
+ * wins over leftover. Counts the quads coloured as gouged. False when the
+ * lattices differ.
+ */
+bool color_by_deviation(PreviewMesh &mesh, const Stock &stock, const Stock &target, double tolerance,
+    const uint32_t colors[3], uint64_t *gouged = nullptr);
 
 } // namespace stockkit

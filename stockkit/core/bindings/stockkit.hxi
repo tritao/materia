@@ -31,11 +31,29 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	const SK_ZONE_SHANK = 1;
 	extern fn sk_api_version() -> u32;
 	/**
-	 * Colours each quad by its Z ray: `ray_colors[j * count_x + i]`, for example
-	 * a deviation map from `sk_stock_compare`. Needs a mesh built without
+	 * Colours each quad of a contoured mesh by how the stock it was built from
+	 * deviates from `target` (a stock on the same lattice, for example cast from
+	 * the finished part) right at the quad's surface. Along the quad's ray, the
+	 * gouge is the target missing from the stock that starts at the surface on
+	 * its empty side, and the leftover is stock outside the target that ends
+	 * there on its material side. Quads whose gouge exceeds `tolerance` get
+	 * `gouge`, else those whose leftover does get `leftover`, else `on_target`
+	 * (colours as 0xRRGGBBAA). A wall cut too deep shows on the X or Y rays
+	 * crossing it, a floor on the Z rays, and the stock's other surfaces on the
+	 * same rays stay unaffected. Colour before cutting the stock further. Needs
+	 * a mesh built with SK_MESH_CONTOUR.
+	 */
+	extern fn sk_mesh_color_by_deviation(mesh: sk_mesh_handle, target: sk_stock_handle, tolerance: f64, on_target: u32, leftover: u32, gouge: u32) -> sk_result;
+	/**
+	 * Colours each quad made from a ray of the grid along `axis` by that ray:
+	 * `ray_colors[j * count_u + i]`, for example a deviation map from
+	 * `sk_stock_compare` on the same grid. Column meshes are made from Z rays
+	 * only. A contoured quad is made from the ray along its edge: floors and
+	 * ceilings mostly from Z rays, walls from X and Y rays, so colour with each
+	 * grid's comparison to see gouges in walls. Needs a mesh built without
 	 * SK_MESH_MERGE and a colour for every ray of the grid.
 	 */
-	extern fn sk_mesh_color_by_ray(mesh: sk_mesh_handle, ray_colors: ptr<const<u32>> @in_array("ray_count"), ray_count: u32) -> sk_result;
+	extern fn sk_mesh_color_by_ray(mesh: sk_mesh_handle, axis: u32, ray_colors: ptr<const<u32>> @in_array("ray_count"), ray_count: u32) -> sk_result;
 	/**
 	 * Colours each quad by its source move: `palette[source]` (RGBA as 0xRRGGBBAA)
 	 * for sources inside the palette, `original` for untouched stock and

@@ -228,9 +228,11 @@ class CamIslandPocketFixture {
     var report = stock.cut(CutMoves.fromProgram(program.toolpath()));
     check(report.rapidContacts().length == 0, "island pocket never rapids through stock");
     check(report.collisions().length == 0, "island pocket keeps the shank out of the stock");
+    // Walls gouged sideways show only on the X and Y grids.
+    for (along in stock.compareAll(target))
+      check(along.deepestGouge() < 1e-9,
+        'island pocket does not gouge its part along ${along.grid.axis} (deepest ${along.deepestGouge()})');
     var comparison = stock.compare(target);
-    check(comparison.deepestGouge() < 1e-9,
-      'island pocket does not gouge its part (deepest ${comparison.deepestGouge()})');
     check(comparison.thickestLeftover() <= 0.002 + 1e-12,
       "island pocket leaves nothing thicker than its depth");
     // A round cutter leaves a fillet of its radius in each inside corner of

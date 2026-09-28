@@ -132,6 +132,14 @@ class Stock {
       }]);
   }
 
+  /**
+    The stock compared with `target` along every grid of its lattice, X, Y
+    then Z (only Z unless tri-dexel). Walls gouged sideways show on the X
+    and Y grids; each grid estimates the same volumes on its own.
+  **/
+  public function compareAll(target:Stock):Array<StockComparison>
+    return [for (axis in [StockAxis.X, StockAxis.Y, StockAxis.Z]) if (lattice.has(axis)) compare(target, axis)];
+
   /** Captures the stock and its history; see `StockSnapshot`. */
   public function snapshot():StockSnapshot {
     alive();
@@ -184,26 +192,45 @@ class Stock {
     tileY), dual-contoured from all three grids: walls and floors at the
     rays' exact crossings with their normals and sources, sharp edges and
     corners kept, features thinner than a spacing possibly lost. Needs a
-    tri-dexel lattice. Colours as for `mesh`; with `rayColors` each quad
-    takes the colour of the Z ray through its inside node.
+    tri-dexel lattice. `BySource` colours each surface by its move (pass
+    `palette`, one colour per history entry, to reuse one already built);
+    `ByDeviation` colours each surface by the gouge or leftover its own ray
+    finds there against the target, so walls cut too deep show as well as
+    floors. Without `coloring` the mesh is white.
   **/
-  public function contour(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, ?palette:Array<Int>,
-      original:Int = -1, ?rayColors:Array<Int>):StockMesh {
+  public function contour(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, ?coloring:StockColoring,
+      ?palette:Array<Int>):StockMesh {
     if (!lattice.triDexel) throw "stock.contour needs a tri-dexel lattice";
-    return meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, palette,
-      original, rayColors);
+    return switch coloring {
+      case null:
+        meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, null, 0, null);
+      case BySource(color, original):
+        meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh,
+          palette != null ? palette : [for (move in history) color(move)], original, null);
+      case ByDeviation(target, _, _, _, _):
+        target.alive();
+        meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, null, 0, null,
+          coloring);
+    };
   }
 
   function meshWith(flags:Int, tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, palette:Null<Array<Int>>,
-      original:Int, rayColors:Null<Array<Int>>):StockMesh {
+      original:Int, rayColors:Null<Array<Int>>, ?deviation:StockColoring):StockMesh {
     alive();
     var created = StockKitNative.sk_stock_mesh(owner.borrow(), tileX, tileY, tilesWide, tilesHigh, flags);
     check(created.status, "stock.mesh");
     var native = created.out_mesh;
     try {
       var handle = native.borrow();
+      switch deviation {
+        case ByDeviation(target, tolerance, onTarget, leftover, gouge):
+          check(StockKitNative.sk_mesh_color_by_deviation(handle, target.owner.borrow(), tolerance, onTarget,
+            leftover, gouge), "mesh.colorByDeviation");
+        case _:
+      }
       if (rayColors != null)
-        check(StockKitNative.sk_mesh_color_by_ray(handle, rayColors), "mesh.colorByRay");
+        check(StockKitNative.sk_mesh_color_by_ray(handle, StockKitNativeConstants.SK_AXIS_Z, rayColors),
+          "mesh.colorByRay");
       else if (palette != null)
         check(StockKitNative.sk_mesh_color_by_source(handle, palette, original, original), "mesh.colorBySource");
       var info = StockKitNative.sk_mesh_get_info(handle);

@@ -20,6 +20,7 @@ import stockkit.CutMove;
 import stockkit.CutMoves;
 import stockkit.MoveOutcome;
 import stockkit.Stock;
+import stockkit.StockColoring;
 import stockkit.StockLattice;
 import stockkit.StockTimeline;
 
@@ -120,16 +121,9 @@ class StockSimulationSession {
   /** The stock as it is now, in the object's frame, coloured by the current mode. */
   public function geometry():GeometryData {
     var stock = timeline.stock;
-    var mesh = if (colorBy == "operation") {
-      var palette = [for (move in stock.history) operationColour(move)];
-      stock.contour(0, 0, stock.tilesX(), stock.tilesY(), palette, UNTOUCHED);
-    } else {
-      var comparison = stock.compare(target);
-      var colours = [for (k in 0...comparison.gouge.length)
-        comparison.largestGouge[k] > TOLERANCE ? GOUGE
-        : comparison.largestLeftover[k] > TOLERANCE ? LEFTOVER : ON_TARGET];
-      stock.contour(0, 0, stock.tilesX(), stock.tilesY(), null, UNTOUCHED, colours);
-    }
+    var mesh = colorBy == "operation"
+      ? stock.contour(0, 0, stock.tilesX(), stock.tilesY(), BySource(operationColour, UNTOUCHED))
+      : stock.contour(0, 0, stock.tilesX(), stock.tilesY(), ByDeviation(target, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
     var geometry = new GeometryData();
     geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
     geometry.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
@@ -177,7 +171,11 @@ class StockSimulationSession {
   }
 
   /** Deepest gouge into the finished part at the current position, in metres. */
-  public function deepestGouge():Float return timeline.stock.compare(target).deepestGouge();
+  public function deepestGouge():Float {
+    var deepest = 0.0;
+    for (comparison in timeline.stock.compareAll(target)) deepest = Math.max(deepest, comparison.deepestGouge());
+    return deepest;
+  }
 
   public function dispose():Void {
     if (disposed) return;

@@ -23,8 +23,20 @@ struct PreviewMesh {
     std::vector<uint32_t> indices;
     std::vector<uint32_t> triangle_sources;
     std::vector<uint32_t> vertex_sources;
-    /** Ray index (j * count_x + i) of each vertex's column; unset when tops were merged. */
+    /**
+     * The ray each vertex's quad was made from: its grid's axis and its index
+     * (j * count_u + i) in that grid. Column meshes use Z rays only. Unset
+     * when tops were merged.
+     */
     std::vector<uint32_t> vertex_rays;
+    std::vector<uint8_t> vertex_axes;
+    /**
+     * Contoured meshes: each quad's surface coordinate along its ray, and
+     * whether the stock's material lies below it (the ray leaves material
+     * there) or above.
+     */
+    std::vector<double> quad_depths;
+    std::vector<uint8_t> quad_exits;
     std::vector<uint32_t> colors; // RGBA8 per vertex, once coloured
     bool merged = false;
 

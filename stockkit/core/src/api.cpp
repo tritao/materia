@@ -100,7 +100,8 @@ Table<Stock::Snapshot, kKindSnapshot> &snapshots() {
 /** A preview mesh and the grid size its ray indices refer to. */
 struct MeshEntry {
     PreviewMesh mesh;
-    uint64_t rays = 0;
+    uint64_t rays[3] = {0, 0, 0}; // per grid, for colouring by ray
+    uint32_t stock = 0;           // the stock it was built from, for colouring by deviation
     uint64_t unmatched = 0;
 };
 
@@ -615,7 +616,9 @@ SK_API sk_result SK_CALL sk_stock_mesh(sk_stock_handle stock, uint32_t tile_x, u
             build_preview(z, tile_x, tile_y, tiles_x, tiles_y, options, entry->mesh);
         }
         entry->mesh.colors.assign(entry->mesh.vertex_count(), 0xFFFFFFFFu);
-        entry->rays = uint64_t(z.grid().count[0]) * z.grid().count[1];
+        entry->stock = stock.id;
+        for (uint32_t axis = 0; axis < 3; ++axis)
+            if (const DexelGrid *g = s->grid(axis)) entry->rays[axis] = uint64_t(g->grid().count[0]) * g->grid().count[1];
         uint32_t id = meshes().add(std::move(entry));
         if (id == 0) return SK_ERROR_LIMIT;
         out_mesh->id = id;
@@ -689,14 +692,31 @@ SK_API sk_result SK_CALL sk_mesh_color_by_source(sk_mesh_handle mesh, const uint
     });
 }
 
-SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, const uint32_t *ray_colors, uint32_t ray_count) {
+SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, uint32_t axis, const uint32_t *ray_colors,
+    uint32_t ray_count) {
     return guarded([&]() -> sk_result {
         MeshEntry *m = meshes().get(mesh.id);
         if (!m) return SK_ERROR_INVALID_HANDLE;
         if (m->mesh.merged) return SK_ERROR_UNSUPPORTED;
-        if (ray_count < m->rays || (ray_count > 0 && !ray_colors)) return SK_ERROR_INVALID_ARGUMENT;
+        if (axis > 2 || ray_count < m->rays[axis] || (ray_count > 0 && !ray_colors)) return SK_ERROR_INVALID_ARGUMENT;
         PreviewMesh &p = m->mesh;
-        for (size_t k = 0; k < p.vertex_rays.size(); ++k) p.colors[k] = rgba_bytes(ray_colors[p.vertex_rays[k]]);
+        for (size_t k = 0; k < p.vertex_rays.size(); ++k)
+            if (p.vertex_axes[k] == axis) p.colors[k] = rgba_bytes(ray_colors[p.vertex_rays[k]]);
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_mesh_color_by_deviation(sk_mesh_handle mesh, sk_stock_handle target, double tolerance,
+    uint32_t on_target, uint32_t leftover, uint32_t gouge) {
+    return guarded([&]() -> sk_result {
+        MeshEntry *m = meshes().get(mesh.id);
+        if (!m) return SK_ERROR_INVALID_HANDLE;
+        Stock *s = stocks().get(m->stock), *t = stocks().get(target.id);
+        if (!s || !t) return SK_ERROR_INVALID_HANDLE;
+        if (m->mesh.quad_depths.size() * 4 != m->mesh.vertex_count()) return SK_ERROR_UNSUPPORTED;
+        if (!std::isfinite(tolerance) || tolerance < 0) return SK_ERROR_INVALID_ARGUMENT;
+        const uint32_t colors[3] = {rgba_bytes(on_target), rgba_bytes(leftover), rgba_bytes(gouge)};
+        if (!color_by_deviation(m->mesh, *s, *t, tolerance, colors)) return SK_ERROR_INVALID_ARGUMENT;
         return SK_OK;
     });
 }

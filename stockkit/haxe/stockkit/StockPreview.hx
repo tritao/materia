@@ -40,8 +40,10 @@ class StockPreview {
     var tilesX = stock.tilesX(), tilesY = stock.tilesY();
     var changedTile = [for (k in 0...revisions.length)
       colorsChanged || seen.length == 0 || seen[k] != revisions[k]];
+    var contoured = stock.lattice.triDexel;
     var rayColors = switch coloring {
-      case ByDeviation(target, tolerance, onTarget, leftover, gouge) if (colorsChanged || changedTile.indexOf(true) >= 0):
+      case ByDeviation(target, tolerance, onTarget, leftover, gouge)
+        if (!contoured && (colorsChanged || changedTile.indexOf(true) >= 0)):
         deviationColors(target, tolerance, onTarget, leftover, gouge);
       case _: null;
     };
@@ -61,12 +63,10 @@ class StockPreview {
             if (changedTile[ty * tilesX + tx]) dirty = true;
         if (!dirty && meshes[cy * chunksX + cx] != null) continue;
         meshes[cy * chunksX + cx] = switch coloring {
-          case BySource(_, original) if (stock.lattice.triDexel):
-            stock.contour(x0, y0, x1 - x0, y1 - y0, palette, original);
+          case _ if (contoured):
+            stock.contour(x0, y0, x1 - x0, y1 - y0, coloring, palette);
           case BySource(_, original):
             stock.mesh(x0, y0, x1 - x0, y1 - y0, true, false, palette, original, rayColors);
-          case ByDeviation(_, _, _, _, _) if (stock.lattice.triDexel):
-            stock.contour(x0, y0, x1 - x0, y1 - y0, null, 0, rayColors);
           case ByDeviation(_, _, _, _, _):
             stock.mesh(x0, y0, x1 - x0, y1 - y0, false, false, null, 0, rayColors);
         };

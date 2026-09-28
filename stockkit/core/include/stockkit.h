@@ -436,12 +436,32 @@ SK_API sk_result SK_CALL sk_mesh_color_by_source(sk_mesh_handle mesh,
     uint32_t original, uint32_t fallback);
 
 /**
- * Colours each quad by its Z ray: `ray_colors[j * count_x + i]`, for example
- * a deviation map from `sk_stock_compare`. Needs a mesh built without
+ * Colours each quad made from a ray of the grid along `axis` by that ray:
+ * `ray_colors[j * count_u + i]`, for example a deviation map from
+ * `sk_stock_compare` on the same grid. Column meshes are made from Z rays
+ * only. A contoured quad is made from the ray along its edge: floors and
+ * ceilings mostly from Z rays, walls from X and Y rays, so colour with each
+ * grid's comparison to see gouges in walls. Needs a mesh built without
  * SK_MESH_MERGE and a colour for every ray of the grid.
  */
-SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh,
+SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, uint32_t axis,
     const uint32_t *ray_colors SK_IN_ARRAY(ray_count), uint32_t ray_count);
+
+/**
+ * Colours each quad of a contoured mesh by how the stock it was built from
+ * deviates from `target` (a stock on the same lattice, for example cast from
+ * the finished part) right at the quad's surface. Along the quad's ray, the
+ * gouge is the target missing from the stock that starts at the surface on
+ * its empty side, and the leftover is stock outside the target that ends
+ * there on its material side. Quads whose gouge exceeds `tolerance` get
+ * `gouge`, else those whose leftover does get `leftover`, else `on_target`
+ * (colours as 0xRRGGBBAA). A wall cut too deep shows on the X or Y rays
+ * crossing it, a floor on the Z rays, and the stock's other surfaces on the
+ * same rays stay unaffected. Colour before cutting the stock further. Needs
+ * a mesh built with SK_MESH_CONTOUR.
+ */
+SK_API sk_result SK_CALL sk_mesh_color_by_deviation(sk_mesh_handle mesh, sk_stock_handle target,
+    double tolerance, uint32_t on_target, uint32_t leftover, uint32_t gouge);
 
 #ifdef __cplusplus
 }

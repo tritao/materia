@@ -15,6 +15,8 @@ struct Crossing {
     double normal[3];
     uint32_t source;
     bool matched;
+    /** The surface's coordinate along the ray: the interval end itself, before clamping to the edge. */
+    double along;
 };
 
 /**
@@ -189,13 +191,14 @@ private:
             }
         }
         if (best < 0) {
-            out.point[axis] = (t0 + t1) / 2;
+            out.point[axis] = out.along = (t0 + t1) / 2;
             out.normal[0] = out.normal[1] = out.normal[2] = 0;
             out.normal[axis] = first_inside ? 1 : -1;
             out.source = kSourceStock;
             out.matched = false;
             return out;
         }
+        out.along = ends[best];
         out.point[axis] = std::min(t1, std::max(t0, ends[best]));
         const float *normal = first_inside ? &ray.hi_normal[3 * best] : &ray.lo_normal[3 * best];
         double length = std::sqrt(double(normal[0]) * normal[0] + double(normal[1]) * normal[1] +
@@ -277,8 +280,10 @@ private:
         }
         // Face +axis when the material ends on this edge, -axis when it starts.
         if (!first_inside) std::swap(corners[1], corners[3]);
-        const int32_t inner[3] = {first_inside ? i : i + (axis == 0), first_inside ? j : j + (axis == 1), 0};
-        const uint32_t ray = uint32_t(inner[1]) * lattice_.count[0] + uint32_t(inner[0]);
+        // The quad's ray is the one along its edge, whose comparison with a target sees this surface.
+        const Grid &along = grids_[axis]->grid();
+        const int32_t at[3] = {i, j, k};
+        const uint32_t ray = uint32_t(at[along.v_axis()]) * along.count[0] + uint32_t(at[along.u_axis()]);
         // Split along the diagonal whose triangles best follow the crossing's normal.
         auto facing = [&](int p, int q, int r) {
             double e1[3], e2[3];
@@ -298,10 +303,13 @@ private:
             mesh_.normals.insert(mesh_.normals.end(), normal, normal + 3);
             mesh_.vertex_sources.push_back(x.source);
             mesh_.vertex_rays.push_back(ray);
+            mesh_.vertex_axes.push_back(uint8_t(axis));
         }
         if (other) mesh_.indices.insert(mesh_.indices.end(), {base, base + 1, base + 3, base + 1, base + 2, base + 3});
         else mesh_.indices.insert(mesh_.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
         mesh_.triangle_sources.insert(mesh_.triangle_sources.end(), {x.source, x.source});
+        mesh_.quad_depths.push_back(x.along);
+        mesh_.quad_exits.push_back(first_inside ? 1 : 0);
     }
 
     const Lattice &lattice_;
@@ -317,7 +325,72 @@ private:
     std::vector<Crossing> crossings_;
 };
 
+/** Interval `m` of `ray` holds t: lo <= t < hi when `above`, lo < t <= hi otherwise. */
+bool holds(const RayView &ray, uint32_t m, double t, bool above) {
+    return above ? ray.lo[m] <= t && t < ray.hi[m] : ray.lo[m] < t && t <= ray.hi[m];
+}
+
+/** The interval of `ray` just above t (above) or just below it, or -1. */
+int64_t holding(const RayView &ray, double t, bool above) {
+    for (uint32_t m = 0; m < ray.count; ++m)
+        if (holds(ray, m, t, above)) return m;
+    return -1;
+}
+
+/**
+ * The gouge and leftover a stock surface at `t` bounds along a ray, where the
+ * stock's material lies below t (`exit`) or above it. The gouge is target
+ * missing from the stock on the empty side, up to where the target ends or
+ * the stock resumes; the leftover is stock outside the target on the
+ * material side, back to where the target or the stock's material begins.
+ */
+void deviation_at(const RayView &stock, const RayView &target, double t, bool exit, double &gouge,
+    double &leftover) {
+    gouge = leftover = 0;
+    const bool empty_above = exit;
+    // Gouge on the empty side.
+    int64_t g = holding(target, t, empty_above);
+    if (g >= 0) {
+        double end = empty_above ? target.hi[g] : target.lo[g];
+        for (uint32_t m = 0; m < stock.count; ++m) {
+            if (empty_above && stock.lo[m] >= t) end = std::min(end, stock.lo[m]);
+            if (!empty_above && stock.hi[m] <= t) end = std::max(end, stock.hi[m]);
+        }
+        gouge = std::fabs(end - t);
+    }
+    // Leftover on the material side.
+    if (holding(target, t, !empty_above) < 0) {
+        int64_t own = holding(stock, t, !empty_above);
+        if (own >= 0) {
+            double end = empty_above ? stock.lo[own] : stock.hi[own];
+            for (uint32_t m = 0; m < target.count; ++m) {
+                if (empty_above && target.hi[m] <= t) end = std::max(end, target.hi[m]);
+                if (!empty_above && target.lo[m] >= t) end = std::min(end, target.lo[m]);
+            }
+            leftover = std::fabs(t - end);
+        }
+    }
+}
+
 } // namespace
+
+bool color_by_deviation(PreviewMesh &mesh, const Stock &stock, const Stock &target, double tolerance,
+    const uint32_t colors[3], uint64_t *gouged) {
+    if (!(stock.lattice() == target.lattice())) return false;
+    if (gouged) *gouged = 0;
+    for (size_t q = 0; q < mesh.quad_depths.size(); ++q) {
+        const uint32_t v = uint32_t(4 * q), axis = mesh.vertex_axes[v], ray = mesh.vertex_rays[v];
+        const DexelGrid &grid = *stock.grid(axis), &goal = *target.grid(axis);
+        const uint32_t nu = grid.grid().count[0];
+        double gouge, leftover;
+        deviation_at(grid.view(ray % nu, ray / nu), goal.view(ray % nu, ray / nu), mesh.quad_depths[q],
+            mesh.quad_exits[q] != 0, gouge, leftover);
+        const uint32_t color = gouge > tolerance ? colors[2] : leftover > tolerance ? colors[1] : colors[0];
+        if (gouged && gouge > tolerance) ++*gouged;
+        for (uint32_t k = 0; k < 4; ++k) mesh.colors[v + k] = color;
+    }
+    return true;
+}
 
 void build_contour(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
     PreviewMesh &out, ContourStats *stats) {

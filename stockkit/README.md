@@ -117,8 +117,10 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   interval end's source leads back to its `CutMove`, and from there to the
   op and `Provenance`. `cut` returns a `CutReport` with each move's
   `MoveOutcome`, rapid contacts, collisions and totals per operation.
-  `compare` returns a `StockComparison` with leftover and gouge volumes,
-  the deepest gouge and the moves that gouged.
+  `compare` returns a `StockComparison` along one grid with leftover and
+  gouge volumes, the deepest gouge and the moves that gouged;
+  `compareAll` returns one per grid, so a wall gouged sideways (seen only
+  by X or Y rays) is not missed.
 - Preview and scrubbing (phase 5, headless):
   - `sk_stock_mesh` meshes a range of tiles. Each ray is a square column
     spacing wide with exact depths: top faces carry the stored normal and
@@ -143,6 +145,15 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     footprint do, so a finishing pass that moves a wall by less than a
     spacing still remeshes its chunk. `StockPreview` and the app use
     contoured meshes on tri-dexel stock.
+  - `sk_mesh_color_by_deviation` colours a contoured mesh against a target
+    surface by surface: each quad's surface is an exact interval end on its
+    ray, and the ray's comparison with the target gives the gouge starting
+    there on its empty side and the leftover ending there on its material
+    side. A wall cut too deep shows on the X or Y rays crossing it, while
+    the stock's other faces on those rays keep their own colour.
+    `StockColoring.ByDeviation` uses it for contoured meshes.
+    `sk_mesh_color_by_ray` takes a grid axis and colours the quads made from
+    that grid's rays, for any other per-ray map.
   - Tiles are copy-on-write and carry revisions. `sk_stock_snapshot` and
     `sk_stock_restore` share tiles, so a snapshot costs a pointer per tile
     plus whatever later cuts replace.
@@ -182,6 +193,9 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     it, face normals only, volume to float precision, the same in chunks),
     flat and ball slots within their chord error, and a 0.1 mm wall shave
     that no Z ray sees moves the wall and renews the Z tiles along it.
+    A slot too wide and too shallow colours its walls as gouged (seen only
+    by Y rays), its floor as leftover and the box's sides on the same rays
+    as on target, and a groove's gouge ends where the stock resumes.
   - Every oracle and chain fixture also contours the core stock on a
     60-cell-wide lattice and requires the enclosed volume to match the
     OCCT result within 1% of the removed volume.

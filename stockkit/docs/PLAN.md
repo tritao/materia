@@ -77,7 +77,10 @@ arrive as triangle buffers, so the core never links OCCT.
    and sharp edges (a box exactly; curved surfaces within their chord
    error), and the preview and app use it on tri-dexel stock. Not yet
    manifold: features thinner than a cell can merge at a shared vertex.
-   Next: per-axis target comparison in the viewer.
+   Target comparison runs along every grid, and contoured meshes are
+   coloured by deviation surface by surface, each by its own ray, so walls
+   gouged sideways show in the viewer and name their move. Still to do:
+   manifold dual contouring and STL export.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
    adapter, holder/spindle against fixtures via RobotKit/SimKit collision.
 
