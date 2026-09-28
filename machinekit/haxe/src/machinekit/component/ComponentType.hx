@@ -88,6 +88,7 @@ class ComponentType {
 			}) continue;
 			var text = switch value {
 				case Number(number): switch input.type {
+					case Scalar: Std.string(Math.round(number * 1e9) / 1e9);
 					case Length: Dimension.format(number);
 					case Angle: Std.string(Math.round(number * 1e9) / 1e9);
 					default: Std.string(number);

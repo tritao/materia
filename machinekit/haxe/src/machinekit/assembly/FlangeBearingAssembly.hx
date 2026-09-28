@@ -1,8 +1,6 @@
 package machinekit.assembly;
 
-import cadkit.modeling.AssemblyModel;
 import machinekit.component.Bom;
-import machinekit.component.MachineComponent;
 import machinekit.motion.FlangeBearingHousing;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.SocketHeadCapScrew;
@@ -20,7 +18,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
  * instance for each screw seat. The bearing's own `front`/`axis`/`back` connectors (named
  * `'<id>-bearing'`) stay reachable for mating a shaft through it.
  */
-class FlangeBearingAssembly {
+class FlangeBearingAssembly extends MachineAssembly {
 	public static inline var ENGAGEMENT_DIAMETERS:Float = 1.5;
 
 	public final housing:FlangeBearingHousing;
@@ -28,10 +26,26 @@ class FlangeBearingAssembly {
 	public final screw:SocketHeadCapScrew;
 
 	public function new(bearing:DeepGrooveBearing) {
+		super();
 		this.bearing = bearing;
 		housing = new FlangeBearingHousing(bearing);
 		var diameter = housing.mountScrewPart(10).diameter;
 		screw = housing.mountScrewPart(standardScrewLength(housing.depth + ENGAGEMENT_DIAMETERS * diameter));
+		addComponent("housing", housing);
+		addComponent("bearing", bearing);
+		addMate("bearing-seat", "fixed", "housing", "bore", "bearing", "axis");
+		exposeConnector("housingBore", "housing", "bore");
+		exposeConnector("bearingAxis", "bearing", "axis");
+		exposeConnector("bearingFront", "bearing", "front");
+		exposeConnector("bearingBack", "bearing", "back");
+		for (i in 1...5) {
+			var bolt = housing.connector('bolt$i').frame;
+			addMemberConnector("housing", 'bolt${i}Head', {x: bolt.x, y: bolt.y, z: bolt.z + housing.depth,
+				qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw});
+			addComponent('screw$i', screw);
+			addMate('screw$i-seat', "fixed", "housing", 'bolt${i}Head', 'screw$i', "head");
+			exposeConnector('screw${i}Tip', 'screw$i', "tip");
+		}
 	}
 
 	/** Shortest ISO 4762 preferred length at least `minimum` millimetres. */
@@ -43,34 +57,5 @@ class FlangeBearingAssembly {
 		throw 'No standard socket head cap screw is at least ${Math.ceil(minimum)} mm long';
 	}
 
-	public function addTo(model:AssemblyModel, id:String, ?pose:AssemblyFrame):Void {
-		var housingId = '$id-housing';
-		housing.addTo(model, housingId, pose);
-		bearing.addTo(model, '$id-bearing');
-		model.mate('$id-bearing-seat', "fixed", housingId, "bore", '$id-bearing', "axis");
-		for (i in 1...5) {
-			var bolt = housing.connector('bolt$i').frame;
-			model.connector(housingId, 'bolt${i}Head', {x: bolt.x, y: bolt.y, z: bolt.z + housing.depth,
-				qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw});
-			var screwId = '$id-screw$i';
-			screw.addTo(model, screwId);
-			model.mate('$screwId-seat', "fixed", housingId, 'bolt${i}Head', screwId, "head");
-		}
-	}
-
-	public function bom():Bom {
-		var result = new Bom();
-		result.addComponent(housing);
-		result.addComponent(bearing);
-		result.addComponent(screw, 4);
-		return result;
-	}
-
-	/** Instance id to component, for geometry generation by a preview or exporter. */
-	public function components():Array<{id:String, component:MachineComponent}> {
-		var result:Array<{id:String, component:MachineComponent}> = [
-			{id: "housing", component: housing}, {id: "bearing", component: bearing}];
-		for (i in 1...5) result.push({id: 'screw$i', component: screw});
-		return result;
-	}
+	public function bom():Bom return billOfMaterials();
 }

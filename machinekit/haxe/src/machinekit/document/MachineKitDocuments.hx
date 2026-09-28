@@ -100,6 +100,7 @@ class MachineKitDocuments {
 
 	static function definitionInput(name:String, parameter:ComponentParameter, value:ComponentValue):DefinitionInput
 		return switch parameter.type {
+			case Scalar: new DefinitionInput(name, "scalar", "1", number(value));
 			case Length: new DefinitionInput(name, "length", parameter.unit, number(value));
 			case Angle: new DefinitionInput(name, "angle", parameter.unit, number(value));
 			case Count: DefinitionInput.integer(name, integer(value));

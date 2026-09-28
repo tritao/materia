@@ -3,10 +3,11 @@ package machinekit.picking;
 import materia.assembly.AssemblyFrames;
 import machinekit.component.Bom;
 import machinekit.component.MachineComponent;
+import machinekit.assembly.MachineAssembly;
 import machinekit.standard.SocketHeadCapScrew;
 
 /** Composes one rack, its shelves, bins, indicators, frame, and feet. */
-class StorageRack {
+class StorageRack extends MachineAssembly {
 	public final config:PickingStationConfig;
 	public final frame:RackFrame;
 	public final shelf:ShelfAssembly;
@@ -16,6 +17,7 @@ class StorageRack {
 	final positionsList:Array<StoragePosition>;
 
 	public function new(config:PickingStationConfig) {
+		super();
 		if (config == null) throw "Storage rack requires a configuration";
 		this.config = config;
 		frame = new RackFrame(config.rackWidth, config.rackDepth, config.rackHeight,
@@ -30,22 +32,25 @@ class StorageRack {
 		for (shelfIndex in 1...config.shelfCount + 1)
 			for (binIndex in 1...config.binsPerShelf + 1)
 				positionsList.push(new StoragePosition(config, shelfIndex, binIndex));
-		}
+		buildAssemblyMembers();
+	}
 
 	public function positions():Array<StoragePosition> return positionsList.copy();
 
-	public function instances():Array<StationInstance> {
-		var result:Array<StationInstance> = [{id: "rack-01/frame", label: "Rack extrusion frame",
+	public function instances(prefix:String = "rack-01"):Array<StationInstance> {
+		var result:Array<StationInstance> = [{id: MachineAssembly.join(prefix, "frame"), label: "Rack extrusion frame",
 			component: frame, pose: AssemblyFrames.translation(0, 0, 0)}];
 		for (shelfIndex in 1...config.shelfCount + 1) {
-			var shelfId = 'rack-01/shelf-${twoDigits(shelfIndex)}';
+			var shelfId = MachineAssembly.join(prefix, 'shelf-${twoDigits(shelfIndex)}');
 			result.push({id: shelfId, label: 'Shelf ${twoDigits(shelfIndex)}', component: shelf,
 				pose: AssemblyFrames.translation(0, 0, config.shelfZ(shelfIndex))});
 		}
 		for (position in positionsList) {
-			result.push({id: position.id, label: 'Storage bin ${position.id}', component: bin,
+			var localId = positionLocalId(position);
+			var binId = MachineAssembly.join(prefix, localId);
+			result.push({id: binId, label: 'Storage bin ${binId}', component: bin,
 				pose: position.placement});
-			result.push({id: position.indicatorId, label: 'Pick indicator ${position.id}', component: indicator,
+			result.push({id: '$binId/indicator', label: 'Pick indicator ${binId}', component: indicator,
 				pose: position.indicatorPlacement});
 		}
 		var x = config.rackWidth / 2 - PickingStationConfig.FRAME_SIZE / 2;
@@ -53,21 +58,32 @@ class StorageRack {
 		for (corner in [
 			{name: "front-left", x: -x, y: -y}, {name: "front-right", x: x, y: -y},
 			{name: "back-left", x: -x, y: y}, {name: "back-right", x: x, y: y}])
-			result.push({id: 'rack-01/feet/${corner.name}', label: 'Adjustable foot ${corner.name}',
+			result.push({id: MachineAssembly.join(prefix, 'feet/${corner.name}'), label: 'Adjustable foot ${corner.name}',
 				component: foot, pose: AssemblyFrames.translation(corner.x, corner.y, 0)});
 		return result;
 	}
 
-	public function billOfMaterials():Bom {
-		var result = new Bom();
-		result.addComponent(frame);
-		result.addComponent(shelf, config.shelfCount);
-		result.addComponent(bin, config.binsPerShelf * config.shelfCount);
-		result.addComponent(indicator, config.binsPerShelf * config.shelfCount);
-		result.addComponent(foot, 4);
-		result.addComponent(SocketHeadCapScrew.metric("M5", 12), config.shelfCount * 4);
-		return result;
+	function buildAssemblyMembers():Void {
+		addComponent("frame", frame);
+		for (shelfIndex in 1...config.shelfCount + 1)
+			addComponent('shelf-${twoDigits(shelfIndex)}', shelf,
+				AssemblyFrames.translation(0, 0, config.shelfZ(shelfIndex)));
+		for (position in positionsList) {
+			var id = positionLocalId(position);
+			addComponent(id, bin, position.placement);
+			addComponent('$id/indicator', indicator, position.indicatorPlacement);
+		}
+		var x = config.rackWidth / 2 - PickingStationConfig.FRAME_SIZE / 2;
+		var y = config.rackDepth / 2 - PickingStationConfig.FRAME_SIZE / 2;
+		for (corner in [
+			{name: "front-left", x: -x, y: -y}, {name: "front-right", x: x, y: -y},
+			{name: "back-left", x: -x, y: y}, {name: "back-right", x: x, y: y}])
+			addComponent('feet/${corner.name}', foot, AssemblyFrames.translation(corner.x, corner.y, 0));
+		addBomItem(SocketHeadCapScrew.metric("M5", 12).bom, config.shelfCount * 4);
 	}
+
+	static function positionLocalId(position:StoragePosition):String
+		return 'shelf-${twoDigits(position.shelfIndex)}/bin-${twoDigits(position.binIndex)}';
 
 	static function twoDigits(value:Int):String return value < 10 ? "0" + value : Std.string(value);
 }

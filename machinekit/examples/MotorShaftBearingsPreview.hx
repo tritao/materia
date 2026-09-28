@@ -13,7 +13,6 @@ import cadkit.parametric.InstanceElement;
 import cadkit.parametric.TypedProperty;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
-import machinekit.document.MachineKitDocumentAssembly;
 
 /** Materia project entrypoint for the MachineKit motor/shaft/bearing assembly. */
 class MotorShaftBearingsPreview {
@@ -44,9 +43,11 @@ class MotorShaftBearingsPreview {
 		var editable = savedDocument == null ? document() : DocumentCodec.decode(savedDocument);
 		try {
 			var result = previewDocument(editable);
+			MachineKitRecipes.forget(editable);
 			editable.close();
 			return result;
 		} catch (error:Dynamic) {
+			MachineKitRecipes.forget(editable);
 			editable.close();
 			throw error;
 		}
@@ -62,7 +63,7 @@ class MotorShaftBearingsPreview {
 			if (instances.exists(id)) throw 'Duplicate MachineKit occurrence "$id"';
 			instances.set(id, instance);
 		}
-		var model = assembly(example, instances);
+		var model = example.assembly(instances);
 		var parts:Array<SceneArtifactPart> = [];
 		var definitionByOccurrence = new Map<String, String>();
 		var definitionByIdentity = new Map<String, String>();
@@ -105,36 +106,6 @@ class MotorShaftBearingsPreview {
 			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
 			assembly: model.record(), assemblyDefinition: definition,
 			assemblyState: state, recipeDocument: DocumentCodec.encode(editable)});
-	}
-
-	static function assembly(example:MotorShaftBearings, instances:Map<String, InstanceElement>):AssemblyModel {
-		var model = new AssemblyModel();
-		add(model, "motor", example.motor, instances);
-		add(model, "plate", example.plate, instances);
-		model.mate("plate-mount", "fixed", "motor", "mountFace", "plate", "motor");
-		for (i in 1...5) {
-			var id = 'screw$i';
-			add(model, id, example.screw, instances);
-			model.mate('$id-seat', "fixed", "plate", 'bolt$i', id, "head");
-		}
-		add(model, "shaft", example.shaft, instances);
-		model.mate("coupling", "continuous", "motor", "shaftTip", "shaft", "input");
-		for (seat in ["bearingA", "bearingB"]) {
-			add(model, seat, example.bearing, instances);
-			model.mate('$seat-seat', "fixed", "shaft", seat, seat, "front");
-		}
-		add(model, "key", example.key, instances);
-		model.mate("key-seat", "fixed", "shaft", "outputKey", "key", "seat");
-		add(model, "ring", example.ring, instances);
-		model.mate("ring-seat", "fixed", "shaft", "bearingBRing", "ring", "seat");
-		return model;
-	}
-
-	static function add(model:AssemblyModel, id:String, component:machinekit.component.MachineComponent,
-			instances:Map<String, InstanceElement>):Void {
-		var instance = instances.get(id);
-		if (instance == null) component.addTo(model, id);
-		else MachineKitDocumentAssembly.add(model, id, instance);
 	}
 
 	static function addPart(parts:Array<SceneArtifactPart>, id:String, name:String, part:Part,

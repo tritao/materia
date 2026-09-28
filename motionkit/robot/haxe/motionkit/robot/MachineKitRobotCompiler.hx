@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import cadkit.modeling.AssemblyModel;
 import machinekit.assembly.LinearAxis;
 import motionkit.axis.MotionAxisBlueprint;
 import robotkit.model.Actuator;
@@ -44,8 +45,9 @@ class MachineKitRobotCompiler {
     var model = new RobotModel('linear-axis-$axisId');
     var base = model.addLink(new Link('${axisId}.base'));
     var carriage = model.addLink(new Link('${axisId}.carriage'));
+    var carriageStart = machineAxisStart(axis, 'axis-$axisId');
     addPrismaticJoint(model, axisId, base, carriage, axis,
-      [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, axis.screwStart + axis.travelMin],
+      [0.0, 0.0, 0.0, 1.0], [0.0, 0.0, carriageStart],
       maxVelocity, maxAcceleration);
     return model;
   }
@@ -68,26 +70,38 @@ class MachineKitRobotCompiler {
     var yCarriage = model.addLink(new Link("y.carriage"));
     var zCarriage = model.addLink(new Link("z.carriage"));
     var halfSqrt = Math.sqrt(0.5);
+    var xStart = machineAxisStart(xAxis, "x-axis");
+    var yStart = machineAxisStart(yAxis, "y-axis");
+    var zStart = machineAxisStart(zAxis, "z-axis");
     // MachineKit LinearAxis is authored along local +Z. Rotate each carriage
     // frame into the corresponding machine coordinate direction.
     addPrismaticJoint(model, "x", base, xCarriage, xAxis,
       [0.0, halfSqrt, 0.0, halfSqrt],
-      [xAxis.screwStart + xAxis.travelMin, 0.0, 0.0], maxVelocity, maxAcceleration);
+      [xStart, 0.0, 0.0], maxVelocity, maxAcceleration);
     addPrismaticJoint(model, "y", xCarriage, yCarriage, yAxis,
       [-halfSqrt, 0.0, 0.0, halfSqrt],
-      [0.0, yAxis.screwStart + yAxis.travelMin, 0.0], maxVelocity, maxAcceleration);
+      [0.0, yStart, 0.0], maxVelocity, maxAcceleration);
     // The inherited Y-carriage frame is R_y(90°) * R_x(-90°). Use its
     // inverse for Z and express the travel origin along local -X so both the
     // Z joint axis and its origin land on world +Z.
     addPrismaticJoint(model, "z", yCarriage, zCarriage, zAxis,
       [0.5, -0.5, -0.5, 0.5],
-      [-(zAxis.screwStart + zAxis.travelMin), 0.0, 0.0], maxVelocity, maxAcceleration);
+      [-zStart, 0.0, 0.0], maxVelocity, maxAcceleration);
 
     return MotionSystemBlueprint.fromRobotModel(model, [
       axisBlueprint("x", xAxis, maxVelocity, maxAcceleration),
       axisBlueprint("y", yAxis, maxVelocity, maxAcceleration),
       axisBlueprint("z", zAxis, maxVelocity, maxAcceleration)
     ]);
+  }
+
+  /** Read the carriage datum through MachineAssembly's prefix-aware connector API. */
+  static function machineAxisStart(axis:LinearAxis, prefix:String):Float {
+    var mechanical = new AssemblyModel();
+    axis.addTo(mechanical, prefix);
+    var connector = axis.connector("carriageBore", prefix);
+    return mechanical.initialState('machinekit-$prefix').worldConnector(connector.instanceId,
+      connector.connectorName).z;
   }
 
   static function axisBlueprint(id:String, axis:LinearAxis, maxVelocity:Float,

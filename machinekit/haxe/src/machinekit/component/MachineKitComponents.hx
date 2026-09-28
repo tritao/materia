@@ -21,6 +21,8 @@ import machinekit.robotics.RobotFlange;
 import machinekit.robotics.EndEffectorPlate;
 import machinekit.robotics.Pedestal;
 import machinekit.transmission.Sprocket;
+import machinekit.transmission.SpurGear;
+import machinekit.transmission.Rack;
 import machinekit.transmission.TimingPulley;
 
 /** Registered, editable single-part generators. Parts whose inputs include lists, such as
@@ -65,6 +67,8 @@ class MachineKitComponents {
 			Pedestal.recipeType(),
 			Sprocket.chainRecipeType(),
 			Sprocket.genericRecipeType(),
+			SpurGear.recipeType(),
+			Rack.recipeType(),
 			TimingPulley.standardRecipeType(),
 			TimingPulley.customRecipeType()
 	];

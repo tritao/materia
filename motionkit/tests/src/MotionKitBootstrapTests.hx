@@ -104,6 +104,12 @@ class MotionKitBootstrapTests {
   static var assertions:Int = 0;
 
   public static function main():Void {
+    if (Sys.getEnv("MOTIONKIT_MACHINEKIT_ONLY") == "1") {
+      testLinearAxisCompilesToRobotModel();
+      testCompiledXYZGantryRunsThroughSimulation();
+      Sys.println('MachineKit compiler tests passed ($assertions assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       testOpwKinematics();
       Sys.println('C4 focused tests passed ($assertions assertions)');

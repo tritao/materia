@@ -6,6 +6,7 @@ import cadkit.parametric.Definition;
 import cadkit.parametric.DefinitionConnectorEvaluator;
 import cadkit.parametric.DefinitionEvaluator;
 import cadkit.parametric.DefinitionEvaluatorRegistry;
+import cadkit.parametric.Document;
 import cadkit.parametric.InstanceElement;
 import cadkit.parametric.Placement;
 import machinekit.component.ComponentDetail;
@@ -32,6 +33,14 @@ class MachineKitRecipes {
 		}
 	}
 
+	/** Release cached recipe objects owned by a document that is being closed. */
+	public static function forget(document:Document):Void {
+		if (document == null) return;
+		var prefix = document.id.value + ":";
+		var forgotten = [for (identity in components.keys()) if (StringTools.startsWith(identity, prefix)) identity];
+		for (identity in forgotten) components.remove(identity);
+	}
+
 	public static function typeOrNull(id:String):Null<ComponentType> {
 		for (type in MachineKitComponents.all()) if (type.id == id) return type;
 		return null;
@@ -48,7 +57,7 @@ class MachineKitRecipes {
 		for (parameter in type.parameters()) {
 			var raw = instance.resolvedValue(parameter.name);
 			switch parameter.type {
-				case Length | Angle: values.setNumber(parameter.name, cast raw);
+				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
 				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
@@ -69,7 +78,7 @@ class MachineKitRecipes {
 			if (!inputNames.exists(name)) continue;
 			var raw = instance.resolvedValue(name);
 			switch parameter.type {
-				case Length | Angle: values.setNumber(parameter.name, cast raw);
+				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
 				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);

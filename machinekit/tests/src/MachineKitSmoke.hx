@@ -963,6 +963,15 @@ class MachineKitSmoke {
 		near(pair.operatingPressureAngle, SpurGear.STANDARD_PRESSURE_ANGLE, "gear pair operating pressure angle");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
 		near(pair.pose().x, pair.centerDistance, "gear pair pose offset");
+		var pairModel = new AssemblyModel();
+		pair.addTo(pairModel, "gearbox");
+		var pairState = pairModel.initialState("gear-pair");
+		check(pair.connector("inputAxis", "gearbox").instanceId == "gearbox/a",
+			"gear pair exposes its input axis through the prefix");
+		near(pairState.worldConnector("gearbox/b", "axis").x, pair.centerDistance,
+			"gear pair places output gear through MachineAssembly.addTo");
+		check(pair.billOfMaterials().quantity(pinion.designation) == 1 &&
+			pair.billOfMaterials().quantity(gear.designation) == 1, "gear pair BOM counts both gears");
 		var shiftedPair = GearPair.mesh(new SpurGear(2, 17, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.1, 0.1),
 			new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.2, 0.05));
 		near(shiftedPair.profileShiftSum, 0.3, "shifted gear pair profile shift");
@@ -1120,18 +1129,20 @@ class MachineKitSmoke {
 		check(definition.joints.length == 5, "flange assembly joint count");
 		var state = model.initialState("flange-bearing-assembly");
 		var depth = block.housing.depth;
-		near(state.worldConnector("flange-bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
-		near(state.worldConnector("flange-bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
+		near(state.worldConnector("flange/bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
+		near(state.worldConnector("flange/bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
+		check(block.connector("bearingAxis", "flange").instanceId == "flange/bearing",
+			"flange assembly exposes its named bearing axis with the caller prefix");
 		// Screws seat on the outer face and reach through the mounting face into the frame.
 		near(block.screw.length, 35, "flange assembly screw: next standard length over depth + 1.5 d");
 		check(block.screw.length >= depth + 1.5 * block.screw.diameter, "flange assembly screw engagement");
 		for (i in 1...5) {
-			var head = state.worldConnector('flange-screw$i', "head");
+			var head = state.worldConnector('flange/screw$i', "head");
 			var bolt = block.housing.connector('bolt$i').frame;
 			near(head.x, bolt.x, 'flange assembly screw$i on its bolt x');
 			near(head.y, bolt.y, 'flange assembly screw$i on its bolt y');
 			near(head.z, depth, 'flange assembly screw$i head on the outer face');
-			check(state.worldConnector('flange-screw$i', "tip").z < 0, 'flange assembly screw$i tip below the mounting face');
+			check(state.worldConnector('flange/screw$i', "tip").z < 0, 'flange assembly screw$i tip below the mounting face');
 		}
 		near(FlangeBearingAssembly.standardScrewLength(20), 20, "standard screw length exact");
 		near(FlangeBearingAssembly.standardScrewLength(20.1), 25, "standard screw length rounds up");
@@ -1323,6 +1334,17 @@ class MachineKitSmoke {
 		check(state.worldConnector("flangeA-screw1", "tip").z < 21 + axis.bearingAPosition - depth / 2, "flange A screw tips outboard");
 		near(state.worldConnector("flangeB-screw1", "head").z, 21 + axis.bearingBPosition - depth / 2, "flange B screw heads inboard");
 		check(state.worldConnector("flangeB-screw1", "tip").z > 21 + axis.length, "flange B screw tips outboard");
+		var prefixedModel = new AssemblyModel();
+		axis.addTo(prefixedModel, "axis-x");
+		var prefixedState = prefixedModel.initialState("prefixed-linear-axis");
+		check(axis.connector("carriageBore", "axis-x").instanceId == "axis-x/carriage",
+			"linear axis exposes a prefix-aware carriage connector");
+		check(Lambda.exists(prefixedModel.definition("prefixed-linear-axis").joints,
+			joint -> joint.id == "axis-x/carriage-slide"),
+			"linear axis prefixes its joints");
+		axis.setTravel(prefixedState, 5, "axis-x");
+		near(prefixedState.worldConnector("axis-x/carriage", "bore").z, 21 + axis.travelMin + 5,
+			"linear axis setTravel accepts the same instance prefix");
 
 		axis.setTravel(state, 100);
 		near(state.joint("coupling"), axis.nut.rotationFor(100), "screw rotation follows nut lead");
@@ -1432,6 +1454,16 @@ class MachineKitSmoke {
 				"adjustable foot aligns with its post in Y");
 		}
 		check(feet == 4, "rack has one foot aligned to each post");
+		check(rack.instances("rack-02")[0].id == "rack-02/frame",
+			"storage rack instance listing accepts a caller prefix");
+		var rackModel = new AssemblyModel();
+		rack.addTo(rackModel, "rack-02");
+		var rackOccurrences = rackModel.definition("storage-rack").occurrences;
+		check(Lambda.exists(rackOccurrences, occurrence -> occurrence.id == "rack-02/frame") &&
+			Lambda.exists(rackOccurrences, occurrence -> occurrence.id == "rack-02/shelf-01/bin-01/indicator"),
+			"storage rack adds all occurrences below the caller prefix");
+		check(rack.billOfMaterials().quantity("ISO4762-M5x12") == config.shelfCount * 4,
+			"storage rack BOM includes shelf fasteners");
 		checkOverlap(frame.memberGeometry("front-rail-0"), frame.memberGeometry("front-left"), 0,
 			"rack front rail terminates at the post face");
 		checkOverlap(frame.memberGeometry("front-rail-0"), frame.memberGeometry("front-right"), 0,

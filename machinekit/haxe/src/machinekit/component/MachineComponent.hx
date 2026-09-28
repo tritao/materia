@@ -14,7 +14,7 @@ class MachineComponent {
 	/** True when this component was built from explicit, non-catalog specifications. */
 	public final codeOnly:Bool;
 	public var bom(get, never):BomItem;
-	final description:String;
+	public final description:String;
 	var cachedBom:Null<BomItem>;
 	/** Null for code-only parts and assemblies outside the v1 recipe registry. */
 	public var type(get, never):Null<ComponentType>;

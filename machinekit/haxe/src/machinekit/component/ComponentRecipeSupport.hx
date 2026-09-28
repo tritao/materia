@@ -61,6 +61,9 @@ class ComponentRecipeSupport {
 	public static function length(name:String, value:Float):ComponentParameter
 		return new ComponentParameter(name, Length, Number(value), "mm", 0);
 
+	public static function scalar(name:String, value:Float, ?minimum:Float, ?maximum:Float):ComponentParameter
+		return new ComponentParameter(name, Scalar, Number(value), "1", minimum, maximum);
+
 	public static function flag(name:String, value:Bool):ComponentParameter
 		return new ComponentParameter(name, Bool, Boolean(value));
 
