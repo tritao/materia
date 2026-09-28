@@ -35,6 +35,8 @@ import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
+import motionkit.robot.SessionState;
+import motionkit.robot.StopDisposition;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
 import motionkit.path.CornerBlender;
@@ -169,6 +171,7 @@ class MotionKitBootstrapTests {
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
     testNormalAbortWaitsForRest();
+    testMotionSessionTransitions();
     testPlanCapableReplayRecordsMotionPlan();
     testLongBufferedExecution();
     testHoldRefillsNearChunkBoundary();
@@ -2244,6 +2247,125 @@ class MotionKitBootstrapTests {
     simulation.dispose();
   }
 
+  /** Exercise the MotionSession transition table through a virtual runtime. */
+  static function testMotionSessionTransitions():Void {
+    function expect(rig:SessionTransitionRig, label:String, expected:SessionState,
+        commands:Int, action:Void -> Void):Void {
+      var before = rig.robot.commands.length;
+      action();
+      check(rig.machine.sessionState() == expected,
+        '$label transitions to ${Std.string(expected)}');
+      check(rig.robot.commands.length - before == commands,
+        '$label sends $commands command(s) to the runtime');
+    }
+
+    var idleRig = new SessionTransitionRig("session-idle-hold");
+    expect(idleRig, "idle + hold", Held, 0, () -> idleRig.machine.hold());
+    expect(idleRig, "held + queue", Held, 0, () ->
+      idleRig.machine.queueAxes([new AxisTarget("x", 0.02)], idleRig.options));
+    expect(idleRig, "held + resume", Running, 1, () -> idleRig.machine.resume());
+    idleRig.dispose();
+
+    // Running + abort -> Stopping(Discard); a new move replaces the discard
+    // request without submitting a plan until runtime rest is observed.
+    var abortRig = new SessionTransitionRig("session-abort");
+    abortRig.start();
+    expect(abortRig, "running + abort", Stopping(Discard), 1,
+      () -> abortRig.machine.abort());
+    var planCount = abortRig.robot.planCount();
+    expect(abortRig, "stopping + move", Stopping(Replan), 0, () -> {
+      check(abortRig.machine.moveAxes([new AxisTarget("x", 0.02)], abortRig.options) == null,
+        "move after abort is deferred");
+    });
+    check(abortRig.robot.planCount() == planCount,
+      "deferred move sends no plan before rest");
+    abortRig.settleStop();
+    check(abortRig.machine.sessionState() == Running &&
+      abortRig.robot.planCount() == planCount + 1,
+      "stopping + rest starts the deferred plan");
+    abortRig.dispose();
+
+    var stopRig = new SessionTransitionRig("session-stop-hold");
+    stopRig.start();
+    stopRig.machine.abort();
+    expect(stopRig, "stopping + hold", Stopping(Discard), 0,
+      () -> stopRig.machine.hold());
+    expect(stopRig, "stopping + resume", Stopping(Discard), 0,
+      () -> stopRig.machine.resume());
+    stopRig.settleStop();
+    check(stopRig.machine.sessionState() == Idle,
+      "stopping + rest discards aborted motion");
+    stopRig.dispose();
+
+    var holdRig = new SessionTransitionRig("session-hold-resume");
+    holdRig.start();
+    expect(holdRig, "running + hold", Holding, 1,
+      () -> holdRig.machine.hold());
+    expect(holdRig, "holding + resume", Holding, 0,
+      () -> holdRig.machine.resume());
+    holdRig.settleHold();
+    check(holdRig.machine.sessionState() == Running &&
+      holdRig.robot.commandCount("resume") == 1,
+      "holding + rest sends one deferred resume");
+    holdRig.dispose();
+
+    var heldRig = new SessionTransitionRig("session-held-resume");
+    heldRig.start();
+    heldRig.machine.hold();
+    heldRig.settleHold();
+    check(heldRig.machine.sessionState() == Held &&
+      heldRig.robot.commandCount("resume") == 0,
+      "holding + rest becomes held without resuming");
+    expect(heldRig, "held + resume", Running, 1,
+      () -> heldRig.machine.resume());
+    heldRig.dispose();
+
+    var jogRig = new SessionTransitionRig("session-jog");
+    jogRig.machine.jog("x", 0.05, 2.0);
+    jogRig.advance(10);
+    var beforeReplacement = jogRig.robot.planCount();
+    expect(jogRig, "running + jog replacement", Running, 1, () -> {
+      check(jogRig.machine.jog("x", 0.02, 1.0) != null,
+        "running jog is replaced without stopping");
+    });
+    check(jogRig.robot.planCount() == beforeReplacement + 1,
+      "jog replacement submits one plan");
+    jogRig.advance(5);
+    expect(jogRig, "running + continued jog", Running, 1, () -> {
+      check(jogRig.machine.jog("x", 0.03, 1.0) != null,
+        "jog continues after replacement");
+    });
+    check(jogRig.robot.stops == 0,
+      "continued jog sends no stop to the runtime");
+    jogRig.dispose();
+
+    var faultRig = new SessionTransitionRig("session-fault");
+    faultRig.start();
+    faultRig.machine.abort();
+    faultRig.robot.faultOverride = 42;
+    var faultCommands = faultRig.robot.commands.length;
+    throws(() -> faultRig.machine.update(),
+      "snapshot fault while stopping interrupts the update");
+    check(faultRig.machine.sessionState() == Faulted &&
+      faultRig.robot.commands.length == faultCommands,
+      "stopping + fault latches Faulted without another command");
+    throws(() -> faultRig.machine.moveAxes([new AxisTarget("x", 0.01)]),
+      "faulted session rejects new motion");
+    faultRig.robot.faultOverride = 0;
+    faultRig.machine.reset();
+    check(faultRig.machine.sessionState() == Idle,
+      "faulted + explicit reset returns to idle");
+    faultRig.dispose();
+
+    var rejectRig = new SessionTransitionRig("session-rejection");
+    rejectRig.robot.rejectNext = true;
+    throws(() -> rejectRig.machine.moveAxes([new AxisTarget("x", 0.07)], rejectRig.options),
+      "rejected initial plan reports an error");
+    check(rejectRig.machine.sessionState() == Faulted,
+      "rejected submission latches Faulted");
+    rejectRig.dispose();
+  }
+
   static function testRuntimeSynchronizedHolding():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.2);
@@ -3273,6 +3395,115 @@ private class PlanarSolver implements KinematicsSolver {
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
     return [twist.linearX, twist.linearY, 0.0, 0.0, 0.0, 0.0];
+}
+
+/** Virtual robot probe for state transitions and runtime command assertions. */
+private class SessionTransitionRobot implements Robot {
+  public final inner:Robot;
+  public final commands:Array<RobotCommand> = [];
+  public var stops:Int = 0;
+  public var faultOverride:Int = 0;
+  public var rejectNext:Bool = false;
+
+  public function new(inner:Robot) this.inner = inner;
+  public function id():RobotId return inner.id();
+  public function status():RobotStatus return inner.status();
+  public function description():RobotDescription return inner.description();
+  public function capabilities():RobotCapabilities return inner.capabilities();
+  public function snapshot():RobotSnapshot {
+    var value = inner.snapshot();
+    if (faultOverride == 0) return value;
+    return new RobotSnapshot(value.id, value.sourceSequence, value.sourceTimestampNs,
+      value.positions.toArray(), value.velocities.toArray(), value.efforts.toArray(),
+      value.mode, faultOverride, value.receivedTimestampNs, value.sensors.toArray(),
+      value.sourceClockId, value.receivedClockId, value.safety,
+      value.trajectoryQueueDepth, value.trajectoryActive, value.trajectoryTimeNs,
+      value.trajectoryDurationNs, value.trajectoryTag, value.trajectoryTagTimeNs,
+      value.sessionState, value.activePlanId, value.committedUntilNs,
+      value.queueEndTimeNs);
+  }
+  public function sensors():Array<SensorFrame> return inner.sensors();
+  public function fault():Null<RobotFault> return inner.fault();
+  public function submit(command:RobotCommand):Void {
+    if (rejectNext) {
+      rejectNext = false;
+      throw new RobotRuntimeError(RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE,
+        "runtime.submitPlan");
+    }
+    inner.submit(command);
+    commands.push(command);
+  }
+  public function stop(mode:StopMode):Void {
+    inner.stop(mode);
+    stops++;
+  }
+  public function resetSafety():Void inner.resetSafety();
+  public function setChangeListener(listener:Null<RobotId -> Void>):Void
+    inner.setChangeListener(listener);
+  public function close():Void inner.close();
+
+  public function planCount():Int return commandCount("plan");
+  public function commandCount(kind:String):Int {
+    var count = 0;
+    for (command in commands) switch command {
+      case ExecutionPlan(_): if (kind == "plan") count++;
+      case Resume: if (kind == "resume") count++;
+      case Hold: if (kind == "hold") count++;
+      case Abort: if (kind == "abort") count++;
+      case _:
+    }
+    return count;
+  }
+}
+
+private class SessionTransitionRig {
+  public final simulation:Simulation;
+  public final robot:SessionTransitionRobot;
+  public final machine:MotionSystem;
+  public final options:MotionOptions = new MotionOptions(0.05, 0.2);
+  var tick:Int = 0;
+
+  public function new(id:String) {
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(
+      new LinearAxis(23, 10, 80), "x", 0.08, 0.4);
+    simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    robot = new SessionTransitionRobot(new SimulatedRobot(id, runtime,
+      blueprint.model.name, [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]));
+    machine = MotionSystem.fromBlueprint(robot, blueprint);
+  }
+
+  public function start():Void {
+    machine.moveAxes([new AxisTarget("x", 0.07)], options);
+    advance(5);
+  }
+
+  public function advance(count:Int):Void {
+    for (_ in 0...count) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+    }
+  }
+
+  public function settleStop():Void {
+    var steps = 0;
+    while (machine.sessionState() != SessionState.Idle &&
+        machine.sessionState() != SessionState.Running) {
+      advance(1);
+      if (++steps > 500) throw "session stop did not settle";
+    }
+  }
+
+  public function settleHold():Void {
+    var steps = 0;
+    while (machine.sessionState() == SessionState.Holding) {
+      advance(1);
+      if (++steps > 500) throw "session hold did not settle";
+    }
+  }
+
+  public function dispose():Void simulation.dispose();
 }
 
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */
