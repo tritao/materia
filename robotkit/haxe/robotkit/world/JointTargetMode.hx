@@ -5,4 +5,6 @@ enum JointTargetMode {
   Position;
   Velocity;
   Effort;
+  /** Position target with velocity target, stiffness, damping and feedforward effort. */
+  Servo;
 }

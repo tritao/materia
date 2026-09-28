@@ -115,6 +115,9 @@ class MobileBase {
           case robotkit.world.JointTargetMode.Position: capabilities.supportsPosition;
           case robotkit.world.JointTargetMode.Velocity: capabilities.supportsVelocity;
           case robotkit.world.JointTargetMode.Effort: capabilities.supportsEffort;
+          // A servo commands a position and an effort at once.
+          case robotkit.world.JointTargetMode.Servo:
+            capabilities.supportsPosition && capabilities.supportsEffort;
         };
         if (!supported)
           throw 'Robot does not support ${Std.string(target.mode)} joint targets';

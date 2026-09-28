@@ -212,6 +212,9 @@ class RobotClient {
     if (expiryNs != null && Int64.compare(expiryNs, Int64.ofInt(0)) != 0)
       throw "Remote absolute deadlines require clock synchronization";
     var batch = robotkit.world.JointTarget.copyBatch(targets);
+    for (target in batch)
+      if (target.mode == robotkit.world.JointTargetMode.Servo)
+        throw "Servo joint targets are not carried by the robotd protocol yet";
     var sequence = nextCommandSequence();
     var wireTargets:Array<JointTargetValue> = [];
     for (target in batch) wireTargets.push(new JointTargetValue(target.joint,
@@ -219,6 +222,7 @@ class RobotClient {
         case robotkit.world.JointTargetMode.Position: 1;
         case robotkit.world.JointTargetMode.Velocity: 2;
         case robotkit.world.JointTargetMode.Effort: 3;
+        case robotkit.world.JointTargetMode.Servo: throw "unreachable";
       }, target.target));
     var value = new JointTargets(robotId(), wireTargets, sequence,
       expiryNs == null ? Int64.ofInt(0) : expiryNs);

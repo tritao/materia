@@ -85,11 +85,15 @@ class RobotRuntimeCompiler {
       }
       maxRate = tighterLimit(maxRate, actuatorRate);
       maxEffort = tighterLimit(maxEffort, actuatorEffort);
-      result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
+      var compiled = new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
         joint.parentFramePosition, joint.parentFrameRotation,
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
-        joint.limits.maxAcceleration));
+        joint.limits.maxAcceleration);
+      compiled.armature = joint.armature;
+      compiled.damping = joint.damping;
+      compiled.frictionLoss = joint.frictionLoss;
+      result.addJoint(compiled);
     }
     for (coupling in robot.couplings) {
       var leader = -1, follower = -1;
@@ -272,6 +276,10 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_FRAME", path, "joint frames require finite translations and unit xyzw quaternions"));
       if (!validUnitVector(joint.axis))
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
+      if (!(joint.armature >= 0.0) || !(joint.damping >= 0.0) || !(joint.frictionLoss >= 0.0) ||
+          !Math.isFinite(joint.armature) || !Math.isFinite(joint.damping) || !Math.isFinite(joint.frictionLoss))
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_DYNAMICS", path,
+          "joint armature, damping and friction loss must be finite and non-negative"));
       if (joint.type == JointType.Floating)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_UNSUPPORTED", '$path.type',
           "floating joints are not supported; set RobotModel.floatingBase to free the root link"));

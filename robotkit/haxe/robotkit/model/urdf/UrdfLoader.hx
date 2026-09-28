@@ -24,8 +24,9 @@ class UrdfImport {
  * is given in the `inertial` frame. A root link named `world` is dropped: a
  * floating joint from it sets `floatingBase`, a fixed one leaves the robot
  * fixed. Box, cylinder and sphere collision geometry becomes collision shapes;
- * mesh references are kept as geometry references. `mimic` becomes a joint
- * coupling and a simple `transmission` becomes an actuator.
+ * mesh references are kept as geometry references. `dynamics` damping and
+ * friction become joint damping and friction loss, `mimic` a joint coupling,
+ * and a simple `transmission` an actuator.
  */
 class UrdfLoader {
   /** Mass given to a link without an `inertial`, which the runtime requires to be positive. */
@@ -120,8 +121,11 @@ class UrdfLoader {
       } else if (jointType == JointType.Revolute || jointType == JointType.Prismatic)
         throw 'URDF joint $jointName needs <limit>';
       joint.limits = limits;
-      if (child(element, "dynamics") != null)
-        warnings.push('joint $jointName: dynamics (damping, friction) are not stored yet');
+      var dynamics = child(element, "dynamics");
+      if (dynamics != null) {
+        joint.damping = Math.abs(number(dynamics, "damping", 0.0));
+        joint.frictionLoss = Math.abs(number(dynamics, "friction", 0.0));
+      }
       var mimic = child(element, "mimic");
       if (mimic != null)
         mimics.push({follower: jointName, leader: required(mimic, "joint"),

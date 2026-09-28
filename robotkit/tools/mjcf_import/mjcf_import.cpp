@@ -150,20 +150,45 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
         }
     if (root < 0) throw std::runtime_error("the model has no bodies");
 
-    std::set<int> contact_geoms;
+    // A geom named in an explicit contact pair takes the first such pair's
+    // friction and solver settings, which override the geoms' own.
+    std::map<int, int> contact_pairs;
     for (int pair = 0; pair < m->npair; ++pair) {
-        contact_geoms.insert(m->pair_geom1[pair]);
-        contact_geoms.insert(m->pair_geom2[pair]);
+        contact_pairs.emplace(m->pair_geom1[pair], pair);
+        contact_pairs.emplace(m->pair_geom2[pair], pair);
     }
     const auto collides = [&](int geom) {
         return m->geom_contype[geom] != 0 || m->geom_conaffinity[geom] != 0 ||
-               contact_geoms.count(geom) != 0;
+               contact_pairs.count(geom) != 0;
+    };
+    const auto surface_of = [&](int geom) {
+        const auto pair = contact_pairs.find(geom);
+        std::array<double, 3> friction;
+        double time_constant, damping_ratio;
+        int dimensions;
+        if (pair != contact_pairs.end()) {
+            const auto *values = m->pair_friction + 5 * pair->second; // slide, slide, spin, roll, roll
+            friction = {values[0], values[2], values[3]};
+            time_constant = m->pair_solref[2 * pair->second];
+            damping_ratio = m->pair_solref[2 * pair->second + 1];
+            dimensions = m->pair_dim[pair->second];
+        } else {
+            friction = {m->geom_friction[3 * geom], m->geom_friction[3 * geom + 1],
+                        m->geom_friction[3 * geom + 2]};
+            time_constant = m->geom_solref[2 * geom];
+            damping_ratio = m->geom_solref[2 * geom + 1];
+            dimensions = m->geom_condim[geom];
+        }
+        return "{\"friction\": " + array(friction) + ", \"frictionDimensions\": " +
+               std::to_string(dimensions) + ", \"contactTimeConstant\": " + number(time_constant) +
+               ", \"contactDampingRatio\": " + number(damping_ratio) + "}";
     };
 
     bool floating = false;
     std::vector<std::string> links, joints, frames, sensors, actuators;
     std::map<int, std::string> link_ids, joint_ids;
     int armature = 0, damping = 0, friction = 0;
+    int damping_ratio_actuators = 0;
     std::filesystem::create_directories(out_dir / "meshes");
 
     for (int body = 1; body < m->nbody; ++body) {
@@ -212,7 +237,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
                 }
                 shapes.push_back("{\"kind\": " + json_string(kind) + ", \"size\": " + array(sizes) +
                                  ", \"position\": " + array(pos) + ", \"rotation\": " +
-                                 array(rot) + "}");
+                                 array(rot) + ", \"surface\": " + surface_of(geom) + "}");
             } else if (type == mjGEOM_MESH && m->geom_dataid[geom] >= 0) {
                 const int mesh = m->geom_dataid[geom];
                 const float *vertices = m->mesh_vert + 3 * m->mesh_vertadr[mesh];
@@ -264,6 +289,7 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
         Vec3 anchor{0.0, 0.0, 0.0}, axis{0.0, 0.0, 1.0};
         std::string type = "fixed", joint_name = body_name + "_fixed";
         double lower = 0.0, upper = 0.0, effort = 0.0;
+        double joint_armature = 0.0, joint_damping = 0.0, joint_friction = 0.0;
         if (joint_count == 1) {
             const int joint = m->body_jntadr[body];
             const auto joint_type = m->jnt_type[joint];
@@ -282,9 +308,12 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
                 effort = std::max(std::abs(m->jnt_actfrcrange[2 * joint]),
                                   std::abs(m->jnt_actfrcrange[2 * joint + 1]));
             const int dof = m->jnt_dofadr[joint];
-            armature += m->dof_armature[dof] != 0.0;
-            damping += m->dof_damping[dof] != 0.0;
-            friction += m->dof_frictionloss[dof] != 0.0;
+            joint_armature = m->dof_armature[dof];
+            joint_damping = m->dof_damping[dof];
+            joint_friction = m->dof_frictionloss[dof];
+            armature += joint_armature != 0.0;
+            damping += joint_damping != 0.0;
+            friction += joint_friction != 0.0;
             joint_ids[joint] = "joint/" + joint_name;
         }
         // The joint frame sits at the joint anchor with the child body's axes:
@@ -300,7 +329,9 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
             ", \"velocity\": 0, \"effort\": " + number(effort) + ", \"maxAcceleration\": 0}" +
             ", \"parentFramePosition\": " + array(joint_pos) + ", \"parentFrameRotation\": " +
             array(parent_rot) + ", \"childFramePosition\": " + array(anchor) +
-            ", \"childFrameRotation\": [0, 0, 0, 1], \"axis\": " + array(axis) + "}");
+            ", \"childFrameRotation\": [0, 0, 0, 1], \"axis\": " + array(axis) +
+            ", \"dynamics\": {\"armature\": " + number(joint_armature) + ", \"damping\": " +
+            number(joint_damping) + ", \"frictionLoss\": " + number(joint_friction) + "}}");
         ++summary.joints;
     }
 
@@ -319,8 +350,23 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
         else if (m->jnt_actfrclimited[joint])
             effort = std::max(std::abs(m->jnt_actfrcrange[2 * joint]),
                               std::abs(m->jnt_actfrcrange[2 * joint + 1])) / std::abs(gear);
+        // A position servo is gain kp with an affine bias of -kp q - kv qdot.
+        // A positive bias[2] is a damping ratio that MuJoCo resolves at run
+        // time from the joint's inertia, which a fixed gain cannot express.
+        double stiffness = 0.0, servo_damping = 0.0;
+        const auto *gain = m->actuator_gainprm + mjNGAIN * actuator;
+        const auto *bias = m->actuator_biasprm + mjNBIAS * actuator;
+        if (m->actuator_gaintype[actuator] == mjGAIN_FIXED &&
+            m->actuator_biastype[actuator] == mjBIAS_AFFINE && gain[0] > 0.0 &&
+            std::abs(bias[1] + gain[0]) < 1e-12 * gain[0]) {
+            stiffness = gain[0];
+            if (bias[2] <= 0.0) servo_damping = -bias[2];
+            else ++damping_ratio_actuators;
+        }
         actuators.push_back("{\"id\": " + json_string("actuator/" + name) + ", \"maxEffort\": " +
-                            number(effort) + ", \"maxRate\": 0, \"transmission\": " +
+                            number(effort) + ", \"maxRate\": 0, \"servoStiffness\": " +
+                            number(stiffness) + ", \"servoDamping\": " + number(servo_damping) +
+                            ", \"transmission\": " +
                             "{\"kind\": \"simple\", \"jointId\": " + json_string(joint_ids.at(joint)) +
                             ", \"ratio\": " + number(gear) + ", \"offset\": 0}}");
         ++summary.actuators;
@@ -347,13 +393,20 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
         ++summary.imus;
     }
 
-    if (armature || damping || friction)
-        summary.notes.push_back("not yet stored (H2): armature on " + std::to_string(armature) +
-                                ", damping on " + std::to_string(damping) +
-                                ", friction loss on " + std::to_string(friction) + " joints");
+    summary.notes.push_back("joint dynamics: armature on " + std::to_string(armature) +
+                            ", damping on " + std::to_string(damping) + ", friction loss on " +
+                            std::to_string(friction) + " joints");
+    if (damping_ratio_actuators)
+        summary.notes.push_back(std::to_string(damping_ratio_actuators) +
+                                " actuators set a damping ratio, not stored; servoDamping is 0");
     if (m->npair)
-        summary.notes.push_back("not yet stored (H2): " + std::to_string(m->npair) +
-                                " explicit contact pairs and their friction and solver settings");
+        summary.notes.push_back(std::to_string(m->npair) + " explicit contact pairs approximated: " +
+                                "their geoms collide with everything, using the pair's surface");
+    const char *integrators[] = {"euler", "rk4", "implicit", "implicitfast"};
+    summary.notes.push_back("scene solver: timestep " + number(m->opt.timestep) + ", integrator " +
+                            (m->opt.integrator >= 0 && m->opt.integrator < 4
+                                 ? integrators[m->opt.integrator] : "other") +
+                            ", cone " + (m->opt.cone == mjCONE_ELLIPTIC ? "elliptic" : "pyramidal"));
     if (floating) {
         const auto root_pos = vec(m->body_pos + 3 * root);
         summary.notes.push_back("floating base: authored root position " + array(root_pos));

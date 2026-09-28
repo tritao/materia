@@ -51,6 +51,9 @@ class RobotModelCodec {
       vector(joint.childFramePosition, 3, "joint childFramePosition");
       vector(joint.childFrameRotation, 4, "joint childFrameRotation");
       vector(joint.axis, 3, "joint axis");
+      nonNegative(joint.armature, "joint armature");
+      nonNegative(joint.damping, "joint damping");
+      nonNegative(joint.frictionLoss, "joint frictionLoss");
       finite(joint.limits.lower, "joint limits.lower");
       finite(joint.limits.upper, "joint limits.upper");
       finite(joint.limits.velocity, "joint limits.velocity");
@@ -118,7 +121,8 @@ class RobotModelCodec {
         parentFrameRotation: joint.parentFrameRotation,
         childFramePosition: joint.childFramePosition,
         childFrameRotation: joint.childFrameRotation,
-        axis: joint.axis
+        axis: joint.axis,
+        dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss}
       }],
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
       couplings: [for (coupling in model.couplings) {
@@ -194,6 +198,10 @@ class RobotModelCodec {
       joint.childFramePosition = vectorField(record, "childFramePosition", 3);
       joint.childFrameRotation = vectorField(record, "childFrameRotation", 4);
       joint.axis = vectorField(record, "axis", 3);
+      var dynamics:Dynamic = required(record, "dynamics");
+      joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
+      joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");
+      joint.frictionLoss = nonNegative(number(dynamics, "frictionLoss"), "joint frictionLoss");
     }
 
     var couplingIds = new Map<String, Bool>();
@@ -270,7 +278,13 @@ class RobotModelCodec {
       case Capsule(radius, half): kind = "capsule"; size = [radius, half];
       case Cylinder(radius, half): kind = "cylinder"; size = [radius, half];
     }
-    return {kind: kind, size: size, position: shape.position, rotation: shape.rotation};
+    var surface = shape.surface;
+    return {kind: kind, size: size, position: shape.position, rotation: shape.rotation,
+      surface: surface == null ? null : {
+        friction: surface.friction, frictionDimensions: surface.frictionDimensions,
+        contactTimeConstant: surface.contactTimeConstant,
+        contactDampingRatio: surface.contactDampingRatio
+      }};
   }
 
   static function readCollisionShape(record:Dynamic):CollisionShape {
@@ -287,12 +301,19 @@ class RobotModelCodec {
         Cylinder(size[0], size[1]);
       case other: throw 'Unsupported RobotModel collision shape kind $other';
     };
-    return new CollisionShape(primitive, vectorField(record, "position", 3),
+    var shape = new CollisionShape(primitive, vectorField(record, "position", 3),
       vectorField(record, "rotation", 4));
+    var surface:Dynamic = required(record, "surface");
+    if (surface != null)
+      shape.surface = new ContactSurface(vectorField(surface, "friction", 3),
+        fieldInt(surface, "frictionDimensions"), number(surface, "contactTimeConstant"),
+        number(surface, "contactDampingRatio"));
+    return shape;
   }
 
   static function encodeActuator(value:Actuator):Dynamic return {
     id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
+    servoStiffness: value.servoStiffness, servoDamping: value.servoDamping,
     transmission: switch value.transmission {
       case SimpleTransmission(jointId, ratio, offset):
         {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
@@ -301,6 +322,8 @@ class RobotModelCodec {
 
   static function validateActuator(value:Actuator, joints:Map<String, Bool>):Void {
     if (value == null) throw "Robot actuator is null";
+    nonNegative(value.servoStiffness, "actuator servoStiffness");
+    nonNegative(value.servoDamping, "actuator servoDamping");
     requireText(value.id, "actuator ID");
     finite(value.maxEffort, "actuator maxEffort");
     finite(value.maxRate, "actuator maxRate");
@@ -362,8 +385,11 @@ class RobotModelCodec {
         number(transmission, "ratio"), number(transmission, "offset"));
       case kind: throw 'Unsupported transmission kind $kind';
     };
-    return new Actuator(text(value, "id"), number(value, "maxEffort"),
+    var actuator = new Actuator(text(value, "id"), number(value, "maxEffort"),
       number(value, "maxRate"), parsed);
+    actuator.servoStiffness = nonNegative(number(value, "servoStiffness"), "actuator servoStiffness");
+    actuator.servoDamping = nonNegative(number(value, "servoDamping"), "actuator servoDamping");
+    return actuator;
   }
 
   static function encodeMobile(value:RobotMobileConfiguration):Dynamic return {
@@ -475,6 +501,11 @@ class RobotModelCodec {
     if (!Std.isOfType(result, Int) && !Std.isOfType(result, Float))
       throw 'Invalid RobotModel field $name';
     return finite(result, name);
+  }
+
+  static function nonNegative(value:Float, name:String):Float {
+    if (!Math.isFinite(value) || value < 0.0) throw 'RobotModel field $name must be finite and non-negative';
+    return value;
   }
 
   static function bool(value:Dynamic, name:String):Bool {

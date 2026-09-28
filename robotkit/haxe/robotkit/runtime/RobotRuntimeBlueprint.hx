@@ -154,8 +154,15 @@ class RobotRuntimeBlueprint {
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);
     for (i in 0...layout.length) value.set_sensors(i, layout[i].nativeValue());
-    for (index in 0...joints.length)
-      value.set_joints(index, joints[index].nativeValue());
+    for (index in 0...joints.length) {
+      var joint = joints[index];
+      value.set_joints(index, joint.nativeValue());
+      var dynamics = new rk_robot_joint_dynamics();
+      dynamics.set_armature(joint.armature);
+      dynamics.set_damping(joint.damping);
+      dynamics.set_friction_loss(joint.frictionLoss);
+      value.set_joint_dynamics(index, dynamics);
+    }
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());
     return value;

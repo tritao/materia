@@ -22,7 +22,14 @@ class Simulation {
   public final fixedTimestepSeconds:Float;
   var disposed:Bool = false;
 
-  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0) {
+  /**
+   * fixedTimestep is one control tick; physics advances physicsSubsteps times
+   * per tick. integrator and frictionCone take SimKit's NKSIM_INTEGRATOR_* and
+   * NKSIM_FRICTION_CONE_* values (see SimulationSolver); zero keeps the
+   * backend's defaults.
+   */
+  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0,
+      ?integrator:Int = 0, ?frictionCone:Int = 0) {
     if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
       throw "Simulation requires a positive finite timestep and positive substep count";
     fixedTimestepSeconds = fixedTimestep;
@@ -31,6 +38,8 @@ class Simulation {
     desc.set_fixed_timestep(fixedTimestep);
     desc.set_physics_substeps(physicsSubsteps);
     desc.set_backend(backend);
+    desc.set_integrator(integrator);
+    desc.set_friction_cone(frictionCone);
     var result = RobotKitSimKit.rk_simulation_create(desc);
     check(result.status, "simulation.create");
     owner = result.out_simulation;
@@ -257,6 +266,13 @@ class Simulation {
         for (axis in 0...size.length) native.set_size(axis, size[axis]);
         for (axis in 0...3) native.set_position(axis, source.shape.position[axis]);
         for (axis in 0...4) native.set_rotation(axis, source.shape.rotation[axis]);
+        var surface = source.shape.surface;
+        if (surface != null) {
+          for (axis in 0...3) native.set_friction(axis, surface.friction[axis]);
+          native.set_friction_dimensions(surface.frictionDimensions);
+          native.set_contact_time_constant(surface.contactTimeConstant);
+          native.set_contact_damping_ratio(surface.contactDampingRatio);
+        }
         robotDesc.set_link_shapes(index, native);
       }
     }
@@ -663,3 +679,13 @@ typedef SimulationDifferentialDriveState = {
   leftWheelRate:Float,
   rightWheelRate:Float
 };
+
+/** Solver choices for `new Simulation`, matching SimKit's integrator and friction-cone values. */
+class SimulationSolver {
+  public static inline final DEFAULT = 0;
+  public static inline final EULER = 1;
+  public static inline final IMPLICIT_FAST = 2;
+  public static inline final RK4 = 3;
+  public static inline final PYRAMIDAL_CONE = 1;
+  public static inline final ELLIPTIC_CONE = 2;
+}

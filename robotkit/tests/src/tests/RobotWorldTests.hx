@@ -794,6 +794,12 @@ class RobotWorldTests {
       CollisionPrimitive.Cylinder(0.04, 0.1)));
     source.links[1].collisionShapes.push(new CollisionShape(
       CollisionPrimitive.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
+    source.links[1].collisionShapes[1].surface = new ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
+    source.joints[2].armature = 0.02;
+    source.joints[2].damping = 1.5;
+    source.joints[2].frictionLoss = 0.3;
+    source.actuators[0].servoStiffness = 75.0;
+    source.actuators[0].servoDamping = 2.0;
 
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
@@ -851,6 +857,50 @@ class RobotWorldTests {
       "device channel mapping rejects order that differs from semantic model joints");
 
     equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
+    equal(restored.joints[2].damping, 1.5, "RobotModel codec preserves joint damping");
+    equal(restored.joints[2].frictionLoss, 0.3, "RobotModel codec preserves joint friction loss");
+    equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    var restoredSurface = restored.links[1].collisionShapes[1].surface;
+    check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
+      restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
+      "RobotModel codec preserves a collision shape's contact surface");
+    equal(restored.links[1].collisionShapes[0].surface, null,
+      "a shape without a surface keeps the simulator's defaults");
+    var nativeDynamics = RobotRuntimeCompiler.compile(restored).nativeValue().get_joint_dynamics(2);
+    check(nativeDynamics.get_armature() == 0.02 && nativeDynamics.get_damping() == 1.5 &&
+      nativeDynamics.get_friction_loss() == 0.3, "joint dynamics reach the native blueprint");
+    var negativeDamping = RobotModelCodec.decode(encoded);
+    negativeDamping.joints[0].damping = -1.0;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(negativeDamping), "RK_JOINT_DYNAMICS"),
+      "compiler rejects negative joint damping");
+    var badSurface = RobotModelCodec.decode(encoded);
+    var badSurfaceValue:ContactSurface = cast badSurface.links[1].collisionShapes[1].surface;
+    badSurfaceValue.frictionDimensions = 2;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(badSurface), "RK_COLLISION_SHAPE"),
+      "compiler rejects an invalid contact surface");
+
+    var servo = robotkit.world.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
+    var servoCopy = servo.copy();
+    check(servoCopy.mode == robotkit.world.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
+      servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0, "servo targets copy their terms");
+    throws(function() robotkit.world.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
+      "servo targets reject negative stiffness");
+    var servoSimulation = new Simulation(0.02);
+    var servoRuntime = servoSimulation.addRobot(RobotRuntimeCompiler.compile(restored));
+    servoRuntime.submitTargets([robotkit.world.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
+    servoSimulation.step(Int64.ofInt(0));
+    check(Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
+      "a servo target reaches the deterministic backend's joint");
+    servoSimulation.dispose();
+    var servoRecording = new RobotRecording();
+    servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
+    switch RobotRecordingCodec.decode(RobotRecordingCodec.encode(servoRecording.entries[0])).event {
+      case Command(JointTargets(targets, _)):
+        check(targets[0].mode == robotkit.world.JointTargetMode.Servo &&
+          targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
+          "a recorded servo target replays with its terms");
+      case _: throw "Expected recorded servo targets";
+    }
     equal(restored.links[0].collisionShapes.length, 2, "RobotModel codec preserves link collision shapes");
     check(switch restored.links[0].collisionShapes[1].primitive {
       case CollisionPrimitive.Capsule(radius, half): radius == 0.03 && half == 0.12;
@@ -937,6 +987,12 @@ class RobotWorldTests {
     equal(hip.type, JointType.Revolute, "a limited hinge imports as revolute");
     equal(hip.limits.lower, -Math.PI / 2, "degree ranges convert to radians");
     equal(hip.limits.effort, 40.0, "actuatorfrcrange from a default class becomes the joint effort");
+    equal(hip.armature, 0.01, "joint armature from a default class is imported");
+    equal(hip.damping, 0.5, "joint damping from a default class is imported");
+    equal(model.actuators[1].servoStiffness, 50.0, "a position actuator's kp becomes its servo stiffness");
+    var toeSurface = model.links[3].collisionShapes[0].surface;
+    check(toeSurface != null && toeSurface.friction[0] == 0.8 && toeSurface.frictionDimensions == 4 &&
+      toeSurface.contactTimeConstant == 0.01, "a contact pair's surface overrides its geom's");
     equal(knee.parentFramePosition[2], -0.38, "the joint frame sits at the joint anchor in the parent");
     equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
     equal(foot.type, JointType.Fixed, "a jointless body attaches through a fixed joint");
@@ -1008,8 +1064,9 @@ class RobotWorldTests {
     }, "mechanical reduction becomes the transmission ratio");
     equal(model.actuators[0].maxEffort, 20.0, "actuator effort is the joint effort over the reduction");
     var warned = loaded.warnings.join("\n");
-    check(warned.indexOf("dynamics") >= 0 && warned.indexOf("placeholder") >= 0 &&
-      warned.indexOf("foot.stl") >= 0, "skipped and approximated elements are reported");
+    equal(hip.damping, 0.5, "URDF dynamics damping becomes joint damping");
+    check(warned.indexOf("placeholder") >= 0 && warned.indexOf("foot.stl") >= 0,
+      "skipped and approximated elements are reported");
     equal(RobotModelCodec.decode(RobotModelCodec.encode(model)).links.length, 4,
       "a loaded URDF round-trips through the RobotModel codec");
     equal(RobotRuntimeCompiler.compile(model).linkCollisionShapes.length, 3,

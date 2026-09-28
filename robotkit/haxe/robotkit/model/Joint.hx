@@ -12,6 +12,12 @@ class Joint {
   public var childFramePosition:Array<Float> = [0.0, 0.0, 0.0];
   public var childFrameRotation:Array<Float> = [0.0, 0.0, 0.0, 1.0];
   public var axis:Array<Float> = [0.0, 0.0, 1.0];
+  /** Reflected rotor inertia: kg m^2, or kg for a prismatic joint. */
+  public var armature:Float = 0.0;
+  /** Viscous effort per unit joint velocity. */
+  public var damping:Float = 0.0;
+  /** Dry friction effort. */
+  public var frictionLoss:Float = 0.0;
 
   public function new(name:String, type:JointType, parent:Link, child:Link, ?id:JointId) {
     // Legacy callers use the initial name once; imports pass the stored ID.

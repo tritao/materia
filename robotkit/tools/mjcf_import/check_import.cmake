@@ -7,7 +7,7 @@ if(NOT result EQUAL 0)
     message(FATAL_ERROR "import failed (${result}): ${error}")
 endif()
 message(STATUS "${output}")
-foreach(note IN ITEMS "1 visual meshes" "1 IMUs" "not yet stored (H2): armature on 2"
+foreach(note IN ITEMS "1 visual meshes" "1 IMUs" "joint dynamics: armature on 2"
         "2 explicit contact pairs")
     string(FIND "${output}" "${note}" found)
     if(found EQUAL -1)

@@ -141,7 +141,12 @@
         0,
         0,
         1
-      ]
+      ],
+      "dynamics": {
+        "armature": 0,
+        "damping": 0,
+        "frictionLoss": 0
+      }
     },
     {
       "id": "joint/right-wheel",
@@ -182,7 +187,12 @@
         0,
         0,
         1
-      ]
+      ],
+      "dynamics": {
+        "armature": 0,
+        "damping": 0,
+        "frictionLoss": 0
+      }
     },
     {
       "id": "joint/lift",
@@ -223,7 +233,12 @@
         0,
         0,
         1
-      ]
+      ],
+      "dynamics": {
+        "armature": 0,
+        "damping": 0,
+        "frictionLoss": 0
+      }
     }
   ],
   "actuators": [],

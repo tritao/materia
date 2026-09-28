@@ -22,6 +22,10 @@ class RobotRuntimeJointBlueprint {
   public final childFramePosition:Array<Float>;
   public final childFrameRotation:Array<Float>;
   public final axis:Array<Float>;
+  /** Passive dynamics: reflected inertia, viscous damping and dry friction. */
+  public var armature:Float = 0.0;
+  public var damping:Float = 0.0;
+  public var frictionLoss:Float = 0.0;
 
   public function new(joint:Int, type:Int, parentLink:Int, childLink:Int,
       lowerLimit:Float, upperLimit:Float, maxEffort:Float, ?maxRate:Float = 0.0,

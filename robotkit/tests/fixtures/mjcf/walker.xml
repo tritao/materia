@@ -48,7 +48,7 @@
     </body>
   </worldbody>
   <contact>
-    <pair geom1="left_toe" geom2="torso_box"/>
+    <pair geom1="left_toe" geom2="torso_box" condim="4" friction="0.8 0.8 0.02 0.001 0.001" solref="0.01 0.9"/>
     <pair geom1="left_heel" geom2="torso_box"/>
   </contact>
   <actuator>
