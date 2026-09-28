@@ -1,4 +1,12 @@
-# Materia project artifacts
+# Materia project formats
+
+ProjectKit contains portable data types and codecs shared by Materia's kits. It
+has no native code or dependencies on other kits. The public namespaces are
+`materia.project` for scene artifacts, materials, and appearances;
+`materia.assembly` for assembly definitions, records, frames, and codecs; and
+`materia.units` for length units and SI conversion. Keep project evaluation and
+other runtime behavior in separate packages so ProjectKit remains a pure-data
+base layer.
 
 `materia.project.SceneArtifact` is the shared writer and reader for generated
 viewport geometry. A project generator writes the artifact to a file; Materia
