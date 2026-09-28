@@ -1,0 +1,40 @@
+# CncKit roadmap
+
+All phases use the `cnckit-phases-0-1` worktree for now. Each phase gets its own tests and commit. The initial dialect is LinuxCNC; G92 is rejected; CAM belongs in a separate `camkit`; and rotary A is deferred until MachineKit supports it.
+
+## Phase 0 — Restore tests
+
+Trace Haxeon's HashLink and `haxeon_runtime.hdll` selection. Fix mismatched native runtime loading in Haxeon. Pass CncKit and the focused MotionKit CNC and C7 suites from this worktree.
+
+## Phase 1 — Correctness
+
+Apply LinuxCNC block order: F/S, T, M6, M3/M4/M5, M7/M8/M9, G4, modal changes, motion, then M0/M1/M2/M30. Add `CncDialect.LinuxCnc`. Preserve partially blended paths and issue line-tied exact-stop warnings. Replace one-billion-second waits with indefinite barriers; centralize channel names. Make the blend corner limit a machine setting. Cover circles, arc direction and validity, G91 arc centres, comments, lowercase, program end, ordering, blend fallback, and G43/G49 relative mode.
+
+## Phase 2 — Parse, interpret, lower
+
+Split `CncCompiler` into `parse/` (`CncLexer`, `CncBlock`, `CncSpan`), `interp/` (`CncState`, `CncInterpreter`), `ir/` (`CncOp`), and `lower/` (`CncLowering`). Return `CncCompileResult` with program, ops, source map, and all `CncDiagnostic`s. Recover at the next line after an error. Keep `compile()` as a first-error throwing wrapper. Geometry in `CncOp` is in metres so editor preview does not need MotionKit. Preserve Phase 1 and MotionKit C6/C7 behavior.
+
+## Phase 3 — Real files
+
+Accept `%`, O and N; warn on ignored `/` block delete; accept G40 only when compensation is off, G80 cancellation, and G94; reject G93/G95. Add one-block G53 machine moves, G28/G30 stored-home moves, and reject G92. Add R arcs, G18/G19, helices, and G81/G82/G83/G73 with G98/G99 retract modes. First add a MotionKit `CircularSegment` that supports any plane and axial rise through blending (initially exact stop), TOPP-RA, joint conversion, and deviation checks. Add FreeCAD and Fusion LinuxCNC fixtures with golden counts, length, bounds, and geometry tolerance.
+
+## Phase 4 — Machine model
+
+Introduce `CncTool` with number, length, diameter. Check travel envelopes during CNC compilation and derive them from MotionBinding joint limits. Add G41/G42 offsets for lines and arcs in the active plane, with lead-in/out and gouge checks, plus dedicated fixtures.
+
+## Phase 5 — CAM producer
+
+Create `camkit` for 2.5D profile, offset pocket, and drill operations from cadkit faces, edges, or sketches and the tool table. Emit `CncOp` directly; export G-code; round-trip through the compiler. Target MachineKit gantry parts and manufacturingkit sheet profiles first.
+
+## Dependency order and progress
+
+0 → 1 → 2 → 3a (file syntax, coordinates, cycles and R arcs) → 4 → 5. MotionKit 3b (`CircularSegment`) depends on 0 and may be built alongside 2. CncKit 3c (G18/G19 and helices) depends on 2 and 3b. Update this log after each phase.
+
+- [x] Phase 0 — CncKit 20 baseline assertions; MotionKit CNC 50 and C7 2,845 assertions after restoring `ObjectMap.remove`. Haxeon launcher rebuilds a mismatched native release pair.
+- [ ] Phase 1
+- [ ] Phase 2
+- [ ] Phase 3a
+- [ ] Phase 3b
+- [ ] Phase 3c
+- [ ] Phase 4
+- [ ] Phase 5
