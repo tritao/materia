@@ -8,10 +8,11 @@ import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ArcPlane;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
+import cnckit.interp.CncInterpOp;
 
 /** Bounded line/arc cutter-radius offsets with explicit entry and exit moves. */
 class CncCompensator {
-  public static function resolve(ops:Array<ToolpathOp>):CncCompensationResult {
+  public static function resolve(ops:Array<CncInterpOp>):CncCompensationResult {
     var output:Array<ToolpathOp> = [], diagnostics:Array<CncDiagnostic> = [];
     var index = 0;
     while (index < ops.length) {
@@ -23,38 +24,50 @@ class CncCompensator {
             case _: false;
           }) end++;
           var after = end + 1;
-          while (after < ops.length && geometry(ops[after]) == null &&
+          while (after < ops.length && geometry(pathOrNull(ops[after])) == null &&
               !switch ops[after] {
-                case End(_), CutterCompStart(_, _, _, _), CutterCompEnd(_): true;
+                case Path(End(_)), CutterCompStart(_, _, _, _), CutterCompEnd(_): true;
                 case _: false;
               }) after++;
           try {
             if (end >= ops.length) fail(span, "G41/G42 requires G40 and lead-out");
             if (after >= ops.length) fail(span, "G40 requires a lead-out line");
-            var section = compensate(ops.slice(index + 1, end), ops[after],
+            var section = compensate([for (op in ops.slice(index + 1, end)) path(op)],
+              path(ops[after]),
               side, radius, plane, span);
             var insertAt = section.length - 1;
             for (cursor in (end + 1)...after)
-              section.insert(insertAt++, ops[cursor]);
+              section.insert(insertAt++, path(ops[cursor]));
             for (op in section) output.push(op);
           } catch (error:CncDiagnostic) {
             diagnostics.push(error);
             for (cursor in (index + 1)...Std.int(Math.min(end, ops.length)))
-              output.push(ops[cursor]);
+              output.push(path(ops[cursor]));
             for (cursor in (end + 1)...Std.int(Math.min(after, ops.length)))
-              output.push(ops[cursor]);
-            if (after < ops.length) output.push(ops[after]);
+              output.push(path(ops[cursor]));
+            if (after < ops.length) output.push(path(ops[after]));
           }
           index = Std.int(Math.min(ops.length, after + 1));
         case CutterCompEnd(span):
           diagnostics.push(new CncDiagnostic(Error, "CNC_COMP", span,
             "G40 has no active cutter compensation"));
           index++;
-        case other:
+        case Path(other):
           output.push(other); index++;
       }
     }
     return new CncCompensationResult(output, diagnostics);
+  }
+
+  static function pathOrNull(op:CncInterpOp):Null<ToolpathOp> return switch op {
+    case Path(value): value;
+    case _: null;
+  };
+
+  static function path(op:CncInterpOp):ToolpathOp {
+    var value = pathOrNull(op);
+    if (value == null) throw "cutter compensation marker inside path section";
+    return value;
   }
 
   static function compensate(section:Array<ToolpathOp>, exit:ToolpathOp, side:Int,
@@ -325,7 +338,6 @@ class CncCompensator {
   };
   static function opSpan(op:ToolpathOp):Provenance return switch op {
     case Move(_, _, _, _, span): span;
-    case CutterCompStart(_, _, _, span), CutterCompEnd(span): span;
     case Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
         ToolChange(_, span), ToolLengthOffset(_, _, span), OptionalStop(span),
         ProgramStop(span), End(span): span;

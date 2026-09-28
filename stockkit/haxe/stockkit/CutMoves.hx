@@ -34,8 +34,6 @@ class CutMoves {
       case Move(_, geometry, _, _, span):
         if (tool != null) moves.push(new CutMove(tool,
           Path(shift(geometry, origin, toolLength)), false, index, span));
-      case CutterCompStart(_, _, _, _), CutterCompEnd(_):
-        throw "cut moves need cutter compensation resolved first";
       case Dwell(_, _), Spindle(_, _, _), Coolant(_, _, _), OptionalStop(_),
           ProgramStop(_), End(_):
     }

@@ -1,6 +1,7 @@
 import camkit.CamContour;
 
-import toolpathkit.path.ToolpathOp;import camkit.CamJob;
+import toolpathkit.path.ToolpathOp;
+import camkit.CamJob;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
@@ -87,10 +88,9 @@ class CutMoveTests {
     }
     Assert.near(end(moves[4]).z, 0.01, "after G49 the programmed Z is the tip");
 
-    var rejected = false;
-    try CutMoves.fromOps([toolpathkit.path.ToolpathOp.CutterCompEnd(moves[0].span)], machine.tool)
-    catch (_:Dynamic) rejected = true;
-    Assert.check(rejected, "unresolved cutter compensation is rejected");
+    var unresolved = new CncCompiler(machine).compileDetailed("G40");
+    Assert.check(unresolved.diagnostics.length > 0,
+      "unresolved cutter compensation is rejected before shared toolpaths");
   }
 
   static function camProgram():Void {

@@ -17,8 +17,6 @@ enum ToolpathOp {
     geometry already includes `length`, so the tool tip is `length` below it.
   **/
   ToolLengthOffset(number:Int, length:Float, span:Provenance);
-  CutterCompStart(side:Int, radius:Float, plane:ArcPlane, span:Provenance);
-  CutterCompEnd(span:Provenance);
   OptionalStop(span:Provenance);
   ProgramStop(span:Provenance);
   End(span:Provenance);

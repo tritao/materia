@@ -80,8 +80,6 @@ class CamGCodeWriter {
           if (mist) lines.push("M7");
           if (flood) lines.push("M8");
         }
-      case CutterCompStart(_, _, _, _), CutterCompEnd(_):
-        throw "CAM G-code export needs resolved cutter geometry";
       }
       index++;
     }
