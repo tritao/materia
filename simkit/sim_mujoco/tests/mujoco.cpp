@@ -1119,7 +1119,12 @@ struct HingeRig {
 };
 
 // A 0.3 m box base with a unit-mass, unit-inertia arm hinged about z at x = 1
-// and driven by a 10 N m effort target. The base overlaps a static floor.
+// and driven by a 10 N m effort target. The base overlaps a static floor: a
+// KINEMATIC base now carries a real free joint (see mujoco_backend.cpp's
+// configure_body), but add_self_collision_excludes() excludes every pair
+// where neither body is DYNAMIC, so a KINEMATIC-vs-STATIC pair such as this
+// one still generates no contact at all (matching the pre-free-joint
+// behavior) — this overlap is deliberately harmless, and exercises that.
 HingeRig make_hinge_rig(uint32_t base_motion) {
     HingeRig rig;
     assert(nkscene_scene_create(&rig.scene) == NKS_OK);
@@ -1255,16 +1260,16 @@ void kinematic_base_is_not_moved_by_child_reaction() {
 // Contacts see a kinematic body's twist: friction carries a box resting on a
 // moving kinematic platform along with it.
 //
-// DISABLED, known limitation: a kinematic body is pinned in MuJoCo without
+// Previously disabled: a kinematic body used to be pinned in MuJoCo without
 // degrees of freedom and moved between steps through body_pos/body_quat. A
 // contact's velocity is J * qvel, and a body with no DOFs contributes nothing
-// to it, so the platform slides out from under the box (which stays at x = 0
-// with zero velocity) instead of dragging it by friction. Mocap bodies are
-// welded to the world the same way and behave identically. Carrying resting
-// bodies needs the kinematic body to own DOFs whose qvel is its twist (a free
-// joint held on the prescribed motion), which is the competing design this
-// backend does not use. Not run from main().
-[[maybe_unused]] void kinematic_platform_carries_resting_box() {
+// to it (engine_core_util.c's mj_objectVelocity: "dof-less body (static or
+// mocap): quick return"), so the platform slid out from under the box
+// (which stayed at x = 0 with zero velocity) instead of dragging it by
+// friction. A KINEMATIC root now owns a real free joint instead (see
+// mujoco_backend.cpp's configure_body/step()), so its qvel is its twist and
+// this works.
+void kinematic_platform_carries_resting_box() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     const auto platform_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
@@ -1304,6 +1309,88 @@ void kinematic_base_is_not_moved_by_child_reaction() {
 
     nksim_body_destroy(world, box);
     nksim_body_destroy(world, platform);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// A KINEMATIC root's free joint (configure_body) makes it visible to
+// MuJoCo's contact solver so a DYNAMIC body touching it gets real friction
+// (kinematic_platform_carries_resting_box above) — but it must not also
+// make MuJoCo generate contacts between two bodies that can never move:
+// two overlapping KINEMATIC bodies, or a KINEMATIC body overlapping a
+// STATIC one. add_self_collision_excludes() restores that skip explicitly,
+// for any pair where neither body is DYNAMIC, via mjs_addExclude (the same
+// body-pair-exclude list MuJoCo's own mj_collision already consults right
+// after broadphase, before any narrowphase geom work — see that function's
+// comment for the full citation). With the default (unconfigured, zero
+// margin/gap) shapes used here, the informational near-contact fallback in
+// read_contacts() (for a case like a kinematic tool needing its own
+// proximity to a fixed obstacle) also reports nothing, since its own
+// detection band is zero — so the snapshot's contact count is exactly zero
+// for every pair among a kinematic base, a second overlapping kinematic
+// body, and a static floor, despite deep geometric overlap between all
+// three. The base's own jointed DYNAMIC child, held by a position target,
+// is undisturbed throughout.
+void kinematic_bodies_never_contact_static_or_each_other() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto floor_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
+    const auto base_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
+    const auto other_node = make_node_xyz(scene, 0.1, 0.1, 0.0);
+    const auto arm_node = make_node_xyz(scene, 1.0, 0.0, 0.0);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const double normal[] = {0.0, 0.0, 1.0};
+    nksim_shape floor_shape = 0;
+    // Deep overlap: the floor surface is well inside both kinematic boxes.
+    assert(nksim_shape_create_plane(world, normal, -0.2, &floor_shape) == NKSIM_OK);
+    const auto floor = make_body(world, floor_node, NKSIM_MOTION_STATIC, 0.0, floor_shape);
+    const auto base = make_box_body(world, base_node, NKSIM_MOTION_KINEMATIC, 1.0, 0.3, 0.3, 0.3);
+    const auto other = make_box_body(world, other_node, NKSIM_MOTION_KINEMATIC, 1.0, 0.3, 0.3, 0.3);
+    const auto shape = make_box(world);
+    const auto arm = make_body(world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = base;
+    joint_desc.body_b = arm;
+    joint_desc.axis_a[1] = 1.0;
+    joint_desc.anchor_a[0] = 1.0;
+    joint_desc.max_force = 100.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = joint;
+    target.mode = NKSIM_JOINT_TARGET_POSITION;
+    target.target = 0.0; // Hold the arm exactly horizontal against gravity.
+    target.max_force = 100.0;
+    assert(nksim_world_set_joint_targets(world, &target, 1) == NKSIM_OK);
+
+    step_world(world, 30);
+
+    nksim_contact contacts[16]{};
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, contacts, 16, &count) == NKSIM_OK);
+    assert(count == 0);
+
+    const auto state = joint_state_of(world, joint);
+    assert(std::abs(state.position) < 1e-6 && std::abs(state.velocity) < 1e-4);
+    const auto base_state = body_state_of(world, base);
+    assert(base_state.position[0] == 0.0 && base_state.position[1] == 0.0 &&
+           base_state.position[2] == 0.0);
+
+    nksim_joint_destroy(world, joint);
+    nksim_body_destroy(world, arm);
+    nksim_body_destroy(world, other);
+    nksim_body_destroy(world, base);
+    nksim_body_destroy(world, floor);
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
 }
@@ -1652,6 +1739,8 @@ int main() {
     kinematic_root_child_velocity_matches_joint_across_substeps();
     two_joint_arm_on_kinematic_base_holds_position_under_gravity();
     kinematic_base_is_not_moved_by_child_reaction();
+    kinematic_platform_carries_resting_box();
+    kinematic_bodies_never_contact_static_or_each_other();
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();

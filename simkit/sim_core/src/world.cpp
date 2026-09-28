@@ -412,12 +412,16 @@ nksim_result World::pull_backend_state() {
     return result;
 }
 
-// Backends pin a kinematic root without degrees of freedom, so the bodies
-// articulated beneath it report only their motion relative to it. Their world
-// twist adds the root's: v = v_root + w_root x (p - p_root) + v_rel and
-// w = w_root + w_rel.
+// Backends that pin a kinematic root without degrees of freedom report only
+// each articulated descendant's motion relative to it. Their world twist
+// adds the root's: v = v_root + w_root x (p - p_root) + v_rel and
+// w = w_root + w_rel. A backend that instead gives the root real degrees of
+// freedom (PhysicsBackend::reports_kinematic_root_twist_to_descendants())
+// already includes the root's twist in what it reports for a descendant
+// through its own multi-body velocity propagation, so adding it again here
+// would double it.
 void World::carry_kinematic_root_twists() noexcept {
-    if (joints.empty())
+    if (joints.empty() || backend->reports_kinematic_root_twist_to_descendants())
         return;
     const auto parent_of = [&](nksim_body child) {
         nksim_body parent = 0;
