@@ -366,6 +366,31 @@ blended paths retain their original line and arc geometry for task-space
 deviation checks. CncKit passed 20 assertions and the full MotionKit Haxe
 suite passed 6,601 assertions.
 
+### C7 — Virtual CNC acceptance
+
+The MachineKit XYZ gantry runs the C6 rapid and arc program through
+`ProgramCompiler` and the plan executor in deterministic simulation and over
+RKD6 virtual steppers. The scenario checks every recorded position against
+the authored rapid or arc within the declared 1 mm tolerance, spindle start
+and stop events, feed hold on the arc, repeatable samples, and a device-side
+controlled stop after an injected link loss. The focused C7 suite passed 2,845
+assertions; the full MotionKit Haxe suite passed 9,446 assertions.
+
+RKD6 needed two boundary fixes for this dense three-actuator stream:
+continuation queue anchors now use the previous wire polynomial's f32 endpoint,
+and a fresh program after an idle completion starts a new device epoch. The
+first queue epoch reserves the serial time needed to deliver its initial
+segments and commit before the device path clock reaches them. The simulation
+API exposes a reversible link cut for the acceptance test (RobotKit ABI v21).
+
+The physical assembly model remains a recorded gap. `AssemblySimulationBridge`
+creates one mass-bearing link per part, v5 couplings, and upstream collision
+hulls, but it creates no actuators. `MachineKitRobotCompiler.compileXYZGantry`
+creates actuators on a separate simplified gantry model. There is no mapping
+from MachineKit motor parts into the physical assembly model yet, so the CNC
+program cannot drive that intended single model without bypassing the actuator
+contract. That attachment belongs to the physical assembly compiler work.
+
 ### C1 — Native path representation and adaptive lowering
 
 Added validated native C2 joint-path samples and continuous piecewise-quadratic

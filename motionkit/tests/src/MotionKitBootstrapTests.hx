@@ -1,5 +1,6 @@
 import haxe.Int64;
 import cnckit.CncMachine;
+import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
@@ -111,6 +112,11 @@ class MotionKitBootstrapTests {
       Sys.println('CNC focused tests passed ($assertions assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_C7_ONLY") == "1") {
+      testVirtualCncProgram();
+      Sys.println('C7 focused tests passed ($assertions assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       testOpwKinematics();
       Sys.println('C4 focused tests passed ($assertions assertions)');
@@ -125,6 +131,7 @@ class MotionKitBootstrapTests {
     testPathConfigurationSelector();
     testAxisKinematics();
     testCncProgramBinding();
+    testVirtualCncProgram();
     testManipulatorMotion();
     testSimplePathTimingContract();
     testNativePathLowering();
@@ -1518,6 +1525,132 @@ class MotionKitBootstrapTests {
     near(end[0], 0.01, "CNC arc ends at X", 1e-5);
     near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
     result.dispose();
+  }
+
+  static function testVirtualCncProgram():Void {
+    var deterministic = cncTrial(false);
+    var repeated = cncTrial(false);
+    check(deterministic.length == repeated.length,
+      "CNC simulated run has deterministic sample count");
+    for (index in 0...deterministic.length)
+      near(deterministic[index], repeated[index],
+        'CNC deterministic sample $index', 1e-9);
+    var device = cncTrial(true);
+    check(device.length > 0, "CNC program runs through virtual steppers");
+    var disconnected = cncTrial(true, true);
+    check(disconnected.length > 0, "CNC link-loss trial recorded device positions");
+  }
+
+  static function cncTrial(virtualDevice:Bool, ?linkLoss:Bool = false):Array<Float> {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 200), 0.01, 0.04);
+    for (channel in ["spindle.speed", "spindle.direction"])
+      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
+        ProcessEventValue.Analog(0.0)));
+    var options:Null<VirtualDeviceOptions> = null;
+    if (virtualDevice) {
+      options = new VirtualDeviceOptions();
+      for (index in 0...blueprint.model.actuators.length) {
+        var actuator = blueprint.model.actuators[index];
+        switch actuator.transmission {
+          case SimpleTransmission(_, ratio, offset):
+            options.actuators.push(new VirtualActuatorOptions(actuator.id,
+              index, ratio, offset, 3200.0 / (2.0 * Math.PI),
+              0.01 * Math.abs(ratio), 2));
+        }
+      }
+    }
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime, null, options);
+    if (virtualDevice) for (tick in 1...21) simulation.step(Int64.ofInt(tick));
+    var robot = new SimulatedRobot("cnc-gantry", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var cnc = new CncMachine("work", "x", "y", "z", 0.01,
+      null, 0.001);
+    var binding = new CncMotionBinding(cnc, blueprint);
+    var program = new CncCompiler(cnc).compile(
+      "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G3 X20 Y20 I0 J10\nM5\nM2\n");
+    var motion = new ManipulatorMotion(robot, binding.compiler,
+      function(_) return null, function() return runtime.pollEvents());
+    motion.run(program);
+    check(motion.running, 'CNC program starts: ${motion.failure}');
+    var trace:Array<Float> = [];
+    var holdIssued = false, holdTicks = 0, linkCut = false;
+    for (tick in 0...3000) {
+      if (!linkCut) motion.update(0.01);
+      simulation.step(Int64.ofInt(virtualDevice ? tick + 21 : tick));
+      var q = robot.snapshot().positions.toArray();
+      trace.push(q[0]); trace.push(q[1]);
+      var projection = Math.max(0.0, Math.min(1.0, (q[0] + q[1]) / 0.02));
+      var lineError = Math.sqrt((q[0] - projection * 0.01) *
+        (q[0] - projection * 0.01) + (q[1] - projection * 0.01) *
+        (q[1] - projection * 0.01));
+      var radius = Math.sqrt((q[0] - 0.01) * (q[0] - 0.01) +
+        (q[1] - 0.02) * (q[1] - 0.02));
+      var arcError = q[0] >= 0.01 && q[1] <= 0.02 ?
+        Math.abs(radius - 0.01) : Math.min(
+          Math.sqrt((q[0] - 0.01) * (q[0] - 0.01) +
+            (q[1] - 0.01) * (q[1] - 0.01)),
+          Math.sqrt((q[0] - 0.02) * (q[0] - 0.02) +
+            (q[1] - 0.02) * (q[1] - 0.02)));
+      check(Math.min(lineError, arcError) <= cnc.positionTolerance + 1e-5,
+        "CNC recorded position stays on the authored rapid or arc");
+      if (!holdIssued && !linkCut && q[0] > 0.0105 && q[1] > 0.0101) {
+        if (linkLoss) {
+          simulation.cutVirtualDeviceLink(0, true);
+          linkCut = true;
+        } else {
+          motion.hold(); holdIssued = true;
+        }
+      }
+      if (holdIssued && holdTicks++ == 35) motion.resume();
+      if ((holdIssued || linkCut) && q[0] > 0.0105 && q[1] > 0.0101) {
+        var radial = Math.sqrt((q[0] - 0.01) * (q[0] - 0.01) +
+          (q[1] - 0.02) * (q[1] - 0.02));
+        check(Math.abs(radial - 0.01) <= 0.001,
+          "CNC feed hold and resume stay on the programmed arc");
+      }
+      if (linkCut && robot.fault() != null) break;
+      if (!motion.running) break;
+    }
+    if (linkLoss) {
+      check(linkCut, "CNC link was cut during the programmed arc");
+      check(robot.fault() != null, "CNC device latches link-loss fault");
+      var previous = robot.snapshot().positions.toArray();
+      var quiet = 0;
+      for (extra in 0...300) {
+        simulation.step(Int64.ofInt(4000 + extra));
+        var current = robot.snapshot().positions.toArray();
+        if (Math.abs(current[0] - previous[0]) < 1e-6 &&
+            Math.abs(current[1] - previous[1]) < 1e-6) quiet++;
+        else quiet = 0;
+        previous = current;
+        if (quiet >= 20) break;
+      }
+      check(quiet >= 20, "CNC link loss reaches a controlled stop");
+      check(previous[0] <= 0.02 + cnc.positionTolerance &&
+        previous[1] <= 0.02 + cnc.positionTolerance,
+        "CNC link-loss stop stays within the programmed axis bounds");
+      simulation.dispose();
+      return trace;
+    }
+    check(motion.completed, 'CNC program completes: ${motion.failure}');
+    check(holdIssued, "CNC feed hold was issued during the arc");
+    near(robot.snapshot().positions.get(0), 0.02, "CNC finishes X", 2e-4);
+    near(robot.snapshot().positions.get(1), 0.02, "CNC finishes Y", 2e-4);
+    if (virtualDevice) for (extra in 0...20)
+      simulation.step(Int64.ofInt(4000 + extra));
+    var events = motion.firedEvents();
+    check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
+      switch event.value { case ProcessEventValue.Analog(value): value == 12000.0;
+        case _: false; }), "CNC spindle start fires");
+    check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
+      switch event.value { case ProcessEventValue.Analog(value): value == 0.0;
+        case _: false; }), "CNC spindle stop fires");
+    simulation.dispose();
+    return trace;
   }
 
   static function testDualMotorAxisRunsThroughSimulation():Void {

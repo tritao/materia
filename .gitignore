@@ -13,6 +13,7 @@
 /robotkit/worldd/build/
 /automationkit/tests/build/
 /motionkit/tests/build/
+/cnckit/tests/build/
 /processkit/tests/build/
 
 /cadkit/examples/modeling/build/
