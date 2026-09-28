@@ -41,11 +41,13 @@ arrive as triangle buffers, so the core never links OCCT.
    `CncOp.ToolLengthOffset` to recover tool tips. Motion is an analytic path
    with a +Z tool axis; sampled 6-DOF poses arrive with phase 7. Work offsets
    are a translation for now.
-3. **Stock core, Z grid:** tiled rays of sorted intervals with endpoint normal
-   and provenance, structure-of-arrays storage; `SweptVolume` with bounds and
-   exact `intersectRay` for revolution tools on lines, arcs and helices; stock
+3. **Stock core, Z grid** (done, single-threaded): tiled rays of sorted
+   intervals with endpoint normal and provenance, structure-of-arrays
+   storage; `SweptVolume` with bounds and exact `intersectRay` for
+   revolution tools on lines (including ramps), XY arcs and helices; stock
    from box or triangle mesh; bulk submission through the C ABI; per-tile
-   material bounds to skip air; tile ownership for deterministic threads.
+   material bounds to skip air. Still to do: tile ownership for deterministic
+   threads, and X/Y grids in the ABI (they return `SK_ERROR_UNSUPPORTED`).
 4. **Diagnostics:** live rapid-into-stock, shank/holder engagement against the
    live stock, removed volume per operation, target comparison per ray with
    gouge/leftover attribution. CamKit tests adopt it.
@@ -70,13 +72,32 @@ arrive as triangle buffers, so the core never links OCCT.
 The effective ray spacing is always reported; the core never coarsens a grid
 silently.
 
+Measured on the phase 3 core (`stockkit_core_bench`, Release build, one
+thread): a 200×200 mm box at 0.25 mm rays (801×801), cut by 50,304 moves (a
+zig-zag pocket at six levels in 1.5 mm lines joined by half circles).
+
+| Tool | Cut time | Rays evaluated | Rays changed |
+|---|---|---|---|
+| 6 mm flat | 0.34 s | 5.7 M | 3.8 M |
+| 6 mm ball | 1.2 s | 36 M | 10 M |
+
+Creating the stock takes about 0.2 s, and the stock holds 39 MB (48 bytes per
+interval plus 12 per ray). The ball mill costs more because its scallops keep
+material above the tip across its whole footprint, so most rays need the
+exact query.
+
 ## Oracle coverage
 
 The exact oracle handles horizontal lines, vertical lines and XY arcs, which
 covered all CamKit output until CamKit gained ramped pocket entries (lines
-that move in XY and Z together). Ramps, helices and tilted tools need a
-different reference before the simulator's ramp handling can be checked
-exactly; until then the CamKit fixture uses a depth at which CamKit plunges.
+that move in XY and Z together). The oracle's CamKit fixture still uses a
+depth at which CamKit plunges.
+
+Ramps and helices are covered by the sampled reference
+(`tests/src/oracle/SampledReference.hx`), which bounds the swept set from
+inside and outside and shares no code with the core. `CoreFixtures` checks
+the core against it on ramps, helices and a CamKit pocket at a depth where
+CamKit ramps. Tilted tools will need the same treatment.
 
 ### OCCT tangent-fuse findings (OCCT 8.0.1)
 

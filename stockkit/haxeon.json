@@ -4,7 +4,11 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {
-    "cnckit": { "path": "../cnckit" }
+    "cnckit": { "path": "../cnckit" },
+    "cadkit": { "path": "../cadkit" }
+  },
+  "ffi": {
+    "interfaces": ["core/bindings/stockkit.hxi"]
   },
   "target": "host"
 }

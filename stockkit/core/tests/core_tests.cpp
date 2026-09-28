@@ -1,0 +1,517 @@
+// Closed-form checks for StockKit core, through the C ABI only.
+// Units here are millimetres; the core is unit-agnostic.
+
+#include "stockkit.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <functional>
+#include <string>
+#include <vector>
+
+namespace {
+
+constexpr double kPi = 3.14159265358979323846;
+int failures = 0;
+int checks = 0;
+
+void check(bool ok, const std::string &what) {
+    ++checks;
+    if (!ok) {
+        ++failures;
+        std::printf("FAIL: %s\n", what.c_str());
+    }
+}
+
+void near(double actual, double expected, double tolerance, const std::string &what) {
+    check(std::fabs(actual - expected) <= tolerance,
+        what + ": got " + std::to_string(actual) + ", expected " + std::to_string(expected));
+}
+
+sk_profile_segment line(double r0, double z0, double r1, double z1) {
+    sk_profile_segment s{};
+    s.struct_size = sizeof s;
+    s.kind = SK_SEGMENT_LINE;
+    s.r0 = r0, s.z0 = z0, s.r1 = r1, s.z1 = z1;
+    return s;
+}
+
+sk_profile_segment arc(double cr, double cz, double r0, double z0, double r1, double z1) {
+    sk_profile_segment s = line(r0, z0, r1, z1);
+    s.kind = SK_SEGMENT_ARC;
+    s.center_r = cr, s.center_z = cz;
+    return s;
+}
+
+sk_tool_handle tool(const std::vector<sk_profile_segment> &segments) {
+    sk_tool_handle handle{};
+    sk_result result = sk_tool_create(segments.data(), uint32_t(segments.size()), &handle);
+    check(result == SK_OK, "tool create");
+    return handle;
+}
+
+sk_tool_handle flat(double d, double length) { return tool({line(0, 0, d / 2, 0), line(d / 2, 0, d / 2, length)}); }
+
+sk_tool_handle ball(double d, double length) {
+    double r = d / 2;
+    return tool({arc(0, r, 0, 0, r, r), line(r, r, r, length)});
+}
+
+sk_tool_handle bull(double d, double corner, double length) {
+    double r = d / 2, f = r - corner;
+    return tool({line(0, 0, f, 0), arc(f, corner, f, 0, r, corner), line(r, corner, r, length)});
+}
+
+sk_move line_move(double x0, double y0, double z0, double x1, double y1, double z1, uint32_t source = 0) {
+    sk_move m{};
+    m.struct_size = sizeof m;
+    m.kind = SK_MOVE_LINE;
+    m.source = source;
+    m.start[0] = x0, m.start[1] = y0, m.start[2] = z0;
+    m.end[0] = x1, m.end[1] = y1, m.end[2] = z1;
+    return m;
+}
+
+sk_move arc_move(double cx, double cy, double z, double radius, double start, double sweep, double rise,
+    uint32_t source = 0) {
+    sk_move m{};
+    m.struct_size = sizeof m;
+    m.kind = SK_MOVE_ARC;
+    m.source = source;
+    m.center[0] = cx, m.center[1] = cy, m.center[2] = z;
+    m.radius = radius;
+    m.start_angle = start;
+    m.sweep = sweep;
+    m.rise = rise;
+    return m;
+}
+
+std::vector<sk_interval> sweep(sk_tool_handle t, const sk_move &m, double x, double y) {
+    uint32_t count = 0;
+    check(sk_sweep_count_ray(t, &m, SK_AXIS_Z, x, y, &count) == SK_OK, "sweep count");
+    std::vector<sk_interval> out(count);
+    check(sk_sweep_read_ray(t, &m, SK_AXIS_Z, x, y, out.data(), count) == SK_OK, "sweep read");
+    return out;
+}
+
+sk_grid grid(double x0, double y0, double spacing, uint32_t ni, uint32_t nj, uint32_t tile = 8) {
+    sk_grid g{};
+    g.struct_size = sizeof g;
+    g.axis = SK_AXIS_Z;
+    g.origin[0] = x0, g.origin[1] = y0;
+    g.spacing = spacing;
+    g.count[0] = ni, g.count[1] = nj;
+    g.tile_size = tile;
+    return g;
+}
+
+sk_stock_handle box_stock(const sk_grid &g, double x0, double y0, double z0, double x1, double y1, double z1) {
+    sk_box b{};
+    b.struct_size = sizeof b;
+    b.min[0] = x0, b.min[1] = y0, b.min[2] = z0;
+    b.max[0] = x1, b.max[1] = y1, b.max[2] = z1;
+    sk_stock_handle s{};
+    check(sk_stock_create_box(&g, &b, &s) == SK_OK, "box stock");
+    return s;
+}
+
+std::vector<double> cut(sk_stock_handle s, sk_tool_handle t, const std::vector<sk_move> &moves,
+    const std::string &what) {
+    std::vector<double> removed(moves.size());
+    check(sk_stock_cut(s, t, moves.data(), uint32_t(moves.size()), removed.data(), uint32_t(removed.size())) == SK_OK,
+        what);
+    return removed;
+}
+
+sk_stock_info info_of(sk_stock_handle s) {
+    sk_stock_info info{};
+    info.struct_size = sizeof info;
+    check(sk_stock_get_info(s, &info) == SK_OK, "stock info");
+    return info;
+}
+
+struct Rays {
+    std::vector<uint32_t> counts;
+    std::vector<sk_interval> intervals;
+    std::vector<uint32_t> offsets;
+    uint32_t ni = 0;
+    const sk_interval *at(uint32_t i, uint32_t j, uint32_t &n) const {
+        size_t r = size_t(j) * ni + i;
+        n = counts[r];
+        return intervals.data() + offsets[r];
+    }
+};
+
+Rays read_all(sk_stock_handle s) {
+    sk_stock_info info{};
+    info.struct_size = sizeof info;
+    sk_stock_get_info(s, &info);
+    Rays rays;
+    rays.ni = info.grid.count[0];
+    uint32_t ni = info.grid.count[0], nj = info.grid.count[1], total = 0;
+    rays.counts.resize(size_t(ni) * nj);
+    check(sk_stock_read_counts(s, 0, 0, ni, nj, rays.counts.data(), uint32_t(rays.counts.size())) == SK_OK,
+        "read counts");
+    check(sk_stock_count_intervals(s, 0, 0, ni, nj, &total) == SK_OK, "interval total");
+    check(total == info.interval_count, "interval total matches info");
+    check(total == 0 || sk_stock_read_intervals(s, 0, 0, ni, nj, nullptr, total - 1) == SK_ERROR_LIMIT,
+        "short read refused");
+    rays.intervals.resize(total);
+    check(sk_stock_read_intervals(s, 0, 0, ni, nj, rays.intervals.data(), total) == SK_OK, "read rays");
+    uint32_t offset = 0;
+    for (uint32_t c : rays.counts) {
+        rays.offsets.push_back(offset);
+        offset += c;
+    }
+    return rays;
+}
+
+/** Lowest tip-plus-envelope over a finely sampled move: an upper bound on the true floor. */
+double sampled_floor(const std::function<void(double, double &, double &, double &)> &pose,
+    const std::function<double(double)> &lower, double reach, double x, double y, int samples) {
+    double best = INFINITY;
+    for (int k = 0; k <= samples; ++k) {
+        double px, py, pz;
+        pose(double(k) / samples, px, py, pz);
+        double d = std::hypot(x - px, y - py);
+        if (d <= reach) best = std::min(best, pz + lower(d));
+    }
+    return best;
+}
+
+void flat_slot() {
+    sk_tool_handle t = flat(6, 20);
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    double before = info_of(s).volume;
+    auto removed = cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 7)}, "flat slot cut");
+    Rays rays = read_all(s);
+    int wrong = 0;
+    double expected_removed = 0;
+    for (uint32_t j = 0; j < 61; ++j)
+        for (uint32_t i = 0; i < 101; ++i) {
+            double x = 0.5 * i, y = 0.5 * j;
+            double along = std::max(10.0, std::min(40.0, x));
+            bool cut = std::hypot(x - along, y - 15) <= 3;
+            uint32_t n;
+            const sk_interval *v = rays.at(i, j, n);
+            double top = cut ? 15 : 20;
+            if (cut) expected_removed += 5 * 0.25;
+            if (n != 1 || v[0].lo != 0 || v[0].hi != top) ++wrong;
+            else if (cut && (v[0].hi_source != 7 || v[0].hi_normal[2] != 1)) ++wrong;
+            else if (!cut && v[0].hi_source != SK_SOURCE_STOCK) ++wrong;
+        }
+    check(wrong == 0, "flat slot rays (" + std::to_string(wrong) + " wrong)");
+    near(removed[0], expected_removed, 1e-9, "flat slot removed volume");
+    near(before - info_of(s).volume, expected_removed, 1e-9, "stock volume drops by the removed volume");
+    check(info_of(s).tiles_skipped == 0, "flat slot tiles all tested");
+    removed = cut(s, t, {line_move(10, 15, 20.5, 40, 15, 20.5)}, "move above");
+    check(removed[0] == 0 && info_of(s).tiles_skipped > 0, "move above the stock skips tiles");
+    sk_stock_destroy(s);
+    sk_tool_destroy(t);
+}
+
+void ball_slot() {
+    sk_tool_handle t = ball(6, 20);
+    sk_move m = line_move(10, 15, 12, 40, 15, 12);
+    for (double e : {0.0, 0.7, 1.9, 2.5, 2.999}) {
+        auto spans = sweep(t, m, 25, 15 + e);
+        check(spans.size() == 1, "ball slot one span");
+        if (spans.empty()) continue;
+        near(spans[0].lo, 12 + 3 - std::sqrt(9 - e * e), 1e-12, "ball slot floor at e=" + std::to_string(e));
+        near(spans[0].hi, 32, 0, "ball slot top");
+        // Surface normal of the floor points at the ball centre.
+        double ny = -e / 3, nz = std::sqrt(9 - e * e) / 3;
+        near(spans[0].lo_normal[1], ny, 1e-6, "ball slot normal y");
+        near(spans[0].lo_normal[2], nz, 1e-6, "ball slot normal z");
+    }
+    check(sweep(t, m, 25, 18.001).empty(), "ball slot misses past its radius");
+    // End cap: beyond the line end the floor is the sphere at the end point.
+    auto cap = sweep(t, m, 41.5, 16);
+    near(cap[0].lo, 12 + 3 - std::sqrt(9 - 1.5 * 1.5 - 1), 1e-12, "ball slot end cap");
+    sk_tool_destroy(t);
+}
+
+void bull_arc() {
+    sk_tool_handle t = bull(10, 2, 20);
+    const double cx = 25, cy = 15, rho = 8, z = 10;
+    sk_move m = arc_move(cx, cy, z, rho, 0, kPi, 0);
+    auto lower = [](double d) { return d <= 3 ? 0.0 : 2 - std::sqrt(std::max(0.0, 4 - (d - 3) * (d - 3))); };
+    int wrong = 0, tested = 0;
+    for (double x = 10; x <= 40; x += 0.37)
+        for (double y = 5; y <= 30; y += 0.41) {
+            double D = std::hypot(x - cx, y - cy), angle = std::atan2(y - cy, x - cx);
+            double d;
+            if (angle >= 0 && angle <= kPi) d = std::fabs(D - rho);
+            else d = std::min(std::hypot(x - cx - rho, y - cy), std::hypot(x - cx + rho, y - cy));
+            auto spans = sweep(t, m, x, y);
+            if (d > 5) {
+                if (!spans.empty()) ++wrong;
+                continue;
+            }
+            ++tested;
+            if (spans.size() != 1 || std::fabs(spans[0].lo - (z + lower(d))) > 1e-12 || spans[0].hi != z + 20) ++wrong;
+        }
+    check(wrong == 0 && tested > 100, "bull-nose arc floors (" + std::to_string(wrong) + " wrong of " +
+        std::to_string(tested) + ")");
+    sk_tool_destroy(t);
+}
+
+void plunge() {
+    sk_tool_handle t = flat(6, 20);
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    cut(s, t, {line_move(25, 15, 25, 25, 15, 5)}, "plunge cut");
+    Rays rays = read_all(s);
+    uint32_t n;
+    const sk_interval *v = rays.at(50, 30, n);
+    check(n == 1 && v[0].lo == 0 && v[0].hi == 5, "plunge leaves [0, 5] under the tool");
+    v = rays.at(56, 30, n);
+    check(n == 1 && v[0].hi == 5, "plunge cuts at the tool's edge");
+    v = rays.at(57, 30, n);
+    check(n == 1 && v[0].hi == 20, "plunge leaves stock outside the tool");
+    sk_stock_destroy(s);
+    sk_tool_destroy(t);
+}
+
+void ball_ramp() {
+    const double R = 3;
+    sk_tool_handle t = ball(2 * R, 20);
+    // Tip from (10, 15, 15) to (40, 25, 5): a ramp.
+    const double p0[3] = {10, 15, 15}, p1[3] = {40, 25, 5};
+    sk_move m = line_move(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+    double L = std::hypot(p1[0] - p0[0], p1[1] - p0[1]);
+    double k = (p1[2] - p0[2]) / L;
+    int wrong = 0, tested = 0;
+    for (double x = 8; x <= 43; x += 0.61)
+        for (double y = 11; y <= 29; y += 0.53) {
+            // Capsule floor in closed form: the ball centre runs 3 above the tip.
+            double dx = (p1[0] - p0[0]) / L, dy = (p1[1] - p0[1]) / L;
+            double u0 = (x - p0[0]) * dx + (y - p0[1]) * dy;
+            double e = std::fabs((x - p0[0]) * dy - (y - p0[1]) * dx);
+            double best = INFINITY;
+            auto floor_at = [&](double u) {
+                u = std::max(0.0, std::min(L, u));
+                double w = u - u0, d2 = e * e + w * w;
+                if (d2 > R * R) return double(INFINITY);
+                return p0[2] + k * u + R - std::sqrt(R * R - d2);
+            };
+            if (e < R) {
+                double w = -k * std::sqrt(R * R - e * e) / std::sqrt(1 + k * k);
+                best = std::min({floor_at(u0 + w), floor_at(0), floor_at(L)});
+            }
+            // Rays beyond the ball's reach can still meet the shank; the closed form covers the ball only.
+            if (!std::isfinite(best)) continue;
+            auto spans = sweep(t, m, x, y);
+            ++tested;
+            if (spans.empty() || std::fabs(spans[0].lo - best) > 1e-9) ++wrong;
+        }
+    check(wrong == 0 && tested > 100, "ball ramp capsule floor (" + std::to_string(wrong) + " wrong of " +
+        std::to_string(tested) + ")");
+    sk_tool_destroy(t);
+}
+
+void bull_ramp_and_helix() {
+    sk_tool_handle t = bull(10, 2, 20);
+    auto lower = [](double d) { return d <= 3 ? 0.0 : 2 - std::sqrt(std::max(0.0, 4 - (d - 3) * (d - 3))); };
+    const double p0[3] = {10, 15, 15}, p1[3] = {40, 20, 9};
+    sk_move ramp = line_move(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
+    auto ramp_pose = [&](double t, double &x, double &y, double &z) {
+        x = p0[0] + t * (p1[0] - p0[0]);
+        y = p0[1] + t * (p1[1] - p0[1]);
+        z = p0[2] + t * (p1[2] - p0[2]);
+    };
+    const double cx = 25, cy = 15, rho = 3, z0 = 12, sweep_angle = 4 * kPi, rise = -4;
+    sk_move helix = arc_move(cx, cy, z0, rho, 0.3, sweep_angle, rise);
+    auto helix_pose = [&](double t, double &x, double &y, double &z) {
+        double a = 0.3 + t * sweep_angle;
+        x = cx + rho * std::cos(a);
+        y = cy + rho * std::sin(a);
+        z = z0 + t * rise;
+    };
+    struct Case {
+        const char *name;
+        sk_move move;
+        std::function<void(double, double &, double &, double &)> pose;
+        double x0, x1, y0, y1;
+    };
+    for (const Case &c : {Case{"bull ramp", ramp, ramp_pose, 6, 45, 9, 26},
+             Case{"bull helix", helix, helix_pose, 16, 34, 6, 24}}) {
+        int wrong = 0, tested = 0;
+        double worst = 0;
+        for (double x = c.x0; x <= c.x1; x += 0.73)
+            for (double y = c.y0; y <= c.y1; y += 0.67) {
+                double sampled = sampled_floor(c.pose, lower, 5, x, y, 200000);
+                auto spans = sweep(t, c.move, x, y);
+                if (!std::isfinite(sampled)) continue;
+                ++tested;
+                // The sampled floor is an upper bound and within its step of the truth.
+                if (spans.empty() || spans[0].lo > sampled + 1e-12 || spans[0].lo < sampled - 1e-4) ++wrong;
+                else worst = std::max(worst, sampled - spans[0].lo);
+            }
+        check(wrong == 0 && tested > 50, std::string(c.name) + " floor vs sampling (" + std::to_string(wrong) +
+            " wrong of " + std::to_string(tested) + ", worst gap " + std::to_string(worst) + ")");
+    }
+    sk_tool_destroy(t);
+}
+
+void necked_tool() {
+    // Flutes of radius 3 up to 5, a neck of radius 2 up to 15, a shank of radius 3 up to 25.
+    sk_tool_handle t = tool({line(0, 0, 3, 0), line(3, 0, 3, 5), line(3, 5, 2, 5), line(2, 5, 2, 15),
+        line(2, 15, 3, 15), line(3, 15, 3, 25)});
+    sk_move m = line_move(10, 15, 10, 40, 15, 10);
+    auto spans = sweep(t, m, 25, 17.5);
+    check(spans.size() == 2, "necked tool gives two spans beside the neck");
+    if (spans.size() == 2) {
+        near(spans[0].lo, 10, 0, "neck lower span bottom");
+        near(spans[0].hi, 15, 0, "neck lower span top");
+        near(spans[1].lo, 25, 0, "neck upper span bottom");
+        near(spans[1].hi, 35, 0, "neck upper span top");
+        near(spans[0].hi_normal[2], -1, 0, "shoulder under the neck faces down into the tool");
+    }
+    auto inside = sweep(t, m, 25, 16.5);
+    check(inside.size() == 1 && inside[0].lo == 10 && inside[0].hi == 35, "necked tool is solid inside the neck");
+    // A ramp past the neck: the upper span's floor rises with the tool.
+    sk_move ramp = line_move(10, 15, 10, 40, 15, 16);
+    auto ramped = sweep(t, ramp, 25, 17.5);
+    check(ramped.size() == 2, "ramped necked tool keeps the gap");
+    sk_tool_destroy(t);
+}
+
+void box_mesh() {
+    auto mesh_stock = [](const sk_grid &g, const std::vector<double> &p, const std::vector<uint32_t> &idx,
+                          sk_result &result) {
+        sk_stock_handle s{};
+        result = sk_stock_create_mesh(&g, p.data(), uint32_t(p.size()), idx.data(), uint32_t(idx.size()), &s);
+        return s;
+    };
+    auto box = [](double x0, double y0, double z0, double x1, double y1, double z1, std::vector<double> &p,
+                   std::vector<uint32_t> &idx) {
+        p = {x0, y0, z0, x1, y0, z0, x1, y1, z0, x0, y1, z0, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1};
+        // Outward, counter-clockwise seen from outside.
+        idx = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3,
+            4, 7};
+    };
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    std::vector<double> p;
+    std::vector<uint32_t> idx;
+    box(0.25, 0.25, 0, 49.75, 29.75, 20, p, idx);
+    sk_result result;
+    sk_stock_handle s = mesh_stock(g, p, idx, result);
+    check(result == SK_OK, "box mesh stock");
+    sk_stock_handle b = box_stock(g, 0.25, 0.25, 0, 49.75, 29.75, 20);
+    sk_stock_info a{}, c{};
+    a.struct_size = c.struct_size = sizeof a;
+    sk_stock_get_info(s, &a);
+    sk_stock_get_info(b, &c);
+    check(a.interval_count == c.interval_count && a.volume == c.volume, "box mesh matches box stock");
+    Rays rays = read_all(s);
+    uint32_t n;
+    const sk_interval *v = rays.at(10, 10, n);
+    check(n == 1 && v[0].lo_normal[2] == -1 && v[0].hi_normal[2] == 1 && v[0].lo_source == SK_SOURCE_STOCK,
+        "box mesh normals and source");
+    sk_stock_destroy(s);
+    sk_stock_destroy(b);
+
+    // Edges and vertices exactly on rays: every ray is claimed once, so parity closes.
+    box(0, 0, 0, 50, 30, 20, p, idx);
+    s = mesh_stock(g, p, idx, result);
+    check(result == SK_OK, "box mesh with edges on rays");
+    sk_stock_get_info(s, &a);
+    // Half-open in x and y: rays on the low sides are in, on the high sides out.
+    near(a.volume, 100 * 60 * 0.25 * 20, 1e-6, "box mesh on rays volume");
+    sk_stock_destroy(s);
+
+    // Octahedron |x| + |y| + |z| <= 6 about a ray, vertices and edges on rays.
+    std::vector<double> o = {31, 15, 10, 19, 15, 10, 25, 21, 10, 25, 9, 10, 25, 15, 16, 25, 15, 4};
+    // Vertices: 0 +x, 1 -x, 2 +y, 3 -y, 4 +z, 5 -z.
+    std::vector<uint32_t> oi = {0, 2, 4, 2, 1, 4, 1, 3, 4, 3, 0, 4, 2, 0, 5, 1, 2, 5, 3, 1, 5, 0, 3, 5};
+    s = mesh_stock(g, o, oi, result);
+    check(result == SK_OK, "octahedron mesh");
+    rays = read_all(s);
+    int wrong = 0;
+    for (uint32_t j = 0; j < 61; ++j)
+        for (uint32_t i = 0; i < 101; ++i) {
+            double x = 0.5 * i - 25, y = 0.5 * j - 15;
+            double half = 6 - std::fabs(x) - std::fabs(y);
+            const sk_interval *r = rays.at(i, j, n);
+            if (half <= 0) {
+                if (n != 0) ++wrong;
+            } else if (n != 1 || std::fabs(r[0].lo - (10 - half)) > 1e-12 || std::fabs(r[0].hi - (10 + half)) > 1e-12) {
+                ++wrong;
+            }
+        }
+    check(wrong == 0, "octahedron rays (" + std::to_string(wrong) + " wrong)");
+    sk_stock_destroy(s);
+
+    // An open mesh is refused (a missing vertical face is invisible to Z rays; drop a top one).
+    idx.erase(idx.begin() + 6, idx.begin() + 9);
+    s = mesh_stock(g, p, idx, result);
+    check(result == SK_ERROR_INVALID_ARGUMENT, "open mesh refused");
+}
+
+void provenance_and_rapids() {
+    sk_tool_handle t = flat(6, 20);
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    std::vector<sk_move> moves = {line_move(10, 15, 15, 40, 15, 15, 1), line_move(10, 15, 30, 40, 15, 30, 2),
+        line_move(25, 5, 18, 25, 25, 18, 3)};
+    moves[1].flags = moves[2].flags = SK_MOVE_RAPID;
+    auto removed = cut(s, t, moves, "three moves");
+    check(removed[0] > 0 && removed[1] == 0 && removed[2] > 0, "per-move removal shows the rapid through stock");
+    std::vector<double> short_output(2);
+    check(sk_stock_cut(s, t, moves.data(), 3, short_output.data(), 2) == SK_ERROR_INVALID_ARGUMENT,
+        "cut output shorter than the moves is refused");
+    Rays rays = read_all(s);
+    uint32_t n;
+    const sk_interval *v = rays.at(50, 16, n); // (25, 8): only the rapid crossed it
+    check(n == 1 && v[0].hi == 18 && v[0].hi_source == 3, "rapid's cut is attributed to it");
+    v = rays.at(50, 30, n); // (25, 15): slot floor below the rapid
+    check(n == 1 && v[0].hi == 15 && v[0].hi_source == 1, "slot floor keeps its move");
+    sk_stock_destroy(s);
+    sk_tool_destroy(t);
+}
+
+void handles() {
+    sk_tool_handle t = flat(6, 20);
+    sk_tool_info info{};
+    check(sk_tool_get_info(t, &info) == SK_OK && info.radius == 3 && info.height == 20, "tool info");
+    sk_tool_destroy(t);
+    check(sk_tool_get_info(t, &info) == SK_ERROR_INVALID_HANDLE, "destroyed tool is invalid");
+    sk_tool_handle zero{0};
+    check(sk_tool_get_info(zero, &info) == SK_ERROR_INVALID_HANDLE, "zero handle is invalid");
+    sk_tool_handle again = flat(6, 20);
+    check(again.id != t.id, "reused slot gets a new generation");
+    sk_stock_info stock_info{};
+    sk_stock_handle wrong_kind{again.id};
+    check(sk_stock_get_info(wrong_kind, &stock_info) == SK_ERROR_INVALID_HANDLE, "tool handle is not a stock");
+    sk_tool_destroy(again);
+    sk_profile_segment gap[] = {line(0, 0, 3, 0), line(3, 1, 3, 20)};
+    sk_tool_handle bad{};
+    check(sk_tool_create(gap, 2, &bad) == SK_ERROR_INVALID_ARGUMENT && bad.id == 0, "discontinuous profile refused");
+    sk_grid x = grid(0, 0, 1, 10, 10);
+    x.axis = SK_AXIS_X;
+    sk_box b{};
+    b.struct_size = sizeof b;
+    b.max[0] = b.max[1] = b.max[2] = 1;
+    sk_stock_handle s{};
+    check(sk_stock_create_box(&x, &b, &s) == SK_ERROR_UNSUPPORTED, "X grids are not implemented yet");
+}
+
+} // namespace
+
+int main() {
+    flat_slot();
+    ball_slot();
+    bull_arc();
+    plunge();
+    ball_ramp();
+    bull_ramp_and_helix();
+    necked_tool();
+    box_mesh();
+    provenance_and_rapids();
+    handles();
+    std::printf("%d of %d checks passed\n", checks - failures, checks);
+    return failures == 0 ? 0 : 1;
+}

@@ -15,7 +15,7 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Current state (phases 0–2)
+## Current state (phases 0–3)
 
 - Tool shapes live in CncKit so any `CncTool` can carry one:
   `cnckit.tool.CutterProfile` describes a tool as a surface of revolution from
@@ -56,9 +56,68 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   radii and three stock positions, against the Pappus volume of the swept
   tube.
 
-Run the tests with the CadKit native build on `LD_LIBRARY_PATH`:
+- **StockKit core** (`core/`, phase 3) is a C++17 library with a C ABI and
+  no dependencies, following CadKit's layering: opaque generation-checked
+  handles, bulk arrays, no exceptions across the boundary.
+  - The stock is a Z grid of rays in 16×16-ray tiles. Each tile stores its
+    intervals field by field (depths, normals and sources in separate arrays)
+    and keeps the highest and lowest material in it, so a move whose sweep
+    lies wholly above or below skips the tile. A per-ray floor bound rejects
+    rays whose material is already below the sweep before the exact query.
+  - `SweptVolume` gives a move's bounds and the exact material it sweeps
+    along a ray, for any surface-of-revolution profile. The profile is split
+    into runs where the radius only widens or only narrows going up, so
+    necked tools work. Horizontal lines and XY arcs use the closest point in
+    closed form; ramps minimise a convex function (golden section, to
+    floating-point resolution); helices and non-convex profiles scan and then
+    refine each local minimum.
+  - Stock comes from a box or from a closed triangle mesh. Mesh casting uses
+    exact orientation predicates and a tie rule, so a ray through a shared
+    edge or vertex is counted exactly once; open meshes are refused.
+  - Only a tool's cutting zone removes material. Shank and holder contact is
+    phase 4.
+  - `sk_stock_cut` returns the volume each move removed, which is how rapid
+    moves through stock are found.
+- `stockkit.Stock` is the Haxe wrapper. It builds stock from a box, from
+  triangles or from a CadKit mesh, and cuts `CutMove`s, one native call per
+  run of moves with the same tool. It keeps the move history, so an
+  interval end's source leads back to its `CutMove`, and from there to the
+  op and `CncSpan`.
+- `tests/src/oracle/SampledReference.hx` is the second, independent
+  reference, for moves the OCCT oracle refuses (ramps, helices). It samples
+  tool poses and returns an inner set (the union of the exact sampled tools)
+  and an outer set (each sampled tool grown by the distance the tool can move
+  between samples, computed in closed form). The swept set lies between
+  them. Checks are set containment, so a wrong reference can only raise a
+  false alarm.
+- Core checks:
+  - Every ray of a 9-ray-wide grid in every oracle and chain fixture matches
+    the OCCT oracle's stock to 1e-9 m.
+  - Ramps (five tool shapes, plus a climbing ramp), helices and CamKit's
+    ramped pocket must lie within the sampled reference's bounds.
+  - A deliberate 0.1 µm error in the core fails both kinds of check.
+  - `core/tests/core_tests.cpp` adds closed-form checks through the C ABI:
+    slots, arcs, plunges, capsule floors of ball ramps, necked tools, mesh
+    tie rules, provenance and handle validation.
+
+Build the core and run its checks and benchmark:
 
 ```sh
-LD_LIBRARY_PATH=/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
+cmake -S stockkit/core -B build/stockkit-core -DCMAKE_BUILD_TYPE=Release
+cmake --build build/stockkit-core
+build/stockkit-core/stockkit_core_tests
+build/stockkit-core/stockkit_core_bench        # optional ray spacing in mm
+```
+
+After changing `core/include/stockkit.h`, regenerate the Haxe binding with
+`stockkit/core/tools/check-hxi.sh`. Haxeon's FFI allows one output array per
+function and no other outputs beside it, which is why counts and contents
+are read with separate calls.
+
+Run the Haxe tests with the StockKit core and CadKit native builds on
+`LD_LIBRARY_PATH`:
+
+```sh
+LD_LIBRARY_PATH=build/stockkit-core:/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
   ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json
 ```

@@ -1,4 +1,6 @@
 import fixtures.ChainFixtures;
+import fixtures.CoreComparison;
+import fixtures.CoreFixtures;
 import fixtures.OracleFixtures;
 import fixtures.SampledReferenceFixtures;
 import cnckit.tool.CutterProfile;
@@ -10,9 +12,11 @@ class StockKitTests {
     profiles();
     CutMoveTests.run();
     SampledReferenceFixtures.run();
+    CoreFixtures.run();
     OracleFixtures.run();
     ChainFixtures.run();
-    Sys.println('StockKit tests passed (${Assert.count} assertions)');
+    Sys.println('StockKit tests passed (${Assert.count} assertions, '
+      + '${CoreComparison.raysCompared} core rays checked against references)');
   }
 
   static function profiles():Void {
