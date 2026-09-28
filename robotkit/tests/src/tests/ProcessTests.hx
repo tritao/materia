@@ -10,6 +10,10 @@ import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.ChannelToolAdapter;
 import robotkit.tool.SimulatedSprayer;
+import robotkit.tool.SimulatedGripper;
+import robotkit.tool.SimulatedVacuum;
+import robotkit.tool.Tool;
+import robotkit.tool.ToolRuntime;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
 
@@ -21,6 +25,7 @@ class ProcessTests {
     assertions = 0;
     testToolpathConversion();
     testScheduledToolEvents();
+    testMultiCapabilityTool();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
     return assertions;
   }
@@ -72,6 +77,39 @@ class ProcessTests {
     check(Int64.compare(sprayer.history[0].timestampNs, Int64.ofInt(200)) == 0 &&
       Int64.compare(sprayer.history[1].timestampNs, Int64.ofInt(400)) == 0,
       "Sprayer timestamps use scheduled trajectory time");
+  }
+
+  static function testMultiCapabilityTool():Void {
+    var gripper = new SimulatedGripper();
+    var vacuum = new SimulatedVacuum();
+    var tool = new Tool("combination", "combination", Transform3.identity());
+    var runtime = new ToolRuntime(tool, gripper, vacuum);
+    check(runtime.tool == tool && runtime.gripper == gripper && runtime.vacuum == vacuum,
+      "One mounted tool exposes both independent capabilities");
+
+    var adapter = new ChannelToolAdapter();
+    adapter.bindGripper("tool.grip", runtime.gripper);
+    adapter.bindVacuum("tool.vacuum", runtime.vacuum);
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.grip",
+      ProcessEventValue.Digital(true), Int64.ofInt(100), Int64.ofInt(105), 1));
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(200), Int64.ofInt(205), 1));
+    check(gripper.isGrasped() && vacuum.isHolding(), "Gripper and vacuum can hold at once");
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.grip",
+      ProcessEventValue.Digital(false), Int64.ofInt(300), Int64.ofInt(305), 1));
+    check(gripper.isOpen() && vacuum.isHolding(), "Opening the gripper leaves vacuum active");
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
+      ProcessEventValue.Digital(false), Int64.ofInt(400), Int64.ofInt(405), 1));
+    check(!vacuum.isEnabled() && !vacuum.isHolding(), "Vacuum off releases its pickup");
+    check(gripper.history.length == 2 && vacuum.history.length == 2 &&
+      Int64.compare(vacuum.history[0].timestampNs, Int64.ofInt(200)) == 0,
+      "Each capability records its own scheduled commands");
+    var rejected = false;
+    try adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
+      ProcessEventValue.Analog(1.0), Int64.ofInt(500), Int64.ofInt(505), 1))
+    catch (_:Dynamic) rejected = true;
+    check(rejected && vacuum.history.length == 2,
+      "Vacuum rejects non-digital events without changing state");
   }
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool

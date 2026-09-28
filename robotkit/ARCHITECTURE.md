@@ -811,8 +811,12 @@ derivation policy, not a shape), and `mass`.
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
 `SurfaceTool` (enable/disable, standoff), `Sander` (speed, contact force),
-`Sprayer` (flow, pressure), and `Gripper` (open/close, observed grasp
-state). Every command method takes the caller's `timestampNs` explicitly —
+`Sprayer` (flow, pressure), `Gripper` (open/close, observed grasp state),
+and `Vacuum` (enable/disable, observed holding state). `ToolRuntime` pairs
+one mounted `Tool` with any combination of these typed capabilities, so
+one end effector can grip and apply vacuum independently. `ChannelToolAdapter`
+maps digital process channels to gripper and vacuum commands. Every command
+method takes the caller's `timestampNs` explicitly —
 simulated implementations never read a wall clock, keeping planners
 deterministic. `Simulated*` classes implement each interface by recording
 every commanded state change, with its timestamp, into a `history` array

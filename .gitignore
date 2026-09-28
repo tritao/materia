@@ -4,6 +4,7 @@
 /app/*.dump
 /robotkit/robotd/build/
 /robotkit/tests/build/
+/robotkit/tests/tool-capabilities/build/
 /robotkit/tests/mujoco/build/
 /robotkit/tests/excavator/build/
 /robotkit/build/
