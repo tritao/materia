@@ -26,8 +26,6 @@ import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.TrajectorySegment;
 import RobotKitRuntime;
 
 /**
@@ -55,25 +53,15 @@ class MotionSystem {
   /** Native trajectory currently submitted to the runtime queue. */
   var activeTrajectory:Null<Trajectory> = null;
   var queuedTrajectories:Array<Trajectory> = [];
-  var activeSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
-    coefficients:Array<Array<Float>>}> = [];
+  final stream:TrajectoryStream;
   var activeStationary:Bool = false;
-  var elapsedSeconds:Float = 0.0;
+  var elapsedSeconds(get, never):Float;
   var held:Bool = false;
   /** A native lifecycle command must reach the owner before another plan. */
   var nativeRefillDeferred:Bool = false;
   var bufferedTotalSeconds:Float = 0.0;
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
-  var trajectorySubmitted:Bool = false;
-  /** Native segment index used as the boundary of the next plan chunk. */
-  var trajectoryNextSegmentIndex:Int = 0;
-  var trajectoryChunkEndSeconds:Float = 0.0;
-  var trajectoryChunkStartSeconds:Float = 0.0;
-  var nextTrajectoryTag:Int64 = Int64.ofInt(1);
-  var trajectoryChunkReferences:Map<String, PlanChunkReference> = new Map();
-  var trajectoryFinalTag:Int64 = Int64.ofInt(0);
-  var trajectoryFinalEndSeconds:Float = 0.0;
   /** True while stopping so that deferred work can start from rest. */
   var stoppingForReplacement:Bool = false;
   /** Work deferred until a replacement stop reaches rest, in order. */
@@ -101,6 +89,7 @@ class MotionSystem {
         throw 'Robot joint $i does not match motion-system joint "${blueprint.model.joints[i].name}"';
     }
     this.robot = robot;
+    stream = new TrajectoryStream(robot);
     this.modelRevision = Int64.ofInt(blueprint.runtime.revision);
     this.calibrationRevision = Int64.ofInt(blueprint.runtime.calibrationRevision);
     this.fixedTimestepSeconds = blueprint.fixedTimestepSeconds;
@@ -738,7 +727,7 @@ class MotionSystem {
   function trySmoothReplacement(executing:Trajectory, jogAxis:Null<String>,
       planFromState:TrajectoryState -> Trajectory):Null<Trajectory> {
     if (executing == null) return null;
-    return PlanExecutor.replaceWithRetry(executing, syncFromRuntime,
+    return TrajectoryStream.replaceWithRetry(executing, syncFromRuntime,
       replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
       (planned, state, observation, anchorNs) ->
         submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
@@ -746,30 +735,14 @@ class MotionSystem {
 
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):Trajectory {
-    var replacement = planned;
-    var tag = nextTrajectoryTag;
-    var segments = [for (segment in replacement.segments())
-      new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
-        segment.coefficients)];
-    if (segments.length > 128) throw "Smooth replacement exceeds one runtime submission";
-    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-      modelRevision, calibrationRevision, 1, state.positions, state.velocities,
-      state.accelerations, segments, observation.activePlanId,
-      anchorNs)));
-    nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
+    var tag = stream.submitSmoothReplacement(planned, state, observation,
+      anchorNs, modelRevision, calibrationRevision);
     setActive(planned);
     activeJogAxis = jogAxis;
     bufferedTotalSeconds = planned.durationSeconds();
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(planned);
-    trajectorySubmitted = true;
-    trajectoryNextSegmentIndex = planned.segments().length;
-    trajectoryChunkStartSeconds = 0.0;
-    trajectoryChunkEndSeconds = planned.durationSeconds();
-    trajectoryFinalTag = tag;
-    trajectoryFinalEndSeconds = planned.durationSeconds();
-    trajectoryChunkReferences.set(Int64.toStr(tag),
-      new PlanChunkReference(planned, 0.0));
+    stream.recordReplacement(tag);
     return planned;
   }
 
@@ -804,7 +777,8 @@ class MotionSystem {
       return activeTrajectory != null;
     }
     if (nativeRefillDeferred) nativeRefillDeferred = false;
-    else if (!trajectorySubmitted || shouldRefillTrajectory(dt)) fillNativeWindow();
+    else if (!stream.submitted || stream.shouldRefill(dt, fixedTimestepSeconds))
+      fillNativeWindow();
     return true;
   }
 
@@ -815,19 +789,10 @@ class MotionSystem {
   /** Starts executing `trajectoryValue` as a fresh, un-retimed plan. */
   function setActive(trajectoryValue:Trajectory):Void {
     activeTrajectory = trajectoryValue;
-    activeSegments = trajectoryValue.segments();
-    activeStationary = stationarySegments(activeSegments);
+    var segments = trajectoryValue.segments();
+    activeStationary = stationarySegments(segments);
     activeJogAxis = null;
-    resetExecutionState();
-  }
-
-  function resetExecutionState():Void {
-    elapsedSeconds = 0.0;
-    trajectorySubmitted = false;
-    resetTrajectoryChunkState();
-    trajectoryChunkReferences = new Map();
-    trajectoryFinalTag = Int64.ofInt(0);
-    trajectoryFinalEndSeconds = 0.0;
+    stream.begin(segments, trajectoryValue.durationSeconds());
   }
 
   function planAxesFrom(start:Array<Float>, targets:Array<AxisTarget>,
@@ -941,7 +906,6 @@ class MotionSystem {
 
   function clearBufferedMotion():Void {
     activeTrajectory = null;
-    activeSegments = [];
     activeStationary = false;
     queuedTrajectories = [];
     held = false;
@@ -952,109 +916,44 @@ class MotionSystem {
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
     nativeRefillDeferred = false;
-    resetExecutionState();
+    stream.clear();
   }
 
-  function submitActiveTrajectoryChunk():Void {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || activeSegments.length == 0 ||
-        trajectoryNextSegmentIndex >= activeSegments.length) return;
-    var tag = nextTrajectoryTag;
-    var submitted = PlanExecutor.submitTrajectoryChunk(robot, trajectoryValue,
-      activeSegments, trajectoryNextSegmentIndex, tag, modelRevision,
-      calibrationRevision, pathJerkUnchecked.exists(trajectoryValue) &&
-      pathJerkUnchecked.get(trajectoryValue) == true);
-    if (submitted == null) return;
-    nextTrajectoryTag = Int64.add(tag, Int64.ofInt(1));
-    trajectorySubmitted = true;
-    trajectoryNextSegmentIndex = submitted.last;
-    trajectoryChunkStartSeconds = submitted.startSeconds;
-    trajectoryChunkEndSeconds = submitted.endSeconds;
-    trajectoryChunkReferences.set(Int64.toStr(tag),
-      new PlanChunkReference(trajectoryValue, submitted.startSeconds));
-    if (submitted.last >= activeSegments.length) {
-      trajectoryFinalTag = tag;
-      trajectoryFinalEndSeconds = submitted.endSeconds;
-    }
-  }
-
-  /** Keep a fixed execution window queued so native HOLD never needs a host lead estimate. */
+  /** Keep two seconds of motion queued so HOLD can slow along the path. */
   function fillNativeWindow():Void {
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
-    while (trajectoryNextSegmentIndex < activeSegments.length &&
-        trajectoryChunkEndSeconds - elapsedSeconds < 2.0) {
-      var before = trajectoryNextSegmentIndex;
-      submitActiveTrajectoryChunk();
-      if (trajectoryNextSegmentIndex == before) break;
-    }
+    var jerkUnchecked = pathJerkUnchecked.exists(trajectoryValue) &&
+      pathJerkUnchecked.get(trajectoryValue) == true;
+    stream.fill(robot.snapshot().positions.length, false,
+      (first, last, tag, startNs, _) -> stream.motionSubmission(
+        trajectoryValue, first, last, tag, startNs, modelRevision,
+        calibrationRevision, jerkUnchecked),
+      (first, last, error) ->
+        'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
   }
 
-  function syncFromRuntime():RobotSnapshot {
-    var observation = robot.snapshot();
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null) return observation;
-    var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
-    if (reference != null && reference.trajectory == trajectoryValue) {
-      elapsedSeconds = PlanExecutor.elapsedFromSnapshot(observation,
-        reference.startSeconds, trajectoryValue.durationSeconds());
-    }
-    return observation;
-  }
+  function get_elapsedSeconds():Float return stream.elapsedSeconds;
 
-  function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !trajectorySubmitted ||
-        Int64.compare(trajectoryFinalTag, Int64.ofInt(0)) == 0)
-      return false;
-    if (trajectoryFinalEndSeconds < trajectoryValue.durationSeconds() - 1e-9)
-      return false;
-    if (Int64.compare(observation.trajectoryTag, trajectoryFinalTag) != 0)
-      return false;
-    var finalTime = Int64.toFloat(observation.trajectoryTagTimeNs) /
-      1000000000.0;
-    var reachedEnd = Math.isFinite(finalTime) &&
-      trajectoryFinalEndSeconds - trajectoryChunkStartSeconds <= finalTime + 1e-9;
-    return reachedEnd && !observation.trajectoryActive &&
-      observation.trajectoryQueueDepth == 0;
-  }
+  function syncFromRuntime():RobotSnapshot
+    return activeTrajectory == null ? robot.snapshot() : stream.sync();
+
+  function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool
+    return activeTrajectory != null && stream.finishedMotion(observation);
 
   function completeActiveTrajectory():Void {
     if (activeTrajectory == null) return;
     bufferedCompletedSeconds += activeTrajectory.durationSeconds();
     pathJerkUnchecked.remove(activeTrajectory);
     activeTrajectory = null;
-    activeSegments = [];
     activeStationary = false;
-    resetExecutionState();
+    stream.clear();
     activateNextTrajectory();
   }
 
   function discardNativeTrajectory(value:Trajectory):Void {
     pathJerkUnchecked.remove(value);
     value.dispose();
-  }
-
-  function shouldRefillTrajectory(dt:Float):Bool {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || trajectoryNextSegmentIndex >= activeSegments.length)
-      return false;
-    var lead = Math.max(2.0, Math.max(fixedTimestepSeconds, dt) * 2.0);
-    if (trajectoryChunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
-    // If an owner cycle drained the native window before the host update,
-    // refill immediately from the deterministic source trajectory.
-    // At t=0 the first chunk may still be in the runtime mailbox, so its
-    // snapshot quite correctly reports an empty queue until the owner cycle
-    // accepts that command.
-    if (elapsedSeconds <= 1e-9) return false;
-    var observation = robot.snapshot();
-    return !observation.trajectoryActive || observation.trajectoryQueueDepth == 0;
-  }
-
-  function resetTrajectoryChunkState():Void {
-    trajectoryNextSegmentIndex = 0;
-    trajectoryChunkEndSeconds = 0.0;
-    trajectoryChunkStartSeconds = 0.0;
   }
 
   static function trajectoryEnd(trajectoryValue:Trajectory):Array<Float>
@@ -1091,15 +990,5 @@ class MotionSystem {
         maxAcceleration = maxAcceleration <= 0.0 ? axisAcceleration : Math.min(maxAcceleration, axisAcceleration);
     }
     return new MotionLimits(maxVelocity, maxAcceleration, maxJerk);
-  }
-}
-
-private class PlanChunkReference {
-  public final trajectory:Trajectory;
-  public final startSeconds:Float;
-
-  public function new(trajectory:Trajectory, startSeconds:Float) {
-    this.trajectory = trajectory;
-    this.startSeconds = startSeconds;
   }
 }

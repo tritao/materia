@@ -1,0 +1,292 @@
+package motionkit.robot;
+
+import haxe.Int64;
+import motionkit.trajectory.ExecutionPlan;
+import motionkit.trajectory.Trajectory;
+import motionkit.trajectory.TrajectoryState;
+import robotkit.runtime.RobotRuntimeError;
+import RobotKitRuntime;
+import robotkit.world.ExecutionPlanSubmission;
+import robotkit.world.Robot;
+import robotkit.world.RobotCommand;
+import robotkit.world.RobotSnapshot;
+import robotkit.world.ProcessTimedEvent;
+import robotkit.world.TrajectorySegment;
+
+private typedef StreamSegment = {timeFromStartNs:Int64, durationNs:Int64,
+  coefficients:Array<Array<Float>>};
+
+/** Bounded owner-clock stream shared by machine motion and validated programs. */
+class TrajectoryStream {
+  static var nextProgramTag:Int64 = Int64.ofInt(1000000);
+
+  public final robot:Robot;
+  public var elapsedSeconds(default, null):Float = 0.0;
+  public var submitted(default, null):Bool = false;
+  public var nextSegment(default, null):Int = 0;
+  public var chunkStartSeconds(default, null):Float = 0.0;
+  public var chunkEndSeconds(default, null):Float = 0.0;
+  public var finalTag(default, null):Int64 = Int64.ofInt(0);
+  public var finalEndSeconds(default, null):Float = 0.0;
+  public var finalDurationNs(default, null):Int64 = Int64.ofInt(0);
+  var segments:Array<StreamSegment> = [];
+  var durationSeconds:Float = 0.0;
+  var references:Map<String, Float> = new Map();
+  var nextMotionTag:Int64 = Int64.ofInt(1);
+  final programTags:Bool;
+
+  public function new(robot:Robot, ?programTags:Bool = false) {
+    this.robot = robot;
+    this.programTags = programTags;
+  }
+
+  public function begin(segments:Array<StreamSegment>, durationSeconds:Float):Void {
+    this.segments = segments;
+    this.durationSeconds = durationSeconds;
+    elapsedSeconds = 0.0;
+    submitted = false;
+    nextSegment = 0;
+    chunkStartSeconds = 0.0;
+    chunkEndSeconds = 0.0;
+    finalTag = Int64.ofInt(0);
+    finalEndSeconds = 0.0;
+    finalDurationNs = Int64.ofInt(0);
+    references = new Map();
+  }
+
+  public function clear():Void begin([], 0.0);
+
+  public function markCompleted():Void elapsedSeconds = durationSeconds;
+
+  public function sync():RobotSnapshot {
+    var observation = robot.snapshot();
+    var start = references.get(Int64.toStr(observation.trajectoryTag));
+    if (start != null)
+      elapsedSeconds = elapsedFromSnapshot(observation, start, durationSeconds);
+    return observation;
+  }
+
+  public static function elapsedFromSnapshot(observation:RobotSnapshot,
+      startSeconds:Float, durationSeconds:Float):Float {
+    var runtimeSeconds = Int64.toFloat(observation.trajectoryTagTimeNs) * 1e-9;
+    return Math.isFinite(runtimeSeconds) ?
+      Math.min(durationSeconds, Math.max(0.0, startSeconds + runtimeSeconds)) : 0.0;
+  }
+
+  /** Submit enough chunks to keep two seconds of motion on the runtime. */
+  public function fill(jointCount:Int, reserveStaged:Bool,
+      build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
+      describeFailure:Int -> Int -> Dynamic -> String):Void {
+    var stagedSegments = 0;
+    while (nextSegment < segments.length && chunkEndSeconds - elapsedSeconds < 2.0) {
+      var available = 4096 - robot.snapshot().trajectoryQueueDepth -
+        (reserveStaged ? stagedSegments : 0);
+      var coefficientLimit = Std.int(Math.floor(4096.0 / (jointCount * 6.0)));
+      var count = Std.int(Math.min(coefficientLimit, Math.min(128,
+        Math.min(available, segments.length - nextSegment))));
+      if (count < 1) return;
+      var first = nextSegment;
+      var last = first + count;
+      var startNs = segments[first].timeFromStartNs;
+      var endNs = Int64.add(segments[last - 1].timeFromStartNs,
+        segments[last - 1].durationNs);
+      var tag = programTags ? nextProgramTag : nextMotionTag;
+      if (programTags) nextProgramTag = Int64.add(nextProgramTag, Int64.ofInt(1));
+      var submission = build(first, last, tag, startNs, endNs);
+      try robot.submit(RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic)
+        throw describeFailure(first, last, error);
+      if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
+      var startSeconds = Int64.toFloat(startNs) * 1e-9;
+      references.set(Int64.toStr(tag), startSeconds);
+      submitted = true;
+      nextSegment = last;
+      stagedSegments += count;
+      chunkStartSeconds = startSeconds;
+      chunkEndSeconds = Int64.toFloat(endNs) * 1e-9;
+      if (last == segments.length) {
+        finalTag = tag;
+        finalEndSeconds = chunkEndSeconds;
+        finalDurationNs = Int64.sub(endNs, startNs);
+      }
+    }
+  }
+
+  public function motionSubmission(trajectory:Trajectory, first:Int, last:Int, tag:Int64,
+      startNs:Int64, modelRevision:Int64, calibrationRevision:Int64,
+      jerkUnchecked:Bool):ExecutionPlanSubmission {
+    var startSeconds = Int64.toFloat(startNs) * 1e-9;
+    var payload:Array<TrajectorySegment> = [];
+    for (index in first...last) {
+      var segment = segments[index];
+      payload.push(new TrajectorySegment(Int64.sub(segment.timeFromStartNs, startNs),
+        segment.durationNs, segment.coefficients));
+    }
+    var state = trajectory.evaluate(startSeconds);
+    var velocity = state.velocities;
+    var acceleration = state.accelerations;
+    if (segments[first].coefficients[0].length == 2) {
+      velocity = [for (_ in state.positions) 0.0];
+      if (first > 0) {
+        var previous = segments[first - 1];
+        for (joint in 0...velocity.length)
+          velocity[joint] = previous.coefficients[joint][1];
+      }
+      acceleration = [for (_ in state.positions) 0.0];
+    }
+    var accelerationTolerance = [for (_ in state.positions) 0.0];
+    if (jerkUnchecked && segments[first].coefficients[0].length != 2) {
+      var previousAcceleration = first == 0 ?
+        [for (_ in state.positions) 0.0] :
+        trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations;
+      for (joint in 0...state.positions.length)
+        accelerationTolerance[joint] =
+          Math.abs(acceleration[joint] - previousAcceleration[joint]) + 1e-5;
+    }
+    return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
+      state.positions, velocity, acceleration, payload, null, null, null, null,
+      accelerationTolerance, last == segments.length, null, jerkUnchecked);
+  }
+
+  /** Build a program chunk after the caller expands joints and selects events. */
+  public function programSubmission(plan:ExecutionPlan, first:Int, last:Int,
+      tag:Int64, startNs:Int64, endNs:Int64, fixedPositions:Array<Float>,
+      expand:Array<Float> -> Array<Float> -> Array<Float>,
+      expandSegments:Int -> Int -> Int64 -> Array<TrajectorySegment>,
+      selectEvents:Int64 -> Int64 -> Bool -> Array<ProcessTimedEvent>,
+      endsAtRest:Bool, jerkUnchecked:Bool):ExecutionPlanSubmission {
+    var startSeconds = Int64.toFloat(startNs) * 1e-9;
+    var state = plan.evaluate(startSeconds);
+    var payload = expandSegments(first, last, startNs);
+    var events = selectEvents(startNs, endNs, last == segments.length);
+    var positions = expand(state.positions, fixedPositions);
+    var zero = [for (_ in fixedPositions) 0.0];
+    var startVelocity = expand(first == 0 ? plan.copyStartVelocities() :
+      state.velocities, zero);
+    var startAcceleration = expand(first == 0 ? plan.copyStartAccelerations() :
+      state.accelerations, zero);
+    // Linear chunks promise the preceding chord at a continuation anchor.
+    if (segments[first].coefficients[0].length == 2) {
+      startVelocity = zero.copy();
+      startAcceleration = zero.copy();
+      if (first > 0)
+        startVelocity = expand([for (coefficients in segments[first - 1].coefficients)
+          coefficients[1]], zero);
+    }
+    var tolerance = [for (_ in fixedPositions) 0.02];
+    var pTol = expand(first == 0 ? plan.copyPositionTolerances() :
+      [for (_ in state.positions) 0.02], tolerance);
+    var vTol = expand(first == 0 ? plan.copyVelocityTolerances() :
+      [for (_ in state.positions) 0.02], tolerance);
+    var aTol = expand(first == 0 ? plan.copyAccelerationTolerances() :
+      [for (_ in state.positions) 0.02], tolerance);
+    if (!jerkUnchecked && first > 0)
+      aTol = [for (_ in fixedPositions) 1e-6];
+    if (payload[0].coefficients[0].length > 2) {
+      var precedingAcceleration = first == 0 ? zero : expand(
+        plan.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero);
+      for (joint in 0...fixedPositions.length) {
+        var coefficients = payload[0].coefficients[joint];
+        var polynomialAcceleration = 2.0 * coefficients[2];
+        if (jerkUnchecked || first == 0) {
+          aTol[joint] = Math.max(aTol[joint],
+            Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5);
+          aTol[joint] = Math.max(aTol[joint],
+            Math.abs(polynomialAcceleration - precedingAcceleration[joint]) + 1e-5);
+        }
+        startAcceleration[joint] = polynomialAcceleration;
+      }
+    }
+    return new ExecutionPlanSubmission(tag, plan.modelRevision,
+      plan.calibrationRevision, 1, positions, startVelocity, startAcceleration,
+      payload, null, null, pTol, vTol, aTol,
+      last == segments.length && endsAtRest, events, jerkUnchecked);
+  }
+
+  public function finishedMotion(observation:RobotSnapshot):Bool {
+    if (!submitted || Int64.compare(finalTag, Int64.ofInt(0)) == 0 ||
+        finalEndSeconds < durationSeconds - 1e-9 ||
+        Int64.compare(observation.trajectoryTag, finalTag) != 0)
+      return false;
+    var finalTime = Int64.toFloat(observation.trajectoryTagTimeNs) * 1e-9;
+    return Math.isFinite(finalTime) &&
+      finalEndSeconds - chunkStartSeconds <= finalTime + 1e-9 &&
+      !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
+  }
+
+  public function finishedProgram(observation:RobotSnapshot):Bool
+    return Int64.compare(finalTag, Int64.ofInt(0)) != 0 &&
+      Int64.compare(observation.trajectoryTag, finalTag) == 0 &&
+      Int64.compare(observation.trajectoryTagTimeNs, finalDurationNs) >= 0 &&
+      !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
+
+  public function shouldRefill(dt:Float, fixedTimestepSeconds:Float):Bool {
+    if (nextSegment >= segments.length) return false;
+    var lead = Math.max(2.0, Math.max(fixedTimestepSeconds, dt) * 2.0);
+    if (chunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
+    if (elapsedSeconds <= 1e-9) return false;
+    var observation = robot.snapshot();
+    return !observation.trajectoryActive || observation.trajectoryQueueDepth == 0;
+  }
+
+  /** Record a smooth replacement already accepted by the runtime. */
+  public function recordReplacement(tag:Int64):Void {
+    submitted = true;
+    nextSegment = segments.length;
+    chunkStartSeconds = 0.0;
+    chunkEndSeconds = durationSeconds;
+    finalTag = tag;
+    finalEndSeconds = durationSeconds;
+    finalDurationNs = Trajectory.nanoseconds(durationSeconds);
+    references.set(Int64.toStr(tag), 0.0);
+  }
+
+  public function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
+      observation:RobotSnapshot, anchorNs:Int64, modelRevision:Int64,
+      calibrationRevision:Int64):Int64 {
+    var tag = nextMotionTag;
+    var payload = [for (segment in planned.segments())
+      new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
+        segment.coefficients)];
+    if (payload.length > 128) throw "Smooth replacement exceeds one runtime submission";
+    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
+      modelRevision, calibrationRevision, 1, state.positions, state.velocities,
+      state.accelerations, payload, observation.activePlanId, anchorNs)));
+    nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
+    return tag;
+  }
+
+  /** Reobserve the committed horizon after a rejected replacement. */
+  public static function replaceWithRetry(executing:Trajectory,
+      observe:Void -> RobotSnapshot, ownerPeriodSeconds:Float, marginPeriods:Int,
+      planFromState:TrajectoryState -> Trajectory,
+      submit:Trajectory -> TrajectoryState -> RobotSnapshot -> Int64 -> Trajectory
+      ):Null<Trajectory> {
+    for (_ in 0...2) {
+      var observation = observe();
+      if (!observation.trajectoryActive ||
+          Int64.compare(observation.activePlanId, Int64.ofInt(0)) == 0)
+        return null;
+      var startNs = Int64.sub(observation.trajectoryTimeNs,
+        observation.trajectoryTagTimeNs);
+      var marginNs = Trajectory.nanoseconds(ownerPeriodSeconds * marginPeriods);
+      var anchorNs = Int64.add(observation.committedUntilNs, marginNs);
+      var localSeconds = Int64.toFloat(Int64.sub(anchorNs, startNs)) * 1e-9;
+      if (localSeconds < 0.0 ||
+          localSeconds >= executing.durationSeconds() - ownerPeriodSeconds)
+        return null;
+      var state = executing.evaluate(localSeconds);
+      var planned = planFromState(state);
+      try {
+        return submit(planned, state, observation, anchorNs);
+      } catch (error:RobotRuntimeError) {
+        planned.dispose();
+        if (error.status != RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE)
+          throw error;
+      } catch (error:Dynamic) {
+        planned.dispose();
+        throw error;
+      }
+    }
+    return null;
+  }
+}
