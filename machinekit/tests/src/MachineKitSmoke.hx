@@ -1458,6 +1458,10 @@ class MachineKitSmoke {
 		check(feet == 4, "rack has one foot aligned to each post");
 		check(rack.instances("rack-02")[0].id == "rack-02/frame",
 			"storage rack instance listing accepts a caller prefix");
+		var secondRackPosition = rack.positions("rack-02")[0];
+		check(secondRackPosition.id == "rack-02/shelf-01/bin-01" &&
+			secondRackPosition.indicatorId == "rack-02/shelf-01/bin-01/indicator",
+			"storage rack positions and indicators accept the caller prefix");
 		var rackModel = new AssemblyModel();
 		rack.addTo(rackModel, "rack-02");
 		var rackOccurrences = rackModel.definition("storage-rack").occurrences;

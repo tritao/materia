@@ -35,7 +35,11 @@ class StorageRack extends MachineAssembly {
 		buildAssemblyMembers();
 	}
 
-	public function positions():Array<StoragePosition> return positionsList.copy();
+	public function positions(prefix:String = "rack-01"):Array<StoragePosition> {
+		if (prefix == "rack-01") return positionsList.copy();
+		return [for (position in positionsList) new StoragePosition(config,
+			position.shelfIndex, position.binIndex, prefix)];
+	}
 
 	public function instances(prefix:String = "rack-01"):Array<StationInstance> {
 		var result:Array<StationInstance> = [{id: MachineAssembly.join(prefix, "frame"), label: "Rack extrusion frame",
@@ -100,8 +104,8 @@ class StoragePosition {
 	public final allowedContainerDepth:Float;
 	public final allowedContainerHeight:Float;
 
-	public function new(config:PickingStationConfig, shelfIndex:Int, binIndex:Int) {
-		id = config.positionId(shelfIndex, binIndex);
+	public function new(config:PickingStationConfig, shelfIndex:Int, binIndex:Int, prefix:String = "rack-01") {
+		id = config.positionId(shelfIndex, binIndex, prefix);
 		this.shelfIndex = shelfIndex;
 		this.binIndex = binIndex;
 		var radians = config.shelfInclinationDegrees * Math.PI / 180;
@@ -110,7 +114,7 @@ class StoragePosition {
 			config.shelfZ(shelfIndex) + config.binY() * Math.sin(radians) + 18 * Math.cos(radians));
 		placement.qx = Math.sin(radians / 2);
 		placement.qw = Math.cos(radians / 2);
-		indicatorId = config.indicatorId(shelfIndex, binIndex);
+		indicatorId = config.indicatorId(shelfIndex, binIndex, prefix);
 		indicatorPlacement = materia.assembly.AssemblyFrames.translation(config.binX(binIndex),
 			config.indicatorY(), config.shelfZ(shelfIndex) + 5);
 		allowedContainerWidth = config.binWidth;

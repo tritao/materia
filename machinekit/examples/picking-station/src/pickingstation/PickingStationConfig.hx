@@ -87,11 +87,11 @@ class PickingStationConfig {
 		ShelfAssembly.RETAINING_LIP_THICKNESS + 2 + binDepth / 2;
 	public function indicatorY():Float return -rackDepth / 2 - INDICATOR_DEPTH / 2 - 4;
 
-	public function positionId(shelfIndex:Int, binIndex:Int):String
-		return 'rack-01/shelf-${twoDigits(shelfIndex)}/bin-${twoDigits(binIndex)}';
+	public function positionId(shelfIndex:Int, binIndex:Int, prefix:String = "rack-01"):String
+		return '$prefix/shelf-${twoDigits(shelfIndex)}/bin-${twoDigits(binIndex)}';
 
-	public function indicatorId(shelfIndex:Int, binIndex:Int):String
-		return positionId(shelfIndex, binIndex) + "/indicator";
+	public function indicatorId(shelfIndex:Int, binIndex:Int, prefix:String = "rack-01"):String
+		return positionId(shelfIndex, binIndex, prefix) + "/indicator";
 
 	static function twoDigits(value:Int):String return value < 10 ? "0" + value : Std.string(value);
 	static function finitePositive(value:Float):Bool return Math.isFinite(value) && value > 0;
