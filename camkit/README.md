@@ -22,6 +22,8 @@ Input adapters:
 - `CamJob.profileFace(face, tool, depth, feed)` profiles every inner boundary
   before the outer boundary. It checks that the tool fits each hole before
   adding any cuts to the job.
+- `CamJob.pocketFace(face, tool, depth, feed, stepOver)` clears around inner
+  boundaries as islands, finishing each island edge before the outer edge.
 - `CamSheetProfiles.fromPlan(plan, placementId)` turns a manufacturingkit
   rectangular sheet placement into a profile contour.
 
@@ -31,7 +33,9 @@ collapse a narrow feature or collide with another edge. Convex pockets use
 inward offset rings. Concave pockets use horizontal passes inside the cutter's
 clearance region, retract between disconnected passes, and finish the inside
 boundary at each depth.
-Pocket input is one boundary; internal islands are not yet represented.
+`pocket(contour, ...)` accepts one boundary; `pocketFace(face, ...)` accepts
+multiple internal islands and rejects a tool that cannot clear between an
+island and another boundary.
 
 Example:
 
@@ -47,7 +51,8 @@ var linuxCnc = CamGCodeWriter.write(program);
 
 The test project creates its own rectangular, rounded and holed plate fixtures.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
-hole-before-outer ordering, concave profiles and pockets, direct lowering and
+hole-before-outer ordering, concave profiles and pockets, island clearance,
+direct lowering and
 CAM IR → G-code → CncKit IR
 round trips. The suite also
 checks the generic manufacturingkit sheet placement adapter using locally

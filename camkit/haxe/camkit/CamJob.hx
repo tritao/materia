@@ -82,14 +82,7 @@ class CamJob {
       var span = nextSpan();
       selectTool(tool, span);
       for (level in levels) {
-        for (pass in passes) {
-          var start = new CncPoint(pass.left, pass.y, level);
-          var end = new CncPoint(pass.right, pass.y, level);
-          rapid(new CncPoint(start.x, start.y, safeZ), span);
-          feedTo(start, feed, span);
-          feedTo(end, feed, span);
-          rapid(new CncPoint(end.x, end.y, safeZ), span);
-        }
+        cutPocketPasses(passes, level, feed, span);
         cutOffset(contour, radius, level, feed, span, false);
       }
       return this;
@@ -119,6 +112,53 @@ class CamJob {
     for (level in levels)
       for (ring in rings) cutLoop(ring, level, feed, span);
     return this;
+  }
+
+  /** Clear a face around its internal islands, then finish every boundary. */
+  public function pocketFace(face:Face, tool:CncTool, depth:Float,
+      feed:Float, stepOver:Float, ?stepDown:Float = 0.002,
+      ?unit:String = "mm", ?chordToleranceMetres:Float = 0.00005):CamJob {
+    var boundaries = CamContour.fromFaceBoundaries(face, unit,
+      chordToleranceMetres);
+    var outer = boundaries[0];
+    if (boundaries.length == 1)
+      return pocket(outer, tool, depth, feed, stepOver, stepDown);
+    require(outer, tool, depth, feed);
+    if (!Math.isFinite(stepOver) || stepOver <= 0.0 ||
+        stepOver > tool.diameter)
+      throw "CAM pocket step-over must be positive and no larger than tool diameter";
+    var islands = boundaries.slice(1), radius = tool.diameter * 0.5;
+    var levels = depthLevels(outer.z, depth, stepDown);
+    for (island in islands) require(island, tool, depth, feed);
+    var passes = CamPocketPlanner.plan(outer, radius, stepOver, islands);
+    var outerPath = offsetPath(outer, radius, levels[0], false);
+    for (island in islands) {
+      validatePathAgainstContour(island, outerPath, radius, false);
+      var islandPath = offsetPath(island, radius, levels[0], true);
+      validatePathAgainstContour(outer, islandPath, radius, true);
+      for (other in islands) if (other != island)
+        validatePathAgainstContour(other, islandPath, radius, false);
+    }
+    var span = nextSpan();
+    selectTool(tool, span);
+    for (level in levels) {
+      cutPocketPasses(passes, level, feed, span);
+      for (island in islands) cutOffset(island, radius, level, feed, span, true);
+      cutOffset(outer, radius, level, feed, span, false);
+    }
+    return this;
+  }
+
+  function cutPocketPasses(passes:Array<{y:Float, left:Float, right:Float}>,
+      level:Float, feed:Float, span:CncSpan):Void {
+    for (pass in passes) {
+      var start = new CncPoint(pass.left, pass.y, level);
+      var end = new CncPoint(pass.right, pass.y, level);
+      rapid(new CncPoint(start.x, start.y, safeZ), span);
+      feedTo(start, feed, span);
+      feedTo(end, feed, span);
+      rapid(new CncPoint(end.x, end.y, safeZ), span);
+    }
   }
 
   static function hasConcaveCorner(contour:CamContour):Bool {
@@ -266,12 +306,12 @@ class CamJob {
       result.push(CncGeometry.Arc(new CncPoint(vertex.x, vertex.y, depth),
         radius, startAngle, sweep));
     }
-    validateOffsetPath(contour, result, radius, outside);
+    validatePathAgainstContour(contour, result, radius, !outside);
     return result;
   }
 
-  static function validateOffsetPath(contour:CamContour,
-      path:Array<CncGeometry>, radius:Float, outside:Bool):Void {
+  static function validatePathAgainstContour(contour:CamContour,
+      path:Array<CncGeometry>, radius:Float, expectedInside:Bool):Void {
     var points = contour.vertices, count = points.length;
     for (geometry in path) {
       var length = CncGeometryTools.length(geometry);
@@ -295,7 +335,7 @@ class CamJob {
         case _: throw "CAM profile offset needs planar lines and arcs";
       }
       var midpoint = CncGeometryTools.pointAt(geometry, length * 0.5);
-      if (insidePolygon(midpoint, points) == outside)
+      if (insidePolygon(midpoint, points) != expectedInside)
         throw "CAM profile offset crosses its source contour";
     }
   }
