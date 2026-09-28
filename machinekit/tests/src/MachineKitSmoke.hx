@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.assembly.LinearAxis;
+import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
@@ -1889,6 +1890,7 @@ class MachineKitSmoke {
 	}
 
 	static function assembly():Void {
+		assemblyValidation();
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
 		var plate = example.plate.geometry();
@@ -1936,6 +1938,52 @@ class MachineKitSmoke {
 		var duplicate = new Bom();
 		duplicate.add({partNumber: "X", description: "a", quantity: 1, material: null});
 		throws(() -> duplicate.add({partNumber: "X", description: "b", quantity: 1, material: null}), "conflicting");
+	}
+
+	static function assemblyValidation():Void {
+		var bearing = DeepGrooveBearing.metric("608");
+		var invalid = new MachineAssembly();
+		invalid.addComponent("a", bearing);
+		throws(() -> invalid.addMate("x", "fixed", "missing", "axis", "a", "axis"), "Unknown assembly member");
+		throws(() -> invalid.addMate("x", "fixed", "a", "missing", "a", "axis"), "Unknown connector");
+		throws(() -> invalid.exposeConnector("x", "a", "missing"), "Unknown connector");
+		invalid.addComponent("b", bearing);
+		throws(() -> invalid.addMate("x", "invalid", "a", "axis", "b", "axis"), "Unsupported assembly joint");
+		invalid.addMate("first", "fixed", "a", "axis", "b", "axis");
+		throws(() -> invalid.addMate("first", "fixed", "a", "axis", "b", "axis"), "Duplicate assembly operation");
+		invalid.addComponent("c", bearing);
+		invalid.addMate("second", "fixed", "c", "axis", "b", "axis");
+		throws(() -> invalid.validate(), "two parent joints");
+
+		var cycle = new MachineAssembly();
+		cycle.addComponent("a", bearing);
+		cycle.addComponent("b", bearing);
+		cycle.addMate("ab", "fixed", "a", "axis", "b", "axis");
+		cycle.addMate("ba", "fixed", "b", "axis", "a", "axis");
+		throws(() -> cycle.validate(), "cycle");
+		throws(() -> new MachineAssembly().include("nested", cycle), "cycle");
+
+		var coupling = new MachineAssembly();
+		coupling.addComponent("a", bearing);
+		coupling.addComponent("b", bearing);
+		coupling.addMate("ab", "fixed", "a", "axis", "b", "axis");
+		coupling.addCoupling("drive", "ab", "missing", 1);
+		throws(() -> coupling.validate(), "missing joint");
+
+		var inner = new MachineAssembly();
+		inner.addComponent("a", bearing);
+		inner.addComponent("b", bearing);
+		inner.addMate("ab", "fixed", "a", "axis", "b", "axis");
+		inner.validate();
+		var outer = new MachineAssembly();
+		outer.include("unit", inner);
+		outer.validate();
+		throws(() -> outer.include("unit", inner), "Duplicate included assembly");
+		check(outer.subassemblies().length == 1 && outer.subassemblies()[0].assembly == inner,
+			"included assembly remains identifiable");
+		var model = new AssemblyModel();
+		outer.addTo(model, "");
+		check(model.definition().joints.length == 1, "included joint is prefixed and valid");
 	}
 
 	static function catalogMetadata():Void {
