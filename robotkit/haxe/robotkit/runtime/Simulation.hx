@@ -624,6 +624,25 @@ class Simulation {
       "simulation.setJointPositions");
   }
 
+  /**
+   * Pushes a robot's base for the next tick: a world-frame force (N) and
+   * torque (N m) at its centre of mass. Repeat every tick to push for longer.
+   */
+  public function applyRobotForce(robotIndex:Int, force:Array<Float>, ?torque:Array<Float>):Void {
+    ensureLive();
+    var moment = torque == null ? [0.0, 0.0, 0.0] : torque;
+    if (force == null || force.length != 3 || moment.length != 3)
+      throw "Simulation.applyRobotForce requires three-component force and torque";
+    var wrench = new rk_simulation_wrench();
+    wrench.set_struct_size(rk_simulation_wrench.size());
+    for (axis in 0...3) {
+      wrench.set_force(axis, force[axis]);
+      wrench.set_torque(axis, moment[axis]);
+    }
+    check(RobotKitSimKit.rk_simulation_apply_robot_force(owner.borrow(), robotIndex, wrench),
+      "simulation.applyRobotForce");
+  }
+
   /** Reads one robot base pose without mutating physics or the editable model. */
   public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());

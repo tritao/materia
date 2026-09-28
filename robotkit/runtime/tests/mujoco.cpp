@@ -256,6 +256,66 @@ static void floating_base_falls_and_settles(bool floating) {
     rk_simulation_destroy(simulation);
 }
 
+// A push is a force on the base for a tick. Falling free (no floor), a floating
+// two-link robot of 2 kg given 20 N along x for 5 ticks of 5 ms gains
+// 20 * 0.025 / 2 = 0.25 m/s, and a kinematic one ignores the force.
+static void robot_base_can_be_pushed(bool floating) {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.005;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 2;
+    model.joint_count = 1;
+    model.floating_base = floating ? 1 : 0;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    for (uint32_t i = 0; i < model.link_count; ++i) {
+        model.links[i].mass = 1.0;
+        model.links[i].inertia_tensor[0] = model.links[i].inertia_tensor[4] =
+            model.links[i].inertia_tensor[8] = 0.02 / 3.0;
+    }
+    model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].parent_frame_position[0] = 0.25;
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[0] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 10.0;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+
+    rk_simulation_wrench push{};
+    push.struct_size = sizeof(push);
+    push.force[0] = 20.0;
+    assert(rk_simulation_apply_robot_force(simulation, 7, &push) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_apply_robot_force(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    rk_simulation_wrench bad = push;
+    bad.force[1] = std::nan("");
+    assert(rk_simulation_apply_robot_force(simulation, 0, &bad) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_apply_robot_force(999, 0, &push) == RK_ERROR_INVALID_HANDLE);
+    for (int tick = 0; tick < 5; ++tick) {
+        assert(rk_simulation_apply_robot_force(simulation, 0, &push) == RK_OK);
+        assert(rk_simulation_step(simulation, tick) == RK_OK);
+    }
+    assert(rk_simulation_step(simulation, 5) == RK_OK); // an unpushed tick adds nothing
+    rk_simulation_twist twist{};
+    twist.struct_size = sizeof(twist);
+    assert(rk_simulation_get_robot_base_velocity(simulation, 0, &twist) == RK_OK);
+    if (floating) {
+        assert(std::abs(twist.linear[0] - 0.25) < 0.01);
+        assert(std::abs(twist.linear[1]) < 1e-6);
+    } else {
+        assert(std::abs(twist.linear[0]) < 1e-9);
+    }
+    rk_simulation_destroy(simulation);
+}
+
 // A floating one-link robot stands on a sphere and a sideways capsule placed
 // under opposite ends; it rests level on them at their radius, not on the
 // link's default bounds box.
@@ -673,6 +733,8 @@ int main() {
     link_primitives_collide_in_link_frame();
     floating_base_falls_and_settles(false);
     floating_base_falls_and_settles(true);
+    robot_base_can_be_pushed(false);
+    robot_base_can_be_pushed(true);
     convex_link_and_box_link_build();
     tool_hulls_collide_only_on_their_pieces();
     tool_piece_contact_is_reported(1.07, false);

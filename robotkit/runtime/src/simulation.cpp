@@ -1179,6 +1179,21 @@ rk_result Simulation::get_robot_base_velocity(uint32_t robot_index,
     return RK_OK;
 }
 
+rk_result Simulation::apply_robot_force(uint32_t robot_index, const rk_simulation_wrench &wrench) {
+    Lock lock(session_);
+    if (wrench.struct_size < sizeof(wrench) || robot_index >= robot_base_bodies_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (int axis = 0; axis < 3; ++axis)
+        if (!std::isfinite(wrench.force[axis]) || !std::isfinite(wrench.torque[axis]))
+            return RK_ERROR_INVALID_ARGUMENT;
+    nksim_body_force push{};
+    push.struct_size = sizeof(push);
+    push.body = robot_base_bodies_[robot_index];
+    std::copy_n(wrench.force, 3, push.force);
+    std::copy_n(wrench.torque, 3, push.torque);
+    return nksim_session_submit_forces(session_, &push, 1) == NKSIM_OK ? RK_OK : RK_ERROR_BACKEND;
+}
+
 rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
                                      rk_simulation_pose &out_pose) const {
     Lock lock(session_);

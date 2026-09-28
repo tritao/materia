@@ -269,6 +269,13 @@ rk_result RK_CALL rk_simulation_get_robot_base_velocity(rk_simulation simulation
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_apply_robot_force(rk_simulation simulation, uint32_t robot_index,
+                                                  const rk_simulation_wrench *wrench) {
+    if (!wrench) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->apply_robot_force(robot_index, *wrench) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_get_link_pose(rk_simulation simulation,uint32_t robot_index,
                                                uint32_t link_index,rk_simulation_pose *out_pose) {
     if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
