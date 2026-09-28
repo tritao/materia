@@ -38,7 +38,8 @@ class RobotRuntimeSensorBlueprint {
    * `RobotRuntime.publishSensorFrame` against their authored mount.
    */
   public static function isExternalKind(kind:String):Bool
-    return kind == "camera" || kind == "gnss_pose";
+    return kind == "camera" || kind == "gnss_pose" ||
+      kind == "tool_contact" || kind == "tool_vacuum_kpa";
 
   /** True for sensors the native runtime samples itself. */
   public static function isNativeKind(kind:String):Bool

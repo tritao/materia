@@ -207,6 +207,7 @@ class RobotWorldTests {
     testConfiguredSensors();
     testCameraFrameProtocol();
     testExternalSensorRuntime();
+    testToolFeedbackSensorRuntime();
     testSerialRobotUnavailableDevice();
     testSerialDeploymentVersions();
     testProcessChannelDeployment();
@@ -3531,6 +3532,64 @@ class RobotWorldTests {
     for (sensor in robot.snapshot().sensors.toArray())
       if (sensor.sensorId == "sensor/front-camera") updated = Int64.toInt(sensor.sequence);
     equal(updated, 2, "the simulated robot observes an image update without a physics step");
+    robot.close();
+    simulation.dispose();
+  }
+
+  static function testToolFeedbackSensorRuntime():Void {
+    var model = new RobotModel("tool feedback robot");
+    var base = model.addLink(new Link("base", "tool-feedback/base"));
+    var contact = model.addSensor(new Sensor("cup contact", "tool_contact", 0.0,
+      "tool-feedback/contact"));
+    var pressure = model.addSensor(new Sensor("cup pressure", "tool_vacuum_kpa", 0.0,
+      "tool-feedback/pressure"));
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.externalSensorLayout().length, 2,
+      "tool contact and vacuum pressure compile as external sensor inputs");
+    var simulation = new Simulation();
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("tool-feedback", runtime, model.name, [base.name], []);
+    simulation.step(Int64.ofInt(1));
+    simulation.step(Int64.ofInt(2));
+    var tool = new robotkit.tool.ToolRuntime(new robotkit.tool.Tool("cup", "cup",
+      robotkit.spatial.Transform3.identity()), new robotkit.tool.SimulatedGripper(),
+      new robotkit.tool.SimulatedVacuum());
+    tool.bindGripper("cup.close");
+    tool.bindVacuum("cup.vacuum");
+    var selection = new robotkit.tool.ToolRuntimeSelection();
+    var adapter = new robotkit.tool.SimulatedToolSensorAdapter(selection);
+    adapter.bindGripperContact(tool, contact.id);
+    adapter.bindVacuumPressure(tool, pressure.id);
+    selection.select(tool, Int64.ofInt(3));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "cup.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(3), Int64.ofInt(3), 1));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "cup.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(3), Int64.ofInt(3), 1));
+    runtime.publishSensorFrame(contact.id, [1.0], Int64.ofInt(1), Int64.ofInt(4),
+      "robotkit.monotonic");
+    runtime.publishSensorFrame(pressure.id, [45.0], Int64.ofInt(1), Int64.ofInt(4),
+      "robotkit.monotonic");
+    equal(adapter.applySnapshot(robot.snapshot()), 2,
+      "published tool sensor frames reach the selected tool through the robot snapshot");
+    check(tool.gripper.isGrasped() && tool.vacuum.isHolding(),
+      "published contact and vacuum pressure confirm the pickup");
+    runtime.publishSensorFrame(contact.id, [0.0], Int64.ofInt(2), Int64.ofInt(5),
+      "robotkit.monotonic");
+    runtime.publishSensorFrame(pressure.id, [10.0], Int64.ofInt(2), Int64.ofInt(5),
+      "robotkit.monotonic");
+    equal(adapter.applySnapshot(robot.snapshot()), 2,
+      "later tool sensor frames update the selected tool");
+    check(!tool.gripper.isGrasped() && !tool.vacuum.isHolding(),
+      "lost contact and vacuum pressure clear the pickup");
+    throws(function() runtime.publishSensorFrame(contact.id, [0.5], Int64.ofInt(3),
+      Int64.ofInt(6), "robotkit.monotonic"), "one digital value");
+    throws(function() runtime.publishSensorFrame(pressure.id, [-1.0], Int64.ofInt(3),
+      Int64.ofInt(6), "robotkit.monotonic"), "non-negative kPa");
+    selection.select(null, Int64.ofInt(6));
+    runtime.publishSensorFrame(contact.id, [1.0], Int64.ofInt(3), Int64.ofInt(7),
+      "robotkit.monotonic");
+    equal(adapter.applySnapshot(robot.snapshot()), 0,
+      "tool sensor frames do not update a detached tool");
     robot.close();
     simulation.dispose();
   }

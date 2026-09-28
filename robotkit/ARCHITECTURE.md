@@ -829,6 +829,14 @@ reports a grasp. `SimulatedVacuum` requires a measured vacuum magnitude at or
 above its configured hold threshold after enabling before it reports a hold.
 Both record sensor observations separately from commands; opening or disabling
 clears the observed pickup.
+`SimulatedToolSensorAdapter` routes `tool_contact` (0/1) and
+`tool_vacuum_kpa` (non-negative vacuum magnitude) `SensorFrame` values from a
+robot snapshot to the selected tool. Bindings use configuration-specific sensor
+IDs. Frames require the `robotkit.monotonic` source clock so observations older
+than the tool selection can be ignored; repeated sequences are ignored too.
+The runtime accepts both kinds as externally published sensors at authored
+mounts, allowing a simulation sensor producer to publish them without a native
+physics sensor.
 
 `cadbridge.EndEffectorRuntimeBridge` builds a `ToolRuntime` from a selected
 `EndEffectorSet` configuration and working frame. Each explicit control binding
