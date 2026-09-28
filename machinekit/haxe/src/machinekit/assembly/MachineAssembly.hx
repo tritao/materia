@@ -1,6 +1,8 @@
 package machinekit.assembly;
 
 import cadkit.modeling.AssemblyModel;
+import cadkit.modeling.AssemblyState;
+import cadkit.modeling.Vector;
 import machinekit.component.Bom;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
@@ -13,6 +15,11 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 typedef MachineAssemblyComponent = { var id:String; var component:MachineComponent; }
 typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:String; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
+typedef MachineAssemblyMassProperties = {
+	var mass:Float;
+	var centreOfMass:Vector;
+	var unaccounted:Array<String>;
+}
 
 enum MachineAssemblyOperation {
 	Mate(id:String, kind:AssemblyJointType, parent:MachineAssemblyConnector,
@@ -20,6 +27,7 @@ enum MachineAssemblyOperation {
 	Constrain(id:String, kind:AssemblyJointType, parent:MachineAssemblyConnector,
 		child:MachineAssemblyConnector, axis:Null<AssemblyVector>, tolerance:Null<Float>, limits:Null<AssemblyJointLimits>);
 	Couple(id:String, source:String, target:String, ratio:Float, offset:Float);
+
 }
 
 private typedef AssemblyMember = {
@@ -175,6 +183,28 @@ class MachineAssembly {
 		for (member in members) result.addComponent(member.component);
 		for (entry in bomItems) result.add(entry.item, entry.quantity);
 		return result;
+	}
+
+	/** Sum posed component masses; separately report BOM extras with no mass model. */
+	public function massProperties(?state:AssemblyState):MachineAssemblyMassProperties {
+		var model = new AssemblyModel();
+		addTo(model, "");
+		var mass = 0.0, weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
+		for (member in members) {
+			var properties = member.component.massProperties();
+			var pose = state == null ? model.pose(member.id) : state.worldPose(member.id);
+			var centre = properties.centreOfMass;
+			var world = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
+			mass += properties.mass;
+			weightedX += properties.mass * world.x;
+			weightedY += properties.mass * world.y;
+			weightedZ += properties.mass * world.z;
+		}
+		var unaccounted:Array<String> = [];
+		for (entry in bomItems) if (unaccounted.indexOf(entry.item.partNumber) < 0)
+			unaccounted.push(entry.item.partNumber);
+		return {mass: mass, centreOfMass: mass == 0 ? new Vector() :
+			new Vector(weightedX / mass, weightedY / mass, weightedZ / mass), unaccounted: unaccounted};
 	}
 
 	public function connectorNames():Array<String>

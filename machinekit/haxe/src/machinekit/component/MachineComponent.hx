@@ -2,6 +2,8 @@ package machinekit.component;
 
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import machinekit.component.MassProperties.MassSource;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.MaterialLibrary;
 
@@ -16,6 +18,9 @@ class MachineComponent {
 	public var bom(get, never):BomItem;
 	public final description:String;
 	var cachedBom:Null<BomItem>;
+	var cachedMass:Null<MassProperties>;
+	var cachedMassMaterialId:Null<String>;
+	var declaredMass:Null<MassProperties>;
 	/** Null for code-only parts and assemblies outside the v1 recipe registry. */
 	public var type(get, never):Null<ComponentType>;
 	final connectorList:Array<Connector> = [];
@@ -36,6 +41,8 @@ class MachineComponent {
 	public function setMaterial(spec:String):Void {
 		materialId = MaterialLibrary.fromSpec(spec);
 		cachedBom = null;
+		cachedMass = null;
+		cachedMassMaterialId = null;
 	}
 
 	function get_bom():BomItem {
@@ -51,6 +58,35 @@ class MachineComponent {
 
 	public function geometry(detail:ComponentDetail = Preview):Part
 		throw 'Component "$designation" does not generate geometry';
+
+	/** The preview shape supplies volume and centroid; its density is kg/m³. */
+	public function massProperties():MassProperties {
+		if (declaredMass != null) return declaredMass;
+		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
+		var part:Part;
+		try part = geometry(Preview) catch (error:Dynamic) {
+			if (Std.string(error) == 'Component "$designation" does not generate geometry')
+				throw 'Component "$designation" has no geometry or declared mass';
+			throw error;
+		}
+		try {
+			var physical = part.massProperties();
+			var mass = physical.volume * 1e-9 * MaterialLibrary.require(materialId).physical.density;
+			cachedMass = new MassProperties(mass, physical.centerOfMass, Computed(Preview));
+			cachedMassMaterialId = materialId;
+		} catch (error:Dynamic) {
+			part.close();
+			throw error;
+		}
+		part.close();
+		return cachedMass;
+	}
+
+	/** Vendor mass overrides the geometry estimate, including after material changes. */
+	function declareMass(kg:Float, ?centreOfMass:Vector):Void {
+		if (!Math.isFinite(kg) || kg <= 0) throw 'Component "$designation" needs a positive declared mass';
+		declaredMass = new MassProperties(kg, centreOfMass == null ? new Vector() : centreOfMass, Declared);
+	}
 
 	public function toolSpecs():Array<ToolSpec> return [];
 
