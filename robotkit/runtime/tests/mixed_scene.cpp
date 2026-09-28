@@ -6,8 +6,10 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <chrono>
 #include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -622,6 +624,72 @@ static void humanoid_stands_on_a_machine_bed(uint32_t filter) {
            "filter %u: torso ended at %.3f m", filter, height);
 }
 
+// Robots step together and repeatably: every robot publishes from the same
+// tick, the run does not depend on the order robots were added in, and the
+// same scene run twice gives the same trace.
+static void mixed_scene_steps_coherently_and_repeatably() {
+    Options options;
+    options.humanoid = true;
+    options.humanoid_pitch = 0.5;
+    options.floor_box = true;
+    options.humanoid_filter = 2;
+    Scene first, second;
+    build(first, options);
+    build(second, options);
+    // Both sessions get the same policy stream; robots' clocks match every tick.
+    first.policy = second.policy = true;
+    bool clocks_match = true;
+    uint64_t humanoid_stalled = 0;
+    for (uint32_t tick = 0; tick < 200; ++tick) {
+        run(first, 1, tick);
+        run(second, 1, tick);
+        const auto a = snapshot(first.arm), g = snapshot(first.gantry), h = snapshot(first.humanoid);
+        clocks_match &= a.source_timestamp_ns == g.source_timestamp_ns && a.sequence == g.sequence;
+        humanoid_stalled += h.source_timestamp_ns != a.source_timestamp_ns;
+    }
+    EXPECT(clocks_match, "arm and gantry publish from different ticks");
+    EXPECT(first.arm_trace == second.arm_trace && first.gantry_trace == second.gantry_trace,
+           "the same mixed scene run twice gave different traces");
+    const auto h1 = snapshot(first.humanoid), h2 = snapshot(second.humanoid);
+    EXPECT(std::memcmp(h1.position, h2.position, 4 * sizeof(double)) == 0 && h1.safety == h2.safety,
+           "the humanoid is not repeatable");
+    // A faulted robot's own sample stops while a joint is past its limit;
+    // that is its own state and does not touch the others.
+    std::printf("humanoid state lagged the session on %llu of 200 ticks after its fault\n",
+                static_cast<unsigned long long>(humanoid_stalled));
+}
+
+// A realtime session keeps ticking when one robot faults.
+static void realtime_session_survives_a_humanoid_fault() {
+    Options options;
+    options.humanoid = true;
+    options.humanoid_pitch = 0.5;
+    options.floor_box = true;
+    options.humanoid_filter = 2;
+    Scene scene;
+    build(scene, options);
+    const double targets[3] = {0.5, -0.4, 0.3};
+    const auto command = position_command(1, 3, targets);
+    assert(rk_robot_runtime_submit(scene.arm, &command) == RK_OK);
+    assert(rk_simulation_start(scene.simulation) == RK_OK);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    rk_simulation_clock clock{};
+    clock.struct_size = sizeof(clock);
+    assert(rk_simulation_get_clock(scene.simulation, &clock) == RK_OK);
+    const auto before = clock.step_index;
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    assert(rk_simulation_get_clock(scene.simulation, &clock) == RK_OK);
+    const auto humanoid = snapshot(scene.humanoid), arm = snapshot(scene.arm);
+    std::printf("realtime: humanoid safety %d, session ticks %llu -> %llu, arm q0 %.3f\n", humanoid.safety,
+                static_cast<unsigned long long>(before), static_cast<unsigned long long>(clock.step_index),
+                arm.position[0]);
+    EXPECT(humanoid.safety == RK_SAFETY_FAULT, "the toppled humanoid faults");
+    EXPECT(clock.step_index >= before + 30, "the session stopped ticking after the fault: %llu -> %llu",
+           static_cast<unsigned long long>(before), static_cast<unsigned long long>(clock.step_index));
+    EXPECT(std::fabs(arm.position[0] - 0.5) < 0.05, "the arm is at %.3f", arm.position[0]);
+    assert(rk_simulation_stop(scene.simulation) == RK_OK);
+}
+
 // The humanoid alone, unpowered enough to fall: report how it ends.
 [[maybe_unused]] static void probe_fall(uint32_t filter, double tolerance) {
     Options options;
@@ -649,6 +717,8 @@ static void humanoid_stands_on_a_machine_bed(uint32_t filter) {
 }
 
 int main() {
+    mixed_scene_steps_coherently_and_repeatably();
+    realtime_session_survives_a_humanoid_fault();
     contacts_follow_the_contact_filter();
     humanoid_stands_on_a_machine_bed(0);
     humanoid_stands_on_a_machine_bed(1);
