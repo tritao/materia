@@ -41,9 +41,11 @@ private class SlicedPosePrimitive implements PosePrimitive {
 
   public function length():Float return to - from;
   public function waypointAt(distance:Float):PoseWaypoint {
-    if (!Math.isFinite(distance) || distance < 0.0 || distance > length())
+    if (!Math.isFinite(distance) || distance < -1e-12 ||
+        distance > length() + 1e-12)
       throw "Process primitive distance outside slice";
-    return source.waypointAt(from + distance);
+    return source.waypointAt(Math.min(source.length(),
+      Math.max(from, from + distance)));
   }
   public function startWaypoint():PoseWaypoint return source.waypointAt(from);
   public function endWaypoint():PoseWaypoint return source.waypointAt(to);

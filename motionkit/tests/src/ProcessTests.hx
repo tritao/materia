@@ -577,7 +577,9 @@ class ProcessTests extends MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]);
     var binding = MotionKitTestSupport.cncBinding(cnc, blueprint);
     var motion = new ManipulatorMotion(robot, binding.compiler,
-      function(_) return null, function() return runtime.pollEvents());
+      function(channel) return channel == "spindle.at_speed" ?
+        EventValue.Digital(true) : null,
+      function() return runtime.pollEvents());
     motion.run(MotionKitTestSupport.cncProgram(cnc, 
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n"));
     for (tick in 0...3000) {

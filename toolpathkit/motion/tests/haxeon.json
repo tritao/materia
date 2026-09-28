@@ -15,6 +15,9 @@
     "cnckit": {
       "path": "../../../cnckit"
     },
+    "camkit": {
+      "path": "../../../camkit"
+    },
     "cadbridge": {
       "path": "../../../robotkit/cadbridge"
     },

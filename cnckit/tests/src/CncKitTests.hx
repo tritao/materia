@@ -53,7 +53,7 @@ class CncKitTests {
       case MotionOp.SetOutput("spindle.direction", _): true;
       case _: false;
     }, "spindle starts before first motion");
-    var firstPath = switch program.ops[2] {
+    var firstPath = switch program.ops[3] {
       case MotionOp.FollowPath(path, _, _, _): path;
       case _: throw "rapid must be a FollowPath";
     };
@@ -163,22 +163,30 @@ class CncKitTests {
       case _: false;
     }, "M3 follows tool change");
     check(switch ordered.ops[3] {
+      case MotionOp.WaitInput("spindle.at_speed", _, _): true;
+      case _: false;
+    }, "spindle start waits for speed feedback");
+    check(switch ordered.ops[4] {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
     }, "motion follows spindle start");
     var stopped = new CncTestCompiler(machine).compile("M3 M8\nM5 M9 G0 X1\nM2");
-    check(switch stopped.ops[5] {
-      case MotionOp.SetOutput("spindle.speed", _): true;
+    check(switch stopped.ops[3] {
+      case MotionOp.FollowPath(_, _, _, events):
+        Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
+          event.distance == 0.0);
       case _: false;
-    }, "M5 stops spindle before coolant and motion");
-    check(switch stopped.ops[6] {
-      case MotionOp.SetOutput("coolant.mist", _): true;
+    }, "M5 spindle stop is tied to path start");
+    check(switch stopped.ops[3] {
+      case MotionOp.FollowPath(_, _, _, events):
+        Lambda.exists(events, function(event) return event.channel == "coolant.mist" &&
+          event.distance == 0.0);
       case _: false;
-    }, "M9 follows M5 before motion");
-    check(switch stopped.ops[8] {
+    }, "M9 coolant change is tied to path start");
+    check(stopped.ops.length == 4 && switch stopped.ops[3] {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
-    }, "M5 and M9 precede motion");
+    }, "spindle and coolant changes add no stop before motion");
     var partialCompiler = new CncTestCompiler(machine);
     var partial = partialCompiler.compile(
       "G21 G90 G64 P1 F600 G1 X10\nG1 Y10\nG1 Y0\nG1 X20\nM2");
