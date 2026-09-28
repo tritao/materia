@@ -2111,8 +2111,15 @@ class MachineKitSmoke {
 		near(flange.connector("bolt1").frame.x, 25, "robot flange bolt1 x");
 		near(flange.connector("bolt2").frame.y, 25, "robot flange bolt2 y");
 		near(flange.connector("face").frame.z, 0, "robot flange face connector");
+		var pin = flange.pinPoint();
+		var flangeX = AssemblyFrames.transformVector(flange.connector("face").frame, 1, 0, 0);
+		near(flangeX.x, pin.x / 25, "flange X points toward locating pin X");
+		near(flangeX.y, pin.y / 25, "flange X points toward locating pin Y");
 
 		var eoat = new EndEffectorPlate(flange);
+		var plateX = AssemblyFrames.transformVector(eoat.connector("robot").frame, 1, 0, 0);
+		near(plateX.x, flangeX.x, "adapter mount X follows flange pin");
+		near(plateX.y, flangeX.y, "adapter mount Y follows flange pin");
 		check(eoat.designation == "EOAT-50-9-4xM5-PCD70.5", "end effector plate designation");
 		near(eoat.thickness, flange.thickness, "end effector plate default thickness");
 		// Default tool circle: flange bolt circle + flange head + tool head + 2 mm web.

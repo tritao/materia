@@ -134,7 +134,10 @@ class Pedestal extends MachineComponent {
 		cablePathDiameter = actualCablePath;
 		var floorZ = -levelingFootHeight;
 		addConnector("floor", Face, Solids.axial(0, 0, floorZ));
-		addConnector("top", Mount, AssemblyFrames.alongY(0, 0, this.height, 0, 0, -1));
+		// Match the flange's locating-pin datum while facing its boss downward.
+		addConnector("top", Mount, AssemblyFrames.compose(
+			AssemblyFrames.alongY(0, 0, this.height, 0, 0, -1),
+			AssemblyFrames.turnY(Math.PI / flange.boltCount)));
 		var i = 1;
 		for (point in floorBoltPattern()) {
 			var frame = Solids.axial(point.x, point.y, floorZ);
