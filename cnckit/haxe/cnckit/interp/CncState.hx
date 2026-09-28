@@ -15,6 +15,7 @@ class CncState {
   public var spindleDirection:Int = 0;
   public var selectedTool:Int = -1;
   public var motionMode:Int = -1;
+  public var plane:Int = 17;
   public var cycleCode:Int = 0;
   public var cycleDepth:Float = Math.NaN;
   public var cycleR:Float = Math.NaN;
@@ -38,6 +39,7 @@ class CncState {
     result.toolLength = toolLength; result.feedCommand = feedCommand;
     result.spindleSpeed = spindleSpeed; result.spindleDirection = spindleDirection;
     result.selectedTool = selectedTool; result.motionMode = motionMode;
+    result.plane = plane;
     result.cycleCode = cycleCode; result.cycleDepth = cycleDepth;
     result.cycleR = cycleR; result.cycleQ = cycleQ; result.cycleP = cycleP;
     result.cycleInitialZ = cycleInitialZ;

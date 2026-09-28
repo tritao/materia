@@ -6,6 +6,7 @@ import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.CncMachine;
 import cnckit.ir.CncGeometry;
 import cnckit.ir.CncOp;
+import cnckit.ir.CncPlane;
 import cnckit.ir.CncPoint;
 import cnckit.parse.CncBlock;
 import cnckit.parse.CncSpan;
@@ -51,7 +52,7 @@ class CncInterpreter {
         case "G": gWords.push(word);
         case "M": mWords.push(word);
         case "N", "O": integer(word, line);
-        case "X", "Y", "Z", "I", "J", "R", "F", "S", "P", "H", "T", "Q", "L":
+        case "X", "Y", "Z", "I", "J", "K", "R", "F", "S", "P", "H", "T", "Q", "L":
           if (values.exists(word.letter)) fail(line, word.column,
             'duplicate ${word.letter} word');
           values.set(word.letter, word);
@@ -64,6 +65,7 @@ class CncInterpreter {
     var retractChange = -1;
     var lineBlend = state.blendTolerance;
     var unitChange = -1, distanceChange = -1, nextWcs = -1;
+    var planeChange = -1;
     for (word in gWords) {
       var code = gCode(word, line);
       switch code {
@@ -73,7 +75,9 @@ class CncInterpreter {
         case 4:
           if (dwell) fail(line, word.column, "duplicate G4");
           dwell = true;
-        case 17: // The only declared plane.
+        case 17, 18, 19:
+          if (planeChange >= 0) fail(line, word.column, "multiple arc planes");
+          planeChange = code;
         case 28, 30:
           if (homeCode != 0) fail(line, word.column, "multiple home G codes");
           homeCode = code;
@@ -109,7 +113,6 @@ class CncInterpreter {
           setBlend = true; useBlend = true;
           var p = values.get("P");
           if (p == null) fail(line, word.column, "G64 requires P tolerance");
-        case 18, 19: fail(line, word.column, "only G17 XY arcs are supported");
         case _: fail(line, word.column, 'unsupported G$code');
       }
     }
@@ -212,6 +215,7 @@ class CncInterpreter {
     if (unitChange >= 0) state.metric = unitChange == 21;
     if (distanceChange >= 0) state.absolute = distanceChange == 90;
     if (nextWcs >= 0) state.wcs = nextWcs;
+    if (planeChange >= 0) state.plane = planeChange;
     if (retractChange >= 0) state.retractToInitial = retractChange == 98;
     if (setToolOffset) {
       var hWord:CncWord = cast h;
@@ -236,26 +240,27 @@ class CncInterpreter {
       state.cycleSpan = block.span;
     }
     var x = values.get("X"), y = values.get("Y"), z = values.get("Z");
-    var i = values.get("I"), j = values.get("J");
+    var i = values.get("I"), j = values.get("J"), k = values.get("K");
     var hasCoordinates = x != null || y != null || z != null || i != null ||
-      j != null || r != null;
+      j != null || k != null || r != null;
     if (dwell && hasCoordinates) fail(line, gWords[0].column,
       "G4 cannot include axis or arc words");
     if (homeCode != 0) {
-      if (i != null || j != null || r != null || q != null || l != null)
+      if (i != null || j != null || k != null || r != null || q != null || l != null)
         fail(line, words[0].column, "G28/G30 accept only XYZ axes");
       home(homeCode, x, y, z, block.span);
     } else if (state.cycleCode != 0 && (cycleChange > 0 ||
         x != null || y != null || z != null || r != null || q != null ||
         p != null || l != null)) {
-      if (i != null || j != null) fail(line, column(i, column(j, 1)),
-        "I/J are unsupported in drilling cycles");
+      if (i != null || j != null || k != null)
+        fail(line, column(i, column(j, column(k, 1))),
+          "I/J/K are unsupported in drilling cycles");
       drill(state.cycleCode, x, y, z, r, q, p, l,
         state.cycleSpan == null ? block.span : state.cycleSpan, line);
     } else if (hasCoordinates) {
       if (state.motionMode < 0) fail(line, words[0].column,
         "axis words need G0-G3 motion mode");
-      move(line, state.motionMode, x, y, z, i, j, r,
+      move(line, state.motionMode, x, y, z, i, j, k, r,
         machineCoordinates, block.span);
     } else if (machineCoordinates) {
       fail(line, gWords[0].column, "G53 requires axis words");
@@ -271,7 +276,8 @@ class CncInterpreter {
 
   function move(line:Int, mode:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, i:Null<CncWord>, j:Null<CncWord>,
-      r:Null<CncWord>, machineCoordinates:Bool, span:CncSpan):Void {
+      k:Null<CncWord>, r:Null<CncWord>, machineCoordinates:Bool,
+      span:CncSpan):Void {
     var start = new CncPoint(state.position[0], state.position[1], state.position[2]);
     var offset = machine.workOffset(state.wcs);
     var words = [x, y, z];
@@ -288,40 +294,59 @@ class CncInterpreter {
     if (mode < 2) {
       if (machineCoordinates && !state.absolute)
         fail(line, span.column, "G53 requires G90 absolute mode");
-      if (i != null || j != null || r != null)
-        fail(line, column(i, column(j, column(r, 1))),
-          "I/J/R require G2 or G3");
+      if (i != null || j != null || k != null || r != null)
+        fail(line, column(i, column(j, column(k, column(r, 1)))),
+          "I/J/K/R require G2 or G3");
       if (start.distanceTo(end) <= 1e-12) return;
       if (mode == 0) ops.push(CncOp.Rapid(CncGeometry.Line(start, end), span));
       else ops.push(CncOp.Feed(CncGeometry.Line(start, end), feed(line), state.blendTolerance, span));
     } else {
       if (machineCoordinates) fail(line, span.column, "G53 requires G0/G1 motion");
-      if (r != null && (i != null || j != null))
-        fail(line, r.column, "R and I/J arc centres conflict");
-      if (r == null && i == null && j == null)
-        fail(line, 1, "G2/G3 require I/J or R arc centre");
-      if (Math.abs(start.z - end.z) > 1e-10)
-        fail(line, column(z, 1),
-          "helical Z arcs are outside G17 v1");
-      var center = r == null ?
-        new CncPoint(start.x + (i == null ? 0.0 : i.value * unitScale()),
-          start.y + (j == null ? 0.0 : j.value * unitScale()), start.z) :
-        radiusCenter(start, end, r.value * unitScale(), mode, line, r.column);
-      var radius = center.distanceTo(start);
-      if (radius <= 1e-12 || Math.abs(center.distanceTo(end) - radius) >
+      var plane = state.plane;
+      var first:CncWord = switch plane {
+        case 17, 18: cast i;
+        case 19: cast j;
+        case _: throw "invalid CNC plane";
+      };
+      var second:CncWord = switch plane {
+        case 17: cast j;
+        case 18, 19: cast k;
+        case _: throw "invalid CNC plane";
+      };
+      var excluded = plane == 17 ? k : plane == 18 ? j : i;
+      if (excluded != null) fail(line, excluded.column,
+        'G$plane arc centre uses ${plane == 17 ? "I/J" : plane == 18 ? "I/K" : "J/K"}');
+      if (r != null && (first != null || second != null))
+        fail(line, r.column, "R and arc-centre offsets conflict");
+      if (r == null && first == null && second == null)
+        fail(line, 1, "G2/G3 require arc-centre offsets or R");
+      // G18 uses X,Z coordinate order, whose normal points towards -Y.
+      // LinuxCNC defines CW/CCW looking from +Y, so reverse its sweep.
+      var orientedMode = plane == 18 ? (mode == 2 ? 3 : 2) : mode;
+      var center = r == null ? centerFromOffsets(start, plane,
+        first == null ? 0.0 : first.value * unitScale(),
+        second == null ? 0.0 : second.value * unitScale()) :
+        radiusCenter(start, end, r.value * unitScale(), orientedMode,
+          plane, line, r.column);
+      var origin = coordinates(start, plane), finish = coordinates(end, plane);
+      var c = coordinates(center, plane);
+      var radius = Math.sqrt(Math.pow(origin[0] - c[0], 2) +
+        Math.pow(origin[1] - c[1], 2));
+      var endRadius = Math.sqrt(Math.pow(finish[0] - c[0], 2) +
+        Math.pow(finish[1] - c[1], 2));
+      if (radius <= 1e-12 || Math.abs(endRadius - radius) >
           Math.max(1e-8, radius * 1e-5))
-        fail(line, column(i, column(j, 1)),
-          "arc endpoint is not on its I/J circle");
-      var begin = Math.atan2(start.y - center.y, start.x - center.x);
-      var finish = Math.atan2(end.y - center.y, end.x - center.x);
-      var sweep = finish - begin;
-      if (mode == 2) {
-        while (sweep >= -1e-12) sweep -= 2.0 * Math.PI;
-      } else {
-        while (sweep <= 1e-12) sweep += 2.0 * Math.PI;
-      }
-      ops.push(CncOp.Feed(CncGeometry.Arc(center, radius, begin, sweep),
-        feed(line), state.blendTolerance, span));
+        fail(line, column(first, column(second, 1)),
+          "arc endpoint is not on its centre circle");
+      var begin = Math.atan2(origin[1] - c[1], origin[0] - c[0]);
+      var sweep = arcSweep(start, end, center, orientedMode, plane);
+      var rise = finish[2] - origin[2];
+      var geometry = plane == 17 && Math.abs(rise) <= 1e-12 ?
+        CncGeometry.Arc(center, radius, begin, sweep) :
+        CncGeometry.Circular(center, radius, begin, sweep,
+          plane == 17 ? CncPlane.XY : plane == 18 ? CncPlane.XZ : CncPlane.YZ,
+          rise);
+      ops.push(CncOp.Feed(geometry, feed(line), state.blendTolerance, span));
     }
     state.position = target;
   }
@@ -433,34 +458,57 @@ class CncInterpreter {
   }
 
   static function radiusCenter(start:CncPoint, end:CncPoint, radius:Float,
-      mode:Int, line:Int, column:Int):CncPoint {
-    var dx = end.x - start.x, dy = end.y - start.y;
+      mode:Int, plane:Int, line:Int, column:Int):CncPoint {
+    var a = coordinates(start, plane), b = coordinates(end, plane);
+    var dx = b[0] - a[0], dy = b[1] - a[1];
     var chord = Math.sqrt(dx * dx + dy * dy), magnitude = Math.abs(radius);
     if (!Math.isFinite(radius) || magnitude <= 1e-12 || chord <= 1e-12 ||
         chord > 2.0 * magnitude + 1e-10)
       fail(line, column, "R arc radius cannot reach its endpoint");
     var height = Math.sqrt(Math.max(0.0,
       magnitude * magnitude - chord * chord * 0.25));
-    var mx = (start.x + end.x) * 0.5, my = (start.y + end.y) * 0.5;
+    var mx = (a[0] + b[0]) * 0.5, my = (a[1] + b[1]) * 0.5;
     var nx = -dy / chord, ny = dx / chord;
-    var first = new CncPoint(mx + nx * height, my + ny * height, start.z);
-    var second = new CncPoint(mx - nx * height, my - ny * height, start.z);
-    var firstSweep = Math.abs(arcSweep(start, end, first, mode));
-    var secondSweep = Math.abs(arcSweep(start, end, second, mode));
+    var first = fromCoordinates(mx + nx * height, my + ny * height,
+      a[2], plane);
+    var second = fromCoordinates(mx - nx * height, my - ny * height,
+      a[2], plane);
+    var firstSweep = Math.abs(arcSweep(start, end, first, mode, plane));
+    var secondSweep = Math.abs(arcSweep(start, end, second, mode, plane));
     return radius >= 0.0 ?
       (firstSweep <= secondSweep ? first : second) :
       (firstSweep >= secondSweep ? first : second);
   }
 
   static function arcSweep(start:CncPoint, end:CncPoint,
-      center:CncPoint, mode:Int):Float {
-    var begin = Math.atan2(start.y - center.y, start.x - center.x);
-    var finish = Math.atan2(end.y - center.y, end.x - center.x);
+      center:CncPoint, mode:Int, plane:Int):Float {
+    var a = coordinates(start, plane), b = coordinates(end, plane);
+    var c = coordinates(center, plane);
+    var begin = Math.atan2(a[1] - c[1], a[0] - c[0]);
+    var finish = Math.atan2(b[1] - c[1], b[0] - c[0]);
     var sweep = finish - begin;
     if (mode == 2) while (sweep >= -1e-12) sweep -= 2.0 * Math.PI;
     else while (sweep <= 1e-12) sweep += 2.0 * Math.PI;
     return sweep;
   }
+
+  static function centerFromOffsets(start:CncPoint, plane:Int,
+      first:Float, second:Float):CncPoint {
+    var origin = coordinates(start, plane);
+    return fromCoordinates(origin[0] + first, origin[1] + second,
+      origin[2], plane);
+  }
+
+  static function coordinates(point:CncPoint, plane:Int):Array<Float>
+    return plane == 17 ? [point.x, point.y, point.z] :
+      plane == 18 ? [point.x, point.z, point.y] :
+      [point.y, point.z, point.x];
+
+  static function fromCoordinates(u:Float, v:Float, axial:Float,
+      plane:Int):CncPoint
+    return plane == 17 ? new CncPoint(u, v, axial) :
+      plane == 18 ? new CncPoint(u, axial, v) :
+      new CncPoint(axial, u, v);
 
   function spindle(channel:String, value:Float, span:CncSpan):Void
     ops.push(CncOp.Spindle(channel, value, span));

@@ -35,6 +35,6 @@ Create `camkit` for 2.5D profile, offset pocket, and drill operations from cadki
 - [x] Phase 2 — Parser, transactional modal interpreter, metre-based CNC IR, and MotionKit lowering with distance-aware source map. Structured diagnostics recover at the next line; `compile()` keeps its first-error behavior. CncKit 51, MotionKit CNC 50, and C7 2,845 assertions pass.
 - [x] Phase 3a — LinuxCNC file syntax, line-only G53, stored G28/G30 homes, R arcs, and G73/G81/G82/G83 cycles with G98/G99. Real posted FreeCAD and Fusion output fixtures have golden motion counts, length, bounds, and lowered-path geometry checks. CncKit 194, MotionKit CNC 50, and C7 2,845 assertions pass.
 - [x] Phase 3b — MotionKit `CircularSegment` supports XY/XZ/YZ planes and axial rise, with unit tangents, Cartesian second derivatives, and 3D distance checks. Circular corners remain exact stops in blending and timing. Direct MotionSystem, ProgramCompiler/TOPP-RA, and task-space checks pass in all planes. MotionKit CNC 80, C7 2,845, full bootstrap 9,496, and CncKit 194 assertions pass.
-- [ ] Phase 3c
+- [x] Phase 3c — G17/G18/G19 arcs and helices, including plane-specific I/J/K centres and R form, stay as metre geometry in preview and lower through MotionKit `CircularSegment`. G18 direction follows LinuxCNC's positive-Y viewpoint. CncKit 214, MotionKit CNC 89, and C7 2,845 assertions pass.
 - [ ] Phase 4
 - [ ] Phase 5

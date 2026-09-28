@@ -11,6 +11,8 @@ import cnckit.ir.CncOp;
 import cnckit.parse.CncSpan;
 import motionkit.event.EventValue;
 import motionkit.path.ArcSegment;
+import motionkit.path.CircularPlane;
+import motionkit.path.CircularSegment;
 import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
@@ -123,6 +125,13 @@ class CncLowering {
     case Line(start, end): new LineSegment(point(start), point(end));
     case Arc(center, radius, startAngle, sweep):
       new ArcSegment(point(center), radius, startAngle, sweep);
+    case Circular(center, radius, startAngle, sweep, plane, rise):
+      new CircularSegment(point(center), radius, startAngle, sweep,
+        switch plane {
+          case XY: CircularPlane.XY;
+          case XZ: CircularPlane.XZ;
+          case YZ: CircularPlane.YZ;
+        }, rise);
   };
 
   static function point(value:cnckit.ir.CncPoint):PathPoint

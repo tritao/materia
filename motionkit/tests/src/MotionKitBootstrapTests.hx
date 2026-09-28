@@ -1716,6 +1716,19 @@ class MotionKitBootstrapTests {
     near(end[0], 0.01, "CNC arc ends at X", 1e-5);
     near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
     result.dispose();
+    for (arc in ["G17 G2 X5 Y5 Z5 I5 J0",
+        "G18 G3 X5 Y5 Z5 I5 K0", "G19 G2 X5 Y5 Z5 J5 K0"]) {
+      var helix = binding.compile('G21 G90 F600 $arc\nM2\n',
+        [0.0, 0.0, 0.0], Int64.ofInt(950));
+      var block = helix.blocks[helix.blocks.length - 1];
+      var finalPlan = block.plans[block.plans.length - 1];
+      var finalPose = binding.solver.forward(
+        finalPlan.evaluate(finalPlan.durationSeconds).positions);
+      near(finalPose.x, 0.005, '$arc ends at X', 1e-5);
+      near(finalPose.y, 0.005, '$arc ends at Y', 1e-5);
+      near(finalPose.z, 0.005, '$arc ends at Z', 1e-5);
+      helix.dispose();
+    }
   }
 
   static function testCircularSegments():Void {

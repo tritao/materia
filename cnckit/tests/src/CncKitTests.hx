@@ -3,8 +3,11 @@ import cnckit.CncMachine;
 import cnckit.CncDialect;
 import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.ir.CncGeometryTools;
+import cnckit.ir.CncGeometry;
+import cnckit.ir.CncPlane;
 import cnckit.ir.CncOp;
 import motionkit.path.ArcSegment;
+import motionkit.path.CircularSegment;
 import motionkit.program.MotionOp;
 import sys.io.File;
 
@@ -105,7 +108,6 @@ class CncKitTests {
       case MotionOp.WaitInput("cnc.tool_change.3", _, _): true;
       case _: false;
     }, "M6 is a tool-change barrier");
-    rejects(machine, "G18\nG1 X1 F100", "line 1 column 1");
     rejects(machine, "G2 X1 R2", "line 1 column 7");
     rejects(machine, "G41", "line 1 column 1");
     rejects(machine, "G64 P1 G61\nG1 X1 F100", "multiple path-control");
@@ -179,7 +181,7 @@ class CncKitTests {
     near(cwArc.center.x, 0.005, "G91 I centre is relative to start");
     near(ccwArc.center.x, 0.005, "G91 CCW centre is relative to start");
     rejects(machine, "G21 G90 F600 G0 X10\nG2 X0 Y10 I-10 J0",
-      "arc endpoint is not on its I/J circle");
+      "arc endpoint is not on its centre circle");
     var relativeTool = new CncCompiler(machine).compile(
       "G21 G91 G43 H2 G0 Z10\nG49 G0 Z10\nM2");
     var finalRelative = switch relativeTool.ops[relativeTool.ops.length - 1] {
@@ -283,6 +285,86 @@ class CncKitTests {
     };
     near(homeLast.x, 0.1, "G28 uses stored machine X");
     near(homeLast.y, 0.01, "G28 leaves unspecified Y axis alone");
+    var xyHelix = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G90 F600 G2 X5 Y5 Z10 I5 J0\nM2");
+    check(xyHelix.diagnostics.length == 0, "G17 helix compiles");
+    var xyGeometry = switch xyHelix.ops[0] {
+      case CncOp.Feed(CncGeometry.Circular(_, _, _, _, CncPlane.XY, rise), _, _, _):
+        near(rise, 0.01, "G17 helix rises on Z");
+        switch xyHelix.ops[0] {
+          case CncOp.Feed(geometry, _, _, _): geometry;
+          case _: throw "G17 helix missing";
+        };
+      case _: throw "G17 helix needs circular IR";
+    };
+    var xyEnd = CncGeometryTools.pointAt(xyGeometry,
+      CncGeometryTools.length(xyGeometry));
+    near(xyEnd.x, 0.005, "G17 helix preview X");
+    near(xyEnd.y, 0.005, "G17 helix preview Y");
+    near(xyEnd.z, 0.01, "G17 helix preview Z");
+    var xyProgram:motionkit.program.MotionProgram = cast xyHelix.program;
+    var xyPath = switch xyProgram.ops[0] {
+      case MotionOp.FollowPath(path, _, _, _): path;
+      case _: throw "G17 helix path missing";
+    };
+    var xyPrimitive:cnckit.CncPosePrimitive = cast xyPath.primitives[0];
+    var xyCircular:CircularSegment = cast xyPrimitive.geometry;
+    near(xyCircular.length(), CncGeometryTools.length(xyGeometry),
+      "G17 helix lowering keeps 3D length");
+    var helixSpan = xyHelix.sourceMap.spanAt(0, xyCircular.length() * 0.5);
+    check(helixSpan != null && helixSpan.line == 1,
+      "helical path maps to its G-code line");
+    var xzCw = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G90 G18 F600 G2 X5 Z5 I5 K0\nM2");
+    var xzCcw = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G90 G18 F600 G3 X5 Z5 I5 K0\nM2");
+    var xzCwSweep = switch xzCw.ops[0] {
+      case CncOp.Feed(CncGeometry.Circular(_, _, _, sweep, CncPlane.XZ, _), _, _, _): sweep;
+      case _: throw "G18 CW arc missing";
+    };
+    var xzCcwSweep = switch xzCcw.ops[0] {
+      case CncOp.Feed(CncGeometry.Circular(_, _, _, sweep, CncPlane.XZ, _), _, _, _): sweep;
+      case _: throw "G18 CCW arc missing";
+    };
+    check(xzCwSweep > Math.PI && xzCcwSweep < 0.0 &&
+      Math.abs(xzCcwSweep) < Math.PI,
+      "G18 direction uses LinuxCNC positive-Y viewpoint");
+    var xzHelix = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G91 G18 F600 G3 X5 Y10 Z5 I5 K0\nM2");
+    var xzGeometry = switch xzHelix.ops[0] {
+      case CncOp.Feed(g, _, _, _): g;
+      case _: throw "G18 relative helix missing";
+    };
+    var xzEnd = CncGeometryTools.pointAt(xzGeometry,
+      CncGeometryTools.length(xzGeometry));
+    near(xzEnd.x, 0.005, "G18 helix preview X");
+    near(xzEnd.y, 0.01, "G18 helix rises on Y");
+    near(xzEnd.z, 0.005, "G18 helix preview Z");
+    var yzHelix = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G90 G19 F600 G2 X10 Y5 Z5 J5 K0\nM2");
+    var yzGeometry = switch yzHelix.ops[0] {
+      case CncOp.Feed(CncGeometry.Circular(_, _, _, sweep, CncPlane.YZ, rise), _, _, _):
+        check(sweep < 0.0, "G19 CW uses positive-X viewpoint");
+        near(rise, 0.01, "G19 helix rises on X");
+        switch yzHelix.ops[0] {
+          case CncOp.Feed(g, _, _, _): g;
+          case _: throw "G19 helix missing";
+        };
+      case _: throw "G19 helix needs circular IR";
+    };
+    var yzEnd = CncGeometryTools.pointAt(yzGeometry,
+      CncGeometryTools.length(yzGeometry));
+    near(yzEnd.x, 0.01, "G19 helix preview X");
+    near(yzEnd.y, 0.005, "G19 helix preview Y");
+    near(yzEnd.z, 0.005, "G19 helix preview Z");
+    var xzRadius = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G18 F600 G3 X5 Y10 Z5 R5\nM2");
+    check(xzRadius.diagnostics.length == 0 && xzRadius.ops.length == 2,
+      "G18 helical R arc compiles");
+    rejects(fixtureMachine, "G18 F600 G2 X5 Z5 J1 I5", "G18 arc centre uses I/K");
+    rejects(fixtureMachine, "G19 F600 G2 Y5 Z5 I1 J5", "G19 arc centre uses J/K");
+    rejects(fixtureMachine, "G17 F600 G2 X5 Y5 K1 I5", "G17 arc centre uses I/J");
+    rejects(fixtureMachine, "G18 F600 G2 X10 Z10 I5 K0", "arc endpoint is not on its centre circle");
     var cycles = new CncCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G0 Z10\nF600 G99 G81 X10 Z-5 R2\nX20\nG80\n" +
       "G98 G82 X30 Z-4 R2 P0.2\nG80\nG83 X40 Z-4 R2 Q2\n" +
