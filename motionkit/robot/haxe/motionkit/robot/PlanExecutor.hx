@@ -18,6 +18,8 @@ class PlanExecutor {
   public final jointIndices:Array<Int>;
   public var elapsedSeconds(get, never):Float;
   public var completed(default, null):Bool = false;
+  public final session:MotionSession;
+  final ownsSession:Bool;
   var plan:Null<ExecutionPlan>;
   var planSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
     coefficients:Array<Array<Float>>}> = [];
@@ -28,56 +30,109 @@ class PlanExecutor {
   var jerkUnchecked:Bool = false;
   var deferredRefill:Bool = false;
 
-  public function new(robot:Robot, ?jointIndices:Array<Int>) {
+  public function new(robot:Robot, ?jointIndices:Array<Int>,
+      ?session:MotionSession) {
     if (robot == null || !robot.capabilities().supportsExecutionPlans ||
         !robot.capabilities().supportsTrajectoryQueue)
       throw "PlanExecutor requires execution plan and trajectory queue support";
     this.robot = robot;
+    ownsSession = session == null;
+    this.session = session == null ? new MotionSession() : session;
     stream = new TrajectoryStream(robot, true);
     this.jointIndices = jointIndices == null ?
       [for (i in 0...robot.description().joints.length) i] : jointIndices.copy();
   }
 
   public function start(plan:ExecutionPlan, ?endsAtRest:Bool = true):Void {
+    session.requireReady();
+    if (session.isStopping() || session.isHolding())
+      throw "PlanExecutor must reach rest and resume before starting a plan";
     if (plan == null || this.plan != null) throw "PlanExecutor needs one inactive validated plan";
-    this.plan = plan;
+    if (plan.evaluate(0.0).positions.length != jointIndices.length)
+      throw "PlanExecutor plan and robot joint map disagree";
     planSegments = plan.segments();
     planEvents = plan.events;
     fixedPositions = robot.snapshot().positions.toArray();
-    if (plan.evaluate(0.0).positions.length != jointIndices.length)
-      throw "PlanExecutor plan and robot joint map disagree";
+    this.plan = plan;
     this.endsAtRest = endsAtRest;
     jerkUnchecked = plan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
       MotionKitNativeConstants.MK_CHECK_UNCHECKED;
     completed = false;
     stream.begin(planSegments, plan.durationSeconds);
     deferredRefill = false;
+    if (session.state == Idle) session.begin();
     fill();
   }
 
   public function update():Void {
-    var active = plan;
-    if (active == null || completed) return;
     var observation = sync();
+    stream.observe(session, observation);
+    if (session.isStopping()) {
+      if (TrajectoryStream.atRest(observation)) {
+        session.rest();
+        clear();
+      }
+      return;
+    }
+    if (session.state == Holding) {
+      if (TrajectoryStream.atRest(observation)) {
+        session.rest();
+        if (session.resumePending) {
+          resume();
+          // The owner tick after this update applies Resume before the next
+          // update can refill, so no second defer is needed.
+          deferredRefill = false;
+        }
+      }
+      return;
+    }
+    if (session.state == Held) return;
+    var active = plan;
+    if (active == null) return;
     if (stream.finishedProgram(observation)) {
       stream.markCompleted();
       completed = true;
       plan = null;
+      if (ownsSession) session.completed();
       return;
     }
     if (deferredRefill) deferredRefill = false; else fill();
   }
 
-  public function hold():Void robot.submit(RobotCommand.Hold);
+  public function hold():Void {
+    if (session.hold() && plan != null) stream.submit(session, RobotCommand.Hold);
+  }
   public function resume():Void {
-    robot.submit(RobotCommand.Resume);
-    deferredRefill = true;
+    if (session.resume() && plan != null) {
+      stream.submit(session, RobotCommand.Resume);
+      deferredRefill = true;
+    }
   }
   public function abort():Void {
-    robot.submit(RobotCommand.Abort);
+    session.requireReady();
+    if (session.isStopping()) return;
+    if (session.state == Idle) { clear(); return; }
+    stream.submit(session, RobotCommand.Abort);
+    session.stop(Discard, []);
+  }
+
+  public function reset():Void {
+    if (!session.isFaulted()) return;
+    robot.resetSafety();
+    var snapshot = robot.snapshot();
+    if (snapshot.faultCode != 0) {
+      session.observe(snapshot);
+      throw 'Motion runtime fault ${snapshot.faultCode} remains after reset';
+    }
+    clear();
+    session.reset();
+  }
+
+  public function clear():Void {
     plan = null;
     stream.clear();
     completed = false;
+    deferredRefill = false;
   }
 
   function get_elapsedSeconds():Float return stream.elapsedSeconds;
@@ -87,7 +142,7 @@ class PlanExecutor {
 
   function fill():Void {
     if (plan == null) return;
-    stream.fill(fixedPositions.length, true, buildChunk,
+    stream.fill(session, fixedPositions.length, true, buildChunk,
       (first, last, error) -> {
         var snapshot = robot.snapshot();
         return 'plan chunk [$first,$last] of ${planSegments.length}, '

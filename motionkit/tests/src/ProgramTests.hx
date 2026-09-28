@@ -117,6 +117,7 @@ import MotionKitTestSupport.PlanarSolver;
 import MotionKitTestSupport.SessionTransitionRig;
 import MotionKitTestSupport.LaggingRobot;
 import MotionKitTestSupport.TrialRig;
+import MotionKitTestSupport.FaultingArmRobot;
 
 class ProgramTests extends MotionKitTestSupport {
   public function new() { super(); }
@@ -512,6 +513,95 @@ class ProgramTests extends MotionKitTestSupport {
       case _: false;
     }), "manipulator abort restores the safe process value");
     pathSimulation.dispose();
+  }
+
+  public function testManipulatorSessionTransitions():Void {
+    var fixture = buildContractArmFixture();
+    for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model));
+    var robot = new FaultingArmRobot("session-arm", runtime, fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model,
+      fixture.chain), 1e-8);
+    var compiler = new ProgramCompiler(solver,
+      new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0)), "work",
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
+      [for (_ in 0...6) 20.0],
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+    var motion = new ManipulatorMotion(robot, compiler, (_) -> null,
+      () -> runtime.pollEvents());
+    var target = [0.08, 0.0, 0.0, 0.0, 0.0, 0.0];
+    var home = [for (_ in 0...6) 0.0];
+    var longMove = new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(target), new MotionOptions(), Blend.ExactStop)]);
+    var homeMove = new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(home), new MotionOptions(), Blend.ExactStop)]);
+    var tick = 0;
+    motion.run(longMove);
+    for (_ in 0...5) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+    }
+    motion.abort();
+    check(motion.sessionState() == Stopping(Discard) && motion.running &&
+      robot.commandCount("abort") == 1,
+      "arm abort keeps the program in Stopping while runtime slows");
+    var commandsAtStop = robot.commands.length;
+    motion.run(homeMove);
+    check(motion.sessionState() == Stopping(Discard) && motion.running &&
+      robot.commands.length == commandsAtStop,
+      "arm accepts a replacement program during Stopping without submitting it");
+    motion.hold(); motion.resume();
+    check(motion.sessionState() == Stopping(Discard) &&
+      robot.commands.length == commandsAtStop,
+      "arm hold and resume during Stopping do not change state");
+    for (_ in 0...800) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      if (!motion.running) break;
+    }
+    check(motion.completed && motion.failure == null,
+      'arm replacement starts after rest and completes: ${motion.failure}');
+    near(robot.snapshot().positions.get(0), 0.0,
+      "arm replacement reaches home from settled stop", 1e-3);
+
+    motion.run(longMove);
+    for (_ in 0...5) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+    }
+    motion.hold();
+    check(motion.sessionState() == Holding && robot.commandCount("hold") == 1,
+      "arm running plus hold enters Holding");
+    var resumesBefore = robot.commandCount("resume");
+    motion.resume();
+    check(motion.sessionState() == Holding &&
+      robot.commandCount("resume") == resumesBefore,
+      "arm resume during Holding waits for rest");
+    for (_ in 0...800) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      if (!motion.running) break;
+    }
+    check(motion.completed && robot.commandCount("resume") == resumesBefore + 1,
+      'arm deferred resume sends one runtime command and completes: ${motion.failure}');
+
+    motion.run(homeMove);
+    for (_ in 0...5) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+    }
+    motion.abort();
+    var commandsBeforeFault = robot.commands.length;
+    robot.faultOverride = 42;
+    motion.update(0.01);
+    check(motion.sessionState() == Faulted &&
+      robot.commands.length == commandsBeforeFault,
+      "arm snapshot fault during Stopping latches Faulted");
+    throws(() -> motion.run(longMove),
+      "arm fault blocks new programs until reset");
+    robot.faultOverride = 0;
+    motion.reset();
+    check(motion.sessionState() == Idle,
+      "arm explicit reset returns Faulted to Idle");
+    simulation.dispose();
   }
 
   public function testMotionProgramContracts():Void {

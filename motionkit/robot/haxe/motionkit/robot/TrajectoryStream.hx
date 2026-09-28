@@ -10,6 +10,7 @@ import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
+import robotkit.world.StopMode;
 import robotkit.world.ProcessTimedEvent;
 import robotkit.world.TrajectorySegment;
 
@@ -66,6 +67,34 @@ class TrajectoryStream {
     return observation;
   }
 
+  /** Observe and submit through the same fault boundary for axes and arms. */
+  public function observe(session:MotionSession, snapshot:RobotSnapshot):RobotSnapshot {
+    session.observe(snapshot);
+    session.requireReady();
+    return snapshot;
+  }
+
+  public function submit(session:MotionSession, command:RobotCommand):Void {
+    try robot.submit(command) catch (error:Dynamic) {
+      session.reject();
+      throw error;
+    }
+    observe(session, robot.snapshot());
+  }
+
+  public function stop(session:MotionSession, mode:StopMode):Void {
+    try robot.stop(mode) catch (error:Dynamic) {
+      session.reject();
+      throw error;
+    }
+    observe(session, robot.snapshot());
+  }
+
+  public static function atRest(snapshot:RobotSnapshot):Bool
+    return (snapshot.sessionState == RobotKitRuntimeConstants.RK_SESSION_HELD ||
+      !snapshot.trajectoryActive) &&
+      snapshot.sessionState != RobotKitRuntimeConstants.RK_SESSION_STOPPING;
+
   public static function elapsedFromSnapshot(observation:RobotSnapshot,
       startSeconds:Float, durationSeconds:Float):Float {
     var runtimeSeconds = Int64.toFloat(observation.trajectoryTagTimeNs) * 1e-9;
@@ -74,7 +103,7 @@ class TrajectoryStream {
   }
 
   /** Submit enough chunks to keep two seconds of motion on the runtime. */
-  public function fill(jointCount:Int, reserveStaged:Bool,
+  public function fill(session:MotionSession, jointCount:Int, reserveStaged:Bool,
       build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
       describeFailure:Int -> Int -> Dynamic -> String):Void {
     var stagedSegments = 0;
@@ -93,7 +122,7 @@ class TrajectoryStream {
       var tag = programTags ? nextProgramTag : nextMotionTag;
       if (programTags) nextProgramTag = Int64.add(nextProgramTag, Int64.ofInt(1));
       var submission = build(first, last, tag, startNs, endNs);
-      try robot.submit(RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic)
+      try submit(session, RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic)
         throw describeFailure(first, last, error);
       if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
       var startSeconds = Int64.toFloat(startNs) * 1e-9;

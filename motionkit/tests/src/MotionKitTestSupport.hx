@@ -658,6 +658,47 @@ class LaggingRobot implements Robot {
   public function close():Void inner.close();
 }
 
+/** Virtual arm with an injectable snapshot fault for lifecycle transitions. */
+class FaultingArmRobot extends SimulatedRobot {
+  public var faultOverride:Int = 0;
+  public final commands:Array<RobotCommand> = [];
+
+  public function new(id:RobotId, runtime:robotkit.runtime.RobotRuntime,
+      name:String, links:Array<String>, joints:Array<String>)
+    super(id, runtime, name, links, joints);
+
+  override public function submit(command:RobotCommand):Void {
+    super.submit(command);
+    commands.push(command);
+  }
+
+  public function commandCount(kind:String):Int {
+    var count = 0;
+    for (command in commands) if (switch command {
+      case Hold: kind == "hold";
+      case Resume: kind == "resume";
+      case Abort: kind == "abort";
+      case ExecutionPlan(_): kind == "plan";
+      case _: false;
+    }) count++;
+    return count;
+  }
+
+  override public function snapshot():RobotSnapshot {
+    var value = super.snapshot();
+    if (faultOverride == 0) return value;
+    return new RobotSnapshot(value.id, value.sourceSequence,
+      value.sourceTimestampNs, value.positions.toArray(),
+      value.velocities.toArray(), value.efforts.toArray(), value.mode,
+      faultOverride, value.receivedTimestampNs, value.sensors.toArray(),
+      value.sourceClockId, value.receivedClockId, value.safety,
+      value.trajectoryQueueDepth, value.trajectoryActive,
+      value.trajectoryTimeNs, value.trajectoryDurationNs,
+      value.trajectoryTag, value.trajectoryTagTimeNs, value.sessionState,
+      value.activePlanId, value.committedUntilNs, value.queueEndTimeNs);
+  }
+}
+
 /** A simulated machine for sweep trials. */
 class TrialRig {
   public final machine:MotionSystem;

@@ -6,14 +6,16 @@ import motionkit.program.InputPredicate;
 import motionkit.program.MotionProgram;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.Robot;
+import motionkit.robot.SessionState;
 
 /** Runs compiled manipulator blocks and evaluates host-side barriers. */
 class ManipulatorMotion {
   public final robot:Robot;
   public final compiler:ProgramCompiler;
-  public var completed(default, null):Bool = false;
+  public var completed(get, never):Bool;
   public var failure(default, null):Null<String> = null;
-  public var running(default, null):Bool = false;
+  public var running(get, never):Bool;
+  public final session:MotionSession = new MotionSession();
   final input:String -> Null<EventValue>;
   final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
   final executor:PlanExecutor;
@@ -22,7 +24,8 @@ class ManipulatorMotion {
   var blockIndex:Int = 0;
   var planIndex:Int = 0;
   var barrierElapsed:Float = 0.0;
-  var holding:Bool = false;
+  var pendingProgram:Null<MotionProgram>;
+  var programCompleted:Bool = false;
   var planStarted:Bool = false;
   var nextPlanId:Int64 = Int64.ofInt(1);
   var events:Array<FiredProcessEvent> = [];
@@ -47,13 +50,24 @@ class ManipulatorMotion {
         throw "ManipulatorMotion needs distinct robot joint indices";
       seen.set(index, true);
     }
-    executor = new PlanExecutor(robot, this.jointIndices);
+    executor = new PlanExecutor(robot, this.jointIndices, session);
   }
 
+  function get_running():Bool return session.isActive();
+  function get_completed():Bool return programCompleted;
+  public function sessionState():SessionState return session.state;
+
   public function run(program:MotionProgram):Void {
+    session.requireReady();
+    if (program == null) throw "Manipulator program is required";
+    if (session.isStopping()) {
+      if (pendingProgram != null) throw "Manipulator program is already pending";
+      pendingProgram = program;
+      return;
+    }
     if (running) throw "Manipulator program is already running";
-    release(); completed = false; failure = null; events = [];
-    blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; holding = false; planStarted = false;
+    release(); programCompleted = false; failure = null; events = [];
+    blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false;
     try {
       var positions = robot.snapshot().positions;
       compiled = compiler.compile(program, lastCommandedQ == null
@@ -61,9 +75,9 @@ class ManipulatorMotion {
         : lastCommandedQ.copy(), nextPlanId);
       for (block in compiled.blocks) nextPlanId = Int64.add(nextPlanId,
         Int64.ofInt(block.plans.length));
-      running = true;
+      session.begin();
       advance(0.0);
-    } catch (error:Dynamic) { fail(Std.string(error)); }
+    } catch (error:Dynamic) { fail(Std.string(error), false); }
   }
 
   public function update(dtSeconds:Float):Void {
@@ -72,29 +86,41 @@ class ManipulatorMotion {
       throw "Manipulator update duration must be finite and positive";
     try {
       collectEvents();
-      if (!running) return;
+      if (session.isFaulted()) return;
       var fault = robot.fault();
-      if (fault != null) throw 'Robot fault ${fault.code}: ${fault.message}';
-      if (holding) { executor.sync(); return; }
+      if (fault != null) {
+        session.reject();
+        throw 'Robot fault ${fault.code}: ${fault.message}';
+      }
       executor.update();
+      if (session.isStopping()) return;
+      if (session.state == Idle) {
+        release();
+        var next = pendingProgram;
+        pendingProgram = null;
+        if (next != null) run(next);
+        return;
+      }
+      if (session.isHolding()) return;
       if (executor.completed && planStarted) { planIndex++; planStarted = false; }
       advance(dtSeconds);
-    } catch (error:Dynamic) { fail(Std.string(error)); }
+    } catch (error:Dynamic) { fail(Std.string(error), !session.isFaulted()); }
   }
 
-  public function hold():Void {
-    if (!running || holding) return;
-    holding = true;
-    if (hasPlan()) executor.hold();
-  }
-  public function resume():Void {
-    if (!running || !holding) return;
-    holding = false;
-    if (hasPlan()) executor.resume();
-  }
+  public function hold():Void if (running) executor.hold();
+  public function resume():Void if (running) executor.resume();
   public function abort():Void {
     if (!running) return;
-    fail("Program aborted");
+    pendingProgram = null;
+    fail("Program aborted", true);
+  }
+  public function reset():Void {
+    executor.reset();
+    if (session.state == Idle) {
+      release();
+      pendingProgram = null;
+      lastCommandedQ = null;
+    }
   }
   public function firedEvents():Array<FiredProcessEvent> {
     collectEvents();
@@ -130,7 +156,7 @@ class ManipulatorMotion {
   function advance(dt:Float):Void {
     var source = compiled;
     if (source == null) return;
-    while (running && blockIndex < source.blocks.length) {
+    while (session.state == Running && blockIndex < source.blocks.length) {
       var block = source.blocks[blockIndex];
       if (planIndex < block.plans.length) {
         if (!planStarted) {
@@ -165,11 +191,11 @@ class ManipulatorMotion {
       }
       blockIndex++; planIndex = 0; barrierElapsed = 0.0;
     }
-    if (running) {
+    if (session.state == Running) {
       for (block in source.blocks)
         for (plan in block.plans)
           lastCommandedQ = plan.evaluate(plan.durationSeconds).positions;
-      running = false; completed = true; release();
+      programCompleted = true; session.completed(); release();
     }
   }
 
@@ -178,20 +204,25 @@ class ManipulatorMotion {
     return source != null && blockIndex < source.blocks.length &&
       planIndex < source.blocks[blockIndex].plans.length;
   }
-  function fail(message:String):Void {
-    if (running) {
-      try executor.abort() catch (_:Dynamic) {}
+  function fail(message:String, stop:Bool):Void {
+    if (stop && running && !session.isFaulted()) {
+      try executor.abort() catch (error:Dynamic) {
+        session.reject();
+        message += ': ' + Std.string(error);
+      }
     }
-    failure = message; completed = false; running = false;
+    failure = message; programCompleted = false;
+    pendingProgram = null;
     lastCommandedQ = null;
-    release();
+    if (session.isFaulted()) { pendingProgram = null; release(); executor.clear(); }
+    else if (session.state == Idle) release();
   }
   function collectEvents():Void {
     var batch = eventSource();
     for (event in batch.events) events.push(event);
     if (batch.overflow) {
-      if (running) fail("Runtime process event overflow");
-      else { failure = "Runtime process event overflow"; completed = false; }
+      if (running) fail("Runtime process event overflow", true);
+      else { failure = "Runtime process event overflow"; programCompleted = false; }
     }
   }
   function release():Void {

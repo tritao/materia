@@ -331,9 +331,7 @@ class MotionSystem {
   /** True once a requested stop has reached rest. */
   function stopSettled():Bool {
     var observation = syncFromRuntime();
-    return (observation.sessionState == RobotKitRuntimeConstants.RK_SESSION_HELD ||
-      !observation.trajectoryActive) &&
-      observation.sessionState != RobotKitRuntimeConstants.RK_SESSION_STOPPING;
+    return TrajectoryStream.atRest(observation);
   }
 
   /** Runs deferred work or a pending resume once a stop has reached rest. */
@@ -605,7 +603,7 @@ class MotionSystem {
     var jerkUnchecked = pathJerkUnchecked.exists(trajectoryValue) &&
       pathJerkUnchecked.get(trajectoryValue) == true;
     try {
-      stream.fill(robot.snapshot().positions.length, false,
+      stream.fill(session, robot.snapshot().positions.length, false,
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
           calibrationRevision, jerkUnchecked),
@@ -636,29 +634,14 @@ class MotionSystem {
     activateNextTrajectory();
   }
 
-  function observe(snapshot:RobotSnapshot):RobotSnapshot {
-    session.observe(snapshot);
-    session.requireReady();
-    return snapshot;
-  }
+  function observe(snapshot:RobotSnapshot):RobotSnapshot
+    return stream.observe(session, snapshot);
 
   function checkSnapshot():Void observe(robot.snapshot());
 
-  function submitCommand(command:RobotCommand):Void {
-    try robot.submit(command) catch (error:Dynamic) {
-      session.reject();
-      throw error;
-    }
-    checkSnapshot();
-  }
+  function submitCommand(command:RobotCommand):Void stream.submit(session, command);
 
-  function stopRobot(mode:StopMode):Void {
-    try robot.stop(mode) catch (error:Dynamic) {
-      session.reject();
-      throw error;
-    }
-    checkSnapshot();
-  }
+  function stopRobot(mode:StopMode):Void stream.stop(session, mode);
 
   function clearBufferedMotionAfterFault():Void {
     activeTrajectory = null;

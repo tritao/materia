@@ -17,6 +17,8 @@ import robotkit.world.RobotSnapshot;
  * Stopping    rest                    Idle, then pending requests may begin
  * Any         runtime fault/rejection Faulted
  * Faulted     reset                   Idle, after runtime safety reset
+ * The same transitions govern axis motion and manipulator programs. A program
+ * waiting for a controlled stop is owned by its caller, not by this session.
  */
 class MotionSession {
   public var state(default, null):SessionState = Idle;
@@ -28,6 +30,7 @@ class MotionSession {
   public function new() {}
 
   public function isFaulted():Bool return state == Faulted;
+  public function isActive():Bool return state != Idle && state != Faulted;
   public function isHolding():Bool return state == Holding || state == Held;
   public function isStopping():Bool return switch state {
     case Stopping(_): true;

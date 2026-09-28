@@ -1,9 +1,8 @@
 # MotionKit hardening plan
 
-Keep this work on the `motionkit-phase0` branch in the single worktree at
-`../materia-mk-phase0`. The MotionKit suite, native CTests, and RobotKit
-integration suite must pass for a phase to be complete, and every commit must
-leave them green.
+Continue this hardening work on `main` after the CNC phases merge. The
+MotionKit suite, native CTests, and RobotKit integration suite must pass for
+a phase to be complete, and every commit must leave them green.
 
 ## Phase 0: correctness fixes
 
@@ -105,7 +104,22 @@ unaffected. Do this as five commits on one branch.
    immediately by a move, hold during `Stopping`, resume during `Holding`, a
    jog continued after replacement, and a fault while `Stopping`.
 
-Outcome: `MotionSystem` shrinks to roughly 250 lines of facade.
+Outcome: `MotionSystem` remains an axis-specific facade of about 675 lines.
+The shared session and stream own lifecycle transitions, runtime observation,
+submission, and bounded plan streaming; the remaining facade keeps axis
+planning, buffering, and public machine operations. Its line count is a
+description of that boundary, not a target to optimize on its own.
+
+## Arm session follow-up
+
+- `ManipulatorMotion` and `PlanExecutor` share one `MotionSession`. Abort
+  remains in `Stopping` until the runtime reports rest; an immediately
+  requested program starts from the settled position. Holds distinguish
+  `Holding` from `Held`, and faults require explicit `reset()`.
+- `ProcessRun` may enter recovery and issue its restart program only when
+  its motion session is `Held` or `Idle`.
+- `TrajectoryStream` provides the common runtime observation, submission,
+  and rest checks for machine axes and manipulator programs.
 
 ## Phase 3: guarantees and tests
 

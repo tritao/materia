@@ -7,6 +7,12 @@ class MotionKitBootstrapTests {
     var kinematicsTests:KinematicsTests = new KinematicsTests();
     var processTests:ProcessTests = new ProcessTests();
 
+    if (Sys.getEnv("MOTIONKIT_ARM_SESSION_ONLY") == "1") {
+      programTests.testManipulatorSessionTransitions();
+      Sys.println('Arm session tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
+
     if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
       plannerTests.testCircularSegments();
       processTests.testCncProgramBinding();
@@ -44,6 +50,7 @@ class MotionKitBootstrapTests {
     processTests.testPhysicalAssemblyCncBinding();
     processTests.testVirtualCncProgram();
     programTests.testManipulatorMotion();
+    programTests.testManipulatorSessionTransitions();
     plannerTests.testSimplePathTimingContract();
     plannerTests.testNativePathLowering();
     plannerTests.testToppraPathTiming();

@@ -7,6 +7,8 @@ import motionkit.path.PosePath;
 import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
+import motionkit.robot.MotionSession;
+import motionkit.robot.SessionState;
 import robotkit.world.FiredProcessEvent;
 
 /** Plans process spans and logs interruption and recovery transitions. */
@@ -15,6 +17,7 @@ class ProcessRun {
   public final path:PosePath;
   public final device:ProcessDevice;
   public final channel:String;
+  public final motionSession:MotionSession;
   public final transitions:Array<ProcessTransition> = [];
   public var state(default, null):ProcessRunState;
   public var currentFeed(default, null):Float;
@@ -24,14 +27,16 @@ class ProcessRun {
   var pausedForFeed:Bool = false;
 
   public function new(recipe:ProcessRecipe, path:PosePath,
-      device:ProcessDevice, channel:String) {
+      device:ProcessDevice, channel:String, motionSession:MotionSession) {
     if (recipe == null || path == null || path.length() <= 0.0 ||
-        device == null || channel == null || StringTools.trim(channel).length == 0)
-      throw "Process run needs a recipe, path, device and channel";
+        device == null || channel == null || StringTools.trim(channel).length == 0 ||
+        motionSession == null)
+      throw "Process run needs a recipe, path, device, channel and motion session";
     this.recipe = recipe;
     this.path = path;
     this.device = device;
     this.channel = channel;
+    this.motionSession = motionSession;
     currentFeed = recipe.nominalSpeed;
   }
 
@@ -57,7 +62,7 @@ class ProcessRun {
           transition(ProcessRunState.Completion, path.length(), "path complete");
         }
       case ControlledInterruption:
-        if (!pausedForFeed && device.fault() == null) {
+        if (!pausedForFeed && device.fault() == null && canRecover()) {
           device.prepare();
           transition(ProcessRunState.Recovery, interruptedAt, "ready to reapproach");
         }
@@ -72,6 +77,8 @@ class ProcessRun {
     if (state != ProcessRunState.Ready && state != ProcessRunState.Recovery)
       throw "Process program is available only when ready or recovering";
     if (pausedForFeed) throw "Process feed override is paused";
+    if (state == ProcessRunState.Recovery && !canRecover())
+      throw "Process recovery requires held or idle motion";
     if (!device.ready()) throw "Process device is not ready";
     var startDistance = state == ProcessRunState.Recovery ?
       Math.max(0.0, interruptedAt - pendingBackoff) : 0.0;
@@ -88,6 +95,9 @@ class ProcessRun {
       startDistance > 0.0 ? "resume after backoff" : "begin process");
     return program;
   }
+
+  function canRecover():Bool return motionSession.state == SessionState.Held ||
+    motionSession.state == SessionState.Idle;
 
   /** Apply runtime-fired process records to the bound simulation device. */
   public function applyRecords(records:Array<FiredProcessEvent>):Void device.apply(records);
