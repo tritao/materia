@@ -33,8 +33,10 @@ plus `MeshFaceRange` entries. A range uses the same face index as
 subrange belonging to that CAD face. Tessellation results are cached per
 immutable shape and exact deflection options; closing the shape releases the
 cache while already returned mesh values remain valid.
-`Shape.massProperties()` reports solid volume, surface area, and center of mass
-in the shape's current length unit; density can be supplied to calculate mass.
+`Shape.massProperties()` reports solid volume, surface area, center of mass,
+and centroidal inertia in the shape's current length unit. Inertia has
+length-to-the-fifth units for unit density; `inertiaAtDensity()` scales it by
+density per cubic length unit.
 
 Modeling methods with an `Operation` suffix retain OCCT result history:
 `Operation.resultShape()` returns the new shape, while `Operation.history()`

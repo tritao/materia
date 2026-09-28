@@ -63,11 +63,14 @@ class Shape {
 		return CadKit.shapeVolumeChecked(native.borrow());
 	}
 
-	/** Compute volume, surface area, and the volume-weighted center of mass. */
+	/** Compute volume, area, centroid, and unit-density centroidal inertia. */
 	public function massProperties():PhysicalProperties {
-		var nativeProperties = CadKit.shapeMassPropertiesChecked(native.borrow());
+		var nativeProperties = CadKit.shapePhysicalPropertiesChecked(native.borrow());
+		var tensor = nativeProperties.get_inertia();
 		return new PhysicalProperties(nativeProperties.get_volume(), nativeProperties.get_surfaceArea(),
-			cadkit.modeling.Vector.fromNative(nativeProperties.get_centerOfMass()));
+			cadkit.modeling.Vector.fromNative(nativeProperties.get_centerOfMass()),
+			new cadkit.InertiaTensor(tensor.get_xx(), tensor.get_xy(), tensor.get_xz(), tensor.get_yy(),
+				tensor.get_yz(), tensor.get_zz()));
 	}
 
 	public function kind():CadKit.ShapeKind {

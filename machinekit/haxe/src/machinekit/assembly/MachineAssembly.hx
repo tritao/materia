@@ -3,6 +3,7 @@ package machinekit.assembly;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
+import cadkit.InertiaTensor;
 import machinekit.component.Bom;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
@@ -22,7 +23,10 @@ typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
 typedef MachineAssemblyMassProperties = {
 	var mass:Float;
 	var centreOfMass:Vector;
+	/** Centroidal inertia in kg mm²; null if any component lacks inertia. */
+	var inertia:Null<InertiaTensor>;
 	var unaccounted:Array<String>;
+	var unaccountedInertia:Array<String>;
 }
 
 enum MachineAssemblyOperation {
@@ -235,11 +239,15 @@ class MachineAssembly {
 		var model = new AssemblyModel();
 		addTo(model, "");
 		var mass = 0.0, weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
+		var posed:Array<{id:String, properties:machinekit.component.MassProperties, pose:AssemblyFrame,
+			centre:Vector}> = [];
 		for (member in members) {
 			var properties = member.component.massProperties();
 			var pose = state == null ? model.pose(member.id) : state.worldPose(member.id);
 			var centre = properties.centreOfMass;
 			var world = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
+			posed.push({id: member.id, properties: properties, pose: pose,
+				centre: new Vector(world.x, world.y, world.z)});
 			mass += properties.mass;
 			weightedX += properties.mass * world.x;
 			weightedY += properties.mass * world.y;
@@ -248,8 +256,24 @@ class MachineAssembly {
 		var unaccounted:Array<String> = [];
 		for (entry in bomItems) if (unaccounted.indexOf(entry.item.partNumber) < 0)
 			unaccounted.push(entry.item.partNumber);
-		return {mass: mass, centreOfMass: mass == 0 ? new Vector() :
-			new Vector(weightedX / mass, weightedY / mass, weightedZ / mass), unaccounted: unaccounted};
+		var combinedCentre = mass == 0 ? new Vector() :
+			new Vector(weightedX / mass, weightedY / mass, weightedZ / mass);
+		var inertia = InertiaTensor.zero();
+		var unaccountedInertia:Array<String> = [];
+		for (entry in posed) {
+			var tensor = entry.properties.inertia;
+			if (tensor == null) {
+				unaccountedInertia.push(entry.id);
+				continue;
+			}
+			var pose = entry.pose, centre = entry.centre;
+			inertia = inertia.add(tensor.rotated(pose.qx, pose.qy, pose.qz, pose.qw)
+				.shifted(entry.properties.mass, centre.x - combinedCentre.x,
+					centre.y - combinedCentre.y, centre.z - combinedCentre.z));
+		}
+		return {mass: mass, centreOfMass: combinedCentre,
+			inertia: unaccountedInertia.length == 0 ? inertia : null,
+			unaccounted: unaccounted, unaccountedInertia: unaccountedInertia};
 	}
 
 	public function connectorNames():Array<String>

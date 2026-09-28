@@ -110,6 +110,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_shape_mass_properties(shape: cad_shape, out_properties: ptr<cad_mass_properties> @out) -> cad_result;
 	extern fn cad_shape_mirror(shape: cad_shape, plane_origin: cad_vec3, plane_normal: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_mirror_operation(shape: cad_shape, plane_origin: cad_vec3, plane_normal: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	extern fn cad_shape_physical_properties(shape: cad_shape, out_properties: ptr<cad_physical_properties> @out) -> cad_result;
 	extern fn cad_shape_place(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_shape_place_operation(shape: cad_shape, origin: cad_vec3, x_direction: cad_vec3, z_direction: cad_vec3, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_shape_revolve(profile: cad_shape, axis_origin: cad_vec3, axis_direction: cad_vec3, angle: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
@@ -141,6 +142,14 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 		min: cad_vec3 @offset(0);
 		max: cad_vec3 @offset(24);
 	}
+	struct cad_inertia_tensor @layout(48, 8) {
+		xx: f64 @offset(0);
+		xy: f64 @offset(8);
+		xz: f64 @offset(16);
+		yy: f64 @offset(24);
+		yz: f64 @offset(32);
+		zz: f64 @offset(40);
+	}
 	struct cad_mass_properties @layout(40, 8) {
 		volume: f64 @offset(0);
 		surface_area: f64 @offset(8);
@@ -154,6 +163,12 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	struct cad_mesh_options @layout(16, 8) {
 		linear_deflection: f64 @offset(0);
 		angular_deflection: f64 @offset(8);
+	}
+	struct cad_physical_properties @layout(88, 8) {
+		volume: f64 @offset(0);
+		surface_area: f64 @offset(8);
+		center_of_mass: cad_vec3 @offset(16);
+		inertia: cad_inertia_tensor @offset(40);
 	}
 	struct cad_resource_counts @layout(12, 4) {
 		shape_count: u32 @offset(0);

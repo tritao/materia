@@ -156,6 +156,15 @@ less twice that profile's pitch-line differential.
 
 ## Assembly
 
+`MachineComponent.massProperties()` computes mass, centre of mass, and centroidal
+inertia from Preview geometry and material density. Mass is in kg, positions in
+mm, and inertia in kg mm². Components with catalog values can declare mass and
+optionally inertia. When a declared mass has no inertia, its tensor is `null`.
+`MachineAssembly.massProperties(?state)` rotates and combines member tensors at
+the solved poses; it returns `null` inertia and lists the affected member IDs in
+`unaccountedInertia` if any tensor is missing. Its `unaccounted` list continues
+to identify extra BOM items omitted from the mass rollup.
+
 `machinekit.assembly` composes standalone `MachineComponent`s into small
 machines, the same way `examples/MotorShaftBearings.hx` does, but as reusable
 library classes rather than one-off scripts:

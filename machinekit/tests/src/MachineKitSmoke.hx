@@ -3,6 +3,7 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import cadkit.InertiaTensor;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.FlangeBearingAssembly;
@@ -82,11 +83,12 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 private class MassTestBlock extends MachineComponent {
-	public function new(?declared:Float) {
+	public function new(?declared:Float, withInertia:Bool = false) {
 		super("TEST-BLOCK", "10 mm test block", "aluminium 6061", true);
 		addConnector("origin", Mount, AssemblyFrames.identity());
 		addConnector("right", Mount, {x: 20, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1});
-		if (declared != null) declareMass(declared, new Vector(1, 2, 3));
+		if (declared != null) declareMass(declared, new Vector(1, 2, 3),
+			withInertia ? new InertiaTensor(2, 0, 0, 3, 0, 4) : null);
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 10, 10);
@@ -129,6 +131,7 @@ class MachineKitSmoke {
 		near(declared.mass, 0.5, "declared mass overrides geometry");
 		near(declared.centreOfMass.x, 1, "declared centre of mass");
 		check(switch declared.source { case Declared: true; default: false; }, "declared mass source");
+		check(declared.inertia == null, "declared mass does not silently invent inertia");
 		throws(() -> new MasslessTestPart().massProperties(), "has no geometry or declared mass");
 
 		var block = new MassTestBlock();
@@ -141,6 +144,11 @@ class MachineKitSmoke {
 		near(combined.mass, 0.0054, "two block mass", 1e-9);
 		near(combined.centreOfMass.x, 10, "solved assembly centre of mass x");
 		near(combined.centreOfMass.z, 5, "solved assembly centre of mass z");
+		var combinedInertia:InertiaTensor = cast combined.inertia;
+		near(combinedInertia.xx, 0.09, "two block axial inertia", 1e-8);
+		near(combinedInertia.yy, 0.63, "parallel axis inertia", 1e-8);
+		near(combinedInertia.zz, 0.63, "parallel axis inertia about z", 1e-8);
+		check(combined.unaccountedInertia.length == 0, "computed inertia is fully accounted");
 		check(combined.unaccounted.length == 1 && combined.unaccounted[0] == "RAIL-CUT", "unaccounted BOM extras");
 
 		var inner = new MachineAssembly();
@@ -152,6 +160,10 @@ class MachineKitSmoke {
 		near(outer.massProperties().mass, inner.massProperties().mass, "included assembly mass", 1e-9);
 		near(outer.massProperties().centreOfMass.x, inner.massProperties().centreOfMass.x,
 			"included assembly centre of mass");
+		var outerInertia:InertiaTensor = cast outer.massProperties().inertia;
+		var innerInertia:InertiaTensor = cast inner.massProperties().inertia;
+		near(outerInertia.yy, innerInertia.yy,
+			"included assembly inertia");
 
 		var moving = new MachineAssembly();
 		moving.addComponent("a", block);
@@ -163,6 +175,20 @@ class MachineKitSmoke {
 		var state = model.initialState();
 		state.setJoint("slide", 30);
 		near(moving.massProperties(state).centreOfMass.x, 15, "configured moving centre of mass");
+		var movingInertia:InertiaTensor = cast moving.massProperties(state).inertia;
+		near(movingInertia.yy, 1.305, "configured moving inertia", 1e-8);
+
+		var missing = new MachineAssembly();
+		missing.addComponent("declared", new MassTestBlock(0.5));
+		var incomplete = missing.massProperties();
+		check(incomplete.inertia == null && incomplete.unaccountedInertia[0] == "declared",
+			"declared mass reports missing inertia");
+		var rotated = new MachineAssembly();
+		rotated.addComponent("declared", new MassTestBlock(1, true),
+			{x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: Math.sqrt(0.5), qw: Math.sqrt(0.5)});
+		var rotatedInertia:InertiaTensor = cast rotated.massProperties().inertia;
+		near(rotatedInertia.xx, 3, "declared tensor rotates into assembly frame");
+		near(rotatedInertia.yy, 2, "declared tensor y moment rotates into assembly frame");
 	}
 
 	static function ports():Void {

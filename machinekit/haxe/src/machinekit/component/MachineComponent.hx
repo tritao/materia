@@ -3,6 +3,7 @@ package machinekit.component;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
+import cadkit.InertiaTensor;
 import machinekit.component.MassProperties.MassSource;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.MaterialLibrary;
@@ -73,8 +74,10 @@ class MachineComponent {
 		}
 		try {
 			var physical = part.massProperties();
-			var mass = physical.volume * 1e-9 * MaterialLibrary.require(materialId).physical.density;
-			cachedMass = new MassProperties(mass, physical.centerOfMass, Computed(Preview));
+			var density = MaterialLibrary.require(materialId).physical.density;
+			var mass = physical.volume * 1e-9 * density;
+			cachedMass = new MassProperties(mass, physical.centerOfMass, Computed(Preview),
+				physical.inertiaAtDensity(density * 1e-9));
 			cachedMassMaterialId = materialId;
 		} catch (error:Dynamic) {
 			part.close();
@@ -85,9 +88,9 @@ class MachineComponent {
 	}
 
 	/** Vendor mass overrides the geometry estimate, including after material changes. */
-	function declareMass(kg:Float, ?centreOfMass:Vector):Void {
+	function declareMass(kg:Float, ?centreOfMass:Vector, ?inertia:InertiaTensor):Void {
 		if (!Math.isFinite(kg) || kg <= 0) throw 'Component "$designation" needs a positive declared mass';
-		declaredMass = new MassProperties(kg, centreOfMass == null ? new Vector() : centreOfMass, Declared);
+		declaredMass = new MassProperties(kg, centreOfMass == null ? new Vector() : centreOfMass, Declared, inertia);
 	}
 
 	public function toolSpecs():Array<ToolSpec> return [];
