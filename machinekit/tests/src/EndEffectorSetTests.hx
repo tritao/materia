@@ -12,7 +12,7 @@ private class TestChangerMaster extends MachineComponent {
 		super("TEST-MASTER", "Test changer master", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());
 		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
-		addPort({name: "airIn", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
 		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
 		addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: Unspecified, required: true});
 		addBridge("airIn", "airOut");
@@ -97,12 +97,16 @@ class EndEffectorSetTests {
 			short.portNames().indexOf("coupleAir") >= 0)
 			throw "Configuration has the wrong robot-side interface";
 		var upstream = short.upstream("tool/cup", "vacuum");
-		if (upstream.instanceId != "robot/master" || upstream.portName != "airIn")
-			throw 'Wrong changer upstream: ${upstream.instanceId}/${upstream.portName}';
+		if (upstream.port.instanceId != "robot/master" || upstream.port.portName != "airIn" || !upstream.external)
+			throw 'Wrong changer upstream: ${upstream.port.instanceId}/${upstream.port.portName}';
 		if (short.components().length != 3 || long.components().length != 3)
 			throw "Configuration contains inactive components";
 		set.addTool("unmapped", tool(1, 20, true));
 		fails(() -> set.configuration("unmapped"), "Required consumer port");
+		var missingPort = new EndEffector();
+		missingPort.addComponent("plate", new TestChangerPlate(1, 20));
+		missingPort.mount("plate", "mount");
+		fails(() -> set.addTool("missing-port", missingPort), "does not expose mapped port");
 		fails(() -> set.configuration("missing"), "Unknown changer tool");
 	}
 }

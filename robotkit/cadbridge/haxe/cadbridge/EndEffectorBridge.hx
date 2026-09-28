@@ -15,7 +15,7 @@ import robotkit.tool.ToolCollisionShape;
 /** Convert one end-effector working frame into a RobotKit tool. */
 class EndEffectorBridge {
   public static function toTool(endEffector:EndEffector, frameName:String,
-      ?state:AssemblyState):Tool {
+      ?state:AssemblyState, ?id:String):Tool {
     if (endEffector == null) throw "End effector is required";
     endEffector.validate();
     var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state));
@@ -27,12 +27,13 @@ class EndEffectorBridge {
       throw 'End effector has unaccounted BOM mass: ${properties.unaccounted.join(", ")}';
     if (!Math.isFinite(properties.mass) || properties.mass <= 0)
       throw "End effector requires positive mass";
-    return new Tool(frameName, frameName, transform,
-      ToolCollisionShape.Box(envelopeHalfExtents(endEffector, state)), properties.mass);
+    var bounds = envelopeBox(endEffector, state);
+    return new Tool(id == null ? frameName : id, frameName, transform,
+      ToolCollisionShape.Box(bounds.halfExtents, bounds.centre), properties.mass);
   }
 
-  /** Conservative flange-centred box: Box has no offset field in RobotKit. */
-  static function envelopeHalfExtents(endEffector:EndEffector, state:AssemblyState):Vec3 {
+  /** Axis-aligned bounds of all component envelopes in the robot flange frame. */
+  static function envelopeBox(endEffector:EndEffector, state:AssemblyState):{centre:Vec3, halfExtents:Vec3} {
     var model = new AssemblyModel();
     endEffector.addTo(model, "");
     var mount = endEffector.mountReference();
@@ -40,7 +41,8 @@ class EndEffectorBridge {
     var mountWorld = AssemblyFrames.compose(mountPose,
       endEffector.memberConnectorFrame(mount.instanceId, mount.connectorName));
     var mountInverse = AssemblyFrames.inverse(mountWorld);
-    var halfX = 0.0, halfY = 0.0, halfZ = 0.0;
+    var minX = Math.POSITIVE_INFINITY, minY = Math.POSITIVE_INFINITY, minZ = Math.POSITIVE_INFINITY;
+    var maxX = Math.NEGATIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY, maxZ = Math.NEGATIVE_INFINITY;
     for (member in endEffector.components()) {
       var part = member.component.geometry(Envelope);
       var bounds:CadKit.Bounds;
@@ -57,11 +59,19 @@ class EndEffectorBridge {
           for (z in [min.get_z(), max.get_z()]) {
             var point = AssemblyFrames.transformPoint(relative, x, y, z);
             var robot = EndEffectorFrames.pointYToZ(point.x, point.y, point.z);
-            halfX = Math.max(halfX, Math.abs(robot.x));
-            halfY = Math.max(halfY, Math.abs(robot.y));
-            halfZ = Math.max(halfZ, Math.abs(robot.z));
+            minX = Math.min(minX, robot.x);
+            minY = Math.min(minY, robot.y);
+            minZ = Math.min(minZ, robot.z);
+            maxX = Math.max(maxX, robot.x);
+            maxY = Math.max(maxY, robot.y);
+            maxZ = Math.max(maxZ, robot.z);
           }
     }
-    return new Vec3(halfX * 1e-3, halfY * 1e-3, halfZ * 1e-3);
+    if (!Math.isFinite(minX) || !Math.isFinite(maxX))
+      throw "End effector needs envelope geometry for collision";
+    return {centre: new Vec3((minX + maxX) * 0.5e-3,
+      (minY + maxY) * 0.5e-3, (minZ + maxZ) * 0.5e-3),
+      halfExtents: new Vec3((maxX - minX) * 0.5e-3,
+        (maxY - minY) * 0.5e-3, (maxZ - minZ) * 0.5e-3)};
   }
 }

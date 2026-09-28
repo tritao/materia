@@ -163,6 +163,8 @@ class MachineComponent {
 		var input = port(from), output = port(to);
 		if (from == to || input.kind != output.kind)
 			throw 'Port bridge "$designation/$from->$to" needs distinct ports of the same kind';
+		if (input.role == Supply)
+			throw 'Port bridge "$designation/$from->$to" cannot use a Supply inlet';
 		for (existing in bridgeList) if (existing.from == from && existing.to == to)
 			throw 'Duplicate port bridge "$designation/$from->$to"';
 		bridgeList.push({from: from, to: to});

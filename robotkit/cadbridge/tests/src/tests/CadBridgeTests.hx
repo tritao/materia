@@ -30,6 +30,7 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.MachineAssemblyMassBridge;
 import cadbridge.EndEffectorBridge;
+import eoat.EndEffectorExample;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.component.MachineComponent;
@@ -114,15 +115,36 @@ class CadBridgeTests {
       "contact frame converts from connector +Y to robot +Z");
     check(approx(tool.mass, 3, 1e-12), "attached tube contributes to RobotKit tool mass");
     var boxCorrect = switch tool.collision {
-      case Box(half): approx(half.x, 0.02, 1e-6) && approx(half.y, 0.005, 1e-6) &&
-        approx(half.z, 0.03, 1e-6);
+      case Box(half, centre): centre != null &&
+        approx(centre.x, -0.01, 1e-6) && approx(centre.y, 0, 1e-6) &&
+        approx(centre.z, 0.015, 1e-6) &&
+        approx(half.x, 0.01, 1e-6) && approx(half.y, 0.005, 1e-6) &&
+        approx(half.z, 0.015, 1e-6);
       case _: false;
     };
-    check(boxCorrect, "flange-centred envelope box contains the offset body");
+    check(boxCorrect, "offset envelope box follows the actual body bounds");
+    var centredBox = ToolCollisionShape.Box(new Vec3(0.01, 0.02, 0.03));
+    check(switch centredBox {
+      case Box(_, centre): centre == null;
+      case _: false;
+    }, "existing flange-centred Box construction remains valid");
     var inspection = EndEffectorBridge.toTool(endEffector, "inspection");
     check(inspection.id == "inspection" &&
       inspection.flangeTTcp.translation.norm() < 1e-12,
       "each working frame produces a separate RobotKit tool");
+
+    var set = EndEffectorExample.build();
+    var shortTool = EndEffectorBridge.toTool(set.configuration("short"), "contact", null, "short/contact");
+    var longTool = EndEffectorBridge.toTool(set.configuration("long"), "contact", null, "long/contact");
+    check(shortTool.id == "short/contact" && longTool.id == "long/contact" &&
+      shortTool.id != longTool.id, "configuration-qualified RobotKit tool IDs are distinct");
+    var forwardBox = switch shortTool.collision {
+      case Box(half, centre): centre != null &&
+        approx(centre.z - half.z, 0, 1e-6) &&
+        approx(centre.z + half.z, shortTool.flangeTTcp.translation.z, 1e-6);
+      case _: false;
+    };
+    check(forwardBox, "adapter, frame and cup collision box spans flange to contact only");
 
     var link = new Link("end-effector");
     MachineAssemblyMassBridge.applyToLink(endEffector, link);

@@ -41,10 +41,14 @@ class EndEffectorSet extends EndEffector {
 	}
 
 	public function addTool(id:String, tool:EndEffector):Void {
+		if (changerRef == null) throw "End effector set needs a changer before adding tools";
 		if (id == null || id.length == 0 || tool == null || tool == this)
 			throw "Changer tool needs a distinct id and end effector";
 		if (tools.exists(id)) throw 'Duplicate changer tool "$id"';
 		tool.mountReference();
+		for (mapping in changerRef.ports)
+			try tool.port(mapping.tool) catch (_:Dynamic)
+				throw 'Changer tool "$id" does not expose mapped port "${mapping.tool}"';
 		tools.set(id, tool);
 	}
 
