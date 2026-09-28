@@ -11,6 +11,8 @@ class StockTimeline {
   public final interval:Int;
   /** Moves cut into the stock so far. */
   public var position(default, null):Int;
+  /** What each move did when the whole program was first cut, in program order. */
+  public final outcomes:Array<MoveOutcome> = [];
   final snapshots:Array<StockSnapshot> = [];
 
   /** `stock` must be fresh (no history); it ends at the program's end. */
@@ -24,7 +26,7 @@ class StockTimeline {
     var at = 0;
     while (at < moves.length) {
       var end = Std.int(Math.min(moves.length, at + interval));
-      stock.cut(moves.slice(at, end));
+      for (outcome in stock.cut(moves.slice(at, end)).moves) outcomes.push(outcome);
       at = end;
       if (at % interval == 0 && at < moves.length) snapshots.push(stock.snapshot());
     }

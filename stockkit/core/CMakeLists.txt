@@ -1,9 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 project(stockkit_core VERSION 0.1.0 LANGUAGES C CXX)
 
-include(CTest)
+# Tests and the benchmark build only when StockKit core is the top-level project.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    include(CTest)
+endif()
 option(SK_BUILD_SHARED "Build StockKit core as a shared library" ON)
-if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
@@ -46,7 +49,7 @@ else()
 endif()
 add_library(stockkit::core ALIAS stockkit_core)
 
-if(BUILD_TESTING)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
     add_executable(stockkit_core_tests tests/core_tests.cpp)
     target_link_libraries(stockkit_core_tests PRIVATE stockkit_core)
     target_compile_features(stockkit_core_tests PRIVATE cxx_std_17)
