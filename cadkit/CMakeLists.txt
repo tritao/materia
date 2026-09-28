@@ -10,6 +10,20 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(CADKIT_BUILD_TESTS "Build CadKit tests" ON)
 option(CADKIT_BUILD_OCCT "Build the pinned vendored OCCT source" ON)
 option(CADKIT_BUILD_SHARED "Build the CadKit core as a shared library" ON)
+# Building OCCT takes most of an hour. A prebuilt install of the same pinned
+# source (cmake --install of an OCCT build tree) can stand in for it; the
+# environment variable lets builds driven by other tools, such as haxeon, opt in.
+set(CADKIT_OCCT_DIR "$ENV{CADKIT_OCCT_DIR}" CACHE PATH
+    "Prefix of a prebuilt install of the pinned OCCT source, used instead of building it")
+
+if(CADKIT_OCCT_DIR)
+    find_package(OpenCASCADE CONFIG REQUIRED PATHS "${CADKIT_OCCT_DIR}" NO_DEFAULT_PATH)
+    message(STATUS "CadKit uses prebuilt OCCT ${OpenCASCADE_VERSION} from ${CADKIT_OCCT_DIR}")
+    set(CADKIT_OCCT_INCLUDE_DIR "${OpenCASCADE_INCLUDE_DIR}")
+    set(CADKIT_BUILD_OCCT OFF)
+else()
+    set(CADKIT_OCCT_INCLUDE_DIR "${CMAKE_BINARY_DIR}/include/opencascade")
+endif()
 
 if(CADKIT_BUILD_OCCT)
     # CadKit core uses OCCT's headless modeling and STEP providers. Keep Draw
