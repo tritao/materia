@@ -460,9 +460,9 @@ same immutable sensor frames; endpoints without those measurements do not
 invent them. Rebuild native consumers for the extended structs.
 
 The default backend is still the deterministic SimKit test backend. Build with
-`-DNKSIM_BUILD_MUJOCO=ON` and select `rk_simulation_desc.backend = 1` (Haxe
-`new Simulation(dt, substeps, 1)`) for MuJoCo; requesting it in an unconfigured
-build returns `RK_ERROR_UNSUPPORTED`, never a silent fallback. MuJoCo tests
+`-DNKSIM_BUILD_MUJOCO=ON` and create the session's world with
+`nksim_mujoco_world_create` (Haxe `SimulationSpace.create(SimulationSpace.MUJOCO,
+dt, substeps)`) for MuJoCo; there is no silent fallback. MuJoCo tests
 exercise articulated IMU/offset acceleration, moving-object LiDAR occlusion,
 collision response, angular limits in radians, world-oriented body velocities,
 and deterministic replay. Rebuilds preserve articulated rest transforms;
@@ -1256,7 +1256,7 @@ scan/register/plan/navigate/execute/coverage/replay logic runs against
 either backend; `testSimulatedWallFinishingScenario` calls it with
 `backend = 0` (default, `strictFkCrossCheck = true`, `minCoverage = 0.99`),
 and `testSimulatedWallFinishingScenarioMuJoCo` with the plan's own
-`new Simulation(0.01, 2, 1)` (`strictFkCrossCheck = false`,
+`new SimulationHarness(0.01, 2, SimulationSpace.MUJOCO)` (`strictFkCrossCheck = false`,
 `minCoverage = 0.97`). A fixed navigation tick budget is scaled by the
 timestep (`40.0 / timestep`) so both backends get the same *simulated-time*
 budget to converge, not the same tick count. MuJoCo's per-joint
@@ -1291,9 +1291,9 @@ for any other consumer). `robotkit/tests/mujoco/haxeon.json` points its
 `tests.WallFinishingMuJoCoRunner`, which calls only
 `WallFinishingScenarioTests.runMuJoCo()` — not `RobotWorldTests.main()`,
 which is still the entry for the standard `robotkit/tests` project and must
-never reach a `new Simulation(dt, substeps, 1)` call on a build where MuJoCo
-support is compiled out (`RK_ERROR_UNSUPPORTED`, not a silent fallback, per
-the "One simulation tick" section above).
+never reach a MuJoCo `SimulationHarness` on a build where MuJoCo support is
+compiled out (there is no silent fallback, per the "One simulation tick"
+section above).
 
 ## Construction skills (M10)
 

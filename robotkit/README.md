@@ -130,7 +130,9 @@ cmake --build /tmp/materia-mujoco -j 6
 ctest --test-dir /tmp/materia-mujoco --output-on-failure
 ```
 
-Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backend.
+Select it with `SimulationSpace.create(SimulationSpace.MUJOCO, 0.01, 2)` (or
+`new SimulationHarness(0.01, 2, SimulationSpace.MUJOCO)` in tests); the
+deterministic backend remains the default.
 MuJoCo self-collision excludes direct parent/child pairs and links that
 already overlap in their authored rest pose, while other link pairs can make
 contact. Set `blueprint.selfCollision = false` for a model whose simple box
