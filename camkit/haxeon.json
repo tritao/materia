@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "package": { "name": "camkit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "cnckit": { "path": "../cnckit" },
+    "cadkit": { "path": "../cadkit" },
+    "manufacturingkit": { "path": "../manufacturingkit" }
+  },
+  "target": "host"
+}
