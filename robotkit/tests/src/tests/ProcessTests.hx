@@ -14,8 +14,12 @@ import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
 import robotkit.tool.Tool;
 import robotkit.tool.ToolRuntime;
+import robotkit.tool.ToolRuntimeSelection;
+import robotkit.tool.SimulatedToolSensorAdapter;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
+import robotkit.world.RobotSnapshot;
+import robotkit.world.SensorFrame;
 
 /** Toolpath authoring and B1 process-path conversion acceptance. */
 class ProcessTests {
@@ -26,6 +30,7 @@ class ProcessTests {
     testToolpathConversion();
     testScheduledToolEvents();
     testMultiCapabilityTool();
+    testSelectedToolSensorFrames();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
     return assertions;
   }
@@ -139,6 +144,54 @@ class ProcessTests {
     check(rejected && vacuum.observations.length == 4,
       "Invalid vacuum measurements do not change observed state");
   }
+
+  static function testSelectedToolSensorFrames():Void {
+    var first = new ToolRuntime(new Tool("first", "first", Transform3.identity()),
+      new SimulatedGripper(), new SimulatedVacuum());
+    first.bindGripper("first.close");
+    first.bindVacuum("first.vacuum");
+    var second = new ToolRuntime(new Tool("second", "second", Transform3.identity()),
+      new SimulatedGripper());
+    second.bindGripper("second.close");
+    var selection = new ToolRuntimeSelection();
+    var sensors = new SimulatedToolSensorAdapter(selection);
+    sensors.bindGripperContact(first, "first/contact");
+    sensors.bindVacuumPressure(first, "first/pressure");
+    sensors.bindGripperContact(second, "second/contact");
+    selection.select(first, Int64.ofInt(100));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "first.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(101), Int64.ofInt(101), 1));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "first.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(102), Int64.ofInt(102), 1));
+    var missed = new RobotSnapshot("robot", Int64.ofInt(1), Int64.ofInt(110),
+      [], [], [], 0, 0, null, [toolSensor("first/contact", "tool_contact", 1, 110, 0),
+        toolSensor("first/pressure", "tool_vacuum_kpa", 1, 110, 20)]);
+    check(sensors.applySnapshot(missed) == 2 && !first.gripper.isGrasped() &&
+      !first.vacuum.isHolding(), "missed pickup sensor frames leave both capabilities unheld");
+    var pickup = new RobotSnapshot("robot", Int64.ofInt(2), Int64.ofInt(120),
+      [], [], [], 0, 0, null, [toolSensor("first/contact", "tool_contact", 2, 120, 1),
+        toolSensor("first/pressure", "tool_vacuum_kpa", 2, 120, 45)]);
+    check(sensors.applySnapshot(pickup) == 2 && first.gripper.isGrasped() &&
+      first.vacuum.isHolding(), "fresh sensor frames confirm both pickups");
+    check(sensors.applySnapshot(pickup) == 0, "repeated snapshot sequences do not replay feedback");
+
+    selection.select(second, Int64.ofInt(150));
+    check(!first.gripper.isGrasped() && !first.vacuum.isHolding(),
+      "tool change releases the previous configuration");
+    selection.apply(new FiredProcessEvent(Int64.ofInt(2), "second.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(151), Int64.ofInt(151), 1));
+    check(!sensors.apply(toolSensor("first/contact", "tool_contact", 3, 160, 1)) &&
+      !sensors.apply(toolSensor("second/contact", "tool_contact", 1, 140, 1)),
+      "inactive and pre-selection observations are ignored");
+    check(sensors.apply(toolSensor("second/contact", "tool_contact", 2, 170, 1)) &&
+      second.gripper.isGrasped(), "active tool accepts fresh contact feedback");
+    check(sensors.apply(toolSensor("second/contact", "tool_contact", 3, 180, 0)) &&
+      !second.gripper.isGrasped(), "lost contact clears the active grasp");
+  }
+
+  static function toolSensor(id:String, kind:String, sequence:Int, timestamp:Int, value:Float):SensorFrame
+    return new SensorFrame(id, kind, "tool", Int64.ofInt(sequence), Int64.ofInt(timestamp),
+      [value], Int64.ofInt(timestamp), "", null, null, "robotkit.monotonic");
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool
     return Math.abs(a - b) <= tolerance;
