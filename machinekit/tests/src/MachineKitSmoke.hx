@@ -18,6 +18,9 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValue;
 import machinekit.component.MachineComponent;
 import machinekit.component.MassProperties.MassSource;
+import machinekit.component.PortKind;
+import machinekit.component.PortRole;
+import machinekit.component.PortInterface;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
@@ -99,6 +102,18 @@ private class MasslessTestPart extends MachineComponent {
 	public function new() super("TEST-MASSLESS", "Massless test part", "steel", true);
 }
 
+private class PortTestComponent extends MachineComponent {
+	public function new(name:String) super(name, name, "steel", true);
+
+	public function definePort(name:String, kind:PortKind, role:PortRole, iface:PortInterface,
+			required:Bool = false, ?connector:String):Void
+		addPort({name: name, kind: kind, role: role, iface: iface, required: required, connector: connector});
+
+	public function defineBridge(from:String, to:String):Void addBridge(from, to);
+
+	public function defineConnector(name:String):Void addConnector(name, Mount, AssemblyFrames.identity());
+}
+
 class MachineKitSmoke {
 	static function massProperties():Void {
 		var tube = new MassTestTube();
@@ -149,6 +164,100 @@ class MachineKitSmoke {
 		state.setJoint("slide", 30);
 		near(moving.massProperties(state).centreOfMass.x, 15, "configured moving centre of mass");
 	}
+
+	static function ports():Void {
+		var changer = new PortTestComponent("CHANGER");
+		changer.defineConnector("airFace");
+		changer.definePort("robotAir", Pneumatic, Supply, PushIn(6), false, "airFace");
+		changer.definePort("toolAir", Pneumatic, Passive, PushIn(6));
+		changer.defineBridge("robotAir", "toolAir");
+		check(changer.ports().length == 2 && changer.bridges().length == 1,
+			"component ports and bridge are available");
+		throws(() -> changer.definePort("robotAir", Pneumatic, Supply, Unspecified), "Duplicate port");
+		throws(() -> changer.definePort("badTube", Pneumatic, Supply, PushIn(0)), "Invalid port interface");
+		throws(() -> changer.definePort("bad", Pneumatic, Supply, Unspecified, false, "missing"), "Missing connector");
+		throws(() -> changer.defineBridge("robotAir", "missing"), "Missing port");
+		var wrongBridge = new PortTestComponent("BRIDGE");
+		wrongBridge.definePort("air", Pneumatic, Consumer, Unspecified);
+		wrongBridge.definePort("vacuum", Vacuum, Supply, Unspecified);
+		throws(() -> wrongBridge.defineBridge("air", "vacuum"), "same kind");
+
+		var manifold = new PortTestComponent("MANIFOLD");
+		manifold.definePort("in", Pneumatic, Passive, PushIn(6));
+		manifold.definePort("out", Pneumatic, Passive, PushIn(6));
+		manifold.defineBridge("in", "out");
+		var generator = new PortTestComponent("GENERATOR");
+		generator.definePort("air", Pneumatic, Consumer, PushIn(6), true);
+		generator.definePort("vacuum", Vacuum, Supply, PushIn(6));
+		var cup = new PortTestComponent("CUP");
+		cup.definePort("vacuum", Vacuum, Consumer, PushIn(6), true);
+
+		var tool = new MachineAssembly();
+		tool.addComponent("changer", changer);
+		tool.addComponent("manifold", manifold);
+		tool.addComponent("generator", generator);
+		tool.addComponent("cup", cup);
+		throws(() -> tool.connectPorts("missing", "none", "air", "cup", "vacuum"), "Unknown assembly member");
+		throws(() -> tool.connectPorts("missing", "changer", "none", "cup", "vacuum"), "Unknown port");
+		throws(() -> tool.exposePort("bad", "cup", "none"), "Unknown port");
+		tool.connectPorts("supply", "changer", "toolAir", "manifold", "in",
+			{partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"});
+		tool.connectPorts("air", "manifold", "out", "generator", "air");
+		tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
+		tool.exposePort("robotAir", "changer", "robotAir");
+		check(tool.validate().length == 0, "compatible service path validates");
+		check(tool.billOfMaterials().quantity("TUBE-6") == 1, "connection line reaches BOM");
+		var source = tool.upstream("cup", "vacuum");
+		check(source.instanceId == "changer" && source.portName == "robotAir",
+			"cup vacuum traces through generator, manifold, and changer bridge");
+		var model = new AssemblyModel();
+		tool.addTo(model, "tool");
+		check(model.definition().joints.length == 0, "port connections are not CAD mates");
+		var station = new MachineAssembly();
+		station.include("tool", tool);
+		check(station.port("tool/robotAir").instanceId == "tool/changer", "included air port is prefixed");
+		var includedSource = station.upstream("tool/cup", "vacuum");
+		check(includedSource.instanceId == "tool/changer" && includedSource.portName == "robotAir",
+			"included service path retains its source");
+		check(station.billOfMaterials().quantity("TUBE-6") == 1, "included line is counted once");
+
+		var unconnected = new MachineAssembly();
+		unconnected.addComponent("cup", cup);
+		throws(() -> unconnected.validate(), "Required consumer port");
+		unconnected.exposePort("vacuum", "cup", "vacuum");
+		check(unconnected.validate().length == 0, "exposed consumer can be supplied by parent assembly");
+
+		var badKind = new MachineAssembly();
+		badKind.addComponent("changer", changer);
+		badKind.addComponent("cup", cup);
+		badKind.connectPorts("wrong", "changer", "toolAir", "cup", "vacuum");
+		throws(() -> badKind.validate(), "mismatched kinds");
+		var supplier = new PortTestComponent("SUPPLIER");
+		supplier.definePort("air", Pneumatic, Supply, PushIn(6));
+		var doubleSupply = new MachineAssembly();
+		doubleSupply.addComponent("a", supplier);
+		doubleSupply.addComponent("b", supplier);
+		doubleSupply.connectPorts("wrong", "a", "air", "b", "air");
+		throws(() -> doubleSupply.validate(), "incompatible roles");
+		var consumer = new PortTestComponent("CONSUMER");
+		consumer.definePort("air", Pneumatic, Consumer, PushIn(6));
+		var doubleConsumer = new MachineAssembly();
+		doubleConsumer.addComponent("a", consumer);
+		doubleConsumer.addComponent("b", consumer);
+		doubleConsumer.connectPorts("wrong", "a", "air", "b", "air");
+		throws(() -> doubleConsumer.validate(), "incompatible roles");
+		var threaded = new PortTestComponent("THREADED");
+		threaded.definePort("air", Pneumatic, Consumer, Thread("G1/8"));
+		var warning = new MachineAssembly();
+		warning.addComponent("a", supplier);
+		warning.addComponent("b", threaded);
+		warning.connectPorts("adapter-needed", "a", "air", "b", "air");
+		check(warning.validate().length == 1, "interface mismatch is a warning");
+		warning.addComponent("c", threaded);
+		warning.connectPorts("branch", "a", "air", "c", "air");
+		throws(() -> warning.validate(), "more than once");
+	}
+
 	static function componentRecipes():Void {
 		for (recipe in MachineKitComponents.all()) {
 			var original = recipe.create();
@@ -2148,6 +2257,7 @@ class MachineKitSmoke {
 		catalogExtras();
 		robotics();
 		assembly();
+		ports();
 		trace("MachineKit smoke passed");
 	}
 }

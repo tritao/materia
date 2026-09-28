@@ -24,6 +24,8 @@ class MachineComponent {
 	/** Null for code-only parts and assemblies outside the v1 recipe registry. */
 	public var type(get, never):Null<ComponentType>;
 	final connectorList:Array<Connector> = [];
+	final portList:Array<ComponentPort> = [];
+	final bridgeList:Array<PortBridge> = [];
 
 	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false) {
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
@@ -113,6 +115,15 @@ class MachineComponent {
 		throw 'Missing connector "$designation/$name"';
 	}
 
+	public function ports():Array<ComponentPort> return portList.copy();
+
+	public function port(name:String):ComponentPort {
+		for (entry in portList) if (entry.name == name) return entry;
+		throw 'Missing port "$designation/$name"';
+	}
+
+	public function bridges():Array<PortBridge> return bridgeList.copy();
+
 	/** Adds an instance with every connector frame so it can be mated by name. */
 	public function addTo(model:AssemblyModel, id:String, ?pose:AssemblyFrame):Void {
 		model.add(id, pose);
@@ -123,5 +134,29 @@ class MachineComponent {
 		for (existing in connectorList) if (existing.name == name)
 			throw 'Duplicate connector "$designation/$name"';
 		connectorList.push({name: name, role: role, frame: frame});
+	}
+
+	function addPort(entry:ComponentPort):Void {
+		if (entry == null || entry.name == null || entry.name.length == 0 || entry.kind == null ||
+			entry.role == null || entry.iface == null) throw 'Invalid port on "$designation"';
+		switch entry.iface {
+			case PushIn(tubeOd): if (!Math.isFinite(tubeOd) || tubeOd <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Thread(name): if (name == null || name.length == 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Plug(name, pins): if (name == null || name.length == 0 || pins <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Unspecified:
+		}
+		for (existing in portList) if (existing.name == entry.name)
+			throw 'Duplicate port "$designation/${entry.name}"';
+		if (entry.connector != null) connector(entry.connector);
+		portList.push(entry);
+	}
+
+	function addBridge(from:String, to:String):Void {
+		var input = port(from), output = port(to);
+		if (from == to || input.kind != output.kind)
+			throw 'Port bridge "$designation/$from->$to" needs distinct ports of the same kind';
+		for (existing in bridgeList) if (existing.from == from && existing.to == to)
+			throw 'Duplicate port bridge "$designation/$from->$to"';
+		bridgeList.push({from: from, to: to});
 	}
 }
