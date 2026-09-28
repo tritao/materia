@@ -30,14 +30,24 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.MachineAssemblyMassBridge;
 import cadbridge.EndEffectorBridge;
+import cadbridge.EndEffectorRuntimeBridge;
+import cadbridge.EndEffectorControlBinding;
 import eoat.EndEffectorExample;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Solids;
+import machinekit.component.PortKind;
+import machinekit.component.PortRole;
+import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorSet;
 import robotkit.tool.ToolCollisionShape;
+import robotkit.tool.ToolRuntimeSelection;
+import robotkit.world.FiredProcessEvent;
+import robotkit.world.ProcessEventValue;
+import haxe.Int64;
 import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
 import cadkit.modeling.AssemblyModel;
@@ -51,6 +61,7 @@ class CadBridgeTests {
   public static function main():Void {
     testMachineAssemblyMassBridge();
     testEndEffectorBridge();
+    testEndEffectorRuntimeBridge();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
@@ -168,6 +179,71 @@ class CadBridgeTests {
       approx(tcp.translation.y, expected.y, 1e-9) &&
       approx(tcp.translation.z, expected.z, 1e-9),
       "Manipulator.tcpPose places the cup contact at the mounted tool offset");
+  }
+
+  static function testEndEffectorRuntimeBridge():Void {
+    var set = new EndEffectorSet();
+    set.addComponent("base", new BridgeEndEffectorPart());
+    set.mount("base", "mount");
+    set.changer("coupling", "base", "contact", []);
+    for (kind in ["cup", "gripper", "combo"]) {
+      var endEffector = new EndEffector();
+      endEffector.addComponent("body", new BridgeRuntimePart(kind != "cup", kind != "gripper"));
+      endEffector.mount("body", "mount");
+      endEffector.workingFrame("contact", "body", "contact", true);
+      if (kind != "cup") {
+        endEffector.connectPorts("open-feed", "body", "openSupply", "body", "open");
+        endEffector.connectPorts("close-feed", "body", "closeSupply", "body", "close");
+      }
+      if (kind != "gripper")
+        endEffector.connectPorts("vacuum-feed", "body", "vacuumSupply", "body", "vacuum");
+      set.addTool(kind, endEffector);
+    }
+
+    var cup = EndEffectorRuntimeBridge.toRuntime(set, "cup", "contact", [
+      EndEffectorControlBinding.Vacuum("cup.vacuum", "tool/body", "vacuum")]);
+    var gripper = EndEffectorRuntimeBridge.toRuntime(set, "gripper", "contact", [
+      EndEffectorControlBinding.Gripper("gripper.close", "tool/body", "open", "close")]);
+    check(cup.tool.id == "cup/contact" && gripper.tool.id == "gripper/contact" &&
+      cup.tool.id != gripper.tool.id, "configuration creates a distinct mounted tool ID");
+    check(cup.tool.mass < gripper.tool.mass &&
+      cup.tool.flangeTTcp.translation.z < gripper.tool.flangeTTcp.translation.z,
+      "configuration selects its own mass and TCP");
+    check(cup.vacuum != null && cup.gripper == null &&
+      gripper.gripper != null && gripper.vacuum == null,
+      "configuration selects only its bound runtime capabilities");
+    check(cup.channelDeclarations().length == 1 &&
+      cup.channelDeclarations()[0].id == "cup.vacuum" &&
+      gripper.channelDeclarations().length == 1 &&
+      gripper.channelDeclarations()[0].id == "gripper.close",
+      "configuration selects its own process channel bindings");
+    var selected = new ToolRuntimeSelection();
+    selected.select(cup, Int64.ofInt(0));
+    selected.apply(new FiredProcessEvent(Int64.ofInt(1), "cup.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(100), Int64.ofInt(110), 1));
+    check(cup.vacuum.isHolding(), "active vacuum configuration receives its channel");
+    selected.select(gripper, Int64.ofInt(150));
+    check(!cup.vacuum.isHolding() && selected.active() == gripper,
+      "switching releases the old tool and selects the new runtime");
+    selected.apply(new FiredProcessEvent(Int64.ofInt(2), "gripper.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(200), Int64.ofInt(210), 1));
+    check(gripper.gripper.isGrasped(), "selected gripper channel actuates the new configuration");
+    var rejected = false;
+    try selected.apply(new FiredProcessEvent(Int64.ofInt(2), "cup.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(300), Int64.ofInt(310), 1))
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "inactive configuration channels are not bound");
+    rejected = false;
+    try EndEffectorRuntimeBridge.toRuntime(set, "cup", "contact", [
+      EndEffectorControlBinding.Gripper("wrong", "tool/body", "open", "close")])
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "binding a capability to missing actuator ports is rejected");
+    var combo = EndEffectorRuntimeBridge.toRuntime(set, "combo", "contact", [
+      EndEffectorControlBinding.Gripper("combo.close", "tool/body", "open", "close"),
+      EndEffectorControlBinding.Vacuum("combo.vacuum", "tool/body", "vacuum")]);
+    check(combo.gripper != null && combo.vacuum != null &&
+      combo.channelDeclarations().length == 2,
+      "one coupled end effector can bind gripper and vacuum together");
   }
 
   static function testAssemblySimulationBridge():Void {
@@ -432,4 +508,37 @@ private class BridgeEndEffectorPart extends MachineComponent {
 
   override public function geometry(detail:ComponentDetail = Preview):Part
     return Part.box(20, 10, 30);
+}
+
+private class BridgeRuntimePart extends MachineComponent {
+  final length:Float;
+
+  public function new(gripper:Bool, vacuum:Bool) {
+    super(gripper && vacuum ? "BRIDGE-COMBO" : gripper ? "BRIDGE-GRIPPER" : "BRIDGE-CUP",
+      "runtime bridge fixture", "steel", true);
+    length = gripper ? 60 : 25;
+    addConnector("mount", Mount, Solids.axial(10, 0, 0));
+    addConnector("contact", Face, Solids.axial(10, 0, length));
+    if (gripper) {
+      addPort({name: "openSupply", kind: PortKind.Pneumatic, role: PortRole.Supply,
+        iface: PortInterface.Unspecified, required: false});
+      addPort({name: "closeSupply", kind: PortKind.Pneumatic, role: PortRole.Supply,
+        iface: PortInterface.Unspecified, required: false});
+      addPort({name: "open", kind: PortKind.Pneumatic, role: PortRole.Consumer,
+        iface: PortInterface.Unspecified, required: true});
+      addPort({name: "close", kind: PortKind.Pneumatic, role: PortRole.Consumer,
+        iface: PortInterface.Unspecified, required: true});
+    }
+    if (vacuum) {
+      addPort({name: "vacuumSupply", kind: PortKind.Vacuum, role: PortRole.Supply,
+        iface: PortInterface.Unspecified, required: false});
+      addPort({name: "vacuum", kind: PortKind.Vacuum, role: PortRole.Consumer,
+        iface: PortInterface.Unspecified, required: true});
+    }
+    declareMass(gripper && vacuum ? 4 : gripper ? 3 : 1, new Vector(0, 0, length / 2),
+      new InertiaTensor(2000000, 0, 0, 3000000, 0, 4000000));
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(20, 10, length);
 }
