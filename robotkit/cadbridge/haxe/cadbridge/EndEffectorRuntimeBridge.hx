@@ -6,6 +6,10 @@ import machinekit.component.PortRole;
 import machinekit.component.RuntimePortIntent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.EndEffectorFrames;
+import materia.assembly.AssemblyFrames;
+import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.runtime.RobotRuntimeSensorBlueprint;
 import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
 import robotkit.tool.SimulatedChangerLock;
@@ -123,6 +127,52 @@ class EndEffectorRuntimeBridge {
     var bindings = deriveBindings(set, configurationId);
     return {runtime: toRuntime(set, configurationId, frameName, bindings.controls, state),
       bindings: bindings};
+  }
+
+  /** Add the design's pressure sensor to a robot blueprint before simulation
+   * creation. Its mount is expressed relative to the flange link. */
+  public static function addVacuumSensorToBlueprint(set:EndEffectorSet,
+      configurationId:String, blueprint:RobotRuntimeBlueprint,
+      flangeLinkIndex:Int, ?flangeLinkId:String,
+      ?state:AssemblyState):RobotRuntimeSensorBlueprint {
+    if (blueprint == null || flangeLinkIndex < 0 || flangeLinkIndex >= blueprint.linkCount)
+      throw "Vacuum sensor needs a valid robot flange link";
+    var bindings = deriveBindings(set, configurationId);
+    var sensorId = bindings.vacuumSensorId;
+    if (sensorId == null) throw "End effector has no vacuum pressure sensor";
+    if (blueprint.sensorById(sensorId) != null)
+      throw 'Robot blueprint already has sensor "$sensorId"';
+    var configuration = set.configuration(configurationId);
+    var solved = configuration.solve(state);
+    for (member in configuration.components())
+      for (intent in member.component.runtimePortIntents()) switch intent {
+        case VacuumPressureSensor(_, signalPort):
+          var port = member.component.port(signalPort);
+          var connector = port.connector == null ? "mount" : port.connector;
+          var pose = solved.poses.get(member.id);
+          if (pose == null) throw 'Missing pressure sensor pose for "${member.id}"';
+          var mountWorld = AssemblyFrames.compose(pose,
+            configuration.memberConnectorFrame(member.id, connector));
+          var mountRelative = AssemblyFrames.compose(
+            AssemblyFrames.inverse(solved.mountWorld), mountWorld);
+          var frame = EndEffectorFrames.toRobotFrame(mountRelative);
+          var mappedLinkId = blueprint.identity == null ? null :
+            blueprint.identity.linkId(flangeLinkIndex);
+          if (flangeLinkId != null && mappedLinkId != null && flangeLinkId != mappedLinkId)
+            throw "Pressure sensor flange link ID does not match the robot blueprint";
+          var linkId = flangeLinkId != null ? flangeLinkId : mappedLinkId != null ?
+            mappedLinkId : flangeLinkIndex == 0 ? "base_link" : null;
+          if (linkId == null) throw "Robot blueprint has no flange link identity";
+          var sensor = new RobotRuntimeSensorBlueprint(sensorId, "tool_vacuum_kpa",
+            sensorId, linkId, flangeLinkIndex,
+            [frame.position.x, frame.position.y, frame.position.z],
+            [frame.quaternion.x, frame.quaternion.y, frame.quaternion.z,
+              frame.quaternion.w]);
+          blueprint.sensors.push(sensor);
+          return sensor;
+        case _:
+      }
+    throw "End effector pressure sensor intent did not resolve";
   }
 
   /** Register declared pressure feedback on a selected runtime. */

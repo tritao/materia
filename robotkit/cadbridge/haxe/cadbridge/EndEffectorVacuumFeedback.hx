@@ -6,15 +6,16 @@ import haxe.Int64;
 import machinekit.pneumatic.SuctionCup;
 import machinekit.robotics.EndEffectorSet;
 import robotkit.runtime.RobotRuntime;
+import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationStepObserver;
 import robotkit.tool.SimulatedVacuum;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolRuntimeSelection;
-import robotkit.world.SensorFrame;
 
 /** Deterministic pressure feedback from simulation contact on one cup piece.
  * Geometric touch is a seal proxy; this model has no leakage or evacuation time.
  */
-class EndEffectorVacuumFeedback {
+class EndEffectorVacuumFeedback implements SimulationStepObserver {
   final selection:ToolRuntimeSelection;
   final bundle:EndEffectorRuntimeBundle;
   final robot:RobotRuntime;
@@ -23,6 +24,8 @@ class EndEffectorVacuumFeedback {
   final adapter:robotkit.tool.SimulatedToolSensorAdapter;
   var sequence:Int64 = Int64.ofInt(0);
   var lastTimestampNs:Null<Int64>;
+  var attached:Null<Simulation>;
+  var observerId:Null<Int>;
 
   public function new(set:EndEffectorSet, configurationId:String,
       selection:ToolRuntimeSelection, bundle:EndEffectorRuntimeBundle,
@@ -34,6 +37,8 @@ class EndEffectorVacuumFeedback {
       throw "Simulated sealed vacuum must be within ambient pressure";
     if (bundle.runtime.tool.id.indexOf(configurationId + "/") != 0)
       throw "Vacuum feedback configuration does not match the mounted tool";
+    if (!robot.hasExternalSensor(bundle.bindings.vacuumSensorId, "tool_vacuum_kpa"))
+      throw "Robot blueprint needs the authored EOAT pressure sensor";
     var configuration = set.configuration(configurationId);
     var collision = EndEffectorCollision.pieces(configuration, state);
     var cups:Array<String> = [];
@@ -63,25 +68,49 @@ class EndEffectorVacuumFeedback {
     adapter = EndEffectorRuntimeBridge.bindSensors(selection, bundle);
   }
 
-  /** Sample after a simulation step using the same monotonic time as tool selection. */
+  /** Register for every explicit simulation step. */
+  public function attach(simulation:Simulation):Void {
+    if (simulation == null || attached != null)
+      throw "Vacuum feedback needs one simulation attachment";
+    if (!simulation.ownsRobot(robot))
+      throw "Vacuum feedback robot does not belong to this simulation";
+    observerId = simulation.addStepObserver(this);
+    attached = simulation;
+  }
+
+  public function detach():Void {
+    if (attached == null) return;
+    if (observerId != null) attached.removeStepObserver(observerId);
+    attached = null;
+    observerId = null;
+  }
+
+  public function afterSimulationStep(sourceTimestampNs:Int64):Void {
+    sample(sourceTimestampNs);
+  }
+
+  /** Publish one authored sensor frame and update the selected tool. */
   public function sample(timestampNs:Int64):Bool {
     if (timestampNs == null || Int64.compare(timestampNs, Int64.ofInt(0)) < 0 ||
         (lastTimestampNs != null && Int64.compare(timestampNs, lastTimestampNs) <= 0))
       throw "Vacuum feedback needs increasing non-negative simulation timestamps";
-    lastTimestampNs = timestampNs;
-    if (selection.active() != bundle.runtime) return false;
+    if (selection.active() == bundle.runtime &&
+        selection.selectedClockId() != "robotkit.simulation")
+      throw "Vacuum feedback selection needs the robotkit.simulation source clock";
     var vacuum:SimulatedVacuum = cast bundle.runtime.vacuum;
     var sealed = false;
-    if (vacuum.isEnabled()) for (contact in robot.contacts())
-      if (contact.toolPieceIndex == cupPieceIndex && contact.distance <= 0.0) {
-        sealed = true;
-        break;
-      }
-    sequence = Int64.add(sequence, Int64.ofInt(1));
-    var frame = new SensorFrame(bundle.bindings.vacuumSensorId, "tool_vacuum_kpa",
-      bundle.runtime.tool.id, sequence, timestampNs,
-      [sealed ? sealedVacuumKpa : 0.0], timestampNs, "", null, null,
-      "robotkit.monotonic");
+    if (selection.active() == bundle.runtime && vacuum.isEnabled())
+      for (contact in robot.contacts())
+        if (contact.toolPieceIndex == cupPieceIndex && contact.distance <= 0.0) {
+          sealed = true;
+          break;
+        }
+    var nextSequence = Int64.add(sequence, Int64.ofInt(1));
+    var frame = robot.publishSensorFrameAndGet(bundle.bindings.vacuumSensorId,
+      [sealed ? sealedVacuumKpa : 0.0], nextSequence, timestampNs,
+      "robotkit.simulation");
+    sequence = nextSequence;
+    lastTimestampNs = timestampNs;
     return adapter.apply(frame);
   }
 }

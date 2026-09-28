@@ -55,6 +55,12 @@ class RobotRuntime {
   public function toolProximity():Array<RobotContact>
     return contacts().filter(contact -> contact.toolPieceIndex >= 0 && !contact.active);
 
+  public function hasExternalSensor(id:String, kind:String):Bool {
+    for (sensor in externalSensorLayout)
+      if (sensor.id == id && sensor.kind == kind) return true;
+    return false;
+  }
+
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
   public static function create(blueprint:RobotRuntimeBlueprint):RobotRuntime {
     var result = RobotKitRuntime.rk_robot_runtime_create(blueprint.nativeValue());
@@ -392,6 +398,13 @@ class RobotRuntime {
    */
   public function publishSensorFrame(sensorId:String, values:Array<Float>, sequence:Int64,
       sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):Void {
+    publishSensorFrameAndGet(sensorId, values, sequence, sourceTimestampNs,
+      sourceClockId, image);
+  }
+
+  /** Publish and return the exact frame retained by the runtime snapshot. */
+  public function publishSensorFrameAndGet(sensorId:String, values:Array<Float>, sequence:Int64,
+      sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):SensorFrame {
     ensureLive();
     if (sensorId == null || sensorId.length == 0 || values == null || sequence == null ||
         Int64.compare(sequence, Int64.ofInt(0)) <= 0 || sourceTimestampNs == null ||
@@ -433,12 +446,14 @@ class RobotRuntime {
     }
     externalFrames.set(sensorId, frame);
     externalMutex.release();
+    return frame;
   }
 
   /** Publishes one camera image; see `publishSensorFrame`. */
   public function publishCameraFrame(sensorId:String, image:CameraImage, sequence:Int64,
-      sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified"):Void
+      sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified"):Void {
     publishSensorFrame(sensorId, [], sequence, sourceTimestampNs, sourceClockId, image);
+  }
 
   public function dispose():Void {
     if (disposed)

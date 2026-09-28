@@ -9,6 +9,8 @@ import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.spatial.Vec3;
 
+private typedef StepObserverEntry = {id:Int, observer:SimulationStepObserver};
+
 /**
  * The robots taking part in one SimKit session.
  *
@@ -25,9 +27,13 @@ import robotkit.spatial.Vec3;
 class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
+  final stepObservers:Array<StepObserverEntry> = [];
+  var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
   /** The session this simulation joined, or null when it owns its own. */
   final session:Null<SimSession>;
+  final fixedTimestepNs:Int64;
+  var sourceTimeNs:Int64 = Int64.ofInt(0);
   var disposed:Bool = false;
 
   /**
@@ -39,6 +45,7 @@ class Simulation {
     this.session = session;
     if (session != null) {
       fixedTimestepSeconds = session.fixedTimestep();
+      fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestepSeconds * 1e9)));
       var attached = RobotKitSimKit.rk_simulation_create_in_session(session.nativeHandle());
       check(attached.status, "simulation.createInSession");
       owner = attached.out_simulation;
@@ -47,6 +54,7 @@ class Simulation {
     if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
       throw "Simulation requires a positive finite timestep and positive substep count";
     fixedTimestepSeconds = fixedTimestep;
+    fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestep * 1e9)));
     var desc = new rk_simulation_desc();
     desc.set_struct_size(rk_simulation_desc.size());
     desc.set_fixed_timestep(fixedTimestep);
@@ -274,6 +282,11 @@ class Simulation {
   }
 
   /** Contacts for a runtime attached to this simulation. */
+  public function ownsRobot(runtime:RobotRuntime):Bool {
+    ensureLive();
+    return runtime != null && robots.indexOf(runtime) >= 0;
+  }
+
   public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
     ensureLive();
     if (runtime == null || runtime.simulation != this)
@@ -299,10 +312,36 @@ class Simulation {
     return contacts;
   }
 
-  /** Advances once. timestampNs is a legacy hint, not source or receive time. */
+  /** Logical source time for explicitly stepped sensors. It stays monotonic
+   * across physics resets so published frames remain ordered. */
+  public function sourceTimestampNs():Int64 return sourceTimeNs;
+
+  public function addStepObserver(observer:SimulationStepObserver):Int {
+    ensureLive();
+    if (observer == null) throw "Simulation step observer is required";
+    var id = nextStepObserverId++;
+    stepObservers.push({id: id, observer: observer});
+    return id;
+  }
+
+  public function removeStepObserver(id:Int):Void {
+    for (index in 0...stepObservers.length) if (stepObservers[index].id == id) {
+      stepObservers.splice(index, 1);
+      return;
+    }
+  }
+
+  /** Advances once. timestampNs remains a legacy native hint; sensor observers
+   * receive a separate monotonically increasing simulation source time. */
   public function step(timestampNs:Int64):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");
+    sourceTimeNs = Int64.add(sourceTimeNs, fixedTimestepNs);
+    for (entry in stepObservers.copy()) {
+      var registered = false;
+      for (current in stepObservers) if (current.id == entry.id) registered = true;
+      if (registered) entry.observer.afterSimulationStep(sourceTimeNs);
+    }
   }
 
   /** Injects a virtual RKD6 link loss or reconnects the link. */
@@ -603,6 +642,7 @@ class Simulation {
   public function dispose():Void {
     if (disposed) return;
     stop();
+    stepObservers.resize(0);
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
     owner.close();

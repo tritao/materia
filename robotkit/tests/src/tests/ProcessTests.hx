@@ -31,6 +31,7 @@ class ProcessTests {
     testScheduledToolEvents();
     testMultiCapabilityTool();
     testSelectedToolSensorFrames();
+    testSimulationSensorClock();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
     return assertions;
   }
@@ -187,6 +188,25 @@ class ProcessTests {
       second.gripper.isGrasped(), "active tool accepts fresh contact feedback");
     check(sensors.apply(toolSensor("second/contact", "tool_contact", 3, 180, 0)) &&
       !second.gripper.isGrasped(), "lost contact clears the active grasp");
+  }
+
+  static function testSimulationSensorClock():Void {
+    var tool = new ToolRuntime(new Tool("sim-cup", "sim-cup", Transform3.identity()),
+      null, new SimulatedVacuum());
+    var selection = new ToolRuntimeSelection();
+    var sensors = new SimulatedToolSensorAdapter(selection);
+    sensors.bindVacuumPressure(tool, "sim/pressure");
+    selection.select(tool, Int64.ofInt(10), "robotkit.simulation");
+    tool.vacuum.enable(Int64.ofInt(10));
+    var frame = new SensorFrame("sim/pressure", "tool_vacuum_kpa", "tool",
+      Int64.ofInt(1), Int64.ofInt(11), [45.0], Int64.ofInt(11),
+      "", null, null, "robotkit.simulation");
+    check(sensors.apply(frame) && tool.vacuum.isHolding(),
+      "simulation-clock pressure feedback confirms a pickup");
+    var wrongClock = false;
+    try sensors.apply(toolSensor("sim/pressure", "tool_vacuum_kpa", 2, 12, 0))
+    catch (error:Dynamic) wrongClock = Std.string(error).indexOf("different source clock") >= 0;
+    check(wrongClock, "pressure feedback rejects a clock different from tool selection");
   }
 
   static function toolSensor(id:String, kind:String, sequence:Int, timestamp:Int, value:Float):SensorFrame

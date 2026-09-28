@@ -38,9 +38,12 @@ For a single-cup tool with a pressure sensor, `EndEffectorVacuumFeedback` can
 sample MuJoCo contacts after each simulation step and feed pressure observations
 to the selected `ToolRuntime`. It treats geometric touch on the cup's own hull as
 a seal and requires the caller to choose the sealed pressure. This is a simple
-runtime feedback model, not a prediction of leakage or evacuation time. Call
-`feedback.sample(timestampNs)` after each `Simulation.step()` with timestamps
-from the same monotonic clock used for tool selection.
+runtime feedback model, not a prediction of leakage or evacuation time. Add the
+sensor with `EndEffectorRuntimeBridge.addVacuumSensorToBlueprint()` before
+`Simulation.addRobot*()`, then attach the feedback producer to the simulation.
+Each `Simulation.step()` publishes a pressure `SensorFrame` in the runtime
+snapshot. Select tools using `simulation.sourceTimestampNs()` and the
+`robotkit.simulation` clock so stale-frame checks use the same timebase.
 
 Run the example checks with:
 
