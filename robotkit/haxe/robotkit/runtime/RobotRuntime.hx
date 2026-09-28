@@ -374,7 +374,8 @@ class RobotRuntime {
    * The runtime stamps the authored frame, link, and mount plus the receive
    * time; later snapshots carry the latest frame for each such sensor.
    * A `gnss_pose` frame carries latitude and longitude in degrees and ENU yaw
-   * in radians; a `camera` frame carries an image and no values.
+   * in radians; a `camera` frame carries an image and no values. Tool contact
+   * carries one digital value; tool vacuum carries one non-negative kPa value.
    */
   public function publishSensorFrame(sensorId:String, values:Array<Float>, sequence:Int64,
       sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):Void {
@@ -399,6 +400,12 @@ class RobotRuntime {
       case "gnss_pose":
         if (image != null || values.length != 3)
           throw 'GNSS "$sensorId" publication requires latitude, longitude, and yaw';
+      case "tool_contact":
+        if (image != null || values.length != 1 || (values[0] != 0.0 && values[0] != 1.0))
+          throw 'Contact "$sensorId" publication requires one digital value';
+      case "tool_vacuum_kpa":
+        if (image != null || values.length != 1 || values[0] < 0.0)
+          throw 'Vacuum "$sensorId" publication requires one non-negative kPa value';
       case _:
     }
     var frame = new SensorFrame(mounted.id, mounted.kind, mounted.frameId, sequence,
