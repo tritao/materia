@@ -5,6 +5,8 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.ToolChangerMaster;
+import machinekit.robotics.ToolChangerTool;
 import materia.assembly.AssemblyFrames;
 
 private class TestChangerMaster extends MachineComponent {
@@ -75,6 +77,14 @@ class EndEffectorSetTests {
 		return result;
 	}
 
+	static function genericTool(channels:Int, diameter:Float):EndEffector {
+		var result = new EndEffector();
+		result.addComponent("half", new ToolChangerTool(channels, diameter));
+		result.mount("half", "master");
+		result.exposePort("air", "half", "airIn1");
+		return result;
+	}
+
 	public static function run():Void {
 		var set = new EndEffectorSet();
 		set.addComponent("master", new TestChangerMaster());
@@ -108,5 +118,16 @@ class EndEffectorSetTests {
 		missingPort.mount("plate", "mount");
 		fails(() -> set.addTool("missing-port", missingPort), "does not expose mapped port");
 		fails(() -> set.configuration("missing"), "Unknown changer tool");
+
+		var generic = new EndEffectorSet();
+		generic.addComponent("master", new ToolChangerMaster(1, 60));
+		generic.mount("master", "robot");
+		generic.exposePort("coupledAir", "master", "airOut1");
+		generic.changer("coupling", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
+		generic.addTool("matching", genericTool(1, 60));
+		if (generic.toolIds().indexOf("matching") < 0) throw "Matching generic changer was rejected";
+		fails(() -> generic.addTool("wrong-diameter", genericTool(1, 55)), "does not fit");
+		fails(() -> generic.addTool("wrong-channels", genericTool(2, 60)), "does not fit");
+		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching ToolChangerTool");
 	}
 }

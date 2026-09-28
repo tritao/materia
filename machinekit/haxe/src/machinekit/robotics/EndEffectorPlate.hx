@@ -28,7 +28,8 @@ import machinekit.standard.SocketHeadCapScrew;
  * flange bolt and pin holes, and its neighbours.
  * CAD frame: robot-side face at z=0, tool-side face at z=thickness. Connectors: `robot` (the
  * flange mount, mate it to the flange's `face`), `tool` (the tool mount), and
- * `toolBolt1`..`toolBoltN`, all with +Y along +Z.
+ * `toolBolt1`..`toolBoltN`, all with +Y along +Z. The `robot` and `tool`
+ * connectors point +X toward the flange's locating pin.
  */
 class EndEffectorPlate extends MachineComponent {
 	static inline var MIN_WEB:Float = 1.0;
@@ -66,8 +67,8 @@ class EndEffectorPlate extends MachineComponent {
 		this.toolBoltCount = toolBoltCount;
 		this.toolMountScrew = toolMountScrew;
 		diameter = Math.max(flange.flangeDiameter, actualBoltCircle + toolScrew.spec.headDiameter + 2 * MIN_WEB);
-		addConnector("robot", Mount, Solids.axial(0, 0, 0));
-		addConnector("tool", Mount, Solids.axial(0, 0, this.thickness));
+		addConnector("robot", Mount, flange.pinAlignedFrame(0));
+		addConnector("tool", Mount, flange.pinAlignedFrame(this.thickness));
 		var i = 1;
 		for (point in toolBoltPattern()) addConnector('toolBolt${i++}', Mount, Solids.axial(point.x, point.y, this.thickness));
 	}

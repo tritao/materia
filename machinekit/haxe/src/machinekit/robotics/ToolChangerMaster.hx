@@ -15,6 +15,9 @@ class ToolChangerMaster extends MachineComponent {
 	public final diameter:Float;
 	public final thickness:Float;
 
+	/** Generic coupling dimensions shared with the matching tool-side half. */
+	public function interfaceKey():String return 'generic:$airChannels:${Dimension.format(diameter)}';
+
 	public function new(airChannels:Int, diameter:Float = 60, thickness:Float = 15) {
 		if (airChannels < 1 || !Math.isFinite(diameter) || diameter <= 0 ||
 			!Math.isFinite(thickness) || thickness <= 0)

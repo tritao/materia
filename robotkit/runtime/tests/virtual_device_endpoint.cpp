@@ -1,6 +1,8 @@
 #include "virtual_device_endpoint.hpp"
+#include "robotkit_runtime.hpp"
 #include "motionkit.h"
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <cstdio>
@@ -369,12 +371,130 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
     return events;
 }
 
+void runtime_hold_rest_resume_fires_final_event() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.revision = 1;
+    blueprint.joint_count = 1;
+    blueprint.link_count = 2;
+    blueprint.owner_period_ns = 10'000'000;
+    for (std::uint32_t i = 0; i < blueprint.link_count; ++i) {
+        auto &link = blueprint.links[i];
+        link.mass = 1.0;
+        link.inertia_tensor[0] = link.inertia_tensor[4] = link.inertia_tensor[8] = 1.0;
+    }
+    auto &joint = blueprint.joints[0];
+    joint.type = RK_RUNTIME_JOINT_PRISMATIC;
+    joint.parent_link = 0;
+    joint.child_link = 1;
+    joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
+    joint.axis[0] = 1.0;
+    joint.lower_limit = -1.0;
+    joint.upper_limit = 1.0;
+    joint.max_velocity = 1.0;
+    joint.max_acceleration = 2.0;
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+
+    VirtualDeviceConfig6 config;
+    config.fingerprint.fill(11);
+    config.steps_per_unit = {1'000};
+    config.clock_bound_ns = 5'000'000;
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    robotkit::RobotRuntime runtime(blueprint, endpoint,
+        std::chrono::milliseconds(10));
+    runtime.set_externally_driven(true);
+    std::uint64_t now = 0;
+    auto cycle = [&] {
+        now += 10'000'000;
+        assert(runtime.apply_pending_commands(now) == RK_OK);
+        assert(runtime.publish_sample(now) == RK_OK);
+        rk_robot_snapshot snapshot{};
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        return snapshot;
+    };
+    for (int i = 0; i < 15; ++i) cycle();
+
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 1;
+    plan.plan_id = 80;
+    plan.model_revision = blueprint.revision;
+    plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
+    plan.ends_at_rest = 1;
+    plan.segments.struct_size = sizeof(plan.segments);
+    plan.segments.segment_count = 1;
+    plan.segments.tag = 80;
+    auto &segment = plan.segments.segments[0];
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 1;
+    segment.joint_count = 1;
+    segment.coefficients[0].value[1] = 0.5;
+    plan.event_count = 2;
+    std::strcpy(plan.events[0].channel, "sprayer.flow");
+    plan.events[0].time_ns = 250'000'000;
+    plan.events[0].value.kind = RK_EVENT_DIGITAL;
+    plan.events[0].value.digital = 1;
+    plan.events[0].hold_policy = RK_EVENT_RESTORE_ON_RESUME;
+    plan.events[1] = plan.events[0];
+    plan.events[1].time_ns = segment.duration_ns;
+    plan.events[1].value.digital = 0;
+    assert(runtime.submit_plan(plan) == RK_OK);
+
+    rk_robot_snapshot snapshot{};
+    for (int i = 0; i < 40; ++i) snapshot = cycle();
+    assert(snapshot.trajectory_active != 0);
+    assert(runtime.submit({.struct_size = sizeof(rk_robot_command),
+        .sequence = 2, .kind = RK_COMMAND_HOLD}) == RK_OK);
+    bool held = false;
+    for (int i = 0; i < 100; ++i) {
+        snapshot = cycle();
+        if (snapshot.session_state == RK_SESSION_HELD) {
+            held = true;
+            break;
+        }
+    }
+    assert(held && snapshot.trajectory_active != 0);
+    const auto held_time = snapshot.trajectory_time_ns;
+    // The endpoint must stay held too. Without runtime lifecycle forwarding,
+    // its clock reaches the final event while the host still reports Held.
+    for (int i = 0; i < 100; ++i) snapshot = cycle();
+    assert(snapshot.session_state == RK_SESSION_HELD);
+    assert(snapshot.trajectory_time_ns == held_time);
+    assert(endpoint->event_log().size() == 1);
+    assert(endpoint->channel_values()[0] == 0.0f);
+    assert(runtime.submit({.struct_size = sizeof(rk_robot_command),
+        .sequence = 3, .kind = RK_COMMAND_RESUME}) == RK_OK);
+
+    bool completed = false;
+    for (int i = 0; i < 200; ++i) {
+        snapshot = cycle();
+        if (!snapshot.trajectory_active && snapshot.trajectory_queue_depth == 0) {
+            completed = true;
+            break;
+        }
+    }
+    assert(completed && snapshot.fault_code == 0 && snapshot.trajectory_tag == 80);
+    for (int i = 0; i < 20; ++i) cycle();
+    const auto events = endpoint->event_log();
+    assert(events.size() == 2);
+    assert(events[0].plan_id == 80 && events[0].digital == 1);
+    assert(events[1].plan_id == 80 && events[1].digital == 0);
+    assert(events[1].scheduled_path_ticks > events[0].scheduled_path_ticks);
+    assert(events[1].applied_path_ticks >= events[1].scheduled_path_ticks);
+    assert(endpoint->channel_values()[0] == 0.0f);
+}
+
 int main() {
     dual_drive_layout();
     lead_screw_carriage_coupling();
     minimal_midstream_replacement();
     const auto ordinary_events = run_event_pair(false, false);
     const auto held_events = run_event_pair(true, false);
+    runtime_hold_rest_resume_fires_final_event();
     run_event_pair(false, true);
     assert(held_events[1].device_ticks > ordinary_events[1].device_ticks);
     VirtualDeviceConfig6 config;
