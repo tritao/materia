@@ -94,22 +94,50 @@ class ProcessTests {
       ProcessEventValue.Digital(true), Int64.ofInt(100), Int64.ofInt(105), 1));
     adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
       ProcessEventValue.Digital(true), Int64.ofInt(200), Int64.ofInt(205), 1));
-    check(gripper.isGrasped() && vacuum.isHolding(), "Gripper and vacuum can hold at once");
+    check(!gripper.isGrasped() && !vacuum.isHolding(),
+      "Commands alone do not claim a successful pickup");
+    gripper.observeContact(false, Int64.ofInt(220));
+    vacuum.observeVacuumKpa(20, Int64.ofInt(230));
+    check(!gripper.isGrasped() && !vacuum.isHolding(),
+      "Missed contact and low vacuum report no pickup");
+    gripper.observeContact(true, Int64.ofInt(240));
+    vacuum.observeVacuumKpa(45, Int64.ofInt(250));
+    check(gripper.isGrasped() && vacuum.isHolding(),
+      "Contact and sufficient vacuum confirm independent pickups");
     adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.grip",
       ProcessEventValue.Digital(false), Int64.ofInt(300), Int64.ofInt(305), 1));
     check(gripper.isOpen() && vacuum.isHolding(), "Opening the gripper leaves vacuum active");
     adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
       ProcessEventValue.Digital(false), Int64.ofInt(400), Int64.ofInt(405), 1));
     check(!vacuum.isEnabled() && !vacuum.isHolding(), "Vacuum off releases its pickup");
-    check(gripper.history.length == 2 && vacuum.history.length == 2 &&
+    gripper.close(Int64.ofInt(450));
+    vacuum.enable(Int64.ofInt(460));
+    check(!gripper.isGrasped() && !vacuum.isHolding() && vacuum.vacuumKpa() == 0,
+      "New commands require fresh feedback after a release");
+    gripper.observeContact(true, Int64.ofInt(470));
+    vacuum.observeVacuumKpa(40, Int64.ofInt(480));
+    check(gripper.isGrasped() && vacuum.isHolding(),
+      "Feedback at the vacuum threshold confirms a new pickup");
+    gripper.observeContact(false, Int64.ofInt(490));
+    vacuum.observeVacuumKpa(39, Int64.ofInt(500));
+    check(!gripper.isGrasped() && !vacuum.isHolding(),
+      "Lost contact or pressure clears observed pickup");
+    check(gripper.history.length == 3 && vacuum.history.length == 3 &&
       Int64.compare(vacuum.history[0].timestampNs, Int64.ofInt(200)) == 0,
       "Each capability records its own scheduled commands");
+    check(gripper.observations.length == 4 && vacuum.observations.length == 4 &&
+      Int64.compare(vacuum.observations[1].timestampNs, Int64.ofInt(250)) == 0,
+      "Sensor observations are recorded separately from commands");
     var rejected = false;
     try adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
       ProcessEventValue.Analog(1.0), Int64.ofInt(500), Int64.ofInt(505), 1))
     catch (_:Dynamic) rejected = true;
-    check(rejected && vacuum.history.length == 2,
+    check(rejected && vacuum.history.length == 3,
       "Vacuum rejects non-digital events without changing state");
+    rejected = false;
+    try vacuum.observeVacuumKpa(Math.NaN, Int64.ofInt(510)) catch (_:Dynamic) rejected = true;
+    check(rejected && vacuum.observations.length == 4,
+      "Invalid vacuum measurements do not change observed state");
   }
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool

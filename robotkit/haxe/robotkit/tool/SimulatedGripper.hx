@@ -3,13 +3,12 @@ package robotkit.tool;
 import haxe.Int64;
 
 /**
- * In-memory `Gripper` that records every commanded state change with its
- * timestamp. There is no contact physics in this simulation, so `close`
- * grasps unconditionally; a caller that wants a missed grasp should not
- * call `close` (or should model failure above this interface).
+ * In-memory `Gripper` with separate commands and contact observations.
+ * Closing does not imply a grasp; a simulation sensor calls observeContact.
  */
 class SimulatedGripper implements Gripper {
   public final history:Array<GripperEvent> = [];
+  public final observations:Array<GripperObservation> = [];
 
   var openState = true;
   var graspedState = false;
@@ -24,8 +23,14 @@ class SimulatedGripper implements Gripper {
 
   public function close(timestampNs:Int64):Void {
     openState = false;
-    graspedState = true;
+    graspedState = false;
     record(timestampNs);
+  }
+
+  /** Report measured contact; only a closed gripper can hold an object. */
+  public function observeContact(detected:Bool, timestampNs:Int64):Void {
+    graspedState = !openState && detected;
+    observations.push(new GripperObservation(detected, graspedState, timestampNs));
   }
 
   public function isOpen():Bool return openState;
@@ -34,6 +39,19 @@ class SimulatedGripper implements Gripper {
 
   function record(timestampNs:Int64):Void
     history.push(new GripperEvent(openState, graspedState, timestampNs));
+}
+
+/** One contact observation and the resulting grasp state. */
+class GripperObservation {
+  public final contact:Bool;
+  public final grasped:Bool;
+  public final timestampNs:Int64;
+
+  public function new(contact:Bool, grasped:Bool, timestampNs:Int64) {
+    this.contact = contact;
+    this.grasped = grasped;
+    this.timestampNs = timestampNs;
+  }
 }
 
 /** One recorded `SimulatedGripper` state change. */
