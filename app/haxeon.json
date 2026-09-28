@@ -12,6 +12,7 @@
 		"bimkit": { "path": "../bimkit" },
 		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" },
+		"simkit": { "path": "../simkit" },
 		"cadbridge": { "path": "../robotkit/cadbridge" },
 		"scenekit": { "path": "../scenekit" },
 		"animkit": { "path": "../animkit" },
