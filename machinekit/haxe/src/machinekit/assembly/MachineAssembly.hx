@@ -264,7 +264,39 @@ class MachineAssembly {
 		}
 		for (connector in memberConnectorFrames)
 			model.connector(join(prefix, connector.instanceId), connector.name, connector.frame);
+		// Included assemblies can have internal mates before the mate that attaches
+		// their root. Apply the complete tree parent-first, then loop closures.
+		var pending:Array<MachineAssemblyOperation> = [];
 		for (op in operations) switch op {
+			case Mate(_, _, _, _, _, _, _): pending.push(op);
+			case _:
+		}
+		while (pending.length > 0) {
+			var progressed = false;
+			for (op in pending.copy()) switch op {
+				case Mate(_, _, parent, _, _, _, _):
+					var parentPending = false;
+					for (other in pending) switch other {
+						case Mate(_, _, _, child, _, _, _): if (child.instanceId == parent.instanceId) parentPending = true;
+						case _:
+					}
+					if (!parentPending) {
+						addOperationToModel(model, prefix, op);
+						pending.remove(op);
+						progressed = true;
+					}
+				case _:
+			}
+			if (!progressed) throw "Assembly mate cycle";
+		}
+		for (op in operations) switch op {
+			case Mate(_, _, _, _, _, _, _):
+			case _: addOperationToModel(model, prefix, op);
+		}
+	}
+
+	function addOperationToModel(model:AssemblyModel, prefix:String, op:MachineAssemblyOperation):Void {
+		switch op {
 			case Mate(id, kind, parent, child, value, axis, limits):
 				if (axis == null) model.mate(join(prefix, id), kind, join(prefix, parent.instanceId),
 					parent.connectorName, join(prefix, child.instanceId), child.connectorName, value);

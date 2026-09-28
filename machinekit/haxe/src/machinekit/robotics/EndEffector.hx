@@ -39,6 +39,18 @@ class EndEffector extends MachineAssembly {
 
 	public function workingFrameNames():Array<String> return [for (frame in frames) frame.name];
 
+	/** The connector that mates this unit to the robot or changer. */
+	public function mountReference():{instanceId:String, connectorName:String} {
+		if (mountRef == null) throw "End effector needs a mount";
+		return {instanceId: mountRef.instanceId, connectorName: mountRef.connectorName};
+	}
+
+	public function workingFrameReference(name:String):{instanceId:String, connectorName:String} {
+		for (frame in frames) if (frame.name == name)
+			return {instanceId: frame.instanceId, connectorName: frame.connectorName};
+		throw 'Unknown working frame "$name"';
+	}
+
 	override public function validate():Array<String> {
 		var warnings = super.validate();
 		if (mountRef == null) throw "End effector needs a mount";

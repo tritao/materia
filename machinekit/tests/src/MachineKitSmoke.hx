@@ -2360,6 +2360,7 @@ class MachineKitSmoke {
 
 	static function main():Void {
 		EndEffectorTests.run();
+		EndEffectorSetTests.run();
 		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();
