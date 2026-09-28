@@ -31,6 +31,7 @@ class CoreFixtures {
   public static function run():Void {
     ramps();
     helices();
+    horizontalLevel();
     rampedPocket();
     meshStock();
     provenance();
@@ -343,7 +344,36 @@ class CoreFixtures {
     stock.dispose();
   }
 
-  static function sampled(profile:CutterProfile, geometry:Array<PathGeometry>, label:String):Void
+  /** Cuts `geometry` and checks the stock, then sweeps each move along X and Y rays. */
+  static function sampled(profile:CutterProfile, geometry:Array<PathGeometry>, label:String):Void {
     CoreComparison.againstSampled(ExactOracle.pathMoves(profile, geometry), 0, 0, -STOCK_Z,
       STOCK_X, STOCK_Y, 0, SAMPLES, label);
+    horizontal(profile, geometry, label);
+  }
+
+  static function horizontal(profile:CutterProfile, geometry:Array<PathGeometry>, label:String):Void
+    for (g in geometry)
+      CoreComparison.sweepAgainstSampled(profile, g, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0.004,
+        SAMPLES, '$label (horizontal rays)');
+
+  /**
+    Level lines, arcs and plunges along X and Y rays. Once X and Y grids exist
+    these are checked exactly against the OCCT oracle too.
+  **/
+  static function horizontalLevel():Void {
+    var r = 0.003;
+    var moves:Array<PathGeometry> = [
+      Line(new Point3(0.008, 0.006, -0.004), new Point3(0.033, 0.013, -0.004)),
+      Circular(new Point3(0.02, 0.01, -0.003), 0.006, 0.4, 3.9, XY, 0),
+      Circular(new Point3(0.02, 0.01, -0.003), 0.002, -1.0, -2 * Math.PI, XY, 0),
+      Line(new Point3(0.02, 0.011, 0.001), new Point3(0.02, 0.011, -0.006))
+    ];
+    for (tool in [
+      {name: "flat", profile: CutterProfile.flat(2 * r, 0.02)},
+      {name: "ball", profile: CutterProfile.ball(2 * r, 0.02)},
+      {name: "bull-nose", profile: CutterProfile.bullNose(2 * r, 0.001, 0.02)},
+      {name: "V-bit", profile: CutterProfile.vee(2 * r, 60 * Math.PI / 180, 0.02)}
+    ])
+      horizontal(tool.profile, moves, '${tool.name} level moves');
+  }
 }

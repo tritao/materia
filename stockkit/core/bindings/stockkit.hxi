@@ -137,7 +137,8 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	extern fn sk_stock_snapshot(stock: sk_stock_handle, out_snapshot: ptr<sk_snapshot_handle> @out @owned) -> sk_result;
 	/**
 	 * Exact material swept by one move of `tool`'s cutting zone along the ray through (u, v)
-	 * on `axis` (Z: u = x, v = y): `out_count` disjoint intervals.
+	 * on `axis` (Z: along +Z through (x, y) = (u, v); X: along +X through (y, z) = (u, v);
+	 * Y: along +Y through (x, z) = (u, v)): `out_count` disjoint intervals.
 	 */
 	extern fn sk_sweep_count_ray(tool: sk_tool_handle, move: ptr<const<sk_move>>, axis: u32, u: f64, v: f64, out_count: ptr<u32> @out) -> sk_result;
 	/**

@@ -71,6 +71,14 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     closed form; ramps minimise a convex function (golden section, to
     floating-point resolution); helices and non-convex profiles scan and then
     refine each local minimum.
+  - `SweptVolume` also answers X and Y rays (`sk_sweep_*_ray` with
+    `SK_AXIS_X`, through (y, z), or `SK_AXIS_Y`, through (x, z)), ahead of
+    the X and Y grids. At each height the tool is a disc, so a level move
+    sweeps its path's 2D offset: a capsule for a line, an annular sector with
+    end discs for an arc, whose crossings with the ray are found in closed
+    form. A plunge sweeps its widest section over the heights it passes;
+    ramps and helices scan and refine. Endpoint normals come from the profile
+    at the endpoint's height.
   - Stock comes from a box or from a closed triangle mesh. Mesh casting uses
     exact orientation predicates and a tie rule, so a ray through a shared
     edge or vertex is counted exactly once; open meshes are refused.

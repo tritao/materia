@@ -262,8 +262,7 @@ sk_result sweep_ray(sk_tool_handle tool, const sk_move *move, uint32_t axis, dou
     sk_result result = to_motion(move, motion);
     if (result != SK_OK) return result;
     if (axis > SK_AXIS_Z || !std::isfinite(u) || !std::isfinite(v)) return SK_ERROR_INVALID_ARGUMENT;
-    if (axis != SK_AXIS_Z) return SK_ERROR_UNSUPPORTED;
-    SweptVolume(t->cutting, motion).intersect_z(u, v, spans);
+    SweptVolume(t->cutting, motion).intersect(axis, u, v, spans);
     return SK_OK;
 }
 

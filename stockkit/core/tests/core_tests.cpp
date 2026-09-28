@@ -797,6 +797,240 @@ void thread_determinism() {
 
 } // namespace
 
+std::vector<sk_interval> sweep_axis(sk_tool_handle t, const sk_move &m, uint32_t axis, double u, double v) {
+    uint32_t count = 0;
+    check(sk_sweep_count_ray(t, &m, axis, u, v, &count) == SK_OK, "sweep count");
+    std::vector<sk_interval> out(count);
+    check(sk_sweep_read_ray(t, &m, axis, u, v, out.data(), count) == SK_OK, "sweep read");
+    return out;
+}
+
+/** Checks a horizontal ray's intervals and their ends' normals, when given. */
+void expect_spans(sk_tool_handle t, const sk_move &m, uint32_t axis, double u, double v,
+    const std::vector<std::pair<double, double>> &expected, const std::string &what,
+    const std::vector<float> &lo_normal = {}, const std::vector<float> &hi_normal = {}) {
+    auto spans = sweep_axis(t, m, axis, u, v);
+    check(spans.size() == expected.size(),
+        what + ": " + std::to_string(spans.size()) + " spans, expected " + std::to_string(expected.size()));
+    if (spans.size() != expected.size()) return;
+    for (size_t k = 0; k < spans.size(); ++k) {
+        near(spans[k].lo, expected[k].first, 1e-12, what + " lo");
+        near(spans[k].hi, expected[k].second, 1e-12, what + " hi");
+    }
+    for (int c = 0; c < 3 && !lo_normal.empty(); ++c) near(spans[0].lo_normal[c], lo_normal[c], 1e-6, what + " lo normal");
+    for (int c = 0; c < 3 && !hi_normal.empty(); ++c)
+        near(spans.back().hi_normal[c], hi_normal[c], 1e-6, what + " hi normal");
+}
+
+void horizontal_level() {
+    sk_tool_handle f = flat(6, 20);
+    const double s8 = std::sqrt(8.0);
+    // A slot along X at y = 20, tip at z = 5.
+    sk_move along_x = line_move(10, 20, 5, 40, 20, 5);
+    expect_spans(f, along_x, SK_AXIS_Y, 25, 8, {{17, 23}}, "Y ray across an X slot", {0, 1, 0}, {0, -1, 0});
+    expect_spans(f, along_x, SK_AXIS_X, 21, 8, {{10 - s8, 40 + s8}}, "X ray along an X slot",
+        {float(s8 / 3), -1.0f / 3, 0}, {float(-s8 / 3), -1.0f / 3, 0});
+    expect_spans(f, along_x, SK_AXIS_X, 20, 4.9, {}, "X ray below the tip");
+    expect_spans(f, along_x, SK_AXIS_X, 20, 25.1, {}, "X ray above the tool");
+    expect_spans(f, along_x, SK_AXIS_X, 23.5, 8, {}, "X ray beside the slot");
+    // The same slot along Y.
+    sk_move along_y = line_move(20, 10, 5, 20, 40, 5);
+    expect_spans(f, along_y, SK_AXIS_Y, 21, 8, {{10 - s8, 40 + s8}}, "Y ray along a Y slot",
+        {-1.0f / 3, float(s8 / 3), 0});
+    expect_spans(f, along_y, SK_AXIS_X, 25, 8, {{17, 23}}, "X ray across a Y slot", {1, 0, 0}, {-1, 0, 0});
+    // A diagonal slot: the capsule's sides.
+    sk_move diagonal = line_move(10, 10, 5, 30, 30, 5);
+    expect_spans(f, diagonal, SK_AXIS_X, 20, 8, {{20 - 3 * std::sqrt(2.0), 20 + 3 * std::sqrt(2.0)}},
+        "X ray across a diagonal slot");
+
+    // A ball mill below its centre: the section at height 1 has radius sqrt(5).
+    sk_tool_handle b = ball(6, 20);
+    const double s5 = std::sqrt(5.0);
+    expect_spans(b, along_x, SK_AXIS_X, 20, 6, {{10 - s5, 40 + s5}}, "ball section below its centre",
+        {float(s5 / 3), 0, 2.0f / 3}, {float(-s5 / 3), 0, 2.0f / 3});
+
+    // Arcs of radius 10 about (50, 50) with the flat mill (radius 3).
+    sk_move circle = arc_move(50, 50, 5, 10, 0, 2 * kPi, 0);
+    expect_spans(f, circle, SK_AXIS_X, 50, 8, {{37, 43}, {57, 63}}, "X ray through a circle's centre",
+        {1, 0, 0}, {-1, 0, 0});
+    expect_spans(f, circle, SK_AXIS_Y, 50, 8, {{37, 43}, {57, 63}}, "Y ray through a circle's centre",
+        {0, 1, 0}, {0, -1, 0});
+    const double s168 = std::sqrt(168.0), s48 = std::sqrt(48.0);
+    for (double sweep : {kPi, -kPi}) {
+        sk_move upper = arc_move(50, 50, 5, 10, sweep > 0 ? 0 : kPi, sweep, 0);
+        std::string dir = sweep > 0 ? " (counter-clockwise)" : " (clockwise)";
+        expect_spans(f, upper, SK_AXIS_X, 51, 8, {{50 - s168, 50 - s48}, {50 + s48, 50 + s168}},
+            "X ray through an upper half circle" + dir);
+        expect_spans(f, upper, SK_AXIS_X, 49, 8, {{40 - s8, 40 + s8}, {60 - s8, 60 + s8}},
+            "X ray under an upper half circle meets its end discs" + dir);
+        expect_spans(f, upper, SK_AXIS_Y, 50, 8, {{57, 63}}, "Y ray through an upper half circle" + dir);
+    }
+    // The left half circle, from (50, 60) to (50, 40), seen by Y rays.
+    sk_move left = arc_move(50, 50, 5, 10, kPi / 2, kPi, 0);
+    expect_spans(f, left, SK_AXIS_Y, 49, 8, {{50 - s168, 50 - s48}, {50 + s48, 50 + s168}},
+        "Y ray through a left half circle");
+    expect_spans(f, left, SK_AXIS_Y, 51, 8, {{40 - s8, 40 + s8}, {60 - s8, 60 + s8}},
+        "Y ray beside a left half circle meets its end discs");
+    // A quarter arc from (60, 50) to (50, 60): the sector's edge bounds the ray.
+    sk_move quarter = arc_move(50, 50, 5, 10, 0, kPi / 2, 0);
+    expect_spans(f, quarter, SK_AXIS_X, 55, 8, {{50 + std::sqrt(24.0), 62}}, "X ray through a quarter arc");
+    // An arc tighter than the tool sweeps a full disc.
+    sk_move tight = arc_move(50, 50, 5, 2, 0, 2 * kPi, 0);
+    expect_spans(f, tight, SK_AXIS_X, 50, 8, {{45, 55}}, "X ray through a tight circle");
+
+    // Necked tool: flutes of radius 3 to height 5, a neck of radius 2 to 15.
+    sk_tool_handle n = tool({line(0, 0, 3, 0), line(3, 0, 3, 5), line(3, 5, 2, 5), line(2, 5, 2, 15),
+        line(2, 15, 3, 15), line(3, 15, 3, 25)});
+    sk_move neck = line_move(10, 15, 10, 40, 15, 10);
+    const double w = std::sqrt(9 - 6.25);
+    expect_spans(n, neck, SK_AXIS_X, 17.5, 12, {{10 - w, 40 + w}}, "X ray beside the flutes");
+    expect_spans(n, neck, SK_AXIS_X, 17.5, 18, {}, "X ray beside the neck misses it");
+    expect_spans(n, neck, SK_AXIS_Y, 25, 18, {{13, 17}}, "Y ray through the neck", {0, 1, 0}, {0, -1, 0});
+    sk_tool_destroy(f);
+    sk_tool_destroy(b);
+    sk_tool_destroy(n);
+}
+
+void horizontal_plunge_ramp_helix() {
+    // A 90-degree V-bit, radius 5 from height 5 up.
+    sk_tool_handle v = tool({line(0, 0, 5, 5), line(5, 5, 5, 20)});
+    sk_move plunge = line_move(20, 20, 10, 20, 20, 4);
+    const float h = float(std::sqrt(0.5));
+    expect_spans(v, plunge, SK_AXIS_Y, 20, 7, {{17, 23}}, "V-bit plunge sweeps its widest section", {0, h, h},
+        {0, -h, h});
+    expect_spans(v, plunge, SK_AXIS_X, 21, 7, {{20 - std::sqrt(8.0), 20 + std::sqrt(8.0)}}, "V-bit plunge off-axis");
+    expect_spans(v, plunge, SK_AXIS_X, 20, 3.9, {}, "below a plunge");
+    sk_move rising = line_move(20, 20, 4, 20, 20, 10);
+    expect_spans(v, rising, SK_AXIS_Y, 20, 7, {{17, 23}}, "rising plunge");
+
+    // A flat mill (radius 3) ramping down along X from (0, 0, 0) to (10, 0, -2).
+    sk_tool_handle f = flat(6, 20);
+    sk_move ramp = line_move(0, 0, 0, 10, 0, -2);
+    expect_spans(f, ramp, SK_AXIS_X, 0, -1, {{2, 13}}, "X ray along a ramp", {1, 0, 0}, {-1, 0, 0});
+    expect_spans(f, ramp, SK_AXIS_Y, 5, -1, {{-3, 3}}, "Y ray across a ramp", {0, 1, 0}, {0, -1, 0});
+    expect_spans(f, ramp, SK_AXIS_X, 0, -2.5, {}, "X ray under a ramp");
+
+    // A flat mill (radius 2) on a descending turn of radius 5 about the origin.
+    sk_tool_handle g = flat(4, 10);
+    sk_move helix = arc_move(0, 0, 0, 5, 0, 2 * kPi, -2);
+    expect_spans(g, helix, SK_AXIS_X, 0, -1, {{-7, -3}, {3, 7}}, "X ray through the lower half of a helix");
+    expect_spans(g, helix, SK_AXIS_X, 0, -1.5, {{3, 7}}, "X ray through the last quarter of a helix");
+    expect_spans(g, helix, SK_AXIS_Y, 0, -1, {{-7, -3}}, "Y ray through the lower half of a helix");
+    sk_tool_destroy(v);
+    sk_tool_destroy(f);
+    sk_tool_destroy(g);
+}
+
+/**
+ * Horizontal rays against the union of densely sampled poses, each cut by
+ * the ray exactly: the sampled union must lie inside the swept intervals,
+ * and the swept intervals within a sampling step of it.
+ */
+void horizontal_sampled() {
+    struct Shape {
+        const char *name;
+        sk_tool_handle handle;
+        std::function<double(double)> radius; // section radius at height h, negative outside
+    };
+    std::vector<Shape> shapes = {
+        {"flat", flat(6, 20), [](double h) { return h >= 0 && h <= 20 ? 3.0 : -1.0; }},
+        {"ball", ball(6, 20),
+            [](double h) { return h < 0 || h > 20 ? -1.0 : h < 3 ? std::sqrt(9 - (3 - h) * (3 - h)) : 3.0; }},
+        {"bull", bull(10, 2, 20),
+            [](double h) { return h < 0 || h > 20 ? -1.0 : h < 2 ? 3 + std::sqrt(4 - (2 - h) * (2 - h)) : 5.0; }},
+        {"V-bit", tool({line(0, 0, 5, 5), line(5, 5, 5, 20)}),
+            [](double h) { return h < 0 || h > 20 ? -1.0 : std::min(h, 5.0); }},
+        {"necked", tool({line(0, 0, 3, 0), line(3, 0, 3, 5), line(3, 5, 2, 5), line(2, 5, 2, 15),
+                           line(2, 15, 3, 15), line(3, 15, 3, 25)}),
+            [](double h) { return h < 0 || h > 25 ? -1.0 : h <= 5 || h >= 15 ? 3.0 : 2.0; }},
+    };
+    struct Case {
+        const char *name;
+        sk_move move;
+    };
+    const std::vector<Case> cases = {
+        {"level line", line_move(10, 12, 10, 38, 25, 10)},
+        {"plunge", line_move(24, 18, 16, 24, 18, 6)},
+        {"ramp", line_move(10, 15, 15, 40, 20, 9)},
+        {"climb", line_move(12, 24, 6, 36, 12, 14)},
+        {"level arc", arc_move(25, 18, 10, 8, 0.4, 3.9, 0)},
+        {"helix", arc_move(25, 18, 14, 4, 0.3, 4 * kPi, -5)},
+        {"rising helix", arc_move(25, 18, 8, 7, 2.0, -5.0, 3)},
+    };
+    const int samples = 100000;
+    const double tolerance = 2e-3;
+    for (const Shape &shape : shapes)
+        for (const Case &c : cases) {
+            int wrong = 0, tested = 0;
+            unsigned seed = 12345;
+            auto next = [&]() {
+                seed = seed * 1664525u + 1013904223u;
+                return (seed >> 8) / double(1u << 24);
+            };
+            for (int r = 0; r < 60; ++r) {
+                uint32_t axis = r % 2 == 0 ? SK_AXIS_X : SK_AXIS_Y;
+                double u = axis == SK_AXIS_X ? 8 + 22 * next() : 6 + 36 * next();
+                double v = 4 + 20 * next();
+                auto spans = sweep_axis(shape.handle, c.move, axis, u, v);
+                // The sampled union, merging stretches closer than the tolerance.
+                std::vector<std::pair<double, double>> sampled;
+                for (int k = 0; k <= samples; ++k) {
+                    double t = double(k) / samples, x, y, z;
+                    if (c.move.kind == SK_MOVE_LINE) {
+                        x = c.move.start[0] + t * (c.move.end[0] - c.move.start[0]);
+                        y = c.move.start[1] + t * (c.move.end[1] - c.move.start[1]);
+                        z = c.move.start[2] + t * (c.move.end[2] - c.move.start[2]);
+                    } else {
+                        double a = c.move.start_angle + t * c.move.sweep;
+                        x = c.move.center[0] + c.move.radius * std::cos(a);
+                        y = c.move.center[1] + c.move.radius * std::sin(a);
+                        z = c.move.center[2] + t * c.move.rise;
+                    }
+                    double along = axis == SK_AXIS_X ? x : y, off = u - (axis == SK_AXIS_X ? y : x);
+                    double rr = shape.radius(v - z);
+                    if (rr < std::fabs(off)) continue;
+                    double w = std::sqrt(rr * rr - off * off);
+                    sampled.push_back({along - w, along + w});
+                }
+                std::sort(sampled.begin(), sampled.end());
+                std::vector<std::pair<double, double>> merged;
+                for (auto &p : sampled) {
+                    if (!merged.empty() && p.first <= merged.back().second + 2 * tolerance)
+                        merged.back().second = std::max(merged.back().second, p.second);
+                    else merged.push_back(p);
+                }
+                if (merged.empty() && spans.empty()) continue;
+                ++tested;
+                bool ok = true;
+                // Sampled poses are inside the swept set.
+                for (auto &p : sampled) {
+                    bool inside = false;
+                    for (auto &s : spans) inside |= s.lo <= p.first + 1e-9 && s.hi >= p.second - 1e-9;
+                    if (!inside && p.second - p.first > 1e-9) ok = false;
+                }
+                // The swept set is within the tolerance of them.
+                for (auto &s : spans) {
+                    bool close = false;
+                    for (auto &p : merged) close |= s.lo >= p.first - tolerance && s.hi <= p.second + tolerance;
+                    if (!close) ok = false;
+                }
+                if (!ok) {
+                    ++wrong;
+                    if (wrong <= 3) {
+                        std::printf("  %s %s axis %u (%.6f, %.6f):", shape.name, c.name, axis, u, v);
+                        for (auto &s : spans) std::printf(" [%.6f, %.6f]", s.lo, s.hi);
+                        std::printf(" sampled");
+                        for (auto &p : merged) std::printf(" [%.6f, %.6f]", p.first, p.second);
+                        std::printf("\n");
+                    }
+                }
+            }
+            check(wrong == 0 && tested > 10, std::string(shape.name) + " " + c.name + " horizontal rays vs sampling (" +
+                std::to_string(wrong) + " wrong of " + std::to_string(tested) + ")");
+        }
+    for (const Shape &shape : shapes) sk_tool_destroy(shape.handle);
+}
+
 int main() {
     flat_slot();
     ball_slot();
@@ -805,6 +1039,9 @@ int main() {
     ball_ramp();
     bull_ramp_and_helix();
     necked_tool();
+    horizontal_level();
+    horizontal_plunge_ramp_helix();
+    horizontal_sampled();
     box_mesh();
     provenance_and_rapids();
     handles();

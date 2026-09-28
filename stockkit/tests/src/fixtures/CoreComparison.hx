@@ -6,8 +6,12 @@ import oracle.ExactOracle;
 import oracle.SampledReference;
 import stockkit.CutMove;
 import stockkit.Stock;
+import stockkit.StockAxis;
 import stockkit.StockGrid;
 import stockkit.StockInterval;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
 
 /**
   Compares StockKit core stock with the references on every ray of the core's
@@ -75,6 +79,33 @@ class CoreComparison {
     } catch (error:Dynamic) {
       stock.dispose();
       throw error;
+    }
+  }
+
+  /**
+    One move's swept material along a lattice of X and Y rays, from the core
+    and from the sampled reference, which must bound it.
+  **/
+  public static function sweepAgainstSampled(profile:CutterProfile, geometry:PathGeometry,
+      minX:Float, minY:Float, minZ:Float, maxX:Float, maxY:Float, maxZ:Float, samples:Int,
+      label:String):Void {
+    var tool = Tool.shaped(1, 0.0, profile);
+    var across = 11, up = 9;
+    for (axis in [StockAxis.X, StockAxis.Y]) {
+      var lo = axis == StockAxis.X ? minY : minX, hi = axis == StockAxis.X ? maxY : maxX;
+      for (a in 0...across)
+        for (b in 0...up) {
+          // Off round coordinates, like a cell-centred lattice.
+          var u = lo + (a + 0.37) * (hi - lo) / across;
+          var v = minZ + (b + 0.41) * (maxZ - minZ) / up;
+          var actual = spans(Stock.sweep(tool, geometry, axis, u, v));
+          var reference = axis == StockAxis.X ? ReferenceAxis.X : ReferenceAxis.Y;
+          var bounds = SampledReference.sweepAlong(reference, profile, geometry, u, v, samples);
+          Assert.check(SampledReference.contains(bounds.inner, actual, bounds.outer, 1e-12),
+            '$label: core $axis ray at ($u, $v) sweeps ${describe(actual)}, outside the sampled '
+            + 'bounds ${describe(bounds.inner)} .. ${describe(bounds.outer)}');
+          raysCompared++;
+        }
     }
   }
 

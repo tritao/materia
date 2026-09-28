@@ -209,7 +209,8 @@ SK_API sk_result SK_CALL sk_tool_get_info(sk_tool_handle tool, sk_tool_info *out
 
 /**
  * Exact material swept by one move of `tool`'s cutting zone along the ray through (u, v)
- * on `axis` (Z: u = x, v = y): `out_count` disjoint intervals.
+ * on `axis` (Z: along +Z through (x, y) = (u, v); X: along +X through (y, z) = (u, v);
+ * Y: along +Y through (x, z) = (u, v)): `out_count` disjoint intervals.
  */
 SK_API sk_result SK_CALL sk_sweep_count_ray(sk_tool_handle tool, const sk_move *move,
     uint32_t axis, double u, double v, uint32_t *out_count SK_OUT);

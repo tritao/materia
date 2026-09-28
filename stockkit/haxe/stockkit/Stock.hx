@@ -246,21 +246,25 @@ class Stock {
   }
 
   /**
-    The material one move of `tool` would sweep along the +Z ray through
-    (x, y), for checking the core against references. Uses the tool's
-    cutting zone, as `cut` does.
+    The material one move of `tool` would sweep along the ray through (u, v)
+    on `axis` (see `StockAxis`), for checking the core against references.
+    Uses the tool's cutting zone, as `cut` does.
   **/
-  public static function sweep(tool:Tool, geometry:PathGeometry, x:Float,
-      y:Float):Array<StockInterval> {
+  public static function sweep(tool:Tool, geometry:PathGeometry, axis:StockAxis, u:Float,
+      v:Float):Array<StockInterval> {
+    var nativeAxis = switch axis {
+      case X: StockKitNativeConstants.SK_AXIS_X;
+      case Y: StockKitNativeConstants.SK_AXIS_Y;
+      case Z: StockKitNativeConstants.SK_AXIS_Z;
+    };
     var cutting = new NativeTool(tool);
     try {
       var move = nativeMove(new CutMove(tool, Path(geometry), Cut, 0,
         new toolpathkit.path.Provenance(1, 1, 0)), 0);
-      var counted = StockKitNative.sk_sweep_count_ray(cutting.borrow(), move,
-        StockKitNativeConstants.SK_AXIS_Z, x, y);
+      var counted = StockKitNative.sk_sweep_count_ray(cutting.borrow(), move, nativeAxis, u, v);
       check(counted.status, "sweep.count");
-      var read = StockKitNative.sk_sweep_read_ray(cutting.borrow(), move,
-        StockKitNativeConstants.SK_AXIS_Z, x, y, counted.out_count);
+      var read = StockKitNative.sk_sweep_read_ray(cutting.borrow(), move, nativeAxis, u, v,
+        counted.out_count);
       check(read.status, "sweep.read");
       var result = [for (native in read.out_intervals) interval(native)];
       cutting.dispose();
