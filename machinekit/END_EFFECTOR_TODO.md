@@ -1,33 +1,8 @@
 # End effector (EOAT) follow-up tasks
 
-Open fixes and possible expansions for the end-effector layer described in
+Possible expansions for the end-effector layer described in
 `END_EFFECTOR_PLAN.md`. Effort: **S** about one PR, **M** a few PRs, **L** a
 project of its own.
-
-## Open fixes
-
-- [ ] Map nksim contact settings onto MuJoCo correctly in
-  `simkit/sim_mujoco/src/mujoco_backend.cpp`: MuJoCo `margin = margin + gap`,
-  MuJoCo `gap = gap`. The current one-to-one copy means proximity mode
-  (`margin 0, gap = padding`) detects nothing early and only produces force
-  once the tool is `gap` deep inside an obstacle. Replace
-  `convex_mesh_margin_detects_before_gap_force` with tests that proximity mode
-  detects a nearby contact without force and still pushes back on contact.
-- [ ] Add a contact query so proximity detection is observable:
-  `nksim_world_get_contacts` (bodies, child part index, distance, position,
-  normal, active flag), `rk_simulation_get_robot_contacts`, and
-  `RobotRuntime.contacts()` / `toolProximity()` in Haxe.
-- [ ] In `EndEffectorCollision.pieces`, merge a small piece only when over
-  `maxPieces` or when its bounds are within `minFeature` of another piece, and
-  choose the neighbour by bounds distance rather than centroid distance. A
-  small sensor far from the rest of the tool must stay a separate piece.
-- [ ] Offset the enclosing k-DOP by the tessellation deflection: record
-  `linearDeflection` on `cadkit.Mesh`, add an `offset` parameter to
-  `ConvexHullVertices.enclosingFromMesh`, and test that points on an exact
-  cylinder lie inside its hull.
-- [ ] Remove the unused `ChangerCoupling` marker interface and document
-  `MachineComponent.couplingKey()` / `couplingConnector()` as the changer
-  contract.
 
 ## Real parts
 
