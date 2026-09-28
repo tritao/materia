@@ -7,6 +7,7 @@ import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
+import motionkit.robot.OpwKinematics;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
