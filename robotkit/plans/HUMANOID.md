@@ -200,3 +200,23 @@ Rough-terrain locomotion, perception-driven footstep planning, dexterous hands,
 and multi-hull collision decomposition beyond what the G1 model ships with.
 
 ## Progress log
+
+### H0 — Floating base through the runtime
+
+- `RobotModel.floatingBase` (schema v6) compiles into the blueprint's
+  `floating_base`, which reuses the former `reserved0` slot, so the native
+  layout is unchanged. The two checked-in v5 `robot.json` fixtures moved to v6.
+- `Simulation` creates a floating robot's root as a dynamic body, which the
+  MuJoCo backend turns into a free joint. `drive_robot_base` and the
+  differential and omni couplings return `RK_ERROR_INVALID_STATE` for it.
+  Teleport, place and reset already set the pose and zero the velocity.
+- New `rk_simulation_get_robot_base_velocity` / `Simulation.robotBaseVelocity`.
+- Tests: `robotkit/runtime/tests/mujoco.cpp` drops a two-box robot from 0.5 m;
+  the floating one settles at 0.1 m with near-zero twist and resets to its
+  initial pose at rest, while the kinematic one stays at 0.5 m. Codec,
+  compiler and `RK_FLOATING_MOBILE` checks are in `RobotWorldTests`.
+- The codec test needed `Reflect.deleteField`, which haxeon lacked; it was
+  added in haxeon rather than worked around.
+- Not covered yet: the deterministic SimKit backend with a floating base, and
+  the editor's own robot records (`SensorConfiguration` in `app/`), which do
+  not persist `floatingBase`. The editor gets it with H1's importer or H6.

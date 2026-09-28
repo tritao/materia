@@ -302,7 +302,8 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
             desc.node = binding->nodes_[index];
-            desc.motion_type = index == root ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
+            desc.motion_type = index == root && !blueprint.floating_base
+                ? NKSIM_MOTION_KINEMATIC : NKSIM_MOTION_DYNAMIC;
             desc.mass = blueprint.links[index].mass;
             desc.has_inertial_properties = 1;
             std::copy_n(blueprint.links[index].center_of_mass, 3, desc.center_of_mass);
@@ -446,6 +447,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         virtual_devices_.push_back(virtual_endpoint);
         binding->base_body_ = binding->bodies_[root];
         robot_base_bodies_.push_back(binding->base_body_);
+        robot_floating_.push_back(blueprint.floating_base != 0);
         robot_initial_poses_.push_back(chosen_initial);
         robot_base_poses_.push_back(chosen_initial);
         robot_tick_poses_.push_back(chosen_initial);
@@ -770,6 +772,7 @@ rk_result Simulation::set_differential_drive(
         !valid_drive_geometry(desc.wheel_radius) || !valid_drive_geometry(desc.track_width) ||
         desc.left_wheel_joint == desc.right_wheel_joint)
         return RK_ERROR_INVALID_ARGUMENT;
+    if (robot_floating_[robot_index]) return RK_ERROR_INVALID_STATE;
     const uint32_t joints[2] = {desc.left_wheel_joint, desc.right_wheel_joint};
     const auto valid = valid_wheel_joints(robot_index, joints, 2);
     if (valid != RK_OK) return valid;
@@ -789,6 +792,7 @@ rk_result Simulation::set_omni_drive(uint32_t robot_index,
     if (desc.struct_size < sizeof(desc) || robot_index >= drives_.size() ||
         !valid_drive_geometry(desc.wheel_radius) || !valid_drive_geometry(desc.base_radius))
         return RK_ERROR_INVALID_ARGUMENT;
+    if (robot_floating_[robot_index]) return RK_ERROR_INVALID_STATE;
     for (const double angle : desc.wheel_angles)
         if (!std::isfinite(angle)) return RK_ERROR_INVALID_ARGUMENT;
     const auto &j = desc.wheel_joints;
@@ -899,6 +903,8 @@ rk_result Simulation::drive_robot_base(uint32_t robot_index, const rk_simulation
     if (robot_index >= robot_base_bodies_.size()) return RK_ERROR_INVALID_ARGUMENT;
     if (pose.struct_size < sizeof(pose) || !valid_pose(pose.position, pose.rotation))
         return RK_ERROR_INVALID_ARGUMENT;
+    // A floating base moves only under physics; place or teleport it instead.
+    if (robot_floating_[robot_index]) return RK_ERROR_INVALID_STATE;
     // The drive's twist is the motion from the pose the base held at the end
     // of the previous tick, differenced in double precision.
     const auto &from = robot_tick_poses_[robot_index];
@@ -974,6 +980,20 @@ rk_result Simulation::get_robot_pose(uint32_t robot_index,rk_simulation_pose &ou
     return read_body_pose(robot_base_bodies_[robot_index],out_pose);
 }
 
+rk_result Simulation::get_robot_base_velocity(uint32_t robot_index,
+                                             rk_simulation_twist &out_twist) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    if (out_twist.struct_size < sizeof(out_twist) || robot_index >= robot_base_bodies_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    const auto result = read_body_state(robot_base_bodies_[robot_index], state);
+    if (result != RK_OK) return result;
+    std::copy_n(state.linear_velocity, 3, out_twist.linear);
+    std::copy_n(state.angular_velocity, 3, out_twist.angular);
+    return RK_OK;
+}
+
 rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
                                      rk_simulation_pose &out_pose) const {
     std::lock_guard tick_lock(tick_mutex_);
@@ -1029,6 +1049,14 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
 
 rk_result Simulation::read_body_pose(nksim_body body,rk_simulation_pose &out_pose) const {
     nksim_body_state state{};state.struct_size=sizeof(state);
+    const auto result=read_body_state(body,state);
+    if(result!=RK_OK)return result;
+    std::copy_n(state.position,3,out_pose.position);
+    std::copy_n(state.rotation,4,out_pose.rotation);
+    return RK_OK;
+}
+
+rk_result Simulation::read_body_state(nksim_body body,nksim_body_state &state) const {
     bool found=false;
     if(snapshot_!=0){
         uint64_t count=0;
@@ -1038,10 +1066,7 @@ rk_result Simulation::read_body_pose(nksim_body body,rk_simulation_pose &out_pos
             if(candidate.body==body){state=candidate;found=true;break;}
         }
     } else if(nksim_body_get_state(world_,body,&state)==NKSIM_OK)found=true;
-    if(!found)return RK_ERROR_BACKEND;
-    std::copy_n(state.position,3,out_pose.position);
-    std::copy_n(state.rotation,4,out_pose.rotation);
-    return RK_OK;
+    return found?RK_OK:RK_ERROR_BACKEND;
 }
 
 rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,

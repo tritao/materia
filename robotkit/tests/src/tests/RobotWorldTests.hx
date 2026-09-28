@@ -838,10 +838,32 @@ class RobotWorldTests {
     throws(function() wrongLayout.validateAgainst(source),
       "device channel mapping rejects order that differs from semantic model joints");
 
+    equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
+    var floating = configuredForkliftModel();
+    floating.mobileBase = null;
+    floating.forkMechanism = null;
+    floating.floatingBase = true;
+    var floatingRestored = RobotModelCodec.decode(RobotModelCodec.encode(floating));
+    equal(floatingRestored.floatingBase, true, "v6 RobotModel preserves a floating base");
+    var floatingBlueprint = RobotRuntimeCompiler.compile(floatingRestored);
+    equal(floatingBlueprint.floatingBase, true, "a floating base compiles into the blueprint");
+    equal(floatingBlueprint.nativeValue().get_floating_base(), 1,
+      "a floating base reaches the native blueprint");
+    equal(RobotRuntimeCompiler.compile(restored).nativeValue().get_floating_base(), 0,
+      "a fixed base stays kinematic in the native blueprint");
+    var wheeledFloating = configuredForkliftModel();
+    wheeledFloating.floatingBase = true;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(wheeledFloating), "RK_FLOATING_MOBILE"),
+      "a floating base cannot also be a wheeled mobile base");
+    var missingFloating:Dynamic = haxe.Json.parse(encoded.toString());
+    Reflect.deleteField(missingFloating, "floatingBase");
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(missingFloating))),
+      "v6 RobotModel requires the floatingBase field");
+
     var oldVersion:Dynamic = haxe.Json.parse(encoded.toString());
-    Reflect.setField(oldVersion, "schemaVersion", 4);
+    Reflect.setField(oldVersion, "schemaVersion", 5);
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
-      "v5-only RobotModel codec rejects old schemas");
+      "v6-only RobotModel codec rejects old schemas");
     var legacyDrive:Dynamic = haxe.Json.parse(encoded.toString());
     var legacyJoints:Array<Dynamic> = cast Reflect.field(legacyDrive, "joints");
     Reflect.setField(legacyJoints[0], "drive", {name: "old-drive"});

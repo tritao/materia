@@ -372,7 +372,13 @@ typedef struct rk_robot_runtime_blueprint {
     uint32_t frame_count; /**< Number of compiled reference frames. */
     uint32_t collision_approximation;
     uint32_t self_collision; /**< RK_SELF_COLLISION_*; zero preserves enabled-by-default. */
-    uint32_t reserved0;
+    /**
+     * Nonzero makes the root link a free six-DOF body in Simulation instead of
+     * a kinematic base. Runtime joints stay one-DOF; the root's pose and twist
+     * are read through rk_simulation_get_robot_pose() and
+     * rk_simulation_get_robot_base_velocity(). Must be 0 or 1.
+     */
+    uint32_t floating_base;
     uint64_t reserved[1];
     rk_robot_runtime_joint joints[RK_MAX_JOINTS];
     rk_robot_runtime_link links[RK_MAX_LINKS];

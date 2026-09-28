@@ -40,6 +40,7 @@ class RobotRuntimeCompiler {
         [for (link in robot.links) link.visualGeometry],
         [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
       compileConfiguration(robot), calibrationRevision);
+    result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
       case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
@@ -61,7 +62,7 @@ class RobotRuntimeCompiler {
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
         case JointType.Prismatic: RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
         case JointType.Floating:
-          throw 'Joint ${joint.name} has unsupported floating type';
+          throw 'Joint ${joint.name} has unsupported floating type; set RobotModel.floatingBase';
         default:
           throw 'Joint ${joint.name} has unknown type ${joint.type}';
       };
@@ -261,7 +262,7 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
       if (joint.type == JointType.Floating)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_UNSUPPORTED", '$path.type',
-          "floating joints are not supported by the current runtime backend"));
+          "floating joints are not supported; set RobotModel.floatingBase to free the root link"));
       else if (joint.type != JointType.Fixed && joint.type != JointType.Revolute
           && joint.type != JointType.Continuous && joint.type != JointType.Prismatic)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_TYPE", '$path.type',
@@ -487,6 +488,9 @@ class RobotRuntimeCompiler {
     }
 
     var mobile = robot.mobileBase;
+    if (mobile != null && robot.floatingBase)
+      diagnostics.push(new RobotCompileDiagnostic("RK_FLOATING_MOBILE", "mobileBase",
+        "a floating base moves under physics and cannot also be a wheeled mobile base"));
     if (mobile != null) {
       positive(mobile.maxLinearSpeed, "mobileBase.maxLinearSpeed");
       positive(mobile.maxAngularSpeed, "mobileBase.maxAngularSpeed");

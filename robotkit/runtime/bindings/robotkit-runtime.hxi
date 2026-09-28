@@ -161,6 +161,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	const RK_PLAN_CAPABILITY_EVENTS = 2;
 	const RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1;
+	const RK_PLAN_JERK_UNCHECKED = 1;
 	const RK_PROCESS_CHANNEL_ID_BYTES = 48;
 	const RK_PROCESS_COMMAND_BYTES = 48;
 	const RK_RECORDING_CLOSED = 3;
@@ -458,6 +459,9 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		model_revision: u64 @offset(24);
 		calibration_revision: u64 @offset(32);
 		required_capabilities: u32 @offset(40);
+		/**
+		 * < RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked.
+		 */
 		reserved0: u32 @offset(44);
 		/**
 		 * < Zero means append/start, not replace.
@@ -609,7 +613,13 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < RK_SELF_COLLISION_*; zero preserves enabled-by-default.
 		 */
 		self_collision: u32 @offset(32);
-		reserved0: u32 @offset(36);
+		/**
+		 * Nonzero makes the root link a free six-DOF body in Simulation instead of
+		 * a kinematic base. Runtime joints stay one-DOF; the root's pose and twist
+		 * are read through rk_simulation_get_robot_pose() and
+		 * rk_simulation_get_robot_base_velocity(). Must be 0 or 1.
+		 */
+		floating_base: u32 @offset(36);
 		reserved: array<u64, 1> @offset(40);
 		joints: array<rk_robot_runtime_joint, 512> @offset(48);
 		links: array<rk_robot_runtime_link, 1024> @offset(98352);

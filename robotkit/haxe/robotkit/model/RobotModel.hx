@@ -4,7 +4,7 @@ import robotkit.model.Transmission;
 
 /** Editable static definition of a robot's links, joints, and sensors. */
 class RobotModel {
-  public static inline var CURRENT_VERSION:Int = 5;
+  public static inline var CURRENT_VERSION:Int = 6;
   public final schemaVersion:Int = CURRENT_VERSION;
   public final name:String;
   public final links:Array<Link> = [];
@@ -16,6 +16,12 @@ class RobotModel {
   public final sensors:Array<Sensor> = [];
   public final frames:Array<Frame> = [];
   public var collisionApproximation:CollisionApproximation = CollisionApproximation.BoundsBox;
+  /**
+   * True when the root link is a free six-DOF body, as for a legged or
+   * humanoid robot, rather than a base fixed to the world. This replaces a
+   * floating joint: runtime joints stay one-DOF.
+   */
+  public var floatingBase:Bool = false;
   /** Semantic mobile roles authored against stable joint IDs. */
   public var mobileBase:Null<RobotMobileConfiguration> = null;
   /** Semantic fork roles authored against stable joint IDs. */

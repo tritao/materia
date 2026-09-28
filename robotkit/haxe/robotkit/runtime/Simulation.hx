@@ -461,6 +461,20 @@ class Simulation {
       rotation:[for(index in 0...4)pose.get_rotation(index)]};
   }
 
+  /**
+   * Reads one robot base's world-frame twist: linear in metres per second,
+   * angular in radians per second. A floating base reports its free motion.
+   */
+  public function robotBaseVelocity(robotIndex:Int):{linear:Array<Float>, angular:Array<Float>} {
+    ensureLive();
+    var twist = new rk_simulation_twist();
+    twist.set_struct_size(rk_simulation_twist.size());
+    var result = RobotKitSimKit.rk_simulation_get_robot_base_velocity(owner.borrow(), robotIndex, twist);
+    check(result.status, "simulation.getRobotBaseVelocity");
+    return {linear: [for (index in 0...3) twist.get_linear(index)],
+      angular: [for (index in 0...3) twist.get_angular(index)]};
+  }
+
   /** Reads an articulated link pose without mutating the simulation. */
   public function linkPose(robotIndex:Int, linkIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();

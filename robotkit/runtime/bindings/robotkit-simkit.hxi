@@ -70,7 +70,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * such as the IMU measure consecutive drives as continuous motion without
 	 * single-precision scene rounding, however far from the origin. A tick with no
 	 * drive holds the base at rest. Use rk_simulation_place_robot_base() for a
-	 * jump that must not read as motion.
+	 * jump that must not read as motion. A floating base moves only under
+	 * physics, so driving one returns RK_ERROR_INVALID_STATE.
 	 *
 	 * @param simulation Shared simulation owner.
 	 * @param robot_index Index of the robot in attachment order.
@@ -102,6 +103,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one robot's omni-wheel plant state.
 	 */
 	extern fn rk_simulation_get_omni_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_omni_drive_state> @inout) -> rk_result;
+	/**
+	 * Reads one robot base's world-frame twist from the latest physics state.
+	 * A floating base (rk_robot_runtime_blueprint.floating_base) reports its free
+	 * motion; a kinematic base reports the twist it was driven with.
+	 */
+	extern fn rk_simulation_get_robot_base_velocity(simulation: rk_simulation, robot_index: u32, out_twist: ptr<rk_simulation_twist> @inout) -> rk_result;
 	extern fn rk_simulation_get_robot_contact(simulation: rk_simulation, runtime: rk_robot_runtime, index: u32, out_contact: ptr<rk_robot_contact> @inout) -> rk_result;
 	extern fn rk_simulation_get_robot_contacts(simulation: rk_simulation, runtime: rk_robot_runtime, out: ptr<rk_robot_contact>, capacity: u32, out_count: ptr<u32> @out) -> rk_result;
 	/**
@@ -166,7 +173,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * @param robot_index Index of the robot in attachment order.
 	 * @param desc Wheel joints and geometry.
 	 * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed or
-	 * missing wheel joint, identical wheels, or non-positive geometry.
+	 * missing wheel joint, identical wheels, or non-positive geometry, or
+	 * RK_ERROR_INVALID_STATE for a floating-base robot.
 	 */
 	extern fn rk_simulation_set_differential_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_differential_drive_desc>>) -> rk_result;
 	/**
@@ -180,7 +188,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 *
 	 * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed,
 	 * missing, or repeated wheel joint, non-positive or non-finite geometry, or
-	 * wheel angles that cannot span every planar motion.
+	 * wheel angles that cannot span every planar motion, or
+	 * RK_ERROR_INVALID_STATE for a floating-base robot.
 	 */
 	extern fn rk_simulation_set_omni_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_omni_drive_desc>>) -> rk_result;
 	/**
@@ -467,6 +476,15 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		tool_piece_vertices: array<f64, 3072> @offset(1613288);
 		tool_margin: f64 @offset(1637864);
 		tool_gap: f64 @offset(1637872);
+	}
+	/**
+	 * World-frame twist of one body: metres per second and radians per second.
+	 */
+	struct rk_simulation_twist @layout(56, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		linear: array<f64, 3> @offset(8);
+		angular: array<f64, 3> @offset(32);
 	}
 	/**
 	 * Opaque handle for one shared simulation universe and clock.

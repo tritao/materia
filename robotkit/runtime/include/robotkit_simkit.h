@@ -350,7 +350,8 @@ RK_API rk_result RK_CALL rk_simulation_teleport_robot(
  * such as the IMU measure consecutive drives as continuous motion without
  * single-precision scene rounding, however far from the origin. A tick with no
  * drive holds the base at rest. Use rk_simulation_place_robot_base() for a
- * jump that must not read as motion.
+ * jump that must not read as motion. A floating base moves only under
+ * physics, so driving one returns RK_ERROR_INVALID_STATE.
  *
  * @param simulation Shared simulation owner.
  * @param robot_index Index of the robot in attachment order.
@@ -396,7 +397,8 @@ RK_API rk_result RK_CALL rk_simulation_place_robot_base(
  * @param robot_index Index of the robot in attachment order.
  * @param desc Wheel joints and geometry.
  * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed or
- * missing wheel joint, identical wheels, or non-positive geometry.
+ * missing wheel joint, identical wheels, or non-positive geometry, or
+ * RK_ERROR_INVALID_STATE for a floating-base robot.
  */
 RK_API rk_result RK_CALL rk_simulation_set_differential_drive(
     rk_simulation simulation, uint32_t robot_index,
@@ -419,7 +421,8 @@ RK_API rk_result RK_CALL rk_simulation_get_differential_drive_state(
  *
  * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed,
  * missing, or repeated wheel joint, non-positive or non-finite geometry, or
- * wheel angles that cannot span every planar motion.
+ * wheel angles that cannot span every planar motion, or
+ * RK_ERROR_INVALID_STATE for a floating-base robot.
  */
 RK_API rk_result RK_CALL rk_simulation_set_omni_drive(
     rk_simulation simulation, uint32_t robot_index,
@@ -435,6 +438,21 @@ RK_API rk_result RK_CALL rk_simulation_get_omni_drive_state(
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_pose *out_pose RK_INOUT);
+/** World-frame twist of one body: metres per second and radians per second. */
+typedef struct rk_simulation_twist {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t reserved0;
+    double linear[3];
+    double angular[3];
+} rk_simulation_twist;
+/**
+ * Reads one robot base's world-frame twist from the latest physics state.
+ * A floating base (rk_robot_runtime_blueprint.floating_base) reports its free
+ * motion; a kinematic base reports the twist it was driven with.
+ */
+RK_API rk_result RK_CALL rk_simulation_get_robot_base_velocity(
+    rk_simulation simulation, uint32_t robot_index,
+    rk_simulation_twist *out_twist RK_INOUT);
 /** Reads one robot link pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,

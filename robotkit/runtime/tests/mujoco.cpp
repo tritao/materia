@@ -170,7 +170,95 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     rk_simulation_destroy(simulation);
 }
 
+// Drops a two-box robot onto a floor. A floating base falls and comes to rest
+// on it; the same robot with a kinematic base stays where it was placed.
+static void floating_base_falls_and_settles(bool floating) {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.005;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 2;
+    model.joint_count = 1;
+    model.floating_base = floating ? 1 : 0;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    for (uint32_t i = 0; i < model.link_count; ++i) {
+        model.links[i].mass = 1.0;
+        model.links[i].inertia_tensor[0] = model.links[i].inertia_tensor[4] =
+            model.links[i].inertia_tensor[8] = 0.02 / 3.0;
+    }
+    model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].parent_frame_position[0] = 0.25;
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[0] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 0.5;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    for (int axis = 0; axis < 6; ++axis) robot_desc.collision_half_extents[axis] = 0.1;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    rk_simulation_object_desc floor{};
+    floor.struct_size = sizeof(floor);
+    floor.rotation[3] = 1.0;
+    floor.position[2] = -0.5;
+    floor.half_extents[0] = floor.half_extents[1] = 5.0;
+    floor.half_extents[2] = 0.5;
+    rk_simulation_object floor_object = 0;
+    assert(rk_simulation_spawn_object(simulation, &floor, &floor_object) == RK_OK);
+
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    pose.position[2] = 0.5;
+    pose.rotation[3] = 1.0;
+    const rk_result drive = floating ? RK_ERROR_INVALID_STATE : RK_OK;
+    assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == drive);
+    rk_simulation_differential_drive_desc wheels{};
+    wheels.struct_size = sizeof(wheels);
+    wheels.left_wheel_joint = 0;
+    wheels.right_wheel_joint = 1;
+    wheels.wheel_radius = wheels.track_width = 0.1;
+    // Joint 1 does not exist, but a floating base is refused before wheels are checked.
+    assert(rk_simulation_set_differential_drive(simulation, 0, &wheels) ==
+           (floating ? RK_ERROR_INVALID_STATE : RK_ERROR_INVALID_ARGUMENT));
+
+    for (int tick = 0; tick < 400; ++tick)
+        assert(rk_simulation_step(simulation, tick) == RK_OK);
+    rk_simulation_twist twist{};
+    twist.struct_size = sizeof(twist);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &pose) == RK_OK);
+    assert(rk_simulation_get_robot_base_velocity(simulation, 0, &twist) == RK_OK);
+    double speed = 0.0;
+    for (int axis = 0; axis < 3; ++axis)
+        speed += twist.linear[axis] * twist.linear[axis] +
+            twist.angular[axis] * twist.angular[axis];
+    speed = std::sqrt(speed);
+    if (floating) {
+        // Both 0.2 m boxes rest flat on the floor, whose top is at z = 0.
+        assert(std::abs(pose.position[2] - 0.1) < 0.01);
+        assert(speed < 0.05);
+    } else {
+        assert(std::abs(pose.position[2] - 0.5) < 1e-9);
+    }
+
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(rk_simulation_reset(simulation) == RK_OK);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &pose) == RK_OK);
+    assert(rk_simulation_get_robot_base_velocity(simulation, 0, &twist) == RK_OK);
+    assert(std::abs(pose.position[2] - 0.5) < 1e-9);
+    for (int axis = 0; axis < 3; ++axis)
+        assert(twist.linear[axis] == 0.0 && twist.angular[axis] == 0.0);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
+    floating_base_falls_and_settles(false);
+    floating_base_falls_and_settles(true);
     convex_link_and_box_link_build();
     tool_hulls_collide_only_on_their_pieces();
     tool_piece_contact_is_reported(1.07, false);

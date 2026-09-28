@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "name": "pty-forklift",
   "collisionApproximation": "bounds-box",
+  "floatingBase": false,
   "links": [
     {
       "id": "link/base",

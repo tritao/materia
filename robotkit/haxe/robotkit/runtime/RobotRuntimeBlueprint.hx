@@ -26,6 +26,8 @@ class RobotRuntimeBlueprint {
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
   public var selfCollision:Bool = true;
+  /** True makes the root link a free six-DOF body in Simulation. */
+  public var floatingBase:Bool = false;
   /** Zero uses two owner periods. */
   public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
   /** Zero uses the runtime's 10 ms owner period. */
@@ -145,6 +147,7 @@ class RobotRuntimeBlueprint {
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);
     value.set_self_collision(selfCollision ? 1 : 2);
+    value.set_floating_base(floatingBase ? 1 : 0);
     var layout = nativeSensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);

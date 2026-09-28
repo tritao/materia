@@ -95,6 +95,7 @@ class RobotModelCodec {
       schemaVersion: VERSION,
       name: model.name,
       collisionApproximation: collisionName(model.collisionApproximation),
+      floatingBase: model.floatingBase,
       links: [for (link in model.links) {
         id: link.id, name: link.name, mass: link.mass,
         centerOfMass: link.centerOfMass, inertiaTensor: link.inertiaTensor,
@@ -144,6 +145,7 @@ class RobotModelCodec {
 
     var model = new RobotModel(text(root, "name"));
     model.collisionApproximation = readCollision(text(root, "collisionApproximation"));
+    model.floatingBase = bool(root, "floatingBase");
     var links = new Map<String, Link>();
     for (record in array(root, "links")) {
       var id = text(record, "id");
@@ -431,6 +433,12 @@ class RobotModelCodec {
     if (!Std.isOfType(result, Int) && !Std.isOfType(result, Float))
       throw 'Invalid RobotModel field $name';
     return finite(result, name);
+  }
+
+  static function bool(value:Dynamic, name:String):Bool {
+    var result:Dynamic = required(value, name);
+    if (!Std.isOfType(result, Bool)) throw 'Invalid RobotModel field $name';
+    return result;
   }
 
   static function fieldInt(value:Dynamic, name:String):Int {
