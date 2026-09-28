@@ -84,9 +84,17 @@ bool valid_law(const mk_time_stage *stages, uint32_t count) {
 
 bool inverse_time(const std::vector<mk_time_stage> &stages, double s, double &seconds) {
     const double epsilon = 1e-12 * std::max(1.0, std::abs(s));
+    // Only the final rest boundary receives the larger tolerance caused by
+    // nanosecond rounding. Interior path-event positions keep full precision.
+    const auto &last = stages.back();
+    const double final_epsilon = 1e-8 * std::max(1.0, std::abs(s));
     if (!std::isfinite(s) || s < stages.front().start_s - epsilon ||
-        s > end_s(stages.back()) + epsilon)
+        s > end_s(last) + final_epsilon)
         return false;
+    if (std::abs(s - end_s(last)) <= final_epsilon) {
+        seconds = static_cast<double>(last.start_ns + last.duration_ns) * 1e-9;
+        return true;
+    }
     for (const auto &stage : stages) {
         if (std::abs(s - stage.start_s) <= epsilon) {
             seconds = static_cast<double>(stage.start_ns) * 1e-9;
@@ -477,7 +485,7 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
         const auto l = laws.find(law.id);
         if (p == paths.end() || l == laws.end()) return MK_ERROR_INVALID_HANDLE;
         if (std::abs(p->second.front().s - l->second.stages.front().start_s) > 1e-10 ||
-            std::abs(p->second.back().s - end_s(l->second.stages.back())) > 1e-10)
+            std::abs(p->second.back().s - end_s(l->second.stages.back())) > 1e-8)
             return MK_ERROR_INVALID_ARGUMENT;
         mk_trajectory_handle trajectory{};
         auto result = mk_trajectory_create(p->second.front().joint_count, &trajectory);
@@ -533,6 +541,12 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         return MK_ERROR_INVALID_ARGUMENT;
     try {
         const auto dof = static_cast<Eigen::Index>(joint_count + 1);
+        // Scale each joint by its velocity limit so rotary shafts and linear
+        // carriages have comparable LP coefficients. The time law remains in
+        // the original path coordinate and the final validation uses SI units.
+        std::vector<double> coordinate_scale(joint_count);
+        for (uint32_t j = 0; j < joint_count; ++j)
+            coordinate_scale[j] = 1.0 / max_velocity[j];
         std::vector<double> knots, caps;
         toppra::Matrices coefficients;
         knots.reserve(samples.size());
@@ -546,7 +560,8 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 const Poly p = path_poly(samples[i], samples[i + 1], j);
                 for (size_t k = 0; k < p.size(); ++k)
                     matrix(5 - static_cast<Eigen::Index>(k), j) =
-                        p[k] / std::pow(ds, static_cast<int>(k));
+                        p[k] * coordinate_scale[j] /
+                        std::pow(ds, static_cast<int>(k));
             }
             matrix(4, joint_count) = 1.0;
             matrix(5, joint_count) = samples[i].s;
@@ -572,10 +587,12 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         const double moving_boundary_margin = (start_speed > 0.0 || end_speed > 0.0)
             ? 0.98 : 1.0;
         for (uint32_t j = 0; j < joint_count; ++j) {
-            lower_velocity[j] = -max_velocity[j] * moving_boundary_margin;
-            upper_velocity[j] = max_velocity[j] * moving_boundary_margin;
-            lower_acceleration[j] = -max_acceleration[j] * moving_boundary_margin * interpolation_margin;
-            upper_acceleration[j] = max_acceleration[j] * moving_boundary_margin * interpolation_margin;
+            lower_velocity[j] = -max_velocity[j] * coordinate_scale[j] * moving_boundary_margin;
+            upper_velocity[j] = max_velocity[j] * coordinate_scale[j] * moving_boundary_margin;
+            lower_acceleration[j] = -max_acceleration[j] * coordinate_scale[j] *
+                moving_boundary_margin * interpolation_margin;
+            upper_acceleration[j] = max_acceleration[j] * coordinate_scale[j] *
+                moving_boundary_margin * interpolation_margin;
         }
         lower_velocity[joint_count] = -1e8;
         upper_velocity[joint_count] = 1e8;
@@ -636,6 +653,20 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
                 path_acceleration, max_velocity, max_acceleration, caps[span]));
             speed += path_acceleration * rounded;
             start_ns += duration_ns;
+        }
+        if (end_speed == 0.0 && !stages.empty()) {
+            // Nanosecond rounding perturbs the last constant-acceleration
+            // stage's computed exit speed. Enforce the authored rest boundary
+            // exactly; the resulting path-distance change is below the
+            // nanosecond quantization error and is checked before lowering.
+            auto &last = stages.back();
+            const double duration = static_cast<double>(last.duration_ns) * 1e-9;
+            const double corrected = -last.speed / duration;
+            const double old_end = end_s(last);
+            last.acceleration = corrected;
+            if (std::abs(end_s(last) - old_end) > 1e-8 *
+                    std::max(1.0, std::abs(old_end)))
+                return MK_ERROR_GENERATION;
         }
         mk_time_law_handle created{};
         bool accepted = false;

@@ -25,6 +25,7 @@ import cadbridge.FaceBridge;
 import cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
 import cadbridge.AssemblySimulationBridge;
+import cadbridge.AssemblyPhysicalPartView;
 import robotkit.runtime.RobotRuntimeCompiler;
 import cadkit.modeling.AssemblyModel;
 import materia.assembly.AssemblyFrames;
@@ -52,11 +53,19 @@ class CadBridgeTests {
     assembly.connector("slider", "mount", AssemblyFrames.identity());
     assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
-    var parts:cadbridge.AssemblySimulationBridge.AssemblyPhysicalData = {metresPerUnit: 0.001,
-      parts: [for (id in ["base", "slider"]) {id: id, materialId: "machined-steel",
+    var vertices = Bytes.alloc(4 * 24);
+    var points = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
+      0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
+    for (index in 0...points.length) vertices.setDouble(index * 8, points[index]);
+    var parts = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider"]) {
+        id: id, name: id, red: 0.5, green: 0.5, blue: 0.5,
+        materialId: "machined-steel", materialDensity: 7850.0,
         volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
         inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
-        density: 7850.0}]};
+        vertexCount: 4, indexCount: 0, vertices: vertices,
+        normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
+      }]});
     var translated = AssemblySimulationBridge.toRobotModel(assembly.definition("bridge-test"), parts);
     check(translated.model.links.length == 3 && translated.model.joints.length == 2,
       "assembly tree translates to robot links and joints");
@@ -66,6 +75,10 @@ class CadBridgeTests {
       "assembly limits and material mass convert to SI units");
     check(RobotRuntimeCompiler.validate(translated.model).length == 0,
       "translated assembly is a valid RobotKit runtime model");
+    var hull:Array<Float> = cast translated.linkCollisionHulls[1];
+    check(translated.linkCollisionHulls.length == translated.model.links.length &&
+      hull != null && hull.length <= 64 * 3,
+      "physical-part view supplies bounded hulls to the bridge");
   }
 
   /**
