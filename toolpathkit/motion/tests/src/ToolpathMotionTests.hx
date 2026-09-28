@@ -8,6 +8,9 @@ import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 import motionkit.program.MotionOp;
+import machinekit.assembly.LinearAxis;
+import motionkit.robot.MachineKitRobotCompiler;
+import haxe.Int64;
 
 class ToolpathMotionTests {
   static function acceptsBinding(binding:ToolpathMotionBinding):Void {}
@@ -45,6 +48,18 @@ class ToolpathMotionTests {
       rejected = Std.string(error).indexOf("X travel") >= 0;
     }
     if (!rejected) throw "machine travel was not checked";
-    Sys.println("ToolpathKit Motion tests passed (4 assertions)");
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 200), 0.1, 0.4);
+    var robotBinding = new ToolpathMotionBinding(
+      new MachineBinding("work", "x", "y", "z", 0.08), blueprint);
+    var compiled = robotBinding.compile([
+      ToolpathOp.Move(Cut,
+        PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
+        0.01, 0, Provenance.cam(8))
+    ], [0.0, 0.0, 0.0], Int64.ofInt(1));
+    if (compiled.blocks.length == 0) throw "robot binding produced no plans";
+    compiled.dispose();
+    Sys.println("ToolpathKit Motion tests passed (5 assertions)");
   }
 }

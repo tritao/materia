@@ -1,11 +1,40 @@
 {
   "version": 1,
-  "package": { "name": "toolpathkit-motion-tests" },
+  "package": {
+    "name": "toolpathkit-motion-tests"
+  },
   "entry": "ToolpathMotionTests",
-  "sourceRoots": ["src"],
+  "sourceRoots": [
+    "src"
+  ],
   "dependencies": {
-    "toolpathkit-motion": { "path": ".." }
+    "toolpathkit-motion": {
+      "path": ".."
+    }
   },
   "target": "host",
-  "outputDir": "build"
+  "outputDir": "build",
+  "native": {
+    "cmake": {
+      "source": "../../../robotkit/robotd/native",
+      "target": "robotd_native",
+      "inputs": [
+        "../../../robotkit/robotd/native/CMakeLists.txt",
+        "../../../robotkit/CMakeLists.txt",
+        "../../../robotkit/runtime/CMakeLists.txt",
+        "../../../robotkit/runtime/include/robotkit_runtime.h",
+        "../../../robotkit/runtime/include/robotkit_simkit.h",
+        "../../../motionkit/native/CMakeLists.txt",
+        "../../../motionkit/native/include/motionkit.h",
+        "../../../motionkit/native/src/trajectory.cpp",
+        "../../../motionkit/native/src/validation.cpp",
+        "../../../motionkit/native/src/generator.cpp",
+        "../../../motionkit/native/src/path.cpp",
+        "../../../motionkit/native/vendor/ruckig/CMakeLists.txt",
+        "../../../motionkit/native/vendor/toppra/cpp/CMakeLists.txt",
+        "../../../nativekit/CMakeLists.txt",
+        "../../../simkit/CMakeLists.txt"
+      ]
+    }
+  }
 }
