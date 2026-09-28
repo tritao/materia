@@ -238,6 +238,20 @@ All on this branch, with `CADKIT_OCCT_DIR` pointing at the prebuilt OCCT:
   MuJoCo, tracking max 5.4e-8): pass; `cnckit/tests`: 304 assertions pass.
   (The first `robotkit/tests` run exited 1 at the wall-finishing scenario
   while the disk was full and passed on rerun.)
+- `toolpathkit/motion/tests` (ToolpathKit motion tests, the "Machining run"
+  CAM pocket with feed hold, restart and spindle fault at 10 ms, and the toolpath
+  scenarios): pass. `motionkit/tests`: 6693 assertions pass.
+- `app/tests` (scene editing, stock, human simulation, scene documents, CAD
+  workflow) and `app/tests/project-source` (`app.ProjectSourceTests`: the
+  MachineKit assembly on both backends, link and hull collision with the
+  `none` approximation): exit 0. The app tests do not compile with this
+  branch's pinned haxeon (`EditorToolbarLayoutTests.hx:8: E1005 Unknown
+  variable "Full"`, an enum imported through its module and by name); I ran
+  them with haxeon 3d96aff7 from the `humanoid-h4` branch's haxeon and put the
+  pinned one back. Their native build needed the animkit vendor submodules
+  (cgltf, ozz-animation, stb) and the prebuilt OCCT; `0658001a` is a
+  cherry-pick of `493d7120` (`cadkit-prebuilt-occt`) for the latter and can be
+  dropped when that branch merges.
 - `none` approximation with shapeless links: no CNC (`MachineKitRobotCompiler`)
   or arm scene in RobotKit, MotionKit or ToolpathKit sets it, so they use
   bounding boxes and are not affected. It is used by the app's MachineKit
