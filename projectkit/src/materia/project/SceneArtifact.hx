@@ -52,11 +52,12 @@ typedef SceneArtifactData = {
 	@:optional var assemblyState:AssemblyStateRecord;
 	/** Optional editable source document for generated parts. */
 	@:optional var recipeDocument:String;
+	@:optional var recipeDiagnostics:Array<String>;
 }
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 9;
+	public static inline var VERSION:Int = 10;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -74,10 +75,13 @@ class SceneArtifact {
 		var assemblyState = data.assemblyState == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encodeState(data.assemblyDefinition, data.assemblyState));
 		var recipeDocument = data.recipeDocument == null ? Bytes.alloc(0) : Bytes.ofString(data.recipeDocument);
+		var recipeDiagnostics = data.recipeDiagnostics == null ? Bytes.alloc(0)
+			: Bytes.ofString(haxe.Json.stringify(data.recipeDiagnostics));
 		if (assembly.length > 2000000 || assemblyDefinition.length > 2000000 || assemblyState.length > 2000000)
 			throw "Scene artifact assembly metadata is too large";
 		if (recipeDocument.length > 2000000) throw "Scene artifact recipe document is too large";
-		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length;
+		if (recipeDiagnostics.length > 2000000) throw "Scene artifact recipe diagnostics are too large";
+		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -159,6 +163,8 @@ class SceneArtifact {
 		result.blit(offset, assemblyState, 0, assemblyState.length); offset += assemblyState.length;
 		offset = putInt(result, offset, recipeDocument.length);
 		result.blit(offset, recipeDocument, 0, recipeDocument.length); offset += recipeDocument.length;
+		offset = putInt(result, offset, recipeDiagnostics.length);
+		result.blit(offset, recipeDiagnostics, 0, recipeDiagnostics.length); offset += recipeDiagnostics.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -288,7 +294,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != SceneArtifact.VERSION)
+			version != 8 && version != 9 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -361,10 +367,23 @@ private class SceneArtifactReader {
 				throw "Scene artifact recipe document is too large";
 			if (documentLength > 0) recipeDocument = readBytes(documentLength).getString(0, documentLength);
 		}
+		var recipeDiagnostics:Null<Array<String>> = null;
+		if (version >= 10) {
+			var diagnosticsLength = readInt();
+			if (diagnosticsLength < 0 || diagnosticsLength > 2000000)
+				throw "Scene artifact recipe diagnostics are too large";
+			if (diagnosticsLength > 0) {
+				var decoded:Dynamic = haxe.Json.parse(readBytes(diagnosticsLength).getString(0, diagnosticsLength));
+				if (!Std.isOfType(decoded, Array)) throw "Scene artifact recipe diagnostics are invalid";
+				for (entry in (cast decoded:Array<Dynamic>))
+					if (!Std.isOfType(entry, String)) throw "Scene artifact recipe diagnostics are invalid";
+				recipeDiagnostics = cast decoded;
+			}
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
-			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument};
+			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument, recipeDiagnostics: recipeDiagnostics};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

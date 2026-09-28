@@ -42,11 +42,11 @@ class MotorShaftBearingsPreview {
 		MachineKitRecipes.register();
 		var editable = document();
 		try {
+			var diagnostics:Array<String> = [];
 			if (savedDocument != null) {
-				var diagnostics:Array<String> = [];
 				MachineKitRecipes.reconcileDocument(editable, savedDocument, diagnostics);
 			}
-			var result = previewDocument(editable);
+			var result = previewDocument(editable, diagnostics);
 			MachineKitRecipes.forget(editable);
 			editable.close();
 			return result;
@@ -57,7 +57,7 @@ class MotorShaftBearingsPreview {
 		}
 	}
 
-	static function previewDocument(editable:Document):Bytes {
+	static function previewDocument(editable:Document, diagnostics:Array<String>):Bytes {
 		var example = new MotorShaftBearings();
 		var instances = new Map<String, InstanceElement>();
 		for (element in editable.allElements()) if (element.kind == "instance") {
@@ -109,7 +109,7 @@ class MotorShaftBearingsPreview {
 		return SceneArtifact.encode({lengthUnit: "mm",
 			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
 			assembly: model.record(), assemblyDefinition: definition,
-			assemblyState: state, recipeDocument: DocumentCodec.encode(editable)});
+			assemblyState: state, recipeDocument: DocumentCodec.encode(editable), recipeDiagnostics: diagnostics});
 	}
 
 	static function addPart(parts:Array<SceneArtifactPart>, id:String, name:String, part:Part,

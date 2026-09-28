@@ -118,6 +118,12 @@ class MachineKitRecipes {
 	public static function reconcileDocument(fresh:cadkit.parametric.Document, savedText:String,
 			diagnostics:Array<String>):Bool {
 		register();
+		var tracePath = Sys.getEnv("MATERIA_RECONCILE_TRACE");
+		if (tracePath != null) {
+			var trace = sys.io.File.append(tracePath);
+			trace.writeString("reconcile\n");
+			trace.close();
+		}
 		var savedVersion = documentVersion(savedText);
 		var saved:cadkit.parametric.Document;
 		try saved = DocumentCodec.decode(savedText) catch (error:Dynamic) throw error;

@@ -54,6 +54,12 @@ class MachineKitRecipeProjectTests {
 		return jsonText(root);
 	}
 
+	static function countDiagnostic(diagnostics:Array<String>, fragment:String):Int {
+		var count = 0;
+		for (diagnostic in diagnostics) if (diagnostic.indexOf(fragment) >= 0) count++;
+		return count;
+	}
+
 	static function hasDiagnostic(diagnostics:Array<String>, fragment:String):Bool {
 		for (diagnostic in diagnostics) if (diagnostic.indexOf(fragment) >= 0) return true;
 		return false;
@@ -181,6 +187,7 @@ class MachineKitRecipeProjectTests {
 		reconciliationRegressions(cast generated.recipeDocument);
 		var session = new ProjectDocumentSession();
 		var destination = "/tmp/materia-machinekit-recipe-" + Sys.getPid() + ".materia.json";
+		var tracePath = destination + ".reconcile-trace";
 		try {
 			session.openGeneratedScene(generated.objects, manifest, generated.assembly,
 				generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
@@ -242,6 +249,31 @@ class MachineKitRecipeProjectTests {
 				"new source part stays editable after loading older saved recipes");
 			check(occurrence(reconciled, "removed-from-source") == null && session.staleEdits().length > 0,
 				"removed source part produces a diagnostic");
+			check(hasDiagnostic(session.staleEdits(), "no longer exists in source"),
+				"removed from source diagnostic reaches the app");
+			var oldVersionSaved = json(Reflect.field(project, "recipeDocument"));
+			Reflect.setField(oldVersionSaved, "version", 8);
+			var oldDefinitions:Array<Dynamic> = cast Reflect.field(oldVersionSaved, "definitions");
+			for (definition in oldDefinitions) {
+				var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
+				for (input in inputs) Reflect.deleteField(input, "editedByUser");
+			}
+			Reflect.setField(project, "recipeDocument", jsonText(oldVersionSaved));
+			File.saveContent(destination, jsonText(project));
+			File.saveContent(tracePath, "");
+			Sys.putEnv("MATERIA_RECONCILE_TRACE", tracePath);
+			try session.open(destination) catch (error:Dynamic) {
+				Sys.putEnv("MATERIA_RECONCILE_TRACE", "");
+				throw error;
+			}
+			Sys.putEnv("MATERIA_RECONCILE_TRACE", "");
+			check(countDiagnostic(session.staleEdits(), "re-save this project") == 1,
+				"version 8 project prompts to re-save exactly once");
+			check(hasDiagnostic(session.staleEdits(), "no longer exists in source"),
+				"removed from source diagnostic survives version 8 load");
+			check(File.getContent(tracePath) == "reconcile\n",
+				"saved recipe is reconciled exactly once per load");
+			Reflect.setField(project, "recipeDocument", jsonText(saved));
 			for (record in kept) if (Reflect.field(record, "kind") == "instance"
 				&& Reflect.field(record, "name") == "bearingA") {
 				var values:Array<Dynamic> = cast Reflect.field(record, "properties");
@@ -257,10 +289,12 @@ class MachineKitRecipeProjectTests {
 		} catch (error:Dynamic) {
 			session.dispose();
 			if (FileSystem.exists(destination)) FileSystem.deleteFile(destination);
+			if (FileSystem.exists(tracePath)) FileSystem.deleteFile(tracePath);
 			throw error;
 		}
 		session.dispose();
 		if (FileSystem.exists(destination)) FileSystem.deleteFile(destination);
+		if (FileSystem.exists(tracePath)) FileSystem.deleteFile(tracePath);
 		return 0;
 	}
 }

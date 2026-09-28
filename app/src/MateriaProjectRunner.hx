@@ -326,7 +326,7 @@ class MateriaProjectRunner {
       assemblyState: runtimeState == null ? null : runtimeState.record(),
       localCentersByDefinition: localCentersByDefinition,
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
-      recipeDocument: artifact.recipeDocument};
+      recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics};
   }
 
   /** Re-evaluate generated occurrence placements for a project-owned configuration. */
@@ -364,7 +364,7 @@ class MateriaProjectRunner {
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       metresPerUnit: generated.metresPerUnit, physical: generated.physical,
-      recipeDocument: generated.recipeDocument};
+      recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -504,4 +504,5 @@ typedef GeneratedAssemblyScene = {
   var metresPerUnit:Float;
   var physical:AssemblyPhysicalData;
   var recipeDocument:Null<String>;
+  @:optional var recipeDiagnostics:Array<String>;
 }

@@ -233,9 +233,12 @@ class ProjectDocumentSession {
     var projectRequirement = MateriaProjectRunner.executionRequirement(reference);
     var generated = MateriaProjectRunner.loadProject(reference,
       projectRequirement.reconcilesSavedRecipe ? savedRecipe : null);
-    if (savedRecipe != null && generated.recipeDocument != null) {
+    if (projectRequirement.reconcilesSavedRecipe) {
+      if (generated.recipeDiagnostics != null)
+        for (diagnostic in generated.recipeDiagnostics) diagnostics.push(diagnostic);
+    } else if (savedRecipe != null && generated.recipeDocument != null) {
       var reconciled = reconcileRecipe(generated.recipeDocument, savedRecipe, diagnostics);
-      if (reconciled.changed && !projectRequirement.reconcilesSavedRecipe)
+      if (reconciled.changed)
         generated = MateriaProjectRunner.loadProject(reference, reconciled.text);
       else
         generated.recipeDocument = reconciled.text;
