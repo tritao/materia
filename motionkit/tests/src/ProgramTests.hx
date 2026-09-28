@@ -118,6 +118,13 @@ import MotionKitTestSupport.SessionTransitionRig;
 import MotionKitTestSupport.LaggingRobot;
 import MotionKitTestSupport.TrialRig;
 import MotionKitTestSupport.FaultingArmRobot;
+import processkit.ChannelProcessDevice;
+import processkit.FeedChangePolicy;
+import processkit.ProcessRecipe;
+import processkit.ProcessRun;
+import processkit.ProcessRunState;
+import robotkit.tool.ChannelToolAdapter;
+import robotkit.tool.SimulatedSprayer;
 
 class ProgramTests extends MotionKitTestSupport {
   public function new() { super(); }
@@ -513,6 +520,143 @@ class ProgramTests extends MotionKitTestSupport {
       case _: false;
     }), "manipulator abort restores the safe process value");
     pathSimulation.dispose();
+  }
+
+  public function testProcessRunVirtualArmRecovery():Void {
+    var fixture = buildContractArmFixture();
+    for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
+    var simulation = new Simulation(0.01);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    blueprint.channels.push(new ProcessChannelDeclaration("paint.flow",
+      ProcessEventValue.Analog(0.0)));
+    var runtime = simulation.addRobot(blueprint);
+    var robot = new FaultingArmRobot("process-arm", runtime, fixture.model.name,
+      [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model,
+      fixture.chain), 1e-8);
+    var compiler = new ProgramCompiler(solver,
+      new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0)), "work",
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
+      [for (_ in 0...6) 20.0],
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+    var motion = new ManipulatorMotion(robot, compiler, (_) -> null,
+      () -> runtime.pollEvents());
+    var origin = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
+    var destination = origin.copy(); destination[0] += 0.2;
+    var path = new PosePath("work", [new PoseLine(
+      new PoseWaypoint(solver.forward(origin), 0.01, 0.04),
+      new PoseWaypoint(solver.forward(destination), 0.01, 0.04),
+      OrientationPolicy.Interpolated, 0.1, 0.05)]);
+    var sprayer = new SimulatedSprayer();
+    var adapter = new ChannelToolAdapter();
+    adapter.bindSprayerFlow("paint.flow", sprayer, 1.0);
+    var tick = 0;
+    var device = new ChannelProcessDevice(adapter, "paint.flow",
+      () -> Int64.ofInt(tick * 10000000));
+    var recipe = new ProcessRecipe(0.05, 0.2, 0.05, 0.03,
+      OrientationPolicy.Interpolated, 0.05, 2.0, 0.0, 0.03,
+      FeedChangePolicy.Adapt);
+    var run = new ProcessRun(recipe, path, device, "paint.flow", motion.session);
+    var approach = origin.copy(); approach[0] -= 0.05;
+    motion.run(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget(approach), new MotionOptions(), Blend.ExactStop)]));
+    for (_ in 0...600) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      if (!motion.running) break;
+    }
+    check(motion.completed, 'arm reaches process start: ${motion.failure}');
+    run.start(); run.update(0.0);
+    check(run.state == Ready, "process device becomes ready on the virtual arm");
+    motion.run(run.takeProgram());
+    check(motion.running, 'initial process program starts: ${motion.failure}');
+    var applied = 0;
+    var distance = 0.0;
+    for (_ in 0...1200) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      var records = motion.firedEvents();
+      run.applyRecords([for (i in applied...records.length) records[i]]);
+      applied = records.length;
+      distance = Math.max(distance, motion.progress().pathDistance);
+      run.update(Math.min(distance, path.length()));
+      if (sprayer.flow() > 0.0 && distance > path.length() * 0.4) break;
+    }
+    check(motion.running && sprayer.flow() > 0.0 && distance > path.length() * 0.4,
+      'process flow is active midpass at $distance: ${motion.failure}');
+    device.setFault("blocked nozzle");
+    run.update(distance);
+    check(run.state == ControlledInterruption && sprayer.flow() == 0.0,
+      "process fault interrupts the pass and makes the tool safe");
+    motion.abort();
+    check(motion.sessionState() == Stopping(Discard),
+      "arm stops before process recovery");
+    robot.faultOverride = 42;
+    motion.update(0.01);
+    check(motion.sessionState() == Faulted,
+      "runtime fault while stopping latches the shared session");
+    device.setFault(null);
+    run.update(distance);
+    check(run.state == ControlledInterruption,
+      "process recovery waits while the arm session is faulted");
+    var settled = false;
+    for (_ in 0...500) {
+      simulation.step(Int64.ofInt(tick++));
+      var snapshot = runtime.snapshot();
+      if (snapshot.sessionState == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
+          !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0) {
+        settled = true;
+        break;
+      }
+    }
+    check(settled, "virtual arm settles before reset");
+    robot.faultOverride = 0;
+    motion.reset();
+    check(motion.sessionState() == Idle, "explicit arm reset permits recovery");
+    simulation.step(Int64.ofInt(tick++));
+    run.update(distance);
+    check(run.state == Recovery, "process run enters recovery after arm reset");
+    var continuation = run.takeProgram();
+    var restart = Math.max(0.0, distance - recipe.recoveryBackoff);
+    near(run.lastProgramStart, restart,
+      "recovery backs up along the authored path", 1e-6);
+    check(run.lastProgramStart < run.interruptedAt,
+      "recovery overlaps the interrupted pass");
+    var approachMatches = switch continuation.ops[0] {
+      case MoveL(pose, _, _, _):
+        motionkit.path.PoseMath.distance(pose,
+          path.waypointAt(restart).pose) < 1e-6;
+      case _: false;
+    };
+    check(approachMatches, "recovery approaches the backed-off path pose");
+    motion.run(continuation);
+    check(motion.running, 'recovery program starts from settled arm: ${motion.failure}');
+    applied = 0;
+    var flowRestored = false;
+    var finalOffEvent = false;
+    for (_ in 0...1200) {
+      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      var records = motion.firedEvents();
+      for (i in applied...records.length) {
+        var record = records[i];
+        if (record.channel == "paint.flow") switch record.value {
+          case ProcessEventValue.Analog(value):
+            if (value > 0.0) flowRestored = true;
+            else if (flowRestored) finalOffEvent = true;
+          case _:
+        }
+        run.applyRecords([record]);
+      }
+      applied = records.length;
+      if (!motion.running) break;
+    }
+    check(motion.completed && motion.failure == null,
+      'recovery program completes: ${motion.failure}');
+    check(flowRestored, "runtime restores process output on the resumed pass");
+    check(finalOffEvent && sprayer.flow() == 0.0,
+      "runtime fires the final safe output event");
+    run.update(path.length());
+    check(run.state == Completion, "process run completes after resumed pass");
+    simulation.dispose();
   }
 
   public function testManipulatorSessionTransitions():Void {

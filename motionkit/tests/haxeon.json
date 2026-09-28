@@ -8,6 +8,7 @@
     "toolpathkit": { "path": "../../toolpathkit" },
     "cadbridge": { "path": "../../robotkit/cadbridge" },
     "machinekit": { "path": "../../machinekit" },
+    "processkit": { "path": "../../processkit" },
     "motionkit-robot": { "path": "../robot" },
     "nativekit": { "path": "../../nativekit" },
     "robotkit": { "path": "../../robotkit" }
