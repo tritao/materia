@@ -502,6 +502,126 @@ static void world_settings_are_shared() {
 }
 
 
+// What a standing humanoid's leg touches when something else overlaps it.
+enum class Target { None, ArmLink, GantryLink, StaticBox, DynamicBox, ShapelessRobot };
+const char *target_name(Target target) {
+    switch (target) {
+    case Target::None: return "nothing";
+    case Target::ArmLink: return "arm link";
+    case Target::GantryLink: return "gantry link";
+    case Target::StaticBox: return "static box";
+    case Target::DynamicBox: return "dynamic box";
+    case Target::ShapelessRobot: return "shapeless none-approximation robot";
+    }
+    return "";
+}
+
+struct Touch {
+    uint32_t contacts = 0;   // Active contacts of the leg links with anything but the floor.
+    double displacement = 0; // How far the humanoid ended from where it ends with nothing there.
+    double pose[7] = {};
+};
+
+Touch leg_touch(Target target, uint32_t filter, const Touch *reference) {
+    // The shank capsule of the left leg is centred (hx, 0.1, 0.16) at rest.
+    const double at[3] = {0.0, 0.18, 0.16};
+    Options options;
+    options.arm = target == Target::ArmLink;
+    options.gantry = target == Target::GantryLink;
+    options.humanoid = true;
+    options.humanoid_first = true;
+    options.humanoid_x = 0.0;
+    options.humanoid_height = 0.68;
+    options.humanoid_filter = filter;
+    options.floor_box = true;
+    std::copy(at, at + 3, options.arm_position);
+    std::copy(at, at + 3, options.gantry_position);
+    if (target == Target::StaticBox) options.static_box = at;
+    if (target == Target::DynamicBox) options.dynamic_box = at;
+    if (target == Target::ShapelessRobot) options.shapeless_robot = at;
+    Scene scene;
+    build(scene, options);
+    Touch touch;
+    for (uint32_t tick = 0; tick < 100; ++tick) {
+        assert(rk_simulation_step(scene.simulation, tick * 10'000'000ull) == RK_OK);
+        rk_robot_contact contacts[256]{};
+        uint32_t count = 0;
+        assert(rk_simulation_get_robot_contacts(scene.simulation, scene.humanoid, contacts, 256, &count) == RK_OK);
+        uint32_t now = 0;
+        for (uint32_t i = 0; i < count && i < 256; ++i)
+            if (contacts[i].active && contacts[i].other_object != scene.floor && contacts[i].link_index >= 1)
+                ++now;
+        touch.contacts = std::max(touch.contacts, now);
+    }
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(rk_simulation_get_robot_pose(scene.simulation, 0, &pose) == RK_OK);
+    std::copy(pose.position, pose.position + 3, touch.pose);
+    std::copy(pose.rotation, pose.rotation + 4, touch.pose + 3);
+    if (reference)
+        for (int i = 0; i < 3; ++i)
+            touch.displacement = std::fmax(touch.displacement, std::fabs(touch.pose[i] - reference->pose[i]));
+    return touch;
+}
+
+// Contact between a humanoid's leg shapes and what overlaps them follows the
+// shapes' contact filter: by layers with everything, only through pairs (so
+// with nothing outside the robot), or through pairs and with everything the
+// layers allow outside the robot. A link that collides with nothing is never
+// touched.
+static void contacts_follow_the_contact_filter() {
+    struct Row {
+        Target target;
+        bool touched[3]; // Filters 0, 1, 2.
+    };
+    const Row rows[] = {
+        {Target::ArmLink, {true, false, true}},
+        {Target::GantryLink, {true, false, true}},
+        {Target::StaticBox, {true, false, true}},
+        {Target::DynamicBox, {true, false, true}},
+        {Target::ShapelessRobot, {false, false, false}},
+    };
+    for (const uint32_t filter : {0u, 1u, 2u}) {
+        const auto reference = leg_touch(Target::None, filter, nullptr);
+        EXPECT(reference.contacts == 0, "filter %u: a lone humanoid touches something", filter);
+        for (const auto &row : rows) {
+            const auto touch = leg_touch(row.target, filter, &reference);
+            std::printf("filter %u leg vs %-36s: max contacts %u, humanoid moved %.4f m\n", filter,
+                        target_name(row.target), touch.contacts, touch.displacement);
+            EXPECT((touch.contacts > 0) == row.touched[filter],
+                   "filter %u vs %s: %u contacts", filter, target_name(row.target), touch.contacts);
+            EXPECT((touch.displacement > 1e-3) == row.touched[filter] ||
+                       row.target == Target::DynamicBox,
+                   "filter %u vs %s: humanoid moved %.4f m", filter, target_name(row.target),
+                   touch.displacement);
+        }
+    }
+}
+
+// A humanoid dropped onto a machine bed, a link of a CNC robot, stands on it as
+// it stands on the floor, and its feet do not pass through into the floor below.
+static void humanoid_stands_on_a_machine_bed(uint32_t filter) {
+    Options options;
+    options.arm = false;
+    options.humanoid = true;
+    options.humanoid_first = true;
+    options.humanoid_filter = filter;
+    options.humanoid_x = 3.0;
+    options.humanoid_height = 1.23; // Feet 2 cm above a bed top at 0.55 m.
+    options.floor_box = true;       // The workshop floor, 0.55 m below the bed.
+    options.bed = true;
+    Scene scene;
+    build(scene, options);
+    for (uint32_t tick = 0; tick < 150; ++tick)
+        assert(rk_simulation_step(scene.simulation, tick * 10'000'000ull) == RK_OK);
+    const auto height = height_of(scene, scene.humanoid_index);
+    std::printf("filter %u humanoid dropped on a machine bed: torso height %.3f (bed top 0.55, floor 0)\n",
+                filter, height);
+    // Standing on the bed puts the torso near 0.55 + 0.66; through it, near 0.66.
+    EXPECT(filter == 1 ? height < 1.0 : height > 1.15,
+           "filter %u: torso ended at %.3f m", filter, height);
+}
+
 // The humanoid alone, unpowered enough to fall: report how it ends.
 [[maybe_unused]] static void probe_fall(uint32_t filter, double tolerance) {
     Options options;
@@ -529,6 +649,10 @@ static void world_settings_are_shared() {
 }
 
 int main() {
+    contacts_follow_the_contact_filter();
+    humanoid_stands_on_a_machine_bed(0);
+    humanoid_stands_on_a_machine_bed(1);
+    humanoid_stands_on_a_machine_bed(2);
     world_settings_are_shared();
     far_humanoid_does_not_change_arm_and_gantry(false, 0.0);
     far_humanoid_does_not_change_arm_and_gantry(true, 0.0);
