@@ -22,7 +22,7 @@ target_include_directories(cadkit-core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE
-        ${CMAKE_BINARY_DIR}/include/opencascade
+        ${CADKIT_OCCT_INCLUDE_DIR}
 )
 
 target_link_libraries(cadkit-core
