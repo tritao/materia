@@ -4,13 +4,17 @@ import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
+import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.CornerBlender;
+import motionkit.path.ArcSegment;
 import motionkit.path.GeometricPath;
+import motionkit.path.LineSegment;
 import motionkit.path.PathPoint;
+import motionkit.path.PathPrimitive;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseLine;
 import motionkit.path.PoseMath;
@@ -112,6 +116,7 @@ class ProgramCompiler {
     var distanceMaps:Array<Array<Float>> = [];
     var timeMaps:Array<Array<Float>> = [];
     var notes:Array<String> = [];
+    var leadingOutputs:Array<{channel:String, value:EventValue}> = [];
     var pending:Null<PendingMotion> = null;
     var currentIndex = -1;
     var skipNext = false;
@@ -139,6 +144,7 @@ class ProgramCompiler {
             var generated = Trajectory.generateStateToState(q, zeros(), zeros(), goal,
               velocity, acceleration, jerk);
             pending = new PendingMotion(index, q, goal, generated, [], null, null);
+            attachLeadingOutputs(pending, leadingOutputs);
             q = goal;
           case MoveL(pose, requestedFrame, feed, blend):
             if (pending != null) {
@@ -185,6 +191,7 @@ class ProgramCompiler {
                 OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
             }
             q = pending.endQ.copy();
+            attachLeadingOutputs(pending, leadingOutputs);
           case MoveC(via, endPose, requestedFrame, feed, blend):
             if (pending != null) {
               plans.push(finish(pending, nextId));
@@ -202,6 +209,7 @@ class ProgramCompiler {
               new PoseWaypoint(endPose, positionTolerance, orientationTolerance),
               OrientationPolicy.Interpolated, feed)]), q, feed, [], index);
             q = pending.endQ.copy();
+            attachLeadingOutputs(pending, leadingOutputs);
           case FollowPath(path, requestedFrame, feed, events):
             if (pending != null) {
               plans.push(finish(pending, nextId));
@@ -216,10 +224,10 @@ class ProgramCompiler {
               throw 'Motion program op $index path frame does not match $frameId';
             pending = lowerPath(path, q, feed, events, index);
             q = pending.endQ.copy();
+            attachLeadingOutputs(pending, leadingOutputs);
           case SetOutput(channel, value):
-            if (pending == null)
-              throw 'Motion program op $index SetOutput needs preceding motion';
-            pending.events.push(new TimedEvent(
+            if (pending == null) leadingOutputs.push({channel:channel, value:value});
+            else pending.events.push(new TimedEvent(
               Trajectory.nanoseconds(pending.trajectory.durationSeconds()), channel, value));
           case Dwell(seconds):
             if (pending != null) {
@@ -255,6 +263,8 @@ class ProgramCompiler {
               distanceMaps.push(pending.distances.copy());
               timeMaps.push(pending.times.copy());
       }
+      if (leadingOutputs.length > 0)
+        throw 'Motion program op $currentIndex has output changes without following motion';
       if (plans.length > 0) blocks.push(new ProgramBlock(plans, indices, null, lengths,
         distanceMaps, timeMaps));
       return new CompiledProgram(blocks, notes);
@@ -270,6 +280,13 @@ class ProgramCompiler {
 
   static function pathLength(pending:PendingMotion):Float
     return pending.path == null ? 0.0 : pending.path.length();
+
+  static function attachLeadingOutputs(pending:PendingMotion,
+      leading:Array<{channel:String, value:EventValue}>):Void {
+    for (output in leading)
+      pending.events.push(new TimedEvent(Int64.ofInt(0), output.channel, output.value));
+    while (leading.length > 0) leading.pop();
+  }
 
   function finish(pending:PendingMotion, id:Int64):ExecutionPlan {
     pending.events.sort(function(a, b) return Int64.compare(a.timeNs, b.timeNs));
@@ -424,7 +441,8 @@ class ProgramCompiler {
       distances:Array<Float>, times:Array<Float>, index:Int,
       authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float):Void {
     var worst = 0.0, worstTime = 0.0;
-    var tolerance = authoredPolyline == null ? positionTolerance : blendTolerance;
+    var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
+      positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
     var failure:Null<String> = null;
     for (sample in 0...(distances.length * 2 - 1)) {
       var left = Std.int(sample / 2);
@@ -433,10 +451,15 @@ class ProgramCompiler {
       var time = sample % 2 == 0 ? times[left] : (times[left] + times[left+1]) * 0.5;
       var desired = path.waypointAt(distance);
       var actual = solver.forward(plan.evaluate(time).positions);
-      var error = authoredPolyline == null ? PoseMath.distance(actual, desired.pose) :
+      var error = authoredPolyline != null ?
         Math.min(distanceToSegment(actual, authoredPolyline[0], authoredPolyline[1]),
-          distanceToSegment(actual, authoredPolyline[1], authoredPolyline[2]));
-      var allowed = authoredPolyline == null ? desired.positionTolerance : blendTolerance;
+          distanceToSegment(actual, authoredPolyline[1], authoredPolyline[2])) :
+        path.authoredGeometry != null ?
+          distanceToGeometry(actual, path.authoredGeometry) :
+          PoseMath.distance(actual, desired.pose);
+      var allowed = authoredPolyline != null ? blendTolerance :
+        path.authoredGeometry != null ? path.blendTolerance :
+          desired.positionTolerance;
       var angle = orientationError(actual, desired.pose,
         path.orientationPolicyAt(distance));
       if (error > worst) { worst = error; worstTime = time; tolerance = allowed; }
@@ -463,6 +486,36 @@ class ProgramCompiler {
     var y = point.y - start.y - fraction * dy;
     var z = point.z - start.z - fraction * dz;
     return Math.sqrt(x * x + y * y + z * z);
+  }
+
+  static function distanceToGeometry(point:Pose3, geometry:GeometricPath):Float {
+    var best = Math.POSITIVE_INFINITY;
+    for (primitive in geometry.primitives) {
+      var candidate = if (Std.isOfType(primitive, LineSegment)) {
+        var line:LineSegment = cast primitive;
+        distanceToSegment(point,
+          new Pose3(line.start.x, line.start.y, line.start.z),
+          new Pose3(line.end.x, line.end.y, line.end.z));
+      } else if (Std.isOfType(primitive, ArcSegment)) {
+        var arc:ArcSegment = cast primitive;
+        var angle = Math.atan2(point.y - arc.center.y,
+          point.x - arc.center.x);
+        var delta = angle - arc.startAngle;
+        if (arc.sweepAngle >= 0.0) {
+          while (delta < 0.0) delta += 2.0 * Math.PI;
+        } else {
+          while (delta > 0.0) delta -= 2.0 * Math.PI;
+        }
+        var fraction = arc.sweepAngle == 0.0 ? 0.0 :
+          Math.max(0.0, Math.min(1.0, delta / arc.sweepAngle));
+        var at = arc.pointAt(arc.length() * fraction);
+        Math.sqrt((point.x - at.x) * (point.x - at.x) +
+          (point.y - at.y) * (point.y - at.y) +
+          (point.z - at.z) * (point.z - at.z));
+      } else throw "Unsupported authored path primitive";
+      best = Math.min(best, candidate);
+    }
+    return best;
   }
 
   function requireFrame(requested:String, index:Int):Void {

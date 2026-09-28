@@ -14,7 +14,8 @@ class AxisKinematics implements KinematicsSolver {
   public final z:MotionAxis;
   final home:Array<Float>;
 
-  public function new(blueprint:MotionSystemBlueprint) {
+  public function new(blueprint:MotionSystemBlueprint,
+      ?xAxisId:String = "x", ?yAxisId:String = "y", ?zAxisId:String = "z") {
     if (blueprint == null) throw "Axis kinematics needs a motion-system blueprint";
     this.blueprint = blueprint;
     var names = [for (joint in blueprint.model.joints) joint.name];
@@ -23,7 +24,7 @@ class AxisKinematics implements KinematicsSolver {
       for (axis in axes) if (axis.id == id) return axis;
       throw 'Axis kinematics requires logical axis "$id"';
     }
-    x = required("x"); y = required("y"); z = required("z");
+    x = required(xAxisId); y = required(yAxisId); z = required(zAxisId);
     var used = new Map<Int, Bool>();
     for (axis in [x, y, z]) for (joint in axis.jointIndices) {
       if (used.exists(joint))

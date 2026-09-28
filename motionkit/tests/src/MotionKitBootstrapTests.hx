@@ -1,4 +1,5 @@
 import haxe.Int64;
+import cnckit.CncMachine;
 import machinekit.assembly.LinearAxis;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
@@ -21,6 +22,7 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
+import motionkit.robot.CncMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
@@ -104,6 +106,11 @@ class MotionKitBootstrapTests {
   static var assertions:Int = 0;
 
   public static function main():Void {
+    if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
+      testCncProgramBinding();
+      Sys.println('CNC focused tests passed ($assertions assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       testOpwKinematics();
       Sys.println('C4 focused tests passed ($assertions assertions)');
@@ -117,6 +124,7 @@ class MotionKitBootstrapTests {
     testProgramCompiler();
     testPathConfigurationSelector();
     testAxisKinematics();
+    testCncProgramBinding();
     testManipulatorMotion();
     testSimplePathTimingContract();
     testNativePathLowering();
@@ -1491,6 +1499,25 @@ class MotionKitBootstrapTests {
     near(cornerEnd.positions.get(0), 0.04, "line path reaches its X endpoint", 1e-5);
     near(cornerEnd.positions.get(1), 0.03, "line path reaches its Y endpoint", 1e-5);
     simulation.dispose();
+  }
+
+  static function testCncProgramBinding():Void {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 200), 0.1, 0.4);
+    var cnc = new CncMachine("work", "x", "y", "z", 0.08);
+    var binding = new CncMotionBinding(cnc, blueprint);
+    var result = binding.compile("G21 G90 G17\nS12000 M3\nG0 X10 Y10\n" +
+      "F600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
+      [0.0, 0.0, 0.0], Int64.ofInt(900));
+    check(result.blocks.length > 0, "CNC ProgramCompiler emits execution blocks");
+    var last = result.blocks[result.blocks.length - 1].plans;
+    check(last.length > 0, "CNC arc is lowered into an execution plan");
+    var plan = last[last.length - 1];
+    var end = plan.evaluate(plan.durationSeconds).positions;
+    near(end[0], 0.01, "CNC arc ends at X", 1e-5);
+    near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
+    result.dispose();
   }
 
   static function testDualMotorAxisRunsThroughSimulation():Void {

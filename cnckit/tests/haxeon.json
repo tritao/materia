@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "cnckit-tests" },
+  "entry": "CncKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "cnckit": { "path": ".." }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

@@ -9,6 +9,9 @@ class PosePath implements MotionPath {
   public final frameId:String;
   public final primitives:Array<PosePrimitive>;
   public final events:Array<PathEvent>;
+  /** Original geometry for paths that replace corners with tolerance blends. */
+  public var authoredGeometry(default, null):Null<GeometricPath> = null;
+  public var blendTolerance(default, null):Float = 0.0;
   final totalLength:Float;
 
   public function new(frameId:String, primitives:Array<PosePrimitive>, ?events:Array<PathEvent>) {
@@ -36,6 +39,14 @@ class PosePath implements MotionPath {
   }
 
   public function length():Float return totalLength;
+
+  public function withAuthoredGeometry(geometry:GeometricPath, tolerance:Float):PosePath {
+    if (geometry == null || !Math.isFinite(tolerance) || tolerance <= 0.0)
+      throw "Authored geometry needs a positive blend tolerance";
+    authoredGeometry = geometry;
+    blendTolerance = tolerance;
+    return this;
+  }
   public function poseAt(distance:Float):Pose3 return waypointAt(distance).pose;
 
   public function orientationPolicyAt(distance:Float):OrientationPolicy {

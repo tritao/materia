@@ -354,6 +354,18 @@ These are follow-on plans.
 
 ## Progress log
 
+### C6 — CNC G-code to MotionProgram
+
+Added a strict G17 XY I/J CNC parser in the independent `cnckit` project.
+It tracks units, absolute or incremental coordinates, work and tool offsets,
+feeds, spindle and coolant state, exact stops, and G64 P corner blending.
+Unsupported words report line and column. The robot binding compiles the
+result through `ProgramCompiler` using logical XYZ axes and their model-derived
+transmissions and couplings. Initial output events attach to the first plan;
+blended paths retain their original line and arc geometry for task-space
+deviation checks. CncKit passed 20 assertions and the full MotionKit Haxe
+suite passed 6,601 assertions.
+
 ### C1 — Native path representation and adaptive lowering
 
 Added validated native C2 joint-path samples and continuous piecewise-quadratic

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "package": { "name": "cnckit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "motionkit": { "path": "../motionkit" }
+  },
+  "target": "host"
+}

@@ -56,4 +56,6 @@ class MotionAxis {
     for (i in 0...jointIndices.length)
       jointValues[jointIndices[i]] = jointScales[i] * logicalValue;
   }
+
+  public function jointScale(index:Int):Float return jointScales[index];
 }

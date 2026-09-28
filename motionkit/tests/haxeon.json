@@ -4,6 +4,7 @@
   "entry": "MotionKitBootstrapTests",
   "sourceRoots": ["src"],
   "dependencies": {
+    "cnckit": { "path": "../../cnckit" },
     "machinekit": { "path": "../../machinekit" },
     "motionkit-robot": { "path": "../robot" },
     "nativekit": { "path": "../../nativekit" },
