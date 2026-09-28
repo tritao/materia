@@ -3,20 +3,36 @@ package humankit;
 /**
  * Names of an asset rig's joints for each standard bone. Joint names are
  * compared after dropping any namespace prefix ending in ':', so Mixamo's
- * "mixamorig:Hips" and "mixamorig1:Hips" both match "Hips".
+ * "mixamorig:Hips" and "mixamorig1:Hips" both match "Hips". A bone may list
+ * alternatives, used in order, for variants within one rig family.
  */
 class RigMapping {
 	public final name:String;
 	final joints:Map<String, String>;
+	final alternatives:Map<String, Array<String>> = new Map();
 
 	public function new(name:String, joints:Map<String, String>) {
 		this.name = name;
 		this.joints = joints;
 	}
 
-	/** The asset joint name for a standard bone, or null when the rig lacks it. */
-	public function jointName(bone:HumanBone):Null<String>
-		return joints.get(bone);
+	/** The asset joint names that may provide a standard bone, preferred first. */
+	public function jointNames(bone:HumanBone):Array<String> {
+		var primary = joints.get(bone);
+		var names:Array<String> = primary == null ? [] : [primary];
+		var others = alternatives.get(bone);
+		return others == null ? names : names.concat(others);
+	}
+
+	/** Adds a fallback joint name for a bone, tried after the ones already given. */
+	public function alternative(bone:HumanBone, joint:String):RigMapping {
+		var others = alternatives.get(bone);
+		if (others == null)
+			alternatives.set(bone, [joint]);
+		else
+			others.push(joint);
+		return this;
+	}
 
 	/** Quaternius characters, including the Ultimate Modular and Universal Animation rigs. */
 	public static function quaternius():RigMapping {
@@ -38,8 +54,13 @@ class RigMapping {
 			joints.set('shin.$side', 'LowerLeg.$side');
 			joints.set('foot.$side', 'Foot.$side');
 			joints.set('toe.$side', 'Toes.$side');
+			// Blender exports each chain's bone tail as a "_end" leaf.
+			joints.set('toe_tip.$side', 'Toes.${side}_end');
 		}
-		return new RigMapping("quaternius", joints);
+		var mapping = new RigMapping("quaternius", joints);
+		// Rigs without toe bones end the foot bone at the toe tips.
+		mapping.alternative(HumanBone.ToeTipL, "Foot.L_end").alternative(HumanBone.ToeTipR, "Foot.R_end");
+		return mapping;
 	}
 
 	/** Mixamo exports, with or without the "mixamorig:" namespace. */
@@ -61,6 +82,7 @@ class RigMapping {
 			joints.set('shin.$side', '${prefix}Leg');
 			joints.set('foot.$side', '${prefix}Foot');
 			joints.set('toe.$side', '${prefix}ToeBase');
+			joints.set('toe_tip.$side', '${prefix}Toe_End');
 		}
 		return new RigMapping("mixamo", joints);
 	}

@@ -18,8 +18,10 @@ class HumanoidRig {
 		}
 		var missing:Array<String> = [];
 		for (bone in HumanBones.all()) {
-			var name = mapping.jointName(bone);
-			var joint = name == null ? null : byLocalName.get(name);
+			var joint:Null<Int> = null;
+			for (name in mapping.jointNames(bone))
+				if (joint == null)
+					joint = byLocalName.get(name);
 			if (joint != null)
 				joints.set(bone, joint);
 			else if (HumanBones.REQUIRED.indexOf(bone) >= 0)

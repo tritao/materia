@@ -31,8 +31,11 @@ enum abstract HumanBone(String) from String to String {
 	var ShinL = "shin.L";
 	var FootL = "foot.L";
 	var ToeL = "toe.L";
+	/** Tip of the left foot, where the toes end. */
+	var ToeTipL = "toe_tip.L";
 	var ThighR = "thigh.R";
 	var ShinR = "shin.R";
 	var FootR = "foot.R";
 	var ToeR = "toe.R";
+	var ToeTipR = "toe_tip.R";
 }
