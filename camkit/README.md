@@ -5,7 +5,7 @@ supports 2.5D outside and inside profiles, pocket clearing,
 and drilled hole centres. Profiles and pockets use configurable depth steps.
 Coordinates are metres; feeds are metres/second.
 `ToolpathMotion.lower(program.ops, binding)` sends the operations to MotionKit.
-`CamGCodeWriter.write(program, setup, cncMachine)` validates
+`cnckit.CncWriter.write(program.ops, setup, cncMachine)` validates
 the setup and exports LinuxCNC millimetre G-code. Each CAM operation carries
 its operation ID and, when available, a CAD feature reference.
 
@@ -68,7 +68,7 @@ var program = new CamJob(0.005, 12000)
   .profile(contour, tool, -0.002, 0.01)
   .finish(setup);
 var previewAndExecution = ToolpathMotion.lower(program.ops, machineBinding);
-var linuxCnc = CamGCodeWriter.write(program, setup, cncMachine);
+var linuxCnc = CncWriter.write(program.ops, setup, cncMachine);
 ```
 
 The test project creates its own rectangular, rounded and holed plate fixtures,

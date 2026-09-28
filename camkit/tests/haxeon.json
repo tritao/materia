@@ -5,6 +5,7 @@
   "sourceRoots": ["src"],
   "dependencies": {
     "camkit": { "path": ".." },
+    "cnckit": { "path": "../../cnckit" },
     "toolpathkit-motion": { "path": "../../toolpathkit/motion" }
   },
   "target": "host",

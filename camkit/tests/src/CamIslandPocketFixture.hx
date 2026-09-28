@@ -1,4 +1,4 @@
-import camkit.CamGCodeWriter;
+import cnckit.CncWriter;
 import camkit.CamJob;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Sketch;
@@ -126,7 +126,7 @@ class CamIslandPocketFixture {
     }
 
     var imported = new CncCompiler(machine).compileDetailed(
-      CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
+      CncWriter.write(program.ops, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 &&
       imported.ops.length == program.ops.length,
       "island pocket G-code recompiles with the same operation count");
