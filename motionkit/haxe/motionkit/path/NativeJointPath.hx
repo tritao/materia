@@ -39,13 +39,15 @@ class NativeJointPath {
     return new Trajectory(created.out_trajectory);
   }
 
-  public function time(limits:PathTimingLimits):PathTimeLaw {
+  public function time(limits:PathTimingLimits,
+      loweringTolerance:Float):{law:PathTimeLaw, trajectory:Trajectory} {
     if (disposed) throw "Native joint path has been disposed";
     var created = MotionKitNative.mk_time_path(owner.borrow(), limits.maxVelocity,
       limits.maxAcceleration, limits.speedCaps, limits.startPathSpeed,
-      limits.endPathSpeed);
+      limits.endPathSpeed, loweringTolerance);
     check(created.status, "path.time");
-    return new PathTimeLaw([], created.out_law);
+    return {law: new PathTimeLaw([], created.out_law),
+      trajectory: new Trajectory(created.out_trajectory)};
   }
 
   public function dispose():Void {

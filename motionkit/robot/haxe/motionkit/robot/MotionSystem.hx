@@ -476,7 +476,7 @@ class MotionSystem {
       var first:Array<Array<Float>> = [];
       var second:Array<Array<Float>> = [];
       for (index in 0...(count + 1)) {
-        var distance = length * index / count;
+        var distance = index == count ? length : length * index / count;
         var point = primitive.pointAt(distance);
         var tangent = primitive.tangentAt(distance);
         var curvature = primitive.curvatureAt(distance);

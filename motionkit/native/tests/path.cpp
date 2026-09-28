@@ -83,8 +83,14 @@ int main() {
     assert(mk_path_create(straight, 2, &path) == MK_OK);
     const double velocity_limit[1] = {0.4};
     const double acceleration_limit[1] = {1.0};
+    mk_trajectory_handle timed_trajectory{};
     assert(mk_time_path(path, velocity_limit, acceleration_limit, 1,
-        nullptr, 0, 0.0, 0.0, &law) == MK_OK);
+        nullptr, 0, 0.0, 0.0, 1e-6, &law, &timed_trajectory) == MK_OK);
+    assert(timed_trajectory.id != 0);
+    mk_trajectory_state timed_state{};
+    timed_state.struct_size = sizeof(timed_state);
+    assert(mk_trajectory_evaluate(timed_trajectory, 0, &timed_state) == MK_OK);
+    assert(std::abs(timed_state.position[0]) < 1e-9);
     assert(mk_path_distance_to_time(law, 1.0, &time) == MK_OK);
     assert(time > 2.8 && time < 3.1); // 0.4 m/s cruise, 1 m/s² ramps.
     uint32_t binding_count = 0;
@@ -99,11 +105,11 @@ int main() {
             velocity_bound = true;
     }
     assert(velocity_bound);
+    mk_trajectory_destroy(timed_trajectory);
     mk_time_law_destroy(law);
     const double boundary_velocity_limit[1] = {0.2};
     assert(mk_time_path(path, boundary_velocity_limit, acceleration_limit, 1,
-        nullptr, 0, 0.15, 0.15, &law) == MK_OK);
-    assert(mk_path_lower(path, law, 1e-8, &tight) == MK_OK);
+        nullptr, 0, 0.15, 0.15, 1e-8, &law, &tight) == MK_OK);
     mk_trajectory_state moving_boundary{};
     moving_boundary.struct_size = sizeof(moving_boundary);
     assert(mk_trajectory_evaluate(tight, 0, &moving_boundary) == MK_OK);

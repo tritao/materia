@@ -25,6 +25,7 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
+import motionkit.robot.OpwKinematics;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
@@ -151,13 +152,18 @@ class ProgramCompiler {
             }
             requireFrame(requestedFrame, index);
             var blended:Null<PosePath> = null;
+            var blendTolerance = 0.0;
+            var blendNextPose:Null<Pose3> = null;
             switch blend {
               case ToleranceBlend(metres):
+                blendTolerance = metres;
                 if (index + 1 < program.ops.length) switch program.ops[index + 1] {
                   case MoveL(nextPose, nextFrame, nextFeed, ExactStop):
-                    if (nextFrame == frameId)
+                    if (nextFrame == frameId) {
                       blended = blendLinear(solver.forward(q), pose, nextPose,
                         metres, feed, nextFeed);
+                      blendNextPose = nextPose;
+                    }
                   case _:
                 }
               case ExactStop:
@@ -167,7 +173,8 @@ class ProgramCompiler {
                 case MoveL(_, _, speed, _): speed;
                 case _: feed;
               };
-              pending = lowerPath(blended, q, Math.max(feed, nextFeed), [], index);
+              pending = lowerPath(blended, q, Math.max(feed, nextFeed), [], index,
+                [solver.forward(q), pose, cast blendNextPose], blendTolerance);
               skipNext = true;
               notes.push('Motion program ops $index and ${index + 1} tolerance blended');
             } else {
@@ -272,7 +279,8 @@ class ProgramCompiler {
       plan = ExecutionPlan.create(pending.trajectory, limits, id, pending.startQ,
         zeros(), zeros(), tolerances(), tolerances(), tolerances(), pending.events);
       if (pending.path != null) checkTaskSpace(plan, pending.path, pending.distances,
-        pending.times, pending.opIndex);
+        pending.times, pending.opIndex, pending.authoredPolyline,
+        pending.blendTolerance);
       pending.trajectory.dispose();
       return plan;
     } catch (error:Dynamic) {
@@ -344,7 +352,8 @@ class ProgramCompiler {
       positionTolerance, orientationTolerance);
 
   function lowerPath(path:PosePath, startQ:Array<Float>, feed:Float,
-      authoredEvents:Array<PathEvent>, index:Int):PendingMotion {
+      authoredEvents:Array<PathEvent>, index:Int,
+      ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
     var distances:Array<Float> = [];
     var count = Std.int(Math.ceil(path.length() / cartesianResolution));
@@ -404,7 +413,7 @@ class ProgramCompiler {
       var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
       timed.releaseDistanceMap();
       return new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
-        path, distances, timeMap);
+        path, distances, timeMap, authoredPolyline, blendTolerance);
     } catch (error:Dynamic) {
       timed.releaseDistanceMap();
       timed.trajectory.dispose();
@@ -413,8 +422,10 @@ class ProgramCompiler {
   }
 
   function checkTaskSpace(plan:ExecutionPlan, path:PosePath,
-      distances:Array<Float>, times:Array<Float>, index:Int):Void {
-    var worst = 0.0, worstTime = 0.0, tolerance = positionTolerance;
+      distances:Array<Float>, times:Array<Float>, index:Int,
+      authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float):Void {
+    var worst = 0.0, worstTime = 0.0;
+    var tolerance = authoredPolyline == null ? positionTolerance : blendTolerance;
     var failure:Null<String> = null;
     for (sample in 0...(distances.length * 2 - 1)) {
       var left = Std.int(sample / 2);
@@ -423,11 +434,14 @@ class ProgramCompiler {
       var time = sample % 2 == 0 ? times[left] : (times[left] + times[left+1]) * 0.5;
       var desired = path.waypointAt(distance);
       var actual = solver.forward(plan.evaluate(time).positions);
-      var error = PoseMath.distance(actual, desired.pose);
+      var error = authoredPolyline == null ? PoseMath.distance(actual, desired.pose) :
+        Math.min(distanceToSegment(actual, authoredPolyline[0], authoredPolyline[1]),
+          distanceToSegment(actual, authoredPolyline[1], authoredPolyline[2]));
+      var allowed = authoredPolyline == null ? desired.positionTolerance : blendTolerance;
       var angle = orientationError(actual, desired.pose,
         path.orientationPolicyAt(distance));
-      if (error > worst) { worst = error; worstTime = time; tolerance = desired.positionTolerance; }
-      if (error > desired.positionTolerance + 1e-9 ||
+      if (error > worst) { worst = error; worstTime = time; tolerance = allowed; }
+      if (error > allowed + 1e-9 ||
           angle > desired.orientationTolerance + 1e-9)
         failure = 'Motion program op $index task-space tolerance exceeded at path distance $distance';
     }
@@ -438,6 +452,18 @@ class ProgramCompiler {
       MotionKitNativeConstants.MK_CHECK_FAILED, worst, worstTime, tolerance,
       Trajectory.nanoseconds(resolutionSeconds * 0.5));
     if (failure != null) throw failure;
+  }
+
+  static function distanceToSegment(point:Pose3, start:Pose3, end:Pose3):Float {
+    var dx = end.x - start.x, dy = end.y - start.y, dz = end.z - start.z;
+    var lengthSquared = dx * dx + dy * dy + dz * dz;
+    var fraction = lengthSquared <= 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
+      ((point.x - start.x) * dx + (point.y - start.y) * dy +
+        (point.z - start.z) * dz) / lengthSquared));
+    var x = point.x - start.x - fraction * dx;
+    var y = point.y - start.y - fraction * dy;
+    var z = point.z - start.z - fraction * dz;
+    return Math.sqrt(x * x + y * y + z * z);
   }
 
   function requireFrame(requested:String, index:Int):Void {
@@ -508,14 +534,19 @@ private class PendingMotion {
   public final path:Null<PosePath>;
   public final distances:Array<Float>;
   public final times:Array<Float>;
+  public final authoredPolyline:Null<Array<Pose3>>;
+  public final blendTolerance:Float;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,
-      distances:Null<Array<Float>>, ?times:Array<Float>) {
+      distances:Null<Array<Float>>, ?times:Array<Float>,
+      ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0) {
     this.opIndex = opIndex; this.startQ = startQ.copy(); this.endQ = endQ.copy();
     this.trajectory = trajectory; this.events = events;
     this.path = path;
     this.distances = distances == null ? [] : distances;
     this.times = times == null ? [] : times;
+    this.authoredPolyline = authoredPolyline == null ? null : authoredPolyline.copy();
+    this.blendTolerance = blendTolerance;
   }
 }
