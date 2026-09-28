@@ -1,13 +1,16 @@
 package humankit.facility;
 
 import materia.automation.facility.FacilityRoute;
-import robotkit.navigation.Path;
 
 /**
  * Bridges AutomationKit's facility routing to HumanWalker. HumanKit itself
  * does not depend on RobotKit or AutomationKit; this small package is the
  * one place that knows about both, so a person can walk a FacilityRoute (or
  * any robotkit Path) planned above it.
+ *
+ * Path is named fully qualified (robotkit.navigation.Path) throughout: UiKit
+ * ships its own unrelated, unnamespaced Path resource type, which a program
+ * linking both packages would otherwise shadow this one with.
  */
 class FacilityWalk {
 	/**
@@ -16,7 +19,7 @@ class FacilityWalk {
 	 * collapsed, so a route never carries a zero-length final segment that
 	 * would leave the walker's ending heading undefined.
 	 */
-	public static function routeFromPath(path:Path):Array<Array<Float>> {
+	public static function routeFromPath(path:robotkit.navigation.Path):Array<Array<Float>> {
 		var points:Array<Array<Float>> = [];
 		for (pose in path.poses()) {
 			var point = [pose.x, pose.y];

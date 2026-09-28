@@ -8,7 +8,6 @@ import materia.automation.facility.Station;
 import materia.automation.facility.Zone;
 import robotkit.mobile.Footprint;
 import robotkit.mobile.Pose2;
-import robotkit.navigation.Path;
 
 /**
  * A small built-in AutomationKit facility for the editor's character
@@ -40,9 +39,10 @@ class FacilityRouteDemo {
 		built.addStation(dock);
 		built.addStation(shelf);
 		built.addStation(bench);
-		built.addLane(new Lane("dock-shelf", dock.id, shelf.id, new Path([dock.pose, shelf.pose], "map"), 1.0, 1.4));
-		built.addLane(new Lane("shelf-bench", shelf.id, bench.id, new Path([shelf.pose, bench.pose], "map"), 1.0,
-			1.4));
+		built.addLane(new Lane("dock-shelf", dock.id, shelf.id,
+			new robotkit.navigation.Path([dock.pose, shelf.pose], "map"), 1.0, 1.4));
+		built.addLane(new Lane("shelf-bench", shelf.id, bench.id,
+			new robotkit.navigation.Path([shelf.pose, bench.pose], "map"), 1.0, 1.4));
 		facility = built;
 		return built;
 	}

@@ -1,19 +1,17 @@
 package materia.automation.facility;
 
-import robotkit.navigation.Path;
-
 /** Directed travel corridor connecting two facility stations. */
 class Lane {
   public final id:String;
   public final fromStationId:String;
   public final toStationId:String;
-  public final centerline:Path;
+  public final centerline:robotkit.navigation.Path;
   public final widthMeters:Float;
   public final maximumSpeedMetersPerSecond:Float;
   public final bidirectional:Bool;
 
   public function new(id:String, fromStationId:String, toStationId:String,
-      centerline:Path, widthMeters:Float, maximumSpeedMetersPerSecond:Float,
+      centerline:robotkit.navigation.Path, widthMeters:Float, maximumSpeedMetersPerSecond:Float,
       ?bidirectional:Bool = true) {
     if (id == null || id.length == 0 || fromStationId == null || fromStationId.length == 0 ||
         toStationId == null || toStationId.length == 0 || fromStationId == toStationId ||
@@ -23,7 +21,7 @@ class Lane {
     this.id = id;
     this.fromStationId = fromStationId;
     this.toStationId = toStationId;
-    this.centerline = new Path(centerline.poses(), centerline.frameId);
+    this.centerline = new robotkit.navigation.Path(centerline.poses(), centerline.frameId);
     this.widthMeters = widthMeters;
     this.maximumSpeedMetersPerSecond = maximumSpeedMetersPerSecond;
     this.bidirectional = bidirectional;

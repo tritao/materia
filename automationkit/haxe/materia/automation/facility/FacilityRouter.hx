@@ -1,7 +1,6 @@
 package materia.automation.facility;
 
 import robotkit.mobile.Pose2;
-import robotkit.navigation.Path;
 import robotkit.navigation.PathSpeedLimit;
 
 /** Plans the minimum-travel-time lane route between named facility stations. */
@@ -114,7 +113,7 @@ class FacilityRouter {
         speed));
       maximumSpeed = Math.min(maximumSpeed, speed);
     }
-    var routePath = new Path(poses, start.frameId);
+    var routePath = new robotkit.navigation.Path(poses, start.frameId);
     var speedLimits:Array<PathSpeedLimit> = [for (range in legPoseRanges)
       new PathSpeedLimit(routePath.distanceAtWaypoint(range.startIndex),
         routePath.distanceAtWaypoint(range.endIndex), range.maximumSpeed)];
