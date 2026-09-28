@@ -42,6 +42,8 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
         var speed = manipulator.group.limitsOf(joint).velocity;
         speed > 0.0 ? speed : 10.0;
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
+      StartTolerances.uniform(count, positionTolerance,
+        maxAcceleration * 0.01, 20.0 * 0.01),
       null, 0.01, maxJointJump, positionTolerance,
       orientationTolerance, new IkTolerance(positionTolerance,
         orientationTolerance, ikMaxIterations, ikDamping));

@@ -30,6 +30,7 @@ import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.CncMotionBinding;
 import motionkit.robot.ProgramCompiler;
+import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MachineKitRobotCompiler;
@@ -141,6 +142,7 @@ class MotionKitBootstrapTests {
     testOpwKinematics();
     testMotionProgramContracts();
     testProgramCompiler();
+    testProgramStartTolerances();
     testPathConfigurationSelector();
     testAxisKinematics();
     testCncProgramBinding();
@@ -166,6 +168,7 @@ class MotionKitBootstrapTests {
     testMachineKitLeadScrewThroughVirtualDevice();
     testDualMotorAxisRunsThroughSimulation();
     testBufferedExecution();
+    testNormalAbortWaitsForRest();
     testPlanCapableReplayRecordsMotionPlan();
     testLongBufferedExecution();
     testHoldRefillsNearChunkBoundary();
@@ -304,6 +307,71 @@ class MotionKitBootstrapTests {
       "Descartes reports the first disconnected sample distance");
   }
 
+  static function testProgramStartTolerances():Void {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
+      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var solver = new AxisKinematics(blueprint);
+    var limits = new ValidationLimits(3, Int64.ofInt(blueprint.runtime.revision),
+      Int64.ofInt(blueprint.runtime.calibrationRevision));
+    for (joint in 0...3) {
+      limits.position(joint, 0.0, 0.08);
+      limits.velocity(joint, 0.1);
+      limits.acceleration(joint, 0.4);
+      limits.jerk(joint, 10.0);
+    }
+    var rejectedLength = false;
+    try new ProgramCompiler(solver, limits, "work", [0.1, 0.1, 0.1],
+      [0.4, 0.4, 0.4], [10.0, 10.0, 10.0],
+      new StartTolerances([0.00001], [0.02, 0.02, 0.02], [0.02, 0.02, 0.02]))
+    catch (_:Dynamic) rejectedLength = true;
+    check(rejectedLength, "program compiler rejects incomplete start tolerances");
+    var rejectedNegative = false;
+    try new StartTolerances([0.00001, -1.0, 0.00001],
+      [0.02, 0.02, 0.02], [0.02, 0.02, 0.02])
+    catch (_:Dynamic) rejectedNegative = true;
+    check(rejectedNegative, "program compiler rejects negative start tolerances");
+    var rejectedNonfinite = false;
+    try new StartTolerances([0.00001, Math.NaN, 0.00001],
+      [0.02, 0.02, 0.02], [0.02, 0.02, 0.02])
+    catch (_:Dynamic) rejectedNonfinite = true;
+    check(rejectedNonfinite, "program compiler rejects non-finite start tolerances");
+
+    var compiler = new ProgramCompiler(solver, limits, "work", [0.1, 0.1, 0.1],
+      [0.4, 0.4, 0.4], [10.0, 10.0, 10.0],
+      StartTolerances.uniform(3, 0.00001, 0.02, 0.02));
+    var compiled = compiler.compile(new MotionProgram([MotionOp.MoveJ(
+      MoveTarget.JointTarget([0.01, 0.0, 0.0]), new MotionOptions(),
+      Blend.ExactStop)]), [0.001, 0.0, 0.0], Int64.ofInt(812));
+    var plan = compiled.blocks[0].plans[0];
+    near(plan.copyPositionTolerances()[0], 0.00001,
+      "program compiler preserves tight start position tolerance", 1e-12);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var segments = [for (segment in plan.segments())
+      new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
+        segment.coefficients)];
+    var submission = new ExecutionPlanSubmission(plan.planId,
+      plan.modelRevision, plan.calibrationRevision,
+      RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
+      plan.copyStartPositions(), plan.copyStartVelocities(),
+      plan.copyStartAccelerations(), segments, null, null,
+      plan.copyPositionTolerances(), plan.copyVelocityTolerances(),
+      plan.copyAccelerationTolerances());
+    var rejectedAtRuntime = false;
+    try runtime.submitPlan(submission, 1) catch (error:Dynamic) {
+      if (Std.isOfType(error, RobotRuntimeError)) {
+        var nativeError:RobotRuntimeError = cast error;
+        rejectedAtRuntime = nativeError.status ==
+          RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE;
+      }
+    }
+    check(rejectedAtRuntime,
+      "runtime rejects compiled program whose start exceeds tight tolerance");
+    simulation.dispose();
+    compiled.dispose();
+  }
+
   static function testProgramCompiler():Void {
     var fixture = buildContractArmFixture();
     var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
@@ -313,7 +381,7 @@ class MotionKitBootstrapTests {
     var acceleration = [for (_ in 0...6) 4.0];
     var jerk = [for (_ in 0...6) 20.0];
     var compiler = new ProgramCompiler(solver, limits, "work", velocity,
-      acceleration, jerk);
+      acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02));
     var start = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
     var goal = start.copy(); goal[0] += 0.05;
     var program = new MotionProgram([MotionOp.MoveJ(
@@ -381,7 +449,7 @@ class MotionKitBootstrapTests {
 
     var branchSolver = new WristBranchSolver();
     var branchCompiler = new ProgramCompiler(branchSolver, limits, "work", velocity,
-      acceleration, jerk, null, 0.05, 0.5);
+      acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02), null, 0.05, 0.5);
     var branchPath = new PosePath("work", [new PoseLine(
       new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
       new PoseWaypoint(new Pose3(1.0), 0.005, 0.02),
@@ -395,7 +463,7 @@ class MotionKitBootstrapTests {
 
     var linearSolver = new WristBranchSolver(false);
     var linearCompiler = new ProgramCompiler(linearSolver, limits, "work", velocity,
-      acceleration, jerk, null, 0.05);
+      acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02), null, 0.05);
     var linearPath = new PosePath("work", [new PoseLine(
       new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
       new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
@@ -422,7 +490,7 @@ class MotionKitBootstrapTests {
     var bounded = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
     bounded.position(0, -0.1, 0.05);
     var boundedCompiler = new ProgramCompiler(linearSolver, bounded, "work", velocity,
-      acceleration, jerk, null, 0.05);
+      acceleration, jerk, StartTolerances.uniform(6, 0.02, 0.02, 0.02), null, 0.05);
     var limitError = "";
     try boundedCompiler.compile(linearProgram,
       [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(501))
@@ -445,7 +513,8 @@ class MotionKitBootstrapTests {
     freePlan.dispose();
 
     var planarCompiler = new ProgramCompiler(new PlanarSolver(), limits,
-      "work", velocity, acceleration, jerk, null, 0.005);
+      "work", velocity, acceleration, jerk,
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02), null, 0.005);
     var blended = planarCompiler.compile(new MotionProgram([
       MotionOp.MoveL(new Pose3(0.05, 0.0), "work", 0.1,
         Blend.ToleranceBlend(0.005)),
@@ -494,7 +563,8 @@ class MotionKitBootstrapTests {
     var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
     var compiler = new ProgramCompiler(solver, limits, "work",
-      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0], [for (_ in 0...6) 20.0]);
+      [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0], [for (_ in 0...6) 20.0],
+      StartTolerances.uniform(6, 0.02, 0.02, 0.02));
     var unsupported = new RuntimeRobotAdapter("unsupported-arm", runtime,
       fixture.model.name, [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name], false, false,
@@ -844,7 +914,7 @@ class MotionKitBootstrapTests {
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
     var compiler = new ProgramCompiler(solver, limits, "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
-      [for (_ in 0...6) 20.0]);
+      [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02));
     check(compiler.configurationSelector != null,
       "analytic arm programs use Descartes configuration selection");
     var program = new MotionProgram([MotionOp.MoveL(solver.forward(next),
@@ -1519,7 +1589,8 @@ class MotionKitBootstrapTests {
       blueprint.model.joints[joint].limits.upper);
     var compiler = new ProgramCompiler(axisSolver, limits, "work",
       [for (_ in 0...3) 0.1], [for (_ in 0...3) 0.4],
-      [for (_ in 0...3) 10.0], null, 0.005);
+      [for (_ in 0...3) 10.0], StartTolerances.uniform(3, 0.02, 0.02, 0.02),
+      null, 0.005);
     var pose = (point:PathPoint) -> new PoseWaypoint(
       new Pose3(point.x, point.y, point.z), 0.005, 0.02);
     var programPath = new PosePath("work", [
@@ -2106,6 +2177,67 @@ class MotionKitBootstrapTests {
     simulation.dispose();
   }
 
+  static function testNormalAbortWaitsForRest():Void {
+    var axis = new LinearAxis(23, 10, 80);
+    var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.05, 0.2);
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("abort-replacement", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var recording = new RobotRecording();
+    var instrumented = new RecordingRobot(robot, recording);
+    var machine = MotionSystem.fromBlueprint(instrumented, blueprint);
+    var options = new MotionOptions(0.05, 0.2);
+    machine.moveAxes([new AxisTarget("x", 0.07)], options);
+
+    var tick = 0;
+    for (_ in 0...5) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+    }
+    check(runtime.snapshot().trajectoryActive,
+      "abort replacement test starts with a running native trajectory");
+
+    machine.abort();
+    check(machine.isMoving(), "normal abort remains moving while the runtime stops");
+    check(machine.moveAxes([new AxisTarget("x", 0.01)], options) == null,
+      "move after abort is deferred until the runtime reaches rest");
+    var queuedTargets = [new AxisTarget("x", 0.025)];
+    check(machine.queueAxes(queuedTargets, options) == null,
+      "queued move waits behind the deferred replacement");
+    queuedTargets[0] = new AxisTarget("x", 0.05);
+    check(machine.isMoving(), "deferred move remains moving while the stop settles");
+
+    var stopTicks = 0;
+    while (runtime.snapshot().trajectoryActive ||
+        runtime.snapshot().sessionState == RobotKitRuntimeConstants.RK_SESSION_STOPPING) {
+      machine.update();
+      simulation.step(Int64.ofInt(tick++));
+      stopTicks++;
+      if (stopTicks > 500) throw "normal abort did not settle";
+    }
+    check(machine.isMoving(), "deferred replacement remains visible at runtime rest");
+    var settledPosition = robot.snapshot().positions.get(0);
+    var planCount = 0;
+    for (command in recording.commands) switch command {
+      case ExecutionPlan(_): planCount++;
+      case _:
+    }
+    check(planCount == 1,
+      "replacement plan is not submitted before the runtime reports rest");
+
+    machine.update();
+    var replacement = machine.trajectory();
+    check(replacement != null, "deferred replacement starts after the stop settles");
+    near(cast(replacement, Trajectory).evaluate(0.0).positions[0], settledPosition,
+      "replacement starts from the position where the stop settled", 1e-5);
+    runMotion(machine, simulation);
+    near(robot.snapshot().positions.get(0), 0.025,
+      "queued move uses targets captured before the caller mutates its array", 1e-5);
+    simulation.dispose();
+  }
+
   static function testRuntimeSynchronizedHolding():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.2);
@@ -2254,6 +2386,11 @@ class MotionKitBootstrapTests {
     check(squareReport.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
       MotionKitNativeConstants.MK_CHECK_UNCHECKED,
       "TOPP-RA reports jerk as unchecked");
+    var invalidPathRejected = false;
+    try squareMachine.queuePath(null) catch (_:Dynamic) invalidPathRejected = true;
+    check(invalidPathRejected && squareMachine.lastPathValidationReport == null &&
+      squareMachine.lastPathPlanningDiagnostics.length == 0,
+      "failed path planning clears the prior validation report and diagnostics");
     tick = 0;
     var reachedThirdLeg = false;
     while (squareMachine.isMoving()) {

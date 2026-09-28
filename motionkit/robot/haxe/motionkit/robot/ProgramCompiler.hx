@@ -44,6 +44,7 @@ class ProgramCompiler {
   public final maxVelocity:Array<Float>;
   public final maxAcceleration:Array<Float>;
   public final maxJerk:Array<Float>;
+  public final startTolerances:StartTolerances;
   public final cartesianResolution:Float;
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
@@ -55,7 +56,7 @@ class ProgramCompiler {
 
   public function new(solver:KinematicsSolver, limits:ValidationLimits,
       frameId:String, maxVelocity:Array<Float>, maxAcceleration:Array<Float>,
-      maxJerk:Array<Float>, ?timing:PathTimingBackend,
+      maxJerk:Array<Float>, startTolerances:StartTolerances, ?timing:PathTimingBackend,
       ?cartesianResolution:Float = 0.01, ?maxJointJump:Float = 0.5,
       ?positionTolerance:Float = 0.005, ?orientationTolerance:Float = 0.02,
       ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector,
@@ -66,6 +67,8 @@ class ProgramCompiler {
     if (frameId == null || StringTools.trim(frameId).length == 0)
       throw "Program compiler needs a frame ID";
     var count = limits.jointCount;
+    if (startTolerances == null) throw "Program compiler start tolerances are required";
+    startTolerances.validate(count);
     for (vector in [maxVelocity, maxAcceleration, maxJerk]) {
       if (vector == null || vector.length != count)
         throw "Program compiler joint-limit counts must match";
@@ -83,6 +86,8 @@ class ProgramCompiler {
     this.maxVelocity = maxVelocity.copy();
     this.maxAcceleration = maxAcceleration.copy();
     this.maxJerk = maxJerk.copy();
+    this.startTolerances = new StartTolerances(startTolerances.position,
+      startTolerances.velocity, startTolerances.acceleration);
     this.timing = timing == null ? new ToppraPathTiming() : timing;
     this.cartesianResolution = cartesianResolution;
     this.maxJointJump = maxJointJump;
@@ -336,7 +341,8 @@ class ProgramCompiler {
       if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
       plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
-        zeros(), zeros(), tolerances(), tolerances(), tolerances(), pending.events);
+        zeros(), zeros(), startTolerances.position, startTolerances.velocity,
+        startTolerances.acceleration, pending.events);
       if (pending.path != null) checkTaskSpace(plan, pending.path, pending.distances,
         pending.times, pending.opIndex, pending.authoredPolyline,
         pending.blendTolerance);
@@ -626,7 +632,6 @@ class ProgramCompiler {
     return Math.acos(Math.max(-1.0, Math.min(1.0, dot)));
   }
   function zeros():Array<Float> return [for (_ in 0...solver.jointCount()) 0.0];
-  function tolerances():Array<Float> return [for (_ in 0...solver.jointCount()) 0.02];
   static function effective(machine:Array<Float>, requested:Float):Array<Float>
     return [for (limit in machine) requested > 0.0 ? Math.min(limit, requested) : limit];
   static function noteBlend(blend:Blend, index:Int, notes:Array<String>):Void {

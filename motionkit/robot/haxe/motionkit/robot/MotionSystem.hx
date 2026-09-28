@@ -172,7 +172,8 @@ class MotionSystem {
   /** Adds a coordinated axis move behind all motion already in the buffer. */
   public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
-      afterStop.push(() -> queueAxes(targets, options));
+      var captured = targets == null ? null : targets.copy();
+      afterStop.push(() -> queueAxes(captured, options));
       return null;
     }
     var trajectoryValue = planAxesFrom(planningStartPositions(), targets, options);
@@ -208,7 +209,8 @@ class MotionSystem {
   public function queueLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
-      afterStop.push(() -> queueLinear(target, feed, options));
+      var captured = target == null ? null : new PathPoint(target.x, target.y, target.z);
+      afterStop.push(() -> queueLinear(captured, feed, options));
       return null;
     }
     var trajectoryValue = planLinearPathFrom(planningStartPositions(), target, feed, options);
@@ -236,7 +238,8 @@ class MotionSystem {
   public function queuePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
       ?motionOptions:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
-      afterStop.push(() -> queuePath(path, pathOptions, motionOptions));
+      var captured = path == null ? null : new GeometricPath(path.primitives);
+      afterStop.push(() -> queuePath(captured, pathOptions, motionOptions));
       return null;
     }
     var trajectoryValue = planPathFrom(planningStartPositions(), path,
@@ -279,9 +282,12 @@ class MotionSystem {
    * path before discarding it; an emergency stop acts immediately.
    */
   public function abort(?mode:StopMode = StopMode.Normal):Void {
-    if (mode == StopMode.Normal && isMotionInProgress()) {
+    if (mode == StopMode.Normal && isMotionInProgress() && elapsedSeconds > 1e-9) {
       robot.submit(RobotCommand.Abort);
-      clearBufferedMotion();
+      queuedTrajectories = [];
+      afterStop = [];
+      held = false;
+      stoppingForReplacement = true;
       return;
     }
     clearBufferedMotion();
@@ -336,8 +342,9 @@ class MotionSystem {
 
   /** True once a requested stop has reached rest. */
   function stopSettled():Bool {
-    if (activeTrajectory == null) return true;
-    return !syncFromRuntime().trajectoryActive;
+    var observation = syncFromRuntime();
+    return !observation.trajectoryActive &&
+      observation.sessionState != RobotKitRuntimeConstants.RK_SESSION_STOPPING;
   }
 
   /** Runs deferred work or a pending resume once a stop has reached rest. */
@@ -355,6 +362,8 @@ class MotionSystem {
 
   function planLinearPathFrom(start:Array<Float>, target:PathPoint, feed:Feed,
       options:Null<MotionOptions>):Trajectory {
+    lastPathValidationReport = null;
+    lastPathPlanningDiagnostics = [];
     if (target == null || feed == null) throw "Linear move needs a target and feed";
     var xAxis = requireAxis("x");
     var yAxis = requireAxis("y");
@@ -371,10 +380,11 @@ class MotionSystem {
 
   function planPathFrom(start:Array<Float>, path:GeometricPath,
       pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):Trajectory {
+    lastPathValidationReport = null;
+    lastPathPlanningDiagnostics = [];
     if (path == null) throw "Cartesian path is required";
     var options = pathOptions == null ? PathPlanningOptions.exactStopMode() : pathOptions;
     var planningPath = path;
-    lastPathPlanningDiagnostics = [];
     if (!options.exactStop && options.blendTolerance > 0.0) {
       var blended = CornerBlender.blend(path, options.blendTolerance * 0.8,
         options.maxBlendTurnAngleRadians);

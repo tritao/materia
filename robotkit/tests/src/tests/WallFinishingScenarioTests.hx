@@ -290,7 +290,8 @@ class WallFinishingScenarioTests {
         var simpleCompiler = new ProgramCompiler(toppraCompiler.solver,
           toppraCompiler.limits, toppraCompiler.frameId,
           toppraCompiler.maxVelocity, toppraCompiler.maxAcceleration,
-          toppraCompiler.maxJerk, new SimplePathTiming(),
+          toppraCompiler.maxJerk, toppraCompiler.startTolerances,
+          new SimplePathTiming(),
           0.01, toppraCompiler.maxJointJump,
           toppraCompiler.positionTolerance, toppraCompiler.orientationTolerance,
           toppraCompiler.ikTolerance);
