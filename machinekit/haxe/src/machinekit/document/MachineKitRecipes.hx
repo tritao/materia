@@ -119,7 +119,7 @@ class MachineKitRecipes {
 			diagnostics:Array<String>):Bool {
 		register();
 		var tracePath = Sys.getEnv("MATERIA_RECONCILE_TRACE");
-		if (tracePath != null) {
+		if (tracePath != null && tracePath.length > 0) {
 			var previous = sys.FileSystem.exists(tracePath) ? sys.io.File.getContent(tracePath) : "";
 			sys.io.File.saveContent(tracePath, previous + "reconcile\n");
 		}
