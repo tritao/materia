@@ -43,6 +43,11 @@ Long entries ramp down at no more than a 10% slope, retrace the ramp at full
 depth, then cut the pass. Short entries plunge vertically at `plungeFeed`.
 Rapid approach stops above the stock surface.
 
+Profiles also accept a final `plungeFeed` argument, with the same default.
+Profile and drill XY rapids run at safe Z; the job raises vertically before
+the first XY move and before a tool change. Drill `feed` is its vertical
+cutting feed.
+
 Example:
 
 ```haxe
@@ -58,7 +63,7 @@ var linuxCnc = CamGCodeWriter.write(program);
 The test project creates its own rectangular, rounded and holed plate fixtures.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
 hole-before-outer ordering, concave profiles and pockets, island clearance,
-ramps and narrow-pocket plunges,
+ramps and narrow-pocket plunges, safe profile and drill travel,
 direct lowering and
 CAM IR → G-code → CncKit IR
 round trips. The suite also
