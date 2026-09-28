@@ -25,6 +25,7 @@ class CncMotionBinding {
     var velocity = [for (_ in 0...count) 0.0];
     var acceleration = [for (_ in 0...count) 0.0];
     var jerk = [for (_ in 0...count) 0.0];
+    var jump = [for (_ in 0...count) 0.1];
     for (axis in [solver.x, solver.y, solver.z]) {
       if (axis.maxVelocity <= 0.0 || axis.maxAcceleration <= 0.0)
         throw 'CNC axis "${axis.id}" needs velocity and acceleration limits';
@@ -34,11 +35,19 @@ class CncMotionBinding {
         velocity[joint] = axis.maxVelocity * scale;
         acceleration[joint] = axis.maxAcceleration * scale;
         jerk[joint] = acceleration[joint] * 25.0;
+        jump[joint] = Math.max(0.1, 0.1 * scale);
       }
     }
     for (joint in 0...count) {
-      if (velocity[joint] <= 0.0 || acceleration[joint] <= 0.0)
-        throw 'CNC joint $joint is not bound to an XYZ axis';
+      if (velocity[joint] <= 0.0 || acceleration[joint] <= 0.0) {
+        if (blueprint.model.joints[joint].type != robotkit.model.JointType.Fixed)
+          throw 'CNC joint $joint is not bound to an XYZ axis';
+        // Assembly root and mounting joints remain stationary, but native
+        // trajectory validation still needs finite positive limit arrays.
+        velocity[joint] = 1.0;
+        acceleration[joint] = 1.0;
+        jerk[joint] = 25.0;
+      }
       var bounds = blueprint.model.joints[joint].limits;
       if (bounds.lower < bounds.upper) limits.position(joint,
         bounds.lower, bounds.upper);
@@ -48,7 +57,9 @@ class CncMotionBinding {
     }
     compiler = new ProgramCompiler(solver, limits, machine.frameId,
       velocity, acceleration, jerk, null, 0.002, 0.1,
-      machine.positionTolerance, machine.orientationTolerance);
+      machine.positionTolerance, machine.orientationTolerance,
+      null, null, jump,
+      [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings);
   }
 
   public function compile(source:String, initialJoints:Array<Float>,

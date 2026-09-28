@@ -1,6 +1,7 @@
 package motionkit.robot;
 
 import haxe.Int64;
+import robotkit.model.JointCoupling;
 import motionkit.MotionOptions;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
@@ -45,6 +46,8 @@ class ProgramCompiler {
   public final maxJerk:Array<Float>;
   public final cartesianResolution:Float;
   public final maxJointJump:Float;
+  public final perJointMaxJump:Array<Float>;
+  final couplingIndices:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}>;
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
@@ -55,7 +58,9 @@ class ProgramCompiler {
       maxJerk:Array<Float>, ?timing:PathTimingBackend,
       ?cartesianResolution:Float = 0.01, ?maxJointJump:Float = 0.5,
       ?positionTolerance:Float = 0.005, ?orientationTolerance:Float = 0.02,
-      ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector) {
+      ?ikTolerance:IkTolerance, ?configurationSelector:PathConfigurationSelector,
+      ?perJointMaxJump:Array<Float>, ?jointIds:Array<String>,
+      ?couplings:Array<JointCoupling>) {
     if (solver == null || limits == null || solver.jointCount() != limits.jointCount)
       throw "Program compiler needs matching kinematics and validation limits";
     if (frameId == null || StringTools.trim(frameId).length == 0)
@@ -81,6 +86,38 @@ class ProgramCompiler {
     this.timing = timing == null ? new ToppraPathTiming() : timing;
     this.cartesianResolution = cartesianResolution;
     this.maxJointJump = maxJointJump;
+    if (perJointMaxJump != null && perJointMaxJump.length != count)
+      throw "Program compiler joint jump limit count must match joints";
+    this.perJointMaxJump = perJointMaxJump == null ?
+      [for (_ in 0...count) maxJointJump] : perJointMaxJump.copy();
+    for (jump in this.perJointMaxJump)
+      if (!Math.isFinite(jump) || jump <= 0.0)
+        throw "Program compiler joint jump limits must be finite and positive";
+    couplingIndices = [];
+    if (couplings != null) {
+      if (jointIds == null || jointIds.length != count)
+        throw "Program compiler couplings need joint IDs in solver order";
+      var pending:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}> = [];
+      for (coupling in couplings) {
+        var leader = jointIds.indexOf(coupling.leader);
+        var follower = jointIds.indexOf(coupling.follower);
+        if (leader < 0 || follower < 0)
+          throw 'Program compiler coupling "${coupling.id}" references an unknown joint';
+        pending.push({leader: leader, follower: follower,
+          ratio: coupling.ratio, offset: coupling.offset});
+      }
+      while (pending.length > 0) {
+        var next = -1;
+        for (index in 0...pending.length) {
+          var depends = false;
+          for (other in pending)
+            if (other.follower == pending[index].leader) depends = true;
+          if (!depends) { next = index; break; }
+        }
+        if (next < 0) throw "Program compiler joint couplings contain a cycle";
+        couplingIndices.push(pending.splice(next, 1)[0]);
+      }
+    }
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
@@ -99,7 +136,7 @@ class ProgramCompiler {
         upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
       }
       this.configurationSelector = new PathConfigurationSelector(solver,
-        lower, upper, [for (_ in 0...count) maxJointJump], maxVelocity);
+        lower, upper, this.perJointMaxJump, maxVelocity);
     } else {
       this.configurationSelector = null;
     }
@@ -294,18 +331,34 @@ class ProgramCompiler {
   function finish(pending:PendingMotion, id:Int64):ExecutionPlan {
     pending.events.sort(function(a, b) return Int64.compare(a.timeNs, b.timeNs));
     var plan:Null<ExecutionPlan> = null;
+    var projected:Null<Trajectory> = null;
     try {
-      plan = ExecutionPlan.create(pending.trajectory, limits, id, pending.startQ,
+      if (couplingIndices.length > 0) projected = projectCouplings(pending.trajectory);
+      plan = ExecutionPlan.create(projected == null ? pending.trajectory : projected,
+        limits, id, pending.startQ,
         zeros(), zeros(), tolerances(), tolerances(), tolerances(), pending.events);
       if (pending.path != null) checkTaskSpace(plan, pending.path, pending.distances,
         pending.times, pending.opIndex, pending.authoredPolyline,
         pending.blendTolerance);
       pending.trajectory.dispose();
+      if (projected != null) projected.dispose();
       return plan;
     } catch (error:Dynamic) {
       if (plan != null) plan.dispose();
+      if (projected != null) projected.dispose();
       throw 'Motion program op ${pending.opIndex}: $error';
     }
+  }
+
+  /** Keep the follower polynomial exact after independent Hermite lowering. */
+  function projectCouplings(source:Trajectory):Trajectory {
+    var segments = source.segments();
+    for (segment in segments) for (coupling in couplingIndices)
+      for (degree in 0...segment.coefficients[coupling.leader].length)
+        segment.coefficients[coupling.follower][degree] =
+          coupling.ratio * segment.coefficients[coupling.leader][degree] +
+          (degree == 0 ? coupling.offset : 0.0);
+    return Trajectory.fromSegments(segments);
   }
 
   function resolveTarget(target:MoveTarget, start:Array<Float>, index:Int):Array<Float> {
@@ -397,11 +450,9 @@ class ProgramCompiler {
         throw 'Motion program op $index unreachable pose at path distance $distance';
       checkJointPosition(solved, index, distance);
       if (sample > 0) {
-        var jump = 0.0;
         for (joint in 0...startQ.length)
-          jump = Math.max(jump, Math.abs(solved[joint] - previous[joint]));
-        if (jump > maxJointJump)
-          throw 'Motion program op $index IK discontinuity at path distance $distance';
+          if (Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
+            throw 'Motion program op $index IK discontinuity at path distance $distance';
         caps.push(Math.min(feed, primitiveSpeedAt(path,
           (distance + distances[sample-1]) * 0.5)));
       }
