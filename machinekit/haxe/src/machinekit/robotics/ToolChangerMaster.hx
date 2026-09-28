@@ -27,11 +27,11 @@ class ToolChangerMaster extends MachineComponent {
 		addConnector("robot", Mount, Solids.axial(0, 0, 0));
 		addConnector("tool", Mount, Solids.axial(0, 0, thickness));
 		for (i in 1...airChannels + 1) {
-			addPort({name: 'airIn$i', kind: Pneumatic, role: Supply, iface: PushIn(6), required: false});
+			addPort({name: 'airIn$i', kind: Pneumatic, role: Consumer, iface: PushIn(6), required: false});
 			addPort({name: 'airOut$i', kind: Pneumatic, role: Supply, iface: PushIn(6), required: false});
 			addBridge('airIn$i', 'airOut$i');
 		}
-		addPort({name: "signalIn", kind: Signal, role: Supply, iface: Plug("generic", 4), required: false});
+		addPort({name: "signalIn", kind: Signal, role: Consumer, iface: Plug("generic", 4), required: false});
 		addPort({name: "signalOut", kind: Signal, role: Supply, iface: Plug("generic", 4), required: false});
 		addBridge("signalIn", "signalOut");
 		addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
