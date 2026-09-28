@@ -142,12 +142,13 @@ class Main {
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
-          arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0) {
+          arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
+          arg.indexOf("--character-hold=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
-          "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME]]");
+          "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] [--character-hold=GLTF]]");
         return 2;
       }
 
@@ -220,8 +221,12 @@ class Main {
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       for (arg in args) if (arg.indexOf("--character=") == 0) {
         var clip:Null<String> = null;
-        for (option in args) if (option.indexOf("--character-clip=") == 0) clip = option.substr(17);
-        editor.enableCharacterPreview(arg.substr(12), clip);
+        var hold:Null<String> = null;
+        for (option in args) {
+          if (option.indexOf("--character-clip=") == 0) clip = option.substr(17);
+          if (option.indexOf("--character-hold=") == 0) hold = option.substr(17);
+        }
+        editor.enableCharacterPreview(arg.substr(12), clip, hold);
       }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
@@ -806,9 +811,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Shows an animated glTF character walking around the origin; it is not saved. */
-  public function enableCharacterPreview(path:String, ?clipName:String):Void {
+  public function enableCharacterPreview(path:String, ?clipName:String, ?propPath:String):Void {
     if (characterPreview != null) characterPreview.dispose();
-    characterPreview = new CharacterPreview(path, clipName);
+    characterPreview = new CharacterPreview(path, clipName, propPath);
     if (hostContext != null) hostContext.requestFrame();
   }
 

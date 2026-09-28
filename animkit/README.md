@@ -83,13 +83,21 @@ the origin. The preview is runtime-only and is not saved with the document:
 
 ```sh
 ./app/run-built.sh --character=animkit/assets/kenney/character-soldier.glb
-./app/run-built.sh --character=path/to/worker.glb --character-clip=Idle
+./app/run-built.sh --character=animkit/assets/quaternius/worker.glb --character-clip=Interact
+./app/run-built.sh --character=animkit/assets/quaternius/worker.glb \
+  --character-hold=animkit/assets/props/wrench.glb
 ```
 
 Clips whose names contain "walk" move along the circle; other clips play in
-place.
+place. Clip names also match the action after Blender's `Armature|` prefix,
+ignoring case. Humanoid characters are presented through HumanKit, which
+`--character-hold` uses to put a prop in the right hand.
 
 ## Assets
 
-`assets/kenney/` holds Kenney's Mini Arena soldier (CC0; see its
-`License.txt`). It is used by the tests and the editor preview.
+All bundled assets are CC0; each folder has a `License.txt`.
+
+- `assets/kenney/`: Kenney's Mini Arena soldier, a small non-humanoid rig.
+- `assets/quaternius/`: Quaternius's construction worker, with 85 joints and
+  24 clips.
+- `assets/props/`: CreativeTrio's wrench, used as a held prop.
