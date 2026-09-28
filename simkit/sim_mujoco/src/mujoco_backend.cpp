@@ -809,14 +809,15 @@ public:
                 if ((model->geom_contype[first] & model->geom_conaffinity[second]) == 0 &&
                     (model->geom_contype[second] & model->geom_conaffinity[first]) == 0)
                     continue;
-                const int body_a = model->geom_bodyid[first];
-                const int body_b = model->geom_bodyid[second];
-                // Both fixed objects can share MuJoCo's world weld despite
-                // belonging to different application bodies.
-                const int signature = (std::min(body_a, body_b) << 16) +
-                                      std::max(body_a, body_b);
-                if (std::binary_search(model->exclude_signature,
-                    model->exclude_signature + model->nexclude, signature)) continue;
+                // Every pair this loop reaches already has neither body
+                // DYNAMIC (checked above), which is now also exactly
+                // add_self_collision_excludes()'s "neither is DYNAMIC"
+                // condition for excluding a pair from MuJoCo's own
+                // collision detection (see that function's comment): MuJoCo
+                // itself will therefore never generate a native contact for
+                // this pair, so there is nothing in model->exclude_signature
+                // to defer to here — reported_pairs (checked above, from
+                // data->ncon) is the only de-duplication this loop needs.
                 const double detection = model->geom_margin[first] + model->geom_margin[second] +
                     model->geom_gap[first] + model->geom_gap[second];
                 if (detection <= 0.0) continue;
@@ -1083,6 +1084,39 @@ private:
     // contact its own base instead of passing through it. Rest-pose geometry
     // is tested with an oriented-box SAT for the shapes RobotKit supplies;
     // the generic sphere/capsule fallback is conservative for those shapes.
+    //
+    // A KINEMATIC root now carries a real free joint (configure_body), so it
+    // no longer gets MuJoCo's own free pass on collision between two
+    // dof-less bodies (engine_collision_driver.c's mj_collision: the
+    // exclude_signature check — see below — sits at the exact point in the
+    // pipeline that used to be preceded by filterBodyPair's "both dof-less:
+    // no forces can act, skip"; that skip is now gone for a KINEMATIC body,
+    // since it has dof). Neither a KINEMATIC nor a STATIC body can ever be
+    // moved by a contact (both are pinned to a prescribed pose every
+    // substep or forever), so a contact between two non-DYNAMIC bodies —
+    // two overlapping kinematic actor capsules, or a kinematic robot base
+    // resting on the static floor — could still never do anything physical;
+    // it would only waste solver work and couple bodies that can't respond
+    // into the same constraint island as real contacts. This loop restores
+    // that old skip explicitly, for any pair where neither body is DYNAMIC,
+    // regardless of articulation.
+    //
+    // Excludes, not contype/conaffinity, restore it: mjs_addExclude adds a
+    // body pair (by name) to model->exclude_signature, which mj_collision
+    // consults right after broadphase and before any narrowphase geom work
+    // (the same early, cheap point where the self-collision excludes below
+    // already rely on it) — an excluded pair costs nothing further and
+    // never appears in d->contact[]. contype/conaffinity is a per-GEOM
+    // bitmask copied directly, bit for bit, from SimKit's own
+    // collision_layer/collision_mask (configure_body); tagging "is this
+    // body's owner DYNAMIC" into it would mean reserving a bit out of that
+    // caller-controlled mask, which is not available to steal without
+    // narrowing what collision_layer/collision_mask can express for every
+    // body, DYNAMIC or not. Excludes leave every pair that involves a
+    // DYNAMIC body — including a KINEMATIC body's contact and friction
+    // against one — governed by exactly the same contype/conaffinity logic,
+    // and exactly the same collision_layer/collision_mask semantics, as
+    // before this whole fix.
     nksim_result add_self_collision_excludes() {
         auto is_same_articulation = [&](std::uint64_t first, std::uint64_t second) {
             std::vector<std::uint64_t> visited{first};
@@ -1111,11 +1145,15 @@ private:
         for (std::size_t i = 0; i < body_order.size(); ++i) {
             for (std::size_t j = i + 1; j < body_order.size(); ++j) {
                 const auto first = body_order[i], second = body_order[j];
-                if (!is_same_articulation(first, second)) continue;
                 const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
-                if (!is_parent_child(first, second) &&
-                    !geometries_overlap_at_rest(body_a, body_b))
-                    continue;
+                const bool neither_dynamic = body_a.desc.motion_type != NKSIM_MOTION_DYNAMIC &&
+                    body_b.desc.motion_type != NKSIM_MOTION_DYNAMIC;
+                bool needs_exclude = neither_dynamic;
+                if (!needs_exclude && is_same_articulation(first, second)) {
+                    needs_exclude = is_parent_child(first, second) ||
+                        geometries_overlap_at_rest(body_a, body_b);
+                }
+                if (!needs_exclude) continue;
                 auto *exclude = mjs_addExclude(spec);
                 if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
                 mjs_setString(exclude->bodyname1, body_a.name.c_str());
