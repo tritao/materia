@@ -253,6 +253,7 @@ class MachineKitRecipeProjectTests {
 				"removed from source diagnostic reaches the app");
 			var oldVersionSaved = json(Reflect.field(project, "recipeDocument"));
 			Reflect.setField(oldVersionSaved, "version", 8);
+			Reflect.setField(inputRecord(definitionRecord(oldVersionSaved, "bearingB"), "designation"), "value", "6000");
 			var oldDefinitions:Array<Dynamic> = cast Reflect.field(oldVersionSaved, "definitions");
 			for (definition in oldDefinitions) {
 				var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
