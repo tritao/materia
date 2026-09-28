@@ -19,6 +19,7 @@
 		"humankit": { "path": "../humankit" },
 		"humankit-sim": { "path": "../humankit/sim" },
 		"humankit-facility": { "path": "../humankit/facility" },
+		"materia-automation": { "path": "../automationkit" },
 		"stockkit": { "path": "../stockkit" },
 		"camkit": { "path": "../camkit" },
 		"cnckit": { "path": "../cnckit" },
