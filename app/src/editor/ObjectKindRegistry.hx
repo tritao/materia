@@ -18,7 +18,8 @@ class ObjectKindRegistry {
     new BuiltinObjectKind("cad-plate", "CAD", "Mounting plate", "scene.create-plate", true, true),
     new BuiltinObjectKind("cad-bracket", "CAD", "L bracket", "scene.create-bracket", true, true),
     new BuiltinObjectKind("cad-step", "Import", "STEP part", "scene.import-step", true, true),
-    new BuiltinObjectKind("cad-preview", "", "Generated CAD preview", "", false, true)
+    new BuiltinObjectKind("cad-preview", "", "Generated CAD preview", "", false, true),
+    new StockSimulationKind()
   ];
 
   public static function all():Array<ObjectKindProvider> return providers.copy();

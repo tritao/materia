@@ -81,7 +81,7 @@ class SceneReconciler {
               ? session.geometry()
               : (record.type == "cad-preview"
                 ? owner.previewGeometry(record.meshSnapshot)
-                : EditorScene.boxGeometry(record.width, record.height, record.depth));
+                : owner.plainGeometry(record.id, record.type, record.width, record.height, record.depth));
             owner.scene.setGeometryData(geometry, geometryData);
             owner.failIfInjected("prepare.new-geometry");
           }
@@ -143,7 +143,7 @@ class SceneReconciler {
                 ? session.geometry()
                 : (record.type == "cad-preview"
                   ? owner.previewGeometry(record.meshSnapshot)
-                  : EditorScene.boxGeometry(record.width, record.height, record.depth));
+                  : owner.plainGeometry(record.id, record.type, record.width, record.height, record.depth));
               owner.scene.setGeometryData(geometry, geometryData);
             }
             if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
@@ -213,6 +213,7 @@ class SceneReconciler {
     }
     owner.objects = prepared.objects;
     owner.cadSessions = prepared.cadSessions;
+    owner.pruneStockSimulations();
     owner.bridge.replaceEntries(prepared.bridgeEntries, prepared.nodeEntries);
     owner.selection.selectedId = selection;
     owner.selection.selectedFeatureKey=null;

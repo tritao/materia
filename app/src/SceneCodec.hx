@@ -305,7 +305,7 @@ class SceneCodec {
       ids.set(id, true);
       var kind = stringField(value, "type");
       if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" &&
-          kind != "cad-part" && kind != "cad-preview")
+          kind != "cad-part" && kind != "cad-preview" && kind != StockSimulationSession.KIND)
         throw "Unsupported scene object type: " + kind;
       var materialId = stringField(value, "materialId");
       var material = resolveMaterial(materialId, custom);

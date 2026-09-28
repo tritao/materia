@@ -13,13 +13,15 @@
 		"uikit": { "path": "../uikit" },
 		"robotkit": { "path": "../robotkit" },
 		"cadbridge": { "path": "../robotkit/cadbridge" },
-		"scenekit": { "path": "../scenekit" }
+		"scenekit": { "path": "../scenekit" },
+		"stockkit": { "path": "../stockkit" },
+		"camkit": { "path": "../camkit" }
 	},
 	"native": {
 		"cmake": {
 			"source": "native",
 			"target": "haxeon_app_native",
-			"inputs": ["native/CMakeLists.txt", "../nativekit/CMakeLists.txt", "../nativekit/modules/gpu/CMakeLists.txt", "../uikit/CMakeLists.txt", "../scenekit/scene/CMakeLists.txt", "../scenekit/scene_render/CMakeLists.txt", "../simkit/sim_core/CMakeLists.txt", "../simkit/sim_mujoco/CMakeLists.txt", "../cadkit/CMakeLists.txt", "../cadkit/core/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt"]
+			"inputs": ["native/CMakeLists.txt", "../nativekit/CMakeLists.txt", "../nativekit/modules/gpu/CMakeLists.txt", "../uikit/CMakeLists.txt", "../scenekit/scene/CMakeLists.txt", "../scenekit/scene_render/CMakeLists.txt", "../simkit/sim_core/CMakeLists.txt", "../simkit/sim_mujoco/CMakeLists.txt", "../cadkit/CMakeLists.txt", "../cadkit/core/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt", "../stockkit/core/CMakeLists.txt"]
 		}
 	},
 	"target": "host",

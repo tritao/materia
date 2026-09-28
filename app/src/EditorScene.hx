@@ -90,6 +90,8 @@ class EditorScene {
   function get_objects():Array<EditorSceneObject> return model.objects;
   function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> return model.objects = value;
   var cadSessions:Map<String, CadDocumentSession>;
+  /** Derived per-object simulations; rebuilt from the record's block size when it changes. */
+  final stockSimulations:Map<String, StockSimulationSession> = new Map();
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
@@ -295,7 +297,7 @@ class EditorScene {
       if (meshSnapshot == null) throw "CAD preview object has no mesh snapshot";
       geometryData = previewGeometry(meshSnapshot);
     } else {
-      geometryData = boxGeometry(width, height, depth);
+      geometryData = plainGeometry(id, kind, width, height, depth);
     }
     profileLoadEnd("geometryData", phaseStarted);
     try {
@@ -368,7 +370,7 @@ class EditorScene {
         previewGeometryIndexes.set(item.meshSnapshot, geometryIndex);
       } else if (geometryIndex == null) {
         geometryIndex = geometryData.length;
-        geometryData.push(boxGeometry(item.width, item.height, item.depth));
+        geometryData.push(plainGeometry(item.id, item.type, item.width, item.height, item.depth));
       }
       if (geometryIndex == null) throw 'No geometry resource was prepared for "${item.id}"';
       geometryIndexes.push(geometryIndex);
@@ -431,6 +433,9 @@ class EditorScene {
 
   public function createBracket():Bool
     return model.createDefault(this, "cad-bracket", "bracket", "Create L bracket");
+
+  public function createStockSimulation():Bool
+    return model.createDefault(this, StockSimulationSession.KIND, "stock", "Create stock simulation");
 
   public function createCadPart():Bool
     return model.createDefault(this, "cad-part", "part", "Create CAD part");
@@ -1455,6 +1460,9 @@ class EditorScene {
     clearSelectedCadFace();
     var item=object(id);
     var subelement=hit.subelement();
+    // Stock meshes have no subelement ranges: the hit reports its triangle plus one.
+    if(item!=null&&item.kind==StockSimulationSession.KIND&&subelement>0&&(subelement & 0x40000000)==0)
+      stockSimulation(id).pick(subelement-1);
     if(item!=null&&(isCadKind(item.kind)||ObjectKindRegistry.require(item.kind).hasGeneratedGeometry())&&
         (subelement & 0x40000000)!=0) {
       selection.selectedCadEdgeIndex = (subelement & 0x3fffffff)-1;
@@ -2030,6 +2038,60 @@ class EditorScene {
     return GeometryData.box(width, height, depth);
   }
 
+  /** Geometry of kinds without CAD or generated sources: a stock simulation's stock, else a box. */
+  function plainGeometry(id:String, kind:String, width:Float, height:Float, depth:Float):GeometryData
+    return kind == StockSimulationSession.KIND ? stockSimulationFor(id, width, height, depth).geometry()
+      : boxGeometry(width, height, depth);
+
+  function stockSimulationFor(id:String, width:Float, height:Float, depth:Float):StockSimulationSession {
+    var existing = stockSimulations.get(id);
+    if (existing != null && existing.width == width && existing.height == height && existing.depth == depth)
+      return existing;
+    var created = new StockSimulationSession(width, height, depth);
+    if (existing != null) existing.dispose();
+    stockSimulations.set(id, created);
+    return created;
+  }
+
+  /** The simulation of stock-simulation object `id`. */
+  public function stockSimulation(id:String):StockSimulationSession {
+    var item = requiredObject(id);
+    if (item.kind != StockSimulationSession.KIND) throw 'Scene object "$id" is not a stock simulation';
+    return stockSimulationFor(id, item.width, item.height, item.depth);
+  }
+
+  /** Shows the stock after the first `position` moves of its program. View state: not undoable. */
+  public function setStockSimulationPosition(id:String, position:Int):Void {
+    var session = stockSimulation(id);
+    if (position == session.position()) return;
+    session.seek(position);
+    refreshStockSimulation(id, session);
+  }
+
+  public function setStockSimulationColouring(id:String, mode:String):Void {
+    var session = stockSimulation(id);
+    if (mode == session.colorBy) return;
+    session.setColorBy(mode);
+    refreshStockSimulation(id, session);
+  }
+
+  function refreshStockSimulation(id:String, session:StockSimulationSession):Void {
+    var runtime = runtimeFor(id);
+    scene.setGeometryData(runtime.geometry, session.geometry());
+    publish([runtime.node], false);
+  }
+
+  /** Releases simulations whose objects are gone or are no longer simulations. */
+  function pruneStockSimulations():Void {
+    for (id in [for (key in stockSimulations.keys()) key]) {
+      var item = object(id);
+      if (item == null || item.kind != StockSimulationSession.KIND) {
+        stockSimulations.get(id).dispose();
+        stockSimulations.remove(id);
+      }
+    }
+  }
+
   static inline function validDimension(value:Float):Bool
     return value == value && value - value == 0.0 && value >= 0.000001 && value <= 1000000.0;
 
@@ -2127,6 +2189,8 @@ class EditorScene {
   public function dispose():Void {
     if (disposed) return;
     disposed = true;
+    for (session in stockSimulations) session.dispose();
+    stockSimulations.clear();
     if (pendingRenderChanges != null) pendingRenderChanges.dispose();
     pendingRenderChanges = null;
     if (activeSketchEdit != null) {

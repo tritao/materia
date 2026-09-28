@@ -15,7 +15,7 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Current state (phases 0–5, without the editor)
+## Current state (phases 0–5)
 
 - Tool shapes live in CncKit so any `CncTool` can carry one:
   `cnckit.tool.CutterProfile` describes a tool as a surface of revolution from
@@ -120,7 +120,11 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     `StockPreview` keeps chunk meshes and rebuilds only chunks whose tiles
     changed, and `StockPreview.pick(chunk, triangle)` gives the `CutMove`
     under a picked triangle, hence its operation and `CncSpan`.
-  - The app has no CNC workspace yet, so nothing displays these meshes.
+  - The app's **Stock simulation** object shows a CamKit demo program cut
+    with StockKit, with a timeline, colouring by operation or deviation, and
+    click-to-G-code-line picking (see `app/README.md`). It meshes the whole
+    stock into one geometry, which suits its small block; large stock would
+    use `StockPreview` chunks as child nodes.
 - CamKit's island-pocket test cuts its program with StockKit and requires no
   gouge, no rapid or shank through stock, and leftover only in the inside
   corners.

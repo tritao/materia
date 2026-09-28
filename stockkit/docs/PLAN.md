@@ -59,8 +59,12 @@ arrive as triangle buffers, so the core never links OCCT.
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
    pick → operation → `CncSpan`. The StockKit side is done and headless:
    column meshes per chunk of tiles with dirty tracking, colouring by source
-   or per ray, snapshots and a timeline, and pick to `CutMove`. Still to do:
-   the app has no CNC workspace, G-code editor or timeline to host it.
+   or per ray, snapshots and a timeline, and pick to `CutMove`. The editor
+   has a minimal viewer: a Stock simulation object running a CamKit demo
+   program, with a timeline property, colouring, and picking to the
+   operation and G-code line. Still to do: real programs from a CAM
+   workspace, a G-code editor with two-way highlighting, and chunked child
+   nodes for large stock.
 6. **Tri-dexel and meshing** (milestone 2): X and Y grids updated by every
    move; manifold dual contouring with a QEF over stored normals; STL export.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
