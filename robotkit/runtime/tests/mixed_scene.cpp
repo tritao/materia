@@ -174,7 +174,12 @@ struct Options {
     uint32_t integrator = 0, solver_iterations = 0, line_search_iterations = 0;
     bool floor_box = false; // A floor under the humanoid only.
     bool plane = false;     // An infinite ground plane through z = 0.
+    bool bed = false;       // The gantry's base link is a 1 m x 1 m x 10 cm machine bed.
     double gantry_z = 0.5;
+    double arm_position[3] = {0.0, 0.0, 1.0};
+    double gantry_position[3] = {3.0, 0.0, 0.5};
+    // Extra bodies, at a position, for contact probes.
+    const double *static_box = nullptr, *dynamic_box = nullptr, *shapeless_robot = nullptr;
 };
 
 // One robot's observable trace: joint state and every link pose, each tick.
@@ -184,6 +189,20 @@ struct Trace {
         return values.size() == other.values.size() &&
             (values.empty() || std::memcmp(values.data(), other.values.data(),
                                            values.size() * sizeof(double)) == 0);
+    }
+    // Largest difference in joint positions and link poses, ignoring joint
+    // velocities and efforts, which chatter at the level of the integrator.
+    double pose_difference(const Trace &other, uint32_t joints, uint32_t links) const {
+        const std::size_t record = joints * 3 + links * 7;
+        double worst = 0.0;
+        if (values.size() != other.values.size() || record == 0) return 1e300;
+        for (std::size_t base = 0; base + record <= values.size(); base += record) {
+            for (uint32_t joint = 0; joint < joints; ++joint)
+                worst = std::fmax(worst, std::fabs(values[base + joint * 3] - other.values[base + joint * 3]));
+            for (std::size_t i = joints * 3; i < record; ++i)
+                worst = std::fmax(worst, std::fabs(values[base + i] - other.values[base + i]));
+        }
+        return worst;
     }
     double max_difference(const Trace &other) const {
         double worst = 0.0;
@@ -199,11 +218,14 @@ struct Scene {
     rk_robot_runtime arm = 0, gantry = 0, humanoid = 0;
     int arm_index = -1, gantry_index = -1, humanoid_index = -1;
     uint32_t arm_links = 4, gantry_links = 4, humanoid_links = 5;
-    rk_simulation_object floor = 0;
+    rk_simulation_object floor = 0, box = 0;
     std::vector<rk_result> results;
     Trace arm_trace, gantry_trace;
     uint64_t sequence = 0;
     bool policy = false; // The humanoid is sent a fresh servo batch every tick, like a policy.
+    double timestep = 0.01;
+    uint32_t stride = 1; // Record every stride-th tick.
+    double arm_error = 0.0, gantry_error = 0.0; // Worst distance from the commanded position.
     ~Scene() { if (simulation) rk_simulation_destroy(simulation); }
 };
 
@@ -238,6 +260,7 @@ void build(Scene &scene, const Options &options) {
     desc.solver_iterations = options.solver_iterations;
     desc.line_search_iterations = options.line_search_iterations;
     assert(rk_simulation_create(&desc, &scene.simulation) == RK_OK);
+    scene.timestep = options.timestep;
     int next = 0;
     const auto add_humanoid = [&] {
         auto humanoid = make_humanoid(options.humanoid_x, 0.0, options.humanoid_height,
@@ -250,15 +273,20 @@ void build(Scene &scene, const Options &options) {
     if (options.humanoid && options.humanoid_first) add_humanoid();
     if (options.arm) {
         auto model = make_arm();
-        auto desc_arm = new_desc(0.0, 0.0, 1.0);
+        auto desc_arm = new_desc(options.arm_position[0], options.arm_position[1], options.arm_position[2]);
         scene.arm_index = next++;
         assert(rk_simulation_add_robot(scene.simulation, model.get(), desc_arm.get(),
                                        &scene.arm) == RK_OK);
     }
     if (options.gantry) {
         auto model = make_gantry();
-        auto desc_gantry = new_desc(3.0, 0.0, options.gantry_z);
+        auto desc_gantry = new_desc(options.gantry_position[0], options.gantry_position[1],
+                                    options.gantry_position[2]);
         scene.gantry_index = next++;
+        if (options.bed) {
+            desc_gantry->collision_half_extents[0] = desc_gantry->collision_half_extents[1] = 0.5;
+            desc_gantry->collision_half_extents[2] = 0.05;
+        }
         assert(rk_simulation_add_robot(scene.simulation, model.get(), desc_gantry.get(),
                                        &scene.gantry) == RK_OK);
     }
@@ -273,6 +301,29 @@ void build(Scene &scene, const Options &options) {
         floor.half_extents[2] = 0.5;
         assert(rk_simulation_spawn_object(scene.simulation, &floor, &scene.floor) == RK_OK);
     }
+    const auto spawn_box = [&](const double *at, uint32_t motion) {
+        rk_simulation_object_desc box{};
+        box.struct_size = sizeof(box);
+        box.motion_type = motion;
+        box.mass = motion == 2 ? 1.0 : 0.0;
+        box.rotation[3] = 1.0;
+        std::copy(at, at + 3, box.position);
+        box.half_extents[0] = box.half_extents[1] = box.half_extents[2] = 0.05;
+        rk_simulation_object object = 0;
+        assert(rk_simulation_spawn_object(scene.simulation, &box, &object) == RK_OK);
+        scene.box = object;
+    };
+    if (options.static_box) spawn_box(options.static_box, 0);
+    if (options.dynamic_box) spawn_box(options.dynamic_box, 2);
+    if (options.shapeless_robot) {
+        // One link, no joints, no collision shape, and the "none" approximation:
+        // a robot that is not meant to touch anything.
+        auto model = new_blueprint(1, RK_COLLISION_APPROXIMATION_NONE);
+        auto robot_desc = new_desc(options.shapeless_robot[0], options.shapeless_robot[1],
+                                   options.shapeless_robot[2]);
+        rk_robot_runtime ghost = 0;
+        assert(rk_simulation_add_robot(scene.simulation, model.get(), robot_desc.get(), &ghost) == RK_OK);
+    }
     if (options.plane) {
         rk_simulation_object_desc plane{};
         plane.struct_size = sizeof(plane);
@@ -286,20 +337,30 @@ void build(Scene &scene, const Options &options) {
     }
 }
 
+rk_robot_state snapshot(rk_robot_runtime robot) {
+    rk_robot_state state{};
+    state.struct_size = sizeof(state);
+    assert(rk_robot_runtime_snapshot(robot, &state) == RK_OK);
+    return state;
+}
+
 // Steps `ticks` times. The arm and the gantry follow a scripted job, the way a
 // motion program feeds them, one new position batch per tick.
 void run(Scene &scene, uint32_t ticks, uint32_t first_tick = 0) {
     for (uint32_t tick = first_tick; tick < first_tick + ticks; ++tick) {
-        const double t = tick * 0.01;
+        const double t = tick * scene.timestep;
+        double arm_targets[3] = {}, gantry_targets[3] = {};
         if (scene.arm) {
             const double targets[3] = {0.8 * std::sin(1.3 * t), 0.5 * std::sin(2.1 * t) - 0.2,
                                        0.6 * std::sin(0.9 * t)};
+            std::copy(targets, targets + 3, arm_targets);
             const auto command = position_command(++scene.sequence, 3, targets);
             EXPECT(rk_robot_runtime_submit(scene.arm, &command) == RK_OK, "arm submit tick %u", tick);
         }
         if (scene.gantry) {
             const double targets[3] = {0.2 * std::sin(1.1 * t), 0.2 * std::sin(1.7 * t),
                                        0.1 * std::sin(2.3 * t) + 0.1};
+            std::copy(targets, targets + 3, gantry_targets);
             const auto command = position_command(++scene.sequence, 3, targets);
             EXPECT(rk_robot_runtime_submit(scene.gantry, &command) == RK_OK, "gantry submit tick %u", tick);
         }
@@ -309,6 +370,18 @@ void run(Scene &scene, uint32_t ticks, uint32_t first_tick = 0) {
         }
         scene.results.push_back(rk_simulation_step(scene.simulation,
                                                    static_cast<uint64_t>(tick) * 10'000'000u));
+        if (scene.arm) {
+            const auto state = snapshot(scene.arm);
+            for (int joint = 0; joint < 3; ++joint)
+                scene.arm_error = std::fmax(scene.arm_error, std::fabs(state.position[joint] - arm_targets[joint]));
+        }
+        if (scene.gantry) {
+            const auto state = snapshot(scene.gantry);
+            for (int joint = 0; joint < 3; ++joint)
+                scene.gantry_error = std::fmax(scene.gantry_error,
+                                               std::fabs(state.position[joint] - gantry_targets[joint]));
+        }
+        if ((tick + 1) % scene.stride != 0) continue;
         if (scene.arm) record(scene, scene.arm_trace, scene.arm, scene.arm_index, scene.arm_links);
         if (scene.gantry)
             record(scene, scene.gantry_trace, scene.gantry, scene.gantry_index, scene.gantry_links);
@@ -319,13 +392,6 @@ std::size_t count_failed(const Scene &scene) {
     std::size_t failed = 0;
     for (const auto result : scene.results) failed += result != RK_OK;
     return failed;
-}
-
-rk_robot_state snapshot(rk_robot_runtime robot) {
-    rk_robot_state state{};
-    state.struct_size = sizeof(state);
-    assert(rk_robot_runtime_snapshot(robot, &state) == RK_OK);
-    return state;
 }
 
 double height_of(const Scene &scene, int robot) {
@@ -382,6 +448,60 @@ static void far_humanoid_does_not_change_arm_and_gantry(bool humanoid_first, dou
            "arm safety %d gantry safety %d", arm.safety, gantry.safety);
 }
 
+// The world owns timestep, integrator and solver limits, so a scene that adds
+// a humanoid at 2 ms with G1's solver settings runs the arm and the gantry at
+// those settings too. They must stay valid, and a humanoid that does not touch
+// them must not change them at a given setting.
+static void world_settings_are_shared() {
+    struct Config {
+        const char *name;
+        double timestep;
+        uint32_t substeps, integrator, iterations, line_search;
+    };
+    const Config configs[] = {
+        {"10 ms x5 euler (arm and CNC scenes)", 0.01, 5, 0, 0, 0},
+        {"2 ms x2 implicitfast", 0.002, 2, 2, 0, 0},
+        {"2 ms x2 implicitfast, 5 and 8 iterations (MJX G1)", 0.002, 2, 2, 5, 8},
+    };
+    Trace reference_arm, reference_gantry;
+    for (const auto &config : configs) {
+        Options options;
+        options.timestep = config.timestep;
+        options.substeps = config.substeps;
+        options.integrator = config.integrator;
+        options.solver_iterations = config.iterations;
+        options.line_search_iterations = config.line_search;
+        const auto ticks = static_cast<uint32_t>(std::lround(4.0 / config.timestep));
+        const auto stride = static_cast<uint32_t>(std::lround(0.02 / config.timestep));
+        Scene alone;
+        build(alone, options);
+        alone.stride = stride;
+        run(alone, ticks);
+        options.humanoid = true;
+        options.humanoid_pitch = 0.5;
+        options.floor_box = true;
+        options.humanoid_filter = 2;
+        Scene mixed;
+        build(mixed, options);
+        mixed.stride = stride;
+        run(mixed, ticks);
+        if (reference_arm.values.empty()) {
+            reference_arm = alone.arm_trace;
+            reference_gantry = alone.gantry_trace;
+        }
+        std::printf("%s: tracking error arm %.4f rad gantry %.5f m; vs 10 ms poses: arm %.4f gantry %.5f; humanoid changes them by %.3g\n",
+                    config.name, alone.arm_error, alone.gantry_error,
+                    alone.arm_trace.pose_difference(reference_arm, 3, 4),
+                    alone.gantry_trace.pose_difference(reference_gantry, 3, 4),
+                    std::fmax(mixed.arm_trace.max_difference(alone.arm_trace),
+                              mixed.gantry_trace.max_difference(alone.gantry_trace)));
+        EXPECT(count_failed(alone) == 0 && count_failed(mixed) == 0, "steps fail under %s", config.name);
+        EXPECT(mixed.arm_trace == alone.arm_trace && mixed.gantry_trace == alone.gantry_trace,
+               "a far humanoid changes the arm or gantry under %s", config.name);
+    }
+}
+
+
 // The humanoid alone, unpowered enough to fall: report how it ends.
 [[maybe_unused]] static void probe_fall(uint32_t filter, double tolerance) {
     Options options;
@@ -409,6 +529,7 @@ static void far_humanoid_does_not_change_arm_and_gantry(bool humanoid_first, dou
 }
 
 int main() {
+    world_settings_are_shared();
     far_humanoid_does_not_change_arm_and_gantry(false, 0.0);
     far_humanoid_does_not_change_arm_and_gantry(true, 0.0);
     far_humanoid_does_not_change_arm_and_gantry(false, 0.5);
