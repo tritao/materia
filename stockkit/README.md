@@ -10,8 +10,10 @@ a sorted list of material intervals whose endpoints keep their exact depth, a
 surface normal, and the operation, tool and move that made them. Moves reach
 the stock only through a swept-volume ray query, so 3-axis, 5-axis and robot
 motion share one stock representation. The phase plan and targets are in
-[`docs/PLAN.md`](docs/PLAN.md); notes on the open-source work this draws on
-are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
+[`docs/PLAN.md`](docs/PLAN.md); why the design looks like this (comparison
+with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
+kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
+open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
 ## Current state (phases 0–2)
 
