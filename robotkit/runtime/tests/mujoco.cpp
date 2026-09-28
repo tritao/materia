@@ -428,7 +428,9 @@ static void servo_target_runs_through_the_runtime() {
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, 0) == RK_ERROR_LIMIT);
+    // The refused command faults its robot, not the shared tick.
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    assert(state(robot).safety == RK_SAFETY_FAULT);
     rk_simulation_destroy(simulation);
 }
 
@@ -513,8 +515,9 @@ static void link_shape_contact_softness_reaches_the_backend() {
 }
 
 // An unpowered arm falls onto its 0.3 rad stop and, since MuJoCo's stops are
-// compliant, rests slightly past it. With exact limits the runtime faults;
-// with an observed-limit tolerance it holds on the stop.
+// compliant, rests slightly past it. With exact limits the runtime faults that
+// robot (the tick itself succeeds); with an observed-limit tolerance it holds
+// on the stop.
 static rk_result arm_on_its_stop(double tolerance, double &position) {
     auto model = gravity_arm(0.0);
     model.joints[0].upper_limit = 0.3;
@@ -529,9 +532,10 @@ static rk_result arm_on_its_stop(double tolerance, double &position) {
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     rk_result result = RK_OK;
-    for (int tick = 0; tick < 200 && result == RK_OK; ++tick)
-        result = rk_simulation_step(simulation, static_cast<uint64_t>(tick) * 10'000'000u);
+    for (int tick = 0; tick < 200; ++tick)
+        assert(rk_simulation_step(simulation, static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
     position = state(robot).position[0];
+    if (state(robot).safety == RK_SAFETY_FAULT) result = RK_ERROR_LIMIT;
     rk_simulation_destroy(simulation);
     return result;
 }

@@ -223,7 +223,9 @@ void shared_world_steps_once() {
     assert(rk_robot_runtime_snapshot(first, &destroyed) == RK_ERROR_INVALID_HANDLE);
 }
 
-void failed_command_phase_does_not_advance() {
+// A command a robot rejects faults that robot alone: the shared tick still
+// advances every other robot, and neither loses its own commands.
+void rejected_command_faults_only_its_robot() {
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.01;
@@ -257,18 +259,24 @@ void failed_command_phase_does_not_advance() {
 
     const auto rejected_after_stop = target(-0.8, 3);
     assert(rk_robot_runtime_submit(second, &rejected_after_stop) == RK_OK);
-    assert(rk_simulation_step(simulation, 200) == RK_ERROR_SAFETY_STOPPED);
+    auto more_first = target(0.8, 2);
+    more_first.targets[0].max_rate = 2.0;
+    assert(rk_robot_runtime_submit(first, &more_first) == RK_OK);
+    assert(rk_simulation_step(simulation, 200) == RK_OK);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
-    assert(clock.step_index == 1);
-    assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
+    assert(clock.step_index == 2);
+    assert(std::abs(snapshot(first).position[0] - 0.04) < 1e-12); // Its command was not lost.
+    assert(snapshot(second).safety == RK_SAFETY_EMERGENCY_STOP);
+    assert(std::abs(snapshot(second).position[0]) < 1e-12);
 
     rk_robot_command clear_stop{};
     clear_stop.struct_size = sizeof(clear_stop);
     clear_stop.sequence = 4;
     clear_stop.kind = RK_COMMAND_RESET_SAFETY;
     assert(rk_robot_runtime_submit(second, &clear_stop) == RK_OK);
-    assert(rk_simulation_step(simulation, 200) == RK_OK);
-    assert(std::abs(snapshot(first).position[0] - 0.04) < 1e-12);
+    assert(rk_simulation_step(simulation, 300) == RK_OK);
+    assert(snapshot(second).safety == RK_SAFETY_READY);
+    assert(std::abs(snapshot(first).position[0] - 0.06) < 1e-12);
     rk_simulation_destroy(simulation);
 }
 
@@ -1150,7 +1158,7 @@ int main() {
     convex_link_and_box_link_build();
     shared_world_steps_once();
     realtime_presentation_keeps_one_revision();
-    failed_command_phase_does_not_advance();
+    rejected_command_faults_only_its_robot();
     velocity_targets_advance_joint_coordinates();
     sensor_geometry_and_reset();
     driving_base_keeps_owner_sensors_and_reset_pose();
