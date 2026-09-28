@@ -1,9 +1,12 @@
 package cadbridge;
 
 import cadkit.modeling.AssemblyState;
+import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties;
+import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorFrames;
 import robotkit.material.LoadLimits;
 import robotkit.material.Payload;
 import robotkit.model.Link;
@@ -12,13 +15,24 @@ import robotkit.model.Link;
 class MachineAssemblyMassBridge {
   static function complete(assembly:MachineAssembly, state:Null<AssemblyState>, needInertia:Bool):MachineAssemblyMassProperties {
     if (assembly == null) throw "Machine assembly is required";
-    var properties = assembly.massProperties(state);
+    var mounted = Std.isOfType(assembly, EndEffector);
+    var properties = mounted
+      ? (cast assembly : EndEffector).massPropertiesAtMount(state)
+      : assembly.massProperties(state);
     if (properties.unaccounted.length != 0)
       throw 'Machine assembly has unaccounted BOM mass: ${properties.unaccounted.join(", ")}';
     if (!Math.isFinite(properties.mass) || properties.mass <= 0)
       throw "Machine assembly requires positive mass";
     if (needInertia && properties.inertia == null)
       throw 'Machine assembly has missing inertia: ${properties.unaccountedInertia.join(", ")}';
+    if (mounted) {
+      var centre = EndEffectorFrames.pointYToZ(properties.centreOfMass.x,
+        properties.centreOfMass.y, properties.centreOfMass.z);
+      var half = Math.sqrt(0.5);
+      return {mass: properties.mass, centreOfMass: new Vector(centre.x, centre.y, centre.z),
+        inertia: properties.inertia == null ? null : properties.inertia.rotated(half, 0, 0, half),
+        unaccounted: properties.unaccounted, unaccountedInertia: properties.unaccountedInertia};
+    }
     return properties;
   }
 
