@@ -80,10 +80,13 @@ direct lowering and
 CAM IR → G-code → CncKit IR
 round trips. The suite also
 checks the generic manufacturingkit sheet placement adapter using locally
-authored input; it does not depend on a MachineKit example. Run with the cadkit native
-build on `LD_LIBRARY_PATH`:
+authored input; it does not depend on a MachineKit example. The island pocket
+is also cut with StockKit and compared with the finished part: no gouge, no
+rapid or shank through stock, and leftover only in the inside corners. Build
+StockKit core (see `stockkit/README.md`), then run with it and the cadkit
+native build on `LD_LIBRARY_PATH`:
 
 ```sh
-LD_LIBRARY_PATH=/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
+LD_LIBRARY_PATH=build/stockkit-core:/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
   ./haxeon/scripts/haxeon run --project camkit/tests/haxeon.json
 ```

@@ -1,6 +1,7 @@
 import camkit.CamGCodeWriter;
 import camkit.CamJob;
 import cadkit.modeling.Curve;
+import cadkit.modeling.Part;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.CncCompiler;
@@ -9,6 +10,9 @@ import cnckit.CncTool;
 import cnckit.ir.CncGeometryTools;
 import cnckit.ir.CncOp;
 import cnckit.ir.CncPoint;
+import stockkit.CutMoves;
+import stockkit.Stock;
+import stockkit.StockGrid;
 
 /** Generated plate pocket with a central raised boss. */
 class CamIslandPocketFixture {
@@ -72,6 +76,7 @@ class CamIslandPocketFixture {
       case _:
     }
     check(retracted, "tool retracts before crossing the raised boss");
+    simulate(program, tool, check);
 
     var cutterRadius = tool.diameter * 0.5;
     for (op in program.ops) switch op {
@@ -184,6 +189,51 @@ class CamIslandPocketFixture {
     check(rejected, "rejected island pocket leaves no partial CAM operation");
     tightFace.close(); tightSketch.close(); tightBoss.close();
     face.close(); sketch.close(); outer.close(); boss.close();
+  }
+
+  /**
+    Cuts the program from a plate with StockKit and compares it with the
+    finished part: nothing gouged, no rapid through stock, no shank contact,
+    and leftover only in the pocket's four inside corners.
+  **/
+  static function simulate(program:camkit.CamProgram, tool:CncTool,
+      check:Bool->String->Void):Void {
+    var solids:Array<Part> = [];
+    function box(width:Float, depth:Float, height:Float, x:Float, y:Float, z:Float):Part {
+      var local = Part.box(width, depth, height, Min, Min, Min);
+      var placed = local.translated(new Vector(x, y, z));
+      solids.push(local);
+      solids.push(placed);
+      return placed;
+    }
+    var blank = box(0.05, 0.04, 0.01, -0.005, -0.005, -0.01);
+    var pocket = box(0.04, 0.03, 0.003, 0, 0, -0.002).subtract(box(0.01, 0.008, 0.005, 0.015, 0.011, -0.003));
+    var part = blank.subtract(pocket);
+    var mesh = part.shape.tessellate(1e-6, 0.1);
+    solids.push(pocket);
+    solids.push(part);
+    for (solid in solids) solid.close();
+    // Rays off the part's round coordinates.
+    var grid = new StockGrid(-0.00487, -0.00491, 0.00025, 200, 160);
+    var target = Stock.fromMesh(grid, mesh);
+    var stock = Stock.box(grid, -0.005, -0.005, -0.01, 0.045, 0.035, 0);
+    var report = stock.cut(CutMoves.fromOps(program.ops, program.tool));
+    check(report.rapidContacts().length == 0, "island pocket never rapids through stock");
+    check(report.collisions().length == 0, "island pocket keeps the shank out of the stock");
+    var comparison = stock.compare(target);
+    check(comparison.deepestGouge() < 1e-9,
+      'island pocket does not gouge its part (deepest ${comparison.deepestGouge()})');
+    check(comparison.thickestLeftover() <= 0.002 + 1e-12,
+      "island pocket leaves nothing thicker than its depth");
+    // A round cutter leaves a fillet of its radius in each inside corner of
+    // the outer wall, (1 - pi / 4) r^2 each; the boss's corners are outside
+    // corners. At 0.25 mm rays each fillet is about three rays.
+    var r = tool.diameter / 2;
+    var fillets = (4 - Math.PI) * r * r * 0.002;
+    check(Math.abs(comparison.leftoverVolume() - fillets) <= 0.25 * fillets,
+      'island pocket leftover is the corner fillets: ${comparison.leftoverVolume()} vs $fillets');
+    target.dispose();
+    stock.dispose();
   }
 
   static function rectangle(x0:Float, y0:Float, x1:Float, y1:Float):Curve

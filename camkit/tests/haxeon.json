@@ -4,7 +4,8 @@
   "entry": "CamKitTests",
   "sourceRoots": ["src"],
   "dependencies": {
-    "camkit": { "path": ".." }
+    "camkit": { "path": ".." },
+    "stockkit": { "path": "../../stockkit" }
   },
   "target": "host",
   "outputDir": "build"
