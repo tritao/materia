@@ -45,10 +45,19 @@ joints makes it fall.
   snapshots and trajectories are unchanged. Importers map an MJCF
   `<freejoint>` on the root body, or a URDF world→base floating joint, to this
   flag. `JointType.Floating` stays rejected by the compiler.
-- **HU-D2 — Import MJCF through MuJoCo's own parser.** A native tool loads the
-  file with the vendored MuJoCo (`mjSpec`) and emits a `RobotModel` plus mesh
-  assets. Writing our own MJCF parser would reimplement defaults classes,
-  includes and compiler options badly. URDF import follows as a subset.
+- **HU-D2 — MJCF through MuJoCo's compiler, URDF through our own Haxe
+  loader.**
+  - MJCF means whatever MuJoCo's compiler makes of it: nested default classes,
+    `childclass`, includes, angle and Euler conventions, `fromto`, inertia
+    computed from geometry. A native tool loads it with the vendored MuJoCo
+    (`mjSpec`) and emits a `RobotModel` plus mesh assets, so H2's conformance
+    test compares physics, not two readings of the file. It needs a
+    MuJoCo-enabled build, which is acceptable for an import step.
+  - URDF is small and maps almost one-to-one onto `RobotModel`. A Haxe loader
+    runs wherever Materia runs, including the editor and Wasm, without MuJoCo,
+    and keeps visual meshes that MuJoCo's URDF import drops. It needs an XML
+    parser in haxeon, added there rather than privately in RobotKit. Only
+    expanded URDF is accepted; `xacro` stays an external step.
 - **HU-D3 — The humanoid joint command is `q, qd, kp, kd, τ_ff`,** evaluated as
   PD inside every physics substep, with the physics rate independent of the
   control rate. This is what both RL policies and whole-body controllers emit.
@@ -90,22 +99,36 @@ Tests:
 - kinematic-base operations are rejected for a floating robot;
 - reset restores the initial pose with zero velocity.
 
-## H1 — MJCF import (G1 into a RobotModel)
+## H1 — Robot import (G1 into a RobotModel)
 
-Do:
-- `robotkit/tools/mjcf_import` (C++, links the vendored MuJoCo): bodies, hinge
-  and slide joints, free joint → `floatingBase`, limits, inertials, geoms
-  (mesh, box, capsule, sphere, cylinder), actuators with gear and force range,
-  joint armature, damping and friction loss, IMU sites → `Sensor` frames.
-- Mesh assets written next to the model for SceneKit and collision.
-- Take the G1 model from MuJoCo Menagerie (check the model's own license) as a
-  fixture outside the default test run, plus a small hand-written MJCF fixture
-  in the default run.
+Problem: there is no way to bring an existing robot description in, and
+`Simulation` gives each link a single collision shape (a box, or a convex hull
+of at most 64 vertices). G1 collides through several primitives per link, and
+its meshes are far larger than 64 vertices.
+
+Do, in order:
+1. **Several collision shapes per link.** `RobotModel` links carry a list of
+   primitive collision shapes (box, sphere, capsule, cylinder, convex hull),
+   each with a pose in the link frame. The blueprint or robot description
+   carries them, and `Simulation` builds a compound shape per link from them.
+2. **MJCF importer** (`robotkit/tools/mjcf_import`, C++, links the vendored
+   MuJoCo): bodies, hinge and slide joints, free joint → `floatingBase`,
+   limits, inertials, collision geoms → the shapes above, visual meshes,
+   actuators with gear and force range, IMU sites → `Sensor` frames. Joint
+   armature, damping and friction loss are read but stored only once H2 adds
+   them to the model.
+3. **Haxe URDF loader** on haxeon's XML parser (HU-D2).
+
+G1 comes from MuJoCo Menagerie through a download script, not vendored; check
+the model's own license. A small hand-written MJCF and URDF fixture pair runs
+in the default tests.
 
 Tests:
-- the small fixture round-trips every supported element;
+- the fixtures import every supported element;
 - G1 total mass, link masses, inertias and joint limits match the MJCF within
-  tolerance; the model renders in the editor.
+  tolerance; the model renders in the editor;
+- a G1 dropped on a floor lands on its feet's collision shapes, not bounding
+  boxes.
 
 ## H2 — Physics fidelity for legged contact
 
