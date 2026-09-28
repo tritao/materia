@@ -3,7 +3,7 @@
 	"package": { "name": "machinekit-picking-station-example" },
 	"entry": "PickingStationWorkflow",
 	"sources": ["PickingStationDesign.hx", "PickingStationPreview.hx", "PickingStationWorkflow.hx", "PickingStationChecks.hx", "PickingStationUiExtension.hx"],
-	"sourceRoots": [".", "src"],
+	"sourceRoots": ["src", "."],
 	"dependencies": {
 		"projectkit": { "path": "../../../projectkit" },
 		"manufacturingkit": { "path": "../../../manufacturingkit" },

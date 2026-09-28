@@ -37,8 +37,8 @@ import machinekit.motion.FlangeBearingHousing;
 import machinekit.motion.PillowBlock;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
-import machinekit.picking.PickingStationConfig;
-import machinekit.picking.StorageRack;
+import pickingstation.PickingStationConfig;
+import pickingstation.StorageRack;
 import machinekit.standard.Bushing;
 import machinekit.standard.BearingFit.BearingHousingFit;
 import machinekit.standard.BearingFit.BearingShaftFit;
@@ -1356,21 +1356,23 @@ class MachineKitSmoke {
 		axis.setTravel(state, 0);
 		var unturned = state.worldPose("carriage");
 		axis.setTravel(state, 2);
-		near(state.joint("coupling"), 2 * Math.PI, "one screw turn advances by lead");
+		near(state.joint("coupling"), -2 * Math.PI,
+			"right-hand screw turns negative about +Z to advance the nut along +Z");
 		near(state.worldPose("carriage").qz, unturned.qz, "carriage does not rotate with screw");
 		throws(() -> axis.setTravel(state, axis.stroke + 1), "outside its stroke");
 		var multiAxis = new LinearAxis(23, 10, 200, null, 30,
 			new LeadScrewThread(MetricTrapezoidal, 10, 2, 4));
 		var multiState = multiAxis.assembly().initialState("linear-axis");
 		multiAxis.setTravel(multiState, 8);
-		near(multiState.joint("coupling"), 2 * Math.PI, "multi-start axis moves 8 mm per turn");
+		near(multiState.joint("coupling"), -2 * Math.PI,
+			"right-hand multi-start axis rotates negative to move 8 mm along +Z");
 		near(multiState.worldConnector("carriage", "bore").z, 21 + multiAxis.travelMin + 8,
 			"multi-start carriage travel");
 		var leftAxis = new LinearAxis(23, 10, 200, null, 30,
 			new LeadScrewThread(MetricTrapezoidal, 10, 2, 4, LeftHand));
 		var leftState = leftAxis.assembly().initialState("linear-axis");
 		leftAxis.setTravel(leftState, 8);
-		near(leftState.joint("coupling"), -2 * Math.PI, "left-hand axis reverses rotation");
+		near(leftState.joint("coupling"), 2 * Math.PI, "left-hand axis rotates positive about +Z to advance along +Z");
 		state.setJoint("carriage-slide", axis.travelMax);
 		near(state.joint("coupling"), axis.nut.rotationFor(axis.stroke),
 			"assembly coupling drives screw rotation from carriage travel");
@@ -1661,8 +1663,8 @@ class MachineKitSmoke {
 		check(nut.designation == "LEADNUT-TR-D8-P2-S1-RH", "lead screw nut designation");
 		check(nut.thread.pitch == 2 && nut.thread.starts == 1, "nut carries pitch and starts");
 		check(nut.mountScrew == "M3", "lead screw nut mount screw size");
-		near(nut.travelPerRevolution(), 2, "lead screw nut travel per revolution");
-		near(nut.rotationFor(10), 10 / 2 * 2 * Math.PI, "lead screw nut rotation for a travel distance");
+		near(nut.travelPerRevolution(), -2, "right-hand nut moves toward -Z per positive screw revolution");
+		near(nut.rotationFor(10), -10 / 2 * 2 * Math.PI, "right-hand nut rotation for travel toward +Z");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, -1, 2), "positive screw diameter");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, -1), "positive pitch");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, 2, 0), "at least one start");
@@ -1670,9 +1672,9 @@ class MachineKitSmoke {
 		var multi = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4));
 		check(multi.designation == "LEADNUT-TR-D8-P2-S4-RH", "multi-start nut designation");
 		near(multi.lead, 8, "four-start lead is four times pitch");
-		near(multi.travelPerRevolution(), 8, "four-start travel per positive revolution");
+		near(multi.travelPerRevolution(), -8, "four-start right-hand travel per positive revolution");
 		var left = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4, LeftHand));
-		near(left.travelPerRevolution(), -8, "left-hand nut travels opposite on positive revolution");
+		near(left.travelPerRevolution(), 8, "left-hand nut moves toward +Z per positive screw revolution");
 
 		var nutEnvelope = nut.geometry(Envelope);
 		solid(nutEnvelope, "lead screw nut envelope");

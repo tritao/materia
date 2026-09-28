@@ -16,7 +16,7 @@ In the editor, inspect the assembly hierarchy and open **Cut planning** for the 
 
 For an active-pick capture, launch with `--project-action=start-order --capture-dir=machinekit/examples/picking-station/capture --frames=3` after building the app.
 
-The project declares its editor extension in `materia.project.json`. `PickingStationUiExtension.hx` owns the panel contents, actions, selection response, and indicator colours. `src/pickingstation/PickingScenario.hx` owns the sample order and virtual inventory; MachineKit owns station geometry. The editor renders the project UI protocol described in [the app documentation](../../../app/docs/project-ui-extension.md).
+The project declares its editor extension in `materia.project.json`. `PickingStationUiExtension.hx` owns the panel contents, actions, selection response, and indicator colours. The `pickingstation` package under `src/` owns station geometry and the sample order state; it depends on MachineKit for component primitives and ManufacturingKit for sheet stock. The editor renders the project UI protocol described in [the app documentation](../../../app/docs/project-ui-extension.md).
 
 ![Active pick in the editor](active-pick.png)
 

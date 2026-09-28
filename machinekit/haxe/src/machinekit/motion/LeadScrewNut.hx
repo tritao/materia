@@ -19,7 +19,8 @@ import machinekit.standard.SocketHeadCapScrew;
 /** ACME/trapezoidal lead screw nut: a flanged block with a bore matching the screw diameter and
  * a mounting bolt pattern on the flange face, for driving a carriage. The thread itself is
  * semantic (`LeadScrewThread` family, diameter, pitch, starts and hand), not modelled.
- * `travelPerRevolution()`/`rotationFor()` convert between screw rotation and nut travel.
+ * `travelPerRevolution()`/`rotationFor()` convert between screw rotation and nut travel; for a
+ * right-hand thread, positive rotation about +Z moves the nut toward -Z.
  * CAD frame: axis along +Z, body from z=0 to z=bodyLength, flange from there to
  * z=bodyLength+flangeThickness. Connectors: `bore` (axis, mid-body) and `mount1`..`mountN` (on
  * the flange face), all with +Y along +Z.

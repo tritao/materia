@@ -12,8 +12,8 @@ import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
-import machinekit.picking.PickingStation;
-import machinekit.picking.StationInstance;
+import pickingstation.PickingStation;
+import pickingstation.StationInstance;
 
 /** Materia preview: stock and cutting layout below, finished CAD panels above it. */
 class PickingStationPreview {

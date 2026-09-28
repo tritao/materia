@@ -179,7 +179,10 @@ class LinearAxis extends MachineAssembly {
 		bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
 		travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
 		travelMax = travelMin + stroke;
-		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke, threadSpec.hand == RightHand ? 1 : -1);
+		// The carriage coordinate is +Z. A right-hand screw needs negative rotation to move the
+		// nut along +Z; a left-hand screw needs positive rotation.
+		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke,
+			threadSpec.hand == RightHand ? -1 : 1);
 		bearingBPosition = travelMax + carriage.length / 2 + margin + depth / 2;
 		length = bearingBPosition + depth / 2;
 		screwStart = motor.connector("shaftTip").frame.z;

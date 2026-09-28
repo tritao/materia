@@ -1,4 +1,4 @@
-package machinekit.picking;
+package pickingstation;
 
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;

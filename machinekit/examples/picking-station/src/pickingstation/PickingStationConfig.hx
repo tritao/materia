@@ -1,4 +1,4 @@
-package machinekit.picking;
+package pickingstation;
 
 /** Validated dimensions shared by the station layout and its example scenario. */
 class PickingStationConfig {

@@ -48,7 +48,7 @@ Each component also produces the machining it needs:
 | `Bushing` | — (proportional to bore diameter) | — |
 | `ShaftCoupling` | — (proportional to the larger bore) | radial set-screw holes/connectors, `setScrewPart()`, `billOfMaterials()` |
 | `LinearBearing` | LM8UU–LM20UU | `housingSeat()` with named housing fits; Preview adds end rims and seal tracks |
-| `LeadScrewThread` | semantic metric trapezoidal or ACME family, diameter, pitch, starts and hand | `lead = pitch × starts` |
+| `LeadScrewThread` | semantic metric trapezoidal or ACME family, diameter, pitch, starts and hand | `lead = pitch × starts`; positive rotation about +Z moves a right-hand nut toward -Z |
 | `LeadScrew` | nominal cylindrical thread envelope | `input`, `output` connectors |
 | `LeadScrewNut` | flanged preview sized from a `LeadScrewThread` | `travelPerRevolution()`, `rotationFor()`, `mountScrewPart()` |
 
@@ -111,7 +111,9 @@ generic square 2020/4040-style profile with a T-slot channel on each face and
 a centre bore, all proportional to its `size` rather than a vendor's literal
 table. Use `TSlotExtrusion.forProfile()` for catalog-backed MISUMI HFS5
 profiles; those entries retain their slot, bore, and cross-section dimensions
-and provenance.
+and provenance. Geometry currently cuts one simplified slot into each outside
+face. Multi-slot patterns for 2040, 2060, and 4040 profiles remain a known
+limitation.
 
 `FrameAssembly` registers named points with `point(name, x, y, z)`, then
 members with `member(name, start, end, profile)`. Optional `FrameEndCut.Mitre(setback)`
@@ -198,7 +200,10 @@ library classes rather than one-off scripts:
 
 ## Sheet stock and cutting plans
 
-The `examples/picking-station/` project connects rectangular cut blanks to
+The stand-alone `examples/picking-station/` package depends on MachineKit and
+ManufacturingKit. Its `pickingstation` source package contains the station
+geometry and picking example code; MachineKit itself contains no picking
+domain classes. The project connects rectangular cut blanks to
 finished picking-bench and tote-station panels. Its versioned
 `materia.project.json.sheet.json` companion stores stock specifications, part
 requirements, manually placed blanks, ordered guillotine cuts, physical sheets,

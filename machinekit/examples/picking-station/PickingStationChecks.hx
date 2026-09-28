@@ -1,9 +1,9 @@
-import machinekit.picking.PickingStation;
-import machinekit.picking.PickingStationConfig;
+import pickingstation.PickingStation;
+import pickingstation.PickingStationConfig;
 import pickingstation.PickingScenario;
 import pickingstation.PickingScenario.PickingAction;
 import pickingstation.PickingScenario.PickingScenarioStatus;
-import machinekit.picking.ShelfAssembly;
+import pickingstation.ShelfAssembly;
 import materia.sheet.SheetPlanValidator;
 
 /** Focused deterministic checks for the virtual station example. */

@@ -7,7 +7,8 @@
 		"projectkit": { "path": "../../projectkit" },
 		"manufacturingkit": { "path": "../../manufacturingkit" },
 		"cadkit": { "path": "../../cadkit" },
-		"machinekit": { "path": ".." }
+		"machinekit": { "path": ".." },
+		"machinekit-picking-station-example": { "path": "../examples/picking-station" }
 	},
 	"target": "host",
 	"outputDir": "build"
