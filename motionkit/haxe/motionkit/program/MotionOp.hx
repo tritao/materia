@@ -14,5 +14,6 @@ enum MotionOp {
   FollowPath(path:PosePath, frameId:String, timing:Float, events:Array<PathEvent>);
   Dwell(seconds:Float);
   SetOutput(channel:String, value:EventValue);
-  WaitInput(channel:String, predicate:InputPredicate, timeoutSeconds:Float);
+  /** A null timeout waits indefinitely. */
+  WaitInput(channel:String, predicate:InputPredicate, timeoutSeconds:Null<Float>);
 }

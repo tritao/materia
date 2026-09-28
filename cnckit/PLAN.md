@@ -31,7 +31,7 @@ Create `camkit` for 2.5D profile, offset pocket, and drill operations from cadki
 0 → 1 → 2 → 3a (file syntax, coordinates, cycles and R arcs) → 4 → 5. MotionKit 3b (`CircularSegment`) depends on 0 and may be built alongside 2. CncKit 3c (G18/G19 and helices) depends on 2 and 3b. Update this log after each phase.
 
 - [x] Phase 0 — CncKit 20 baseline assertions; MotionKit CNC 50 and C7 2,845 assertions after restoring `ObjectMap.remove`. Haxeon launcher rebuilds a mismatched native release pair.
-- [ ] Phase 1
+- [x] Phase 1 — LinuxCNC ordering, indefinite waits, partial-blend warnings and configurable corner limit. CncKit 38 assertions; MotionKit CNC 50 and C7 2,845 assertions.
 - [ ] Phase 2
 - [ ] Phase 3a
 - [ ] Phase 3b

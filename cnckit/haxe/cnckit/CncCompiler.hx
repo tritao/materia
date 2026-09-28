@@ -20,6 +20,8 @@ class CncCompiler {
   public final machine:CncMachine;
   var ops:Array<MotionOp>;
   var pending:Array<PathPrimitive>;
+  var pendingLines:Array<Int>;
+  public var warnings(default, null):Array<String> = [];
   var pendingFeed:Float;
   var pendingBlend:Float;
   var metric:Bool;
@@ -42,7 +44,8 @@ class CncCompiler {
 
   public function compile(source:String):MotionProgram {
     if (source == null) throw "CNC source must not be null";
-    ops = []; pending = []; pendingFeed = 0.0; pendingBlend = 0.0;
+    ops = []; pending = []; pendingLines = []; warnings = [];
+    pendingFeed = 0.0; pendingBlend = 0.0;
     metric = true; absolute = true; wcs = 54; toolLength = 0.0;
     feedCommand = Math.NaN; spindleSpeed = 0.0; spindleDirection = 0;
     selectedTool = -1; motionMode = -1; blendTolerance = 0.0;
@@ -134,18 +137,8 @@ class CncCompiler {
       fail(line, p.column, "P requires G4 or G64");
     if (dwell && p == null) fail(line, gWords[0].column,
       "G4 requires P seconds");
-    if (unitChange >= 0) metric = unitChange == 21;
-    if (distanceChange >= 0) absolute = distanceChange == 90;
-    if (nextWcs >= 0) wcs = nextWcs;
-    if (setToolOffset) {
-      var hWord:GWord = cast h;
-      try toolLength = machine.toolLength(integer(hWord, line))
-      catch (error:Dynamic) fail(line, hWord.column, Std.string(error));
-    }
-    if (clearToolOffset) toolLength = 0.0;
-    if (setBlend && lineBlend != blendTolerance) {
-      flush(); blendTolerance = lineBlend;
-    }
+    // LinuxCNC block order: F/S, T, M6, spindle, coolant, dwell,
+    // modal state, motion, then operator and program stops.
     var f = values.get("F");
     if (f != null) {
       if (f.value <= 0.0) fail(line, f.column, "F feed must be positive");
@@ -172,16 +165,47 @@ class CncCompiler {
       }
     }
     if (s != null && spindleDirection != 0 && spindleCode < 0)
-      output("spindle.speed", EventValue.Analog(spindleSpeed));
+      output(CncChannels.SpindleSpeed, EventValue.Analog(spindleSpeed));
+    for (word in mWords) if (integer(word, line) == 6) {
+      if (selectedTool < 0) fail(line, word.column, "M6 requires selected T tool");
+      flush(); ops.push(MotionOp.WaitInput(CncChannels.toolChange(selectedTool),
+        InputPredicate.Equals(EventValue.Digital(true)), null));
+    }
     if (spindleCode == 3 || spindleCode == 4) {
       spindleDirection = spindleCode == 3 ? 1 : -1;
-      output("spindle.direction", EventValue.Analog(spindleDirection));
-      output("spindle.speed", EventValue.Analog(spindleSpeed));
+      output(CncChannels.SpindleDirection, EventValue.Analog(spindleDirection));
+      output(CncChannels.SpindleSpeed, EventValue.Analog(spindleSpeed));
+    } else if (spindleCode == 5) {
+      spindleDirection = 0;
+      output(CncChannels.SpindleSpeed, EventValue.Analog(0.0));
+      output(CncChannels.SpindleDirection, EventValue.Analog(0.0));
     }
     for (word in mWords) switch integer(word, line) {
-      case 7: output("coolant.mist", EventValue.Digital(true));
-      case 8: output("coolant.flood", EventValue.Digital(true));
+      case 7: output(CncChannels.CoolantMist, EventValue.Digital(true));
+      case 8: output(CncChannels.CoolantFlood, EventValue.Digital(true));
+      case 9:
+        output(CncChannels.CoolantMist, EventValue.Digital(false));
+        output(CncChannels.CoolantFlood, EventValue.Digital(false));
       case _:
+    }
+
+    if (dwell) {
+      var dwellP:GWord = cast p;
+      if (dwellP.value <= 0.0) fail(line, dwellP.column,
+        "G4 P seconds must be positive");
+      flush(); ops.push(MotionOp.Dwell(dwellP.value));
+    }
+    if (unitChange >= 0) metric = unitChange == 21;
+    if (distanceChange >= 0) absolute = distanceChange == 90;
+    if (nextWcs >= 0) wcs = nextWcs;
+    if (setToolOffset) {
+      var hWord:GWord = cast h;
+      try toolLength = machine.toolLength(integer(hWord, line))
+      catch (error:Dynamic) fail(line, hWord.column, Std.string(error));
+    }
+    if (clearToolOffset) toolLength = 0.0;
+    if (setBlend && lineBlend != blendTolerance) {
+      flush(); blendTolerance = lineBlend;
     }
 
     if (modalMotion >= 0) motionMode = modalMotion;
@@ -195,28 +219,10 @@ class CncCompiler {
         "axis words need G0-G3 motion mode");
       move(line, motionMode, x, y, z, i, j);
     }
-    if (dwell) {
-      var dwellP:GWord = cast p;
-      if (dwellP.value <= 0.0) fail(line, dwellP.column,
-        "G4 P seconds must be positive");
-      flush(); ops.push(MotionOp.Dwell(dwellP.value));
-    }
-    if (spindleCode == 5) {
-      spindleDirection = 0;
-      output("spindle.speed", EventValue.Analog(0.0));
-      output("spindle.direction", EventValue.Analog(0.0));
-    }
     for (word in mWords) switch integer(word, line) {
-      case 9:
-        output("coolant.mist", EventValue.Digital(false));
-        output("coolant.flood", EventValue.Digital(false));
       case 0, 1:
-        flush(); ops.push(MotionOp.WaitInput("cnc.operator.resume",
-          InputPredicate.Equals(EventValue.Digital(true)), 1e9));
-      case 6:
-        if (selectedTool < 0) fail(line, word.column, "M6 requires selected T tool");
-        flush(); ops.push(MotionOp.WaitInput('cnc.tool_change.$selectedTool',
-          InputPredicate.Equals(EventValue.Digital(true)), 1e9));
+        flush(); ops.push(MotionOp.WaitInput(CncChannels.OperatorResume,
+          InputPredicate.Equals(EventValue.Digital(true)), null));
       case _:
     }
     if (endCode >= 0) { flush(); ended = true; }
@@ -241,7 +247,7 @@ class CncCompiler {
         "I/J require G2 or G3");
       if (start.distanceTo(end) <= 1e-12) return;
       addMove(new LineSegment(start, end), mode == 0 ? machine.rapidSpeed : feed(line),
-        mode == 0);
+        mode == 0, line);
     } else {
       if (i == null && j == null) fail(line, 1, "G2/G3 require I/J arc centre");
       if (Math.abs(start.z - end.z) > 1e-10)
@@ -262,17 +268,18 @@ class CncCompiler {
       } else {
         while (sweep <= 1e-12) sweep += 2.0 * Math.PI;
       }
-      addMove(new ArcSegment(center, radius, begin, sweep), feed(line), false);
+      addMove(new ArcSegment(center, radius, begin, sweep), feed(line), false, line);
     }
     position = target;
   }
 
-  function addMove(geometry:PathPrimitive, speed:Float, rapid:Bool):Void {
+  function addMove(geometry:PathPrimitive, speed:Float, rapid:Bool, line:Int):Void {
     var blend = rapid ? 0.0 : blendTolerance;
     if (pending.length > 0 && (rapid || pendingBlend == 0.0 ||
         blend == 0.0 || Math.abs(speed - pendingFeed) > 1e-12 ||
         blend != pendingBlend)) flush();
-    pending.push(geometry); pendingFeed = speed; pendingBlend = blend;
+    pending.push(geometry); pendingLines.push(line);
+    pendingFeed = speed; pendingBlend = blend;
     if (rapid || blend == 0.0) flush();
   }
 
@@ -282,16 +289,21 @@ class CncCompiler {
     var combined = false;
     if (geometry.length > 1 && pendingBlend > 0.0) {
       var blended = CornerBlender.blend(new GeometricPath(geometry),
-        pendingBlend, Math.PI * 5.0 / 6.0);
-      if (blended.diagnostics.length == 0) {
-        geometry = blended.path.primitives;
-        combined = true;
+        pendingBlend, machine.maxBlendTurnAngleRadians);
+      geometry = blended.path.primitives;
+      combined = true;
+      for (diagnostic in blended.diagnostics) {
+        var parts = diagnostic.split(":");
+        var corner = Std.parseInt(parts[0].substr("corner ".length));
+        var line = corner == null || corner < 1 || corner >= pendingLines.length
+          ? pendingLines[0] : pendingLines[corner];
+        warnings.push('G-code line $line: $diagnostic');
       }
     }
     if (combined) emitPath(geometry, pendingFeed,
       new GeometricPath(pending), pendingBlend);
     else for (primitive in pending) emitPath([primitive], pendingFeed);
-    pending = [];
+    pending = []; pendingLines = [];
   }
 
   function emitPath(geometry:Array<PathPrimitive>, speed:Float,

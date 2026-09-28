@@ -1,5 +1,7 @@
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
+import cnckit.CncDialect;
+import motionkit.path.ArcSegment;
 import motionkit.program.MotionOp;
 
 class CncKitTests {
@@ -104,6 +106,87 @@ class CncKitTests {
     rejects(machine, "G41", "line 1 column 1");
     rejects(machine, "G64 P1 G61\nG1 X1 F100", "multiple path-control");
     rejects(machine, "G43 H9", "line 1 column 5");
+    var ordered = new CncCompiler(machine).compile("T1 M6 M3 G0 Z5\nM2");
+    check(switch ordered.ops[0] {
+      case MotionOp.WaitInput("cnc.tool_change.1", _, null): true;
+      case _: false;
+    }, "M6 precedes spindle and has no timeout");
+    check(switch ordered.ops[1] {
+      case MotionOp.SetOutput("spindle.direction", _): true;
+      case _: false;
+    }, "M3 follows tool change");
+    check(switch ordered.ops[3] {
+      case MotionOp.FollowPath(_, _, _, _): true;
+      case _: false;
+    }, "motion follows spindle start");
+    var stopped = new CncCompiler(machine).compile("M3 M8\nM5 M9 G0 X1\nM2");
+    check(switch stopped.ops[3] {
+      case MotionOp.SetOutput("spindle.speed", _): true;
+      case _: false;
+    }, "M5 stops spindle before coolant and motion");
+    check(switch stopped.ops[5] {
+      case MotionOp.SetOutput("coolant.mist", _): true;
+      case _: false;
+    }, "M9 follows M5 before motion");
+    check(switch stopped.ops[7] {
+      case MotionOp.FollowPath(_, _, _, _): true;
+      case _: false;
+    }, "M5 and M9 precede motion");
+    var partialCompiler = new CncCompiler(machine);
+    var partial = partialCompiler.compile(
+      "G21 G90 G64 P1 F600 G1 X10\nG1 Y10\nG1 Y0\nG1 X20\nM2");
+    check(partialCompiler.warnings.length > 0, "unblendable corner warns");
+    check(partialCompiler.warnings[0].indexOf("G-code line 3") >= 0,
+      "blend warning names the corner line");
+    check(partial.ops.length == 1, "fallback keeps the combined path");
+    var strictMachine = new CncMachine("work", "x", "y", "z", 0.2,
+      null, 0.0005, 0.02, CncDialect.LinuxCnc, 0.5);
+    var strictCompiler = new CncCompiler(strictMachine);
+    strictCompiler.compile("G21 G64 P1 F600 G1 X10\nG1 Y10\nM2");
+    check(strictCompiler.warnings.length == 1,
+      "machine blend corner limit controls exact stops");
+    var circle = new CncCompiler(machine).compile(
+      "G21 G90 F600 G0 X10 Y0\nG2 X10 Y0 I-10 J0\nM2");
+    var circlePath = switch circle.ops[1] {
+      case MotionOp.FollowPath(path, _, _, _): path;
+      case _: throw "full circle missing";
+    };
+    near(circlePath.length(), 2 * Math.PI * 0.01,
+      "G2 full circle circumference", 1e-7);
+    var arcMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var cw = new CncCompiler(arcMachine).compile(
+      "G21 G91 F600 G2 X10 I5 J0\nM2");
+    var ccw = new CncCompiler(arcMachine).compile(
+      "G21 G91 F600 G3 X10 I5 J0\nM2");
+    var cwPath = switch cw.ops[0] {
+      case MotionOp.FollowPath(path, _, _, _): path;
+      case _: throw "CW arc missing";
+    };
+    var ccwPath = switch ccw.ops[0] {
+      case MotionOp.FollowPath(path, _, _, _): path;
+      case _: throw "CCW arc missing";
+    };
+    var cwPrimitive:cnckit.CncPosePrimitive = cast cwPath.primitives[0];
+    var ccwPrimitive:cnckit.CncPosePrimitive = cast ccwPath.primitives[0];
+    var cwArc:ArcSegment = cast cwPrimitive.geometry;
+    var ccwArc:ArcSegment = cast ccwPrimitive.geometry;
+    check(cwArc.sweepAngle < 0.0 && ccwArc.sweepAngle > 0.0,
+      "CW and CCW sweeps have opposite signs");
+    near(cwArc.center.x, 0.005, "G91 I centre is relative to start");
+    near(ccwArc.center.x, 0.005, "G91 CCW centre is relative to start");
+    rejects(machine, "G21 G90 F600 G0 X10\nG2 X0 Y10 I-10 J0",
+      "arc endpoint is not on its I/J circle");
+    var relativeTool = new CncCompiler(machine).compile(
+      "G21 G91 G43 H2 G0 Z10\nG49 G0 Z10\nM2");
+    var finalRelative = switch relativeTool.ops[relativeTool.ops.length - 1] {
+      case MotionOp.FollowPath(path, _, _, _): path.poseAt(path.length());
+      case _: throw "relative G49 motion missing";
+    };
+    near(finalRelative.z, 0.02, "G43/G49 do not shift relative moves");
+    var lowercase = new CncCompiler(machine).compile(
+      "g21 g90 (comment) f600 g1 x1 ; tail\nm30");
+    check(lowercase.ops.length == 1, "lowercase and comments parse");
+    rejects(machine, "M30\nG0 X1", "code after M2/M30");
     Sys.println('CncKit tests passed ($assertions assertions)');
   }
 }

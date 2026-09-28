@@ -7,6 +7,8 @@ class CncMachine {
   public final yAxisId:String;
   public final zAxisId:String;
   public final rapidSpeed:Float;
+  public final dialect:CncDialect;
+  public final maxBlendTurnAngleRadians:Float;
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final initialPosition:Array<Float>;
@@ -16,7 +18,9 @@ class CncMachine {
   public function new(frameId:String, xAxisId:String, yAxisId:String,
       zAxisId:String, rapidSpeed:Float, ?initialPosition:Array<Float>,
       ?positionTolerance:Float = 0.0005,
-      ?orientationTolerance:Float = 0.02) {
+      ?orientationTolerance:Float = 0.02,
+      ?dialect:CncDialect = LinuxCnc,
+      ?maxBlendTurnAngleRadians:Float = Math.PI * 5.0 / 6.0) {
     if (frameId == null || frameId.length == 0 || xAxisId == null ||
         yAxisId == null || zAxisId == null || xAxisId.length == 0 ||
         yAxisId.length == 0 || zAxisId.length == 0 ||
@@ -24,7 +28,9 @@ class CncMachine {
       throw "CNC machine needs a frame and three distinct logical axes";
     if (!Math.isFinite(rapidSpeed) || rapidSpeed <= 0.0 ||
         !Math.isFinite(positionTolerance) || positionTolerance <= 0.0 ||
-        !Math.isFinite(orientationTolerance) || orientationTolerance <= 0.0)
+        !Math.isFinite(orientationTolerance) || orientationTolerance <= 0.0 ||
+        !Math.isFinite(maxBlendTurnAngleRadians) ||
+        maxBlendTurnAngleRadians <= 0.0 || maxBlendTurnAngleRadians >= Math.PI)
       throw "CNC machine needs positive rapid speed and tolerances";
     var initial = initialPosition == null ? [0.0, 0.0, 0.0] : initialPosition;
     if (initial.length != 3) throw "CNC machine needs three initial coordinates";
@@ -35,6 +41,8 @@ class CncMachine {
     this.yAxisId = yAxisId;
     this.zAxisId = zAxisId;
     this.rapidSpeed = rapidSpeed;
+    this.dialect = dialect;
+    this.maxBlendTurnAngleRadians = maxBlendTurnAngleRadians;
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.initialPosition = initial.copy();
