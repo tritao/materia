@@ -31,13 +31,13 @@ class ParallelKey extends MachineComponent {
 
 	static function rows():Array<ParallelKeySpec>
 		return [
-			{maxShaft: 8, width: 2, height: 2, shaftDepth: 1.2, hubDepth: 1.0},
-			{maxShaft: 10, width: 3, height: 3, shaftDepth: 1.8, hubDepth: 1.4},
-			{maxShaft: 12, width: 4, height: 4, shaftDepth: 2.5, hubDepth: 1.8},
-			{maxShaft: 17, width: 5, height: 5, shaftDepth: 3.0, hubDepth: 2.3},
-			{maxShaft: 22, width: 6, height: 6, shaftDepth: 3.5, hubDepth: 2.8},
-			{maxShaft: 30, width: 8, height: 7, shaftDepth: 4.0, hubDepth: 3.3},
-			{maxShaft: 38, width: 10, height: 8, shaftDepth: 5.0, hubDepth: 3.3},
+			{minShaft: 6, maxShaft: 8, width: 2, height: 2, shaftDepth: 1.2, hubDepth: 1.0},
+			{minShaft: 8, maxShaft: 10, width: 3, height: 3, shaftDepth: 1.8, hubDepth: 1.4},
+			{minShaft: 10, maxShaft: 12, width: 4, height: 4, shaftDepth: 2.5, hubDepth: 1.8},
+			{minShaft: 12, maxShaft: 17, width: 5, height: 5, shaftDepth: 3.0, hubDepth: 2.3},
+			{minShaft: 17, maxShaft: 22, width: 6, height: 6, shaftDepth: 3.5, hubDepth: 2.8},
+			{minShaft: 22, maxShaft: 30, width: 8, height: 7, shaftDepth: 4.0, hubDepth: 3.3},
+			{minShaft: 30, maxShaft: 38, width: 10, height: 8, shaftDepth: 5.0, hubDepth: 3.3},
 		];
 
 	public static function catalog():Catalog<ParallelKeySpec> {
@@ -50,21 +50,32 @@ class ParallelKey extends MachineComponent {
 	public static function metric(size:String, length:Float):ParallelKey
 		return new ParallelKey(catalog().get(size), length);
 
+	public static function custom(spec:ParallelKeySpec, length:Float):ParallelKey
+		return new ParallelKey(spec, length, true);
+
 	/** Key sized for the smallest DIN 6885-1 range that covers `shaftDiameter`. */
 	public static function forShaft(shaftDiameter:Float, length:Float):ParallelKey {
 		if (!(shaftDiameter > 0)) throw "Key needs a positive shaft diameter";
 		for (designation in catalog().designations()) {
 			var spec = catalog().get(designation);
-			if (shaftDiameter <= spec.maxShaft) return new ParallelKey(spec, length);
+			if (shaftDiameter >= spec.minShaft && shaftDiameter <= spec.maxShaft) return new ParallelKey(spec, length);
 		}
 		throw 'No DIN 6885-1 key fits shaft diameter $shaftDiameter';
 	}
 
-	public function new(spec:ParallelKeySpec, length:Float) {
+	private function new(spec:ParallelKeySpec, length:Float, codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw "Key needs a positive length";
+		if (spec == null || !Math.isFinite(spec.minShaft) || !Math.isFinite(spec.maxShaft) ||
+			!(spec.minShaft > 0) || !(spec.maxShaft >= spec.minShaft) ||
+			!(spec.width > 0) || !(spec.height > 0) || !(spec.shaftDepth > 0) || !(spec.hubDepth > 0) ||
+			!(spec.shaftDepth <= spec.height) || !(spec.hubDepth <= spec.height))
+			throw "Parallel key specification has inconsistent DIN 6885 dimensions";
 		var size = '${Dimension.format(spec.width)}x${Dimension.format(spec.height)}';
-		super('DIN6885-B-${size}x${Dimension.format(length)}', 'Form B parallel key $size, ${Dimension.format(length)} mm long',
-			"steel C45");
+		var designation = 'DIN6885-B-${size}x${Dimension.format(length)}';
+		var customName = '${size}x${Dimension.format(length)}-S${Dimension.format(spec.minShaft)}-${Dimension.format(spec.maxShaft)}' +
+			'-D${Dimension.format(spec.shaftDepth)}x${Dimension.format(spec.hubDepth)}';
+		super(codeOnly ? customDesignation(customName) : designation,
+			'Form B parallel key $size, ${Dimension.format(length)} mm long', "steel C45", codeOnly);
 		this.spec = spec;
 		this.length = length;
 		addConnector("seat", Face, Solids.axial(0, 0, length / 2));
@@ -87,12 +98,12 @@ class ParallelKey extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues()
 				.set("size", Token('${Dimension.format(this.spec.width)}x${Dimension.format(this.spec.height)}'))
-				.set("length", Number(this.length));
+				.set("length", Number(this.length)).setToken("material", materialSpec());
 	}
 
 }

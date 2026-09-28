@@ -9,8 +9,10 @@ typedef LinearRailProfileSpec = {
 	var blockWidth:Float;
 	var blockHeight:Float;
 	var blockLength:Float;
-	/** Distance between the two block mounting holes along the rail axis. */
-	var blockHoleSpacing:Float;
+	/** Block mounting pitch B along the rail axis. */
+	var blockHolePitchB:Float;
+	/** Block mounting pitch C across the rail. */
+	var blockHolePitchC:Float;
 	var blockMountScrew:String;
 	var railHolePitch:Float;
 	var railEndMargin:Float;

@@ -25,13 +25,22 @@ class LinearRail extends MachineComponent {
 	public final length:Float;
 	public final holePositions:Array<Float>;
 
-	public function new(spec:LinearRailProfileSpec, length:Float) {
+	public static function metric(profile:String, length:Float):LinearRail
+		return new LinearRail(LinearRailSystem.catalog().get(profile), length);
+
+	public static function custom(spec:LinearRailProfileSpec, length:Float):LinearRail
+		return new LinearRail(spec, length, true);
+
+	private function new(spec:LinearRailProfileSpec, length:Float, codeOnly:Bool = false) {
 		if (!(length > 2 * spec.railEndMargin)) throw 'Linear rail length must exceed twice the end margin';
 		if (!(spec.railWidth > 0) || !(spec.railHeight > 0) || !(spec.railHolePitch > 0) || !(spec.railEndMargin > 0))
 			throw 'Linear rail profile "${spec.designation}" has invalid rail dimensions';
 		var lengthText = Dimension.format(length);
-		super('${spec.family}-${spec.designation}-RAIL-L$lengthText',
-			'${spec.family} ${spec.designation} profile rail, $lengthText mm long', "steel");
+		var designation = '${spec.family}-${spec.designation}-RAIL-L$lengthText';
+		var customName = '${spec.family}-${spec.designation}-RW${Dimension.format(spec.railWidth)}-RH${Dimension.format(spec.railHeight)}' +
+			'-HP${Dimension.format(spec.railHolePitch)}-EM${Dimension.format(spec.railEndMargin)}-L$lengthText';
+		super(codeOnly ? customDesignation(customName) : designation,
+			'${spec.family} ${spec.designation} profile rail, $lengthText mm long', "steel", codeOnly);
 		this.spec = spec;
 		this.length = length;
 		holePositions = [];
@@ -65,11 +74,11 @@ class LinearRail extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues().setToken("profile", this.spec.designation)
-				.setNumber("length", this.length);
+				.setNumber("length", this.length).setToken("material", materialSpec());
 	}
 
 }

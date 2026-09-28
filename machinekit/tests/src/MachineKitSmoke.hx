@@ -11,11 +11,13 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
+import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import machinekit.document.MachineKitDocumentAssembly;
+import machinekit.component.Solids;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Placement;
@@ -29,11 +31,15 @@ import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearGuideSystem;
 import machinekit.motion.LinearRailSystem;
+import machinekit.motion.LinearRail;
+import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.FlangeBearingHousing;
 import machinekit.motion.PillowBlock;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
+import pickingstation.PickingStationConfig;
+import pickingstation.StorageRack;
 import machinekit.standard.Bushing;
 import machinekit.standard.BearingFit.BearingHousingFit;
 import machinekit.standard.BearingFit.BearingShaftFit;
@@ -100,6 +106,34 @@ class MachineKitSmoke {
 		var screwRecipe = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
 		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
 		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
+		check(steelScrew.designation == "ISO4762-M5x20-steel-C45" &&
+			steelScrew.bom.partNumber != screwRecipe.create().bom.partNumber,
+			"non-default screw material has its own designation and BOM identity");
+		var customBearing = DeepGrooveBearing.custom({designation: "608", bore: 8, outside: 22, width: 7, chamfer: 0.3}, false);
+		check(customBearing.componentType() == null && StringTools.startsWith(customBearing.designation, "CUSTOM-608-D8x22x7-C0.3") &&
+			customBearing.bom.partNumber == customBearing.designation && customBearing.bom.typeId == null,
+			"custom catalog dimensions produce a code-only, prefixed component");
+		var customBearingVariant = DeepGrooveBearing.custom({designation: "608", bore: 8.2, outside: 22, width: 7, chamfer: 0.3}, false);
+		check(customBearingVariant.bom.partNumber != customBearing.bom.partNumber,
+			"custom bearing dimensions retain distinct BOM identities");
+		var customMotor = NemaStepper.custom(NemaStepper.catalog().get("17"), {
+			designation: "17HS19-custom", frame: 17, bodyFace: 42, bodyLength: 52,
+			shaftDiameter: 5, shaftLength: 25, pilotHeight: 2, mountScrew: "M3",
+			tappedMount: true, mountHoleDepth: 4.5
+		});
+		check(customMotor.componentType() == null && StringTools.startsWith(customMotor.designation, "CUSTOM-17HS19-custom-IF"),
+			"custom NEMA variants are code-only and prefixed");
+		customCodeOnly(HexBolt.custom(HexBolt.catalog().get("M5"), 20), "hex bolt");
+		customCodeOnly(HexNut.custom(HexNut.catalog().get("M5")), "hex nut");
+		customCodeOnly(FlatWasher.custom(FlatWasher.catalog().get("M5")), "flat washer");
+		customCodeOnly(ParallelKey.custom(ParallelKey.catalog().get("2x2"), 10), "parallel key");
+		customCodeOnly(RetainingRing.custom(RetainingRing.catalog().get("8")), "retaining ring");
+		customCodeOnly(ShaftCollar.custom(ShaftCollar.catalog().get("8")), "shaft collar");
+		customCodeOnly(SocketHeadCapScrew.custom(SocketHeadCapScrew.catalog().get("M5"), 20), "cap screw");
+		customCodeOnly(LinearBearing.custom(LinearBearing.catalog().get("LM8UU")), "linear bearing");
+		customCodeOnly(PillowBlock.custom(PillowBlock.catalog().get("UCP204")), "pillow block");
+		customCodeOnly(LinearRail.custom(LinearRailSystem.catalog().get("MGN12C"), 100), "profile rail");
+		customCodeOnly(LinearRailBlock.custom(LinearRailSystem.catalog().get("MGN12C")), "rail block");
 		var firstLength = screwRecipe.defaults().setNumber("length", 20.0001);
 		var secondLength = screwRecipe.defaults().setNumber("length", 20.0002);
 		check(screwRecipe.key(firstLength) == screwRecipe.key(secondLength), "length keys round to a micrometre");
@@ -110,6 +144,13 @@ class MachineKitSmoke {
 			material: "steel", typeId: "test", valuesKey: "b"}), "conflicting");
 	}
 
+	static function customCodeOnly(component:MachineComponent, label:String):Void {
+		check(component.componentType() == null && StringTools.startsWith(component.designation, "CUSTOM-"),
+			'$label custom spec is code-only and prefixed');
+		check(component.bom.partNumber == component.designation && component.bom.typeId == null,
+			'$label custom spec has a code-only BOM line');
+	}
+
 	static function documentRecipes():Void {
 		MachineKitRecipes.register();
 		MachineKitRecipes.register();
@@ -117,10 +158,16 @@ class MachineKitSmoke {
 		for (registered in MachineKitComponents.all()) {
 			check(DefinitionEvaluatorRegistry.isRegistered(registered.id), "MachineKit evaluator registration");
 			var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
+			var defaultComponent = registered.create();
+			var toolInputCount = 0;
+			for (tool in defaultComponent.toolSpecs())
+				toolInputCount += tool.parameters().length;
 			check(recipeDefinition.output("body").purpose == DefinitionOutput.Geometry,
 				"MachineKit recipe geometry output");
-			check(recipeDefinition.outputs().length == registered.create().toolNames().length + 1,
+			check(recipeDefinition.outputs().length == defaultComponent.toolSpecs().length + 1,
 				"MachineKit stores geometry and type-level tool outputs");
+			check(recipeDefinition.inputs().length == registered.parameters().length + toolInputCount + 1,
+				"MachineKit defines typed tool inputs with defaults");
 		}
 		registryDocument.close();
 		var document = new Document();
@@ -139,7 +186,20 @@ class MachineKitSmoke {
 		check(first.shape().volume() != firstVolume && second.shape().volume() == secondVolume,
 			"detail input selects geometry fidelity per instance");
 		first.removeOverride("detail");
-		check(document.definitionOutput(first, "bearingSeat").volume() > 0, "bearing seat tool output");
+		var bearingSeat = document.definitionOutput(first, "bearingSeat").volume();
+		check(bearingSeat > 0, "bearing seat tool output");
+		check(definition.input("tool_bearingSeat_fit").defaultValue == "Slip",
+			"bearing seat fit has a typed definition default");
+		check(definition.input("tool_bearingSeat_depth").defaultValue == 7,
+			"bearing seat depth has a typed definition default");
+		first.setTypedOverride("tool_bearingSeat_fit", "Interference");
+		check(document.definitionOutput(first, "bearingSeat").volume() != bearingSeat,
+			"bearing seat fit override changes tool geometry");
+		first.removeOverride("tool_bearingSeat_fit");
+		first.setTypedOverride("tool_bearingSeat_depth", 3.0);
+		check(document.definitionOutput(first, "bearingSeat").volume() != bearingSeat,
+			"bearing seat depth override changes tool geometry");
+		first.removeOverride("tool_bearingSeat_depth");
 		var firstBack = first.connector("back").location.plane.origin.z;
 		document.setElementPlacement(first, new Placement(new Plane(
 			new Vector(10, 20, 30), Vector.X(), Vector.Z())));
@@ -165,6 +225,26 @@ class MachineKitSmoke {
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
+		var legacyTools:Dynamic = haxe.Json.parse(saved);
+		var legacyToolDefinitions:Array<Dynamic> = cast Reflect.field(legacyTools, "definitions");
+		var removedToolInputs = 0;
+		for (record in legacyToolDefinitions) {
+			var inputs:Array<Dynamic> = cast Reflect.field(record, "inputs");
+			var kept:Array<Dynamic> = [];
+			for (input in inputs) {
+				var name:String = Reflect.field(input, "name");
+				if (StringTools.startsWith(name, "tool_")) removedToolInputs++;
+				else kept.push(input);
+			}
+			Reflect.setField(record, "inputs", kept);
+		}
+		check(removedToolInputs > 0, "legacy recipe fixture removes typed tool inputs");
+		var legacyToolsDocument = DocumentCodec.decode(haxe.Json.stringify(legacyTools));
+		var legacyBearing = legacyToolsDocument.createInstance("Legacy bearing",
+			legacyToolsDocument.definition(first.definitionId));
+		check(legacyToolsDocument.definitionOutput(legacyBearing, "bearingSeat").volume() > 0,
+			"legacy recipe evaluates newly parameterized tools from defaults");
+		legacyToolsDocument.close();
 		var legacy:Dynamic = haxe.Json.parse(saved);
 		Reflect.setField(legacy, "version", 7);
 		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacy, "definitions");
@@ -197,6 +277,24 @@ class MachineKitSmoke {
 		var screw = tools.createInstance("Screw", MachineKitDocuments.define(tools, screwType));
 		for (name in ["clearanceHole", "tapHole", "counterboreHole"])
 			check(tools.definitionOutput(screw, name).volume() > 0, "screw tool output " + name);
+		var mediumClearance = tools.definitionOutput(screw, "clearanceHole").volume();
+		screw.setTypedOverride("tool_clearanceHole_fit", "Coarse");
+		check(tools.definitionOutput(screw, "clearanceHole").volume() != mediumClearance,
+			"screw clearance fit override changes tool geometry");
+		var screwComponent = SocketHeadCapScrew.metric("M5", 2);
+		var counterbore:Null<machinekit.component.ToolSpec> = null;
+		for (tool in screwComponent.toolSpecs()) if (tool.name == "counterboreHole") counterbore = tool;
+		check(counterbore != null && counterbore.defaults().number("depth") > screwComponent.spec.counterboreDepth,
+			"counterbore default depth covers the screw head");
+		var nutType = MachineKitComponents.byId("machinekit.standard.hex-nut");
+		var nut = tools.createInstance("Nut", MachineKitDocuments.define(tools, nutType));
+		check(tools.definitionOutput(nut, "pocket").volume() > 0,
+			"HexNut exposes a valid pocket tool output");
+		var slipHousing = new FlangeBearingHousing(DeepGrooveBearing.metric("608"), BearingHousingFit.Slip);
+		var interferenceHousing = new FlangeBearingHousing(DeepGrooveBearing.metric("608"), BearingHousingFit.Interference);
+		check(slipHousing.tool("bearingSeat", new ComponentValues()).volume() !=
+			interferenceHousing.tool("bearingSeat", new ComponentValues()).volume(),
+			"flange bearing housing tool uses its selected fit");
 		var motorType = MachineKitComponents.byId("machinekit.motion.nema-stepper");
 		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
 		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");
@@ -276,6 +374,8 @@ class MachineKitSmoke {
 		for (designation in DeepGrooveBearing.catalog().designations())
 			DeepGrooveBearing.metric(designation, false);
 		throws(() -> DeepGrooveBearing.metric("6299"), 'Unknown deep groove bearing "6299"');
+		throws(() -> DeepGrooveBearing.custom({designation: "invalid", bore: 10, outside: 20, width: 6, chamfer: 2}, false),
+			"Invalid deep groove bearing");
 
 		var envelope = bearing.geometry(Envelope);
 		solid(envelope, "bearing envelope");
@@ -351,6 +451,15 @@ class MachineKitSmoke {
 			var largePart = large.geometry(Preview);
 			solid(largePart, size + " screw preview");
 			largePart.close();
+		}
+		for (reference in [
+			{name: "M14", coarse: 16.5, bore: 24.0, depth: 14.6},
+			{name: "M16", coarse: 18.5, bore: 26.0, depth: 16.6},
+			{name: "M20", coarse: 24.0, bore: 33.0, depth: 20.6}]) {
+			var standard = SocketHeadCapScrew.metric(reference.name, 40);
+			near(standard.clearanceDiameter(Coarse), reference.coarse, reference.name + " ISO 273 coarse clearance");
+			near(standard.spec.counterboreDiameter, reference.bore, reference.name + " DIN 974-1 counterbore diameter");
+			near(standard.spec.counterboreDepth, reference.depth, reference.name + " DIN 974-1 counterbore depth");
 		}
 	}
 
@@ -471,6 +580,9 @@ class MachineKitSmoke {
 		throws(() -> ParallelKey.metric("9x9", 10), 'Unknown parallel key "9x9"');
 		throws(() -> ParallelKey.forShaft(100, 10), "No DIN 6885-1 key fits shaft diameter 100");
 		throws(() -> ParallelKey.forShaft(0, 10), "positive shaft diameter");
+		throws(() -> ParallelKey.forShaft(5.9, 10), "No DIN 6885-1 key fits shaft diameter 5.9");
+		throws(() -> ParallelKey.custom({minShaft: 6, maxShaft: 8, width: 2, height: 2, shaftDepth: 2.1, hubDepth: 1}, 10),
+			"inconsistent DIN 6885 dimensions");
 
 		var shaft = new SteppedShaft(
 			[{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
@@ -499,7 +611,8 @@ class MachineKitSmoke {
 		var previewBox = bounds(preview);
 		near(previewBox.maxX, 4, "groove leaves the shaft's outer surface elsewhere");
 		preview.close();
-		check(shaft.designation == "SHAFT-8x51.5-6x8.5", "shaft designation");
+		check(shaft.designation == "SHAFT-8x51.5-6x8.5-F8:bearingA@10-F8:bearingB@43-G4:ring@50x1.2x7.6-K9:outputKey@52:DIN6885-B-2x2x6-S6x8-D1.2x1",
+			"shaft designation includes its faces, keyway and groove");
 		check(new SteppedShaft([{diameter: 6.35, length: 20}]).designation == "SHAFT-6.35x20",
 			"fractional shaft designation is rounded, not a raw float");
 
@@ -519,7 +632,20 @@ class MachineKitSmoke {
 				inputThread: {diameter: 10, pitch: 1.5, length: 6},
 				outputThread: {diameter: 6, pitch: 1, length: 5},
 				shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]});
-		check(detailedShaft.designation == "SHAFT-12x20-8x20-TI10x1.5x6-TO6x1x5", "detailed shaft designation");
+		check(detailedShaft.designation == "SHAFT-12x20-8x20-CI1-CO0.5-S20-R0.5-U2x7.5-TI10x1.5x6-TO6x1x5",
+			"detailed shaft designation includes chamfers, shoulders and threads");
+		var otherDetailedShaft = new SteppedShaft(
+			[{diameter: 12, length: 20}, {diameter: 8, length: 20}], null, null, null,
+			{inputChamfer: 2, outputChamfer: 0.5,
+				inputThread: {diameter: 10, pitch: 1.5, length: 6},
+				outputThread: {diameter: 6, pitch: 1, length: 5},
+				shoulders: [{z: 20, fillet: 0.5, reliefWidth: 2, reliefDiameter: 7.5}]});
+		check(otherDetailedShaft.bom.partNumber != detailedShaft.bom.partNumber,
+			"different shaft features have different BOM part numbers");
+		var shaftBom = new machinekit.component.Bom();
+		shaftBom.addComponent(detailedShaft);
+		shaftBom.addComponent(otherDetailedShaft);
+		check(shaftBom.lines().length == 2, "different shaft features remain separate in the BOM");
 		near(detailedShaft.connector("inputThread").frame.z, 3, "input thread connector");
 		near(detailedShaft.connector("outputThread").frame.z, 37.5, "output thread connector");
 		var detailedEnvelope = detailedShaft.geometry(Envelope);
@@ -560,6 +686,8 @@ class MachineKitSmoke {
 			{inputChamfer: 4.1}), "smaller than its radius");
 		throws(() -> new SteppedShaft([{diameter: 8, length: 10}], null, null, null,
 			{inputThread: {diameter: 8, pitch: 1, length: 4}}), "below the shaft diameter");
+		throws(() -> new SteppedShaft([{diameter: 12, length: 20}, {diameter: 8, length: 20}], null, null, null,
+			{shoulders: [{z: 20, fillet: 2}]}), "fillet at z=20 is too large");
 		throws(() -> new SteppedShaft([{diameter: 8, length: 10}, {diameter: 6, length: 10}], null, null, null,
 			{shoulders: [{z: 5, reliefWidth: 1, reliefDiameter: 4}]}), "not a section boundary");
 	}
@@ -753,22 +881,50 @@ class MachineKitSmoke {
 		var detailedFrame = new FrameAssembly();
 		detailedFrame.point("A", 0, 0, 0);
 		detailedFrame.point("B", 0, 0, 100);
-		detailedFrame.member("detailed", "A", "B", tube, null, Mitre(10), Cope(5));
+		detailedFrame.member("detailed", "A", "B", tube, null, Mitre(10));
 		near(detailedFrame.length("detailed"), 100, "detailed frame centreline length");
-		near(detailedFrame.cutLength("detailed"), 85, "detailed frame cut length");
+		near(detailedFrame.cutLength("detailed"), 105, "mitred stock length reaches the long point");
 		var detailedPart = detailedFrame.geometry("detailed");
 		solid(detailedPart, "detailed frame member");
 		var detailedBox = bounds(detailedPart);
-		near(detailedBox.minZ, 10, "detailed frame start setback");
-		near(detailedBox.maxZ, 95, "detailed frame end setback");
-		check(detailedPart.volume() > 0 && detailedPart.volume() < (40 * 40 - 34 * 34) * 85,
-			"detailed frame end cuts remove material");
+		near(detailedBox.minZ, -5, "mitre long point extends through the start node");
+		near(detailedBox.maxZ, 100, "square frame end remains at its node");
+		near(detailedPart.volume(), (40 * 40 - 34 * 34) * 100, "node-centred mitre preserves full stock volume");
 		detailedPart.close();
-		near(detailedFrame.cutList()[0].totalLength, 85, "detailed frame cut list length");
-		throws(() -> detailedFrame.member("badCut", "A", "B", tube, null, Mitre(60), Cope(50)),
-			"end cuts consume its length");
+		near(detailedFrame.cutList()[0].totalLength, 105, "mitre cut list includes its long point");
 		throws(() -> detailedFrame.member("badSetback", "A", "B", tube, null, Mitre(0), null),
 			"end-cut setback must be positive");
+
+		var mitreCorner = new FrameAssembly(), mitreTube = new RectTube(20, 20, 2);
+		mitreCorner.point("A", -100, 0, 0);
+		mitreCorner.point("N", 0, 0, 0);
+		mitreCorner.point("B", 0, 100, 0);
+		mitreCorner.member("horizontal", "A", "N", mitreTube, null, null, Mitre(20));
+		mitreCorner.member("vertical", "N", "B", mitreTube, null, Mitre(20));
+		near(mitreCorner.cutLength("horizontal"), 110, "horizontal mitre cut length to long point");
+		near(mitreCorner.cutLength("vertical"), 110, "vertical mitre cut length to long point");
+		var horizontalMiter = mitreCorner.geometry("horizontal"), verticalMiter = mitreCorner.geometry("vertical");
+		var analyticCornerVolume = 2 * (20 * 20 - 16 * 16) * 100;
+		near(horizontalMiter.volume() + verticalMiter.volume(), analyticCornerVolume,
+			"two 20 mm mitred tubes preserve analytic stock volume");
+		checkOverlap(horizontalMiter, verticalMiter, 0, "L-corner mitres meet without overlap");
+		var miterUnion = Solids.union([mitreCorner.geometry("horizontal"), mitreCorner.geometry("vertical")]);
+		near(miterUnion.volume(), analyticCornerVolume, "mitred L-corner union matches analytic stock volume");
+		miterUnion.close();
+		near(mitreCorner.cutList()[0].totalLength, 220, "mitred corner cut list uses long points");
+
+		var copeFrame = new FrameAssembly(), copeTube = new RoundTube(20, 2);
+		copeFrame.point("left", -50, 0, 0);
+		copeFrame.point("node", 0, 0, 0);
+		copeFrame.point("right", 50, 0, 0);
+		copeFrame.point("branch", 0, 50, 0);
+		copeFrame.member("mateLeft", "left", "node", copeTube);
+		copeFrame.member("mateRight", "node", "right", copeTube);
+		copeFrame.member("coped", "node", "branch", copeTube, null, Cope(10));
+		near(copeFrame.cutLength("coped"), 50, "cope keeps node-to-node stock length");
+		var copedPart = copeFrame.geometry("coped"), matePart = copeFrame.geometry("mateLeft");
+		check(copedPart.volume() < (Math.PI * (10 * 10 - 8 * 8) * 50), "cope removes stock at the mating axis");
+		checkOverlap(matePart, copedPart, 0, "cope cutter axis follows the mating member at the node");
 	}
 
 	static function gears():Void {
@@ -811,19 +967,36 @@ class MachineKitSmoke {
 		near(pair.operatingPressureAngle, SpurGear.STANDARD_PRESSURE_ANGLE, "gear pair operating pressure angle");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
 		near(pair.pose().x, pair.centerDistance, "gear pair pose offset");
+		var pairModel = new AssemblyModel();
+		pair.addTo(pairModel, "gearbox");
+		var pairState = pairModel.initialState("gear-pair");
+		check(pair.connector("inputAxis", "gearbox").instanceId == "gearbox/a",
+			"gear pair exposes its input axis through the prefix");
+		near(pairState.worldConnector("gearbox/b", "axis").x, pair.centerDistance,
+			"gear pair places output gear through MachineAssembly.addTo");
+		check(pair.billOfMaterials().quantity(pinion.designation) == 1 &&
+			pair.billOfMaterials().quantity(gear.designation) == 1, "gear pair BOM counts both gears");
 		var shiftedPair = GearPair.mesh(new SpurGear(2, 17, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.1, 0.1),
 			new SpurGear(2, 20, 12, SpurGear.STANDARD_PRESSURE_ANGLE, 0.2, 0.05));
 		near(shiftedPair.profileShiftSum, 0.3, "shifted gear pair profile shift");
 		near(shiftedPair.backlash, 0.15, "shifted gear pair backlash");
-		near(shiftedPair.centerDistance, (17 + 20) + 2 * 0.3 / Math.sin(SpurGear.STANDARD_PRESSURE_ANGLE),
-			"shifted gear pair centre distance");
-		near(shiftedPair.operatingPressureAngle,
-			Math.acos((17 + 20) * Math.cos(SpurGear.STANDARD_PRESSURE_ANGLE) / shiftedPair.centerDistance),
-			"shifted gear pair operating pressure angle");
+		near(Math.tan(shiftedPair.operatingPressureAngle) - shiftedPair.operatingPressureAngle,
+			Math.tan(SpurGear.STANDARD_PRESSURE_ANGLE) - SpurGear.STANDARD_PRESSURE_ANGLE
+				+ 2 * 0.3 * Math.tan(SpurGear.STANDARD_PRESSURE_ANGLE) / (17 + 20),
+			"shifted gear pair involute operating angle");
+		near(shiftedPair.centerDistance, (17 + 20) * Math.cos(SpurGear.STANDARD_PRESSURE_ANGLE)
+			/ Math.cos(shiftedPair.operatingPressureAngle), "shifted gear pair centre distance");
 		near(shiftedPair.pose().x, shiftedPair.centerDistance, "shifted gear pair pose offset");
+		var shiftedTwenty = GearPair.mesh(new SpurGear(1, 20, 10, SpurGear.STANDARD_PRESSURE_ANGLE, 0.5),
+			new SpurGear(1, 20, 10, SpurGear.STANDARD_PRESSURE_ANGLE, 0.5));
+		near(shiftedTwenty.centerDistance, 20.88, "20+20 shifted gear centre distance", 0.02);
+		near(shiftedTwenty.operatingPressureAngle, 25.8 * Math.PI / 180, "20+20 shifted gear operating angle", 0.001);
+		var minimumSixShift = SpurGear.minimumProfileShift(6);
+		throws(() -> new SpurGear(1, 6, 6, SpurGear.STANDARD_PRESSURE_ANGLE, minimumSixShift), "tip tooth thickness");
+		throws(() -> new SpurGear(1, 20, 10, SpurGear.STANDARD_PRESSURE_ANGLE, 1.2), "tip tooth thickness");
 		throws(() -> GearPair.mesh(
-			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.5),
-			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.5)),
+			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9),
+			new SpurGear(2, 40, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -0.9)),
 			"invalid operating pressure angle");
 		var shiftedASolid = shiftedPair.a.geometry(), shiftedBSolid = shiftedPair.b.geometry();
 		var shiftedMaxPenetration = 0.0;
@@ -897,6 +1070,7 @@ class MachineKitSmoke {
 		check(rack.designation == "RACK-M2-10T", "rack designation");
 		near(rack.length, 10 * Math.PI * 2, "rack length");
 		throws(() -> new Rack(2, 0, 12), "at least one tooth");
+		throws(() -> new Rack(2, 10, 12, SpurGear.STANDARD_PRESSURE_ANGLE, -1), "non-negative");
 
 		var rackPart = rack.geometry();
 		solid(rackPart, "rack");
@@ -959,18 +1133,20 @@ class MachineKitSmoke {
 		check(definition.joints.length == 5, "flange assembly joint count");
 		var state = model.initialState("flange-bearing-assembly");
 		var depth = block.housing.depth;
-		near(state.worldConnector("flange-bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
-		near(state.worldConnector("flange-bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
+		near(state.worldConnector("flange/bearing", "axis").z, depth / 2, "bearing centred in the housing depth");
+		near(state.worldConnector("flange/bearing", "front").z, depth / 2 - bearing.width / 2, "bearing front inside the housing");
+		check(block.connector("bearingAxis", "flange").instanceId == "flange/bearing",
+			"flange assembly exposes its named bearing axis with the caller prefix");
 		// Screws seat on the outer face and reach through the mounting face into the frame.
 		near(block.screw.length, 35, "flange assembly screw: next standard length over depth + 1.5 d");
 		check(block.screw.length >= depth + 1.5 * block.screw.diameter, "flange assembly screw engagement");
 		for (i in 1...5) {
-			var head = state.worldConnector('flange-screw$i', "head");
+			var head = state.worldConnector('flange/screw$i', "head");
 			var bolt = block.housing.connector('bolt$i').frame;
 			near(head.x, bolt.x, 'flange assembly screw$i on its bolt x');
 			near(head.y, bolt.y, 'flange assembly screw$i on its bolt y');
 			near(head.z, depth, 'flange assembly screw$i head on the outer face');
-			check(state.worldConnector('flange-screw$i', "tip").z < 0, 'flange assembly screw$i tip below the mounting face');
+			check(state.worldConnector('flange/screw$i', "tip").z < 0, 'flange assembly screw$i tip below the mounting face');
 		}
 		near(FlangeBearingAssembly.standardScrewLength(20), 20, "standard screw length exact");
 		near(FlangeBearingAssembly.standardScrewLength(20.1), 25, "standard screw length rounds up");
@@ -1003,8 +1179,10 @@ class MachineKitSmoke {
 		var envelopeBounds = envelope.shape.bounds();
 		near(envelopeBounds.get_min().get_y(), 0, "UCP pillow block base bottom");
 		near(envelopeBounds.get_max().get_y(), 64.5, "UCP pillow block top");
-		near(envelopeBounds.get_min().get_z(), -63.5, "UCP pillow block input end");
-		near(envelopeBounds.get_max().get_z(), 63.5, "UCP pillow block output end");
+		near(envelopeBounds.get_min().get_x(), -63.5, "UCP pillow block length start");
+		near(envelopeBounds.get_max().get_x(), 63.5, "UCP pillow block length end");
+		near(envelopeBounds.get_min().get_z(), -19, "UCP pillow block width start");
+		near(envelopeBounds.get_max().get_z(), 19, "UCP pillow block width end");
 		var envelopeVolume = envelope.volume();
 		envelope.close();
 		var preview = block.geometry();
@@ -1012,15 +1190,25 @@ class MachineKitSmoke {
 		check(preview.volume() < envelopeVolume, "UCP preview removes mounting holes");
 		preview.close();
 		near(block.connector("axis").frame.y, 33.3, "UCP shaft axis connector height");
-		near(block.connector("input").frame.z, -63.5, "UCP input connector");
-		near(block.connector("output").frame.z, 63.5, "UCP output connector");
-		near(block.connector("bolt1").frame.z, -47.5, "UCP first bolt connector");
-		near(block.connector("bolt2").frame.z, 47.5, "UCP second bolt connector");
+		near(block.connector("input").frame.z, -19, "UCP input connector");
+		near(block.connector("output").frame.z, 19, "UCP output connector");
+		near(block.connector("bolt1").frame.x, -47.5, "UCP first bolt connector");
+		near(block.connector("bolt2").frame.x, 47.5, "UCP second bolt connector");
 		var model = new AssemblyModel();
 		block.addTo(model, "ucp");
 		var state = model.initialState("ucp");
 		near(state.worldConnector("ucp", "axis").y, 33.3, "UCP axis assembly height");
 		near(state.worldConnector("ucp", "base").y, 0, "UCP base assembly face");
+		var screw = block.mountScrewPart(20);
+		var screwModel = new AssemblyModel();
+		block.addTo(screwModel, "block");
+		screw.addTo(screwModel, "mount-screw");
+		screwModel.mate("mount-screw-seat", "fixed", "block", "bolt1", "mount-screw", "head");
+		var screwState = screwModel.initialState("block");
+		var screwAxis = AssemblyFrames.transformVector(screwState.worldConnector("mount-screw", "head"), 0, 1, 0);
+		near(Math.abs(screwAxis.y), 1, "UCP mounting screw is vertical");
+		near(screwAxis.x, 0, "UCP mounting screw has no X tilt");
+		near(screwAxis.z, 0, "UCP mounting screw has no Z tilt");
 		var bom = new Bom();
 		bom.addComponent(block);
 		check(bom.quantity("UCP204") == 1, "UCP pillow block BOM");
@@ -1069,6 +1257,8 @@ class MachineKitSmoke {
 		check(axis.guideSystem.bearingDesignation == "LM8UU", "linear axis guide catalog row");
 		check(axis.guideSystem.rodFit == BearingShaftFit.Slip, "linear axis guide rod fit");
 		check(axis.guideSystem.housingFit == BearingHousingFit.Slip, "linear axis guide seat fit");
+		check(axis.guideSpacing >= axis.flangeBearingA.housing.face / 2 + axis.guideBearingA.boreDiameter / 2 + LinearAxis.RAIL_GAP,
+			"linear axis guide rods clear the flange housing width");
 		near(axis.guideSystem.rodDiameter, 7.99, "linear axis guide rod fit diameter");
 		near(axis.guideSystem.seatDiameter, 15.0375, "linear axis guide seat fit diameter");
 		near(axis.carriage.guideSeatDiameter, axis.guideSystem.seatDiameter, "carriage uses guide seat fit");
@@ -1148,29 +1338,45 @@ class MachineKitSmoke {
 		check(state.worldConnector("flangeA-screw1", "tip").z < 21 + axis.bearingAPosition - depth / 2, "flange A screw tips outboard");
 		near(state.worldConnector("flangeB-screw1", "head").z, 21 + axis.bearingBPosition - depth / 2, "flange B screw heads inboard");
 		check(state.worldConnector("flangeB-screw1", "tip").z > 21 + axis.length, "flange B screw tips outboard");
+		var prefixedModel = new AssemblyModel();
+		axis.addTo(prefixedModel, "axis-x");
+		var prefixedState = prefixedModel.initialState("prefixed-linear-axis");
+		check(axis.connector("carriageBore", "axis-x").instanceId == "axis-x/carriage",
+			"linear axis exposes a prefix-aware carriage connector");
+		check(Lambda.exists(prefixedModel.definition("prefixed-linear-axis").joints,
+			joint -> joint.id == "axis-x/carriage-slide"),
+			"linear axis prefixes its joints");
+		axis.setTravel(prefixedState, 5, "axis-x");
+		near(prefixedState.worldConnector("axis-x/carriage", "bore").z, 21 + axis.travelMin + 5,
+			"linear axis setTravel accepts the same instance prefix");
 
 		axis.setTravel(state, 100);
 		near(state.joint("coupling"), axis.nut.rotationFor(100), "screw rotation follows nut lead");
 		near(state.worldConnector("carriage", "bore").z, 21 + axis.travelMin + 100, "carriage travels with screw rotation");
 		near(state.worldConnector("guideBearingB", "axis").x, axis.guideSpacing, "bearing stays on second guide");
+		var housingPart = axis.flangeBearingA.housing.geometry(Envelope);
+		var guideRodPart = placedAt(axis.guideRodA.geometry(Envelope), state.worldPose("guideRodA"));
+		checkOverlap(housingPart, guideRodPart, 0, "guide rod clears the flange housing");
 		axis.setTravel(state, 0);
 		var unturned = state.worldPose("carriage");
 		axis.setTravel(state, 2);
-		near(state.joint("coupling"), 2 * Math.PI, "one screw turn advances by lead");
+		near(state.joint("coupling"), -2 * Math.PI,
+			"right-hand screw turns negative about +Z to advance the nut along +Z");
 		near(state.worldPose("carriage").qz, unturned.qz, "carriage does not rotate with screw");
 		throws(() -> axis.setTravel(state, axis.stroke + 1), "outside its stroke");
 		var multiAxis = new LinearAxis(23, 10, 200, null, 30,
 			new LeadScrewThread(MetricTrapezoidal, 10, 2, 4));
 		var multiState = multiAxis.assembly().initialState("linear-axis");
 		multiAxis.setTravel(multiState, 8);
-		near(multiState.joint("coupling"), 2 * Math.PI, "multi-start axis moves 8 mm per turn");
+		near(multiState.joint("coupling"), -2 * Math.PI,
+			"right-hand multi-start axis rotates negative to move 8 mm along +Z");
 		near(multiState.worldConnector("carriage", "bore").z, 21 + multiAxis.travelMin + 8,
 			"multi-start carriage travel");
 		var leftAxis = new LinearAxis(23, 10, 200, null, 30,
 			new LeadScrewThread(MetricTrapezoidal, 10, 2, 4, LeftHand));
 		var leftState = leftAxis.assembly().initialState("linear-axis");
 		leftAxis.setTravel(leftState, 8);
-		near(leftState.joint("coupling"), -2 * Math.PI, "left-hand axis reverses rotation");
+		near(leftState.joint("coupling"), 2 * Math.PI, "left-hand axis rotates positive about +Z to advance along +Z");
 		state.setJoint("carriage-slide", axis.travelMax);
 		near(state.joint("coupling"), axis.nut.rotationFor(axis.stroke),
 			"assembly coupling drives screw rotation from carriage travel");
@@ -1217,6 +1423,12 @@ class MachineKitSmoke {
 			21 + railAxis.travelMin, "profile rail lower limit aligns with axis");
 		check(railState.closureResiduals().length == 1, "profile rail closure recorded");
 		near(railState.closureResiduals()[0].position, 0, "profile rail closure has no transverse error");
+		var frameRail = railAxis.frame.geometry("rail");
+		var profileRail = placedAt(railGuide.rail.geometry(Envelope), railState.worldPose("profileRail"));
+		checkOverlap(frameRail, profileRail, 0, "frame rail clears the profile rail envelope");
+		var frameRail2 = railAxis.frame.geometry("rail");
+		var profileBlock = placedAt(railGuide.blocks[0].geometry(Envelope), railState.worldPose("profileBlock1"));
+		checkOverlap(frameRail2, profileBlock, 0, "frame rail clears the profile block envelope");
 		railAxis.setTravel(railState, railAxis.stroke);
 		near(railState.worldConnector("profileBlock1", "rail").z, 21 + railAxis.travelMax,
 			"profile block follows carriage at upper travel");
@@ -1228,6 +1440,50 @@ class MachineKitSmoke {
 		throws(() -> LinearAxis.forRailProfile("MGN99C"), 'Unknown linear rail profile "MGN99C"');
 	}
 
+	static function pickingFrames():Void {
+		var config = PickingStationConfig.defaults();
+		var rack = new StorageRack(config), frame = rack.frame;
+		var clearWidth = config.rackWidth - 2 * frame.profile.size;
+		var clearDepth = config.rackDepth - 2 * frame.profile.size;
+		for (cut in frame.memberCuts()) {
+			if (cut.name.indexOf("front-rail-") == 0 || cut.name.indexOf("back-rail-") == 0)
+				near(cut.length, clearWidth, cut.name + " is trimmed to the post faces");
+			else if (cut.name.indexOf("left-rail-") == 0 || cut.name.indexOf("right-rail-") == 0)
+				near(cut.length, clearDepth, cut.name + " is trimmed to the post faces");
+		}
+		var feet = 0;
+		for (entry in rack.instances()) if (entry.id.indexOf("rack-01/feet/") == 0) {
+			feet++;
+			near(Math.abs(entry.pose.x), config.rackWidth / 2 - frame.profile.size / 2,
+				"adjustable foot aligns with its post in X");
+			near(Math.abs(entry.pose.y), config.rackDepth / 2 - frame.profile.size / 2,
+				"adjustable foot aligns with its post in Y");
+		}
+		check(feet == 4, "rack has one foot aligned to each post");
+		check(rack.instances("rack-02")[0].id == "rack-02/frame",
+			"storage rack instance listing accepts a caller prefix");
+		var secondRackPosition = rack.positions("rack-02")[0];
+		check(secondRackPosition.id == "rack-02/shelf-01/bin-01" &&
+			secondRackPosition.indicatorId == "rack-02/shelf-01/bin-01/indicator",
+			"storage rack positions and indicators accept the caller prefix");
+		var rackModel = new AssemblyModel();
+		rack.addTo(rackModel, "rack-02");
+		var rackOccurrences = rackModel.definition("storage-rack").occurrences;
+		check(Lambda.exists(rackOccurrences, occurrence -> occurrence.id == "rack-02/frame") &&
+			Lambda.exists(rackOccurrences, occurrence -> occurrence.id == "rack-02/shelf-01/bin-01/indicator"),
+			"storage rack adds all occurrences below the caller prefix");
+		check(rack.billOfMaterials().quantity("ISO4762-M5x12") == config.shelfCount * 4,
+			"storage rack BOM includes shelf fasteners");
+		checkOverlap(frame.memberGeometry("front-rail-0"), frame.memberGeometry("front-left"), 0,
+			"rack front rail terminates at the post face");
+		checkOverlap(frame.memberGeometry("front-rail-0"), frame.memberGeometry("front-right"), 0,
+			"rack front rail clears the opposite post");
+		checkOverlap(frame.memberGeometry("back-rail-0"), frame.memberGeometry("back-right"), 0,
+			"rack back rail terminates at the post face");
+		checkOverlap(frame.memberGeometry("left-rail-0"), frame.memberGeometry("front-left"), 0,
+			"rack side rail terminates at the post face");
+	}
+
 	static function linearRailGuide():Void {
 		var guide = LinearGuideSystem.forRailProfile("MGN12C", 300);
 		check(guide.spec.family == "HIWIN", "profile rail family");
@@ -1237,7 +1493,8 @@ class MachineKitSmoke {
 		near(guide.spec.railHeight, 8, "MGN12 rail height");
 		near(guide.spec.blockWidth, 27, "MGN12 block width");
 		near(guide.spec.blockLength, 34.7, "MGN12 block length");
-		near(guide.spec.blockHoleSpacing, 21.7, "MGN12 block hole spacing");
+		near(guide.spec.blockHolePitchB, 20, "MGN12 block hole pitch B");
+		near(guide.spec.blockHolePitchC, 15, "MGN12 block hole pitch C");
 		near(guide.travelMin, 27.35, "profile rail lower travel");
 		near(guide.travelMax, 272.65, "profile rail upper travel");
 		near(guide.stroke, 245.3, "profile rail stroke");
@@ -1245,11 +1502,12 @@ class MachineKitSmoke {
 		near(guide.rail.holePositions[0], 10, "profile rail first mounting hole");
 		near(guide.rail.holePositions[guide.rail.holePositions.length - 1], 285, "profile rail last mounting hole");
 		near(guide.rail.connector("mount1").frame.z, 10, "profile rail mount connector");
-		near(guide.blocks[0].connector("mount1").frame.z, -10.85, "profile block first mount connector");
+		near(guide.blocks[0].connector("mount1").frame.z, -10, "profile block first mount connector");
 
 		var railPart = guide.rail.geometry(Envelope);
 		solid(railPart, "profile rail envelope");
 		var railBounds = bounds(railPart);
+		var railBottom = railPart.shape.bounds().get_min().get_y();
 		near(railBounds.minX, -6, "profile rail minimum x");
 		near(railBounds.maxX, 6, "profile rail maximum x");
 		near(railBounds.minZ, 0, "profile rail start");
@@ -1258,18 +1516,32 @@ class MachineKitSmoke {
 		var blockPart = guide.blocks[0].geometry(Preview);
 		solid(blockPart, "profile block envelope");
 		var blockBounds = bounds(blockPart);
+		var blockBounds3D = blockPart.shape.bounds();
 		near(blockBounds.minX, -13.5, "profile block minimum x");
 		near(blockBounds.maxX, 13.5, "profile block maximum x");
 		near(blockBounds.minZ, -17.35, "profile block minimum z");
 		near(blockBounds.maxZ, 17.35, "profile block maximum z");
+		near(blockBounds3D.get_min().get_y(), 0, "profile block sits on the rail top");
+		near(blockBounds3D.get_max().get_y(), 5, "profile block top above rail top");
+		near(blockBounds3D.get_max().get_y() - railBottom, 13,
+			"profile block height measured from rail bottom");
 		blockPart.close();
+		check(guide.blocks[0].connectors().length == 6, "profile block has four mount connectors and two axes");
+		near(guide.blocks[0].connector("mount1").frame.x, -7.5, "profile block first mount X");
+		near(guide.blocks[0].connector("mount1").frame.z, -10, "profile block first mount Z");
+		near(guide.blocks[0].connector("mount2").frame.x, -7.5, "profile block second mount X");
+		near(guide.blocks[0].connector("mount2").frame.z, 10, "profile block second mount Z");
+		near(guide.blocks[0].connector("mount3").frame.x, 7.5, "profile block third mount X");
+		near(guide.blocks[0].connector("mount3").frame.z, -10, "profile block third mount Z");
+		near(guide.blocks[0].connector("mount4").frame.x, 7.5, "profile block fourth mount X");
+		near(guide.blocks[0].connector("mount4").frame.z, 10, "profile block fourth mount Z");
 
 		var model = guide.assembly();
 		var definition = model.definition("linear-rail");
 		check(definition.joints.length == 1, "profile rail joint count");
 		var state = model.initialState("linear-rail");
 		near(state.worldConnector("block1", "rail").z, guide.travelMin, "profile block starts at lower travel");
-		near(state.worldConnector("block1", "mount1").z, guide.travelMin - guide.spec.blockHoleSpacing / 2,
+		near(state.worldConnector("block1", "mount1").z, guide.travelMin - guide.spec.blockHolePitchB / 2,
 			"profile block mounting pattern at lower travel");
 		guide.setTravel(state, guide.travelMax);
 		near(state.worldConnector("block1", "rail").z, guide.travelMax, "profile block reaches upper travel");
@@ -1289,6 +1561,8 @@ class MachineKitSmoke {
 	static function catalogExtras():Void {
 		var bushing = new Bushing(8);
 		check(bushing.designation == "BUSHING-8x11x12", "bushing designation");
+		check(Bushing.recipeType().create(bushing.values()).designation == bushing.designation,
+			"bushing designation survives a recipe round trip");
 		throws(() -> new Bushing(-1), "positive bore diameter");
 		var bushingPart = bushing.geometry();
 		solid(bushingPart, "bushing");
@@ -1318,13 +1592,14 @@ class MachineKitSmoke {
 		check(couplingBom.quantity(coupling.designation) == 1, "shaft coupling BOM body");
 		check(couplingBom.quantity(coupling.setScrewPart(8).designation) == 2, "shaft coupling set screw BOM");
 		var customCoupling = new ShaftCoupling(5, 8, null, null,
-			[{z: 4, angle: 0}, {z: 20, angle: Math.PI / 2}]);
+			[{z: 6, angle: 0}, {z: 18, angle: Math.PI / 2}]);
 		check(customCoupling.setScrews.length == 2, "custom shaft coupling set screws");
 		var customPart = customCoupling.geometry();
 		solid(customPart, "custom shaft coupling holes");
 		customPart.close();
-		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 24, angle: 0}]), "within its length");
-		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 4, angle: 0}, {z: 4, angle: 0}]), "must be unique");
+		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 4, angle: 0}]), "clear both ends by 1.5 screw diameters");
+		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 24, angle: 0}]), "clear both ends by 1.5 screw diameters");
+		throws(() -> new ShaftCoupling(5, 8, null, null, [{z: 6, angle: 0}, {z: 6, angle: 0}]), "must be unique");
 
 		var linearBearing = LinearBearing.metric("LM8UU");
 		check(linearBearing.designation == "LM8UU", "linear bearing designation");
@@ -1340,8 +1615,8 @@ class MachineKitSmoke {
 		var linearBearingPart = linearBearing.geometry();
 		solid(linearBearingPart, "linear bearing preview");
 		check(linearBearingPart.volume() < linearEnvelope.volume(), "linear bearing preview seal tracks");
-		check(bounds(linearBearingPart).maxX > bounds(linearEnvelope).maxX,
-			"linear bearing preview end rims");
+		near(bounds(linearBearingPart).maxX, bounds(linearEnvelope).maxX,
+			"linear bearing retaining rims stay inside the outside diameter");
 		linearBearingPart.close();
 		linearEnvelope.close();
 
@@ -1361,7 +1636,8 @@ class MachineKitSmoke {
 		throws(() -> new Sprocket(12.7, 20, 8, 6, 7.8, "ANSI40"), "must match its catalog entry");
 		throws(() -> new Sprocket(12.7, 20, 8, 6, 13), "roller diameter must be positive and less than the pitch");
 		throws(() -> new Sprocket(12.7, 5, 8, 6), "at least 8 teeth");
-		throws(() -> new Sprocket(12.7, 8, 40, 6), "must clear the bore");
+		throws(() -> new Sprocket(12.7, 8, 40, 6), "tooth-root land");
+		throws(() -> Sprocket.forChain("ANSI25", 8, 13, 5), "tooth-root land");
 		var sprocketPart = sprocket.geometry();
 		solid(sprocketPart, "sprocket");
 		var sprocketBox = bounds(sprocketPart);
@@ -1379,7 +1655,8 @@ class MachineKitSmoke {
 		check(new TimingPulley(T5, 20, 5, 6).designation == "PULLEY-T5-20T", "T5 family has its own designation");
 		near(new TimingPulley(T5, 20, 5, 6).pitchLineDifferential, 0.5, "T5 PLD differs from HTD5M");
 		near(new TimingPulley(XL, 20, 5, 6).outsideDiameter, 5.08 * 20 / Math.PI - 0.508, "explicit PLD");
-		check(new TimingPulley(Custom("CUSTOM2032", 2.032, 0.254), 20, 5, 6).designation == "PULLEY-CUSTOM-CUSTOM2032-P2.032-PLD0.254-20T", "fractional pulley designation");
+		check(new TimingPulley(Custom("CUSTOM", 2.032, 0.254), 20, 5, 6).designation == "PULLEY-CUSTOM-CUSTOM-P2.032-PLD0.254-20T", "fractional pulley designation");
+		throws(() -> new TimingPulley(Custom("CUSTOM2032", 2.032, 0.254), 20, 5, 6), "must be \"CUSTOM\"");
 		throws(() -> new TimingPulley(GT2, 5, 5, 6), "at least 8 teeth");
 		throws(() -> new TimingPulley(GT2, 8, 11, 6), "must clear the bore");
 		var pulleyPart = pulley.geometry();
@@ -1394,18 +1671,19 @@ class MachineKitSmoke {
 		check(nut.designation == "LEADNUT-TR-D8-P2-S1-RH", "lead screw nut designation");
 		check(nut.thread.pitch == 2 && nut.thread.starts == 1, "nut carries pitch and starts");
 		check(nut.mountScrew == "M3", "lead screw nut mount screw size");
-		near(nut.travelPerRevolution(), 2, "lead screw nut travel per revolution");
-		near(nut.rotationFor(10), 10 / 2 * 2 * Math.PI, "lead screw nut rotation for a travel distance");
+		near(nut.travelPerRevolution(), -2, "right-hand nut moves toward -Z per positive screw revolution");
+		near(nut.rotationFor(10), -10 / 2 * 2 * Math.PI, "right-hand nut rotation for travel toward +Z");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, -1, 2), "positive screw diameter");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, -1), "positive pitch");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, 2, 0), "at least one start");
 		throws(() -> new LeadScrewNut(thread, 2), "at least 3 mounting bolts");
+		throws(() -> new LeadScrewNut(thread, 100), "leaves too little material between mounting holes");
 		var multi = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4));
 		check(multi.designation == "LEADNUT-TR-D8-P2-S4-RH", "multi-start nut designation");
 		near(multi.lead, 8, "four-start lead is four times pitch");
-		near(multi.travelPerRevolution(), 8, "four-start travel per positive revolution");
+		near(multi.travelPerRevolution(), -8, "four-start right-hand travel per positive revolution");
 		var left = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4, LeftHand));
-		near(left.travelPerRevolution(), -8, "left-hand nut travels opposite on positive revolution");
+		near(left.travelPerRevolution(), 8, "left-hand nut moves toward +Z per positive screw revolution");
 
 		var nutEnvelope = nut.geometry(Envelope);
 		solid(nutEnvelope, "lead screw nut envelope");
@@ -1426,6 +1704,8 @@ class MachineKitSmoke {
 			check(r + screw.headDiameter / 2 <= sized.flangeDiameter / 2 - 1 + 1e-9,
 				'lead screw nut D$size mount screw heads stay on the flange');
 		}
+		throws(() -> new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 10, 2), 100),
+			"too little material between mounting holes");
 		check(new LeadScrewNut(new LeadScrewThread(Acme, 6.35, 3.175)).designation == "LEADNUT-ACME-D6.35-P3.175-S1-RH", "fractional nut designation");
 	}
 
@@ -1530,7 +1810,7 @@ class MachineKitSmoke {
 			Math.PI * 15.75 * 15.75 * 3, "flange pilot boss reaches into the plate");
 
 		var pedestal = new Pedestal(flange, 300);
-		check(pedestal.designation == "PEDESTAL-50-D70x300", "pedestal designation");
+		check(pedestal.designation == "PEDESTAL-50-D70x300-B14-A102-G0x5.6x4-F0x0-C0", "pedestal designation");
 		near(pedestal.columnDiameter, 70, "pedestal column defaults to the flange diameter");
 		check(pedestal.floorMountScrew == "M10", "pedestal floor screw size");
 		near(pedestal.floorBoltCircleDiameter, 70 + 2 * 16, "pedestal floor bolt circle");
@@ -1551,8 +1831,11 @@ class MachineKitSmoke {
 		var detailedPedestal = new Pedestal(flange, 300, 70, 4,
 			{baseThickness: 18, anchorCircleDiameter: 120, gussetHeight: 80, gussetThickness: 6,
 				gussetCount: 4, levelingFootDiameter: 24, levelingFootHeight: 6, cablePathDiameter: 20});
-		check(detailedPedestal.designation == "PEDESTAL-50-D70x300-B18-A120-G80x6x4-F24-C20",
+		check(detailedPedestal.designation == "PEDESTAL-50-D70x300-B18-A120-G80x6x4-F24x6-C20",
 			"detailed pedestal designation");
+		var pedestalRoundTrip = Pedestal.recipeType().create(pedestal.values());
+		check(pedestalRoundTrip.designation == pedestal.designation,
+			"pedestal designation survives a recipe round trip");
 		near(detailedPedestal.baseThickness, 18, "detailed pedestal base thickness");
 		near(detailedPedestal.floorBoltCircleDiameter, 120, "detailed pedestal anchor circle");
 		near(detailedPedestal.anchorHoleDiameter, 11, "detailed pedestal anchor hole");
@@ -1568,6 +1851,14 @@ class MachineKitSmoke {
 		check(detailedPedestal.connector("cablePath") != null, "detailed pedestal cable connector");
 		check(detailedPedestal.connector("anchor1").role == Mount, "detailed pedestal anchor connector");
 		near(detailedPedestal.connector("floor").frame.z, -6, "detailed pedestal floor connector");
+		for (point in detailedPedestal.floorBoltPattern()) {
+			var holeVolume = Part.cylinderSpan(detailedPedestal.anchorHoleDiameter / 2,
+				detailedPedestal.baseThickness + 0.1, detailedPedestal.gussetHeight + 0.1, point.x, point.y);
+			var gussetOverlap = detailedPreview.intersect(holeVolume);
+			holeVolume.close();
+			near(gussetOverlap.volume(), 0, "pedestal gussets clear the anchor-hole envelope", 1e-6);
+			gussetOverlap.close();
+		}
 		detailedPreview.close();
 		detailedEnvelope.close();
 		var pedestalBom = detailedPedestal.billOfMaterials(40);
@@ -1575,7 +1866,7 @@ class MachineKitSmoke {
 		check(pedestalBom.quantity(detailedPedestal.floorMountScrewPart(40).designation) == 4, "pedestal anchor BOM");
 		throws(() -> new Pedestal(flange, 300, 70, 4, {baseThickness: 300}), "below its height");
 		throws(() -> new Pedestal(flange, 300, 70, 4, {anchorCircleDiameter: 80}), "clear the column");
-		throws(() -> new Pedestal(flange, 300, 70, 4, {cablePathDiameter: 70}), "smaller than the column");
+		throws(() -> new Pedestal(flange, 300, 70, 4, {cablePathDiameter: 32}), "pilot recess diameter");
 
 		// Pedestal -> flange: the flange turns over onto the top face, its boss in the top recess.
 		var pedestalModel = new AssemblyModel();
@@ -1686,6 +1977,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();
 		documentPreview();
@@ -1704,6 +1996,7 @@ class MachineKitSmoke {
 		pillowBlock();
 		linearAxis();
 		linearRailGuide();
+		pickingFrames();
 		catalogExtras();
 		robotics();
 		assembly();

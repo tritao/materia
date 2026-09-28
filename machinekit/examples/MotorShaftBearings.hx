@@ -1,5 +1,7 @@
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
+import cadkit.parametric.InstanceElement;
+import machinekit.document.MachineKitDocumentAssembly;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
@@ -65,27 +67,35 @@ class MotorShaftBearings {
 		);
 	}
 
-	public function assembly():AssemblyModel {
+	public function assembly(?instances:Map<String, InstanceElement>):AssemblyModel {
 		var model = new AssemblyModel();
-		motor.addTo(model, "motor");
-		plate.addTo(model, "plate");
+		if (instances == null) instances = [];
+		add(model, "motor", motor, instances);
+		add(model, "plate", plate, instances);
 		model.mate("plate-mount", "fixed", "motor", "mountFace", "plate", "motor");
 		for (i in 1...5) {
 			var id = 'screw$i';
-			screw.addTo(model, id);
+			add(model, id, screw, instances);
 			model.mate('$id-seat', "fixed", "plate", 'bolt$i', id, "head");
 		}
-		shaft.addTo(model, "shaft");
+		add(model, "shaft", shaft, instances);
 		model.mate("coupling", "continuous", "motor", "shaftTip", "shaft", "input");
 		for (seat in ["bearingA", "bearingB"]) {
-			bearing.addTo(model, seat);
+			add(model, seat, bearing, instances);
 			model.mate('$seat-seat', "fixed", "shaft", seat, seat, "front");
 		}
-		key.addTo(model, "key");
+		add(model, "key", key, instances);
 		model.mate("key-seat", "fixed", "shaft", "outputKey", "key", "seat");
-		ring.addTo(model, "ring");
+		add(model, "ring", ring, instances);
 		model.mate("ring-seat", "fixed", "shaft", "bearingBRing", "ring", "seat");
 		return model;
+	}
+
+	static function add(model:AssemblyModel, id:String, component:MachineComponent,
+			instances:Map<String, InstanceElement>):Void {
+		var instance = instances.get(id);
+		if (instance == null) component.addTo(model, id);
+		else MachineKitDocumentAssembly.add(model, id, instance);
 	}
 
 	public function bom():Bom {

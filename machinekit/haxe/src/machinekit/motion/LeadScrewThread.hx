@@ -46,7 +46,9 @@ class LeadScrewThread {
 		designation = '${familyCode}-D${Dimension.format(screwDiameter)}-P${Dimension.format(pitch)}-S$starts-$handCode';
 	}
 
-	/** Signed travel for one positive screw revolution. */
+	/** Signed nut travel for one positive screw revolution about the screw's +Z axis.
+	 * A right-hand thread moves the nut toward -Z; a left-hand thread moves it toward +Z.
+	 */
 	public function signedLead():Float
-		return hand == RightHand ? lead : -lead;
+		return hand == RightHand ? -lead : lead;
 }

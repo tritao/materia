@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -80,14 +81,22 @@ class DeepGrooveBearing extends MachineComponent {
 	public static function metric(designation:String, shielded:Bool = true):DeepGrooveBearing
 		return new DeepGrooveBearing(catalog().get(designation), shielded);
 
-	public function new(spec:DeepGrooveBearingSpec, shielded:Bool = true) {
+	/** Build a bearing from explicit, unverified dimensions without assigning a catalog recipe. */
+	public static function custom(spec:DeepGrooveBearingSpec, shielded:Bool = true):DeepGrooveBearing
+		return new DeepGrooveBearing(spec, shielded, true);
+
+	private function new(spec:DeepGrooveBearingSpec, shielded:Bool = true, codeOnly:Bool = false) {
+		var section = (spec.outside - spec.bore) / 2;
 		if (!(spec.bore > 0) || !(spec.outside > spec.bore) || !(spec.width > 0) ||
-			!(spec.chamfer >= 0) || 2 * spec.chamfer >= Math.min(spec.width, (spec.outside - spec.bore) / 2))
+			!(spec.chamfer >= 0) || spec.chamfer >= 0.3 * section || 2 * spec.chamfer >= Math.min(spec.width, section))
 			throw 'Invalid deep groove bearing "${spec.designation}"';
-		super(spec.designation + (shielded ? "-2Z" : ""),
+		var designation = spec.designation + (shielded ? "-2Z" : "");
+		var customName = '${spec.designation}-D${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}-C${Dimension.format(spec.chamfer)}' +
+			(shielded ? "-2Z" : "-OPEN");
+		super(codeOnly ? customDesignation(customName) : designation,
 			'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} ' +
 			'${Dimension.format(spec.bore)}x${Dimension.format(spec.outside)}x${Dimension.format(spec.width)}',
-			"bearing steel");
+			"bearing steel", codeOnly);
 		this.spec = spec;
 		this.shielded = shielded;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
@@ -159,11 +168,13 @@ class DeepGrooveBearing extends MachineComponent {
 	function get_outside():Float return spec.outside;
 	function get_width():Float return spec.width;
 
-	override public function toolNames():Array<String> return ["bearingSeat"];
+	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("bearingSeat", [
+		ComponentRecipeSupport.toolDepth(width),
+		ComponentRecipeSupport.choice("fit", ["Slip", "Transition", "Interference"], "Slip")])];
 
-	override public function tool(name:String, depth:Float):Part {
-		if (name == "bearingSeat") return housingSeat(depth > 0 ? depth : width);
-		return super.tool(name, depth);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		if (name == "bearingSeat") return housingSeat(values.number("depth"), ComponentRecipeSupport.fit(values.token("fit")));
+		return super.buildTool(name, values);
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;
@@ -177,11 +188,11 @@ class DeepGrooveBearing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("designation", Token(this.spec.designation))
-				.set("shielded", Boolean(this.shielded));
+				.set("shielded", Boolean(this.shielded)).setToken("material", materialSpec());
 	}
 
 }

@@ -26,7 +26,9 @@ axes. `motionkit-robot` provides `motionkit.robot.MotionSystem`,
 
 MachineKit dimensions are authored in millimetres. The compiler converts them
 to RobotKit metres, places the logical zero at the axis's lower travel limit,
-and retains the motor and lead-screw identity on the compiled actuator.
+and retains the motor and lead-screw identity on the compiled actuator. The
+actuator ratio follows the thread hand: positive rotation about +Z moves a
+right-hand nut toward -Z.
 
 The first end-to-end path is intentionally small:
 

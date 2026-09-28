@@ -27,7 +27,7 @@ class ComponentParameter {
 	public function validate(value:ComponentValue):Void {
 		if (value == null) throw 'Missing component parameter "$name"';
 		switch type {
-			case Length | Angle:
+			case Scalar | Length | Angle:
 				switch value {
 					case Number(v): validateNumber(v);
 					default: wrongType();

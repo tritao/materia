@@ -73,8 +73,10 @@ class Sprocket extends MachineComponent {
 		var pitchDia = pitch / Math.sin(Math.PI / teeth);
 		var outsideDia = pitch * (0.6 + Math.cos(Math.PI / teeth) / Math.sin(Math.PI / teeth));
 		var rootDia = pitchDia - roller;
-		if (!(rootDia > boreDiameter))
-			throw "Sprocket root diameter must clear the bore; use more teeth or a smaller bore";
+		var rootRadius = rootDia / 2;
+		var maxBore = 2 * rootRadius * Math.cos(0.325 * 2 * Math.PI / teeth);
+		if (!(maxBore > boreDiameter))
+			throw "Sprocket bore must clear the tooth-root land; use more teeth or a smaller bore";
 		var pitchText = Dimension.format(pitch);
 		super(chain == null ? 'GENERIC-SPROCKET-P$pitchText-${teeth}T' : 'SPROCKET-${chain}-${teeth}T',
 			chain == null ? 'Generic sprocket, $pitchText mm pitch, ${teeth} teeth' : '$chain sprocket, ${teeth} teeth', "steel");
@@ -117,10 +119,9 @@ class Sprocket extends MachineComponent {
 	public static function chainRecipeType():ComponentType {
 		if (chainRecipeTypeCache == null)
 			chainRecipeTypeCache = new ComponentType("machinekit.transmission.sprocket",
-			[ComponentRecipeSupport.length("pitch", 6.35), ComponentRecipeSupport.count("teeth", 20), ComponentRecipeSupport.length("boreDiameter", 8),
-				ComponentRecipeSupport.length("thickness", 5), ComponentRecipeSupport.length("rollerDiameter", 3.3), ComponentRecipeSupport.catalog("chain", Sprocket.chainCatalog(), "ANSI25")],
-			v -> new Sprocket(v.number("pitch"), v.integer("teeth"), v.number("boreDiameter"),
-				v.number("thickness"), v.number("rollerDiameter"), v.token("chain")));
+			[ComponentRecipeSupport.count("teeth", 20), ComponentRecipeSupport.length("boreDiameter", 8),
+				ComponentRecipeSupport.length("thickness", 5), ComponentRecipeSupport.catalog("chain", Sprocket.chainCatalog(), "ANSI25")],
+			v -> Sprocket.forChain(v.token("chain"), v.integer("teeth"), v.number("boreDiameter"), v.number("thickness")));
 		return chainRecipeTypeCache;
 	}
 
@@ -145,12 +146,11 @@ class Sprocket extends MachineComponent {
 				.setInteger("teeth", this.teeth)
 				.setNumber("boreDiameter", this.boreDiameter)
 				.setNumber("thickness", this.thickness)
-				.setNumber("rollerDiameter", this.rollerDiameter);
-		return new ComponentValues().setNumber("pitch", this.pitch)
-				.setInteger("teeth", this.teeth).setNumber("boreDiameter", this.boreDiameter)
+				.setNumber("rollerDiameter", this.rollerDiameter).setToken("material", materialSpec());
+		return new ComponentValues().setInteger("teeth", this.teeth)
+				.setNumber("boreDiameter", this.boreDiameter)
 				.setNumber("thickness", this.thickness)
-				.setNumber("rollerDiameter", this.rollerDiameter)
-				.setToken("chain", this.chain);
+				.setToken("chain", this.chain).setToken("material", materialSpec());
 	}
 
 }

@@ -72,7 +72,7 @@ class TimingPulley extends MachineComponent {
 			case T5: {name: "T5", pitch: 5.0, pld: 0.5};
 			case XL: {name: "XL", pitch: 5.08, pld: 0.254};
 			case Custom(family, pitch, pld):
-				if (family == null || family.length == 0) throw "Custom timing belt needs a family name";
+				if (family != "CUSTOM") throw 'Custom timing belt family must be "CUSTOM"';
 				{name: 'CUSTOM-${family}-P${Dimension.format(pitch)}-PLD${Dimension.format(pld)}', pitch: pitch, pld: pld};
 		};
 
@@ -136,12 +136,12 @@ class TimingPulley extends MachineComponent {
 							.setNumber("pitchLineDifferential", differential);
 					default: throw "Expected custom timing pulley";
 				}
-				return values;
+				return values.setToken("material", materialSpec());
 			}
 		return new ComponentValues().setToken("profile", Std.string(this.beltProfile))
 				.setInteger("teeth", this.teeth)
 				.setNumber("boreDiameter", this.boreDiameter)
-				.setNumber("thickness", this.thickness);
+				.setNumber("thickness", this.thickness).setToken("material", materialSpec());
 	}
 
 }

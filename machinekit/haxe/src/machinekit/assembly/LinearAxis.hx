@@ -92,7 +92,7 @@ class Carriage extends MachineComponent {
  * keeps the guide bearing catalog row and shaft/seat fit intent with those parts. Their real
  * mounting structure and screw bearing closure remain outside this kinematic preview.
  */
-class LinearAxis {
+class LinearAxis extends MachineAssembly {
 	/** Axial gap between the coupling's end and flange bearing A's housing. */
 	public static inline var COUPLING_GAP:Float = 2;
 	/** Gap between the rail and the widest part around the screw. */
@@ -139,6 +139,7 @@ class LinearAxis {
 	 */
 	public function new(motorFrame:Int = 23, screwDiameter:Float = 10, stroke:Float = 200,
 			?bearingDesignation:String, margin:Float = 30, ?thread:LeadScrewThread, ?railProfile:String) {
+		super();
 		if (!(screwDiameter > 0)) throw "Linear axis needs a positive screw diameter";
 		if (!(stroke > 0)) throw "Linear axis needs a positive stroke";
 		if (!(margin > 0)) throw "Linear axis needs a positive end margin";
@@ -148,6 +149,8 @@ class LinearAxis {
 		bearing = bearingDesignation == null ? matchingBearing(screwDiameter) : DeepGrooveBearing.metric(bearingDesignation);
 		if (!(Math.abs(bearing.bore - screwDiameter) < 1e-9))
 			throw 'Bearing "${bearing.spec.designation}" bore does not match the screw diameter';
+		flangeBearingA = new FlangeBearingAssembly(bearing);
+		flangeBearingB = new FlangeBearingAssembly(bearing);
 		coupling = new ShaftCoupling(motor.variant.shaftDiameter, screwDiameter);
 		if (thread == null && screwDiameter != 10)
 			throw "Linear axis needs an explicit thread for a nondefault screw diameter";
@@ -157,7 +160,8 @@ class LinearAxis {
 		nut = new LeadScrewNut(threadSpec);
 		var profileSpec = railProfile == null ? null : LinearRailSystem.catalog().get(railProfile);
 		var guideBearingSpec = LinearBearing.metric("LM8UU");
-		guideSpacing = Math.max(25, screwDiameter * 2.5);
+		guideSpacing = Math.max(Math.max(25, screwDiameter * 2.5),
+			flangeBearingA.housing.face / 2 + guideBearingSpec.boreDiameter / 2 + RAIL_GAP);
 		var guideSeatFit = BearingHousingFit.Slip;
 		var guideSeatDiameter = guideBearingSpec.housingSeatDiameter(guideSeatFit);
 		var carriageWidth = 2 * (guideSpacing + guideSeatDiameter / 2 + 5);
@@ -169,15 +173,16 @@ class LinearAxis {
 		carriage = new Carriage(screwDiameter, carriageWidth, carriageLength,
 			guideSpacing, guideSeatDiameter, nut, guideSeatFit,
 			profileSpec == null ? null : -(carriageWidth / 2 + profileSpec.blockHeight));
-		flangeBearingA = new FlangeBearingAssembly(bearing);
-		flangeBearingB = new FlangeBearingAssembly(bearing);
 		if (!(margin > Math.max(flangeBearingA.screw.spec.headHeight, nut.bodyLength + nut.flangeThickness)))
 			throw "Linear axis end margin must clear the flange housing screw heads and lead nut";
 		var depth = flangeBearingA.housing.depth;
 		bearingAPosition = coupling.length / 2 + COUPLING_GAP + depth / 2;
 		travelMin = bearingAPosition + depth / 2 + margin + carriage.length / 2;
 		travelMax = travelMin + stroke;
-		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke, threadSpec.hand == RightHand ? 1 : -1);
+		// The carriage coordinate is +Z. A right-hand screw needs negative rotation to move the
+		// nut along +Z; a left-hand screw needs positive rotation.
+		transmission = new LeadScrewTransmission("coupling", "carriage-slide", nut.lead, travelMin, stroke,
+			threadSpec.hand == RightHand ? -1 : 1);
 		bearingBPosition = travelMax + carriage.length / 2 + margin + depth / 2;
 		length = bearingBPosition + depth / 2;
 		screwStart = motor.connector("shaftTip").frame.z;
@@ -207,11 +212,14 @@ class LinearAxis {
 		var housing = flangeBearingA.housing;
 		var screwHeadReach = housing.boltSpacing / 2 + flangeBearingA.screw.spec.headDiameter / 2;
 		var reach = Math.max(Math.max(housing.face / 2, screwHeadReach), Math.max(carriage.width, coupling.outerDiameter) / 2);
+		if (profileSpec != null)
+			reach = Math.max(reach, -carriage.railMountY + profileSpec.railHeight);
 		var railY = -(reach + RAIL_GAP + rail.height / 2);
 		frame = new FrameAssembly();
 		frame.point("railStart", 0, railY, screwStart);
 		frame.point("railEnd", 0, railY, screwStart + length);
 		frame.member("rail", "railStart", "railEnd", rail);
+		configureAssembly();
 	}
 
 	/** Construct an axis whose carriage is supported by a catalog-backed profile rail. The
@@ -227,57 +235,91 @@ class LinearAxis {
 		throw 'No catalog deep groove bearing has a ${Dimension.format(bore)} mm bore to match the screw';
 	}
 
+	/** Compatibility model using the unprefixed ids. */
 	public function assembly():AssemblyModel {
 		var model = new AssemblyModel();
-		motor.addTo(model, "motor");
-		coupling.addTo(model, "coupling");
-		model.mate("coupling", "continuous", "motor", "shaftTip", "coupling", "axis");
-		screw.addTo(model, "screw");
-		model.mate("coupling-screw", "fixed", "coupling", "axis", "screw", "input");
-		carriage.addTo(model, "carriage");
-		model.mateOnAxis("carriage-slide", "prismatic", "motor", "shaftTip", "carriage", "bore",
+		addTo(model, "");
+		return model;
+	}
+
+	function configureAssembly():Void {
+		addComponent("motor", motor);
+		addComponent("coupling", coupling);
+		addComponent("screw", screw);
+		addComponent("carriage", carriage);
+		addComponent("leadNut", nut);
+		addMate("coupling", "continuous", "motor", "shaftTip", "coupling", "axis");
+		addMate("coupling-screw", "fixed", "coupling", "axis", "screw", "input");
+		addMateOnAxis("carriage-slide", "prismatic", "motor", "shaftTip", "carriage", "bore",
 			{x: 0, y: 1, z: 0}, travelMin, {lower: travelMin, upper: travelMax, velocity: null, effort: null});
 		var ratio = 2 * Math.PI / (transmission.lead * transmission.direction);
-		model.couple("lead-screw", "carriage-slide", "coupling", ratio,
+		addCoupling("lead-screw", "carriage-slide", "coupling", ratio,
 			-transmission.linearOffset * ratio);
-		nut.addTo(model, "leadNut");
-		model.mate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
+		addMate("nut-carriage", "fixed", "carriage", "nutMount", "leadNut", "mountFace");
+		exposeConnector("motorShaft", "motor", "shaftTip");
+		exposeConnector("carriageBore", "carriage", "bore");
+		exposeConnector("screwOutput", "screw", "output");
 		if (railGuide == null) {
-			guideBearingA.addTo(model, "guideBearingA");
-			guideBearingB.addTo(model, "guideBearingB");
-			model.mate("guide-bearing-a", "fixed", "carriage", "guideA", "guideBearingA", "axis");
-			model.mate("guide-bearing-b", "fixed", "carriage", "guideB", "guideBearingB", "axis");
+			addComponent("guideBearingA", guideBearingA);
+			addComponent("guideBearingB", guideBearingB);
+			addMate("guide-bearing-a", "fixed", "carriage", "guideA", "guideBearingA", "axis");
+			addMate("guide-bearing-b", "fixed", "carriage", "guideB", "guideBearingB", "axis");
 			var poseGuideA:AssemblyFrame = {x: -guideSpacing, y: 0, z: screwStart, qx: 0, qy: 0, qz: 0, qw: 1};
 			var poseGuideB:AssemblyFrame = {x: guideSpacing, y: 0, z: screwStart, qx: 0, qy: 0, qz: 0, qw: 1};
-			guideRodA.addTo(model, "guideRodA", poseGuideA);
-			guideRodB.addTo(model, "guideRodB", poseGuideB);
+			addComponent("guideRodA", guideRodA, poseGuideA);
+			addComponent("guideRodB", guideRodB, poseGuideB);
+			exposeConnector("guideA", "guideRodA", "input");
+			exposeConnector("guideB", "guideRodB", "input");
 		} else {
 			var profileRailPose:AssemblyFrame = {x: 0, y: carriage.railMountY, z: screwStart + railGuideOffset,
 				qx: 0, qy: 0, qz: 0, qw: 1};
-			railGuide.rail.addTo(model, "profileRail", profileRailPose);
+			addComponent("profileRail", railGuide.rail, profileRailPose);
 			for (i in 0...railGuide.blocks.length) {
 				var blockId = 'profileBlock${i + 1}';
-				railGuide.blocks[i].addTo(model, blockId);
-				model.mate('profile-block-carriage-$i', "fixed", "carriage", "railMount", blockId, "rail");
-				model.constrainOnAxis('profile-block-rail-$i', "prismatic", "profileRail", "axis", blockId, "rail",
+				addComponent(blockId, railGuide.blocks[i]);
+				addMate('profile-block-carriage-$i', "fixed", "carriage", "railMount", blockId, "rail");
+				addConstraintOnAxis('profile-block-rail-$i', "prismatic", "profileRail", "axis", blockId, "rail",
 					{x: 0, y: 1, z: 0});
 			}
 		}
 		var depth = flangeBearingA.housing.depth;
 		// Housing A: mounting face (local z=0) toward the motor.
 		var poseA:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingAPosition - depth / 2, qx: 0, qy: 0, qz: 0, qw: 1};
-		flangeBearingA.addTo(model, "flangeA", poseA);
 		// Housing B: turned half a turn about X so its mounting face points at the far end.
 		var poseB:AssemblyFrame = {x: 0, y: 0, z: screwStart + bearingBPosition + depth / 2, qx: 1, qy: 0, qz: 0, qw: 0};
-		flangeBearingB.addTo(model, "flangeB", poseB);
-		return model;
+		addFlangeAssembly("flangeA", flangeBearingA, poseA);
+		addFlangeAssembly("flangeB", flangeBearingB, poseB);
+	}
+
+	function addFlangeAssembly(prefix:String, flange:FlangeBearingAssembly, pose:AssemblyFrame):Void {
+		var housingId = '$prefix-housing', bearingId = '$prefix-bearing';
+		addComponent(housingId, flange.housing, pose);
+		addComponent(bearingId, flange.bearing);
+		addMate('$prefix-bearing-seat', "fixed", housingId, "bore", bearingId, "axis");
+		exposeConnector('$prefix-bearingAxis', bearingId, "axis");
+		for (i in 1...5) {
+			var bolt = flange.housing.connector('bolt$i').frame;
+			addMemberConnector(housingId, 'bolt${i}Head', {x: bolt.x, y: bolt.y, z: bolt.z + flange.housing.depth,
+				qx: bolt.qx, qy: bolt.qy, qz: bolt.qz, qw: bolt.qw});
+			var screwId = '$prefix-screw$i';
+			addComponent(screwId, flange.screw);
+			addMate('$screwId-seat', "fixed", housingId, 'bolt${i}Head', screwId, "head");
+		}
 	}
 
 	/** Apply the screw-to-nut transmission to both assembly coordinates. Travel is measured
 	 * from the carriage's lower limit, and one screw turn advances it by `nut.lead`.
 	 */
-	public function setTravel(state:AssemblyState, travel:Float):Void
-		transmission.setTravel(state, travel);
+	public function setTravel(state:AssemblyState, travel:Float, prefix:String = ""):Void {
+		if (prefix == null || prefix.length == 0) {
+			transmission.setTravel(state, travel);
+			return;
+		}
+		if (!Math.isFinite(travel) || travel < 0 || travel > stroke)
+			throw "Linear axis travel is outside its stroke";
+		state.setJoint(MachineAssembly.join(prefix, "carriage-slide"), transmission.linearOffset + travel);
+		state.forwardKinematics();
+	}
 
 	/** The rail as a BOM line: its profile cut to the screw length. */
 	public function railBomItem():BomItem {
@@ -286,47 +328,15 @@ class LinearAxis {
 			quantity: 1, material: "steel"};
 	}
 
-	public function bom():Bom {
-		var result = new Bom();
-		result.addComponent(motor);
-		result.addComponent(coupling);
-		result.addComponent(screw);
-		result.addComponent(carriage);
-		result.addComponent(nut);
-		if (railGuide == null) {
-			result.addComponent(guideRodA);
-			result.addComponent(guideRodB);
-			result.addComponent(guideBearingA);
-			result.addComponent(guideBearingB);
-		} else {
-			result.addComponent(railGuide.rail);
-			for (block in railGuide.blocks) result.addComponent(block);
-		}
+	public function bom():Bom return billOfMaterials();
+
+	override public function billOfMaterials():Bom {
+		var result = super.billOfMaterials();
 		result.add(railBomItem());
-		for (line in flangeBearingA.bom().lines()) result.add(line);
-		for (line in flangeBearingB.bom().lines()) result.add(line);
 		return result;
 	}
 
 	/** Instance id to component, for geometry generation by a preview or exporter. Excludes the
 	 * frame rail, which is generated through `frame.geometry("rail")` instead.
 	 */
-	public function components():Array<{id:String, component:MachineComponent}> {
-		var result:Array<{id:String, component:MachineComponent}> = [
-			{id: "motor", component: motor}, {id: "coupling", component: coupling}, {id: "screw", component: screw},
-			{id: "carriage", component: carriage}, {id: "leadNut", component: nut}];
-		if (railGuide == null) {
-			result.push({id: "guideRodA", component: guideRodA});
-			result.push({id: "guideRodB", component: guideRodB});
-			result.push({id: "guideBearingA", component: guideBearingA});
-			result.push({id: "guideBearingB", component: guideBearingB});
-		} else {
-			result.push({id: "profileRail", component: railGuide.rail});
-			for (i in 0...railGuide.blocks.length)
-				result.push({id: 'profileBlock${i + 1}', component: railGuide.blocks[i]});
-		}
-		for (entry in flangeBearingA.components()) result.push({id: 'flangeA-${entry.id}', component: entry.component});
-		for (entry in flangeBearingB.components()) result.push({id: 'flangeB-${entry.id}', component: entry.component});
-		return result;
-	}
 }

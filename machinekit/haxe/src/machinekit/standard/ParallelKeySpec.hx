@@ -4,6 +4,8 @@ package machinekit.standard;
  * `maxShaft` is the upper bound (inclusive) of the shaft diameter range this size fits.
  */
 typedef ParallelKeySpec = {
+	/** Inclusive lower bound of the DIN 6885 shaft diameter range for this size. */
+	var minShaft:Float;
 	var maxShaft:Float;
 	var width:Float;
 	var height:Float;

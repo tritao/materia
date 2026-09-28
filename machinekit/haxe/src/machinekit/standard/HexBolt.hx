@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -67,13 +68,21 @@ class HexBolt extends MachineComponent {
 	public static function metric(size:String, length:Float):HexBolt
 		return new HexBolt(catalog().get(size), length);
 
-	public function new(spec:HexBoltSpec, length:Float) {
+	public static function custom(spec:HexBoltSpec, length:Float):HexBolt
+		return new HexBolt(spec, length, true);
+
+	private function new(spec:HexBoltSpec, length:Float, codeOnly:Bool = false) {
 		if (!(length > 0) || !Math.isFinite(length)) throw 'Bolt ${spec.size} needs a positive length';
 		if (!(spec.diameter > 0) || !(spec.acrossFlats > spec.diameter) || !(spec.headHeight > 0)
 			|| !(spec.tapDrill < spec.diameter) || !(spec.clearanceFine > spec.diameter))
 			throw 'Bolt ${spec.size} has inconsistent dimensions';
 		var name = '${spec.size}x${Dimension.format(length)}';
-		super('ISO4017-$name', 'Hex bolt $name', "steel 8.8");
+		var designation = 'ISO4017-$name';
+		var customName = '${spec.size}-D${Dimension.format(spec.diameter)}-P${Dimension.format(spec.pitch)}-AF${Dimension.format(spec.acrossFlats)}' +
+			'-H${Dimension.format(spec.headHeight)}-TD${Dimension.format(spec.tapDrill)}' +
+			'-C${Dimension.format(spec.clearanceFine)}x${Dimension.format(spec.clearanceMedium)}x${Dimension.format(spec.clearanceCoarse)}' +
+			'-L${Dimension.format(length)}';
+		super(codeOnly ? customDesignation(customName) : designation, 'Hex bolt $name', "steel 8.8", codeOnly);
 		this.spec = spec;
 		this.length = length;
 		addConnector("head", Face, Solids.axial(0, 0, 0));
@@ -121,15 +130,21 @@ class HexBolt extends MachineComponent {
 	function get_threadLength():Float return length;
 	function get_acrossCorners():Float return spec.acrossFlats / Math.cos(Math.PI / 6);
 
-	override public function toolNames():Array<String> return ["clearanceHole", "tapHole", "counterboreHole"];
+	override public function toolSpecs():Array<ToolSpec> return [
+		new ToolSpec("clearanceHole", [ComponentRecipeSupport.toolDepth(length),
+			ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")]),
+		new ToolSpec("tapHole", [ComponentRecipeSupport.toolDepth(length)]),
+		new ToolSpec("counterboreHole", [ComponentRecipeSupport.toolDepth(Math.max(length, spec.headHeight + 1)),
+			ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")])
+	];
 
-	override public function tool(name:String, depth:Float):Part {
-		var cutDepth = depth > 0 ? depth : Math.max(length, spec.headHeight + 1);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		var depth = values.number("depth");
 		return switch name {
-			case "clearanceHole": clearanceHole(cutDepth);
-			case "tapHole": tapHole(cutDepth);
-			case "counterboreHole": counterboreHole(cutDepth);
-			default: super.tool(name, depth);
+			case "clearanceHole": clearanceHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
+			case "tapHole": tapHole(depth);
+			case "counterboreHole": counterboreHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
+			default: super.buildTool(name, values);
 		};
 	}
 
@@ -144,11 +159,11 @@ class HexBolt extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("size", Token(this.spec.size))
-				.set("length", Number(this.length));
+				.set("length", Number(this.length)).setToken("material", materialSpec());
 	}
 
 }

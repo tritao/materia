@@ -19,7 +19,8 @@ import machinekit.standard.SocketHeadCapScrew;
 /** ACME/trapezoidal lead screw nut: a flanged block with a bore matching the screw diameter and
  * a mounting bolt pattern on the flange face, for driving a carriage. The thread itself is
  * semantic (`LeadScrewThread` family, diameter, pitch, starts and hand), not modelled.
- * `travelPerRevolution()`/`rotationFor()` convert between screw rotation and nut travel.
+ * `travelPerRevolution()`/`rotationFor()` convert between screw rotation and nut travel; for a
+ * right-hand thread, positive rotation about +Z moves the nut toward -Z.
  * CAD frame: axis along +Z, body from z=0 to z=bodyLength, flange from there to
  * z=bodyLength+flangeThickness. Connectors: `bore` (axis, mid-body) and `mount1`..`mountN` (on
  * the flange face), all with +Y along +Z.
@@ -49,6 +50,8 @@ class LeadScrewNut extends MachineComponent {
 		var screw = SocketHeadCapScrew.catalog().get(mountScrewSize);
 		// Holes keep 1 mm of material to the body and the screw heads 1 mm to the flange rim.
 		var boltRadius = bodyDia / 2 + screw.clearanceMedium / 2 + 1;
+		if (2 * boltRadius * Math.sin(Math.PI / boltCount) < screw.clearanceMedium + 1)
+			throw "Lead screw nut bolt count leaves too little material between mounting holes";
 		var flangeDia = 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1);
 		var diameterText = Dimension.format(screwDiameter), leadText = Dimension.format(lead);
 		super('LEADNUT-${thread.designation}', 'Lead screw nut, ${thread.designation}, $leadText mm lead', "bronze");
@@ -117,7 +120,8 @@ class LeadScrewNut extends MachineComponent {
 	override public function componentType():Null<ComponentType> return recipeType();
 
 	override public function values():ComponentValues {
-		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount);
+		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount)
+			.setToken("material", materialSpec());
 	}
 
 }

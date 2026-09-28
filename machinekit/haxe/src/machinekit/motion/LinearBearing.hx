@@ -54,10 +54,15 @@ class LinearBearing extends MachineComponent {
 	public static function metric(designation:String):LinearBearing
 		return new LinearBearing(catalog().get(designation));
 
-	public function new(spec:LinearBearingSpec) {
+	public static function custom(spec:LinearBearingSpec):LinearBearing
+		return new LinearBearing(spec, true);
+
+	private function new(spec:LinearBearingSpec, codeOnly:Bool = false) {
 		if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.length > 0))
 			throw 'Linear bearing ${spec.designation} has inconsistent dimensions';
-		super(spec.designation, 'Linear ball bearing ${spec.designation}', "steel");
+		var customName = '${spec.designation}-D${Dimension.format(spec.boreDiameter)}x${Dimension.format(spec.outerDiameter)}x${Dimension.format(spec.length)}';
+		super(codeOnly ? customDesignation(customName) : spec.designation,
+			'Linear ball bearing ${spec.designation}', "steel", codeOnly);
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.length / 2));
@@ -65,34 +70,57 @@ class LinearBearing extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var envelope = Solids.cut(Part.cylinderSpan(outerDiameter / 2, 0, length),
-			[Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)]);
-		if (detail == Envelope) return envelope;
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var outer = Part.cylinderSpan(outerDiameter / 2, 0, length);
+			tracked.push(outer);
+			var bore = Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1);
+			tracked.push(bore);
+			var envelope = Solids.cut(outer, [bore]);
+			tracked.push(envelope);
+			if (detail == Envelope) return envelope;
 
-		// The envelope is a plain catalog cylinder. Preview adds the raised outer end rims and
-		// recessed seal tracks that identify an LMUU bearing without pretending to model its balls.
-		var rimWidth = Math.min(1.2, length / 8);
-		var rimRise = Math.min(0.2, outerDiameter * 0.02);
-		var rimInner = outerDiameter / 2 - Math.min(0.3, (outerDiameter - boreDiameter) * 0.15);
-		var rimOuter = outerDiameter / 2 + rimRise;
-		var rims = [annulus(rimOuter, rimInner, 0, rimWidth),
-			annulus(rimOuter, rimInner, length - rimWidth, length)];
-		var detailed = Solids.union([envelope, rims[0], rims[1]]);
+			// Preview cuts retaining-ring style end grooves and recessed seal tracks without
+			// extending beyond the catalog outside diameter.
+			var rimWidth = Math.min(1.2, length / 8);
+			var rimDepth = Math.min(0.2, outerDiameter * 0.02);
+			var rimOuter = outerDiameter / 2 + 0.05;
+			var rimInner = outerDiameter / 2 - rimDepth;
+			var frontRim = annulus(rimOuter, rimInner, 0, rimWidth);
+			tracked.push(frontRim);
+			var backRim = annulus(rimOuter, rimInner, length - rimWidth, length);
+			tracked.push(backRim);
+			var rims = [frontRim, backRim];
+			var detailed = Solids.cut(envelope, rims);
+			tracked.push(detailed);
 
-		var sealWidth = Math.min(0.8, length / 12);
-		var sealInner = boreDiameter / 2 + Math.min(0.6, (outerDiameter - boreDiameter) * 0.2);
-		var sealOuter = Math.min(outerDiameter / 2 - 0.5, sealInner + 0.8);
-		if (sealOuter > sealInner) {
-			var seals = [annulus(sealOuter, sealInner, -0.05, sealWidth),
-				annulus(sealOuter, sealInner, length - sealWidth, length + 0.05)];
-			detailed = Solids.cut(detailed, seals);
-		}
-		return detailed;
+			var sealWidth = Math.min(0.8, length / 12);
+			var sealInner = boreDiameter / 2 + Math.min(0.6, (outerDiameter - boreDiameter) * 0.2);
+			var sealOuter = Math.min(outerDiameter / 2 - 0.5, sealInner + 0.8);
+			if (sealOuter > sealInner) {
+				var frontSeal = annulus(sealOuter, sealInner, -0.05, sealWidth);
+				tracked.push(frontSeal);
+				var backSeal = annulus(sealOuter, sealInner, length - sealWidth, length + 0.05);
+				tracked.push(backSeal);
+				var seals = [frontSeal, backSeal];
+				detailed = Solids.cut(detailed, seals);
+				tracked.push(detailed);
+			}
+			return detailed;
+		});
 	}
 
 	static function annulus(outerRadius:Float, innerRadius:Float, z0:Float, z1:Float):Part {
-		return Solids.cut(Part.cylinderSpan(outerRadius, z0, z1),
-			[Part.cylinderSpan(innerRadius, z0 - 0.05, z1 + 0.05)]);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var outer = Part.cylinderSpan(outerRadius, z0, z1);
+			tracked.push(outer);
+			var inner = Part.cylinderSpan(innerRadius, z0 - 0.05, z1 + 0.05);
+			tracked.push(inner);
+			var result = Solids.cut(outer, [inner]);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	/** Diameter of the round guide rod for a named shaft fit. The allowance is diametral. */
@@ -125,10 +153,11 @@ class LinearBearing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().setToken("designation", this.spec.designation);
+		return new ComponentValues().setToken("designation", this.spec.designation)
+			.setToken("material", materialSpec());
 	}
 
 }

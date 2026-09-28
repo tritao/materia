@@ -9,9 +9,9 @@ import materia.sheet.SheetStockSpec;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
-import machinekit.picking.PickingStation;
-import machinekit.picking.PickingStationConfig;
-import machinekit.picking.ShelfAssembly;
+import pickingstation.PickingStation;
+import pickingstation.PickingStationConfig;
+import pickingstation.ShelfAssembly;
 
 /** Sheet requirements derived from the virtual station, plus one authored default layout. */
 class PickingStationDesign {

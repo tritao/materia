@@ -1,7 +1,7 @@
 package pickingstation;
 
-import machinekit.picking.PickingStation;
-import machinekit.picking.StorageRack.StoragePosition;
+import pickingstation.PickingStation;
+import pickingstation.StorageRack.StoragePosition;
 
 enum PickingScenarioStatus {
 	Idle;

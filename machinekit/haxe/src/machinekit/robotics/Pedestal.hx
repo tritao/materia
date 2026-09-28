@@ -101,12 +101,20 @@ class Pedestal extends MachineComponent {
 		if (!Math.isFinite(actualFootDiameter) || !Math.isFinite(actualFootHeight) || actualFootDiameter < 0 ||
 			(actualFootDiameter > 0 && !(actualFootHeight > 0)))
 			throw "Pedestal leveling feet need positive dimensions";
-		if (!Math.isFinite(actualCablePath) || actualCablePath < 0 || (actualCablePath > 0 && actualCablePath >= column))
-			throw "Pedestal cable path must be smaller than the column";
-		var detailSuffix = detailDesignation(resolvedDetail);
+		if (!Math.isFinite(actualCablePath) || actualCablePath < 0 || actualCablePath > flange.pilotDiameter)
+			throw "Pedestal cable path must not exceed the flange pilot recess diameter";
+		var detailSuffix = detailDesignation({baseThickness: actualBaseThickness,
+			anchorCircleDiameter: actualAnchorCircle, gussetHeight: actualGussetHeight,
+			gussetThickness: actualGussetThickness, gussetCount: actualGussetCount,
+			levelingFootDiameter: actualFootDiameter,
+			levelingFootHeight: actualFootDiameter > 0 ? actualFootHeight : 0,
+			cablePathDiameter: actualCablePath});
+		var hasDetails = actualBaseThickness != Math.max(10, column * 0.2) ||
+			actualAnchorCircle != column + 2 * head || actualGussetHeight > 0 ||
+			actualFootDiameter > 0 || actualCablePath > 0;
 		super('PEDESTAL-${Dimension.format(flange.boltCircleDiameter)}-D${Dimension.format(column)}x${Dimension.format(height)}$detailSuffix',
 			'Pedestal for ${flange.designation}, ${Dimension.format(column)} mm column, ${Dimension.format(height)} mm tall' +
-			(detailSuffix == "" ? "" : ", detailed base and services"),
+			(hasDetails ? ", detailed base and services" : ""),
 			"steel");
 		this.flange = flange;
 		this.height = height;
@@ -159,35 +167,55 @@ class Pedestal extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var parts = [Part.cylinderSpan(baseDiameter / 2, 0, baseThickness), Part.cylinderSpan(columnDiameter / 2, 0, height)];
-		if (levelingFootDiameter > 0)
-			for (point in floorBoltPattern())
-				parts.push(Part.cylinderSpan(levelingFootDiameter / 2, -levelingFootHeight, 0, point.x, point.y));
-		if (gussetHeight > 0)
-			for (i in 0...gussetCount)
-				parts.push(gusset(2 * Math.PI * i / gussetCount));
-		var body = Solids.union(parts);
-		if (detail == Envelope) return body;
-		var screw = floorMountScrewPart(10);
-		var anchorStart = -levelingFootHeight - 0.1;
-		var tools = [for (point in floorBoltPattern())
-			Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y)];
-		if (cablePathDiameter > 0)
-			tools.push(Part.cylinderSpan(cablePathDiameter / 2, -0.1, height + 0.1));
-		// The cutout is built in the mated part's frame (face at z=0, material toward +Z); the
-		// `top` connector turns it over (x kept, y and z reversed) onto the top face.
-		var topCut = flange.mountingCutout(topCutDepth);
-		try {
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var parts:Array<Part> = [];
+			var base = Part.cylinderSpan(baseDiameter / 2, 0, baseThickness);
+			tracked.push(base);
+			var column = Part.cylinderSpan(columnDiameter / 2, 0, height);
+			tracked.push(column);
+			parts.push(base);
+			parts.push(column);
+			if (levelingFootDiameter > 0)
+				for (point in floorBoltPattern()) {
+					var foot = Part.cylinderSpan(levelingFootDiameter / 2, -levelingFootHeight, 0, point.x, point.y);
+					tracked.push(foot);
+					parts.push(foot);
+				}
+			if (gussetHeight > 0)
+				for (i in 0...gussetCount) {
+					var support = gusset(2 * Math.PI * (i + 0.5) / gussetCount);
+					tracked.push(support);
+					parts.push(support);
+				}
+			var body = Solids.union(parts);
+			tracked.push(body);
+			if (detail == Envelope) return body;
+			var screw = floorMountScrewPart(10);
+			var anchorStart = -levelingFootHeight - 0.1;
+			var tools:Array<Part> = [];
+			for (point in floorBoltPattern()) {
+				var tool = Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y);
+				tracked.push(tool);
+				tools.push(tool);
+			}
+			if (cablePathDiameter > 0) {
+				var cable = Part.cylinderSpan(cablePathDiameter / 2, -0.1, height + 0.1);
+				tracked.push(cable);
+				tools.push(cable);
+			}
+			// The cutout is built in the mated part's frame (face at z=0, material toward +Z); the
+			// `top` connector turns it over (x kept, y and z reversed) onto the top face.
+			var topCut = flange.mountingCutout(topCutDepth);
+			tracked.push(topCut);
 			var placedTopCut = topCut.placed(new Location(new Plane(new Vector(0, 0, height), Vector.X(), Vector.Z().scale(-1))));
 			topCut.close();
+			tracked.push(placedTopCut);
 			tools.push(placedTopCut);
-		} catch (error:Dynamic) {
-			topCut.close();
-			for (tool in tools) tool.close();
-			body.close();
-			throw error;
-		}
-		return Solids.cut(body, tools);
+			var result = Solids.cut(body, tools);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	function gusset(angle:Float):Part {
@@ -217,18 +245,13 @@ class Pedestal extends MachineComponent {
 			gussetCount: null, levelingFootDiameter: null, levelingFootHeight: null, cablePathDiameter: null};
 
 	static function detailDesignation(detail:PedestalDetail):String {
-		var result = "";
-		if (detail.baseThickness != null) result += '-B${Dimension.format(detail.baseThickness)}';
-		if (detail.anchorCircleDiameter != null) result += '-A${Dimension.format(detail.anchorCircleDiameter)}';
-		if (detail.gussetHeight != null) {
-			result += '-G${Dimension.format(detail.gussetHeight)}';
-			if (detail.gussetThickness != null) result += 'x${Dimension.format(detail.gussetThickness)}';
-			if (detail.gussetCount != null) result += 'x${detail.gussetCount}';
-		}
-		if (detail.levelingFootDiameter != null) result += '-F${Dimension.format(detail.levelingFootDiameter)}';
-		if (detail.cablePathDiameter != null) result += '-C${Dimension.format(detail.cablePathDiameter)}';
-		return result;
+		return '-B${Dimension.format(optionalFloat(detail.baseThickness))}-A${Dimension.format(optionalFloat(detail.anchorCircleDiameter))}' +
+			'-G${Dimension.format(optionalFloat(detail.gussetHeight))}x${Dimension.format(optionalFloat(detail.gussetThickness))}x${detail.gussetCount == null ? 0 : detail.gussetCount}' +
+			'-F${Dimension.format(optionalFloat(detail.levelingFootDiameter))}x${Dimension.format(optionalFloat(detail.levelingFootHeight))}' +
+			'-C${Dimension.format(optionalFloat(detail.cablePathDiameter))}';
 	}
+
+	static function optionalFloat(value:Null<Float>):Float return value == null ? 0 : value;
 
 	private static var recipeTypeCache:Null<ComponentType>;
 
@@ -264,7 +287,7 @@ class Pedestal extends MachineComponent {
 				.setInteger("gussetCount", this.gussetCount)
 				.setNumber("levelingFootDiameter", this.levelingFootDiameter)
 				.setNumber("levelingFootHeight", this.levelingFootHeight)
-				.setNumber("cablePathDiameter", this.cablePathDiameter);
+				.setNumber("cablePathDiameter", this.cablePathDiameter).setToken("material", materialSpec());
 	}
 
 }

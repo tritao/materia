@@ -1,4 +1,4 @@
-package machinekit.picking;
+package pickingstation;
 
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
@@ -34,9 +34,9 @@ class PickIndicator extends MachineComponent {
 		if (detail == Envelope) return housing;
 		var display = Part.box(width * 0.62, 2, height * 0.20,
 			Align.Center, Align.Center, Align.Min).translated(new Vector(0, -depth / 2 - 1, height * 0.48));
-		var light = Solids.cylinderAlongY(width * 0.12, -depth / 2 - 3, -depth / 2,
+		var light = Part.cylinderAlongY(width * 0.12, -depth / 2 - 3, -depth / 2,
 			0, height * 0.78);
-		var target = Solids.cylinderAlongY(confirmationDiameter / 2, -depth / 2 - 3, -depth / 2,
+		var target = Part.cylinderAlongY(confirmationDiameter / 2, -depth / 2 - 3, -depth / 2,
 			0, height * 0.22);
 		return Solids.union([housing, display, light, target]);
 	}

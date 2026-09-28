@@ -7,7 +7,7 @@ import materia.sheet.SheetPlanValidator;
 import materia.sheet.SheetProjectCodec;
 import materia.project.SceneArtifact;
 import machinekit.component.BomItem;
-import machinekit.picking.PickingStation;
+import pickingstation.PickingStation;
 import pickingstation.PickingScenario;
 import pickingstation.PickingScenario.PickingAction;
 import sys.FileSystem;

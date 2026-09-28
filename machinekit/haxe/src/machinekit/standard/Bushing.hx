@@ -60,7 +60,8 @@ class Bushing extends MachineComponent {
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("boreDiameter", Number(this.boreDiameter))
-				.set("outerDiameter", Number(this.outerDiameter)).set("length", Number(this.length));
+				.set("outerDiameter", Number(this.outerDiameter)).set("length", Number(this.length))
+				.setToken("material", materialSpec());
 	}
 
 }

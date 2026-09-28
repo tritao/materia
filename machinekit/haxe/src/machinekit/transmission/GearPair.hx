@@ -1,12 +1,13 @@
 package machinekit.transmission;
 
+import machinekit.assembly.MachineAssembly;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Two spur gears meshed at their profile-shifted centre distance, both rotating about parallel
  * +Z axes. `a` sits at the origin; `pose` places `b` along `a`'s local +X, turned about its own
  * axis so the teeth interleave.
  */
-class GearPair {
+class GearPair extends MachineAssembly {
 	public final a:SpurGear;
 	public final b:SpurGear;
 	public final centerDistance:Float;
@@ -23,6 +24,7 @@ class GearPair {
 		return new GearPair(a, b);
 
 	function new(a:SpurGear, b:SpurGear) {
+		super();
 		this.a = a;
 		this.b = b;
 		var distance = a.centerDistance(b);
@@ -42,6 +44,12 @@ class GearPair {
 		var turn = Math.PI - Math.PI / b.teeth;
 		turn -= step * Math.ffloor(turn / step + 1e-9);
 		bRotation = turn < 1e-9 ? 0.0 : turn;
+		addComponent("a", a);
+		addComponent("b", b, pose());
+		exposeConnector("inputAxis", "a", "axis");
+		exposeConnector("outputAxis", "b", "axis");
+		exposeConnector("inputPitch", "a", "pitch");
+		exposeConnector("outputPitch", "b", "pitch");
 	}
 
 	/** Gear ratio, driven teeth over driving teeth: `b.teeth / a.teeth`. */

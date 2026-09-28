@@ -52,11 +52,17 @@ class ShaftCollar extends MachineComponent {
 	public static function forShaft(boreDiameter:Float):ShaftCollar
 		return new ShaftCollar(catalog().get(Dimension.format(boreDiameter)));
 
-	public function new(spec:ShaftCollarSpec) {
+	public static function custom(spec:ShaftCollarSpec):ShaftCollar
+		return new ShaftCollar(spec, true);
+
+	private function new(spec:ShaftCollarSpec, codeOnly:Bool = false) {
 		if (!(spec.boreDiameter > 0) || !(spec.outerDiameter > spec.boreDiameter) || !(spec.width > 0))
 			throw 'Shaft collar for ${Dimension.format(spec.boreDiameter)} mm shaft has inconsistent dimensions';
 		var bore = Dimension.format(spec.boreDiameter);
-		super('COLLAR-$bore', 'Shaft collar for $bore mm shaft, ${spec.setScrew} set screw', "steel");
+		var designation = 'COLLAR-$bore';
+		var customName = '$bore-OD${Dimension.format(spec.outerDiameter)}-W${Dimension.format(spec.width)}-SS${spec.setScrew}';
+		super(codeOnly ? customDesignation(customName) : designation,
+			'Shaft collar for $bore mm shaft, ${spec.setScrew} set screw', "steel", codeOnly);
 		this.spec = spec;
 		addConnector("front", Face, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, spec.width / 2));
@@ -81,10 +87,11 @@ class ShaftCollar extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return codeOnly ? null : recipeType();
 
 	override public function values():ComponentValues {
-		return new ComponentValues().set("bore", Token(Dimension.format(this.spec.boreDiameter)));
+		return new ComponentValues().set("bore", Token(Dimension.format(this.spec.boreDiameter)))
+			.setToken("material", materialSpec());
 	}
 
 }

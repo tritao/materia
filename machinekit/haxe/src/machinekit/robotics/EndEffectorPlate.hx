@@ -13,6 +13,8 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.catalog.CatalogIndex;
+import machinekit.catalog.FilteredCatalogIndex;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
@@ -75,13 +77,24 @@ class EndEffectorPlate extends MachineComponent {
 		return circle(toolBoltCircleDiameter, toolBoltCount);
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.cylinderSpan(diameter / 2, 0, thickness);
-		if (detail == Envelope) return body;
-		var toolScrew = SocketHeadCapScrew.metric(toolMountScrew, 10);
-		var tools = [flange.mountingCutout(thickness)];
-		for (point in toolBoltPattern())
-			tools.push(Part.cylinderSpan(toolScrew.clearanceDiameter(Medium) / 2, -0.1, thickness + 0.1, point.x, point.y));
-		return Solids.cut(body, tools);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var body = Part.cylinderSpan(diameter / 2, 0, thickness);
+			tracked.push(body);
+			if (detail == Envelope) return body;
+			var toolScrew = SocketHeadCapScrew.metric(toolMountScrew, 10);
+			var flangeTool = flange.mountingCutout(thickness);
+			var tools = [flangeTool];
+			tracked.push(flangeTool);
+			for (point in toolBoltPattern()) {
+				var tool = Part.cylinderSpan(toolScrew.clearanceDiameter(Medium) / 2, -0.1, thickness + 0.1, point.x, point.y);
+				tracked.push(tool);
+				tools.push(tool);
+			}
+			var result = Solids.cut(body, tools);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	static function circle(diameter:Float, count:Int):Array<{x:Float, y:Float}> {
@@ -118,13 +131,29 @@ class EndEffectorPlate extends MachineComponent {
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;
+	private static var toolScrewCatalogCache:Null<CatalogIndex>;
+
+	static function toolScrewCatalog():CatalogIndex {
+		if (toolScrewCatalogCache == null) {
+			var screws = SocketHeadCapScrew.catalog();
+			var compatible:Array<String> = [];
+			for (designation in screws.designations()) {
+				try {
+					new EndEffectorPlate(new RobotFlange(40, 4), 12, 65, 4, designation);
+					compatible.push(designation);
+				} catch (_:Dynamic) {}
+			}
+			toolScrewCatalogCache = new FilteredCatalogIndex(screws, compatible);
+		}
+		return toolScrewCatalogCache;
+	}
 
 	public static function recipeType():ComponentType {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.robotics.end-effector-plate",
 			[ComponentRecipeSupport.length("flangePitchCircle", 40), ComponentRecipeSupport.count("flangeBoltCount", 4), ComponentRecipeSupport.length("thickness", 12),
 				ComponentRecipeSupport.length("toolBoltCircleDiameter", 65), ComponentRecipeSupport.count("toolBoltCount", 4),
-				ComponentRecipeSupport.catalog("toolMountScrew", SocketHeadCapScrew.catalog(), "M5")],
+				ComponentRecipeSupport.catalog("toolMountScrew", toolScrewCatalog(), "M5")],
 			v -> new EndEffectorPlate(new RobotFlange(v.number("flangePitchCircle"), v.integer("flangeBoltCount")),
 				v.number("thickness"), v.number("toolBoltCircleDiameter"), v.integer("toolBoltCount"), v.token("toolMountScrew")));
 		return recipeTypeCache;
@@ -138,7 +167,7 @@ class EndEffectorPlate extends MachineComponent {
 				.setNumber("thickness", this.thickness)
 				.setNumber("toolBoltCircleDiameter", this.toolBoltCircleDiameter)
 				.setInteger("toolBoltCount", this.toolBoltCount)
-				.setToken("toolMountScrew", this.toolMountScrew);
+				.setToken("toolMountScrew", this.toolMountScrew).setToken("material", materialSpec());
 	}
 
 }

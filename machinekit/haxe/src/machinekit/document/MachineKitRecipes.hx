@@ -18,6 +18,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
+import machinekit.component.ToolSpec;
 
 /** CadKit evaluator registration for editable MachineKit single-part recipes. */
 class MachineKitRecipes {
@@ -59,7 +60,7 @@ class MachineKitRecipes {
 		for (parameter in type.parameters()) {
 			var raw = instance.resolvedValue(parameter.name);
 			switch parameter.type {
-				case Length | Angle: values.setNumber(parameter.name, cast raw);
+				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
 				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
@@ -68,6 +69,33 @@ class MachineKitRecipes {
 		var built = type.create(values);
 		components.set(identity, {key: key, component: built});
 		return built;
+	}
+
+	/** Release cached recipe objects owned by a document that is being closed. */
+	public static function forget(document:cadkit.parametric.Document):Void {
+		if (document == null) return;
+		var prefix = Std.string(document.runtimeIdentity()) + ":";
+		var forgotten = [for (identity in components.keys()) if (StringTools.startsWith(identity, prefix)) identity];
+		for (identity in forgotten) components.remove(identity);
+	}
+
+	public static function toolValues(definition:Definition, instance:InstanceElement,
+			tool:ToolSpec):ComponentValues {
+		var values = tool.defaults();
+		var inputNames:Map<String, Bool> = [];
+		for (input in definition.inputs()) inputNames.set(input.name, true);
+		for (parameter in tool.parameters()) {
+			var name = ToolSpec.inputName(tool.name, parameter.name);
+			if (!inputNames.exists(name)) continue;
+			var raw = instance.resolvedValue(name);
+			switch parameter.type {
+				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
+				case Count: values.setInteger(parameter.name, cast raw);
+				case Bool: values.setBoolean(parameter.name, cast raw);
+				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
+			}
+		}
+		return tool.resolve(values);
 	}
 
 	/** Merge explicit saved edits onto freshly generated recipe definitions. */
@@ -305,7 +333,10 @@ private class MachineKitRecipeEvaluator implements DefinitionEvaluator implement
 			var detail = instance.resolvedToken("detail") == "envelope" ? ComponentDetail.Envelope : ComponentDetail.Preview;
 			part = component.geometry(detail);
 		} else {
-			part = component.tool(output, 0);
+			var tool:Null<ToolSpec> = null;
+			for (candidate in component.toolSpecs()) if (candidate.name == output) tool = candidate;
+			if (tool == null) throw 'Unknown tool "$output" for ${type.id}';
+			part = component.tool(output, MachineKitRecipes.toolValues(definition, instance, tool));
 		}
 		var result = part.shape.cloneShape();
 		part.close();

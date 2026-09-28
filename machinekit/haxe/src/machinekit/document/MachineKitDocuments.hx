@@ -13,6 +13,8 @@ import machinekit.component.ComponentParameterType;
 import machinekit.component.ComponentType;
 import machinekit.component.ComponentValue;
 import machinekit.component.ComponentValues;
+import machinekit.component.ComponentParameter;
+import machinekit.component.ToolSpec;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -25,20 +27,17 @@ class MachineKitDocuments {
 		var inputs:Array<DefinitionInput> = [];
 		for (parameter in type.parameters()) {
 			var value = resolved.get(parameter.name);
-			var input = switch parameter.type {
-				case Length: new DefinitionInput(parameter.name, "length", parameter.unit, number(value));
-				case Angle: new DefinitionInput(parameter.name, "angle", parameter.unit, number(value));
-				case Count: DefinitionInput.integer(parameter.name, integer(value));
-				case Bool: DefinitionInput.boolean(parameter.name, boolean(value));
-				case Choice(options): DefinitionInput.token(parameter.name, token(value), options);
-				case CatalogDesignation(index):
-					DefinitionInput.token(parameter.name, token(value), index.designations());
-			};
-			inputs.push(input);
+			inputs.push(definitionInput(parameter.name, parameter, value));
+		}
+		for (tool in component.toolSpecs()) {
+			var defaults = tool.defaults();
+			for (parameter in tool.parameters())
+				inputs.push(definitionInput(ToolSpec.inputName(tool.name, parameter.name), parameter,
+					defaults.get(parameter.name)));
 		}
 		inputs.push(DefinitionInput.token("detail", "preview", ["preview", "envelope"]));
 		var outputs = [new DefinitionOutput("body", DefinitionOutput.Geometry)];
-		for (name in component.toolNames()) outputs.push(new DefinitionOutput(name, DefinitionOutput.Tool));
+		for (tool in component.toolSpecs()) outputs.push(new DefinitionOutput(tool.name, DefinitionOutput.Tool));
 		var definition = document.createDefinition(type.label(), type.id, inputs, outputs);
 		definition.restoreProperty("machinekit.type", TypedProperty.text("machinekit.type", type.id));
 		return definition;
@@ -98,5 +97,16 @@ class MachineKitDocuments {
 		case Token(v): v;
 		default: throw "Expected token component input";
 	};
+
+	static function definitionInput(name:String, parameter:ComponentParameter, value:ComponentValue):DefinitionInput
+		return switch parameter.type {
+			case Scalar: new DefinitionInput(name, "scalar", "1", number(value));
+			case Length: new DefinitionInput(name, "length", parameter.unit, number(value));
+			case Angle: new DefinitionInput(name, "angle", parameter.unit, number(value));
+			case Count: DefinitionInput.integer(name, integer(value));
+			case Bool: DefinitionInput.boolean(name, boolean(value));
+			case Choice(options): DefinitionInput.token(name, token(value), options);
+			case CatalogDesignation(index): DefinitionInput.token(name, token(value), index.designations());
+		};
 
 }

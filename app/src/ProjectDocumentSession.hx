@@ -572,7 +572,7 @@ class ProjectDocumentSession {
     previousSensors.dispose();
     if(previousOwnership!=null&&previousOwnership!=nextOwnership)previousOwnership.dispose();
     if(previousBim!=nextBim)previousBim.close();
-    if(previousRecipe!=null)previousRecipe.close();
+    if(previousRecipe!=null){MachineKitRecipes.forget(previousRecipe);previousRecipe.close();}
   }
 
   /** Applies a BIM mutation with an explicit inverse on the shared project history. */
@@ -903,7 +903,7 @@ class ProjectDocumentSession {
     return result.length == 0 ? "." : result.join("/");
   }
 
-  public function dispose():Void { scene.dispose(); sensors.dispose();if(scriptOwnership!=null)scriptOwnership.dispose();bim.close();if(recipeDocument!=null)recipeDocument.close(); }
+  public function dispose():Void { scene.dispose(); sensors.dispose();if(scriptOwnership!=null)scriptOwnership.dispose();bim.close();if(recipeDocument!=null){MachineKitRecipes.forget(recipeDocument);recipeDocument.close();} }
 
   static function decodeRecipe(text:Null<String>):Null<cadkit.parametric.Document> {
     if (text == null) return null;

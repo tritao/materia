@@ -1,4 +1,4 @@
-package machinekit.picking;
+package pickingstation;
 
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.component.MachineComponent;

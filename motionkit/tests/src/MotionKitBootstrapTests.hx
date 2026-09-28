@@ -123,6 +123,13 @@ class MotionKitBootstrapTests {
       Sys.println('C7 focused tests passed ($assertions assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_MACHINEKIT_ONLY") == "1") {
+      testLinearAxisCompilesToRobotModel();
+      testCompiledXYZGantryRunsThroughSimulation();
+      testMachineKitLeadScrewThroughVirtualDevice();
+      Sys.println('MachineKit compiler tests passed ($assertions assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       testOpwKinematics();
       Sys.println('C4 focused tests passed ($assertions assertions)');
@@ -1194,6 +1201,8 @@ class MotionKitBootstrapTests {
       case SimpleTransmission(jointId, ratio, offset):
         jointId == joint.id && Math.abs(ratio - expectedRatio) < 1e-9 && offset == 0.0;
     }, "compiled actuator carries the lead-screw rad/m ratio");
+    check(expectedRatio < 0.0,
+      "right-hand screw actuator rotates negative to move the carriage along +Z");
     near(blueprint.axes[0].jointScales[0], 1.0,
       "transmission-derived single-joint mapping keeps the old scale");
     near(blueprint.axes[0].jointOffsets[0], 0.0,
@@ -1870,12 +1879,13 @@ class MotionKitBootstrapTests {
   static function testMachineKitLeadScrewThroughVirtualDevice():Void {
     var screw = new LeadScrewThread(MetricTrapezoidal, 10, 2, 4);
     var axis = new LinearAxis(23, 10, 80, null, 30, screw);
-    near(axis.nut.travelPerRevolution(), 8.0, "four-start screw has an 8 mm lead");
+    near(axis.nut.travelPerRevolution(), -8.0, "four-start right-hand screw moves -8 mm per positive revolution");
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.01, 0.04);
-    var ratio = 2.0 * Math.PI / 0.008;
+    var ratio = 2.0 * Math.PI /
+      (axis.nut.travelPerRevolution() * MachineKitRobotCompiler.MILLIMETRES_TO_METRES);
     var options = new VirtualDeviceOptions();
     options.actuators = [new VirtualActuatorOptions(blueprint.model.actuators[0].id, 0, ratio, 0.0,
-      3200.0 / (2.0 * Math.PI), 0.01 * ratio, 2)];
+      3200.0 / (2.0 * Math.PI), 0.01 * Math.abs(ratio), 2)];
     var simulation = new Simulation(0.01);
     var runtime = simulation.addRobot(blueprint.runtime, null, options);
     for (tick in 1...21) simulation.step(Int64.ofInt(tick));

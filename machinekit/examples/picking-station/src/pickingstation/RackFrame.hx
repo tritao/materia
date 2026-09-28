@@ -1,4 +1,4 @@
-package machinekit.picking;
+package pickingstation;
 
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
@@ -41,14 +41,26 @@ class RackFrame extends MachineComponent {
 	public function cutList():Array<CutListLine> return assembly.cutList();
 	public function memberCuts():Array<{name:String, length:Float}>
 		return [for (name in memberNames) {name: name, length: assembly.cutLength(name)}];
+	public function memberGeometry(name:String):Part return assembly.geometry(name);
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var parts:Array<Part> = [for (name in memberNames) assembly.geometry(name)];
-		return Solids.union(parts);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var parts:Array<Part> = [];
+			for (name in memberNames) {
+				var part = assembly.geometry(name);
+				tracked.push(part);
+				parts.push(part);
+			}
+			var result = Solids.union(parts);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	function buildFrame():Void {
 		var x = width / 2 - profile.size / 2, y = depth / 2 - profile.size / 2;
+		var innerX = width / 2 - profile.size, innerY = depth / 2 - profile.size;
 		for (corner in [
 			{name: "front-left", x: -x, y: -y}, {name: "front-right", x: x, y: -y},
 			{name: "back-left", x: -x, y: y}, {name: "back-right", x: x, y: y}]) {
@@ -60,14 +72,18 @@ class RackFrame extends MachineComponent {
 		for (index in 1...shelfCount + 1) levels.push(footHeight + shelfSpacing * index);
 		for (levelIndex in 0...levels.length) {
 			var z = levels[levelIndex];
-			assembly.point('rail-left-$levelIndex', -x, -y, z);
-			assembly.point('rail-right-$levelIndex', x, -y, z);
-			assembly.point('rail-back-left-$levelIndex', -x, y, z);
-			assembly.point('rail-back-right-$levelIndex', x, y, z);
+			assembly.point('rail-left-$levelIndex', -innerX, -y, z);
+			assembly.point('rail-right-$levelIndex', innerX, -y, z);
+			assembly.point('rail-back-left-$levelIndex', -innerX, y, z);
+			assembly.point('rail-back-right-$levelIndex', innerX, y, z);
+			assembly.point('side-left-front-$levelIndex', -x, -innerY, z);
+			assembly.point('side-left-back-$levelIndex', -x, innerY, z);
+			assembly.point('side-right-front-$levelIndex', x, -innerY, z);
+			assembly.point('side-right-back-$levelIndex', x, innerY, z);
 			addMember('front-rail-$levelIndex', 'rail-left-$levelIndex', 'rail-right-$levelIndex');
 			addMember('back-rail-$levelIndex', 'rail-back-left-$levelIndex', 'rail-back-right-$levelIndex');
-			addMember('left-rail-$levelIndex', 'rail-left-$levelIndex', 'rail-back-left-$levelIndex');
-			addMember('right-rail-$levelIndex', 'rail-right-$levelIndex', 'rail-back-right-$levelIndex');
+			addMember('left-rail-$levelIndex', 'side-left-front-$levelIndex', 'side-left-back-$levelIndex');
+			addMember('right-rail-$levelIndex', 'side-right-front-$levelIndex', 'side-right-back-$levelIndex');
 		}
 	}
 

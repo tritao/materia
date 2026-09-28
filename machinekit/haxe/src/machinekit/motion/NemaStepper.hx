@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -73,6 +74,10 @@ class NemaStepper extends MachineComponent {
 		return new NemaStepper(catalog().get(Std.string(variant.frame)), variant);
 	}
 
+	/** Build a motor from explicit frame and motor dimensions without a named catalog recipe. */
+	public static function custom(spec:NemaFrameInterface, variant:StepperMotorVariant):NemaStepper
+		return new NemaStepper(spec, variant, true);
+
 	/** Default named variant for a frame. A length override creates a generic preview variant. */
 	public static function frame(size:Int, ?bodyLength:Float):NemaStepper {
 		var spec = catalog().get(Std.string(size));
@@ -93,7 +98,7 @@ class NemaStepper extends MachineComponent {
 		return new NemaStepper(spec, custom);
 	}
 
-	public function new(spec:NemaFrameInterface, variant:StepperMotorVariant) {
+	private function new(spec:NemaFrameInterface, variant:StepperMotorVariant, codeOnly:Bool = false) {
 		if (spec.frame != variant.frame) throw "Stepper motor variant frame does not match its mounting interface";
 		if (!(variant.bodyLength > variant.mountHoleDepth) || !(variant.bodyFace > spec.boltSpacing))
 			throw 'NEMA ${spec.frame} motor body is too short or narrow';
@@ -102,7 +107,11 @@ class NemaStepper extends MachineComponent {
 			|| !(variant.shaftLength > variant.pilotHeight) || !(variant.pilotHeight > 0))
 			throw 'NEMA ${spec.frame} interface or motor variant has inconsistent dimensions';
 		SocketHeadCapScrew.catalog().get(variant.mountScrew);
-		super(variant.designation, '${variant.designation} NEMA ${spec.frame} stepper motor', null);
+		var customName = '${variant.designation}-IF${Dimension.format(spec.face)}x${Dimension.format(spec.boltSpacing)}x${Dimension.format(spec.pilotDiameter)}' +
+			'-B${Dimension.format(variant.bodyFace)}x${Dimension.format(variant.bodyLength)}-S${Dimension.format(variant.shaftDiameter)}x${Dimension.format(variant.shaftLength)}' +
+			'-P${Dimension.format(variant.pilotHeight)}-M${variant.mountScrew}-${variant.tappedMount ? "T" : "C"}${Dimension.format(variant.mountHoleDepth)}';
+		super(codeOnly ? customDesignation(customName) : variant.designation,
+			'${variant.designation} NEMA ${spec.frame} stepper motor', null, codeOnly);
 		this.spec = spec;
 		this.variant = variant;
 		bodyLength = variant.bodyLength;
@@ -120,25 +129,44 @@ class NemaStepper extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var half = variant.bodyFace / 2;
-		var parts:Array<Part> = [];
-		if (detail == Envelope) {
-			parts.push(Part.prism([new Vector(-half, -half), new Vector(half, -half),
-				new Vector(half, half), new Vector(-half, half)], -bodyLength, 0));
-		} else {
-			var c = 0.08 * variant.bodyFace;
-			var body = Part.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
-				new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
-				new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
-				-bodyLength, 0);
-			var screw = mountScrew(10);
-			var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
-			parts.push(Solids.cut(body, [for (point in boltPattern())
-				Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y)]));
-		}
-		parts.push(Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight));
-		parts.push(Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength));
-		return Solids.union(parts);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var half = variant.bodyFace / 2;
+			var parts:Array<Part> = [];
+			if (detail == Envelope) {
+				var body = Part.prism([new Vector(-half, -half), new Vector(half, -half),
+					new Vector(half, half), new Vector(-half, half)], -bodyLength, 0);
+				tracked.push(body);
+				parts.push(body);
+			} else {
+				var c = 0.08 * variant.bodyFace;
+				var body = Part.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
+					new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
+					new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
+					-bodyLength, 0);
+				tracked.push(body);
+				var screw = mountScrew(10);
+				var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
+				var tools:Array<Part> = [];
+				for (point in boltPattern()) {
+					var tool = Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y);
+					tracked.push(tool);
+					tools.push(tool);
+				}
+				body = Solids.cut(body, tools);
+				tracked.push(body);
+				parts.push(body);
+			}
+			var pilot = Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight);
+			var shaft = Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength);
+			tracked.push(pilot);
+			tracked.push(shaft);
+			parts.push(pilot);
+			parts.push(shaft);
+			var result = Solids.union(parts);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	public function mountScrew(length:Float):SocketHeadCapScrew
@@ -153,11 +181,14 @@ class NemaStepper extends MachineComponent {
 		return Solids.union(tools);
 	}
 
-	override public function toolNames():Array<String> return ["mountingCutout"];
+	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("mountingCutout", [
+		ComponentRecipeSupport.toolDepth(10), ComponentRecipeSupport.length("pilotClearance", 0.2),
+		ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")])];
 
-	override public function tool(name:String, depth:Float):Part {
-		if (name == "mountingCutout") return mountingCutout(depth > 0 ? depth : 10);
-		return super.tool(name, depth);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		if (name == "mountingCutout") return mountingCutout(values.number("depth"),
+			values.number("pilotClearance"), ComponentRecipeSupport.clearanceFit(values.token("fit")));
+		return super.buildTool(name, values);
 	}
 
 	private static var namedRecipeTypeCache:Null<ComponentType>;
@@ -182,13 +213,14 @@ class NemaStepper extends MachineComponent {
 	}
 
 	override public function componentType():Null<ComponentType>
-		return variant.designation.indexOf("GENERIC-NEMA") == 0 ? genericRecipeType() : namedRecipeType();
+		return codeOnly ? null : variant.designation.indexOf("GENERIC-NEMA") == 0 ? genericRecipeType() : namedRecipeType();
 
 	override public function values():ComponentValues {
 		if (variant.designation.indexOf("GENERIC-NEMA") == 0)
 			return new ComponentValues().setToken("frame", Std.string(this.spec.frame))
-				.setNumber("bodyLength", this.bodyLength);
-		return new ComponentValues().setToken("model", this.variant.designation);
+				.setNumber("bodyLength", this.bodyLength).setToken("material", materialSpec());
+		return new ComponentValues().setToken("model", this.variant.designation)
+			.setToken("material", materialSpec());
 	}
 
 }

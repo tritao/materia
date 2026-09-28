@@ -17,6 +17,26 @@ class MachineKitRecipeProjectTests {
 		return null;
 	}
 
+	static function removeToolInputs(projectText:String):String {
+		var project:Dynamic = haxe.Json.parse(projectText);
+		var saved:Dynamic = haxe.Json.parse(Reflect.field(project, "recipeDocument"));
+		var definitions:Array<Dynamic> = cast Reflect.field(saved, "definitions");
+		var removed = 0;
+		for (definition in definitions) {
+			var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
+			var kept:Array<Dynamic> = [];
+			for (input in inputs) {
+				var name:String = Reflect.field(input, "name");
+				if (StringTools.startsWith(name, "tool_")) removed++;
+				else kept.push(input);
+			}
+			Reflect.setField(definition, "inputs", kept);
+		}
+		check(removed > 0, "saved recipe fixture contains typed tool inputs");
+		Reflect.setField(project, "recipeDocument", haxe.Json.stringify(saved));
+		return haxe.Json.stringify(project);
+	}
+
 	public static function main():Int {
 		var root = FileSystem.fullPath(Sys.getCwd());
 		while (!FileSystem.exists(root + "/machinekit/examples/materia.project.json")) {
@@ -52,6 +72,9 @@ class MachineKitRecipeProjectTests {
 			session.save(destination);
 			check(File.getContent(destination).indexOf("recipeDocument") >= 0,
 				"saved project retains the editable recipe document");
+			// Simulate a project saved before typed tool inputs were added. Reconciliation
+			// must preserve its existing edits and leave new definition inputs at defaults.
+			File.saveContent(destination, removeToolInputs(File.getContent(destination)));
 			session.open(destination);
 			var reopened = session.recipeDocument;
 			var persisted = occurrence(reopened, "bearingB").resolvedToken("designation") == "6000";

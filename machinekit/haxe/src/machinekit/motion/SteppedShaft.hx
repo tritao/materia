@@ -87,20 +87,24 @@ class SteppedShaft extends MachineComponent {
 		for (section in sections) total += section.length;
 		var sizes = [for (section in sections) '${Dimension.format(section.diameter)}x${Dimension.format(section.length)}'];
 		var resolvedDetail:ShaftDetail = detail == null ? emptyDetail() : detail;
-		var detailSuffix = detailDesignation(resolvedDetail);
-		super("SHAFT-" + sizes.join("-") + detailSuffix, "Stepped shaft " + sizes.join(" / ") + detailDescription(resolvedDetail), "steel C45");
+		var resolvedKeyways = keyways == null ? [] : keyways.copy();
+		var resolvedGrooves = grooves == null ? [] : grooves.copy();
+		var resolvedFaces = namedFaces == null ? [] : namedFaces.copy();
+		var featureSuffix = featureDesignation(resolvedFaces, resolvedKeyways, resolvedGrooves, resolvedDetail);
+		super("SHAFT-" + sizes.join("-") + featureSuffix,
+			"Stepped shaft " + sizes.join(" / ") + detailDescription(resolvedDetail), "steel C45");
 		this.sections = sections.copy();
 		totalLength = total;
 		this.detail = resolvedDetail;
 		validateDetail();
 		addConnector("input", Axis, Solids.axial(0, 0, 0));
 		addConnector("output", Shaft, Solids.axial(0, 0, total));
-		if (namedFaces != null)
-			for (face in namedFaces) {
+		if (resolvedFaces.length > 0)
+			for (face in resolvedFaces) {
 				if (face.z < 0 || face.z > total) throw 'Face "${face.name}" lies outside the shaft';
 				addConnector(face.name, Face, Solids.axial(0, 0, face.z));
 			}
-		this.keyways = keyways == null ? [] : keyways.copy();
+		this.keyways = resolvedKeyways;
 		for (keyway in this.keyways) {
 			var end = keyway.z0 + keyway.key.length;
 			if (keyway.z0 < 0 || end > total) throw 'Keyway "${keyway.name}" lies outside the shaft';
@@ -114,7 +118,7 @@ class SteppedShaft extends MachineComponent {
 			addConnector(keyway.name, Face, Solids.axial(0, radius - keyway.key.spec.shaftDepth,
 				keyway.z0 + keyway.key.length / 2));
 		}
-		this.grooves = grooves == null ? [] : grooves.copy();
+		this.grooves = resolvedGrooves;
 		for (groove in this.grooves) {
 			if (!(groove.width > 0)) throw "Retaining ring groove needs a positive width";
 			if (groove.z0 < 0 || groove.z0 + groove.width > total) throw "Retaining ring groove lies outside the shaft";
@@ -179,8 +183,9 @@ class SteppedShaft extends MachineComponent {
 			if (shoulderIndex(shoulder.z) < 0) throw 'Shoulder detail z=${shoulder.z} is not a section boundary';
 			var prior = diameterAt(shoulder.z - 1e-5), next = diameterAt(shoulder.z + 1e-5);
 			var smaller = Math.min(prior, next);
+			var stepHeight = Math.abs(prior - next) / 2;
 			var fillet = optionalFloat(shoulder.fillet);
-			if (shoulder.fillet != null && (!(fillet > 0) || fillet >= smaller / 2))
+			if (shoulder.fillet != null && (!(fillet > 0) || fillet >= stepHeight))
 				throw 'Shoulder fillet at z=${shoulder.z} is too large';
 			if (shoulder.reliefWidth != null) {
 				var width = optionalFloat(shoulder.reliefWidth);
@@ -224,14 +229,38 @@ class SteppedShaft extends MachineComponent {
 	function sectionLengthAfter(z:Float):Float
 		return sections[shoulderIndex(z) + 1].length;
 
-	static function detailDesignation(detail:ShaftDetail):String {
-		var result = "";
+	static function featureDesignation(faces:Array<{name:String, z:Float}>, keyways:Array<ShaftKeyway>,
+			grooves:Array<ShaftGroove>, detail:ShaftDetail):String {
+		var features:Array<String> = [];
+		for (face in faces)
+			features.push('F${face.name.length}:${face.name}@${Dimension.format(face.z)}');
+		for (keyway in keyways)
+			features.push('K${keyway.name.length}:${keyway.name}@${Dimension.format(keyway.z0)}:${keyway.key.designation}' +
+				'-S${Dimension.format(keyway.key.spec.minShaft)}x${Dimension.format(keyway.key.spec.maxShaft)}' +
+				'-D${Dimension.format(keyway.key.spec.shaftDepth)}x${Dimension.format(keyway.key.spec.hubDepth)}');
+		for (groove in grooves) {
+			var name = groove.name == null ? "" : groove.name;
+			features.push('G${name.length}:$name@${Dimension.format(groove.z0)}x${Dimension.format(groove.width)}x${Dimension.format(groove.diameter)}');
+		}
+		if (detail.inputChamfer != null && detail.inputChamfer > 0)
+			features.push('CI${Dimension.format(detail.inputChamfer)}');
+		if (detail.outputChamfer != null && detail.outputChamfer > 0)
+			features.push('CO${Dimension.format(detail.outputChamfer)}');
 		var inputThread = detail.inputThread, outputThread = detail.outputThread;
 		if (inputThread != null)
-			result += '-TI${Dimension.format(inputThread.diameter)}x${Dimension.format(inputThread.pitch)}x${Dimension.format(inputThread.length)}';
+			features.push('TI${Dimension.format(inputThread.diameter)}x${Dimension.format(inputThread.pitch)}x${Dimension.format(inputThread.length)}');
 		if (outputThread != null)
-			result += '-TO${Dimension.format(outputThread.diameter)}x${Dimension.format(outputThread.pitch)}x${Dimension.format(outputThread.length)}';
-		return result;
+			features.push('TO${Dimension.format(outputThread.diameter)}x${Dimension.format(outputThread.pitch)}x${Dimension.format(outputThread.length)}');
+		if (detail.shoulders != null)
+			for (shoulder in detail.shoulders) {
+				var feature = 'S${Dimension.format(shoulder.z)}';
+				if (shoulder.fillet != null) feature += '-R${Dimension.format(shoulder.fillet)}';
+				if (shoulder.reliefWidth != null)
+					feature += '-U${Dimension.format(shoulder.reliefWidth)}x${Dimension.format(optionalFloat(shoulder.reliefDiameter))}';
+				features.push(feature);
+			}
+		features.sort(Reflect.compare);
+		return features.length == 0 ? "" : "-" + features.join("-");
 	}
 
 	static function emptyDetail():ShaftDetail
@@ -249,36 +278,72 @@ class SteppedShaft extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var z = 0.0, parts:Array<Part> = [];
-		for (section in sections) {
-			parts.push(Part.cylinderSpan(section.diameter / 2, z, z + section.length));
-			z += section.length;
-		}
-		var body = Solids.union(parts);
-		if (detail == Envelope) return body;
-		body = applyEndDetails(body);
-		var tools:Array<Part> = [];
-		for (keyway in keyways) tools.push(keywayTool(keyway));
-		for (groove in grooves) tools.push(grooveTool(groove));
-		for (shoulder in (this.detail.shoulders == null ? [] : this.detail.shoulders))
-			if (optionalFloat(shoulder.reliefWidth) > 0)
-				tools.push(shoulderReliefTool(shoulder));
-		return tools.length == 0 ? body : Solids.cut(body, tools);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var z = 0.0, sectionsParts:Array<Part> = [];
+			for (section in sections) {
+				var part = Part.cylinderSpan(section.diameter / 2, z, z + section.length);
+				tracked.push(part);
+				sectionsParts.push(part);
+				z += section.length;
+			}
+			var body = Solids.union(sectionsParts);
+			tracked.push(body);
+			if (detail == Envelope) return body;
+			body = applyEndDetails(body);
+			tracked.push(body);
+			var tools:Array<Part> = [];
+			for (keyway in keyways) {
+				var tool = keywayTool(keyway);
+				tracked.push(tool);
+				tools.push(tool);
+			}
+			for (groove in grooves) {
+				var tool = grooveTool(groove);
+				tracked.push(tool);
+				tools.push(tool);
+			}
+			for (shoulder in (this.detail.shoulders == null ? [] : this.detail.shoulders))
+				if (optionalFloat(shoulder.reliefWidth) > 0) {
+					var tool = shoulderReliefTool(shoulder);
+					tracked.push(tool);
+					tools.push(tool);
+				}
+			if (tools.length == 0) return body;
+			var result = Solids.cut(body, tools);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	function applyEndDetails(body:Part):Part {
-		var result = body;
-		var inputThread = detail.inputThread, outputThread = detail.outputThread;
-		if (inputThread != null) result = applyThread(result, inputThread, true);
-		if (outputThread != null) result = applyThread(result, outputThread, false);
-		if (optionalFloat(detail.inputChamfer) > 0)
-			result = finishEdge(result, 0, optionalFloat(detail.inputChamfer), false);
-		if (optionalFloat(detail.outputChamfer) > 0)
-			result = finishEdge(result, totalLength, optionalFloat(detail.outputChamfer), false);
-		for (shoulder in (detail.shoulders == null ? [] : detail.shoulders))
-			if (optionalFloat(shoulder.fillet) > 0)
-				result = finishEdge(result, shoulder.z, optionalFloat(shoulder.fillet), true);
-		return result;
+		var ownedParts:Array<Part> = [body];
+		return Solids.building(ownedParts, tracked -> {
+			var result = body;
+			var inputThread = detail.inputThread, outputThread = detail.outputThread;
+			if (inputThread != null) {
+				result = applyThread(result, inputThread, true);
+				tracked.push(result);
+			}
+			if (outputThread != null) {
+				result = applyThread(result, outputThread, false);
+				tracked.push(result);
+			}
+			if (optionalFloat(detail.inputChamfer) > 0) {
+				result = finishEdge(result, 0, optionalFloat(detail.inputChamfer), false);
+				tracked.push(result);
+			}
+			if (optionalFloat(detail.outputChamfer) > 0) {
+				result = finishEdge(result, totalLength, optionalFloat(detail.outputChamfer), false);
+				tracked.push(result);
+			}
+			for (shoulder in (detail.shoulders == null ? [] : detail.shoulders))
+				if (optionalFloat(shoulder.fillet) > 0) {
+					result = finishEdge(result, shoulder.z, optionalFloat(shoulder.fillet), true);
+					tracked.push(result);
+				}
+			return result;
+		});
 	}
 
 	function applyThread(body:Part, thread:ShaftThreadEnd, atInput:Bool):Part {

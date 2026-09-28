@@ -10,4 +10,6 @@ enum ConnectorRole {
 	Mount;
 	/** End of a drive shaft that receives a coupling, pulley, or gear. */
 	Shaft;
+	/** Contact datum on a gear or rack's theoretical pitch surface. */
+	Pitch;
 }
