@@ -49,10 +49,88 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_body_set_state(world: nksim_world, body: nksim_body, state: ptr<const<nksim_body_state>>) -> nksim_result;
 	extern fn nksim_closure_create(world: nksim_world, desc: ptr<const<nksim_closure_desc>>) -> nksim_result;
+	extern fn nksim_frame_destroy(frame: nksim_frame) -> void;
+	extern fn nksim_frame_get_actor_pose(frame: nksim_frame, actor: nksim_actor, part: u32, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
+	extern fn nksim_frame_get_body_state(frame: nksim_frame, body: nksim_body, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
+	extern fn nksim_frame_get_clock(frame: nksim_frame, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
+	extern fn nksim_frame_get_object_pose(frame: nksim_frame, object: nksim_object, out_pose: ptr<nksim_pose> @inout) -> nksim_result;
 	extern fn nksim_joint_couple(world: nksim_world, desc: ptr<const<nksim_joint_coupling_desc>>) -> nksim_result;
 	extern fn nksim_joint_create(world: nksim_world, desc: ptr<const<nksim_joint_desc>>, out_joint: ptr<nksim_joint> @out) -> nksim_result;
 	extern fn nksim_joint_destroy(world: nksim_world, joint: nksim_joint) -> void;
 	extern fn nksim_joint_get_state(world: nksim_world, joint: nksim_joint, out_state: ptr<nksim_joint_state> @inout) -> nksim_result;
+	/**
+	 * Captures the clock and every body's state under one session lock.
+	 */
+	extern fn nksim_session_capture(session: nksim_session, out_frame: ptr<nksim_frame> @out @owned) -> nksim_result;
+	extern fn nksim_session_create(desc: ptr<const<nksim_session_desc>>, out_session: ptr<nksim_session> @out @owned) -> nksim_result;
+	/**
+	 * Adds a group of 1..256 kinematic bodies while stopped. Actor bodies push
+	 * dynamic bodies they move into and are never pushed back.
+	 */
+	extern fn nksim_session_create_actor(session: nksim_session, parts: ptr<const<nksim_actor_part>> @in_array("part_count"), part_count: u32, out_actor: ptr<nksim_actor> @out) -> nksim_result;
+	/**
+	 * Adds one environment body while stopped.
+	 */
+	extern fn nksim_session_create_object(session: nksim_session, desc: ptr<const<nksim_object_desc>>, out_object: ptr<nksim_object> @out) -> nksim_result;
+	/**
+	 * Stops the session, destroys what it created, and leaves the world and scene.
+	 */
+	extern fn nksim_session_destroy(session: nksim_session) -> void;
+	extern fn nksim_session_destroy_actor(session: nksim_session, actor: nksim_actor) -> nksim_result;
+	/**
+	 * Removes one environment body while stopped.
+	 */
+	extern fn nksim_session_destroy_object(session: nksim_session, object: nksim_object) -> nksim_result;
+	/**
+	 * Moves a kinematic object for the next tick while stopped or running; its
+	 * velocity over the tick is the motion from where the previous tick left it.
+	 */
+	extern fn nksim_session_drive_object(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>) -> nksim_result;
+	extern fn nksim_session_get_actor_body(session: nksim_session, actor: nksim_actor, part: u32, out_body: ptr<nksim_body> @out) -> nksim_result;
+	extern fn nksim_session_get_object_body(session: nksim_session, object: nksim_object, out_body: ptr<nksim_body> @out) -> nksim_result;
+	extern fn nksim_session_get_status(session: nksim_session, out_status: ptr<nksim_session_status> @inout) -> nksim_result;
+	/**
+	 * Adds a keyframe to an actor's trajectory: the pose of every part at
+	 * simulation time `time`, while stopped or running. Each tick moves every
+	 * part to its pose interpolated at the tick's end time (linear position,
+	 * shortest-arc rotation), holding the last keyframe after it and the first
+	 * before it, with the velocity of that motion. A keyframe at or before an
+	 * existing one's time replaces it and every later keyframe, so a writer can
+	 * replan; keyframes older than the current tick are discarded. Writers that
+	 * keep a lead of a few ticks see smooth motion in realtime; a single
+	 * keyframe at the current time moves the actor on the next tick.
+	 */
+	extern fn nksim_session_push_actor_keyframe(session: nksim_session, actor: nksim_actor, time: f64, poses: ptr<const<nksim_pose>> @in_array("pose_count"), pose_count: u32) -> nksim_result;
+	/**
+	 * Casts a ray against the session's objects and actors in the latest state
+	 * and returns the distance to the nearest hit, or max_distance when nothing
+	 * is nearer.
+	 */
+	extern fn nksim_session_raycast(session: nksim_session, ray: ptr<const<nksim_ray>>, out_distance: ptr<f64> @out) -> nksim_result;
+	/**
+	 * Restores the world, the clock, every object and actor, and every
+	 * participant to their initial state. The session must be stopped.
+	 */
+	extern fn nksim_session_reset(session: nksim_session) -> nksim_result;
+	/**
+	 * Starts a realtime owner loop that ticks at the fixed timestep.
+	 */
+	extern fn nksim_session_start(session: nksim_session) -> nksim_result;
+	/**
+	 * Advances exactly one fixed tick on the caller's thread: every participant
+	 * prepares, then submits, physics advances, and every participant publishes.
+	 * owner_time_ns is the timestamp participants that follow the owner's clock
+	 * receive. Returns NKSIM_ERROR_INVALID_STATE while running realtime.
+	 */
+	extern fn nksim_session_step(session: nksim_session, owner_time_ns: u64, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
+	/**
+	 * Stops the realtime loop and returns the world to the caller's thread.
+	 */
+	extern fn nksim_session_stop(session: nksim_session) -> nksim_result;
+	/**
+	 * Moves an object at rest while stopped; the pose also becomes its reset pose.
+	 */
+	extern fn nksim_session_teleport_object(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>) -> nksim_result;
 	extern fn nksim_shape_create(world: nksim_world, desc: ptr<const<nksim_shape_desc>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_box(world: nksim_world, half_extents: ptr<const<f64>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_capsule(world: nksim_world, radius: f64, height: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
@@ -90,6 +168,21 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_world_set_joint_targets(world: nksim_world, targets: ptr<const<nksim_joint_target>> @in_array("count"), count: u32) -> nksim_result;
 	extern fn nksim_world_snapshot(world: nksim_world, out_snapshot: ptr<nksim_snapshot> @out @owned) -> nksim_result;
 	extern fn nksim_world_step(world: nksim_world, out_result: ptr<nksim_step_result> @inout) -> nksim_result;
+	/**
+	 * One kinematic body of an actor.
+	 */
+	struct nksim_actor_part @layout(128, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		/**
+		 * Box, sphere, or capsule, as nksim_shape_create() takes it.
+		 */
+		shape: nksim_shape_desc @offset(8);
+		/**
+		 * Pose at creation, and the pose reset restores.
+		 */
+		pose: nksim_pose @offset(64);
+	}
 	struct nksim_body_desc @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		node: nkscene_node_id @offset(8);
@@ -198,6 +291,79 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		target: f64 @offset(16);
 		max_force: f64 @offset(24);
 	}
+	struct nksim_object_desc @layout(160, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < NKSIM_MOTION_STATIC, _KINEMATIC, or _DYNAMIC.
+		 */
+		motion_type: u32 @offset(4);
+		/**
+		 * Box, sphere, or capsule, as nksim_shape_create() takes it.
+		 */
+		shape: nksim_shape_desc @offset(8);
+		pose: nksim_pose @offset(64);
+		/**
+		 * < Positive for a dynamic object; ignored otherwise.
+		 */
+		mass: f64 @offset(128);
+		/**
+		 * Both zero selects layer 1 and mask 1, the ordinary environment category.
+		 */
+		collision_layer: u32 @offset(136);
+		collision_mask: u32 @offset(140);
+		reserved: array<u64, 2> @offset(144);
+	}
+	struct nksim_pose @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		position: array<f64, 3> @offset(8);
+		/**
+		 * < Quaternion in x, y, z, w order.
+		 */
+		rotation: array<f64, 4> @offset(32);
+	}
+	struct nksim_ray @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		reserved0: u32 @offset(4);
+		origin: array<f64, 3> @offset(8);
+		/**
+		 * < Unit vector.
+		 */
+		direction: array<f64, 3> @offset(32);
+		max_distance: f64 @offset(56);
+	}
+	struct nksim_session_desc @layout(48, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * The scene the world was created with. Borrowed.
+		 */
+		scene: nkscene_scene @offset(4);
+		/**
+		 * Borrowed; must be created on the thread that creates the session.
+		 */
+		world: nksim_world @offset(8);
+		reserved: array<u64, 4> @offset(16);
+	}
+	struct nksim_session_status @layout(80, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		/**
+		 * < A realtime owner loop is ticking.
+		 */
+		running: u32 @offset(4);
+		/**
+		 * < The physics owner thread holds the world.
+		 */
+		hosted: u32 @offset(8);
+		/**
+		 * Set by the first tick or start; topology participants add before it.
+		 */
+		sealed: u32 @offset(12);
+		step_index: u64 @offset(16);
+		simulation_time: f64 @offset(24);
+		fixed_timestep: f64 @offset(32);
+		gravity: array<f64, 3> @offset(40);
+		reserved: array<u64, 2> @offset(64);
+	}
 	struct nksim_shape_desc @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		type: u32 @offset(4);
@@ -232,9 +398,34 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		gravity: array<f64, 3> @offset(24);
 		reserved: array<u64, 4> @offset(48);
 	}
+	/**
+	 * A group of kinematic bodies moved together along a timed trajectory.
+	 */
+	handle nksim_actor : u32;
 	handle nksim_body : u32;
+	/**
+	 * Immutable consistent view of the session after one tick.
+	 */
+	handle nksim_frame : u32 @destroy("nksim_frame_destroy");
 	handle nksim_joint : u32;
+	/**
+	 * An environment body the session owns: static, kinematic, or dynamic.
+	 */
+	handle nksim_object : u32;
 	type nksim_result = i32;
+	/**
+	 * One shared simulated space: a fixed-step clock and owner loop around a
+	 * borrowed world and its scene, which every participant (robots, people,
+	 * environment props) attaches to instead of owning physics itself.
+	 *
+	 * The session borrows its world and scene; destroy the session before them.
+	 * While the session is hosted (from its first tick or start until stop or
+	 * reset), the world belongs to the session's physics owner thread, and the
+	 * session's calls may come from any thread; it serializes them against ticks.
+	 * While it is not hosted, calls that touch the world must come from the
+	 * world's owner thread, as direct world calls must.
+	 */
+	handle nksim_session : u32 @destroy("nksim_session_destroy");
 	handle nksim_shape : u32;
 	handle nksim_snapshot : u32 @destroy("nksim_snapshot_destroy");
 	handle nksim_world : u32 @destroy("nksim_world_destroy");

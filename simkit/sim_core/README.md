@@ -55,5 +55,35 @@ of the public C ABI yet; `NativeKit::sim_mujoco` is the first engine adapter
 planned for this boundary. MuJoCo types and model/data pointers must not cross
 the Sim API.
 
+## Shared sessions
+
+`nativekit_sim_session.h` is the owner of one shared simulated space. A
+session borrows a world and its scene and owns everything participants share:
+the fixed-step clock, explicit stepping (`nksim_session_step`), the realtime
+owner loop (`nksim_session_start`/`stop`), reset, and consistent captures
+(`nksim_frame`). Robots, people, and props attach to a session; none of them
+owns physics.
+
+* **Objects** are single static, kinematic, or dynamic environment bodies
+  (box, sphere, capsule). Kinematic objects can be driven while running.
+* **Actors** are groups of kinematic bodies that follow a timed trajectory.
+  Writers push keyframes in simulation time; each tick moves every part to its
+  pose interpolated at the tick's end, with the velocity of that motion, so an
+  actor pushes dynamic bodies and is never pushed. A writer stepping the
+  session itself pushes one keyframe per tick; a writer feeding a realtime
+  session keeps a lead of a few ticks. Pushing at or before an existing
+  keyframe replaces the rest of the trajectory.
+* **Participants** are native systems with per-tick callbacks: every
+  participant prepares its commands (one failure discards everyone's and skips
+  the tick), then submits physics inputs, physics advances, and every
+  participant publishes from the new snapshot. Callbacks run under the
+  recursive session lock and may call any session function. The participant
+  interface is native only; Haxe code takes part through objects and actors.
+
+The session hosts the world from its first tick or start until stop or reset:
+while hosted, the world belongs to the physics owner thread, topology is
+fixed, and session calls may come from any thread. While not hosted, calls
+that touch the world must come from the world's owner thread.
+
 Haxeon consumers can use `bindings/nativekit-sim.hxi`, the typed wrappers in
 `bindings/haxe/nativekit/sim/`, and `bindings/nativekit-sim.hxmap`.

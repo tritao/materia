@@ -1,0 +1,275 @@
+#undef NDEBUG
+#include "nativekit_scene.h"
+#include "nativekit_sim.h"
+#include "nativekit_sim_session.h"
+
+#include <cassert>
+#include <chrono>
+#include <cmath>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace {
+
+struct Space {
+    nkscene_scene scene = 0;
+    nksim_world world = 0;
+    nksim_session session = 0;
+
+    explicit Space(double timestep = 0.01) {
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.scene = scene;
+        desc.fixed_timestep = timestep;
+        desc.physics_substeps = 1;
+        desc.gravity[2] = -9.81;
+        assert(nksim_world_create(&desc, &world) == NKSIM_OK);
+        nksim_session_desc session_desc{};
+        session_desc.struct_size = sizeof(session_desc);
+        session_desc.scene = scene;
+        session_desc.world = world;
+        assert(nksim_session_create(&session_desc, &session) == NKSIM_OK);
+    }
+    ~Space() {
+        nksim_session_destroy(session);
+        nksim_world_destroy(world);
+        nkscene_scene_destroy(scene);
+    }
+};
+
+nksim_pose pose_at(double x, double y, double z) {
+    nksim_pose pose{};
+    pose.struct_size = sizeof(pose);
+    pose.position[0] = x;
+    pose.position[1] = y;
+    pose.position[2] = z;
+    pose.rotation[3] = 1.0;
+    return pose;
+}
+
+nksim_shape_desc capsule(double radius, double length) {
+    nksim_shape_desc shape{};
+    shape.struct_size = sizeof(shape);
+    shape.type = NKSIM_SHAPE_CAPSULE;
+    shape.parameters[0] = radius;
+    shape.parameters[1] = length;
+    return shape;
+}
+
+nksim_pose actor_pose(nksim_session session, nksim_actor actor, uint32_t part) {
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    nksim_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(nksim_frame_get_actor_pose(frame, actor, part, &pose) == NKSIM_OK);
+    nksim_frame_destroy(frame);
+    return pose;
+}
+
+bool near(double a, double b, double tolerance = 1e-5) { return std::abs(a - b) < tolerance; }
+
+void objects_follow_their_motion_type() {
+    Space space;
+    nksim_object_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.motion_type = NKSIM_MOTION_DYNAMIC;
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    desc.shape.parameters[0] = desc.shape.parameters[1] = desc.shape.parameters[2] = 0.25;
+    desc.pose = pose_at(1.0, 0.0, 5.0);
+    nksim_object falling = 0;
+    // Dynamic objects need a mass.
+    assert(nksim_session_create_object(space.session, &desc, &falling) ==
+           NKSIM_ERROR_INVALID_ARGUMENT);
+    desc.mass = 2.0;
+    assert(nksim_session_create_object(space.session, &desc, &falling) == NKSIM_OK);
+    desc.motion_type = NKSIM_MOTION_KINEMATIC;
+    desc.pose = pose_at(0.0, 0.0, 1.0);
+    nksim_object carried = 0;
+    assert(nksim_session_create_object(space.session, &desc, &carried) == NKSIM_OK);
+    // Only kinematic objects can be driven.
+    auto target = pose_at(0.1, 0.0, 1.0);
+    assert(nksim_session_drive_object(space.session, falling, &target) ==
+           NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_drive_object(space.session, carried, &target) == NKSIM_OK);
+
+    nksim_clock clock{};
+    clock.struct_size = sizeof(clock);
+    assert(nksim_session_step(space.session, 0, &clock) == NKSIM_OK);
+    assert(clock.step_index == 1 && near(clock.time, 0.01));
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    nksim_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(nksim_frame_get_object_pose(frame, falling, &pose) == NKSIM_OK);
+    assert(pose.position[2] < 5.0);
+    assert(nksim_frame_get_object_pose(frame, carried, &pose) == NKSIM_OK);
+    assert(near(pose.position[0], 0.1));
+    nksim_body body = 0;
+    assert(nksim_session_get_object_body(space.session, carried, &body) == NKSIM_OK);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_frame_get_body_state(frame, body, &state) == NKSIM_OK);
+    assert(near(state.linear_velocity[0], 10.0, 1e-6));
+    nksim_frame_destroy(frame);
+
+    // Topology is fixed while hosted; stopping returns the world.
+    nksim_object late = 0;
+    assert(nksim_session_create_object(space.session, &desc, &late) ==
+           NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_reset(space.session) == NKSIM_OK);
+    assert(nksim_session_capture(space.session, &frame) == NKSIM_OK);
+    assert(nksim_frame_get_object_pose(frame, falling, &pose) == NKSIM_OK);
+    assert(near(pose.position[2], 5.0));
+    assert(nksim_frame_get_object_pose(frame, carried, &pose) == NKSIM_OK);
+    assert(near(pose.position[0], 0.0));
+    nksim_frame_destroy(frame);
+}
+
+void actors_follow_timed_keyframes() {
+    Space space;
+    nksim_actor_part parts[2]{};
+    for (auto &part : parts) {
+        part.struct_size = sizeof(part);
+        part.shape = capsule(0.1, 0.4);
+    }
+    parts[0].pose = pose_at(0.0, 0.0, 1.0);
+    parts[1].pose = pose_at(0.0, 0.0, 0.5);
+    nksim_actor actor = 0;
+    assert(nksim_session_create_actor(space.session, parts, 2, &actor) == NKSIM_OK);
+
+    // One second of motion 1 m along +X, pushed ahead of the clock.
+    nksim_pose start[] = {pose_at(0.0, 0.0, 1.0), pose_at(0.0, 0.0, 0.5)};
+    nksim_pose end[] = {pose_at(1.0, 0.0, 1.0), pose_at(1.0, 0.0, 0.5)};
+    assert(nksim_session_push_actor_keyframe(space.session, actor, 0.0, start, 2) == NKSIM_OK);
+    assert(nksim_session_push_actor_keyframe(space.session, actor, 1.0, end, 1) ==
+           NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_session_push_actor_keyframe(space.session, actor, 1.0, end, 2) == NKSIM_OK);
+    for (int tick = 0; tick < 25; ++tick)
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    auto pose = actor_pose(space.session, actor, 1);
+    assert(near(pose.position[0], 0.25) && near(pose.position[2], 0.5));
+    nksim_body body = 0;
+    assert(nksim_session_get_actor_body(space.session, actor, 1, &body) == NKSIM_OK);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_session_get_body_state(space.session, body, &state) == NKSIM_OK);
+    assert(near(state.linear_velocity[0], 1.0, 1e-6));
+
+    // Replanning replaces the future: stop where it is by t = 0.5.
+    nksim_pose hold[] = {pose_at(0.5, 0.0, 1.0), pose_at(0.5, 0.0, 0.5)};
+    assert(nksim_session_push_actor_keyframe(space.session, actor, 0.5, hold, 2) == NKSIM_OK);
+    for (int tick = 0; tick < 50; ++tick)
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    pose = actor_pose(space.session, actor, 0);
+    assert(near(pose.position[0], 0.5) && near(pose.position[2], 1.0));
+    assert(nksim_session_get_body_state(space.session, body, &state) == NKSIM_OK);
+    assert(near(state.linear_velocity[0], 0.0, 1e-9));
+
+    // A ray down the X axis at hip height meets the lower capsule's side.
+    nksim_ray ray{};
+    ray.struct_size = sizeof(ray);
+    ray.origin[0] = -2.0;
+    ray.origin[2] = 0.5;
+    ray.direction[0] = 1.0;
+    ray.max_distance = 10.0;
+    double distance = 0.0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 2.4));
+    // Straight down onto the upper capsule's top hemisphere.
+    ray.origin[0] = 0.5;
+    ray.origin[2] = 3.0;
+    ray.direction[0] = 0.0;
+    ray.direction[2] = -1.0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 3.0 - 1.3));
+    // Nothing within reach reports the reach.
+    ray.max_distance = 1.0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(distance == 1.0);
+
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(nksim_session_reset(space.session) == NKSIM_OK);
+    pose = actor_pose(space.session, actor, 0);
+    assert(near(pose.position[0], 0.0));
+}
+
+struct Recorder {
+    std::string log;
+    bool fail_prepare = false;
+    nksim_session session = 0;
+    uint64_t last_step = 0;
+};
+
+void participants_share_every_tick() {
+    Space space;
+    Recorder first, second;
+    first.session = second.session = space.session;
+    auto describe = [](Recorder &recorder) {
+        nksim_participant_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.user = &recorder;
+        desc.prepare = [](void *user, const nksim_tick *) -> nksim_result {
+            auto &self = *static_cast<Recorder *>(user);
+            self.log += "p";
+            return self.fail_prepare ? NKSIM_ERROR_INVALID_ARGUMENT : NKSIM_OK;
+        };
+        desc.discard = [](void *user) { static_cast<Recorder *>(user)->log += "d"; };
+        desc.submit = [](void *user, const nksim_tick *) -> nksim_result {
+            static_cast<Recorder *>(user)->log += "s";
+            return NKSIM_OK;
+        };
+        desc.publish = [](void *user, const nksim_tick *tick) -> nksim_result {
+            auto &self = *static_cast<Recorder *>(user);
+            self.log += "u";
+            // Callbacks may re-enter the session under its lock.
+            assert(nksim_session_latest_snapshot(self.session) != 0);
+            self.last_step = tick->step_index;
+            return NKSIM_OK;
+        };
+        desc.reset = [](void *user) -> nksim_result {
+            static_cast<Recorder *>(user)->log += "r";
+            return NKSIM_OK;
+        };
+        return desc;
+    };
+    nksim_participant a = 0, b = 0;
+    auto desc_a = describe(first), desc_b = describe(second);
+    assert(nksim_session_add_participant(space.session, &desc_a, &a) == NKSIM_OK);
+    assert(nksim_session_add_participant(space.session, &desc_b, &b) == NKSIM_OK);
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+    assert(first.log == "psu" && second.log == "psu" && second.last_step == 1);
+
+    // One participant's rejected commands discard everyone's and skip the tick.
+    second.fail_prepare = true;
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(first.log == "psupd" && second.log == "psupd");
+    nksim_session_status status{};
+    status.struct_size = sizeof(status);
+    assert(nksim_session_get_status(space.session, &status) == NKSIM_OK);
+    assert(status.step_index == 1 && status.hosted && status.sealed);
+
+    second.fail_prepare = false;
+    assert(nksim_session_remove_participant(space.session, b) == NKSIM_OK);
+    assert(nksim_session_start(space.session) == NKSIM_OK);
+    std::this_thread::sleep_for(std::chrono::milliseconds(80));
+    assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+    assert(first.last_step > 2 && second.last_step == 1);
+    assert(nksim_session_reset(space.session) == NKSIM_OK);
+    assert(first.log.back() == 'r' && second.log == "psupd");
+    assert(nksim_session_get_status(space.session, &status) == NKSIM_OK);
+    assert(status.step_index == 0 && !status.hosted && !status.running);
+    assert(near(status.gravity[2], -9.81) && near(status.fixed_timestep, 0.01));
+}
+
+} // namespace
+
+int main() {
+    objects_follow_their_motion_type();
+    actors_follow_timed_keyframes();
+    participants_share_every_tick();
+    return 0;
+}

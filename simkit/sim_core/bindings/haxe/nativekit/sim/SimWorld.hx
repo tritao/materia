@@ -52,7 +52,7 @@ class SimWorld {
     static function fromNativeOwner(scene:Scene, owner:Ownednksim_world):SimWorld
         return new SimWorld(scene, null, owner);
 
-    @:allow(MujocoSimWorld)
+    @:allow(MujocoSimWorld, SimSession, SimObject, SimActor, SimFrame)
     static function check(status:Int, operation:String):Void {
         if (status != NativeKitSimConstants.NKSIM_OK)
             throw '$operation failed with NativeKit simulation status $status';

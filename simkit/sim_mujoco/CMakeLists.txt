@@ -83,6 +83,12 @@ if(NK_BUILD_TESTS)
     target_link_libraries(nativekit_sim_mujoco_tests PRIVATE NativeKit::sim_mujoco)
     add_test(NAME sim_mujoco COMMAND nativekit_sim_mujoco_tests)
     set_tests_properties(sim_mujoco PROPERTIES LABELS "sim;mujoco" TIMEOUT 30)
+
+    add_executable(nativekit_sim_mujoco_session_tests tests/session.cpp)
+    target_compile_features(nativekit_sim_mujoco_session_tests PRIVATE cxx_std_20)
+    target_link_libraries(nativekit_sim_mujoco_session_tests PRIVATE NativeKit::sim_mujoco)
+    add_test(NAME sim_mujoco_session COMMAND nativekit_sim_mujoco_session_tests)
+    set_tests_properties(sim_mujoco_session PROPERTIES LABELS "sim;mujoco" TIMEOUT 30)
 endif()
 
 if(NK_BUILD_EXAMPLES)
