@@ -653,6 +653,8 @@ class PlannerTests extends MotionKitTestSupport {
         new LineSegment(circular.end, new PathPoint(circular.end.x + 0.01,
           circular.end.y, circular.end.z))]), 0.001, Math.PI * 0.9);
       check(blended.diagnostics.length == 1 &&
+        blended.diagnosticCorners.length == 1 &&
+        blended.diagnosticCorners[0] == 1 &&
         blended.path.primitives.length == 2,
         'helical $plane corner is an exact stop');
       var blendedRig = gantryRig(true);

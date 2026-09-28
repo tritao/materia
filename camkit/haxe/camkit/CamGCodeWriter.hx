@@ -1,6 +1,7 @@
 package camkit;
 
 import cnckit.CncChannels;
+import cnckit.CncMachine;
 import cnckit.ir.CncGeometry;
 import cnckit.ir.CncGeometryTools;
 import cnckit.ir.CncOp;
@@ -9,8 +10,11 @@ import cnckit.ir.CncPoint;
 
 /** Small LinuxCNC post for CAM IR, using millimetres and absolute XYZ. */
 class CamGCodeWriter {
-  public static function write(program:CamProgram):String {
+  public static function write(program:CamProgram, setup:CamSetup,
+      machine:CncMachine):String {
     if (program == null) throw "G-code export needs a CAM program";
+    if (setup == null) throw "G-code export needs a CAM setup";
+    setup.validate(program, machine);
     var lines = ["G21 G90 G17 G61"], plane = CncPlane.XY;
     var index = 0;
     while (index < program.ops.length) {

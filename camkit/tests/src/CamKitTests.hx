@@ -139,7 +139,7 @@ class CamKitTests {
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");
-    var gcode = CamGCodeWriter.write(program);
+    var gcode = CamGCodeWriter.write(program, CamTestSetup.standard(), machine);
     var parsed = new CncCompiler(machine).compileDetailed(gcode);
     check(parsed.diagnostics.length == 0,
       'CAM G-code recompiles: ${parsed.diagnostics}');
@@ -155,6 +155,7 @@ class CamKitTests {
     CamIslandPocketFixture.run(check);
     CamPocketEntryFixture.run(check);
     CamSafeTravelFixture.run(check);
+    CamSetupFixture.run(check);
     Sys.println('CamKit tests passed ($assertions assertions)');
   }
 

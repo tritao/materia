@@ -80,7 +80,7 @@ class CamSafeTravelFixture {
     check(program.lower(machine).diagnostics.length == 0,
       "mixed tool job lowers through MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(
-      CamGCodeWriter.write(program));
+      CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 &&
       imported.ops.length == program.ops.length,
       "mixed tool G-code round trip keeps operation order");

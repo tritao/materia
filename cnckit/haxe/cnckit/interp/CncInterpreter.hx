@@ -90,7 +90,9 @@ class CncInterpreter {
         case 73, 81, 82, 83:
           if (cycleChange >= 0) fail(line, word.column, "multiple drilling cycles");
           cycleChange = code;
-        case 80: cycleChange = 80;
+        case 80:
+          if (cycleChange >= 0) fail(line, word.column, "multiple motion G codes");
+          cycleChange = 80;
         case 20, 21:
           if (unitChange >= 0) fail(line, word.column, "multiple unit modes");
           unitChange = code;
@@ -131,11 +133,15 @@ class CncInterpreter {
       "G4 cannot share a block with motion");
     if (cycleChange > 0 && cycleChange != 80 && modalMotion >= 0)
       fail(line, gWords[0].column, "drilling cycle conflicts with G0-G3");
+    if (cycleChange == 80 && modalMotion >= 0)
+      fail(line, gWords[0].column, "multiple motion G codes");
     if (homeCode != 0 && (modalMotion >= 0 || cycleChange > 0 ||
         machineCoordinates)) fail(line, gWords[0].column,
       "G28/G30 cannot share a block with motion or G53");
     if (machineCoordinates && (homeCode != 0 || cycleChange > 0 || dwell))
       fail(line, gWords[0].column, "G53 requires G0/G1 motion");
+    if (machineCoordinates && state.cycleCode != 0)
+      fail(line, gColumn(gWords, 53), "G53 requires G80 before machine-coordinate motion");
     if (setToolOffset && clearToolOffset) fail(line, gWords[0].column,
       "G43 and G49 conflict");
     var h = values.get("H");
@@ -154,6 +160,23 @@ class CncInterpreter {
     if (dwell && p == null) fail(line, gWords[0].column,
       "G4 requires P seconds");
     var r = values.get("R"), q = values.get("Q"), l = values.get("L");
+    if (state.cutterSide != 0 && cutterChange != 40) {
+      if (homeCode != 0)
+        fail(line, gColumn(gWords, homeCode),
+          "G28/G30 require G40 before cutter-compensated motion");
+      if (cycleChange > 0 && cycleChange != 80)
+        fail(line, gColumn(gWords, cycleChange),
+          "drilling cycles require G40 before cutter-compensated motion");
+      if (cycleChange != 80 && state.cycleCode != 0 &&
+          (values.exists("X") || values.exists("Y") || values.exists("Z") ||
+           r != null || q != null || l != null || p != null))
+        fail(line, words[0].column,
+          "drilling cycles require G40 before cutter-compensated motion");
+    }
+    if ((cutterChange == 41 || cutterChange == 42) &&
+        (homeCode != 0 || (cycleChange > 0 && cycleChange != 80)))
+      fail(line, gColumn(gWords, homeCode != 0 ? homeCode : cycleChange),
+        "G28/G30 and drilling cycles require G40 before cutter compensation");
     var effectiveMotion = modalMotion >= 0 ? modalMotion : state.motionMode;
     if (r != null && cycleForBlock == 0 && effectiveMotion != 2 &&
         effectiveMotion != 3)
@@ -307,7 +330,16 @@ class CncInterpreter {
           CncOp.ProgramStop(block.span));
       case _:
     }
-    if (endCode >= 0) { ops.push(CncOp.End(block.span)); state.ended = true; }
+    if (endCode >= 0) {
+      if (state.spindleDirection != 0) {
+        spindle(CncChannels.SpindleSpeed, 0.0, block.span);
+        spindle(CncChannels.SpindleDirection, 0.0, block.span);
+        state.spindleDirection = 0;
+      }
+      if (state.coolantMist) coolant(CncChannels.CoolantMist, false, block.span);
+      if (state.coolantFlood) coolant(CncChannels.CoolantFlood, false, block.span);
+      ops.push(CncOp.End(block.span)); state.ended = true;
+    }
   }
 
   function move(line:Int, mode:Int, x:Null<CncWord>, y:Null<CncWord>,
@@ -549,8 +581,16 @@ class CncInterpreter {
   function spindle(channel:String, value:Float, span:CncSpan):Void
     ops.push(CncOp.Spindle(channel, value, span));
 
-  function coolant(channel:String, enabled:Bool, span:CncSpan):Void
+  function coolant(channel:String, enabled:Bool, span:CncSpan):Void {
+    if (channel == CncChannels.CoolantMist) state.coolantMist = enabled;
+    if (channel == CncChannels.CoolantFlood) state.coolantFlood = enabled;
     ops.push(CncOp.Coolant(channel, enabled, span));
+  }
+
+  static function gColumn(words:Array<CncWord>, code:Int):Int {
+    for (word in words) if (gCode(word, 1) == code) return word.column;
+    return words.length == 0 ? 1 : words[0].column;
+  }
 
   function feed(line:Int):Float {
     if (!Math.isFinite(state.feedCommand)) fail(line, 1, "G1/G2/G3 require F feed");

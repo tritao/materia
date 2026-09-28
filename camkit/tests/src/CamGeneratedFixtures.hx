@@ -86,7 +86,7 @@ class CamGeneratedFixtures {
       check(program.lower(machine).diagnostics.length == 0,
         "concave pocket lowers through MotionKit");
       var imported = new CncCompiler(machine).compileDetailed(
-        CamGCodeWriter.write(program));
+        CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
       check(imported.diagnostics.length == 0 &&
         imported.ops.length == program.ops.length,
         "concave pocket G-code preserves operation count");
@@ -239,7 +239,7 @@ class CamGeneratedFixtures {
       "concave profile lowers through MotionKit");
     check(inside.lower(machine).diagnostics.length == 0,
       "concave inside profile lowers through MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program));
+    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
       "concave profile G-code recompiles with the same operations");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
@@ -256,7 +256,7 @@ class CamGeneratedFixtures {
       case _:
     }
     var insideImported = new CncCompiler(machine).compileDetailed(
-      CamGCodeWriter.write(inside));
+      CamGCodeWriter.write(inside, CamTestSetup.standard(), machine));
     check(insideImported.diagnostics.length == 0 &&
       insideImported.ops.length == inside.ops.length,
       "concave inside G-code recompiles with the same operations");
@@ -404,7 +404,7 @@ class CamGeneratedFixtures {
     machine.setTool(tool);
     check(program.lower(machine).diagnostics.length == 0,
       "holed plate lowers to MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program));
+    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
       "holed plate G-code round trips through CncKit");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {

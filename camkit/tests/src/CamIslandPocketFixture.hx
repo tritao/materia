@@ -118,7 +118,7 @@ class CamIslandPocketFixture {
     }
 
     var imported = new CncCompiler(machine).compileDetailed(
-      CamGCodeWriter.write(program));
+      CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 &&
       imported.ops.length == program.ops.length,
       "island pocket G-code recompiles with the same operation count");
