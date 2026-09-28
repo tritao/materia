@@ -67,6 +67,16 @@ class Stock {
     return fromTriangles(grid, positions, indices);
   }
 
+  /**
+    Threads the core cuts with: 0 (the default) means one per hardware
+    thread. The result is bit-identical for any count.
+  **/
+  public function setThreads(threads:Int):Void {
+    alive();
+    if (threads < 0) throw "stock thread count cannot be negative";
+    check(StockKitNative.sk_stock_set_threads(owner.borrow(), threads), "stock.setThreads");
+  }
+
   /** Removes the material each move sweeps, in order. */
   public function cut(moves:Array<CutMove>):CutReport {
     alive();

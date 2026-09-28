@@ -164,6 +164,8 @@ typedef struct sk_stock_info {
     uint64_t rays_tested;
     uint64_t rays_changed;
     uint64_t tiles_skipped;
+    /** Threads `sk_stock_cut` uses; 0 means one per hardware thread. */
+    uint32_t threads;
 } sk_stock_info;
 
 SK_API uint32_t SK_CALL sk_api_version(void);
@@ -208,6 +210,14 @@ SK_API sk_result SK_CALL sk_stock_create_mesh(const sk_grid *grid,
 
 SK_API void SK_CALL sk_stock_destroy(sk_stock_handle stock);
 SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info *out_info SK_OUT);
+
+/**
+ * Sets how many threads `sk_stock_cut` uses: 0 (the default) means one per
+ * hardware thread, 1 cuts on the calling thread. Tiles are owned by one
+ * thread each and every ray sees its moves in order, so the stock and the
+ * removed volumes are bit-identical for any thread count.
+ */
+SK_API sk_result SK_CALL sk_stock_set_threads(sk_stock_handle stock, uint32_t threads);
 
 /**
  * Removes the material swept by each move of `tool`, in order, and writes

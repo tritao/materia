@@ -16,12 +16,15 @@ endif()
 add_library(stockkit_core ${SK_LIBRARY_TYPE}
     src/api.cpp
     src/mesh.cpp
+    src/pool.cpp
     src/profile.cpp
     src/stock.cpp
     src/sweep.cpp
 )
 target_compile_features(stockkit_core PUBLIC c_std_11 PRIVATE cxx_std_17)
 target_include_directories(stockkit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+find_package(Threads REQUIRED)
+target_link_libraries(stockkit_core PRIVATE Threads::Threads)
 set_target_properties(stockkit_core PROPERTIES
     C_VISIBILITY_PRESET hidden
     CXX_VISIBILITY_PRESET hidden

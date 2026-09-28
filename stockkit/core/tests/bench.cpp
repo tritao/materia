@@ -99,28 +99,31 @@ int main(int argc, char **argv) {
     box.max[2] = 30;
 
     std::vector<sk_move> moves = pocket();
-    for (sk_tool_handle tool : {flat, ball}) {
-        sk_stock_handle stock{};
-        auto made = std::chrono::steady_clock::now();
-        if (sk_stock_create_box(&grid, &box, &stock) != SK_OK) return 1;
-        auto start = std::chrono::steady_clock::now();
-        std::vector<double> removed(moves.size());
-        if (sk_stock_cut(stock, tool, moves.data(), uint32_t(moves.size()), removed.data(), uint32_t(removed.size())) !=
-            SK_OK)
-            return 1;
-        double total = 0;
-        for (double r : removed) total += r;
-        auto end = std::chrono::steady_clock::now();
-        sk_stock_info info{};
-        info.struct_size = sizeof info;
-        sk_stock_get_info(stock, &info);
-        std::printf("%s: %zu moves, %u x %u rays at %.3g mm: create %.3f s, cut %.3f s; "
-                    "%.3g rays tested, %.3g changed, removed %.0f mm^3, %llu intervals, %.1f MB\n",
-            tool.id == flat.id ? "flat 6 mm" : "ball 6 mm", moves.size(), grid.count[0], grid.count[1], spacing,
-            std::chrono::duration<double>(start - made).count(), std::chrono::duration<double>(end - start).count(),
-            double(info.rays_tested), double(info.rays_changed), total,
-            (unsigned long long)info.interval_count, info.bytes / 1e6);
-        sk_stock_destroy(stock);
-    }
+    for (sk_tool_handle tool : {flat, ball})
+        for (uint32_t threads : {1u, 0u}) {
+            sk_stock_handle stock{};
+            auto made = std::chrono::steady_clock::now();
+            if (sk_stock_create_box(&grid, &box, &stock) != SK_OK) return 1;
+            sk_stock_set_threads(stock, threads);
+            auto start = std::chrono::steady_clock::now();
+            std::vector<double> removed(moves.size());
+            if (sk_stock_cut(stock, tool, moves.data(), uint32_t(moves.size()), removed.data(),
+                    uint32_t(removed.size())) != SK_OK)
+                return 1;
+            auto end = std::chrono::steady_clock::now();
+            double total = 0;
+            for (double r : removed) total += r;
+            sk_stock_info info{};
+            info.struct_size = sizeof info;
+            sk_stock_get_info(stock, &info);
+            std::printf("%s, %s: %zu moves, %u x %u rays at %.3g mm: create %.3f s, cut %.3f s; "
+                        "%.3g rays tested, %.3g changed, removed %.0f mm^3, %llu intervals, %.1f MB\n",
+                tool.id == flat.id ? "flat 6 mm" : "ball 6 mm", threads == 1 ? "1 thread" : "all threads",
+                moves.size(), grid.count[0], grid.count[1], spacing,
+                std::chrono::duration<double>(start - made).count(),
+                std::chrono::duration<double>(end - start).count(), double(info.rays_tested),
+                double(info.rays_changed), total, (unsigned long long)info.interval_count, info.bytes / 1e6);
+            sk_stock_destroy(stock);
+        }
     return 0;
 }

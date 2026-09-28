@@ -78,6 +78,14 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     phase 4.
   - `sk_stock_cut` returns the volume each move removed, which is how rapid
     moves through stock are found.
+  - Cuts run on a pool of threads owned by the core (one per hardware thread
+    by default; `sk_stock_set_threads` changes it). Each tile belongs to one
+    thread, which applies every move of the batch to its tiles in order, and
+    removed volumes are summed per tile in tile order. So the stock and the
+    volumes are bit-identical for any thread count, which a native test
+    checks. The core does not use NativeKit's task system, since it has no
+    NativeKit dependency. An app can still run a long simulation as an
+    `nk_task` that cuts a slice of moves per step.
 - `stockkit.Stock` is the Haxe wrapper. It builds stock from a box, from
   triangles or from a CadKit mesh, and cuts `CutMove`s, one native call per
   run of moves with the same tool. It keeps the move history, so an
@@ -98,7 +106,8 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   - A deliberate 0.1 µm error in the core fails both kinds of check.
   - `core/tests/core_tests.cpp` adds closed-form checks through the C ABI:
     slots, arcs, plunges, capsule floors of ball ramps, necked tools, mesh
-    tie rules, provenance and handle validation.
+    tie rules, provenance, handle validation, and bit-identical results with
+    1, 2, 3, 8 and all threads.
 
 Build the core and run its checks and benchmark:
 

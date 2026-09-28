@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 #include <string>
 #include <vector>
@@ -499,6 +500,44 @@ void handles() {
     check(sk_stock_create_box(&x, &b, &s) == SK_ERROR_UNSUPPORTED, "X grids are not implemented yet");
 }
 
+/** A zig-zag of short lines, arcs, ramps and a helix over several levels, cut at each thread count. */
+void thread_determinism() {
+    sk_tool_handle t = bull(6, 1, 20);
+    std::vector<sk_move> moves;
+    uint32_t source = 0;
+    for (int level = 1; level <= 3; ++level) {
+        double z = 20 - 1.5 * level;
+        moves.push_back(arc_move(25, 15, z + 1.5, 2, 0, -4 * kPi, -1.5, source++));
+        for (double y = 4; y <= 26; y += 2.5) {
+            for (double x = 4; x < 46; x += 1.7) moves.push_back(line_move(x, y, z, x + 1.7, y, z, source++));
+            moves.push_back(arc_move(46, y + 1.25, z, 1.25, -kPi / 2, kPi, 0, source++));
+        }
+        moves.push_back(line_move(5, 5, z + 1, 45, 25, z - 0.5, source++));
+    }
+    sk_grid g = grid(0, 0, 0.23, 218, 131, 8);
+    std::vector<sk_interval> reference;
+    std::vector<double> reference_removed;
+    for (uint32_t threads : {1u, 2u, 3u, 8u, 0u}) {
+        sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+        check(sk_stock_set_threads(s, threads) == SK_OK, "set threads");
+        auto removed = cut(s, t, moves, "threaded cut");
+        Rays rays = read_all(s);
+        if (threads == 1) {
+            reference = rays.intervals;
+            reference_removed = removed;
+        } else {
+            bool same = rays.intervals.size() == reference.size() &&
+                std::memcmp(rays.intervals.data(), reference.data(), reference.size() * sizeof(sk_interval)) == 0;
+            check(same, "stock with " + std::to_string(threads) + " threads is bit-identical to one thread");
+            check(std::memcmp(removed.data(), reference_removed.data(), removed.size() * sizeof(double)) == 0,
+                "removed volumes with " + std::to_string(threads) + " threads are bit-identical");
+        }
+        sk_stock_destroy(s);
+    }
+    check(reference.size() > 1000, "determinism program cuts many rays");
+    sk_tool_destroy(t);
+}
+
 } // namespace
 
 int main() {
@@ -512,6 +551,7 @@ int main() {
     box_mesh();
     provenance_and_rapids();
     handles();
+    thread_determinism();
     std::printf("%d of %d checks passed\n", checks - failures, checks);
     return failures == 0 ? 0 : 1;
 }

@@ -350,6 +350,17 @@ SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info 
         out_info->rays_tested = stats.rays_tested;
         out_info->rays_changed = stats.rays_changed;
         out_info->tiles_skipped = stats.tiles_skipped;
+        out_info->threads = s->threads();
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_set_threads(sk_stock_handle stock, uint32_t threads) {
+    return guarded([&]() -> sk_result {
+        Stock *s = stocks().get(stock.id);
+        if (!s) return SK_ERROR_INVALID_HANDLE;
+        if (threads > 1024) return SK_ERROR_INVALID_ARGUMENT;
+        s->set_threads(threads);
         return SK_OK;
     });
 }
@@ -368,10 +379,14 @@ SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool
             sk_result result = to_motion(&moves[k], motions[k]);
             if (result != SK_OK) return result;
         }
+        std::vector<SweptVolume> sweeps;
+        std::vector<uint32_t> sources(move_count);
+        sweeps.reserve(move_count);
         for (uint32_t k = 0; k < move_count; ++k) {
-            SweptVolume sweep(*profile, motions[k]);
-            out_removed[k] = s->cut(sweep, moves[k].source);
+            sweeps.emplace_back(*profile, motions[k]);
+            sources[k] = moves[k].source;
         }
+        s->cut(sweeps, sources.data(), out_removed);
         return SK_OK;
     });
 }

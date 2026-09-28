@@ -135,14 +135,50 @@ void Stock::write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals
     uint32_t local;
     Tile &tile = tile_of(i, j, local);
     write_local(tile, local, intervals.data(), static_cast<uint32_t>(intervals.size()));
-    tile.refresh_bounds();
 }
 
-double Stock::cut(const SweptVolume &sweep, uint32_t source) {
-    CutStats &stats = stats_;
+void Stock::set_threads(uint32_t threads) { threads_ = threads; }
+
+void Stock::cut(const std::vector<SweptVolume> &sweeps, const uint32_t *sources, double *removed) {
+    const uint32_t tiles = tiles_i_ * tiles_j_;
+    uint32_t owners = threads_ == 0 ? Pool::hardware() : threads_;
+    owners = std::max<uint32_t>(1, std::min<uint32_t>({owners, tiles, uint32_t(sweeps.size())}));
+    // Few moves are not worth waking threads for.
+    if (sweeps.size() < 4) owners = 1;
+    pool_.resize(std::max(pool_.size(), owners));
+    owners = std::min(owners, pool_.size());
+    workers_.resize(owners);
+    for (Worker &worker : workers_) {
+        worker.stats = CutStats{};
+        worker.removals.clear();
+    }
+    pool_.run(owners, [&](unsigned owner) {
+        Worker &worker = workers_[owner];
+        for (size_t k = 0; k < sweeps.size(); ++k)
+            cut_owned(sweeps[k], uint32_t(k), sources[k], owner, owners, worker);
+    });
+    // Per-tile volumes, summed per move in tile order whatever the thread count.
+    std::vector<Worker::Removal> all;
+    for (Worker &worker : workers_) {
+        all.insert(all.end(), worker.removals.begin(), worker.removals.end());
+        stats_.rays_tested += worker.stats.rays_tested;
+        stats_.rays_changed += worker.stats.rays_changed;
+        stats_.tiles_skipped += worker.stats.tiles_skipped;
+    }
+    std::sort(all.begin(), all.end(), [](const Worker::Removal &a, const Worker::Removal &b) {
+        return a.move < b.move || (a.move == b.move && a.tile < b.tile);
+    });
+    std::fill(removed, removed + sweeps.size(), 0.0);
+    for (const Worker::Removal &r : all) removed[r.move] += r.volume;
+}
+
+void Stock::cut_owned(const SweptVolume &sweep, uint32_t move, uint32_t source, uint32_t owner, uint32_t owners,
+    Worker &worker) {
+    CutStats &stats = worker.stats;
+    std::vector<Span> &spans = worker.spans;
+    std::vector<Interval> &scratch = worker.scratch;
     const Bounds &b = sweep.bounds();
-    double total = 0;
-    if (grid_.count[0] == 0 || grid_.count[1] == 0) return 0;
+    if (grid_.count[0] == 0 || grid_.count[1] == 0) return;
     const double s = grid_.spacing;
     // Rays strictly inside the xy bounds; the bounds are closed but a ray on
     // them only grazes the tool.
@@ -158,18 +194,22 @@ double Stock::cut(const SweptVolume &sweep, uint32_t source) {
     int64_t i1 = last_index(b.max[0], grid_.origin[0], grid_.count[0]);
     int64_t j0 = first_index(b.min[1], grid_.origin[1], grid_.count[1]);
     int64_t j1 = last_index(b.max[1], grid_.origin[1], grid_.count[1]);
-    if (i0 > i1 || j0 > j1) return 0;
+    if (i0 > i1 || j0 > j1) return;
     const double area = s * s;
     const double sweep_low = sweep.lowest();
     const double sweep_high = b.max[2];
     for (uint32_t tj = uint32_t(j0) / grid_.tile; tj <= uint32_t(j1) / grid_.tile; ++tj)
         for (uint32_t ti = uint32_t(i0) / grid_.tile; ti <= uint32_t(i1) / grid_.tile; ++ti) {
-            Tile &tile = tiles_[static_cast<size_t>(tj) * tiles_i_ + ti];
+            // Diagonal ownership: moves along x or y alternate between owners.
+            if ((ti + tj) % owners != owner) continue;
+            const uint32_t index = tj * tiles_i_ + ti;
+            Tile &tile = tiles_[index];
             if (!(tile.top > sweep_low) || !(tile.bottom < sweep_high)) {
                 ++stats.tiles_skipped;
                 continue;
             }
             bool changed = false;
+            double tile_removed = 0;
             uint32_t ia = std::max<uint32_t>(uint32_t(i0), tile.i0);
             uint32_t ib = std::min<uint32_t>(uint32_t(i1), tile.i0 + tile.ni - 1);
             uint32_t ja = std::max<uint32_t>(uint32_t(j0), tile.j0);
@@ -183,10 +223,10 @@ double Stock::cut(const SweptVolume &sweep, uint32_t source) {
                     if (!(tile.hi[first + n - 1] > sweep_low) || !(tile.lo[first] < sweep_high)) continue;
                     ++stats.rays_tested;
                     if (!(tile.hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
-                    sweep.intersect_z(ray_u(i), ray_v(j), spans_);
-                    if (spans_.empty()) continue;
+                    sweep.intersect_z(ray_u(i), ray_v(j), spans);
+                    if (spans.empty()) continue;
                     // Subtract every span from the ray.
-                    scratch_.clear();
+                    scratch.clear();
                     double removed = 0;
                     for (uint32_t k = 0; k < n; ++k) {
                         uint32_t at = first + k;
@@ -197,7 +237,7 @@ double Stock::cut(const SweptVolume &sweep, uint32_t source) {
                         std::copy_n(&tile.hi_normal[3 * size_t(at)], 3, piece.hi_normal);
                         piece.lo_source = tile.lo_source[at];
                         piece.hi_source = tile.hi_source[at];
-                        for (const Span &span : spans_) {
+                        for (const Span &span : spans) {
                             if (span.hi <= piece.lo) continue;
                             if (span.lo >= piece.hi) break;
                             if (span.lo > piece.lo) {
@@ -205,7 +245,7 @@ double Stock::cut(const SweptVolume &sweep, uint32_t source) {
                                 below.hi = span.lo;
                                 std::copy_n(span.lo_normal, 3, below.hi_normal);
                                 below.hi_source = source;
-                                scratch_.push_back(below);
+                                scratch.push_back(below);
                             }
                             removed += std::min(span.hi, piece.hi) - std::max(span.lo, piece.lo);
                             if (span.hi >= piece.hi) {
@@ -216,21 +256,27 @@ double Stock::cut(const SweptVolume &sweep, uint32_t source) {
                             std::copy_n(span.hi_normal, 3, piece.lo_normal);
                             piece.lo_source = source;
                         }
-                        if (piece.hi > piece.lo) scratch_.push_back(piece);
+                        if (piece.hi > piece.lo) scratch.push_back(piece);
                     }
                     if (removed <= 0) continue;
-                    write_local(tile, local, scratch_.data(), static_cast<uint32_t>(scratch_.size()));
-                    total += removed * area;
+                    write_local(tile, local, scratch.data(), static_cast<uint32_t>(scratch.size()));
+                    tile_removed += removed * area;
                     ++stats.rays_changed;
                     changed = true;
                 }
-            if (changed) tile.refresh_bounds();
+            if (changed) {
+                tile.refresh_bounds();
+                worker.removals.push_back({move, index, tile_removed});
+            }
         }
-    return total;
 }
 
+
 void Stock::pack() {
-    for (Tile &tile : tiles_) tile.compact();
+    for (Tile &tile : tiles_) {
+        tile.compact();
+        tile.refresh_bounds();
+    }
 }
 
 uint64_t Stock::interval_count() const {

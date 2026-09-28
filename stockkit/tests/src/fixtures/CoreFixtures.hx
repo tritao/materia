@@ -150,6 +150,14 @@ class CoreFixtures {
       "rapid's cut points back at the rapid");
     var untouched = stock.ray(2, 2);
     Assert.check(untouched[0].hiSource == Stock.ORIGINAL, "untouched stock keeps its original surface");
+    // The same moves on one thread give the same stock.
+    var single = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+    single.setThreads(1);
+    var again = single.cut(moves);
+    Assert.check(again.removed[0] == report.removed[0] && again.removed[1] == report.removed[1],
+      "one thread removes the same volumes");
+    Assert.check(single.volume() == stock.volume(), "one thread leaves the same stock");
+    single.dispose();
     // Cutting again appends to the history.
     stock.cut([moves[0]]);
     Assert.check(stock.history.length == 3, "history grows with every cut");

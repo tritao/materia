@@ -53,6 +53,13 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	 */
 	extern fn sk_stock_read_intervals(stock: sk_stock_handle, i0: u32, j0: u32, ni: u32, nj: u32, out_intervals: ptr<sk_interval> @out_array("interval_capacity"), interval_capacity: u32) -> sk_result;
 	/**
+	 * Sets how many threads `sk_stock_cut` uses: 0 (the default) means one per
+	 * hardware thread, 1 cuts on the calling thread. Tiles are owned by one
+	 * thread each and every ray sees its moves in order, so the stock and the
+	 * removed volumes are bit-identical for any thread count.
+	 */
+	extern fn sk_stock_set_threads(stock: sk_stock_handle, threads: u32) -> sk_result;
+	/**
 	 * Exact material swept by one move of `tool` along the ray through (u, v)
 	 * on `axis` (Z: u = x, v = y): `out_count` disjoint intervals.
 	 */
@@ -137,7 +144,7 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		center_r: f64 @offset(40);
 		center_z: f64 @offset(48);
 	}
-	struct sk_stock_info @layout(104, 8) {
+	struct sk_stock_info @layout(112, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		grid: sk_grid @offset(8);
 		interval_count: u64 @offset(56);
@@ -150,6 +157,10 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		rays_tested: u64 @offset(80);
 		rays_changed: u64 @offset(88);
 		tiles_skipped: u64 @offset(96);
+		/**
+		 * Threads `sk_stock_cut` uses; 0 means one per hardware thread.
+		 */
+		threads: u32 @offset(104);
 	}
 	/**
 	 * Tool info: widest radius and height of the profile.

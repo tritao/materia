@@ -1,5 +1,6 @@
 #pragma once
 
+#include "pool.hpp"
 #include "sweep.hpp"
 
 #include <cstdint>
@@ -48,13 +49,27 @@ public:
 
     void read(uint32_t i, uint32_t j, std::vector<Interval> &out) const;
     uint32_t count(uint32_t i, uint32_t j) const;
+    /** Replaces a ray's intervals; call `pack` after a series of writes. */
     void write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals);
-    /** Packs every tile to exactly the slots its rays use, after bulk writes. */
+    /** Packs every tile to exactly the slots its rays use and refreshes its material bounds. */
     void pack();
 
-    /** Removes the swept volume and returns how much; endpoints it creates get `source`. */
-    double cut(const SweptVolume &sweep, uint32_t source);
+    /**
+     * Removes each sweep's material in order, giving the endpoints it creates
+     * `sources[k]`, and writes the volume each removed to `removed[k]`.
+     *
+     * Tiles are split among threads by a fixed ownership pattern; each thread
+     * walks every sweep in order over the tiles it owns, so a ray only ever
+     * sees its moves in program order. Removed volumes are summed per tile,
+     * then over tiles in tile order. Results are bit-identical for any
+     * thread count.
+     */
+    void cut(const std::vector<SweptVolume> &sweeps, const uint32_t *sources, double *removed);
     const CutStats &stats() const { return stats_; }
+
+    /** Threads used by `cut`; 0 means one per hardware thread. */
+    void set_threads(uint32_t threads);
+    uint32_t threads() const { return threads_; }
 
     uint64_t interval_count() const;
     double volume() const;
@@ -77,6 +92,18 @@ private:
         void refresh_bounds();
     };
 
+    /** Per-thread scratch and results for one `cut` call. */
+    struct Worker {
+        std::vector<Span> spans;
+        std::vector<Interval> scratch;
+        CutStats stats;
+        struct Removal { uint32_t move, tile; double volume; };
+        std::vector<Removal> removals;
+    };
+
+    /** Cuts one sweep from the tiles `owner` owns among `owners`. */
+    void cut_owned(const SweptVolume &sweep, uint32_t move, uint32_t source, uint32_t owner, uint32_t owners,
+        Worker &worker);
     Tile &tile_of(uint32_t i, uint32_t j, uint32_t &local);
     const Tile &tile_of(uint32_t i, uint32_t j, uint32_t &local) const;
     void write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n);
@@ -85,8 +112,9 @@ private:
     uint32_t tiles_i_ = 0, tiles_j_ = 0;
     std::vector<Tile> tiles_;
     CutStats stats_;
-    std::vector<Span> spans_;
-    std::vector<Interval> scratch_;
+    uint32_t threads_ = 0;
+    Pool pool_;
+    std::vector<Worker> workers_;
 };
 
 } // namespace stockkit
