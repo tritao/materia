@@ -539,6 +539,15 @@ see below) and confirms the fix; `robotkit_mujoco_tests`'
 IMU-vs-joint-velocity assertion now passes along with the rest of that
 regression suite (12/12).
 
+Later, kinematic actors (walking humans, moving platforms) needed contacts to
+see their motion, which a zero-dof body cannot give (MuJoCo reports no
+velocity for it). A `KINEMATIC` root that carries no other bodies therefore
+gets a free joint again, with gravity compensation, re-placed on its scripted
+trajectory before every substep. A `KINEMATIC` root with bodies beneath it,
+such as a robot base, stays welded as above: a free joint under articulated
+children, even one stiffened with a large armature, still leaked into their
+joint friction and limits.
+
 A second, previously undocumented native bug surfaced while writing this
 fix's test with a position-mode target instead of effort mode: `data->M`
 stores MuJoCo's mass matrix in a *sparse, per-dof-row* format where

@@ -618,20 +618,10 @@ void effort_target_respects_max_force_clamp() {
 }
 
 void kinematic_root_child_velocity_matches_joint_across_substeps() {
-    // Pre-existing bug (documented in robotkit/ARCHITECTURE.md under "Link
-    // rest poses (M8.5, F1)"): a KINEMATIC body currently gets a free joint
-    // and real mass in MuJoCo, just like a DYNAMIC one. World::step() only
-    // re-pins that free joint's qpos/qvel to the scene node's authoritative
-    // pose once per OUTER step (World::refresh_kinematic_bodies), not once
-    // per physics substep. With more than one substep, the reaction torque
-    // the child's hinge actuator exerts on its finite-inertia "kinematic"
-    // parent (ordinary momentum coupling through the shared mass matrix)
-    // gives the parent real, non-zero angular velocity partway through the
-    // step; the child's own hinge qvel never reflects that parent motion,
-    // but the child's world-frame angular velocity (what an IMU would read)
-    // does, so the two disagree — exactly robotkit_mujoco_tests' failing
-    // "MuJoCo's hinge velocity and the mounted gyroscope agree" assertion,
-    // reproduced here at the sim_mujoco level without an IMU sensor.
+    // A KINEMATIC root that carries other bodies stays welded to its scripted
+    // pose, so the reaction torque of its child's hinge actuator cannot move
+    // it within a step's substeps. The child's world-frame angular velocity
+    // (what a mounted IMU reads) then matches its hinge velocity.
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     const auto base_node = make_node(scene, 0.0);
@@ -646,8 +636,7 @@ void kinematic_root_child_velocity_matches_joint_across_substeps() {
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
 
-    // A "kinematic root" the way a robot base is: driven by the scene node,
-    // but currently backed by a mass-bearing MuJoCo free joint.
+    // A "kinematic root" the way a robot base is: driven by the scene node.
     const auto base = make_body(world, base_node, NKSIM_MOTION_KINEMATIC, 1.0);
     const auto shape = make_box(world);
     const auto arm = make_body(world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, shape);
@@ -684,8 +673,7 @@ void kinematic_root_child_velocity_matches_joint_across_substeps() {
 
     // The base never actually moves (its scene node pose is never changed),
     // so the arm's world angular velocity about Z should be exactly its own
-    // hinge qvel; any gap is spurious velocity leaked from the "kinematic"
-    // base's free joint within the step's substeps.
+    // hinge qvel; any gap is spurious velocity leaked from the base.
     assert(std::abs(arm_state.angular_velocity[2] - joint_state.velocity) < 1e-8);
 
     nksim_joint_destroy(world, joint);
@@ -1121,11 +1109,9 @@ struct HingeRig {
 
 // A 0.3 m box base with a unit-mass, unit-inertia arm hinged about z at x = 1
 // and driven by a 10 N m effort target. The base overlaps a static floor: a
-// KINEMATIC base now carries a real free joint (see mujoco_backend.cpp's
-// configure_body), but add_self_collision_excludes() excludes every pair
-// where neither body is DYNAMIC, so a KINEMATIC-vs-STATIC pair such as this
-// one still generates no contact at all (matching the pre-free-joint
-// behavior) — this overlap is deliberately harmless, and exercises that.
+// KINEMATIC-vs-STATIC pair such as this one generates no contact
+// (add_self_collision_excludes() excludes every pair where neither body is
+// DYNAMIC), so this overlap is deliberately harmless, and exercises that.
 HingeRig make_hinge_rig(uint32_t base_motion) {
     HingeRig rig;
     assert(nkscene_scene_create(&rig.scene) == NKS_OK);
@@ -1191,7 +1177,7 @@ nksim_body_state body_state_of(nksim_world world, nksim_body body) {
 // A kinematic root is prescribed motion: the reaction torque of the motor on
 // its hinged child must not spin it (a free unit-inertia base would take half
 // the motor's work and roughly halve the hinge rate), so the hinge moves as it
-// does on a static base (to about one part in 1e6, the armature ratio), and
+// does on a static base, and
 // the arm's world angular velocity is exactly the base's prescribed rate plus
 // the hinge rate.
 void kinematic_base_is_not_moved_by_child_reaction() {
@@ -1267,9 +1253,9 @@ void kinematic_base_is_not_moved_by_child_reaction() {
 // to it (engine_core_util.c's mj_objectVelocity: "dof-less body (static or
 // mocap): quick return"), so the platform slid out from under the box
 // (which stayed at x = 0 with zero velocity) instead of dragging it by
-// friction. A KINEMATIC root now owns a real free joint instead (see
-// mujoco_backend.cpp's configure_body/step()), so its qvel is its twist and
-// this works.
+// friction. A KINEMATIC root that carries no other bodies now owns a real
+// free joint instead (see mujoco_backend.cpp's configure_body/step()), so
+// its qvel is its twist and this works.
 void kinematic_platform_carries_resting_box() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
@@ -1314,7 +1300,7 @@ void kinematic_platform_carries_resting_box() {
     nkscene_scene_destroy(scene);
 }
 
-// A KINEMATIC root's free joint (configure_body) makes it visible to
+// A childless KINEMATIC root's free joint (configure_body) makes it visible to
 // MuJoCo's contact solver so a DYNAMIC body touching it gets real friction
 // (kinematic_platform_carries_resting_box above) — but it must not also
 // make MuJoCo generate contacts between two bodies that can never move:

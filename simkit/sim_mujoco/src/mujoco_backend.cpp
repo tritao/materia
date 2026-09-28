@@ -120,28 +120,6 @@ Vec3 rotate(const Quat &rotation, const Vec3 &value) {
 // step()), so these values never affect this body's own motion.
 constexpr double kKinematicBodyMass = 1000.0;
 
-// Added to every dof of a KINEMATIC root's free joint (mjsJoint::armature,
-// applied uniformly to all 6 dof: user_model.cc's joint compiler loop sets
-// `m->dof_armature[dofadr] = pj->armature` per dof, not just translational
-// ones). Armature is reflected inertia at the DOF itself — it stiffens that
-// dof's own row/column of the mass matrix M against reaction forces from
-// this body's own articulated children (see configure_body's longer
-// comment) without adding actual body mass, so it does not also inflate
-// how hard gravity pulls on this body between substep placements.
-//
-// It only damps the coupling, not eliminates it (that would need infinite
-// armature): with a driven child still applying real torque every substep,
-// a residual proportional to child_inertia / armature remains — e.g. a
-// unit-inertia child hinge held by a 10 N*m motor settles about
-// child_inertia/armature radians off its target instead of exactly on it
-// (confirmed empirically: 1e6 left a ~1e-6 relative residual on the hinge
-// rate in kinematic_base_is_not_moved_by_child_reaction's rotating-base
-// case, scaling down linearly as armature grows — 1e9 cut it to ~1e-9,
-// comfortably inside that test's 1e-6 tolerance). 1e9 is chosen for that
-// margin; it showed no solver conditioning issues in this backend's own
-// test suite.
-constexpr double kKinematicBodyArmature = 1.0e9;
-
 // The incremental rotation a body with constant LOCAL-frame angular
 // velocity `local_angular_velocity` accumulates over `dt`, matching
 // mju_quatIntegrate's own convention exactly (vendored MuJoCo,
@@ -339,13 +317,6 @@ public:
             mj_deleteSpec(spec);
     }
 
-    // A KINEMATIC root gets a real free joint (see configure_body), so a
-    // descendant's world-frame velocity from read_body_states (via
-    // mj_objectVelocity's cvel-based computation) already includes the
-    // root's own twist. World::carry_kinematic_root_twists() must not add
-    // it again.
-    bool reports_kinematic_root_twist_to_descendants() const override { return true; }
-
     nksim_result initialize(const nksim_world_desc &desc) override {
         spec = mj_makeSpec();
         if (!spec)
@@ -475,8 +446,8 @@ public:
             return NKSIM_ERROR_INVALID_HANDLE;
         const auto joint_id = model->body_jntadr[body_id];
         if (joint_id >= 0 && model->jnt_type[joint_id] == mjJNT_FREE) {
-            // Both a DYNAMIC root and a KINEMATIC root (configure_body gives
-            // both a free joint) land here. For a KINEMATIC root this is
+            // Both a DYNAMIC root and a childless KINEMATIC root
+            // (configure_body gives both a free joint) land here. For a KINEMATIC root this is
             // just bookkeeping for the tick: it records the driven pose and
             // twist in found->second.state below, which step()'s
             // kinematic_drives() reads to place the body correctly across
@@ -501,9 +472,8 @@ public:
             }
             apply_joint_targets();
         } else {
-            // STATIC root pose is model state, not a free-joint qpos (a
-            // DYNAMIC or KINEMATIC root always has one — see configure_body
-            // — so only a STATIC root reaches this branch).
+            // A STATIC root's pose, or a welded KINEMATIC root's (one that
+            // carries other bodies), is model state, not a free-joint qpos.
             std::copy(state.position.begin(), state.position.end(), model->body_pos + 3*body_id);
             const auto q = normalize(state.rotation);
             model->body_quat[4*body_id] = q[3];
@@ -676,7 +646,7 @@ public:
         std::vector<KinematicDrive> drives;
         for (const auto body_id : body_order) {
             const auto &record = bodies.at(body_id);
-            if (record.desc.motion_type != NKSIM_MOTION_KINEMATIC || parent_joint_id(body_id) != 0)
+            if (!free_kinematic_root(body_id))
                 continue;
             const auto model_id = model_body_id(body_id);
             if (model_id < 0)
@@ -925,6 +895,23 @@ private:
                 return joint_id;
         }
         return 0;
+    }
+
+    bool has_children(std::uint64_t body_id) const {
+        for (const auto joint_id : joint_order)
+            if (joints.at(joint_id).desc.body_a == body_id)
+                return true;
+        return false;
+    }
+
+    // A KINEMATIC root that carries no other bodies moves on a free joint
+    // (see configure_body). One with bodies beneath it, such as a robot's
+    // base, stays welded to its scripted pose: a free joint's own dynamics
+    // leak into the joints beneath it, however stiff it is made.
+    bool free_kinematic_root(std::uint64_t body_id) const {
+        const auto &record = bodies.at(body_id);
+        return record.desc.motion_type == NKSIM_MOTION_KINEMATIC &&
+               parent_joint_id(body_id) == 0 && !has_children(body_id);
     }
 
     bool would_create_cycle(std::uint64_t parent, std::uint64_t child) const {
@@ -1357,7 +1344,7 @@ private:
         write_pose(local_position, local_rotation, *body);
 
         const auto body_result = configure_body(*body, found->second.desc, incoming,
-                                                found->second.name);
+                                                free_kinematic_root(id), found->second.name);
         if (body_result != NKSIM_OK)
             return body_result;
 
@@ -1375,6 +1362,7 @@ private:
     nksim_result configure_body(mjsBody &body,
                                        const nksim::BackendBodyDesc &desc,
                                        const JointRecord *incoming,
+                                       bool kinematic_root,
                                        const std::string &body_name) {
         // A KINEMATIC root (e.g. a walking actor's capsule, or a robot's own
         // base link) is externally scripted from its owning World's scene
@@ -1399,16 +1387,15 @@ private:
         // zero relative velocity on the mocap side — exactly the bug this
         // fix targets, not a solution to it.
         //
-        // So a KINEMATIC root instead gets a genuine free joint, exactly
-        // like a DYNAMIC body, giving it real degrees of freedom that
+        // So a KINEMATIC root that carries no other bodies instead gets a
+        // genuine free joint, exactly like a DYNAMIC body, giving it real degrees of freedom that
         // participate normally in MuJoCo's contact Jacobian and cvel.
         // step() below re-places its qpos/qvel onto the exact prescribed
         // trajectory before every physics substep, not just once per outer
         // step (re-pinning only once per OUTER step would leave the body
         // sitting still through every substep in between — the same
         // teleport problem, one level down — and would let a substep's
-        // contact force give it spurious velocity that then leaks into a
-        // child's world-frame velocity reading within the same step).
+        // contact force give it spurious velocity).
         // Re-placing before every substep means the solver
         // always sees the correct instantaneous relative velocity for
         // friction, while any reaction it computes back onto this body is
@@ -1421,25 +1408,10 @@ private:
         // impact. kKinematicBodyMass is chosen well above any plausible
         // dynamic payload so that impulse approximates what an immovable
         // obstacle of the same velocity would give.
-        //
-        // Mass alone is not enough, though: a KINEMATIC root with its own
-        // articulated children (a robot base with jointed links) must still
-        // look rigid to THEM — a finite mass, however large, has some
-        // compliance, and a child's own reaction torque acts on this body's
-        // free joint within every substep before step() corrects it, which
-        // showed up as the base "giving" a little and the correction
-        // injecting a small kick every substep, undamped, so it built up
-        // into a sustained joint oscillation instead of settling (this is
-        // what surfaced the need for the fix: growing kKinematicBodyMass
-        // alone from 1e3 to 1e5 left the coupled system's steady-state
-        // error unchanged, so the residual wasn't from insufficient mass).
-        // mjsJoint::armature (added to the free joint below) is reflected
-        // inertia at the dof itself, not body mass: it stiffens the base's
-        // own 6 dof against reaction forces from its children without
-        // adding gravitational weight, decoupling "resists being reactively
-        // pushed by its own children" from "delivers a strong impulse to
-        // whatever it contacts" (still governed by mass, above).
-        const bool kinematic_root = desc.motion_type == NKSIM_MOTION_KINEMATIC && !incoming;
+        // Gravity compensation keeps its own weight from pulling it off its
+        // path within a substep, under whatever rests on it.
+        if (kinematic_root)
+            body.gravcomp = 1.0;
         if (desc.motion_type == NKSIM_MOTION_DYNAMIC || kinematic_root) {
             body.mass = desc.motion_type == NKSIM_MOTION_DYNAMIC ? desc.mass : kKinematicBodyMass;
             if (body.mass > 0.0) {
@@ -1468,12 +1440,6 @@ private:
                 auto *free_joint = mjs_addFreeJoint(&body);
                 if (!free_joint)
                     return NKSIM_ERROR_OUT_OF_MEMORY;
-                // A DYNAMIC root's free joint stays at zero armature (real
-                // physics). A KINEMATIC root's is stiffened so this body's own
-                // articulated children see an effectively rigid foundation —
-                // see kKinematicBodyArmature's comment.
-                if (kinematic_root)
-                    free_joint->armature = kKinematicBodyArmature;
             }
         } else if (incoming->desc.type != NKSIM_JOINT_FIXED) {
             auto *joint = mjs_addJoint(&body, nullptr);

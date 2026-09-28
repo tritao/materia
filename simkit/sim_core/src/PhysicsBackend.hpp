@@ -172,19 +172,6 @@ public:
         out.clear();
         return NKSIM_OK;
     }
-
-    // True when this backend gives a KINEMATIC root real degrees of freedom
-    // (so a descendant's reported world-frame velocity, from
-    // read_body_states, already includes the root's own twist through the
-    // backend's normal multi-body velocity propagation — e.g. MuJoCo's
-    // recursive cvel over an articulation whose root now carries a free
-    // joint). World::carry_kinematic_root_twists() exists to add a
-    // KINEMATIC root's twist onto its descendants for a backend that pins
-    // the root without any degrees of freedom (the default: a descendant's
-    // velocity then reflects only its own relative motion); a backend that
-    // overrides this to true must not have that compensation double-added
-    // on top of what it already reports.
-    virtual bool reports_kinematic_root_twist_to_descendants() const { return false; }
 };
 
 std::unique_ptr<PhysicsBackend> make_test_physics_backend();
