@@ -1,5 +1,6 @@
 package camkit;
 
+import cadkit.Face;
 import cnckit.CncTool;
 import cnckit.CncChannels;
 import cnckit.ir.CncGeometry;
@@ -45,6 +46,27 @@ class CamJob {
         level, feed, span);
       else cutLoop(path, level, feed, span);
     }
+    return this;
+  }
+
+  /** Profile a planar CAD face, completing each hole before releasing its outer edge. */
+  public function profileFace(face:Face, tool:CncTool, depth:Float,
+      feed:Float, ?stepDown:Float = 0.002, ?unit:String = "mm",
+      ?chordToleranceMetres:Float = 0.00005):CamJob {
+    var boundaries = CamContour.fromFaceBoundaries(face, unit,
+      chordToleranceMetres);
+    var outer = boundaries[0];
+    require(outer, tool, depth, feed);
+    depthLevels(outer.z, depth, stepDown);
+    outer.inset(-tool.diameter * 0.5);
+    for (i in 1...boundaries.length) {
+      require(boundaries[i], tool, depth, feed);
+      depthLevels(boundaries[i].z, depth, stepDown);
+      boundaries[i].inset(tool.diameter * 0.5);
+    }
+    for (i in 1...boundaries.length)
+      profile(boundaries[i], tool, depth, feed, "inside", stepDown);
+    profile(outer, tool, depth, feed, "outside", stepDown);
     return this;
   }
 

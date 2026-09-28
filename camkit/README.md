@@ -19,6 +19,9 @@ Input adapters:
   inner contours, so a plate with holes can use an outside profile for its
   outer boundary and inside profiles for the holes. `fromFace` still requires
   a single boundary.
+- `CamJob.profileFace(face, tool, depth, feed)` profiles every inner boundary
+  before the outer boundary. It checks that the tool fits each hole before
+  adding any cuts to the job.
 - `CamSheetProfiles.fromPlan(plan, placementId)` turns a manufacturingkit
   rectangular sheet placement into a profile contour.
 
@@ -40,7 +43,8 @@ var linuxCnc = CamGCodeWriter.write(program);
 
 The test project creates its own rectangular, rounded and holed plate fixtures.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
-direct lowering and CAM IR → G-code → CncKit IR round trips. The suite also
+hole-before-outer ordering, direct lowering and CAM IR → G-code → CncKit IR
+round trips. The suite also
 checks the generic manufacturingkit sheet placement adapter using locally
 authored input; it does not depend on a MachineKit example. Run with the cadkit native
 build on `LD_LIBRARY_PATH`:

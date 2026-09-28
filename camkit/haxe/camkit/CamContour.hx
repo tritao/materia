@@ -195,6 +195,15 @@ class CamContour {
     if (distance > 0.0 && (Math.abs(result.signedArea) >= Math.abs(signedArea) ||
         result.signedArea * signedArea <= 0.0))
       throw "CAM inset exhausted the pocket";
+    if (distance > 0.0)
+      for (point in shifted) for (i in 0...vertices.length) {
+        var a = vertices[i], b = vertices[(i + 1) % vertices.length];
+        var dx = b.x - a.x, dy = b.y - a.y;
+        var inward = orientation * cross(dx, dy,
+          point.x - a.x, point.y - a.y) / Math.sqrt(dx * dx + dy * dy);
+        if (inward < distance - 1e-9)
+          throw "CAM inset exhausted the pocket";
+      }
     return result;
   }
 
