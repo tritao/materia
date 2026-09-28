@@ -3,7 +3,8 @@ package humanoid;
 import haxe.Int64;
 import robotkit.model.RobotModelCodec;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
+import robotkit.runtime.SimulationSpace;
 import robotkit.world.JointTarget;
 
 /**
@@ -24,12 +25,16 @@ class StandCheck {
     var model = RobotModelCodec.decode(sys.io.File.getBytes(args[0]));
     var pose = Pose.load(args[1], args[2]);
     var seconds = Std.parseFloat(args[3]), period = Std.parseFloat(args[4]);
-    var simulation = new Simulation(period, Std.parseInt(args[5]), 1, null, Std.parseInt(args[6]), 0,
-      Std.parseInt(args[7]), Std.parseInt(args[8]));
+    var harness = new SimulationHarness(period, Std.parseInt(args[5]), SimulationSpace.MUJOCO, {
+      integrator: Std.parseInt(args[6]),
+      solverIterations: Std.parseInt(args[7]),
+      lineSearchIterations: Std.parseInt(args[8])
+    });
+    var simulation = harness.simulation;
     var blueprint = RobotRuntimeCompiler.compile(model);
     blueprint.observedLimitTolerance = 0.05;
     var runtime = simulation.addRobotAtPose(blueprint, pose.rootPosition, pose.rootRotation);
-    simulation.spawnPlane();
+    harness.spawnPlane();
     simulation.setJointPositions(0, pose.jointPositions(model));
 
     var actuators = new ActuatorMap(model);
@@ -47,7 +52,7 @@ class StandCheck {
     var startHeight = pose.rootPosition[2], lowest = startHeight, worstTilt = 0.0;
     var ticks = Std.int(Math.round(seconds / period));
     for (tick in 0...ticks) {
-      simulation.step(Int64.ofInt(tick));
+      harness.step(Int64.ofInt(tick));
       var base = simulation.robotPose(0);
       lowest = Math.min(lowest, base.position[2]);
       // Tilt: angle between the base's up axis and world up.
@@ -58,7 +63,7 @@ class StandCheck {
         Sys.println('t=${(tick + 1) * period}: base height ${base.position[2]}, tilt so far $worstTilt rad');
     }
     var finalHeight = simulation.robotPose(0).position[2];
-    simulation.dispose();
+    harness.dispose();
     Sys.println('${model.name} holding "${pose.name}" for $seconds s: base height $startHeight -> $finalHeight '
       + '(lowest $lowest), worst tilt $worstTilt rad');
     if (finalHeight < 0.9 * startHeight || worstTilt > 0.3) {

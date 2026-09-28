@@ -638,6 +638,18 @@ class Simulation {
     disposed = true;
   }
 
+  /**
+   * RobotKit's status for the robot fault that failed the latest tick, such
+   * as RK_ERROR_LIMIT, or RK_OK. The session that stepped reports only that a
+   * participant failed.
+   */
+  public function rejection():Int {
+    ensureLive();
+    var value = RobotKitSimKit.rk_simulation_get_rejection(owner.borrow());
+    check(value.status, "simulation.rejection");
+    return value.out_result;
+  }
+
   function readClock():rk_simulation_clock {
     ensureLive();
     var value = new rk_simulation_clock();

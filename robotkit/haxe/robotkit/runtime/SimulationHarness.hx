@@ -32,9 +32,19 @@ class SimulationHarness {
     }
   }
 
-  /** Advances the session one tick and notifies the simulation's step observers. */
+  /**
+   * Advances the session one tick and notifies the simulation's step
+   * observers. A tick the robots refused throws with RobotKit's status.
+   */
   public function step(?timestampNs:Int64):Void {
-    space.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
+    try {
+      space.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
+    } catch (error:Dynamic) {
+      var rejected = simulation.rejection();
+      if (rejected != RobotKitRuntimeConstants.RK_OK)
+        throw 'simulation.step failed with RobotKit status $rejected';
+      throw error;
+    }
   }
 
   public function start():Void
@@ -65,7 +75,6 @@ class SimulationHarness {
     simulation.teleportRobot(robotIndex, position, rotation);
   }
 
-  /** Adds a box to the shared physics world and returns its owned session object. */
   /**
    * Adds an infinite static ground plane through `position` (default the
    * origin), facing the +Z axis of `rotation` (default the world XY plane).
@@ -80,6 +89,7 @@ class SimulationHarness {
       new SimPose(at[0], at[1], at[2], facing[0], facing[1], facing[2], facing[3]));
   }
 
+  /** Adds a box to the shared physics world and returns its owned session object. */
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
       ?dynamicBody:Bool = false, ?mass:Float = 1.0, ?orientation:Array<Float>):SimObject {
     if (position == null || position.length != 3 || halfExtents == null || halfExtents.length != 3)

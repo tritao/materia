@@ -125,6 +125,17 @@ rk_result RK_CALL rk_simulation_get_clock(rk_simulation simulation,
     return RK_OK;
 }
 
+rk_result RK_CALL rk_simulation_get_rejection(rk_simulation simulation,
+                                              rk_result *out_result) {
+    if (!out_result)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value)
+        return RK_ERROR_INVALID_HANDLE;
+    *out_result = value->rejection();
+    return RK_OK;
+}
+
 rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation, uint32_t robot_index) {
     const auto value = resolve(simulation);
     return value ? value->reset_robot(robot_index) : RK_ERROR_INVALID_HANDLE;

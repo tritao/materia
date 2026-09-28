@@ -335,6 +335,13 @@ RK_API rk_result RK_CALL rk_simulation_cut_virtual_device_link(
  */
 RK_API rk_result RK_CALL rk_simulation_get_clock(
     rk_simulation simulation, rk_simulation_clock *out_clock RK_INOUT);
+/**
+ * Reads the RobotKit error behind the latest failed tick, such as
+ * RK_ERROR_LIMIT for a command beyond a joint's limits, or RK_OK. The session
+ * that stepped reports only that a participant failed.
+ */
+RK_API rk_result RK_CALL rk_simulation_get_rejection(
+    rk_simulation simulation, rk_result *out_result RK_OUT);
 /** Restores one attached robot's bodies and clears its runtime state. */
 RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
                                                     uint32_t robot_index);

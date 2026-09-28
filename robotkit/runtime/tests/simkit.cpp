@@ -1172,12 +1172,8 @@ void robots_attach_to_a_shared_session() {
 // A descriptor that only adds collision shapes keeps the default placement:
 // the second robot sits one metre along x, as it would without a descriptor.
 void shape_descriptor_without_pose_keeps_default_placement() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
     const auto model = blueprint(7);
     rk_robot_runtime first = 0, second = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &first) == RK_OK);
@@ -1200,12 +1196,11 @@ void shape_descriptor_without_pose_keeps_default_placement() {
     link.struct_size = sizeof(link);
     assert(rk_simulation_get_link_pose(simulation, 0, 1, &link) == RK_OK);
     assert(std::abs(link.rotation[2] - std::sin(0.2)) < 1e-9); // 0.4 rad about the Z axis.
-    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    assert(step(fixture.session, 0) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
     assert(rk_simulation_get_robot_pose(simulation, 1, &pose) == RK_OK);
     assert(std::abs(pose.position[0] - 1.0) < 1e-9);
-    rk_simulation_destroy(simulation);
 }
 
 int main() {

@@ -81,6 +81,8 @@ public:
     uint64_t step_index() const;
     /** Returns the fixed-step simulation time in seconds. */
     double simulation_time() const;
+    /** Returns the RobotKit error that failed the latest tick, or RK_OK. */
+    rk_result rejection() const { return rejected_; }
 
 private:
     friend class SimulationRobot;

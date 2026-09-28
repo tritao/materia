@@ -116,6 +116,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_get_omni_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_omni_drive_state> @inout) -> rk_result;
 	/**
+	 * Reads the RobotKit error behind the latest failed tick, such as
+	 * RK_ERROR_LIMIT for a command beyond a joint's limits, or RK_OK. The session
+	 * that stepped reports only that a participant failed.
+	 */
+	extern fn rk_simulation_get_rejection(simulation: rk_simulation, out_result: ptr<rk_result> @out) -> rk_result;
+	/**
 	 * Reads one robot base's world-frame twist from the latest physics state.
 	 * A floating base (rk_robot_runtime_blueprint.floating_base) reports its free
 	 * motion; a kinematic base reports the twist it was driven with.

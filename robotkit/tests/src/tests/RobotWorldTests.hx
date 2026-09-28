@@ -909,13 +909,13 @@ class RobotWorldTests {
       servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0, "servo targets copy their terms");
     throws(function() robotkit.world.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
       "servo targets reject negative stiffness");
-    var servoSimulation = new Simulation(0.02);
-    var servoRuntime = servoSimulation.addRobot(RobotRuntimeCompiler.compile(restored));
+    var servoHarness = new SimulationHarness(0.02);
+    var servoRuntime = servoHarness.simulation.addRobot(RobotRuntimeCompiler.compile(restored));
     servoRuntime.submitTargets([robotkit.world.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
-    servoSimulation.step(Int64.ofInt(0));
+    servoHarness.step(Int64.ofInt(0));
     check(Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
       "a servo target reaches the deterministic backend's joint");
-    servoSimulation.dispose();
+    servoHarness.dispose();
     var servoRecording = new RobotRecording();
     servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
     switch RobotRecordingCodec.decode(RobotRecordingCodec.encode(servoRecording.entries[0])).event {
@@ -936,10 +936,10 @@ class RobotWorldTests {
     equal(shapeBlueprint.linkCollisionShapes.length, 4, "every link collision shape compiles");
     equal(shapeBlueprint.linkCollisionShapes[3].link, 1,
       "compiled collision shapes keep their runtime link index");
-    var shapeSimulation = new Simulation(0.02);
-    shapeSimulation.addRobot(shapeBlueprint);
-    shapeSimulation.step(Int64.ofInt(0));
-    shapeSimulation.dispose();
+    var shapeHarness = new SimulationHarness(0.02);
+    shapeHarness.simulation.addRobot(shapeBlueprint);
+    shapeHarness.step(Int64.ofInt(0));
+    shapeHarness.dispose();
     var badShape = RobotModelCodec.decode(encoded);
     badShape.links[1].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.0)));
     check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape), "RK_COLLISION_SHAPE"),
