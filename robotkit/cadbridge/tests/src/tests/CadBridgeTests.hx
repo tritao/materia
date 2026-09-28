@@ -48,8 +48,11 @@ import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.ParallelGripper;
 import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
+import machinekit.pneumatic.VacuumPressureSensor;
+import machinekit.pneumatic.VacuumControlValve;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
@@ -62,6 +65,7 @@ import robotkit.tool.MassProperties;
 import robotkit.spatial.Inertia3;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
+import robotkit.world.SensorFrame;
 import haxe.Int64;
 import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -81,6 +85,7 @@ class CadBridgeTests {
     testSuctionCapacityBridge();
     testSchmalzEndEffector();
     testEndEffectorRuntimeBridge();
+    testDerivedRuntimeBindings();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
@@ -265,7 +270,8 @@ class CadBridgeTests {
   static function testSchmalzEndEffector():Void {
     var effector = SchmalzEndEffectorExample.build();
     check(effector.validate().length == 0 &&
-      effector.billOfMaterials().quantity("10.07.09.00001") == 1,
+      effector.billOfMaterials().lines().filter(line ->
+        StringTools.startsWith(line.partNumber, "10.07.09.00001-L")).length == 1,
       "catalog EOAT validates with its hose and matching fitting");
     var grip = SuctionCapacityBridge.toGrip(effector, "cup", 60, 0.5, 2);
     check(approx(grip.normalCapacityN(), 69, 1e-9),
@@ -475,6 +481,83 @@ class CadBridgeTests {
     check(combo.gripper != null && combo.vacuum != null &&
       combo.channelDeclarations().length == 2,
       "one coupled end effector can bind gripper and vacuum together");
+  }
+
+  static function testDerivedRuntimeBindings():Void {
+    var generic = EndEffectorExample.build();
+    var derived = EndEffectorRuntimeBridge.toRuntimeFromDesign(generic, "short", "contact");
+    check(derived.runtime.vacuum != null && derived.runtime.changerLock != null &&
+      derived.runtime.channelDeclarations().length == 2 &&
+      derived.bindings.vacuumSensorId == null,
+      "generic EOAT derives vacuum and changer lock outputs from ports");
+    var selected = new ToolRuntimeSelection();
+    selected.select(derived.runtime, Int64.ofInt(0));
+    selected.apply(new FiredProcessEvent(Int64.ofInt(1), "short/robot/master.lock",
+      ProcessEventValue.Digital(false), Int64.ofInt(1), Int64.ofInt(2), 1));
+    check(!derived.runtime.changerLock.isLocked(), "declared changer lock accepts release command");
+    selected.select(null, Int64.ofInt(3));
+    check(derived.runtime.changerLock.isLocked(), "inactive changer returns to safe locked state");
+
+    var set = new EndEffectorSet();
+    set.addComponent("base", new BridgeServiceSourcePart());
+    set.mount("base", "mount");
+    set.exposePort("coupledAir", "base", "air");
+    set.exposePort("valveCommand", "base", "valveCommand");
+    set.changer("manual", "base", "contact", [
+      {robot: "coupledAir", tool: "air"},
+      {robot: "valveCommand", tool: "valveCommand"}]);
+    var effector = new EndEffector();
+    effector.addComponent("generator", new VacuumGenerator());
+    effector.addComponent("valve", new VacuumControlValve(6));
+    effector.addComponent("sensor", new VacuumPressureSensor(6));
+    effector.addComponent("cup", new SuctionCup(25, 18));
+    effector.mount("generator", "mount");
+    effector.addMate("valve-seat", "fixed", "generator", "mount", "valve", "mount");
+    effector.addMate("sensor-seat", "fixed", "generator", "mount", "sensor", "mount");
+    effector.addMate("cup-seat", "fixed", "generator", "mount", "cup", "mount");
+    effector.connectPorts("valve-feed", "generator", "vacuum", "valve", "vacuumIn");
+    effector.connectPorts("pressure-feed", "valve", "vacuumOut", "sensor", "vacuumIn");
+    effector.connectPorts("cup-feed", "sensor", "vacuumOut", "cup", "vacuum");
+    effector.exposePort("air", "generator", "air");
+    effector.exposePort("valveCommand", "valve", "control");
+    effector.workingFrame("contact", "cup", "contact", true);
+    set.addTool("sensor", effector);
+    var sensed = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "sensor", "contact");
+    check(sensed.bindings.vacuumSensorId == "sensor/tool/sensor.pressureSignal" &&
+      sensed.runtime.vacuum != null &&
+      sensed.runtime.channelDeclarations()[0].id == "sensor/tool/valve.enable",
+      "pressure sensor and explicit vacuum valve derive feedback and command IDs");
+    var sensorSelection = new ToolRuntimeSelection();
+    var sensorAdapter = EndEffectorRuntimeBridge.bindSensors(sensorSelection, sensed);
+    sensorSelection.select(sensed.runtime, Int64.ofInt(0));
+    sensorSelection.apply(new FiredProcessEvent(Int64.ofInt(1),
+      "sensor/tool/valve.enable", ProcessEventValue.Digital(true),
+      Int64.ofInt(1), Int64.ofInt(2), 1));
+    var frame = new SensorFrame(sensed.bindings.vacuumSensorId, "tool_vacuum_kpa",
+      "tool", Int64.ofInt(1), Int64.ofInt(3), [45.0], Int64.ofInt(3),
+      "", null, null, "robotkit.monotonic");
+    check(sensorAdapter.apply(frame) && sensed.runtime.vacuum.isHolding(),
+      "derived pressure sensor feeds active vacuum capability");
+
+    var gripperSet = new EndEffectorSet();
+    gripperSet.addComponent("base", new BridgeServiceSourcePart());
+    gripperSet.mount("base", "mount");
+    gripperSet.exposePort("open", "base", "open");
+    gripperSet.exposePort("close", "base", "close");
+    gripperSet.changer("manual", "base", "contact", [
+      {robot: "open", tool: "openAir"}, {robot: "close", tool: "closeAir"}]);
+    var gripperTool = new EndEffector();
+    gripperTool.addComponent("gripper", new ParallelGripper(40, 20, 60, 12));
+    gripperTool.mount("gripper", "mount");
+    gripperTool.exposePort("openAir", "gripper", "open");
+    gripperTool.exposePort("closeAir", "gripper", "close");
+    gripperTool.workingFrame("contact", "gripper", "tcp", true);
+    gripperSet.addTool("gripper", gripperTool);
+    var derivedGripper = EndEffectorRuntimeBridge.toRuntimeFromDesign(gripperSet,
+      "gripper", "contact");
+    check(derivedGripper.runtime.gripper != null &&
+      derivedGripper.runtime.channelDeclarations()[0].id == "gripper/tool/gripper.close",
+      "gripper valve command derives from declared open and close ports");
   }
 
   static function testAssemblySimulationBridge():Void {
@@ -759,6 +842,23 @@ private class BridgeEndEffectorPart extends MachineComponent {
 
   override public function geometry(detail:ComponentDetail = Preview):Part
     return Part.box(20, 10, 30);
+}
+
+private class BridgeServiceSourcePart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-SERVICE-SOURCE", "service source fixture", "steel", true);
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addConnector("contact", Face, Solids.axial(0, 0, 10));
+    for (name in ["air", "open", "close"])
+      addPort({name: name, kind: Pneumatic, role: Supply,
+        iface: Unspecified, required: false});
+    addPort({name: "valveCommand", kind: Signal, role: Supply,
+      iface: Plug("digital-valve", 2), required: false});
+    declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(10, 10, 10);
 }
 
 private class BridgePayloadPart extends MachineComponent {

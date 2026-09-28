@@ -8,9 +8,12 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.RuntimePortIntent;
 
 /** Generic ejector converting compressed air to vacuum. */
 class VacuumGenerator extends MachineComponent {
+	override public function runtimePortIntents():Array<RuntimePortIntent>
+		return [VacuumActuator("air")];
 	/** Catalog maximum vacuum below ambient in kPa, not a guaranteed cup pressure. */
 	public final ratedVacuumKpa:Null<Float>;
 

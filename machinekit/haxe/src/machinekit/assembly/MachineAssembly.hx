@@ -218,7 +218,7 @@ class MachineAssembly {
 		}
 	}
 
-	/** Check structure and complete service wiring; interface mismatches are warnings. */
+	/** Check structure, complete service wiring and physical port compatibility. */
 	public function validate():Array<String> {
 		validateStructure();
 		var connections = checkConnections();
@@ -243,7 +243,7 @@ class MachineAssembly {
 					(first.role == Consumer && second.role == Consumer))
 					throw 'Port connection "$id" has incompatible roles';
 				if (!PortInterfaces.compatible(first.iface, second.iface))
-					warnings.push('Port connection "$id" has mismatched interfaces');
+					throw 'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}';
 			case _:
 		}
 		return {connected: connected, warnings: warnings};

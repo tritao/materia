@@ -19,6 +19,7 @@ typedef SchmalzCupSpec = {
 	var massKg:Float;
 	var theoreticalForceAt60KpaN:Float;
 	var vacuumThread:String;
+	var sourceUrl:String;
 }
 
 /** Schmalz cup with source mass and dimensions. Centre and inertia are
@@ -30,11 +31,22 @@ class SchmalzSuctionCup extends SuctionCup {
 
 	public static function catalog():Catalog<SchmalzCupSpec> {
 		if (table == null) table = new Catalog("Schmalz suction cup", row -> row.designation, [{
+			designation: "10.01.01.11400", label: "SAF 30 NBR-45 G1/4-IG",
+			nominalDiameterMm: 30, envelopeDiameterMm: 34, heightMm: 20,
+			massKg: 0.01188, theoreticalForceAt60KpaN: 38, vacuumThread: "G1/4-F",
+			sourceUrl: "https://www.schmalz.ru/en-ru/products/automation-743270/vacuum-grippers-746238/vacuum-suction-cups-301609/flat-suction-cups-round-301610/flat-suction-cups-saf-303827/10.01.01.11400"
+		}, {
 			designation: "10.01.01.11401", label: "SAF 40 NBR-45 G1/4-IG",
 			nominalDiameterMm: 40, envelopeDiameterMm: 46, heightMm: 22,
-			massKg: 0.0136, theoreticalForceAt60KpaN: 69, vacuumThread: 'G1/4-F'
-		}], _ -> ({
-			source: "https://www.schmalz.co.jp/en-jp/products/vacuum-technology-for-automation-301607/vacuum-components-301608/vacuum-suction-cups-301609/flat-suction-cups-round-301610/flat-suction-cups-saf-302308/10.01.01.11401",
+			massKg: 0.0136, theoreticalForceAt60KpaN: 69, vacuumThread: 'G1/4-F',
+			sourceUrl: "https://www.schmalz.co.jp/en-jp/products/vacuum-technology-for-automation-301607/vacuum-components-301608/vacuum-suction-cups-301609/flat-suction-cups-round-301610/flat-suction-cups-saf-302308/10.01.01.11401"
+		}, {
+			designation: "10.01.01.11441", label: "SAF 50 NBR-45 G1/4-IG",
+			nominalDiameterMm: 50, envelopeDiameterMm: 56, heightMm: 33,
+			massKg: 0.0308, theoreticalForceAt60KpaN: 100, vacuumThread: "G1/4-F",
+			sourceUrl: "https://www.schmalz.com/en-it/products/automation-743270/vacuum-grippers-746238/vacuum-suction-cups-301609/flat-suction-cups-round-301610/flat-suction-cups-saf-303827/10.01.01.11441"
+		}], row -> ({
+			source: row.sourceUrl,
 			standard: null, standardEdition: null, dimensionKind: Mixed,
 			conformance: NominalEnvelope,
 			verifiedFields: ["nominalDiameterMm", "envelopeDiameterMm", "heightMm",

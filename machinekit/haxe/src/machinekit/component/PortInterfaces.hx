@@ -15,6 +15,7 @@ class PortInterfaces {
 					((aMale && bFemale) || (aFemale && bMale));
 				else a == b;
 			case [Plug(a, ap), Plug(b, bp)]: a == b && ap == bp;
+			case [Coupling(a, ac), Coupling(b, bc)]: a == b && ac == bc;
 			case _: false;
 		};
 	}

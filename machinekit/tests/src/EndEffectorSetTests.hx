@@ -8,6 +8,8 @@ import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
 import machinekit.robotics.ParallelGripper;
+import machinekit.robotics.schmalz.SchmalzSxtMaster;
+import machinekit.robotics.schmalz.SchmalzSxtTool;
 import materia.assembly.AssemblyFrames;
 
 private class TestChangerMaster extends MachineComponent {
@@ -120,6 +122,22 @@ class EndEffectorSetTests {
 	}
 
 	public static function run():Void {
+		var sxtSet = new EndEffectorSet();
+		sxtSet.addComponent("master", new SchmalzSxtMaster("10.07.13.00013"));
+		sxtSet.mount("master", "robot");
+		sxtSet.exposePort("robotAir", "master", "airIn1");
+		sxtSet.exposePort("coupledAir", "master", "airOut1");
+		sxtSet.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
+		var sxtTool = new EndEffector();
+		sxtTool.addComponent("half", new SchmalzSxtTool("10.07.13.00018"));
+		sxtTool.mount("half", "master");
+		sxtTool.exposePort("air", "half", "airIn1");
+		sxtSet.addTool("manual", sxtTool);
+		var coupledSxt = sxtSet.configuration("manual");
+		if (coupledSxt.upstream("tool/half", "airOut1").port.instanceId != "robot/master" ||
+			coupledSxt.billOfMaterials().quantity("10.07.13.00013") != 1 ||
+			coupledSxt.billOfMaterials().quantity("10.07.13.00018") != 1)
+			throw "SXT catalog halves must couple and bridge the keyed air passage";
 		var gripper = new ParallelGripper(40, 20, 60, 30);
 		var preview = gripper.geometry(Preview), envelope = gripper.geometry(Envelope);
 		var previewBox = preview.shape.bounds(), envelopeBox = envelope.shape.bounds();

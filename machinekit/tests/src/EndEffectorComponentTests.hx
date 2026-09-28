@@ -1,4 +1,5 @@
 import machinekit.component.MachineComponent;
+import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MassProperties.MassSource;
 import machinekit.pneumatic.PneumaticManifold;
@@ -7,6 +8,10 @@ import machinekit.pneumatic.VacuumGenerator;
 import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
 import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
 import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
+import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.robotics.schmalz.SchmalzSxtMaster;
+import machinekit.robotics.schmalz.SchmalzSxtTool;
+import cadkit.modeling.Vector;
 import eoat.SchmalzEndEffectorExample;
 import machinekit.component.PortInterfaces;
 import machinekit.component.PortInterface;
@@ -20,6 +25,43 @@ class EndEffectorComponentTests {
 		var vendorCup = new SchmalzSuctionCup("10.01.01.11401");
 		var vendorEjector = new SchmalzVacuumGenerator("10.02.01.00563");
 		var vendorFitting = new SchmalzPushInFitting("10.08.02.00203");
+		var cup30 = new SchmalzSuctionCup("10.01.01.11400");
+		var cup50 = new SchmalzSuctionCup("10.01.01.11441");
+		if (cup30.massProperties().mass >= vendorCup.massProperties().mass ||
+			cup50.massProperties().mass <= vendorCup.massProperties().mass ||
+			(cast cup30.effectiveAreaMm2:Float) >= (cast vendorCup.effectiveAreaMm2:Float) ||
+			(cast cup50.effectiveAreaMm2:Float) <= (cast vendorCup.effectiveAreaMm2:Float))
+			throw "Catalog cup sizes must have distinct mass and rated area";
+		var sxtMaster = new SchmalzSxtMaster("10.07.13.00013");
+		var sxtTool = new SchmalzSxtTool("10.07.13.00018");
+		if (sxtMaster.couplingKey() != sxtTool.couplingKey() ||
+			!PortInterfaces.compatible(sxtMaster.port("airOut2").iface,
+				sxtTool.port("airIn2").iface) ||
+			PortInterfaces.compatible(sxtMaster.port("airOut2").iface,
+				sxtTool.port("airIn3").iface) ||
+			Math.abs(sxtMaster.massProperties().mass - 1.7) > 1e-9 ||
+			Math.abs(sxtTool.massProperties().mass - 0.55) > 1e-9 ||
+			sxtMaster.runtimePortIntents().length != 0 ||
+			sxtTool.runtimePortIntents().length != 0)
+			throw "Schmalz SXT pair has incorrect fit, channels or mass";
+		var hose = new SchmalzVacuumHose("10.07.09.00001", [new Vector(0, 0, 0),
+			new Vector(0, 0, 100), new Vector(100, 0, 100)]);
+		if (Math.abs(hose.lengthMm - 200) > 1e-9 ||
+			Math.abs(hose.massProperties().mass - 0.0022) > 1e-9 ||
+			hose.bom.partNumber.indexOf("10.07.09.00001-L200") != 0 ||
+			!PortInterfaces.compatible(hose.port("input").iface,
+				vendorFitting.port("hose").iface))
+			throw "Cut hose must retain routed length, mass and tube fit";
+		var mismatch = new MachineAssembly();
+		mismatch.addComponent("fitting", vendorFitting);
+		mismatch.addComponent("hose", hose);
+		mismatch.exposePort("inlet", "fitting", "hose");
+		mismatch.connectPorts("bad-fit", "fitting", "thread", "hose", "input");
+		mismatch.validateStructure();
+		var rejectedFit = false;
+		try mismatch.validate() catch (error:Dynamic)
+			rejectedFit = Std.string(error).indexOf("mismatched interfaces") >= 0;
+		if (!rejectedFit) throw "Mismatched physical service interfaces must fail validation";
 		if (!PortInterfaces.compatible(vendorCup.port("vacuum").iface,
 				vendorFitting.port("thread").iface) ||
 			PortInterfaces.compatible(Thread("G1/4-F"), Thread("G1/4-F")) ||

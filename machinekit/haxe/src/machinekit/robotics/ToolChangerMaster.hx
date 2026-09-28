@@ -8,9 +8,12 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.RuntimePortIntent;
 
 /** Generic robot-side changer half with bridged air and signal channels. */
 class ToolChangerMaster extends MachineComponent {
+	override public function runtimePortIntents():Array<RuntimePortIntent>
+		return [ChangerLock("lock")];
 	public final airChannels:Int;
 	public final diameter:Float;
 	public final thickness:Float;
