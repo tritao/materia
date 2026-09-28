@@ -152,6 +152,7 @@ class CamKitTests {
       gcode.indexOf("M2") >= 0,
       "LinuxCNC export includes tool, spindle, and program commands");
     CamGeneratedFixtures.run(check);
+    CamIslandPocketFixture.run(check);
     Sys.println('CamKit tests passed ($assertions assertions)');
   }
 

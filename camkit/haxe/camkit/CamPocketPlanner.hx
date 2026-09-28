@@ -4,10 +4,11 @@ import cnckit.ir.CncPoint;
 
 typedef CamPocketPass = {y:Float, left:Float, right:Float};
 
-/** Horizontal cutter-centre passes inside a simple polygon eroded by a disk. */
+/** Horizontal cutter-centre passes inside a face eroded by a disk. */
 class CamPocketPlanner {
   public static function plan(contour:CamContour, radius:Float,
-      stepOver:Float):Array<CamPocketPass> {
+      stepOver:Float, ?islands:Array<CamContour>):Array<CamPocketPass> {
+    if (islands == null) islands = [];
     var vertices = contour.vertices;
     var minY = Math.POSITIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY;
     for (point in vertices) {
@@ -27,37 +28,21 @@ class CamPocketPlanner {
       rows.push(lastY);
     var passes:Array<CamPocketPass> = [];
     for (row in rows) {
-      var crossings:Array<Float> = [];
-      for (i in 0...vertices.length) {
-        var a = vertices[i], b = vertices[(i + 1) % vertices.length];
-        if ((a.y <= row && row < b.y) || (b.y <= row && row < a.y))
-          crossings.push(a.x + (row - a.y) * (b.x - a.x) / (b.y - a.y));
-      }
-      crossings.sort((a, b) -> a < b ? -1 : (a > b ? 1 : 0));
-      if (crossings.length % 2 != 0)
-        throw "CAM pocket contour has unmatched scanline crossings";
-      var intervals:Array<{left:Float, right:Float}> = [];
-      for (i in 0...Std.int(crossings.length / 2))
-        intervals.push({left: crossings[2 * i], right: crossings[2 * i + 1]});
+      var intervals = interiorIntervals(contour, row);
       for (i in 0...vertices.length) {
         var forbidden = capsuleSlice(vertices[i],
           vertices[(i + 1) % vertices.length], row, radius);
-        if (forbidden == null) continue;
-        var remaining:Array<{left:Float, right:Float}> = [];
-        for (interval in intervals) {
-          if (forbidden.right <= interval.left ||
-              forbidden.left >= interval.right) {
-            remaining.push(interval);
-          } else {
-            if (forbidden.left - interval.left > 1e-9)
-              remaining.push({left: interval.left,
-                right: forbidden.left});
-            if (interval.right - forbidden.right > 1e-9)
-              remaining.push({left: forbidden.right,
-                right: interval.right});
-          }
+        if (forbidden != null) intervals = subtract(intervals, forbidden);
+      }
+      for (island in islands) {
+        for (blocked in interiorIntervals(island, row))
+          intervals = subtract(intervals, blocked);
+        var edgePoints = island.vertices;
+        for (i in 0...edgePoints.length) {
+          var forbidden = capsuleSlice(edgePoints[i],
+            edgePoints[(i + 1) % edgePoints.length], row, radius);
+          if (forbidden != null) intervals = subtract(intervals, forbidden);
         }
-        intervals = remaining;
       }
       for (interval in intervals)
         if (interval.right - interval.left > 1e-8) {
@@ -69,6 +54,39 @@ class CamPocketPlanner {
     }
     if (passes.length == 0) throw "Tool does not fit inside CAM pocket";
     return passes;
+  }
+
+  static function interiorIntervals(contour:CamContour, row:Float)
+      :Array<{left:Float, right:Float}> {
+    var vertices = contour.vertices, crossings:Array<Float> = [];
+    for (i in 0...vertices.length) {
+      var a = vertices[i], b = vertices[(i + 1) % vertices.length];
+      if ((a.y <= row && row < b.y) || (b.y <= row && row < a.y))
+        crossings.push(a.x + (row - a.y) * (b.x - a.x) / (b.y - a.y));
+    }
+    crossings.sort((a, b) -> a < b ? -1 : (a > b ? 1 : 0));
+    if (crossings.length % 2 != 0)
+      throw "CAM pocket contour has unmatched scanline crossings";
+    return [for (i in 0...Std.int(crossings.length / 2))
+      {left: crossings[2 * i], right: crossings[2 * i + 1]}];
+  }
+
+  static function subtract(intervals:Array<{left:Float, right:Float}>,
+      forbidden:{left:Float, right:Float})
+      :Array<{left:Float, right:Float}> {
+    var remaining:Array<{left:Float, right:Float}> = [];
+    for (interval in intervals) {
+      if (forbidden.right <= interval.left ||
+          forbidden.left >= interval.right) {
+        remaining.push(interval);
+      } else {
+        if (forbidden.left - interval.left > 1e-9)
+          remaining.push({left: interval.left, right: forbidden.left});
+        if (interval.right - forbidden.right > 1e-9)
+          remaining.push({left: forbidden.right, right: interval.right});
+      }
+    }
+    return remaining;
   }
 
   /** A segment's radius-r neighbourhood has one interval on a horizontal row. */
