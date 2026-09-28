@@ -16,6 +16,144 @@ class CamGeneratedFixtures {
   public static function run(check:Bool->String->Void):Void {
     roundedPlate(check);
     plateWithHole(check);
+    concavePlate(check);
+  }
+
+  static function concavePlate(check:Bool->String->Void):Void {
+    var contour = new CamContour([
+      new cnckit.ir.CncPoint(0, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.03, 0),
+      new cnckit.ir.CncPoint(0, 0.03, 0)
+    ]);
+    var tool = new CncTool(5, 0, 0.002);
+    var program = new CamJob(0.005, 10000)
+      .profile(contour, tool, -0.002, 0.005, "outside").finish();
+    var arcs = 0, cornerMeeting = 0;
+    for (op in program.ops) switch op {
+      case Feed(geometry, _, _, span) if (span.line == 1):
+        switch geometry {
+          case Arc(_, _, _, _): arcs++;
+          case _:
+        }
+        var start = CncGeometryTools.pointAt(geometry, 0);
+        var end = CncGeometryTools.pointAt(geometry,
+          CncGeometryTools.length(geometry));
+        if (Math.abs(start.z - end.z) > 1e-9) continue;
+        for (fraction in [0.0, 0.25, 0.5, 0.75, 1.0]) {
+          var point = CncGeometryTools.pointAt(geometry,
+            CncGeometryTools.length(geometry) * fraction);
+          var clearance = Math.POSITIVE_INFINITY;
+          for (i in 0...contour.vertices.length)
+            clearance = Math.min(clearance, segmentDistance(point,
+              contour.vertices[i], contour.vertices[(i + 1) % contour.vertices.length]));
+          check(clearance >= 0.001 - 1e-8,
+            "concave outside cutter path clears its authored contour");
+        }
+        if (Math.abs(end.x - 0.011) < 1e-8 &&
+            Math.abs(end.y - 0.011) < 1e-8) cornerMeeting++;
+      case _:
+    }
+    check(arcs == 5, "L plate rounds five outside corners and trims the inward corner");
+    check(cornerMeeting == 1, "inward corner meets at the two shifted-edge intersection");
+    var inside = new CamJob(0.005, 10000)
+      .profile(contour, tool, -0.002, 0.005, "inside").finish();
+    var insideArcs = 0;
+    for (op in inside.ops) switch op {
+      case Feed(Arc(center, radius, _, sweep), _, _, _):
+        insideArcs++;
+        check(Math.abs(center.x - 0.01) < 1e-9 &&
+          Math.abs(center.y - 0.01) < 1e-9 &&
+          Math.abs(radius - 0.001) < 1e-9 && sweep < 0.0,
+          "inside L profile rounds its reflex corner into the hole");
+      case _:
+    }
+    check(insideArcs == 1, "inside L profile has one rounded inward corner");
+    var reversedVertices = contour.vertices.copy();
+    reversedVertices.reverse();
+    var reversed = new CamContour(reversedVertices);
+    for (side in ["outside", "inside"]) {
+      var reversedProgram = new CamJob(0.005, 10000)
+        .profile(reversed, tool, -0.002, 0.005, side).finish();
+      var reversedArcs = 0;
+      for (op in reversedProgram.ops) switch op {
+        case Feed(Arc(_, _, _, _), _, _, _): reversedArcs++;
+        case _:
+      }
+      check(reversedArcs == (side == "outside" ? 5 : 1),
+        "concave offset follows the contour's winding");
+    }
+    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    machine.setTool(tool);
+    check(program.lower(machine).diagnostics.length == 0,
+      "concave profile lowers through MotionKit");
+    check(inside.lower(machine).diagnostics.length == 0,
+      "concave inside profile lowers through MotionKit");
+    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program));
+    check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
+      "concave profile G-code recompiles with the same operations");
+    for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+      case [Feed(a, _, _, _), Feed(b, _, _, _)],
+           [Rapid(a, _), Rapid(b, _)]:
+        for (fraction in [0.0, 0.5, 1.0]) {
+          var original = CncGeometryTools.pointAt(a,
+            CncGeometryTools.length(a) * fraction);
+          var reparsed = CncGeometryTools.pointAt(b,
+            CncGeometryTools.length(b) * fraction);
+          check(original.distanceTo(reparsed) < 1e-8,
+            "concave G-code preserves the cutter path");
+        }
+      case _:
+    }
+    var insideImported = new CncCompiler(machine).compileDetailed(
+      CamGCodeWriter.write(inside));
+    check(insideImported.diagnostics.length == 0 &&
+      insideImported.ops.length == inside.ops.length,
+      "concave inside G-code recompiles with the same operations");
+    for (index in 0...inside.ops.length) switch [inside.ops[index], insideImported.ops[index]] {
+      case [Feed(a, _, _, _), Feed(b, _, _, _)],
+           [Rapid(a, _), Rapid(b, _)]:
+        for (fraction in [0.0, 0.5, 1.0]) {
+          var original = CncGeometryTools.pointAt(a,
+            CncGeometryTools.length(a) * fraction);
+          var reparsed = CncGeometryTools.pointAt(b,
+            CncGeometryTools.length(b) * fraction);
+          check(original.distanceTo(reparsed) < 1e-8,
+            "concave inside G-code preserves the cutter path");
+        }
+      case _:
+    }
+    var rejected = false;
+    try new CamJob(0.005, 10000).profile(contour,
+      new CncTool(6, 0, 0.05), -0.002, 0.005, "outside")
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "oversized cutter is rejected at the narrow concave feature");
+    var narrowNotch = new CamContour([
+      new cnckit.ir.CncPoint(0, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0.03, 0),
+      new cnckit.ir.CncPoint(0.02, 0.03, 0),
+      new cnckit.ir.CncPoint(0.02, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.03, 0),
+      new cnckit.ir.CncPoint(0, 0.03, 0)
+    ]);
+    rejected = false;
+    try new CamJob(0.005, 10000).profile(narrowNotch,
+      new CncTool(7, 0, 0.012), -0.002, 0.005, "outside")
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "outside cutter wider than a U notch is rejected");
+  }
+
+  static function segmentDistance(point:cnckit.ir.CncPoint,
+      a:cnckit.ir.CncPoint, b:cnckit.ir.CncPoint):Float {
+    var dx = b.x - a.x, dy = b.y - a.y;
+    var t = Math.max(0.0, Math.min(1.0,
+      ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
+    return Math.sqrt(Math.pow(point.x - a.x - t * dx, 2) +
+      Math.pow(point.y - a.y - t * dy, 2));
   }
 
   static function roundedPlate(check:Bool->String->Void):Void {
