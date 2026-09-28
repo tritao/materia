@@ -38,6 +38,7 @@ class SpurGear {
 	public final baseDiameter:Float;
 	public final outsideDiameter:Float;
 	public final rootDiameter:Float;
+	public final tipToothThickness:Float;
 
 	public function new(moduleSize:Float, teeth:Int, faceWidth:Float, pressureAngle:Float = STANDARD_PRESSURE_ANGLE,
 			profileShift:Float = 0, backlash:Float = 0) {
@@ -64,6 +65,11 @@ class SpurGear {
 		if (!(rootDiameter > 0)) throw "Spur gear root diameter must be positive; use a larger module or more teeth";
 		var toothThickness = pitchToothThickness();
 		if (!(toothThickness > 0)) throw "Spur gear backlash leaves no tooth thickness";
+		tipToothThickness = outsideDiameter * (toothThickness / pitchDiameter
+			+ involuteRollAngle(pitchDiameter / 2, baseDiameter / 2)
+			- involuteRollAngle(outsideDiameter / 2, baseDiameter / 2));
+		if (!Math.isFinite(tipToothThickness) || tipToothThickness < 0.25 * moduleSize)
+			throw "Spur gear tip tooth thickness must be at least 0.25 module";
 		var moduleText = Dimension.format(moduleSize);
 		var shiftSuffix = profileShift == 0 ? "" : '-X${Dimension.format(profileShift)}';
 		var backlashSuffix = backlash == 0 ? "" : '-B${Dimension.format(backlash)}';
@@ -96,8 +102,34 @@ class SpurGear {
 		if (moduleSize != other.moduleSize) throw "Meshing gears must share a module";
 		if (Math.abs(pressureAngle - other.pressureAngle) > 1e-10)
 			throw "Meshing gears must share a pressure angle";
-		return (pitchDiameter + other.pitchDiameter) / 2 +
-			moduleSize * (profileShift + other.profileShift) / Math.sin(pressureAngle);
+		var teethSum = teeth + other.teeth;
+		var shiftedInvolute = involuteRollAngle(pitchDiameter / 2, baseDiameter / 2)
+			+ 2 * (profileShift + other.profileShift) * Math.tan(pressureAngle) / teethSum;
+		if (shiftedInvolute < -1e-12 || !Math.isFinite(shiftedInvolute))
+			throw "Meshing gear profile shifts produce an invalid operating pressure angle";
+		var operatingAngle = solveInvolute(shiftedInvolute);
+		return (pitchDiameter + other.pitchDiameter) / 2 * Math.cos(pressureAngle) / Math.cos(operatingAngle);
+	}
+
+	/** Solve tan(angle)-angle = value on [0, pi/2) with safeguarded Newton steps. */
+	static function solveInvolute(value:Float):Float {
+		if (value <= 0) return 0;
+		var lower = 0.0, upper = Math.PI / 2 - 1e-8, angle = STANDARD_PRESSURE_ANGLE;
+		for (_ in 0...64) {
+			var tangent = Math.tan(angle), error = tangent - angle - value;
+			if (Math.abs(error) <= 1e-14) return angle;
+			if (error < 0) {
+				lower = angle;
+			} else {
+				upper = angle;
+			}
+			var derivative = tangent * tangent;
+			var next = derivative > 1e-14 ? angle - error / derivative : (lower + upper) / 2;
+			if (!Math.isFinite(next) || next <= lower || next >= upper)
+				next = (lower + upper) / 2;
+			angle = next;
+		}
+		return angle;
 	}
 
 	/** Tooth thickness measured along the pitch circle after profile shift and backlash. */

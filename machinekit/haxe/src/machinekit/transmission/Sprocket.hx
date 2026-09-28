@@ -73,8 +73,10 @@ class Sprocket extends MachineComponent {
 		var pitchDia = pitch / Math.sin(Math.PI / teeth);
 		var outsideDia = pitch * (0.6 + Math.cos(Math.PI / teeth) / Math.sin(Math.PI / teeth));
 		var rootDia = pitchDia - roller;
-		if (!(rootDia > boreDiameter))
-			throw "Sprocket root diameter must clear the bore; use more teeth or a smaller bore";
+		var rootRadius = rootDia / 2;
+		var maxBore = 2 * rootRadius * Math.cos(0.325 * 2 * Math.PI / teeth);
+		if (!(maxBore > boreDiameter))
+			throw "Sprocket bore must clear the tooth-root land; use more teeth or a smaller bore";
 		var pitchText = Dimension.format(pitch);
 		super(chain == null ? 'GENERIC-SPROCKET-P$pitchText-${teeth}T' : 'SPROCKET-${chain}-${teeth}T',
 			chain == null ? 'Generic sprocket, $pitchText mm pitch, ${teeth} teeth' : '$chain sprocket, ${teeth} teeth', "steel");

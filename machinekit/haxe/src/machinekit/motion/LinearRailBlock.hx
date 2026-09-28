@@ -24,23 +24,27 @@ class LinearRailBlock extends MachineComponent {
 
 	public function new(spec:LinearRailProfileSpec) {
 		if (!(spec.blockWidth > 0) || !(spec.blockHeight > 0) || !(spec.blockLength > 0) ||
-			!(spec.blockHoleSpacing > 0) || spec.blockHoleSpacing > spec.blockLength)
+			!(spec.blockHolePitchB > 0) || spec.blockHolePitchB > spec.blockLength ||
+			!(spec.blockHolePitchC > 0) || spec.blockHolePitchC > spec.blockWidth ||
+			spec.blockHeight <= spec.railHeight)
 			throw 'Linear rail profile "${spec.designation}" has invalid block dimensions';
 		super('${spec.family}-${spec.designation}-BLOCK',
 			'${spec.family} ${spec.designation} carriage block', "steel");
 		this.spec = spec;
 		addConnector("rail", Axis, Solids.axial(0, 0, 0));
 		addConnector("axis", Axis, Solids.axial(0, 0, 0));
-		for (i in 0...2) {
-			var z = (i == 0 ? -1 : 1) * spec.blockHoleSpacing / 2;
-			addConnector('mount${i + 1}', Mount, AssemblyFrames.alongY(0, spec.blockHeight, z, 0, 1, 0));
-		}
+		var index = 1;
+		for (x in [-spec.blockHolePitchC / 2, spec.blockHolePitchC / 2])
+			for (z in [-spec.blockHolePitchB / 2, spec.blockHolePitchB / 2])
+				addConnector('mount${index++}', Mount,
+					AssemblyFrames.alongY(x, spec.blockHeight - spec.railHeight, z, 0, 1, 0));
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var top = spec.blockHeight - spec.railHeight;
 		return Part.prism([
 			new Vector(-spec.blockWidth / 2, 0), new Vector(spec.blockWidth / 2, 0),
-			new Vector(spec.blockWidth / 2, spec.blockHeight), new Vector(-spec.blockWidth / 2, spec.blockHeight),
+			new Vector(spec.blockWidth / 2, top), new Vector(-spec.blockWidth / 2, top),
 		], -spec.blockLength / 2, spec.blockLength / 2);
 	}
 

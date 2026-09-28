@@ -48,8 +48,8 @@ class StorageRack {
 			result.push({id: position.indicatorId, label: 'Pick indicator ${position.id}', component: indicator,
 				pose: position.indicatorPlacement});
 		}
-		var x = config.rackWidth / 2 - PickingStationConfig.FRAME_SIZE;
-		var y = config.rackDepth / 2 - PickingStationConfig.FRAME_SIZE;
+		var x = config.rackWidth / 2 - PickingStationConfig.FRAME_SIZE / 2;
+		var y = config.rackDepth / 2 - PickingStationConfig.FRAME_SIZE / 2;
 		for (corner in [
 			{name: "front-left", x: -x, y: -y}, {name: "front-right", x: x, y: -y},
 			{name: "back-left", x: -x, y: y}, {name: "back-right", x: x, y: y}])

@@ -100,8 +100,9 @@ class ShaftCoupling extends MachineComponent {
 	function validateSetScrews(holes:Array<ShaftCouplingSetScrew>):Void {
 		for (i in 0...holes.length) {
 			var hole = holes[i];
-			if (hole == null || !(hole.z > 0) || hole.z >= length || !Math.isFinite(hole.z) || !Math.isFinite(hole.angle))
-				throw "Shaft coupling set screw location must lie within its length";
+			var endMargin = setScrewPart(10).diameter * 1.5;
+			if (hole == null || hole.z < endMargin || hole.z > length - endMargin || !Math.isFinite(hole.z) || !Math.isFinite(hole.angle))
+				throw "Shaft coupling set screw location must clear both ends by 1.5 screw diameters";
 			for (j in 0...i)
 				if (Math.abs(holes[j].z - hole.z) < 1e-6 && Math.abs(holes[j].angle - hole.angle) < 1e-6)
 					throw "Shaft coupling set screw locations must be unique";

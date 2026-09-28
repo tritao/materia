@@ -179,8 +179,9 @@ class SteppedShaft extends MachineComponent {
 			if (shoulderIndex(shoulder.z) < 0) throw 'Shoulder detail z=${shoulder.z} is not a section boundary';
 			var prior = diameterAt(shoulder.z - 1e-5), next = diameterAt(shoulder.z + 1e-5);
 			var smaller = Math.min(prior, next);
+			var stepHeight = Math.abs(prior - next) / 2;
 			var fillet = optionalFloat(shoulder.fillet);
-			if (shoulder.fillet != null && (!(fillet > 0) || fillet >= smaller / 2))
+			if (shoulder.fillet != null && (!(fillet > 0) || fillet >= stepHeight))
 				throw 'Shoulder fillet at z=${shoulder.z} is too large';
 			if (shoulder.reliefWidth != null) {
 				var width = optionalFloat(shoulder.reliefWidth);
@@ -249,36 +250,72 @@ class SteppedShaft extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var z = 0.0, parts:Array<Part> = [];
-		for (section in sections) {
-			parts.push(Part.cylinderSpan(section.diameter / 2, z, z + section.length));
-			z += section.length;
-		}
-		var body = Solids.union(parts);
-		if (detail == Envelope) return body;
-		body = applyEndDetails(body);
-		var tools:Array<Part> = [];
-		for (keyway in keyways) tools.push(keywayTool(keyway));
-		for (groove in grooves) tools.push(grooveTool(groove));
-		for (shoulder in (this.detail.shoulders == null ? [] : this.detail.shoulders))
-			if (optionalFloat(shoulder.reliefWidth) > 0)
-				tools.push(shoulderReliefTool(shoulder));
-		return tools.length == 0 ? body : Solids.cut(body, tools);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var z = 0.0, sectionsParts:Array<Part> = [];
+			for (section in sections) {
+				var part = Part.cylinderSpan(section.diameter / 2, z, z + section.length);
+				tracked.push(part);
+				sectionsParts.push(part);
+				z += section.length;
+			}
+			var body = Solids.union(sectionsParts);
+			tracked.push(body);
+			if (detail == Envelope) return body;
+			body = applyEndDetails(body);
+			tracked.push(body);
+			var tools:Array<Part> = [];
+			for (keyway in keyways) {
+				var tool = keywayTool(keyway);
+				tracked.push(tool);
+				tools.push(tool);
+			}
+			for (groove in grooves) {
+				var tool = grooveTool(groove);
+				tracked.push(tool);
+				tools.push(tool);
+			}
+			for (shoulder in (this.detail.shoulders == null ? [] : this.detail.shoulders))
+				if (optionalFloat(shoulder.reliefWidth) > 0) {
+					var tool = shoulderReliefTool(shoulder);
+					tracked.push(tool);
+					tools.push(tool);
+				}
+			if (tools.length == 0) return body;
+			var result = Solids.cut(body, tools);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	function applyEndDetails(body:Part):Part {
-		var result = body;
-		var inputThread = detail.inputThread, outputThread = detail.outputThread;
-		if (inputThread != null) result = applyThread(result, inputThread, true);
-		if (outputThread != null) result = applyThread(result, outputThread, false);
-		if (optionalFloat(detail.inputChamfer) > 0)
-			result = finishEdge(result, 0, optionalFloat(detail.inputChamfer), false);
-		if (optionalFloat(detail.outputChamfer) > 0)
-			result = finishEdge(result, totalLength, optionalFloat(detail.outputChamfer), false);
-		for (shoulder in (detail.shoulders == null ? [] : detail.shoulders))
-			if (optionalFloat(shoulder.fillet) > 0)
-				result = finishEdge(result, shoulder.z, optionalFloat(shoulder.fillet), true);
-		return result;
+		var ownedParts:Array<Part> = [body];
+		return Solids.building(ownedParts, tracked -> {
+			var result = body;
+			var inputThread = detail.inputThread, outputThread = detail.outputThread;
+			if (inputThread != null) {
+				result = applyThread(result, inputThread, true);
+				tracked.push(result);
+			}
+			if (outputThread != null) {
+				result = applyThread(result, outputThread, false);
+				tracked.push(result);
+			}
+			if (optionalFloat(detail.inputChamfer) > 0) {
+				result = finishEdge(result, 0, optionalFloat(detail.inputChamfer), false);
+				tracked.push(result);
+			}
+			if (optionalFloat(detail.outputChamfer) > 0) {
+				result = finishEdge(result, totalLength, optionalFloat(detail.outputChamfer), false);
+				tracked.push(result);
+			}
+			for (shoulder in (detail.shoulders == null ? [] : detail.shoulders))
+				if (optionalFloat(shoulder.fillet) > 0) {
+					result = finishEdge(result, shoulder.z, optionalFloat(shoulder.fillet), true);
+					tracked.push(result);
+				}
+			return result;
+		});
 	}
 
 	function applyThread(body:Part, thread:ShaftThreadEnd, atInput:Bool):Part {

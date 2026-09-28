@@ -49,6 +49,8 @@ class LeadScrewNut extends MachineComponent {
 		var screw = SocketHeadCapScrew.catalog().get(mountScrewSize);
 		// Holes keep 1 mm of material to the body and the screw heads 1 mm to the flange rim.
 		var boltRadius = bodyDia / 2 + screw.clearanceMedium / 2 + 1;
+		if (2 * boltRadius * Math.sin(Math.PI / boltCount) < screw.clearanceMedium + 1)
+			throw "Lead screw nut bolt count leaves too little material between mounting holes";
 		var flangeDia = 2 * Math.max(screwDiameter * 1.5, boltRadius + screw.headDiameter / 2 + 1);
 		var diameterText = Dimension.format(screwDiameter), leadText = Dimension.format(lead);
 		super('LEADNUT-${thread.designation}', 'Lead screw nut, ${thread.designation}, $leadText mm lead', "bronze");

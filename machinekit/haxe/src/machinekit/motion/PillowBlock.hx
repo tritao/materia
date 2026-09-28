@@ -20,10 +20,12 @@ import machinekit.component.Solids;
 import machinekit.motion.PillowBlockSpec.PillowBlockSpec;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.SocketHeadCapScrew;
+import materia.assembly.AssemblyFrames;
 
 /** Base-mounted UCP-style pillow block unit. The housing is a cast base with two mounting
- * holes along the shaft direction and an insert-bearing envelope above the base. CAD frame: the
- * shaft runs along +Z, its centre is at `shaftHeight`, and the base bottom is y=0. Connectors:
+ * holes along the housing length and an insert-bearing envelope above the base. CAD frame: the
+ * shaft runs along +Z, its centre is at `shaftHeight`, the base bottom is y=0, length runs along
+ * X, and base width runs along Z. Connectors:
  * `axis` at the shaft centre, `input`/`output` at the housing ends, `base` on the mounting face,
  * and `bolt1`/`bolt2` at the two mounting-hole centres. */
 class PillowBlock extends MachineComponent {
@@ -110,23 +112,23 @@ class PillowBlock extends MachineComponent {
 		mountHoleDiameter = spec.mountHoleDiameter;
 		mountScrew = spec.mountScrew;
 		addConnector("axis", Axis, Solids.axial(0, shaftHeight, 0));
-		addConnector("input", Shaft, Solids.axial(0, shaftHeight, -length / 2));
-		addConnector("output", Shaft, Solids.axial(0, shaftHeight, length / 2));
-		addConnector("base", Mount, Solids.axial(0, 0, 0));
-		addConnector("bolt1", Mount, Solids.axial(0, 0, -boltSpacing / 2));
-		addConnector("bolt2", Mount, Solids.axial(0, 0, boltSpacing / 2));
+		addConnector("input", Shaft, Solids.axial(0, shaftHeight, -baseWidth / 2));
+		addConnector("output", Shaft, Solids.axial(0, shaftHeight, baseWidth / 2));
+		addConnector("base", Mount, AssemblyFrames.alongY(0, 0, 0, 0, 1, 0));
+		addConnector("bolt1", Mount, AssemblyFrames.alongY(-boltSpacing / 2, 0, 0, 0, 1, 0));
+		addConnector("bolt2", Mount, AssemblyFrames.alongY(boltSpacing / 2, 0, 0, 0, 1, 0));
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var base = Part.box(baseWidth, baseHeight, length, Align.Center, Align.Min, Align.Center);
+		var base = Part.box(length, baseHeight, baseWidth, Align.Center, Align.Min, Align.Center);
 		var barrelRadius = overallHeight - shaftHeight;
-		var barrel = Part.cylinderSpan(barrelRadius, -length / 2, length / 2, 0, shaftHeight);
+		var barrel = Part.cylinderSpan(barrelRadius, -baseWidth / 2, baseWidth / 2, 0, shaftHeight);
 		var body = Solids.union([base, barrel]);
-		var boreTool = Part.cylinderSpan(bearing.outside / 2, -length / 2 - 0.1, length / 2 + 0.1, 0, shaftHeight);
+		var boreTool = Part.cylinderSpan(bearing.outside / 2, -baseWidth / 2 - 0.1, baseWidth / 2 + 0.1, 0, shaftHeight);
 		if (detail == Envelope) return Solids.cut(body, [boreTool]);
 		var tools = [boreTool];
-		for (z in [-boltSpacing / 2, boltSpacing / 2])
-			tools.push(Part.cylinderAlongY(mountHoleDiameter / 2, -0.1, baseHeight + 0.1, 0, z));
+		for (x in [-boltSpacing / 2, boltSpacing / 2])
+			tools.push(Part.cylinderAlongY(mountHoleDiameter / 2, -0.1, baseHeight + 0.1, x, 0));
 		return Solids.cut(body, tools);
 	}
 

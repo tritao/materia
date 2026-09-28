@@ -6,6 +6,20 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** MachineKit helpers that consume parts, plus its joint-axis convention. */
 class Solids {
+	/** Build a result while tracking temporary parts. If the callback throws, every still-open
+	 * part in `parts` is closed before the original error is rethrown. Successful callbacks keep
+	 * the same consuming semantics as `union` and `cut`.
+	 */
+	public static function building(parts:Array<Part>, fn:Array<Part>->Part):Part {
+		try {
+			return fn(parts);
+		} catch (error:Dynamic) {
+			for (part in parts) if (part != null && !part.shape.isClosed())
+				try part.close() catch (_:Dynamic) {}
+			throw error;
+		}
+	}
+
 	/** Fuse all parts and close each input. */
 	public static function union(parts:Array<Part>):Part {
 		var result:Part = null;

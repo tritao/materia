@@ -81,8 +81,9 @@ class DeepGrooveBearing extends MachineComponent {
 		return new DeepGrooveBearing(catalog().get(designation), shielded);
 
 	public function new(spec:DeepGrooveBearingSpec, shielded:Bool = true) {
+		var section = (spec.outside - spec.bore) / 2;
 		if (!(spec.bore > 0) || !(spec.outside > spec.bore) || !(spec.width > 0) ||
-			!(spec.chamfer >= 0) || 2 * spec.chamfer >= Math.min(spec.width, (spec.outside - spec.bore) / 2))
+			!(spec.chamfer >= 0) || spec.chamfer >= 0.3 * section || 2 * spec.chamfer >= Math.min(spec.width, section))
 			throw 'Invalid deep groove bearing "${spec.designation}"';
 		super(spec.designation + (shielded ? "-2Z" : ""),
 			'Deep groove ball bearing ${spec.designation}${shielded ? " shielded" : ""} ' +

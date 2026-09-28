@@ -148,6 +148,8 @@ class LinearAxis {
 		bearing = bearingDesignation == null ? matchingBearing(screwDiameter) : DeepGrooveBearing.metric(bearingDesignation);
 		if (!(Math.abs(bearing.bore - screwDiameter) < 1e-9))
 			throw 'Bearing "${bearing.spec.designation}" bore does not match the screw diameter';
+		flangeBearingA = new FlangeBearingAssembly(bearing);
+		flangeBearingB = new FlangeBearingAssembly(bearing);
 		coupling = new ShaftCoupling(motor.variant.shaftDiameter, screwDiameter);
 		if (thread == null && screwDiameter != 10)
 			throw "Linear axis needs an explicit thread for a nondefault screw diameter";
@@ -157,7 +159,8 @@ class LinearAxis {
 		nut = new LeadScrewNut(threadSpec);
 		var profileSpec = railProfile == null ? null : LinearRailSystem.catalog().get(railProfile);
 		var guideBearingSpec = LinearBearing.metric("LM8UU");
-		guideSpacing = Math.max(25, screwDiameter * 2.5);
+		guideSpacing = Math.max(Math.max(25, screwDiameter * 2.5),
+			flangeBearingA.housing.face / 2 + guideBearingSpec.boreDiameter / 2 + RAIL_GAP);
 		var guideSeatFit = BearingHousingFit.Slip;
 		var guideSeatDiameter = guideBearingSpec.housingSeatDiameter(guideSeatFit);
 		var carriageWidth = 2 * (guideSpacing + guideSeatDiameter / 2 + 5);
@@ -169,8 +172,6 @@ class LinearAxis {
 		carriage = new Carriage(screwDiameter, carriageWidth, carriageLength,
 			guideSpacing, guideSeatDiameter, nut, guideSeatFit,
 			profileSpec == null ? null : -(carriageWidth / 2 + profileSpec.blockHeight));
-		flangeBearingA = new FlangeBearingAssembly(bearing);
-		flangeBearingB = new FlangeBearingAssembly(bearing);
 		if (!(margin > Math.max(flangeBearingA.screw.spec.headHeight, nut.bodyLength + nut.flangeThickness)))
 			throw "Linear axis end margin must clear the flange housing screw heads and lead nut";
 		var depth = flangeBearingA.housing.depth;
@@ -207,6 +208,8 @@ class LinearAxis {
 		var housing = flangeBearingA.housing;
 		var screwHeadReach = housing.boltSpacing / 2 + flangeBearingA.screw.spec.headDiameter / 2;
 		var reach = Math.max(Math.max(housing.face / 2, screwHeadReach), Math.max(carriage.width, coupling.outerDiameter) / 2);
+		if (profileSpec != null)
+			reach = Math.max(reach, -carriage.railMountY + profileSpec.railHeight);
 		var railY = -(reach + RAIL_GAP + rail.height / 2);
 		frame = new FrameAssembly();
 		frame.point("railStart", 0, railY, screwStart);

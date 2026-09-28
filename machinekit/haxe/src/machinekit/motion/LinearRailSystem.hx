@@ -29,7 +29,7 @@ class LinearRailSystem {
 		return [{
 			designation: "MGN12C", family: "HIWIN",
 			railWidth: 12, railHeight: 8, blockWidth: 27, blockHeight: 13, blockLength: 34.7,
-			blockHoleSpacing: 21.7, blockMountScrew: "M3x8", railHolePitch: 25, railEndMargin: 10,
+			blockHolePitchB: 20, blockHolePitchC: 15, blockMountScrew: "M3x8", railHolePitch: 25, railEndMargin: 10,
 			railMountScrew: "M3x8"
 		}];
 
@@ -40,7 +40,7 @@ class LinearRailSystem {
 				source: "https://www.hiwin.com/wp-content/uploads/HIWIN-Linear-Guideway-Catalog.pdf",
 				standard: null, standardEdition: null, dimensionKind: Nominal, conformance: NominalEnvelope,
 				verifiedFields: ["railWidth", "railHeight", "blockWidth", "blockHeight", "blockLength",
-					"blockHoleSpacing", "blockMountScrew", "railHolePitch", "railEndMargin", "railMountScrew"]
+					"blockMountScrew", "railHolePitch", "railEndMargin", "railMountScrew"]
 			}));
 		return table;
 	}

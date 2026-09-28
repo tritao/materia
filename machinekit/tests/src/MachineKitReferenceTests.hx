@@ -114,14 +114,15 @@ class MachineKitReferenceTests {
 		equal(rail.blockWidth, 27, "MGN12C block width");
 		equal(rail.blockHeight, 13, "MGN12C block height");
 		equal(rail.blockLength, 34.7, "MGN12C block length");
-		equal(rail.blockHoleSpacing, 21.7, "MGN12C block hole spacing");
+		equal(rail.blockHolePitchB, 20, "MGN12C block hole pitch B");
+		equal(rail.blockHolePitchC, 15, "MGN12C block hole pitch C");
 		if (rail.blockMountScrew != "M3x8" || rail.railMountScrew != "M3x8")
 			throw "MGN12C mounting screw size";
 		equal(rail.railHolePitch, 25, "MGN12C rail hole pitch");
 		equal(rail.railEndMargin, 10, "MGN12C rail end margin");
 		var railMetadata = LinearRailSystem.catalog().metadata("MGN12C");
 		if (railMetadata.dimensionKind != Nominal || railMetadata.conformance != NominalEnvelope ||
-			railMetadata.verifiedFields == null)
+			railMetadata.verifiedFields == null || railMetadata.verifiedFields.indexOf("blockHoleSpacing") >= 0)
 			throw "MGN12C reference metadata";
 		// Koyo/JTEKT UCP204 product page: base-mounted unit dimensions, in mm.
 		var pillow = PillowBlock.catalog().get("UCP204");
@@ -177,9 +178,9 @@ class MachineKitReferenceTests {
 		if (metadata.dimensionKind != Unverified || metadata.verifiedFields == null || metadata.verifiedFields.length != 11)
 			throw "M5 partial verification metadata";
 		for (reference in [
-				{name: "M14", diameter: 14.0, pitch: 2.0, headDiameter: 21.0, headHeight: 14.0, socketSize: 12.0, socketDepth: 7.0, threadLength: 40.0},
-				{name: "M16", diameter: 16.0, pitch: 2.0, headDiameter: 24.0, headHeight: 16.0, socketSize: 14.0, socketDepth: 8.0, threadLength: 44.0},
-				{name: "M20", diameter: 20.0, pitch: 2.5, headDiameter: 30.0, headHeight: 20.0, socketSize: 17.0, socketDepth: 10.0, threadLength: 52.0}]) {
+				{name: "M14", diameter: 14.0, pitch: 2.0, headDiameter: 21.0, headHeight: 14.0, socketSize: 12.0, socketDepth: 7.0, threadLength: 40.0, coarse: 16.5, counterbore: 24.0, depth: 14.6},
+				{name: "M16", diameter: 16.0, pitch: 2.0, headDiameter: 24.0, headHeight: 16.0, socketSize: 14.0, socketDepth: 8.0, threadLength: 44.0, coarse: 18.5, counterbore: 26.0, depth: 16.6},
+				{name: "M20", diameter: 20.0, pitch: 2.5, headDiameter: 30.0, headHeight: 20.0, socketSize: 17.0, socketDepth: 10.0, threadLength: 52.0, coarse: 24.0, counterbore: 33.0, depth: 20.6}]) {
 			var screw = SocketHeadCapScrew.catalog().get(reference.name);
 			equal(screw.diameter, reference.diameter, reference.name + " diameter");
 			equal(screw.pitch, reference.pitch, reference.name + " pitch");
@@ -188,6 +189,9 @@ class MachineKitReferenceTests {
 			equal(screw.socketSize, reference.socketSize, reference.name + " socket size");
 			equal(screw.socketDepth, reference.socketDepth, reference.name + " socket depth");
 			equal(screw.threadLength, reference.threadLength, reference.name + " thread length");
+			equal(screw.clearanceCoarse, reference.coarse, reference.name + " ISO 273 coarse clearance");
+			equal(screw.counterboreDiameter, reference.counterbore, reference.name + " DIN 974-1 counterbore diameter");
+			equal(screw.counterboreDepth, reference.depth, reference.name + " DIN 974-1 counterbore depth");
 			var screwMetadata = SocketHeadCapScrew.catalog().metadata(reference.name);
 			if (screwMetadata.dimensionKind != Unverified || screwMetadata.verifiedFields == null)
 				throw reference.name + " partial verification metadata";

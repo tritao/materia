@@ -25,9 +25,11 @@ interface StructuralProfile {
 	function geometry(length:Float):Part;
 }
 
-/** End treatment for one structural member. `setback` is the stock removed from a member's
- * centreline endpoint for the frame's cut-length envelope. Mitres use a sloped end plane and
- * copes use a curved notch sized from the profile envelope.
+/** End treatment for one structural member. A mitre's `setback` is the axial difference between
+ * the short and long points across the section; its plane passes through the frame node. The long
+ * point is on local -X at either end. A cope's
+ * `setback` is the radius of a cylindrical tool whose axis follows the mating member through the
+ * shared node.
  */
 enum FrameEndCut {
 	Square;
@@ -49,9 +51,9 @@ typedef CutListLine = {
  * between two points. A frame is one rigid weldment, not a kinematic mechanism, so members carry
  * no assembly joints: `geometry(name)` returns the member's `Part` already placed in world space.
  *
- * Members are placed by centreline, node to node. Square ends preserve that envelope; mitre and
- * cope treatments remove the requested stock setback from the corresponding endpoint. `length`
- * remains the node-to-node distance, while `cutLength` and `cutList` report stock lengths.
+ * Members are placed by their centreline nodes. Square and coped members keep node-to-node stock;
+ * mitre planes pass through the nodes and add stock to reach the long points. `length` is the
+ * node-to-node distance, while `cutLength` and `cutList` report stock lengths including mitres.
  *
  * Section orientation: the profile's local +Z runs from `start` to `end`, its local +Y (a
  * channel's `height`, an angle's `legB`, a tube's `height`) follows `reference` projected
@@ -92,55 +94,70 @@ class FrameAssembly {
 		var resolvedStartCut = startCut == null ? Square : startCut;
 		var resolvedEndCut = endCut == null ? Square : endCut;
 		var centerline = points.get(end).subtract(points.get(start)).length();
-		var stockLength = centerline - cutBack(resolvedStartCut) - cutBack(resolvedEndCut);
-		if (centerline > 1e-9 && !(stockLength > 1e-9)) throw 'Member "$name" end cuts consume its length';
+		validateCut(resolvedStartCut);
+		validateCut(resolvedEndCut);
 		members.push({name: name, start: start, end: end, profile: profile, reference: reference,
 			startCut: resolvedStartCut, endCut: resolvedEndCut});
 	}
 
-	/** Straight-line (centreline, untrimmed) distance between a member's endpoints. */
+	/** Straight-line distance between the frame nodes on a member's centreline. */
 	public function length(name:String):Float {
 		var m = find(name);
 		return points.get(m.end).subtract(points.get(m.start)).length();
 	}
 
-	/** Stock length after the member's start and end cut setbacks. */
+	/** Stock length between the mitre long points; square and coped ends remain node-to-node. */
 	public function cutLength(name:String):Float {
 		var m = find(name);
-		return length(name) - cutBack(m.startCut) - cutBack(m.endCut);
+		return length(name) + mitreLongPoint(m.profile, m.startCut) + mitreLongPoint(m.profile, m.endCut);
 	}
 
-	/** The member's `Part`, extruded to its length and placed in world space along its endpoints. */
+	/** The member's `Part` placed in world space along its endpoints and extended to mitre long points. */
 	public function geometry(name:String):Part {
-		var m = find(name);
-		var start = points.get(m.start), end = points.get(m.end);
-		var axis = end.subtract(start);
-		var len = axis.length();
-		if (!(len > 1e-9)) throw 'Member "$name" has coincident endpoints';
-		var direction = axis.scale(1 / len);
-		var reference = m.reference != null ? m.reference
-			: (Math.abs(direction.dot(Vector.Z())) < 0.9 ? Vector.Z() : Vector.Y());
-		// Local X = reference x direction makes local Y = direction x X the reference's
-		// component perpendicular to the member.
-		var sideways = reference.cross(direction);
-		if (!(sideways.length() > 1e-6 * reference.length()))
-			throw 'Member "$name" reference is parallel to its axis; pick a reference across the member';
-		sideways = sideways.normalized();
-		var startSetback = cutBack(m.startCut);
-		var stockLength = len - startSetback - cutBack(m.endCut);
-		var body = m.profile.geometry(stockLength);
-		try {
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var m = find(name);
+			var start = points.get(m.start), end = points.get(m.end);
+			var axis = end.subtract(start);
+			var len = axis.length();
+			if (!(len > 1e-9)) throw 'Member "$name" has coincident endpoints';
+			var direction = axis.scale(1 / len);
+			var reference = m.reference != null ? m.reference
+				: (Math.abs(direction.dot(Vector.Z())) < 0.9 ? Vector.Z() : Vector.Y());
+			// Local X = reference x direction makes local Y = direction x X the reference's
+			// component perpendicular to the member.
+			var sideways = reference.cross(direction);
+			if (!(sideways.length() > 1e-6 * reference.length()))
+				throw 'Member "$name" reference is parallel to its axis; pick a reference across the member';
+			sideways = sideways.normalized();
 			var section = m.profile.sectionBounds();
-			body = applyEndCut(body, m.startCut, true, stockLength, section);
-			body = applyEndCut(body, m.endCut, false, stockLength, section);
-			var cutStart = start.add(direction.scale(startSetback));
-			var placed = body.placed(new Location(new Plane(cutStart, sideways, direction)));
+			var startExtension = mitreLongPoint(m.profile, m.startCut);
+			var endExtension = mitreLongPoint(m.profile, m.endCut);
+			var body = m.profile.geometry(len + startExtension + endExtension);
+			tracked.push(body);
+			body = applyEndCut(body, m.startCut, true, len, startExtension, section);
+			tracked.push(body);
+			body = applyEndCut(body, m.endCut, false, len, startExtension, section);
+			tracked.push(body);
+			var stockStart = start.subtract(direction.scale(startExtension));
+			var placed = body.placed(new Location(new Plane(stockStart, sideways, direction)));
 			body.close();
-			return placed;
-		} catch (error:Dynamic) {
-			body.close();
-			throw error;
-		}
+			body = placed;
+			tracked.push(body);
+			if (isCope(m.startCut)) {
+				var tool = copeTool(m, true, section);
+				tracked.push(tool);
+				body = Solids.cut(body, [tool]);
+				tracked.push(body);
+			}
+			if (isCope(m.endCut)) {
+				var tool = copeTool(m, false, section);
+				tracked.push(tool);
+				body = Solids.cut(body, [tool]);
+				tracked.push(body);
+			}
+			return body;
+		});
 	}
 
 	/** Cut lengths aggregated by profile designation, in first-used order. */
@@ -169,44 +186,46 @@ class FrameAssembly {
 		throw 'Unknown frame member "$name"';
 	}
 
-	static function cutBack(cut:FrameEndCut):Float {
-		return switch (cut) {
-			case Square: 0;
+	static function validateCut(cut:FrameEndCut):Void {
+		switch cut {
+			case Square:
 			case Mitre(setback) | Cope(setback):
 				if (!(setback > 0) || !Math.isFinite(setback)) throw "Frame end-cut setback must be positive";
-				setback;
+		}
+	}
+
+	static function mitreLongPoint(profile:StructuralProfile, cut:FrameEndCut):Float {
+		return switch cut {
+			case Mitre(setback):
+				var bounds = profile.sectionBounds(), width = bounds.maxX - bounds.minX;
+				setback * Math.max(Math.abs(bounds.minX), Math.abs(bounds.maxX)) / width;
+			case Square | Cope(_): 0;
 		};
 	}
 
-	static function applyEndCut(body:Part, cut:FrameEndCut, atStart:Bool, length:Float, bounds:SectionBounds):Part {
+	static function applyEndCut(body:Part, cut:FrameEndCut, atStart:Bool, length:Float, startOffset:Float,
+			bounds:SectionBounds):Part {
 		return switch (cut) {
 			case Square: body;
 			case Mitre(setback):
-				var tool = mitreTool(length, bounds, atStart, setback);
+				var tool = mitreTool(length, startOffset, bounds, atStart, setback);
 				intersectClosing(body, tool);
-			case Cope(setback):
-				var radius = Math.min(setback, Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY));
-				var yMargin = Math.max(1, (bounds.maxY - bounds.minY) * 0.1);
-				var tool = Part.cylinder(radius, bounds.maxY - bounds.minY + 2 * yMargin);
-				var origin = new Location(new Plane(new Vector((bounds.minX + bounds.maxX) / 2,
-					bounds.minY - yMargin, atStart ? 0 : length), Vector.X(), Vector.Y()));
-				var placed = tool.placed(origin);
-				tool.close();
-				var result = Solids.cut(body, [placed]);
-				result;
+			case Cope(_): body;
 		};
 	}
 
-	static function mitreTool(length:Float, bounds:SectionBounds, atStart:Bool, setback:Float):Part {
+	static function mitreTool(length:Float, startOffset:Float, bounds:SectionBounds, atStart:Bool, setback:Float):Part {
 		var xSpan = bounds.maxX - bounds.minX;
 		var xMargin = Math.max(1, xSpan * 0.1);
 		var x0 = bounds.minX - xMargin, x1 = bounds.maxX + xMargin;
-		var z0 = atStart ? setback * (x0 - bounds.minX) / xSpan : 0;
-		var z1 = atStart ? setback * (x1 - bounds.minX) / xSpan : length - setback * (x1 - bounds.minX) / xSpan;
-		var far = length + setback + 1;
+		var z0 = startOffset + setback * x0 / xSpan;
+		var z1 = startOffset + setback * x1 / xSpan;
+		var endNode = startOffset + length;
+		var far = endNode + Math.abs(setback) + 1;
 		var points = atStart
 			? [new Vector(x0, z0), new Vector(x1, z1), new Vector(x1, far), new Vector(x0, far)]
-			: [new Vector(x0, -1), new Vector(x1, -1), new Vector(x1, z1), new Vector(x0, length - setback * (x0 - bounds.minX) / xSpan)];
+			: [new Vector(x0, -far), new Vector(x1, -far), new Vector(x1, endNode - (z1 - startOffset)),
+				new Vector(x0, endNode - (z0 - startOffset))];
 		var yMargin = Math.max(1, (bounds.maxY - bounds.minY) * 0.1);
 		var plane = new Plane(new Vector(0, bounds.maxY + yMargin, 0), Vector.X(), Vector.Y().scale(-1));
 		var sketch = Sketch.polygon(points, plane);
@@ -219,6 +238,44 @@ class FrameAssembly {
 			throw error;
 		}
 	}
+
+	function copeTool(member:FrameMember, atStart:Bool, bounds:SectionBounds):Part {
+		var node = atStart ? member.start : member.end;
+		var mating:Null<FrameMember> = null;
+		for (candidate in members)
+			if (candidate.name != member.name && (candidate.start == node || candidate.end == node)) {
+				mating = candidate;
+				break;
+			}
+		if (mating == null) throw 'Member "${member.name}" cope at "$node" needs a mating member';
+		var mateDirection = points.get(mating.end).subtract(points.get(mating.start)).normalized();
+		var memberDirection = points.get(member.end).subtract(points.get(member.start)).normalized();
+		var xDirection = memberDirection.cross(mateDirection);
+		if (!(xDirection.length() > 1e-8))
+			throw 'Member "${member.name}" cope at "$node" needs a non-parallel mating member';
+		xDirection = xDirection.normalized();
+		var setback = switch (atStart ? member.startCut : member.endCut) {
+			case Cope(radius): radius;
+			default: throw "Expected cope end cut";
+		};
+		var radius = Math.min(setback, Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY));
+		var toolLength = 2 * (Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY) + radius + 1);
+		var tool = Part.cylinderSpan(radius, -toolLength / 2, toolLength / 2);
+		try {
+			var placed = tool.placed(new Location(new Plane(points.get(node), xDirection, mateDirection)));
+			tool.close();
+			return placed;
+		} catch (error:Dynamic) {
+			tool.close();
+			throw error;
+		}
+	}
+
+	static function isCope(cut:FrameEndCut):Bool
+		return switch cut {
+			case Cope(_): true;
+			case Square | Mitre(_): false;
+		};
 
 	static function intersectClosing(base:Part, tool:Part):Part {
 		try {

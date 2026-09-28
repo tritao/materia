@@ -120,25 +120,44 @@ class NemaStepper extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var half = variant.bodyFace / 2;
-		var parts:Array<Part> = [];
-		if (detail == Envelope) {
-			parts.push(Part.prism([new Vector(-half, -half), new Vector(half, -half),
-				new Vector(half, half), new Vector(-half, half)], -bodyLength, 0));
-		} else {
-			var c = 0.08 * variant.bodyFace;
-			var body = Part.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
-				new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
-				new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
-				-bodyLength, 0);
-			var screw = mountScrew(10);
-			var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
-			parts.push(Solids.cut(body, [for (point in boltPattern())
-				Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y)]));
-		}
-		parts.push(Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight));
-		parts.push(Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength));
-		return Solids.union(parts);
+		var ownedParts:Array<Part> = [];
+		return Solids.building(ownedParts, tracked -> {
+			var half = variant.bodyFace / 2;
+			var parts:Array<Part> = [];
+			if (detail == Envelope) {
+				var body = Part.prism([new Vector(-half, -half), new Vector(half, -half),
+					new Vector(half, half), new Vector(-half, half)], -bodyLength, 0);
+				tracked.push(body);
+				parts.push(body);
+			} else {
+				var c = 0.08 * variant.bodyFace;
+				var body = Part.prism([new Vector(-half + c, -half), new Vector(half - c, -half),
+					new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
+					new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
+					-bodyLength, 0);
+				tracked.push(body);
+				var screw = mountScrew(10);
+				var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
+				var tools:Array<Part> = [];
+				for (point in boltPattern()) {
+					var tool = Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y);
+					tracked.push(tool);
+					tools.push(tool);
+				}
+				body = Solids.cut(body, tools);
+				tracked.push(body);
+				parts.push(body);
+			}
+			var pilot = Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight);
+			var shaft = Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength);
+			tracked.push(pilot);
+			tracked.push(shaft);
+			parts.push(pilot);
+			parts.push(shaft);
+			var result = Solids.union(parts);
+			tracked.push(result);
+			return result;
+		});
 	}
 
 	public function mountScrew(length:Float):SocketHeadCapScrew

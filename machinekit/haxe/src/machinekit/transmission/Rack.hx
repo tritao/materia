@@ -24,16 +24,19 @@ class Rack {
 	public final barHeight:Float;
 
 	public function new(moduleSize:Float, teethCount:Int, faceWidth:Float,
-			pressureAngle:Float = SpurGear.STANDARD_PRESSURE_ANGLE, barHeight:Float = -1) {
+			pressureAngle:Float = SpurGear.STANDARD_PRESSURE_ANGLE, ?barHeight:Float) {
 		if (!(moduleSize > 0)) throw "Rack needs a positive module";
 		if (teethCount < 1) throw "Rack needs at least one tooth";
 		if (!(faceWidth > 0)) throw "Rack needs a positive face width";
 		if (!SpurGear.validPressureAngle(pressureAngle)) throw "Rack pressure angle must be between 14.5 and 25 degrees";
+		var resolvedBarHeight = barHeight == null ? 1.5 * moduleSize : barHeight;
+		if (!Math.isFinite(resolvedBarHeight) || resolvedBarHeight < 0)
+			throw "Rack bar height must be finite and non-negative";
 		this.moduleSize = moduleSize;
 		this.teethCount = teethCount;
 		this.faceWidth = faceWidth;
 		this.pressureAngle = pressureAngle;
-		this.barHeight = barHeight >= 0 ? barHeight : 1.5 * moduleSize;
+		this.barHeight = resolvedBarHeight;
 		length = teethCount * Math.PI * moduleSize;
 		var moduleText = Dimension.format(moduleSize);
 		designation = 'RACK-M$moduleText-${teethCount}T';
