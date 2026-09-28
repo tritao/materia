@@ -19,6 +19,7 @@ import robotkit.tool.Tool;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.skill.Skill;
 import robotkit.skill.SkillRunner;
 import robotkit.skill.SkillStatus;
@@ -63,7 +64,9 @@ class ExcavatorTests {
 
   static function testToolpathProcessSpans():Void {
     var fixture = buildExcavatorFixture();
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var robot = new SimulatedRobot("two-pass-toolpath",
       simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model)),
       fixture.model.name, [for (link in fixture.model.links) link.name],
@@ -83,7 +86,7 @@ class ExcavatorTests {
     var removed = 0.0;
     var sawFirstCut = false, sawSecondCut = false, sweptApproach = false;
     for (tick in 0...10000) {
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       var snapshot = robot.snapshot();
       var op = motion.motion.progress().op;
       motion.update(0.02);
@@ -111,7 +114,7 @@ class ExcavatorTests {
     check(motion.completed() && sweeps == 2 && removed > 0.0 &&
       sawFirstCut && sawSecondCut && !sweptApproach,
       "two process spans produce exactly two BucketSweep cuts");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testZeroPoseFK():Void {
@@ -193,7 +196,9 @@ class ExcavatorTests {
   static function testDigTrenchScenario():Void {
     var fixture = buildExcavatorFixture();
     var blueprint = RobotRuntimeCompiler.compile(fixture.model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var linkNames = [for (link in fixture.model.links) link.name];
     var jointNames = [for (joint in fixture.model.joints) joint.name];
     var robot = new SimulatedRobot("excavator", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
@@ -229,7 +234,7 @@ class ExcavatorTests {
     var status = runner.start(dig);
     var steps = 0;
     while (status == SkillStatus.Running && steps < 200000) {
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       tick++;
       var snapshot = robot.snapshot();
       status = runner.update(snapshot, 0.02);
@@ -264,13 +269,15 @@ class ExcavatorTests {
     check(!belowDesign, "DigTrench does not cut below the design surface beyond grade tolerance");
     check(!outsideFootprint, "DigTrench does not lower vertices outside the footprint plus half a cell");
     Sys.println('M12 trench scenario: cycles=${dig.cyclesCompleted} finalDepthError=${dig.remainingDepthError()} removedVolume=${dig.totalRemovedVolume}');
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testGradeRegionScenario():Void {
     var fixture = buildExcavatorFixture();
     var blueprint = RobotRuntimeCompiler.compile(fixture.model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var linkNames = [for (link in fixture.model.links) link.name];
     var jointNames = [for (joint in fixture.model.joints) joint.name];
     var robot = new SimulatedRobot("excavator-grade", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
@@ -306,7 +313,7 @@ class ExcavatorTests {
     var status = runner.start(grade);
     var steps = 0;
     while (status == SkillStatus.Running && steps < 200000) {
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       tick++;
       status = runner.update(robot.snapshot(), 0.02);
       steps++;
@@ -316,13 +323,15 @@ class ExcavatorTests {
       'GradeRegion reaches Succeeded (got $status)');
     check(approx(region.gradeFraction(), 1.0, 1e-9), "GradeRegion brings every vertex to grade");
     check(grade.cyclesCompleted >= 1, "GradeRegion runs at least one cycle");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testDumpAtMovesToTarget():Void {
     var fixture = buildExcavatorFixture();
     var blueprint = RobotRuntimeCompiler.compile(fixture.model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var linkNames = [for (link in fixture.model.links) link.name];
     var jointNames = [for (joint in fixture.model.joints) joint.name];
     var robot = new SimulatedRobot("excavator-dump", simulation.addRobot(blueprint), fixture.model.name, linkNames, jointNames);
@@ -343,7 +352,7 @@ class ExcavatorTests {
     var steps = 0;
     var lastQ = seed;
     while (status == SkillStatus.Running && steps < 20000) {
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       tick++;
       var snapshot = robot.snapshot();
       lastQ = [for (i in 0...4) snapshot.positions.get(i)];
@@ -358,7 +367,7 @@ class ExcavatorTests {
       approx(achieved.translation.y, targetPose.translation.y, 5e-3) &&
       approx(achieved.translation.z, targetPose.translation.z, 5e-3),
       "DumpAt drives the TCP to the requested position");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   // -- fixture --------------------------------------------------------

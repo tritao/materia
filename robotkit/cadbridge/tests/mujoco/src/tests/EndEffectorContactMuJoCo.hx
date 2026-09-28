@@ -20,6 +20,7 @@ import haxe.Int64;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RobotRecording;
 import robotkit.world.ReplayRobot;
@@ -64,19 +65,21 @@ class EndEffectorContactMuJoCo {
     var cup = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls(
       [collision.pieces[cupIndex].vertices], 0));
     var tool = EndEffectorBridge.toTool(effector, "contact", null, "short/contact", options);
-    var simulation = new Simulation(0.01, 2, 1);
+    var simulationHarness = new SimulationHarness(0.01, 2, 1);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
       [0, 0, 0], [0, 0, 0, 1], null, null, null, null, tool.collision, 0);
-    var obstacle = simulation.spawnBox([
+    var obstacle = simulationHarness.spawnBox([
       cup.centre.x, cup.centre.y, cup.centre.z + cup.halfExtents.z + 0.007],
       [0.005, 0.005, 0.005]);
-    simulation.step(Int64.ofInt(0));
+    simulationHarness.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
     if (contacts.length == 0) throw "Example cup proximity was not reported";
     for (contact in contacts)
-      if (contact.toolPieceIndex != cupIndex || contact.otherObject != obstacle)
+      if (contact.toolPieceIndex != cupIndex || contact.otherObject != obstacle.handle)
         throw "Proximity came from a piece other than the example cup";
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testVacuumFeedback():Void {
@@ -114,7 +117,9 @@ class EndEffectorContactMuJoCo {
     if (authored.id != bundle.bindings.vacuumSensorId ||
         authored.kind != "tool_vacuum_kpa" || authored.position.get(2) <= 0)
       throw "EOAT pressure sensor was not mounted on the flange blueprint";
-    var simulation = new Simulation(0.01, 2, 1);
+    var simulationHarness = new SimulationHarness(0.01, 2, 1);
+
+    var simulation = simulationHarness.simulation;
     var robot = simulation.addRobotAtPose(blueprint,
       [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
       bundle.runtime.tool.collision, 0, 0, 0.01);
@@ -124,16 +129,16 @@ class EndEffectorContactMuJoCo {
     feedback.attach(simulation);
     selection.apply(new FiredProcessEvent(Int64.ofInt(1), "sensed/tool/generator.enable",
       ProcessEventValue.Digital(true), Int64.ofInt(1), Int64.ofInt(1), 1));
-    simulation.spawnBox([bounds.centre.x, bounds.centre.y,
+    simulationHarness.spawnBox([bounds.centre.x, bounds.centre.y,
       bounds.centre.z + bounds.halfExtents.z + 0.007], [0.005, 0.005, 0.005]);
-    simulation.step(Int64.ofInt(2));
+    simulationHarness.step(Int64.ofInt(2));
     var nearbyFrame = pressureFrame(robot, authored.id);
     if (nearbyFrame.values.get(0) != 0 || vacuum.isHolding() ||
         vacuum.vacuumKpa() != 0 || nearbyFrame.sourceClockId != "robotkit.simulation")
       throw "Cup proximity must not produce a seal pressure";
-    var touchingObject = simulation.spawnBox([bounds.centre.x, bounds.centre.y,
+    var touchingObject = simulationHarness.spawnBox([bounds.centre.x, bounds.centre.y,
       bounds.centre.z + bounds.halfExtents.z + 0.003], [0.005, 0.005, 0.005]);
-    simulation.step(Int64.ofInt(3));
+    simulationHarness.step(Int64.ofInt(3));
     var touching = false;
     for (contact in robot.contacts())
       if (contact.toolPieceIndex == cupIndex && contact.distance <= 0) touching = true;
@@ -146,8 +151,8 @@ class EndEffectorContactMuJoCo {
       ["base_link"], []);
     var recording = new RobotRecording();
     recording.recordSnapshot(simulatedRobot.snapshot());
-    simulation.removeObject(touchingObject);
-    simulation.step(Int64.ofInt(4));
+    simulationHarness.removeObject(touchingObject);
+    simulationHarness.step(Int64.ofInt(4));
     var lostFrame = pressureFrame(robot, authored.id);
     if (lostFrame.values.get(0) != 0 || vacuum.isHolding() ||
         vacuum.vacuumKpa() != 0)
@@ -158,17 +163,17 @@ class EndEffectorContactMuJoCo {
         sensorValue(replay.sensors(), authored.id) != 0)
       throw "Recorded pressure frames must replay in order";
     selection.select(null, simulation.sourceTimestampNs(), "robotkit.simulation");
-    simulation.step(Int64.ofInt(5));
+    simulationHarness.step(Int64.ofInt(5));
     if (vacuum.isHolding() || pressureFrame(robot, authored.id).values.get(0) != 0)
       throw "Deselecting the tool must release its vacuum state";
     var finalSequence = pressureFrame(robot, authored.id).sequence;
     feedback.detach();
-    simulation.step(Int64.ofInt(6));
+    simulationHarness.step(Int64.ofInt(6));
     if (Int64.compare(pressureFrame(robot, authored.id).sequence, finalSequence) != 0)
       throw "Detached vacuum feedback must stop publishing sensor frames";
     replay.close();
     simulatedRobot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function pressureFrame(robot:RobotRuntime, id:String):SensorFrame {

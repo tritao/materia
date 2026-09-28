@@ -64,13 +64,18 @@ boundary, but they do not advance physics independently. The Haxe
 `robotkit.runtime.Simulation` façade exposes the same lifecycle while behavior
 code continues to depend on robot-scoped submit/snapshot APIs.
 
-`Simulation.inSession(session)` (`rk_simulation_create_in_session`) joins a
-session the application owns and steps; `presentFrame` presents the robots
-from the same `SimFrame` the application reads its props and people from. The
-`Simulation` constructor (`rk_simulation_create`) instead owns a private
-session, and then `Simulation.step()`, `start()`, `stop()`, `reset()`, and the
-environment-object calls control that session; this mode is transitional and
-will be removed once every consumer owns a session.
+`Simulation.inSession(session)` (`rk_simulation_create_in_session`) is the only
+way to construct a `Simulation`: it joins a session the caller owns, steps,
+starts, stops, and resets, and whose environment (session objects and actors)
+the caller edits directly through the session API; `presentFrame` presents the
+robots from the same `SimFrame` the caller reads its props and people from.
+`Simulation` itself has no clock or environment calls of its own. Callers that
+just want one thing to construct, step, and dispose end to end — mainly
+tests, and robotd's standalone/in-memory server mode — can use
+`robotkit.runtime.SimulationHarness` instead, which owns a
+`robotkit.runtime.SimulationSpace` (scene, world, and session) and the
+`Simulation` joined to it, and offers the same `step`/`start`/`stop`/`reset`
+and box-object convenience the old self-owned mode had.
 
 `Simulation` also owns robot runtime-scene operations: per-robot reset and
 robot teleport. These edits are accepted while the session is stopped. Once running,

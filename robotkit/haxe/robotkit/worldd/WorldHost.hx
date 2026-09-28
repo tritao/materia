@@ -3,26 +3,27 @@ package robotkit.worldd;
 import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntimeCompiler;
-import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.world.RemoteRobot;
 import robotkit.world.RobotWorld;
 import robotkit.world.SimulatedRobot;
 
-/** Headless composition of the existing RobotWorld and shared Simulation. */
+/** Headless composition of the existing RobotWorld and a shared Simulation
+ * this host owns end to end (through a SimulationHarness). */
 class WorldHost {
   public final world:RobotWorld;
-  public final simulation:Simulation;
+  public final simulation:SimulationHarness;
   var closed:Bool = false;
 
   public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1) {
     world = new RobotWorld();
-    simulation = new Simulation(fixedTimestep, physicsSubsteps);
+    simulation = new SimulationHarness(fixedTimestep, physicsSubsteps);
   }
 
   public function addSimulatedRobot(id:String, model:RobotModel):SimulatedRobot {
     ensureOpen();
     var blueprint = RobotRuntimeCompiler.compile(model);
-    var runtime = simulation.addRobot(blueprint);
+    var runtime = simulation.simulation.addRobot(blueprint);
     var robot = new SimulatedRobot(id, runtime, model.name,
       [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
     world.attach(robot);

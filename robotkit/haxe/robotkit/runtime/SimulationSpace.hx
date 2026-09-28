@@ -1,4 +1,4 @@
-package app;
+package robotkit.runtime;
 
 import nativekit.scene.Scene;
 import nativekit.sim.MujocoSimWorld;
@@ -6,10 +6,17 @@ import nativekit.sim.SimSession;
 import nativekit.sim.SimWorld;
 
 /**
- * The scene, physics world, and SimKit session one application simulation
- * runs in. Robots, environment props, and people all join the session.
+ * The scene, physics world, and SimKit session one simulation runs in.
+ * Robots (through Simulation.inSession()), environment props, and people all
+ * join the session. Shared by the app and by anything else that needs to own
+ * a session end to end, such as a test.
  */
 class SimulationSpace {
+	/** The deterministic, dependency-free test backend. */
+	public static inline var DETERMINISTIC:Int = 0;
+	/** The MuJoCo backend; must be built in. */
+	public static inline var MUJOCO:Int = 1;
+
 	public final session:SimSession;
 	final scene:Scene;
 	final releaseWorld:Void->Void;
@@ -25,7 +32,7 @@ class SimulationSpace {
 	public static function create(backend:Int, timestep:Float):SimulationSpace {
 		var scene = Scene.create();
 		try {
-			if (backend == ApplicationSimulation.MUJOCO) {
+			if (backend == MUJOCO) {
 				var world = MujocoSimWorld.create(scene, {timestep: timestep, physicsSubsteps: 1});
 				return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose);
 			}

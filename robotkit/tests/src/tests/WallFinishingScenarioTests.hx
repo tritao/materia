@@ -34,6 +34,7 @@ import robotkit.perception.SimulatedSurfaceScanner;
 import robotkit.perception.SurfaceRegistration;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.HolonomicDrivePlant;
 import robotkit.mobile.MobileBase;
 import robotkit.mobile.Pose2;
@@ -104,7 +105,7 @@ class WallFinishingScenarioTests {
    * ARCHITECTURE.md "Simulated wall-finishing robot (M9)"). Not called from
    * `RobotWorldTests.main()`/`run()`: the standard `robotkit/tests`
    * project's own native build has MuJoCo backend support compiled out, so
-   * `new Simulation(dt, substeps, 1)` there would throw `RK_ERROR_UNSUPPORTED`.
+   * `new SimulationHarness(dt, substeps, 1)` there would throw `RK_ERROR_UNSUPPORTED`.
    */
   public static function runMuJoCo():Int {
     assertions = 0;
@@ -136,7 +137,10 @@ class WallFinishingScenarioTests {
     blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
       ProcessEventValue.Digital(false)));
 
-    var simulation = new Simulation(physicsTimestep, physicsSubsteps, backend);
+    var simulationHarness = new SimulationHarness(physicsTimestep, physicsSubsteps, backend);
+
+
+    var simulation = simulationHarness.simulation;
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-wall-finishing-backend$backend.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
     var runtime = simulation.addRobot(blueprint);
@@ -145,7 +149,7 @@ class WallFinishingScenarioTests {
     var robot = new RecordingRobot(sourceRobot, writer);
 
     var base = MobileBase.fromBlueprint(robot, blueprint);
-    var plant = new HolonomicDrivePlant(simulation, 0, base);
+    var plant = new HolonomicDrivePlant(simulationHarness, 0, base);
     var localization = new SimulationTruthLocalization(simulation, 0, "map", "base");
     var navigation = new Navigation(base, localization, 0.2, 0.3, 1.0);
     var grid = new OccupancyGrid2(0.1, new Pose2(-2.0, -2.0), 40, 40, "map", OccupancyCell.Free);
@@ -254,7 +258,7 @@ class WallFinishingScenarioTests {
       var navSteps = 0;
       // A fixed tick budget must scale with the timestep so every backend
       // gets the same simulated-time budget to converge (the MuJoCo run
-      // uses a smaller physicsTimestep, per the plan's `new Simulation(0.01,
+      // uses a smaller physicsTimestep, per the plan's `new SimulationHarness(0.01,
       // 2, 1)`, so it needs proportionally more ticks for the same 40s).
       var maxNavSteps = Std.int(40.0 / timestep);
       while (status == SkillStatus.Running && navSteps < maxNavSteps) {
@@ -458,7 +462,7 @@ class WallFinishingScenarioTests {
     replay.close();
 
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
     if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");

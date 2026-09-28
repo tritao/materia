@@ -15,6 +15,7 @@ import robotkit.runtime.RobotRuntimeMobileConfiguration;
 import robotkit.runtime.RobotRuntimeForkConfiguration;
 import robotkit.runtime.RobotRuntimeForkAxisConfiguration;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
@@ -487,20 +488,22 @@ class RobotWorldTests {
       RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -100.0, 100.0, 100.0, 50.0));
     mobileBlueprint.addJoint(new RobotRuntimeJointBlueprint(1,
       RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE, 0, 2, -100.0, 100.0, 100.0, 50.0));
-    var mobileSimulation = new Simulation(0.01);
+    var mobileSimulationHarness = new SimulationHarness(0.01);
+
+    var mobileSimulation = mobileSimulationHarness.simulation;
     var simulatedRobot = new SimulatedRobot("mobile-sim",
       mobileSimulation.addRobot(mobileBlueprint), "mobile simulation",
       ["base", "left-wheel", "right-wheel"], ["left-wheel-joint", "right-wheel-joint"]);
     var simulatedBase = new MobileBase(simulatedRobot,
       new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
     simulatedBase.command(new Twist2(0.2, 0.0));
-    mobileSimulation.step(Int64.ofInt(100));
+    mobileSimulationHarness.step(Int64.ofInt(100));
     var simulatedState = simulatedRobot.snapshot();
     check(Math.abs(simulatedState.velocities.get(0) - 2.0) < 1e-9 &&
       Math.abs(simulatedState.velocities.get(1) - 2.0) < 1e-9,
       "mobile base drives both simulated wheels through the shared Simulation runtime");
     simulatedRobot.close();
-    mobileSimulation.dispose();
+    mobileSimulationHarness.dispose();
 
     var speedLimited = differential.command(new Twist2(10.0, 0.0));
     check(Math.abs(speedLimited.linear - 1.0) < 1e-9,
@@ -925,11 +928,13 @@ class RobotWorldTests {
     simAntenna.position = [1.0, 0.0, 0.8];
     var simSensor = simulated.addSensor(new Sensor("gnss", "gnss_pose", 10.0, "sim/gnss"));
     simSensor.frame = simAntenna;
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(simulated));
     var robot = new SimulatedRobot("gnss-sim", runtime, simulated.name, [simBase.name], []);
-    simulation.step(Int64.ofInt(1));
-    simulation.step(Int64.ofInt(2));
+    simulationHarness.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(2));
     runtime.publishSensorFrame("sim/gnss", [0.0, oneMetreEast, Math.PI * 0.5], Int64.ofInt(1),
       Int64.ofInt(987654321), "gnss.receiver");
     var observed = robot.snapshot();
@@ -949,7 +954,7 @@ class RobotWorldTests {
     check(fused.quality != LocalizationQuality.Invalid && Math.abs(fused.pose.x - 1.0) < 1e-3 &&
       Math.abs(fused.pose.y + 1.0) < 1e-3, "GNSS fixes anchor pose fusion in the map frame");
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testFiducialPerception():Void {
@@ -1222,7 +1227,9 @@ class RobotWorldTests {
       "stale external localization is ignored without disturbing a fresh estimate");
 
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     simulation.addRobot(blueprint);
     var yaw = Math.PI * 0.5;
     simulation.teleportRobot(0, [2.0, 3.0, 0.0],
@@ -1243,7 +1250,7 @@ class RobotWorldTests {
       "simulation truth publishes exact quality and zero truth covariance");
     throws(function() truth.reset(new Pose2(9.0, 9.0, 0.0)),
       "simulation truth cannot be reset to a fabricated pose");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testNavigation():Void {
@@ -1577,7 +1584,9 @@ class RobotWorldTests {
     lidar.maxRange = 5.0;
 
     var blueprint = RobotRuntimeCompiler.compile(model);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("motion-guard-sim", runtime, model.name,
       [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
@@ -1594,7 +1603,7 @@ class RobotWorldTests {
     navigation.follow(path);
 
     function observe(tick:Int):PerceptionSnapshot {
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       var snapshot = robot.snapshot();
       return framedPerception.observe(snapshot.sensors.toArray());
     }
@@ -1605,7 +1614,7 @@ class RobotWorldTests {
       base.currentCommand().linear > 0.5,
       "MotionGuard leaves navigation speed unchanged when the path is clear");
 
-    var objectId = simulation.spawnBox([1.0, 0.0, 0.0], [0.1, 0.1, 0.1]);
+    var objectId = simulationHarness.spawnBox([1.0, 0.0, 0.0], [0.1, 0.1, 0.1]);
     var detected = observe(2);
     check(detected.obstacles().length > 0,
       "simulated LiDAR perception detects an obstacle in the navigation corridor");
@@ -1615,7 +1624,7 @@ class RobotWorldTests {
       approachSpeed > 0.0 && approachSpeed < 0.6,
       "MotionGuard reduces navigation speed inside the stopping envelope");
 
-    simulation.teleportObject(objectId, [0.65, 0.0, 0.0]);
+    simulationHarness.teleportObject(objectId, [0.65, 0.0, 0.0]);
     var blocked = observe(3);
     check(blocked.obstacles().length > 0,
       "simulated perception continues observing an obstacle near the footprint");
@@ -1625,7 +1634,7 @@ class RobotWorldTests {
       Math.abs(base.currentCommand().linear) < 1e-9,
       "MotionGuard commands a stop when obstacle clearance reaches its margin");
 
-    simulation.removeObject(objectId);
+    simulationHarness.removeObject(objectId);
     var resumed = observe(4);
     equal(resumed.obstacles().length, 0, "simulated LiDAR clears the removed obstacle");
     guard.update(resumed, 0.1);
@@ -1640,7 +1649,7 @@ class RobotWorldTests {
       "MotionGuard blocks when obstacle frame transforms are unavailable");
     guard.detach();
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testGridPlanning():Void {
@@ -1844,7 +1853,9 @@ class RobotWorldTests {
     lidar.maxRange = 4.0;
 
     var blueprint = RobotRuntimeCompiler.compile(model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("navigator-sim", runtime, model.name,
       [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
@@ -1867,7 +1878,7 @@ class RobotWorldTests {
 
     // The articulated physics backend does not model wheel traction, so an ideal
     // differential-drive plant couples commanded wheel rates to the chassis.
-    var plant = new DifferentialDrivePlant(simulation, 0, base);
+    var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
     var lastPerception = new PerceptionSnapshot();
     function robotObservation(tick:Int):RobotSnapshot
       return plant.step(Int64.ofInt(tick));
@@ -1922,7 +1933,7 @@ class RobotWorldTests {
     check(movingState.pose.x > offPathFinal.pose.x + 0.05,
       "Navigator advances the simulated robot before an obstacle appears");
     var obstaclePose = movingState.pose.compose(new Pose2(1.3, 0.0));
-    simulation.spawnBox([obstaclePose.x, obstaclePose.y, 0.2], [0.12, 0.12, 0.3]);
+    simulationHarness.spawnBox([obstaclePose.x, obstaclePose.y, 0.2], [0.12, 0.12, 0.3]);
 
     var detectedObstacle = false;
     var pathDetoured = false;
@@ -2028,7 +2039,7 @@ class RobotWorldTests {
       "simulated Navigator traverses the narrow passage and reaches its goal");
     navigator.cancel();
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testGoToBlockedTimeout():Void {
@@ -2115,14 +2126,16 @@ class RobotWorldTests {
     var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
     imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
     var blueprint = RobotRuntimeCompiler.compile(model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var robot = new SimulatedRobot("plant-kinematics", simulation.addRobot(blueprint),
       model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var startYaw = 0.5;
     simulation.teleportRobot(0, [1.0, 2.0, 0.3],
       [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
-    var plant = new DifferentialDrivePlant(simulation, 0, base);
+    var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
     check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
       Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
       "DifferentialDrivePlant starts from the simulated base pose and authored height");
@@ -2242,13 +2255,13 @@ class RobotWorldTests {
 
     // Driving and teleporting never replace the reset pose chosen at add time.
     simulation.resetRobot(0);
-    simulation.step(Int64.ofInt(tick++));
+    simulationHarness.step(Int64.ofInt(tick++));
     var reset = simulation.robotPose(0);
     check(Math.abs(reset.position[0]) < 1e-6 && Math.abs(reset.position[1]) < 1e-6 &&
       Math.abs(reset.position[2]) < 1e-6,
       "resetRobot restores the addRobot default pose after driving and teleporting");
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testHolonomicDrivePlantKinematics():Void {
@@ -2268,14 +2281,16 @@ class RobotWorldTests {
     var imu = model.addSensor(new Sensor("base imu", "imu", 0.0, "sensor/imu"));
     imu.frame = model.addFrame(new Frame("imu mount", baseLink, "frame/imu"));
     var blueprint = RobotRuntimeCompiler.compile(model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var robot = new SimulatedRobot("omni-plant-kinematics", simulation.addRobot(blueprint),
       model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var startYaw = 0.5;
     simulation.teleportRobot(0, [1.0, 2.0, 0.3],
       [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
-    var plant = new HolonomicDrivePlant(simulation, 0, base);
+    var plant = new HolonomicDrivePlant(simulationHarness, 0, base);
     check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
       Math.abs(plant.pose.yaw - startYaw) < 1e-9 && Math.abs(plant.baseHeight - 0.3) < 1e-9,
       "HolonomicDrivePlant starts from the simulated base pose and authored height");
@@ -2383,7 +2398,7 @@ class RobotWorldTests {
       Math.abs(simulation.robotPose(0).position[2] - 0.3) < 1e-6,
       "HolonomicDrivePlant teleports to a planar pose at the authored height");
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testForkMechanisms():Void {
@@ -2703,7 +2718,9 @@ class RobotWorldTests {
   static function testSimulatedMaterialHandlingScenario():Void {
     var model = configuredForkliftModel();
     var blueprint = RobotRuntimeCompiler.compile(model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("material-handling", runtime, model.name,
       [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
@@ -2714,7 +2731,7 @@ class RobotWorldTests {
     var localization = new SimulationTruthLocalization(simulation, 0,
       "map", "link/base");
     var navigation = new Navigation(base, localization, 0.3, 0.45, 1.0);
-    var plant = new DifferentialDrivePlant(simulation, 0, base);
+    var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
     var runner = new SkillRunner();
     var tick = 0;
     var timestep = 0.02;
@@ -2880,7 +2897,7 @@ class RobotWorldTests {
       "Charge completes through SkillRunner when the battery reaches its target");
 
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testForkliftSkillsOnSimulationAndReplay():Void {
@@ -2888,7 +2905,9 @@ class RobotWorldTests {
     var blueprint = RobotRuntimeCompiler.compile(model);
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+
+    var simulation = simulationHarness.simulation;
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-forklift-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
     var sourceRobot = new SimulatedRobot("forklift", simulation.addRobot(blueprint),
@@ -2909,7 +2928,7 @@ class RobotWorldTests {
       return new PerceptionSnapshot();
     };
     var forks = Forks.fromRobot(simulatedRobot, model);
-    simulation.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(1));
     var configuredScan = sourceRobot.snapshot().sensors;
     check(configuredScan.length == 1 &&
       configuredScan.get(0).sensorId == "sensor/front-lidar" &&
@@ -2932,7 +2951,7 @@ class RobotWorldTests {
       var observation = simulatedRobot.snapshot();
       liveStatus = skillRunner.update(observation, 0.01);
       if (switch liveStatus { case Running: true; case _: false; })
-        simulation.step(Int64.ofInt((ticks + 1) * 10000000));
+        simulationHarness.step(Int64.ofInt((ticks + 1) * 10000000));
       ticks++;
     }
     check(switch liveStatus { case Succeeded: true; case _: false; } && ticks < 300 &&
@@ -2963,7 +2982,7 @@ class RobotWorldTests {
       var count = 0;
       while (status == SkillStatus.Running && !until() && count < 3000) {
         status = update(simulatedRobot.snapshot());
-        if (status == SkillStatus.Running && !until()) simulation.step(nextLiveTimestamp());
+        if (status == SkillStatus.Running && !until()) simulationHarness.step(nextLiveTimestamp());
         count++;
       }
       return status;
@@ -3008,7 +3027,7 @@ class RobotWorldTests {
       !forks.loadState.secured && distance(pickEnd, pickStart) > 0.2 &&
       distance(pickEnd, pickPose) <= 0.06,
       "PickPallet drives to its approach and then commands its simulated fork mechanism");
-    simulation.step(nextLiveTimestamp());
+    simulationHarness.step(nextLiveTimestamp());
     var forkObservation = forks.state();
     check(Math.abs(forkObservation.lift.position - 0.5) < 1e-9 &&
       Math.abs(cast(forkObservation.tilt, robotkit.material.ForkAxisState).position - 0.1) < 1e-9,
@@ -3032,7 +3051,7 @@ class RobotWorldTests {
       var observation = simulatedRobot.snapshot();
       travelStatus = travel.update(observation, 0.01);
       if (switch travelStatus { case Running: true; case _: false; })
-        simulation.step(nextLiveTimestamp());
+        simulationHarness.step(nextLiveTimestamp());
       travelTicks++;
     }
     check(switch travelStatus { case Succeeded: true; case _: false; } && travelTicks < 300,
@@ -3050,7 +3069,7 @@ class RobotWorldTests {
       forks.loadState.secured && forks.loadState.payload == payload &&
       distance(placeEnd, placeStart) > 0.2 && distance(placeEnd, placePose) <= 0.09,
       "PlacePallet drives to its drop pose, commands the forks, and waits for release");
-    simulation.step(nextLiveTimestamp());
+    simulationHarness.step(nextLiveTimestamp());
     forks.setLoadState(LoadState.empty());
     placeStatus = place.update(simulatedRobot.snapshot(), 0.01);
     check(switch placeStatus { case Succeeded: true; case _: false; },
@@ -3328,7 +3347,7 @@ class RobotWorldTests {
       "forklift MCAP replay reproduces every recorded joint target batch");
     replay.close();
     simulatedRobot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
     if (sys.FileSystem.exists(recordingPath)) sys.FileSystem.deleteFile(recordingPath);
     if (sys.FileSystem.exists(recordingPath + ".incomplete.status"))
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
@@ -3478,11 +3497,14 @@ class RobotWorldTests {
     check(blueprint.sensorById("sensor/gnss") != null && blueprint.sensorById("imu") != null,
       "compiled identity resolves both default native and authored external sensors");
 
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("external-sensors", runtime, model.name, [base.name], []);
-    simulation.step(Int64.ofInt(1));
-    simulation.step(Int64.ofInt(2));
+    simulationHarness.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(2));
     var nativeCount = robot.snapshot().sensors.length;
     var pixels = haxe.io.Bytes.alloc(6);
     for (index in 0...pixels.length) pixels.set(index, index + 31);
@@ -3534,7 +3556,7 @@ class RobotWorldTests {
       if (sensor.sensorId == "sensor/front-camera") updated = Int64.toInt(sensor.sequence);
     equal(updated, 2, "the simulated robot observes an image update without a physics step");
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testToolFeedbackSensorRuntime():Void {
@@ -3547,11 +3569,13 @@ class RobotWorldTests {
     var blueprint = RobotRuntimeCompiler.compile(model);
     equal(blueprint.externalSensorLayout().length, 2,
       "tool contact and vacuum pressure compile as external sensor inputs");
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("tool-feedback", runtime, model.name, [base.name], []);
-    simulation.step(Int64.ofInt(1));
-    simulation.step(Int64.ofInt(2));
+    simulationHarness.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(2));
     var tool = new robotkit.tool.ToolRuntime(new robotkit.tool.Tool("cup", "cup",
       robotkit.spatial.Transform3.identity()), new robotkit.tool.SimulatedGripper(),
       new robotkit.tool.SimulatedVacuum());
@@ -3592,7 +3616,7 @@ class RobotWorldTests {
     equal(adapter.applySnapshot(robot.snapshot()), 0,
       "tool sensor frames do not update a detached tool");
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testCameraFrameProtocol():Void {
@@ -3701,11 +3725,13 @@ class RobotWorldTests {
     mount.name = "renamed";
     scan.name = "renamed scan";
     model.sensors.reverse();
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("configured", runtime, "configured", ["base"], []);
-    simulation.spawnBox([0.5, 2.0, 0.0], [0.25, 0.25, 0.25]);
-    simulation.step(Int64.ofInt(1));
+    simulationHarness.spawnBox([0.5, 2.0, 0.0], [0.25, 0.25, 0.25]);
+    simulationHarness.step(Int64.ofInt(1));
     var first = robot.snapshot();
     var firstScan = first.sensors.get(0);
     equal(firstScan.sensorId, "sensor/scan", "compiled sensor identity survives model rename and reorder");
@@ -3734,23 +3760,23 @@ class RobotWorldTests {
       "perception ray angles match simulated scan angles");
     var noisyValue = first.sensors.get(1).values.get(0);
     check(noisyValue != firstScan.values.get(0), "configured noise changes measurement");
-    simulation.step(Int64.ofInt(2));
+    simulationHarness.step(Int64.ofInt(2));
     var second = robot.snapshot();
     equal(second.sensors.get(0).sequence, firstScan.sequence, "slow sensor sequence held between acquisitions");
     equal(second.sensors.get(0).receivedTimestampNs, firstScan.receivedTimestampNs, "cached sensor receipt does not become fresh");
     equal(second.sensors.get(0).sourceTimestampNs, firstScan.sourceTimestampNs, "cached sensor source time preserved");
     equal(second.sensors.get(2).values.get(5), 9.81, "configured mounted IMU is measured");
-    for (_ in 0...8) simulation.step(Int64.ofInt(3));
+    for (_ in 0...8) simulationHarness.step(Int64.ofInt(3));
     equal(robot.snapshot().sensors.get(0).sequence, Int64.ofInt(2), "10 Hz scan updates on source-clock schedule");
     var recording = new RobotRecording();
     recording.recordSnapshot(second);
     var replay = new ReplayRobot("configured", recording);
     equal(replay.snapshot().sensors.get(0).frameId, "frame/stable", "recording retains frame identity");
     equal(replay.snapshot().sensors.get(0).mountPosition.get(0), 0.5, "recording retains mount metadata");
-    simulation.reset();
-    simulation.step(Int64.ofInt(1));
+    simulationHarness.reset();
+    simulationHarness.step(Int64.ofInt(1));
     equal(robot.snapshot().sensors.get(1).values.get(0), noisyValue, "reset repeats seeded noise deterministically");
-    robot.close(); simulation.dispose(); replay.close();
+    robot.close(); simulationHarness.dispose(); replay.close();
     scan.rayCount = 65;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
     noisy.updateRate = -1.0;
@@ -3824,14 +3850,16 @@ class RobotWorldTests {
     equal(deployment.channels[0].id, "sprayer.flow", "deployment keeps channel ID");
     var blueprint = RobotRuntimeCompiler.compile(deployment.robot);
     for (channel in deployment.channels) blueprint.channels.push(channel);
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("process-channel", runtime, "process-channel",
       [for (link in deployment.robot.links) link.id],
       [for (joint in deployment.robot.joints) joint.id]);
     equal(robot.description().channels.length, 1,
       "simulation description exposes its declared process channels");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testRuntimeProcessEvents():Void {
@@ -3844,7 +3872,9 @@ class RobotWorldTests {
     var blueprint = RobotRuntimeCompiler.compile(model);
     blueprint.channels.push(new ProcessChannelDeclaration("sprayer.flow",
       ProcessEventValue.Digital(false)));
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(500000000),
       [[0.0, 0.0]]);
@@ -3862,7 +3892,7 @@ class RobotWorldTests {
     adapter.bindSprayerFlow("sprayer.flow", sprayer, 1.5);
     var recorded = new RobotRecording();
     for (tick in 1...36) {
-      simulation.step(Int64.ofInt(tick * 10000000));
+      simulationHarness.step(Int64.ofInt(tick * 10000000));
       var batch = runtime.pollEvents();
       check(!batch.overflow, "runtime event polling stays within capacity");
       for (event in batch.events) {
@@ -3876,7 +3906,7 @@ class RobotWorldTests {
     equal(sprayer.history[1].timestampNs, Int64.ofInt(300000000),
       "sprayer receives the later scheduled trajectory time");
     equal(recorded.processEvents.length, 2, "recording captures fired runtime events");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testVirtualDeviceSimulation():Void {
@@ -3888,9 +3918,11 @@ class RobotWorldTests {
     var blueprint = RobotRuntimeCompiler.compile(model);
     var options = new VirtualDeviceOptions();
     options.stepsPerUnit = [1000.0];
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint, null, options);
-    for (tick in 1...21) simulation.step(Int64.ofInt(tick));
+    for (tick in 1...21) simulationHarness.step(Int64.ofInt(tick));
     var segment = new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(1000000000),
       [[0.0, 0.0, 0.0, 5.0, -7.5, 3.0]]);
     var plan = new ExecutionPlanSubmission(Int64.ofInt(900),
@@ -3898,35 +3930,37 @@ class RobotWorldTests {
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE,
       [0.0], [0.0], [0.0], [segment]);
     runtime.submitPlan(plan, 1);
-    for (tick in 21...140) simulation.step(Int64.ofInt(tick));
+    for (tick in 21...140) simulationHarness.step(Int64.ofInt(tick));
     check(Math.abs(runtime.snapshot().q.get(0) - 0.5) <= 0.0011,
       "RKD6 virtual device runs a scheduled plan in Simulation");
     var toolPose = simulation.linkPose(0, 1);
     var plantAngle = 2.0 * Math.atan2(toolPose.rotation[2], toolPose.rotation[3]);
     check(Math.abs(plantAngle - 0.5) <= 0.0011,
       "virtual step position drives the SimKit joint");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testSensorResetPublication():Void {
     var model = new RobotModel("sensor-reset");
     model.addLink(new Link("base"));
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
     var robot = new SimulatedRobot("sensor-reset", runtime, "sensor-reset", ["base"], []);
-    simulation.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
-    simulation.step(Int64.ofInt(100));
+    simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
+    simulationHarness.step(Int64.ofInt(100));
     var before = robot.snapshot();
     equal(before.sensors.get(1).values.get(0), 1.75, "adapter exposes scene ray distance");
-    simulation.reset();
+    simulationHarness.reset();
     simulation.teleportRobot(0, [1.0, 0.0, 0.0]);
-    simulation.step(Int64.ofInt(100));
+    simulationHarness.step(Int64.ofInt(100));
     var after = robot.snapshot();
     equal(after.sourceSequence, before.sourceSequence, "reset repeats source sequence");
     equal(after.sensors.get(1).values.get(0), 0.75,
       "adapter refreshes sensors even when reset repeats sequence");
     equal(before.sensors.get(1).values.get(0), 1.75, "old sensor snapshot survives reset");
-    simulation.step(Int64.ofInt(200));
+    simulationHarness.step(Int64.ofInt(200));
     equal(robot.snapshot().sensors.length, 3, "second sample publishes measured IMU");
     var rejected = false;
     try robot.submit(RobotCommand.JointTargets([
@@ -3935,12 +3969,14 @@ class RobotWorldTests {
     catch (_:Dynamic) rejected = true;
     check(rejected, "simulation never silently ignores an unsupported deadline");
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testRobotResetPose():Void {
     var blueprint = new RobotRuntimeBlueprint(1, 0, 1);
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var yaw = Math.PI * 0.5;
     simulation.addRobot(blueprint, new Pose2(3.0, 2.0, yaw));
     simulation.teleportRobot(0, [8.0, 9.0, 0.0],
@@ -3954,14 +3990,14 @@ class RobotWorldTests {
       Math.abs(reset.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
       "resetRobot restores the initial pose supplied to addRobot");
     simulation.teleportRobot(0, [5.0, 6.0, 0.0]);
-    simulation.reset();
+    simulationHarness.reset();
     var resetAll = simulation.robotPose(0);
     check(Math.abs(resetAll.position[0] - 3.0) < 1e-9 &&
       Math.abs(resetAll.position[1] - 2.0) < 1e-9 &&
       Math.abs(resetAll.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9 &&
       Math.abs(resetAll.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
       "teleportRobot does not replace the stored reset pose");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testSensorAndClockContracts():Void {
@@ -4007,13 +4043,15 @@ class RobotWorldTests {
     model.addFrame(new robotkit.model.Frame("tool frame", tool, "frame/tool"));
     var original = RobotRuntimeCompiler.compile(model, 1, 9);
     equal(original.calibrationRevision, 9, "compiler preserves calibration revision");
-    var revisionSimulation = new Simulation();
+    var revisionSimulationHarness = new SimulationHarness();
+
+    var revisionSimulation = revisionSimulationHarness.simulation;
     var revisionRuntime = revisionSimulation.addRobot(original);
     var revisionSnapshot = revisionRuntime.snapshot();
     equal(revisionSnapshot.modelRevision, Int64.ofInt(1), "snapshot carries model revision");
     equal(revisionSnapshot.calibrationRevision, Int64.ofInt(9),
       "snapshot carries calibration revision");
-    revisionSimulation.dispose();
+    revisionSimulationHarness.dispose();
     var originalIds = original.identity;
     check(originalIds != null, "compiler supplies semantic identity mappings");
     if (originalIds == null) throw "missing compiled identity";
@@ -4308,7 +4346,9 @@ class RobotWorldTests {
       3.14,
       100.0
     ));
-    var simulation = new Simulation();
+    var simulationHarness = new SimulationHarness();
+
+    var simulation = simulationHarness.simulation;
     var first = new SimulatedRobot(
       "sim-a",
       simulation.addRobot(blueprint),
@@ -4342,7 +4382,7 @@ class RobotWorldTests {
     world.submit("sim-b", RobotCommand.JointTargets([
       robotkit.world.JointTarget.position(0, -0.3)
     ], null));
-    simulation.step(Int64.ofInt(1000));
+    simulationHarness.step(Int64.ofInt(1000));
 
     var value = world.snapshot();
     var firstState = value.robot("sim-a");
@@ -4404,9 +4444,9 @@ class RobotWorldTests {
     }, "unconnected remote remains disconnected");
 
     world.close();
-    simulation.step(Int64.ofInt(2000));
+    simulationHarness.step(Int64.ofInt(2000));
     equal(simulation.stepIndex(), Int64.ofInt(2), "RobotWorld does not own shared simulation");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function testRuntimeUsesCompiledJointRate():Void {
@@ -4425,31 +4465,40 @@ class RobotWorldTests {
     equal(blueprint.joints[0].maxEffort, 200.0,
       "runtime blueprint converts actuator effort to joint effort");
 
-    var simulation = new Simulation(0.1);
+    var simulationHarness = new SimulationHarness(0.1);
+
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     runtime.submitPosition(0, 0.8, 1);
-    simulation.step(Int64.ofInt(100));
+    simulationHarness.step(Int64.ofInt(100));
     check(Math.abs(runtime.snapshot().q.get(0) - 0.05) < 0.000000001,
       "runtime applies the compiled rate limit on the first shared tick");
-    simulation.step(Int64.ofInt(200));
+    simulationHarness.step(Int64.ofInt(200));
     check(Math.abs(runtime.snapshot().q.get(0) - 0.1) < 0.000000001,
       "runtime keeps advancing the same target on later shared ticks");
-    simulation.dispose();
+    simulationHarness.dispose();
 
-    var segmentSimulation = new Simulation(0.1);
+    var segmentSimulationHarness = new SimulationHarness(0.1);
+
+
+    var segmentSimulation = segmentSimulationHarness.simulation;
     var segmentRuntime = segmentSimulation.addRobot(blueprint);
     segmentRuntime.submitTrajectory(TrajectoryChunk.fromSegments([
       new TrajectorySegment(Int64.ofInt(0), Int64.ofInt(200000000), [[0.0, 0.5]])
     ]), 1);
-    segmentSimulation.step(Int64.ofInt(100));
+    segmentSimulationHarness.step(Int64.ofInt(100));
     check(segmentRuntime.snapshot().trajectoryQueueDepth == 1,
       "Haxe segment submission reaches native knot queue");
-    segmentSimulation.step(Int64.ofInt(200));
+    segmentSimulationHarness.step(Int64.ofInt(200));
     check(Math.abs(segmentRuntime.snapshot().q.get(0) - 0.05) < 0.000000001,
       "Haxe segment submission executes polynomial target");
-    segmentSimulation.dispose();
+    segmentSimulationHarness.dispose();
 
-    var planSimulation = new Simulation(0.1);
+    var planSimulationHarness = new SimulationHarness(0.1);
+
+
+    var planSimulation = planSimulationHarness.simulation;
     var planRuntime = planSimulation.addRobot(blueprint);
     var planPath = '/tmp/robotkit-${Sys.getPid()}-plan-session.mcap';
     var writer = new McapRobotRecording(planPath, 1024 * 1024);
@@ -4464,7 +4513,7 @@ class RobotWorldTests {
     recorded.submit(RobotCommand.ExecutionPlan(plan));
     var progress:Array<String> = [];
     for (time in [100, 200, 300]) {
-      planSimulation.step(Int64.ofInt(time));
+      planSimulationHarness.step(Int64.ofInt(time));
       var snapshot = recorded.snapshot();
       progress.push('${snapshot.sessionState}:${Int64.toStr(snapshot.activePlanId)}:' +
         '${Int64.toStr(snapshot.committedUntilNs)}:${Int64.toStr(snapshot.queueEndTimeNs)}');
@@ -4491,7 +4540,7 @@ class RobotWorldTests {
       replay.advance();
     }
     replay.close();
-    planSimulation.dispose();
+    planSimulationHarness.dispose();
     sys.FileSystem.deleteFile(planPath);
     sys.FileSystem.deleteFile(planPath + ".incomplete.status");
   }

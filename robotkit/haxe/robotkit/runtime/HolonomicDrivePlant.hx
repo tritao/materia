@@ -21,6 +21,7 @@ import robotkit.world.RobotSnapshot;
  * driven directly can strafe through the full `Twist2` command.
  */
 class HolonomicDrivePlant {
+  final harness:SimulationHarness;
   public final simulation:Simulation;
   public final robotIndex:Int;
   public final base:MobileBase;
@@ -32,14 +33,15 @@ class HolonomicDrivePlant {
   /** Base height, preserved while the plant drives the planar pose. */
   public var baseHeight(get, never):Float;
 
-  public function new(simulation:Simulation, robotIndex:Int, base:MobileBase,
+  public function new(harness:SimulationHarness, robotIndex:Int, base:MobileBase,
       ?initialPose:Pose2) {
-    if (simulation == null || robotIndex < 0 || base == null)
+    if (harness == null || robotIndex < 0 || base == null)
       throw "Holonomic-drive plant requires a simulation, robot index, and mobile base";
     var drive:HolonomicDrive = cast(base.driveModel, HolonomicDrive);
     if (drive == null)
       throw "Holonomic-drive plant requires a holonomic drive model";
-    this.simulation = simulation;
+    this.harness = harness;
+    this.simulation = harness.simulation;
     this.robotIndex = robotIndex;
     this.base = base;
     simulation.setOmniDrive(robotIndex, drive.wheelJoints, drive.wheelAngles, drive.wheelRadius,
@@ -60,7 +62,7 @@ class HolonomicDrivePlant {
 
   /** Advances one fixed simulation step and returns the robot's snapshot. */
   public function step(timestampNs:Int64):RobotSnapshot {
-    simulation.step(timestampNs);
+    harness.step(timestampNs);
     return base.robot.snapshot();
   }
 
