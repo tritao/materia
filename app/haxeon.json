@@ -15,7 +15,9 @@
 		"cadbridge": { "path": "../robotkit/cadbridge" },
 		"scenekit": { "path": "../scenekit" },
 		"stockkit": { "path": "../stockkit" },
-		"camkit": { "path": "../camkit" }
+		"camkit": { "path": "../camkit" },
+		"cnckit": { "path": "../cnckit" },
+		"toolpathkit": { "path": "../toolpathkit" }
 	},
 	"native": {
 		"cmake": {

@@ -4,14 +4,16 @@ import cadkit.modeling.Curve;
 import cadkit.modeling.Part;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
-import camkit.CamGCodeWriter;
 import camkit.CamJob;
-import camkit.CamSetup;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.ir.CncPoint;
-import cnckit.tool.CutterProfile;
+import cnckit.CncWriter;
+import toolpathkit.path.Point3;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.setup.Setup;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
 import haxe.io.Bytes;
 import nativekit.scene.GeometryData;
 import stockkit.CutMove;
@@ -66,20 +68,24 @@ class StockSimulationSession {
     this.depth = depth;
     var program = demoProgram();
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    for (tool in program.program.tools) machine.setTool(tool);
-    var setup = new CamSetup(0, width, 0, height, 0, -depth, program.safeZ);
-    var text = CamGCodeWriter.write(program.program, setup, machine);
+    for (tool in program.program.tools) machine.toolLibrary.set(tool);
+    var setup = new Setup(0, width, 0, height, 0, -depth, program.safeZ);
+    var text = CncWriter.write(program.program.ops, setup, machine);
     gcode = text.split("\n");
     var compiled = new CncCompiler(machine).compileDetailed(text);
     if (compiled.diagnostics.length > 0)
       throw "Stock simulation program does not compile: " + compiled.diagnostics[0];
     if (compiled.ops.length != program.program.ops.length)
       throw "Stock simulation G-code does not match its CAM operations";
-    // Compiled ops follow the CAM ops one for one; the CAM op's span line is its operation number.
-    operations = [for (op in program.program.ops) spanOf(op).line];
+    // Compiled ops follow the CAM ops one for one; each CAM op records its operation number.
+    operations = [for (op in program.program.ops) {
+      var index = provenanceOf(op).operationIndex;
+      index == null ? 0 : index;
+    }];
     // Work coordinates put the block's top corner at the origin; the object centres the
     // block, so object = work - (width / 2, height / 2, -depth / 2).
-    moves = CutMoves.fromOps(compiled.ops, machine.tool, new CncPoint(width / 2, height / 2, -depth / 2));
+    moves = CutMoves.fromProgram(new ToolpathProgram(compiled.ops, machine.toolLibrary),
+      new Point3(width / 2, height / 2, -depth / 2));
     // Rays at cell centres, so none lies exactly on the program's millimetre-round walls,
     // where cut stock and the finished part's mesh could disagree about which side it is on.
     var grid = new StockGrid(-width / 2 + SPACING / 2, -height / 2 + SPACING / 2, SPACING,
@@ -148,7 +154,7 @@ class StockSimulationSession {
 
   /** "Operation 1 · line 42: G1 X12 Y8" for a move. */
   public function describe(move:CutMove):String {
-    var line = move.span.line;
+    var line = move.provenance.line;
     var text = line >= 1 && line <= gcode.length ? StringTools.trim(gcode[line - 1]) : "";
     return 'Operation ${operationOf(move)} · line $line: $text';
   }
@@ -181,11 +187,12 @@ class StockSimulationSession {
     target.dispose();
   }
 
-  static function spanOf(op:cnckit.ir.CncOp):cnckit.parse.CncSpan
+  static function provenanceOf(op:ToolpathOp):toolpathkit.path.Provenance
     return switch op {
-      case Rapid(_, span), Feed(_, _, _, span), Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
-          ToolChange(_, span), ToolLengthOffset(_, _, span), CutterCompStart(_, _, _, span),
-          CutterCompEnd(span), OptionalStop(span), ProgramStop(span), End(span): span;
+      case SetSetup(_, provenance), Move(_, _, _, _, provenance), MachineMove(_, _, _, _, provenance),
+          Dwell(_, provenance), Spindle(_, _, provenance), Coolant(_, _, provenance),
+          ToolChange(_, provenance), ToolLengthOffset(_, _, provenance), OptionalStop(provenance),
+          ProgramStop(provenance), End(provenance): provenance;
     };
 
   function operationColour(move:CutMove):Int
@@ -193,7 +200,7 @@ class StockSimulationSession {
 
   /** Work-coordinate geometry of the demo, in metres. */
   function demoProgram():{program:camkit.CamProgram, safeZ:Float, outer:Array<Float>,
-      boss:Array<Float>, pocketDepth:Float, holes:Array<CncPoint>, holeDiameter:Float, holeDepth:Float} {
+      boss:Array<Float>, pocketDepth:Float, holes:Array<Point3>, holeDiameter:Float, holeDepth:Float} {
     var size = Math.min(width, height);
     var margin = 0.15 * size;
     var outer = [margin, margin, width - margin, height - margin];
@@ -201,13 +208,13 @@ class StockSimulationSession {
     var boss = [width / 2 - bossHalfX, height / 2 - bossHalfY, width / 2 + bossHalfX, height / 2 + bossHalfY];
     var diameter = Math.max(0.002, Math.min(0.006, size / 15));
     var pocketDepth = Math.min(0.5 * depth, 0.004);
-    var mill = CncTool.shaped(1, 0.0, CutterProfile.flat(diameter, 0.02).withShank(diameter, 0.02));
+    var mill = Tool.shaped(1, 0.0, CutterProfile.flat(diameter, 0.02).withShank(diameter, 0.02));
     var drillDiameter = Math.max(0.0015, diameter / 2);
-    var drill = CncTool.shaped(2, 0.0, CutterProfile.vee(drillDiameter, 118 * Math.PI / 180, 0.02));
+    var drill = Tool.shaped(2, 0.0, CutterProfile.vee(drillDiameter, 118 * Math.PI / 180, 0.02));
     var holeDepth = Math.min(0.8 * depth, 0.008);
     var inset = margin / 2;
-    var holes = [new CncPoint(inset, inset, 0), new CncPoint(width - inset, inset, 0),
-      new CncPoint(width - inset, height - inset, 0), new CncPoint(inset, height - inset, 0)];
+    var holes = [new Point3(inset, inset, 0), new Point3(width - inset, inset, 0),
+      new Point3(width - inset, height - inset, 0), new Point3(inset, height - inset, 0)];
     var mm = 1000.0;
     function rectangle(r:Array<Float>):Curve
       return Curve.polyline([new Vector(r[0] * mm, r[1] * mm), new Vector(r[2] * mm, r[1] * mm),
@@ -235,7 +242,7 @@ class StockSimulationSession {
     cylinders (the drill's cone tip shows as leftover below them).
   **/
   function finishedPart(program:{program:camkit.CamProgram, safeZ:Float, outer:Array<Float>,
-      boss:Array<Float>, pocketDepth:Float, holes:Array<CncPoint>, holeDiameter:Float, holeDepth:Float}):Part {
+      boss:Array<Float>, pocketDepth:Float, holes:Array<Point3>, holeDiameter:Float, holeDepth:Float}):Part {
     var parts:Array<Part> = [];
     function place(part:Part, x:Float, y:Float, z:Float):Part {
       var placed = part.translated(new Vector(x, y, z));

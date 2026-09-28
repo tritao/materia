@@ -46,20 +46,23 @@ class StockSimulationTests {
       check(text(scene, "Rapids through stock") == "0", "the demo program never rapids through stock");
       check(text(scene, "Deepest gouge") == "0 mm", "the demo program does not gouge its part");
 
-      // The block is 60 x 40 mm centred on the object; the pocket floor lies 15 mm left of centre.
-      check(scene.selectAtRay(-0.015, 0, 1, 0, 0, -1) == id, "a ray onto the pocket floor hits the stock");
+      // The block is 60 x 40 mm centred on the object; the pocket floor lies 15 mm left of
+      // centre. Rays aim inside a column, off the mesh's quad edges.
+      var pocketX = -0.0151, pocketY = 0.0001;
+      check(scene.selectAtRay(pocketX, pocketY, 1, 0, 0, -1) == id, "a ray onto the pocket floor hits the stock");
       var picked = text(scene, "Picked surface");
       check(StringTools.startsWith(picked, "Operation 1 · line "), 'the pocket floor names its operation: $picked');
       var line = Std.parseInt(picked.substring("Operation 1 · line ".length, picked.indexOf(":")));
       check(line != null && line > 1 && line <= simulation.gcode.length, "the picked line is in the program");
       check(picked.indexOf("G") > 0, "the picked surface shows its G-code line");
-      check(scene.selectAtRay(0, 0, 1, 0, 0, -1) == id && text(scene, "Picked surface").indexOf("Click") == 0,
-        "the boss top is untouched stock");
+      check(scene.selectAtRay(0.0001, 0.0001, 1, 0, 0, -1) == id, "a ray onto the boss hits the stock");
+      check(text(scene, "Picked surface").indexOf("Click") == 0,
+        'the boss top is untouched stock: ${text(scene, "Picked surface")}');
 
       // Scrub back to the start: the same point is uncut.
       apply(scene, "Moves cut", PropertyValue.Int(0));
       check(simulation.position() == 0, "the timeline moves to the start");
-      scene.selectAtRay(-0.015, 0, 1, 0, 0, -1);
+      scene.selectAtRay(pocketX, pocketY, 1, 0, 0, -1);
       check(text(scene, "Picked surface").indexOf("Click") == 0, "before any move the pocket is uncut stock");
       apply(scene, "Moves cut", PropertyValue.Int(simulation.moveCount()));
 
