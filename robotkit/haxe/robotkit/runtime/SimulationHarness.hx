@@ -5,6 +5,7 @@ import nativekit.sim.MotionType;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
 import nativekit.sim.SimShape;
+import nativekit.sim.SimWorldOptions;
 
 /**
  * Test/standalone convenience that owns a SimulationSpace and the Simulation
@@ -21,8 +22,8 @@ class SimulationHarness {
   var disposed:Bool = false;
 
   public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1,
-      ?backend:Int = SimulationSpace.DETERMINISTIC) {
-    space = SimulationSpace.create(backend, fixedTimestep);
+      ?backend:Int = SimulationSpace.DETERMINISTIC, ?solver:SimWorldOptions) {
+    space = SimulationSpace.create(backend, fixedTimestep, physicsSubsteps, solver);
     try {
       simulation = Simulation.inSession(space.session);
     } catch (error:Dynamic) {
@@ -65,6 +66,20 @@ class SimulationHarness {
   }
 
   /** Adds a box to the shared physics world and returns its owned session object. */
+  /**
+   * Adds an infinite static ground plane through `position` (default the
+   * origin), facing the +Z axis of `rotation` (default the world XY plane).
+   */
+  public function spawnPlane(?position:Array<Float>, ?rotation:Array<Float>):SimObject {
+    var at = position == null ? [0.0, 0.0, 0.0] : position;
+    var facing = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
+    if (at.length != 3 || facing.length != 4)
+      throw "SimulationHarness.spawnPlane requires a three-component position and four-component rotation";
+    stop();
+    return space.session.createObject(MotionType.Static, SimShape.plane(),
+      new SimPose(at[0], at[1], at[2], facing[0], facing[1], facing[2], facing[3]));
+  }
+
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
       ?dynamicBody:Bool = false, ?mass:Float = 1.0, ?orientation:Array<Float>):SimObject {
     if (position == null || position.length != 3 || halfExtents == null || halfExtents.length != 3)

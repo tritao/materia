@@ -63,7 +63,65 @@ typedef struct rk_simulation_closure_desc {
     double axis_parent[3];
 } rk_simulation_closure_desc;
 
-/** Optional initial pose for one robot added to a Simulation. */
+/** Kinds of primitive link collision shape. Sizes are in metres. */
+typedef uint32_t rk_simulation_link_shape_type;
+enum {
+    RK_LINK_SHAPE_BOX = 1,      /**< size: half extents. */
+    RK_LINK_SHAPE_SPHERE = 2,   /**< size[0]: radius. */
+    /** size[0]: radius; size[1]: half-length of the straight part, along local Z. */
+    RK_LINK_SHAPE_CAPSULE = 3,
+    /** size[0]: radius; size[1]: half-length along local Z. */
+    RK_LINK_SHAPE_CYLINDER = 4
+};
+
+enum { RK_MAX_LINK_SHAPES = 256 };
+
+/** One primitive collision shape attached to a robot link, posed in the link frame. */
+typedef struct rk_simulation_link_shape {
+    uint32_t link;
+    uint32_t type; /**< rk_simulation_link_shape_type. */
+    double size[3];
+    double position[3];
+    double rotation[4]; /**< Unit quaternion in x, y, z, w order. */
+    /**
+     * Contact surface; zero fields keep the backend default. friction is
+     * sliding, torsional and rolling; friction_dimensions is 1, 3, 4 or 6;
+     * contact_time_constant (s) and contact_damping_ratio set soft-contact
+     * stiffness and damping.
+     */
+    double friction[3];
+    double contact_time_constant;
+    double contact_damping_ratio;
+    uint32_t friction_dimensions;
+    /**
+     * NKSIM_CONTACT_* from nativekit_sim.h: 0 collides by layers like other
+     * links; 1 only through contact pairs; 2 through pairs and with every
+     * environment object, using this shape's surface.
+     */
+    uint32_t contact_filter;
+} rk_simulation_link_shape;
+
+enum { RK_MAX_CONTACT_PAIRS = 128 };
+
+/**
+ * An explicit contact between two of a robot's link shapes, given as indices
+ * into rk_simulation_robot_desc.link_shapes, with its own surface (see
+ * rk_simulation_link_shape; zero fields keep the backend default).
+ */
+typedef struct rk_simulation_contact_pair {
+    uint32_t shape_a;
+    uint32_t shape_b;
+    double friction[3];
+    double contact_time_constant;
+    double contact_damping_ratio;
+    uint32_t friction_dimensions;
+    uint32_t reserved0;
+} rk_simulation_contact_pair;
+
+/**
+ * Optional settings for one robot added to a Simulation. An initial_pose whose
+ * struct_size is zero keeps the default placement.
+ */
 typedef struct rk_simulation_robot_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t reserved0;
@@ -112,6 +170,16 @@ typedef struct rk_simulation_robot_desc {
     double tool_piece_vertices[16 * 64 * 3];
     double tool_margin;
     double tool_gap;
+    /**
+     * Optional primitive collision shapes. A link that has any collides
+     * through them together with its hull or box above, if given, and its
+     * tool pieces; otherwise the link keeps the legacy shape policy.
+     */
+    uint32_t link_shape_count;
+    rk_simulation_link_shape link_shapes[RK_MAX_LINK_SHAPES];
+    /** Optional explicit contacts between link shapes. */
+    uint32_t contact_pair_count;
+    rk_simulation_contact_pair contact_pairs[RK_MAX_CONTACT_PAIRS];
 } rk_simulation_robot_desc;
 
 /**
@@ -287,7 +355,8 @@ RK_API rk_result RK_CALL rk_simulation_teleport_robot(
  * such as the IMU measure consecutive drives as continuous motion without
  * single-precision scene rounding, however far from the origin. A tick with no
  * drive holds the base at rest. Use rk_simulation_place_robot_base() for a
- * jump that must not read as motion.
+ * jump that must not read as motion. A floating base moves only under
+ * physics, so driving one returns RK_ERROR_INVALID_STATE.
  *
  * @param simulation Shared simulation owner.
  * @param robot_index Index of the robot in attachment order.
@@ -333,7 +402,8 @@ RK_API rk_result RK_CALL rk_simulation_place_robot_base(
  * @param robot_index Index of the robot in attachment order.
  * @param desc Wheel joints and geometry.
  * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed or
- * missing wheel joint, identical wheels, or non-positive geometry.
+ * missing wheel joint, identical wheels, or non-positive geometry, or
+ * RK_ERROR_INVALID_STATE for a floating-base robot.
  */
 RK_API rk_result RK_CALL rk_simulation_set_differential_drive(
     rk_simulation simulation, uint32_t robot_index,
@@ -356,7 +426,8 @@ RK_API rk_result RK_CALL rk_simulation_get_differential_drive_state(
  *
  * @return RK_OK, or RK_ERROR_INVALID_ARGUMENT for an unknown robot, a fixed,
  * missing, or repeated wheel joint, non-positive or non-finite geometry, or
- * wheel angles that cannot span every planar motion.
+ * wheel angles that cannot span every planar motion, or
+ * RK_ERROR_INVALID_STATE for a floating-base robot.
  */
 RK_API rk_result RK_CALL rk_simulation_set_omni_drive(
     rk_simulation simulation, uint32_t robot_index,
@@ -368,10 +439,35 @@ RK_API rk_result RK_CALL rk_simulation_clear_omni_drive(
 RK_API rk_result RK_CALL rk_simulation_get_omni_drive_state(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_omni_drive_state *out_state RK_INOUT);
+/**
+ * Places one attached robot's joints at positions, in joint order, as a pose
+ * to start from, such as a humanoid's standing keyframe. Velocities become
+ * zero. Accepted only while the simulation is stopped, like
+ * rk_simulation_teleport_robot(); reset returns joints to zero. Fixed joints
+ * must be given 0.
+ */
+RK_API rk_result RK_CALL rk_simulation_set_joint_positions(
+    rk_simulation simulation, uint32_t robot_index,
+    const double *positions RK_IN_ARRAY(count), uint32_t count);
 /** Reads one robot base pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_pose *out_pose RK_INOUT);
+/** World-frame twist of one body: metres per second and radians per second. */
+typedef struct rk_simulation_twist {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t reserved0;
+    double linear[3];
+    double angular[3];
+} rk_simulation_twist;
+/**
+ * Reads one robot base's world-frame twist from the latest physics state.
+ * A floating base (rk_robot_runtime_blueprint.floating_base) reports its free
+ * motion; a kinematic base reports the twist it was driven with.
+ */
+RK_API rk_result RK_CALL rk_simulation_get_robot_base_velocity(
+    rk_simulation simulation, uint32_t robot_index,
+    rk_simulation_twist *out_twist RK_INOUT);
 /** Reads one robot link pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,

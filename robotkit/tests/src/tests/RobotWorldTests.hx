@@ -30,6 +30,7 @@ import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotMobileConfiguration;
 import robotkit.model.RobotForkConfiguration;
 import robotkit.model.RobotModelCodec;
+import robotkit.model.CollisionShape;
 import robotkit.device.DeviceChannel;
 import robotkit.device.DeviceLayout;
 import robotkit.world.RobotCapabilities;
@@ -175,6 +176,8 @@ class RobotWorldTests {
     testMobileLayer();
     testModelDrivenConfiguration();
     testRobotModelCodec();
+    testMjcfWalkerImport();
+    testUrdfWalkerImport();
     testLocalization();
     testWheelImuLocalization();
     testGnssLocalization();
@@ -786,6 +789,24 @@ class RobotWorldTests {
     source.frames[0].rotation = [0.0, 0.0, 0.38268343236509, 0.923879532511287];
     source.sensors[0].startAngleRadians = -0.4;
     source.sensors[0].fieldOfViewRadians = 2.4;
+    source.links[0].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.05),
+      [0.1, 0.0, -0.2]));
+    source.links[0].collisionShapes.push(new CollisionShape(
+      CollisionPrimitive.Capsule(0.03, 0.12), [0.0, 0.0, 0.0],
+      [0.70710678118654757, 0.0, 0.0, 0.70710678118654757]));
+    source.links[1].collisionShapes.push(new CollisionShape(
+      CollisionPrimitive.Cylinder(0.04, 0.1)));
+    source.links[1].collisionShapes.push(new CollisionShape(
+      CollisionPrimitive.Box(0.1, 0.2, 0.3), [0.0, 0.5, 0.0]));
+    source.links[1].collisionShapes[1].surface = new ContactSurface([0.7, 0.01, 0.001], 4, 0.01, 0.9);
+    source.joints[2].armature = 0.02;
+    source.joints[2].damping = 1.5;
+    source.joints[2].frictionLoss = 0.3;
+    source.joints[2].limitTimeConstant = 0.008;
+    source.joints[2].limitDampingRatio = 1.0;
+    source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
+    source.actuators[0].servoStiffness = 75.0;
+    source.actuators[0].servoDamping = 2.0;
 
     var encoded = RobotModelCodec.encode(source);
     var restored = RobotModelCodec.decode(encoded);
@@ -842,10 +863,119 @@ class RobotWorldTests {
     throws(function() wrongLayout.validateAgainst(source),
       "device channel mapping rejects order that differs from semantic model joints");
 
+    equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
+    equal(restored.joints[2].damping, 1.5, "RobotModel codec preserves joint damping");
+    equal(restored.joints[2].frictionLoss, 0.3, "RobotModel codec preserves joint friction loss");
+    check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
+      "RobotModel codec preserves joint limit softness");
+    equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    var restoredSurface = restored.links[1].collisionShapes[1].surface;
+    check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
+      restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,
+      "RobotModel codec preserves a collision shape's contact surface");
+    equal(restored.links[1].collisionShapes[0].surface, null,
+      "a shape without a surface keeps the simulator's defaults");
+    var nativeDynamics = RobotRuntimeCompiler.compile(restored).nativeValue().get_joint_dynamics(2);
+    check(nativeDynamics.get_armature() == 0.02 && nativeDynamics.get_damping() == 1.5 &&
+      nativeDynamics.get_friction_loss() == 0.3 && nativeDynamics.get_limit_time_constant() == 0.008 &&
+      nativeDynamics.get_limit_impedance(2) == 0.01, "joint dynamics reach the native blueprint");
+    var negativeDamping = RobotModelCodec.decode(encoded);
+    negativeDamping.joints[0].damping = -1.0;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(negativeDamping), "RK_JOINT_DYNAMICS"),
+      "compiler rejects negative joint damping");
+    var badSurface = RobotModelCodec.decode(encoded);
+    var badSurfaceValue:ContactSurface = cast badSurface.links[1].collisionShapes[1].surface;
+    badSurfaceValue.frictionDimensions = 2;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(badSurface), "RK_COLLISION_SHAPE"),
+      "compiler rejects an invalid contact surface");
+
+    var paired = RobotModelCodec.decode(encoded);
+    paired.links[0].collisionShapes[0].contact = ShapeContact.PairsAndEnvironment;
+    paired.contactPairs.push(new robotkit.model.ContactPair(paired.links[0].id, 1,
+      paired.links[1].id, 0, new ContactSurface([0.5, 0.0, 0.0], 3, 0.0, 0.0)));
+    var pairedRestored = RobotModelCodec.decode(RobotModelCodec.encode(paired));
+    check(pairedRestored.links[0].collisionShapes[0].contact == ShapeContact.PairsAndEnvironment &&
+      pairedRestored.contactPairs.length == 1 && pairedRestored.contactPairs[0].shapeA == 1 &&
+      pairedRestored.contactPairs[0].surface.friction[0] == 0.5,
+      "RobotModel codec preserves shape contact modes and contact pairs");
+    paired.contactPairs[0].shapeB = 5;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(paired), "RK_CONTACT_PAIR"),
+      "compiler rejects a contact pair naming a missing shape");
+    throws(function() RobotModelCodec.encode(paired), "codec rejects a contact pair naming a missing shape");
+
+    var servo = robotkit.world.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
+    var servoCopy = servo.copy();
+    check(servoCopy.mode == robotkit.world.JointTargetMode.Servo && servoCopy.stiffness == 100.0 &&
+      servoCopy.servoVelocity == 0.1 && servoCopy.feedforward == -2.0, "servo targets copy their terms");
+    throws(function() robotkit.world.JointTarget.servo(0, 0.0, 0.0, -1.0, 0.0, 0.0),
+      "servo targets reject negative stiffness");
+    var servoSimulation = new Simulation(0.02);
+    var servoRuntime = servoSimulation.addRobot(RobotRuntimeCompiler.compile(restored));
+    servoRuntime.submitTargets([robotkit.world.JointTarget.servo(2, 0.4, 0.0, 100.0, 5.0, 0.0)], 1);
+    servoSimulation.step(Int64.ofInt(0));
+    check(Math.abs(servoRuntime.snapshot().q.get(2) - 0.4) < 1e-9,
+      "a servo target reaches the deterministic backend's joint");
+    servoSimulation.dispose();
+    var servoRecording = new RobotRecording();
+    servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
+    switch RobotRecordingCodec.decode(RobotRecordingCodec.encode(servoRecording.entries[0])).event {
+      case Command(JointTargets(targets, _)):
+        check(targets[0].mode == robotkit.world.JointTargetMode.Servo &&
+          targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
+          "a recorded servo target replays with its terms");
+      case _: throw "Expected recorded servo targets";
+    }
+    equal(restored.links[0].collisionShapes.length, 2, "RobotModel codec preserves link collision shapes");
+    check(switch restored.links[0].collisionShapes[1].primitive {
+      case CollisionPrimitive.Capsule(radius, half): radius == 0.03 && half == 0.12;
+      case _: false;
+    }, "RobotModel codec preserves capsule radius and half-length");
+    equal(restored.links[0].collisionShapes[0].position[2], -0.2,
+      "RobotModel codec preserves collision shape poses");
+    var shapeBlueprint = RobotRuntimeCompiler.compile(restored);
+    equal(shapeBlueprint.linkCollisionShapes.length, 4, "every link collision shape compiles");
+    equal(shapeBlueprint.linkCollisionShapes[3].link, 1,
+      "compiled collision shapes keep their runtime link index");
+    var shapeSimulation = new Simulation(0.02);
+    shapeSimulation.addRobot(shapeBlueprint);
+    shapeSimulation.step(Int64.ofInt(0));
+    shapeSimulation.dispose();
+    var badShape = RobotModelCodec.decode(encoded);
+    badShape.links[1].collisionShapes.push(new CollisionShape(CollisionPrimitive.Sphere(0.0)));
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(badShape), "RK_COLLISION_SHAPE"),
+      "compiler rejects a non-positive collision shape size");
+    throws(function() RobotModelCodec.encode(badShape), "codec rejects an invalid collision shape");
+    var unknownShape:Dynamic = haxe.Json.parse(encoded.toString());
+    var unknownLinks:Array<Dynamic> = cast Reflect.field(unknownShape, "links");
+    var unknownShapes:Array<Dynamic> = cast Reflect.field(unknownLinks[0], "collisionShapes");
+    Reflect.setField(unknownShapes[0], "kind", "cone");
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(unknownShape))),
+      "codec rejects unknown collision shape kinds");
+    var floating = configuredForkliftModel();
+    floating.mobileBase = null;
+    floating.forkMechanism = null;
+    floating.floatingBase = true;
+    var floatingRestored = RobotModelCodec.decode(RobotModelCodec.encode(floating));
+    equal(floatingRestored.floatingBase, true, "v6 RobotModel preserves a floating base");
+    var floatingBlueprint = RobotRuntimeCompiler.compile(floatingRestored);
+    equal(floatingBlueprint.floatingBase, true, "a floating base compiles into the blueprint");
+    equal(floatingBlueprint.nativeValue().get_floating_base(), 1,
+      "a floating base reaches the native blueprint");
+    equal(RobotRuntimeCompiler.compile(restored).nativeValue().get_floating_base(), 0,
+      "a fixed base stays kinematic in the native blueprint");
+    var wheeledFloating = configuredForkliftModel();
+    wheeledFloating.floatingBase = true;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(wheeledFloating), "RK_FLOATING_MOBILE"),
+      "a floating base cannot also be a wheeled mobile base");
+    var missingFloating:Dynamic = haxe.Json.parse(encoded.toString());
+    Reflect.deleteField(missingFloating, "floatingBase");
+    throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(missingFloating))),
+      "v6 RobotModel requires the floatingBase field");
+
     var oldVersion:Dynamic = haxe.Json.parse(encoded.toString());
-    Reflect.setField(oldVersion, "schemaVersion", 4);
+    Reflect.setField(oldVersion, "schemaVersion", 5);
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(oldVersion))),
-      "v5-only RobotModel codec rejects old schemas");
+      "v6-only RobotModel codec rejects old schemas");
     var legacyDrive:Dynamic = haxe.Json.parse(encoded.toString());
     var legacyJoints:Array<Dynamic> = cast Reflect.field(legacyDrive, "joints");
     Reflect.setField(legacyJoints[0], "drive", {name: "old-drive"});
@@ -859,6 +989,125 @@ class RobotWorldTests {
     Reflect.setField(brokenJoints[0], "parentLink", "link/missing");
     throws(function() RobotModelCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(brokenReference))),
       "RobotModel codec rejects unresolved link references");
+  }
+
+  /**
+   * robotkit_mjcf_import's output for fixtures/mjcf/walker.xml, checked against
+   * the values authored in that file (the native import test keeps this file
+   * current).
+   */
+  static function testMjcfWalkerImport():Void {
+    var path = Sys.getCwd() + "/robotkit/tests/fixtures/mjcf/walker.robot.json";
+    if (!sys.FileSystem.exists(path)) path = Sys.getCwd() + "/fixtures/mjcf/walker.robot.json";
+    var model = RobotModelCodec.decode(sys.io.File.getBytes(path));
+    equal(model.floatingBase, true, "an MJCF free joint imports as a floating base");
+    equal(model.links.length, 4, "every MJCF body imports as a link");
+    var mass = 0.0;
+    for (link in model.links) mass += link.mass;
+    equal(mass, 15.5, "imported link masses match the MJCF inertials");
+    equal(model.links[0].inertiaTensor[4], 0.2, "diagonal inertia keeps its axes");
+    equal(model.links[0].centerOfMass[2], 0.05, "centre of mass stays in the link frame");
+    var hip = model.joints[0], knee = model.joints[1], foot = model.joints[2];
+    equal(hip.type, JointType.Revolute, "a limited hinge imports as revolute");
+    equal(hip.limits.lower, -Math.PI / 2, "degree ranges convert to radians");
+    equal(hip.limits.effort, 40.0, "actuatorfrcrange from a default class becomes the joint effort");
+    equal(hip.armature, 0.01, "joint armature from a default class is imported");
+    equal(hip.damping, 0.5, "joint damping from a default class is imported");
+    equal(model.actuators[1].servoStiffness, 50.0, "a position actuator's kp becomes its servo stiffness");
+    check(model.links[3].collisionShapes[0].contact == ShapeContact.PairsOnly,
+      "a geom without contact bits collides only through its pairs");
+    check(model.links[0].collisionShapes[0].contact == ShapeContact.Layers,
+      "a geom with contact bits collides by layers");
+    equal(model.contactPairs.length, 2, "pairs between robot geoms become contact pairs");
+    var toePair = model.contactPairs[0];
+    check(toePair.linkA == "link/torso" && toePair.linkB == "link/left_foot" && toePair.shapeB == 0 &&
+      toePair.surface.friction[0] == 0.8 && toePair.surface.frictionDimensions == 4 &&
+      toePair.surface.contactTimeConstant == 0.01, "a contact pair keeps its own surface");
+    equal(RobotRuntimeCompiler.compile(model).contactPairs[0].shapeB, 3,
+      "compiled contact pairs index the robot's shapes in link order");
+    equal(knee.parentFramePosition[2], -0.38, "the joint frame sits at the joint anchor in the parent");
+    equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
+    equal(foot.type, JointType.Fixed, "a jointless body attaches through a fixed joint");
+    var thigh = model.links[1].collisionShapes[0];
+    check(switch thigh.primitive {
+      case CollisionPrimitive.Capsule(radius, half): radius == 0.05 && half == 0.2;
+      case _: false;
+    }, "a fromto capsule keeps its radius and half-length");
+    equal(thigh.position[2], -0.2, "a fromto capsule is centred between its ends");
+    equal(model.links[3].collisionShapes.length, 2,
+      "pair-only geoms collide and a geom that never collides is left out");
+    equal(model.links[0].visualGeometry, "meshes/torso.stl", "visual meshes merge into one file per link");
+    equal(model.actuators.length, 2, "joint actuators import");
+    check(switch model.actuators[0].transmission {
+      case SimpleTransmission(jointId, ratio, _): jointId == hip.id && ratio == 2.0;
+    }, "actuator gear becomes the transmission ratio");
+    equal(model.actuators[0].maxEffort, 20.0, "actuator force range stays in actuator units");
+    equal(model.sensors.length, 1, "one IMU per sensor site");
+    check(model.sensors[0].frame == model.frames[0], "the IMU mounts on its site frame");
+    equal(model.frames[0].position[0], 0.02, "the IMU frame keeps the site position");
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    equal(blueprint.floatingBase, true, "the imported walker compiles with a floating base");
+    equal(blueprint.linkCollisionShapes.length, 5, "every imported collision shape compiles");
+  }
+
+  /** UrdfLoader on fixtures/urdf/walker.urdf, checked against the values authored there. */
+  static function testUrdfWalkerImport():Void {
+    var path = Sys.getCwd() + "/robotkit/tests/fixtures/urdf/walker.urdf";
+    if (!sys.FileSystem.exists(path)) path = Sys.getCwd() + "/fixtures/urdf/walker.urdf";
+    var loaded = robotkit.model.urdf.UrdfLoader.load(sys.io.File.getContent(path));
+    var model = loaded.model;
+    equal(model.name, "walker-urdf", "URDF robot name");
+    equal(model.floatingBase, true, "a floating joint from world sets a floating base");
+    equal(model.links.length, 4, "the world link is dropped");
+    equal(model.links[0].id, "link/torso", "URDF link IDs follow RobotModel conventions");
+    equal(model.links[0].visualGeometry, "package://walker/meshes/torso.stl", "visual mesh references are kept");
+    check(switch model.links[0].collisionShapes[0].primitive {
+      case CollisionPrimitive.Box(x, y, z): x == 0.15 && y == 0.1 && z == 0.2;
+      case _: false;
+    }, "a URDF box size becomes half extents");
+    check(switch model.links[1].collisionShapes[0].primitive {
+      case CollisionPrimitive.Cylinder(radius, half): radius == 0.05 && half == 0.2;
+      case _: false;
+    }, "a URDF cylinder length becomes a half-length");
+    equal(model.links[1].collisionShapes[0].position[2], -0.2, "collision origins are kept");
+    equal(model.links[2].collisionShapes.length, 1, "only primitive collision geometry becomes a shape");
+    equal(model.links[2].collisionGeometry, "package://walker/meshes/foot.stl",
+      "a collision mesh is kept as a geometry reference");
+    check(Math.abs(model.links[2].inertiaTensor[0] - 0.001) < 1e-12 &&
+      Math.abs(model.links[2].inertiaTensor[4] - 0.002) < 1e-12,
+      "inertia in a rotated inertial frame is expressed in link axes");
+    equal(model.links[3].mass, robotkit.model.urdf.UrdfLoader.PLACEHOLDER_MASS,
+      "a link without inertial gets a placeholder mass");
+    var hip = model.joints[0], knee = model.joints[1], toe = model.joints[2];
+    equal(hip.axis[1], 1.0, "joint axes are normalised");
+    equal(hip.limits.effort, 40.0, "limit effort is kept");
+    equal(hip.parentFramePosition[1], 0.1, "the joint origin places the child frame in the parent");
+    check(Math.abs(knee.parentFrameRotation[0] - Math.sqrt(0.5)) < 1e-12 &&
+      Math.abs(knee.parentFrameRotation[3] - Math.sqrt(0.5)) < 1e-12,
+      "rpy converts to an xyzw quaternion");
+    equal(knee.childFramePosition[2], 0.0, "the URDF joint frame is the child link frame");
+    equal(model.couplings.length, 1, "mimic becomes a joint coupling");
+    equal(model.couplings[0].leader, knee.id, "the mimicked joint leads");
+    equal(model.couplings[0].follower, toe.id, "the mimic joint follows");
+    equal(model.couplings[0].ratio, 0.5, "mimic multiplier becomes the coupling ratio");
+    equal(model.actuators.length, 1, "a simple transmission becomes an actuator");
+    check(switch model.actuators[0].transmission {
+      case SimpleTransmission(jointId, ratio, _): jointId == hip.id && ratio == 2.0;
+    }, "mechanical reduction becomes the transmission ratio");
+    equal(model.actuators[0].maxEffort, 20.0, "actuator effort is the joint effort over the reduction");
+    var warned = loaded.warnings.join("\n");
+    equal(hip.damping, 0.5, "URDF dynamics damping becomes joint damping");
+    check(warned.indexOf("placeholder") >= 0 && warned.indexOf("foot.stl") >= 0,
+      "skipped and approximated elements are reported");
+    equal(RobotModelCodec.decode(RobotModelCodec.encode(model)).links.length, 4,
+      "a loaded URDF round-trips through the RobotModel codec");
+    equal(RobotRuntimeCompiler.compile(model).linkCollisionShapes.length, 3,
+      "a loaded URDF compiles");
+    throws(function() robotkit.model.urdf.UrdfLoader.load("<robot name='x'><link name='a'/>"),
+      "malformed URDF XML is rejected");
+    throws(function() robotkit.model.urdf.UrdfLoader.load(
+      "<robot><link name='a'/><link name='b'/><joint name='j' type='planar'><parent link='a'/><child link='b'/></joint></robot>"),
+      "unsupported joint types are rejected");
   }
 
   static function testGnssLocalization():Void {

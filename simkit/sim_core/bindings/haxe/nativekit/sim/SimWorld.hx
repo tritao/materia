@@ -5,12 +5,6 @@ import NativeKitSim;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 
-typedef SimWorldOptions = {
-    ?timestep:Float,
-    ?physicsSubsteps:Int,
-    ?gravity:Array<Float>
-};
-
 /** Thin typed Haxeon façade over an explicitly stepped simulation world. */
 class SimWorld {
     final scene:Scene;
@@ -45,6 +39,13 @@ class SimWorld {
             throw "Simulation gravity must contain three values";
         for (index in 0...3)
             desc.set_gravity(index, gravity[index]);
+        if (options != null) {
+            if (options.integrator != null) desc.set_integrator(options.integrator);
+            if (options.frictionCone != null) desc.set_friction_cone(options.frictionCone);
+            if (options.solverIterations != null) desc.set_solver_iterations(options.solverIterations);
+            if (options.lineSearchIterations != null)
+                desc.set_line_search_iterations(options.lineSearchIterations);
+        }
         return desc;
     }
 

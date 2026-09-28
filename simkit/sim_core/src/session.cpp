@@ -119,8 +119,14 @@ bool valid_shape(const nksim_shape_desc &shape) {
     case NKSIM_SHAPE_SPHERE:
         return std::isfinite(shape.parameters[0]) && shape.parameters[0] > 0.0;
     case NKSIM_SHAPE_CAPSULE:
+    case NKSIM_SHAPE_CYLINDER:
         return std::isfinite(shape.parameters[0]) && std::isfinite(shape.parameters[1]) &&
             shape.parameters[0] > 0.0 && shape.parameters[1] > 0.0;
+    case NKSIM_SHAPE_PLANE: {
+        const double length = std::sqrt(shape.parameters[0] * shape.parameters[0] +
+            shape.parameters[1] * shape.parameters[1] + shape.parameters[2] * shape.parameters[2]);
+        return std::isfinite(length) && length > 0.0 && std::isfinite(shape.parameters[3]);
+    }
     default:
         return false;
     }
@@ -148,9 +154,37 @@ double ray_sphere(const double o[3], const double d[3], const double centre[3], 
     return nearest_root(a, b, c, limit);
 }
 
-// Ray against a shape in its local frame (capsules lie along local Z).
+// Ray against a shape in its local frame (capsules and cylinders lie along
+// local Z; a plane bounds the solid half-space behind its normal).
 double ray_shape(const nksim_shape_desc &shape, const double o[3], const double d[3],
                  double limit) {
+    if (shape.type == NKSIM_SHAPE_PLANE) {
+        const double *n = shape.parameters;
+        const double length = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        const double height = (n[0] * o[0] + n[1] * o[1] + n[2] * o[2]) / length - n[3];
+        if (height <= 0.0) return 0.0;
+        const double approach = (n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / length;
+        if (approach >= 0.0) return limit;
+        const double t = -height / approach;
+        return t < limit ? t : limit;
+    }
+    if (shape.type == NKSIM_SHAPE_CYLINDER) {
+        const double radius = shape.parameters[0], half = shape.parameters[1] * 0.5;
+        if (o[0] * o[0] + o[1] * o[1] <= radius * radius && std::abs(o[2]) <= half)
+            return 0.0;
+        double nearest = limit;
+        const double a = d[0] * d[0] + d[1] * d[1];
+        const double t = nearest_root(a, 2.0 * (o[0] * d[0] + o[1] * d[1]),
+                                      o[0] * o[0] + o[1] * o[1] - radius * radius, limit);
+        if (t < limit && std::abs(o[2] + t * d[2]) <= half) nearest = t;
+        for (const double end : {-half, half}) {
+            if (std::abs(d[2]) < 1e-15) continue;
+            const double cap = (end - o[2]) / d[2];
+            const double x = o[0] + cap * d[0], y = o[1] + cap * d[1];
+            if (cap >= 0.0 && cap < nearest && x * x + y * y <= radius * radius) nearest = cap;
+        }
+        return nearest;
+    }
     if (shape.type == NKSIM_SHAPE_SPHERE) {
         const double centre[3]{};
         return ray_sphere(o, d, centre, shape.parameters[0], limit);
@@ -321,6 +355,7 @@ public:
         std::lock_guard lock(mutex);
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         if (desc.motion_type > NKSIM_MOTION_DYNAMIC || !valid_shape(desc.shape) ||
+            (desc.shape.type == NKSIM_SHAPE_PLANE && desc.motion_type != NKSIM_MOTION_STATIC) ||
             desc.pose.struct_size < sizeof(desc.pose) || !valid_pose(desc.pose) ||
             (desc.motion_type == NKSIM_MOTION_DYNAMIC &&
              !(std::isfinite(desc.mass) && desc.mass > 0.0)))
@@ -394,8 +429,10 @@ public:
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         if (!parts || count == 0 || count > 256) return NKSIM_ERROR_INVALID_ARGUMENT;
         for (uint32_t index = 0; index < count; ++index)
+            // Actor parts move, and an infinite plane cannot.
             if (parts[index].struct_size < sizeof(nksim_actor_part) ||
-                !valid_shape(parts[index].shape) || !valid_pose(parts[index].pose))
+                !valid_shape(parts[index].shape) || parts[index].shape.type == NKSIM_SHAPE_PLANE ||
+                !valid_pose(parts[index].pose))
                 return NKSIM_ERROR_INVALID_ARGUMENT;
         Actor actor;
         actor.parts.resize(count);

@@ -40,6 +40,7 @@ class RobotRuntimeCompiler {
         [for (link in robot.links) link.visualGeometry],
         [for (link in robot.links) link.collisionGeometry], robot.collisionApproximation),
       compileConfiguration(robot), calibrationRevision);
+    result.floatingBase = robot.floatingBase;
     result.collisionApproximation = switch (robot.collisionApproximation) {
       case CollisionApproximation.None: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_NONE;
       case CollisionApproximation.BoundsBox: RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
@@ -48,6 +49,8 @@ class RobotRuntimeCompiler {
     for (index in 0...robot.links.length) {
       var link = robot.links[index];
       result.links[index] = new RobotRuntimeLinkBlueprint(link.mass, link.centerOfMass, link.inertiaTensor);
+      for (shape in link.collisionShapes)
+        result.linkCollisionShapes.push(new RobotRuntimeLinkShape(index, shape));
     }
     for (index in 0...robot.joints.length) {
       var joint:robotkit.model.Joint = robot.joints[index];
@@ -61,7 +64,7 @@ class RobotRuntimeCompiler {
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
         case JointType.Prismatic: RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
         case JointType.Floating:
-          throw 'Joint ${joint.name} has unsupported floating type';
+          throw 'Joint ${joint.name} has unsupported floating type; set RobotModel.floatingBase';
         default:
           throw 'Joint ${joint.name} has unknown type ${joint.type}';
       };
@@ -82,11 +85,31 @@ class RobotRuntimeCompiler {
       }
       maxRate = tighterLimit(maxRate, actuatorRate);
       maxEffort = tighterLimit(maxEffort, actuatorEffort);
-      result.addJoint(new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
+      var compiled = new RobotRuntimeJointBlueprint(index, nativeType, parent, child,
         joint.limits.lower, joint.limits.upper, maxEffort, maxRate,
         joint.parentFramePosition, joint.parentFrameRotation,
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
-        joint.limits.maxAcceleration));
+        joint.limits.maxAcceleration);
+      compiled.armature = joint.armature;
+      compiled.damping = joint.damping;
+      compiled.frictionLoss = joint.frictionLoss;
+      compiled.limitTimeConstant = joint.limitTimeConstant;
+      compiled.limitDampingRatio = joint.limitDampingRatio;
+      compiled.limitImpedance = joint.limitImpedance.copy();
+      result.addJoint(compiled);
+    }
+    // Contact pairs refer to shapes by their place in linkCollisionShapes.
+    var firstShape = new Map<String, Int>();
+    var shapeCount = 0;
+    for (link in robot.links) {
+      firstShape.set(link.id, shapeCount);
+      shapeCount += link.collisionShapes.length;
+    }
+    for (pair in robot.contactPairs) {
+      // Validation guarantees both links exist.
+      var firstA:Int = cast firstShape.get(pair.linkA), firstB:Int = cast firstShape.get(pair.linkB);
+      result.contactPairs.push(new RobotRuntimeContactPair(firstA + pair.shapeA,
+        firstB + pair.shapeB, pair.surface));
     }
     for (coupling in robot.couplings) {
       var leader = -1, follower = -1;
@@ -186,6 +209,16 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_LINK_INERTIA", '$path.inertiaTensor', "inertia tensor must be finite, symmetric, and positive definite"));
       if (!validGeometryReference(link.visualGeometry) || !validGeometryReference(link.collisionGeometry))
         diagnostics.push(new RobotCompileDiagnostic("RK_LINK_GEOMETRY", path, "geometry reference must be null or a non-empty string"));
+      if (link.collisionShapes == null)
+        diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_SHAPE", '$path.collisionShapes',
+          "collision shape list is missing"));
+      else for (shapeIndex in 0...link.collisionShapes.length) {
+        var shape = link.collisionShapes[shapeIndex];
+        var error = shape == null ? "collision shape is null" : shape.validate();
+        if (error != null)
+          diagnostics.push(new RobotCompileDiagnostic("RK_COLLISION_SHAPE",
+            '$path.collisionShapes[$shapeIndex]', error));
+      }
     }
 
     var jointIds = new Map<String, Bool>();
@@ -259,13 +292,38 @@ class RobotRuntimeCompiler {
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_FRAME", path, "joint frames require finite translations and unit xyzw quaternions"));
       if (!validUnitVector(joint.axis))
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
+      if (!(joint.armature >= 0.0) || !(joint.damping >= 0.0) || !(joint.frictionLoss >= 0.0) ||
+          !Math.isFinite(joint.armature) || !Math.isFinite(joint.damping) || !Math.isFinite(joint.frictionLoss) ||
+          !(joint.limitTimeConstant >= 0.0) || !(joint.limitDampingRatio >= 0.0) ||
+          !Math.isFinite(joint.limitTimeConstant) || !Math.isFinite(joint.limitDampingRatio) ||
+          !validVector(joint.limitImpedance, 5))
+        diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_DYNAMICS", path,
+          "joint armature, damping and friction loss must be finite and non-negative"));
       if (joint.type == JointType.Floating)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_UNSUPPORTED", '$path.type',
-          "floating joints are not supported by the current runtime backend"));
+          "floating joints are not supported; set RobotModel.floatingBase to free the root link"));
       else if (joint.type != JointType.Fixed && joint.type != JointType.Revolute
           && joint.type != JointType.Continuous && joint.type != JointType.Prismatic)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_TYPE", '$path.type',
           'unknown joint type "${joint.type}"'));
+    }
+
+    for (index in 0...robot.contactPairs.length) {
+      var pair = robot.contactPairs[index];
+      var path = 'contactPairs[$index]';
+      var a:Null<robotkit.model.Link> = null, b:Null<robotkit.model.Link> = null;
+      for (link in robot.links) if (link != null) {
+        if (pair != null && link.id == pair.linkA) a = link;
+        if (pair != null && link.id == pair.linkB) b = link;
+      }
+      if (pair == null || a == null || b == null || a == b || pair.shapeA < 0 || pair.shapeB < 0 ||
+          pair.shapeA >= a.collisionShapes.length || pair.shapeB >= b.collisionShapes.length)
+        diagnostics.push(new RobotCompileDiagnostic("RK_CONTACT_PAIR", path,
+          "contact pair must name one shape on each of two different links"));
+      else {
+        var error = pair.surface == null ? "contact pair surface is missing" : pair.surface.validate();
+        if (error != null) diagnostics.push(new RobotCompileDiagnostic("RK_CONTACT_PAIR", path, error));
+      }
     }
 
     var actuatorIds = new Map<String, Bool>();
@@ -487,6 +545,9 @@ class RobotRuntimeCompiler {
     }
 
     var mobile = robot.mobileBase;
+    if (mobile != null && robot.floatingBase)
+      diagnostics.push(new RobotCompileDiagnostic("RK_FLOATING_MOBILE", "mobileBase",
+        "a floating base moves under physics and cannot also be a wheeled mobile base"));
     if (mobile != null) {
       positive(mobile.maxLinearSpeed, "mobileBase.maxLinearSpeed");
       positive(mobile.maxAngularSpeed, "mobileBase.maxAngularSpeed");

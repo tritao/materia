@@ -230,6 +230,9 @@ public:
                 return NKSIM_ERROR_INVALID_HANDLE;
             switch (targets[index].mode) {
             case NKSIM_JOINT_TARGET_POSITION:
+            case NKSIM_JOINT_TARGET_SERVO:
+                // Joints here follow their targets exactly, so a servo's
+                // position target is reached at once, as a position target is.
                 joint->state.position = targets[index].target;
                 joint->state.velocity = 0.0;
                 break;
@@ -486,6 +489,16 @@ private:
                 return &body;
         }
         return nullptr;
+    }
+
+    nksim_result joint_set_state(std::uint64_t id, double position, double velocity) override {
+        auto *joint = find_joint(id);
+        if (!joint) return NKSIM_ERROR_INVALID_HANDLE;
+        joint->state.position = position;
+        joint->state.velocity = velocity;
+        clamp_joint_position(*joint);
+        enforce_couplings();
+        return recompute_articulated_poses(0.0);
     }
 
     TestJoint *find_joint(std::uint64_t id) noexcept {

@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "name": "pty-forklift",
   "collisionApproximation": "bounds-box",
+  "floatingBase": false,
   "links": [
     {
       "id": "link/base",
@@ -24,7 +25,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     },
     {
       "id": "link/left-wheel",
@@ -47,7 +49,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     },
     {
       "id": "link/right-wheel",
@@ -70,7 +73,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     },
     {
       "id": "link/lift",
@@ -93,7 +97,8 @@
         1
       ],
       "visualGeometry": null,
-      "collisionGeometry": null
+      "collisionGeometry": null,
+      "collisionShapes": []
     }
   ],
   "joints": [
@@ -136,7 +141,15 @@
         0,
         0,
         1
-      ]
+      ],
+      "dynamics": {
+        "armature": 0,
+        "damping": 0,
+        "frictionLoss": 0,
+        "limitTimeConstant": 0,
+        "limitDampingRatio": 0,
+        "limitImpedance": [0, 0, 0, 0, 0]
+      }
     },
     {
       "id": "joint/right-wheel",
@@ -177,7 +190,15 @@
         0,
         0,
         1
-      ]
+      ],
+      "dynamics": {
+        "armature": 0,
+        "damping": 0,
+        "frictionLoss": 0,
+        "limitTimeConstant": 0,
+        "limitDampingRatio": 0,
+        "limitImpedance": [0, 0, 0, 0, 0]
+      }
     },
     {
       "id": "joint/lift",
@@ -218,7 +239,15 @@
         0,
         0,
         1
-      ]
+      ],
+      "dynamics": {
+        "armature": 0,
+        "damping": 0,
+        "frictionLoss": 0,
+        "limitTimeConstant": 0,
+        "limitDampingRatio": 0,
+        "limitImpedance": [0, 0, 0, 0, 0]
+      }
     }
   ],
   "actuators": [],
@@ -247,5 +276,6 @@
     "maxMassKg": 1000,
     "maxLoadMomentKgMeters": 600,
     "maxLiftHeightMeters": 1
-  }
+  },
+  "contactPairs": []
 }

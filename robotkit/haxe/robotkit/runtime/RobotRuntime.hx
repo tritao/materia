@@ -146,7 +146,16 @@ class RobotRuntime {
         case robotkit.world.JointTargetMode.Position: RobotKitRuntimeConstants.RK_TARGET_POSITION;
         case robotkit.world.JointTargetMode.Velocity: RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
         case robotkit.world.JointTargetMode.Effort: RobotKitRuntimeConstants.RK_TARGET_EFFORT;
+        case robotkit.world.JointTargetMode.Servo: RobotKitRuntimeConstants.RK_TARGET_SERVO;
       });
+      if (targetValue.mode == robotkit.world.JointTargetMode.Servo) {
+        var servo = new rk_joint_servo();
+        servo.set_velocity(targetValue.servoVelocity);
+        servo.set_stiffness(targetValue.stiffness);
+        servo.set_damping(targetValue.damping);
+        servo.set_feedforward(targetValue.feedforward);
+        command.set_servos(index, servo);
+      }
       target.set_target(targetValue.target);
       target.set_max_rate(targetValue.joint < defaultMaxRates.length
         ? defaultMaxRates[targetValue.joint] : 0.0);

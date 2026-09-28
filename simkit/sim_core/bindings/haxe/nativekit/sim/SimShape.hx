@@ -22,6 +22,17 @@ class SimShape {
     public static function sphere(radius:Float):SimShape
         return new SimShape(ShapeType.Sphere, radius, 0.0, 0.0);
 
+    /** A solid cylinder along local +Z, of full height `height`. */
+    public static function cylinder(radius:Float, height:Float):SimShape
+        return new SimShape(ShapeType.Cylinder, radius, height, 0.0);
+
+    /**
+     * An infinite plane through the object's origin facing its local +Z, such
+     * as a ground plane; only static objects may be planes.
+     */
+    public static function plane():SimShape
+        return new SimShape(ShapeType.Plane, 0.0, 0.0, 1.0);
+
     /** A capsule along local +Z; length is between its hemisphere centres. */
     public static function capsule(radius:Float, length:Float):SimShape
         return new SimShape(ShapeType.Capsule, radius, length, 0.0);

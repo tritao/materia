@@ -156,7 +156,7 @@ hashes ordered actuator transmissions and process-channel declarations.
 
 ### Transmissions (model contract and RKD6 implementation)
 
-RobotModel v5 owns actuators independently of joints. Each actuator has a
+RobotModel v6 owns actuators independently of joints. Each actuator has a
 stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
 with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
 `joint = offset + actuator / ratio`: for a motor driving a linear joint,
@@ -166,9 +166,29 @@ logical coordinate and derives the other joint scales and offsets by equating
 actuator coordinates, using the first actuator authored for each joint as its
 mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
-`RobotModelCodec` accepts v5 only; older schemas are rejected, not migrated.
+`RobotModelCodec` accepts v6 only; older schemas are rejected, not migrated.
 
-RobotModel v5 also owns `JointCoupling{id, leader, follower, ratio, offset}`.
+RobotModel v6 adds `floatingBase`. When true, the root link is a free six-DOF
+body, as for a legged or humanoid robot, instead of a base fixed to or driven
+over the world. It is a model property rather than a joint, so runtime joints
+stay one-DOF and joint indices, targets, and plans are unchanged;
+`JointType.Floating` remains rejected by the compiler. The blueprint carries it
+as `floating_base`. `Simulation` then creates the root as a dynamic body
+(a MuJoCo free joint), reports its twist through
+`rk_simulation_get_robot_base_velocity()`, and refuses kinematic base drives
+and wheel couplings for it. A floating base cannot also have a `mobileBase`.
+See `robotkit/plans/HUMANOID.md`.
+
+RobotModel v6 links also carry `collisionShapes`: boxes, spheres, capsules and
+cylinders, each posed in the link frame, with capsule and cylinder lengths
+given as half-lengths along local Z (MuJoCo's convention). The compiler copies
+them onto the blueprint, and `Simulation` sends them in the robot
+description's `link_shapes` tail. A link with shapes collides through one
+compound of them together with its explicit hull or box and any tool pieces;
+a link without shapes keeps the model's `collisionApproximation`.
+`robotkit_mjcf_import` produces these from MJCF (`robotkit/tools/mjcf_import`).
+
+RobotModel v5 added `JointCoupling{id, leader, follower, ratio, offset}`.
 This is a joint-to-joint relation, `follower = ratio * leader + offset`,
 separate from the actuator-to-joint `SimpleTransmission`. The runtime blueprint
 carries these couplings. MotionKit derives logical-axis scales and offsets from

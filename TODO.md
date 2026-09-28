@@ -2,7 +2,8 @@
 
 ## Physics regression
 
-- [ ] Add a focused MuJoCo actuator-limit test in RobotKit or SimKit. Use a
+- [x] Add a focused MuJoCo actuator-limit test in RobotKit or SimKit. Done as
+  `actuator_limit_stalls_then_lifts` in `robotkit/runtime/tests/mujoco.cpp`. Use a
   gravity-loaded single joint with known mass, center of mass, axis, and torque
   limit. Verify that a position command stalls when available torque is below
   the gravitational load, then moves when the limit is raised above it. Check

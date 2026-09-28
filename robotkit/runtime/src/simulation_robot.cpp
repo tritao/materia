@@ -47,16 +47,17 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         // an active buffered trajectory into a short position-target ramp;
         // this branch handles direct velocity/effort targets that have no
         // runtime trajectory to ramp.
-        // Position-held joints keep their current, already rate-limited
-        // reference, which is where they stop; never-commanded joints stay
-        // passive.
+        // Position- and servo-held joints keep their current, already
+        // rate-limited reference, which is where they stop; never-commanded
+        // joints stay passive.
         stopped_ = false;
         pending_targets_.clear();
         const auto staged = staged_commands();
         for (std::size_t index = 0; index < joints_.size(); ++index) {
             if (index >= actuated_joints_.size() || !actuated_joints_[index] ||
                 staged[index].mode == 0 ||
-                staged[index].mode == NKSIM_JOINT_TARGET_POSITION)
+                staged[index].mode == NKSIM_JOINT_TARGET_POSITION ||
+                staged[index].mode == NKSIM_JOINT_TARGET_SERVO)
                 continue;
             queue_velocity_hold(index);
         }
@@ -85,6 +86,13 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.mode = source.mode;
         target.target = source.target;
         target.max_force = source.max_effort;
+        if (source.mode == RK_TARGET_SERVO) {
+            const auto &servo = command.servos[index];
+            target.velocity = servo.velocity;
+            target.stiffness = servo.stiffness;
+            target.damping = servo.damping;
+            target.feedforward = servo.feedforward;
+        }
         pending_targets_.push_back(target);
         staged[source.joint] = {source.mode, source.target};
     }

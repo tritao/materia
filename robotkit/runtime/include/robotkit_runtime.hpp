@@ -153,6 +153,9 @@ public:
         return endpoint_ != nullptr && endpoint_->supports_trajectory_queue();
     }
 
+    /** The compiled topology and limits this runtime executes. */
+    const rk_robot_runtime_blueprint &blueprint() const noexcept { return blueprint_; }
+
     bool running() const;
 
     struct RuntimeTrajectoryPoint {
@@ -188,6 +191,7 @@ private:
     };
     struct ControlState {
         rk_joint_target targets[RK_MAX_JOINTS]{};
+        rk_joint_servo servos[RK_MAX_SERVO_JOINTS]{}; // Terms of RK_TARGET_SERVO targets, by joint.
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};

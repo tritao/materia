@@ -5,6 +5,8 @@ import haxe.Int64;
 import nativekit.sim.SimFrame;
 import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
+import robotkit.model.CollisionShape.CollisionPrimitive;
+import robotkit.model.CollisionShape.ShapeContact;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.spatial.Vec3;
@@ -256,6 +258,66 @@ class Simulation {
         }
       }
     }
+    var shapes = blueprint.linkCollisionShapes;
+    if (shapes.length > 0) {
+      if (shapes.length > RobotKitSimKitConstants.RK_MAX_LINK_SHAPES)
+        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_LINK_SHAPES} link collision shapes';
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      robotDesc.set_link_shape_count(shapes.length);
+      for (index in 0...shapes.length) {
+        var source = shapes[index];
+        var native = new rk_simulation_link_shape();
+        native.set_link(source.link);
+        var size:Array<Float> = switch source.shape.primitive {
+          case CollisionPrimitive.Box(x, y, z):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_BOX);
+            [x, y, z];
+          case CollisionPrimitive.Sphere(radius):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_SPHERE);
+            [radius];
+          case CollisionPrimitive.Capsule(radius, half):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CAPSULE);
+            [radius, half];
+          case CollisionPrimitive.Cylinder(radius, half):
+            native.set_type(RobotKitSimKitConstants.RK_LINK_SHAPE_CYLINDER);
+            [radius, half];
+        };
+        for (axis in 0...size.length) native.set_size(axis, size[axis]);
+        for (axis in 0...3) native.set_position(axis, source.shape.position[axis]);
+        for (axis in 0...4) native.set_rotation(axis, source.shape.rotation[axis]);
+        var surface = source.shape.surface;
+        if (surface != null) {
+          for (axis in 0...3) native.set_friction(axis, surface.friction[axis]);
+          native.set_friction_dimensions(surface.frictionDimensions);
+          native.set_contact_time_constant(surface.contactTimeConstant);
+          native.set_contact_damping_ratio(surface.contactDampingRatio);
+        }
+        native.set_contact_filter(switch source.shape.contact {
+          case Layers: 0;
+          case PairsOnly: 1;
+          case PairsAndEnvironment: 2;
+        });
+        robotDesc.set_link_shapes(index, native);
+      }
+      var pairs = blueprint.contactPairs;
+      if (pairs.length > RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS)
+        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS} contact pairs';
+      robotDesc.set_contact_pair_count(pairs.length);
+      for (index in 0...pairs.length) {
+        var pair = pairs[index];
+        var native = new rk_simulation_contact_pair();
+        native.set_shape_a(pair.shapeA);
+        native.set_shape_b(pair.shapeB);
+        for (axis in 0...3) native.set_friction(axis, pair.surface.friction[axis]);
+        native.set_friction_dimensions(pair.surface.frictionDimensions);
+        native.set_contact_time_constant(pair.surface.contactTimeConstant);
+        native.set_contact_damping_ratio(pair.surface.contactDampingRatio);
+        robotDesc.set_contact_pairs(index, native);
+      }
+    }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
     var runtime = new RobotRuntime(result.out_runtime, blueprint);
@@ -496,6 +558,17 @@ class Simulation {
     };
   }
 
+  /**
+   * Places a robot's joints, in joint order, as a pose to start from (such as
+   * a standing keyframe) while the simulation is stopped. Velocities become
+   * zero; reset returns joints to zero.
+   */
+  public function setJointPositions(robotIndex:Int, positions:Array<Float>):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_set_joint_positions(owner.borrow(), robotIndex, positions),
+      "simulation.setJointPositions");
+  }
+
   /** Reads one robot base pose without mutating physics or the editable model. */
   public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());
@@ -503,6 +576,20 @@ class Simulation {
     check(result.status,"simulation.getRobotPose");
     return {position:[for(index in 0...3)pose.get_position(index)],
       rotation:[for(index in 0...4)pose.get_rotation(index)]};
+  }
+
+  /**
+   * Reads one robot base's world-frame twist: linear in metres per second,
+   * angular in radians per second. A floating base reports its free motion.
+   */
+  public function robotBaseVelocity(robotIndex:Int):{linear:Array<Float>, angular:Array<Float>} {
+    ensureLive();
+    var twist = new rk_simulation_twist();
+    twist.set_struct_size(rk_simulation_twist.size());
+    var result = RobotKitSimKit.rk_simulation_get_robot_base_velocity(owner.borrow(), robotIndex, twist);
+    check(result.status, "simulation.getRobotBaseVelocity");
+    return {linear: [for (index in 0...3) twist.get_linear(index)],
+      angular: [for (index in 0...3) twist.get_angular(index)]};
   }
 
   /** Reads an articulated link pose without mutating the simulation. */
@@ -600,3 +687,17 @@ typedef SimulationDifferentialDriveState = {
   leftWheelRate:Float,
   rightWheelRate:Float
 };
+
+/**
+ * Solver choices for a session's world (SimWorldOptions.integrator and
+ * frictionCone, as SimulationSpace and SimulationHarness take them), matching
+ * SimKit's integrator and friction-cone values.
+ */
+class SimulationSolver {
+  public static inline final DEFAULT = 0;
+  public static inline final EULER = 1;
+  public static inline final IMPLICIT_FAST = 2;
+  public static inline final RK4 = 3;
+  public static inline final PYRAMIDAL_CONE = 1;
+  public static inline final ELLIPTIC_CONE = 2;
+}

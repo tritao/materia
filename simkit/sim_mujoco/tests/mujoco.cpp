@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <cmath>
 #include <cstdio>
 
@@ -1723,12 +1724,335 @@ void convex_mesh_margin_detects_before_gap_force() {
 
 } // namespace
 
+// An upright cylinder rests on its flat end at half its height; a capsule of
+// the same radius and height would stand a radius taller on its rounded cap.
+void cylinder_rests_on_its_flat_end() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto floor_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
+    const auto cylinder_node = make_node_xyz(scene, 0.0, 0.0, 0.5);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.005;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const double normal[] = {0.0, 0.0, 1.0};
+    nksim_shape floor_shape = 0, cylinder_shape = 0, invalid = 0;
+    assert(nksim_shape_create_plane(world, normal, 0.0, &floor_shape) == NKSIM_OK);
+    assert(nksim_shape_create_cylinder(world, 0.1, 0.4, &cylinder_shape) == NKSIM_OK);
+    assert(nksim_shape_create_cylinder(world, 0.1, 0.0, &invalid) ==
+           NKSIM_ERROR_INVALID_ARGUMENT);
+    const auto floor = make_body(world, floor_node, NKSIM_MOTION_STATIC, 0.0, floor_shape);
+    const auto cylinder = make_body(world, cylinder_node, NKSIM_MOTION_DYNAMIC, 1.0,
+                                    cylinder_shape);
+    step_world(world, 400);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, cylinder, &state) == NKSIM_OK);
+    assert(std::abs(state.position[2] - 0.2) < 0.005);
+    assert(std::abs(state.linear_velocity[2]) < 0.01);
+    nksim_body_destroy(world, cylinder);
+    nksim_body_destroy(world, floor);
+    nksim_shape_destroy(world, cylinder_shape);
+    nksim_shape_destroy(world, floor_shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// A 1 kg arm, centre 0.5 m from a hinge about Y, in a MuJoCo world. Gravity
+// loads the hinge with 4.905 N m at the horizontal pose.
+struct ArmRig {
+    nkscene_scene scene = 0;
+    nksim_world world = 0;
+    nksim_body base = 0, arm = 0;
+    nksim_shape shape = 0;
+    nksim_joint joint = 0;
+};
+
+ArmRig make_arm_rig(double armature, double damping, double friction_loss,
+                   double limit_time_constant = 0.0) {
+    ArmRig rig;
+    assert(nkscene_scene_create(&rig.scene) == NKS_OK);
+    const auto base_node = make_node(rig.scene, 0.0);
+    const auto arm_node = make_node(rig.scene, 0.5);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = rig.scene;
+    world_desc.fixed_timestep = 0.002;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    assert(nksim_mujoco_world_create(&world_desc, &rig.world) == NKSIM_OK);
+    rig.base = make_body(rig.world, base_node, NKSIM_MOTION_STATIC, 0.0);
+    rig.shape = make_box(rig.world);
+    rig.arm = make_body(rig.world, arm_node, NKSIM_MOTION_DYNAMIC, 1.0, rig.shape);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_REVOLUTE;
+    joint_desc.body_a = rig.base;
+    joint_desc.body_b = rig.arm;
+    joint_desc.axis_a[1] = 1.0;
+    joint_desc.anchor_b[0] = -0.5;
+    joint_desc.armature = armature;
+    joint_desc.damping = damping;
+    joint_desc.friction_loss = friction_loss;
+    if (limit_time_constant > 0.0) {
+        joint_desc.lower_limit = -1.0;
+        joint_desc.upper_limit = 0.3;
+        joint_desc.limit_time_constant = limit_time_constant;
+        joint_desc.limit_damping_ratio = 1.0;
+    }
+    assert(nksim_joint_create(rig.world, &joint_desc, &rig.joint) == NKSIM_OK);
+    return rig;
+}
+
+double arm_angle(const ArmRig &rig) {
+    nksim_joint_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_joint_get_state(rig.world, rig.joint, &state) == NKSIM_OK);
+    return state.position;
+}
+
+void destroy_arm_rig(ArmRig &rig) {
+    nksim_joint_destroy(rig.world, rig.joint);
+    nksim_body_destroy(rig.world, rig.arm);
+    nksim_body_destroy(rig.world, rig.base);
+    nksim_shape_destroy(rig.world, rig.shape);
+    nksim_world_destroy(rig.world);
+    nkscene_scene_destroy(rig.scene);
+}
+
+double servo_arm_angle(double stiffness, double feedforward, double max_force) {
+    auto rig = make_arm_rig(0.0, 0.0, 0.0);
+    nksim_joint_target target{};
+    target.struct_size = sizeof(target);
+    target.joint = rig.joint;
+    target.mode = NKSIM_JOINT_TARGET_SERVO;
+    target.max_force = max_force;
+    target.stiffness = stiffness;
+    target.damping = 5.0;
+    target.feedforward = feedforward;
+    assert(nksim_world_set_joint_targets(rig.world, &target, 1) == NKSIM_OK);
+    step_world(rig.world, 1000);
+    const double angle = arm_angle(rig);
+    destroy_arm_rig(rig);
+    return angle;
+}
+
+// A servo is a plain PD: it sags by load / stiffness, feedforward cancels the
+// load, and max_force caps the effort.
+void servo_target_is_a_saturating_pd() {
+    const double load = 9.81 * 0.5;
+    const double sag = servo_arm_angle(100.0, 0.0, 0.0);
+    assert(std::abs(std::abs(sag) - load / 100.0) < 0.003);
+    assert(std::abs(servo_arm_angle(100.0, sag > 0.0 ? -load : load, 0.0)) < 1e-3);
+    assert(std::abs(servo_arm_angle(100.0, 0.0, 2.0)) > 1.0);
+
+    auto rig = make_arm_rig(0.0, 0.0, 0.0);
+    nksim_joint_target invalid{};
+    invalid.struct_size = sizeof(invalid);
+    invalid.joint = rig.joint;
+    invalid.mode = NKSIM_JOINT_TARGET_SERVO;
+    invalid.stiffness = -1.0;
+    assert(nksim_world_set_joint_targets(rig.world, &invalid, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
+    invalid.stiffness = 1.0;
+    invalid.struct_size = offsetof(nksim_joint_target, velocity); // Too short to carry servo terms.
+    assert(nksim_world_set_joint_targets(rig.world, &invalid, 1) == NKSIM_ERROR_INVALID_ARGUMENT);
+    invalid.mode = NKSIM_JOINT_TARGET_EFFORT; // The legacy prefix still works for other modes.
+    assert(nksim_world_set_joint_targets(rig.world, &invalid, 1) == NKSIM_OK);
+    destroy_arm_rig(rig);
+}
+
+double falling_arm_angle(double armature, double damping, double friction_loss, int steps) {
+    auto rig = make_arm_rig(armature, damping, friction_loss);
+    step_world(rig.world, steps);
+    const double angle = std::abs(arm_angle(rig));
+    destroy_arm_rig(rig);
+    return angle;
+}
+
+// Joint damping and armature slow a released arm (unit inertia about its
+// centre, 1.25 kg m^2 about the hinge); friction loss above the gravity load
+// holds it, apart from the creep MuJoCo's soft dry friction allows.
+void joint_dynamics_reach_the_backend() {
+    const double free_fall = falling_arm_angle(0.0, 0.0, 0.0, 150);
+    assert(free_fall > 0.15);
+    assert(falling_arm_angle(0.0, 5.0, 0.0, 150) < 0.8 * free_fall);
+    assert(falling_arm_angle(0.5, 0.0, 0.0, 150) < 0.8 * free_fall);
+    assert(falling_arm_angle(0.0, 0.0, 10.0, 500) < 0.01);
+    assert(falling_arm_angle(0.0, 0.0, 0.0, 500) > 1.0);
+}
+
+// Distance a box slides down a 20 degree incline in one second when both the
+// box and the incline have the given sliding friction.
+double incline_slide(double friction) {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const double tilt = 20.0 * 3.14159265358979323846 / 180.0;
+    const double normal[] = {std::sin(tilt), 0.0, std::cos(tilt)};
+    const auto plane_node = make_node(scene, 0.0);
+    const auto box_node = make_node_xyz(scene, normal[0] * 0.1, 0.0, normal[2] * 0.1);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.002;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_shape plane_shape = 0, box_shape = 0;
+    assert(nksim_shape_create_plane(world, normal, 0.0, &plane_shape) == NKSIM_OK);
+    box_shape = make_box(world);
+    nksim_surface surface{};
+    surface.struct_size = sizeof(surface);
+    surface.friction_dimensions = 3;
+    surface.friction[0] = friction;
+    assert(nksim_shape_set_surface(world, plane_shape, &surface) == NKSIM_OK);
+    assert(nksim_shape_set_surface(world, box_shape, &surface) == NKSIM_OK);
+    const auto plane = make_body(world, plane_node, NKSIM_MOTION_STATIC, 0.0, plane_shape);
+    const auto box = make_body(world, box_node, NKSIM_MOTION_DYNAMIC, 1.0, box_shape);
+    nksim_surface invalid = surface;
+    invalid.friction_dimensions = 2;
+    assert(nksim_shape_set_surface(world, box_shape, &invalid) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_shape_set_surface(world, box_shape, &surface) == NKSIM_ERROR_INVALID_STATE);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, box, &state) == NKSIM_OK);
+    state.rotation[0] = 0.0;
+    state.rotation[1] = std::sin(tilt / 2.0);
+    state.rotation[2] = 0.0;
+    state.rotation[3] = std::cos(tilt / 2.0);
+    assert(nksim_body_set_state(world, box, &state) == NKSIM_OK);
+    const double start = state.position[0];
+    step_world(world, 500);
+    assert(nksim_body_get_state(world, box, &state) == NKSIM_OK);
+    const double slide = std::abs(state.position[0] - start) / std::cos(tilt);
+    nksim_body_destroy(world, box);
+    nksim_body_destroy(world, plane);
+    nksim_shape_destroy(world, box_shape);
+    nksim_shape_destroy(world, plane_shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+    return slide;
+}
+
+// tan(20 degrees) is 0.36: a box with friction 1 holds, with friction 0.1 slides.
+void surface_friction_decides_sliding() {
+    assert(incline_slide(1.0) < 0.01);
+    assert(incline_slide(0.1) > 0.5);
+}
+
+void world_options_are_validated() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    desc.integrator = NKSIM_INTEGRATOR_IMPLICIT_FAST;
+    desc.friction_cone = NKSIM_FRICTION_CONE_ELLIPTIC;
+    desc.solver_iterations = 5;
+    desc.line_search_iterations = 8;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    nksim_world_destroy(world);
+    desc.integrator = 9;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_ERROR_INVALID_ARGUMENT);
+    desc.integrator = 7; // Beyond the prefix an older caller supplies, so never read.
+    desc.struct_size = offsetof(nksim_world_desc, integrator);
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// Contact filters: a box that collides only through pairs falls through the
+// floor, one that also meets the environment rests on it, and one with an
+// explicit pair to the floor rests on it too.
+void contact_filters_and_pairs_decide_contacts() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.005;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const double normal[] = {0.0, 0.0, 1.0};
+    nksim_shape floor_shape = 0;
+    assert(nksim_shape_create_plane(world, normal, 0.0, &floor_shape) == NKSIM_OK);
+    const auto floor = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0, floor_shape);
+    nksim_body boxes[3]{};
+    nksim_shape shapes[3]{};
+    const uint32_t filters[] = {NKSIM_CONTACT_PAIRS_ONLY, NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT,
+                                NKSIM_CONTACT_PAIRS_ONLY};
+    assert(nksim_world_begin_topology_update(world) == NKSIM_OK);
+    for (int index = 0; index < 3; ++index) {
+        shapes[index] = make_box(world);
+        nksim_surface surface{};
+        surface.struct_size = sizeof(surface);
+        surface.contact_filter = filters[index];
+        assert(nksim_shape_set_surface(world, shapes[index], &surface) == NKSIM_OK);
+        boxes[index] = make_body(world, make_node_xyz(scene, index * 1.0, 0.0, 0.3),
+                                 NKSIM_MOTION_DYNAMIC, 1.0, shapes[index]);
+    }
+    nksim_contact_pair_desc pair{};
+    pair.struct_size = sizeof(pair);
+    pair.body_a = boxes[2];
+    pair.body_b = floor;
+    pair.surface.struct_size = sizeof(pair.surface);
+    assert(nksim_contact_pair_create(world, &pair) == NKSIM_OK);
+    auto invalid = pair;
+    invalid.part_a = 1; // The box shape has one part.
+    assert(nksim_contact_pair_create(world, &invalid) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_world_end_topology_update(world) == NKSIM_OK);
+    step_world(world, 200);
+    double heights[3]{};
+    for (int index = 0; index < 3; ++index) {
+        nksim_body_state state{};
+        state.struct_size = sizeof(state);
+        assert(nksim_body_get_state(world, boxes[index], &state) == NKSIM_OK);
+        heights[index] = state.position[2];
+    }
+    assert(heights[0] < -1.0);
+    assert(std::abs(heights[1] - 0.1) < 0.005);
+    assert(std::abs(heights[2] - 0.1) < 0.005);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// An arm falling onto its 0.3 rad stop rests further past it when the limit is
+// softer (a longer time constant).
+void joint_limit_softness_reaches_the_backend() {
+    const auto rest = [](double time_constant) {
+        auto rig = make_arm_rig(0.0, 1.0, 0.0, time_constant);
+        step_world(rig.world, 1500);
+        const double angle = arm_angle(rig);
+        destroy_arm_rig(rig);
+        return angle - 0.3;
+    };
+    const double stiff = rest(0.004), soft = rest(0.1);
+    assert(stiff > 0.0 && stiff < 0.01);
+    assert(soft > 5.0 * stiff);
+}
+
 int main() {
+    joint_limit_softness_reaches_the_backend();
+    contact_filters_and_pairs_decide_contacts();
+    servo_target_is_a_saturating_pd();
+    joint_dynamics_reach_the_backend();
+    surface_friction_decides_sliding();
+    world_options_are_validated();
     revolute_joint_is_owned_by_nativekit();
     prismatic_joint_uses_mujoco_velocity_control();
     fixed_joint_rebuilds_and_can_be_removed();
     kinematic_scene_state_drives_mujoco();
     plane_shape_stops_dynamic_body();
+    cylinder_rests_on_its_flat_end();
     mujoco_replay_is_deterministic();
     rotated_free_body_preserves_world_angular_velocity();
     wheel_velocity_target_does_not_stall();

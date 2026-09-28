@@ -4,6 +4,7 @@ import nativekit.scene.Scene;
 import nativekit.sim.MujocoSimWorld;
 import nativekit.sim.SimSession;
 import nativekit.sim.SimWorld;
+import nativekit.sim.SimWorldOptions;
 
 /**
  * The scene, physics world, and SimKit session one simulation runs in.
@@ -28,15 +29,27 @@ class SimulationSpace {
 		this.releaseWorld = releaseWorld;
 	}
 
-	/** Creates a space on the deterministic test backend or on MuJoCo. */
-	public static function create(backend:Int, timestep:Float):SimulationSpace {
+	/**
+	 * Creates a space on the deterministic test backend or on MuJoCo. Physics
+	 * advances `physicsSubsteps` times per tick; `solver` picks the integrator,
+	 * friction cone, and solver iteration limits (unset keeps backend defaults).
+	 */
+	public static function create(backend:Int, timestep:Float, physicsSubsteps:Int = 1,
+			?solver:SimWorldOptions):SimulationSpace {
+		var options:SimWorldOptions = {timestep: timestep, physicsSubsteps: physicsSubsteps};
+		if (solver != null) {
+			options.integrator = solver.integrator;
+			options.frictionCone = solver.frictionCone;
+			options.solverIterations = solver.solverIterations;
+			options.lineSearchIterations = solver.lineSearchIterations;
+		}
 		var scene = Scene.create();
 		try {
 			if (backend == MUJOCO) {
-				var world = MujocoSimWorld.create(scene, {timestep: timestep, physicsSubsteps: 1});
+				var world = MujocoSimWorld.create(scene, options);
 				return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose);
 			}
-			var world = new SimWorld(scene, {timestep: timestep, physicsSubsteps: 1});
+			var world = new SimWorld(scene, options);
 			return new SimulationSpace(scene, new SimSession(scene, world.nativeHandle()), world.dispose);
 		} catch (error:Dynamic) {
 			scene.dispose();

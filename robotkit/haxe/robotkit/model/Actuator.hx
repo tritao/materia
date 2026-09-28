@@ -8,6 +8,13 @@ class Actuator {
   public var maxEffort:Float;
   public var maxRate:Float;
   public var transmission:Transmission;
+  /**
+   * Default servo gains in actuator units, such as an MJCF position
+   * actuator's kp and kv: effort per unit of position and velocity error.
+   * Zero means none is authored.
+   */
+  public var servoStiffness:Float = 0.0;
+  public var servoDamping:Float = 0.0;
 
   public function new(id:String, maxEffort:Float, maxRate:Float,
       transmission:Transmission) {

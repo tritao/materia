@@ -42,6 +42,7 @@ public:
     rk_result cut_virtual_device_link(uint32_t robot_index, bool cut);
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
+    rk_result set_joint_positions(uint32_t robot_index, const double *positions, uint32_t count);
     /**
      * Moves one kinematic robot base for the next tick without stopping the
      * owner, resetting sensors, or replacing the reset pose.
@@ -65,6 +66,8 @@ public:
     rk_result get_omni_drive_state(uint32_t robot_index,
                                    rk_simulation_omni_drive_state &out_state) const;
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
+    /** Reads one robot base's world-frame twist from the latest physics state. */
+    rk_result get_robot_base_velocity(uint32_t robot_index, rk_simulation_twist &out_twist) const;
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
     rk_result get_robot_contacts(rk_robot_runtime runtime,
@@ -102,6 +105,7 @@ private:
     rk_result publish(const nksim_tick &tick);
     rk_result reset_robots();
     rk_result read_body_pose(nksim_body body, rk_simulation_pose &out_pose) const;
+    rk_result read_body_state(nksim_body body, nksim_body_state &state) const;
     /**
      * Writes one robot base's scene node, which its kinematic body follows on
      * the next tick, and re-seeds any drive plant from it.
@@ -177,6 +181,9 @@ private:
     std::vector<std::shared_ptr<RobotRuntime>> runtimes_;
     std::vector<rk_robot_runtime> handles_;
     std::vector<nksim_body> robot_base_bodies_;
+    // True when the robot's root link is a free dynamic body (floating base),
+    // which kinematic base drives and couplings must not move.
+    std::vector<bool> robot_floating_;
     std::vector<rk_simulation_pose> robot_initial_poses_;
     std::vector<rk_simulation_pose> robot_base_poses_; // Last pose written to each base node.
     // Base pose each robot held at the end of the latest completed tick

@@ -23,8 +23,7 @@ class RobotRecordingCodec {
         Reflect.setField(root, "type", "command");
         switch value { case JointTargets(targets, expiryNs):
           Reflect.setField(root, "payload", {kind:"jointTargets",
-            targets:[for (target in targets) {joint:target.joint,
-              mode:jointTargetMode(target.mode), target:target.target}],
+            targets:[for (target in targets) jointTargetRecord(target)],
             expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
         case TrajectoryChunk(chunk):
           Reflect.setField(root, "payload", {kind:"trajectorySegmentChunk",
@@ -105,9 +104,14 @@ class RobotRecordingCodec {
               fieldFloat(payload,"target"))], expiry));
           case "jointTargets" if (version >= 2):
             var targets:Array<JointTarget> = [];
-            for (item in array(payload, "targets"))
-              targets.push(new JointTarget(fieldInt(item, "joint"),
-                readJointTargetMode(string(item, "mode")), fieldFloat(item, "target")));
+            for (item in array(payload, "targets")) {
+              var mode = readJointTargetMode(string(item, "mode"));
+              targets.push(mode == Servo
+                ? JointTarget.servo(fieldInt(item, "joint"), fieldFloat(item, "target"),
+                  fieldFloat(item, "velocity"), fieldFloat(item, "stiffness"),
+                  fieldFloat(item, "damping"), fieldFloat(item, "feedforward"))
+                : new JointTarget(fieldInt(item, "joint"), mode, fieldFloat(item, "target")));
+            }
             Command(JointTargets(JointTarget.copyBatch(targets), expiry));
           case "trajectorySegmentChunk" if (version >= 3):
             var spliceTag = nullableWide(payload, "spliceTag");
@@ -283,11 +287,24 @@ class RobotRecordingCodec {
     case Position: "position";
     case Velocity: "velocity";
     case Effort: "effort";
+    case Servo: "servo";
   };
+  /** A servo target records its terms too, so a replay applies the same servo. */
+  static function jointTargetRecord(target:JointTarget):Dynamic {
+    var record:Dynamic = {joint:target.joint, mode:jointTargetMode(target.mode), target:target.target};
+    if (target.mode == Servo) {
+      Reflect.setField(record, "velocity", target.servoVelocity);
+      Reflect.setField(record, "stiffness", target.stiffness);
+      Reflect.setField(record, "damping", target.damping);
+      Reflect.setField(record, "feedforward", target.feedforward);
+    }
+    return record;
+  }
   static function readJointTargetMode(value:String):JointTargetMode return switch value {
     case "position": Position;
     case "velocity": Velocity;
     case "effort": Effort;
+    case "servo": Servo;
     case _: throw "Unsupported RobotKit joint target mode";
   };
   static function string(v:Dynamic,n:String):String {var x=Reflect.field(v,n);if(!Std.isOfType(x,String))throw 'Invalid recording field $n';return x;}

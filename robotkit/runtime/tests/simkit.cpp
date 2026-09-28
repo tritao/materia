@@ -1169,7 +1169,47 @@ void robots_attach_to_a_shared_session() {
 
 } // namespace
 
+// A descriptor that only adds collision shapes keeps the default placement:
+// the second robot sits one metre along x, as it would without a descriptor.
+void shape_descriptor_without_pose_keeps_default_placement() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    const auto model = blueprint(7);
+    rk_robot_runtime first = 0, second = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &first) == RK_OK);
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.link_shape_count = 2;
+    robot_desc.link_shapes[0] = {1, RK_LINK_SHAPE_CYLINDER, {0.05, 0.2, 0.0}, {0.0, 0.0, 0.1},
+                                 {0.0, 0.0, 0.0, 1.0}};
+    robot_desc.link_shapes[1] = {1, RK_LINK_SHAPE_BOX, {0.1, 0.1, 0.1}, {0.0, 0.3, 0.0},
+                                 {0.0, 0.0, 0.0, 1.0}};
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &second) == RK_OK);
+    robot_desc.initial_pose.struct_size = 4; // Neither absent nor a full pose.
+    rk_robot_runtime invalid = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &invalid) ==
+           RK_ERROR_INVALID_ARGUMENT);
+    // Joint poses move links on this backend too, before the first step.
+    const double joint_pose[] = {0.4};
+    assert(rk_simulation_set_joint_positions(simulation, 0, joint_pose, 1) == RK_OK);
+    rk_simulation_pose link{};
+    link.struct_size = sizeof(link);
+    assert(rk_simulation_get_link_pose(simulation, 0, 1, &link) == RK_OK);
+    assert(std::abs(link.rotation[2] - std::sin(0.2)) < 1e-9); // 0.4 rad about the Z axis.
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(rk_simulation_get_robot_pose(simulation, 1, &pose) == RK_OK);
+    assert(std::abs(pose.position[0] - 1.0) < 1e-9);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
+    shape_descriptor_without_pose_keeps_default_placement();
     convex_link_and_box_link_build();
     shared_world_steps_once();
     realtime_presentation_keeps_one_revision();

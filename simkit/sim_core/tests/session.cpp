@@ -267,7 +267,54 @@ void participants_share_every_tick() {
 
 } // namespace
 
+// Ground planes and cylinders are session objects too: a plane must be static,
+// and rays hit a plane's surface and a cylinder's side and caps.
+void planes_and_cylinders_are_objects() {
+    Space space;
+    nksim_object_desc plane{};
+    plane.struct_size = sizeof(plane);
+    plane.motion_type = NKSIM_MOTION_DYNAMIC;
+    plane.mass = 1.0;
+    plane.shape.type = NKSIM_SHAPE_PLANE;
+    plane.shape.parameters[2] = 1.0;
+    plane.pose = pose_at(0.0, 0.0, 0.0);
+    nksim_object ground = 0;
+    assert(nksim_session_create_object(space.session, &plane, &ground) == NKSIM_ERROR_INVALID_ARGUMENT);
+    plane.motion_type = NKSIM_MOTION_STATIC;
+    plane.mass = 0.0;
+    assert(nksim_session_create_object(space.session, &plane, &ground) == NKSIM_OK);
+    nksim_object_desc column{};
+    column.struct_size = sizeof(column);
+    column.motion_type = NKSIM_MOTION_STATIC;
+    column.shape.type = NKSIM_SHAPE_CYLINDER;
+    column.shape.parameters[0] = 0.5; // radius
+    column.shape.parameters[1] = 2.0; // full height
+    column.pose = pose_at(3.0, 0.0, 1.0);
+    nksim_object cylinder = 0;
+    assert(nksim_session_create_object(space.session, &column, &cylinder) == NKSIM_OK);
+
+    nksim_ray ray{};
+    ray.struct_size = sizeof(ray);
+    ray.origin[2] = 1.5;
+    ray.direction[2] = -1.0;
+    ray.max_distance = 10.0;
+    double distance = 0.0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 1.5)); // Down onto the ground plane.
+    ray.direction[2] = 0.0;
+    ray.direction[0] = 1.0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 2.5)); // Sideways into the cylinder's side.
+    ray.origin[0] = 3.2;
+    ray.origin[2] = 4.0;
+    ray.direction[0] = 0.0;
+    ray.direction[2] = -1.0;
+    assert(nksim_session_raycast(space.session, &ray, &distance) == NKSIM_OK);
+    assert(near(distance, 2.0)); // Down onto the cylinder's top cap at z = 2.
+}
+
 int main() {
+    planes_and_cylinders_are_objects();
     objects_follow_their_motion_type();
     actors_follow_timed_keyframes();
     participants_share_every_tick();

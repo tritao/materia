@@ -73,4 +73,33 @@ if(RK_BUILD_SIMKIT)
             set_tests_properties(robotkit_mujoco_backend PROPERTIES LABELS "sim;mujoco" TIMEOUT 60)
         endif()
     endif()
+
+    # MJCF import compiles the file with MuJoCo itself (plans/HUMANOID.md, HU-D2).
+    if(TARGET mujoco::mujoco)
+        add_executable(robotkit_mjcf_import tools/mjcf_import/mjcf_import.cpp)
+        # The conformance reference steps the same file in plain MuJoCo.
+        add_executable(robotkit_mjcf_reference tools/mjcf_import/mjcf_reference.cpp)
+        foreach(tool robotkit_mjcf_import robotkit_mjcf_reference)
+            target_compile_features(${tool} PRIVATE cxx_std_17)
+            # Mesh decoders (STL, OBJ) register themselves from static
+            # constructors that nothing references, so a static MuJoCo must
+            # link whole.
+            if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.24)
+                target_link_libraries(${tool} PRIVATE
+                    "$<LINK_LIBRARY:WHOLE_ARCHIVE,mujoco::mujoco>")
+            else()
+                message(WARNING "CMake 3.24 or newer is needed to load MJCF files with mesh assets")
+                target_link_libraries(${tool} PRIVATE mujoco::mujoco)
+            endif()
+        endforeach()
+        if(RK_BUILD_TESTS)
+            add_test(NAME robotkit_mjcf_import COMMAND "${CMAKE_COMMAND}"
+                "-DIMPORTER=$<TARGET_FILE:robotkit_mjcf_import>"
+                "-DMODEL=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/mjcf/walker.xml"
+                "-DEXPECTED=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/mjcf/walker.robot.json"
+                "-DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/mjcf-walker"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/tools/mjcf_import/check_import.cmake")
+            set_tests_properties(robotkit_mjcf_import PROPERTIES LABELS "robot;mujoco;import" TIMEOUT 60)
+        endif()
+    endif()
 endif()
