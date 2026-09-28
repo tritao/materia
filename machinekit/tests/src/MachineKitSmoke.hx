@@ -1677,6 +1677,7 @@ class MachineKitSmoke {
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, -1), "positive pitch");
 		throws(() -> new LeadScrewThread(MetricTrapezoidal, 8, 2, 0), "at least one start");
 		throws(() -> new LeadScrewNut(thread, 2), "at least 3 mounting bolts");
+		throws(() -> new LeadScrewNut(thread, 100), "leaves too little material between mounting holes");
 		var multi = new LeadScrewNut(new LeadScrewThread(MetricTrapezoidal, 8, 2, 4));
 		check(multi.designation == "LEADNUT-TR-D8-P2-S4-RH", "multi-start nut designation");
 		near(multi.lead, 8, "four-start lead is four times pitch");
