@@ -30,8 +30,10 @@ class CamJob {
 
   /** Offset closed profile; `outside` and `inside` use the cutter radius. */
   public function profile(contour:CamContour, tool:CncTool, depth:Float,
-      feed:Float, ?side:String = "outside", ?stepDown:Float = 0.002):CamJob {
+      feed:Float, ?side:String = "outside", ?stepDown:Float = 0.002,
+      ?plungeFeed:Null<Float>):CamJob {
     require(contour, tool, depth, feed);
+    var entryFeed = checkedEntryFeed(feed, plungeFeed);
     if (side != "outside" && side != "inside" && side != "on")
       throw 'Unknown CAM profile side "$side"';
     var levels = depthLevels(contour.z, depth, stepDown);
@@ -40,9 +42,9 @@ class CamJob {
     var span = nextSpan();
     selectTool(tool, span);
     for (level in levels) {
-      if (side == "on") cutLoop(contour, level, feed, span);
-      else cutOffset(contour, tool.diameter * 0.5, level, feed, span,
-        side == "outside");
+      if (side == "on") cutLoop(contour, level, feed, entryFeed, span);
+      else cutOffset(contour, tool.diameter * 0.5, level, feed,
+        entryFeed, span, side == "outside");
     }
     return this;
   }
@@ -50,11 +52,13 @@ class CamJob {
   /** Profile a planar CAD face, completing each hole before releasing its outer edge. */
   public function profileFace(face:Face, tool:CncTool, depth:Float,
       feed:Float, ?stepDown:Float = 0.002, ?unit:String = "mm",
-      ?chordToleranceMetres:Float = 0.00005):CamJob {
+      ?chordToleranceMetres:Float = 0.00005,
+      ?plungeFeed:Null<Float>):CamJob {
     var boundaries = CamContour.fromFaceBoundaries(face, unit,
       chordToleranceMetres);
     var outer = boundaries[0];
     require(outer, tool, depth, feed);
+    checkedEntryFeed(feed, plungeFeed);
     depthLevels(outer.z, depth, stepDown);
     offsetPath(outer, tool.diameter * 0.5, depth, true);
     for (i in 1...boundaries.length) {
@@ -63,18 +67,38 @@ class CamJob {
       offsetPath(boundaries[i], tool.diameter * 0.5, depth, false);
     }
     for (i in 1...boundaries.length)
-      profile(boundaries[i], tool, depth, feed, "inside", stepDown);
-    profile(outer, tool, depth, feed, "outside", stepDown);
+      profile(boundaries[i], tool, depth, feed, "inside", stepDown,
+        plungeFeed);
+    profile(outer, tool, depth, feed, "outside", stepDown, plungeFeed);
     return this;
   }
 
-  /** Repeated inward offsets, no larger than `stepOver`, for convex pockets. */
+  /** Clear a pocket with a separate plunge feed and ramps where spans allow. */
   public function pocket(contour:CamContour, tool:CncTool, depth:Float,
-      feed:Float, stepOver:Float, ?stepDown:Float = 0.002):CamJob {
+      feed:Float, stepOver:Float, ?stepDown:Float = 0.002,
+      ?plungeFeed:Null<Float>):CamJob {
     require(contour, tool, depth, feed);
     if (!Math.isFinite(stepOver) || stepOver <= 0.0 ||
         stepOver > tool.diameter)
       throw "CAM pocket step-over must be positive and no larger than tool diameter";
+    var entryFeed = checkedEntryFeed(feed, plungeFeed);
+    var levels = depthLevels(contour.z, depth, stepDown);
+    if (hasConcaveCorner(contour)) {
+      var radius = tool.diameter * 0.5;
+      var passes = CamPocketPlanner.plan(contour, radius, stepOver);
+      offsetPath(contour, radius, levels[0], false);
+      var span = nextSpan();
+      selectTool(tool, span);
+      for (index in 0...levels.length) {
+        var level = levels[index];
+        var prior = index == 0 ? contour.z : levels[index - 1];
+        cutPocketPasses(passes, level, prior, contour.z, feed,
+          entryFeed, span);
+        cutPocketBoundary(contour, radius, level, prior, feed,
+          entryFeed, span, false);
+      }
+      return this;
+    }
     var span = nextSpan();
     selectTool(tool, span);
     var inset = tool.diameter * 0.5;
@@ -97,9 +121,141 @@ class CamJob {
     }
     if (rounds == 0) throw "Tool does not fit inside CAM pocket";
     if (rounds >= 10000) throw "CAM pocket exceeds 10000 clearing rings";
-    for (level in depthLevels(contour.z, depth, stepDown))
-      for (ring in rings) cutLoop(ring, level, feed, span);
+    for (index in 0...levels.length) {
+      var level = levels[index];
+      var prior = index == 0 ? contour.z : levels[index - 1];
+      for (ring in rings) cutPocketRing(ring, level, prior, contour.z,
+        feed, entryFeed, span);
+    }
     return this;
+  }
+
+  /** Clear a face around its internal islands, then finish every boundary. */
+  public function pocketFace(face:Face, tool:CncTool, depth:Float,
+      feed:Float, stepOver:Float, ?stepDown:Float = 0.002,
+      ?unit:String = "mm", ?chordToleranceMetres:Float = 0.00005,
+      ?plungeFeed:Null<Float>):CamJob {
+    var boundaries = CamContour.fromFaceBoundaries(face, unit,
+      chordToleranceMetres);
+    var outer = boundaries[0];
+    if (boundaries.length == 1)
+      return pocket(outer, tool, depth, feed, stepOver, stepDown,
+        plungeFeed);
+    require(outer, tool, depth, feed);
+    if (!Math.isFinite(stepOver) || stepOver <= 0.0 ||
+        stepOver > tool.diameter)
+      throw "CAM pocket step-over must be positive and no larger than tool diameter";
+    var entryFeed = checkedEntryFeed(feed, plungeFeed);
+    var islands = boundaries.slice(1), radius = tool.diameter * 0.5;
+    var levels = depthLevels(outer.z, depth, stepDown);
+    for (island in islands) require(island, tool, depth, feed);
+    var passes = CamPocketPlanner.plan(outer, radius, stepOver, islands);
+    var outerPath = offsetPath(outer, radius, levels[0], false);
+    for (island in islands) {
+      validatePathAgainstContour(island, outerPath, radius, false);
+      var islandPath = offsetPath(island, radius, levels[0], true);
+      validatePathAgainstContour(outer, islandPath, radius, true);
+      for (other in islands) if (other != island)
+        validatePathAgainstContour(other, islandPath, radius, false);
+    }
+    var span = nextSpan();
+    selectTool(tool, span);
+    for (index in 0...levels.length) {
+      var level = levels[index];
+      var prior = index == 0 ? outer.z : levels[index - 1];
+      cutPocketPasses(passes, level, prior, outer.z, feed,
+        entryFeed, span);
+      for (island in islands)
+        cutPocketBoundary(island, radius, level, prior, feed,
+          entryFeed, span, true);
+      cutPocketBoundary(outer, radius, level, prior, feed,
+        entryFeed, span, false);
+    }
+    return this;
+  }
+
+  function cutPocketPasses(passes:Array<{y:Float, left:Float, right:Float}>,
+      level:Float, prior:Float, surface:Float, feed:Float,
+      plungeFeed:Float, span:CncSpan):Void {
+    for (pass in passes) {
+      var start = new CncPoint(pass.left, pass.y, level);
+      var end = new CncPoint(pass.right, pass.y, level);
+      enterPocket(start, end, prior, surface, feed, plungeFeed, span);
+      feedTo(end, feed, span);
+      rapid(new CncPoint(end.x, end.y, safeZ), span);
+    }
+  }
+
+  function cutPocketRing(contour:CamContour, level:Float, prior:Float,
+      surface:Float, feed:Float, plungeFeed:Float, span:CncSpan):Void {
+    var first = contour.vertices[0], next = contour.vertices[1];
+    var start = new CncPoint(first.x, first.y, level);
+    enterPocket(start, new CncPoint(next.x, next.y, level), prior,
+      surface, feed, plungeFeed, span);
+    for (i in 1...contour.vertices.length) {
+      var point = contour.vertices[i];
+      feedTo(new CncPoint(point.x, point.y, level), feed, span);
+    }
+    feedTo(start, feed, span);
+    rapid(new CncPoint(start.x, start.y, safeZ), span);
+  }
+
+  function cutPocketBoundary(contour:CamContour, radius:Float,
+      level:Float, prior:Float, feed:Float, plungeFeed:Float,
+      span:CncSpan, outside:Bool):Void {
+    var path = offsetPath(contour, radius, level, outside);
+    var start = CncGeometryTools.pointAt(path[0], 0.0);
+    var next = CncGeometryTools.pointAt(path[0],
+      CncGeometryTools.length(path[0]));
+    enterPocket(start, next, prior, contour.z, feed, plungeFeed, span);
+    for (geometry in path) feedGeometry(geometry, feed, span);
+    rapid(new CncPoint(start.x, start.y, safeZ), span);
+  }
+
+  /** Approach above stock, then ramp and retrace or plunge at its own feed. */
+  function enterPocket(start:CncPoint, firstEnd:CncPoint, prior:Float,
+      surface:Float, feed:Float, plungeFeed:Float, span:CncSpan):Void {
+    rapidToSafeXY(start.x, start.y, span);
+    rapid(new CncPoint(start.x, start.y,
+      Math.min(safeZ, surface + 0.001)), span);
+    feedTo(new CncPoint(start.x, start.y, prior), plungeFeed, span);
+    var drop = prior - start.z;
+    var slope = Math.min(0.1, plungeFeed / feed);
+    var run = drop / slope;
+    var dx = firstEnd.x - start.x, dy = firstEnd.y - start.y;
+    var length = Math.sqrt(dx * dx + dy * dy);
+    if (drop > 1e-10 && run <= length + 1e-12) {
+      var fraction = Math.min(1.0, run / length);
+      var rampEnd = new CncPoint(start.x + dx * fraction,
+        start.y + dy * fraction, start.z);
+      feedTo(rampEnd, feed, span);
+      // The ramp leaves a shallow wedge. Recut it at the requested depth.
+      feedTo(start, feed, span);
+    } else feedTo(start, plungeFeed, span);
+  }
+
+  static function checkedEntryFeed(feed:Float,
+      requested:Null<Float>):Float {
+    var value:Float = requested == null ? feed * 0.25 : requested;
+    if (!Math.isFinite(value) || value <= 0.0 || value > feed)
+      throw "CAM plunge feed must be positive and no greater than cutting feed";
+    return value;
+  }
+
+  static function hasConcaveCorner(contour:CamContour):Bool {
+    var vertices = contour.vertices;
+    var orientation = contour.signedArea > 0.0 ? 1.0 : -1.0;
+    for (i in 0...vertices.length) {
+      var a = vertices[i], b = vertices[(i + 1) % vertices.length];
+      var c = vertices[(i + 2) % vertices.length];
+      var abx = b.x - a.x, aby = b.y - a.y;
+      var bcx = c.x - b.x, bcy = c.y - b.y;
+      var turn = orientation * (abx * bcy - aby * bcx) /
+        (Math.sqrt(abx * abx + aby * aby) *
+          Math.sqrt(bcx * bcx + bcy * bcy));
+      if (turn < -1e-9) return true;
+    }
+    return false;
   }
 
   /** Expand hole centres into safe rapid, feed, and retract moves. */
@@ -109,14 +265,16 @@ class CamJob {
         !Math.isFinite(depth) || !Math.isFinite(retractZ) ||
         !Math.isFinite(feed) || feed <= 0.0)
       throw "CAM drill needs holes, tool, depth, retract and feed";
-    var span = nextSpan();
-    selectTool(tool, span);
     for (hole in holes) {
       if (hole == null || !Math.isFinite(hole.x) || !Math.isFinite(hole.y) ||
           !Math.isFinite(hole.z) || depth >= hole.z ||
           retractZ < hole.z || safeZ < retractZ)
         throw "CAM drill depth and retract must be below safe Z";
-      rapid(new CncPoint(hole.x, hole.y, safeZ), span);
+    }
+    var span = nextSpan();
+    selectTool(tool, span);
+    for (hole in holes) {
+      rapidToSafeXY(hole.x, hole.y, span);
       rapid(new CncPoint(hole.x, hole.y, retractZ), span);
       feedTo(new CncPoint(hole.x, hole.y, depth), feed, span);
       rapid(new CncPoint(hole.x, hole.y, safeZ), span);
@@ -135,10 +293,11 @@ class CamJob {
   }
 
   function cutLoop(contour:CamContour, depth:Float, feed:Float,
+      plungeFeed:Float,
       span:CncSpan):Void {
     var first = contour.vertices[0];
-    rapid(new CncPoint(first.x, first.y, safeZ), span);
-    feedTo(new CncPoint(first.x, first.y, depth), feed, span);
+    rapidToSafeXY(first.x, first.y, span);
+    feedTo(new CncPoint(first.x, first.y, depth), plungeFeed, span);
     for (i in 1...contour.vertices.length) {
       var next = contour.vertices[i];
       feedTo(new CncPoint(next.x, next.y, depth), feed, span);
@@ -148,11 +307,11 @@ class CamJob {
   }
 
   function cutOffset(contour:CamContour, radius:Float, depth:Float,
-      feed:Float, span:CncSpan, outside:Bool):Void {
+      feed:Float, plungeFeed:Float, span:CncSpan, outside:Bool):Void {
     var path = offsetPath(contour, radius, depth, outside);
     var first = cnckit.ir.CncGeometryTools.pointAt(path[0], 0.0);
-    rapid(new CncPoint(first.x, first.y, safeZ), span);
-    feedTo(first, feed, span);
+    rapidToSafeXY(first.x, first.y, span);
+    feedTo(first, plungeFeed, span);
     for (geometry in path) feedGeometry(geometry, feed, span);
     rapid(new CncPoint(first.x, first.y, safeZ), span);
   }
@@ -231,12 +390,12 @@ class CamJob {
       result.push(CncGeometry.Arc(new CncPoint(vertex.x, vertex.y, depth),
         radius, startAngle, sweep));
     }
-    validateOffsetPath(contour, result, radius, outside);
+    validatePathAgainstContour(contour, result, radius, !outside);
     return result;
   }
 
-  static function validateOffsetPath(contour:CamContour,
-      path:Array<CncGeometry>, radius:Float, outside:Bool):Void {
+  static function validatePathAgainstContour(contour:CamContour,
+      path:Array<CncGeometry>, radius:Float, expectedInside:Bool):Void {
     var points = contour.vertices, count = points.length;
     for (geometry in path) {
       var length = CncGeometryTools.length(geometry);
@@ -260,7 +419,7 @@ class CamJob {
         case _: throw "CAM profile offset needs planar lines and arcs";
       }
       var midpoint = CncGeometryTools.pointAt(geometry, length * 0.5);
-      if (insidePolygon(midpoint, points) == outside)
+      if (insidePolygon(midpoint, points) != expectedInside)
         throw "CAM profile offset crosses its source contour";
     }
   }
@@ -307,6 +466,11 @@ class CamJob {
     current = target;
   }
 
+  function rapidToSafeXY(x:Float, y:Float, span:CncSpan):Void {
+    rapid(new CncPoint(current.x, current.y, safeZ), span);
+    rapid(new CncPoint(x, y, safeZ), span);
+  }
+
   function feedTo(target:CncPoint, speed:Float, span:CncSpan):Void {
     if (current.distanceTo(target) > 1e-12)
       ops.push(CncOp.Feed(CncGeometry.Line(current, target), speed, 0.0, span));
@@ -328,6 +492,7 @@ class CamJob {
     }
     if (!known) tools.push(tool);
     if (selectedTool != tool.number) {
+      rapid(new CncPoint(current.x, current.y, safeZ), span);
       if (selectedTool >= 0) {
         ops.push(CncOp.Spindle(CncChannels.SpindleSpeed, 0.0, span));
         ops.push(CncOp.Spindle(CncChannels.SpindleDirection, 0.0, span));

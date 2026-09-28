@@ -115,11 +115,10 @@ class CamKitTests {
     var concave = new CamContour([new CncPoint(0, 0, 0),
       new CncPoint(0.02, 0, 0), new CncPoint(0.02, 0.01, 0),
       new CncPoint(0.01, 0.005, 0), new CncPoint(0, 0.01, 0)]);
-    var rejected = "";
-    try new CamJob(0.005, 12000.0).pocket(concave, tool, -0.001, 0.01, 0.001)
-    catch (error:Dynamic) rejected = Std.string(error);
-    check(rejected.indexOf("convex contour") >= 0,
-      "concave offset clearing rejects geometry it cannot clear safely");
+    check(new CamJob(0.005, 12000.0)
+      .pocket(concave, tool, -0.001, 0.01, 0.001)
+      .finish().ops.length > 0,
+      "concave pocket clearing generates cutter passes");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
     var lowered = program.lower(machine);
@@ -140,7 +139,7 @@ class CamKitTests {
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");
-    var gcode = CamGCodeWriter.write(program);
+    var gcode = CamGCodeWriter.write(program, CamTestSetup.standard(), machine);
     var parsed = new CncCompiler(machine).compileDetailed(gcode);
     check(parsed.diagnostics.length == 0,
       'CAM G-code recompiles: ${parsed.diagnostics}');
@@ -153,6 +152,10 @@ class CamKitTests {
       gcode.indexOf("M2") >= 0,
       "LinuxCNC export includes tool, spindle, and program commands");
     CamGeneratedFixtures.run(check);
+    CamIslandPocketFixture.run(check);
+    CamPocketEntryFixture.run(check);
+    CamSafeTravelFixture.run(check);
+    CamSetupFixture.run(check);
     Sys.println('CamKit tests passed ($assertions assertions)');
   }
 

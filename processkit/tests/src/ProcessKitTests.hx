@@ -6,6 +6,7 @@ import motionkit.path.PosePath;
 import motionkit.path.PoseWaypoint;
 import motionkit.kinematics.Pose3;
 import motionkit.program.MotionOp;
+import motionkit.robot.MotionSession;
 import processkit.ChannelProcessDevice;
 import processkit.FeedChangePolicy;
 import processkit.ProcessRecipe;
@@ -36,7 +37,8 @@ class ProcessKitTests {
     var recipe = new ProcessRecipe(0.05, 0.2, 0.1, 0.03,
       OrientationPolicy.Interpolated, 0.05, 2.0, 0.02, 0.05,
       FeedChangePolicy.Adapt);
-    var run = new ProcessRun(recipe, straightPath(), device, "paint.flow");
+    var session = new MotionSession();
+    var run = new ProcessRun(recipe, straightPath(), device, "paint.flow", session);
     run.start();
     run.update(0.0);
     check(run.state == ProcessRunState.Ready, "Paint waits for a ready device");
@@ -51,8 +53,29 @@ class ProcessKitTests {
     check(run.state == ProcessRunState.ControlledInterruption && sprayer.flow() == 0.0,
       "Fault makes the tool safe and interrupts the process");
     device.setFault(null);
+    session.begin();
+    run.update(0.6);
+    check(run.state == ProcessRunState.ControlledInterruption,
+      "Process recovery waits while the arm is running");
+    session.hold();
+    run.update(0.6);
+    check(run.state == ProcessRunState.ControlledInterruption,
+      "Process recovery waits while the arm is slowing to a hold");
+    session.rest();
     run.update(0.6);
     check(run.state == ProcessRunState.Recovery, "Cleared fault enters recovery");
+    session.stop(motionkit.robot.StopDisposition.Discard, []);
+    var blockedWhileStopping = false;
+    try run.takeProgram() catch (_:Dynamic) blockedWhileStopping = true;
+    check(blockedWhileStopping,
+      "Process recovery cannot start while motion is stopping");
+    session.rest();
+    session.reject();
+    var blockedWhileFaulted = false;
+    try run.takeProgram() catch (_:Dynamic) blockedWhileFaulted = true;
+    check(blockedWhileFaulted,
+      "Process recovery cannot start from a faulted session");
+    session.reset();
     var resumed = run.takeProgram();
     check(Math.abs(run.lastProgramStart - 0.55) < 1e-9,
       "Recovery backs off from the interrupted path distance");
@@ -77,7 +100,8 @@ class ProcessKitTests {
     var recipe = new ProcessRecipe(0.05, 0.2, 0.1, 0.01,
       OrientationPolicy.Interpolated, 0.02, 0.4, 0.0, 0.03,
       FeedChangePolicy.Adapt);
-    var run = new ProcessRun(recipe, straightPath(), device, "dispense.rate");
+    var run = new ProcessRun(recipe, straightPath(), device, "dispense.rate",
+      new MotionSession());
     run.start(); run.update(0.0);
     var original = run.takeProgram();
     check(Math.abs(firstRate(original) / 0.1 - 0.4) < 0.008,
@@ -98,7 +122,7 @@ class ProcessKitTests {
       OrientationPolicy.Interpolated, 0.02, 0.4, 0.0, 0.03,
       FeedChangePolicy.Reject);
     var run = new ProcessRun(recipe, straightPath(),
-      simulatedDevice("reject.rate"), "reject.rate");
+      simulatedDevice("reject.rate"), "reject.rate", new MotionSession());
     run.start(); run.update(0.0); run.takeProgram();
     var rejected = false;
     try run.requestFeed(0.15, 0.2) catch (_:Dynamic) rejected = true;
@@ -111,7 +135,7 @@ class ProcessKitTests {
       OrientationPolicy.Interpolated, 0.02, 0.4, 0.0, 0.03,
       FeedChangePolicy.Pause);
     var run = new ProcessRun(recipe, straightPath(),
-      simulatedDevice("pause.rate"), "pause.rate");
+      simulatedDevice("pause.rate"), "pause.rate", new MotionSession());
     run.start(); run.update(0.0);
     run.requestFeed(0.15, 0.0);
     var blocked = false;

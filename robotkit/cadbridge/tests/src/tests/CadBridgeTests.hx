@@ -6,6 +6,7 @@ import cadkit.Geometry;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Vector;
+import cadkit.modeling.Part;
 import cadkit.InertiaTensor;
 import cadkit.parametric.ElementReference;
 import bimkit.BimDocument;
@@ -28,9 +29,14 @@ import cadbridge.BimFrameBridge;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.MachineAssemblyMassBridge;
+import cadbridge.EndEffectorBridge;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.component.MachineComponent;
+import machinekit.component.ComponentDetail;
+import machinekit.component.Solids;
+import machinekit.robotics.EndEffector;
+import robotkit.tool.ToolCollisionShape;
 import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
 import cadkit.modeling.AssemblyModel;
@@ -43,6 +49,7 @@ class CadBridgeTests {
 
   public static function main():Void {
     testMachineAssemblyMassBridge();
+    testEndEffectorBridge();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
@@ -70,7 +77,7 @@ class CadBridgeTests {
       0.5, 0.2, 0.2, 0.2) != null, "MachineKit payload moment violates RobotKit limits");
 
     assembly.addBomItem({partNumber: "TUBE", description: "Tube", quantity: 1,
-      material: "polyurethane"}, 1, Point(0.1, new Vector(100, 0, 50)));
+      material: "polyurethane"}, 1, Attached(0.1, "tool", new Vector(100, 0, 50)));
     MachineAssemblyMassBridge.applyToLink(assembly, link);
     check(approx(link.mass, 2.1, 1e-12) && approx(link.centerOfMass[0], 0.1, 1e-12),
       "accounted tubing contributes to RobotKit link mass");
@@ -88,6 +95,54 @@ class CadBridgeTests {
     try MachineAssemblyMassBridge.payloadViolation(assembly, limits, 0.5, 0.2, 0.2, 0.2)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("UNMODELLED-LINE") >= 0;
     check(rejected, "unaccounted BOM mass prevents a payload decision");
+  }
+
+  static function testEndEffectorBridge():Void {
+    var endEffector = new EndEffector();
+    endEffector.addComponent("body", new BridgeEndEffectorPart());
+    endEffector.mount("body", "mount");
+    endEffector.workingFrame("contact", "body", "contact", true);
+    endEffector.workingFrame("inspection", "body", "mount");
+    endEffector.addBomItem({partNumber: "ATTACHED-TUBE", description: "attached air tube",
+      quantity: 1, material: "polyurethane"}, 1,
+      Attached(1, "body", new Vector(10, 0, 20)));
+
+    var tool = EndEffectorBridge.toTool(endEffector, "contact");
+    check(approx(tool.flangeTTcp.translation.x, 0, 1e-12) &&
+      approx(tool.flangeTTcp.translation.z, 0.03, 1e-12) &&
+      tool.flangeTTcp.rotation.angularDistance(Quat.identity()) < 1e-9,
+      "contact frame converts from connector +Y to robot +Z");
+    check(approx(tool.mass, 3, 1e-12), "attached tube contributes to RobotKit tool mass");
+    var boxCorrect = switch tool.collision {
+      case Box(half): approx(half.x, 0.02, 1e-6) && approx(half.y, 0.005, 1e-6) &&
+        approx(half.z, 0.03, 1e-6);
+      case _: false;
+    };
+    check(boxCorrect, "flange-centred envelope box contains the offset body");
+    var inspection = EndEffectorBridge.toTool(endEffector, "inspection");
+    check(inspection.id == "inspection" &&
+      inspection.flangeTTcp.translation.norm() < 1e-12,
+      "each working frame produces a separate RobotKit tool");
+
+    var link = new Link("end-effector");
+    MachineAssemblyMassBridge.applyToLink(endEffector, link);
+    check(approx(link.mass, 3, 1e-12) &&
+      approx(link.centerOfMass[0], -2.0 / 300.0, 1e-12) &&
+      approx(link.centerOfMass[2], 2.0 / 300.0, 1e-12),
+      "link mass and attached tube centre use the mount frame in metres");
+    check(link.inertiaTensor[2] < 0 && link.inertiaTensor[6] < 0,
+      "attached tube contributes rotated off-diagonal inertia");
+
+    var fixture = buildUR5Fixture();
+    var manipulator = new Manipulator(fixture.model, fixture.chain, tool.flangeTTcp);
+    var q = [0.2, -0.4, 0.3, 0.1, -0.2, 0.15];
+    var flangePose = fixture.chain.forwardKinematics(q);
+    var expected = flangePose.transformPoint(new Vec3(0, 0, 0.03));
+    var tcp = manipulator.tcpPose(q);
+    check(approx(tcp.translation.x, expected.x, 1e-9) &&
+      approx(tcp.translation.y, expected.y, 1e-9) &&
+      approx(tcp.translation.z, expected.z, 1e-9),
+      "Manipulator.tcpPose places the cup contact at the mounted tool offset");
   }
 
   static function testAssemblySimulationBridge():Void {
@@ -339,4 +394,17 @@ private class BridgeMassPart extends MachineComponent {
     declareMass(2, new Vector(100, 0, 50), withInertia ?
       new InertiaTensor(2000000, 250000, 0, 3000000, 0, 4000000) : null);
   }
+}
+
+private class BridgeEndEffectorPart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-EOAT", "bridge end effector", "steel", true);
+    addConnector("mount", Mount, Solids.axial(10, 0, 0));
+    addConnector("contact", Face, Solids.axial(10, 0, 30));
+    declareMass(2, new Vector(0, 0, 0),
+      new InertiaTensor(2000000, 0, 0, 3000000, 0, 4000000));
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(20, 10, 30);
 }

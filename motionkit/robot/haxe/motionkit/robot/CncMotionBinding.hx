@@ -81,8 +81,12 @@ class CncMotionBinding {
       limits.acceleration(joint, acceleration[joint]);
       limits.jerk(joint, jerk[joint]);
     }
+    var startTolerances = new StartTolerances(
+      [for (_ in 0...count) machine.positionTolerance],
+      [for (joint in 0...count) acceleration[joint] * blueprint.fixedTimestepSeconds],
+      [for (joint in 0...count) jerk[joint] * blueprint.fixedTimestepSeconds]);
     compiler = new ProgramCompiler(solver, limits, machine.frameId,
-      velocity, acceleration, jerk, null, 0.002, 0.1,
+      velocity, acceleration, jerk, startTolerances, null, 0.002, 0.1,
       machine.positionTolerance, machine.orientationTolerance,
       null, null, jump,
       [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings);

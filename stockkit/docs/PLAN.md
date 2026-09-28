@@ -73,8 +73,10 @@ silently.
 ## Oracle coverage
 
 The exact oracle handles horizontal lines, vertical lines and XY arcs, which
-covers all current CamKit output. Ramps, helices and tilted tools need a
-different reference (dense exact sampling or a lofted envelope) before phase 7.
+covered all CamKit output until CamKit gained ramped pocket entries (lines
+that move in XY and Z together). Ramps, helices and tilted tools need a
+different reference before the simulator's ramp handling can be checked
+exactly; until then the CamKit fixture uses a depth at which CamKit plunges.
 
 ### OCCT tangent-fuse findings (OCCT 8.0.1)
 

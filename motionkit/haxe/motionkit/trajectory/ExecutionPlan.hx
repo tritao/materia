@@ -11,6 +11,8 @@ class ExecutionPlan {
   final owner:Ownedmk_plan_handle;
   var disposed:Bool = false;
   public final report:ValidationReport;
+  /** Validation claims carried with this plan's telemetry. */
+  public function guarantees():ValidationGuarantees return report.guarantees();
   public final planId:Int64;
   public final modelRevision:Int64;
   public final calibrationRevision:Int64;

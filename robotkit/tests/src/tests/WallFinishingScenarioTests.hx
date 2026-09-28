@@ -290,7 +290,8 @@ class WallFinishingScenarioTests {
         var simpleCompiler = new ProgramCompiler(toppraCompiler.solver,
           toppraCompiler.limits, toppraCompiler.frameId,
           toppraCompiler.maxVelocity, toppraCompiler.maxAcceleration,
-          toppraCompiler.maxJerk, new SimplePathTiming(),
+          toppraCompiler.maxJerk, toppraCompiler.startTolerances,
+          new SimplePathTiming(),
           0.01, toppraCompiler.maxJointJump,
           toppraCompiler.positionTolerance, toppraCompiler.orientationTolerance,
           toppraCompiler.ikTolerance);
@@ -305,7 +306,9 @@ class WallFinishingScenarioTests {
           simpleSeconds += planned.durationSeconds;
         toppraProgram.dispose();
         simpleProgram.dispose();
-        check(toppraSeconds <= simpleSeconds * 1.01,
+        // The 1 ms task-space check can require a denser Cartesian path;
+        // allow a small timing spread between the two validated profiles.
+        check(toppraSeconds <= simpleSeconds * 1.05,
           'TOPP-RA patch cycle time $toppraSeconds exceeds simple timing $simpleSeconds');
         timingCompared = true;
       }

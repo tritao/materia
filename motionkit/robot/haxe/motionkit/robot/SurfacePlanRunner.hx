@@ -49,7 +49,8 @@ class SurfacePlanRunner implements robotkit.skill.SurfacePlanRunner {
         var speed = manipulator.group.limitsOf(joint).velocity;
         speed > 0.0 ? speed : 2.0;
       }], [for (_ in 0...count) maxAcceleration], [for (_ in 0...count) 20.0],
-      null, cartesianResolution, maxJointJump, 0.005, 0.02,
+      StartTolerances.uniform(count, 0.005, maxAcceleration * 0.01, 20.0 * 0.01),
+      null, Math.min(cartesianResolution, 0.0075), maxJointJump, 0.005, 0.02,
       new IkTolerance(2e-3, 5e-3, 300, 0.03));
     var indices = [for (target in manipulator.toJointTargets(
       [for (_ in 0...count) 0.0])) target.joint];

@@ -1129,6 +1129,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                     if (blueprint_.joints[joint].max_acceleration <= 0.0)
                         return RK_ERROR_UNSUPPORTED;
+                if (endpoint_->executes_trajectory_queue()) {
+                    const auto result = apply_intermediate_lifecycle(value);
+                    if (result != RK_OK) return result;
+                }
                 safe_channels(owner_time_ns, RK_EVENT_HOLD_SAFE, true);
                 control_.hold_requested = true;
                 control_.resume_requested = false;
@@ -1139,6 +1143,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 if (!control_.trajectory_active || control_.trajectory.empty() ||
                     !control_.hold_requested || control_.stop_ramp_active)
                     return RK_ERROR_INVALID_STATE;
+                if (endpoint_->executes_trajectory_queue()) {
+                    const auto result = apply_intermediate_lifecycle(value);
+                    if (result != RK_OK) return result;
+                }
                 for (uint32_t channel = 0; channel < blueprint_.channel_count; ++channel)
                     if (control_.channel_has_fired[channel] &&
                         control_.channel_hold_policies[channel] == RK_EVENT_RESTORE_ON_RESUME)

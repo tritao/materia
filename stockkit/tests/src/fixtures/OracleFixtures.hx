@@ -120,8 +120,11 @@ class OracleFixtures {
       new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
     ]);
     var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
+    // One 2 mm level: a 10% ramp would need 20 mm, longer than the first
+    // 18 mm pass, so CamKit plunges vertically. The oracle cannot build the
+    // swept solid of a ramp (XY and Z together) and would refuse it.
     var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
-      .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.001)
+      .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
       .finish();
     // Moves wholly above the stock cannot cut it; skipping them saves booleans.
     var moves = [for (move in CutMoves.fromOps(program.ops, program.tool))

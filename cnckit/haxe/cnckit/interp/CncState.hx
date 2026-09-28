@@ -13,6 +13,8 @@ class CncState {
   public var feedCommand:Float = Math.NaN;
   public var spindleSpeed:Float = 0.0;
   public var spindleDirection:Int = 0;
+  public var coolantMist:Bool = false;
+  public var coolantFlood:Bool = false;
   public var selectedTool:Int = -1;
   public var activeTool:Int = -1;
   public var cutterSide:Int = 0;
@@ -40,6 +42,7 @@ class CncState {
     result.metric = metric; result.absolute = absolute; result.wcs = wcs;
     result.toolLength = toolLength; result.feedCommand = feedCommand;
     result.spindleSpeed = spindleSpeed; result.spindleDirection = spindleDirection;
+    result.coolantMist = coolantMist; result.coolantFlood = coolantFlood;
     result.selectedTool = selectedTool; result.motionMode = motionMode;
     result.activeTool = activeTool; result.cutterSide = cutterSide;
     result.plane = plane;

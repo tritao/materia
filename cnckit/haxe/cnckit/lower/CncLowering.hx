@@ -90,12 +90,10 @@ class CncLowering {
         machine.maxBlendTurnAngleRadians);
       var spans = [for (index in blended.sourcePrimitiveIndices)
         pendingSpans[index]];
-      for (diagnostic in blended.diagnostics) {
-        var corner = Std.parseInt(diagnostic.split(":")[0].substr("corner ".length));
-        var index = corner == null || corner < 1 || corner >= pendingSpans.length
-          ? 0 : corner;
+      for (warning in 0...blended.diagnostics.length) {
+        var index = blended.diagnosticCorners[warning];
         diagnostics.push(new CncDiagnostic(Warning, "CNC_EXACT_STOP",
-          pendingSpans[index], diagnostic));
+          pendingSpans[index], blended.diagnostics[warning]));
       }
       emitPath(blended.path.primitives, spans, pendingFeed, authored,
         pendingBlend);

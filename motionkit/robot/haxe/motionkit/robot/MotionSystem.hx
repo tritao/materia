@@ -7,27 +7,16 @@ import motionkit.MotionOptions;
 import motionkit.axis.MotionAxis;
 import motionkit.path.PathPoint;
 import motionkit.path.GeometricPath;
-import motionkit.path.ArcSegment;
-import motionkit.path.CornerBlender;
-import motionkit.path.LineSegment;
-import motionkit.path.PathPrimitiveKind;
-import motionkit.path.QuinticBlend;
-import motionkit.planner.JointPathSamples;
-import motionkit.planner.PathTimingLimits;
-import motionkit.planner.ToppraPathTiming;
 import motionkit.planner.PathPlanningOptions;
-import motionkit.trajectory.MotionLimits;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.TrajectoryState;
-import motionkit.trajectory.ValidationLimits;
 import motionkit.trajectory.ValidationReport;
 import MotionKitNative;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
-import robotkit.world.ExecutionPlanSubmission;
-import robotkit.world.TrajectorySegment;
+import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
 
 /**
@@ -45,6 +34,8 @@ import RobotKitRuntime;
 class MotionSystem {
   public final robot:Robot;
   public final axes:Array<MotionAxis>;
+  final axisPlanner:AxisPlanner;
+  final pathPlanner:PathPlanner;
   public final fixedTimestepSeconds:Float;
   public final replacementMarginOwnerPeriods:Int;
   public final replacementOwnerPeriodSeconds:Float;
@@ -55,31 +46,15 @@ class MotionSystem {
   /** Native trajectory currently submitted to the runtime queue. */
   var activeTrajectory:Null<Trajectory> = null;
   var queuedTrajectories:Array<Trajectory> = [];
-  var activeSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
-    coefficients:Array<Array<Float>>}> = [];
+  final stream:TrajectoryStream;
+  final session:MotionSession = new MotionSession();
   var activeStationary:Bool = false;
-  var elapsedSeconds:Float = 0.0;
-  var held:Bool = false;
+  var elapsedSeconds(get, never):Float;
   /** A native lifecycle command must reach the owner before another plan. */
   var nativeRefillDeferred:Bool = false;
   var bufferedTotalSeconds:Float = 0.0;
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
-  var trajectorySubmitted:Bool = false;
-  /** Native segment index used as the boundary of the next plan chunk. */
-  var trajectoryNextSegmentIndex:Int = 0;
-  var trajectoryChunkEndSeconds:Float = 0.0;
-  var trajectoryChunkStartSeconds:Float = 0.0;
-  var nextTrajectoryTag:Int64 = Int64.ofInt(1);
-  var trajectoryChunkReferences:Map<String, PlanChunkReference> = new Map();
-  var trajectoryFinalTag:Int64 = Int64.ofInt(0);
-  var trajectoryFinalEndSeconds:Float = 0.0;
-  /** True while stopping so that deferred work can start from rest. */
-  var stoppingForReplacement:Bool = false;
-  /** Work deferred until a replacement stop reaches rest, in order. */
-  var afterStop:Array<Void -> Void> = [];
-  /** Logical axis of the active jog, which a further jog can change without stopping. */
-  var activeJogAxis:Null<String> = null;
   final modelRevision:Int64;
   final calibrationRevision:Int64;
 
@@ -101,6 +76,7 @@ class MotionSystem {
         throw 'Robot joint $i does not match motion-system joint "${blueprint.model.joints[i].name}"';
     }
     this.robot = robot;
+    stream = new TrajectoryStream(robot);
     this.modelRevision = Int64.ofInt(blueprint.runtime.revision);
     this.calibrationRevision = Int64.ofInt(blueprint.runtime.calibrationRevision);
     this.fixedTimestepSeconds = blueprint.fixedTimestepSeconds;
@@ -119,6 +95,9 @@ class MotionSystem {
       axisIds.set(axis.id, true);
       this.axes.push(axis);
     }
+    axisPlanner = new AxisPlanner(this.axes, fixedTimestepSeconds);
+    pathPlanner = new PathPlanner(this.axes, fixedTimestepSeconds,
+      modelRevision, calibrationRevision);
   }
 
   public function axis(id:String):Null<MotionAxis> {
@@ -127,7 +106,23 @@ class MotionSystem {
   }
 
   /** True while a trajectory is active, held, or waiting to start after a stop. */
-  public function isMoving():Bool return activeTrajectory != null || afterStop.length > 0;
+  public function isMoving():Bool
+    return activeTrajectory != null || session.isStopping() || session.hasPending();
+
+  public function sessionState():SessionState return session.state;
+
+  /** A fault is latched until the application explicitly resets runtime safety. */
+  public function reset():Void {
+    if (!session.isFaulted()) return;
+    robot.resetSafety();
+    var snapshot = robot.snapshot();
+    if (snapshot.faultCode != 0) {
+      session.observe(snapshot);
+      throw 'Motion runtime fault ${snapshot.faultCode} remains after reset';
+    }
+    clearBufferedMotionAfterFault();
+    session.reset();
+  }
 
   public function trajectory():Null<Trajectory> return activeTrajectory;
 
@@ -153,7 +148,7 @@ class MotionSystem {
     return Math.min(1.0, Math.max(0.0, completed / bufferedTotalSeconds));
   }
 
-  public function isHolding():Bool return held;
+  public function isHolding():Bool return session.isHolding();
 
   /**
    * Plans a coordinated move while leaving unspecified axes at their current
@@ -162,17 +157,18 @@ class MotionSystem {
    * it came to rest and null is returned, as the plan does not exist yet.
    */
   public function moveAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
+    checkSnapshot();
     var retargeted = retargetNativeAxes(targets, options);
     if (retargeted != null) return retargeted;
     var planned = planAxesFrom(robot.snapshot().positions.toArray(), targets, options);
-    return replaceMotion(planned,
-      () -> planAxesFrom(robot.snapshot().positions.toArray(), targets, options));
+    return replaceMotion(planned, MotionRequestCapture.axes(targets, options));
   }
 
   /** Adds a coordinated axis move behind all motion already in the buffer. */
   public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
-    if (afterStop.length > 0) {
-      afterStop.push(() -> queueAxes(targets, options));
+    checkSnapshot();
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedAxes(targets, options));
       return null;
     }
     var trajectoryValue = planAxesFrom(planningStartPositions(), targets, options);
@@ -182,12 +178,13 @@ class MotionSystem {
 
   /** Adds an already planned joint trajectory to the execution buffer. */
   public function queueTrajectory(trajectoryValue:Trajectory):Void {
+    checkSnapshot();
     if (trajectoryValue == null) throw "Queued trajectory is required";
     var jointCount = robot.description().joints.length;
     if (trajectoryValue.jointCount() != jointCount)
       throw 'Queued trajectory has ${trajectoryValue.jointCount()} joints; robot has $jointCount';
-    if (afterStop.length > 0) {
-      afterStop.push(() -> queueTrajectory(trajectoryValue));
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedTrajectory(trajectoryValue));
       return;
     }
     enqueueTrajectory(trajectoryValue);
@@ -199,16 +196,17 @@ class MotionSystem {
    */
   public function moveLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
+    checkSnapshot();
     var planned = planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options);
-    return replaceMotion(planned,
-      () -> planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options));
+    return replaceMotion(planned, MotionRequestCapture.linear(target, feed, options));
   }
 
   /** Adds a straight Cartesian move behind all motion already in the buffer. */
   public function queueLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
-    if (afterStop.length > 0) {
-      afterStop.push(() -> queueLinear(target, feed, options));
+    checkSnapshot();
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedLinear(target, feed, options));
       return null;
     }
     var trajectoryValue = planLinearPathFrom(planningStartPositions(), target, feed, options);
@@ -223,6 +221,7 @@ class MotionSystem {
    */
   public function movePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
       ?motionOptions:MotionOptions):Trajectory {
+    checkSnapshot();
     if (isMotionInProgress())
       throw "A path must start where the machine is at rest; hold and wait before replacing motion with a path";
     var trajectoryValue = planPathFrom(robot.snapshot().positions.toArray(), path,
@@ -235,8 +234,9 @@ class MotionSystem {
   /** Adds a connected Cartesian polyline behind motion already in the buffer. */
   public function queuePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
       ?motionOptions:MotionOptions):Null<Trajectory> {
-    if (afterStop.length > 0) {
-      afterStop.push(() -> queuePath(path, pathOptions, motionOptions));
+    checkSnapshot();
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedPath(path, pathOptions, motionOptions));
       return null;
     }
     var trajectoryValue = planPathFrom(planningStartPositions(), path,
@@ -247,9 +247,8 @@ class MotionSystem {
 
   /** Holds buffered motion and slows to rest along the path without discarding it. */
   public function hold():Void {
-    if (held) return;
-    held = true;
-    if (activeTrajectory != null) robot.submit(RobotCommand.Hold);
+    checkSnapshot();
+    if (session.hold() && activeTrajectory != null) submitCommand(RobotCommand.Hold);
   }
 
   /**
@@ -257,21 +256,12 @@ class MotionSystem {
    * path. If the hold is still slowing down, it resumes once at rest.
    */
   public function resume():Void {
-    if (!held) return;
+    checkSnapshot();
+    if (!session.resume()) return;
     if (activeTrajectory != null) {
-      if (trajectoryFinishedInRuntime(syncFromRuntime())) {
-        completeActiveTrajectory();
-        held = false;
-        activateNextTrajectory();
-        return;
-      }
-      robot.submit(RobotCommand.Resume);
+      submitCommand(RobotCommand.Resume);
       nativeRefillDeferred = true;
-      held = false;
-      return;
-    }
-    held = false;
-    activateNextTrajectory();
+    } else activateNextTrajectory();
   }
 
   /**
@@ -279,36 +269,40 @@ class MotionSystem {
    * path before discarding it; an emergency stop acts immediately.
    */
   public function abort(?mode:StopMode = StopMode.Normal):Void {
-    if (mode == StopMode.Normal && isMotionInProgress()) {
-      robot.submit(RobotCommand.Abort);
-      clearBufferedMotion();
+    checkSnapshot();
+    if (mode == StopMode.Normal && isMotionInProgress() && elapsedSeconds > 1e-9) {
+      submitCommand(RobotCommand.Abort);
+      queuedTrajectories = [];
+      session.stop(Discard, []);
+      return;
+    }
+    if (mode != StopMode.Normal && (session.state == Holding || session.isStopping())) {
+      stopRobot(mode);
+      queuedTrajectories = [];
+      session.stop(Discard, []);
       return;
     }
     clearBufferedMotion();
-    robot.stop(mode);
+    stopRobot(mode);
   }
 
   /**
    * Starts `planned` now when the machine is at rest. Otherwise stops along
-   * the current path and starts a fresh `replan` from where it came to rest.
+   * the current path and plans the captured request from where it came to rest.
    */
-  function replaceMotion(planned:Trajectory, replan:Void -> Trajectory,
-      ?jogAxis:String):Null<Trajectory> {
+  function replaceMotion(planned:Trajectory, request:MotionRequest):Null<Trajectory> {
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
-      activeJogAxis = jogAxis;
+      session.jogAxis = switch request {
+        case Jog(axisId, _, _, _): axisId;
+        case _: null;
+      };
       return planned;
     }
     discardNativeTrajectory(planned);
     queuedTrajectories = [];
-    afterStop = [() -> {
-      clearBufferedMotion();
-      beginImmediate(replan());
-      activeJogAxis = jogAxis;
-    }];
-    held = false;
-    stoppingForReplacement = true;
+    session.stop(Replan, [request]);
     beginStop();
     return null;
   }
@@ -318,328 +312,96 @@ class MotionSystem {
    * started and not finished, or a stop still slowing down.
    */
   function isMotionInProgress():Bool {
-    if (stoppingForReplacement) return true;
+    if (session.isStopping() || session.state == Holding) return true;
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return false;
     if (syncFromRuntime().trajectoryActive) return true;
     return elapsedSeconds > 1e-9 && elapsedSeconds < trajectoryValue.durationSeconds() - 1e-9 &&
-      !(held && stopSettled());
+      !(session.isHolding() && stopSettled());
   }
 
   /** Slows the active trajectory to rest along its path. */
   function beginStop():Void {
     if (activeTrajectory != null) {
       syncFromRuntime();
-      robot.stop(StopMode.Normal);
+      stopRobot(StopMode.Normal);
     }
   }
 
   /** True once a requested stop has reached rest. */
   function stopSettled():Bool {
-    if (activeTrajectory == null) return true;
-    return !syncFromRuntime().trajectoryActive;
+    var observation = syncFromRuntime();
+    return TrajectoryStream.atRest(observation);
   }
 
   /** Runs deferred work or a pending resume once a stop has reached rest. */
   function advanceStop():Void {
     if (!stopSettled()) return;
-    if (stoppingForReplacement && !held) {
-      stoppingForReplacement = false;
-      held = false;
-      var actions = afterStop;
-      afterStop = [];
-      for (action in actions) action();
-      return;
+    var wasHolding = session.state == Holding;
+    var discarding = session.state == Stopping(Discard);
+    var actions = session.rest();
+    if (discarding) clearBufferedMotion();
+    if (wasHolding && session.resumePending) resume();
+    for (action in actions) executeAfterStop(action);
+  }
+
+  function executeAfterStop(request:MotionRequest):Void {
+    switch request {
+      case Axes(targets, options):
+        clearBufferedMotion();
+        beginImmediate(planAxesFrom(robot.snapshot().positions.toArray(),
+          targets, options));
+      case Linear(target, feed, options):
+        clearBufferedMotion();
+        beginImmediate(planLinearPathFrom(robot.snapshot().positions.toArray(),
+          target, feed, options));
+      case Path(path, pathOptions, motionOptions):
+        clearBufferedMotion();
+        beginImmediate(planPathFrom(robot.snapshot().positions.toArray(),
+          path, pathOptions, motionOptions));
+      case Jog(axisId, velocity, durationSeconds, acceleration):
+        clearBufferedMotion();
+        var axisValue = axis(axisId);
+        if (axisValue == null) throw 'Unknown motion axis "$axisId"';
+        beginImmediate(axisPlanner.planJog(robot.snapshot().positions.toArray(),
+          axisValue, velocity, durationSeconds, acceleration).trajectory);
+        session.jogAxis = axisId;
+      case Queued(command):
+        switch command {
+          case Axes(targets, options): queueAxes(targets, options);
+          case Linear(target, feed, options): queueLinear(target, feed, options);
+          case Path(path, pathOptions, motionOptions):
+            queuePath(path, pathOptions, motionOptions);
+          case Trajectory(segments):
+            queueTrajectory(Trajectory.fromSegments(segments));
+        }
     }
   }
 
   function planLinearPathFrom(start:Array<Float>, target:PathPoint, feed:Feed,
       options:Null<MotionOptions>):Trajectory {
-    if (target == null || feed == null) throw "Linear move needs a target and feed";
-    var xAxis = requireAxis("x");
-    var yAxis = requireAxis("y");
-    var zAxis = requireAxis("z");
-    var current = new PathPoint(xAxis.logicalPosition(start), yAxis.logicalPosition(start),
-      zAxis.logicalPosition(start));
-    var chosen = options == null ? new MotionOptions(feed.value, 0.0, 0.0) : options;
-    var maxVelocity = chosen.maxVelocity <= 0.0
-      ? feed.value : Math.min(feed.value, chosen.maxVelocity);
-    var resolved = new MotionOptions(maxVelocity, chosen.maxAcceleration, chosen.maxJerk);
-    return planPathFrom(start, GeometricPath.lines([current, target]),
-      PathPlanningOptions.exactStopMode(), resolved);
+    lastPathValidationReport = null;
+    lastPathPlanningDiagnostics = [];
+    return storePathPlan(pathPlanner.planLinear(start,
+      {target: target, feed: feed, options: options}));
   }
 
   function planPathFrom(start:Array<Float>, path:GeometricPath,
       pathOptions:Null<PathPlanningOptions>, motionOptions:Null<MotionOptions>):Trajectory {
-    if (path == null) throw "Cartesian path is required";
-    var options = pathOptions == null ? PathPlanningOptions.exactStopMode() : pathOptions;
-    var planningPath = path;
+    lastPathValidationReport = null;
     lastPathPlanningDiagnostics = [];
-    if (!options.exactStop && options.blendTolerance > 0.0) {
-      var blended = CornerBlender.blend(path, options.blendTolerance * 0.8,
-        options.maxBlendTurnAngleRadians);
-      planningPath = blended.path;
-      lastPathPlanningDiagnostics = blended.diagnostics;
-    }
-    var xAxis = requireAxis("x");
-    var yAxis = requireAxis("y");
-    var zAxis = requireAxis("z");
-    var first = path.primitives[0].pointAt(0.0);
-    var starts = [xAxis.logicalPosition(start), yAxis.logicalPosition(start),
-      zAxis.logicalPosition(start)];
-    var startCoordinates = [first.x, first.y, first.z];
-    for (i in 0...3) {
-      if (Math.abs(starts[i] - startCoordinates[i]) > 1e-8)
-        throw 'Cartesian path starts at ${startCoordinates[i]} but axis ${["x", "y", "z"][i]} is at ${starts[i]}';
-    }
-
-    validatePathLimits(planningPath, [xAxis, yAxis, zAxis]);
-    var maxVelocity = [for (_ in start) 1e8];
-    var maxAcceleration = [for (_ in start) 1e8];
-    var requested = motionOptions == null ? new MotionOptions() : motionOptions;
-    for (direct in [xAxis, yAxis, zAxis]) {
-      var unit = [for (_ in start) 0.0];
-      direct.writeLogicalDelta(unit, 1.0);
-      for (joint in direct.jointIndices) {
-        var scale = Math.abs(unit[joint]);
-        maxVelocity[joint] = direct.maxVelocity * scale;
-        maxAcceleration[joint] = direct.maxAcceleration * scale;
-        if (requested.maxAcceleration > 0.0)
-          maxAcceleration[joint] = Math.min(maxAcceleration[joint],
-            requested.maxAcceleration * scale);
-      }
-    }
-    var segments:Array<{timeFromStartNs:Int64, durationNs:Int64,
-      coefficients:Array<Array<Float>>}> = [];
-    var junctionSpeeds = [for (_ in 0...(planningPath.primitives.length + 1)) 0.0];
-    if (!options.exactStop) for (index in 1...planningPath.primitives.length) {
-      var before = planningPath.primitives[index - 1];
-      var after = planningPath.primitives[index];
-      if (before.kind() == PathPrimitiveKind.Circular ||
-          after.kind() == PathPrimitiveKind.Circular) continue;
-      var beforeTangent = before.tangentAt(before.length());
-      var afterTangent = after.tangentAt(0.0);
-      var tangentDot = 0.0;
-      for (coordinate in 0...3)
-        tangentDot += beforeTangent[coordinate] * afterTangent[coordinate];
-      if (tangentDot < 0.99999) continue;
-      var speed = requested.maxVelocity > 0.0 ? requested.maxVelocity : 1e8;
-      var pathAcceleration = 1e8;
-      for (side in [before, after]) {
-        for (sample in 0...33) {
-          var distance = side.length() * sample / 32.0;
-          var tangent = side.tangentAt(distance);
-          var curvature = side.curvatureAt(distance);
-          var prime = [for (_ in start) 0.0];
-          var second = [for (_ in start) 0.0];
-          for (entry in [{axis: xAxis, prime: tangent[0], second: -tangent[1] * curvature},
-              {axis: yAxis, prime: tangent[1], second: tangent[0] * curvature},
-              {axis: zAxis, prime: tangent[2], second: 0.0}]) {
-            entry.axis.writeLogicalDelta(prime, entry.prime);
-            entry.axis.writeLogicalDelta(second, entry.second);
-          }
-          for (joint in 0...start.length) {
-            if (Math.abs(prime[joint]) > 1e-12) {
-              speed = Math.min(speed, maxVelocity[joint] / Math.abs(prime[joint]));
-              pathAcceleration = Math.min(pathAcceleration,
-                maxAcceleration[joint] / Math.abs(prime[joint]));
-            }
-            if (Math.abs(second[joint]) > 1e-12)
-              speed = Math.min(speed,
-                Math.sqrt((Std.isOfType(side, QuinticBlend) ? 0.5 : 1.0) *
-                  maxAcceleration[joint] / Math.abs(second[joint])));
-          }
-        }
-      }
-      speed = Math.min(speed * 0.75,
-        0.75 * Math.sqrt(2.0 * pathAcceleration *
-          Math.min(before.length(), after.length())));
-      junctionSpeeds[index] = speed;
-    }
-    var offset = Int64.ofInt(0);
-    var previousEnd:Null<PathPoint> = null;
-    var worstTaskDeviation = 0.0;
-    var worstTaskTime = 0.0;
-    for (primitiveIndex in 0...planningPath.primitives.length) {
-      var primitive = planningPath.primitives[primitiveIndex];
-      var length = primitive.length();
-      var primitiveStart = primitive.pointAt(0.0);
-      if (previousEnd != null && previousEnd.distanceTo(primitiveStart) > 1e-8)
-        throw "Path primitives must form a connected path";
-      previousEnd = primitive.pointAt(length);
-      if (length <= 1e-12) continue;
-      var count = 1;
-      if (primitive.kind() == PathPrimitiveKind.Arc) {
-        var arc:ArcSegment = cast primitive;
-        count = Std.int(Math.ceil(Math.abs(arc.sweepAngle) * 16.0));
-      }
-      if (primitive.kind() == PathPrimitiveKind.Circular) {
-        var circular:motionkit.path.CircularSegment = cast primitive;
-        count = Std.int(Math.ceil(Math.abs(circular.sweepAngle) * 16.0));
-      }
-      if (primitive.kind() == PathPrimitiveKind.Blend) count = 32;
-      var distances:Array<Float> = [];
-      var positions:Array<Array<Float>> = [];
-      var first:Array<Array<Float>> = [];
-      var second:Array<Array<Float>> = [];
-      for (index in 0...(count + 1)) {
-        var distance = index == count ? length : length * index / count;
-        var point = primitive.pointAt(distance);
-        var tangent = primitive.tangentAt(distance);
-        var curvature = primitive.curvatureAt(distance);
-        var secondDerivative = primitive.kind() == PathPrimitiveKind.Circular ?
-          (cast primitive:motionkit.path.CircularSegment).secondDerivativeAt(distance) :
-          [-tangent[1] * curvature, tangent[0] * curvature, 0.0];
-        var q = start.copy();
-        var qPrime = [for (_ in start) 0.0];
-        var qDoublePrime = [for (_ in start) 0.0];
-        for (entry in [{axis: xAxis, position: point.x, prime: tangent[0],
-            second: secondDerivative[0]},
-            {axis: yAxis, position: point.y, prime: tangent[1],
-              second: secondDerivative[1]},
-            {axis: zAxis, position: point.z, prime: tangent[2],
-              second: secondDerivative[2]}]) {
-          entry.axis.writeLogicalPosition(q, entry.position);
-          entry.axis.writeLogicalDelta(qPrime, entry.prime);
-          entry.axis.writeLogicalDelta(qDoublePrime, entry.second);
-        }
-        distances.push(distance);
-        positions.push(q);
-        first.push(qPrime);
-        second.push(qDoublePrime);
-      }
-      var jointPath = new JointPathSamples(distances, positions, first, second);
-      var speedCaps = requested.maxVelocity > 0.0
-        ? [for (_ in 0...count) requested.maxVelocity] : [];
-      // Leave room for nanosecond stage rounding and Hermite coefficient
-      // roundoff before the runtime validates exact polynomial extrema.
-      var limits = new PathTimingLimits(
-        [for (value in maxVelocity) value * 0.999],
-        [for (value in maxAcceleration) value * 0.999], speedCaps,
-        junctionSpeeds[primitiveIndex], junctionSpeeds[primitiveIndex + 1]);
-      var loweringTolerance = options.exactStop ? 1e-6 :
-        Math.min(1e-6, options.blendTolerance * 0.01);
-      var timed = new ToppraPathTiming(loweringTolerance).time(jointPath, limits);
-      var pieceDuration = timed.trajectory.durationSeconds();
-      var sampleCount = Std.int(Math.ceil(pieceDuration / 0.001));
-      for (sampleIndex in 0...(sampleCount + 1)) {
-        var localTime = pieceDuration * sampleIndex / sampleCount;
-        var actual = timed.trajectory.evaluate(localTime).positions;
-        var tool = new PathPoint(xAxis.logicalPosition(actual),
-          yAxis.logicalPosition(actual), zAxis.logicalPosition(actual));
-        var deviation = distanceToAuthoredPath(tool, path);
-        if (deviation > worstTaskDeviation) {
-          worstTaskDeviation = deviation;
-          worstTaskTime = Int64.toFloat(offset) * 1e-9 + localTime;
-        }
-      }
-      var pieceSegments = timed.trajectory.segments();
-      for (segment in pieceSegments)
-        segments.push({timeFromStartNs: Int64.add(offset, segment.timeFromStartNs),
-          durationNs: segment.durationNs, coefficients: segment.coefficients});
-      var last = pieceSegments[pieceSegments.length - 1];
-      offset = Int64.add(offset, Int64.add(last.timeFromStartNs, last.durationNs));
-      timed.releaseDistanceMap();
-      timed.trajectory.dispose();
-    }
-    if (segments.length == 0)
-      return Trajectory.fromPositionSamples([0.0, fixedTimestepSeconds], [start, start]);
-    var finalPoint = previousEnd;
-    if (finalPoint == null) throw "Cartesian path has no endpoint";
-    var finalPosition = start.copy();
-    xAxis.writeLogicalPosition(finalPosition, finalPoint.x);
-    yAxis.writeLogicalPosition(finalPosition, finalPoint.y);
-    zAxis.writeLogicalPosition(finalPosition, finalPoint.z);
-    segments.push({timeFromStartNs: offset, durationNs: Int64.ofInt(1),
-      coefficients: [for (position in finalPosition) [position]]});
-    var result = Trajectory.fromSegments(segments);
-    var validation = new ValidationLimits(start.length, modelRevision, calibrationRevision);
-    validation.continuity(0, 1e-9);
-    for (joint in 0...start.length) {
-      validation.velocity(joint, maxVelocity[joint]);
-      validation.acceleration(joint, maxAcceleration[joint]);
-    }
-    for (direct in [xAxis, yAxis, zAxis]) {
-      var lower = start.copy();
-      var upper = start.copy();
-      direct.writeLogicalPosition(lower, direct.lowerLimit);
-      direct.writeLogicalPosition(upper, direct.upperLimit);
-      for (joint in direct.jointIndices)
-        validation.position(joint, Math.min(lower[joint], upper[joint]),
-          Math.max(lower[joint], upper[joint]));
-    }
-    var report = result.validate(validation);
-    var tolerance = options.exactStop || options.blendTolerance == 0.0
-      ? 1e-5 : options.blendTolerance;
-    report.setTaskSpace(worstTaskDeviation <= tolerance
-      ? MotionKitNativeConstants.MK_CHECK_PASSED
-      : MotionKitNativeConstants.MK_CHECK_FAILED,
-      worstTaskDeviation, worstTaskTime, tolerance, Int64.ofInt(1000000));
-    lastPathValidationReport = report;
-    pathJerkUnchecked.set(result, report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
-      MotionKitNativeConstants.MK_CHECK_UNCHECKED);
-    if (report.hasFailure()) {
-      for (index in 0...report.checks.length) {
-        var check = report.checks[index];
-        if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED)
-          throw 'Timed Cartesian path check $index failed: ${check.value} > ${check.limit} at ${check.timeSeconds}';
-      }
-    }
-    return result;
+    return storePathPlan(pathPlanner.plan(start,
+      {path: path, pathOptions: pathOptions, motionOptions: motionOptions}));
   }
 
-  function distanceToAuthoredPath(point:PathPoint, path:GeometricPath):Float {
-    var closest = Math.POSITIVE_INFINITY;
-    for (primitive in path.primitives) {
-      if (primitive.kind() == PathPrimitiveKind.Line) {
-        var line:LineSegment = cast primitive;
-        var length = line.length();
-        if (length <= 0.0) {
-          closest = Math.min(closest, point.distanceTo(line.start));
-          continue;
-        }
-        var direction = line.tangentAt(0.0);
-        var projection = (point.x - line.start.x) * direction[0] +
-          (point.y - line.start.y) * direction[1] +
-          (point.z - line.start.z) * direction[2];
-        closest = Math.min(closest, point.distanceTo(
-          line.pointAt(Math.max(0.0, Math.min(length, projection)))));
-      } else if (primitive.kind() == PathPrimitiveKind.Arc) {
-        var arc:ArcSegment = cast primitive;
-        var angle = Math.atan2(point.y - arc.center.y, point.x - arc.center.x);
-        var baseShift = Math.round((arc.startAngle - angle) / (2.0 * Math.PI));
-        for (shift in -2...3) {
-          var candidate = angle + 2.0 * Math.PI * (baseShift + shift);
-          var fraction = arc.sweepAngle == 0.0 ? 0.0 :
-            (candidate - arc.startAngle) / arc.sweepAngle;
-          var distance = arc.length() * Math.max(0.0, Math.min(1.0, fraction));
-          closest = Math.min(closest, point.distanceTo(arc.pointAt(distance)));
-        }
-      } else if (primitive.kind() == PathPrimitiveKind.Circular) {
-        var circular:motionkit.path.CircularSegment = cast primitive;
-        closest = Math.min(closest, circular.distanceTo(point));
-      } else {
-        for (sample in 0...129)
-          closest = Math.min(closest,
-            point.distanceTo(primitive.pointAt(primitive.length() * sample / 128.0)));
-      }
-    }
-    return closest;
-  }
-
-  function validatePathLimits(path:GeometricPath, directAxes:Array<MotionAxis>):Void {
-    for (primitive in path.primitives) {
-      var length = primitive.length();
-      for (sampleIndex in 0...65) {
-        var point = primitive.pointAt(length * sampleIndex / 64.0);
-        var coordinates = [point.x, point.y, point.z];
-        for (i in 0...3) {
-          if (coordinates[i] < directAxes[i].lowerLimit ||
-              coordinates[i] > directAxes[i].upperLimit)
-            throw 'Axis "${["x", "y", "z"][i]}" path point ${coordinates[i]} is outside its limits';
-        }
-      }
-    }
+  function storePathPlan(result:PlanningResult):Trajectory {
+    lastPathValidationReport = result.report;
+    lastPathPlanningDiagnostics = result.diagnostics;
+    if (result.report != null)
+      pathJerkUnchecked.set(result.trajectory,
+        result.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
+        MotionKitNativeConstants.MK_CHECK_UNCHECKED);
+    return result.trajectory;
   }
 
   /** Software homing for the bootstrap: move to each authored home coordinate. */
@@ -654,6 +416,7 @@ class MotionSystem {
    */
   public function jog(axisId:String, velocity:Float, durationSeconds:Float,
       ?maxAcceleration:Float):Null<Trajectory> {
+    checkSnapshot();
     var axisValue = axis(axisId);
     if (axisValue == null) throw 'Unknown motion axis "$axisId"';
     if (!Math.isFinite(velocity) || velocity == 0.0)
@@ -670,14 +433,11 @@ class MotionSystem {
     if (continued != null) return continued;
     function planJog():Trajectory {
       var start = robot.snapshot().positions.toArray();
-      var startLogical = axisValue.logicalPosition(start);
-      var requestedEnd = startLogical + velocity * durationSeconds;
-      var endLogical = Math.max(axisValue.lowerLimit,
-        Math.min(axisValue.upperLimit, requestedEnd));
-      return planLogical(start, [axisValue], [endLogical],
-        new MotionLimits(Math.abs(velocity), acceleration));
+      return axisPlanner.planJog(start, axisValue, velocity,
+        durationSeconds, acceleration).trajectory;
     }
-    return replaceMotion(planJog(), planJog, axisValue.id);
+    return replaceMotion(planJog(), MotionRequestCapture.jog(axisValue.id,
+      velocity, durationSeconds, acceleration));
   }
 
   /**
@@ -686,25 +446,14 @@ class MotionSystem {
   function continueJog(axisValue:MotionAxis, velocity:Float, durationSeconds:Float,
       acceleration:Float):Null<Trajectory> {
     var executing = activeTrajectory;
-    if (executing == null || activeJogAxis != axisValue.id || held || stoppingForReplacement ||
-        afterStop.length > 0 || queuedTrajectories.length > 0)
+    if (executing == null || session.jogAxis != axisValue.id || session.isHolding() || session.isStopping() ||
+        session.hasPending() || queuedTrajectories.length > 0)
       return null;
     var smooth = executing;
     if (smooth != null) {
-      return trySmoothReplacement(executing, axisValue.id, state -> {
-        var target = state.positions.copy();
-        var logical = axisValue.logicalPosition(target);
-        var end = Math.max(axisValue.lowerLimit,
-          Math.min(axisValue.upperLimit, logical + velocity * durationSeconds));
-        axisValue.writeLogicalPosition(target, end);
-        var currentLogicalVelocity = axisValue.logicalPosition(
-          [for (joint in 0...state.velocities.length)
-            state.positions[joint] + state.velocities[joint]]) - logical;
-        return nativeLogicalPlan(state.positions, state.velocities,
-          state.accelerations, target,
-          new MotionLimits(Math.max(Math.abs(velocity), Math.abs(currentLogicalVelocity)),
-            acceleration));
-      });
+      return trySmoothReplacement(executing, axisValue.id, state ->
+        axisPlanner.planContinuedJog(state, axisValue, velocity,
+          durationSeconds, acceleration).trajectory);
     }
     return null;
   }
@@ -712,67 +461,39 @@ class MotionSystem {
   function retargetNativeAxes(targets:Array<AxisTarget>,
       options:Null<MotionOptions>):Null<Trajectory> {
     var executing = activeTrajectory;
-    if (executing == null || held || stoppingForReplacement ||
-        afterStop.length > 0 || queuedTrajectories.length > 0)
+    if (executing == null || session.isHolding() || session.isStopping() ||
+        session.hasPending() || queuedTrajectories.length > 0)
       return null;
     var smooth = executing;
     if (smooth == null || smooth.segments()[0].coefficients[0].length < 3) return null;
-    return trySmoothReplacement(executing, null, state -> {
-      var target = state.positions.copy();
-      var seen = new Map<String, Bool>();
-      for (requested in targets) {
-        if (requested == null) throw "Axis move cannot contain a null target";
-        var axisValue = axis(requested.axis);
-        if (axisValue == null) throw 'Unknown motion axis "${requested.axis}"';
-        if (seen.exists(requested.axis)) throw 'Axis move targets "${requested.axis}" more than once';
-        if (requested.position < axisValue.lowerLimit ||
-            requested.position > axisValue.upperLimit)
-          throw 'Axis "${requested.axis}" target ${requested.position} is outside its limits';
-        axisValue.writeLogicalPosition(target, requested.position);
-        seen.set(requested.axis, true);
-      }
-      var limits = resolveLimits(targets,
-        options == null ? new MotionOptions() : options);
-      return nativeLogicalPlan(state.positions, state.velocities,
-        state.accelerations, target, limits);
-    });
+    return trySmoothReplacement(executing, null, state ->
+      axisPlanner.planRetarget(state, targets, options).trajectory);
   }
 
   function trySmoothReplacement(executing:Trajectory, jogAxis:Null<String>,
       planFromState:TrajectoryState -> Trajectory):Null<Trajectory> {
     if (executing == null) return null;
-    return PlanExecutor.replaceWithRetry(executing, syncFromRuntime,
-      replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
-      (planned, state, observation, anchorNs) ->
-        submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
+    try {
+      return TrajectoryStream.replaceWithRetry(executing, syncFromRuntime,
+        replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
+        (planned, state, observation, anchorNs) ->
+          submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
+    } catch (error:RobotRuntimeError) {
+      session.reject();
+      throw error;
+    }
   }
 
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
       observation:RobotSnapshot, anchorNs:Int64, jogAxis:Null<String>):Trajectory {
-    var replacement = planned;
-    var tag = nextTrajectoryTag;
-    var segments = [for (segment in replacement.segments())
-      new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
-        segment.coefficients)];
-    if (segments.length > 128) throw "Smooth replacement exceeds one runtime submission";
-    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
-      modelRevision, calibrationRevision, 1, state.positions, state.velocities,
-      state.accelerations, segments, observation.activePlanId,
-      anchorNs)));
-    nextTrajectoryTag = Int64.add(nextTrajectoryTag, Int64.ofInt(1));
+    var tag = stream.submitSmoothReplacement(planned, state, observation,
+      anchorNs, modelRevision, calibrationRevision);
     setActive(planned);
-    activeJogAxis = jogAxis;
+    session.jogAxis = jogAxis;
     bufferedTotalSeconds = planned.durationSeconds();
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(planned);
-    trajectorySubmitted = true;
-    trajectoryNextSegmentIndex = planned.segments().length;
-    trajectoryChunkStartSeconds = 0.0;
-    trajectoryChunkEndSeconds = planned.durationSeconds();
-    trajectoryFinalTag = tag;
-    trajectoryFinalEndSeconds = planned.durationSeconds();
-    trajectoryChunkReferences.set(Int64.toStr(tag),
-      new PlanChunkReference(planned, 0.0));
+    stream.recordReplacement(tag);
     return planned;
   }
 
@@ -783,7 +504,8 @@ class MotionSystem {
   public function update(?dtSeconds:Float = -1.0):Bool {
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
-    if (held || stoppingForReplacement) {
+    checkSnapshot();
+    if (session.isHolding() || session.isStopping()) {
       // No refills while stopping: beginStop() already queued enough path for
       // the whole stop, and a late chunk could otherwise land after the stop
       // finished and be taken as a resume.
@@ -791,7 +513,7 @@ class MotionSystem {
       if (stopping != null && trajectoryFinishedInRuntime(syncFromRuntime()))
         completeActiveTrajectory();
       advanceStop();
-      if (held || stoppingForReplacement) return false;
+      if (session.isHolding() || session.isStopping()) return false;
     }
     if (activeTrajectory == null) activateNextTrajectory();
     if (activeTrajectory == null) return false;
@@ -801,13 +523,14 @@ class MotionSystem {
       return activeTrajectory != null;
     }
     var observation = syncFromRuntime();
-    if (stoppingForReplacement) return true;
+    if (session.isStopping()) return true;
     if (trajectoryFinishedInRuntime(observation)) {
       completeActiveTrajectory();
       return activeTrajectory != null;
     }
     if (nativeRefillDeferred) nativeRefillDeferred = false;
-    else if (!trajectorySubmitted || shouldRefillTrajectory(dt)) fillNativeWindow();
+    else if (!stream.submitted || stream.shouldRefill(dt, fixedTimestepSeconds))
+      fillNativeWindow();
     return true;
   }
 
@@ -818,96 +541,15 @@ class MotionSystem {
   /** Starts executing `trajectoryValue` as a fresh, un-retimed plan. */
   function setActive(trajectoryValue:Trajectory):Void {
     activeTrajectory = trajectoryValue;
-    activeSegments = trajectoryValue.segments();
-    activeStationary = stationarySegments(activeSegments);
-    activeJogAxis = null;
-    resetExecutionState();
-  }
-
-  function resetExecutionState():Void {
-    elapsedSeconds = 0.0;
-    trajectorySubmitted = false;
-    resetTrajectoryChunkState();
-    trajectoryChunkReferences = new Map();
-    trajectoryFinalTag = Int64.ofInt(0);
-    trajectoryFinalEndSeconds = 0.0;
+    var segments = trajectoryValue.segments();
+    activeStationary = stationarySegments(segments);
+    session.begin();
+    stream.begin(segments, trajectoryValue.durationSeconds());
   }
 
   function planAxesFrom(start:Array<Float>, targets:Array<AxisTarget>,
-      options:Null<MotionOptions>):Trajectory {
-    if (targets == null || targets.length == 0) throw "Axis move needs at least one target";
-    var movedAxes:Array<MotionAxis> = [];
-    var logicalGoal:Array<Float> = [];
-    var seen = new Map<String, Bool>();
-    for (target in targets) {
-      if (target == null) throw "Axis move cannot contain a null target";
-      var axisValue = axis(target.axis);
-      if (axisValue == null) throw 'Unknown motion axis "${target.axis}"';
-      if (seen.exists(target.axis)) throw 'Axis move targets "${target.axis}" more than once';
-      if (target.position < axisValue.lowerLimit || target.position > axisValue.upperLimit)
-        throw 'Axis "${target.axis}" target ${target.position} is outside its limits';
-      movedAxes.push(axisValue);
-      logicalGoal.push(target.position);
-      seen.set(target.axis, true);
-    }
-    var chosenOptions = options == null ? new MotionOptions() : options;
-    return planLogical(start, movedAxes, logicalGoal, resolveLimits(targets, chosenOptions));
-  }
-
-  /**
-   * Plans in logical axis units and maps the native polynomial onto joints. The
-   * limits are the axes' authored units, and every joint of an axis follows
-   * that axis's one profile, so the motors of a geared or dual-motor axis stay
-   * in proportion throughout the move. Joints of other axes keep `start`.
-   */
-  function planLogical(start:Array<Float>, movedAxes:Array<MotionAxis>, logicalGoal:Array<Float>,
-      limits:MotionLimits):Trajectory {
-    var target = start.copy();
-    for (index in 0...movedAxes.length)
-      movedAxes[index].writeLogicalPosition(target, logicalGoal[index]);
-    var stationary = true;
-    for (joint in 0...start.length)
-      if (Math.abs(target[joint] - start[joint]) > 1e-12) stationary = false;
-    if (stationary)
-      return Trajectory.fromPositionSamples([0.0, fixedTimestepSeconds], [start, start]);
-    return nativeLogicalPlan(start, [for (_ in start) 0.0],
-      [for (_ in start) 0.0], target, limits);
-  }
-
-  function nativeLogicalPlan(start:Array<Float>, velocity:Array<Float>,
-      acceleration:Array<Float>, target:Array<Float>, limits:MotionLimits):Trajectory {
-    var maxVelocity = [for (_ in start) 0.0];
-    var maxAcceleration = [for (_ in start) 0.0];
-    var maxJerk = [for (_ in start) 0.0];
-    for (axisValue in axes) {
-      var scales = [for (_ in start) 0.0];
-      axisValue.writeLogicalDelta(scales, 1.0);
-      var velocityLimit = limits.maxVelocity > 0.0 ?
-        Math.min(axisValue.maxVelocity, limits.maxVelocity) : axisValue.maxVelocity;
-      var accelerationLimit = limits.maxAcceleration > 0.0 ?
-        Math.min(axisValue.maxAcceleration, limits.maxAcceleration) : axisValue.maxAcceleration;
-      var jerkLimit = limits.maxJerk > 0.0 ? limits.maxJerk :
-        accelerationLimit / fixedTimestepSeconds;
-      for (joint in axisValue.jointIndices) {
-        var scale = Math.abs(scales[joint]);
-        var speed = velocityLimit * scale;
-        var accel = accelerationLimit * scale;
-        var jerk = jerkLimit * scale;
-        maxVelocity[joint] = maxVelocity[joint] <= 0.0 ? speed :
-          Math.min(maxVelocity[joint], speed);
-        maxAcceleration[joint] = maxAcceleration[joint] <= 0.0 ? accel :
-          Math.min(maxAcceleration[joint], accel);
-        maxJerk[joint] = maxJerk[joint] <= 0.0 ? jerk : Math.min(maxJerk[joint], jerk);
-      }
-    }
-    for (joint in 0...start.length)
-      if (maxVelocity[joint] <= 0.0 || maxAcceleration[joint] <= 0.0 ||
-          maxJerk[joint] <= 0.0)
-        throw 'Joint $joint needs positive velocity, acceleration and jerk limits';
-    var native = Trajectory.generateStateToState(start, velocity, acceleration, target,
-      maxVelocity, maxAcceleration, maxJerk);
-    return native;
-  }
+      options:Null<MotionOptions>):Trajectory
+    return axisPlanner.plan(start, {targets: targets, options: options}).trajectory;
 
   function planningStartPositions():Array<Float> {
     if (plannedEndPositions != null) return plannedEndPositions.copy();
@@ -934,7 +576,7 @@ class MotionSystem {
   }
 
   function activateNextTrajectory():Void {
-    if (held || stoppingForReplacement || activeTrajectory != null ||
+    if (session.isHolding() || session.isStopping() || activeTrajectory != null ||
         queuedTrajectories.length == 0)
       return;
     var next:Trajectory = queuedTrajectories.shift();
@@ -944,120 +586,77 @@ class MotionSystem {
 
   function clearBufferedMotion():Void {
     activeTrajectory = null;
-    activeSegments = [];
     activeStationary = false;
     queuedTrajectories = [];
-    held = false;
-    stoppingForReplacement = false;
-    afterStop = [];
-    activeJogAxis = null;
+    session.clear();
     bufferedTotalSeconds = 0.0;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
     nativeRefillDeferred = false;
-    resetExecutionState();
+    stream.clear();
   }
 
-  function submitActiveTrajectoryChunk():Void {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || activeSegments.length == 0 ||
-        trajectoryNextSegmentIndex >= activeSegments.length) return;
-    var tag = nextTrajectoryTag;
-    var submitted = PlanExecutor.submitTrajectoryChunk(robot, trajectoryValue,
-      activeSegments, trajectoryNextSegmentIndex, tag, modelRevision,
-      calibrationRevision, pathJerkUnchecked.exists(trajectoryValue) &&
-      pathJerkUnchecked.get(trajectoryValue) == true);
-    if (submitted == null) return;
-    nextTrajectoryTag = Int64.add(tag, Int64.ofInt(1));
-    trajectorySubmitted = true;
-    trajectoryNextSegmentIndex = submitted.last;
-    trajectoryChunkStartSeconds = submitted.startSeconds;
-    trajectoryChunkEndSeconds = submitted.endSeconds;
-    trajectoryChunkReferences.set(Int64.toStr(tag),
-      new PlanChunkReference(trajectoryValue, submitted.startSeconds));
-    if (submitted.last >= activeSegments.length) {
-      trajectoryFinalTag = tag;
-      trajectoryFinalEndSeconds = submitted.endSeconds;
-    }
-  }
-
-  /** Keep a fixed execution window queued so native HOLD never needs a host lead estimate. */
+  /** Keep two seconds of motion queued so HOLD can slow along the path. */
   function fillNativeWindow():Void {
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
-    while (trajectoryNextSegmentIndex < activeSegments.length &&
-        trajectoryChunkEndSeconds - elapsedSeconds < 2.0) {
-      var before = trajectoryNextSegmentIndex;
-      submitActiveTrajectoryChunk();
-      if (trajectoryNextSegmentIndex == before) break;
+    var jerkUnchecked = pathJerkUnchecked.exists(trajectoryValue) &&
+      pathJerkUnchecked.get(trajectoryValue) == true;
+    try {
+      stream.fill(session, robot.snapshot().positions.length, false,
+        (first, last, tag, startNs, _) -> stream.motionSubmission(
+          trajectoryValue, first, last, tag, startNs, modelRevision,
+          calibrationRevision, jerkUnchecked),
+        (first, last, error) ->
+          'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
+    } catch (error:Dynamic) {
+      session.reject();
+      throw error;
     }
   }
 
-  function syncFromRuntime():RobotSnapshot {
-    var observation = robot.snapshot();
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null) return observation;
-    var reference = trajectoryChunkReferences.get(Int64.toStr(observation.trajectoryTag));
-    if (reference != null && reference.trajectory == trajectoryValue) {
-      elapsedSeconds = PlanExecutor.elapsedFromSnapshot(observation,
-        reference.startSeconds, trajectoryValue.durationSeconds());
-    }
-    return observation;
-  }
+  function get_elapsedSeconds():Float return stream.elapsedSeconds;
 
-  function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || !trajectorySubmitted ||
-        Int64.compare(trajectoryFinalTag, Int64.ofInt(0)) == 0)
-      return false;
-    if (trajectoryFinalEndSeconds < trajectoryValue.durationSeconds() - 1e-9)
-      return false;
-    if (Int64.compare(observation.trajectoryTag, trajectoryFinalTag) != 0)
-      return false;
-    var finalTime = Int64.toFloat(observation.trajectoryTagTimeNs) /
-      1000000000.0;
-    var reachedEnd = Math.isFinite(finalTime) &&
-      trajectoryFinalEndSeconds - trajectoryChunkStartSeconds <= finalTime + 1e-9;
-    return reachedEnd && !observation.trajectoryActive &&
-      observation.trajectoryQueueDepth == 0;
-  }
+  function syncFromRuntime():RobotSnapshot
+    return observe(activeTrajectory == null ? robot.snapshot() : stream.sync());
+
+  function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool
+    return activeTrajectory != null && stream.finishedMotion(observation);
 
   function completeActiveTrajectory():Void {
     if (activeTrajectory == null) return;
     bufferedCompletedSeconds += activeTrajectory.durationSeconds();
     pathJerkUnchecked.remove(activeTrajectory);
     activeTrajectory = null;
-    activeSegments = [];
     activeStationary = false;
-    resetExecutionState();
+    stream.clear();
+    session.completed();
     activateNextTrajectory();
+  }
+
+  function observe(snapshot:RobotSnapshot):RobotSnapshot
+    return stream.observe(session, snapshot);
+
+  function checkSnapshot():Void observe(robot.snapshot());
+
+  function submitCommand(command:RobotCommand):Void stream.submit(session, command);
+
+  function stopRobot(mode:StopMode):Void stream.stop(session, mode);
+
+  function clearBufferedMotionAfterFault():Void {
+    activeTrajectory = null;
+    activeStationary = false;
+    queuedTrajectories = [];
+    bufferedTotalSeconds = 0.0;
+    bufferedCompletedSeconds = 0.0;
+    plannedEndPositions = null;
+    nativeRefillDeferred = false;
+    stream.clear();
   }
 
   function discardNativeTrajectory(value:Trajectory):Void {
     pathJerkUnchecked.remove(value);
     value.dispose();
-  }
-
-  function shouldRefillTrajectory(dt:Float):Bool {
-    var trajectoryValue = activeTrajectory;
-    if (trajectoryValue == null || trajectoryNextSegmentIndex >= activeSegments.length)
-      return false;
-    var lead = Math.max(2.0, Math.max(fixedTimestepSeconds, dt) * 2.0);
-    if (trajectoryChunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
-    // If an owner cycle drained the native window before the host update,
-    // refill immediately from the deterministic source trajectory.
-    // At t=0 the first chunk may still be in the runtime mailbox, so its
-    // snapshot quite correctly reports an empty queue until the owner cycle
-    // accepts that command.
-    if (elapsedSeconds <= 1e-9) return false;
-    var observation = robot.snapshot();
-    return !observation.trajectoryActive || observation.trajectoryQueueDepth == 0;
-  }
-
-  function resetTrajectoryChunkState():Void {
-    trajectoryNextSegmentIndex = 0;
-    trajectoryChunkEndSeconds = 0.0;
-    trajectoryChunkStartSeconds = 0.0;
   }
 
   static function trajectoryEnd(trajectoryValue:Trajectory):Array<Float>
@@ -1072,37 +671,5 @@ class MotionSystem {
     return true;
   }
 
-  function requireAxis(id:String):MotionAxis {
-    var result = axis(id);
-    if (result == null) throw 'Motion system needs a "$id" axis';
-    return cast result;
-  }
 
-  function resolveLimits(targets:Array<AxisTarget>, options:MotionOptions):MotionLimits {
-    var maxVelocity = options.maxVelocity;
-    var maxAcceleration = options.maxAcceleration;
-    var maxJerk = options.maxJerk;
-    for (target in targets) {
-      var axisValue = axis(target.axis);
-      if (axisValue == null) throw 'Unknown motion axis "${target.axis}"';
-      var resolvedAxis:MotionAxis = cast axisValue;
-      var axisVelocity = resolvedAxis.maxVelocity;
-      var axisAcceleration = resolvedAxis.maxAcceleration;
-      if (axisVelocity > 0.0)
-        maxVelocity = maxVelocity <= 0.0 ? axisVelocity : Math.min(maxVelocity, axisVelocity);
-      if (axisAcceleration > 0.0)
-        maxAcceleration = maxAcceleration <= 0.0 ? axisAcceleration : Math.min(maxAcceleration, axisAcceleration);
-    }
-    return new MotionLimits(maxVelocity, maxAcceleration, maxJerk);
-  }
-}
-
-private class PlanChunkReference {
-  public final trajectory:Trajectory;
-  public final startSeconds:Float;
-
-  public function new(trajectory:Trajectory, startSeconds:Float) {
-    this.trajectory = trajectory;
-    this.startSeconds = startSeconds;
-  }
 }

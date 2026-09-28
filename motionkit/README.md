@@ -12,12 +12,11 @@ RobotKit execution. The bootstrap package currently provides:
   public limits API, plus tangent-aware line/arc lookahead with exact-stop and
   blend modes;
 - a semantic `MotionSystem`/`MotionAxis` view over any RobotKit `Robot`;
-- authored homing plus bounded timed jogging through the same logical-axis API;
+- software homing to an authored coordinate plus bounded timed jogging through the same logical-axis API;
 - a MachineKit `LinearAxis` compiler that produces a two-link prismatic
   RobotModel and a runtime-ready MotionSystem blueprint.
-- buffered trajectory execution with a native timestamped-chunk path when the
-  RobotKit runtime advertises queue support, including bounded streaming for
-  trajectories longer than one native chunk.
+- buffered trajectory execution with native execution plans and a trajectory
+  queue, including bounded streaming for trajectories longer than one chunk.
 
 The pure `motionkit` package contains paths, planners, trajectories and logical
 axes. `motionkit-robot` provides `motionkit.robot.MotionSystem`,
@@ -57,6 +56,9 @@ while (machine.isMoving()) {
 }
 ```
 
+`home()` moves to the authored home coordinate using a planned trajectory. It
+does not reference a physical limit switch or establish a hardware zero.
+
 For a direct XYZ machine, the same system can plan and buffer a Cartesian
 polyline:
 
@@ -75,23 +77,37 @@ path clock within joint acceleration limits. Non-final chunks declare that
 more motion follows, so a late refill triggers controlled underflow braking.
 The runtime rejects plans that violate joint limits and bounds queue depth.
 
+## What “validated” means
+
+`ValidationReport.guarantees()` summarizes each check as `Proven`,
+`Sampled(resolutionNs)`, `Unchecked`, or `Failed`. Joint position, velocity,
+and acceleration bounds are checked against polynomial extrema over the full
+trajectory when those limits are claimed. Jerk and continuity are reported
+separately; either can be `Unchecked` if its limit was not supplied. An
+unchecked check is not a safety guarantee.
+
+Cartesian task-space deviation is checked at samples no more than 1 ms apart
+for timed paths and manipulator programs. `Sampled` describes coverage at
+those points, not a continuous bound between them. The report retains the
+actual sampling resolution and any unresolved assumptions. Each execution
+plan exposes the summary through `plan.guarantees()`; active manipulator
+programs include it in `ManipulatorProgress.guarantees`.
+
 `motionkit.trajectory.Trajectory.fromPositionSamples` builds degree-1 native
 segments. Native velocity is each segment's chord slope; acceleration and
-jerk are zero within that segment. The transitional sampled Haxe type retains
-authored derivatives for the position-streaming fallback.
+jerk are zero within that segment. Robots used with MotionKit must support
+execution plans and the trajectory queue.
 
 Every change of speed obeys the joint limits. A moving Ruckig axis move, jog,
 or home can retarget from the runtime's committed state. Degree-1 path moves
 still stop first, so `moveLinear` may return null while motion is in progress.
 `movePath` needs the machine at rest, since a path must start where the machine
-is. MotionKit retains its path-preserving position-target fallback, including
-host-side re-timing, for backends without plan support. CNC semantics and
-G-code remain outside MotionKit.
+is. CNC semantics and G-code remain outside MotionKit.
 
 A `jog` issued while the same axis is already jogging changes speed or
-direction without stopping. Queue backends replace the Ruckig plan beyond
+direction without stopping. The runtime replaces the Ruckig plan beyond
 the committed horizon; a late replacement is retried once before falling
-back to stop-first. The non-queue fallback still uses `JogProfile`.
+back to stop-first.
 
 Axis moves are planned in logical axis units and mapped onto joints, so the
 motors of a geared or dual-motor axis stay in proportion throughout a move.

@@ -12,6 +12,7 @@ import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
+import machinekit.component.BomItem;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.ComponentParameter;
@@ -63,6 +64,7 @@ import machinekit.standard.ParallelKey;
 import machinekit.robotics.EndEffectorPlate;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
+import eoat.EndEffectorExampleChecks;
 import machinekit.standard.RetainingRing;
 import machinekit.standard.ShaftCollar;
 import machinekit.standard.SocketHeadCapScrew;
@@ -195,6 +197,27 @@ class MachineKitSmoke {
 		near(moving.massProperties(state).centreOfMass.x, 15, "configured moving centre of mass");
 		var movingInertia:InertiaTensor = cast moving.massProperties(state).inertia;
 		near(movingInertia.yy, 1.305, "configured moving inertia", 1e-8);
+		var tubeItem:BomItem = {partNumber: "MOVING-TUBE", description: "Tube", quantity: 1, material: "polyurethane"};
+		moving.addBomItem(tubeItem, 1, Attached(0.001, "b", new Vector(0, 0, 0)));
+		moving.addBomItem({partNumber: "FIXED-TUBE", description: "Fixed tube", quantity: 1,
+			material: "polyurethane"}, 1, Point(0.001, new Vector(0, 0, 0)));
+		var at30 = moving.massProperties(state);
+		state.setJoint("slide", 40);
+		var at40 = moving.massProperties(state);
+		near(at40.centreOfMass.x - at30.centreOfMass.x,
+			10 * (block.massProperties().mass + 0.001) / at40.mass,
+			"moving member and attached tube shift centre of mass", 1e-9);
+		throws(() -> moving.addBomItem(tubeItem, 1, Attached(0.001, "missing", new Vector())),
+			"Unknown assembly member");
+		var offsetInner = new MachineAssembly();
+		offsetInner.addComponent("part", block);
+		offsetInner.addBomItem(tubeItem, 1, Attached(0.001, "part", new Vector(2, 0, 0)));
+		var offsetOuter = new MachineAssembly();
+		offsetOuter.include("unit", offsetInner,
+			{x: 50, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1});
+		near(offsetOuter.massProperties().centreOfMass.x,
+			50 + (0.001 * 2) /
+			(block.massProperties().mass + 0.001), "included attached mass follows include pose");
 
 		var missing = new MachineAssembly();
 		missing.addComponent("declared", new MassTestBlock(0.5));
@@ -247,7 +270,7 @@ class MachineKitSmoke {
 		throws(() -> tool.exposePort("bad", "cup", "none"), "Unknown port");
 		tool.connectPorts("supply", "changer", "toolAir", "manifold", "in",
 			{partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"},
-			Point(0.001, new Vector(0, 0, 0)));
+			Attached(0.001, "changer", new Vector(0, 0, 0)));
 		tool.connectPorts("air", "manifold", "out", "generator", "air");
 		tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
 		tool.exposePort("robotAir", "changer", "robotAir");
@@ -261,7 +284,14 @@ class MachineKitSmoke {
 		check(model.definition().joints.length == 0, "port connections are not CAD mates");
 		var station = new MachineAssembly();
 		station.include("tool", tool);
-		check(station.port("tool/robotAir").instanceId == "tool/changer", "included air port is prefixed");
+		check(station.portNames().length == 0, "included ports are not automatically public");
+		throws(() -> station.port("tool/robotAir"), "Missing assembly port");
+		var top = new MachineAssembly();
+		top.include("station", station);
+		check(top.portNames().length == 0, "unexposed ports stay private across three levels");
+		station.exposePort("airSupply", "tool/changer", "robotAir");
+		check(station.port("airSupply").instanceId == "tool/changer", "port can be re-exposed under a new name");
+		check(top.portNames().length == 0, "a containing assembly does not inherit exposed ports");
 		var includedSource = station.upstream("tool/cup", "vacuum");
 		check(includedSource.instanceId == "tool/changer" && includedSource.portName == "robotAir",
 			"included service path retains its source");
@@ -274,11 +304,20 @@ class MachineKitSmoke {
 		reversed.connectPorts("reverse", "cup", "vacuum", "generator", "vacuum");
 		check(reversed.upstream("cup", "vacuum").instanceId == "generator",
 			"consumer-first connection traces to its supply");
+		var unfinished = new MachineAssembly();
+		unfinished.addComponent("source", vacuumSource);
+		unfinished.addComponent("cup", cup);
+		unfinished.addComponent("gripper", generator);
+		unfinished.connectPorts("vacuum", "source", "vacuum", "cup", "vacuum");
+		check(unfinished.upstream("cup", "vacuum").instanceId == "source",
+			"upstream works while another required input is unconnected");
+		throws(() -> unfinished.validate(), "Required consumer port");
 		var incompleteTool = new MachineAssembly();
 		incompleteTool.addComponent("cup", cup);
 		incompleteTool.exposePort("vacuum", "cup", "vacuum");
 		var parent = new MachineAssembly();
 		parent.include("tool", incompleteTool);
+		check(parent.portNames().length == 0, "included required input is private until re-exposed");
 		throws(() -> parent.validate(), "Required consumer port");
 		parent.exposePort("tool/vacuum", "tool/cup", "vacuum");
 		check(parent.validate().length == 0, "parent must explicitly re-expose an included required input");
@@ -316,6 +355,10 @@ class MachineKitSmoke {
 		badKind.addComponent("cup", cup);
 		badKind.connectPorts("wrong", "changer", "toolAir", "cup", "vacuum");
 		throws(() -> badKind.validate(), "mismatched kinds");
+		badKind.addComponent("source", vacuumSource);
+		badKind.addComponent("otherCup", cup);
+		badKind.connectPorts("valid", "source", "vacuum", "otherCup", "vacuum");
+		throws(() -> badKind.upstream("otherCup", "vacuum"), "mismatched kinds");
 		var supplier = new PortTestComponent("SUPPLIER");
 		supplier.definePort("air", Pneumatic, Supply, PushIn(6));
 		var doubleSupply = new MachineAssembly();
@@ -2317,6 +2360,10 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		EndEffectorTests.run();
+		EndEffectorSetTests.run();
+		EndEffectorComponentTests.run();
+		EndEffectorExampleChecks.run();
 		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();

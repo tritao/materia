@@ -165,15 +165,21 @@ inertia, its tensor is `null`.
 the solved poses; it returns `null` inertia and lists the affected member IDs in
 `unaccountedInertia` if any tensor is missing. Its `unaccounted` list continues
 to identify extra BOM items omitted from the mass rollup. `addBomItem(item,
-quantity, Point(kg, centreOfMass))` and `connectPorts(..., line,
-Point(kg, centreOfMass))` account for BOM-only masses. The mass is per item;
-these entries use a point-mass inertia approximation at the supplied centre.
+quantity, Point(kg, centreOfMass))` accounts for BOM-only masses fixed in the
+assembly frame. Use `Attached(kg, instanceId, centreOfMass)` to attach a mass to
+a member; its centre is in that member's frame and follows its joint pose.
+`connectPorts(..., line, mass)` accepts either form. Its default mass is
+`Unknown`, since a line has no implied attachment end. Mass is per item; both
+forms use a point-mass inertia approximation at the resolved centre.
 
 `MachineAssembly.addTo` checks CAD joints and tree structure, so a partially
 wired assembly can still be shown and weighed. Call `validate()` to check
-service connections and required inputs. Included ports remain addressable by
-their prefixed names, but a required input must be connected or explicitly
-re-exposed by the containing assembly. Supply and Consumer connection arguments
+service connections and required inputs. Included member ports can be wired by
+their prefixed member paths, but they do not appear in the containing assembly's
+public `portNames()` or `port(name)` until `exposePort` publishes them. A required
+input must be connected or explicitly exposed at each level. `upstream()` checks
+connection validity while allowing other required inputs to remain unconnected.
+Supply and Consumer connection arguments
 can be given in either order. Components declare service passages with
 `addBridge` and changes of service kind with `addConversion`; `upstream()`
 follows only those declared routes.

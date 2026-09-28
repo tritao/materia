@@ -17,6 +17,154 @@ class CamGeneratedFixtures {
     roundedPlate(check);
     plateWithHole(check);
     concavePlate(check);
+    concavePockets(check);
+  }
+
+  static function concavePockets(check:Bool->String->Void):Void {
+    var l = new CamContour([
+      new cnckit.ir.CncPoint(0, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.03, 0),
+      new cnckit.ir.CncPoint(0, 0.03, 0)
+    ]);
+    var u = new CamContour([
+      new cnckit.ir.CncPoint(0, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0, 0),
+      new cnckit.ir.CncPoint(0.03, 0.03, 0),
+      new cnckit.ir.CncPoint(0.02, 0.03, 0),
+      new cnckit.ir.CncPoint(0.02, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.01, 0),
+      new cnckit.ir.CncPoint(0.01, 0.03, 0),
+      new cnckit.ir.CncPoint(0, 0.03, 0)
+    ]);
+    var tool = new CncTool(8, 0, 0.002);
+    var lProgram = new CamJob(0.005, 10000)
+      .pocket(l, tool, -0.003, 0.005, 0.001, 0.001).finish();
+    var uProgram = new CamJob(0.005, 10000)
+      .pocket(u, tool, -0.001, 0.005, 0.001).finish();
+    var levels = new Map<String, Bool>();
+    for (op in lProgram.ops) switch op {
+      case Feed(Line(start, end), _, _, _)
+        if (Math.abs(start.z - end.z) < 1e-9):
+        levels.set(Std.string(Math.round(start.z * 1000000)), true);
+      case _:
+    }
+    var levelCount = 0;
+    for (_ in levels.keys()) levelCount++;
+    check(levelCount == 3, "L pocket clears at three stepped depths");
+    checkPocketCoverage(l, lProgram, -0.003, check);
+    checkPocketCoverage(u, uProgram, -0.001, check);
+
+    var leftIndex = -1, rightIndex = -1;
+    for (index in 0...uProgram.ops.length) switch uProgram.ops[index] {
+      case Feed(Line(a, b), _, _, _) if (Math.abs(a.z + 0.001) < 1e-9 &&
+          Math.abs(b.z + 0.001) < 1e-9 && Math.abs(a.y - 0.02) < 1e-9 &&
+          Math.abs(b.y - 0.02) < 1e-9):
+        if (a.x < 0.01 && b.x < 0.01) leftIndex = index;
+        if (a.x > 0.02 && b.x > 0.02) rightIndex = index;
+      case _:
+    }
+    check(leftIndex >= 0 && rightIndex > leftIndex,
+      "U pocket has separate left and right clearing passes");
+    var retracted = false;
+    for (index in (leftIndex + 1)...rightIndex) switch uProgram.ops[index] {
+      case Rapid(Line(a, b), _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
+        retracted = true;
+      case _:
+    }
+    check(retracted, "U pocket retracts before crossing its open notch");
+    var rejected = false;
+    try new CamJob(0.005, 10000).pocket(u,
+      new CncTool(9, 0, 0.012), -0.001, 0.005, 0.004)
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "U pocket rejects a tool wider than its arms");
+    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    machine.setTool(tool);
+    for (program in [lProgram, uProgram]) {
+      check(program.lower(machine).diagnostics.length == 0,
+        "concave pocket lowers through MotionKit");
+      var imported = new CncCompiler(machine).compileDetailed(
+        CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
+      check(imported.diagnostics.length == 0 &&
+        imported.ops.length == program.ops.length,
+        "concave pocket G-code preserves operation count");
+      for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+        case [Feed(a, _, _, _), Feed(b, _, _, _)],
+             [Rapid(a, _), Rapid(b, _)]:
+          for (fraction in [0.0, 0.5, 1.0]) {
+            var original = CncGeometryTools.pointAt(a,
+              CncGeometryTools.length(a) * fraction);
+            var reparsed = CncGeometryTools.pointAt(b,
+              CncGeometryTools.length(b) * fraction);
+            check(original.distanceTo(reparsed) < 1e-8,
+              "concave pocket G-code preserves toolpath geometry");
+          }
+        case _:
+      }
+    }
+  }
+
+  static function checkPocketCoverage(contour:CamContour,
+      program:camkit.CamProgram, depth:Float,
+      check:Bool->String->Void):Void {
+    for (op in program.ops) switch op {
+      case Feed(Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 &&
+          Math.abs(b.z - depth) < 1e-9):
+        for (fraction in [0.0, 0.5, 1.0]) {
+          var point = new cnckit.ir.CncPoint(a.x + (b.x - a.x) * fraction,
+            a.y + (b.y - a.y) * fraction, depth);
+          var clearance = Math.POSITIVE_INFINITY;
+          for (i in 0...contour.vertices.length)
+            clearance = Math.min(clearance, segmentDistance(point,
+              contour.vertices[i],
+              contour.vertices[(i + 1) % contour.vertices.length]));
+          check(inside(point, contour.vertices) &&
+            clearance >= 0.001 - 1e-8,
+            "concave pocket centreline stays inside with cutter clearance");
+        }
+      case _:
+    }
+    for (ix in 0...30) for (iy in 0...30) {
+      var point = new cnckit.ir.CncPoint((ix + 0.5) * 0.001,
+        (iy + 0.5) * 0.001, depth);
+      if (!inside(point, contour.vertices)) continue;
+      var best = Math.POSITIVE_INFINITY;
+      for (op in program.ops) switch op {
+        case Feed(geometry, _, _, _):
+          var start = CncGeometryTools.pointAt(geometry, 0);
+          var end = CncGeometryTools.pointAt(geometry,
+            CncGeometryTools.length(geometry));
+          if (Math.abs(start.z - depth) > 1e-9 ||
+              Math.abs(end.z - depth) > 1e-9) continue;
+          switch geometry {
+            case Line(a, b): best = Math.min(best, segmentDistance(point, a, b));
+            case Arc(_, _, _, _):
+              for (sample in 0...65) {
+                var center = CncGeometryTools.pointAt(geometry,
+                  CncGeometryTools.length(geometry) * sample / 64);
+                best = Math.min(best, point.distanceTo(center));
+              }
+            case _:
+          }
+        case _:
+      }
+      check(best <= 0.001 + 0.00001,
+        'concave pocket covers reachable grid point ${point.x},${point.y}: $best');
+    }
+  }
+
+  static function inside(point:cnckit.ir.CncPoint,
+      polygon:Array<cnckit.ir.CncPoint>):Bool {
+    var hit = false;
+    for (i in 0...polygon.length) {
+      var a = polygon[i], b = polygon[(i + 1) % polygon.length];
+      if ((a.y > point.y) != (b.y > point.y) &&
+          point.x < a.x + (point.y - a.y) * (b.x - a.x) / (b.y - a.y))
+        hit = !hit;
+    }
+    return hit;
   }
 
   static function concavePlate(check:Bool->String->Void):Void {
@@ -91,7 +239,7 @@ class CamGeneratedFixtures {
       "concave profile lowers through MotionKit");
     check(inside.lower(machine).diagnostics.length == 0,
       "concave inside profile lowers through MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program));
+    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
       "concave profile G-code recompiles with the same operations");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
@@ -108,7 +256,7 @@ class CamGeneratedFixtures {
       case _:
     }
     var insideImported = new CncCompiler(machine).compileDetailed(
-      CamGCodeWriter.write(inside));
+      CamGCodeWriter.write(inside, CamTestSetup.standard(), machine));
     check(insideImported.diagnostics.length == 0 &&
       insideImported.ops.length == inside.ops.length,
       "concave inside G-code recompiles with the same operations");
@@ -256,7 +404,7 @@ class CamGeneratedFixtures {
     machine.setTool(tool);
     check(program.lower(machine).diagnostics.length == 0,
       "holed plate lowers to MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program));
+    var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
       "holed plate G-code round trips through CncKit");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {

@@ -1,4 +1,5 @@
 import cnckit.CncCompiler;
+import cnckit.CncCompileResult;
 import cnckit.CncMachine;
 import cnckit.CncTool;
 import cnckit.CncDialect;
@@ -27,6 +28,13 @@ class CncKitTests {
     try new CncCompiler(machine).compile(source)
     catch (caught:Dynamic) error = Std.string(caught);
     check(error.indexOf(expected) >= 0, 'expected "$expected" in "$error"');
+  }
+  static function hasError(result:CncCompileResult, line:Int,
+      fragment:String):Bool {
+    for (diagnostic in result.diagnostics)
+      if (diagnostic.severity == Error && diagnostic.span.line == line &&
+          diagnostic.message.indexOf(fragment) >= 0) return true;
+    return false;
   }
 
   public static function main():Void {
@@ -393,8 +401,52 @@ class CncKitTests {
     rejects(fixtureMachine, "G21 F600 G83 X0 Z-5 R2 M2", "requires positive Q");
     rejects(fixtureMachine, "G21 F600 G82 X0 Z-5 R2 M2", "requires positive P");
     rejects(fixtureMachine, "G21 G91 G53 G0 X1 M2", "G53 requires G90");
+    var activeCycleG53 = new CncCompiler(machine).compileDetailed(
+      "G21 G90 F600 G81 X0 Y0 Z-1 R2\nG53 X0\nG80\nM2");
+    check(hasError(activeCycleG53, 2, "G53 requires G80"),
+      "G53 in an active cycle reports its own line");
+    var secondLineOps = 0;
+    for (op in activeCycleG53.ops) switch op {
+      case CncOp.Rapid(_, span), CncOp.Feed(_, _, _, span):
+        if (span.line == 2) secondLineOps++;
+      case _:
+    }
+    check(secondLineOps == 0, "rejected G53 does not drill another hole");
+    rejects(fixtureMachine, "G80 G0 X1\nM2", "multiple motion G codes");
+    var endOutputs = new CncCompiler(fixtureMachine).compileDetailed(
+      "S1000 M3 M7 M8\nM30");
+    var endOps = endOutputs.ops;
+    check(endOps.length >= 5 && switch endOps[endOps.length - 5] {
+      case CncOp.Spindle("spindle.speed", speed, span) if (speed == 0.0): span.line == 2;
+      case _: false;
+    }, "M30 stops spindle speed on the end line");
+    check(switch endOps[endOps.length - 4] {
+      case CncOp.Spindle("spindle.direction", direction, _) if (direction == 0.0): true;
+      case _: false;
+    }, "M30 stops spindle direction");
+    check(switch endOps[endOps.length - 3] {
+      case CncOp.Coolant("coolant.mist", false, _): true;
+      case _: false;
+    }, "M30 turns off mist coolant");
+    check(switch endOps[endOps.length - 2] {
+      case CncOp.Coolant("coolant.flood", false, _): true;
+      case _: false;
+    }, "M30 turns off flood coolant before End");
+    var m2Outputs = new CncCompiler(fixtureMachine).compileDetailed(
+      "S1000 M3 M8\nM2");
+    check(switch m2Outputs.ops[m2Outputs.ops.length - 2] {
+      case CncOp.Coolant("coolant.flood", false, _): true;
+      case _: false;
+    }, "M2 also turns off active coolant");
     var compensatedMachine = new CncMachine("work", "x", "y", "z", 0.2);
     compensatedMachine.setTool(new CncTool(2, 0.012, 0.002));
+    var compUnsupported = new CncCompiler(compensatedMachine).compileDetailed(
+      "G21 G90 F600 T2 M6\nG0 X0 Y0\nG41 D2 G1 X5\nG1 Y5\n" +
+      "G28\nG81 X5 Y5 Z-1 R2\nG40 G1 X10\nM2");
+    check(hasError(compUnsupported, 5, "G28/G30 require G40"),
+      "G28 under cutter compensation reports its own line");
+    check(hasError(compUnsupported, 6, "drilling cycles require G40"),
+      "drilling cycle under cutter compensation reports its own line");
     near(compensatedMachine.toolLength(2), 0.012,
       "tool table supplies G43 length");
     near(compensatedMachine.tool(2).diameter, 0.002,

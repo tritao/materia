@@ -104,13 +104,15 @@ class CutMoveTests {
       .profile(contour, large, -0.003, 0.01)
       .finish();
     Assert.check(program.tool(3) == large, "CAM programs keep the tools they use");
-    var motions = 0;
+    // CAM retracts before each tool change; the first retract has no tool loaded.
+    var motions = 0, loaded = false;
     for (op in program.ops) switch op {
-      case Rapid(_, _) | Feed(_, _, _, _): motions++;
+      case ToolChange(_, _): loaded = true;
+      case Rapid(_, _) | Feed(_, _, _, _): if (loaded) motions++;
       case _:
     }
     var moves = CutMoves.fromOps(program.ops, program.tool);
-    Assert.check(moves.length == motions, "every CAM motion becomes a cut move");
+    Assert.check(moves.length == motions, "every CAM motion with a tool loaded becomes a cut move");
     Assert.check(moves[0].tool == small && moves[moves.length - 1].tool == large,
       "moves follow the CAM tool changes");
     var rejected = false;
