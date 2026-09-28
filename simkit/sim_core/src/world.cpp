@@ -50,6 +50,7 @@ bool valid_shape_desc(const nksim_shape_desc &desc) noexcept {
     case NKSIM_SHAPE_SPHERE:
         return std::isfinite(desc.parameters[0]) && desc.parameters[0] > 0.0;
     case NKSIM_SHAPE_CAPSULE:
+    case NKSIM_SHAPE_CYLINDER:
         return std::isfinite(desc.parameters[0]) && std::isfinite(desc.parameters[1]) &&
             desc.parameters[0] > 0.0 && desc.parameters[1] > 0.0;
     case NKSIM_SHAPE_PLANE: {
@@ -678,6 +679,10 @@ nksim_result World::create_compound_shape(const nksim_shape *children,
             break;
         case NKSIM_SHAPE_SPHERE: radius = part.parameters[0]; break;
         case NKSIM_SHAPE_CAPSULE: radius = part.parameters[0] + part.parameters[1] * 0.5; break;
+        case NKSIM_SHAPE_CYLINDER:
+            radius = std::sqrt(part.parameters[0] * part.parameters[0] +
+                               0.25 * part.parameters[1] * part.parameters[1]);
+            break;
         case NKSIM_SHAPE_CONVEX:
             for (std::size_t vertex = 0; vertex < part.vertices.size(); vertex += 3) {
                 const double x = part.vertices[vertex], y = part.vertices[vertex + 1],

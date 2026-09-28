@@ -23,6 +23,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_SHAPE_CAPSULE = 3;
 	const NKSIM_SHAPE_COMPOUND = 6;
 	const NKSIM_SHAPE_CONVEX = 5;
+	/**
+	 * Solid cylinder along local Z: parameters radius, full height.
+	 */
+	const NKSIM_SHAPE_CYLINDER = 7;
 	const NKSIM_SHAPE_PLANE = 4;
 	const NKSIM_SHAPE_SPHERE = 2;
 	const NKSIM_SNAPSHOT_PAGE_CAPACITY = 64;
@@ -62,11 +66,16 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * Copies 12..192 XYZ coordinates (4..64 vertices); MuJoCo compiles their convex polytope.
 	 */
 	extern fn nksim_shape_create_convex(world: nksim_world, vertices: ptr<const<f64>> @in_array("coordinate_count"), coordinate_count: u32, out_shape: ptr<nksim_shape> @out) -> nksim_result;
+	/**
+	 * A solid cylinder along local Z; height is the full length between its flat ends.
+	 */
+	extern fn nksim_shape_create_cylinder(world: nksim_world, radius: f64, height: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_plane(world: nksim_world, normal: ptr<const<f64>>, offset: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_sphere(world: nksim_world, radius: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_destroy(world: nksim_world, shape: nksim_shape) -> void;
 	/**
-	 * Forces begin inside margin; detection extends to margin + gap.
+	 * margin is the distance at which contact force begins. gap is the extra
+	 * band beyond margin where contacts are detected without force.
 	 */
 	extern fn nksim_shape_set_contact(world: nksim_world, shape: nksim_shape, margin: f64, gap: f64) -> nksim_result;
 	extern fn nksim_snapshot_destroy(snapshot: nksim_snapshot) -> void;
@@ -161,8 +170,8 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		axis_a: array<f64, 3> @offset(40);
 	}
 	/**
-	 * A detected contact. A positive distance is a proximity contact; active is
-	 * false when the backend reports it without a constraint (for example gap).
+	 * A detected contact. Distance is signed surface separation in metres;
+	 * active is false when the backend reports it without a force constraint.
 	 * Body handles are zero for backend-owned world geometry.
 	 */
 	struct nksim_contact @layout(88, 8) {

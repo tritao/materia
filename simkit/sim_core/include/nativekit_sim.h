@@ -71,7 +71,9 @@ enum {
     NKSIM_SHAPE_CAPSULE = 3,
     NKSIM_SHAPE_PLANE = 4,
     NKSIM_SHAPE_CONVEX = 5,
-    NKSIM_SHAPE_COMPOUND = 6
+    NKSIM_SHAPE_COMPOUND = 6,
+    /** Solid cylinder along local Z: parameters radius, full height. */
+    NKSIM_SHAPE_CYLINDER = 7
 };
 
 enum {
@@ -285,6 +287,9 @@ NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_convex(
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_sphere(
     nksim_world world, double radius, nksim_shape *out_shape NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_capsule(
+    nksim_world world, double radius, double height, nksim_shape *out_shape NK_OUT);
+/** A solid cylinder along local Z; height is the full length between its flat ends. */
+NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_cylinder(
     nksim_world world, double radius, double height, nksim_shape *out_shape NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_plane(
     nksim_world world, const double normal[3], double offset,

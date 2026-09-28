@@ -87,6 +87,19 @@ nksim_result NKSIM_CALL nksim_shape_create_capsule(nksim_world world, double rad
     return create_shape(world, desc, out_shape);
 }
 
+nksim_result NKSIM_CALL nksim_shape_create_cylinder(nksim_world world, double radius,
+                                                    double height, nksim_shape *out_shape) {
+    if (!out_shape || !std::isfinite(radius) || !std::isfinite(height) || radius <= 0.0 ||
+        height <= 0.0)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    nksim_shape_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.type = NKSIM_SHAPE_CYLINDER;
+    desc.parameters[0] = radius;
+    desc.parameters[1] = height;
+    return create_shape(world, desc, out_shape);
+}
+
 nksim_result NKSIM_CALL nksim_shape_create_plane(nksim_world world, const double normal[3],
                                                  double offset, nksim_shape *out_shape) {
     if (!normal || !out_shape || !std::isfinite(offset))

@@ -191,6 +191,8 @@ std::vector<RestBox> rest_piece_boxes(const BodyRecord &body) {
         } else if (part.type == NKSIM_SHAPE_CAPSULE) {
             box.half = {part.parameters[0], part.parameters[0],
                         part.parameters[0] + part.parameters[1] * 0.5};
+        } else if (part.type == NKSIM_SHAPE_CYLINDER) {
+            box.half = {part.parameters[0], part.parameters[0], part.parameters[1] * 0.5};
         }
         const auto rotation = normalize(multiply(body_rotation, normalize(part.rotation)));
         const auto offset = rotate(body_rotation, local_center);
@@ -215,6 +217,7 @@ double rest_shape_radius(const BodyRecord &body) {
     case NKSIM_SHAPE_SPHERE:
         return body.desc.shape_parameters[0];
     case NKSIM_SHAPE_CAPSULE:
+    case NKSIM_SHAPE_CYLINDER:
         return std::sqrt(body.desc.shape_parameters[0] * body.desc.shape_parameters[0] +
                          0.25 * body.desc.shape_parameters[1] * body.desc.shape_parameters[1]);
     default:
@@ -1134,6 +1137,9 @@ private:
             case NKSIM_SHAPE_CAPSULE:
                 geom->type = mjGEOM_CAPSULE;
                 break;
+            case NKSIM_SHAPE_CYLINDER:
+                geom->type = mjGEOM_CYLINDER;
+                break;
             case NKSIM_SHAPE_PLANE:
                 geom->type = mjGEOM_PLANE;
                 break;
@@ -1180,7 +1186,9 @@ private:
                 geom->quat[3] = part.rotation[2];
                 if (part.type != NKSIM_SHAPE_CONVEX) {
                     geom->size[0] = part.parameters[0];
-                    geom->size[1] = part.type == NKSIM_SHAPE_CAPSULE
+                    // MuJoCo sizes capsules and cylinders by half-length.
+                    geom->size[1] = part.type == NKSIM_SHAPE_CAPSULE ||
+                            part.type == NKSIM_SHAPE_CYLINDER
                         ? part.parameters[1] * 0.5 : part.parameters[1];
                     geom->size[2] = part.parameters[2];
                 }

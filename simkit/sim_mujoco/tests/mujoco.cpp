@@ -1636,12 +1636,51 @@ void convex_mesh_margin_detects_before_gap_force() {
 
 } // namespace
 
+// An upright cylinder rests on its flat end at half its height; a capsule of
+// the same radius and height would stand a radius taller on its rounded cap.
+void cylinder_rests_on_its_flat_end() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    const auto floor_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
+    const auto cylinder_node = make_node_xyz(scene, 0.0, 0.0, 0.5);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.005;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const double normal[] = {0.0, 0.0, 1.0};
+    nksim_shape floor_shape = 0, cylinder_shape = 0, invalid = 0;
+    assert(nksim_shape_create_plane(world, normal, 0.0, &floor_shape) == NKSIM_OK);
+    assert(nksim_shape_create_cylinder(world, 0.1, 0.4, &cylinder_shape) == NKSIM_OK);
+    assert(nksim_shape_create_cylinder(world, 0.1, 0.0, &invalid) ==
+           NKSIM_ERROR_INVALID_ARGUMENT);
+    const auto floor = make_body(world, floor_node, NKSIM_MOTION_STATIC, 0.0, floor_shape);
+    const auto cylinder = make_body(world, cylinder_node, NKSIM_MOTION_DYNAMIC, 1.0,
+                                    cylinder_shape);
+    step_world(world, 400);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, cylinder, &state) == NKSIM_OK);
+    assert(std::abs(state.position[2] - 0.2) < 0.005);
+    assert(std::abs(state.linear_velocity[2]) < 0.01);
+    nksim_body_destroy(world, cylinder);
+    nksim_body_destroy(world, floor);
+    nksim_shape_destroy(world, cylinder_shape);
+    nksim_shape_destroy(world, floor_shape);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 int main() {
     revolute_joint_is_owned_by_nativekit();
     prismatic_joint_uses_mujoco_velocity_control();
     fixed_joint_rebuilds_and_can_be_removed();
     kinematic_scene_state_drives_mujoco();
     plane_shape_stops_dynamic_body();
+    cylinder_rests_on_its_flat_end();
     mujoco_replay_is_deterministic();
     rotated_free_body_preserves_world_angular_velocity();
     wheel_velocity_target_does_not_stall();
