@@ -985,6 +985,48 @@ rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
     return read_body_pose(binding->bodies_[link_index],out_pose);
 }
 
+rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
+                                         std::vector<rk_robot_contact> &out) const {
+    std::lock_guard tick_lock(tick_mutex_);
+    out.clear();
+    const auto handle = std::find(handles_.begin(), handles_.end(), runtime);
+    if (handle == handles_.end()) return RK_ERROR_INVALID_HANDLE;
+    const auto robot_index = static_cast<std::size_t>(handle - handles_.begin());
+    if (robot_index >= bindings_.size() || snapshot_ == 0) return RK_ERROR_INVALID_STATE;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    uint64_t count = 0;
+    if (nksim_snapshot_get_contact_count(snapshot_, &count) != NKSIM_OK)
+        return RK_ERROR_BACKEND;
+    for (uint64_t i = 0; i < count; ++i) {
+        nksim_contact source{};
+        source.struct_size = sizeof(source);
+        if (nksim_snapshot_get_contact(snapshot_, i, &source) != NKSIM_OK)
+            return RK_ERROR_BACKEND;
+        for (uint32_t link = 0; link < binding->bodies_.size(); ++link) {
+            const auto body = binding->bodies_[link];
+            if (source.body_a != body && source.body_b != body) continue;
+            const auto part = source.body_a == body ? source.part_a : source.part_b;
+            rk_robot_contact result{};
+            result.struct_size = sizeof(result);
+            result.link_index = link;
+            result.tool_piece_index = part - 1;
+            const auto other_body = source.body_a == body ? source.body_b : source.body_a;
+            for (std::size_t object = 0; object < objects_.size(); ++object)
+                if (objects_[object].active && objects_[object].body == other_body)
+                    result.other_object = static_cast<rk_simulation_object>(object + 1);
+            result.distance = source.distance;
+            std::copy_n(source.position, 3, result.position);
+            std::copy_n(source.normal, 3, result.normal);
+            if (source.body_b == body)
+                for (double &axis : result.normal) axis = -axis;
+            result.active = source.active;
+            out.push_back(result);
+        }
+    }
+    return RK_OK;
+}
+
 rk_result Simulation::read_body_pose(nksim_body body,rk_simulation_pose &out_pose) const {
     nksim_body_state state{};state.struct_size=sizeof(state);
     bool found=false;

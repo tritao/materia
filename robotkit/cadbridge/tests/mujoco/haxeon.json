@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "package": {"name": "cadbridge-mujoco-tests"},
+  "entry": "tests.EndEffectorContactMuJoCo",
+  "sourceRoots": ["src", "../../../../machinekit/examples"],
+  "dependencies": {
+    "nativekit": {"path": "../../../../nativekit"},
+    "robotkit": {"path": "../../.."},
+    "cadkit": {"path": "../../../../cadkit"},
+    "machinekit": {"path": "../../../../machinekit"},
+    "cadbridge": {"path": "../.."}
+  },
+  "native": {
+    "cmake": {
+      "source": "../../../robotd/native-mujoco",
+      "target": "robotd_native",
+      "inputs": [
+        "../../../runtime/include/robotkit_runtime.h",
+        "../../../runtime/include/robotkit_simkit.h",
+        "../../../../simkit/CMakeLists.txt",
+        "../../../../cadkit/CMakeLists.txt"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

@@ -609,6 +609,31 @@ public:
         return NKSIM_OK;
     }
 
+    nksim_result read_contacts(std::vector<nksim::BackendContact> &out) override {
+        out.clear();
+        if (!model || !data) return NKSIM_OK;
+        for (int i = 0; i < data->ncon; ++i) {
+            const auto &source = data->contact[i];
+            nksim::BackendContact contact{};
+            auto first = geom_owner.find(source.geom[0]);
+            auto second = geom_owner.find(source.geom[1]);
+            if (first != geom_owner.end()) {
+                contact.body_a = first->second.first;
+                contact.part_a = first->second.second;
+            }
+            if (second != geom_owner.end()) {
+                contact.body_b = second->second.first;
+                contact.part_b = second->second.second;
+            }
+            std::copy_n(source.pos, 3, contact.position.begin());
+            std::copy_n(source.frame, 3, contact.normal.begin());
+            contact.distance = source.dist;
+            contact.active = source.efc_address >= 0;
+            out.push_back(contact);
+        }
+        return NKSIM_OK;
+    }
+
 private:
     void clear_topology_backup() noexcept {
         saved_bodies.clear();
@@ -820,6 +845,16 @@ private:
         }
 
         restore_model_state();
+        geom_owner.clear();
+        for (const auto body_id : body_order) {
+            const auto &record = bodies.at(body_id);
+            for (std::size_t part = 0; part < record.desc.shape_parts.size(); ++part) {
+                const auto name = record.name + "_part_" + std::to_string(part);
+                const auto geom_id = mj_name2id(model, mjOBJ_GEOM, name.c_str());
+                if (geom_id >= 0) geom_owner.emplace(geom_id,
+                    std::make_pair(body_id, static_cast<std::int32_t>(part)));
+            }
+        }
         apply_joint_targets();
         mj_forward(model, data);
         return NKSIM_OK;
@@ -937,7 +972,8 @@ private:
         }
         write_pose(local_position, local_rotation, *body);
 
-        const auto body_result = configure_body(*body, found->second.desc, incoming);
+        const auto body_result = configure_body(*body, found->second.desc, incoming,
+                                                found->second.name);
         if (body_result != NKSIM_OK)
             return body_result;
 
@@ -954,7 +990,8 @@ private:
 
     nksim_result configure_body(mjsBody &body,
                                        const nksim::BackendBodyDesc &desc,
-                                       const JointRecord *incoming) {
+                                       const JointRecord *incoming,
+                                       const std::string &body_name) {
         // A KINEMATIC body (e.g. a robot's own root/base link) is externally
         // scripted from its owning World's scene node every outer step
         // (World::refresh_kinematic_bodies), never integrated by physics —
@@ -1029,6 +1066,9 @@ private:
             const auto &part = desc.shape_parts[index];
             auto *geom = mjs_addGeom(&body, nullptr);
             if (!geom) return NKSIM_ERROR_OUT_OF_MEMORY;
+            const auto geom_name = body_name + "_part_" + std::to_string(index);
+            if (mjs_setName(geom->element, geom_name.c_str()) != 0)
+                return NKSIM_ERROR_BACKEND;
             switch (part.type) {
             case NKSIM_SHAPE_BOX:
                 geom->type = mjGEOM_BOX;
@@ -1090,6 +1130,8 @@ private:
                     geom->size[2] = part.parameters[2];
                 }
             }
+            // This pinned MuJoCo adds geom margin and gap for detection, then
+            // creates a force constraint only below geom margin.
             geom->margin = part.margin;
             geom->gap = part.gap;
             geom->contype = static_cast<int>(desc.collision_layer);
@@ -1261,6 +1303,7 @@ private:
     mjModel *model = nullptr;
     mjData *data = nullptr;
     std::unordered_map<std::uint64_t, BodyRecord> bodies;
+    std::unordered_map<int, std::pair<std::uint64_t, std::int32_t>> geom_owner;
     std::vector<std::uint64_t> body_order;
     std::unordered_map<std::uint64_t, JointRecord> joints;
     std::vector<std::uint64_t> joint_order;

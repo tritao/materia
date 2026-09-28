@@ -439,6 +439,24 @@ RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
 RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
     rk_simulation_pose *out_pose RK_INOUT);
+/** Contact involving one robot link. tool_piece_index is -1 for link geometry. */
+typedef struct rk_robot_contact {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t link_index;
+    int32_t tool_piece_index;
+    rk_simulation_object other_object; /**< Zero for another robot link. */
+    double distance;
+    double position[3];
+    double normal[3];
+    uint32_t active;
+    uint32_t reserved;
+} rk_robot_contact;
+RK_API rk_result RK_CALL rk_simulation_get_robot_contacts(
+    rk_simulation simulation, rk_robot_runtime runtime, rk_robot_contact *out,
+    uint32_t capacity, uint32_t *out_count RK_OUT);
+RK_API rk_result RK_CALL rk_simulation_get_robot_contact(
+    rk_simulation simulation, rk_robot_runtime runtime, uint32_t index,
+    rk_robot_contact *out_contact RK_INOUT);
 /** Adds one environment body from the editable scene while stopped. */
 RK_API rk_result RK_CALL rk_simulation_spawn_object(
     rk_simulation simulation, const rk_simulation_object_desc *desc,

@@ -555,7 +555,40 @@ nksim_result World::snapshot(std::shared_ptr<Snapshot> &out_snapshot) const {
     result->clock = clock;
     bodies.for_each([&](nksim_body, const Body &body) { result->bodies.push_back(body.state); });
     joints.for_each([&](nksim_joint, const Joint &joint) { result->joints.push_back(joint.state); });
+    std::uint32_t count = 0;
+    auto status = contacts(nullptr, 0, &count);
+    if (status != NKSIM_OK) return status;
+    result->contacts.resize(count);
+    status = contacts(result->contacts.data(), count, &count);
+    if (status != NKSIM_OK) return status;
     out_snapshot = std::move(result);
+    return NKSIM_OK;
+}
+
+nksim_result World::contacts(nksim_contact *out, std::uint32_t capacity,
+                             std::uint32_t *out_count) const {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!out_count || (capacity != 0 && !out)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::vector<BackendContact> values;
+    const auto result = backend->read_contacts(values);
+    if (result != NKSIM_OK) return result;
+    *out_count = static_cast<std::uint32_t>(values.size());
+    for (std::uint32_t i = 0; i < std::min(capacity, *out_count); ++i) {
+        const auto &value = values[i];
+        nksim_contact contact{};
+        contact.struct_size = sizeof(contact);
+        bodies.for_each([&](nksim_body handle, const Body &body) {
+            if (body.backend_body == value.body_a) contact.body_a = handle;
+            if (body.backend_body == value.body_b) contact.body_b = handle;
+        });
+        contact.part_a = value.part_a;
+        contact.part_b = value.part_b;
+        std::copy(value.position.begin(), value.position.end(), contact.position);
+        std::copy(value.normal.begin(), value.normal.end(), contact.normal);
+        contact.distance = value.distance;
+        contact.active = value.active ? 1u : 0u;
+        out[i] = contact;
+    }
     return NKSIM_OK;
 }
 
@@ -1125,6 +1158,12 @@ nksim_result NKSIM_CALL nksim_world_snapshot(nksim_world world, nksim_snapshot *
         return NKSIM_ERROR_OUT_OF_MEMORY;
     *out_snapshot = handle;
     return NKSIM_OK;
+}
+
+nksim_result NKSIM_CALL nksim_world_get_contacts(nksim_world world,
+    nksim_contact *out, uint32_t capacity, uint32_t *out_count) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->contacts(out, capacity, out_count) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 } // extern "C"

@@ -229,8 +229,35 @@ class Simulation {
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
     var runtime = new RobotRuntime(result.out_runtime, blueprint);
+    runtime.simulation = this;
     robots.push(runtime);
     return runtime;
+  }
+
+  /** Contacts for a runtime attached to this simulation. */
+  public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
+    ensureLive();
+    if (runtime == null || runtime.simulation != this)
+      throw "Runtime does not belong to this simulation";
+    var countResult = RobotKitSimKit.rk_simulation_get_robot_contacts(
+      owner.borrow(), runtime.owner.borrow(), null, 0);
+    check(countResult.status, "simulation.robotContacts");
+    var contacts:Array<RobotContact> = [];
+    for (index in 0...countResult.out_count) {
+      var value = new rk_robot_contact();
+      value.set_struct_size(rk_robot_contact.size());
+      var result = RobotKitSimKit.rk_simulation_get_robot_contact(owner.borrow(),
+        runtime.owner.borrow(), index, value);
+      check(result.status, "simulation.robotContact");
+      value = result.out_contact;
+      contacts.push({linkIndex: value.get_link_index(),
+        toolPieceIndex: value.get_tool_piece_index(), otherObject: value.get_other_object(),
+        distance: value.get_distance(),
+        position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
+        normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
+        active: value.get_active() != 0});
+    }
+    return contacts;
   }
 
   /** Advances once. timestampNs is a legacy hint, not source or receive time. */

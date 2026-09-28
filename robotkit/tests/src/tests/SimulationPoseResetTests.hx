@@ -39,7 +39,28 @@ class SimulationPoseResetTests {
       ToolCollisionShape.Box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)), 0);
     boxSimulation.step(Int64.ofInt(0));
     boxSimulation.dispose();
+    if (backend == 1) toolProximity();
     coupling(backend);
+  }
+
+  static function toolProximity():Void {
+    var simulation = new Simulation(0.01, 2, 1);
+    var cup:Array<Float> = [];
+    for (index in 0...8) {
+      cup.push((index & 1) == 0 ? -0.01 : 0.01);
+      cup.push((index & 2) == 0 ? -0.01 : 0.01);
+      cup.push((index & 4) == 0 ? 0.0 : 0.02);
+    }
+    var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
+      [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
+      ToolCollisionShape.Hulls([cup], 0.03), 0);
+    var obstacle = simulation.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01], true);
+    simulation.step(Int64.ofInt(0));
+    var contacts = runtime.toolProximity();
+    if (contacts.length == 0 || contacts[0].toolPieceIndex != 0 || contacts[0].active ||
+        contacts[0].otherObject != obstacle)
+      throw "Tool cup proximity was not reported";
+    simulation.dispose();
   }
 
   static function coupling(backend:Int):Void {

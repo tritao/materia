@@ -102,6 +102,8 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one robot's omni-wheel plant state.
 	 */
 	extern fn rk_simulation_get_omni_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_omni_drive_state> @inout) -> rk_result;
+	extern fn rk_simulation_get_robot_contact(simulation: rk_simulation, runtime: rk_robot_runtime, index: u32, out_contact: ptr<rk_robot_contact> @inout) -> rk_result;
+	extern fn rk_simulation_get_robot_contacts(simulation: rk_simulation, runtime: rk_robot_runtime, out: ptr<rk_robot_contact>, capacity: u32, out_count: ptr<u32> @out) -> rk_result;
 	/**
 	 * Reads one robot base pose from the latest physics state.
 	 */
@@ -224,6 +226,23 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * This does not change the pose restored by reset or resetRobot.
 	 */
 	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
+	/**
+	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
+	 */
+	struct rk_robot_contact @layout(80, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		link_index: u32 @offset(4);
+		tool_piece_index: i32 @offset(8);
+		/**
+		 * < Zero for another robot link.
+		 */
+		other_object: rk_simulation_object @offset(12);
+		distance: f64 @offset(16);
+		position: array<f64, 3> @offset(24);
+		normal: array<f64, 3> @offset(48);
+		active: u32 @offset(72);
+		reserved: u32 @offset(76);
+	}
 	/**
 	 * Read-only clock values published by a Simulation tick.
 	 *

@@ -94,6 +94,17 @@ struct BackendClosure {
     std::array<double, 3> axis_a{};
 };
 
+struct BackendContact {
+    std::uint64_t body_a = 0;
+    std::uint64_t body_b = 0;
+    std::int32_t part_a = -1;
+    std::int32_t part_b = -1;
+    std::array<double, 3> position{};
+    std::array<double, 3> normal{};
+    double distance = 0.0;
+    bool active = false;
+};
+
 /** Internal backend contract. It is intentionally not part of the C ABI. */
 class PhysicsBackend {
 public:
@@ -127,6 +138,10 @@ public:
                                           std::uint32_t count) = 0;
     virtual nksim_result read_joint_states(BackendJointState *states,
                                            std::uint32_t count) = 0;
+    virtual nksim_result read_contacts(std::vector<BackendContact> &out) {
+        out.clear();
+        return NKSIM_OK;
+    }
 };
 
 std::unique_ptr<PhysicsBackend> make_test_physics_backend();

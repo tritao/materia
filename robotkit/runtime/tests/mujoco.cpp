@@ -110,9 +110,70 @@ static void tool_hulls_collide_only_on_their_pieces() {
     rk_simulation_destroy(simulation);
 }
 
+static void tool_piece_contact_is_reported(double obstacle_z, bool expected_active) {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.links[0].mass = 1.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.tool_link_index = 0;
+    robot_desc.tool_piece_count = 1;
+    robot_desc.tool_gap = 0.03;
+    robot_desc.tool_piece_vertex_count[0] = 8;
+    for (int vertex = 0; vertex < 8; ++vertex) {
+        auto *point = robot_desc.tool_piece_vertices + vertex * 3;
+        point[0] = (vertex & 1) ? 0.05 : -0.05;
+        point[1] = (vertex & 2) ? 0.05 : -0.05;
+        point[2] = (vertex & 4) ? 1.0 : 0.0;
+    }
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    rk_simulation_object_desc obstacle{};
+    obstacle.struct_size = sizeof(obstacle);
+    obstacle.motion_type = 2;
+    obstacle.rotation[3] = 1.0;
+    obstacle.mass = 1.0;
+    obstacle.half_extents[0] = obstacle.half_extents[1] =
+        obstacle.half_extents[2] = 0.05;
+    obstacle.position[2] = obstacle_z;
+    rk_simulation_object object = 0;
+    assert(rk_simulation_spawn_object(simulation, &obstacle, &object) == RK_OK);
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    uint32_t count = 0;
+    assert(rk_simulation_get_robot_contacts(simulation, robot, nullptr, 0, &count) == RK_OK);
+    bool found = false;
+    for (uint32_t i = 0; i < count; ++i) {
+        rk_robot_contact contact{};
+        contact.struct_size = sizeof(contact);
+        assert(rk_simulation_get_robot_contact(simulation, robot, i, &contact) == RK_OK);
+        if (contact.tool_piece_index == 0) {
+            found = true;
+            assert((contact.active != 0) == expected_active);
+            assert(contact.link_index == 0);
+            assert(contact.other_object == object);
+        }
+    }
+    assert(found);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
     convex_link_and_box_link_build();
     tool_hulls_collide_only_on_their_pieces();
+    tool_piece_contact_is_reported(1.07, false);
+    tool_piece_contact_is_reported(1.04, true);
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.005;

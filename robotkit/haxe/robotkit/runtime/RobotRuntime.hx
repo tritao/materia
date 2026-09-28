@@ -22,6 +22,7 @@ import sys.thread.Mutex;
  * simulation so all robots observe one physics tick.
  */
 class RobotRuntime {
+  @:allow(robotkit.runtime.Simulation)
   final owner:Ownedrk_robot_runtime;
   final defaultMaxRates:Array<Float>;
   final defaultMaxEfforts:Array<Float>;
@@ -31,6 +32,8 @@ class RobotRuntime {
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
   var disposed:Bool = false;
+  @:allow(robotkit.runtime.Simulation)
+  var simulation:Null<Simulation>;
 
   @:allow(robotkit.runtime.Simulation)
   private function new(owner:Ownedrk_robot_runtime, blueprint:RobotRuntimeBlueprint) {
@@ -41,6 +44,16 @@ class RobotRuntime {
     channels = blueprint.channels.copy();
     externalSensorLayout = blueprint.externalSensorLayout();
   }
+
+  /** Contacts from the latest simulation tick. Standalone runtimes have none. */
+  public function contacts():Array<RobotContact> {
+    if (simulation == null) return [];
+    return simulation.robotContacts(this);
+  }
+
+  /** Inactive proximity contacts on attached tool pieces. */
+  public function toolProximity():Array<RobotContact>
+    return contacts().filter(contact -> contact.toolPieceIndex >= 0 && !contact.active);
 
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
   public static function create(blueprint:RobotRuntimeBlueprint):RobotRuntime {

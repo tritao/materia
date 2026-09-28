@@ -1577,7 +1577,9 @@ void compound_shape_preserves_an_l_shaped_gap() {
     nkscene_scene_destroy(scene);
 }
 
-double convex_mesh_margin_velocity(double margin, double gap) {
+struct MeshContactResult { double velocity; uint32_t contacts; bool active; double distance; };
+
+MeshContactResult convex_mesh_contact(double margin, double gap, double height = 0.165) {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     nksim_world_desc desc{};
@@ -1596,23 +1598,40 @@ double convex_mesh_margin_velocity(double margin, double gap) {
     assert(nksim_shape_create_sphere(world, 0.05, &sphere) == NKSIM_OK);
     const auto obstacle = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
                                     NKSIM_MOTION_STATIC, 0.0, mesh);
-    const auto moving = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.165),
+    const auto moving = make_body(world, make_node_xyz(scene, 0.0, 0.0, height),
                                   NKSIM_MOTION_DYNAMIC, 1.0, sphere);
     step_world(world, 3);
     nksim_body_state state{};
     state.struct_size = sizeof(state);
     assert(nksim_body_get_state(world, moving, &state) == NKSIM_OK);
     const double velocity = state.linear_velocity[2];
+    nksim_contact contacts[8]{};
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, contacts, 8, &count) == NKSIM_OK);
+    bool found = false, active = false;
+    double distance = 0.0;
+    for (uint32_t i = 0; i < std::min(count, 8u); ++i) {
+        if ((contacts[i].body_a == obstacle && contacts[i].body_b == moving) ||
+            (contacts[i].body_b == obstacle && contacts[i].body_a == moving)) {
+            found = true;
+            active = contacts[i].active != 0;
+            distance = contacts[i].distance;
+            assert(contacts[i].part_a == 0 && contacts[i].part_b == 0);
+        }
+    }
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
-    return velocity;
+    return {velocity, found ? count : 0u, active, distance};
 }
 
 void convex_mesh_margin_detects_before_gap_force() {
-    const double physical = convex_mesh_margin_velocity(0.03, 0.0);
-    const double proximity = convex_mesh_margin_velocity(0.0, 0.03);
-    assert(physical > 1e-5);
-    assert(std::abs(proximity) < 1e-8);
+    const auto physical = convex_mesh_contact(0.03, 0.0);
+    const auto proximity = convex_mesh_contact(0.0, 0.03);
+    const auto touching = convex_mesh_contact(0.0, 0.03, 0.145);
+    assert(physical.velocity > 1e-5 && physical.contacts > 0 && physical.active);
+    assert(std::abs(proximity.velocity) < 1e-8 && proximity.contacts > 0 && !proximity.active);
+    assert(proximity.distance > 0.0);
+    assert(touching.velocity > 1e-5 && touching.contacts > 0 && touching.active);
 }
 
 } // namespace

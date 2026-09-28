@@ -46,6 +46,21 @@ nksim_result NKSIM_CALL nksim_snapshot_get_body_count(nksim_snapshot snapshot,
     return NKSIM_OK;
 }
 
+nksim_result NKSIM_CALL nksim_snapshot_get_contact_count(nksim_snapshot snapshot,
+                                                          uint64_t *out_count) {
+    if (!out_count) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_snapshot(snapshot);
+    if (!value) return NKSIM_ERROR_INVALID_HANDLE;
+    *out_count = value->contacts.size();
+    return NKSIM_OK;
+}
+
+nksim_result NKSIM_CALL nksim_snapshot_get_contact(nksim_snapshot snapshot,
+    uint64_t index, nksim_contact *out_contact) {
+    const auto value = nksim::resolve_snapshot(snapshot);
+    return value ? copy_value(value->contacts, index, out_contact) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_snapshot_get_body(nksim_snapshot snapshot, uint64_t index,
                                                 nksim_body_state *out_state) {
     const auto value = nksim::resolve_snapshot(snapshot);

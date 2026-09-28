@@ -219,6 +219,22 @@ typedef struct nksim_joint_target {
     double max_force;
 } nksim_joint_target;
 
+/** A detected contact. Distance is signed surface separation in metres;
+ * active is false when the backend reports it without a force constraint.
+ * Body handles are zero for backend-owned world geometry.
+ */
+typedef struct nksim_contact {
+    uint32_t struct_size NK_STRUCT_SIZE;
+    nksim_body body_a;
+    nksim_body body_b;
+    int32_t part_a;
+    int32_t part_b;
+    double position[3];
+    double normal[3];
+    double distance;
+    uint32_t active NK_BOOL32;
+} nksim_contact;
+
 enum { NKSIM_SNAPSHOT_PAGE_CAPACITY = 64u };
 
 typedef struct nksim_snapshot_body_page {
@@ -252,6 +268,12 @@ NKSIM_API nksim_result NKSIM_CALL nksim_world_set_joint_targets(
     nksim_world world, const nksim_joint_target *targets NK_IN_ARRAY(count), uint32_t count);
 NKSIM_API nksim_result NKSIM_CALL nksim_world_snapshot(
     nksim_world world, nksim_snapshot *out_snapshot NK_OUT NK_OWNED);
+/** Copies at most capacity contacts and reports the full available count.
+ * Pass capacity 0 and out NULL to size a buffer. Read after stepping.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_world_get_contacts(
+    nksim_world world, nksim_contact *out,
+    uint32_t capacity, uint32_t *out_count NK_OUT);
 
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_box(
     nksim_world world, const double half_extents[3],
@@ -272,7 +294,8 @@ NKSIM_API nksim_result NKSIM_CALL nksim_shape_create(
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_compound(
     nksim_world world, const nksim_shape *children, const nksim_shape_pose *poses,
     uint32_t count, nksim_shape *out_shape NK_OUT);
-/** Forces begin inside margin; detection extends to margin + gap. */
+/** margin is the distance at which contact force begins. gap is the extra
+ * band beyond margin where contacts are detected without force. */
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_set_contact(
     nksim_world world, nksim_shape shape, double margin, double gap);
 NKSIM_API void NKSIM_CALL nksim_shape_destroy(nksim_world world, nksim_shape shape);
@@ -334,6 +357,10 @@ NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_joint(
 NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_joint_page(
     nksim_snapshot snapshot, uint64_t start_index,
     nksim_snapshot_joint_page *out_page NK_INOUT);
+NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_contact_count(
+    nksim_snapshot snapshot, uint64_t *out_count NK_OUT);
+NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_contact(
+    nksim_snapshot snapshot, uint64_t index, nksim_contact *out_contact NK_INOUT);
 
 #ifdef __cplusplus
 }
