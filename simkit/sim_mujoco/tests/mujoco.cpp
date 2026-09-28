@@ -1119,7 +1119,16 @@ struct HingeRig {
 };
 
 // A 0.3 m box base with a unit-mass, unit-inertia arm hinged about z at x = 1
-// and driven by a 10 N m effort target. The base overlaps a static floor.
+// and driven by a 10 N m effort target. A static floor sits well clear of the
+// base: this rig is about the base/child coupling, not floor contact, and a
+// KINEMATIC base now carries a real free joint (see mujoco_backend.cpp's
+// configure_body), so a deep floor penetration here would generate a real
+// contact/friction force against the base's own prescribed rotation in the
+// second half of kinematic_base_is_not_moved_by_child_reaction() below,
+// which leaks into the hinge through the coupled mass matrix regardless of
+// armature (armature only damps the base's OWN response to a reaction
+// torque, not an external contact force's effect on the coupled system) —
+// exactly what floor contact should do, just not what this test is for.
 HingeRig make_hinge_rig(uint32_t base_motion) {
     HingeRig rig;
     assert(nkscene_scene_create(&rig.scene) == NKS_OK);
@@ -1135,7 +1144,7 @@ HingeRig make_hinge_rig(uint32_t base_motion) {
     assert(nksim_mujoco_world_create(&world_desc, &rig.world) == NKSIM_OK);
     const double normal[] = {0.0, 0.0, 1.0};
     nksim_shape floor_shape = 0;
-    assert(nksim_shape_create_plane(rig.world, normal, -0.2, &floor_shape) == NKSIM_OK);
+    assert(nksim_shape_create_plane(rig.world, normal, -0.5, &floor_shape) == NKSIM_OK);
     rig.floor = make_body(rig.world, floor_node, NKSIM_MOTION_STATIC, 0.0, floor_shape);
     rig.base = make_box_body(rig.world, rig.base_node, base_motion,
                              base_motion == NKSIM_MOTION_STATIC ? 0.0 : 1.0, 0.3, 0.3, 0.3);
@@ -1255,16 +1264,16 @@ void kinematic_base_is_not_moved_by_child_reaction() {
 // Contacts see a kinematic body's twist: friction carries a box resting on a
 // moving kinematic platform along with it.
 //
-// DISABLED, known limitation: a kinematic body is pinned in MuJoCo without
+// Previously disabled: a kinematic body used to be pinned in MuJoCo without
 // degrees of freedom and moved between steps through body_pos/body_quat. A
 // contact's velocity is J * qvel, and a body with no DOFs contributes nothing
-// to it, so the platform slides out from under the box (which stays at x = 0
-// with zero velocity) instead of dragging it by friction. Mocap bodies are
-// welded to the world the same way and behave identically. Carrying resting
-// bodies needs the kinematic body to own DOFs whose qvel is its twist (a free
-// joint held on the prescribed motion), which is the competing design this
-// backend does not use. Not run from main().
-[[maybe_unused]] void kinematic_platform_carries_resting_box() {
+// to it (engine_core_util.c's mj_objectVelocity: "dof-less body (static or
+// mocap): quick return"), so the platform slid out from under the box
+// (which stayed at x = 0 with zero velocity) instead of dragging it by
+// friction. A KINEMATIC root now owns a real free joint instead (see
+// mujoco_backend.cpp's configure_body/step()), so its qvel is its twist and
+// this works.
+void kinematic_platform_carries_resting_box() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
     const auto platform_node = make_node_xyz(scene, 0.0, 0.0, 0.0);
@@ -1652,6 +1661,7 @@ int main() {
     kinematic_root_child_velocity_matches_joint_across_substeps();
     two_joint_arm_on_kinematic_base_holds_position_under_gravity();
     kinematic_base_is_not_moved_by_child_reaction();
+    kinematic_platform_carries_resting_box();
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();

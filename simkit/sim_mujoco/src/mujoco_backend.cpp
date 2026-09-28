@@ -107,6 +107,56 @@ Vec3 rotate(const Quat &rotation, const Vec3 &value) {
     return {rotated[0], rotated[1], rotated[2]};
 }
 
+// Nominal mass/inertia given to a KINEMATIC root's free joint (see
+// configure_body). Chosen well above any plausible dynamic payload so a
+// contact impulse against it approximates what an immovable obstacle
+// moving at the same velocity would give; the body's own qpos/qvel are
+// re-pinned to the prescribed trajectory every substep regardless (see
+// step()), so these values never affect this body's own motion.
+constexpr double kKinematicBodyMass = 1000.0;
+
+// Added to every dof of a KINEMATIC root's free joint (mjsJoint::armature,
+// applied uniformly to all 6 dof: user_model.cc's joint compiler loop sets
+// `m->dof_armature[dofadr] = pj->armature` per dof, not just translational
+// ones). Armature is reflected inertia at the DOF itself — it stiffens that
+// dof's own row/column of the mass matrix M against reaction forces from
+// this body's own articulated children (see configure_body's longer
+// comment) without adding actual body mass, so it does not also inflate
+// how hard gravity pulls on this body between substep placements.
+//
+// It only damps the coupling, not eliminates it (that would need infinite
+// armature): with a driven child still applying real torque every substep,
+// a residual proportional to child_inertia / armature remains — e.g. a
+// unit-inertia child hinge held by a 10 N*m motor settles about
+// child_inertia/armature radians off its target instead of exactly on it
+// (confirmed empirically: 1e6 left a ~1e-6 relative residual on the hinge
+// rate in kinematic_base_is_not_moved_by_child_reaction's rotating-base
+// case, scaling down linearly as armature grows — 1e9 cut it to ~1e-9,
+// comfortably inside that test's 1e-6 tolerance). 1e9 is chosen for that
+// margin; it showed no solver conditioning issues in this backend's own
+// test suite.
+constexpr double kKinematicBodyArmature = 1.0e9;
+
+// The incremental rotation a body with constant LOCAL-frame angular
+// velocity `local_angular_velocity` accumulates over `dt`, matching
+// mju_quatIntegrate's own convention exactly (vendored MuJoCo,
+// engine_util_spatial.c: "quat = quat * qrot(vel*dt)", i.e. a right
+// multiply by an axis-angle quaternion built from the LOCAL angular
+// velocity) — mj_integratePosInd (engine_support.c) applies a free
+// joint's qpos update the same way, so placing this body's qpos with the
+// identical formula keeps step()'s per-substep placement consistent with
+// what MuJoCo's own integrator would produce.
+Quat axis_angle(const Vec3 &local_angular_velocity, double dt) {
+    const auto length = std::sqrt(dot(local_angular_velocity, local_angular_velocity));
+    if (!std::isfinite(length) || length < 1e-12)
+        return {0.0, 0.0, 0.0, 1.0};
+    const auto angle = length * dt;
+    const auto axis = normalize(local_angular_velocity);
+    const auto half = angle * 0.5;
+    return {axis[0] * std::sin(half), axis[1] * std::sin(half), axis[2] * std::sin(half),
+            std::cos(half)};
+}
+
 RestBox rest_box(const BodyRecord &body) {
     RestBox result;
     result.center = {body.desc.position[0], body.desc.position[1], body.desc.position[2]};
@@ -281,6 +331,13 @@ public:
             mj_deleteSpec(spec);
     }
 
+    // A KINEMATIC root gets a real free joint (see configure_body), so a
+    // descendant's world-frame velocity from read_body_states (via
+    // mj_objectVelocity's cvel-based computation) already includes the
+    // root's own twist. World::carry_kinematic_root_twists() must not add
+    // it again.
+    bool reports_kinematic_root_twist_to_descendants() const override { return true; }
+
     nksim_result initialize(const nksim_world_desc &desc) override {
         spec = mj_makeSpec();
         if (!spec)
@@ -391,6 +448,12 @@ public:
             return NKSIM_ERROR_INVALID_HANDLE;
         const auto joint_id = model->body_jntadr[body_id];
         if (joint_id >= 0 && model->jnt_type[joint_id] == mjJNT_FREE) {
+            // Both a DYNAMIC root and a KINEMATIC root (configure_body gives
+            // both a free joint) land here. For a KINEMATIC root this is
+            // just bookkeeping for the tick: it records the driven pose and
+            // twist in found->second.state below, which step()'s
+            // kinematic_drives() reads to place the body correctly across
+            // every substep this tick, not only right now.
             set_free_body_state(body_id, state);
         } else if (const auto incoming = parent_joint_id(id); incoming != 0) {
             // A constrained link can be reset to its declared rest pose, but
@@ -411,7 +474,9 @@ public:
             }
             apply_joint_targets();
         } else {
-            // Static root pose is model state, not a free-joint qpos.
+            // STATIC root pose is model state, not a free-joint qpos (a
+            // DYNAMIC or KINEMATIC root always has one — see configure_body
+            // — so only a STATIC root reaches this branch).
             std::copy(state.position.begin(), state.position.end(), model->body_pos + 3*body_id);
             const auto q = normalize(state.rotation);
             model->body_quat[4*body_id] = q[3];
@@ -543,16 +608,104 @@ public:
         return NKSIM_OK;
     }
 
+    // A KINEMATIC root's target for this whole outer step was already
+    // written into its free joint's qpos/qvel by body_set_state (called by
+    // World::refresh_kinematic_bodies before World's own call into
+    // backend->step()), via the same set_free_body_state() path a DYNAMIC
+    // free body uses. Left there for the whole step, the body would sit
+    // still through every substep — the exact "teleport" bug this backend
+    // used to have. kinematic_drives() below instead re-derives, for a
+    // given substep, the pose that lies `remaining` seconds before that
+    // known end pose along the constant twist the caller supplied
+    // (position extrapolates linearly; rotation undoes axis_angle(), the
+    // exact inverse of the forward integration MuJoCo's own free joint
+    // uses — see axis_angle()'s comment), so placing it before every
+    // mj_step() call makes the body move smoothly across the step and lets
+    // the contact solver see its true instantaneous velocity.
+    struct KinematicDrive {
+        int qpos_adr = 0;
+        int qvel_adr = 0;
+        Vec3 position{};
+        Quat rotation{0.0, 0.0, 0.0, 1.0};
+        Vec3 linear_velocity{};
+        Vec3 local_angular_velocity{};
+    };
+
+    std::vector<KinematicDrive> kinematic_drives() const {
+        std::vector<KinematicDrive> drives;
+        for (const auto body_id : body_order) {
+            const auto &record = bodies.at(body_id);
+            if (record.desc.motion_type != NKSIM_MOTION_KINEMATIC || parent_joint_id(body_id) != 0)
+                continue;
+            const auto model_id = model_body_id(body_id);
+            if (model_id < 0)
+                continue;
+            const auto joint_id = model->body_jntadr[model_id];
+            if (joint_id < 0 || model->jnt_type[joint_id] != mjJNT_FREE)
+                continue;
+            KinematicDrive drive;
+            drive.qpos_adr = model->jnt_qposadr[joint_id];
+            drive.qvel_adr = model->jnt_dofadr[joint_id];
+            drive.position = {record.state.position[0], record.state.position[1],
+                              record.state.position[2]};
+            drive.rotation = normalize(Quat{record.state.rotation[0], record.state.rotation[1],
+                                            record.state.rotation[2], record.state.rotation[3]});
+            drive.linear_velocity = {record.state.linear_velocity[0],
+                                     record.state.linear_velocity[1],
+                                     record.state.linear_velocity[2]};
+            const Vec3 world_angular{record.state.angular_velocity[0],
+                                     record.state.angular_velocity[1],
+                                     record.state.angular_velocity[2]};
+            // set_free_body_state() stores the same world-to-local
+            // conversion for a DYNAMIC free body's qvel; matching it here
+            // keeps both paths consistent.
+            drive.local_angular_velocity = rotate(conjugate(drive.rotation), world_angular);
+            drives.push_back(drive);
+        }
+        return drives;
+    }
+
+    void place_kinematic_drives(const std::vector<KinematicDrive> &drives, double remaining) {
+        for (const auto &drive : drives) {
+            Vec3 position;
+            for (int axis = 0; axis < 3; ++axis)
+                position[axis] = drive.position[axis] - drive.linear_velocity[axis] * remaining;
+            const auto undo = axis_angle(drive.local_angular_velocity, remaining);
+            const auto rotation = normalize(multiply(drive.rotation, conjugate(undo)));
+            std::copy(position.begin(), position.end(), data->qpos + drive.qpos_adr);
+            data->qpos[drive.qpos_adr + 3] = rotation[3];
+            data->qpos[drive.qpos_adr + 4] = rotation[0];
+            data->qpos[drive.qpos_adr + 5] = rotation[1];
+            data->qpos[drive.qpos_adr + 6] = rotation[2];
+            std::copy(drive.linear_velocity.begin(), drive.linear_velocity.end(),
+                      data->qvel + drive.qvel_adr);
+            std::copy(drive.local_angular_velocity.begin(), drive.local_angular_velocity.end(),
+                      data->qvel + drive.qvel_adr + 3);
+        }
+    }
+
     nksim_result step(double dt, std::uint32_t substeps) override {
         if (!model || !data || !std::isfinite(dt) || dt <= 0.0 || substeps == 0)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         model->opt.timestep = dt / static_cast<double>(substeps);
+        const auto drives = kinematic_drives();
         for (std::uint32_t index = 0; index < substeps; ++index) {
+            if (!drives.empty())
+                place_kinematic_drives(drives,
+                    static_cast<double>(substeps - index) * model->opt.timestep);
             apply_joint_targets();
             mj_step(model, data);
         }
+        // Any reaction mj_step computed back onto a kinematic root's free
+        // joint (it has real mass so the contact solve treats it like any
+        // other body) is discarded here: it lands back exactly on its
+        // authored trajectory regardless of what physics did to it.
+        if (!drives.empty())
+            place_kinematic_drives(drives, 0.0);
         // mj_step integrates qpos/qvel after computing derived body quantities.
-        // Refresh them so snapshots contain pose and velocity at the same time.
+        // Refresh them so snapshots contain pose and velocity at the same time,
+        // and so read_contacts() sees contacts recomputed from the final,
+        // exact kinematic placement above rather than the last substep's.
         mj_forward(model, data);
         std::fill(data->xfrc_applied, data->xfrc_applied + model->nbody * 6, 0.0);
         return NKSIM_OK;
@@ -1047,24 +1200,75 @@ private:
                                        const nksim::BackendBodyDesc &desc,
                                        const JointRecord *incoming,
                                        const std::string &body_name) {
-        // A KINEMATIC body (e.g. a robot's own root/base link) is externally
-        // scripted from its owning World's scene node every outer step
-        // (World::refresh_kinematic_bodies), never integrated by physics —
-        // exactly like a STATIC body, just repositioned over time instead of
-        // fixed forever. Only a genuinely DYNAMIC body needs mass/inertia and
-        // a free joint here; giving a KINEMATIC root a mass-bearing MuJoCo
-        // free joint (the pre-fix behavior) let real physics act on it, and
-        // World::refresh_kinematic_bodies only re-pins that free joint's
-        // qpos/qvel once per OUTER step, not per physics substep, so
-        // constraint forces from a driven child (e.g. an actuated hinge)
-        // could give the "kinematic" root spurious velocity within a step
-        // that then leaked into a child's world-frame velocity reading
-        // without appearing in that child's own joint qvel.
-        if (desc.motion_type == NKSIM_MOTION_DYNAMIC) {
-            body.mass = desc.mass;
-            if (desc.mass > 0.0) {
+        // A KINEMATIC root (e.g. a walking actor's capsule, or a robot's own
+        // base link) is externally scripted from its owning World's scene
+        // node or an nksim_body_drive() every outer step
+        // (World::refresh_kinematic_bodies) — it must never be pushed by
+        // contact forces, and it must still make its motion visible to
+        // MuJoCo's contact solver so friction/velocity transfer with a
+        // DYNAMIC body works.
+        //
+        // A plain MuJoCo "mocap" body (mjsBody.mocap = true) does not do
+        // this: a mocap body has zero degrees of freedom, and MuJoCo
+        // explicitly special-cases dof-less bodies twice in the vendored
+        // source. mj_objectVelocity/mj_objectAcceleration
+        // (engine_core_util.c: "dof-less body (static or mocap): quick
+        // return") always report zero velocity for one, and
+        // filterBodyPair() in engine_collision_driver.c skips collision
+        // detection outright "if (dofnum1 == 0 && dofnum2 == 0)" ("both
+        // dof-less: no forces can act, skip") — i.e. even the contacts that
+        // *are* generated against a mocap body (it can carry colliding
+        // geoms; only the KINEMATIC-vs-STATIC/KINEMATIC-vs-KINEMATIC case is
+        // skipped, since a DYNAMIC body always has dof) are resolved with
+        // zero relative velocity on the mocap side — exactly the bug this
+        // fix targets, not a solution to it.
+        //
+        // So a KINEMATIC root instead gets a genuine free joint, exactly
+        // like a DYNAMIC body, giving it real degrees of freedom that
+        // participate normally in MuJoCo's contact Jacobian and cvel.
+        // step() below re-places its qpos/qvel onto the exact prescribed
+        // trajectory before every physics substep, not just once per outer
+        // step (re-pinning only once per OUTER step would leave the body
+        // sitting still through every substep in between — the same
+        // teleport problem, one level down — and would let a substep's
+        // contact force give it spurious velocity that then leaks into a
+        // child's world-frame velocity reading within the same step).
+        // Re-placing before every substep means the solver
+        // always sees the correct instantaneous relative velocity for
+        // friction, while any reaction it computes back onto this body is
+        // discarded before it can move the body or accumulate.
+        //
+        // The mass/inertia below are nominal: World zeroes desc.mass for
+        // anything but a DYNAMIC body, and this body's own dynamics never
+        // actually run (step() pins it every substep), so the values only
+        // set how much of a contact impulse a DYNAMIC body picks up on
+        // impact. kKinematicBodyMass is chosen well above any plausible
+        // dynamic payload so that impulse approximates what an immovable
+        // obstacle of the same velocity would give.
+        //
+        // Mass alone is not enough, though: a KINEMATIC root with its own
+        // articulated children (a robot base with jointed links) must still
+        // look rigid to THEM — a finite mass, however large, has some
+        // compliance, and a child's own reaction torque acts on this body's
+        // free joint within every substep before step() corrects it, which
+        // showed up as the base "giving" a little and the correction
+        // injecting a small kick every substep, undamped, so it built up
+        // into a sustained joint oscillation instead of settling (this is
+        // what surfaced the need for the fix: growing kKinematicBodyMass
+        // alone from 1e3 to 1e5 left the coupled system's steady-state
+        // error unchanged, so the residual wasn't from insufficient mass).
+        // mjsJoint::armature (added to the free joint below) is reflected
+        // inertia at the dof itself, not body mass: it stiffens the base's
+        // own 6 dof against reaction forces from its children without
+        // adding gravitational weight, decoupling "resists being reactively
+        // pushed by its own children" from "delivers a strong impulse to
+        // whatever it contacts" (still governed by mass, above).
+        const bool kinematic_root = desc.motion_type == NKSIM_MOTION_KINEMATIC && !incoming;
+        if (desc.motion_type == NKSIM_MOTION_DYNAMIC || kinematic_root) {
+            body.mass = desc.motion_type == NKSIM_MOTION_DYNAMIC ? desc.mass : kKinematicBodyMass;
+            if (body.mass > 0.0) {
                 body.explicitinertial = 1;
-                if (desc.has_inertial_properties) {
+                if (desc.motion_type == NKSIM_MOTION_DYNAMIC && desc.has_inertial_properties) {
                     std::copy(desc.center_of_mass.begin(), desc.center_of_mass.end(), body.ipos);
                     const auto &m = desc.inertia_tensor;
                     body.fullinertia[0] = m[0];
@@ -1084,8 +1288,17 @@ private:
         }
 
         if (!incoming) {
-            if (desc.motion_type == NKSIM_MOTION_DYNAMIC && !mjs_addFreeJoint(&body))
-                return NKSIM_ERROR_OUT_OF_MEMORY;
+            if (desc.motion_type == NKSIM_MOTION_DYNAMIC || kinematic_root) {
+                auto *free_joint = mjs_addFreeJoint(&body);
+                if (!free_joint)
+                    return NKSIM_ERROR_OUT_OF_MEMORY;
+                // A DYNAMIC root's free joint stays at zero armature (real
+                // physics). A KINEMATIC root's is stiffened so this body's own
+                // articulated children see an effectively rigid foundation —
+                // see kKinematicBodyArmature's comment.
+                if (kinematic_root)
+                    free_joint->armature = kKinematicBodyArmature;
+            }
         } else if (incoming->desc.type != NKSIM_JOINT_FIXED) {
             auto *joint = mjs_addJoint(&body, nullptr);
             if (!joint)
