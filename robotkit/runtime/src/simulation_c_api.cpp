@@ -59,7 +59,7 @@ extern "C" {
 
 rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
                                        rk_simulation *out_simulation) {
-    if (!desc || desc->struct_size < sizeof(*desc) || !out_simulation ||
+    if (!desc || desc->struct_size < offsetof(rk_simulation_desc, integrator) || !out_simulation ||
         !std::isfinite(desc->fixed_timestep) || desc->fixed_timestep <= 0.0 ||
         desc->physics_substeps == 0 || desc->backend > 1)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -68,8 +68,10 @@ rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
     if (desc->backend == 1) return RK_ERROR_UNSUPPORTED;
 #endif
     try {
+        const bool has_options = desc->struct_size >= sizeof(*desc);
         *out_simulation = store(std::make_shared<robotkit::Simulation>(
-            desc->fixed_timestep, desc->physics_substeps, desc->backend));
+            desc->fixed_timestep, desc->physics_substeps, desc->backend,
+            has_options ? desc->integrator : 0u, has_options ? desc->friction_cone : 0u));
         return RK_OK;
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;

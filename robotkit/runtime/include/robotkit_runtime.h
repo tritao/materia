@@ -232,7 +232,15 @@ typedef uint32_t rk_joint_target_mode;
 enum {
     RK_TARGET_POSITION = 1, /**< Target joint position. */
     RK_TARGET_VELOCITY = 2, /**< Target joint velocity. */
-    RK_TARGET_EFFORT = 3 /**< Target joint effort or torque. */
+    RK_TARGET_EFFORT = 3, /**< Target joint effort or torque. */
+    /**
+     * Joint servo: target is a position, and the command's parallel servos
+     * entry adds a velocity target, stiffness, damping and feedforward effort.
+     * The endpoint applies effort = stiffness * (position error) +
+     * damping * (velocity error) + feedforward every physics step, clamped to
+     * the joint's effort limit (or max_effort when smaller).
+     */
+    RK_TARGET_SERVO = 4
 };
 
 /** Joint topology type understood by the runtime compiler/backend. */
@@ -272,6 +280,13 @@ enum {
     RK_SELF_COLLISION_ENABLED = 1,
     RK_SELF_COLLISION_DISABLED = 2
 };
+/** Passive joint dynamics; zero is none. */
+typedef struct rk_robot_joint_dynamics {
+    double armature; /**< Reflected rotor inertia: kg m^2, or kg for a prismatic joint. */
+    double damping; /**< Viscous effort per unit joint velocity. */
+    double friction_loss; /**< Dry friction effort. */
+} rk_robot_joint_dynamics;
+
 typedef struct rk_robot_runtime_link {
     double mass;
     double center_of_mass[3];
@@ -393,6 +408,8 @@ typedef struct rk_robot_runtime_blueprint {
     rk_channel_declaration channels[RK_MAX_PROCESS_CHANNELS];
     uint32_t coupling_count; /**< Joint relations compiled from RobotModel v5. */
     rk_robot_joint_coupling couplings[RK_MAX_JOINT_COUPLINGS];
+    /** Versioned: absent means no passive dynamics. Indexed by joint. */
+    rk_robot_joint_dynamics joint_dynamics[RK_MAX_JOINTS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */
@@ -407,6 +424,17 @@ typedef struct rk_joint_target {
     double max_rate; /**< Optional rate limit; zero means backend default. */
     double max_effort; /**< Optional effort limit; zero means backend default. */
 } rk_joint_target;
+
+/** Servo control covers joints 0 .. RK_MAX_SERVO_JOINTS - 1: enough for a humanoid with hands. */
+enum { RK_MAX_SERVO_JOINTS = 64 };
+
+/** Servo terms for one RK_TARGET_SERVO target, in the target's SI units. */
+typedef struct rk_joint_servo {
+    double velocity; /**< Velocity target. */
+    double stiffness; /**< Effort per unit position error; non-negative. */
+    double damping; /**< Effort per unit velocity error; non-negative. */
+    double feedforward; /**< Effort added to the feedback terms. */
+} rk_joint_servo;
 
 /** Coefficients for one joint, in powers of seconds from segment start. */
 typedef struct rk_trajectory_coefficients {
@@ -490,6 +518,12 @@ typedef struct rk_robot_command {
     rk_command_kind kind; /**< Operation represented by this batch. */
     uint32_t target_count; /**< Number of valid entries in targets. */
     rk_joint_target targets[RK_MAX_JOINTS]; /**< Fixed-capacity target payload. */
+    /**
+     * Parallel to the first RK_MAX_SERVO_JOINTS targets; read only for
+     * RK_TARGET_SERVO entries, which are limited to joints below
+     * RK_MAX_SERVO_JOINTS so the command stays small to copy.
+     */
+    rk_joint_servo servos[RK_MAX_SERVO_JOINTS];
 } rk_robot_command;
 
 /** Mutable native state used internally while a runtime publishes a snapshot. */

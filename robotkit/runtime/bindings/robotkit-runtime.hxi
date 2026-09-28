@@ -136,6 +136,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Capacity of the current serial wire protocol.
 	 */
 	const RK_MAX_SERIAL_JOINTS = 64;
+	const RK_MAX_SERVO_JOINTS = 64;
 	/**
 	 * < Maximum used scalar coefficients per segment chunk.
 	 */
@@ -249,6 +250,14 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Target joint position.
 	 */
 	const RK_TARGET_POSITION = 1;
+	/**
+	 * Joint servo: target is a position, and the command's parallel servos
+	 * entry adds a velocity target, stiffness, damping and feedforward effort.
+	 * The endpoint applies effort = stiffness * (position error) +
+	 * damping * (velocity error) + feedforward every physics step, clamped to
+	 * the joint's effort limit (or max_effort when smaller).
+	 */
+	const RK_TARGET_SERVO = 4;
 	/**
 	 * < Target joint velocity.
 	 */
@@ -419,6 +428,27 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		argument: f64 @offset(64);
 	}
 	/**
+	 * Servo terms for one RK_TARGET_SERVO target, in the target's SI units.
+	 */
+	struct rk_joint_servo @layout(32, 8) {
+		/**
+		 * < Velocity target.
+		 */
+		velocity: f64 @offset(0);
+		/**
+		 * < Effort per unit position error; non-negative.
+		 */
+		stiffness: f64 @offset(8);
+		/**
+		 * < Effort per unit velocity error; non-negative.
+		 */
+		damping: f64 @offset(16);
+		/**
+		 * < Effort added to the feedback terms.
+		 */
+		feedforward: f64 @offset(24);
+	}
+	/**
 	 * One requested joint target inside a RobotCommand batch.
 	 */
 	struct rk_joint_target @layout(32, 8) {
@@ -548,7 +578,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Command metadata and optional fixed-capacity joint-target payload.
 	 */
-	struct rk_robot_command @layout(16416, 8) {
+	struct rk_robot_command @layout(18464, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -573,6 +603,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Fixed-capacity target payload.
 		 */
 		targets: array<rk_joint_target, 512> @offset(32);
+		/**
+		 * Parallel to the first RK_MAX_SERVO_JOINTS targets; read only for
+		 * RK_TARGET_SERVO entries, which are limited to joints below
+		 * RK_MAX_SERVO_JOINTS so the command stays small to copy.
+		 */
+		servos: array<rk_joint_servo, 64> @offset(16416);
 	}
 	/**
 	 * Bulk compiled robot description consumed when a RobotRuntime is created.
@@ -587,7 +623,24 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		ratio: f64 @offset(8);
 		offset: f64 @offset(16);
 	}
-	struct rk_robot_runtime_blueprint @layout(222696, 8) {
+	/**
+	 * Passive joint dynamics; zero is none.
+	 */
+	struct rk_robot_joint_dynamics @layout(24, 8) {
+		/**
+		 * < Reflected rotor inertia: kg m^2, or kg for a prismatic joint.
+		 */
+		armature: f64 @offset(0);
+		/**
+		 * < Viscous effort per unit joint velocity.
+		 */
+		damping: f64 @offset(8);
+		/**
+		 * < Dry friction effort.
+		 */
+		friction_loss: f64 @offset(16);
+	}
+	struct rk_robot_runtime_blueprint @layout(234984, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -658,6 +711,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 */
 		coupling_count: u32 @offset(210400);
 		couplings: array<rk_robot_joint_coupling, 512> @offset(210408);
+		/**
+		 * Versioned: absent means no passive dynamics. Indexed by joint.
+		 */
+		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(222696);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.

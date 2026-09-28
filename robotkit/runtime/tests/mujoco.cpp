@@ -323,7 +323,186 @@ static void link_primitives_collide_in_link_frame() {
     rk_simulation_destroy(simulation);
 }
 
+// A 1 kg arm on a kinematic base, hinged about Y with its centre of mass
+// 0.5 m out along X: at q = 0 gravity loads the hinge with 4.905 N m and
+// pulls q positive.
+static rk_robot_runtime_blueprint gravity_arm(double max_effort, double friction_loss = 0.0,
+                                              double damping = 0.0) {
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 2;
+    model.joint_count = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    for (auto &link : model.links) {
+        link.mass = 1.0;
+        link.inertia_tensor[0] = link.inertia_tensor[4] = link.inertia_tensor[8] = 0.01;
+    }
+    model.links[1].center_of_mass[0] = 0.5;
+    model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, max_effort};
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[1] = 1.0;
+    model.joint_dynamics[0].friction_loss = friction_loss;
+    model.joint_dynamics[0].damping = damping;
+    return model;
+}
+
+struct ArmRun {
+    double position;
+    double effort;
+};
+
+// Runs the arm for `seconds` under one command and reports the final joint state.
+static ArmRun run_gravity_arm(const rk_robot_runtime_blueprint &model,
+                              const rk_robot_command &command, double seconds) {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 5;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    if (command.target_count > 0) assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    const int ticks = static_cast<int>(seconds / desc.fixed_timestep);
+    for (int tick = 0; tick < ticks; ++tick)
+        assert(rk_simulation_step(simulation, static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
+    const auto value = state(robot);
+    rk_simulation_destroy(simulation);
+    return {value.position[0], value.effort[0]};
+}
+
+static rk_robot_command arm_command(uint32_t mode, double target) {
+    rk_robot_command command{};
+    command.struct_size = sizeof(command);
+    command.sequence = 1;
+    command.kind = RK_COMMAND_JOINT_TARGETS;
+    command.target_count = 1;
+    command.targets[0] = {0, mode, target, 0.0, 0.0};
+    return command;
+}
+
+// TODO.md physics regression: a position command stalls when the joint's
+// torque limit is below its gravity load, and moves once the limit is above it.
+static void actuator_limit_stalls_then_lifts() {
+    const double load = 9.81 * 0.5;
+    const auto lift = arm_command(RK_TARGET_POSITION, -0.3);
+    // Joint damping settles the arm where the limited effort balances gravity:
+    // load * cos(q) = 3 N m.
+    const auto weak = run_gravity_arm(gravity_arm(3.0, 0.0, 2.0), lift, 3.0);
+    assert(std::abs(weak.position - std::acos(3.0 / load)) < 0.02); // Sagged, not lifted.
+    assert(std::abs(std::abs(weak.effort) - 3.0) < 1e-6); // Pushing at its limit.
+    const auto strong = run_gravity_arm(gravity_arm(20.0, 0.0, 2.0), lift, 3.0);
+    assert(std::abs(strong.position + 0.3) < 0.01);
+    assert(std::abs(strong.effort) < 20.0);
+}
+
+// A servo target is a plain PD with feedforward: it sags by load / stiffness,
+// feedforward cancels the load, and validation bounds its terms.
+static void servo_target_runs_through_the_runtime() {
+    const double load = 9.81 * 0.5;
+    auto command = arm_command(RK_TARGET_SERVO, 0.0);
+    command.servos[0] = {0.0, 200.0, 10.0, 0.0};
+    const auto sag = run_gravity_arm(gravity_arm(50.0), command, 2.0);
+    assert(std::abs(sag.position - load / 200.0) < 0.002);
+    command.servos[0].feedforward = -load; // Gravity pulls q positive; push back.
+    const auto held = run_gravity_arm(gravity_arm(50.0), command, 2.0);
+    assert(std::abs(held.position) < 1e-3);
+
+    auto invalid = command;
+    invalid.servos[0].stiffness = -1.0;
+    assert(rk_robot_command_validate(&invalid) == RK_ERROR_INVALID_ARGUMENT);
+    invalid = command;
+    invalid.targets[0].joint = RK_MAX_SERVO_JOINTS;
+    assert(rk_robot_command_validate(&invalid) == RK_ERROR_INVALID_ARGUMENT);
+
+    // Feedforward beyond the joint's effort limit is refused like an effort target.
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    const auto model = gravity_arm(3.0);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(rk_simulation_step(simulation, 0) == RK_ERROR_LIMIT);
+    rk_simulation_destroy(simulation);
+}
+
+// Joint friction loss compiled into the blueprint holds an unpowered arm,
+// apart from the slow creep of MuJoCo's soft dry friction.
+static void blueprint_joint_friction_holds_an_arm() {
+    rk_robot_command none{};
+    none.struct_size = sizeof(none);
+    assert(run_gravity_arm(gravity_arm(0.0, 10.0), none, 0.4).position < 0.02);
+    assert(run_gravity_arm(gravity_arm(0.0, 0.0), none, 0.4).position > 0.5);
+}
+
+// Rest height of a 10 kg floating sphere robot on a floor, for a contact time constant.
+static double sphere_rest_height(double time_constant) {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.005;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    desc.integrator = 2; // NKSIM_INTEGRATOR_IMPLICIT_FAST
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.floating_base = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    model.links[0].mass = 10.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 0.01;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 0.06;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.link_shape_count = 1;
+    auto &sphere = robot_desc.link_shapes[0];
+    sphere.type = RK_LINK_SHAPE_SPHERE;
+    sphere.size[0] = 0.05;
+    sphere.rotation[3] = 1.0;
+    sphere.contact_time_constant = time_constant;
+    sphere.contact_damping_ratio = 1.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    rk_simulation_object_desc floor{};
+    floor.struct_size = sizeof(floor);
+    floor.rotation[3] = 1.0;
+    floor.position[2] = -0.5;
+    floor.half_extents[0] = floor.half_extents[1] = 5.0;
+    floor.half_extents[2] = 0.5;
+    rk_simulation_object floor_object = 0;
+    assert(rk_simulation_spawn_object(simulation, &floor, &floor_object) == RK_OK);
+    for (int tick = 0; tick < 400; ++tick)
+        assert(rk_simulation_step(simulation, tick) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &pose) == RK_OK);
+    rk_simulation_destroy(simulation);
+    return pose.position[2];
+}
+
+// A softer contact (longer time constant) lets a robot's shape sink further.
+static void link_shape_contact_softness_reaches_the_backend() {
+    const double stiff = sphere_rest_height(0.02);
+    const double soft = sphere_rest_height(0.2);
+    assert(std::abs(stiff - 0.05) < 0.005);
+    assert(soft < stiff - 0.005);
+}
+
 int main() {
+    actuator_limit_stalls_then_lifts();
+    servo_target_runs_through_the_runtime();
+    blueprint_joint_friction_holds_an_arm();
+    link_shape_contact_softness_reaches_the_backend();
     link_primitives_collide_in_link_frame();
     floating_base_falls_and_settles(false);
     floating_base_falls_and_settles(true);

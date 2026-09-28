@@ -151,7 +151,8 @@ uint64_t monotonic_now_ns() {
 
 } // namespace
 
-Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend)
+Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend,
+                       uint32_t integrator, uint32_t friction_cone)
     : fixed_timestep_(fixed_timestep), physics_substeps_(physics_substeps),
       period_(static_cast<int64_t>(fixed_timestep * 1'000'000'000.0)) {
     if (fixed_timestep <= 0.0 || physics_substeps == 0)
@@ -164,6 +165,8 @@ Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_
         desc.fixed_timestep = fixed_timestep_;
         desc.physics_substeps = physics_substeps_;
         std::copy_n(gravity_, 3, desc.gravity);
+        desc.integrator = integrator;
+        desc.friction_cone = friction_cone;
         if (backend == 0)
             require_sim(nksim_world_create(&desc, &world_), "nksim_world_create");
 #ifdef RK_HAS_MUJOCO
@@ -397,6 +400,14 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                         2.0 * source.size[1], &primitive), "nksim_shape_create_cylinder(link primitive)");
                     break;
                 }
+                nksim_surface surface{};
+                surface.struct_size = sizeof(surface);
+                surface.friction_dimensions = source.friction_dimensions;
+                std::copy_n(source.friction, 3, surface.friction);
+                surface.contact_time_constant = source.contact_time_constant;
+                surface.contact_damping_ratio = source.contact_damping_ratio;
+                require_sim(nksim_shape_set_surface(world_, primitive, &surface),
+                            "nksim_shape_set_surface(link primitive)");
                 link_shapes_.push_back(primitive);
                 add_child(primitive, source.position, source.rotation);
                 has_link_shape = true;
@@ -466,6 +477,13 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.lower_limit = source.lower_limit;
             desc.upper_limit = source.upper_limit;
             desc.max_force = source.max_effort;
+            if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
+                    sizeof(blueprint.joint_dynamics)) {
+                const auto &dynamics = blueprint.joint_dynamics[index];
+                desc.armature = dynamics.armature;
+                desc.damping = dynamics.damping;
+                desc.friction_loss = dynamics.friction_loss;
+            }
             nksim_joint joint = 0;
             require_sim(nksim_joint_create(world_, &desc, &joint), "nksim_joint_create");
             binding->joints_.push_back(joint);

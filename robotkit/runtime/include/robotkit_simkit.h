@@ -47,6 +47,9 @@ typedef struct rk_simulation_desc {
     uint32_t physics_substeps;
     uint32_t backend; /**< 0: deterministic test backend; 1: MuJoCo (must be built). */
     uint64_t reserved[4];
+    /* Optional when struct_size includes this tail; zero keeps backend defaults. */
+    uint32_t integrator; /**< NKSIM_INTEGRATOR_* from nativekit_sim.h. */
+    uint32_t friction_cone; /**< NKSIM_FRICTION_CONE_* from nativekit_sim.h. */
 } rk_simulation_desc;
 
 /**
@@ -110,6 +113,17 @@ typedef struct rk_simulation_link_shape {
     double size[3];
     double position[3];
     double rotation[4]; /**< Unit quaternion in x, y, z, w order. */
+    /**
+     * Contact surface; zero fields keep the backend default. friction is
+     * sliding, torsional and rolling; friction_dimensions is 1, 3, 4 or 6;
+     * contact_time_constant (s) and contact_damping_ratio set soft-contact
+     * stiffness and damping.
+     */
+    double friction[3];
+    double contact_time_constant;
+    double contact_damping_ratio;
+    uint32_t friction_dimensions;
+    uint32_t reserved0;
 } rk_simulation_link_shape;
 
 /**

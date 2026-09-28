@@ -17,7 +17,7 @@ bool is_finite(double value) {
 }
 
 bool valid_target_mode(rk_joint_target_mode mode) {
-    return mode >= RK_TARGET_POSITION && mode <= RK_TARGET_EFFORT;
+    return mode >= RK_TARGET_POSITION && mode <= RK_TARGET_SERVO;
 }
 
 bool valid_trajectory_status(uint32_t depth, uint32_t active, uint64_t time_ns,
@@ -98,6 +98,15 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             sizeof(blueprint->serial_processing_allowance_ns) &&
         blueprint->serial_processing_allowance_ns > static_cast<uint64_t>(INT64_MAX))
         return RK_ERROR_INVALID_ARGUMENT;
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
+            sizeof(blueprint->joint_dynamics))
+        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint) {
+            const auto &dynamics = blueprint->joint_dynamics[joint];
+            if (!is_finite(dynamics.armature) || !is_finite(dynamics.damping) ||
+                !is_finite(dynamics.friction_loss) || dynamics.armature < 0.0 ||
+                dynamics.damping < 0.0 || dynamics.friction_loss < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
     constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
         blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;
@@ -207,6 +216,15 @@ rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *command) {
         if (targeted[target.joint])
             return RK_ERROR_INVALID_ARGUMENT;
         targeted[target.joint] = true;
+        if (target.mode == RK_TARGET_SERVO) {
+            if (index >= RK_MAX_SERVO_JOINTS || target.joint >= RK_MAX_SERVO_JOINTS)
+                return RK_ERROR_INVALID_ARGUMENT;
+            const auto &servo = command->servos[index];
+            if (!is_finite(servo.velocity) || !is_finite(servo.stiffness) ||
+                !is_finite(servo.damping) || !is_finite(servo.feedforward) ||
+                servo.stiffness < 0.0 || servo.damping < 0.0)
+                return RK_ERROR_INVALID_ARGUMENT;
+        }
     }
     return RK_OK;
 }
@@ -231,7 +249,8 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
             if (follower && follower->mode != RK_TARGET_EFFORT &&
                 (!leader || follower->mode != leader->mode ||
                 std::abs(follower->target - c.ratio * leader->target -
-                    (follower->mode == RK_TARGET_POSITION ? c.offset : 0.0)) > 1e-6))
+                    (follower->mode == RK_TARGET_POSITION || follower->mode == RK_TARGET_SERVO
+                        ? c.offset : 0.0)) > 1e-6))
                 return RK_ERROR_INVALID_ARGUMENT;
         }
     }
