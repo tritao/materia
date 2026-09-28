@@ -89,6 +89,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
@@ -216,9 +217,10 @@ class MotionKitTestSupport {
         }
       }
     }
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime, null, options);
-    if (virtualDevice) for (tick in 1...21) simulation.step(Int64.ofInt(tick));
+    if (virtualDevice) for (tick in 1...21) simulationHarness.step(Int64.ofInt(tick));
     var robot = new SimulatedRobot("cnc-gantry", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
@@ -237,7 +239,7 @@ class MotionKitTestSupport {
     var holdIssued = false, holdTicks = 0, linkCut = false;
     for (tick in 0...3000) {
       if (!linkCut) motion.update(0.01);
-      simulation.step(Int64.ofInt(virtualDevice ? tick + 21 : tick));
+      simulationHarness.step(Int64.ofInt(virtualDevice ? tick + 21 : tick));
       var q = robot.snapshot().positions.toArray();
       trace.push(q[0]); trace.push(q[1]);
       var projection = Math.max(0.0, Math.min(1.0, (q[0] + q[1]) / 0.02));
@@ -278,7 +280,7 @@ class MotionKitTestSupport {
       var previous = robot.snapshot().positions.toArray();
       var quiet = 0;
       for (extra in 0...300) {
-        simulation.step(Int64.ofInt(4000 + extra));
+        simulationHarness.step(Int64.ofInt(4000 + extra));
         var current = robot.snapshot().positions.toArray();
         if (Math.abs(current[0] - previous[0]) < 1e-6 &&
             Math.abs(current[1] - previous[1]) < 1e-6) quiet++;
@@ -290,7 +292,7 @@ class MotionKitTestSupport {
       check(previous[0] <= 0.02 + cnc.positionTolerance &&
         previous[1] <= 0.02 + cnc.positionTolerance,
         "CNC link-loss stop stays within the programmed axis bounds");
-      simulation.dispose();
+      simulationHarness.dispose();
       return trace;
     }
     check(motion.completed, 'CNC program completes: ${motion.failure}');
@@ -298,7 +300,7 @@ class MotionKitTestSupport {
     near(robot.snapshot().positions.get(0), 0.02, "CNC finishes X", 2e-4);
     near(robot.snapshot().positions.get(1), 0.02, "CNC finishes Y", 2e-4);
     if (virtualDevice) for (extra in 0...20)
-      simulation.step(Int64.ofInt(4000 + extra));
+      simulationHarness.step(Int64.ofInt(4000 + extra));
     var events = motion.firedEvents();
     check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
       switch event.value { case ProcessEventValue.Analog(value): value == 12000.0;
@@ -306,21 +308,21 @@ class MotionKitTestSupport {
     check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
       switch event.value { case ProcessEventValue.Analog(value): value == 0.0;
         case _: false; }), "CNC spindle stop fires");
-    simulation.dispose();
+    simulationHarness.dispose();
     return trace;
   }
 
-  public function runMotion(machine:MotionSystem, simulation:Simulation):Void {
+  public function runMotion(machine:MotionSystem, harness:SimulationHarness):Void {
     var tick = 0;
     while (machine.isMoving()) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      harness.step(Int64.ofInt(tick++));
       if (tick > 2000) {
         var snapshot = machine.robot.snapshot();
         throw 'MotionKit trajectory did not complete: safety=${snapshot.safety} fault=${snapshot.faultCode} session=${snapshot.sessionState} active=${snapshot.trajectoryActive} queue=${snapshot.trajectoryQueueDepth} time=${snapshot.trajectoryTimeNs} duration=${snapshot.trajectoryDurationNs} committed=${snapshot.committedUntilNs}';
       }
     }
-    for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
+    for (_ in 0...4) harness.step(Int64.ofInt(tick++));
   }
 
   /**
@@ -332,7 +334,8 @@ class MotionKitTestSupport {
       resumeAfterStop:Bool, ?begin:MotionSystem -> Void):Array<Float> {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new RuntimeRobotAdapter("limits", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -346,7 +349,7 @@ class MotionKitTestSupport {
     var stillTicks = 0;
     function step():Void {
       machine.update();
-      try simulation.step(Int64.ofInt(tick++)) catch (error:Dynamic)
+      try simulationHarness.step(Int64.ofInt(tick++)) catch (error:Dynamic)
         throw 'gantry trial (queue $queueSupport, event at $eventTick) failed at tick $tick: $error';
       var position = robot.snapshot().positions.get(0);
       stillTicks = positions.length > 0 &&
@@ -363,7 +366,7 @@ class MotionKitTestSupport {
     }
     stillTicks = 0;
     while (machine.isMoving() || stillTicks < 3) step();
-    simulation.dispose();
+    simulationHarness.dispose();
     return positions;
   }
 
@@ -389,7 +392,7 @@ class MotionKitTestSupport {
     var stillTicks = 0;
     function step():Void {
       machine.update();
-      rig.simulation.step(Int64.ofInt(tick++));
+      rig.harness.step(Int64.ofInt(tick++));
       var current = rig.robot.snapshot().positions.toArray();
       var still = positions.length > 0;
       if (still)
@@ -408,7 +411,7 @@ class MotionKitTestSupport {
     }
     stillTicks = 0;
     while (machine.isMoving() || stillTicks < 3) step();
-    rig.simulation.dispose();
+    rig.harness.dispose();
     return positions;
   }
 
@@ -423,13 +426,13 @@ class MotionKitTestSupport {
   public function gantryRig(queueSupport:Bool):TrialRig {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
-    var simulation = new Simulation(0.01);
-    var runtime = simulation.addRobot(blueprint.runtime);
+    var simulationHarness = new SimulationHarness(0.01);
+    var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
     var robot = new RuntimeRobotAdapter("rig", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport);
-    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulation, robot);
+    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot);
   }
 
   public function segmentDistance(x:Float, y:Float, ax:Float, ay:Float, bx:Float, by:Float):Float {
@@ -460,14 +463,14 @@ class MotionKitTestSupport {
       new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4, 0.0,
         [1.0, -2.0], [0.0, 0.0])
     ]);
-    var simulation = new Simulation(0.01);
-    var runtime = simulation.addRobot(blueprint.runtime);
+    var simulationHarness = new SimulationHarness(0.01);
+    var runtime = simulationHarness.simulation.addRobot(blueprint.runtime);
     var recording = new RobotRecording();
     var robot = new RecordingRobot(new RuntimeRobotAdapter("dual-motor-geared", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name], false, false,
       "simulated runtime fault", queueSupport), recording);
-    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulation, robot, recording);
+    return new TrialRig(MotionSystem.fromBlueprint(robot, blueprint), simulationHarness, robot, recording);
   }
 
   /** Unwraps a move that started at once because the machine was at rest. */
@@ -606,6 +609,7 @@ class SessionTransitionRobot implements Robot {
 }
 
 class SessionTransitionRig {
+  public final harness:SimulationHarness;
   public final simulation:Simulation;
   public final robot:SessionTransitionRobot;
   public final machine:MotionSystem;
@@ -615,7 +619,8 @@ class SessionTransitionRig {
   public function new(id:String) {
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(
       new LinearAxis(23, 10, 80), "x", 0.08, 0.4);
-    simulation = new Simulation(0.01);
+    harness = new SimulationHarness(0.01);
+    simulation = harness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     robot = new SessionTransitionRobot(new SimulatedRobot(id, runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
@@ -631,7 +636,7 @@ class SessionTransitionRig {
   public function advance(count:Int):Void {
     for (_ in 0...count) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      harness.step(Int64.ofInt(tick++));
     }
   }
 
@@ -652,7 +657,7 @@ class SessionTransitionRig {
     }
   }
 
-  public function dispose():Void simulation.dispose();
+  public function dispose():Void harness.dispose();
 }
 
 /** Robot wrapper that can hold submitted commands back, to simulate transport delay. */
@@ -748,14 +753,14 @@ class FaultingArmRobot extends SimulatedRobot {
 /** A simulated machine for sweep trials. */
 class TrialRig {
   public final machine:MotionSystem;
-  public final simulation:Simulation;
+  public final harness:SimulationHarness;
   public final robot:Robot;
   public final recording:Null<RobotRecording>;
 
-  public function new(machine:MotionSystem, simulation:Simulation, robot:Robot,
+  public function new(machine:MotionSystem, harness:SimulationHarness, robot:Robot,
       ?recording:RobotRecording) {
     this.machine = machine;
-    this.simulation = simulation;
+    this.harness = harness;
     this.robot = robot;
     this.recording = recording;
   }

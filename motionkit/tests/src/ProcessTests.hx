@@ -86,6 +86,7 @@ import robotkit.model.JointCoupling;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
@@ -225,7 +226,8 @@ class ProcessTests extends MotionKitTestSupport {
     var limited = RobotRuntimeCompiler.compile(blueprint.model);
     near(limited.joints[0].maxRate, 0.02,
       "lead-screw motor rate converts to the tighter joint-space limit");
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(limited);
     var plan = new ExecutionPlanSubmission(Int64.ofInt(1), Int64.ofInt(limited.revision),
       Int64.ofInt(limited.calibrationRevision),
@@ -241,13 +243,14 @@ class ProcessTests extends MotionKitTestSupport {
     }
     check(rejectedForLimit,
       "runtime rejects a plan faster than the converted motor rate limit");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testCompiledAxisRunsThroughSimulation():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("single-axis", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -257,26 +260,27 @@ class ProcessTests extends MotionKitTestSupport {
     machine.home();
     check(machine.isMoving(), "home creates a motion command");
     machine.update();
-    simulation.step(Int64.ofInt(0));
+    simulationHarness.step(Int64.ofInt(0));
     check(!machine.isMoving(), "zero-distance home completes deterministically");
 
     machine.moveAxes([new AxisTarget("x", 0.04)], new MotionOptions(0.08, 0.4));
     var tick = 1;
     while (machine.isMoving()) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (tick > 1000) throw "single-axis trajectory did not complete";
     }
-    for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
+    for (_ in 0...4) simulationHarness.step(Int64.ofInt(tick++));
     var snapshot = robot.snapshot();
     near(snapshot.positions.get(0), 0.04, "simulated robot reaches the MotionKit axis target", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testHomingAndJogging():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.1, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("jog-axis", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -284,7 +288,7 @@ class ProcessTests extends MotionKitTestSupport {
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
 
     machine.home();
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.0, "homing returns the axis to its authored home", 1e-5);
 
     var forward = planned(machine.jog("x", 0.02, 1.0));
@@ -297,26 +301,26 @@ class ProcessTests extends MotionKitTestSupport {
         "jog respects its acceleration limit");
     near(forward.evaluate(forward.durationSeconds()).positions[0], 0.02,
       "jog plans the requested logical displacement");
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.02,
       "positive jog reaches its target", 1e-5);
 
     machine.jog("x", -0.01, 0.5);
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.015,
       "negative jog follows the same logical axis API", 1e-5);
 
     var clamped = planned(machine.jog("x", 0.1, 2.0));
     near(clamped.evaluate(clamped.durationSeconds()).positions[0], 0.08,
       "jog clamps its endpoint to the authored upper limit");
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.08,
       "clamped jog stops at the axis limit", 1e-5);
     throws(function() machine.jog("x", 0.1001, 1.0),
       "jog rejects a velocity above the axis rate limit");
     throws(function() machine.jog("x", 0.0, 1.0),
       "jog rejects a zero velocity");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testCompiledXYZGantryRunsThroughSimulation():Void {
@@ -361,7 +365,8 @@ class ProcessTests extends MotionKitTestSupport {
     near(jacobian[0][2], 0.0, "XYZ gantry Z joint has no world X component");
     near(jacobian[1][2], 0.0, "XYZ gantry Z joint has no world Y component");
 
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("xyz-gantry", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -371,7 +376,7 @@ class ProcessTests extends MotionKitTestSupport {
       "XYZ gantry exposes all logical axes");
 
     machine.home();
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     var home = robot.snapshot();
     near(home.positions.get(0), 0.0, "XYZ gantry homes X");
     near(home.positions.get(1), 0.0, "XYZ gantry homes Y");
@@ -382,7 +387,7 @@ class ProcessTests extends MotionKitTestSupport {
     machine.moveAxes([
       new AxisTarget("x", 0.02), new AxisTarget("y", 0.01), new AxisTarget("z", 0.015)
     ], new MotionOptions(0.08, 0.4));
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     var firstMove = robot.snapshot();
     near(firstMove.positions.get(0), 0.02, "XYZ gantry reaches X axis target", 1e-5);
     near(firstMove.positions.get(1), 0.01, "XYZ gantry reaches Y axis target", 1e-5);
@@ -395,7 +400,7 @@ class ProcessTests extends MotionKitTestSupport {
     var zAlpha = (midpoint.positions[2] - 0.015) / 0.01;
     near(xAlpha, yAlpha, "Cartesian move preserves the X/Y line", 1e-5);
     near(xAlpha, zAlpha, "Cartesian move preserves the X/Z line", 1e-5);
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     var linearMove = robot.snapshot();
     near(linearMove.positions.get(0), 0.03, "Cartesian move reaches X target", 1e-5);
     near(linearMove.positions.get(1), 0.02, "Cartesian move reaches Y target", 1e-5);
@@ -435,11 +440,11 @@ class ProcessTests extends MotionKitTestSupport {
       near(programEnd[joint], movePathEnd[joint],
         'gantry ProgramCompiler matches movePath joint $joint', 1e-5);
     compiled.dispose();
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     var cornerEnd = robot.snapshot();
     near(cornerEnd.positions.get(0), 0.04, "line path reaches its X endpoint", 1e-5);
     near(cornerEnd.positions.get(1), 0.03, "line path reaches its Y endpoint", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testPhysicalAssemblyCncBinding():Void {
@@ -568,7 +573,8 @@ class ProcessTests extends MotionKitTestSupport {
     for (channel in ["spindle.speed", "spindle.direction"])
       blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
         ProcessEventValue.Analog(0.0)));
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobotAtPose(blueprint.runtime,
       [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], null, null,
       physical.linkCollisionHulls);
@@ -584,14 +590,14 @@ class ProcessTests extends MotionKitTestSupport {
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n"));
     for (tick in 0...3000) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       if (!motion.running) break;
     }
     check(motion.completed, 'physical assembly CNC completes: ${motion.failure}');
     var finalPose = kinematics.forward(robot.snapshot().positions.toArray());
     near(finalPose.x, 0.01, "physical assembly CNC executes X", 2e-4);
     near(finalPose.y, 0.02, "physical assembly CNC executes Y", 2e-4);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testCncProgramBinding():Void {
@@ -666,24 +672,25 @@ class ProcessTests extends MotionKitTestSupport {
     var options = new VirtualDeviceOptions();
     options.actuators = [new VirtualActuatorOptions(blueprint.model.actuators[0].id, 0, ratio, 0.0,
       3200.0 / (2.0 * Math.PI), 0.01 * Math.abs(ratio), 2)];
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime, null, options);
-    for (tick in 1...21) simulation.step(Int64.ofInt(tick));
+    for (tick in 1...21) simulationHarness.step(Int64.ofInt(tick));
     var robot = new SimulatedRobot("lead-screw-virtual", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
     var before = simulation.linkPose(0, 1);
     machine.moveAxes([new AxisTarget("x", 0.02)], new MotionOptions(0.01, 0.04));
-    runMotion(machine, simulation);
-    for (tick in 0...20) simulation.step(Int64.ofInt(tick));
+    runMotion(machine, simulationHarness);
+    for (tick in 0...20) simulationHarness.step(Int64.ofInt(tick));
     var finalJoint = robot.snapshot().positions.get(0);
     check(Math.abs(finalJoint - 0.02) <= 1.0 / 400000.0 + 1e-6,
       "MachineKit lead screw follows the virtual RKD6 step position");
     var after = simulation.linkPose(0, 1);
     check(Math.abs(after.position[2] - before.position[2] - 0.02) <=
       1.0 / 400000.0 + 1e-6, "lead screw step position moves the SimKit carriage");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
 }

@@ -86,6 +86,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
@@ -155,7 +156,8 @@ class StreamTests extends MotionKitTestSupport {
     var yAxis = new LinearAxis(23, 10, 60);
     var zAxis = new LinearAxis(23, 10, 40);
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(xAxis, yAxis, zAxis, 0.1, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("buffered-gantry", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -190,7 +192,7 @@ class StreamTests extends MotionKitTestSupport {
     var tick = 0;
     for (iteration in 0...5) {
       check(machine.update(), "buffer remains active while its first move is running");
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (iteration == 0) {
         var nativeProgress = runtime.snapshot();
         check(nativeProgress.trajectoryActive && nativeProgress.trajectoryQueueDepth > 0,
@@ -202,14 +204,14 @@ class StreamTests extends MotionKitTestSupport {
     // Let the runtime advance while the host-side clock is stalled. Hold must
     // resume from the runtime's authoritative trajectory time, not replay
     // source samples that are already behind the actual machine pose.
-    for (_ in 0...5) simulation.step(Int64.ofInt(tick++));
+    for (_ in 0...5) simulationHarness.step(Int64.ofInt(tick++));
     var beforeHold = robot.snapshot().positions.get(0);
     machine.hold();
     check(machine.isHolding(), "buffer reports controlled hold");
     check(machine.queueDepth() == 2, "hold preserves active and waiting trajectories");
     for (_ in 0...5) {
       check(!machine.update(), "held buffer does not submit motion commands");
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
     }
     var heldPosition = robot.snapshot().positions.get(0);
     check(heldPosition > beforeHold && heldPosition < 0.02,
@@ -217,7 +219,7 @@ class StreamTests extends MotionKitTestSupport {
     var holdTicks = 0;
     while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       check(!machine.update(), "held buffer remains paused after deceleration");
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       holdTicks += 1;
       if (holdTicks > 200) throw "controlled hold did not settle";
     }
@@ -225,7 +227,7 @@ class StreamTests extends MotionKitTestSupport {
     check(stoppedPosition >= heldPosition,
       "controlled hold follows the path while slowing down");
     for (_ in 0...2) {
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
     }
     near(robot.snapshot().positions.get(0), stoppedPosition,
       "controlled hold remains stopped after deceleration", 1e-5);
@@ -235,14 +237,14 @@ class StreamTests extends MotionKitTestSupport {
     check(!machine.isHolding(), "buffer resumes from controlled hold");
     for (_ in 0...2) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
     }
     var resumedPosition = robot.snapshot().positions.get(0);
     check(resumedPosition >= heldPosition - 1e-6,
       "resume does not replay a stale trajectory sample backwards");
     while (machine.isMoving()) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (tick > 2000) throw "buffered MotionKit trajectory did not complete";
     }
     near(robot.snapshot().positions.get(0), 0.04,
@@ -256,13 +258,14 @@ class StreamTests extends MotionKitTestSupport {
     check(machine.queueDepth() == 0 && !machine.isMoving(),
       "abort clears active and waiting trajectories");
     check(!machine.isHolding(), "abort clears controlled hold state");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testLongBufferedExecution():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("long-buffer", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -282,13 +285,13 @@ class StreamTests extends MotionKitTestSupport {
     machine.update();
     check(recording.commands.length == initialPlanCount,
       "streamer keeps its initial plan window until the owner advances");
-    simulation.step(Int64.ofInt(tick++));
+    simulationHarness.step(Int64.ofInt(tick++));
     while (machine.isMoving()) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (tick > 1200) throw "long buffered trajectory did not complete";
     }
-    for (_ in 0...4) simulation.step(Int64.ofInt(tick++));
+    for (_ in 0...4) simulationHarness.step(Int64.ofInt(tick++));
     check(recording.commands.length >= 3,
       "long trajectory refills native chunks before the queue drains");
     for (command in recording.commands) switch command {
@@ -305,13 +308,14 @@ class StreamTests extends MotionKitTestSupport {
     near(instrumented.snapshot().positions.get(0), 0.05,
       "streamed trajectory reaches its final position", 1e-5);
     near(machine.progress(), 1.0, "streamed trajectory reports completed progress");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testHoldRefillsNearChunkBoundary():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("hold-refill-boundary", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
@@ -327,7 +331,7 @@ class StreamTests extends MotionKitTestSupport {
     for (_ in 0...252) {
       previousPreHoldPosition = preHoldPosition;
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       preHoldPosition = robot.snapshot().positions.get(0);
     }
     var beforeHoldSnapshot = robot.snapshot();
@@ -339,7 +343,7 @@ class StreamTests extends MotionKitTestSupport {
     var stopTicks = 0;
     while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       var position = robot.snapshot().positions.get(0);
       var velocity = (position - previousPosition) / 0.01;
       peakAcceleration = Math.max(peakAcceleration,
@@ -353,7 +357,7 @@ class StreamTests extends MotionKitTestSupport {
       "hold near a streamed refill boundary keeps deceleration bounded");
     check(previousPosition > beforeHold,
       "hold near a streamed refill boundary continues along the path to rest");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
 }
