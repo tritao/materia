@@ -5,7 +5,6 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
-import machinekit.robotics.ChangerCoupling;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
 import machinekit.robotics.ParallelGripper;
@@ -26,7 +25,7 @@ private class TestChangerMaster extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
-private class CoupledMaster extends MachineComponent implements ChangerCoupling {
+private class CoupledMaster extends MachineComponent {
 	public function new() {
 		super("COUPLED-MASTER", "Coupled master", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());
@@ -39,7 +38,7 @@ private class CoupledMaster extends MachineComponent implements ChangerCoupling 
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
-private class CoupledPlate extends MachineComponent implements ChangerCoupling {
+private class CoupledPlate extends MachineComponent {
 	public function new() {
 		super("COUPLED-PLATE", "Coupled plate", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());

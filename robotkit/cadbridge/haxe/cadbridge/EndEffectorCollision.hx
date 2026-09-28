@@ -16,7 +16,9 @@ typedef EndEffectorCollisionResult = {
   diagnostics:Array<CollisionDiagnostic>, padding:Float
 };
 
-/** Geometry policy, in millimetres except for the piece limit. */
+/** Geometry policy, in millimetres except for the piece limit. Small members
+ * merge only when within minFeature of another piece; maxPieces forces merges.
+ */
 class EndEffectorCollisionOptions {
   public final minFeature:Float;
   public final maxPieces:Int;
@@ -59,7 +61,8 @@ class EndEffectorCollision {
         throw error;
       }
       part.close();
-      var hull = ConvexHullVertices.enclosingFromMesh(mesh.vertices, mesh.vertexCount, 0.1);
+      var hull = ConvexHullVertices.enclosingFromMesh(mesh.vertices, mesh.vertexCount, 0.1,
+        mesh.linearDeflection + 0.05);
       var vertices:Array<Float> = [];
       for (index in 0...Std.int(hull.vertices.length / 3)) {
         var at = index * 3;
@@ -79,18 +82,20 @@ class EndEffectorCollision {
       var smallest = -1, size = Math.POSITIVE_INFINITY;
       for (index in 0...result.length) {
         var diameter = diagonal(result[index].vertices);
-        if ((diameter < settings.minFeature || result.length > settings.maxPieces) && diameter < size) {
+        var shouldMerge = result.length > settings.maxPieces;
+        if (!shouldMerge && diameter < settings.minFeature)
+          for (other in 0...result.length) if (other != index &&
+              boxDistance(result[index].vertices, result[other].vertices) <= settings.minFeature)
+            shouldMerge = true;
+        if (shouldMerge && diameter < size) {
           smallest = index;
           size = diameter;
         }
       }
       if (smallest < 0) break;
       var neighbour = -1, distance = Math.POSITIVE_INFINITY;
-      var centre = centroid(result[smallest].vertices);
       for (index in 0...result.length) if (index != smallest) {
-        var other = centroid(result[index].vertices);
-        var squared = Math.pow(other[0] - centre[0], 2) + Math.pow(other[1] - centre[1], 2) +
-          Math.pow(other[2] - centre[2], 2);
+        var squared = boxDistance(result[smallest].vertices, result[index].vertices);
         if (squared < distance) { distance = squared; neighbour = index; }
       }
       var absorbed = result[smallest], retained = result[neighbour];
@@ -110,14 +115,18 @@ class EndEffectorCollision {
       diagnostics: diagnostics, padding: settings.padding / 1000};
   }
 
-  static function centroid(points:Array<Float>):Array<Float> {
-    var centre = [0.0, 0.0, 0.0];
-    for (index in 0...points.length) centre[index % 3] += points[index];
-    for (axis in 0...3) centre[axis] /= points.length / 3;
-    return centre;
+  static function boxDistance(a:Array<Float>, b:Array<Float>):Float {
+    var alo = bounds(a), blo = bounds(b);
+    var squared = 0.0;
+    for (axis in 0...3) {
+      var separation = Math.max(0, Math.max(alo.lo[axis] - blo.hi[axis],
+        blo.lo[axis] - alo.hi[axis]));
+      squared += separation * separation;
+    }
+    return Math.sqrt(squared);
   }
 
-  static function diagonal(points:Array<Float>):Float {
+  static function bounds(points:Array<Float>):{lo:Array<Float>, hi:Array<Float>} {
     var lo = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
     var hi = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
     for (index in 0...points.length) {
@@ -125,7 +134,12 @@ class EndEffectorCollision {
       lo[axis] = Math.min(lo[axis], points[index]);
       hi[axis] = Math.max(hi[axis], points[index]);
     }
-    return Math.sqrt(Math.pow(hi[0] - lo[0], 2) + Math.pow(hi[1] - lo[1], 2) +
-      Math.pow(hi[2] - lo[2], 2));
+    return {lo: lo, hi: hi};
+  }
+
+  static function diagonal(points:Array<Float>):Float {
+    var box = bounds(points);
+    return Math.sqrt(Math.pow(box.hi[0] - box.lo[0], 2) +
+      Math.pow(box.hi[1] - box.lo[1], 2) + Math.pow(box.hi[2] - box.lo[2], 2));
   }
 }

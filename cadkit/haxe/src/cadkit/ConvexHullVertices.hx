@@ -10,9 +10,10 @@ class ConvexHullVertices {
 
   /** An enclosing 26-DOP built from exact mesh support in fixed directions. */
   public static function enclosingFromMesh(vertices:Bytes, count:Int,
-      minimumThickness:Float):CollisionHullResult {
+      minimumThickness:Float, ?offset:Float):CollisionHullResult {
     if (vertices == null || count < 1 || vertices.length < count * 24 ||
-        !Math.isFinite(minimumThickness) || minimumThickness <= 0)
+        !Math.isFinite(minimumThickness) || minimumThickness <= 0 ||
+        (offset != null && (!Math.isFinite(offset) || offset < 0)))
       throw "Collision mesh data or minimum thickness is invalid";
     var directions:Array<Array<Float>> = [];
     var supports:Array<Float> = [];
@@ -41,7 +42,7 @@ class ConvexHullVertices {
       }
       directions.push(direction);
       // A small outward offset also gives oblique planar meshes full volume.
-      supports.push(support + minimumThickness * 0.5);
+      supports.push(support + (offset == null ? minimumThickness * 0.5 : offset));
     }
     var result:Array<Float> = [];
     var scale = Math.max(1.0, Math.max(diagonal, minimumThickness));

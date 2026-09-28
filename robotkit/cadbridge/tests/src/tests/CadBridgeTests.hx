@@ -117,6 +117,10 @@ class CadBridgeTests {
     var merged = EndEffectorCollision.pieces(effector);
     check(merged.pieces.length == 2 && merged.merged.indexOf("screw") >= 0,
       "small member merges into a neighbouring piece");
+    var twoPieceBudget = EndEffectorCollision.pieces(effector, null,
+      new EndEffectorCollisionOptions(0, 2));
+    check(twoPieceBudget.pieces.length == 2 && twoPieceBudget.merged.indexOf("screw") >= 0,
+      "two-piece budget merges the smallest member");
     var limited = EndEffectorCollision.pieces(effector, null,
       new EndEffectorCollisionOptions(0, 1));
     check(limited.pieces.length == 1 && limited.merged.length == 2,
@@ -125,6 +129,28 @@ class CadBridgeTests {
     var excluded = EndEffectorCollision.pieces(effector);
     check(excluded.excluded.indexOf("screw") >= 0 && excluded.pieces.length == 2,
       "only explicit exclusion drops a member");
+
+    var remote = new EndEffector();
+    remote.addComponent("bar", new BridgeCollisionBlock(100, 10, 10, 90));
+    remote.addComponent("sensor", new BridgeCollisionBlock(2, 2, 2, 0));
+    remote.mount("bar", "mount");
+    remote.addMate("sensor-mount", "fixed", "bar", "sensor", "sensor", "mount");
+    var separate = EndEffectorCollision.pieces(remote);
+    check(separate.pieces.length == 2 && separate.merged.length == 0,
+      "distant small sensor remains a separate collision piece");
+    var gapPoint = new Vec3(0.2, 0, 0);
+    var gapCovered = false;
+    for (piece in separate.pieces) {
+      var box = ToolCollisionShapes.bounds(ToolCollisionShape.Hulls([piece.vertices], 0));
+      if (Math.abs(gapPoint.x - box.centre.x) <= box.halfExtents.x &&
+          Math.abs(gapPoint.y - box.centre.y) <= box.halfExtents.y &&
+          Math.abs(gapPoint.z - box.centre.z) <= box.halfExtents.z) gapCovered = true;
+    }
+    check(!gapCovered, "gap between bar and sensor remains free");
+    var budgeted = EndEffectorCollision.pieces(remote, null,
+      new EndEffectorCollisionOptions(10, 1));
+    check(budgeted.pieces.length == 1 && budgeted.merged.length == 1,
+      "piece budget still forces a distant merge");
   }
 
   static function testEnclosingHull():Void {
@@ -155,6 +181,36 @@ class CadBridgeTests {
       }
       check(hullSupport + 1e-6 >= meshSupport, "k-DOP encloses every sampled mesh support");
     }
+    var cylinder = Shape.cylinder(30, 60);
+    var cylinderMesh = cylinder.tessellateRelative(0.1);
+    var cylinderHull = ConvexHullVertices.enclosingFromMesh(cylinderMesh.vertices,
+      cylinderMesh.vertexCount, 0.1, cylinderMesh.linearDeflection + 0.05);
+    var cylinderBounds = cylinder.bounds();
+    var minZ = cylinderBounds.get_min().get_z();
+    var maxZ = cylinderBounds.get_max().get_z();
+    var centerX = (cylinderBounds.get_min().get_x() + cylinderBounds.get_max().get_x()) * 0.5;
+    var centerY = (cylinderBounds.get_min().get_y() + cylinderBounds.get_max().get_y()) * 0.5;
+    var rimEnclosed = true;
+    for (sample in 0...128) {
+      var angle = sample * Math.PI * 2 / 128;
+      var point = [centerX + 30 * Math.cos(angle), centerY + 30 * Math.sin(angle),
+        sample % 2 == 0 ? minZ : maxZ];
+      for (xi in 0...3) for (yi in 0...3) for (zi in 0...3) {
+        var x = xi - 1, y = yi - 1, z = zi - 1;
+        if (x == 0 && y == 0 && z == 0) continue;
+        var length = Math.sqrt(x * x + y * y + z * z);
+        var support = Math.NEGATIVE_INFINITY;
+        for (vertex in 0...Std.int(cylinderHull.vertices.length / 3)) {
+          var at = vertex * 3;
+          support = Math.max(support, (x * cylinderHull.vertices[at] +
+            y * cylinderHull.vertices[at + 1] + z * cylinderHull.vertices[at + 2]) / length);
+        }
+        if ((x * point[0] + y * point[1] + z * point[2]) / length > support + 1e-6)
+          rimEnclosed = false;
+      }
+    }
+    cylinder.close();
+    check(rimEnclosed, "coarse cylinder exact rim is enclosed");
   }
 
   static function testMachineAssemblyMassBridge():Void {
@@ -239,10 +295,10 @@ class CadBridgeTests {
     check(shortTool.id == "short/contact" && longTool.id == "long/contact" &&
       shortTool.id != longTool.id, "configuration-qualified RobotKit tool IDs are distinct");
     var hullBounds = ToolCollisionShapes.bounds(shortTool.collision);
-    check(hullBounds.centre.z - hullBounds.halfExtents.z >= -0.0001 &&
+    check(hullBounds.centre.z - hullBounds.halfExtents.z >= -0.001 &&
       hullBounds.centre.z + hullBounds.halfExtents.z <=
-        shortTool.flangeTTcp.translation.z + 0.0001,
-      "tool pieces stay in the forward flange frame");
+        shortTool.flangeTTcp.translation.z + 0.001,
+      "tool pieces stay forward within tessellation clearance");
     var tcpX = shortTool.flangeTTcp.transformVector(new Vec3(1, 0, 0));
     check(approx(tcpX.x, 1, 1e-9) && approx(tcpX.y, 0, 1e-9) &&
       approx(tcpX.z, 0, 1e-9), "cup TCP X retains the flange locating-pin direction");
@@ -613,6 +669,7 @@ private class BridgeCollisionBlock extends MachineComponent {
     this.height = height;
     addConnector("mount", Mount, AssemblyFrames.identity());
     addConnector("end", Mount, AssemblyFrames.translation(endX, 0, 0));
+    addConnector("sensor", Mount, AssemblyFrames.translation(300, 0, 0));
     declareMass(1, new Vector(), InertiaTensor.zero());
   }
 

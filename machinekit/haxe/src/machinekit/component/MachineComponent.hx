@@ -12,7 +12,9 @@ import materia.project.MaterialLibrary;
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
-	/** Null unless this component provides a changer coupling contract. */
+	/** Return a non-null key to declare this component a changer half.
+	 * EndEffectorSet compares both halves' keys and their couplingConnector()
+	 * values when a tool is added. */
 	public function couplingKey():Null<String> return null;
 	public function couplingConnector():Null<String> return null;
 	public final designation:String;

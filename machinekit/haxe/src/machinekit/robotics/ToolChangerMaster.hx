@@ -10,7 +10,7 @@ import machinekit.component.PortRole;
 import machinekit.component.Solids;
 
 /** Generic robot-side changer half with bridged air and signal channels. */
-class ToolChangerMaster extends MachineComponent implements ChangerCoupling {
+class ToolChangerMaster extends MachineComponent {
 	public final airChannels:Int;
 	public final diameter:Float;
 	public final thickness:Float;
