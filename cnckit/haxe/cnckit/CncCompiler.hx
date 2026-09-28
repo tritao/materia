@@ -27,8 +27,12 @@ class CncCompiler {
     }
     var parsed = CncLexer.parse(source);
     var interpreter = new CncInterpreter(machine);
-    var ops = interpreter.interpret(parsed.blocks);
+    var interpreted = interpreter.interpret(parsed.blocks);
+    var compensated = CncCompensator.resolve(interpreted);
+    var ops = compensated.ops;
     var diagnostics = parsed.diagnostics.concat(interpreter.diagnostics);
+    diagnostics = diagnostics.concat(compensated.diagnostics);
+    diagnostics = diagnostics.concat(CncTravelChecks.check(machine, ops));
     var program:Null<MotionProgram> = null;
     var sourceMap = new CncSourceMap();
     try {

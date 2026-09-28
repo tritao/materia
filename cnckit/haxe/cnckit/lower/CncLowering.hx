@@ -59,6 +59,8 @@ class CncLowering {
       case ToolChange(number, span):
         flush(); add(MotionOp.WaitInput(CncChannels.toolChange(number),
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
+      case CutterCompStart(_, _, _, _), CutterCompEnd(_):
+        throw "Cutter compensation must be resolved before MotionKit lowering";
       case OptionalStop(span), ProgramStop(span):
         flush(); add(MotionOp.WaitInput(CncChannels.OperatorResume,
           InputPredicate.Equals(EventValue.Digital(true)), null), span);

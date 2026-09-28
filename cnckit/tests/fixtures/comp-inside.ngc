@@ -1,0 +1,7 @@
+(2 mm cutter, left offset, inside corner)
+G21 G90 G17 F600
+G41 D2 G1 X10 Y0
+G1 X20 Y0
+G1 X20 Y10
+G40 G1 X20 Y20
+M2

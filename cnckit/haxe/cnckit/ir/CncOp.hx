@@ -10,6 +10,8 @@ enum CncOp {
   Spindle(channel:String, value:Float, span:CncSpan);
   Coolant(channel:String, enabled:Bool, span:CncSpan);
   ToolChange(number:Int, span:CncSpan);
+  CutterCompStart(side:Int, radius:Float, plane:CncPlane, span:CncSpan);
+  CutterCompEnd(span:CncSpan);
   OptionalStop(span:CncSpan);
   ProgramStop(span:CncSpan);
   End(span:CncSpan);

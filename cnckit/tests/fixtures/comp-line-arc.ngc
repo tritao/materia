@@ -1,0 +1,7 @@
+(2 mm cutter, inside line-to-arc corner)
+G21 G90 G17 F600
+G41 D2 G1 X10 Y0
+G1 X20 Y0
+G3 X15 Y5 I-5 J0
+G40 G1 X15 Y20
+M2

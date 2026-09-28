@@ -13,7 +13,9 @@ class CncMachine {
   public final orientationTolerance:Float;
   public final initialPosition:Array<Float>;
   final offsets:Map<Int, Array<Float>> = new Map();
-  final lengths:Map<Int, Float> = new Map();
+  final tools:Map<Int, CncTool> = new Map();
+  public var travelLower(default, null):Null<Array<Float>> = null;
+  public var travelUpper(default, null):Null<Array<Float>> = null;
   final homes:Map<Int, Array<Float>> = new Map();
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
@@ -65,15 +67,34 @@ class CncMachine {
   }
 
   public function setToolLength(h:Int, length:Float):Void {
-    if (h < 0 || !Math.isFinite(length))
-      throw "CNC tool length needs a non-negative H and finite metres";
-    lengths.set(h, length);
+    var old = tools.get(h);
+    setTool(new CncTool(h, length, old == null ? 0.0 : old.diameter));
   }
 
   public function toolLength(h:Int):Float {
-    var result = lengths.get(h);
-    if (result == null) throw 'Unknown CNC tool length H$h';
+    return tool(h).length;
+  }
+
+  public function setTool(tool:CncTool):Void {
+    if (tool == null) throw "CNC tool must not be null";
+    tools.set(tool.number, tool);
+  }
+
+  public function tool(number:Int):CncTool {
+    var result = tools.get(number);
+    if (result == null) throw 'Unknown CNC tool $number';
     return result;
+  }
+
+  public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void {
+    if (lower == null || upper == null || lower.length != 3 || upper.length != 3)
+      throw "CNC travel envelope needs three lower and upper coordinates";
+    for (axis in 0...3)
+      if (!Math.isFinite(lower[axis]) || !Math.isFinite(upper[axis]) ||
+          lower[axis] >= upper[axis])
+        throw "CNC travel envelope needs finite ordered bounds";
+    travelLower = lower.copy();
+    travelUpper = upper.copy();
   }
 
   /** Stored G28/G30 positions are absolute machine coordinates in metres. */

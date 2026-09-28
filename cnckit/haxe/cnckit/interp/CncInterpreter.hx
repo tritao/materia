@@ -4,6 +4,7 @@ import cnckit.CncChannels;
 import cnckit.CncDiagnostic;
 import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.CncMachine;
+import cnckit.CncTool;
 import cnckit.ir.CncGeometry;
 import cnckit.ir.CncOp;
 import cnckit.ir.CncPlane;
@@ -52,7 +53,7 @@ class CncInterpreter {
         case "G": gWords.push(word);
         case "M": mWords.push(word);
         case "N", "O": integer(word, line);
-        case "X", "Y", "Z", "I", "J", "K", "R", "F", "S", "P", "H", "T", "Q", "L":
+        case "X", "Y", "Z", "I", "J", "K", "R", "F", "S", "P", "H", "T", "Q", "L", "D":
           if (values.exists(word.letter)) fail(line, word.column,
             'duplicate ${word.letter} word');
           values.set(word.letter, word);
@@ -65,7 +66,7 @@ class CncInterpreter {
     var retractChange = -1;
     var lineBlend = state.blendTolerance;
     var unitChange = -1, distanceChange = -1, nextWcs = -1;
-    var planeChange = -1;
+    var planeChange = -1, cutterChange = -1;
     for (word in gWords) {
       var code = gCode(word, line);
       switch code {
@@ -81,7 +82,10 @@ class CncInterpreter {
         case 28, 30:
           if (homeCode != 0) fail(line, word.column, "multiple home G codes");
           homeCode = code;
-        case 40: // Cutter compensation is currently always off.
+        case 40, 41, 42:
+          if (cutterChange >= 0) fail(line, word.column,
+            "multiple cutter compensation codes");
+          cutterChange = code;
         case 53: machineCoordinates = true;
         case 73, 81, 82, 83:
           if (cycleChange >= 0) fail(line, word.column, "multiple drilling cycles");
@@ -135,6 +139,9 @@ class CncInterpreter {
     if (setToolOffset && clearToolOffset) fail(line, gWords[0].column,
       "G43 and G49 conflict");
     var h = values.get("H");
+    var d = values.get("D");
+    if (d != null && cutterChange != 41 && cutterChange != 42)
+      fail(line, d.column, "D requires G41 or G42");
     if (setToolOffset && h == null) fail(line, gWords[0].column,
       "G43 requires H tool length");
     if (!setToolOffset && h != null) fail(line, h.column,
@@ -186,6 +193,9 @@ class CncInterpreter {
       spindle(CncChannels.SpindleSpeed, state.spindleSpeed, block.span);
     for (word in mWords) if (integer(word, line) == 6) {
       if (state.selectedTool < 0) fail(line, word.column, "M6 requires selected T tool");
+      if (state.cutterSide != 0) fail(line, word.column,
+        "M6 requires G40 before tool change");
+      state.activeTool = state.selectedTool;
       ops.push(CncOp.ToolChange(state.selectedTool, block.span));
     }
     if (spindleCode == 3 || spindleCode == 4) {
@@ -215,7 +225,33 @@ class CncInterpreter {
     if (unitChange >= 0) state.metric = unitChange == 21;
     if (distanceChange >= 0) state.absolute = distanceChange == 90;
     if (nextWcs >= 0) state.wcs = nextWcs;
+    if (state.cutterSide != 0 && cutterChange != 40 && planeChange >= 0 &&
+        planeChange != state.plane) fail(line, gWords[0].column,
+          "cutter compensation plane cannot change before G40");
     if (planeChange >= 0) state.plane = planeChange;
+    if (cutterChange == 40 && state.cutterSide != 0) {
+      ops.push(CncOp.CutterCompEnd(block.span));
+      state.cutterSide = 0;
+    }
+    if (cutterChange == 41 || cutterChange == 42) {
+      if (state.cutterSide != 0) fail(line, gWords[0].column,
+        "cutter compensation is already active");
+      if (state.plane == 19) fail(line, gWords[0].column,
+        "G41/G42 cutter compensation is unsupported in G19 YZ plane");
+      var number = d == null ? state.activeTool : integer(d, line);
+      if (number < 0) fail(line, gWords[0].column,
+        "G41/G42 requires a loaded tool or D number");
+      var tool:CncTool = null;
+      try tool = machine.tool(number)
+      catch (error:Dynamic) fail(line, d == null ? gWords[0].column : d.column,
+        Std.string(error));
+      if (tool.diameter <= 0.0) fail(line, d == null ? gWords[0].column : d.column,
+        "G41/G42 requires a positive tool diameter");
+      state.cutterSide = cutterChange == 41 ? 1 : -1;
+      ops.push(CncOp.CutterCompStart(state.cutterSide, tool.diameter * 0.5,
+        state.plane == 17 ? CncPlane.XY :
+          state.plane == 18 ? CncPlane.XZ : CncPlane.YZ, block.span));
+    }
     if (retractChange >= 0) state.retractToInitial = retractChange == 98;
     if (setToolOffset) {
       var hWord:CncWord = cast h;

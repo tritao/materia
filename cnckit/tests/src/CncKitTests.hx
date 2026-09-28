@@ -1,5 +1,6 @@
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
+import cnckit.CncTool;
 import cnckit.CncDialect;
 import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.ir.CncGeometryTools;
@@ -384,6 +385,112 @@ class CncKitTests {
     rejects(fixtureMachine, "G21 F600 G83 X0 Z-5 R2 M2", "requires positive Q");
     rejects(fixtureMachine, "G21 F600 G82 X0 Z-5 R2 M2", "requires positive P");
     rejects(fixtureMachine, "G21 G91 G53 G0 X1 M2", "G53 requires G90");
+    var compensatedMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    compensatedMachine.setTool(new CncTool(2, 0.012, 0.002));
+    near(compensatedMachine.toolLength(2), 0.012,
+      "tool table supplies G43 length");
+    near(compensatedMachine.tool(2).diameter, 0.002,
+      "tool table stores cutter diameter");
+    compensatedMachine.setToolLength(2, 0.013);
+    near(compensatedMachine.tool(2).diameter, 0.002,
+      "legacy tool-length setter preserves cutter diameter");
+    var inside = new CncCompiler(compensatedMachine).compileDetailed(
+      File.getContent("fixtures/comp-inside.ngc"));
+    check(inside.diagnostics.length == 0, "inside cutter fixture compiles");
+    var insideFirst = switch inside.ops[1] {
+      case CncOp.Feed(g, _, _, _): CncGeometryTools.pointAt(g,
+        CncGeometryTools.length(g));
+      case _: throw "inside first contour missing";
+    };
+    near(insideFirst.x, 0.019, "inside corner trims first line X");
+    near(insideFirst.y, 0.001, "inside corner trims first line Y");
+    var insideSecond = switch inside.ops[2] {
+      case CncOp.Feed(g, _, _, _): CncGeometryTools.pointAt(g, 0.0);
+      case _: throw "inside second contour missing";
+    };
+    near(insideSecond.x, insideFirst.x, "inside corner remains connected X");
+    near(insideSecond.y, insideFirst.y, "inside corner remains connected Y");
+    var outside = new CncCompiler(compensatedMachine).compileDetailed(
+      File.getContent("fixtures/comp-outside.ngc"));
+    check(outside.diagnostics.length == 0 && outside.ops.length == 6,
+      "outside corner adds a round cutter-radius join");
+    var outsideJoin = switch outside.ops[2] {
+      case CncOp.Feed(CncGeometry.Arc(_, radius, _, sweep), _, _, _):
+        near(sweep, -Math.PI * 0.5, "outside join follows corner turn");
+        radius;
+      case _: throw "outside corner join missing";
+    };
+    near(outsideJoin, 0.001, "outside join uses cutter radius");
+    var rightComp = new CncCompiler(compensatedMachine).compileDetailed(
+      "G21 F600 G42 D2 G1 X10\nG1 X20\nG40 G1 X30\nM2");
+    var rightStart = switch rightComp.ops[1] {
+      case CncOp.Feed(g, _, _, _): CncGeometryTools.pointAt(g, 0.0);
+      case _: throw "G42 contour missing";
+    };
+    near(rightStart.y, -0.001, "G42 offsets to the right");
+    var loadedComp = new CncCompiler(compensatedMachine).compileDetailed(
+      "G21 F600 T2 M6\nG41 G1 X10\nG1 X20\nG40 G1 X30\nM2");
+    check(loadedComp.diagnostics.length == 0,
+      "G41 uses the declared loaded tool without D");
+    var withControls = new CncCompiler(compensatedMachine).compileDetailed(
+      "G21 F600 G41 D2 G1 X10\nM8\nG1 X20\nG40\nM9\nG1 X30\nM2");
+    check(withControls.diagnostics.length == 0 &&
+      withControls.ops.length == 7,
+      "coolant operations remain ordered around compensated motion");
+    var arcComp = new CncCompiler(compensatedMachine).compileDetailed(
+      File.getContent("fixtures/comp-arc.ngc"));
+    check(arcComp.diagnostics.length == 0, "arc compensation fixture compiles");
+    var arcRadius = switch arcComp.ops[1] {
+      case CncOp.Feed(CncGeometry.Arc(_, radius, _, _), _, _, _): radius;
+      case _: throw "compensated arc missing";
+    };
+    near(arcRadius, 0.009, "G41 offsets CCW arc inward");
+    var mixedComp = new CncCompiler(compensatedMachine).compileDetailed(
+      File.getContent("fixtures/comp-line-arc.ngc"));
+    check(mixedComp.diagnostics.length == 0,
+      "inside line-to-arc corner offsets without gouging");
+    var mixedLineEnd = switch mixedComp.ops[1] {
+      case CncOp.Feed(g, _, _, _): CncGeometryTools.pointAt(g,
+        CncGeometryTools.length(g));
+      case _: throw "mixed compensated line missing";
+    };
+    var mixedArcStart = switch mixedComp.ops[2] {
+      case CncOp.Feed(g, _, _, _): CncGeometryTools.pointAt(g, 0.0);
+      case _: throw "mixed compensated arc missing";
+    };
+    near(mixedLineEnd.distanceTo(mixedArcStart), 0.0,
+      "inside line and arc meet after trimming", 1e-8);
+    rejects(compensatedMachine,
+      "G21 F600 G41 D2 G1 X10\nG1 X10.5\nG1 Y10\nG40 G1 Y20\nM2",
+      "gouge at inside corner");
+    var xzComp = new CncCompiler(compensatedMachine).compileDetailed(
+      "G21 G18 F600 G41 D2 G1 X10 Z0\nG3 X15 Z5 I5 K0\n" +
+      "G40 G1 X15 Z20\nM2");
+    var xzCompRadius = switch xzComp.ops[1] {
+      case CncOp.Feed(CncGeometry.Circular(_, radius, _, _, CncPlane.XZ, _), _, _, _): radius;
+      case _: throw "G18 compensated arc missing";
+    };
+    near(xzCompRadius, 0.004, "G18 G41 follows positive-Y side convention");
+    rejects(compensatedMachine, "G19 G41 D2", "unsupported in G19 YZ plane");
+    rejects(compensatedMachine,
+      "G21 F600 G41 D2 G1 X0.5\nG1 X10\nG40 G1 X20\nM2",
+      "lead-in is shorter than tool radius");
+    rejects(compensatedMachine,
+      "G21 F600 G41 D2 G1 X10\nG3 X20 Y10 I0 J10\nG40 G1 X21 Y10\nM2",
+      "lead-out is shorter than tool diameter");
+    compensatedMachine.setTool(new CncTool(3, 0.0, 0.022));
+    rejects(compensatedMachine,
+      "G21 F600 G41 D3 G1 X30\nG3 X40 Y10 I0 J10\nG40 G1 X40 Y40\nM2",
+      "gouges arc radius");
+    var travelMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    travelMachine.setTravelEnvelope([0.0, 0.0, 0.0], [0.02, 0.02, 0.02]);
+    var travelResult = new CncCompiler(travelMachine).compileDetailed(
+      "G21 G0 X25\nG0 X10\nM2");
+    check(travelResult.diagnostics.length >= 1 &&
+      travelResult.diagnostics[0].code == "CNC_TRAVEL" &&
+      travelResult.diagnostics[0].span.line == 1,
+      "travel error identifies the G-code line");
+    rejects(travelMachine, "G21 F600 G3 X10 Y0 I5 J0", "Y travel");
     Sys.println('CncKit tests passed ($assertions assertions)');
   }
 
