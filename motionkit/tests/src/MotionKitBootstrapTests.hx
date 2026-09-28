@@ -12,6 +12,11 @@ class MotionKitBootstrapTests {
       Sys.println('Arm session tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_PROCESS_RECOVERY_ONLY") == "1") {
+      programTests.testProcessRunVirtualArmRecovery();
+      Sys.println('Process recovery tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
 
     if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
       plannerTests.testCircularSegments();
@@ -51,6 +56,7 @@ class MotionKitBootstrapTests {
     processTests.testVirtualCncProgram();
     programTests.testManipulatorMotion();
     programTests.testManipulatorSessionTransitions();
+    programTests.testProcessRunVirtualArmRecovery();
     plannerTests.testSimplePathTimingContract();
     plannerTests.testNativePathLowering();
     plannerTests.testToppraPathTiming();
