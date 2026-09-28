@@ -491,6 +491,16 @@ private:
         return nullptr;
     }
 
+    nksim_result joint_set_state(std::uint64_t id, double position, double velocity) override {
+        auto *joint = find_joint(id);
+        if (!joint) return NKSIM_ERROR_INVALID_HANDLE;
+        joint->state.position = position;
+        joint->state.velocity = velocity;
+        clamp_joint_position(*joint);
+        enforce_couplings();
+        return recompute_articulated_poses(0.0);
+    }
+
     TestJoint *find_joint(std::uint64_t id) noexcept {
         for (auto &joint : joints) {
             if (joint.id == id)

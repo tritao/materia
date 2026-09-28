@@ -307,6 +307,10 @@ public:
             spec->option.cone = mjCONE_PYRAMIDAL;
         else if (desc.friction_cone == NKSIM_FRICTION_CONE_ELLIPTIC)
             spec->option.cone = mjCONE_ELLIPTIC;
+        if (desc.solver_iterations != 0)
+            spec->option.iterations = static_cast<int>(desc.solver_iterations);
+        if (desc.line_search_iterations != 0)
+            spec->option.ls_iterations = static_cast<int>(desc.line_search_iterations);
         return rebuild();
     }
 
@@ -320,6 +324,7 @@ public:
             saved_joint_order = joint_order;
             saved_couplings = couplings;
             saved_closures = closures;
+            saved_contact_pairs = contact_pairs;
             saved_next_body = next_body;
             saved_next_joint = next_joint;
         } catch (const std::bad_alloc &) {
@@ -342,6 +347,7 @@ public:
             joint_order.swap(saved_joint_order);
             couplings.swap(saved_couplings);
             closures.swap(saved_closures);
+            contact_pairs.swap(saved_contact_pairs);
             next_body = saved_next_body;
             next_joint = saved_next_joint;
             (void)rebuild();
@@ -394,6 +400,9 @@ public:
         for (const auto &closure : closures)
             if (closure.body_a == id || closure.body_b == id)
                 return NKSIM_ERROR_INVALID_STATE;
+        contact_pairs.erase(std::remove_if(contact_pairs.begin(), contact_pairs.end(),
+            [id](const nksim::BackendContactPair &pair) { return pair.body_a == id || pair.body_b == id; }),
+            contact_pairs.end());
         bodies.erase(found);
         body_order.erase(std::remove(body_order.begin(), body_order.end(), id), body_order.end());
         return topology_update ? NKSIM_OK : rebuild();
@@ -534,6 +543,16 @@ public:
         return topology_update ? NKSIM_OK : rebuild();
     }
 
+    nksim_result contact_pair_create(const nksim::BackendContactPair &pair) override {
+        const auto a = bodies.find(pair.body_a), b = bodies.find(pair.body_b);
+        if (a == bodies.end() || b == bodies.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (pair.part_a >= a->second.desc.shape_parts.size() ||
+            pair.part_b >= b->second.desc.shape_parts.size())
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        contact_pairs.push_back(pair);
+        return topology_update ? NKSIM_OK : rebuild();
+    }
+
     nksim_result set_joint_targets(const nksim::BackendJointTarget *targets,
                                    std::uint32_t count) override {
         if (count != 0 && !targets)
@@ -605,6 +624,21 @@ public:
             state.sleeping = 0;
             found->second.state = state;
         }
+        return NKSIM_OK;
+    }
+
+    nksim_result joint_set_state(std::uint64_t id, double position, double velocity) override {
+        const auto found = joints.find(id);
+        if (found == joints.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        const auto joint_id = model_joint_id(found->second);
+        if (joint_id < 0) return NKSIM_ERROR_INVALID_STATE;
+        const auto type = model->jnt_type[joint_id];
+        if (type != mjJNT_HINGE && type != mjJNT_SLIDE) return NKSIM_ERROR_UNSUPPORTED;
+        data->qpos[model->jnt_qposadr[joint_id]] = position;
+        data->qvel[model->jnt_dofadr[joint_id]] = velocity;
+        found->second.state.position = position;
+        found->second.state.velocity = velocity;
+        mj_forward(model, data);
         return NKSIM_OK;
     }
 
@@ -719,6 +753,7 @@ private:
         saved_joint_order.clear();
         saved_couplings.clear();
         saved_closures.clear();
+        saved_contact_pairs.clear();
     }
 
     const JointRecord *parent_joint(std::uint64_t body_id) const {
@@ -787,6 +822,8 @@ private:
         std::vector<mjsElement *> exclusions;
         for (auto *element = mjs_firstElement(spec, mjOBJ_EXCLUDE); element;
              element = mjs_nextElement(spec, element)) exclusions.push_back(element);
+        for (auto *element = mjs_firstElement(spec, mjOBJ_PAIR); element;
+             element = mjs_nextElement(spec, element)) exclusions.push_back(element);
         for (auto *element : exclusions)
             if (mjs_delete(spec, element) != 0) return NKSIM_ERROR_BACKEND;
         std::vector<mjsElement *> elements;
@@ -837,6 +874,9 @@ private:
         const auto exclude_result = add_self_collision_excludes();
         if (exclude_result != NKSIM_OK)
             return exclude_result;
+        const auto pair_result = add_contact_pairs();
+        if (pair_result != NKSIM_OK)
+            return pair_result;
         const auto actuator_result = add_joint_actuators();
         if (actuator_result != NKSIM_OK)
             return actuator_result;
@@ -994,6 +1034,60 @@ private:
         return NKSIM_OK;
     }
 
+    // Explicit pairs, and for each part that also meets the environment, one
+    // pair with every part of every environment body (one no joint connects).
+    nksim_result add_contact_pairs() {
+        const auto geom_name = [&](std::uint64_t body, std::size_t part) {
+            return bodies.at(body).name + "_part_" + std::to_string(part);
+        };
+        const auto add_pair = [&](std::uint64_t body_a, std::size_t part_a, std::uint64_t body_b,
+                                  std::size_t part_b, const nksim::BackendShapePart &surface) {
+            auto *pair = mjs_addPair(spec, nullptr);
+            if (!pair) return NKSIM_ERROR_OUT_OF_MEMORY;
+            mjs_setString(pair->geomname1, geom_name(body_a, part_a).c_str());
+            mjs_setString(pair->geomname2, geom_name(body_b, part_b).c_str());
+            // Zero surface fields keep MuJoCo's pair defaults.
+            if (surface.friction_dimensions != 0)
+                pair->condim = static_cast<int>(surface.friction_dimensions);
+            if (surface.friction[0] > 0.0) pair->friction[0] = pair->friction[1] = surface.friction[0];
+            if (surface.friction[1] > 0.0) pair->friction[2] = surface.friction[1];
+            if (surface.friction[2] > 0.0) pair->friction[3] = pair->friction[4] = surface.friction[2];
+            if (surface.contact_time_constant > 0.0) pair->solref[0] = surface.contact_time_constant;
+            if (surface.contact_damping_ratio > 0.0) pair->solref[1] = surface.contact_damping_ratio;
+            const auto &a = bodies.at(body_a).desc.shape_parts[part_a];
+            const auto &b = bodies.at(body_b).desc.shape_parts[part_b];
+            pair->margin = std::max(a.margin, b.margin);
+            pair->gap = std::max(a.gap, b.gap);
+            return NKSIM_OK;
+        };
+        for (const auto &pair : contact_pairs) {
+            const auto result = add_pair(pair.body_a, pair.part_a, pair.body_b, pair.part_b, pair.surface);
+            if (result != NKSIM_OK) return result;
+        }
+        const auto jointed = [&](std::uint64_t body) {
+            for (const auto joint_id : joint_order) {
+                const auto &joint = joints.at(joint_id);
+                if (joint.desc.body_a == body || joint.desc.body_b == body) return true;
+            }
+            return false;
+        };
+        for (const auto body_id : body_order) {
+            const auto &parts = bodies.at(body_id).desc.shape_parts;
+            for (std::size_t part = 0; part < parts.size(); ++part) {
+                if (parts[part].contact_filter != NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT) continue;
+                for (const auto other : body_order) {
+                    if (other == body_id || jointed(other)) continue;
+                    for (std::size_t other_part = 0;
+                         other_part < bodies.at(other).desc.shape_parts.size(); ++other_part) {
+                        const auto result = add_pair(body_id, part, other, other_part, parts[part]);
+                        if (result != NKSIM_OK) return result;
+                    }
+                }
+            }
+        }
+        return NKSIM_OK;
+    }
+
     nksim_result add_joint_actuators() {
         for (const auto joint_id : joint_order) {
             const auto &joint = joints.at(joint_id);
@@ -1010,6 +1104,28 @@ private:
             const char *error = mjs_setToMotor(actuator);
             if (error && error[0] != '\0')
                 return NKSIM_ERROR_BACKEND;
+            // NKSIM_JOINT_TARGET_SERVO runs as MuJoCo's own affine servo, so
+            // integrators that treat velocity-dependent actuator force
+            // implicitly (implicitfast) treat its damping implicitly too, as
+            // for an MJCF position actuator. apply_joint_targets sets its
+            // gains each step; they stay zero, and it exerts nothing, while
+            // the joint is in another mode.
+            auto *servo = mjs_addActuator(spec, nullptr);
+            if (!servo)
+                return NKSIM_ERROR_OUT_OF_MEMORY;
+            const auto servo_name = joint.name + "_servo";
+            if (mjs_setName(servo->element, servo_name.c_str()) != 0)
+                return NKSIM_ERROR_BACKEND;
+            servo->trntype = mjTRN_JOINT;
+            mjs_setString(servo->target, joint.name.c_str());
+            servo->gaintype = mjGAIN_FIXED;
+            servo->biastype = mjBIAS_AFFINE;
+            servo->ctrllimited = mjLIMITED_FALSE;
+            // Its limit is the joint's actuator force range, as for an MJCF
+            // actuatorfrcrange: MuJoCo keeps a joint-clamped actuator in the
+            // implicit velocity derivative, but drops one clamped by its own
+            // forcerange.
+            servo->forcelimited = mjLIMITED_FALSE;
         }
         return NKSIM_OK;
     }
@@ -1138,6 +1254,13 @@ private:
             joint->armature = incoming->desc.armature;
             joint->damping[0] = incoming->desc.damping;
             joint->frictionloss = incoming->desc.friction_loss;
+            if (incoming->desc.limit_time_constant > 0.0)
+                joint->solref_limit[0] = incoming->desc.limit_time_constant;
+            if (incoming->desc.limit_damping_ratio > 0.0)
+                joint->solref_limit[1] = incoming->desc.limit_damping_ratio;
+            const auto &impedance = incoming->desc.limit_impedance;
+            if (std::any_of(impedance.begin(), impedance.end(), [](double v) { return v != 0.0; }))
+                std::copy(impedance.begin(), impedance.end(), joint->solimp_limit);
         }
 
         if (desc.shape_parts.empty())
@@ -1226,8 +1349,10 @@ private:
                 if (part.friction[axis] > 0.0) geom->friction[axis] = part.friction[axis];
             if (part.contact_time_constant > 0.0) geom->solref[0] = part.contact_time_constant;
             if (part.contact_damping_ratio > 0.0) geom->solref[1] = part.contact_damping_ratio;
-            geom->contype = static_cast<int>(desc.collision_layer);
-            geom->conaffinity = static_cast<int>(desc.collision_mask);
+            // A part that collides through pairs stays out of layer collision.
+            const bool layered = part.contact_filter == NKSIM_CONTACT_LAYERS;
+            geom->contype = layered ? static_cast<int>(desc.collision_layer) : 0;
+            geom->conaffinity = layered ? static_cast<int>(desc.collision_mask) : 0;
         }
         return NKSIM_OK;
     }
@@ -1334,6 +1459,32 @@ private:
 
         for (const auto joint_id : joint_order) {
             auto &joint = joints.at(joint_id);
+            // A plain joint-space PD with feedforward, the law a motor driver
+            // runs: force = kp (target - q) + kd (velocity - qdot) + ff, as
+            // gain kp on ctrl = target with an affine bias [kd v + ff, -kp, -kd].
+            // Outside servo mode every term is zero, so it exerts nothing.
+            const auto servo = model_actuator_id(joint, "servo");
+            if (servo >= 0) {
+                const bool servoing = joint.target_mode == NKSIM_JOINT_TARGET_SERVO;
+                auto *servo_gain = model->actuator_gainprm + mjNGAIN * servo;
+                auto *servo_bias = model->actuator_biasprm + mjNBIAS * servo;
+                servo_gain[0] = servoing ? joint.target_stiffness : 0.0;
+                servo_bias[0] = servoing
+                    ? joint.target_damping * joint.target_velocity + joint.target_feedforward : 0.0;
+                servo_bias[1] = servoing ? -joint.target_stiffness : 0.0;
+                servo_bias[2] = servoing ? -joint.target_damping : 0.0;
+                data->ctrl[servo] = servoing ? joint.target : 0.0;
+                // Every mode clamps to this same bound, so a joint-level clamp
+                // changes nothing for the motor's already-clamped torque.
+                const auto joint_model = model_joint_id(joint);
+                const auto limit = joint.target_max_force > 0.0
+                    ? joint.target_max_force : joint.desc.max_force;
+                if (joint_model >= 0) {
+                    model->jnt_actfrclimited[joint_model] = limit > 0.0 ? 1 : 0;
+                    model->jnt_actfrcrange[2 * joint_model] = limit > 0.0 ? -limit : 0.0;
+                    model->jnt_actfrcrange[2 * joint_model + 1] = limit > 0.0 ? limit : 0.0;
+                }
+            }
             if (joint.target_mode == 0)
                 continue;
             const auto model_id = model_joint_id(joint);
@@ -1355,16 +1506,8 @@ private:
             case NKSIM_JOINT_TARGET_VELOCITY:
                 torque = m_qacc[dof] + bias;
                 break;
-            case NKSIM_JOINT_TARGET_SERVO: {
-                // A plain joint-space PD with feedforward, the law a motor
-                // driver runs; unlike the modes above it neither sees the
-                // mass matrix nor cancels gravity.
-                const auto q = data->qpos[model->jnt_qposadr[model_id]];
-                torque = joint.target_stiffness * (joint.target - q) +
-                    joint.target_damping * (joint.target_velocity - data->qvel[dof]) +
-                    joint.target_feedforward;
-                break;
-            }
+            case NKSIM_JOINT_TARGET_SERVO:
+                break; // The servo actuator below applies it.
             case NKSIM_JOINT_TARGET_EFFORT:
             default:
                 torque = joint.target;
@@ -1418,6 +1561,8 @@ private:
     std::vector<std::uint64_t> saved_joint_order;
     std::vector<nksim::BackendJointCoupling> saved_couplings;
     std::vector<nksim::BackendClosure> saved_closures;
+    std::vector<nksim::BackendContactPair> contact_pairs;
+    std::vector<nksim::BackendContactPair> saved_contact_pairs;
     std::uint64_t next_body = 1;
     std::uint64_t next_joint = 1;
     std::uint64_t saved_next_body = 1;

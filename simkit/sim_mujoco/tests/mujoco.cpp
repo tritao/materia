@@ -1685,7 +1685,8 @@ struct ArmRig {
     nksim_joint joint = 0;
 };
 
-ArmRig make_arm_rig(double armature, double damping, double friction_loss) {
+ArmRig make_arm_rig(double armature, double damping, double friction_loss,
+                   double limit_time_constant = 0.0) {
     ArmRig rig;
     assert(nkscene_scene_create(&rig.scene) == NKS_OK);
     const auto base_node = make_node(rig.scene, 0.0);
@@ -1710,6 +1711,12 @@ ArmRig make_arm_rig(double armature, double damping, double friction_loss) {
     joint_desc.armature = armature;
     joint_desc.damping = damping;
     joint_desc.friction_loss = friction_loss;
+    if (limit_time_constant > 0.0) {
+        joint_desc.lower_limit = -1.0;
+        joint_desc.upper_limit = 0.3;
+        joint_desc.limit_time_constant = limit_time_constant;
+        joint_desc.limit_damping_ratio = 1.0;
+    }
     assert(nksim_joint_create(rig.world, &joint_desc, &rig.joint) == NKSIM_OK);
     return rig;
 }
@@ -1860,6 +1867,8 @@ void world_options_are_validated() {
     desc.physics_substeps = 1;
     desc.integrator = NKSIM_INTEGRATOR_IMPLICIT_FAST;
     desc.friction_cone = NKSIM_FRICTION_CONE_ELLIPTIC;
+    desc.solver_iterations = 5;
+    desc.line_search_iterations = 8;
     nksim_world world = 0;
     assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
     nksim_world_destroy(world);
@@ -1872,7 +1881,81 @@ void world_options_are_validated() {
     nkscene_scene_destroy(scene);
 }
 
+// Contact filters: a box that collides only through pairs falls through the
+// floor, one that also meets the environment rests on it, and one with an
+// explicit pair to the floor rests on it too.
+void contact_filters_and_pairs_decide_contacts() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.005;
+    world_desc.physics_substeps = 2;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+    const double normal[] = {0.0, 0.0, 1.0};
+    nksim_shape floor_shape = 0;
+    assert(nksim_shape_create_plane(world, normal, 0.0, &floor_shape) == NKSIM_OK);
+    const auto floor = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0, floor_shape);
+    nksim_body boxes[3]{};
+    nksim_shape shapes[3]{};
+    const uint32_t filters[] = {NKSIM_CONTACT_PAIRS_ONLY, NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT,
+                                NKSIM_CONTACT_PAIRS_ONLY};
+    assert(nksim_world_begin_topology_update(world) == NKSIM_OK);
+    for (int index = 0; index < 3; ++index) {
+        shapes[index] = make_box(world);
+        nksim_surface surface{};
+        surface.struct_size = sizeof(surface);
+        surface.contact_filter = filters[index];
+        assert(nksim_shape_set_surface(world, shapes[index], &surface) == NKSIM_OK);
+        boxes[index] = make_body(world, make_node_xyz(scene, index * 1.0, 0.0, 0.3),
+                                 NKSIM_MOTION_DYNAMIC, 1.0, shapes[index]);
+    }
+    nksim_contact_pair_desc pair{};
+    pair.struct_size = sizeof(pair);
+    pair.body_a = boxes[2];
+    pair.body_b = floor;
+    pair.surface.struct_size = sizeof(pair.surface);
+    assert(nksim_contact_pair_create(world, &pair) == NKSIM_OK);
+    auto invalid = pair;
+    invalid.part_a = 1; // The box shape has one part.
+    assert(nksim_contact_pair_create(world, &invalid) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_world_end_topology_update(world) == NKSIM_OK);
+    step_world(world, 200);
+    double heights[3]{};
+    for (int index = 0; index < 3; ++index) {
+        nksim_body_state state{};
+        state.struct_size = sizeof(state);
+        assert(nksim_body_get_state(world, boxes[index], &state) == NKSIM_OK);
+        heights[index] = state.position[2];
+    }
+    assert(heights[0] < -1.0);
+    assert(std::abs(heights[1] - 0.1) < 0.005);
+    assert(std::abs(heights[2] - 0.1) < 0.005);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+// An arm falling onto its 0.3 rad stop rests further past it when the limit is
+// softer (a longer time constant).
+void joint_limit_softness_reaches_the_backend() {
+    const auto rest = [](double time_constant) {
+        auto rig = make_arm_rig(0.0, 1.0, 0.0, time_constant);
+        step_world(rig.world, 1500);
+        const double angle = arm_angle(rig);
+        destroy_arm_rig(rig);
+        return angle - 0.3;
+    };
+    const double stiff = rest(0.004), soft = rest(0.1);
+    assert(stiff > 0.0 && stiff < 0.01);
+    assert(soft > 5.0 * stiff);
+}
+
 int main() {
+    joint_limit_softness_reaches_the_backend();
+    contact_filters_and_pairs_decide_contacts();
     servo_target_is_a_saturating_pd();
     joint_dynamics_reach_the_backend();
     surface_friction_decides_sliding();

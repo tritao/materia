@@ -287,6 +287,7 @@ public:
                                       nksim_shape *out_shape);
     nksim_result set_shape_contact(nksim_shape shape, double margin, double gap);
     nksim_result set_shape_surface(nksim_shape shape, const nksim_surface &surface);
+    nksim_result create_contact_pair(const nksim_contact_pair_desc &desc);
     nksim_result destroy_shape(nksim_shape shape);
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);
@@ -300,6 +301,7 @@ public:
     nksim_result create_closure(const nksim_closure_desc &desc);
     nksim_result destroy_joint(nksim_joint joint);
     nksim_result get_joint_state(nksim_joint joint, nksim_joint_state *out_state) const;
+    nksim_result set_joint_state(nksim_joint joint, double position, double velocity);
 
     const nksim_world_desc &desc() const noexcept { return world_desc; }
 

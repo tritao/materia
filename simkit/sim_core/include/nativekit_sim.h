@@ -119,6 +119,9 @@ typedef struct nksim_world_desc {
     /* Optional when struct_size includes this tail; zero keeps backend defaults. */
     uint32_t integrator; /**< NKSIM_INTEGRATOR_*. */
     uint32_t friction_cone; /**< NKSIM_FRICTION_CONE_*. */
+    /** Constraint solver iteration limits; zero keeps the backend default. */
+    uint32_t solver_iterations;
+    uint32_t line_search_iterations;
 } nksim_world_desc;
 
 typedef struct nksim_clock {
@@ -215,6 +218,16 @@ typedef struct nksim_joint_desc {
     double armature;
     double damping;
     double friction_loss;
+    /*
+     * Optional limit softness, read when struct_size includes it; zeros keep
+     * the backend default. The limit acts like a soft contact:
+     * limit_time_constant (s) and limit_damping_ratio set its stiffness and
+     * damping, limit_impedance its impedance curve (MuJoCo's solimp: dmin,
+     * dmax, width, midpoint, power).
+     */
+    double limit_time_constant;
+    double limit_damping_ratio;
+    double limit_impedance[5];
 } nksim_joint_desc;
 
 /** Follower = ratio * leader + offset, in joint coordinates. */
@@ -272,7 +285,37 @@ typedef struct nksim_surface {
     double friction[3];
     double contact_time_constant;
     double contact_damping_ratio;
+    uint32_t contact_filter; /**< NKSIM_CONTACT_*; zero is layer collision. */
+    uint32_t reserved0;
 } nksim_surface;
+
+/** Which contacts a shape takes part in. */
+enum {
+    /** Collides by its body's collision layer and mask. */
+    NKSIM_CONTACT_LAYERS = 0,
+    /** Collides only through explicit contact pairs. */
+    NKSIM_CONTACT_PAIRS_ONLY = 1,
+    /**
+     * Collides through explicit pairs and with every environment body (one no
+     * joint connects to anything), using this surface for those contacts.
+     */
+    NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT = 2
+};
+
+/**
+ * A contact between one part of each of two bodies' shapes (the part index
+ * within a compound, or 0), with its own surface, whatever either shape's
+ * contact filter says.
+ */
+typedef struct nksim_contact_pair_desc {
+    uint32_t struct_size NK_STRUCT_SIZE;
+    uint32_t part_a;
+    nksim_body body_a;
+    nksim_body body_b;
+    uint32_t part_b;
+    uint32_t reserved0;
+    nksim_surface surface; /**< contact_filter is ignored. */
+} nksim_contact_pair_desc;
 
 /** A detected contact. Distance is signed surface separation in metres;
  * active is false when the backend reports it without a force constraint.
@@ -352,6 +395,9 @@ NKSIM_API nksim_result NKSIM_CALL nksim_shape_create(
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_compound(
     nksim_world world, const nksim_shape *children, const nksim_shape_pose *poses,
     uint32_t count, nksim_shape *out_shape NK_OUT);
+/** Adds an explicit contact pair between two existing bodies' shape parts. */
+NKSIM_API nksim_result NKSIM_CALL nksim_contact_pair_create(
+    nksim_world world, const nksim_contact_pair_desc *desc);
 /** Sets a shape's contact surface; like its margin, only before a body uses it. */
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_set_surface(
     nksim_world world, nksim_shape shape, const nksim_surface *surface);
@@ -400,6 +446,13 @@ NKSIM_API nksim_result NKSIM_CALL nksim_closure_create(
 NKSIM_API void NKSIM_CALL nksim_joint_destroy(nksim_world world, nksim_joint joint);
 NKSIM_API nksim_result NKSIM_CALL nksim_joint_get_state(
     nksim_world world, nksim_joint joint, nksim_joint_state *out_state NK_INOUT);
+/**
+ * Places a one-DOF joint at a position and velocity, moving the bodies it
+ * carries, as a pose to start from; it is not a target. Coupled followers are
+ * re-derived by the backend at its next step.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_joint_set_state(
+    nksim_world world, nksim_joint joint, double position, double velocity);
 
 NKSIM_API void NKSIM_CALL nksim_snapshot_destroy(nksim_snapshot snapshot);
 NKSIM_API nksim_result NKSIM_CALL nksim_snapshot_get_clock(
