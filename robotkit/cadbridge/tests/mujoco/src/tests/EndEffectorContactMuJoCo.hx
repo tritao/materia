@@ -77,7 +77,7 @@ class EndEffectorContactMuJoCo {
     var contacts = runtime.toolProximity();
     if (contacts.length == 0) throw "Example cup proximity was not reported";
     for (contact in contacts)
-      if (contact.toolPieceIndex != cupIndex || contact.otherObject != obstacle.handle)
+      if (contact.toolPieceIndex != cupIndex || contact.otherObject != obstacle.handle.rawValue())
         throw "Proximity came from a piece other than the example cup";
     simulationHarness.dispose();
   }

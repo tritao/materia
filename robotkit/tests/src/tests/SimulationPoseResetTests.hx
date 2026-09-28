@@ -65,7 +65,7 @@ class SimulationPoseResetTests {
     simulationHarness.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
     if (contacts.length == 0 || contacts[0].toolPieceIndex != 0 || contacts[0].active ||
-        contacts[0].otherObject != obstacle.handle)
+        contacts[0].otherObject != obstacle.handle.rawValue())
       throw "Tool cup proximity was not reported";
     simulationHarness.dispose();
   }
