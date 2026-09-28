@@ -60,7 +60,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 8;
+	public static inline var VERSION:Int = 9;
 	static final migrations:Map<String, (Document, Int)->Void> = [];
 
 	/** Register a domain-owned migration without coupling the codec to that domain. */

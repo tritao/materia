@@ -562,20 +562,32 @@ class ElementSmoke {
 		check(!instance.resolvedBoolean("enabled") && instance.resolvedInteger("count") == 3,
 			"typed overrides resolve");
 		definition.setTypedDefault("detail", "envelope");
+		definition.setUserEditedDefault("width", 12);
+		check(definition.input("width").editedByUser && definition.input("width").defaultValue == 12,
+			"user-edited definition default is marked");
+		check(doc.undo() && !definition.input("width").editedByUser && definition.input("width").defaultValue == 10,
+			"undo restores the user-edited marker with the default");
+		check(doc.redo() && definition.input("width").editedByUser && definition.input("width").defaultValue == 12,
+			"redo restores the user-edited marker with the default");
+		var uniqueTypedDefinition = instance.makeUnique();
+		check(uniqueTypedDefinition.input("width").editedByUser,
+			"makeUnique copies the user-edited marker");
 		var parent = doc.createObject("Parent");
 		parent.setPlacement(new Placement(new Plane(new Vector(20, 0, 0), Vector.X(), Vector.Z())));
 		instance.setPlacement(new Placement(new Plane(new Vector(2, 0, 0), Vector.X(), Vector.Z())));
 		instance.reparent(new ElementReference(doc.id, parent.id), false);
 		var origin = instance.connector("mount").location.plane.origin;
-		check(origin.x == 22 && origin.z == 10, "connector follows placement and reparenting");
+		check(origin.x == 22 && origin.z == 12, "connector follows edited defaults, placement, and reparenting");
 		var saved = DocumentCodec.encode(doc);
 		check(Reflect.field(Json.parse(saved), "version") == DocumentCodec.VERSION, "typed format version is current");
 		var loaded = DocumentCodec.decode(saved);
 		var loadedInstance:cadkit.parametric.InstanceElement = cast loaded.element(instance.id);
 		check(loadedInstance.resolvedToken("detail") == "envelope" && !loadedInstance.resolvedBoolean("enabled")
 			&& loadedInstance.resolvedInteger("count") == 3, "typed values round-trip");
+		check(loaded.definition(loadedInstance.definitionId).input("width").editedByUser,
+			"user-edited marker survives save and reload");
 		var loadedOrigin = loadedInstance.connector("mount").location.plane.origin;
-		check(loadedOrigin.x == 22 && loadedOrigin.z == 10, "connector frame survives reload");
+		check(loadedOrigin.x == 22 && loadedOrigin.z == 12, "connector frame survives reload");
 		loaded.close();
 		doc.close();
 
