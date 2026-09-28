@@ -248,8 +248,8 @@ command mailbox → validation → arbitration/intent → controllers
 The runtime rejects stale command sequences, validates compiled joint and
 actuator limits before endpoint application, latches endpoint/sample failures
 as faults, and exposes explicit stop/reset-safety commands. `RobotEndpoint`
-only has `apply()` and `sample()` plus the rollback hook needed by a shared
-transactional simulation tick. Backends do not receive runtime ownership.
+only has `apply()` and `sample()` plus the rollback hook a shared simulation
+tick uses to undo one robot's half-applied commands. Backends do not receive runtime ownership.
 
 Position targets are retained as runtime intent and emitted on every owner
 tick. When a command supplies `max_rate`, the runtime advances a deterministic
@@ -428,6 +428,16 @@ in-memory runtimes own a worker lifecycle through `start()` and `stop()`;
 runtimes attached to a shared `Simulation` are externally driven and cannot be
 started independently. This keeps the clock owner explicit and prevents a
 robot from accidentally advancing only part of a multi-robot world.
+
+A robot's failure is that robot's fault, not the tick's. If a runtime rejects
+its commands in step 2, or cannot publish in step 6 (for instance a joint is
+observed past its limit), `RobotRuntime::fail_tick` rolls that runtime back and
+leaves it faulted; every other robot still applies its commands, the host still
+advances, and every other robot still publishes. `Simulation.step` returns OK,
+a realtime session keeps ticking, and the fault shows in that robot's own
+state (`safety`, `mode`, `fault_code`). Timestep, integrator, friction cone and
+solver iteration limits, and the MuJoCo constraint solver, remain shared by
+every robot in the world (see `plans/MIXED_SCENE.md`).
 
 While stopped, the simulation owner can reset the whole world, reset one robot,
 teleport a robot, and spawn/remove/teleport environment objects. The editable

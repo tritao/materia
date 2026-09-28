@@ -241,7 +241,7 @@ struct Scene {
     rk_simulation simulation = 0;
     rk_robot_runtime arm = 0, gantry = 0, humanoid = 0;
     int arm_index = -1, gantry_index = -1, humanoid_index = -1;
-    uint32_t arm_links = 4, gantry_links = 4, humanoid_links = 5, arm_joints = 3;
+    uint32_t arm_links = 4, gantry_links = 4, arm_joints = 3;
     rk_simulation_object floor = 0, box = 0;
     std::vector<rk_result> results;
     Trace arm_trace, gantry_trace;
@@ -758,32 +758,6 @@ static void realtime_session_survives_a_humanoid_fault() {
            static_cast<unsigned long long>(before), static_cast<unsigned long long>(clock.step_index));
     EXPECT(std::fabs(arm.position[0] - 0.5) < 0.05, "the arm is at %.3f", arm.position[0]);
     assert(rk_simulation_stop(scene.simulation) == RK_OK);
-}
-
-// The humanoid alone, unpowered enough to fall: report how it ends.
-[[maybe_unused]] static void probe_fall(uint32_t filter, double tolerance) {
-    Options options;
-    options.arm = options.gantry = false;
-    options.humanoid = true;
-    options.humanoid_x = 0.0;
-    options.humanoid_pitch = 0.5;
-    options.floor_box = true;
-    options.humanoid_filter = filter;
-    options.humanoid_tolerance = tolerance;
-    Scene scene;
-    build(scene, options);
-    uint32_t first_failure = 0;
-    for (uint32_t tick = 0; tick < 400; ++tick) {
-        const auto result = rk_simulation_step(scene.simulation, tick * 10'000'000ull);
-        if (result != RK_OK && first_failure == 0) {
-            first_failure = tick + 1;
-            std::printf("  step %u -> %d\n", tick, result);
-        }
-    }
-    const auto state = snapshot(scene.humanoid);
-    std::printf("humanoid alone filter %u tol %.2f: height %.3f safety %d mode %d first failure tick %u q = %.3f %.3f %.3f %.3f\n",
-                filter, tolerance, height_of(scene, 0), state.safety, state.mode, first_failure,
-                state.position[0], state.position[1], state.position[2], state.position[3]);
 }
 
 int main() {
