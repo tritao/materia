@@ -7,15 +7,25 @@ import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
 import humankit.HumanLimb;
+import humankit.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.HumanPose;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
 import humankit.Mat4;
 import humankit.RigMapping;
+import humankit.facility.FacilityWalk;
+import materia.automation.facility.Facility;
+import materia.automation.facility.FacilityRouter;
+import materia.automation.facility.Lane;
+import materia.automation.facility.Station;
+import materia.automation.facility.Zone;
 import nativekit.scene.Scene;
 import nativekit.scene.SceneRenderer;
 import nativekit.scene.SceneView;
+import robotkit.mobile.Footprint;
+import robotkit.mobile.Pose2;
+import robotkit.navigation.Path;
 import sys.FileSystem;
 
 class HumanKitTests {
@@ -72,6 +82,8 @@ class HumanKitTests {
 		human.dispose();
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
+		facilityRoute(scene, worker, rig);
+		reachTask(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
 	}
@@ -266,6 +278,96 @@ class HumanKitTests {
 		try human.reach(LegL, [0.3, 0.1, 0.1]) catch (_:Dynamic) rejected = true;
 		if (!rejected)
 			throw "A Quaternius leg, whose foot is not below its shin, was accepted as a chain";
+		human.dispose();
+	}
+
+	/**
+	 * A real FacilityRouter route through two lanes, adapted with FacilityWalk:
+	 * the person ends at the destination station and faces along the last lane,
+	 * not the straight line from the start.
+	 */
+	static function facilityRoute(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var facility = new Facility("warehouse", "Warehouse A");
+		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(10.0, 10.0)));
+		var start = new Station("start", "Start", "floor", "map", new Pose2(0.0, 0.0, 0.0));
+		var corner = new Station("corner", "Corner", "floor", "map", new Pose2(4.0, 0.0, 0.0));
+		var dest = new Station("dest", "Dest", "floor", "map", new Pose2(4.0, 3.0, Math.PI / 2));
+		facility.addStation(start);
+		facility.addStation(corner);
+		facility.addStation(dest);
+		facility.addLane(new Lane("start-corner", start.id, corner.id,
+			new Path([start.pose, corner.pose], "map"), 1.0, 1.4));
+		facility.addLane(new Lane("corner-dest", corner.id, dest.id,
+			new Path([corner.pose, dest.pose], "map"), 1.0, 1.4));
+		var route = new FacilityRouter(facility).route(start.id, dest.id);
+		var points = FacilityWalk.routeFromFacilityRoute(route);
+		if (points.length != 3)
+			throw 'Expected 3 route points, got ${points.length}';
+
+		var human = new HumanCharacter(scene, asset, rig, null, "FacilityWalker");
+		var walker = new HumanWalker(human);
+		walker.follow(points, route.maximumSpeedMetersPerSecond);
+		var step = 1.0 / 60.0;
+		for (_ in 0...600)
+			walker.advance(step);
+		var root = walker.rootTransform();
+		if (walker.isWalking())
+			throw "The facility walk did not stop at its destination";
+		if (Math.abs(root[12] - dest.pose.x) > 1e-3 || Math.abs(root[13] - dest.pose.y) > 1e-3)
+			throw 'The facility walk ended at ${root[12]}, ${root[13]}, not the destination station';
+		// The last lane runs along +Y; the walker must face along it, not the
+		// straight line from start to destination.
+		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
+			throw "The facility walk does not face along the last lane";
+		human.dispose();
+	}
+
+	/**
+	 * A HumanReachTask walks to a spot, stops, reaches for a target with the IK
+	 * weight ramped in and out (playing "interact" while holding), and releases
+	 * cleanly.
+	 */
+	static function reachTask(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "ReachTasker");
+		var walker = new HumanWalker(human);
+		human.advance(0.0);
+		var shoulder = human.pose.bonePosition(HumanBone.UpperArmR);
+		var description = HumanDescription.measure(human.pose, human.height());
+		var reachLength = description.upperArm + description.forearm;
+		var direction = Mat4.normalize([1.0, -0.2, -0.3]);
+		var target = [for (axis in 0...3) shoulder[axis] + direction[axis] * reachLength * 0.8];
+		var task = new HumanReachTask(walker, [[0.0, 0.0], [1.5, 0.0]], 1.2, ArmR, target, 0.3, 0.4, null,
+			"interact", 0.2);
+		var step = 1.0 / 60.0;
+		var checkedHold = false;
+		for (_ in 0...400) {
+			task.advance(step);
+			if (task.phase == Holding && !checkedHold) {
+				checkedHold = true;
+				if (walker.isWalking())
+					throw "The reach task is still walking while holding";
+				var root = walker.rootTransform();
+				if (Math.abs(root[12] - 1.5) > 1e-3 || Math.abs(root[13]) > 1e-3)
+					throw 'The body did not stop at the spot: ${root[12]}, ${root[13]}';
+				var hand = human.pose.bonePosition(HumanBone.HandR);
+				if (distance(hand, target) > 0.01)
+					throw 'The wrist did not reach the target: $hand vs $target';
+				if (human.player.currentClip() != asset.clipIndex("interact"))
+					throw "The interact clip is not playing while holding";
+			}
+			if (task.isDone())
+				break;
+		}
+		if (!checkedHold)
+			throw "The reach task never held its target";
+		if (!task.isDone())
+			throw "The reach task never finished";
+		// A clean release: the IK no longer pins the wrist to the target.
+		for (_ in 0...12)
+			task.advance(step);
+		var released = human.pose.bonePosition(HumanBone.HandR);
+		if (distance(released, target) < 0.02)
+			throw "The reach did not release cleanly; the wrist is still pinned to the target";
 		human.dispose();
 	}
 

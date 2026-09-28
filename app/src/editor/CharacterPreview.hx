@@ -12,8 +12,10 @@ import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
 import humankit.HumanGrip;
+import humankit.HumanLimb;
 import humankit.HumanPose;
 import humankit.HumanoidRig;
+import humankit.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.sim.HumanActor;
 import nativekit.scene.NodeId;
@@ -34,7 +36,11 @@ import nativekit.sim.SimSession;
  * while the simulation is paused and walks by the wall clock without one.
  * A humanoid can be drawn as its mesh, its collision capsules, or its skeleton.
  * It walks a route of floor points with HumanWalker, looping round the
- * default circle or idling at the end of a given route.
+ * default circle or idling at the end of a given route. Given a reach
+ * target too, it stops at the end of an open route and reaches its right
+ * hand for the target with a HumanReachTask, ramping the IK weight in and
+ * out (optionally playing a clip such as "interact" while it holds) before
+ * releasing.
  */
 class CharacterPreview implements SessionParticipant {
 	static inline var PATH_RADIUS:Float = 2.5;
@@ -63,6 +69,10 @@ class CharacterPreview implements SessionParticipant {
 	final route:Array<Array<Float>>;
 	final loopRoute:Bool;
 	var walker:Null<HumanWalker> = null;
+	/** A right-hand reach target (model space) once the route arrives, and its clip. */
+	final reachTarget:Null<Array<Float>>;
+	final reachClip:Null<String>;
+	var reachTask:Null<HumanReachTask> = null;
 	var lastTime:Float = -1.0;
 	/** The humanoid's rest pose and collision proxy, or null for other assets. */
 	final restPose:Null<HumanPose>;
@@ -75,9 +85,11 @@ class CharacterPreview implements SessionParticipant {
 	var simulationTime:Float = 0.0;
 
 	/** Loads the character, and optionally a prop for its right hand. */
-	/** A null route walks the default circle round the origin. */
+	/** A null route walks the default circle round the origin. reachTarget, if
+	 * given, needs an open (non-looping) route: the character reaches its
+	 * right hand for it once the walk arrives. */
 	public function new(path:String, ?clipName:String, ?propPath:String, display:HumanDisplay = Mesh,
-			?route:Array<Array<Float>>) {
+			?route:Array<Array<Float>>, ?reachTarget:Array<Float>, ?reachClip:String) {
 		this.path = path;
 		this.display = display;
 		loopRoute = route == null;
@@ -89,6 +101,10 @@ class CharacterPreview implements SessionParticipant {
 		];
 		if (this.route.length < 2)
 			throw "A character route needs at least two points";
+		if (reachTarget != null && loopRoute)
+			throw "A character reach needs an open route (--character-route or --character-facility-route)";
+		this.reachTarget = reachTarget;
+		this.reachClip = reachClip;
 		this.clipName = clipName;
 		asset = AnimationAsset.load(path);
 		for (warning in asset.warnings)
@@ -115,6 +131,8 @@ class CharacterPreview implements SessionParticipant {
 		prop = propPath == null ? null : AnimationAsset.load(propPath);
 		if (prop != null && rig == null)
 			Sys.println('materia: --character-hold needs a humanoid character; ignoring $propPath');
+		if (reachTarget != null && rig == null)
+			Sys.println("materia: --character-reach needs a humanoid character; ignoring it");
 	}
 
 	/** A humanoid's body joins a new, stopped session where the character stands. */
@@ -150,9 +168,7 @@ class CharacterPreview implements SessionParticipant {
 			if (target < simulationTime) {
 				angle = 0.0;
 				simulationTime = 0.0;
-				var walking = walker;
-				if (walking != null)
-					walking.follow(route, walkSpeed, loopRoute);
+				startWalk();
 			}
 			elapsed = target - simulationTime;
 			simulationTime = target;
@@ -166,7 +182,11 @@ class CharacterPreview implements SessionParticipant {
 		var walking = walker;
 		if (character != null) {
 			if (walking != null) {
-				walking.advance(elapsed);
+				var task = reachTask;
+				if (task != null)
+					task.advance(elapsed);
+				else
+					walking.advance(elapsed);
 				var transaction = scene.runtimeContentScene().beginTransaction();
 				transaction.setTransform(character.root, matrixTransform(walking.rootTransform()));
 				transaction.commit();
@@ -233,14 +253,27 @@ class CharacterPreview implements SessionParticipant {
 		}
 		var character = human;
 		if (character != null && (clipName == null || clipName.toLowerCase().indexOf("walk") >= 0)) {
-			var created = new HumanWalker(character, clipName != null ? clipName : "walk");
-			created.follow(route, walkSpeed, loopRoute);
-			walker = created;
+			walker = new HumanWalker(character, clipName != null ? clipName : "walk");
+			startWalk();
 		} else
 			startClip();
 		var transaction = sceneKit.beginTransaction();
 		transaction.setTransform(root, matrixTransform(rootMatrix()));
 		transaction.commit();
+	}
+
+	/** Starts (or restarts) the walk, wrapped in a HumanReachTask when a reach target was given. */
+	function startWalk():Void {
+		var created = walker;
+		if (created == null)
+			return;
+		if (reachTarget != null)
+			reachTask = new HumanReachTask(created, route, walkSpeed, HumanLimb.ArmR, reachTarget, 0.4, 0.6, null,
+				reachClip);
+		else {
+			reachTask = null;
+			created.follow(route, walkSpeed, loopRoute);
+		}
 	}
 
 	/** Grips a prop part-way along its +X extent. */
@@ -309,6 +342,7 @@ class CharacterPreview implements SessionParticipant {
 		model = null;
 		view = null;
 		walker = null;
+		reachTask = null;
 	}
 
 	public function dispose():Void {
