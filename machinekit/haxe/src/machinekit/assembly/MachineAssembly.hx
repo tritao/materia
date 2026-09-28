@@ -19,6 +19,8 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 typedef MachineAssemblyComponent = { var id:String; var component:MachineComponent; }
 typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:String; }
 typedef PortRef = { var instanceId:String; var portName:String; }
+typedef UpstreamResult = { var port:PortRef; var external:Bool; }
+private typedef ServiceTrace = { var port:PortRef; var external:Bool; var supplied:Bool; var chain:Array<String>; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
 /** BOM-only mass is a point-mass estimate, fixed or attached to a member. */
 enum AssemblyBomMass {
@@ -248,11 +250,19 @@ class MachineAssembly {
 	}
 
 	function checkRequiredPorts(connected:Map<String, Bool>):Void {
+		var deepestFailure:Null<Array<String>> = null;
 		for (member in members) for (port in member.component.ports())
-			if (port.required && port.role == Consumer &&
-				!connected.exists(portKey(portRef(member.id, port.name))) &&
-				!isExposed(member.id, port.name))
-				throw 'Required consumer port "${member.id}/${port.name}" is unconnected';
+			if (port.required && port.role == Consumer) {
+				var reference = portRef(member.id, port.name);
+				if (connected.exists(portKey(reference))) {
+					var trace = traceUpstream(reference);
+					if (!trace.supplied && (deepestFailure == null || trace.chain.length > deepestFailure.length))
+						deepestFailure = trace.chain;
+				}
+				else if (!isExposed(member.id, port.name))
+					throw 'Required consumer port "${member.id}/${port.name}" is unconnected';
+			}
+		if (deepestFailure != null) throw unsuppliedMessage(deepestFailure);
 	}
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
@@ -423,14 +433,25 @@ class MachineAssembly {
 	}
 
 	/** Trace a service through connections, bridges, and a single-input converter. */
-	public function upstream(instanceId:String, portName:String):PortRef {
+	public function upstream(instanceId:String, portName:String):UpstreamResult {
 		checkConnections();
-		var current = portRef(instanceId, portName);
+		var trace = traceUpstream(portRef(instanceId, portName));
+		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
+		return {port: trace.port, external: trace.external};
+	}
+
+	static function unsuppliedMessage(chain:Array<String>):String
+		return 'Service chain ${chain.join(" ← ")} is not supplied';
+
+	function traceUpstream(start:PortRef):ServiceTrace {
+		var current = start;
 		var seen:Map<String, Bool> = [];
+		var chain:Array<String> = [];
 		while (true) {
 			var key = portKey(current);
-			if (seen.exists(key)) throw 'Port service cycle at "$instanceId/$portName"';
+			if (seen.exists(key)) throw 'Port service cycle at "${start.instanceId}/${start.portName}"';
 			seen.set(key, true);
+			chain.push('${current.instanceId}/${current.portName}');
 			var currentPort = requirePort(current);
 			var previous:Array<PortRef> = [];
 			for (op in operations) switch op {
@@ -443,10 +464,13 @@ class MachineAssembly {
 				if (conversion.to == current.portName)
 					previous.push(portRef(current.instanceId, conversion.from));
 			if (previous.length == 0) {
-				if (currentPort.role != Supply) throw 'Port "$instanceId/$portName" has no upstream supply';
-				return current;
+				if (currentPort.role == Supply)
+					return {port: current, external: false, supplied: true, chain: chain};
+				if (isExposed(current.instanceId, current.portName))
+					return {port: current, external: true, supplied: true, chain: chain};
+				return {port: current, external: false, supplied: false, chain: chain};
 			}
-			if (previous.length != 1) throw 'Port "$instanceId/$portName" has ambiguous upstream supply';
+			if (previous.length != 1) throw 'Port "${start.instanceId}/${start.portName}" has ambiguous upstream supply';
 			current = previous[0];
 		}
 	}

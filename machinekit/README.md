@@ -177,8 +177,12 @@ wired assembly can still be shown and weighed. Call `validate()` to check
 service connections and required inputs. Included member ports can be wired by
 their prefixed member paths, but they do not appear in the containing assembly's
 public `portNames()` or `port(name)` until `exposePort` publishes them. A required
-input must be connected or explicitly exposed at each level. `upstream()` checks
-connection validity while allowing other required inputs to remain unconnected.
+input must be connected or explicitly exposed at each level. `validate()` also
+traces each connected required consumer to a Supply or an exposed assembly
+input, reporting the chain if it ends unfed. `upstream()` checks connection
+validity while allowing other required inputs to remain unconnected. It returns
+`{port, external}`: `external` is true when the trace ends at an exposed input,
+and false when it reaches a Supply.
 Supply and Consumer connection arguments
 can be given in either order. Components declare service passages with
 `addBridge` and changes of service kind with `addConversion`; `upstream()`
