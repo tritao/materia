@@ -52,9 +52,14 @@ class MachineComponent {
 	public function geometry(detail:ComponentDetail = Preview):Part
 		throw 'Component "$designation" does not generate geometry';
 
-	public function toolNames():Array<String> return [];
+	public function toolSpecs():Array<ToolSpec> return [];
 
-	public function tool(name:String, depth:Float):Part
+	public function tool(name:String, values:ComponentValues):Part {
+		for (spec in toolSpecs()) if (spec.name == name) return buildTool(name, spec.resolve(values));
+		throw 'Unknown tool "$name" for "$designation"';
+	}
+
+	function buildTool(name:String, values:ComponentValues):Part
 		throw 'Unknown tool "$name" for "$designation"';
 
 	public function componentType():Null<ComponentType> return null;

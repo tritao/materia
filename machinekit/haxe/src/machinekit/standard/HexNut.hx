@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -78,6 +79,14 @@ class HexNut extends MachineComponent {
 	public function pocket(depth:Float):Part {
 		if (!(depth >= spec.height)) throw 'Nut pocket for ${spec.size} needs depth at least ${spec.height}';
 		return Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats + 0.5), 0, depth);
+	}
+
+	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("pocket", [
+		ComponentRecipeSupport.toolDepth(spec.height)])];
+
+	override function buildTool(name:String, values:ComponentValues):Part {
+		if (name == "pocket") return pocket(values.number("depth"));
+		return super.buildTool(name, values);
 	}
 
 	function get_acrossFlats():Float return spec.acrossFlats;

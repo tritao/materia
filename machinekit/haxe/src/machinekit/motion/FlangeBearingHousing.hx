@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -75,11 +76,12 @@ class FlangeBearingHousing extends MachineComponent {
 	public function mountScrewPart(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(mountScrew, length);
 
-	override public function toolNames():Array<String> return ["bearingSeat"];
+	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("bearingSeat", [
+		ComponentRecipeSupport.toolDepth(bearing.width)])];
 
-	override public function tool(name:String, depth:Float):Part {
-		if (name == "bearingSeat") return bearing.housingSeat(depth > 0 ? depth : bearing.width);
-		return super.tool(name, depth);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		if (name == "bearingSeat") return bearing.housingSeat(values.number("depth"), fit);
+		return super.buildTool(name, values);
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;

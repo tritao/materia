@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -179,11 +180,15 @@ class RobotFlange extends MachineComponent {
 		return {pitchCircle: pitchCircle, boltCount: boltCount, screw: screw, pilotDiameter: pilotDiameter,
 			pinDiameter: pinDiameter};
 
-	override public function toolNames():Array<String> return ["mountingCutout"];
+	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("mountingCutout", [
+		ComponentRecipeSupport.toolDepth(pilotRecessDepth() + 1),
+		ComponentRecipeSupport.length("pilotClearance", 0.2),
+		ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")])];
 
-	override public function tool(name:String, depth:Float):Part {
-		if (name == "mountingCutout") return mountingCutout(depth > 0 ? depth : 10);
-		return super.tool(name, depth);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		if (name == "mountingCutout") return mountingCutout(values.number("depth"),
+			values.number("pilotClearance"), ComponentRecipeSupport.clearanceFit(values.token("fit")));
+		return super.buildTool(name, values);
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;

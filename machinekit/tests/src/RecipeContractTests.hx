@@ -36,8 +36,8 @@ class RecipeContractTests {
 
 				checkSolid(component.geometry(Envelope), '${type.id} $key Envelope');
 				checkSolid(component.geometry(Preview), '${type.id} $key Preview');
-				for (name in component.toolNames())
-					checkValid(component.tool(name, 100), '${type.id} $key tool "$name"');
+				for (tool in component.toolSpecs())
+					checkValid(component.tool(tool.name, tool.defaults()), '${type.id} $key tool "${tool.name}"');
 			}
 
 			var baseline = type.create();

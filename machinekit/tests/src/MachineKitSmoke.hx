@@ -157,10 +157,16 @@ class MachineKitSmoke {
 		for (registered in MachineKitComponents.all()) {
 			check(DefinitionEvaluatorRegistry.isRegistered(registered.id), "MachineKit evaluator registration");
 			var recipeDefinition = MachineKitDocuments.define(registryDocument, registered);
+			var defaultComponent = registered.create();
+			var toolInputCount = 0;
+			for (tool in defaultComponent.toolSpecs())
+				toolInputCount += tool.parameters().length;
 			check(recipeDefinition.output("body").purpose == DefinitionOutput.Geometry,
 				"MachineKit recipe geometry output");
-			check(recipeDefinition.outputs().length == registered.create().toolNames().length + 1,
+			check(recipeDefinition.outputs().length == defaultComponent.toolSpecs().length + 1,
 				"MachineKit stores geometry and type-level tool outputs");
+			check(recipeDefinition.inputs().length == registered.parameters().length + toolInputCount + 1,
+				"MachineKit defines typed tool inputs with defaults");
 		}
 		registryDocument.close();
 		var document = new Document();
@@ -179,7 +185,20 @@ class MachineKitSmoke {
 		check(first.shape().volume() != firstVolume && second.shape().volume() == secondVolume,
 			"detail input selects geometry fidelity per instance");
 		first.removeOverride("detail");
-		check(document.definitionOutput(first, "bearingSeat").volume() > 0, "bearing seat tool output");
+		var bearingSeat = document.definitionOutput(first, "bearingSeat").volume();
+		check(bearingSeat > 0, "bearing seat tool output");
+		check(definition.input("tool_bearingSeat_fit").defaultValue == "Slip",
+			"bearing seat fit has a typed definition default");
+		check(definition.input("tool_bearingSeat_depth").defaultValue == 7,
+			"bearing seat depth has a typed definition default");
+		first.setTypedOverride("tool_bearingSeat_fit", "Interference");
+		check(document.definitionOutput(first, "bearingSeat").volume() != bearingSeat,
+			"bearing seat fit override changes tool geometry");
+		first.removeOverride("tool_bearingSeat_fit");
+		first.setTypedOverride("tool_bearingSeat_depth", 3.0);
+		check(document.definitionOutput(first, "bearingSeat").volume() != bearingSeat,
+			"bearing seat depth override changes tool geometry");
+		first.removeOverride("tool_bearingSeat_depth");
 		var firstBack = first.connector("back").location.plane.origin.z;
 		document.setElementPlacement(first, new Placement(new Plane(
 			new Vector(10, 20, 30), Vector.X(), Vector.Z())));
@@ -205,6 +224,26 @@ class MachineKitSmoke {
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
+		var legacyTools:Dynamic = haxe.Json.parse(saved);
+		var legacyToolDefinitions:Array<Dynamic> = cast Reflect.field(legacyTools, "definitions");
+		var removedToolInputs = 0;
+		for (record in legacyToolDefinitions) {
+			var inputs:Array<Dynamic> = cast Reflect.field(record, "inputs");
+			var kept:Array<Dynamic> = [];
+			for (input in inputs) {
+				var name:String = Reflect.field(input, "name");
+				if (StringTools.startsWith(name, "tool_")) removedToolInputs++;
+				else kept.push(input);
+			}
+			Reflect.setField(record, "inputs", kept);
+		}
+		check(removedToolInputs > 0, "legacy recipe fixture removes typed tool inputs");
+		var legacyToolsDocument = DocumentCodec.decode(haxe.Json.stringify(legacyTools));
+		var legacyBearing = legacyToolsDocument.createInstance("Legacy bearing",
+			legacyToolsDocument.definition(first.definitionId));
+		check(legacyToolsDocument.definitionOutput(legacyBearing, "bearingSeat").volume() > 0,
+			"legacy recipe evaluates newly parameterized tools from defaults");
+		legacyToolsDocument.close();
 		var legacy:Dynamic = haxe.Json.parse(saved);
 		Reflect.setField(legacy, "version", 7);
 		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacy, "definitions");
@@ -237,6 +276,24 @@ class MachineKitSmoke {
 		var screw = tools.createInstance("Screw", MachineKitDocuments.define(tools, screwType));
 		for (name in ["clearanceHole", "tapHole", "counterboreHole"])
 			check(tools.definitionOutput(screw, name).volume() > 0, "screw tool output " + name);
+		var mediumClearance = tools.definitionOutput(screw, "clearanceHole").volume();
+		screw.setTypedOverride("tool_clearanceHole_fit", "Coarse");
+		check(tools.definitionOutput(screw, "clearanceHole").volume() != mediumClearance,
+			"screw clearance fit override changes tool geometry");
+		var screwComponent = SocketHeadCapScrew.metric("M5", 2);
+		var counterbore:Null<machinekit.component.ToolSpec> = null;
+		for (tool in screwComponent.toolSpecs()) if (tool.name == "counterboreHole") counterbore = tool;
+		check(counterbore != null && counterbore.defaults().number("depth") > screwComponent.spec.counterboreDepth,
+			"counterbore default depth covers the screw head");
+		var nutType = MachineKitComponents.byId("machinekit.standard.hex-nut");
+		var nut = tools.createInstance("Nut", MachineKitDocuments.define(tools, nutType));
+		check(tools.definitionOutput(nut, "pocket").volume() > 0,
+			"HexNut exposes a valid pocket tool output");
+		var slipHousing = new FlangeBearingHousing(DeepGrooveBearing.metric("608"), BearingHousingFit.Slip);
+		var interferenceHousing = new FlangeBearingHousing(DeepGrooveBearing.metric("608"), BearingHousingFit.Interference);
+		check(slipHousing.tool("bearingSeat", new ComponentValues()).volume() !=
+			interferenceHousing.tool("bearingSeat", new ComponentValues()).volume(),
+			"flange bearing housing tool uses its selected fit");
 		var motorType = MachineKitComponents.byId("machinekit.motion.nema-stepper");
 		var motor = tools.createInstance("Motor", MachineKitDocuments.define(tools, motorType));
 		check(tools.definitionOutput(motor, "mountingCutout").volume() > 0, "motor cutout output");

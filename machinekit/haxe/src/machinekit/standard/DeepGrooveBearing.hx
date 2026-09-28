@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -167,11 +168,13 @@ class DeepGrooveBearing extends MachineComponent {
 	function get_outside():Float return spec.outside;
 	function get_width():Float return spec.width;
 
-	override public function toolNames():Array<String> return ["bearingSeat"];
+	override public function toolSpecs():Array<ToolSpec> return [new ToolSpec("bearingSeat", [
+		ComponentRecipeSupport.toolDepth(width),
+		ComponentRecipeSupport.choice("fit", ["Slip", "Transition", "Interference"], "Slip")])];
 
-	override public function tool(name:String, depth:Float):Part {
-		if (name == "bearingSeat") return housingSeat(depth > 0 ? depth : width);
-		return super.tool(name, depth);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		if (name == "bearingSeat") return housingSeat(values.number("depth"), ComponentRecipeSupport.fit(values.token("fit")));
+		return super.buildTool(name, values);
 	}
 
 	private static var recipeTypeCache:Null<ComponentType>;

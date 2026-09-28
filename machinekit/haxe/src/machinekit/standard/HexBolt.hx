@@ -4,6 +4,7 @@ import machinekit.component.ComponentType;
 import machinekit.component.ComponentValues;
 import machinekit.component.ComponentValue.*;
 import machinekit.component.ComponentRecipeSupport;
+import machinekit.component.ToolSpec;
 import machinekit.component.Dimension;
 import materia.project.MaterialLibrary;
 
@@ -129,15 +130,21 @@ class HexBolt extends MachineComponent {
 	function get_threadLength():Float return length;
 	function get_acrossCorners():Float return spec.acrossFlats / Math.cos(Math.PI / 6);
 
-	override public function toolNames():Array<String> return ["clearanceHole", "tapHole", "counterboreHole"];
+	override public function toolSpecs():Array<ToolSpec> return [
+		new ToolSpec("clearanceHole", [ComponentRecipeSupport.toolDepth(length),
+			ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")]),
+		new ToolSpec("tapHole", [ComponentRecipeSupport.toolDepth(length)]),
+		new ToolSpec("counterboreHole", [ComponentRecipeSupport.toolDepth(Math.max(length, spec.headHeight + 1)),
+			ComponentRecipeSupport.choice("fit", ["Fine", "Medium", "Coarse"], "Medium")])
+	];
 
-	override public function tool(name:String, depth:Float):Part {
-		var cutDepth = depth > 0 ? depth : Math.max(length, spec.headHeight + 1);
+	override function buildTool(name:String, values:ComponentValues):Part {
+		var depth = values.number("depth");
 		return switch name {
-			case "clearanceHole": clearanceHole(cutDepth);
-			case "tapHole": tapHole(cutDepth);
-			case "counterboreHole": counterboreHole(cutDepth);
-			default: super.tool(name, depth);
+			case "clearanceHole": clearanceHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
+			case "tapHole": tapHole(depth);
+			case "counterboreHole": counterboreHole(depth, ComponentRecipeSupport.clearanceFit(values.token("fit")));
+			default: super.buildTool(name, values);
 		};
 	}
 

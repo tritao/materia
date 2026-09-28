@@ -941,8 +941,13 @@ class ProjectDocumentSession {
           continue;
         }
         if (!copiedDefaults.exists(definition.id.value)) {
+          var priorInputs = new Map<String, cadkit.parametric.DefinitionInput>();
+          for (oldInput in oldDefinition.inputs()) priorInputs.set(oldInput.name, oldInput);
           for (input in definition.inputs()) {
-            var oldInput = oldDefinition.input(input.name);
+            // Definitions can gain inputs over time. Keep saved defaults for inputs that
+            // existed in the old recipe and leave newly introduced inputs at their defaults.
+            var oldInput = priorInputs.get(input.name);
+            if (oldInput == null) continue;
             if (Std.string(input.defaultValue) != Std.string(oldInput.defaultValue))
               definition.setTypedDefault(input.name, oldInput.defaultValue);
           }

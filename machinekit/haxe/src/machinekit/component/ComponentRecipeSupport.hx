@@ -7,6 +7,7 @@ import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import machinekit.motion.LeadScrewThread.LeadScrewHand;
 import machinekit.standard.BearingFit.BearingHousingFit;
+import machinekit.standard.ClearanceFit;
 import machinekit.transmission.TimingBeltProfile;
 
 /** Shared parameter constructors and parsed enum inputs for component recipes. */
@@ -29,6 +30,12 @@ class ComponentRecipeSupport {
 		case "Transition": Transition;
 		case "Interference": Interference;
 		default: throw 'Unknown bearing fit "$value"';
+	};
+	public static function clearanceFit(value:String):ClearanceFit return switch value {
+		case "Fine": Fine;
+		case "Medium": Medium;
+		case "Coarse": Coarse;
+		default: throw 'Unknown clearance fit "$value"';
 	};
 	public static function family(value:String):LeadScrewThreadFamily return switch value {
 		case "MetricTrapezoidal": MetricTrapezoidal;
@@ -56,6 +63,9 @@ class ComponentRecipeSupport {
 
 	public static function flag(name:String, value:Bool):ComponentParameter
 		return new ComponentParameter(name, Bool, Boolean(value));
+
+	public static function toolDepth(value:Float):ComponentParameter
+		return new ComponentParameter("depth", Length, Number(value), "mm", 0.001);
 
 	public static function count(name:String, value:Int):ComponentParameter
 		return new ComponentParameter(name, Count, Integer(value), null, 0);
