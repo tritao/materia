@@ -463,8 +463,13 @@ class CamJob {
   }
 
   function rapid(target:Point3, span:Provenance):Void {
-    if (current.distanceTo(target) > 1e-12)
-      ops.push(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(current, target), 0.0, 0.0, span));
+    if (current.distanceTo(target) > 1e-12) {
+      var kind = target.z > current.z + 1e-12 ? MoveKind.Retract :
+        Math.abs(target.z - current.z) <= 1e-12 ? MoveKind.Link :
+        MoveKind.Rapid;
+      ops.push(ToolpathOp.Move(kind, PathGeometry.Line(current, target),
+        0.0, 0.0, span));
+    }
     current = target;
   }
 
@@ -474,8 +479,15 @@ class CamJob {
   }
 
   function feedTo(target:Point3, speed:Float, span:Provenance):Void {
-    if (current.distanceTo(target) > 1e-12)
-      ops.push(ToolpathOp.Move(MoveKind.Cut, PathGeometry.Line(current, target), speed, 0.0, span));
+    if (current.distanceTo(target) > 1e-12) {
+      var kind = MoveKind.Cut;
+      if (target.z < current.z - 1e-12)
+        kind = Math.abs(target.x - current.x) <= 1e-12 &&
+          Math.abs(target.y - current.y) <= 1e-12 ?
+          MoveKind.Plunge : MoveKind.Ramp;
+      ops.push(ToolpathOp.Move(kind, PathGeometry.Line(current, target),
+        speed, 0.0, span));
+    }
     current = target;
   }
 

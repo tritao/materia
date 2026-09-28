@@ -70,7 +70,7 @@ class CamGeneratedFixtures {
       "U pocket has separate left and right clearing passes");
     var retracted = false;
     for (index in (leftIndex + 1)...rightIndex) switch uProgram.ops[index] {
-      case Move(Rapid, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
+      case Move(Retract, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
         retracted = true;
       case _:
     }
@@ -92,7 +92,7 @@ class CamGeneratedFixtures {
         "concave pocket G-code preserves operation count");
       for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
         case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
-             [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
+             [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
           for (fraction in [0.0, 0.5, 1.0]) {
             var original = GeometryTools.pointAt(a,
               GeometryTools.length(a) * fraction);
@@ -244,7 +244,7 @@ class CamGeneratedFixtures {
       "concave profile G-code recompiles with the same operations");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
       case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
-           [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
+           [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);
@@ -262,7 +262,7 @@ class CamGeneratedFixtures {
       "concave inside G-code recompiles with the same operations");
     for (index in 0...inside.ops.length) switch [inside.ops[index], insideImported.ops[index]] {
       case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
-           [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
+           [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);
@@ -409,7 +409,7 @@ class CamGeneratedFixtures {
       "holed plate G-code round trips through CncKit");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
       case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
-           [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
+           [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);

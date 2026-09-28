@@ -20,7 +20,8 @@ class CamGCodeWriter {
     while (index < program.ops.length) {
       var op = program.ops[index];
       switch op {
-      case Move(Rapid, geometry, _, _, _):
+      case Move(Rapid, geometry, _, _, _), Move(Link, geometry, _, _, _),
+          Move(Retract, geometry, _, _, _):
         switch geometry {
           case Line(_, end): lines.push('G0 ${xyz(end)}');
           case _: throw "CAM rapid export needs a line";

@@ -73,6 +73,14 @@ class CamKitTests {
     job.drill([new Point3(0.015, 0.015, 0.0),
       new Point3(0.025, 0.015, 0.0)], tool, -0.003, 0.001, 0.005);
     var program = job.finish();
+    var moveKinds = new Map<String, Bool>();
+    for (op in program.ops) switch op {
+      case ToolpathOp.Move(kind, _, _, _, _):
+        moveKinds.set(Std.string(kind), true);
+      case _:
+    }
+    for (kind in ["Cut", "Plunge", "Ramp", "Link", "Retract"])
+      check(moveKinds.exists(kind), 'CAM emits $kind moves');
     check(program.ops.length > 30,
       "profile, pocket rings, and drills create ordered CNC geometry");
     var outsideArcs = 0;
@@ -162,12 +170,16 @@ class CamKitTests {
 
   static function equalOp(left:ToolpathOp, right:ToolpathOp, index:Int):Void {
     switch [left, right] {
-      case [ToolpathOp.Move(Rapid, a, _, _, _), ToolpathOp.Move(Rapid, b, _, _, _)]: equalGeometry(a, b, index);
-      case [ToolpathOp.Move(Cut, a, speedA, blendA, _),
-            ToolpathOp.Move(Cut, b, speedB, blendB, _)]:
+      case [ToolpathOp.Move(kindA, a, speedA, blendA, _),
+            ToolpathOp.Move(kindB, b, speedB, blendB, _)]:
+        var travelA = kindA == Rapid || kindA == Link || kindA == Retract;
+        var travelB = kindB == Rapid || kindB == Link || kindB == Retract;
+        check(travelA == travelB, 'move class $index');
         equalGeometry(a, b, index);
-        near(speedA, speedB, 'feed $index', 1e-8);
-        near(blendA, blendB, 'blend $index');
+        if (!travelA) {
+          near(speedA, speedB, 'feed $index', 1e-8);
+          near(blendA, blendB, 'blend $index');
+        }
       case [ToolpathOp.ToolChange(a, _), ToolpathOp.ToolChange(b, _)]:
         check(a == b, 'tool change $index');
       case [ToolpathOp.Spindle(channelA, valueA, _),

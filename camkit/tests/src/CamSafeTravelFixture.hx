@@ -33,7 +33,7 @@ class CamSafeTravelFixture {
     var firstRapid = false, toolChanges = 0;
     var profilePlunges = 0, drillFeeds = 0, xyRapids = 0;
     for (op in program.ops) switch op {
-      case Move(Rapid, Line(a, b), _, _, _):
+      case Move(kind, Line(a, b), _, _, _) if (kind == Rapid || kind == Link || kind == Retract):
         if (!firstRapid) {
           firstRapid = true;
           check(Math.abs(a.x - b.x) < 1e-10 &&
@@ -48,7 +48,7 @@ class CamSafeTravelFixture {
             "profile and drill XY rapids stay at safe Z");
         }
         current = b;
-      case Move(Cut, Line(a, b), speed, _, span):
+      case Move(kind, Line(a, b), speed, _, span) if (kind == Cut || kind == Plunge || kind == Ramp):
         if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < 1e-9 &&
             b.z < a.z - 1e-9) {
           if (span.line == 1 || span.line == 3) {
@@ -91,7 +91,7 @@ class CamSafeTravelFixture {
         check(GeometryTools.pointAt(a, GeometryTools.length(a))
           .distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "mixed tool G-code preserves feed endpoints");
-      case [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
+      case [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         check(GeometryTools.pointAt(a, GeometryTools.length(a))
           .distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "mixed tool G-code preserves rapid endpoints");

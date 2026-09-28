@@ -480,7 +480,8 @@ class CncInterpreter {
     for (_ in 0...repeats) {
       var plane = state.cycleR;
       if (state.position[2] < plane - 1e-12)
-        rapidTo([state.position[0], state.position[1], plane], span);
+        rapidTo([state.position[0], state.position[1], plane], span,
+          MoveKind.Retract);
       var target = state.position.copy();
       if (x != null) target[0] = state.absolute ?
         x.value * scale + offset[0] : target[0] + x.value * scale;
@@ -490,7 +491,8 @@ class CncInterpreter {
       rapidTo([state.position[0], state.position[1], plane], span);
       var depth = state.cycleDepth;
       if (code == 81 || code == 82) {
-        feedTo([state.position[0], state.position[1], depth], speed, span);
+        feedTo([state.position[0], state.position[1], depth], speed, span,
+          MoveKind.Plunge);
         if (code == 82) ops.push(ToolpathOp.Dwell(state.cycleP, span));
       } else {
         var lastCut = plane, guard = 0;
@@ -502,34 +504,40 @@ class CncInterpreter {
             var approach = Math.min(plane, lastCut + 0.000254);
             rapidTo([state.position[0], state.position[1], approach], span);
           }
-          feedTo([state.position[0], state.position[1], nextCut], speed, span);
+          feedTo([state.position[0], state.position[1], nextCut], speed, span,
+            MoveKind.Plunge);
           if (nextCut > depth + 1e-12) {
-            if (code == 83) rapidTo([state.position[0], state.position[1], plane], span);
+            if (code == 83) rapidTo([state.position[0], state.position[1], plane], span,
+              MoveKind.Retract);
             else rapidTo([state.position[0], state.position[1],
-              Math.min(plane, nextCut + 0.000254)], span);
+              Math.min(plane, nextCut + 0.000254)], span,
+              MoveKind.Retract);
           }
           lastCut = nextCut;
         }
       }
       var retract = state.retractToInitial ?
         Math.max(state.cycleInitialZ, plane) : plane;
-      rapidTo([state.position[0], state.position[1], retract], span);
+      rapidTo([state.position[0], state.position[1], retract], span,
+        MoveKind.Retract);
     }
   }
 
-  function rapidTo(target:Array<Float>, span:Provenance):Void {
+  function rapidTo(target:Array<Float>, span:Provenance,
+      kind:MoveKind = Rapid):Void {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
     var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      ops.push(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(start, end), 0.0, 0.0, span));
+      ops.push(ToolpathOp.Move(kind, PathGeometry.Line(start, end), 0.0, 0.0, span));
     state.position = target.copy();
   }
 
-  function feedTo(target:Array<Float>, speed:Float, span:Provenance):Void {
+  function feedTo(target:Array<Float>, speed:Float, span:Provenance,
+      kind:MoveKind = Cut):Void {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
     var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      ops.push(ToolpathOp.Move(MoveKind.Cut, PathGeometry.Line(start, end), speed, 0.0, span));
+      ops.push(ToolpathOp.Move(kind, PathGeometry.Line(start, end), speed, 0.0, span));
     state.position = target.copy();
   }
 

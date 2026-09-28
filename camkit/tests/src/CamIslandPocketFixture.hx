@@ -42,7 +42,7 @@ class CamIslandPocketFixture {
     var left = -1, right = -1, bossFinishing = 0;
     var ramps = 0, plunges = 0;
     for (index in 0...program.ops.length) switch program.ops[index] {
-      case Move(Cut, Line(a, b), speed, _, _) if (b.z < a.z - 1e-9):
+      case Move(kind, Line(a, b), speed, _, _) if ((kind == Plunge || kind == Ramp) && b.z < a.z - 1e-9):
         var xy = Math.sqrt(Math.pow(b.x - a.x, 2) +
           Math.pow(b.y - a.y, 2));
         if (xy > 1e-9) {
@@ -75,7 +75,7 @@ class CamIslandPocketFixture {
       "island pocket uses ramps where possible and slow plunges in short spans");
     var retracted = false;
     for (index in (left + 1)...right) switch program.ops[index] {
-      case Move(Rapid, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
+      case Move(Retract, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
         retracted = true;
       case _:
     }
@@ -142,7 +142,7 @@ class CamIslandPocketFixture {
           check(original.distanceTo(reparsed) < 1e-8,
             "island pocket G-code preserves geometry");
         }
-      case [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
+      case [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);

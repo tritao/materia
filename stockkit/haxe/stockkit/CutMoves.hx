@@ -27,7 +27,8 @@ class CutMoves {
         tool = tools(number);
       case ToolLengthOffset(_, length, _):
         toolLength = length;
-      case Move(Rapid, geometry, _, _, span):
+      case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
+          Move(Retract, geometry, _, _, span):
         if (tool != null) moves.push(new CutMove(tool,
           Path(shift(geometry, origin, toolLength)), true, index, span));
       case Move(_, geometry, _, _, span):

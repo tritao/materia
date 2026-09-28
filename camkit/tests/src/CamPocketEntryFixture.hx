@@ -16,7 +16,7 @@ class CamPocketEntryFixture {
     var ramps = 0, plunges = 0;
     var firstRapid = false;
     for (index in 0...program.ops.length) switch program.ops[index] {
-      case Move(Rapid, Line(a, b), _, _, _):
+      case Move(kind, Line(a, b), _, _, _) if (kind == Rapid || kind == Link || kind == Retract):
         if (!firstRapid) {
           firstRapid = true;
           check(Math.abs(a.x - b.x) < 1e-10 &&
@@ -28,8 +28,8 @@ class CamPocketEntryFixture {
           check(Math.abs(a.z - 0.005) < 1e-10 &&
             Math.abs(b.z - 0.005) < 1e-10,
             "pocket XY rapids stay at safe Z");
-      case Move(Cut, Line(a, b), speed, _, _)
-        if (b.z < a.z - 1e-9):
+      case Move(kind, Line(a, b), speed, _, _)
+        if ((kind == Plunge || kind == Ramp) && b.z < a.z - 1e-9):
         var xy = Math.sqrt(Math.pow(b.x - a.x, 2) +
           Math.pow(b.y - a.y, 2));
         if (xy > 1e-9) {
@@ -65,8 +65,8 @@ class CamPocketEntryFixture {
       .finish();
     var cuttingRamps = 0, cuttingPlunges = 0;
     for (op in narrowProgram.ops) switch op {
-      case Move(Cut, Line(a, b), speed, _, _)
-        if (b.z < a.z - 1e-9 && b.z < -1e-9):
+      case Move(kind, Line(a, b), speed, _, _)
+        if ((kind == Plunge || kind == Ramp) && b.z < a.z - 1e-9 && b.z < -1e-9):
         if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) > 1e-9)
           cuttingRamps++;
         else if (Math.abs(speed - 0.001) < 1e-10)

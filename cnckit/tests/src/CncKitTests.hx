@@ -387,16 +387,18 @@ class CncKitTests {
       "G98 G82 X30 Z-4 R2 P0.2\nG80\nG83 X40 Z-4 R2 Q2\n" +
       "G80\nG73 X50 Z-4 R2 Q2\nG80\nM2");
     check(cycles.diagnostics.length == 0, "four drilling cycles compile");
-    var feeds = 0, dwells = 0, cycleLine = 0;
+    var feeds = 0, retracts = 0, dwells = 0, cycleLine = 0;
     for (op in cycles.ops) switch op {
-      case ToolpathOp.Move(Cut, _, _, _, span):
+      case ToolpathOp.Move(Plunge, _, _, _, span):
         feeds++;
         if (span.line == 2) cycleLine++;
+      case ToolpathOp.Move(Retract, _, _, _, _): retracts++;
       case ToolpathOp.Dwell(_, _): dwells++;
       case _:
     }
     check(feeds == 9 && dwells == 1,
       "G81/G82/G83/G73 expand into feeds and dwell");
+    check(retracts >= 4, "drilling cycles mark upward retracts");
     check(cycleLine == 2, "repeated G81 hole uses initiating source span");
     rejects(fixtureMachine, "G21 F600 G83 X0 Z-5 R2 M2", "requires positive Q");
     rejects(fixtureMachine, "G21 F600 G82 X0 Z-5 R2 M2", "requires positive P");
@@ -407,7 +409,7 @@ class CncKitTests {
       "G53 in an active cycle reports its own line");
     var secondLineOps = 0;
     for (op in activeCycleG53.ops) switch op {
-      case ToolpathOp.Move(Rapid, _, _, _, span), ToolpathOp.Move(Cut, _, _, _, span):
+      case ToolpathOp.Move(_, _, _, _, span):
         if (span.line == 2) secondLineOps++;
       case _:
     }
@@ -563,7 +565,7 @@ class CncKitTests {
     var low = [1e9, 1e9, 1e9], high = [-1e9, -1e9, -1e9];
     for (op in result.ops) {
       var geometry = switch op {
-        case ToolpathOp.Move(Rapid, g, _, _, _) | ToolpathOp.Move(Cut, g, _, _, _): g;
+        case ToolpathOp.Move(_, g, _, _, _): g;
         case _: null;
       };
       if (geometry == null) continue;
@@ -595,7 +597,7 @@ class CncKitTests {
     var pathIndex = 0;
     for (op in result.ops) {
       var geometry = switch op {
-        case ToolpathOp.Move(Rapid, g, _, _, _) | ToolpathOp.Move(Cut, g, _, _, _): g;
+        case ToolpathOp.Move(_, g, _, _, _): g;
         case _: null;
       };
       if (geometry == null) continue;
