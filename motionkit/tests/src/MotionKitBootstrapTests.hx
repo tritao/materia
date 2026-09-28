@@ -2100,6 +2100,7 @@ class MotionKitBootstrapTests {
     near(robot.snapshot().positions.get(0), stoppedPosition,
       "controlled hold remains stopped after deceleration", 1e-5);
 
+    machine.update();
     machine.resume();
     check(!machine.isHolding(), "buffer resumes from controlled hold");
     for (_ in 0...2) {

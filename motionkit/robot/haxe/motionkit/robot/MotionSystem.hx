@@ -16,6 +16,7 @@ import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
+import robotkit.runtime.RobotRuntimeError;
 import RobotKitRuntime;
 
 /**
@@ -46,20 +47,14 @@ class MotionSystem {
   var activeTrajectory:Null<Trajectory> = null;
   var queuedTrajectories:Array<Trajectory> = [];
   final stream:TrajectoryStream;
+  final session:MotionSession = new MotionSession();
   var activeStationary:Bool = false;
   var elapsedSeconds(get, never):Float;
-  var held:Bool = false;
   /** A native lifecycle command must reach the owner before another plan. */
   var nativeRefillDeferred:Bool = false;
   var bufferedTotalSeconds:Float = 0.0;
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
-  /** True while stopping so that deferred work can start from rest. */
-  var stoppingForReplacement:Bool = false;
-  /** Copied commands deferred until a replacement stop reaches rest, in order. */
-  var afterStop:Array<MotionRequest> = [];
-  /** Logical axis of the active jog, which a further jog can change without stopping. */
-  var activeJogAxis:Null<String> = null;
   final modelRevision:Int64;
   final calibrationRevision:Int64;
 
@@ -112,7 +107,22 @@ class MotionSystem {
 
   /** True while a trajectory is active, held, or waiting to start after a stop. */
   public function isMoving():Bool
-    return activeTrajectory != null || stoppingForReplacement || afterStop.length > 0;
+    return activeTrajectory != null || session.isStopping() || session.hasPending();
+
+  public function sessionState():SessionState return session.state;
+
+  /** A fault is latched until the application explicitly resets runtime safety. */
+  public function reset():Void {
+    if (!session.isFaulted()) return;
+    robot.resetSafety();
+    var snapshot = robot.snapshot();
+    if (snapshot.faultCode != 0) {
+      session.observe(snapshot);
+      throw 'Motion runtime fault ${snapshot.faultCode} remains after reset';
+    }
+    clearBufferedMotionAfterFault();
+    session.reset();
+  }
 
   public function trajectory():Null<Trajectory> return activeTrajectory;
 
@@ -138,7 +148,7 @@ class MotionSystem {
     return Math.min(1.0, Math.max(0.0, completed / bufferedTotalSeconds));
   }
 
-  public function isHolding():Bool return held;
+  public function isHolding():Bool return session.isHolding();
 
   /**
    * Plans a coordinated move while leaving unspecified axes at their current
@@ -147,6 +157,7 @@ class MotionSystem {
    * it came to rest and null is returned, as the plan does not exist yet.
    */
   public function moveAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
+    checkSnapshot();
     var retargeted = retargetNativeAxes(targets, options);
     if (retargeted != null) return retargeted;
     var planned = planAxesFrom(robot.snapshot().positions.toArray(), targets, options);
@@ -155,8 +166,9 @@ class MotionSystem {
 
   /** Adds a coordinated axis move behind all motion already in the buffer. */
   public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
-    if (afterStop.length > 0) {
-      afterStop.push(MotionRequestCapture.queuedAxes(targets, options));
+    checkSnapshot();
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedAxes(targets, options));
       return null;
     }
     var trajectoryValue = planAxesFrom(planningStartPositions(), targets, options);
@@ -166,12 +178,13 @@ class MotionSystem {
 
   /** Adds an already planned joint trajectory to the execution buffer. */
   public function queueTrajectory(trajectoryValue:Trajectory):Void {
+    checkSnapshot();
     if (trajectoryValue == null) throw "Queued trajectory is required";
     var jointCount = robot.description().joints.length;
     if (trajectoryValue.jointCount() != jointCount)
       throw 'Queued trajectory has ${trajectoryValue.jointCount()} joints; robot has $jointCount';
-    if (afterStop.length > 0) {
-      afterStop.push(MotionRequestCapture.queuedTrajectory(trajectoryValue));
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedTrajectory(trajectoryValue));
       return;
     }
     enqueueTrajectory(trajectoryValue);
@@ -183,6 +196,7 @@ class MotionSystem {
    */
   public function moveLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
+    checkSnapshot();
     var planned = planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options);
     return replaceMotion(planned, MotionRequestCapture.linear(target, feed, options));
   }
@@ -190,8 +204,9 @@ class MotionSystem {
   /** Adds a straight Cartesian move behind all motion already in the buffer. */
   public function queueLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
-    if (afterStop.length > 0) {
-      afterStop.push(MotionRequestCapture.queuedLinear(target, feed, options));
+    checkSnapshot();
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedLinear(target, feed, options));
       return null;
     }
     var trajectoryValue = planLinearPathFrom(planningStartPositions(), target, feed, options);
@@ -206,6 +221,7 @@ class MotionSystem {
    */
   public function movePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
       ?motionOptions:MotionOptions):Trajectory {
+    checkSnapshot();
     if (isMotionInProgress())
       throw "A path must start where the machine is at rest; hold and wait before replacing motion with a path";
     var trajectoryValue = planPathFrom(robot.snapshot().positions.toArray(), path,
@@ -218,8 +234,9 @@ class MotionSystem {
   /** Adds a connected Cartesian polyline behind motion already in the buffer. */
   public function queuePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
       ?motionOptions:MotionOptions):Null<Trajectory> {
-    if (afterStop.length > 0) {
-      afterStop.push(MotionRequestCapture.queuedPath(path, pathOptions, motionOptions));
+    checkSnapshot();
+    if (session.hasPending()) {
+      session.append(MotionRequestCapture.queuedPath(path, pathOptions, motionOptions));
       return null;
     }
     var trajectoryValue = planPathFrom(planningStartPositions(), path,
@@ -230,9 +247,8 @@ class MotionSystem {
 
   /** Holds buffered motion and slows to rest along the path without discarding it. */
   public function hold():Void {
-    if (held) return;
-    held = true;
-    if (activeTrajectory != null) robot.submit(RobotCommand.Hold);
+    checkSnapshot();
+    if (session.hold() && activeTrajectory != null) submitCommand(RobotCommand.Hold);
   }
 
   /**
@@ -240,21 +256,12 @@ class MotionSystem {
    * path. If the hold is still slowing down, it resumes once at rest.
    */
   public function resume():Void {
-    if (!held) return;
+    checkSnapshot();
+    if (!session.resume()) return;
     if (activeTrajectory != null) {
-      if (trajectoryFinishedInRuntime(syncFromRuntime())) {
-        completeActiveTrajectory();
-        held = false;
-        activateNextTrajectory();
-        return;
-      }
-      robot.submit(RobotCommand.Resume);
+      submitCommand(RobotCommand.Resume);
       nativeRefillDeferred = true;
-      held = false;
-      return;
-    }
-    held = false;
-    activateNextTrajectory();
+    } else activateNextTrajectory();
   }
 
   /**
@@ -262,16 +269,21 @@ class MotionSystem {
    * path before discarding it; an emergency stop acts immediately.
    */
   public function abort(?mode:StopMode = StopMode.Normal):Void {
+    checkSnapshot();
     if (mode == StopMode.Normal && isMotionInProgress() && elapsedSeconds > 1e-9) {
-      robot.submit(RobotCommand.Abort);
+      submitCommand(RobotCommand.Abort);
       queuedTrajectories = [];
-      afterStop = [];
-      held = false;
-      stoppingForReplacement = true;
+      session.stop(Discard, []);
+      return;
+    }
+    if (mode != StopMode.Normal && (session.state == Holding || session.isStopping())) {
+      stopRobot(mode);
+      queuedTrajectories = [];
+      session.stop(Discard, []);
       return;
     }
     clearBufferedMotion();
-    robot.stop(mode);
+    stopRobot(mode);
   }
 
   /**
@@ -282,7 +294,7 @@ class MotionSystem {
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
-      activeJogAxis = switch request {
+      session.jogAxis = switch request {
         case Jog(axisId, _, _, _): axisId;
         case _: null;
       };
@@ -290,9 +302,7 @@ class MotionSystem {
     }
     discardNativeTrajectory(planned);
     queuedTrajectories = [];
-    afterStop = [request];
-    held = false;
-    stoppingForReplacement = true;
+    session.stop(Replan, [request]);
     beginStop();
     return null;
   }
@@ -302,40 +312,39 @@ class MotionSystem {
    * started and not finished, or a stop still slowing down.
    */
   function isMotionInProgress():Bool {
-    if (stoppingForReplacement) return true;
+    if (session.isStopping() || session.state == Holding) return true;
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return false;
     if (syncFromRuntime().trajectoryActive) return true;
     return elapsedSeconds > 1e-9 && elapsedSeconds < trajectoryValue.durationSeconds() - 1e-9 &&
-      !(held && stopSettled());
+      !(session.isHolding() && stopSettled());
   }
 
   /** Slows the active trajectory to rest along its path. */
   function beginStop():Void {
     if (activeTrajectory != null) {
       syncFromRuntime();
-      robot.stop(StopMode.Normal);
+      stopRobot(StopMode.Normal);
     }
   }
 
   /** True once a requested stop has reached rest. */
   function stopSettled():Bool {
     var observation = syncFromRuntime();
-    return !observation.trajectoryActive &&
+    return (observation.sessionState == RobotKitRuntimeConstants.RK_SESSION_HELD ||
+      !observation.trajectoryActive) &&
       observation.sessionState != RobotKitRuntimeConstants.RK_SESSION_STOPPING;
   }
 
   /** Runs deferred work or a pending resume once a stop has reached rest. */
   function advanceStop():Void {
     if (!stopSettled()) return;
-    if (stoppingForReplacement && !held) {
-      stoppingForReplacement = false;
-      held = false;
-      var actions = afterStop;
-      afterStop = [];
-      for (action in actions) executeAfterStop(action);
-      return;
-    }
+    var wasHolding = session.state == Holding;
+    var discarding = session.state == Stopping(Discard);
+    var actions = session.rest();
+    if (discarding) clearBufferedMotion();
+    if (wasHolding && session.resumePending) resume();
+    for (action in actions) executeAfterStop(action);
   }
 
   function executeAfterStop(request:MotionRequest):Void {
@@ -358,7 +367,7 @@ class MotionSystem {
         if (axisValue == null) throw 'Unknown motion axis "$axisId"';
         beginImmediate(axisPlanner.planJog(robot.snapshot().positions.toArray(),
           axisValue, velocity, durationSeconds, acceleration).trajectory);
-        activeJogAxis = axisId;
+        session.jogAxis = axisId;
       case Queued(command):
         switch command {
           case Axes(targets, options): queueAxes(targets, options);
@@ -409,6 +418,7 @@ class MotionSystem {
    */
   public function jog(axisId:String, velocity:Float, durationSeconds:Float,
       ?maxAcceleration:Float):Null<Trajectory> {
+    checkSnapshot();
     var axisValue = axis(axisId);
     if (axisValue == null) throw 'Unknown motion axis "$axisId"';
     if (!Math.isFinite(velocity) || velocity == 0.0)
@@ -438,8 +448,8 @@ class MotionSystem {
   function continueJog(axisValue:MotionAxis, velocity:Float, durationSeconds:Float,
       acceleration:Float):Null<Trajectory> {
     var executing = activeTrajectory;
-    if (executing == null || activeJogAxis != axisValue.id || held || stoppingForReplacement ||
-        afterStop.length > 0 || queuedTrajectories.length > 0)
+    if (executing == null || session.jogAxis != axisValue.id || session.isHolding() || session.isStopping() ||
+        session.hasPending() || queuedTrajectories.length > 0)
       return null;
     var smooth = executing;
     if (smooth != null) {
@@ -453,8 +463,8 @@ class MotionSystem {
   function retargetNativeAxes(targets:Array<AxisTarget>,
       options:Null<MotionOptions>):Null<Trajectory> {
     var executing = activeTrajectory;
-    if (executing == null || held || stoppingForReplacement ||
-        afterStop.length > 0 || queuedTrajectories.length > 0)
+    if (executing == null || session.isHolding() || session.isStopping() ||
+        session.hasPending() || queuedTrajectories.length > 0)
       return null;
     var smooth = executing;
     if (smooth == null || smooth.segments()[0].coefficients[0].length < 3) return null;
@@ -465,10 +475,15 @@ class MotionSystem {
   function trySmoothReplacement(executing:Trajectory, jogAxis:Null<String>,
       planFromState:TrajectoryState -> Trajectory):Null<Trajectory> {
     if (executing == null) return null;
-    return TrajectoryStream.replaceWithRetry(executing, syncFromRuntime,
-      replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
-      (planned, state, observation, anchorNs) ->
-        submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
+    try {
+      return TrajectoryStream.replaceWithRetry(executing, syncFromRuntime,
+        replacementOwnerPeriodSeconds, replacementMarginOwnerPeriods, planFromState,
+        (planned, state, observation, anchorNs) ->
+          submitSmoothReplacement(planned, state, observation, anchorNs, jogAxis));
+    } catch (error:RobotRuntimeError) {
+      session.reject();
+      throw error;
+    }
   }
 
   function submitSmoothReplacement(planned:Trajectory, state:TrajectoryState,
@@ -476,7 +491,7 @@ class MotionSystem {
     var tag = stream.submitSmoothReplacement(planned, state, observation,
       anchorNs, modelRevision, calibrationRevision);
     setActive(planned);
-    activeJogAxis = jogAxis;
+    session.jogAxis = jogAxis;
     bufferedTotalSeconds = planned.durationSeconds();
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = trajectoryEnd(planned);
@@ -491,7 +506,8 @@ class MotionSystem {
   public function update(?dtSeconds:Float = -1.0):Bool {
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
-    if (held || stoppingForReplacement) {
+    checkSnapshot();
+    if (session.isHolding() || session.isStopping()) {
       // No refills while stopping: beginStop() already queued enough path for
       // the whole stop, and a late chunk could otherwise land after the stop
       // finished and be taken as a resume.
@@ -499,7 +515,7 @@ class MotionSystem {
       if (stopping != null && trajectoryFinishedInRuntime(syncFromRuntime()))
         completeActiveTrajectory();
       advanceStop();
-      if (held || stoppingForReplacement) return false;
+      if (session.isHolding() || session.isStopping()) return false;
     }
     if (activeTrajectory == null) activateNextTrajectory();
     if (activeTrajectory == null) return false;
@@ -509,7 +525,7 @@ class MotionSystem {
       return activeTrajectory != null;
     }
     var observation = syncFromRuntime();
-    if (stoppingForReplacement) return true;
+    if (session.isStopping()) return true;
     if (trajectoryFinishedInRuntime(observation)) {
       completeActiveTrajectory();
       return activeTrajectory != null;
@@ -529,7 +545,7 @@ class MotionSystem {
     activeTrajectory = trajectoryValue;
     var segments = trajectoryValue.segments();
     activeStationary = stationarySegments(segments);
-    activeJogAxis = null;
+    session.begin();
     stream.begin(segments, trajectoryValue.durationSeconds());
   }
 
@@ -562,7 +578,7 @@ class MotionSystem {
   }
 
   function activateNextTrajectory():Void {
-    if (held || stoppingForReplacement || activeTrajectory != null ||
+    if (session.isHolding() || session.isStopping() || activeTrajectory != null ||
         queuedTrajectories.length == 0)
       return;
     var next:Trajectory = queuedTrajectories.shift();
@@ -574,10 +590,7 @@ class MotionSystem {
     activeTrajectory = null;
     activeStationary = false;
     queuedTrajectories = [];
-    held = false;
-    stoppingForReplacement = false;
-    afterStop = [];
-    activeJogAxis = null;
+    session.clear();
     bufferedTotalSeconds = 0.0;
     bufferedCompletedSeconds = 0.0;
     plannedEndPositions = null;
@@ -591,18 +604,23 @@ class MotionSystem {
     if (trajectoryValue == null) return;
     var jerkUnchecked = pathJerkUnchecked.exists(trajectoryValue) &&
       pathJerkUnchecked.get(trajectoryValue) == true;
-    stream.fill(robot.snapshot().positions.length, false,
-      (first, last, tag, startNs, _) -> stream.motionSubmission(
-        trajectoryValue, first, last, tag, startNs, modelRevision,
-        calibrationRevision, jerkUnchecked),
-      (first, last, error) ->
-        'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
+    try {
+      stream.fill(robot.snapshot().positions.length, false,
+        (first, last, tag, startNs, _) -> stream.motionSubmission(
+          trajectoryValue, first, last, tag, startNs, modelRevision,
+          calibrationRevision, jerkUnchecked),
+        (first, last, error) ->
+          'plan chunk [$first,$last] of ${trajectoryValue.segments().length}: $error');
+    } catch (error:Dynamic) {
+      session.reject();
+      throw error;
+    }
   }
 
   function get_elapsedSeconds():Float return stream.elapsedSeconds;
 
   function syncFromRuntime():RobotSnapshot
-    return activeTrajectory == null ? robot.snapshot() : stream.sync();
+    return observe(activeTrajectory == null ? robot.snapshot() : stream.sync());
 
   function trajectoryFinishedInRuntime(observation:RobotSnapshot):Bool
     return activeTrajectory != null && stream.finishedMotion(observation);
@@ -614,7 +632,43 @@ class MotionSystem {
     activeTrajectory = null;
     activeStationary = false;
     stream.clear();
+    session.completed();
     activateNextTrajectory();
+  }
+
+  function observe(snapshot:RobotSnapshot):RobotSnapshot {
+    session.observe(snapshot);
+    session.requireReady();
+    return snapshot;
+  }
+
+  function checkSnapshot():Void observe(robot.snapshot());
+
+  function submitCommand(command:RobotCommand):Void {
+    try robot.submit(command) catch (error:Dynamic) {
+      session.reject();
+      throw error;
+    }
+    checkSnapshot();
+  }
+
+  function stopRobot(mode:StopMode):Void {
+    try robot.stop(mode) catch (error:Dynamic) {
+      session.reject();
+      throw error;
+    }
+    checkSnapshot();
+  }
+
+  function clearBufferedMotionAfterFault():Void {
+    activeTrajectory = null;
+    activeStationary = false;
+    queuedTrajectories = [];
+    bufferedTotalSeconds = 0.0;
+    bufferedCompletedSeconds = 0.0;
+    plannedEndPositions = null;
+    nativeRefillDeferred = false;
+    stream.clear();
   }
 
   function discardNativeTrajectory(value:Trajectory):Void {
