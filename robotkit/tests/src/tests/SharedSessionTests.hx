@@ -36,9 +36,8 @@ class SharedSessionTests {
     person.pushKeyframe(0.0, [new SimPose(-2.0, 0.0, 0.8)]);
     person.pushKeyframe(1.0, [new SimPose(-1.0, 0.0, 0.8)]);
 
-    var threw = false;
-    try simulation.step(Int64.ofInt(0)) catch (_:Dynamic) threw = true;
-    if (!threw) throw "a joined session's clock belongs to its owner";
+    // A joined session's clock belongs to its owner: Simulation has no
+    // step/start/stop/reset of its own to misuse; only the session does.
     for (_ in 0...50) session.step();
     if (ticks.times.length != 50 || ticks.times[0] != Int64.ofInt(10000000) ||
         ticks.times[49] != Int64.ofInt(500000000) ||

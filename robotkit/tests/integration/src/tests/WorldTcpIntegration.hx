@@ -89,7 +89,8 @@ class WorldTcpIntegration {
     var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID);
     world.attach(remote);
-    var simulation = new robotkit.runtime.Simulation();
+    var simulationHarness = new robotkit.runtime.SimulationHarness();
+    var simulation = simulationHarness.simulation;
     var failure:Dynamic = null;
     try {
       var model = new robotkit.model.RobotModel("demo-forklift");
@@ -141,8 +142,8 @@ class WorldTcpIntegration {
           Int64.ofInt(1), Int64.ofInt(1), "camera.fixture");
       }
       world.attach(local);
-      simulation.step(Int64.ofInt(1));
-      simulation.step(Int64.ofInt(2));
+      simulationHarness.step(Int64.ofInt(1));
+      simulationHarness.step(Int64.ofInt(2));
       remote.connect(host, port, runtime.events);
       waitUntil(runtime, function() return remote.status() == RobotStatus.Ready, "RemoteRobot did not become ready");
       if (remote.id() != LOGICAL_ID) throw "world changed the logical robot ID";
@@ -245,8 +246,8 @@ class WorldTcpIntegration {
         ], null), LOGICAL_ID);
         if (localRunner.update(local) != 0 || remoteRunner.update(remote) != 0)
           throw "runner emitted duplicate commands for an unchanged snapshot";
-        simulation.step(Int64.ofInt(tick++));
-        simulation.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
         waitUntil(runtime, function() {
           var value = remote.snapshot();
           if (value.positions.length != 3 || value.positions.get(0) != target) return false;
@@ -376,7 +377,7 @@ class WorldTcpIntegration {
       Sys.println('RobotKit TCP world test passed: logical=$LOGICAL_ID protocol=42 q0=$position');
     } catch (error:Dynamic) failure = error;
     world.close();
-    simulation.dispose();
+    simulationHarness.dispose();
     runtime.dispose();
     if (failure != null) throw failure;
   }

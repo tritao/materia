@@ -17,13 +17,10 @@
  * 4. publish one snapshot for every runtime.
  *
  * rk_simulation_create_in_session() attaches robots to a session the caller
- * owns and advances. rk_simulation_create() instead owns a private session,
- * whose clock rk_simulation_step(), rk_simulation_start(),
- * rk_simulation_stop(), and rk_simulation_reset() control, and whose
- * environment the rk_simulation_*_object() calls edit; those calls are for
- * that mode only and are superseded by the session's own. Robot topology must
- * be complete before the session's first start or step, because the first
- * tick seals the world layout.
+ * owns, steps, starts, stops, and resets, and whose environment (objects and
+ * actors) the caller edits directly through the session API. Robot topology
+ * must be complete before the session's first start or step, because the
+ * first tick seals the world layout.
  */
 
 #include "robotkit_runtime.h"
@@ -36,31 +33,12 @@ extern "C" {
 /** Opaque handle for one shared simulation universe and clock. */
 typedef uint32_t rk_simulation RK_HANDLE RK_HANDLE_DESTROY(rk_simulation_destroy);
 #define RK_INVALID_SIMULATION ((rk_simulation)0)
-/** Opaque ID for an environment object owned by a Simulation. */
-typedef uint32_t rk_simulation_object;
-#define RK_INVALID_SIMULATION_OBJECT ((rk_simulation_object)0)
-
-/**
- * Construction parameters for one shared Simulation owner.
- *
- * @note struct_size must be initialized to sizeof(rk_simulation_desc). The
- * fixed timestep is expressed in seconds and must be positive. Physics
- * substeps controls the backend solver subdivisions within one RobotKit tick.
- */
-typedef struct rk_simulation_desc {
-    uint32_t struct_size RK_STRUCT_SIZE;
-    double fixed_timestep;
-    uint32_t physics_substeps;
-    uint32_t backend; /**< 0: deterministic test backend; 1: MuJoCo (must be built). */
-    uint64_t reserved[4];
-} rk_simulation_desc;
 
 /**
  * Read-only clock values published by a Simulation tick.
  *
  * step_index counts successfully completed physics advances. simulation_time
- * is the corresponding fixed-step time in seconds; it is independent of the
- * legacy owner-clock hint passed to rk_simulation_step().
+ * is the corresponding fixed-step time in seconds.
  */
 typedef struct rk_simulation_clock {
     uint32_t struct_size RK_STRUCT_SIZE;
@@ -68,17 +46,6 @@ typedef struct rk_simulation_clock {
     double simulation_time;
     uint64_t reserved[2];
 } rk_simulation_clock;
-
-/** Editable-scene description for one simulation-owned environment object. */
-typedef struct rk_simulation_object_desc {
-    uint32_t struct_size RK_STRUCT_SIZE;
-    uint32_t motion_type; /**< 0 static, 1 kinematic, 2 dynamic. */
-    double position[3];
-    double rotation[4]; /**< Quaternion in x, y, z, w order. */
-    double half_extents[3]; /**< Box dimensions used by the default object shape. */
-    double mass;
-    uint64_t reserved[2];
-} rk_simulation_object_desc;
 
 typedef struct rk_simulation_pose {
     uint32_t struct_size RK_STRUCT_SIZE;
@@ -236,39 +203,22 @@ typedef struct rk_simulation_presentation_info {
 } rk_simulation_presentation_info;
 typedef enum rk_simulation_presentation_pose_kind {
     RK_SIMULATION_PRESENTATION_ROBOT_BASE = 1,
-    RK_SIMULATION_PRESENTATION_ROBOT_LINK = 2,
-    RK_SIMULATION_PRESENTATION_ENVIRONMENT = 3
+    RK_SIMULATION_PRESENTATION_ROBOT_LINK = 2
 } rk_simulation_presentation_pose_kind;
 typedef struct rk_simulation_presentation_pose {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t kind;
     uint32_t robot_index;
     uint32_t link_index;
-    uint32_t object_id;
-    uint32_t reserved[3];
+    uint32_t reserved[4];
     double position[3];
     double rotation[4];
 } rk_simulation_presentation_pose;
 
 /**
- * Creates one shared simulated universe and its fixed-step clock.
- *
- * The returned handle owns the SceneKit scene, SimKit world, physics host,
- * clock, and all native resources created for attached robots. No robot
- * runtime exists until rk_simulation_add_robot() is called.
- *
- * @param desc Simulation timing and solver configuration.
- * @param out_simulation Receives an owned simulation handle.
- * @return RK_OK on success, or an argument/backend/allocation error.
- */
-RK_API rk_result RK_CALL rk_simulation_create(
-    const rk_simulation_desc *desc, rk_simulation *out_simulation RK_OUT RK_OWNED);
-/**
  * Attaches a new, empty set of robots to a session the caller owns.
  *
- * The session must be stopped and must outlive the returned handle. The
- * session's owner steps, starts, stops, and resets it; the matching
- * rk_simulation calls return RK_ERROR_INVALID_STATE for this handle.
+ * The session must be stopped and must outlive the returned handle.
  * Destroying the handle while the session is stopped removes its robots from
  * the world.
  *
@@ -291,9 +241,8 @@ RK_API void RK_CALL rk_simulation_destroy(rk_simulation simulation);
  *
  * The blueprint becomes immutable simulation topology. The returned runtime
  * accepts commands and publishes snapshots, but it cannot be started or
- * ticked as an independent runtime; advance the owning simulation instead.
- * All robots should be added before the first call to rk_simulation_step() or
- * rk_simulation_start().
+ * ticked as an independent runtime; advance the session instead. All robots
+ * should be added before the session's first step or start.
  *
  * @param simulation Shared simulation owner.
  * @param blueprint Compiled robot topology and joint metadata.
@@ -306,40 +255,9 @@ RK_API rk_result RK_CALL rk_simulation_add_robot(
     rk_simulation simulation, const rk_robot_runtime_blueprint *blueprint,
     const rk_simulation_robot_desc *robot_desc,
     rk_robot_runtime *out_runtime RK_OUT RK_OWNED);
-/**
- * Applies all attached robot commands and advances the world exactly once.
- *
- * timestamp_ns is a compatibility owner-clock hint. Simulation samples use
- * fixed simulation source time and actual local monotonic receipt time,
- * neither derived from this argument. If any command fails, the world is not
- * advanced and staged commands are discarded so robots cannot observe a
- * partially committed tick.
- *
- * @param simulation Shared simulation owner.
- * @param timestamp_ns Legacy owner-clock hint, ignored by simulated sensors.
- * @return RK_OK after one complete world advance, or an error with no advance.
- */
-RK_API rk_result RK_CALL rk_simulation_step(rk_simulation simulation,
-                                            uint64_t timestamp_ns);
 /** Disconnects or reconnects one virtual RKD6 device in a simulation. */
 RK_API rk_result RK_CALL rk_simulation_cut_virtual_device_link(
     rk_simulation simulation, uint32_t robot_index, uint32_t cut);
-/**
- * Starts the simulation's realtime owner thread.
- *
- * Topology is sealed on the first successful start. While running, callers
- * submit commands through runtime handles and read snapshots; manual calls to
- * rk_simulation_step() are rejected until rk_simulation_stop() completes.
- */
-RK_API rk_result RK_CALL rk_simulation_start(rk_simulation simulation);
-/**
- * Stops the realtime owner thread without destroying the simulation.
- *
- * The simulation handle and its latest clock/snapshot remain available for
- * inspection. Use rk_simulation_start() again only if the backend and caller
- * lifecycle permit restarting the shared clock.
- */
-RK_API rk_result RK_CALL rk_simulation_stop(rk_simulation simulation);
 /**
  * Reads the shared simulation clock.
  *
@@ -349,8 +267,6 @@ RK_API rk_result RK_CALL rk_simulation_stop(rk_simulation simulation);
  */
 RK_API rk_result RK_CALL rk_simulation_get_clock(
     rk_simulation simulation, rk_simulation_clock *out_clock RK_INOUT);
-/** Stops the owner, restores all bodies, and resets the shared fixed-step clock. */
-RK_API rk_result RK_CALL rk_simulation_reset(rk_simulation simulation);
 /** Restores one attached robot's bodies and clears its runtime state. */
 RK_API rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation,
                                                     uint32_t robot_index);
@@ -460,12 +376,16 @@ RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
 RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
     rk_simulation_pose *out_pose RK_INOUT);
-/** Contact involving one robot link. tool_piece_index is -1 for link geometry. */
+/**
+ * Contact involving one robot link. tool_piece_index is -1 for link geometry.
+ * other_object is the session object (nksim_object) the caller created that
+ * the link touches, or zero for another robot link or an unowned body.
+ */
 typedef struct rk_robot_contact {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t link_index;
     int32_t tool_piece_index;
-    rk_simulation_object other_object; /**< Zero for another robot link. */
+    nksim_object other_object;
     double distance;
     double position[3];
     double normal[3];
@@ -478,29 +398,14 @@ RK_API rk_result RK_CALL rk_simulation_get_robot_contacts(
 RK_API rk_result RK_CALL rk_simulation_get_robot_contact(
     rk_simulation simulation, rk_robot_runtime runtime, uint32_t index,
     rk_robot_contact *out_contact RK_INOUT);
-/** Adds one environment body from the editable scene while stopped. */
-RK_API rk_result RK_CALL rk_simulation_spawn_object(
-    rk_simulation simulation, const rk_simulation_object_desc *desc,
-    rk_simulation_object *out_object RK_OUT);
-/** Removes one environment body while stopped. */
-RK_API rk_result RK_CALL rk_simulation_remove_object(
-    rk_simulation simulation, rk_simulation_object object);
-/** Teleports one environment body while stopped. */
-RK_API rk_result RK_CALL rk_simulation_teleport_object(
-    rk_simulation simulation, rk_simulation_object object,
-    const rk_simulation_pose *pose);
-/** Reads one environment object's pose from the latest physics state. */
-RK_API rk_result RK_CALL rk_simulation_get_object_pose(
-    rk_simulation simulation, rk_simulation_object object,
-    rk_simulation_pose *out_pose RK_INOUT);
 /** Copies the complete clock and every presentation pose under one simulation lock. */
 RK_API rk_result RK_CALL rk_simulation_capture_presentation(
     rk_simulation simulation,
     rk_simulation_presentation *out_presentation RK_OUT RK_OWNED);
 /**
- * Copies every robot pose, and every object spawned through this simulation,
- * from a frame captured from its session, so robots, props, and people drawn
- * from one frame agree.
+ * Copies every robot pose from a frame captured from its session, so robots
+ * and the session's other participants drawn from one frame agree. Read an
+ * environment object's pose directly from the frame (nksim_frame_get_object_pose).
  */
 RK_API rk_result RK_CALL rk_simulation_present_frame(
     rk_simulation simulation, nksim_frame frame,

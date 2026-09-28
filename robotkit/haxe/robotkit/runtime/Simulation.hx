@@ -14,10 +14,9 @@ private typedef StepObserverEntry = {id:Int, observer:SimulationStepObserver};
 /**
  * The robots taking part in one SimKit session.
  *
- * Simulation.inSession() attaches robots to a session the caller owns and
- * advances, alongside the session's props and people. The constructor instead
- * owns a private session whose clock this object's step, start, stop, and
- * reset control, and whose environment spawnBox edits.
+ * The session's owner (Simulation.inSession()'s caller) advances it, alongside
+ * its props and people, and controls its clock (step, start, stop, reset) and
+ * its environment (session objects and actors) directly.
  *
  * The object creates RobotRuntime handles but remains their simulation owner:
  * callers should submit through those handles and advance the session once per
@@ -30,48 +29,30 @@ class Simulation {
   final stepObservers:Array<StepObserverEntry> = [];
   var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
-  /** The session this simulation joined, or null when it owns its own. */
-  final session:Null<SimSession>;
-  var sessionObserverId:Null<Int>;
+  /** The session this simulation joined. */
+  final session:SimSession;
+  /** Runs this simulation's step observers after each session tick. */
+  final sessionObserverId:Int;
   final fixedTimestepNs:Int64;
   var sourceTimeNs:Int64 = Int64.ofInt(0);
   var disposed:Bool = false;
 
-  /**
-   * Owns a private session. With `session`, joins that stopped session
-   * instead and ignores the timing arguments; prefer Simulation.inSession().
-   */
-  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0,
-      ?session:SimSession) {
+  /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
+  public function new(session:SimSession) {
     this.session = session;
-    if (session != null) {
-      fixedTimestepSeconds = session.fixedTimestep();
-      fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestepSeconds * 1e9)));
-      var attached = RobotKitSimKit.rk_simulation_create_in_session(session.nativeHandle());
-      check(attached.status, "simulation.createInSession");
-      owner = attached.out_simulation;
-      sessionObserverId = session.addStepObserver(afterStep);
-      return;
-    }
-    if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
-      throw "Simulation requires a positive finite timestep and positive substep count";
-    fixedTimestepSeconds = fixedTimestep;
-    fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestep * 1e9)));
-    var desc = new rk_simulation_desc();
-    desc.set_struct_size(rk_simulation_desc.size());
-    desc.set_fixed_timestep(fixedTimestep);
-    desc.set_physics_substeps(physicsSubsteps);
-    desc.set_backend(backend);
-    var result = RobotKitSimKit.rk_simulation_create(desc);
-    check(result.status, "simulation.create");
-    owner = result.out_simulation;
+    fixedTimestepSeconds = session.fixedTimestep();
+    fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestepSeconds * 1e9)));
+    var attached = RobotKitSimKit.rk_simulation_create_in_session(session.nativeHandle());
+    check(attached.status, "simulation.createInSession");
+    owner = attached.out_simulation;
+    sessionObserverId = session.addStepObserver(afterStep);
   }
 
   /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
   public static function inSession(session:SimSession):Simulation
-    return new Simulation(0.01, 1, 0, session);
+    return new Simulation(session);
 
-  /** Robot poses, and boxes spawned here, from a frame captured from the session. */
+  /** Robot poses from a frame captured from the session. */
   public function presentFrame(frame:SimFrame):SimulationPresentationSnapshot {
     ensureLive();
     var result = RobotKitSimKit.rk_simulation_present_frame(owner.borrow(), frame.nativeHandle());
@@ -305,7 +286,8 @@ class Simulation {
       check(result.status, "simulation.robotContact");
       value = result.out_contact;
       contacts.push({linkIndex: value.get_link_index(),
-        toolPieceIndex: value.get_tool_piece_index(), otherObject: value.get_other_object(),
+        toolPieceIndex: value.get_tool_piece_index(),
+        otherObject: value.get_other_object().rawValue(),
         distance: value.get_distance(),
         position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
         normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
@@ -333,14 +315,10 @@ class Simulation {
     }
   }
 
-  /** Advances once. timestampNs remains a legacy native hint; sensor observers
-   * receive a separate monotonically increasing simulation source time. */
-  public function step(timestampNs:Int64):Void {
-    ensureLive();
-    check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");
-    afterStep();
-  }
-
+  /**
+   * Runs step observers after each session tick, keeping the monotonically
+   * increasing simulation source time explicitly stepped sensors read.
+   */
   function afterStep():Void {
     sourceTimeNs = Int64.add(sourceTimeNs, fixedTimestepNs);
     for (entry in stepObservers.copy()) {
@@ -359,44 +337,22 @@ class Simulation {
       robotIndex, cut ? 1 : 0), "simulation.cutVirtualDeviceLink");
   }
 
-  /** Starts the shared realtime clock after topology construction is complete. */
-  public function start():Void {
-    ensureLive();
-    check(RobotKitSimKit.rk_simulation_start(owner.borrow()), "simulation.start");
-  }
-
-  /**
-   * Stops realtime stepping but leaves the simulation available for disposal.
-   * A joined session's owner stops it, so this does nothing then.
-   */
-  public function stop():Void {
-    if (!disposed && session == null)
-      check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
-  }
-
-  /** Restores every body and the fixed-step clock to the editable-scene state. */
-  public function reset():Void {
-    ensureLive();
-    stop();
-    check(RobotKitSimKit.rk_simulation_reset(owner.borrow()), "simulation.reset");
-  }
-
-  /** Restores one robot's initial body pose and runtime state. */
+  /** Restores one robot's initial body pose and runtime state. The session
+   * must be stopped. */
   public function resetRobot(robotIndex:Int):Void {
     ensureLive();
-    stop();
     check(RobotKitSimKit.rk_simulation_reset_robot(owner.borrow(), robotIndex),
       "simulation.resetRobot");
   }
 
-  /** Teleports one robot base while leaving the shared clock untouched. */
+  /** Teleports one robot base while leaving the shared clock untouched. The
+   * session must be stopped. */
   public function teleportRobot(robotIndex:Int, position:Array<Float>,
       ?rotation:Array<Float>):Void {
     ensureLive();
     if (position == null || position.length != 3)
       throw "Simulation.teleportRobot requires a three-component position";
     var pose = makePose(position, rotation);
-    stop();
     check(RobotKitSimKit.rk_simulation_teleport_robot(owner.borrow(), robotIndex, pose),
       "simulation.teleportRobot");
   }
@@ -558,15 +514,6 @@ class Simulation {
     return poseValue(pose);
   }
 
-  /** Reads an environment body's latest physics pose. */
-  public function objectPose(objectId:Int):{position:Array<Float>,rotation:Array<Float>} {
-    ensureLive();
-    var pose = new rk_simulation_pose(); pose.set_struct_size(rk_simulation_pose.size());
-    var result = RobotKitSimKit.rk_simulation_get_object_pose(owner.borrow(), objectId, pose);
-    check(result.status, "simulation.getObjectPose");
-    return poseValue(pose);
-  }
-
   /** Copies every presentation body pose under one native simulation lock. */
   public function capturePresentation():SimulationPresentationSnapshot {
     ensureLive();
@@ -584,57 +531,6 @@ class Simulation {
     return {position:[for(index in 0...3) pose.get_position(index)],
       rotation:[for(index in 0...4) pose.get_rotation(index)]};
 
-  /** Adds a box to the shared physics world and returns its owned object ID. */
-  public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
-      ?dynamicBody:Bool = false, ?mass:Float = 1.0,
-      ?orientation:Array<Float>):Int {
-    ensureLive();
-    if (position == null || position.length != 3 || halfExtents == null || halfExtents.length != 3)
-      throw "Simulation.spawnBox requires three-component position and extents";
-    var desc = new rk_simulation_object_desc();
-    desc.set_struct_size(rk_simulation_object_desc.size());
-    desc.set_motion_type(dynamicBody ? 2 : 0);
-    for (index in 0...3) {
-      desc.set_position(index, position[index]);
-      desc.set_half_extents(index, halfExtents[index]);
-    }
-    var chosenMass = dynamicBody ? mass : 0.0;
-    desc.set_mass(chosenMass);
-    var rotation = orientation == null ? [0.0, 0.0, 0.0, 1.0] : orientation;
-    if (rotation.length != 4) throw "Simulation.spawnBox requires a quaternion";
-    var length = 0.0;
-    for (component in rotation) {
-      if (!Math.isFinite(component)) throw "Simulation.spawnBox requires a finite quaternion";
-      length += component * component;
-    }
-    if (Math.abs(length - 1.0) > 1e-4) throw "Simulation.spawnBox requires a normalized quaternion";
-    for (index in 0...4) desc.set_rotation(index, rotation[index]);
-    stop();
-    var result = RobotKitSimKit.rk_simulation_spawn_object(owner.borrow(), desc);
-    check(result.status, "simulation.spawnBox");
-    return result.out_object;
-  }
-
-  /** Removes an environment object from the shared scene and physics world. */
-  public function removeObject(objectId:Int):Void {
-    ensureLive();
-    stop();
-    check(RobotKitSimKit.rk_simulation_remove_object(owner.borrow(), objectId),
-      "simulation.removeObject");
-  }
-
-  /** Teleports an environment object and clears its velocity. */
-  public function teleportObject(objectId:Int, position:Array<Float>,
-      ?rotation:Array<Float>):Void {
-    ensureLive();
-    if (position == null || position.length != 3)
-      throw "Simulation.teleportObject requires a three-component position";
-    var pose = makePose(position, rotation);
-    stop();
-    check(RobotKitSimKit.rk_simulation_teleport_object(owner.borrow(), objectId, pose),
-      "simulation.teleportObject");
-  }
-
   public function stepIndex():Int64 {
     var value = readClock();
     return value.get_step_index();
@@ -647,9 +543,7 @@ class Simulation {
 
   public function dispose():Void {
     if (disposed) return;
-    stop();
-    if (session != null && sessionObserverId != null)
-      session.removeStepObserver(sessionObserverId);
+    session.removeStepObserver(sessionObserverId);
     stepObservers.resize(0);
     for (runtime in robots) runtime.dispose();
     robots.resize(0);

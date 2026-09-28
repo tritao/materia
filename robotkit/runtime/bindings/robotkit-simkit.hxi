@@ -3,16 +3,14 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	enum rk_simulation_presentation_pose_kind : c_int {
 		RK_SIMULATION_PRESENTATION_ROBOT_BASE = 1;
 		RK_SIMULATION_PRESENTATION_ROBOT_LINK = 2;
-		RK_SIMULATION_PRESENTATION_ENVIRONMENT = 3;
 	}
 	/**
 	 * Adds one robot binding before the simulation is started or stepped.
 	 *
 	 * The blueprint becomes immutable simulation topology. The returned runtime
 	 * accepts commands and publishes snapshots, but it cannot be started or
-	 * ticked as an independent runtime; advance the owning simulation instead.
-	 * All robots should be added before the first call to rk_simulation_step() or
-	 * rk_simulation_start().
+	 * ticked as an independent runtime; advance the session instead. All robots
+	 * should be added before the session's first step or start.
 	 *
 	 * @param simulation Shared simulation owner.
 	 * @param blueprint Compiled robot topology and joint metadata.
@@ -35,23 +33,9 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_clear_omni_drive(simulation: rk_simulation, robot_index: u32) -> rk_result;
 	/**
-	 * Creates one shared simulated universe and its fixed-step clock.
-	 *
-	 * The returned handle owns the SceneKit scene, SimKit world, physics host,
-	 * clock, and all native resources created for attached robots. No robot
-	 * runtime exists until rk_simulation_add_robot() is called.
-	 *
-	 * @param desc Simulation timing and solver configuration.
-	 * @param out_simulation Receives an owned simulation handle.
-	 * @return RK_OK on success, or an argument/backend/allocation error.
-	 */
-	extern fn rk_simulation_create(desc: ptr<const<rk_simulation_desc>>, out_simulation: ptr<rk_simulation> @out @owned) -> rk_result;
-	/**
 	 * Attaches a new, empty set of robots to a session the caller owns.
 	 *
-	 * The session must be stopped and must outlive the returned handle. The
-	 * session's owner steps, starts, stops, and resets it; the matching
-	 * rk_simulation calls return RK_ERROR_INVALID_STATE for this handle.
+	 * The session must be stopped and must outlive the returned handle.
 	 * Destroying the handle while the session is stopped removes its robots from
 	 * the world.
 	 *
@@ -109,10 +93,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_get_link_pose(simulation: rk_simulation, robot_index: u32, link_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
 	/**
-	 * Reads one environment object's pose from the latest physics state.
-	 */
-	extern fn rk_simulation_get_object_pose(simulation: rk_simulation, object: rk_simulation_object, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
-	/**
 	 * Reads one robot's omni-wheel plant state.
 	 */
 	extern fn rk_simulation_get_omni_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_omni_drive_state> @inout) -> rk_result;
@@ -139,9 +119,9 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_place_robot_base(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	/**
-	 * Copies every robot pose, and every object spawned through this simulation,
-	 * from a frame captured from its session, so robots, props, and people drawn
-	 * from one frame agree.
+	 * Copies every robot pose from a frame captured from its session, so robots
+	 * and the session's other participants drawn from one frame agree. Read an
+	 * environment object's pose directly from the frame (nksim_frame_get_object_pose).
 	 */
 	extern fn rk_simulation_present_frame(simulation: rk_simulation, frame: nksim_frame, out_presentation: ptr<rk_simulation_presentation> @out @owned) -> rk_result;
 	/**
@@ -156,14 +136,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Reads one pose from the immutable presentation snapshot, without locking the simulation.
 	 */
 	extern fn rk_simulation_presentation_get_pose(presentation: rk_simulation_presentation, index: u32, out_pose: ptr<rk_simulation_presentation_pose> @inout) -> rk_result;
-	/**
-	 * Removes one environment body while stopped.
-	 */
-	extern fn rk_simulation_remove_object(simulation: rk_simulation, object: rk_simulation_object) -> rk_result;
-	/**
-	 * Stops the owner, restores all bodies, and resets the shared fixed-step clock.
-	 */
-	extern fn rk_simulation_reset(simulation: rk_simulation) -> rk_result;
 	/**
 	 * Restores one attached robot's bodies and clears its runtime state.
 	 */
@@ -204,59 +176,20 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_omni_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_omni_drive_desc>>) -> rk_result;
 	/**
-	 * Adds one environment body from the editable scene while stopped.
-	 */
-	extern fn rk_simulation_spawn_object(simulation: rk_simulation, desc: ptr<const<rk_simulation_object_desc>>, out_object: ptr<rk_simulation_object> @out) -> rk_result;
-	/**
-	 * Starts the simulation's realtime owner thread.
-	 *
-	 * Topology is sealed on the first successful start. While running, callers
-	 * submit commands through runtime handles and read snapshots; manual calls to
-	 * rk_simulation_step() are rejected until rk_simulation_stop() completes.
-	 */
-	extern fn rk_simulation_start(simulation: rk_simulation) -> rk_result;
-	/**
-	 * Applies all attached robot commands and advances the world exactly once.
-	 *
-	 * timestamp_ns is a compatibility owner-clock hint. Simulation samples use
-	 * fixed simulation source time and actual local monotonic receipt time,
-	 * neither derived from this argument. If any command fails, the world is not
-	 * advanced and staged commands are discarded so robots cannot observe a
-	 * partially committed tick.
-	 *
-	 * @param simulation Shared simulation owner.
-	 * @param timestamp_ns Legacy owner-clock hint, ignored by simulated sensors.
-	 * @return RK_OK after one complete world advance, or an error with no advance.
-	 */
-	extern fn rk_simulation_step(simulation: rk_simulation, timestamp_ns: u64) -> rk_result;
-	/**
-	 * Stops the realtime owner thread without destroying the simulation.
-	 *
-	 * The simulation handle and its latest clock/snapshot remain available for
-	 * inspection. Use rk_simulation_start() again only if the backend and caller
-	 * lifecycle permit restarting the shared clock.
-	 */
-	extern fn rk_simulation_stop(simulation: rk_simulation) -> rk_result;
-	/**
-	 * Teleports one environment body while stopped.
-	 */
-	extern fn rk_simulation_teleport_object(simulation: rk_simulation, object: rk_simulation_object, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
-	/**
 	 * Teleports one attached robot's base while the simulation is stopped.
 	 * This does not change the pose restored by reset or resetRobot.
 	 */
 	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
 	/**
 	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
+	 * other_object is the session object (nksim_object) the caller created that
+	 * the link touches, or zero for another robot link or an unowned body.
 	 */
 	struct rk_robot_contact @layout(80, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		link_index: u32 @offset(4);
 		tool_piece_index: i32 @offset(8);
-		/**
-		 * < Zero for another robot link.
-		 */
-		other_object: rk_simulation_object @offset(12);
+		other_object: nksim_object @offset(12);
 		distance: f64 @offset(16);
 		position: array<f64, 3> @offset(24);
 		normal: array<f64, 3> @offset(48);
@@ -267,8 +200,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Read-only clock values published by a Simulation tick.
 	 *
 	 * step_index counts successfully completed physics advances. simulation_time
-	 * is the corresponding fixed-step time in seconds; it is independent of the
-	 * legacy owner-clock hint passed to rk_simulation_step().
+	 * is the corresponding fixed-step time in seconds.
 	 */
 	struct rk_simulation_clock @layout(40, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -286,23 +218,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved0: u32 @offset(12);
 		anchor_parent: array<f64, 3> @offset(16);
 		axis_parent: array<f64, 3> @offset(40);
-	}
-	/**
-	 * Construction parameters for one shared Simulation owner.
-	 *
-	 * @note struct_size must be initialized to sizeof(rk_simulation_desc). The
-	 * fixed timestep is expressed in seconds and must be positive. Physics
-	 * substeps controls the backend solver subdivisions within one RobotKit tick.
-	 */
-	struct rk_simulation_desc @layout(56, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		fixed_timestep: f64 @offset(8);
-		physics_substeps: u32 @offset(16);
-		/**
-		 * < 0: deterministic test backend; 1: MuJoCo (must be built).
-		 */
-		backend: u32 @offset(20);
-		reserved: array<u64, 4> @offset(24);
 	}
 	/**
 	 * Ideal rolling differential-drive coupling for one robot's kinematic base.
@@ -344,27 +259,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		left_wheel_rate: f64 @offset(40);
 		right_wheel_rate: f64 @offset(48);
 		reserved: array<u64, 2> @offset(56);
-	}
-	/**
-	 * Editable-scene description for one simulation-owned environment object.
-	 */
-	struct rk_simulation_object_desc @layout(112, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		/**
-		 * < 0 static, 1 kinematic, 2 dynamic.
-		 */
-		motion_type: u32 @offset(4);
-		position: array<f64, 3> @offset(8);
-		/**
-		 * < Quaternion in x, y, z, w order.
-		 */
-		rotation: array<f64, 4> @offset(32);
-		/**
-		 * < Box dimensions used by the default object shape.
-		 */
-		half_extents: array<f64, 3> @offset(64);
-		mass: f64 @offset(88);
-		reserved: array<u64, 2> @offset(96);
 	}
 	/**
 	 * Ideal rolling omni-wheel coupling for one robot's kinematic base.
@@ -422,8 +316,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		kind: u32 @offset(4);
 		robot_index: u32 @offset(8);
 		link_index: u32 @offset(12);
-		object_id: u32 @offset(16);
-		reserved: array<u32, 3> @offset(20);
+		reserved: array<u32, 4> @offset(16);
 		position: array<f64, 3> @offset(32);
 		rotation: array<f64, 4> @offset(56);
 	}
@@ -492,10 +385,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Opaque handle for one shared simulation universe and clock.
 	 */
 	handle rk_simulation : u32 @destroy("rk_simulation_destroy");
-	/**
-	 * Opaque ID for an environment object owned by a Simulation.
-	 */
-	type rk_simulation_object = u32;
 	/**
 	 * Immutable copied presentation snapshot captured under one simulation lock.
 	 */

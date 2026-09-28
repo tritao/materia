@@ -88,6 +88,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
@@ -448,7 +449,8 @@ class PlannerTests extends MotionKitTestSupport {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(
       new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
       new LinearAxis(23, 10, 80), 0.2, 2.0);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("linear-planner-limits", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
@@ -461,14 +463,14 @@ class PlannerTests extends MotionKitTestSupport {
     check(peakAcceleration > 1.9,
       "moveLinear uses an authored 2 m/s² acceleration limit");
 
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
 
     var diagonal = planned(machine.moveLinear(Pose.xyz(0.03, 0.03, 0.03),
       Feed.metresPerSecond(0.2), options));
     for (joint in 0...3)
       check(peakChordAcceleration(diagonal, joint) <= 2.0 + 1e-6,
         "diagonal moveLinear chords stay within per-axis acceleration caps");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testToleranceBlend():Void {
@@ -548,12 +550,12 @@ class PlannerTests extends MotionKitTestSupport {
       mixedReport.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
         MotionKitNativeConstants.MK_CHECK_PASSED,
       "mixed blend times and validates through the runtime plan");
-    runMotion(mixedRig.machine, mixedRig.simulation);
+    runMotion(mixedRig.machine, mixedRig.harness);
     near(mixedRig.robot.snapshot().positions.get(0), 0.07,
       "mixed blend executes to its X endpoint", 1e-5);
     near(mixedRig.robot.snapshot().positions.get(1), 0.02,
       "mixed blend executes to its Y endpoint", 1e-5);
-    mixedRig.simulation.dispose();
+    mixedRig.harness.dispose();
     var path = GeometricPath.lines([new PathPoint(0.0, 0.0),
       new PathPoint(0.05, 0.0), new PathPoint(0.05, 0.05)]);
     var exactRig = gantryRig(true);
@@ -587,13 +589,13 @@ class PlannerTests extends MotionKitTestSupport {
     check(taskCheck.status == MotionKitNativeConstants.MK_CHECK_PASSED &&
       Math.abs(taskCheck.limit - 0.0005) < 1e-12,
       "blend validation checks the authored 0.5 mm tolerance");
-    runMotion(blendedRig.machine, blendedRig.simulation);
+    runMotion(blendedRig.machine, blendedRig.harness);
     near(blendedRig.robot.snapshot().positions.get(0), 0.05,
       "blended path executes to its X endpoint", 1e-5);
     near(blendedRig.robot.snapshot().positions.get(1), 0.05,
       "blended path executes to its Y endpoint", 1e-5);
-    exactRig.simulation.dispose();
-    blendedRig.simulation.dispose();
+    exactRig.harness.dispose();
+    blendedRig.harness.dispose();
 
     var reverse = GeometricPath.lines([new PathPoint(0.0, 0.0),
       new PathPoint(0.05, 0.0),
@@ -614,7 +616,7 @@ class PlannerTests extends MotionKitTestSupport {
         stoppedAtCorner = true;
     }
     check(stoppedAtCorner, "near reversal stops at the authored corner");
-    reverseRig.simulation.dispose();
+    reverseRig.harness.dispose();
   }
 
   public function testCircularSegments():Void {
@@ -647,7 +649,7 @@ class PlannerTests extends MotionKitTestSupport {
         'helical $plane reaches Y', 1e-5);
       near(rig.machine.axis("z").logicalPosition(timedEnd), circular.end.z,
         'helical $plane reaches Z', 1e-5);
-      rig.simulation.dispose();
+      rig.harness.dispose();
       var blended = CornerBlender.blend(new GeometricPath([circular,
         new LineSegment(circular.end, new PathPoint(circular.end.x + 0.01,
           circular.end.y, circular.end.z))]), 0.001, Math.PI * 0.9);
@@ -664,7 +666,7 @@ class PlannerTests extends MotionKitTestSupport {
       check(blendedRun.durationSeconds() > 0.0 &&
         blendedRig.machine.lastPathPlanningDiagnostics.length == 1,
         'helical $plane stays executable with an exact-stop blend fallback');
-      blendedRig.simulation.dispose();
+      blendedRig.harness.dispose();
       var blueprint = MachineKitRobotCompiler.compileXYZGantry(
         new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 200), 0.1, 0.4);

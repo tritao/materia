@@ -17,6 +17,7 @@ import robotkit.manipulation.IKResult;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.RobotCommand;
 
@@ -126,7 +127,9 @@ class KinematicsTests {
     var fixture = buildUR5Fixture();
     var manipulator = new Manipulator(fixture.model, fixture.chain);
     var blueprint = RobotRuntimeCompiler.compile(fixture.model);
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint);
     var robot = new SimulatedRobot("ur5-fixture", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
@@ -135,13 +138,13 @@ class KinematicsTests {
     var targets = manipulator.toJointTargets(q);
     check(targets.length == 6, "toJointTargets emits one target per chain joint");
     robot.submit(RobotCommand.JointTargets(targets, null));
-    simulation.step(Int64.ofInt(0));
-    simulation.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(0));
+    simulationHarness.step(Int64.ofInt(1));
     var snapshot = robot.snapshot();
     for (i in 0...6)
       check(approx(snapshot.positions.get(i), q[i], 1e-6),
         'Joint $i reaches its commanded target through RobotCommand and SimulatedRobot');
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   // -- fixtures --------------------------------------------------------

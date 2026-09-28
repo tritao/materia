@@ -5,7 +5,6 @@ typedef SimulationPresentationPose = {
 	var kind:Int;
 	var robotIndex:Int;
 	var linkIndex:Int;
-	var objectId:Int;
 	var position:Array<Float>;
 	var rotation:Array<Float>;
 }

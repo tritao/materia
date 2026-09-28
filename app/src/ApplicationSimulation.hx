@@ -4,6 +4,7 @@ import haxe.Int64;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
+import robotkit.runtime.SimulationSpace;
 import RobotKitRuntime;
 import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.world.Robot;

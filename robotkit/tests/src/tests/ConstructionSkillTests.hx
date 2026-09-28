@@ -19,6 +19,7 @@ import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolPlanningContext;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.HolonomicDrivePlant;
 import robotkit.mobile.MobileBase;
@@ -89,7 +90,10 @@ class ConstructionSkillTests {
     blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
       ProcessEventValue.Digital(false)));
 
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+
+    var simulation = simulationHarness.simulation;
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-construction-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
     var runtime = simulation.addRobot(blueprint);
@@ -98,7 +102,7 @@ class ConstructionSkillTests {
     var robot = new RecordingRobot(sourceRobot, writer);
 
     var base = MobileBase.fromBlueprint(robot, blueprint);
-    var plant = new HolonomicDrivePlant(simulation, 0, base);
+    var plant = new HolonomicDrivePlant(simulationHarness, 0, base);
     var localization = new HolonomicOdometryLocalization([0, 1, 2], fixture.wheelRadius, fixture.baseRadius);
     var navigation = new Navigation(base, localization, 0.2, 0.3, 1.0);
     var grid = new OccupancyGrid2(0.1, new Pose2(-2.0, -2.0), 40, 40, "odom", OccupancyCell.Free);
@@ -221,7 +225,7 @@ class ConstructionSkillTests {
 
     writer.close();
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
     var recording = McapRecordingReader.load(recordingPath);
     check(recording.commands.length > 10 && recording.snapshots.length > 10,
       "construction skill run is recorded to MCAP");

@@ -8,7 +8,6 @@ import haxe.Int64;
 class SimulationPresentationSnapshot {
 	public static inline var ROBOT_BASE:Int = 1;
 	public static inline var ROBOT_LINK:Int = 2;
-	public static inline var ENVIRONMENT:Int = 3;
 
 	public final stepIndex:Int64;
 	public final simulationTime:Float;
@@ -32,7 +31,7 @@ class SimulationPresentationSnapshot {
 			check(RobotKitSimKit.rk_simulation_presentation_get_pose(owner.borrow(), index, value).status,
 				"simulation.presentation.pose");
 			poses.push({kind:value.get_kind(), robotIndex:value.get_robot_index(),
-				linkIndex:value.get_link_index(), objectId:value.get_object_id(),
+				linkIndex:value.get_link_index(),
 				position:[for (component in 0...3) value.get_position(component)],
 				rotation:[for (component in 0...4) value.get_rotation(component)]});
 		}

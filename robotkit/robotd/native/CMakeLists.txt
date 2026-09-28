@@ -28,7 +28,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../.." robotkit)
 
 foreach(target_name
         nativekit nativekit_scene nativekit_scene_render nativekit_scene_interaction
-        nativekit_sim_core motionkit_core robotkit_runtime)
+        nativekit_sim_core nativekit_sim_mujoco motionkit_core robotkit_runtime)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
