@@ -540,8 +540,7 @@ class ElementSmoke {
 			DefinitionInput.boolean("enabled", true),
 			DefinitionInput.integer("count", 2),
 			DefinitionInput.token("detail", "preview", ["preview", "envelope"])
-		], [new DefinitionOutput("body", DefinitionOutput.Geometry),
-			new DefinitionOutput("mount", DefinitionOutput.Connector)]);
+		], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
 		var instance = doc.createInstance("Part", definition);
 		check(instance.resolvedBoolean("enabled") && instance.resolvedInteger("count") == 2 &&
 			instance.resolvedToken("detail") == "preview", "typed defaults resolve");

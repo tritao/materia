@@ -25,25 +25,29 @@ class DefinitionDefaultChange implements DocumentChange {
 	final definition:Definition;
 	final name:String;
 	final before:Dynamic;
+	final beforeEditedByUser:Bool;
 	final beforeRevision:Int;
 	final after:Dynamic;
+	final afterEditedByUser:Bool;
 	final afterRevision:Int;
 
-	public function new(doc:Document, d:Definition, n:String, b:Dynamic, br:Int, a:Dynamic, ar:Int) {
+	public function new(doc:Document, d:Definition, n:String, b:Dynamic, be:Bool, br:Int, a:Dynamic, ae:Bool, ar:Int) {
 		document = doc;
 		definition = d;
 		name = n;
 		before = b;
+		beforeEditedByUser = be;
 		beforeRevision = br;
 		after = a;
+		afterEditedByUser = ae;
 		afterRevision = ar;
 	}
 
 	public function undo():Void
-		document.restoreDefinitionDefault(definition, name, before, beforeRevision);
+		document.restoreDefinitionDefault(definition, name, before, beforeRevision, beforeEditedByUser);
 
 	public function redo():Void
-		document.restoreDefinitionDefault(definition, name, after, afterRevision);
+		document.restoreDefinitionDefault(definition, name, after, afterRevision, afterEditedByUser);
 }
 
 class InstanceOverrideChange implements DocumentChange {

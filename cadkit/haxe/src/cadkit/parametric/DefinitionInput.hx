@@ -7,8 +7,11 @@ class DefinitionInput {
 	public final unit:String;
 	public final allowedValues:Null<Array<String>>;
 	public var defaultValue(default, null):Dynamic;
+	/** Whether a user explicitly changed this saved default from its generated value. */
+	public var editedByUser(default, null):Bool;
 
-	public function new(name:String, kind:String, unit:String, defaultValue:Dynamic, ?allowedValues:Array<String>) {
+	public function new(name:String, kind:String, unit:String, defaultValue:Dynamic, ?allowedValues:Array<String>,
+		editedByUser:Bool = false) {
 		if (name == null || StringTools.trim(name) == "")
 			throw new ParametricError("definition input name must not be empty");
 		this.name = name;
@@ -33,6 +36,7 @@ class DefinitionInput {
 			this.allowedValues = null;
 		}
 		this.defaultValue = normalize(defaultValue, this.unit);
+		this.editedByUser = editedByUser;
 	}
 
 	public static function boolean(name:String, value:Bool):DefinitionInput
@@ -67,6 +71,8 @@ class DefinitionInput {
 		return value;
 	}
 
-	public function restore(value:Dynamic):Void
+	public function restore(value:Dynamic, editedByUser:Bool):Void {
 		defaultValue = value;
+		this.editedByUser = editedByUser;
+	}
 }

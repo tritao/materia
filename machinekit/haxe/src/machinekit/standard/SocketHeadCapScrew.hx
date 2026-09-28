@@ -153,7 +153,7 @@ class SocketHeadCapScrew extends MachineComponent {
 		if (recipeTypeCache == null)
 			recipeTypeCache = new ComponentType("machinekit.standard.socket-head-cap-screw",
 			[ComponentRecipeSupport.catalog("size", SocketHeadCapScrew.catalog(), "M5"), ComponentRecipeSupport.length("length", 20),
-				ComponentRecipeSupport.choice("material", MaterialLibrary.specs(), "steel 12.9")],
+				ComponentRecipeSupport.choice("material", fastenerMaterials(), "steel 12.9")],
 			v -> SocketHeadCapScrew.metric(v.token("size"), v.number("length"), v.token("material")),
 			true);
 		return recipeTypeCache;
@@ -165,6 +165,10 @@ class SocketHeadCapScrew extends MachineComponent {
 		return new ComponentValues().set("size", Token(this.spec.size))
 				.set("length", Number(this.length))
 				.set("material", Token(MaterialLibrary.require(this.materialId).physical.spec));
+	}
+
+	static function fastenerMaterials():Array<String> {
+		return ["steel", "steel C45", "steel 8", "steel 8.8", "steel 12.9", "aluminium 6061"];
 	}
 
 }

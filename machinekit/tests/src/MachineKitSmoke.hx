@@ -170,7 +170,7 @@ class MachineKitSmoke {
 		var legacyDefinitions:Array<Dynamic> = cast Reflect.field(legacy, "definitions");
 		for (record in legacyDefinitions) {
 			var legacyOutputs:Array<Dynamic> = cast Reflect.field(record, "outputs");
-			legacyOutputs.push({name: "back", purpose: DefinitionOutput.Connector});
+			legacyOutputs.push({name: "back", purpose: "connector"});
 			var legacyProperties:Array<Dynamic> = cast Reflect.field(record, "properties");
 			if (legacyProperties != null)
 				legacyProperties.push({name: "machinekit.partNumber", type: "text", value: "stale"});

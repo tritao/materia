@@ -113,21 +113,32 @@ class BimInspectorDescriptors {
 	private static function setDefinitionInput(edit:Null<BimProjectEdit>, definition:Definition,
 			input:DefinitionInput, value:PropertyValue):Void {
 		var before = definition.input(input.name).defaultValue;
-		apply(edit, "Set " + input.name, function() writeDefinitionInput(definition, input, value), function() {
+		var beforeEditedByUser = definition.input(input.name).editedByUser;
+		apply(edit, "Set " + input.name, function() writeDefinitionInput(definition, input, value, true), function() {
 			if (input.isNumeric()) definition.setDefault(input.name,
 				UnitConversion.fromCanonical(before, input.kind, input.unit), input.unit);
 			else definition.setTypedDefault(input.name, before);
+			definition.restoreEditedMarker(input.name, beforeEditedByUser);
 		});
 	}
 
 	private static function writeDefinitionInput(definition:Definition, input:DefinitionInput,
-			value:PropertyValue):Void switch value {
-		case PropertyValue.Bool(next): definition.setTypedDefault(input.name, next);
-		case PropertyValue.Enum(next): definition.setTypedDefault(input.name, next);
+			value:PropertyValue, userEdited:Bool = false):Void switch value {
+		case PropertyValue.Bool(next):
+			if (userEdited) definition.setUserEditedTypedDefault(input.name, next);
+			else definition.setTypedDefault(input.name, next);
+		case PropertyValue.Enum(next):
+			if (userEdited) definition.setUserEditedTypedDefault(input.name, next);
+			else definition.setTypedDefault(input.name, next);
 		case PropertyValue.Int(next):
-			if (input.kind == TypedProperty.TypeInteger) definition.setTypedDefault(input.name, next);
+			if (input.kind == TypedProperty.TypeInteger) {
+				if (userEdited) definition.setUserEditedTypedDefault(input.name, next);
+				else definition.setTypedDefault(input.name, next);
+			} else if (userEdited) definition.setUserEditedDefault(input.name, next, input.unit);
 			else definition.setDefault(input.name, next, input.unit);
-		case PropertyValue.Float(next): definition.setDefault(input.name, next, input.unit);
+		case PropertyValue.Float(next):
+			if (userEdited) definition.setUserEditedDefault(input.name, next, input.unit);
+			else definition.setDefault(input.name, next, input.unit);
 		default: throw "Definition input value has the wrong type";
 	}
 

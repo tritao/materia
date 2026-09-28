@@ -11,6 +11,7 @@
 		"viewport": {
 			"kind": "cad-preview",
 			"documentInput": true,
+			"reconcilesSavedRecipe": true,
 			"module": "MotorShaftBearingsPreview",
 			"function": "preview",
 			"cache": {"inputs": ["MotorShaftBearings.hx", "MotorShaftBearingsPreview.hx"]}

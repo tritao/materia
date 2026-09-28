@@ -61,6 +61,14 @@ import cadkit.parametric.RelationshipId;
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
 	public static inline var VERSION:Int = 8;
+	static final migrations:Map<String, (Document, Int)->Void> = [];
+
+	/** Register a domain-owned migration without coupling the codec to that domain. */
+	public static function registerMigration(id:String, migration:(Document, Int)->Void):Void {
+		if (id == null || id.length == 0 || migration == null)
+			throw new ParametricError("document migration needs an ID and callback");
+		migrations.set(id, migration);
+	}
 
 	public static function encode(document:Document):String {
 		var encodedFeatures:Array<Dynamic> = [];
@@ -167,7 +175,8 @@ class DocumentCodec {
 					kind: input.kind,
 					unit: input.unit,
 					value: input.isNumeric() ? UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit) : input.defaultValue,
-					allowedValues: input.allowedValues
+					allowedValues: input.allowedValues,
+					editedByUser: input.editedByUser
 				});
 			var outputs:Array<Dynamic> = [];
 			for (output in definition.outputs())
@@ -396,13 +405,13 @@ class DocumentCodec {
 						var value:Dynamic = version >= 7 ? requiredField(inputRecord, "value") : numberField(inputRecord, "value");
 						var rawAllowed:Dynamic = version >= 7 ? Reflect.field(inputRecord, "allowedValues") : null;
 						inputs.push(new DefinitionInput(stringField(inputRecord, "name"), kind, stringField(inputRecord, "unit"),
-							value, rawAllowed == null ? null : cast rawAllowed));
+							value, rawAllowed == null ? null : cast rawAllowed, optionalBool(inputRecord, "editedByUser", false)));
 					}
 					var outputRecords:Array<Dynamic> = cast requiredField(definitionRecord, "outputs");
 					var outputs:Array<DefinitionOutput> = [];
 					for (outputRecord in outputRecords) {
 						var purpose = stringField(outputRecord, "purpose");
-						if (version < 8 && purpose == DefinitionOutput.Connector) continue;
+						if (purpose == "connector") continue;
 						outputs.push(new DefinitionOutput(stringField(outputRecord, "name"), purpose));
 					}
 					var subgraph:Null<DefinitionSubgraph> = null;
@@ -431,8 +440,6 @@ class DocumentCodec {
 					definition.restoreRevision(intField(definitionRecord, "revision"));
 					for (propertyRecord in optionalPropertyRecords(definitionRecord)) {
 						var property = decodeTypedProperty(propertyRecord, remapDocumentId);
-						if (version < 8 && (property.name == "machinekit.partNumber" || property.name == "machinekit.material"
-							|| property.name == "machinekit.catalog.source" || property.name == "machinekit.catalog.designation")) continue;
 						definition.restoreProperty(property.name, property);
 					}
 				}
@@ -491,6 +498,7 @@ class DocumentCodec {
 				document.validatePersistentReferences();
 			}
 
+			for (migration in migrations) migration(document, version);
 			if (evaluate)
 				document.recompute();
 			return document;

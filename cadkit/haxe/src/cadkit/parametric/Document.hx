@@ -97,6 +97,7 @@ class Document {
 	private final redoStack:Array<ChangeSet>;
 	private final beforeHooks:Array<{id:Int, callback:Void->Void}>;
 	private final afterHooks:Array<{id:Int, callback:Void->Void}>;
+	private final closeHooks:Array<Void->Void>;
 	private var nextHookId:Int;
 
 	public var lastRemapReport(default, null):TopologyRemapReport;
@@ -146,6 +147,7 @@ class Document {
 		redoStack = [];
 		beforeHooks = [];
 		afterHooks = [];
+		closeHooks = [];
 		nextHookId = 1;
 		lastRemapReport = new TopologyRemapReport();
 		beforeRecompute = null;
@@ -293,7 +295,7 @@ class Document {
 		for (input in source.inputs())
 			inputs.push(new DefinitionInput(input.name, input.kind, input.unit,
 				input.isNumeric() ? UnitConversion.fromCanonical(input.defaultValue, input.kind, input.unit) : input.defaultValue,
-				input.allowedValues));
+				input.allowedValues, input.editedByUser));
 		var outputs:Array<DefinitionOutput> = [];
 		for (output in source.outputs())
 			outputs.push(new DefinitionOutput(output.name, output.purpose));
@@ -395,33 +397,49 @@ class Document {
 	public function setDefinitionDefault(definition:Definition, name:String, value:Float, ?unit:String):Void {
 		var input = definition.input(name);
 		if (!input.isNumeric()) throw new ParametricError("definition input is not numeric: " + name);
-		setDefinitionDefaultCanonical(definition, name, input.normalize(value, unit == null ? input.unit : unit));
+		setDefinitionDefaultCanonical(definition, name, input.normalize(value, unit == null ? input.unit : unit), false);
 	}
 
 	public function setDefinitionDefaultTyped(definition:Definition, name:String, value:Dynamic):Void {
 		var input = definition.input(name);
-		setDefinitionDefaultCanonical(definition, name, input.normalize(value, input.unit));
+		setDefinitionDefaultCanonical(definition, name, input.normalize(value, input.unit), false);
 	}
 
-	private function setDefinitionDefaultCanonical(definition:Definition, name:String, canonical:Dynamic):Void {
+	public function setUserEditedDefinitionDefault(definition:Definition, name:String, value:Float, ?unit:String):Void {
+		var input = definition.input(name);
+		if (!input.isNumeric()) throw new ParametricError("definition input is not numeric: " + name);
+		setDefinitionDefaultCanonical(definition, name, input.normalize(value, unit == null ? input.unit : unit), true);
+	}
+
+	public function setUserEditedDefinitionDefaultTyped(definition:Definition, name:String, value:Dynamic):Void {
+		var input = definition.input(name);
+		setDefinitionDefaultCanonical(definition, name, input.normalize(value, input.unit), true);
+	}
+
+	private function setDefinitionDefaultCanonical(definition:Definition, name:String, canonical:Dynamic,
+		userEdited:Bool):Void {
 		var input = definition.input(name);
 		var before = input.defaultValue;
+		var beforeEditedByUser = input.editedByUser;
+		var afterEditedByUser = beforeEditedByUser || userEdited;
 		var revision = definition.revision;
 		if (before == canonical)
 			return;
-		definition.restoreDefault(name, canonical, revision + 1);
+		definition.restoreDefault(name, canonical, revision + 1, afterEditedByUser);
 		try {
 			runBeforeRecomputeHooks();
 			refreshDefinition(definition);
 		} catch (e:Dynamic) {
-			definition.restoreDefault(name, before, revision);
+			definition.restoreDefault(name, before, revision, beforeEditedByUser);
 			throw e;
 		}
-		recordDocumentChange(new DefinitionDefaultChange(this, definition, name, before, revision, canonical, revision + 1));
+		recordDocumentChange(new DefinitionDefaultChange(this, definition, name, before, beforeEditedByUser,
+			revision, canonical, afterEditedByUser, revision + 1));
 	}
 
-	public function restoreDefinitionDefault(definition:Definition, name:String, value:Dynamic, revision:Int):Void {
-		definition.restoreDefault(name, value, revision);
+	public function restoreDefinitionDefault(definition:Definition, name:String, value:Dynamic, revision:Int,
+		editedByUser:Bool):Void {
+		definition.restoreDefault(name, value, revision, editedByUser);
 		refreshDefinition(definition);
 	}
 
@@ -1136,6 +1154,16 @@ class Document {
 		return closed;
 	}
 
+	/** Runtime-only identity for caches whose lifetime follows this document object. */
+	public function runtimeIdentity():Int return token;
+
+	/** Register cleanup for runtime state owned by another layer. */
+	public function onClose(callback:Void->Void):Void {
+		ensureOpen();
+		if (callback == null) throw new ParametricError("document close callback must not be null");
+		closeHooks.push(callback);
+	}
+
 	private function ensureOpen():Void {
 		if (closed)
 			throw new ParametricError("document is closed");
@@ -1654,6 +1682,8 @@ class Document {
 	public function close():Void {
 		if (closed)
 			return;
+		for (callback in closeHooks) callback();
+		closeHooks.resize(0);
 		if (activeTransaction != null)
 			activeTransaction.cancel();
 		for (feature in features)

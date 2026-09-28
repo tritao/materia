@@ -50,8 +50,12 @@ class MateriaProjectRunner {
     if (entry == null) throw 'Materia project has no default entrypoint "$entryId"';
     if (fieldText(entry, "kind") != "cad-preview")
       throw "Unsupported Materia viewport entrypoint kind";
+    var reconcilesSavedRecipe = Reflect.field(entry, "reconcilesSavedRecipe") == true;
+    if (reconcilesSavedRecipe && Reflect.field(entry, "documentInput") != true)
+      throw "Project recipe reconciliation requires a document input";
     return {kind: "requires-project-code", projectPath: manifestPath,
-      entrypoint: entryId, module: fieldText(entry, "module")};
+      entrypoint: entryId, module: fieldText(entry, "module"),
+      reconcilesSavedRecipe: reconcilesSavedRecipe};
   }
 
   public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
@@ -487,6 +491,7 @@ typedef ProjectExecutionRequirement = {
   var projectPath:String;
   var entrypoint:String;
   var module:String;
+  var reconcilesSavedRecipe:Bool;
 }
 
 typedef GeneratedAssemblyScene = {

@@ -41,8 +41,12 @@ class MotorShaftBearingsPreview {
 	/** A saved document can be edited and passed back to rebuild the viewport. */
 	public static function preview(?savedDocument:String):Bytes {
 		MachineKitRecipes.register();
-		var editable = savedDocument == null ? document() : DocumentCodec.decode(savedDocument);
+		var editable = document();
 		try {
+			if (savedDocument != null) {
+				var diagnostics:Array<String> = [];
+				MachineKitRecipes.reconcileDocument(editable, savedDocument, diagnostics);
+			}
 			var result = previewDocument(editable);
 			editable.close();
 			return result;

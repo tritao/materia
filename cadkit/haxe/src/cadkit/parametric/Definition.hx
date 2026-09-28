@@ -101,8 +101,20 @@ class Definition {
 	public function setTypedDefault(name:String, value:Dynamic):Void
 		document.setDefinitionDefaultTyped(this, name, value);
 
-	public function restoreDefault(name:String, value:Dynamic, revision:Int):Void {
-		input(name).restore(value);
+	/** Set a default through a user edit so saved recipe reconciliation can retain it. */
+	public function setUserEditedDefault(name:String, value:Float, ?unit:String):Void
+		document.setUserEditedDefinitionDefault(this, name, value, unit);
+
+	public function setUserEditedTypedDefault(name:String, value:Dynamic):Void
+		document.setUserEditedDefinitionDefaultTyped(this, name, value);
+
+	public function restoreEditedMarker(name:String, editedByUser:Bool):Void {
+		var value = input(name);
+		value.restore(value.defaultValue, editedByUser);
+	}
+
+	public function restoreDefault(name:String, value:Dynamic, revision:Int, editedByUser:Bool):Void {
+		input(name).restore(value, editedByUser);
 		this.revision = revision;
 	}
 
