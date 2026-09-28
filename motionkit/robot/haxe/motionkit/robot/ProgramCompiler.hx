@@ -84,7 +84,9 @@ class ProgramCompiler {
       throw "Program compiler selector must use its kinematics solver";
     if (configurationSelector != null) {
       this.configurationSelector = configurationSelector;
-    } else if (Std.isOfType(solver, OpwKinematics)) {
+    // Haxeon currently misidentifies an OPW object through this interface as
+    // KinematicsSolver when Std.isOfType checks its concrete class.
+    } else if (Reflect.field(solver, "nativePathSample") != null) {
       var arm:OpwKinematics = cast solver;
       var lower:Array<Float> = [], upper:Array<Float> = [];
       for (joint in 0...count) {
