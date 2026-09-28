@@ -8,7 +8,9 @@ project of its own.
 
 - [ ] **Vendor catalogs (M per vendor).** Eins, Schunk, Zimmer, SMC or Piab via
   `Catalog<T>`: coupling key, ports, declared mass and centre, envelope
-  geometry and provenance, using the same API as the generic parts.
+  geometry and provenance, using the same API as the generic parts. A Schmalz
+  cup, ejector and fitting now provide the first pneumatic slice; changer
+  halves and broader vendor coverage remain.
 - [ ] **Vendor STEP files as envelopes (M).** Load a vendor model for
   collision and appearance, then declare connectors and ports by hand. Vendor
   files usually allow internal use but not redistribution, so keep them outside
@@ -31,12 +33,14 @@ project of its own.
 
 ## Engineering checks
 
-- [ ] **Payload with workpiece (S).** Add the grasped part's mass and centre of
-  mass per pick and check the robot load chart across the motion, not only at
-  a static pose.
-- [ ] **Suction capacity (M).** Cup area × vacuum level against part mass,
-  acceleration and a safety factor. Needs vacuum level and cup area as port or
-  component properties.
+- [x] **Payload with workpiece (S).** Combine the grasped part's mass, centre
+  and inertia at its pick pose with the tool, then sample the joint path against
+  a robot-supplied static mass and flange-moment chart.
+- [x] **Suction capacity (M).** A rated cup's effective sealed area and a
+  guaranteed vacuum at the cup give normal force. The path check uses part mass,
+  COM acceleration, friction and a safety factor; offset loads require a cup
+  moment rating. The bridge verifies the cup's service chain and bounds its
+  requested vacuum by the upstream generator's catalog rating.
 - [ ] **Air consumption and cycle time (M).** Compressed-air use per cycle from
   actuator volumes and ejector flow.
 - [ ] **Tool-change feasibility (M).** Tool stand poses, approach and retract
@@ -77,9 +81,8 @@ project of its own.
 
 ## Suggested priorities
 
-1. Suction capacity and payload-with-workpiece checks: they answer the
-   questions people ask about a tool and build on existing mass and port data.
-2. One vendor catalog slice: makes the layer usable with real parts and tests
-   the abstractions against a real vendor.
+1. Design report: show the configuration BOM, service chains, payload and
+   suction margins in one reviewable artifact.
+2. Extend the vendor catalog to a matching changer pair and more cup sizes.
 3. Document and editor persistence: needed once someone must author tools
    interactively.

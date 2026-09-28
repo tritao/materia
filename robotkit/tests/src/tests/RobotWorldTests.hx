@@ -207,6 +207,7 @@ class RobotWorldTests {
     testSensorResetPublication();
     testRobotResetPose();
     SimulationPoseResetTests.run(0);
+    SharedSessionTests.run();
     testConfiguredSensors();
     testCameraFrameProtocol();
     testExternalSensorRuntime();

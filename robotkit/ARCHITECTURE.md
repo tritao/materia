@@ -827,6 +827,33 @@ frame, per the `a_T_b` convention — `flange_T_tcp` maps tool-tip coordinates
 into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`,
 `Cylinder`, or per-member `Hulls`, since `model.CollisionApproximation` is a link-geometry
 derivation policy, not a shape), and `mass`.
+The CadBridge also carries `MassProperties` in the flange frame: mass in kg,
+centre of mass in metres, and centroidal `Inertia3` in kg m² when known.
+Legacy tools that declare only scalar mass retain that API, but a load check
+requires a known centre of mass. `WorkpieceLoad` supplies a part's mass
+properties and its pose at one pick; the tool and part are combined with the
+parallel-axis theorem.
+
+`PayloadChecker.checkPath` samples the manipulator's joint path and checks
+carried mass and gravity moment about the flange against a `RobotLoadChart`
+at every sample. `ReachLoadChart` is a simple piecewise chart by flange
+distance from the base; robot-specific charts can implement the interface
+with joint-dependent limits. A pose outside the chart fails. This is a static
+gravity check with configurable joint sampling, so acceleration loads and
+unsampled motion between points need separate analysis.
+
+Suction capacity is checked separately from runtime vacuum actuation.
+`cadbridge.SuctionCapacityBridge.toGrip` converts one connected MachineKit
+`SuctionCup` to a flange-frame `SuctionGrip`. The cup needs an effective sealed
+area; the caller supplies a minimum vacuum guaranteed at that cup, friction
+coefficient for the actual cup and workpiece surface, and safety factor. A
+generator's catalog rating only bounds the requested vacuum and does not
+establish delivered pressure. `SuctionCapacityChecker.checkPath` samples
+workpiece COM acceleration and flange pose, checks normal and tangential
+holding margins, and requires a cup moment rating for nonzero overturning
+moment. It models one sealed cup; it does not predict leakage, deformation,
+or load sharing across cups. The motion samples must include acceleration from
+flange rotation. This is a design check, not a live hold sensor.
 
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
@@ -852,11 +879,28 @@ clears the observed pickup.
 `SimulatedToolSensorAdapter` routes `tool_contact` (0/1) and
 `tool_vacuum_kpa` (non-negative vacuum magnitude) `SensorFrame` values from a
 robot snapshot to the selected tool. Bindings use configuration-specific sensor
-IDs. Frames require the `robotkit.monotonic` source clock so observations older
-than the tool selection can be ignored; repeated sequences are ignored too.
+IDs. A frame must use the same source clock as the tool selection, such as
+`robotkit.monotonic` or the logical `robotkit.simulation` clock, so older
+observations can be ignored; repeated sequences are ignored too.
 The runtime accepts both kinds as externally published sensors at authored
 mounts, allowing a simulation sensor producer to publish them without a native
 physics sensor.
+
+`cadbridge.EndEffectorVacuumFeedback` is a deterministic simulation producer
+for one suction cup with a dedicated collision piece. After each physics step,
+it reads that piece's contact distances and feeds the selected tool's pressure
+sensor adapter. `EndEffectorRuntimeBridge.addVacuumSensorToBlueprint` authors its
+sensor mount on the robot flange before runtime creation. Attaching the producer
+to `Simulation` publishes one `tool_vacuum_kpa` frame per explicit step, so
+runtime snapshots, RobotWorld recordings, and replay see the same observations.
+These frames use the logical `robotkit.simulation` source clock, which must also
+be used when selecting the tool. An enabled vacuum command and geometric cup
+touch produce a caller-specified sealed pressure; proximity alone, contact loss, or a disabled
+command produce zero. Contact is only a seal proxy: this model does not predict
+leakage, evacuation time, or seal quality. Designs with multiple cups or a cup
+merged into another collision piece need a richer model and are rejected.
+The test uses distance rather than the contact's `active` force flag because
+MuJoCo cannot apply force between a fixed obstacle and a kinematic flange.
 
 `cadbridge.EndEffectorRuntimeBridge` builds a `ToolRuntime` from a selected
 `EndEffectorSet` configuration and working frame. Each explicit control binding

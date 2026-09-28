@@ -53,7 +53,7 @@ class Conformance {
     var pose = args.length == 12 ? Pose.load(args[10], args[11]) : null;
 
     var start = reference[0];
-    var simulation = new Simulation(period, substeps, 1, integrator, 0, solverIterations,
+    var simulation = new Simulation(period, substeps, 1, null, integrator, 0, solverIterations,
       lineSearchIterations);
     var blueprint = RobotRuntimeCompiler.compile(model);
     // A leg pressed onto its compliant knee stop passes it slightly.

@@ -24,7 +24,7 @@ class StandCheck {
     var model = RobotModelCodec.decode(sys.io.File.getBytes(args[0]));
     var pose = Pose.load(args[1], args[2]);
     var seconds = Std.parseFloat(args[3]), period = Std.parseFloat(args[4]);
-    var simulation = new Simulation(period, Std.parseInt(args[5]), 1, Std.parseInt(args[6]), 0,
+    var simulation = new Simulation(period, Std.parseInt(args[5]), 1, null, Std.parseInt(args[6]), 0,
       Std.parseInt(args[7]), Std.parseInt(args[8]));
     var blueprint = RobotRuntimeCompiler.compile(model);
     blueprint.observedLimitTolerance = 0.05;

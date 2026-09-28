@@ -3,18 +3,37 @@ package machinekit.pneumatic;
 import cadkit.modeling.Part;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
+import machinekit.component.Dimension;
 import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.RuntimePortIntent;
 
 /** Generic ejector converting compressed air to vacuum. */
 class VacuumGenerator extends MachineComponent {
-	public function new() {
-		super("VACUUM-GENERATOR", "Generic pneumatic vacuum generator", "aluminium 6061", true);
+	override public function runtimePortIntents():Array<RuntimePortIntent>
+		return [VacuumActuator("air")];
+	/** Catalog maximum vacuum below ambient in kPa, not a guaranteed cup pressure. */
+	public final ratedVacuumKpa:Null<Float>;
+
+	public function new(?ratedVacuumKpa:Float, ?catalogDesignation:String,
+			?airInterface:PortInterface, ?vacuumInterface:PortInterface,
+			?catalogDescription:String) {
+		if (ratedVacuumKpa != null && (!Math.isFinite(ratedVacuumKpa) ||
+				ratedVacuumKpa <= 0 || ratedVacuumKpa > 101.325))
+			throw "Vacuum generator rating must be between 0 and 101.325 kPa";
+		var ratingId = ratedVacuumKpa == null ? "" : '-V${Dimension.format(ratedVacuumKpa)}';
+		super(catalogDesignation == null ? 'VACUUM-GENERATOR$ratingId' : catalogDesignation,
+			catalogDesignation == null ? "Generic pneumatic vacuum generator" :
+				(catalogDescription == null ? 'Catalog vacuum generator $catalogDesignation' : catalogDescription),
+			"aluminium 6061", catalogDesignation == null);
+		this.ratedVacuumKpa = ratedVacuumKpa;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
-		addPort({name: "air", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
-		addPort({name: "vacuum", kind: Vacuum, role: Supply, iface: PushIn(6), required: false});
+		addPort({name: "air", kind: Pneumatic, role: Consumer,
+			iface: airInterface == null ? PushIn(6) : airInterface, required: true});
+		addPort({name: "vacuum", kind: Vacuum, role: Supply,
+			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: false});
 		addConversion("air", "vacuum");
 	}
 

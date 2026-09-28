@@ -35,7 +35,9 @@ import cadbridge.EndEffectorCollision;
 import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 import cadbridge.EndEffectorRuntimeBridge;
 import cadbridge.EndEffectorControlBinding;
+import cadbridge.SuctionCapacityBridge;
 import eoat.EndEffectorExample;
+import eoat.SchmalzEndEffectorExample;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.component.MachineComponent;
@@ -46,13 +48,24 @@ import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.ParallelGripper;
+import machinekit.pneumatic.SuctionCup;
+import machinekit.pneumatic.VacuumGenerator;
+import machinekit.pneumatic.VacuumPressureSensor;
+import machinekit.pneumatic.VacuumControlValve;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
+import robotkit.tool.SuctionCapacityChecker;
+import robotkit.tool.SuctionMotionSample;
+import robotkit.tool.WorkpieceLoad;
+import robotkit.tool.MassProperties;
+import robotkit.spatial.Inertia3;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
+import robotkit.world.SensorFrame;
 import haxe.Int64;
 import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -69,7 +82,10 @@ class CadBridgeTests {
     testEndEffectorCollisionPieces();
     testMachineAssemblyMassBridge();
     testEndEffectorBridge();
+    testSuctionCapacityBridge();
+    testSchmalzEndEffector();
     testEndEffectorRuntimeBridge();
+    testDerivedRuntimeBindings();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
@@ -251,6 +267,49 @@ class CadBridgeTests {
     check(rejected, "unaccounted BOM mass prevents a payload decision");
   }
 
+  static function testSchmalzEndEffector():Void {
+    var effector = SchmalzEndEffectorExample.build();
+    check(effector.validate().length == 0 &&
+      effector.billOfMaterials().lines().filter(line ->
+        StringTools.startsWith(line.partNumber, "10.07.09.00001-L")).length == 1,
+      "catalog EOAT validates with its hose and matching fitting");
+    var grip = SuctionCapacityBridge.toGrip(effector, "cup", 60, 0.5, 2);
+    check(approx(grip.normalCapacityN(), 69, 1e-9),
+      "Schmalz theoretical force yields the documented area at 60 kPa");
+    var tool = EndEffectorBridge.toTool(effector, "contact");
+    check(tool.mass > 0.038 && tool.flangeTTcp.translation.z > 0.1,
+      "catalog parts and hose contribute to the robot tool mass and TCP");
+    var load = new WorkpieceLoad("panel", new MassProperties(1, Vec3.zero(), Inertia3.zero()),
+      grip.flangeTCup);
+    var down = new Transform3(Vec3.zero(), Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI));
+    var resting = new SuctionMotionSample(down, Vec3.zero());
+    var accelerated = new SuctionMotionSample(down, new Vec3(15, 0, 0));
+    check(SuctionCapacityChecker.checkPath(load, grip, [resting]).safe &&
+      !SuctionCapacityChecker.checkPath(load, grip, [resting, accelerated]).safe,
+      "catalog cup holds the static sample and rejects excessive sideways acceleration");
+  }
+
+  static function testSuctionCapacityBridge():Void {
+    var effector = new EndEffector();
+    effector.addComponent("generator", new VacuumGenerator(60));
+    effector.addComponent("cup", new SuctionCup(40, 18, Math.PI * 18 * 18, 5));
+    effector.mount("generator", "mount");
+    effector.addMate("cup-mount", "fixed", "generator", "mount", "cup", "mount");
+    effector.connectPorts("vacuum-cup", "generator", "vacuum", "cup", "vacuum");
+    effector.exposePort("air", "generator", "air");
+    var grip = SuctionCapacityBridge.toGrip(effector, "cup", 50, 0.5, 2);
+    check(approx(grip.effectiveAreaM2, Math.PI * 18 * 18 * 1e-6, 1e-12) &&
+      approx(grip.flangeTCup.translation.z, 0.018, 1e-9) &&
+      approx(grip.normalCapacityN(), 50 * Math.PI * 18 * 18 * 1e-3, 1e-9),
+      "suction bridge converts cup contact and measured area to RobotKit");
+    check(effector.upstreamChain("cup", "vacuum").indexOf("generator/vacuum") >= 0,
+      "suction bridge follows the actual vacuum service chain");
+    var rejected = false;
+    try SuctionCapacityBridge.toGrip(effector, "cup", 70, 0.5, 2)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("rating") >= 0;
+    check(rejected, "cup vacuum cannot exceed upstream generator rating");
+  }
+
   static function testEndEffectorBridge():Void {
     var endEffector = new EndEffector();
     endEffector.addComponent("body", new BridgeEndEffectorPart());
@@ -267,6 +326,8 @@ class CadBridgeTests {
       tool.flangeTTcp.rotation.angularDistance(Quat.identity()) < 1e-9,
       "contact frame converts from connector +Y to robot +Z");
     check(approx(tool.mass, 3, 1e-12), "attached tube contributes to RobotKit tool mass");
+    check(tool.massProperties != null && approx(tool.massProperties.massKg, 3, 1e-12),
+      "end effector bridge preserves complete tool mass properties");
     check(switch tool.collision { case Hulls(pieces, _): pieces.length == 1; case _: false; },
       "end effector emits convex hull collision by default");
     var boxTool = EndEffectorBridge.toTool(endEffector, "contact", null, null, null, true);
@@ -288,6 +349,22 @@ class CadBridgeTests {
     check(inspection.id == "inspection" &&
       inspection.flangeTTcp.translation.norm() < 1e-12,
       "each working frame produces a separate RobotKit tool");
+
+    var payloadEffector = new EndEffector();
+    payloadEffector.addComponent("body", new BridgePayloadPart());
+    payloadEffector.mount("body", "mount");
+    payloadEffector.workingFrame("contact", "body", "mount", true);
+    var payloadTool = EndEffectorBridge.toTool(payloadEffector, "contact");
+    var payloadMass = payloadTool.massProperties;
+    check(payloadMass != null && approx(payloadMass.centerOfMass.x, 0, 1e-12) &&
+      approx(payloadMass.centerOfMass.y, 0, 1e-12) &&
+      approx(payloadMass.centerOfMass.z, 0.1, 1e-12),
+      "MachineKit +Y centre of mass becomes RobotKit +Z in metres");
+    check(payloadMass != null && payloadMass.inertia != null &&
+      approx(payloadMass.inertia.xx, 1, 1e-9) &&
+      approx(payloadMass.inertia.yy, 3, 1e-9) &&
+      approx(payloadMass.inertia.zz, 2, 1e-9),
+      "bridge rotates centroidal inertia into RobotKit axes and kg m²");
 
     var set = EndEffectorExample.build();
     var shortTool = EndEffectorBridge.toTool(set.configuration("short"), "contact", null, "short/contact");
@@ -404,6 +481,83 @@ class CadBridgeTests {
     check(combo.gripper != null && combo.vacuum != null &&
       combo.channelDeclarations().length == 2,
       "one coupled end effector can bind gripper and vacuum together");
+  }
+
+  static function testDerivedRuntimeBindings():Void {
+    var generic = EndEffectorExample.build();
+    var derived = EndEffectorRuntimeBridge.toRuntimeFromDesign(generic, "short", "contact");
+    check(derived.runtime.vacuum != null && derived.runtime.changerLock != null &&
+      derived.runtime.channelDeclarations().length == 2 &&
+      derived.bindings.vacuumSensorId == null,
+      "generic EOAT derives vacuum and changer lock outputs from ports");
+    var selected = new ToolRuntimeSelection();
+    selected.select(derived.runtime, Int64.ofInt(0));
+    selected.apply(new FiredProcessEvent(Int64.ofInt(1), "short/robot/master.lock",
+      ProcessEventValue.Digital(false), Int64.ofInt(1), Int64.ofInt(2), 1));
+    check(!derived.runtime.changerLock.isLocked(), "declared changer lock accepts release command");
+    selected.select(null, Int64.ofInt(3));
+    check(derived.runtime.changerLock.isLocked(), "inactive changer returns to safe locked state");
+
+    var set = new EndEffectorSet();
+    set.addComponent("base", new BridgeServiceSourcePart());
+    set.mount("base", "mount");
+    set.exposePort("coupledAir", "base", "air");
+    set.exposePort("valveCommand", "base", "valveCommand");
+    set.changer("manual", "base", "contact", [
+      {robot: "coupledAir", tool: "air"},
+      {robot: "valveCommand", tool: "valveCommand"}]);
+    var effector = new EndEffector();
+    effector.addComponent("generator", new VacuumGenerator());
+    effector.addComponent("valve", new VacuumControlValve(6));
+    effector.addComponent("sensor", new VacuumPressureSensor(6));
+    effector.addComponent("cup", new SuctionCup(25, 18));
+    effector.mount("generator", "mount");
+    effector.addMate("valve-seat", "fixed", "generator", "mount", "valve", "mount");
+    effector.addMate("sensor-seat", "fixed", "generator", "mount", "sensor", "mount");
+    effector.addMate("cup-seat", "fixed", "generator", "mount", "cup", "mount");
+    effector.connectPorts("valve-feed", "generator", "vacuum", "valve", "vacuumIn");
+    effector.connectPorts("pressure-feed", "valve", "vacuumOut", "sensor", "vacuumIn");
+    effector.connectPorts("cup-feed", "sensor", "vacuumOut", "cup", "vacuum");
+    effector.exposePort("air", "generator", "air");
+    effector.exposePort("valveCommand", "valve", "control");
+    effector.workingFrame("contact", "cup", "contact", true);
+    set.addTool("sensor", effector);
+    var sensed = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "sensor", "contact");
+    check(sensed.bindings.vacuumSensorId == "sensor/tool/sensor.pressureSignal" &&
+      sensed.runtime.vacuum != null &&
+      sensed.runtime.channelDeclarations()[0].id == "sensor/tool/valve.enable",
+      "pressure sensor and explicit vacuum valve derive feedback and command IDs");
+    var sensorSelection = new ToolRuntimeSelection();
+    var sensorAdapter = EndEffectorRuntimeBridge.bindSensors(sensorSelection, sensed);
+    sensorSelection.select(sensed.runtime, Int64.ofInt(0));
+    sensorSelection.apply(new FiredProcessEvent(Int64.ofInt(1),
+      "sensor/tool/valve.enable", ProcessEventValue.Digital(true),
+      Int64.ofInt(1), Int64.ofInt(2), 1));
+    var frame = new SensorFrame(sensed.bindings.vacuumSensorId, "tool_vacuum_kpa",
+      "tool", Int64.ofInt(1), Int64.ofInt(3), [45.0], Int64.ofInt(3),
+      "", null, null, "robotkit.monotonic");
+    check(sensorAdapter.apply(frame) && sensed.runtime.vacuum.isHolding(),
+      "derived pressure sensor feeds active vacuum capability");
+
+    var gripperSet = new EndEffectorSet();
+    gripperSet.addComponent("base", new BridgeServiceSourcePart());
+    gripperSet.mount("base", "mount");
+    gripperSet.exposePort("open", "base", "open");
+    gripperSet.exposePort("close", "base", "close");
+    gripperSet.changer("manual", "base", "contact", [
+      {robot: "open", tool: "openAir"}, {robot: "close", tool: "closeAir"}]);
+    var gripperTool = new EndEffector();
+    gripperTool.addComponent("gripper", new ParallelGripper(40, 20, 60, 12));
+    gripperTool.mount("gripper", "mount");
+    gripperTool.exposePort("openAir", "gripper", "open");
+    gripperTool.exposePort("closeAir", "gripper", "close");
+    gripperTool.workingFrame("contact", "gripper", "tcp", true);
+    gripperSet.addTool("gripper", gripperTool);
+    var derivedGripper = EndEffectorRuntimeBridge.toRuntimeFromDesign(gripperSet,
+      "gripper", "contact");
+    check(derivedGripper.runtime.gripper != null &&
+      derivedGripper.runtime.channelDeclarations()[0].id == "gripper/tool/gripper.close",
+      "gripper valve command derives from declared open and close ports");
   }
 
   static function testAssemblySimulationBridge():Void {
@@ -688,6 +842,35 @@ private class BridgeEndEffectorPart extends MachineComponent {
 
   override public function geometry(detail:ComponentDetail = Preview):Part
     return Part.box(20, 10, 30);
+}
+
+private class BridgeServiceSourcePart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-SERVICE-SOURCE", "service source fixture", "steel", true);
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addConnector("contact", Face, Solids.axial(0, 0, 10));
+    for (name in ["air", "open", "close"])
+      addPort({name: name, kind: Pneumatic, role: Supply,
+        iface: Unspecified, required: false});
+    addPort({name: "valveCommand", kind: Signal, role: Supply,
+      iface: Plug("digital-valve", 2), required: false});
+    declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(10, 10, 10);
+}
+
+private class BridgePayloadPart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-PAYLOAD", "payload conversion fixture", "steel", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    declareMass(2, new Vector(0, 100, 0),
+      new InertiaTensor(1000000, 0, 0, 2000000, 0, 3000000));
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(20, 20, 20);
 }
 
 private class BridgeRuntimePart extends MachineComponent {

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "humankit-sim" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "humankit": { "path": ".." },
+    "simkit": { "path": "../../simkit" }
+  },
+  "target": "host"
+}

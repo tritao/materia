@@ -18,6 +18,9 @@
 /motionkit/tests/build/
 /cnckit/tests/build/
 /processkit/tests/build/
+/animkit/native/build/
+/animkit/tests/build/
+/humankit/tests/build/
 
 /cadkit/examples/modeling/build/
 /simkit/.cache/

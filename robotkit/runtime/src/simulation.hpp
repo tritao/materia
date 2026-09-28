@@ -4,7 +4,7 @@
 #include "robotkit_runtime.hpp"
 #include "robotkit_simkit.h"
 #include "nativekit_sim.h"
-#include "nativekit_sim_host.h"
+#include "nativekit_sim_session.h"
 
 #include <chrono>
 #include <memory>
@@ -18,16 +18,23 @@ class SimulationRobot;
 class VirtualDeviceEndpoint;
 
 /**
- * Owns one shared simulated universe and coordinates all RobotRuntime objects
- * attached to it. Commands are collected for every robot before this object
- * advances the physics clock exactly once.
+ * The robots taking part in one SimKit session. Every tick the session asks
+ * this participant to apply every robot's commands (all or none), submit
+ * their joint targets and base drives, and publish their samples from the
+ * tick's snapshot.
+ *
+ * A Simulation either attaches to a session its caller owns, or owns a
+ * private scene, world, and session of its own; only the latter controls the
+ * clock (step, start, stop, reset) through this object.
  */
 class Simulation final {
 public:
-    /** Creates an empty shared universe; robots must be added before stepping. */
+    /** Owns a private session; robots must be added before stepping. */
     Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend = 0,
                uint32_t integrator = 0, uint32_t friction_cone = 0,
                uint32_t solver_iterations = 0, uint32_t line_search_iterations = 0);
+    /** Takes part in a session the caller owns and outlives this object. */
+    explicit Simulation(nksim_session session);
     ~Simulation();
 
     Simulation(const Simulation &) = delete;
@@ -83,6 +90,9 @@ public:
     rk_result get_object_pose(rk_simulation_object object, rk_simulation_pose &out_pose) const;
     rk_result capture_presentation(rk_simulation_presentation_info &out_info,
         std::vector<rk_simulation_presentation_pose> &out_poses) const;
+    /** Robot and environment poses from a frame captured from this session. */
+    rk_result present_frame(nksim_frame frame, rk_simulation_presentation_info &out_info,
+                            std::vector<rk_simulation_presentation_pose> &out_poses) const;
     /** Returns the number of completed shared physics steps. */
     uint64_t step_index() const;
     /** Returns the fixed-step simulation time in seconds. */
@@ -90,9 +100,26 @@ public:
 
 private:
     friend class SimulationRobot;
+    /** Holds the recursive session lock, which orders every edit against ticks. */
+    class Lock {
+    public:
+        explicit Lock(nksim_session session) : session_(session) { nksim_session_lock(session_); }
+        ~Lock() { nksim_session_unlock(session_); }
+        Lock(const Lock &) = delete;
+        Lock &operator=(const Lock &) = delete;
+    private:
+        nksim_session session_;
+    };
+    void attach();
     void cleanup() noexcept;
-    rk_result ensure_host();
-    rk_result advance(uint64_t timestamp_ns);
+    /** The world, while the session is not hosted, for topology and direct edits. */
+    nksim_world stopped_world() const;
+    // Session participant callbacks.
+    rk_result prepare(const nksim_tick &tick);
+    void discard() noexcept;
+    rk_result submit(const nksim_tick &tick);
+    rk_result publish(const nksim_tick &tick);
+    rk_result reset_robots();
     rk_result read_body_pose(nksim_body body, rk_simulation_pose &out_pose) const;
     rk_result read_body_state(nksim_body body, nksim_body_state &state) const;
     /**
@@ -118,7 +145,6 @@ private:
                                  uint32_t count) const;
     /** Removes a robot's drive plant when it is of `kind`; its base stays put. */
     rk_result clear_drive(uint32_t robot_index, int kind);
-    void run();
 
     /**
      * Ideal rolling drive plant for one robot's kinematic base. Each tick it
@@ -150,18 +176,22 @@ private:
         double rates[3] = {0.0, 0.0, 0.0};
     };
 
+    // A private scene, world, and session this object owns, or zero.
+    nkscene_scene owned_scene_ = 0;
+    nksim_world owned_world_ = 0;
+    nksim_session owned_session_ = 0;
+    nksim_session session_ = 0;
+    nksim_participant participant_ = 0;
     nkscene_scene scene_ = 0;
-    nksim_world world_ = 0;
     nksim_shape shape_ = 0;
     std::vector<nksim_shape> link_shapes_;
-    nksim_host host_ = 0;
-    nksim_snapshot snapshot_ = 0;
     double fixed_timestep_ = 0.01;
-    uint32_t physics_substeps_ = 1;
-    uint64_t step_index_ = 0;
-    double simulation_time_ = 0.0;
     double gravity_[3] = {0.0, 0.0, -9.81};
-    bool topology_frozen_ = false;
+    /** The robot command error that rejected the latest tick. */
+    rk_result rejected_ = RK_OK;
+    // Virtual device samples taken while submitting, published after physics.
+    std::vector<rk_robot_state> virtual_samples_;
+    std::vector<rk_result> virtual_sample_results_;
     std::vector<nkscene_node_id> nodes_;
     std::vector<nksim_body> bodies_;
     std::vector<nksim_joint> joints_;
@@ -181,22 +211,9 @@ private:
     // measured from it.
     std::vector<rk_simulation_pose> robot_tick_poses_;
     std::vector<DrivePlant> drives_;
-    struct EnvironmentObject {
-        nkscene_node_id node{};
-        nksim_shape shape = 0;
-        nksim_body body = 0;
-        bool active = false;
-        double half_extents[3]{};
-        rk_simulation_pose initial_pose{};
-    };
-    std::vector<EnvironmentObject> objects_;
+    /** Session objects spawned through this simulation, in spawn order. */
+    std::vector<nksim_object> objects_;
     std::chrono::nanoseconds period_;
-    mutable std::mutex tick_mutex_;
-    mutable std::mutex state_mutex_;
-    std::thread worker_;
-    bool running_ = false;
-    bool stopping_ = false;
-    bool sealed_ = false;
 };
 
 } // namespace robotkit

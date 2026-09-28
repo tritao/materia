@@ -2,6 +2,8 @@ package robotkit.runtime;
 
 import RobotKitSimKit;
 import haxe.Int64;
+import nativekit.sim.SimFrame;
+import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
 import robotkit.model.CollisionShape.CollisionPrimitive;
 import robotkit.model.CollisionShape.ShapeContact;
@@ -9,33 +11,59 @@ import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.spatial.Vec3;
 
+private typedef StepObserverEntry = {id:Int, observer:SimulationStepObserver};
+
 /**
- * Owns one shared simulated universe and its fixed-step clock.
+ * The robots taking part in one SimKit session.
+ *
+ * Simulation.inSession() attaches robots to a session the caller owns and
+ * advances, alongside the session's props and people. The constructor instead
+ * owns a private session whose clock this object's step, start, stop, and
+ * reset control, and whose environment spawnBox edits.
  *
  * The object creates RobotRuntime handles but remains their simulation owner:
- * callers should submit through those handles and advance this object once per
+ * callers should submit through those handles and advance the session once per
  * tick. It is intentionally separate from SimulatedRobot, which is only a
  * live Robot adapter for RobotWorld.
  */
 class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
+  final stepObservers:Array<StepObserverEntry> = [];
+  var nextStepObserverId = 1;
   public final fixedTimestepSeconds:Float;
+  /** The session this simulation joined, or null when it owns its own. */
+  final session:Null<SimSession>;
+  final fixedTimestepNs:Int64;
+  var sourceTimeNs:Int64 = Int64.ofInt(0);
   var disposed:Bool = false;
 
   /**
-   * fixedTimestep is one control tick; physics advances physicsSubsteps times
-   * per tick. integrator and frictionCone take SimKit's NKSIM_INTEGRATOR_* and
-   * NKSIM_FRICTION_CONE_* values (see SimulationSolver), and solverIterations
-   * and lineSearchIterations cap the constraint solver; zero keeps the
-   * backend's defaults.
+   * Owns a private session. With `session`, joins that stopped session
+   * instead and ignores the timing and solver arguments; prefer
+   * Simulation.inSession(). For a private session, fixedTimestep is one
+   * control tick, physics advances physicsSubsteps times per tick, and
+   * integrator and frictionCone take SimKit's NKSIM_INTEGRATOR_* and
+   * NKSIM_FRICTION_CONE_* values (see SimulationSolver), while
+   * solverIterations and lineSearchIterations cap the constraint solver; zero
+   * keeps the backend's defaults.
    */
   public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0,
-      ?integrator:Int = 0, ?frictionCone:Int = 0, ?solverIterations:Int = 0,
+      ?session:SimSession, ?integrator:Int = 0, ?frictionCone:Int = 0, ?solverIterations:Int = 0,
       ?lineSearchIterations:Int = 0) {
+    this.session = session;
+    if (session != null) {
+      fixedTimestepSeconds = session.fixedTimestep();
+      fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestepSeconds * 1e9)));
+      var attached = RobotKitSimKit.rk_simulation_create_in_session(session.nativeHandle());
+      check(attached.status, "simulation.createInSession");
+      owner = attached.out_simulation;
+      return;
+    }
     if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
       throw "Simulation requires a positive finite timestep and positive substep count";
     fixedTimestepSeconds = fixedTimestep;
+    fixedTimestepNs = Int64.fromFloat(Math.max(1, Math.round(fixedTimestep * 1e9)));
     var desc = new rk_simulation_desc();
     desc.set_struct_size(rk_simulation_desc.size());
     desc.set_fixed_timestep(fixedTimestep);
@@ -48,6 +76,23 @@ class Simulation {
     var result = RobotKitSimKit.rk_simulation_create(desc);
     check(result.status, "simulation.create");
     owner = result.out_simulation;
+  }
+
+  /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
+  public static function inSession(session:SimSession):Simulation
+    return new Simulation(0.01, 1, 0, session);
+
+  /** Robot poses, and boxes spawned here, from a frame captured from the session. */
+  public function presentFrame(frame:SimFrame):SimulationPresentationSnapshot {
+    ensureLive();
+    var result = RobotKitSimKit.rk_simulation_present_frame(owner.borrow(), frame.nativeHandle());
+    check(result.status, "simulation.presentFrame");
+    try {
+      return new SimulationPresentationSnapshot(result.out_presentation);
+    } catch (error:Dynamic) {
+      result.out_presentation.close();
+      throw error;
+    }
   }
 
   /** Adds topology before the first start or step. */
@@ -310,6 +355,11 @@ class Simulation {
   }
 
   /** Contacts for a runtime attached to this simulation. */
+  public function ownsRobot(runtime:RobotRuntime):Bool {
+    ensureLive();
+    return runtime != null && robots.indexOf(runtime) >= 0;
+  }
+
   public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
     ensureLive();
     if (runtime == null || runtime.simulation != this)
@@ -335,10 +385,36 @@ class Simulation {
     return contacts;
   }
 
-  /** Advances once. timestampNs is a legacy hint, not source or receive time. */
+  /** Logical source time for explicitly stepped sensors. It stays monotonic
+   * across physics resets so published frames remain ordered. */
+  public function sourceTimestampNs():Int64 return sourceTimeNs;
+
+  public function addStepObserver(observer:SimulationStepObserver):Int {
+    ensureLive();
+    if (observer == null) throw "Simulation step observer is required";
+    var id = nextStepObserverId++;
+    stepObservers.push({id: id, observer: observer});
+    return id;
+  }
+
+  public function removeStepObserver(id:Int):Void {
+    for (index in 0...stepObservers.length) if (stepObservers[index].id == id) {
+      stepObservers.splice(index, 1);
+      return;
+    }
+  }
+
+  /** Advances once. timestampNs remains a legacy native hint; sensor observers
+   * receive a separate monotonically increasing simulation source time. */
   public function step(timestampNs:Int64):Void {
     ensureLive();
     check(RobotKitSimKit.rk_simulation_step(owner.borrow(), timestampNs), "simulation.step");
+    sourceTimeNs = Int64.add(sourceTimeNs, fixedTimestepNs);
+    for (entry in stepObservers.copy()) {
+      var registered = false;
+      for (current in stepObservers) if (current.id == entry.id) registered = true;
+      if (registered) entry.observer.afterSimulationStep(sourceTimeNs);
+    }
   }
 
   /** Injects a virtual RKD6 link loss or reconnects the link. */
@@ -356,9 +432,13 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_start(owner.borrow()), "simulation.start");
   }
 
-  /** Stops realtime stepping but leaves the simulation available for disposal. */
+  /**
+   * Stops realtime stepping but leaves the simulation available for disposal.
+   * A joined session's owner stops it, so this does nothing then.
+   */
   public function stop():Void {
-    if (!disposed) check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
+    if (!disposed && session == null)
+      check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
   }
 
   /** Restores every body and the fixed-step clock to the editable-scene state. */
@@ -681,6 +761,7 @@ class Simulation {
   public function dispose():Void {
     if (disposed) return;
     stop();
+    stepObservers.resize(0);
     for (runtime in robots) runtime.dispose();
     robots.resize(0);
     owner.close();

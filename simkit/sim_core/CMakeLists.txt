@@ -7,7 +7,8 @@ add_library(nativekit_sim_core ${NK_LIBRARY_TYPE}
     src/snapshot.cpp
     src/scene_sync.cpp
     src/physics_backend.cpp
-    src/host.cpp)
+    src/host.cpp
+    src/session.cpp)
 add_library(NativeKit::sim_core ALIAS nativekit_sim_core)
 
 target_compile_features(nativekit_sim_core PRIVATE cxx_std_20)
@@ -67,6 +68,12 @@ if(NK_BUILD_TESTS)
     target_link_libraries(nativekit_sim_core_host_tests PRIVATE NativeKit::sim_core)
     add_test(NAME sim_core_host COMMAND nativekit_sim_core_host_tests)
     set_tests_properties(sim_core_host PROPERTIES LABELS "sim;threading" TIMEOUT 30)
+
+    add_executable(nativekit_sim_core_session_tests tests/session.cpp)
+    target_compile_features(nativekit_sim_core_session_tests PRIVATE cxx_std_20)
+    target_link_libraries(nativekit_sim_core_session_tests PRIVATE NativeKit::sim_core)
+    add_test(NAME sim_core_session COMMAND nativekit_sim_core_session_tests)
+    set_tests_properties(sim_core_session PROPERTIES LABELS "sim;threading" TIMEOUT 30)
 endif()
 
 install(TARGETS nativekit_sim_core EXPORT NativeKitTargets

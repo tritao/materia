@@ -5,6 +5,7 @@ import nativekit.ui.widgets.controls.Toggle;
 
 
 import app.EditorToolbarLayout.EditorToolbarDensity;
+import app.editor.CharacterPreview;
 import app.editor.ObjectKindRegistry;
 import app.editor.TelemetryPanel;
 import app.editor.SensorPanel;
@@ -140,12 +141,15 @@ class Main {
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
-          arg != "--record" && arg.indexOf("--record=") != 0) {
+          arg != "--record" && arg.indexOf("--record=") != 0 &&
+          arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
+          arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
+          arg.indexOf("--character-route=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
-          "[--project-action=ID] [--record[=PATH]]");
+          "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] [--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] [--character-route=X,Y;X,Y;...]]");
         return 2;
       }
 
@@ -196,7 +200,8 @@ class Main {
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
     host.continuousFrames = function() return activeEditor != null &&
-      (activeEditor.simulation.isRunning() || diagnostics.robotHost != null);
+      (activeEditor.simulation.isRunning() || diagnostics.robotHost != null ||
+        activeEditor.hasCharacterPreview());
     var hosted = DesktopUiHost.open(host, function(context) {
       var activeTheme = Theme.light();
       if (diagnostics.darkTheme) activeTheme = Theme.dark();
@@ -215,6 +220,25 @@ class Main {
       for (arg in args) if (arg.indexOf("--project-action=") == 0)
         editor.projectInitialAction = arg.substr(17);
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
+      for (arg in args) if (arg.indexOf("--character=") == 0) {
+        var clip:Null<String> = null;
+        var hold:Null<String> = null;
+        var display = humankit.HumanDisplay.Mesh;
+        var route:Null<Array<Array<Float>>> = null;
+        for (option in args) {
+          if (option.indexOf("--character-clip=") == 0) clip = option.substr(17);
+          if (option.indexOf("--character-hold=") == 0) hold = option.substr(17);
+          if (option.indexOf("--character-display=") == 0)
+            display = humankit.HumanDisplays.parse(option.substr(20));
+          if (option.indexOf("--character-route=") == 0)
+            route = [for (point in option.substr(18).split(";")) {
+              var coordinates = point.split(",");
+              if (coordinates.length != 2) throw "--character-route takes X,Y points separated by ;";
+              [Std.parseFloat(coordinates[0]), Std.parseFloat(coordinates[1])];
+            }];
+        }
+        editor.enableCharacterPreview(arg.substr(12), clip, hold, display, route);
+      }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
       return editor;
@@ -427,6 +451,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var contextMenuX:Float;
   var contextMenuY:Float;
   var componentLab:Null<ComponentLab>;
+  var characterPreview:Null<CharacterPreview> = null;
   var perspectiveViewport:Null<EditorPerspectiveViewport> = null;
   final hostContext:Null<DesktopUiHostContext>;
   var sceneInspector:Null<PropertyInspector> = null;
@@ -707,8 +732,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return ui.submitCached(function() return view(), frame, editorSubmitKey());
   }
 
-  /** Advance CAD preview refinement after a rendered frame. */
+  /** Advance the character preview, then CAD preview refinement after a rendered frame. */
   public function tick():Void {
+    if (characterPreview != null) {
+      characterPreview.advance(scene);
+      if (hostContext != null) hostContext.requestFrame();
+    }
     if (!refinementFrameSubmitted) return;
     refinementFrameSubmitted = false;
     var before = scene.visualRevision;
@@ -770,6 +799,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     world.close();
     if (files != null) files.dispose();
     if (perspectiveViewport != null) perspectiveViewport.dispose();
+    if (characterPreview != null) characterPreview.dispose();
     session.dispose();
     ui.dispose();
   }
@@ -790,6 +820,27 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (selected != null) scene.select(selected);
     if (layout != null) workspace.restoreJson(layout);
     if (hostContext != null) hostContext.requestFrame();
+  }
+
+  /** Shows an animated glTF character walking around the origin; it is not saved. */
+  public function enableCharacterPreview(path:String, ?clipName:String, ?propPath:String,
+      display:humankit.HumanDisplay = humankit.HumanDisplay.Mesh, ?route:Array<Array<Float>>):Void {
+    releaseCharacterPreview();
+    var preview = new CharacterPreview(path, clipName, propPath, display, route);
+    characterPreview = preview;
+    // A humanoid preview walks through the shared simulation as a person.
+    simulation.addParticipant(preview);
+    if (hostContext != null) hostContext.requestFrame();
+  }
+
+  public function hasCharacterPreview():Bool return characterPreview != null;
+
+  function releaseCharacterPreview():Void {
+    var preview = characterPreview;
+    if (preview == null) return;
+    simulation.removeParticipant(preview);
+    preview.dispose();
+    characterPreview = null;
   }
 
   public function enableComponentLab(?storyId:String):Void {

@@ -9,6 +9,7 @@ import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentPort;
 import machinekit.component.PortInterface;
+import machinekit.component.PortInterfaces;
 import machinekit.component.PortRole;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
@@ -217,7 +218,7 @@ class MachineAssembly {
 		}
 	}
 
-	/** Check structure and complete service wiring; interface mismatches are warnings. */
+	/** Check structure, complete service wiring and physical port compatibility. */
 	public function validate():Array<String> {
 		validateStructure();
 		var connections = checkConnections();
@@ -241,9 +242,8 @@ class MachineAssembly {
 				if ((first.role == Supply && second.role == Supply) ||
 					(first.role == Consumer && second.role == Consumer))
 					throw 'Port connection "$id" has incompatible roles';
-				if (first.iface != Unspecified && second.iface != Unspecified &&
-					Std.string(first.iface) != Std.string(second.iface))
-					warnings.push('Port connection "$id" has mismatched interfaces');
+				if (!PortInterfaces.compatible(first.iface, second.iface))
+					throw 'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}';
 			case _:
 		}
 		return {connected: connected, warnings: warnings};
@@ -456,6 +456,14 @@ class MachineAssembly {
 		var trace = traceUpstream(portRef(instanceId, portName));
 		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
 		return {port: trace.port, external: trace.external};
+	}
+
+	/** Ordered member/port path from a consumer to its supplied boundary. */
+	public function upstreamChain(instanceId:String, portName:String):Array<String> {
+		checkConnections();
+		var trace = traceUpstream(portRef(instanceId, portName));
+		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
+		return trace.chain.copy();
 	}
 
 	static function unsuppliedMessage(chain:Array<String>):String

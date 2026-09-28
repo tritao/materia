@@ -11,6 +11,7 @@ class ToolRuntime {
   public final tool:Tool;
   public final gripper:Null<Gripper>;
   public final vacuum:Null<Vacuum>;
+  public final changerLock:Null<ChangerLock>;
   public final surface:Null<SurfaceTool>;
   public final sprayer:Null<Sprayer>;
   public final sander:Null<Sander>;
@@ -18,11 +19,13 @@ class ToolRuntime {
   final declaredChannels:Array<ProcessChannelDeclaration> = [];
 
   public function new(tool:Tool, ?gripper:Gripper, ?vacuum:Vacuum,
-      ?surface:SurfaceTool, ?sprayer:Sprayer, ?sander:Sander) {
+      ?surface:SurfaceTool, ?sprayer:Sprayer, ?sander:Sander,
+      ?changerLock:ChangerLock) {
     if (tool == null) throw "Tool runtime requires a mounted tool";
     this.tool = tool;
     this.gripper = gripper;
     this.vacuum = vacuum;
+    this.changerLock = changerLock;
     this.surface = surface;
     this.sprayer = sprayer;
     this.sander = sander;
@@ -41,6 +44,14 @@ class ToolRuntime {
     if (vacuum == null) throw "Mounted tool has no vacuum";
     var declaration = new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false));
     adapter.bindVacuum(channel, vacuum);
+    declaredChannels.push(declaration);
+  }
+
+  /** Bind a lock command; true is the safe state during a configuration switch. */
+  public function bindChangerLock(channel:String):Void {
+    if (changerLock == null) throw "Mounted tool has no changer lock";
+    var declaration = new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(true));
+    adapter.bindChangerLock(channel, changerLock);
     declaredChannels.push(declaration);
   }
 

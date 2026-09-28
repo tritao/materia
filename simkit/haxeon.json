@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "package": {
+    "name": "simkit"
+  },
+  "sourceRoots": [
+    "sim_core/bindings/haxe",
+    "sim_mujoco/bindings/haxe"
+  ],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "nativekit": {
+      "path": "../nativekit"
+    },
+    "scenekit": {
+      "path": "../scenekit"
+    }
+  },
+  "ffi": {
+    "interfaces": [
+      "sim_core/bindings/nativekit-sim.hxi",
+      "sim_mujoco/bindings/nativekit-sim-mujoco.hxi"
+    ],
+    "projections": [
+      "sim_core/bindings/nativekit-sim.hxmap"
+    ]
+  },
+  "target": "host"
+}

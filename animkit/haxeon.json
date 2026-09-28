@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "package": { "name": "animkit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "scenekit": { "path": "../scenekit" }
+  },
+  "ffi": {
+    "interfaces": ["native/bindings/animkit.hxi"]
+  },
+  "target": "host"
+}

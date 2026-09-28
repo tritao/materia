@@ -3,11 +3,29 @@ package cadbridge;
 import cadkit.modeling.AssemblyState;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
+import machinekit.component.RuntimePortIntent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.EndEffectorFrames;
+import materia.assembly.AssemblyFrames;
+import robotkit.runtime.RobotRuntimeBlueprint;
+import robotkit.runtime.RobotRuntimeSensorBlueprint;
 import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
+import robotkit.tool.SimulatedChangerLock;
+import robotkit.tool.SimulatedToolSensorAdapter;
+import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.ToolRuntime;
+
+typedef EndEffectorRuntimeBindings = {
+  var controls:Array<EndEffectorControlBinding>;
+  var vacuumSensorId:Null<String>;
+}
+
+typedef EndEffectorRuntimeBundle = {
+  var runtime:ToolRuntime;
+  var bindings:EndEffectorRuntimeBindings;
+}
 
 /** Build the mounted runtime and its output channels for one coupled EOAT. */
 class EndEffectorRuntimeBridge {
@@ -17,6 +35,7 @@ class EndEffectorRuntimeBridge {
     var configuration = set.configuration(configurationId);
     var gripper:Null<SimulatedGripper> = null;
     var vacuum:Null<SimulatedVacuum> = null;
+    var changerLock:Null<SimulatedChangerLock> = null;
     for (control in controls) {
       if (control == null) throw "End effector control binding is required";
       switch control {
@@ -31,16 +50,139 @@ class EndEffectorRuntimeBridge {
           requireInlet(configuration, instanceId, inletPort,
             [PortKind.Pneumatic, PortKind.Vacuum, PortKind.Signal]);
           vacuum = new SimulatedVacuum();
+        case Lock(_, instanceId, inletPort):
+          if (changerLock != null) throw "End effector has duplicate changer-lock bindings";
+          requireInlet(configuration, instanceId, inletPort, [PortKind.Pneumatic]);
+          changerLock = new SimulatedChangerLock();
       }
     }
     var tool = EndEffectorBridge.toTool(configuration, frameName, state,
       configurationId + "/" + frameName);
-    var runtime = new ToolRuntime(tool, gripper, vacuum);
+    var runtime = new ToolRuntime(tool, gripper, vacuum, null, null, null, changerLock);
     for (control in controls) switch control {
       case Gripper(channel, _, _, _): runtime.bindGripper(channel);
       case Vacuum(channel, _, _): runtime.bindVacuum(channel);
+      case Lock(channel, _, _): runtime.bindChangerLock(channel);
     }
     return runtime;
+  }
+
+  /** Build control channels and pressure feedback from component port intents. */
+  public static function deriveBindings(set:EndEffectorSet,
+      configurationId:String):EndEffectorRuntimeBindings {
+    if (set == null) throw "End effector set is required";
+    var configuration = set.configuration(configurationId);
+    var controls:Array<EndEffectorControlBinding> = [];
+    var sensorId:Null<String> = null;
+    var hasGripper = false, hasVacuum = false, hasLock = false;
+    var hasExplicitVacuumValve = false;
+    for (member in configuration.components()) for (intent in member.component.runtimePortIntents())
+      switch intent {
+        case VacuumValve(_): hasExplicitVacuumValve = true;
+        case _:
+      }
+    for (member in configuration.components()) for (intent in member.component.runtimePortIntents()) {
+      var prefix = '$configurationId/${member.id}';
+      switch intent {
+        case Gripper(openPort, closePort):
+          if (hasGripper || openPort == closePort) throw "Ambiguous gripper runtime ports";
+          requireInlet(configuration, member.id, openPort, [PortKind.Pneumatic, PortKind.Signal]);
+          requireInlet(configuration, member.id, closePort, [PortKind.Pneumatic, PortKind.Signal]);
+          controls.push(EndEffectorControlBinding.Gripper('$prefix.close', member.id,
+            openPort, closePort));
+          hasGripper = true;
+        case VacuumActuator(inletPort):
+          if (hasExplicitVacuumValve) continue;
+          if (hasVacuum) throw "Ambiguous vacuum runtime ports";
+          requireInlet(configuration, member.id, inletPort, [PortKind.Pneumatic, PortKind.Signal]);
+          controls.push(EndEffectorControlBinding.Vacuum('$prefix.enable', member.id, inletPort));
+          hasVacuum = true;
+        case VacuumValve(controlPort):
+          if (hasVacuum) throw "Ambiguous vacuum runtime ports";
+          requireInlet(configuration, member.id, controlPort, [PortKind.Signal]);
+          controls.push(EndEffectorControlBinding.Vacuum('$prefix.enable', member.id, controlPort));
+          hasVacuum = true;
+        case ChangerLock(inletPort):
+          if (hasLock) throw "Ambiguous changer-lock runtime ports";
+          requireInlet(configuration, member.id, inletPort, [PortKind.Pneumatic]);
+          controls.push(EndEffectorControlBinding.Lock('$prefix.lock', member.id, inletPort));
+          hasLock = true;
+        case VacuumPressureSensor(vacuumPort, signalPort):
+          if (sensorId != null) throw "Ambiguous vacuum pressure sensors";
+          requireInlet(configuration, member.id, vacuumPort, [PortKind.Vacuum]);
+          var signal = member.component.port(signalPort);
+          if (signal.role != PortRole.Supply || signal.kind != PortKind.Signal)
+            throw 'Pressure sensor "$prefix" needs a signal supply';
+          sensorId = '$prefix.$signalPort';
+      }
+    }
+    if (sensorId != null && !hasVacuum)
+      throw "Vacuum pressure sensor has no bound vacuum actuator";
+    return {controls: controls, vacuumSensorId: sensorId};
+  }
+
+  /** Build a runtime using only declarations on the coupled components. */
+  public static function toRuntimeFromDesign(set:EndEffectorSet, configurationId:String,
+      frameName:String, ?state:AssemblyState):EndEffectorRuntimeBundle {
+    var bindings = deriveBindings(set, configurationId);
+    return {runtime: toRuntime(set, configurationId, frameName, bindings.controls, state),
+      bindings: bindings};
+  }
+
+  /** Add the design's pressure sensor to a robot blueprint before simulation
+   * creation. Its mount is expressed relative to the flange link. */
+  public static function addVacuumSensorToBlueprint(set:EndEffectorSet,
+      configurationId:String, blueprint:RobotRuntimeBlueprint,
+      flangeLinkIndex:Int, ?flangeLinkId:String,
+      ?state:AssemblyState):RobotRuntimeSensorBlueprint {
+    if (blueprint == null || flangeLinkIndex < 0 || flangeLinkIndex >= blueprint.linkCount)
+      throw "Vacuum sensor needs a valid robot flange link";
+    var bindings = deriveBindings(set, configurationId);
+    var sensorId = bindings.vacuumSensorId;
+    if (sensorId == null) throw "End effector has no vacuum pressure sensor";
+    if (blueprint.sensorById(sensorId) != null)
+      throw 'Robot blueprint already has sensor "$sensorId"';
+    var configuration = set.configuration(configurationId);
+    var solved = configuration.solve(state);
+    for (member in configuration.components())
+      for (intent in member.component.runtimePortIntents()) switch intent {
+        case VacuumPressureSensor(_, signalPort):
+          var port = member.component.port(signalPort);
+          var connector = port.connector == null ? "mount" : port.connector;
+          var pose = solved.poses.get(member.id);
+          if (pose == null) throw 'Missing pressure sensor pose for "${member.id}"';
+          var mountWorld = AssemblyFrames.compose(pose,
+            configuration.memberConnectorFrame(member.id, connector));
+          var mountRelative = AssemblyFrames.compose(
+            AssemblyFrames.inverse(solved.mountWorld), mountWorld);
+          var frame = EndEffectorFrames.toRobotFrame(mountRelative);
+          var mappedLinkId = blueprint.identity == null ? null :
+            blueprint.identity.linkId(flangeLinkIndex);
+          if (flangeLinkId != null && mappedLinkId != null && flangeLinkId != mappedLinkId)
+            throw "Pressure sensor flange link ID does not match the robot blueprint";
+          var linkId = flangeLinkId != null ? flangeLinkId : mappedLinkId != null ?
+            mappedLinkId : flangeLinkIndex == 0 ? "base_link" : null;
+          if (linkId == null) throw "Robot blueprint has no flange link identity";
+          var sensor = new RobotRuntimeSensorBlueprint(sensorId, "tool_vacuum_kpa",
+            sensorId, linkId, flangeLinkIndex,
+            [frame.position.x, frame.position.y, frame.position.z],
+            [frame.quaternion.x, frame.quaternion.y, frame.quaternion.z,
+              frame.quaternion.w]);
+          blueprint.sensors.push(sensor);
+          return sensor;
+        case _:
+      }
+    throw "End effector pressure sensor intent did not resolve";
+  }
+
+  /** Register declared pressure feedback on a selected runtime. */
+  public static function bindSensors(selection:ToolRuntimeSelection,
+      bundle:EndEffectorRuntimeBundle):SimulatedToolSensorAdapter {
+    if (selection == null || bundle == null) throw "Tool selection and runtime are required";
+    var adapter = new SimulatedToolSensorAdapter(selection);
+    if (bundle.bindings.vacuumSensorId != null)
+      adapter.bindVacuumPressure(bundle.runtime, bundle.bindings.vacuumSensorId);
+    return adapter;
   }
 
   static function requireInlet(configuration:EndEffector, instanceId:String,

@@ -3,6 +3,7 @@
 
 #define NKSIM_HAXEON_IMPORT 1
 #include "nativekit_sim.h"
+#include "nativekit_sim_session.h"
 #undef NKSIM_HAXEON_IMPORT
 
 #endif

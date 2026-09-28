@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "package": { "name": "animkit-tests" },
+  "entry": "AnimKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "animkit": { "path": ".." },
+    "scenekit": { "path": "../../scenekit" },
+    "nativekit": { "path": "../../nativekit" }
+  },
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "animkit_tests_native",
+      "inputs": [
+        "native/CMakeLists.txt",
+        "../native/CMakeLists.txt",
+        "../native/include/animkit.h",
+        "../native/src/api.cpp",
+        "../native/src/import.cpp",
+        "../native/src/runtime.cpp",
+        "../../scenekit/scene/CMakeLists.txt",
+        "../../nativekit/CMakeLists.txt"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}
