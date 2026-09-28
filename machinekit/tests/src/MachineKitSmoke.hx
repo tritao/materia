@@ -261,7 +261,14 @@ class MachineKitSmoke {
 		check(model.definition().joints.length == 0, "port connections are not CAD mates");
 		var station = new MachineAssembly();
 		station.include("tool", tool);
-		check(station.port("tool/robotAir").instanceId == "tool/changer", "included air port is prefixed");
+		check(station.portNames().length == 0, "included ports are not automatically public");
+		throws(() -> station.port("tool/robotAir"), "Missing assembly port");
+		var top = new MachineAssembly();
+		top.include("station", station);
+		check(top.portNames().length == 0, "unexposed ports stay private across three levels");
+		station.exposePort("airSupply", "tool/changer", "robotAir");
+		check(station.port("airSupply").instanceId == "tool/changer", "port can be re-exposed under a new name");
+		check(top.portNames().length == 0, "a containing assembly does not inherit exposed ports");
 		var includedSource = station.upstream("tool/cup", "vacuum");
 		check(includedSource.instanceId == "tool/changer" && includedSource.portName == "robotAir",
 			"included service path retains its source");
@@ -279,6 +286,7 @@ class MachineKitSmoke {
 		incompleteTool.exposePort("vacuum", "cup", "vacuum");
 		var parent = new MachineAssembly();
 		parent.include("tool", incompleteTool);
+		check(parent.portNames().length == 0, "included required input is private until re-exposed");
 		throws(() -> parent.validate(), "Required consumer port");
 		parent.exposePort("tool/vacuum", "tool/cup", "vacuum");
 		check(parent.validate().length == 0, "parent must explicitly re-expose an included required input");

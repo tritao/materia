@@ -54,7 +54,7 @@ class MachineAssembly {
 	final members:Array<AssemblyMember> = [];
 	final included:Array<MachineSubassembly> = [];
 	final externalConnectors:Array<{name:String, instanceId:String, connectorName:String}> = [];
-	final externalPorts:Array<{name:String, instanceId:String, portName:String, inherited:Bool}> = [];
+	final externalPorts:Array<{name:String, instanceId:String, portName:String}> = [];
 	final operations:Array<MachineAssemblyOperation> = [];
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
@@ -82,9 +82,7 @@ class MachineAssembly {
 			addMemberConnector(join(id, connector.instanceId), connector.name, connector.frame);
 		for (connector in assembly.externalConnectors)
 			exposeConnector(join(id, connector.name), join(id, connector.instanceId), connector.connectorName);
-		for (port in assembly.externalPorts)
-			externalPorts.push({name: join(id, port.name), instanceId: join(id, port.instanceId),
-				portName: port.portName, inherited: true});
+		// Ports define required service inputs, so each containing assembly must expose its own interface.
 		for (operation in assembly.operations) addOperation(prefixed(operation, id));
 		for (entry in assembly.bomItems) {
 			var mass = switch entry.mass {
@@ -163,13 +161,9 @@ class MachineAssembly {
 		if (name == null || name.length == 0) throw "External assembly port needs a name";
 		requirePort(portRef(instanceId, portName));
 		for (existing in externalPorts) if (existing.name == name) {
-			if (existing.inherited && existing.instanceId == instanceId && existing.portName == portName) {
-				existing.inherited = false;
-				return;
-			}
 			throw 'Duplicate external assembly port "$name"';
 		}
-		externalPorts.push({name: name, instanceId: instanceId, portName: portName, inherited: false});
+		externalPorts.push({name: name, instanceId: instanceId, portName: portName});
 	}
 
 	public function addBomItem(item:BomItem, quantity:Int = 1,
@@ -449,7 +443,7 @@ class MachineAssembly {
 	}
 
 	function isExposed(instanceId:String, portName:String):Bool {
-		for (entry in externalPorts) if (!entry.inherited && entry.instanceId == instanceId &&
+		for (entry in externalPorts) if (entry.instanceId == instanceId &&
 			entry.portName == portName) return true;
 		return false;
 	}
