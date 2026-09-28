@@ -1105,6 +1105,16 @@ false if any patch's best candidate fell short of full reachability. Base
 motion between patches is left entirely to the existing `Navigator`/`GoTo`
 against each patch's `basePose`.
 
+When a tool collision shape and map-frame `ToolBoxObstacle`s are supplied,
+the planner transforms the obstacles into each candidate's base frame and
+checks every solved flange pose. `ToolClearanceChecker` uses separating axes
+for each convex tool piece against each oriented box, preserving the empty
+space between pieces. It also samples the joint-space segment between
+successive solved poses (default maximum step 0.02 radians or metres per
+joint). Hull padding and requested planning clearance are added to the
+separation test. This is a sampled path check; callers needing a tighter
+path guarantee must use a smaller joint step or continuous collision check.
+
 ## Simulated wall-finishing robot (M9)
 
 `robotkit/tests/src/tests/WallFinishingScenarioTests.hx` is the first
