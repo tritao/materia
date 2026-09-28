@@ -4,6 +4,9 @@ import cadkit.modeling.AssemblyModel;
 import machinekit.component.Bom;
 import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
+import machinekit.component.ComponentPort;
+import machinekit.component.PortInterface;
+import machinekit.component.PortRole;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
@@ -12,6 +15,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 typedef MachineAssemblyComponent = { var id:String; var component:MachineComponent; }
 typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:String; }
+typedef PortRef = { var instanceId:String; var portName:String; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
 
 enum MachineAssemblyOperation {
@@ -20,6 +24,7 @@ enum MachineAssemblyOperation {
 	Constrain(id:String, kind:AssemblyJointType, parent:MachineAssemblyConnector,
 		child:MachineAssemblyConnector, axis:Null<AssemblyVector>, tolerance:Null<Float>, limits:Null<AssemblyJointLimits>);
 	Couple(id:String, source:String, target:String, ratio:Float, offset:Float);
+	ConnectPorts(id:String, from:PortRef, to:PortRef, line:Null<BomItem>);
 }
 
 private typedef AssemblyMember = {
@@ -33,6 +38,7 @@ class MachineAssembly {
 	final members:Array<AssemblyMember> = [];
 	final included:Array<MachineSubassembly> = [];
 	final externalConnectors:Array<{name:String, instanceId:String, connectorName:String}> = [];
+	final externalPorts:Array<{name:String, instanceId:String, portName:String}> = [];
 	final operations:Array<MachineAssemblyOperation> = [];
 	final bomItems:Array<{item:BomItem, quantity:Int}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
@@ -60,6 +66,8 @@ class MachineAssembly {
 			addMemberConnector(join(id, connector.instanceId), connector.name, connector.frame);
 		for (connector in assembly.externalConnectors)
 			exposeConnector(join(id, connector.name), join(id, connector.instanceId), connector.connectorName);
+		for (port in assembly.externalPorts)
+			exposePort(join(id, port.name), join(id, port.instanceId), port.portName);
 		for (operation in assembly.operations) addOperation(prefixed(operation, id));
 		for (entry in assembly.bomItems) addBomItem(entry.item, entry.quantity);
 		included.push({id: id, assembly: assembly});
@@ -86,6 +94,12 @@ class MachineAssembly {
 	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void
 		addOperation(Couple(id, source, target, ratio, offset));
 
+	public function connectPorts(id:String, fromInstance:String, fromPort:String,
+			toInstance:String, toPort:String, ?line:BomItem):Void {
+		addOperation(ConnectPorts(id, portRef(fromInstance, fromPort), portRef(toInstance, toPort), line));
+		if (line != null) addBomItem(line);
+	}
+
 	/** Add a calculated connector on one member, such as a screw seat above a housing face. */
 	public function addMemberConnector(instanceId:String, name:String, frame:AssemblyFrame):Void {
 		if (name == null || name.length == 0) throw "Assembly connector needs a name";
@@ -106,15 +120,25 @@ class MachineAssembly {
 		externalConnectors.push({name: name, instanceId: instanceId, connectorName: connectorName});
 	}
 
+	public function exposePort(name:String, instanceId:String, portName:String):Void {
+		if (name == null || name.length == 0) throw "External assembly port needs a name";
+		requirePort(portRef(instanceId, portName));
+		for (existing in externalPorts) if (existing.name == name)
+			throw 'Duplicate external assembly port "$name"';
+		externalPorts.push({name: name, instanceId: instanceId, portName: portName});
+	}
+
 	public function addBomItem(item:BomItem, quantity:Int = 1):Void {
 		if (item == null || quantity <= 0) throw "Assembly BOM entry needs an item and positive quantity";
 		bomItems.push({item: item, quantity: quantity});
 	}
 
 	/** Check relationships that depend on the full operation set. */
-	public function validate():Void {
+	public function validate():Array<String> {
 		var parents:Map<String, String> = [];
 		var joints:Map<String, Bool> = [];
+		var connected:Map<String, Bool> = [];
+		var warnings:Array<String> = [];
 		for (op in operations) switch op {
 			case Mate(id, _, parent, child, _, _, _):
 				if (parents.exists(child.instanceId)) throw 'Assembly member "${child.instanceId}" has two parent joints';
@@ -122,6 +146,21 @@ class MachineAssembly {
 				joints.set(id, true);
 			case Constrain(id, _, _, _, _, _, _): joints.set(id, true);
 			case Couple(_, _, _, _, _):
+			case ConnectPorts(id, from, to, _):
+				var first = requirePort(from), second = requirePort(to);
+				var fromKey = portKey(from), toKey = portKey(to);
+				if (fromKey == toKey) throw 'Port connection "$id" joins a port to itself';
+				if (connected.exists(fromKey) || connected.exists(toKey))
+					throw 'Port connection "$id" uses a port more than once';
+				connected.set(fromKey, true);
+				connected.set(toKey, true);
+				if (first.kind != second.kind) throw 'Port connection "$id" has mismatched kinds';
+				if ((first.role == Supply && second.role == Supply) ||
+					(first.role == Consumer && second.role == Consumer))
+					throw 'Port connection "$id" has incompatible roles';
+				if (first.iface != Unspecified && second.iface != Unspecified &&
+					Std.string(first.iface) != Std.string(second.iface))
+					warnings.push('Port connection "$id" has mismatched interfaces');
 		}
 		for (member in members) {
 			var seen:Map<String, Bool> = [];
@@ -138,6 +177,12 @@ class MachineAssembly {
 					throw 'Assembly coupling "$id" refers to a missing joint';
 			case _:
 		}
+		for (member in members) for (port in member.component.ports())
+			if (port.required && port.role == Consumer &&
+				!connected.exists(portKey(portRef(member.id, port.name))) &&
+				!isExposed(member.id, port.name))
+				throw 'Required consumer port "${member.id}/${port.name}" is unconnected';
+		return warnings;
 	}
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
@@ -162,6 +207,7 @@ class MachineAssembly {
 					parent.connectorName, join(prefix, child.instanceId), child.connectorName, axis, tolerance, limits);
 			case Couple(id, source, target, ratio, offset):
 				model.couple(join(prefix, id), join(prefix, source), join(prefix, target), ratio, offset);
+			case ConnectPorts(_, _, _, _):
 		}
 	}
 
@@ -179,6 +225,46 @@ class MachineAssembly {
 
 	public function connectorNames():Array<String>
 		return [for (connector in externalConnectors) connector.name];
+
+	public function portNames():Array<String> return [for (port in externalPorts) port.name];
+
+	public function port(name:String, prefix:String = ""):PortRef {
+		for (entry in externalPorts) if (entry.name == name)
+			return portRef(join(prefix, entry.instanceId), entry.portName);
+		throw 'Missing assembly port "$name"';
+	}
+
+	/** Trace a service through connections, bridges, and a single-input converter. */
+	public function upstream(instanceId:String, portName:String):PortRef {
+		validate();
+		var current = portRef(instanceId, portName);
+		var seen:Map<String, Bool> = [];
+		while (true) {
+			var key = portKey(current);
+			if (seen.exists(key)) throw 'Port service cycle at "$instanceId/$portName"';
+			seen.set(key, true);
+			var currentPort = requirePort(current);
+			var previous:Array<PortRef> = [];
+			for (op in operations) switch op {
+				case ConnectPorts(_, from, to, _): if (portKey(to) == key) previous.push(from);
+				case _:
+			}
+			for (bridge in requireMember(current.instanceId).bridges())
+				if (bridge.to == current.portName) previous.push(portRef(current.instanceId, bridge.from));
+			// A generator's supplied service may depend on a different input kind.
+			if (previous.length == 0 && currentPort.role == Supply)
+				for (input in requireMember(current.instanceId).ports())
+					if (input.role == Consumer && input.name != current.portName &&
+						isConnected(portRef(current.instanceId, input.name)))
+						previous.push(portRef(current.instanceId, input.name));
+			if (previous.length == 0) {
+				if (currentPort.role != Supply) throw 'Port "$instanceId/$portName" has no upstream supply';
+				return current;
+			}
+			if (previous.length != 1) throw 'Port "$instanceId/$portName" has ambiguous upstream supply';
+			current = previous[0];
+		}
+	}
 
 	public function connector(name:String, prefix:String = ""):MachineAssemblyConnector {
 		for (connector in externalConnectors) if (connector.name == name)
@@ -204,6 +290,9 @@ class MachineAssembly {
 			case Couple(_, source, target, _, _):
 				if (source == null || source.length == 0 || target == null || target.length == 0)
 					throw 'Assembly coupling "$id" needs source and target';
+			case ConnectPorts(_, from, to, _):
+				requirePort(from);
+				requirePort(to);
 		}
 		operations.push(op);
 	}
@@ -223,8 +312,36 @@ class MachineAssembly {
 		throw 'Unknown connector "${reference.instanceId}/${reference.connectorName}"';
 	}
 
+	function requirePort(reference:PortRef):ComponentPort {
+		var component = requireMember(reference.instanceId);
+		if (reference.portName == null || reference.portName.length == 0)
+			throw 'Unknown port "${reference.instanceId}/${reference.portName}"';
+		for (port in component.ports()) if (port.name == reference.portName) return port;
+		throw 'Unknown port "${reference.instanceId}/${reference.portName}"';
+	}
+
+	function isConnected(reference:PortRef):Bool {
+		var key = portKey(reference);
+		for (op in operations) switch op {
+			case ConnectPorts(_, from, to, _): if (portKey(from) == key || portKey(to) == key) return true;
+			case _:
+		}
+		return false;
+	}
+
+	function isExposed(instanceId:String, portName:String):Bool {
+		for (entry in externalPorts) if (entry.instanceId == instanceId && entry.portName == portName) return true;
+		return false;
+	}
+
+	static function portKey(reference:PortRef):String return reference.instanceId + "\x1f" + reference.portName;
+
+	static function portRef(instanceId:String, portName:String):PortRef
+		return {instanceId: instanceId, portName: portName};
+
 	static function operationId(op:MachineAssemblyOperation):String return switch op {
-		case Mate(id, _, _, _, _, _, _) | Constrain(id, _, _, _, _, _, _) | Couple(id, _, _, _, _): id;
+		case Mate(id, _, _, _, _, _, _) | Constrain(id, _, _, _, _, _, _) | Couple(id, _, _, _, _) |
+			ConnectPorts(id, _, _, _): id;
 	}
 
 	static function ref(instanceId:String, connectorName:String):MachineAssemblyConnector
@@ -239,6 +356,9 @@ class MachineAssembly {
 				ref(join(prefix, child.instanceId), child.connectorName), axis, tolerance, limits);
 		case Couple(id, source, target, ratio, offset):
 			Couple(join(prefix, id), join(prefix, source), join(prefix, target), ratio, offset);
+		case ConnectPorts(id, from, to, line):
+			ConnectPorts(join(prefix, id), portRef(join(prefix, from.instanceId), from.portName),
+				portRef(join(prefix, to.instanceId), to.portName), line);
 	}
 
 	static function copyFrame(frame:AssemblyFrame):AssemblyFrame
