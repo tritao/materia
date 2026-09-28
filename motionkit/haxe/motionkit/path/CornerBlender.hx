@@ -17,6 +17,11 @@ class CornerBlender {
     if (tolerance > 0.0) for (i in 0...(count - 1)) {
       var before = path.primitives[i];
       var after = path.primitives[i + 1];
+      if (before.kind() == PathPrimitiveKind.Circular ||
+          after.kind() == PathPrimitiveKind.Circular) {
+        diagnostics.push('corner ${i + 1}: exact stop (circular primitive)');
+        continue;
+      }
       if (before.kind() != PathPrimitiveKind.Line || after.kind() != PathPrimitiveKind.Line) {
         if ((before.kind() == PathPrimitiveKind.Line || before.kind() == PathPrimitiveKind.Arc) &&
             (after.kind() == PathPrimitiveKind.Line || after.kind() == PathPrimitiveKind.Arc)) {

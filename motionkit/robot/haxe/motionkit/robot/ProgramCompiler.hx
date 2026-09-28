@@ -572,6 +572,9 @@ class ProgramCompiler {
         Math.sqrt((point.x - at.x) * (point.x - at.x) +
           (point.y - at.y) * (point.y - at.y) +
           (point.z - at.z) * (point.z - at.z));
+      } else if (Std.isOfType(primitive, motionkit.path.CircularSegment)) {
+        var circular:motionkit.path.CircularSegment = cast primitive;
+        circular.distanceTo(new motionkit.path.PathPoint(point.x, point.y, point.z));
       } else throw "Unsupported authored path primitive";
       best = Math.min(best, candidate);
     }

@@ -36,6 +36,8 @@ import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.MotionSystem;
 import motionkit.robot.MotionSystemBlueprint;
 import motionkit.path.ArcSegment;
+import motionkit.path.CircularPlane;
+import motionkit.path.CircularSegment;
 import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
 import motionkit.path.LineSegment;
@@ -113,6 +115,7 @@ class MotionKitBootstrapTests {
 
   public static function main():Void {
     if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
+      testCircularSegments();
       testCncProgramBinding();
       testPhysicalAssemblyCncBinding();
       Sys.println('CNC focused tests passed ($assertions assertions)');
@@ -1713,6 +1716,67 @@ class MotionKitBootstrapTests {
     near(end[0], 0.01, "CNC arc ends at X", 1e-5);
     near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
     result.dispose();
+  }
+
+  static function testCircularSegments():Void {
+    var cases = [CircularPlane.XY, CircularPlane.XZ, CircularPlane.YZ];
+    for (plane in cases) {
+      var center = switch plane {
+        case XY: new PathPoint(0.02, 0.0, 0.0);
+        case XZ: new PathPoint(0.02, 0.0, 0.0);
+        case YZ: new PathPoint(0.0, 0.02, 0.0);
+      };
+      var circular = new CircularSegment(center, 0.02, Math.PI,
+        -Math.PI * 0.5, plane, 0.01);
+      near(circular.length(), Math.sqrt(Math.pow(Math.PI * 0.01, 2) + 0.0001),
+        'helical $plane length');
+      var tangent = circular.tangentAt(circular.length() * 0.5);
+      near(Math.sqrt(tangent[0] * tangent[0] + tangent[1] * tangent[1] +
+        tangent[2] * tangent[2]), 1.0, 'helical $plane tangent is unit');
+      var midpoint = circular.pointAt(circular.length() * 0.5);
+      near(circular.distanceTo(midpoint), 0.0, 'helical $plane distance', 1e-9);
+      var authored = new GeometricPath([circular]);
+      var rig = gantryRig(true);
+      var timed = rig.machine.movePath(authored,
+        PathPlanningOptions.exactStopMode(), new MotionOptions(0.04, 0.4));
+      check(timed.durationSeconds() > 0.0,
+        'helical $plane is timed as joint motion');
+      var timedEnd = timed.evaluate(timed.durationSeconds()).positions;
+      near(rig.machine.axis("x").logicalPosition(timedEnd), circular.end.x,
+        'helical $plane reaches X', 1e-5);
+      near(rig.machine.axis("y").logicalPosition(timedEnd), circular.end.y,
+        'helical $plane reaches Y', 1e-5);
+      near(rig.machine.axis("z").logicalPosition(timedEnd), circular.end.z,
+        'helical $plane reaches Z', 1e-5);
+      rig.simulation.dispose();
+      var blended = CornerBlender.blend(new GeometricPath([circular,
+        new LineSegment(circular.end, new PathPoint(circular.end.x + 0.01,
+          circular.end.y, circular.end.z))]), 0.001, Math.PI * 0.9);
+      check(blended.diagnostics.length == 1 &&
+        blended.path.primitives.length == 2,
+        'helical $plane corner is an exact stop');
+      var blendedRig = gantryRig(true);
+      var blendedRun = blendedRig.machine.movePath(new GeometricPath([circular,
+        new LineSegment(circular.end, new PathPoint(circular.end.x + 0.01,
+          circular.end.y, circular.end.z))]), PathPlanningOptions.blend(0.001),
+        new MotionOptions(0.04, 0.4));
+      check(blendedRun.durationSeconds() > 0.0 &&
+        blendedRig.machine.lastPathPlanningDiagnostics.length == 1,
+        'helical $plane stays executable with an exact-stop blend fallback');
+      blendedRig.simulation.dispose();
+      var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+        new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
+        new LinearAxis(23, 10, 200), 0.1, 0.4);
+      var binding = new CncMotionBinding(
+        new CncMachine("work", "x", "y", "z", 0.08), blueprint);
+      var primitive = new cnckit.CncPosePrimitive(circular, 0.05, 0.0005, 0.02);
+      var path = new PosePath("work", [primitive]).withAuthoredGeometry(authored, 0.001);
+      var compiled = binding.compiler.compile(new MotionProgram([
+        MotionOp.FollowPath(path, "work", 0.05, [])]),
+        [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(901));
+      check(compiled.blocks.length == 1, 'helical $plane compiles through TOPP-RA');
+      compiled.dispose();
+    }
   }
 
   static function testVirtualCncProgram():Void {

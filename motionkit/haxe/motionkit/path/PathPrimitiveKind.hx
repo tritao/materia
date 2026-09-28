@@ -4,5 +4,6 @@ package motionkit.path;
 enum PathPrimitiveKind {
   Line;
   Arc;
+  Circular;
   Blend;
 }
