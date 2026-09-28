@@ -22,6 +22,17 @@ class EndEffectorComponentTests {
 			throw "Gripper interface is incomplete";
 		var components:Array<MachineComponent> = [master, tool, gripper, new FrameBar(30, 20, 90),
 			new PneumaticManifold(2), new VacuumGenerator(), new SuctionCup(25, 18)];
+		var ratedCup = new SuctionCup(40, 18, 1000, 5);
+		var ratedGenerator = new VacuumGenerator(60);
+		if ((cast ratedCup.effectiveAreaMm2:Float) != 1000 ||
+			(cast ratedCup.ratedMomentNm:Float) != 5 ||
+			(cast ratedGenerator.ratedVacuumKpa:Float) != 60 ||
+			ratedCup.designation == new SuctionCup(40, 18).designation ||
+			ratedGenerator.designation == new VacuumGenerator().designation)
+			throw "Rated suction components must retain distinct design data";
+		var rejected = false;
+		try new SuctionCup(40, 18, 2000) catch (_:Dynamic) rejected = true;
+		if (!rejected) throw "Suction cup accepted an effective area larger than its face";
 		for (component in components) {
 			var properties = component.massProperties();
 			if (properties.mass <= 0 || properties.inertia == null)

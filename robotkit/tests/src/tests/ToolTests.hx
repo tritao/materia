@@ -22,6 +22,9 @@ import robotkit.tool.MassProperties;
 import robotkit.tool.WorkpieceLoad;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.SimulatedSprayer;
+import robotkit.tool.SuctionGrip;
+import robotkit.tool.SuctionMotionSample;
+import robotkit.tool.SuctionCapacityChecker;
 
 /** M3 acceptance tests for robotkit.tool: Tool/TCP offsets and simulated capability state. */
 class ToolTests {
@@ -34,6 +37,7 @@ class ToolTests {
     testSimulatedSprayerStateHistory();
     testWorkpieceMassRollup();
     testPayloadChartAcrossJointMotion();
+    testSuctionCapacityAcrossMotion();
     Sys.println('RobotKit tool tests passed ($assertions assertions)');
     return assertions;
   }
@@ -152,6 +156,53 @@ class ToolTests {
       null, chart, [[0.2]])
     catch (error:Dynamic) missingCentre = Std.string(error).indexOf("centre of mass") >= 0;
     check(missingCentre, "Payload check rejects legacy tools with mass but no centre of mass");
+  }
+
+  static function testSuctionCapacityAcrossMotion():Void {
+    var part = new WorkpieceLoad("panel", new MassProperties(2.0,
+      Vec3.zero(), Inertia3.zero()), Transform3.identity());
+    var down = new Transform3(Vec3.zero(),
+      Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI));
+    var area = Math.PI * 0.02 * 0.02;
+    var grip = new SuctionGrip(down, area, 60, 0.5, 2.0);
+    var staticSample = new SuctionMotionSample(Transform3.identity(), Vec3.zero());
+    var staticResult = SuctionCapacityChecker.checkPath(part, grip, [staticSample]);
+    check(staticResult.safe && approx(staticResult.normalCapacityN, 60e3 * area, 1e-9),
+      "Cup capacity uses minimum vacuum at the sealed area");
+    var moving = SuctionCapacityChecker.checkPath(part, grip, [staticSample,
+      new SuctionMotionSample(Transform3.identity(), new Vec3(4, 0, 0))]);
+    check(moving.safe && moving.worstShearMarginN > 0,
+      "Moderate sideways acceleration stays within the friction margin");
+    var slipping = SuctionCapacityChecker.checkPath(part, grip, [staticSample,
+      new SuctionMotionSample(Transform3.identity(), new Vec3(5, 0, 0))]);
+    check(!slipping.safe && slipping.firstFailureIndex == 1 &&
+      slipping.reason != null && slipping.reason.indexOf("Tangential") >= 0,
+      "Path reports the first sideways slip risk separately from suction tension");
+    var lifting = SuctionCapacityChecker.checkPath(part, grip, [
+      new SuctionMotionSample(Transform3.identity(), new Vec3(0, 0, 10))]);
+    check(!lifting.safe && lifting.reason != null && lifting.reason.indexOf("Normal") >= 0,
+      "Upward acceleration can exceed normal suction capacity");
+    var weakVacuum = SuctionCapacityChecker.checkPath(part,
+      new SuctionGrip(down, area, 10, 0.5, 2.0), [staticSample]);
+    check(!weakVacuum.safe && weakVacuum.worstNormalMarginN < 0,
+      "Low cup vacuum fails even with no commanded acceleration");
+    var sidewaysCup = new Transform3(Vec3.zero(),
+      Quat.fromAxisAngle(new Vec3(0, 1, 0), Math.PI * 0.5));
+    var vertical = SuctionCapacityChecker.checkPath(part,
+      new SuctionGrip(sidewaysCup, area, 60, 0.5, 2.0), [staticSample]);
+    check(!vertical.safe && vertical.reason != null && vertical.reason.indexOf("Tangential") >= 0,
+      "A vertical cup must hold the workpiece through friction");
+    var offsetPart = new WorkpieceLoad("offset", new MassProperties(2.0,
+      new Vec3(0.1, 0, 0), Inertia3.zero()), Transform3.identity());
+    var unknownMoment = SuctionCapacityChecker.checkPath(offsetPart, grip, [staticSample]);
+    check(!unknownMoment.safe && unknownMoment.reason != null &&
+      unknownMoment.reason.indexOf("unverified") >= 0,
+      "An offset workpiece cannot pass without a cup moment rating");
+    var ratedMoment = SuctionCapacityChecker.checkPath(offsetPart,
+      new SuctionGrip(down, area, 60, 0.5, 2.0, 5.0), [staticSample]);
+    check(ratedMoment.safe && ratedMoment.worstMomentMarginNm != null &&
+      ratedMoment.worstMomentMarginNm > 0,
+      "A rated cup can carry the offset moment within its safety margin");
   }
 
   // -- fixtures --------------------------------------------------------

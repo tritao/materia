@@ -35,6 +35,7 @@ import cadbridge.EndEffectorCollision;
 import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 import cadbridge.EndEffectorRuntimeBridge;
 import cadbridge.EndEffectorControlBinding;
+import cadbridge.SuctionCapacityBridge;
 import eoat.EndEffectorExample;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
@@ -46,6 +47,8 @@ import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.pneumatic.SuctionCup;
+import machinekit.pneumatic.VacuumGenerator;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
@@ -69,6 +72,7 @@ class CadBridgeTests {
     testEndEffectorCollisionPieces();
     testMachineAssemblyMassBridge();
     testEndEffectorBridge();
+    testSuctionCapacityBridge();
     testEndEffectorRuntimeBridge();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
@@ -249,6 +253,27 @@ class CadBridgeTests {
     try MachineAssemblyMassBridge.payloadViolation(assembly, limits, 0.5, 0.2, 0.2, 0.2)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("UNMODELLED-LINE") >= 0;
     check(rejected, "unaccounted BOM mass prevents a payload decision");
+  }
+
+  static function testSuctionCapacityBridge():Void {
+    var effector = new EndEffector();
+    effector.addComponent("generator", new VacuumGenerator(60));
+    effector.addComponent("cup", new SuctionCup(40, 18, Math.PI * 18 * 18, 5));
+    effector.mount("generator", "mount");
+    effector.addMate("cup-mount", "fixed", "generator", "mount", "cup", "mount");
+    effector.connectPorts("vacuum-cup", "generator", "vacuum", "cup", "vacuum");
+    effector.exposePort("air", "generator", "air");
+    var grip = SuctionCapacityBridge.toGrip(effector, "cup", 50, 0.5, 2);
+    check(approx(grip.effectiveAreaM2, Math.PI * 18 * 18 * 1e-6, 1e-12) &&
+      approx(grip.flangeTCup.translation.z, 0.018, 1e-9) &&
+      approx(grip.normalCapacityN(), 50 * Math.PI * 18 * 18 * 1e-3, 1e-9),
+      "suction bridge converts cup contact and measured area to RobotKit");
+    check(effector.upstreamChain("cup", "vacuum").indexOf("generator/vacuum") >= 0,
+      "suction bridge follows the actual vacuum service chain");
+    var rejected = false;
+    try SuctionCapacityBridge.toGrip(effector, "cup", 70, 0.5, 2)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("rating") >= 0;
+    check(rejected, "cup vacuum cannot exceed upstream generator rating");
   }
 
   static function testEndEffectorBridge():Void {

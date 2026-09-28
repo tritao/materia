@@ -458,6 +458,14 @@ class MachineAssembly {
 		return {port: trace.port, external: trace.external};
 	}
 
+	/** Ordered member/port path from a consumer to its supplied boundary. */
+	public function upstreamChain(instanceId:String, portName:String):Array<String> {
+		checkConnections();
+		var trace = traceUpstream(portRef(instanceId, portName));
+		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
+		return trace.chain.copy();
+	}
+
 	static function unsuppliedMessage(chain:Array<String>):String
 		return 'Service chain ${chain.join(" ← ")} is not supplied';
 

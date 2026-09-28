@@ -822,6 +822,19 @@ with joint-dependent limits. A pose outside the chart fails. This is a static
 gravity check with configurable joint sampling, so acceleration loads and
 unsampled motion between points need separate analysis.
 
+Suction capacity is checked separately from runtime vacuum actuation.
+`cadbridge.SuctionCapacityBridge.toGrip` converts one connected MachineKit
+`SuctionCup` to a flange-frame `SuctionGrip`. The cup needs an effective sealed
+area; the caller supplies a minimum vacuum guaranteed at that cup, friction
+coefficient for the actual cup and workpiece surface, and safety factor. A
+generator's catalog rating only bounds the requested vacuum and does not
+establish delivered pressure. `SuctionCapacityChecker.checkPath` samples
+workpiece COM acceleration and flange pose, checks normal and tangential
+holding margins, and requires a cup moment rating for nonzero overturning
+moment. It models one sealed cup; it does not predict leakage, deformation,
+or load sharing across cups. The motion samples must include acceleration from
+flange rotation. This is a design check, not a live hold sensor.
+
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
 `SurfaceTool` (enable/disable, standoff), `Sander` (speed, contact force),

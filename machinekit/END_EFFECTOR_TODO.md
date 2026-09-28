@@ -34,9 +34,11 @@ project of its own.
 - [x] **Payload with workpiece (S).** Combine the grasped part's mass, centre
   and inertia at its pick pose with the tool, then sample the joint path against
   a robot-supplied static mass and flange-moment chart.
-- [ ] **Suction capacity (M).** Cup area × vacuum level against part mass,
-  acceleration and a safety factor. Needs vacuum level and cup area as port or
-  component properties.
+- [x] **Suction capacity (M).** A rated cup's effective sealed area and a
+  guaranteed vacuum at the cup give normal force. The path check uses part mass,
+  COM acceleration, friction and a safety factor; offset loads require a cup
+  moment rating. The bridge verifies the cup's service chain and bounds its
+  requested vacuum by the upstream generator's catalog rating.
 - [ ] **Air consumption and cycle time (M).** Compressed-air use per cycle from
   actuator volumes and ejector flow.
 - [ ] **Tool-change feasibility (M).** Tool stand poses, approach and retract
@@ -77,9 +79,9 @@ project of its own.
 
 ## Suggested priorities
 
-1. Suction capacity: use the per-pick workpiece load and vacuum port data to
-   check the cup's holding margin under acceleration.
-2. One vendor catalog slice: makes the layer usable with real parts and tests
+1. One vendor catalog slice: makes the layer usable with real parts and tests
    the abstractions against a real vendor.
+2. Design report: show the configuration BOM, service chains, payload and
+   suction margins in one reviewable artifact.
 3. Document and editor persistence: needed once someone must author tools
    interactively.
