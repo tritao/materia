@@ -1,6 +1,7 @@
 package cnckit;
 
 import toolpathkit.tool.Tool;
+import toolpathkit.tool.ToolLibrary;
 
 /** CNC coordinates, machine-axis binding, and stored offsets, all in metres. */
 class CncMachine {
@@ -15,7 +16,7 @@ class CncMachine {
   public final orientationTolerance:Float;
   public final initialPosition:Array<Float>;
   final offsets:Map<Int, Array<Float>> = new Map();
-  final tools:Map<Int, Tool> = new Map();
+  public final toolLibrary:ToolLibrary = new ToolLibrary();
   public var travelLower(default, null):Null<Array<Float>> = null;
   public var travelUpper(default, null):Null<Array<Float>> = null;
   final homes:Map<Int, Array<Float>> = new Map();
@@ -69,7 +70,7 @@ class CncMachine {
   }
 
   public function setToolLength(h:Int, length:Float):Void {
-    var old = tools.get(h);
+    var old:Null<Tool> = try toolLibrary.tool(h) catch (_:Dynamic) null;
     setTool(old == null ? new Tool(h, length, 0.0) : old.withLength(length));
   }
 
@@ -79,13 +80,11 @@ class CncMachine {
 
   public function setTool(tool:Tool):Void {
     if (tool == null) throw "CNC tool must not be null";
-    tools.set(tool.number, tool);
+    toolLibrary.set(tool);
   }
 
   public function tool(number:Int):Tool {
-    var result = tools.get(number);
-    if (result == null) throw 'Unknown CNC tool $number';
-    return result;
+    return toolLibrary.tool(number);
   }
 
   public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void {

@@ -1,7 +1,7 @@
-package camkit;
+package toolpathkit.setup;
 
 /** A rectangular clamp or other forbidden volume in work coordinates, metres. */
-class CamFixture {
+class Fixture {
   public final name:String;
   public final minX:Float;
   public final maxX:Float;

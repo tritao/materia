@@ -1,15 +1,15 @@
-package camkit;
+package toolpathkit.setup;
 
-import cnckit.CncMachine;
 import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
+import toolpathkit.tool.ToolLibrary;
 
 /** Stock, clearance and clamp checks in the same work coordinates as CAM IR. */
-class CamSetup {
+class Setup {
   public final stockMinX:Float;
   public final stockMaxX:Float;
   public final stockMinY:Float;
@@ -17,11 +17,11 @@ class CamSetup {
   public final stockTop:Float;
   public final stockBottom:Float;
   public final safeZ:Float;
-  public final fixtures:Array<CamFixture>;
+  public final fixtures:Array<Fixture>;
 
   public function new(stockMinX:Float, stockMaxX:Float, stockMinY:Float,
       stockMaxY:Float, stockTop:Float, stockBottom:Float, safeZ:Float,
-      ?fixtures:Array<CamFixture>) {
+      ?fixtures:Array<Fixture>) {
     for (value in [stockMinX, stockMaxX, stockMinY, stockMaxY,
         stockTop, stockBottom, safeZ])
       if (!Math.isFinite(value)) throw "CAM setup needs finite bounds";
@@ -39,16 +39,17 @@ class CamSetup {
   }
 
   /** Rejects a program before export. The cutter tip disk is swept through each path. */
-  public function validate(program:CamProgram, machine:CncMachine):Void {
-    if (program == null || machine == null) throw "CAM export needs a program and machine";
-    var travel = TravelEnvelope.check(machine.travelLower,
-      machine.travelUpper, program.ops);
+  public function validate(ops:Array<ToolpathOp>, tools:ToolLibrary,
+      travelLower:Null<Array<Float>>, travelUpper:Null<Array<Float>>):Void {
+    if (ops == null || tools == null) throw "CAM export needs a program and machine";
+    var travel = TravelEnvelope.check(travelLower,
+      travelUpper, ops);
     if (travel.length > 0)
       throw 'CAM setup line ${travel[0].provenance.line}: ${travel[0].message()}';
     var radius = 0.0;
-    for (op in program.ops) switch op {
+    for (op in ops) switch op {
       case ToolChange(number, span):
-        var tool = machine.tool(number);
+        var tool = tools.tool(number);
         if (tool.diameter <= 0.0) fail(span, 'tool $number needs a positive diameter');
         radius = tool.diameter * 0.5;
       case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
@@ -95,7 +96,7 @@ class CamSetup {
   }
 
   static function intersectsFixture(a:Point3, b:Point3, radius:Float,
-      fixture:CamFixture):Bool {
+      fixture:Fixture):Bool {
     // A cutter tip below the clamp can still leave its shank inside it.
     if (Math.min(a.z, b.z) > fixture.maxZ) return false;
     var lo = 0.0, hi = 1.0;

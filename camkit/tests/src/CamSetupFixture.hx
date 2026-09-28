@@ -1,13 +1,13 @@
 import camkit.CamContour;
 
-import toolpathkit.path.MoveKind;import camkit.CamFixture;
+import toolpathkit.path.MoveKind;import toolpathkit.setup.Fixture;
 import camkit.CamGCodeWriter;
 import camkit.CamJob;
 import camkit.CamProgram;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Provenance;
-import camkit.CamSetup;
+import toolpathkit.setup.Setup;
 import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.Point3;
@@ -26,13 +26,13 @@ class CamSetupFixture {
     machine.setTool(tool);
     var program = new CamJob(0.008, 12000)
       .profile(contour, tool, -0.002, 0.01, "on").finish();
-    var clear = new CamSetup(-0.01, 0.05, -0.01, 0.04,
+    var clear = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.008);
     check(CamGCodeWriter.write(program, clear, machine).indexOf("G1") >= 0,
       "generated plate exports with a clear setup");
-    var clamp = new CamFixture("edge-clamp", 0.018, 0.022,
+    var clamp = new Fixture("edge-clamp", 0.018, 0.022,
       0.0005, 0.005, -0.003, 0.006);
-    var occupied = new CamSetup(-0.01, 0.05, -0.01, 0.04,
+    var occupied = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.008, [clamp]);
     var collision = "";
     try CamGCodeWriter.write(program, occupied, machine)
@@ -40,14 +40,14 @@ class CamSetupFixture {
     check(collision.indexOf("line 1") >= 0 &&
       collision.indexOf("edge-clamp") >= 0,
       "tool radius catches the edge clamp and names the CAM operation");
-    var tooShallow = new CamSetup(-0.01, 0.05, -0.01, 0.04,
+    var tooShallow = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.001, 0.008);
     var depthError = "";
     try CamGCodeWriter.write(program, tooShallow, machine)
     catch (error:Dynamic) depthError = Std.string(error);
     check(depthError.indexOf("below stock bottom") >= 0,
       "setup rejects a cut below planned stock depth");
-    var highClearance = new CamSetup(-0.01, 0.05, -0.01, 0.04,
+    var highClearance = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.009);
     var rapidError = "";
     var traverse = new CamProgram([
@@ -60,9 +60,9 @@ class CamSetupFixture {
     check(rapidError.indexOf("below safe Z") >= 0,
       "setup rejects lateral rapids below its safe Z: " + rapidError);
     var blockedSafeZ = false;
-    try new CamSetup(-0.01, 0.05, -0.01, 0.04,
+    try new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.008,
-      [new CamFixture("tall-clamp", 0.01, 0.02, 0.01, 0.02,
+      [new Fixture("tall-clamp", 0.01, 0.02, 0.01, 0.02,
         0.0, 0.009)])
     catch (_:Dynamic) blockedSafeZ = true;
     check(blockedSafeZ, "setup rejects a safe Z below a fixture top");
@@ -72,9 +72,9 @@ class CamSetupFixture {
         0.01, 0.0, Math.PI), 0.01, 0.0, new Provenance(5, 1, 1)),
       ToolpathOp.End(new Provenance(6, 1, 1))
     ]);
-    var arcClamp = new CamSetup(-0.01, 0.05, -0.01, 0.04,
+    var arcClamp = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.008,
-      [new CamFixture("arc-clamp", 0.019, 0.021,
+      [new Fixture("arc-clamp", 0.019, 0.021,
         0.029, 0.031, -0.003, 0.006)]);
     var arcError = "";
     try CamGCodeWriter.write(arcProgram, arcClamp, machine)

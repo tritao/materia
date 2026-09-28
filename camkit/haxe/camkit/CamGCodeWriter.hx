@@ -1,6 +1,7 @@
 package camkit;
 
 import cnckit.CncMachine;
+import toolpathkit.setup.Setup;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -9,11 +10,11 @@ import toolpathkit.path.Point3;
 
 /** Small LinuxCNC post for CAM IR, using millimetres and absolute XYZ. */
 class CamGCodeWriter {
-  public static function write(program:CamProgram, setup:CamSetup,
+  public static function write(program:CamProgram, setup:Setup,
       machine:CncMachine):String {
     if (program == null) throw "G-code export needs a CAM program";
     if (setup == null) throw "G-code export needs a CAM setup";
-    setup.validate(program, machine);
+    setup.validate(program.ops, machine.toolLibrary, machine.travelLower, machine.travelUpper);
     var lines = ["G21 G90 G17 G61"], plane = ArcPlane.XY;
     var index = 0;
     while (index < program.ops.length) {
