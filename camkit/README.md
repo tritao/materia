@@ -25,9 +25,10 @@ Input adapters:
 - `CamSheetProfiles.fromPlan(plan, placementId)` turns a manufacturingkit
   rectangular sheet placement into a profile contour.
 
-Pocket clearing requires a convex contour. Inside and outside profile offsets
-also require convexity; an `on` profile can follow a concave boundary. These
-limits fail explicitly instead of producing an unsafe offset.
+Inside and outside profiles accept simple concave contours. The cutter path
+rounds exposed corners, trims recessed corners, and rejects offsets that
+collapse a narrow feature or collide with another edge. Pocket clearing still
+requires a convex contour.
 
 Example:
 
@@ -43,7 +44,7 @@ var linuxCnc = CamGCodeWriter.write(program);
 
 The test project creates its own rectangular, rounded and holed plate fixtures.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
-hole-before-outer ordering, direct lowering and CAM IR → G-code → CncKit IR
+hole-before-outer ordering, concave profiles, direct lowering and CAM IR → G-code → CncKit IR
 round trips. The suite also
 checks the generic manufacturingkit sheet placement adapter using locally
 authored input; it does not depend on a MachineKit example. Run with the cadkit native
