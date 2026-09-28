@@ -7,6 +7,8 @@ repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 materia_root="$(cd -- "$repo_root/.." && pwd)"
 cadkit_build="${CADKIT_BUILD_ROOT:-$materia_root/cadkit/build/debug}"
 
+"$repo_root/scripts/build-examples"
+
 if [[ ! -e "$cadkit_build/core/libcadkit-core.so" && ! -e "$cadkit_build/core/libcadkit-core.dylib" ]]; then
 	echo "missing CadKit native build in $cadkit_build; build cadkit or set CADKIT_BUILD_ROOT" >&2
 	exit 1
