@@ -212,6 +212,12 @@ class MachineAssembly {
 	/** Check structure and complete service wiring; interface mismatches are warnings. */
 	public function validate():Array<String> {
 		validateStructure();
+		var connections = checkConnections();
+		checkRequiredPorts(connections.connected);
+		return connections.warnings;
+	}
+
+	function checkConnections():{connected:Map<String, Bool>, warnings:Array<String>} {
 		var connected:Map<String, Bool> = [];
 		var warnings:Array<String> = [];
 		for (op in operations) switch op {
@@ -232,12 +238,15 @@ class MachineAssembly {
 					warnings.push('Port connection "$id" has mismatched interfaces');
 			case _:
 		}
+		return {connected: connected, warnings: warnings};
+	}
+
+	function checkRequiredPorts(connected:Map<String, Bool>):Void {
 		for (member in members) for (port in member.component.ports())
 			if (port.required && port.role == Consumer &&
 				!connected.exists(portKey(portRef(member.id, port.name))) &&
 				!isExposed(member.id, port.name))
 				throw 'Required consumer port "${member.id}/${port.name}" is unconnected';
-		return warnings;
 	}
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
@@ -352,7 +361,7 @@ class MachineAssembly {
 
 	/** Trace a service through connections, bridges, and a single-input converter. */
 	public function upstream(instanceId:String, portName:String):PortRef {
-		validate();
+		checkConnections();
 		var current = portRef(instanceId, portName);
 		var seen:Map<String, Bool> = [];
 		while (true) {

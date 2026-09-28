@@ -281,6 +281,14 @@ class MachineKitSmoke {
 		reversed.connectPorts("reverse", "cup", "vacuum", "generator", "vacuum");
 		check(reversed.upstream("cup", "vacuum").instanceId == "generator",
 			"consumer-first connection traces to its supply");
+		var unfinished = new MachineAssembly();
+		unfinished.addComponent("source", vacuumSource);
+		unfinished.addComponent("cup", cup);
+		unfinished.addComponent("gripper", generator);
+		unfinished.connectPorts("vacuum", "source", "vacuum", "cup", "vacuum");
+		check(unfinished.upstream("cup", "vacuum").instanceId == "source",
+			"upstream works while another required input is unconnected");
+		throws(() -> unfinished.validate(), "Required consumer port");
 		var incompleteTool = new MachineAssembly();
 		incompleteTool.addComponent("cup", cup);
 		incompleteTool.exposePort("vacuum", "cup", "vacuum");
@@ -324,6 +332,10 @@ class MachineKitSmoke {
 		badKind.addComponent("cup", cup);
 		badKind.connectPorts("wrong", "changer", "toolAir", "cup", "vacuum");
 		throws(() -> badKind.validate(), "mismatched kinds");
+		badKind.addComponent("source", vacuumSource);
+		badKind.addComponent("otherCup", cup);
+		badKind.connectPorts("valid", "source", "vacuum", "otherCup", "vacuum");
+		throws(() -> badKind.upstream("otherCup", "vacuum"), "mismatched kinds");
 		var supplier = new PortTestComponent("SUPPLIER");
 		supplier.definePort("air", Pneumatic, Supply, PushIn(6));
 		var doubleSupply = new MachineAssembly();
