@@ -87,6 +87,34 @@ class HumanCharacter {
 		return attachment;
 	}
 
+	/**
+	 * Reaches a limb's wrist or ankle for target ([x, y, z] in model space)
+	 * on top of the animation, from the next advance on. The elbow or knee
+	 * points along pole, a model-space direction: by default elbows point down
+	 * and back and knees forward. weight blends from the animation (0) to the
+	 * full reach (1). Throws when the rig's limb is not one chain, as with
+	 * Quaternius legs, whose feet hang off the body as IK controls.
+	 */
+	public function reach(limb:HumanLimb, target:Array<Float>, weight:Float = 1.0, ?pole:Array<Float>):Void {
+		var bones = limbBones(limb);
+		var arm = limb == ArmL || limb == ArmR;
+		instance.setIk(limb, rig.joint(bones[0]), rig.joint(bones[1]), rig.joint(bones[2]), target,
+			pole != null ? pole : arm ? [-0.4, 0.0, -1.0] : [1.0, 0.0, 0.0], weight);
+	}
+
+	/** Returns a limb to its animation. */
+	public function release(limb:HumanLimb):Void
+		instance.clearIk(limb);
+
+	static function limbBones(limb:HumanLimb):Array<HumanBone>
+		return switch limb {
+			case ArmL: [UpperArmL, ForearmL, HandL];
+			case ArmR: [UpperArmR, ForearmR, HandR];
+			case LegL: [ThighL, ShinL, FootL];
+			case LegR: [ThighR, ShinR, FootR];
+			default: throw 'Unknown limb $limb';
+		};
+
 	/** Advances the current clip and moves the mesh and attachments to the new pose. */
 	public function advance(seconds:Float):Void {
 		player.advance(seconds);

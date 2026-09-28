@@ -6,6 +6,8 @@ import humankit.HumanBone;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
+import humankit.HumanLimb;
+import humankit.HumanWalker;
 import humankit.HumanPose;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
@@ -68,6 +70,8 @@ class HumanKitTests {
 			throw 'Attaching a one-mesh prop changed draw calls from $before to $after';
 		bodyView(scene, human);
 		human.dispose();
+		walking(scene, worker, rig);
+		reaching(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
 	}
@@ -160,6 +164,114 @@ class HumanKitTests {
 			if (Math.abs(world.element(12 + axis) - placement.center[axis]) > 1e-4)
 				throw "The first capsule node is not where the proxy places it";
 		snapshot.dispose();
+	}
+
+	/** Walking a route with the clip matched to the speed keeps planted feet still. */
+	static function walking(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Walker");
+		var walker = new HumanWalker(human);
+		inRange(walker.gait.naturalSpeed, 0.5, 2.5, "natural walking speed");
+		if (walker.isWalking())
+			throw "A new walker is already walking";
+
+		// Along +X, then a left turn towards +Y.
+		var speed = 1.4;
+		walker.follow([[0.0, 0.0], [3.0, 0.0], [3.0, 2.0]], speed);
+		var step = 1.0 / 60.0;
+		var drift = 0.0, travel = 0.0, previous:Null<Array<Float>> = null, lowest = Math.POSITIVE_INFINITY;
+		var heights:Array<Float> = [], worldFeet:Array<Array<Float>> = [];
+		for (_ in 0...90) {
+			walker.advance(step);
+			var root = walker.rootTransform();
+			var foot = human.pose.bonePosition(HumanBone.FootL);
+			var world = [
+				root[0] * foot[0] + root[4] * foot[1] + root[12],
+				root[1] * foot[0] + root[5] * foot[1] + root[13]
+			];
+			heights.push(foot[2]);
+			worldFeet.push(world);
+			lowest = Math.min(lowest, foot[2]);
+		}
+		// After the 0.3 s start: the body is at full speed and the walk fully faded in.
+		for (index in 24...worldFeet.length)
+			if (heights[index] <= lowest + 0.01 && heights[index - 1] <= lowest + 0.01) {
+				drift += Math.abs(worldFeet[index][0] - worldFeet[index - 1][0]);
+				travel += speed * step;
+			}
+		if (travel == 0.0)
+			throw "The left foot never planted during the walk";
+		if (drift > 0.25 * travel)
+			throw 'A planted foot slid ${drift} m while the body walked ${travel} m';
+		// Ramping up from rest over 0.3 s costs half of that at full speed; per-frame
+		// integration may add up to one frame's travel.
+		if (Math.abs(walker.distance() - speed * (90 * step - 0.15)) > speed * step)
+			throw 'The walker covered ${walker.distance()} m, not a ramped ${speed * (90 * step - 0.15)} m';
+		if (Math.abs(human.player.speed - speed / walker.gait.naturalSpeed) > 1e-9)
+			throw "The walk clip does not play at the gait-matched rate";
+
+		for (_ in 0...600)
+			walker.advance(step);
+		var root = walker.rootTransform();
+		if (walker.isWalking() || Math.abs(root[12] - 3.0) > 1e-6 || Math.abs(root[13] - 2.0) > 1e-6)
+			throw 'The walker did not stop at the end of its route: ${root[12]}, ${root[13]}';
+		// Facing +Y after the turn.
+		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
+			throw "The walker does not face along the last leg";
+		if (human.player.currentClip() != asset.clipIndex("idle") || human.player.speed != 1.0)
+			throw "The walker does not idle at normal speed after arriving";
+		human.dispose();
+	}
+
+	/** Two-bone IK puts a wrist on a target, bends the elbow downwards, and lets go cleanly. */
+	static function reaching(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Reacher");
+		human.advance(0.0);
+		var shoulder = human.pose.bonePosition(HumanBone.UpperArmR);
+		var restHand = human.pose.bonePosition(HumanBone.HandR);
+		var description = HumanDescription.measure(human.pose, human.height());
+		var reachLength = description.upperArm + description.forearm;
+		// Ahead of the right shoulder and a little down: well within reach.
+		var direction = Mat4.normalize([1.0, -0.2, -0.3]);
+		var target = [for (axis in 0...3) shoulder[axis] + direction[axis] * reachLength * 0.8];
+		human.reach(ArmR, target);
+		human.advance(0.0);
+		var hand = human.pose.bonePosition(HumanBone.HandR);
+		if (distance(hand, target) > 0.01)
+			throw 'The wrist reached ${hand}, not ${target}';
+		var elbow = human.pose.bonePosition(HumanBone.ForearmR);
+		if (elbow[2] >= (shoulder[2] + hand[2]) * 0.5)
+			throw "The elbow does not bend downwards";
+
+		// Out of reach: the arm straightens towards the target.
+		var far = [for (axis in 0...3) shoulder[axis] + direction[axis] * reachLength * 3.0];
+		human.reach(ArmR, far);
+		human.advance(0.0);
+		hand = human.pose.bonePosition(HumanBone.HandR);
+		var towards = Mat4.normalize(Mat4.subtract(hand, shoulder));
+		if (Mat4.dot(towards, direction) < 0.99 || Math.abs(distance(hand, shoulder) - reachLength) > 0.02)
+			throw "An unreachable target does not straighten the arm towards it";
+
+		// Half weight lands between the animation and the full reach.
+		human.reach(ArmR, target, 0.5);
+		human.advance(0.0);
+		var half = human.pose.bonePosition(HumanBone.HandR);
+		if (distance(half, target) < 0.01 || distance(half, restHand) < 0.01)
+			throw "Half-weight IK does not blend";
+
+		human.release(ArmR);
+		human.advance(0.0);
+		if (distance(human.pose.bonePosition(HumanBone.HandR), restHand) > 1e-4)
+			throw "Releasing the arm does not restore its animated pose";
+		var rejected = false;
+		try human.reach(LegL, [0.3, 0.1, 0.1]) catch (_:Dynamic) rejected = true;
+		if (!rejected)
+			throw "A Quaternius leg, whose foot is not below its shin, was accepted as a chain";
+		human.dispose();
+	}
+
+	static function distance(a:Array<Float>, b:Array<Float>):Float {
+		var delta = Mat4.subtract(a, b);
+		return Math.sqrt(Mat4.dot(delta, delta));
 	}
 
 	static function inRange(value:Float, low:Float, high:Float, label:String):Void

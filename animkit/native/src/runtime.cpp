@@ -5,8 +5,10 @@
 #include <limits>
 
 #include "ozz/animation/runtime/blending_job.h"
+#include "ozz/animation/runtime/ik_two_bone_job.h"
 #include "ozz/animation/runtime/local_to_model_job.h"
 #include "ozz/base/maths/simd_math.h"
+#include "ozz/base/maths/simd_quaternion.h"
 #include "ozz/geometry/runtime/skinning_job.h"
 
 namespace animkit {
@@ -58,6 +60,7 @@ const Matrix &gltfToScene() {
 
 Instance::Instance(std::shared_ptr<const Asset> asset) : asset_(std::move(asset)) {
     import_ = toFloat4x4(gltfToScene());
+    sceneInverse_ = ozz::math::Invert(import_);
     for (const Skin &skin : asset_->skins) {
         std::vector<ozz::math::Float4x4> matrices;
         for (const Matrix &m : skin.inverse_bind) matrices.push_back(toFloat4x4(m));
@@ -133,9 +136,92 @@ bool Instance::evaluate() {
     local_to_model.input = ozz::make_span(locals_);
     local_to_model.output = ozz::make_span(models_);
     if (!local_to_model.Run()) return false;
+    if (!solveIk()) valid = false;
     for (size_t joint = 0; joint < models_.size(); ++joint) scene_models_[joint] = toMatrix(import_ * models_[joint]);
     for (size_t primitive = 0; primitive < outputs_.size(); ++primitive) skinPrimitive(primitive);
     return valid;
+}
+
+bool Instance::validChain(int32_t start, int32_t mid, int32_t end) const {
+    const auto &skeleton = *asset_->skeleton;
+    const int joints = skeleton.num_joints();
+    if (start < 0 || mid < 0 || end < 0 || start >= joints || mid >= joints || end >= joints)
+        return false;
+    const auto parents = skeleton.joint_parents();
+    auto descends = [&](int32_t joint, int32_t ancestor) {
+        for (int16_t parent = parents[joint]; parent >= 0; parent = parents[parent])
+            if (parent == ancestor) return true;
+        return false;
+    };
+    return descends(end, mid) && descends(mid, start);
+}
+
+namespace {
+
+// Rotates one joint's local rotation, stored four joints to a SoA lane, by q.
+void multiplyLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joint,
+                           const ozz::math::SimdQuaternion &q) {
+    ozz::math::SoaTransform &soa = locals[joint / 4];
+    ozz::math::SimdQuaternion quaternions[4];
+    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
+    quaternions[joint & 3] = quaternions[joint & 3] * q;
+    ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
+}
+
+} // namespace
+
+bool Instance::solveIk() {
+    namespace m = ozz::math;
+    bool solved = true;
+    for (const IkChain &chain : ik) {
+        if (!(chain.weight > 0.0f)) continue;
+        const m::Float4x4 &start = models_[chain.start], &mid = models_[chain.mid],
+                          &end = models_[chain.end];
+        const m::SimdFloat4 target =
+            m::TransformPoint(sceneInverse_, m::simd_float4::Load3PtrU(chain.target));
+        const m::SimdFloat4 pole = m::NormalizeSafe3(
+            m::TransformVector(sceneInverse_, m::simd_float4::Load3PtrU(chain.pole)),
+            m::simd_float4::y_axis());
+        // The hinge opens about the normal of the plane the limb bends in:
+        // positive rotation about lower x upper straightens the joint. A
+        // straight limb has no bend plane, so its hinge follows the pole.
+        const m::SimdFloat4 upper = mid.cols[3] - start.cols[3], lower = end.cols[3] - mid.cols[3];
+        m::SimdFloat4 hinge = m::Cross3(lower, upper);
+        const float bend = m::GetX(m::Length3(hinge));
+        const float scale = m::GetX(m::Length3(upper)) * m::GetX(m::Length3(lower));
+        if (!(bend > 1e-4f * scale)) {
+            hinge = m::Cross3(pole, end.cols[3] - start.cols[3]);
+            if (!(m::GetX(m::Length3(hinge)) > 1e-6f)) continue;
+        }
+        const m::SimdFloat4 mid_axis =
+            m::Normalize3(m::TransformVector(m::Invert(mid), m::Normalize3(hinge)));
+
+        m::SimdQuaternion start_correction, mid_correction;
+        ozz::animation::IKTwoBoneJob job;
+        job.target = target;
+        job.pole_vector = pole;
+        job.mid_axis = mid_axis;
+        job.weight = std::clamp(chain.weight, 0.0f, 1.0f);
+        job.soften = std::clamp(chain.soften, 0.0f, 1.0f);
+        job.start_joint = &start;
+        job.mid_joint = &mid;
+        job.end_joint = &end;
+        job.start_joint_correction = &start_correction;
+        job.mid_joint_correction = &mid_correction;
+        if (!job.Run()) {
+            solved = false;
+            continue;
+        }
+        multiplyLocalRotation(locals_, chain.start, start_correction);
+        multiplyLocalRotation(locals_, chain.mid, mid_correction);
+        ozz::animation::LocalToModelJob update;
+        update.skeleton = asset_->skeleton.get();
+        update.input = ozz::make_span(locals_);
+        update.output = ozz::make_span(models_);
+        update.from = chain.start;
+        if (!update.Run()) solved = false;
+    }
+    return solved;
 }
 
 void Instance::skinPrimitive(size_t index) {

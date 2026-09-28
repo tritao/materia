@@ -6,6 +6,7 @@
 #include <clocale>
 #include <cstring>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -177,6 +178,7 @@ int main() {
     for (uint32_t i = 0; i < info.warning_count; ++i) std::fprintf(stderr, "warning: %s\n", ak_asset_warning(asset, i));
 
     const int32_t bone = ak_asset_find_joint(asset, "Bone");
+    const int32_t prop = ak_asset_find_joint(asset, "Prop");
     const int32_t armature = ak_asset_find_joint(asset, "Armature");
     CHECK(bone >= 0 && armature >= 0);
     CHECK(ak_asset_joint_parent(asset, static_cast<uint32_t>(bone)) == armature);
@@ -261,6 +263,27 @@ int main() {
     std::vector<float> normals = read<float>(ak_instance_read_normals, instance, 0);
     CHECK(normals.size() == 9);
     CHECK(near(std::fabs(normals[0]), 1.0f));
+
+    // IK chains name joints from ancestor to descendant; weight 0 or null disables one.
+    ak_two_bone_ik ik{};
+    ik.struct_size = sizeof(ik);
+    ik.start_joint = armature;
+    ik.mid_joint = bone;
+    ik.end_joint = prop;
+    ik.target[0] = 1.0f;
+    ik.target[2] = 1.0f;
+    ik.pole[1] = 1.0f;
+    ik.weight = 1.0f;
+    ik.soften = 1.0f;
+    CHECK(ak_instance_set_ik(instance, 0, &ik) == AK_OK);
+    CHECK(ak_instance_evaluate(instance) == AK_OK);
+    CHECK(ak_instance_set_ik(instance, AK_MAX_IK_CHAINS, &ik) == AK_ERROR_INVALID_ARGUMENT);
+    std::swap(ik.start_joint, ik.end_joint);
+    CHECK(ak_instance_set_ik(instance, 0, &ik) == AK_ERROR_INVALID_ARGUMENT);
+    std::swap(ik.start_joint, ik.end_joint);
+    ik.soften = 0.0f;
+    CHECK(ak_instance_set_ik(instance, 0, &ik) == AK_ERROR_INVALID_ARGUMENT);
+    CHECK(ak_instance_set_ik(instance, 0, nullptr) == AK_OK);
 
     CHECK(ak_instance_set_layer(instance, AK_MAX_LAYERS, 0, 0, 1, 0) == AK_ERROR_INVALID_ARGUMENT);
     CHECK(ak_instance_set_layer(instance, 0, 7, 0, 1, 0) == AK_ERROR_INVALID_ARGUMENT);

@@ -11,13 +11,24 @@
 
 namespace animkit {
 
-enum { kMaxLayers = 4 };
+enum { kMaxLayers = 4, kMaxIkChains = 4 };
 
 struct Layer {
     int32_t clip = -1;
     float time = 0.0f;
     float weight = 0.0f;
     bool loop = true;
+};
+
+/** A two-bone chain reaching for a scene-space target; weight 0 disables it. */
+struct IkChain {
+    int32_t start = -1;
+    int32_t mid = -1;
+    int32_t end = -1;
+    float target[3] = {0.0f, 0.0f, 0.0f};
+    float pole[3] = {0.0f, 0.0f, 1.0f};
+    float weight = 0.0f;
+    float soften = 1.0f;
 };
 
 /**
@@ -31,6 +42,10 @@ public:
 
     const Asset &asset() const { return *asset_; }
     std::array<Layer, kMaxLayers> layers;
+    std::array<IkChain, kMaxIkChains> ik;
+
+    /** True when start, mid, and end name joints where each is an ancestor of the next. */
+    bool validChain(int32_t start, int32_t mid, int32_t end) const;
 
     /** Returns false when a layer names a missing clip. */
     bool evaluate();
@@ -58,6 +73,9 @@ private:
     std::vector<Output> outputs_;
 
     void skinPrimitive(size_t index);
+    /** Applies every enabled IK chain to locals_ and models_. */
+    bool solveIk();
+    ozz::math::Float4x4 sceneInverse_;
 };
 
 } // namespace animkit

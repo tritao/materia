@@ -64,7 +64,7 @@
 extern "C" {
 #endif
 
-enum { AK_API_VERSION = 1, AK_MAX_LAYERS = 4 };
+enum { AK_API_VERSION = 1, AK_MAX_LAYERS = 4, AK_MAX_IK_CHAINS = 4 };
 typedef int32_t ak_result;
 enum {
     AK_OK = 0,
@@ -129,6 +129,25 @@ typedef struct ak_bounds {
     float maximum[3];
 } ak_bounds;
 
+/**
+ * A two-bone inverse kinematics chain, such as shoulder, elbow, and wrist,
+ * solved after the layers blend: the end joint moves to reach target and the
+ * middle joint points in the direction pole (a direction, not a position). The joints must be ancestors in that order
+ * but need not be direct parents. Positions are in scene space. weight blends
+ * from the animated pose (0, which disables the chain) to the solution (1);
+ * soften in (0, 1] eases the chain before it straightens, 1 for none.
+ */
+typedef struct ak_two_bone_ik {
+    uint32_t struct_size AK_STRUCT_SIZE;
+    int32_t start_joint;
+    int32_t mid_joint;
+    int32_t end_joint;
+    float target[3];
+    float pole[3];
+    float weight;
+    float soften;
+} ak_two_bone_ik;
+
 /** Returns this thread's last load failure, or an empty string. */
 AK_API const char *AK_CALL ak_last_error(void) AK_RETURNS_BORROWED_UTF8;
 
@@ -192,7 +211,13 @@ AK_API void AK_CALL ak_instance_destroy(ak_instance_handle instance);
  */
 AK_API ak_result AK_CALL ak_instance_set_layer(ak_instance_handle instance, uint32_t layer, int32_t clip,
     float time, float weight, uint32_t loop AK_BOOL32);
-/** Samples, blends, and skins the current layers. */
+/**
+ * Sets one of AK_MAX_IK_CHAINS inverse kinematics chains, applied in order by
+ * the next evaluation. A null ik or zero weight disables the chain.
+ */
+AK_API ak_result AK_CALL ak_instance_set_ik(ak_instance_handle instance, uint32_t chain,
+    const ak_two_bone_ik *ik);
+/** Samples, blends, solves inverse kinematics, and skins the current layers. */
 AK_API ak_result AK_CALL ak_instance_evaluate(ak_instance_handle instance);
 
 /** Deformed float32 xyz positions in scene space. */

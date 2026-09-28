@@ -1,5 +1,7 @@
 #include "animkit.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <mutex>
@@ -272,6 +274,32 @@ ak_result ak_instance_set_layer(ak_instance_handle handle, uint32_t layer, int32
         || !(time == time) || !(weight == weight))
         return AK_ERROR_INVALID_ARGUMENT;
     instance->layers[layer] = {clip, time, weight, loop != 0};
+    return AK_OK;
+}
+
+ak_result ak_instance_set_ik(ak_instance_handle handle, uint32_t chain, const ak_two_bone_ik *ik) {
+    const auto instance = instances().find(handle.id);
+    if (!instance) return AK_ERROR_INVALID_HANDLE;
+    if (chain >= AK_MAX_IK_CHAINS) return AK_ERROR_INVALID_ARGUMENT;
+    if (!ik || !(ik->weight > 0.0f)) {
+        instance->ik[chain] = {};
+        return AK_OK;
+    }
+    if (ik->struct_size < sizeof(*ik) || !instance->validChain(ik->start_joint, ik->mid_joint, ik->end_joint))
+        return AK_ERROR_INVALID_ARGUMENT;
+    for (int axis = 0; axis < 3; ++axis)
+        if (!std::isfinite(ik->target[axis]) || !std::isfinite(ik->pole[axis]))
+            return AK_ERROR_INVALID_ARGUMENT;
+    if (!std::isfinite(ik->weight) || !(ik->soften > 0.0f) || ik->soften > 1.0f)
+        return AK_ERROR_INVALID_ARGUMENT;
+    animkit::IkChain &value = instance->ik[chain];
+    value.start = ik->start_joint;
+    value.mid = ik->mid_joint;
+    value.end = ik->end_joint;
+    std::copy_n(ik->target, 3, value.target);
+    std::copy_n(ik->pole, 3, value.pole);
+    value.weight = std::min(ik->weight, 1.0f);
+    value.soften = ik->soften;
     return AK_OK;
 }
 

@@ -11,8 +11,11 @@ The package has three parts:
   It parses glTF with cgltf, decodes PNG/JPEG textures with stb_image, builds
   ozz skeletons and clips, and skins meshes on the CPU.
 - `haxe/animkit`: Haxe wrappers. `AnimationAsset` loads a file,
-  `AnimationInstance` blends up to four clip layers and reads the deformed
-  streams, and `ClipPlayer` plays one clip at a time with crossfades.
+  `AnimationInstance` blends up to four clip layers, solves up to four
+  two-bone inverse kinematics chains on top (`setIk`: an end joint reaches a
+  scene-space target with its middle joint pointing along a pole direction),
+  and reads the deformed streams. `ClipPlayer` plays one clip at a time with
+  crossfades and a playback rate.
 - `haxe/animkit/scene`: `SkinnedModel`, which presents an instance in a
   SceneKit scene and republishes its geometry after each evaluation.
 

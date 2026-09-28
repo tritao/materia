@@ -9,6 +9,7 @@ import haxe.io.Bytes;
  */
 class AnimationInstance {
 	public static inline var MAX_LAYERS:Int = 4;
+	public static inline var MAX_IK_CHAINS:Int = 4;
 
 	public final asset:AnimationAsset;
 	final owner:Ownedak_instance_handle;
@@ -31,6 +32,31 @@ class AnimationInstance {
 		AnimationAsset.check(AnimKitNative.ak_instance_set_layer(handle(), layer, clip, time, weight,
 			loop ? 1 : 0), "instance.layer");
 	}
+
+	/**
+	 * Sets one of MAX_IK_CHAINS two-bone chains solved after the layers blend:
+	 * end reaches target and mid points along pole, both [x, y, z] in scene
+	 * space (pole is a direction). Weight 0 disables the chain.
+	 */
+	public function setIk(chain:Int, start:Int, mid:Int, end:Int, target:Array<Float>, pole:Array<Float>,
+			weight:Float = 1.0, soften:Float = 1.0):Void {
+		var ik = new ak_two_bone_ik();
+		ik.set_struct_size(ak_two_bone_ik.size());
+		ik.set_start_joint(start);
+		ik.set_mid_joint(mid);
+		ik.set_end_joint(end);
+		for (axis in 0...3) {
+			ik.set_target(axis, target[axis]);
+			ik.set_pole(axis, pole[axis]);
+		}
+		ik.set_weight(weight);
+		ik.set_soften(soften);
+		AnimationAsset.check(AnimKitNative.ak_instance_set_ik(handle(), chain, ik), "instance.ik");
+	}
+
+	/** Disables one inverse kinematics chain. */
+	public function clearIk(chain:Int):Void
+		AnimationAsset.check(AnimKitNative.ak_instance_set_ik(handle(), chain, null), "instance.ik");
 
 	/** Clears every layer, returning the instance to the rest pose on evaluate. */
 	public function clearLayers():Void {

@@ -53,6 +53,23 @@ the thumb side, held at a chosen distance along the prop. Attachments move in
 the same `advance` as the mesh, and `changedNodes` lists every node a frame
 touched.
 
+## Walking and reaching
+
+`HumanGait.measure` finds a looping walk clip's natural ground speed: a
+planted foot slides backwards past the pelvis at exactly the speed the body
+travels. `HumanWalker` walks a character along a route of floor points at a
+chosen speed, playing the walk clip at the rate that keeps planted feet still;
+it speeds up over the crossfade from idle, brakes to stop at the end of an
+open route, turns at a bounded rate, and idles on arrival. `rootTransform()`
+is where to place the character. A facility route's `Path` becomes a route by
+taking its poses' positions.
+
+`HumanCharacter.reach(limb, target)` puts a wrist or ankle on a model-space
+target with AnimKit's two-bone IK, on top of whatever clip is playing; elbows
+point down and back and knees forward unless a pole is given, and `release`
+returns the limb to its animation. Legs need a foot below the shin, which
+Quaternius rigs lack (their feet are IK controls parented to the body).
+
 ## Body description and collision proxy
 
 `HumanDescription.measure` reads stature, shoulder and hip width, torso, and
@@ -92,17 +109,23 @@ CC0). It checks rig detection and rejection, anatomical landmarks, rigid hand
 frames, and that an attached prop tracks the palm through a walk cycle. It
 also checks that the prop adds exactly one draw call, the measured
 description, capsule placement against the bones, crown, and floor, uniform
-scaling, and that the body view draws only the shown mode and follows the pose.
+scaling, that the body view draws only the shown mode and follows the pose,
+that a gait-matched walk keeps a planted foot within a quarter of the body's
+travel and stops, turned, at the end of its route, and that a reach puts the
+wrist on its target, bends the elbow down, straightens towards an unreachable
+target, blends by weight, and releases cleanly.
 The app suite covers a person joining the application simulation.
 
 ## Editor preview
 
 ```sh
 ./app/run-built.sh --perspective --character=animkit/assets/quaternius/worker.glb \
-  --character-hold=animkit/assets/props/wrench.glb [--character-display=capsules|skeleton]
+  --character-hold=animkit/assets/props/wrench.glb [--character-display=capsules|skeleton] \
+  [--character-route=0,-2;2,-2;2,1]
 ```
 
 Humanoid characters become HumanKit characters; other assets still preview as
 plain AnimKit models. A humanoid preview also joins the application
 simulation as a person: once a simulation is applied it lives on simulation
 time, stands still while the simulation is paused, and walks with each step.
+It walks the given route once and idles at its end, or loops round a circle.
