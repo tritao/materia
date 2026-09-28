@@ -9,6 +9,7 @@ import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
+import toolpathkit.path.SpindleDirection;
 
 /** 2.5D toolpath producer. All inputs here are metres and metres/second. */
 class CamJob {
@@ -32,7 +33,7 @@ class CamJob {
   /** Offset closed profile; `outside` and `inside` use the cutter radius. */
   public function profile(contour:CamContour, tool:Tool, depth:Float,
       feed:Float, ?side:String = "outside", ?stepDown:Float = 0.002,
-      ?plungeFeed:Null<Float>):CamJob {
+      ?plungeFeed:Null<Float>, ?featureRef:String):CamJob {
     require(contour, tool, depth, feed);
     var entryFeed = checkedEntryFeed(feed, plungeFeed);
     if (side != "outside" && side != "inside" && side != "on")
@@ -40,7 +41,7 @@ class CamJob {
     var levels = depthLevels(contour.z, depth, stepDown);
     if (side != "on") offsetPath(contour, tool.diameter * 0.5,
       levels[0], side == "outside");
-    var span = nextSpan();
+    var span = nextSpan(featureRef);
     selectTool(tool, span);
     for (level in levels) {
       if (side == "on") cutLoop(contour, level, feed, entryFeed, span);
@@ -69,15 +70,16 @@ class CamJob {
     }
     for (i in 1...boundaries.length)
       profile(boundaries[i], tool, depth, feed, "inside", stepDown,
-        plungeFeed);
-    profile(outer, tool, depth, feed, "outside", stepDown, plungeFeed);
+        plungeFeed, faceRef(face));
+    profile(outer, tool, depth, feed, "outside", stepDown, plungeFeed,
+      faceRef(face));
     return this;
   }
 
   /** Clear a pocket with a separate plunge feed and ramps where spans allow. */
   public function pocket(contour:CamContour, tool:Tool, depth:Float,
       feed:Float, stepOver:Float, ?stepDown:Float = 0.002,
-      ?plungeFeed:Null<Float>):CamJob {
+      ?plungeFeed:Null<Float>, ?featureRef:String):CamJob {
     require(contour, tool, depth, feed);
     if (!Math.isFinite(stepOver) || stepOver <= 0.0 ||
         stepOver > tool.diameter)
@@ -88,7 +90,7 @@ class CamJob {
       var radius = tool.diameter * 0.5;
       var passes = CamPocketPlanner.plan(contour, radius, stepOver);
       offsetPath(contour, radius, levels[0], false);
-      var span = nextSpan();
+      var span = nextSpan(featureRef);
       selectTool(tool, span);
       for (index in 0...levels.length) {
         var level = levels[index];
@@ -100,7 +102,7 @@ class CamJob {
       }
       return this;
     }
-    var span = nextSpan();
+    var span = nextSpan(featureRef);
     selectTool(tool, span);
     var inset = tool.diameter * 0.5;
     var rounds = 0;
@@ -141,7 +143,7 @@ class CamJob {
     var outer = boundaries[0];
     if (boundaries.length == 1)
       return pocket(outer, tool, depth, feed, stepOver, stepDown,
-        plungeFeed);
+        plungeFeed, faceRef(face));
     require(outer, tool, depth, feed);
     if (!Math.isFinite(stepOver) || stepOver <= 0.0 ||
         stepOver > tool.diameter)
@@ -159,7 +161,7 @@ class CamJob {
       for (other in islands) if (other != island)
         validatePathAgainstContour(other, islandPath, radius, false);
     }
-    var span = nextSpan();
+    var span = nextSpan(faceRef(face));
     selectTool(tool, span);
     for (index in 0...levels.length) {
       var level = levels[index];
@@ -287,8 +289,7 @@ class CamJob {
     if (ops.length == 0) throw "CAM job has no operations";
     var result = ops.copy();
     var endSpan = Provenance.cam(operationNumber + 1);
-    result.push(ToolpathOp.Spindle(CncChannels.SpindleSpeed, 0.0, endSpan));
-    result.push(ToolpathOp.Spindle(CncChannels.SpindleDirection, 0.0, endSpan));
+    result.push(ToolpathOp.Spindle(Off, 0.0, endSpan));
     result.push(ToolpathOp.End(endSpan));
     return new CamProgram(result, tools);
   }
@@ -495,12 +496,10 @@ class CamJob {
     if (selectedTool != tool.number) {
       rapid(new Point3(current.x, current.y, safeZ), span);
       if (selectedTool >= 0) {
-        ops.push(ToolpathOp.Spindle(CncChannels.SpindleSpeed, 0.0, span));
-        ops.push(ToolpathOp.Spindle(CncChannels.SpindleDirection, 0.0, span));
+        ops.push(ToolpathOp.Spindle(Off, 0.0, span));
       }
       ops.push(ToolpathOp.ToolChange(tool.number, span));
-      ops.push(ToolpathOp.Spindle(CncChannels.SpindleDirection, 1.0, span));
-      ops.push(ToolpathOp.Spindle(CncChannels.SpindleSpeed, spindleRpm, span));
+      ops.push(ToolpathOp.Spindle(Clockwise, spindleRpm, span));
       selectedTool = tool.number;
     }
   }
@@ -516,7 +515,11 @@ class CamJob {
       Math.max(depth, surface - level * stepDown)];
   }
 
-  function nextSpan():Provenance return Provenance.cam(++operationNumber);
+  static function faceRef(face:Face):Null<String>
+    return face.index < 0 ? null : 'face:${face.index}';
+
+  function nextSpan(?featureRef:String):Provenance
+    return Provenance.cam(++operationNumber, featureRef);
 
   function require(contour:CamContour, tool:Tool, depth:Float,
       feed:Float):Void {

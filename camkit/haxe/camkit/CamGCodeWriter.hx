@@ -66,37 +66,19 @@ class CamGCodeWriter {
       case OptionalStop(_): lines.push("M1");
       case ProgramStop(_): lines.push("M0");
       case End(_): lines.push("M2");
-      case Spindle(channel, value, _):
-        if (index + 1 >= program.ops.length)
-          throw "CAM spindle export needs a direction/speed pair";
-        var next = program.ops[index + 1];
-        if (channel == CncChannels.SpindleDirection && value != 0.0) {
-          switch next {
-            case Spindle(CncChannels.SpindleSpeed, rpm, _):
-              if (rpm <= 0.0) throw "CAM spindle start needs positive RPM";
-              lines.push('S${number(rpm)} ${value > 0.0 ? "M3" : "M4"}');
-            case _: throw "CAM spindle start needs a following speed";
-          }
-        } else if (channel == CncChannels.SpindleSpeed && value == 0.0) {
-          switch next {
-            case Spindle(CncChannels.SpindleDirection, direction, _):
-              if (direction != 0.0) throw "CAM spindle stop needs zero direction";
-              lines.push("M5");
-            case _: throw "CAM spindle stop needs a following direction";
-          }
-        } else throw 'Unsupported CAM spindle sequence on "$channel"';
-        index++;
-      case Coolant(channel, enabled, _):
-        if (!enabled && channel == CncChannels.CoolantMist) {
-          if (index + 1 >= program.ops.length) throw "M9 needs both coolant channels";
-          switch program.ops[index + 1] {
-            case Coolant(CncChannels.CoolantFlood, false, _):
-              lines.push("M9"); index++;
-            case _: throw "M9 needs both coolant channels";
-          }
-        } else if (enabled && channel == CncChannels.CoolantMist) lines.push("M7");
-        else if (enabled && channel == CncChannels.CoolantFlood) lines.push("M8");
-        else throw 'Unsupported CAM coolant channel "$channel"';
+      case Spindle(direction, rpm, _):
+        switch direction {
+          case Off: lines.push("M5");
+          case Clockwise, CounterClockwise:
+            if (rpm <= 0.0) throw "CAM spindle start needs positive RPM";
+            lines.push('S${number(rpm)} ${direction == Clockwise ? "M3" : "M4"}');
+        }
+      case Coolant(mist, flood, _):
+        if (!mist && !flood) lines.push("M9");
+        else {
+          if (mist) lines.push("M7");
+          if (flood) lines.push("M8");
+        }
       case CutterCompStart(_, _, _, _), CutterCompEnd(_):
         throw "CAM G-code export needs resolved cutter geometry";
       }

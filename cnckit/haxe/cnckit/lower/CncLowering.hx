@@ -52,10 +52,22 @@ class CncLowering {
         addMove(primitive(geometry), speed, blend, span);
       case Dwell(seconds, span):
         flush(); add(MotionOp.Dwell(seconds), span);
-      case Spindle(channel, value, span):
-        flush(); add(MotionOp.SetOutput(channel, EventValue.Analog(value)), span);
-      case Coolant(channel, enabled, span):
-        flush(); add(MotionOp.SetOutput(channel, EventValue.Digital(enabled)), span);
+      case Spindle(direction, rpm, span):
+        flush();
+        add(MotionOp.SetOutput(CncChannels.SpindleDirection,
+          EventValue.Analog(switch direction {
+            case Off: 0.0;
+            case Clockwise: 1.0;
+            case CounterClockwise: -1.0;
+          })), span);
+        add(MotionOp.SetOutput(CncChannels.SpindleSpeed,
+          EventValue.Analog(rpm)), span);
+      case Coolant(mist, flood, span):
+        flush();
+        add(MotionOp.SetOutput(CncChannels.CoolantMist,
+          EventValue.Digital(mist)), span);
+        add(MotionOp.SetOutput(CncChannels.CoolantFlood,
+          EventValue.Digital(flood)), span);
       case ToolChange(number, span):
         flush(); add(MotionOp.WaitInput(CncChannels.toolChange(number),
           InputPredicate.Equals(EventValue.Digital(true)), null), span);

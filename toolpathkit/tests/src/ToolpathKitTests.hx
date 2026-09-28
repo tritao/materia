@@ -5,6 +5,7 @@ import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.Provenance.ProvenanceKind;
+import toolpathkit.path.SpindleDirection;
 import toolpathkit.path.ToolpathOp;
 
 class ToolpathKitTests {
@@ -19,6 +20,9 @@ class ToolpathKitTests {
     if (Provenance.cam(4).operationIndex != 4 ||
         Provenance.cam(4).kind != ProvenanceKind.Cam)
       throw "CAM provenance";
+    if (Provenance.cam(4, "face:2").operationId != "cam:4" ||
+        Provenance.cam(4, "face:2").featureRef != "face:2")
+      throw "CAM feature reference";
     var move = ToolpathOp.Move(MoveKind.Cut, line, 0.01, 0.0001,
       Provenance.cam(4));
     switch move {
@@ -26,6 +30,14 @@ class ToolpathKitTests {
         if (feed != 0.01 || tolerance != 0.0001) throw "move parameters";
       case _: throw "move kind";
     }
-    Sys.println("ToolpathKit tests passed (5 assertions)");
+    switch ToolpathOp.Spindle(Clockwise, 12000, Provenance.cam(4)) {
+      case Spindle(Clockwise, rpm, _) if (rpm == 12000):
+      case _: throw "spindle state";
+    }
+    switch ToolpathOp.Coolant(true, false, Provenance.cam(4)) {
+      case Coolant(true, false, _):
+      case _: throw "coolant state";
+    }
+    Sys.println("ToolpathKit tests passed (8 assertions)");
   }
 }

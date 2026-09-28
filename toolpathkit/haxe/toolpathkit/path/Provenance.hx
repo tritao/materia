@@ -7,18 +7,25 @@ class Provenance {
   public final column:Int;
   public final length:Int;
   public final operationIndex:Null<Int>;
+  public final operationId:Null<String>;
+  public final featureRef:Null<String>;
 
   public function new(line:Int, column:Int, length:Int,
-      kind:ProvenanceKind = GCode, operationIndex:Null<Int> = null) {
+      kind:ProvenanceKind = GCode, operationIndex:Null<Int> = null,
+      operationId:Null<String> = null, featureRef:Null<String> = null) {
     this.kind = kind;
     this.line = line;
     this.column = column;
     this.length = length;
     this.operationIndex = operationIndex;
+    this.operationId = operationId;
+    this.featureRef = featureRef;
   }
 
-  public static function cam(operationIndex:Int):Provenance
-    return new Provenance(operationIndex, 1, 0, Cam, operationIndex);
+  public static function cam(operationIndex:Int,
+      ?featureRef:String):Provenance
+    return new Provenance(operationIndex, 1, 0, Cam, operationIndex,
+      'cam:$operationIndex', featureRef);
 }
 
 enum ProvenanceKind {

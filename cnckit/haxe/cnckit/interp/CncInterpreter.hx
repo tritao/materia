@@ -12,6 +12,7 @@ import toolpathkit.path.ArcPlane;
 import toolpathkit.path.Point3;
 import cnckit.parse.CncBlock;
 import toolpathkit.path.Provenance;
+import toolpathkit.path.SpindleDirection;
 import cnckit.parse.CncWord;
 
 /** Interprets LinuxCNC blocks into plain metre geometry and ordered CNC ops. */
@@ -214,7 +215,7 @@ class CncInterpreter {
       }
     }
     if (s != null && state.spindleDirection != 0 && spindleCode < 0)
-      spindle(CncChannels.SpindleSpeed, state.spindleSpeed, block.span);
+      spindle(block.span);
     for (word in mWords) if (integer(word, line) == 6) {
       if (state.selectedTool < 0) fail(line, word.column, "M6 requires selected T tool");
       if (state.cutterSide != 0) fail(line, word.column,
@@ -224,19 +225,18 @@ class CncInterpreter {
     }
     if (spindleCode == 3 || spindleCode == 4) {
       state.spindleDirection = spindleCode == 3 ? 1 : -1;
-      spindle(CncChannels.SpindleDirection, state.spindleDirection, block.span);
-      spindle(CncChannels.SpindleSpeed, state.spindleSpeed, block.span);
+      spindle(block.span);
     } else if (spindleCode == 5) {
       state.spindleDirection = 0;
-      spindle(CncChannels.SpindleSpeed, 0.0, block.span);
-      spindle(CncChannels.SpindleDirection, 0.0, block.span);
+      spindle(block.span);
     }
     for (word in mWords) switch integer(word, line) {
-      case 7: coolant(CncChannels.CoolantMist, true, block.span);
-      case 8: coolant(CncChannels.CoolantFlood, true, block.span);
+      case 7: state.coolantMist = true; coolant(block.span);
+      case 8: state.coolantFlood = true; coolant(block.span);
       case 9:
-        coolant(CncChannels.CoolantMist, false, block.span);
-        coolant(CncChannels.CoolantFlood, false, block.span);
+        state.coolantMist = false;
+        state.coolantFlood = false;
+        coolant(block.span);
       case _:
     }
 
@@ -338,12 +338,14 @@ class CncInterpreter {
     }
     if (endCode >= 0) {
       if (state.spindleDirection != 0) {
-        spindle(CncChannels.SpindleSpeed, 0.0, block.span);
-        spindle(CncChannels.SpindleDirection, 0.0, block.span);
         state.spindleDirection = 0;
+        spindle(block.span);
       }
-      if (state.coolantMist) coolant(CncChannels.CoolantMist, false, block.span);
-      if (state.coolantFlood) coolant(CncChannels.CoolantFlood, false, block.span);
+      if (state.coolantMist || state.coolantFlood) {
+        state.coolantMist = false;
+        state.coolantFlood = false;
+        coolant(block.span);
+      }
       ops.push(ToolpathOp.End(block.span)); state.ended = true;
     }
   }
@@ -584,14 +586,13 @@ class CncInterpreter {
       plane == 18 ? new Point3(u, axial, v) :
       new Point3(axial, u, v);
 
-  function spindle(channel:String, value:Float, span:Provenance):Void
-    ops.push(ToolpathOp.Spindle(channel, value, span));
+  function spindle(span:Provenance):Void
+    ops.push(ToolpathOp.Spindle(state.spindleDirection == 0 ? Off :
+      state.spindleDirection > 0 ? Clockwise : CounterClockwise,
+      state.spindleDirection == 0 ? 0.0 : state.spindleSpeed, span));
 
-  function coolant(channel:String, enabled:Bool, span:Provenance):Void {
-    if (channel == CncChannels.CoolantMist) state.coolantMist = enabled;
-    if (channel == CncChannels.CoolantFlood) state.coolantFlood = enabled;
-    ops.push(ToolpathOp.Coolant(channel, enabled, span));
-  }
+  function coolant(span:Provenance):Void
+    ops.push(ToolpathOp.Coolant(state.coolantMist, state.coolantFlood, span));
 
   static function gColumn(words:Array<CncWord>, code:Int):Int {
     for (word in words) if (gCode(word, 1) == code) return word.column;

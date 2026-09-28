@@ -21,6 +21,14 @@ class CamIslandPocketFixture {
     var program = new CamJob(0.005, 10000)
       .pocketFace(face, tool, -0.002, 0.005, 0.001, 0.001,
         "mm", 0.00005, 0.001).finish();
+    var hasFaceRef = false;
+    for (op in program.ops) switch op {
+      case Move(_, _, _, _, provenance):
+        if (provenance.featureRef == 'face:${face.index}' &&
+            provenance.operationId != null) hasFaceRef = true;
+      case _:
+    }
+    check(hasFaceRef, "face pocket preserves CAD face reference");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
     var lowered = program.lower(machine);

@@ -135,15 +135,15 @@ class CncKitTests {
       case _: false;
     }, "motion follows spindle start");
     var stopped = new CncCompiler(machine).compile("M3 M8\nM5 M9 G0 X1\nM2");
-    check(switch stopped.ops[3] {
+    check(switch stopped.ops[5] {
       case MotionOp.SetOutput("spindle.speed", _): true;
       case _: false;
     }, "M5 stops spindle before coolant and motion");
-    check(switch stopped.ops[5] {
+    check(switch stopped.ops[6] {
       case MotionOp.SetOutput("coolant.mist", _): true;
       case _: false;
     }, "M9 follows M5 before motion");
-    check(switch stopped.ops[7] {
+    check(switch stopped.ops[8] {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
     }, "M5 and M9 precede motion");
@@ -416,26 +416,26 @@ class CncKitTests {
     var endOutputs = new CncCompiler(fixtureMachine).compileDetailed(
       "S1000 M3 M7 M8\nM30");
     var endOps = endOutputs.ops;
-    check(endOps.length >= 5 && switch endOps[endOps.length - 5] {
-      case ToolpathOp.Spindle("spindle.speed", speed, span) if (speed == 0.0): span.line == 2;
+    check(endOps.length >= 3 && switch endOps[endOps.length - 3] {
+      case ToolpathOp.Spindle(Off, speed, span) if (speed == 0.0): span.line == 2;
       case _: false;
     }, "M30 stops spindle speed on the end line");
-    check(switch endOps[endOps.length - 4] {
-      case ToolpathOp.Spindle("spindle.direction", direction, _) if (direction == 0.0): true;
+    check(switch endOps[endOps.length - 3] {
+      case ToolpathOp.Spindle(Off, _, _): true;
       case _: false;
     }, "M30 stops spindle direction");
-    check(switch endOps[endOps.length - 3] {
-      case ToolpathOp.Coolant("coolant.mist", false, _): true;
+    check(switch endOps[endOps.length - 2] {
+      case ToolpathOp.Coolant(false, _, _): true;
       case _: false;
     }, "M30 turns off mist coolant");
     check(switch endOps[endOps.length - 2] {
-      case ToolpathOp.Coolant("coolant.flood", false, _): true;
+      case ToolpathOp.Coolant(_, false, _): true;
       case _: false;
     }, "M30 turns off flood coolant before End");
     var m2Outputs = new CncCompiler(fixtureMachine).compileDetailed(
       "S1000 M3 M8\nM2");
     check(switch m2Outputs.ops[m2Outputs.ops.length - 2] {
-      case ToolpathOp.Coolant("coolant.flood", false, _): true;
+      case ToolpathOp.Coolant(_, false, _): true;
       case _: false;
     }, "M2 also turns off active coolant");
     var compensatedMachine = new CncMachine("work", "x", "y", "z", 0.2);
@@ -495,7 +495,7 @@ class CncKitTests {
     var withControls = new CncCompiler(compensatedMachine).compileDetailed(
       "G21 F600 G41 D2 G1 X10\nM8\nG1 X20\nG40\nM9\nG1 X30\nM2");
     check(withControls.diagnostics.length == 0 &&
-      withControls.ops.length == 7,
+      withControls.ops.length == 6,
       "coolant operations remain ordered around compensated motion");
     var arcComp = new CncCompiler(compensatedMachine).compileDetailed(
       File.getContent("fixtures/comp-arc.ngc"));

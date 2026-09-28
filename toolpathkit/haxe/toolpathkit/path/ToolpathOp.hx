@@ -9,8 +9,8 @@ enum ToolpathOp {
   Move(kind:MoveKind, geometry:PathGeometry, feed:Float,
     tolerance:Float, provenance:Provenance);
   Dwell(seconds:Float, span:Provenance);
-  Spindle(channel:String, value:Float, span:Provenance);
-  Coolant(channel:String, enabled:Bool, span:Provenance);
+  Spindle(direction:SpindleDirection, rpm:Float, provenance:Provenance);
+  Coolant(mist:Bool, flood:Bool, provenance:Provenance);
   ToolChange(number:Int, span:Provenance);
   /**
     G43 Hn sets tool length offset `number` (G49 is number 0). Z in later
