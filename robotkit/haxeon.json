@@ -4,7 +4,8 @@
 	"sourceRoots": ["haxe"],
 	"scopeSourceRoots": false,
 	"dependencies": {
-		"nativekit": { "path": "../nativekit" }
+		"nativekit": { "path": "../nativekit" },
+		"simkit": { "path": "../simkit" }
 	},
 	"ffi": {
 		"interfaces": [

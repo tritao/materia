@@ -1039,6 +1039,71 @@ void omni_drive_follows_applied_wheel_targets() {
     rk_simulation_destroy(simulation);
 }
 
+// Robots join a session another owner steps; its actors are part of the
+// robots' world, and one frame presents both.
+void robots_attach_to_a_shared_session() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc world_desc{};
+    world_desc.struct_size = sizeof(world_desc);
+    world_desc.scene = scene;
+    world_desc.fixed_timestep = 0.01;
+    world_desc.physics_substeps = 1;
+    world_desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+    nksim_session_desc session_desc{};
+    session_desc.struct_size = sizeof(session_desc);
+    session_desc.scene = scene;
+    session_desc.world = world;
+    nksim_session session = 0;
+    assert(nksim_session_create(&session_desc, &session) == NKSIM_OK);
+
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create_in_session(session, &simulation) == RK_OK);
+    auto model = blueprint(301);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    // A person standing 2 m ahead of the robot's LiDAR.
+    nksim_actor_part part{};
+    part.struct_size = sizeof(part);
+    part.shape.type = NKSIM_SHAPE_CAPSULE;
+    part.shape.parameters[0] = 0.25;
+    part.shape.parameters[1] = 1.0;
+    part.pose.struct_size = sizeof(part.pose);
+    part.pose.position[0] = 2.0;
+    part.pose.rotation[3] = 1.0;
+    nksim_actor person = 0;
+    assert(nksim_session_create_actor(session, &part, 1, &person) == NKSIM_OK);
+
+    // The session's owner, not the robots, controls the clock.
+    assert(rk_simulation_step(simulation, 0) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_start(simulation) == RK_ERROR_INVALID_STATE);
+    assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    const auto sample = snapshot(robot);
+    assert(std::abs(sample.sensors[2].values[0] - 1.75) < 1e-6);
+    assert(sample.sensors[2].values[4] == 10.0);
+
+    nksim_frame frame = 0;
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    rk_simulation_presentation presentation = 0;
+    assert(rk_simulation_present_frame(simulation, frame, &presentation) == RK_OK);
+    rk_simulation_presentation_info info{};
+    info.struct_size = sizeof(info);
+    assert(rk_simulation_presentation_get_info(presentation, &info) == RK_OK);
+    assert(info.step_index == 1 && info.pose_count == 3);
+    rk_simulation_presentation_destroy(presentation);
+    nksim_frame_destroy(frame);
+
+    // Removing the robots from a stopped session leaves the session running on.
+    assert(nksim_session_stop(session) == NKSIM_OK);
+    rk_simulation_destroy(simulation);
+    assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    nksim_session_destroy(session);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 } // namespace
 
 int main() {
@@ -1054,5 +1119,6 @@ int main() {
     driven_base_far_from_origin_reads_exact_imu();
     differential_drive_keeps_authored_tilt();
     omni_drive_follows_applied_wheel_targets();
+    robots_attach_to_a_shared_session();
     return 0;
 }

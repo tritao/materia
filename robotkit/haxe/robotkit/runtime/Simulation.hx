@@ -2,13 +2,20 @@ package robotkit.runtime;
 
 import RobotKitSimKit;
 import haxe.Int64;
+import nativekit.sim.SimFrame;
+import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
 
 /**
- * Owns one shared simulated universe and its fixed-step clock.
+ * The robots taking part in one SimKit session.
+ *
+ * Simulation.inSession() attaches robots to a session the caller owns and
+ * advances, alongside the session's props and people. The constructor instead
+ * owns a private session whose clock this object's step, start, stop, and
+ * reset control, and whose environment spawnBox edits.
  *
  * The object creates RobotRuntime handles but remains their simulation owner:
- * callers should submit through those handles and advance this object once per
+ * callers should submit through those handles and advance the session once per
  * tick. It is intentionally separate from SimulatedRobot, which is only a
  * live Robot adapter for RobotWorld.
  */
@@ -16,9 +23,24 @@ class Simulation {
   final owner:Ownedrk_simulation;
   final robots:Array<RobotRuntime> = [];
   public final fixedTimestepSeconds:Float;
+  /** The session this simulation joined, or null when it owns its own. */
+  final session:Null<SimSession>;
   var disposed:Bool = false;
 
-  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0) {
+  /**
+   * Owns a private session. With `session`, joins that stopped session
+   * instead and ignores the timing arguments; prefer Simulation.inSession().
+   */
+  public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0,
+      ?session:SimSession) {
+    this.session = session;
+    if (session != null) {
+      fixedTimestepSeconds = session.fixedTimestep();
+      var attached = RobotKitSimKit.rk_simulation_create_in_session(session.nativeHandle());
+      check(attached.status, "simulation.createInSession");
+      owner = attached.out_simulation;
+      return;
+    }
     if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
       throw "Simulation requires a positive finite timestep and positive substep count";
     fixedTimestepSeconds = fixedTimestep;
@@ -30,6 +52,23 @@ class Simulation {
     var result = RobotKitSimKit.rk_simulation_create(desc);
     check(result.status, "simulation.create");
     owner = result.out_simulation;
+  }
+
+  /** Attaches robots to a stopped session the caller owns, steps, and outlives. */
+  public static function inSession(session:SimSession):Simulation
+    return new Simulation(0.01, 1, 0, session);
+
+  /** Robot poses, and boxes spawned here, from a frame captured from the session. */
+  public function presentFrame(frame:SimFrame):SimulationPresentationSnapshot {
+    ensureLive();
+    var result = RobotKitSimKit.rk_simulation_present_frame(owner.borrow(), frame.nativeHandle());
+    check(result.status, "simulation.presentFrame");
+    try {
+      return new SimulationPresentationSnapshot(result.out_presentation);
+    } catch (error:Dynamic) {
+      result.out_presentation.close();
+      throw error;
+    }
   }
 
   /** Adds topology before the first start or step. */
@@ -202,9 +241,13 @@ class Simulation {
     check(RobotKitSimKit.rk_simulation_start(owner.borrow()), "simulation.start");
   }
 
-  /** Stops realtime stepping but leaves the simulation available for disposal. */
+  /**
+   * Stops realtime stepping but leaves the simulation available for disposal.
+   * A joined session's owner stops it, so this does nothing then.
+   */
   public function stop():Void {
-    if (!disposed) check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
+    if (!disposed && session == null)
+      check(RobotKitSimKit.rk_simulation_stop(owner.borrow()), "simulation.stop");
   }
 
   /** Restores every body and the fixed-step clock to the editable-scene state. */

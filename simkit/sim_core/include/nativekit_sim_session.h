@@ -196,7 +196,8 @@ typedef uint32_t nksim_participant;
 
 typedef struct nksim_tick {
     uint32_t struct_size;
-    uint32_t reserved0;
+    /** Nonzero for a tick the realtime owner loop scheduled. */
+    uint32_t realtime;
     /** The step index and simulation time this tick completes. */
     uint64_t step_index;
     double simulation_time;

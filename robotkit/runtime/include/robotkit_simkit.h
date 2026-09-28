@@ -5,23 +5,29 @@
  * @file robotkit_simkit.h
  * @brief Shared-physics simulation API for RobotKit.
  *
- * A rk_simulation owns one SceneKit/SimKit universe and its clock. Robot
- * runtimes returned by rk_simulation_add_robot() are bindings into that
- * universe; they do not own a physics world and they must not be advanced
- * independently. A manual tick follows this order:
+ * A rk_simulation is the set of robots taking part in one SimKit session
+ * (nativekit_sim_session.h), which owns the shared world, clock, and the
+ * environment. Robot runtimes returned by rk_simulation_add_robot() are
+ * bindings into that session; they do not own a physics world and they must
+ * not be advanced independently. Every session tick follows this order:
  *
  * 1. drain every attached runtime mailbox;
- * 2. apply every robot command;
+ * 2. apply every robot command (all or none);
  * 3. advance the common physics host exactly once; and
  * 4. publish one snapshot for every runtime.
  *
- * Use rk_simulation_step() for deterministic or externally scheduled ticks.
- * Use rk_simulation_start() and rk_simulation_stop() when the simulation
- * should own a realtime worker thread. Robot topology must be complete before
- * the first start or step, because the first tick seals the world layout.
+ * rk_simulation_create_in_session() attaches robots to a session the caller
+ * owns and advances. rk_simulation_create() instead owns a private session,
+ * whose clock rk_simulation_step(), rk_simulation_start(),
+ * rk_simulation_stop(), and rk_simulation_reset() control, and whose
+ * environment the rk_simulation_*_object() calls edit; those calls are for
+ * that mode only and are superseded by the session's own. Robot topology must
+ * be complete before the session's first start or step, because the first
+ * tick seals the world layout.
  */
 
 #include "robotkit_runtime.h"
+#include "nativekit_sim_session.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -251,6 +257,21 @@ typedef struct rk_simulation_presentation_pose {
 RK_API rk_result RK_CALL rk_simulation_create(
     const rk_simulation_desc *desc, rk_simulation *out_simulation RK_OUT RK_OWNED);
 /**
+ * Attaches a new, empty set of robots to a session the caller owns.
+ *
+ * The session must be stopped and must outlive the returned handle. The
+ * session's owner steps, starts, stops, and resets it; the matching
+ * rk_simulation calls return RK_ERROR_INVALID_STATE for this handle.
+ * Destroying the handle while the session is stopped removes its robots from
+ * the world.
+ *
+ * @param session A stopped SimKit session.
+ * @param out_simulation Receives an owned simulation handle.
+ * @return RK_OK on success, or an invalid-state/handle/backend error.
+ */
+RK_API rk_result RK_CALL rk_simulation_create_in_session(
+    nksim_session session, rk_simulation *out_simulation RK_OUT RK_OWNED);
+/**
  * Destroys a simulation and releases every runtime handle it created.
  *
  * Callers should stop a realtime simulation first. Destroying an invalid or
@@ -450,6 +471,14 @@ RK_API rk_result RK_CALL rk_simulation_get_object_pose(
 /** Copies the complete clock and every presentation pose under one simulation lock. */
 RK_API rk_result RK_CALL rk_simulation_capture_presentation(
     rk_simulation simulation,
+    rk_simulation_presentation *out_presentation RK_OUT RK_OWNED);
+/**
+ * Copies every robot pose, and every object spawned through this simulation,
+ * from a frame captured from its session, so robots, props, and people drawn
+ * from one frame agree.
+ */
+RK_API rk_result RK_CALL rk_simulation_present_frame(
+    rk_simulation simulation, nksim_frame frame,
     rk_simulation_presentation *out_presentation RK_OUT RK_OWNED);
 /** Reads immutable metadata from a captured presentation snapshot. */
 RK_API rk_result RK_CALL rk_simulation_presentation_get_info(

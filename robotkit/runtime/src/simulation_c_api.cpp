@@ -77,6 +77,27 @@ rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
     }
 }
 
+rk_result RK_CALL rk_simulation_create_in_session(nksim_session session,
+                                                  rk_simulation *out_simulation) {
+    if (!out_simulation)
+        return RK_ERROR_INVALID_ARGUMENT;
+    *out_simulation = RK_INVALID_SIMULATION;
+    nksim_session_status status{};
+    status.struct_size = sizeof(status);
+    if (nksim_session_get_status(session, &status) != NKSIM_OK)
+        return RK_ERROR_INVALID_HANDLE;
+    if (status.hosted)
+        return RK_ERROR_INVALID_STATE;
+    try {
+        *out_simulation = store(std::make_shared<robotkit::Simulation>(session));
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
 void RK_CALL rk_simulation_destroy(rk_simulation simulation) {
     std::shared_ptr<robotkit::Simulation> released;
     {
@@ -279,6 +300,26 @@ rk_result RK_CALL rk_simulation_capture_presentation(
         const auto result = value->capture_presentation(presentation->info, presentation->poses);
         if (result != RK_OK) return result;
         presentation->info.pose_count = static_cast<uint32_t>(presentation->poses.size());
+        *out_presentation = store_presentation(std::move(presentation));
+        return RK_OK;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    } catch (...) {
+        return RK_ERROR_BACKEND;
+    }
+}
+
+rk_result RK_CALL rk_simulation_present_frame(
+    rk_simulation simulation, nksim_frame frame, rk_simulation_presentation *out_presentation) {
+    if (!out_presentation) return RK_ERROR_INVALID_ARGUMENT;
+    *out_presentation = RK_INVALID_SIMULATION_PRESENTATION;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        auto presentation = std::make_shared<Presentation>();
+        presentation->info.struct_size = sizeof(presentation->info);
+        const auto result = value->present_frame(frame, presentation->info, presentation->poses);
+        if (result != RK_OK) return result;
         *out_presentation = store_presentation(std::move(presentation));
         return RK_OK;
     } catch (const std::bad_alloc &) {

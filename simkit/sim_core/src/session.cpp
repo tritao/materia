@@ -563,6 +563,7 @@ private:
         info.simulation_time = static_cast<double>(step_index_ + 1) * fixed_timestep_;
         info.fixed_timestep = fixed_timestep_;
         info.owner_time_ns = owner_time_ns;
+        info.realtime = realtime ? 1u : 0u;
         // Iterate a copy so a callback may add or remove participants.
         const auto participants = participants_;
         for (const auto &[id, participant] : participants) {
