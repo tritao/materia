@@ -123,6 +123,20 @@ int main(int argc, char **argv) {
                 std::chrono::duration<double>(start - made).count(),
                 std::chrono::duration<double>(end - start).count(), double(info.rays_tested),
                 double(info.rays_changed), total, (unsigned long long)info.interval_count, info.bytes / 1e6);
+            if (threads == 0)
+                for (uint32_t flags : {0u, uint32_t(SK_MESH_MERGE)}) {
+                    auto meshed = std::chrono::steady_clock::now();
+                    sk_mesh_handle mesh{};
+                    if (sk_stock_mesh(stock, 0, 0, info.tiles[0], info.tiles[1], flags, &mesh) != SK_OK) return 1;
+                    auto done = std::chrono::steady_clock::now();
+                    sk_mesh_info mesh_info{};
+                    sk_mesh_get_info(mesh, &mesh_info);
+                    std::printf("  preview mesh%s: %.3f s, %.2f M triangles, %.0f MB of streams\n",
+                        flags ? " (merged)" : "", std::chrono::duration<double>(done - meshed).count(),
+                        mesh_info.triangle_count / 1e6,
+                        (mesh_info.vertex_count * 28.0 + mesh_info.triangle_count * 16.0) / 1e6);
+                    sk_mesh_destroy(mesh);
+                }
             sk_stock_destroy(stock);
         }
     return 0;

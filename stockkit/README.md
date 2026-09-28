@@ -15,7 +15,7 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Current state (phases 0–4)
+## Current state (phases 0–5, without the editor)
 
 - Tool shapes live in CncKit so any `CncTool` can carry one:
   `cnckit.tool.CutterProfile` describes a tool as a surface of revolution from
@@ -103,6 +103,24 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   `MoveOutcome`, rapid contacts, collisions and totals per operation.
   `compare` returns a `StockComparison` with leftover and gouge volumes,
   the deepest gouge and the moves that gouged.
+- Preview and scrubbing (phase 5, headless):
+  - `sk_stock_mesh` meshes a range of tiles. Each ray is a square column
+    spacing wide with exact depths: top faces carry the stored normal and
+    source move, walls stand where neighbours differ, and optional bottoms
+    close the mesh (its volume is the stock's). Equal faces can be merged
+    along rows. Streams come out as bytes ready for SceneKit (float
+    positions and normals, uint32 indices, RGBA8 colours) plus each
+    triangle's source move for picking. Colouring is by source through a
+    palette (so by operation) or per ray (so by deviation from a target).
+  - Tiles are copy-on-write and carry revisions. `sk_stock_snapshot` and
+    `sk_stock_restore` share tiles, so a snapshot costs a pointer per tile
+    plus whatever later cuts replace.
+  - In Haxe, `StockTimeline` scrubs a program (a snapshot every N moves;
+    seeking restores the nearest one and cuts forward, history included),
+    `StockPreview` keeps chunk meshes and rebuilds only chunks whose tiles
+    changed, and `StockPreview.pick(chunk, triangle)` gives the `CutMove`
+    under a picked triangle, hence its operation and `CncSpan`.
+  - The app has no CNC workspace yet, so nothing displays these meshes.
 - CamKit's island-pocket test cuts its program with StockKit and requires no
   gouge, no rapid or shank through stock, and leftover only in the inside
   corners.
@@ -122,8 +140,9 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   - `core/tests/core_tests.cpp` adds closed-form checks through the C ABI:
     slots, arcs, plunges, capsule floors of ball ramps, necked tools, mesh
     tie rules, provenance, handle validation, shank and holder contact,
-    target comparison, and bit-identical results with 1, 2, 3, 8 and all
-    threads.
+    target comparison, snapshots and revisions, closed preview meshes whose
+    volume equals the stock's (also when built in chunks), colouring, and
+    bit-identical results with 1, 2, 3, 8 and all threads.
 
 Build the core and run its checks and benchmark:
 

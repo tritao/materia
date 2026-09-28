@@ -10,9 +10,12 @@ Stock::Stock(const Grid &grid) : grid_(grid) {
     tiles_i_ = (grid_.count[0] + grid_.tile - 1) / grid_.tile;
     tiles_j_ = (grid_.count[1] + grid_.tile - 1) / grid_.tile;
     tiles_.resize(static_cast<size_t>(tiles_i_) * tiles_j_);
+    revisions_.assign(tiles_.size(), 0);
     for (uint32_t tj = 0; tj < tiles_j_; ++tj)
         for (uint32_t ti = 0; ti < tiles_i_; ++ti) {
-            Tile &tile = tiles_[static_cast<size_t>(tj) * tiles_i_ + ti];
+            auto &slot = tiles_[static_cast<size_t>(tj) * tiles_i_ + ti];
+            slot = std::make_shared<Tile>();
+            Tile &tile = *slot;
             tile.i0 = ti * grid_.tile;
             tile.j0 = tj * grid_.tile;
             tile.ni = std::min(grid_.tile, grid_.count[0] - tile.i0);
@@ -24,15 +27,40 @@ Stock::Stock(const Grid &grid) : grid_(grid) {
         }
 }
 
-Stock::Tile &Stock::tile_of(uint32_t i, uint32_t j, uint32_t &local) {
+uint32_t Stock::tile_index(uint32_t i, uint32_t j, uint32_t &local) const {
     uint32_t ti = i / grid_.tile, tj = j / grid_.tile;
-    Tile &tile = tiles_[static_cast<size_t>(tj) * tiles_i_ + ti];
+    uint32_t index = tj * tiles_i_ + ti;
+    const Tile &tile = *tiles_[index];
     local = (j - tile.j0) * tile.ni + (i - tile.i0);
-    return tile;
+    return index;
 }
 
-const Stock::Tile &Stock::tile_of(uint32_t i, uint32_t j, uint32_t &local) const {
-    return const_cast<Stock *>(this)->tile_of(i, j, local);
+Stock::Tile &Stock::mutable_tile(uint32_t index) {
+    std::shared_ptr<Tile> &slot = tiles_[index];
+    if (slot.use_count() > 1) slot = std::make_shared<Tile>(*slot);
+    ++revisions_[index];
+    return *slot;
+}
+
+std::unique_ptr<Stock::Snapshot> Stock::snapshot() const {
+    auto snapshot = std::make_unique<Snapshot>();
+    snapshot->grid = grid_;
+    snapshot->tiles = tiles_;
+    return snapshot;
+}
+
+bool Stock::restore(const Snapshot &snapshot) {
+    const Grid &g = snapshot.grid;
+    if (g.axis != grid_.axis || g.origin[0] != grid_.origin[0] || g.origin[1] != grid_.origin[1] ||
+        g.spacing != grid_.spacing || g.count[0] != grid_.count[0] || g.count[1] != grid_.count[1] ||
+        g.tile != grid_.tile)
+        return false;
+    for (size_t k = 0; k < tiles_.size(); ++k)
+        if (tiles_[k] != snapshot.tiles[k]) {
+            tiles_[k] = snapshot.tiles[k];
+            ++revisions_[k];
+        }
+    return true;
 }
 
 void Stock::Tile::grow(uint32_t slots) {
@@ -89,12 +117,12 @@ void Stock::Tile::refresh_bounds() {
 
 uint32_t Stock::count(uint32_t i, uint32_t j) const {
     uint32_t local;
-    return tile_of(i, j, local).count[local];
+    return tiles_[tile_index(i, j, local)]->count[local];
 }
 
 void Stock::read(uint32_t i, uint32_t j, std::vector<Interval> &out) const {
     uint32_t local;
-    const Tile &tile = tile_of(i, j, local);
+    const Tile &tile = *tiles_[tile_index(i, j, local)];
     out.resize(tile.count[local]);
     for (uint32_t k = 0; k < tile.count[local]; ++k) {
         uint32_t at = tile.first[local] + k;
@@ -133,7 +161,7 @@ void Stock::write_local(Tile &tile, uint32_t local, const Interval *intervals, u
 
 void Stock::write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals) {
     uint32_t local;
-    Tile &tile = tile_of(i, j, local);
+    Tile &tile = mutable_tile(tile_index(i, j, local));
     write_local(tile, local, intervals.data(), static_cast<uint32_t>(intervals.size()));
 }
 
@@ -215,19 +243,21 @@ void Stock::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uin
             // Diagonal ownership: moves along x or y alternate between owners.
             if ((ti + tj) % owners != owner) continue;
             const uint32_t tile_index = tj * tiles_i_ + ti;
-            Tile &tile = tiles_[tile_index];
+            const Tile &tile = *tiles_[tile_index];
             if (!(tile.top > move.reach.min[2]) || !(tile.bottom < move.reach.max[2])) {
                 ++worker.stats.tiles_skipped;
                 continue;
             }
             MoveResult result;
             bool touched = false;
-            if (cuts && cut_tile(tile, move.cutting, cutting, move.source, worker, result.removed)) touched = true;
+            if (cuts && cut_tile(tile_index, move.cutting, cutting, move.source, worker, result.removed))
+                touched = true;
             // Bands measure the stock this move leaves behind.
             for (const auto &band : move.bands) {
                 RayRange range;
                 if (!ray_range(band.second.bounds(), range)) continue;
-                double contact = touch_tile(tile, band.second, range, worker);
+                // The cut may have replaced a shared tile with a private copy.
+                double contact = touch_tile(*tiles_[tile_index], band.second, range, worker);
                 if (contact > 0) {
                     result.contact[band.first] += contact;
                     touched = true;
@@ -237,30 +267,33 @@ void Stock::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uin
         }
 }
 
-bool Stock::cut_tile(Tile &tile, const SweptVolume &sweep, const RayRange &range, uint32_t source,
+bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
     Worker &worker, double &removed_volume) {
+    // Read through the shared tile; take a private copy only at the first write.
+    Tile *writable = nullptr;
+    const Tile *view = tiles_[index].get();
     CutStats &stats = worker.stats;
     std::vector<Span> &spans = worker.spans;
     std::vector<Interval> &scratch = worker.scratch;
     const double area = grid_.spacing * grid_.spacing;
     const double sweep_low = sweep.lowest();
     const double sweep_high = sweep.bounds().max[2];
-    if (!(tile.top > sweep_low) || !(tile.bottom < sweep_high)) return false;
-    uint32_t ia = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.i0, 0)), tile.i0);
-    uint32_t ja = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.j0, 0)), tile.j0);
-    if (range.i1 < int64_t(tile.i0) || range.j1 < int64_t(tile.j0)) return false;
-    uint32_t ib = std::min<uint32_t>(uint32_t(range.i1), tile.i0 + tile.ni - 1);
-    uint32_t jb = std::min<uint32_t>(uint32_t(range.j1), tile.j0 + tile.nj - 1);
+    if (!(view->top > sweep_low) || !(view->bottom < sweep_high)) return false;
+    uint32_t ia = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.i0, 0)), view->i0);
+    uint32_t ja = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.j0, 0)), view->j0);
+    if (range.i1 < int64_t(view->i0) || range.j1 < int64_t(view->j0)) return false;
+    uint32_t ib = std::min<uint32_t>(uint32_t(range.i1), view->i0 + view->ni - 1);
+    uint32_t jb = std::min<uint32_t>(uint32_t(range.j1), view->j0 + view->nj - 1);
     bool changed = false;
     for (uint32_t j = ja; j <= jb; ++j)
         for (uint32_t i = ia; i <= ib; ++i) {
-            uint32_t local = (j - tile.j0) * tile.ni + (i - tile.i0);
-            uint32_t n = tile.count[local];
+            uint32_t local = (j - view->j0) * view->ni + (i - view->i0);
+            uint32_t n = view->count[local];
             if (n == 0) continue;
-            uint32_t first = tile.first[local];
-            if (!(tile.hi[first + n - 1] > sweep_low) || !(tile.lo[first] < sweep_high)) continue;
+            uint32_t first = view->first[local];
+            if (!(view->hi[first + n - 1] > sweep_low) || !(view->lo[first] < sweep_high)) continue;
             ++stats.rays_tested;
-            if (!(tile.hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
+            if (!(view->hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
             sweep.intersect_z(ray_u(i), ray_v(j), spans);
             if (spans.empty()) continue;
             // Subtract every span from the ray.
@@ -269,12 +302,12 @@ bool Stock::cut_tile(Tile &tile, const SweptVolume &sweep, const RayRange &range
             for (uint32_t k = 0; k < n; ++k) {
                 uint32_t at = first + k;
                 Interval piece;
-                piece.lo = tile.lo[at];
-                piece.hi = tile.hi[at];
-                std::copy_n(&tile.lo_normal[3 * size_t(at)], 3, piece.lo_normal);
-                std::copy_n(&tile.hi_normal[3 * size_t(at)], 3, piece.hi_normal);
-                piece.lo_source = tile.lo_source[at];
-                piece.hi_source = tile.hi_source[at];
+                piece.lo = view->lo[at];
+                piece.hi = view->hi[at];
+                std::copy_n(&view->lo_normal[3 * size_t(at)], 3, piece.lo_normal);
+                std::copy_n(&view->hi_normal[3 * size_t(at)], 3, piece.hi_normal);
+                piece.lo_source = view->lo_source[at];
+                piece.hi_source = view->hi_source[at];
                 for (const Span &span : spans) {
                     if (span.hi <= piece.lo) continue;
                     if (span.lo >= piece.hi) break;
@@ -297,12 +330,16 @@ bool Stock::cut_tile(Tile &tile, const SweptVolume &sweep, const RayRange &range
                 if (piece.hi > piece.lo) scratch.push_back(piece);
             }
             if (removed <= 0) continue;
-            write_local(tile, local, scratch.data(), static_cast<uint32_t>(scratch.size()));
+            if (!writable) {
+                writable = &mutable_tile(index);
+                view = writable;
+            }
+            write_local(*writable, local, scratch.data(), static_cast<uint32_t>(scratch.size()));
             removed_volume += removed * area;
             ++stats.rays_changed;
             changed = true;
         }
-    if (changed) tile.refresh_bounds();
+    if (changed) writable->refresh_bounds();
     return changed;
 }
 
@@ -340,39 +377,6 @@ namespace {
 
 constexpr uint32_t kSourceNone = 0xFFFFFFFEu;
 
-/**
- * The parts of `a` outside `b`, calling `stretch(lo, hi, below, above)` for
- * each, where `below` and `above` are the `b` intervals touching it from
- * below and above (null when the stretch ends at an `a` endpoint instead).
- */
-template <typename F>
-void difference(const std::vector<Interval> &a, const std::vector<Interval> &b, F &&stretch) {
-    size_t k = 0;
-    for (const Interval &piece : a) {
-        double lo = piece.lo;
-        const Interval *below = nullptr;
-        while (k < b.size() && b[k].hi <= lo) ++k;
-        size_t m = k;
-        while (lo < piece.hi) {
-            if (m < b.size() && b[m].lo <= lo) {
-                // Inside b: skip past it.
-                below = &b[m];
-                lo = std::max(lo, b[m].hi);
-                ++m;
-                continue;
-            }
-            double hi = piece.hi;
-            const Interval *above = nullptr;
-            if (m < b.size() && b[m].lo < piece.hi) {
-                hi = b[m].lo;
-                above = &b[m];
-            }
-            if (hi > lo) stretch(lo, hi, below && below->hi == lo ? below : nullptr, above);
-            lo = hi;
-        }
-    }
-}
-
 } // namespace
 
 RayComparison compare_ray(const std::vector<Interval> &stock, const std::vector<Interval> &target) {
@@ -396,7 +400,8 @@ RayComparison compare_ray(const std::vector<Interval> &stock, const std::vector<
 }
 
 void Stock::pack() {
-    for (Tile &tile : tiles_) {
+    for (uint32_t k = 0; k < tiles_.size(); ++k) {
+        Tile &tile = mutable_tile(k);
         tile.compact();
         tile.refresh_bounds();
     }
@@ -404,22 +409,26 @@ void Stock::pack() {
 
 uint64_t Stock::interval_count() const {
     uint64_t total = 0;
-    for (const Tile &tile : tiles_) total += tile.live;
+    for (const auto &tile : tiles_) total += tile->live;
     return total;
 }
 
 double Stock::volume() const {
     double total = 0;
-    for (const Tile &tile : tiles_)
+    for (const auto &slot : tiles_) {
+        const Tile &tile = *slot;
         for (size_t r = 0; r < tile.count.size(); ++r)
             for (uint32_t k = 0; k < tile.count[r]; ++k)
                 total += tile.hi[tile.first[r] + k] - tile.lo[tile.first[r] + k];
+    }
     return total * grid_.spacing * grid_.spacing;
 }
 
 uint64_t Stock::bytes() const {
-    uint64_t total = sizeof(Stock) + tiles_.capacity() * sizeof(Tile);
-    for (const Tile &tile : tiles_) {
+    // Tiles shared with snapshots are counted in full here too.
+    uint64_t total = sizeof(Stock) + tiles_.capacity() * (sizeof(Tile) + sizeof(std::shared_ptr<Tile>));
+    for (const auto &slot : tiles_) {
+        const Tile &tile = *slot;
         total += (tile.first.capacity() + tile.count.capacity() + tile.capacity.capacity()) * 4;
         total += (tile.lo.capacity() + tile.hi.capacity()) * 8;
         total += (tile.lo_normal.capacity() + tile.hi_normal.capacity()) * 4;

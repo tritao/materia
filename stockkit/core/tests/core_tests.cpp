@@ -610,6 +610,153 @@ void target_comparison() {
     sk_tool_destroy(t);
 }
 
+std::vector<uint64_t> revisions_of(sk_stock_handle s) {
+    sk_stock_info info = info_of(s);
+    std::vector<uint64_t> revisions(size_t(info.tiles[0]) * info.tiles[1]);
+    check(sk_stock_read_revisions(s, revisions.data(), uint32_t(revisions.size())) == SK_OK, "read revisions");
+    return revisions;
+}
+
+bool same_rays(sk_stock_handle a, sk_stock_handle b) {
+    Rays x = read_all(a), y = read_all(b);
+    return x.counts == y.counts && x.intervals.size() == y.intervals.size() &&
+        std::memcmp(x.intervals.data(), y.intervals.data(), x.intervals.size() * sizeof(sk_interval)) == 0;
+}
+
+void snapshots() {
+    sk_tool_handle t = flat(6, 20);
+    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    sk_stock_handle copy = box_stock(g, 0, 0, 0, 50, 30, 20);
+    cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 0)}, "before snapshot");
+    cut(copy, t, {line_move(10, 15, 15, 40, 15, 15, 0)}, "reference copy");
+    sk_snapshot_handle shot{};
+    check(sk_stock_snapshot(s, &shot) == SK_OK, "snapshot");
+    auto before = revisions_of(s);
+    cut(s, t, {line_move(45, 2, 10, 45, 28, 10, 1)}, "after snapshot");
+    auto after = revisions_of(s);
+    size_t changed = 0;
+    for (size_t k = 0; k < before.size(); ++k) changed += after[k] != before[k];
+    check(changed > 0 && changed < before.size(), "a cut changes only the tiles it touches");
+    check(!same_rays(s, copy), "the later cut changed the stock");
+    check(sk_stock_restore(s, shot) == SK_OK && same_rays(s, copy), "restore returns the stock to the snapshot");
+    auto restored = revisions_of(s);
+    size_t moved = 0;
+    for (size_t k = 0; k < before.size(); ++k) {
+        moved += restored[k] != after[k];
+        check(restored[k] >= after[k], "revisions never go back");
+    }
+    check(moved == changed, "restore changes the revisions of exactly the tiles that differ");
+    // Cutting after a restore leaves the snapshot intact.
+    cut(s, t, {line_move(2, 2, 5, 48, 28, 5, 2)}, "diverge again");
+    sk_stock_handle other = box_stock(g, 0, 0, 0, 50, 30, 20);
+    check(sk_stock_restore(other, shot) == SK_OK && same_rays(other, copy), "the snapshot survives later cuts");
+    sk_grid wrong = grid(0, 0, 0.25, 201, 121);
+    sk_stock_handle mismatched = box_stock(wrong, 0, 0, 0, 50, 30, 20);
+    check(sk_stock_restore(mismatched, shot) == SK_ERROR_INVALID_ARGUMENT, "snapshots need the same grid");
+    sk_snapshot_destroy(shot);
+    check(sk_stock_restore(s, shot) == SK_ERROR_INVALID_HANDLE, "destroyed snapshot is invalid");
+    for (sk_stock_handle h : {s, copy, other, mismatched}) sk_stock_destroy(h);
+    sk_tool_destroy(t);
+}
+
+struct MeshData {
+    std::vector<float> positions;
+    std::vector<uint32_t> indices, sources, colors;
+};
+
+template <typename T>
+std::vector<T> mesh_stream(sk_mesh_handle m, sk_result (*copy)(sk_mesh_handle, uint8_t *, uint32_t *)) {
+    uint32_t size = 0;
+    copy(m, nullptr, &size);
+    std::vector<T> values(size / sizeof(T));
+    check(copy(m, reinterpret_cast<uint8_t *>(values.data()), &size) == SK_OK, "mesh stream");
+    return values;
+}
+
+MeshData mesh_of(sk_stock_handle s, uint32_t tx, uint32_t ty, uint32_t nx, uint32_t ny, uint32_t flags,
+    sk_mesh_handle *keep = nullptr) {
+    sk_mesh_handle m{};
+    check(sk_stock_mesh(s, tx, ty, nx, ny, flags, &m) == SK_OK, "mesh");
+    MeshData d;
+    d.positions = mesh_stream<float>(m, sk_mesh_copy_positions);
+    d.indices = mesh_stream<uint32_t>(m, sk_mesh_copy_indices);
+    d.sources = mesh_stream<uint32_t>(m, sk_mesh_copy_triangle_sources);
+    d.colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+    if (keep) *keep = m;
+    else sk_mesh_destroy(m);
+    return d;
+}
+
+/** Signed volume by the divergence theorem, in double. */
+double enclosed(const MeshData &d) {
+    double total = 0;
+    for (size_t k = 0; k < d.indices.size(); k += 3) {
+        const float *a = &d.positions[3 * d.indices[k]], *b = &d.positions[3 * d.indices[k + 1]];
+        const float *c = &d.positions[3 * d.indices[k + 2]];
+        total += (double(a[0]) * (double(b[1]) * c[2] - double(b[2]) * c[1]) -
+                     double(a[1]) * (double(b[0]) * c[2] - double(b[2]) * c[0]) +
+                     double(a[2]) * (double(b[0]) * c[1] - double(b[1]) * c[0])) /
+            6;
+    }
+    return total;
+}
+
+void preview_mesh() {
+    sk_tool_handle t = ball(6, 20);
+    sk_grid g = grid(0.1, 0.2, 0.5, 90, 50, 8);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 0), arc_move(25, 15, 12, 6, 0, 3, 0, 1),
+        line_move(5, 5, 21, 30, 25, 14, 2)}, "cut for preview");
+    sk_stock_info info = info_of(s);
+    MeshData closed = mesh_of(s, 0, 0, info.tiles[0], info.tiles[1], SK_MESH_BOTTOMS);
+    near(enclosed(closed), info.volume, 1e-5 * info.volume, "closed preview mesh encloses the stock's volume");
+    MeshData merged = mesh_of(s, 0, 0, info.tiles[0], info.tiles[1], SK_MESH_BOTTOMS | SK_MESH_MERGE);
+    near(enclosed(merged), info.volume, 1e-5 * info.volume, "merged preview mesh encloses the same volume");
+    check(merged.indices.size() < closed.indices.size() / 2, "merging joins the flat faces");
+    // Chunks: the walls between them are emitted once, so the pieces add up to the whole.
+    double pieces = 0;
+    size_t triangles = 0;
+    for (uint32_t ty = 0; ty < info.tiles[1]; ty += 3)
+        for (uint32_t tx = 0; tx < info.tiles[0]; tx += 4) {
+            MeshData piece = mesh_of(s, tx, ty, std::min(4u, info.tiles[0] - tx), std::min(3u, info.tiles[1] - ty),
+                SK_MESH_BOTTOMS);
+            pieces += enclosed(piece);
+            triangles += piece.indices.size();
+        }
+    near(pieces, info.volume, 1e-5 * info.volume, "chunked meshes enclose the stock's volume");
+    check(triangles == closed.indices.size(), "chunks hold the same triangles as one mesh");
+    // Triangle sources name the moves; colours follow them.
+    bool named = false;
+    for (uint32_t source : closed.sources) named = named || source == 1;
+    check(named, "the arc's surfaces carry its source");
+    sk_mesh_handle m{};
+    mesh_of(s, 0, 0, info.tiles[0], info.tiles[1], 0, &m);
+    uint32_t palette[3] = {0xFF0000FFu, 0x00FF00FFu, 0x0000FFFFu};
+    check(sk_mesh_color_by_source(m, palette, 3, 0x808080FFu, 0) == SK_OK, "colour by source");
+    auto colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+    auto sources = mesh_stream<uint32_t>(m, sk_mesh_copy_triangle_sources);
+    auto indices = mesh_stream<uint32_t>(m, sk_mesh_copy_indices);
+    bool matches = true;
+    for (size_t k = 0; k < sources.size(); ++k) {
+        const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&colors[indices[3 * k]]);
+        uint32_t expected = sources[k] == SK_SOURCE_STOCK ? 0x808080FFu : palette[sources[k]];
+        uint32_t actual = uint32_t(rgba[0]) << 24 | uint32_t(rgba[1]) << 16 | uint32_t(rgba[2]) << 8 | rgba[3];
+        matches = matches && actual == expected;
+    }
+    check(matches, "each triangle is coloured by its source");
+    std::vector<uint32_t> rays(size_t(90) * 50, 0x123456FFu);
+    check(sk_mesh_color_by_ray(m, rays.data(), uint32_t(rays.size())) == SK_OK, "colour by ray");
+    sk_mesh_destroy(m);
+    mesh_of(s, 0, 0, 1, 1, SK_MESH_MERGE, &m);
+    check(sk_mesh_color_by_ray(m, rays.data(), uint32_t(rays.size())) == SK_ERROR_UNSUPPORTED,
+        "merged meshes cannot be coloured per ray");
+    sk_mesh_destroy(m);
+    check(sk_stock_mesh(s, 0, 0, info.tiles[0] + 1, 1, 0, &m) == SK_ERROR_INVALID_ARGUMENT, "tile range is checked");
+    sk_stock_destroy(s);
+    sk_tool_destroy(t);
+}
+
 /** A zig-zag of short lines, arcs, ramps and a helix over several levels, cut at each thread count. */
 void thread_determinism() {
     sk_tool_handle t = bull(6, 1, 20);
@@ -664,6 +811,8 @@ int main() {
     thread_determinism();
     shank_and_holder_contact();
     target_comparison();
+    snapshots();
+    preview_mesh();
     std::printf("%d of %d checks passed\n", checks - failures, checks);
     return failures == 0 ? 0 : 1;
 }

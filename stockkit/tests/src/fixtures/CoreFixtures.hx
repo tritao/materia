@@ -13,6 +13,8 @@ import stockkit.CutMove;
 import stockkit.CutMoves;
 import stockkit.Stock;
 import stockkit.StockGrid;
+import stockkit.StockPreview;
+import stockkit.StockTimeline;
 
 /**
   StockKit core through its Haxe API: moves the exact oracle refuses (ramps,
@@ -34,6 +36,87 @@ class CoreFixtures {
     provenance();
     collisions();
     targetComparison();
+    timelineAndPreview();
+  }
+
+  /** Scrubbing a CamKit pocket matches cutting afresh, and the preview follows it. */
+  static function timelineAndPreview():Void {
+    var contour = new CamContour([
+      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
+      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+    ]);
+    var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
+    var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
+      .pocket(contour, tool, -0.004, 0.01, 0.0015, 0.002)
+      .finish();
+    var moves = CutMoves.fromOps(program.ops, program.tool);
+    Assert.check(moves.length > 20, "pocket has enough moves to scrub");
+    var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0004);
+    function fresh(count:Int):Stock {
+      var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+      stock.cut(moves.slice(0, count));
+      return stock;
+    }
+    function same(a:Stock, b:Stock):Bool {
+      var x = a.rays(0, 0, grid.countX, grid.countY), y = b.rays(0, 0, grid.countX, grid.countY);
+      for (k in 0...x.length) {
+        if (x[k].length != y[k].length) return false;
+        for (n in 0...x[k].length)
+          if (x[k][n].lo != y[k][n].lo || x[k][n].hi != y[k][n].hi || x[k][n].hiSource != y[k][n].hiSource)
+            return false;
+      }
+      return true;
+    }
+    var timeline = new StockTimeline(Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0), moves, 7);
+    var stock = timeline.stock;
+    Assert.check(timeline.position == moves.length && stock.history.length == moves.length,
+      "timeline starts at the program's end");
+    var opColor = (move:CutMove) -> 0x10000000 * (move.opIndex % 7) + 0x80FF;
+    var preview = new StockPreview(stock, BySource(opColor, 0xC0C0C0FF), 2);
+    var all = preview.update();
+    Assert.check(all.length == preview.chunksX * preview.chunksY, "first update meshes every chunk");
+    Assert.check(preview.update().length == 0, "an unchanged stock rebuilds nothing");
+    for (target in [moves.length - 3, 5, 0, 13, moves.length - 1, 13, 14]) {
+      timeline.seek(target);
+      var reference = fresh(target);
+      Assert.check(same(stock, reference), 'seeking to move $target matches cutting afresh');
+      Assert.check(stock.history.length == target, 'history is truncated to move $target');
+      reference.dispose();
+    }
+    var before = preview.update().length;
+    timeline.seek(15);
+    var changed = preview.update();
+    Assert.check(changed.length > 0 && changed.length < preview.chunksX * preview.chunksY,
+      'one move rebuilds only the chunks it touched (${changed.length} of ${preview.chunksX * preview.chunksY}, $before before)');
+    // Picking a cut surface leads back to its move and source line.
+    var picked:Null<CutMove> = null;
+    for (chunk in 0...preview.meshes.length) {
+      var mesh = preview.meshes[chunk];
+      if (mesh == null) continue;
+      for (triangle in 0...mesh.triangleCount)
+        if (mesh.sourceAt(triangle) >= 0) {
+          picked = preview.pick(chunk, triangle);
+          break;
+        }
+      if (picked != null) break;
+    }
+    Assert.check(picked != null && moves.indexOf(picked) >= 0 && picked.span != null,
+      "a picked cut surface names its move and source span");
+    // Surfaces are coloured by their move's operation.
+    var mesh = preview.meshes[changed[0]];
+    if (mesh == null) throw "rebuilt chunk has a mesh";
+    var coloured = true;
+    for (triangle in 0...mesh.triangleCount) {
+      var vertex = mesh.indices.getInt32(12 * triangle);
+      var rgba = (mesh.colors.get(4 * vertex) << 24) | (mesh.colors.get(4 * vertex + 1) << 16)
+        | (mesh.colors.get(4 * vertex + 2) << 8) | mesh.colors.get(4 * vertex + 3);
+      var source = mesh.sourceAt(triangle);
+      var expected = source < 0 ? 0xC0C0C0FF : opColor(stock.history[source]);
+      if (rgba != expected) coloured = false;
+    }
+    Assert.check(coloured, "preview colours surfaces by operation");
+    timeline.dispose();
+    stock.dispose();
   }
 
   /** A pocket deeper than the flutes: the shank rubs, and the holder too once it is low enough. */

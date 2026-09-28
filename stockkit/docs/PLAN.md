@@ -57,7 +57,10 @@ arrive as triangle buffers, so the core never links OCCT.
    only until phase 6.
 5. **Preview and editor** (milestone 1): Z-grid mesh, SceneKit colouring by
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
-   pick → operation → `CncSpan`.
+   pick → operation → `CncSpan`. The StockKit side is done and headless:
+   column meshes per chunk of tiles with dirty tracking, colouring by source
+   or per ray, snapshots and a timeline, and pick to `CutMove`. Still to do:
+   the app has no CNC workspace, G-code editor or timeline to host it.
 6. **Tri-dexel and meshing** (milestone 2): X and Y grids updated by every
    move; manifold dual contouring with a QEF over stored normals; STL export.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
@@ -86,6 +89,11 @@ six levels in 1.5 mm lines joined by half circles).
 | 0.25 mm (801×801) | 6 mm ball | 1.1 s | 0.14 s | 39 MB |
 | 0.1 mm (2001×2001) | 6 mm flat | 1.6 s | 0.23 s | 244 MB |
 | 0.1 mm (2001×2001) | 6 mm ball | 6.8 s | 0.78 s | 244 MB |
+
+Meshing the whole 0.25 mm stock for preview takes 0.04–0.1 s after the flat
+mill (0.22M triangles merged, 1.3M unmerged) and 0.1–0.18 s after the ball
+mill (1.5M merged: its scallops barely merge, 2.6M unmerged). A dirty 4×4-tile
+chunk remeshes in about a millisecond.
 
 Creating the stock takes about 0.2 s at either spacing. Memory is 48 bytes
 per interval plus 12 per ray. The ball mill costs more because its scallops

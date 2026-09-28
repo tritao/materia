@@ -10,6 +10,8 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	const SK_ERROR_LIMIT = -4;
 	const SK_ERROR_OUT_OF_MEMORY = -3;
 	const SK_ERROR_UNSUPPORTED = -5;
+	const SK_MESH_BOTTOMS = 1;
+	const SK_MESH_MERGE = 2;
 	const SK_MOVE_ARC = 1;
 	const SK_MOVE_LINE = 0;
 	const SK_MOVE_RAPID = 1;
@@ -23,6 +25,33 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	const SK_ZONE_HOLDER = 2;
 	const SK_ZONE_SHANK = 1;
 	extern fn sk_api_version() -> u32;
+	/**
+	 * Colours each quad by its ray: `ray_colors[j * count_x + i]`, for example a
+	 * deviation map from `sk_stock_compare`. Needs a mesh built without
+	 * SK_MESH_MERGE and a colour for every ray of the grid.
+	 */
+	extern fn sk_mesh_color_by_ray(mesh: sk_mesh_handle, ray_colors: ptr<const<u32>> @in_array("ray_count"), ray_count: u32) -> sk_result;
+	/**
+	 * Colours each quad by its source move: `palette[source]` (RGBA as 0xRRGGBBAA)
+	 * for sources inside the palette, `original` for untouched stock and
+	 * `fallback` for any other source. Colour by operation with a palette that
+	 * maps each move to its operation's colour.
+	 */
+	extern fn sk_mesh_color_by_source(mesh: sk_mesh_handle, palette: ptr<const<u32>> @in_array("palette_count"), palette_count: u32, original: u32, fallback: u32) -> sk_result;
+	extern fn sk_mesh_copy_colors(mesh: sk_mesh_handle, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> sk_result;
+	extern fn sk_mesh_copy_indices(mesh: sk_mesh_handle, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> sk_result;
+	extern fn sk_mesh_copy_normals(mesh: sk_mesh_handle, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> sk_result;
+	/**
+	 * Mesh streams as bytes: positions and normals as float xyz per vertex,
+	 * indices as uint32 triangles, colours as RGBA8 per vertex (after colouring;
+	 * opaque white before), and the source move of each triangle as uint32, for
+	 * picking. Pass a null output to read the size.
+	 */
+	extern fn sk_mesh_copy_positions(mesh: sk_mesh_handle, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> sk_result;
+	extern fn sk_mesh_copy_triangle_sources(mesh: sk_mesh_handle, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> sk_result;
+	extern fn sk_mesh_destroy(mesh: sk_mesh_handle) -> void;
+	extern fn sk_mesh_get_info(mesh: sk_mesh_handle, out_info: ptr<sk_mesh_info> @out) -> sk_result;
+	extern fn sk_snapshot_destroy(snapshot: sk_snapshot_handle) -> void;
 	/**
 	 * Compares the rays in the block [i0, i0 + ni) x [j0, j0 + nj), i fastest,
 	 * with `target`, which must have the same grid (for example a stock cast
@@ -57,6 +86,19 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	extern fn sk_stock_destroy(stock: sk_stock_handle) -> void;
 	extern fn sk_stock_get_info(stock: sk_stock_handle, out_info: ptr<sk_stock_info> @out) -> sk_result;
 	/**
+	 * A display mesh of the tiles [tile_x, tile_x + tiles_x) x [tile_y, tile_y +
+	 * tiles_y). Each ray stands for a square column spacing wide: every interval
+	 * gets a top face at its exact depth with its stored normal and source,
+	 * walls stand where neighbouring columns differ, and SK_MESH_BOTTOMS adds
+	 * bottom faces, which close the mesh. SK_MESH_MERGE joins equal faces along
+	 * rows. Quads share no vertices.
+	 *
+	 * A wall between two columns belongs to the mesh with the lower-index column,
+	 * so a mesh also depends on the tiles just past its +x and +y edges: rebuild
+	 * it when their revisions change too.
+	 */
+	extern fn sk_stock_mesh(stock: sk_stock_handle, tile_x: u32, tile_y: u32, tiles_x: u32, tiles_y: u32, flags: u32, out_mesh: ptr<sk_mesh_handle> @out @owned) -> sk_result;
+	/**
 	 * Interval count of each ray in the block [i0, i0 + ni) x [j0, j0 + nj), i
 	 * fastest; `count_capacity` must be at least ni * nj.
 	 */
@@ -68,12 +110,31 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	 */
 	extern fn sk_stock_read_intervals(stock: sk_stock_handle, i0: u32, j0: u32, ni: u32, nj: u32, out_intervals: ptr<sk_interval> @out_array("interval_capacity"), interval_capacity: u32) -> sk_result;
 	/**
+	 * Each tile's revision, row by row (`tiles[0]` per row). A revision changes
+	 * whenever the tile's rays change, by a cut or a restore, so a preview
+	 * remeshes only tiles whose revision it has not seen. `revision_capacity`
+	 * must be at least the tile count.
+	 */
+	extern fn sk_stock_read_revisions(stock: sk_stock_handle, out_revisions: ptr<u64> @out_array("revision_capacity"), revision_capacity: u32) -> sk_result;
+	/**
+	 * Returns the stock to `snapshot`, which may come from this stock or another
+	 * with the same grid. Only tiles that differ change revision.
+	 */
+	extern fn sk_stock_restore(stock: sk_stock_handle, snapshot: sk_snapshot_handle) -> sk_result;
+	/**
 	 * Sets how many threads `sk_stock_cut` uses: 0 (the default) means one per
 	 * hardware thread, 1 cuts on the calling thread. Tiles are owned by one
 	 * thread each and every ray sees its moves in order, so the stock and the
 	 * removed volumes are bit-identical for any thread count.
 	 */
 	extern fn sk_stock_set_threads(stock: sk_stock_handle, threads: u32) -> sk_result;
+	/**
+	 * Captures the stock as it is. Tiles are shared with the stock until either
+	 * changes them, so a snapshot costs a pointer per tile plus the tiles later
+	 * cuts replace. Use snapshots every few thousand moves to scrub a program:
+	 * restore the nearest earlier one and cut forward.
+	 */
+	extern fn sk_stock_snapshot(stock: sk_stock_handle, out_snapshot: ptr<sk_snapshot_handle> @out @owned) -> sk_result;
 	/**
 	 * Exact material swept by one move of `tool`'s cutting zone along the ray through (u, v)
 	 * on `axis` (Z: u = x, v = y): `out_count` disjoint intervals.
@@ -122,6 +183,15 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		hi: f64 @offset(24);
 		lo_normal: array<f32, 3> @offset(32);
 		hi_normal: array<f32, 3> @offset(44);
+	}
+	struct sk_mesh_info @layout(16, 4) {
+		struct_size: u32 @offset(0) @struct_size;
+		vertex_count: u32 @offset(4);
+		triangle_count: u32 @offset(8);
+		/**
+		 * Non-zero when faces were merged; per-ray colouring then needs an unmerged mesh.
+		 */
+		merged: u32 @offset(12);
 	}
 	/**
 	 * One tool-tip motion with the tool axis along +Z. A line runs from `start`
@@ -188,7 +258,7 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		largest_leftover: f64 @offset(24);
 		largest_gouge: f64 @offset(32);
 	}
-	struct sk_stock_info @layout(112, 8) {
+	struct sk_stock_info @layout(120, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		grid: sk_grid @offset(8);
 		interval_count: u64 @offset(56);
@@ -205,6 +275,10 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		 * Threads `sk_stock_cut` uses; 0 means one per hardware thread.
 		 */
 		threads: u32 @offset(104);
+		/**
+		 * Tiles across (x) and down (y); tile (ti, tj) holds rays from (ti, tj) * grid.tile_size.
+		 */
+		tiles: array<u32, 2> @offset(108);
 	}
 	/**
 	 * Tool info: widest radius and height of the cutting zone and of the whole tool.
@@ -216,7 +290,9 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		radius: f64 @offset(24);
 		height: f64 @offset(32);
 	}
+	handle sk_mesh_handle : u32 @destroy("sk_mesh_destroy");
 	type sk_result = i32;
+	handle sk_snapshot_handle : u32 @destroy("sk_snapshot_destroy");
 	handle sk_stock_handle : u32 @destroy("sk_stock_destroy");
 	handle sk_tool_handle : u32 @destroy("sk_tool_destroy");
 }

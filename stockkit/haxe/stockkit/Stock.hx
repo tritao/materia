@@ -127,6 +127,78 @@ class Stock {
       }]);
   }
 
+  /** Captures the stock and its history; see `StockSnapshot`. */
+  public function snapshot():StockSnapshot {
+    alive();
+    var created = StockKitNative.sk_stock_snapshot(owner.borrow());
+    check(created.status, "stock.snapshot");
+    return new StockSnapshot(grid, history.copy(), created.out_snapshot);
+  }
+
+  /** Returns the stock and its history to `snapshot`, which must share its grid. */
+  public function restore(snapshot:StockSnapshot):Void {
+    alive();
+    check(StockKitNative.sk_stock_restore(owner.borrow(), snapshot.borrow()), "stock.restore");
+    history.resize(0);
+    for (move in snapshot.history) history.push(move);
+  }
+
+  /** Tiles across (x) and down (y); tile (tx, ty) holds rays from (tx, ty) times the tile size. */
+  public function tilesX():Int
+    return info().get_tiles(0);
+
+  public function tilesY():Int
+    return info().get_tiles(1);
+
+  /** Each tile's revision, row by row; it changes whenever the tile's rays change. */
+  public function tileRevisions():Array<haxe.Int64> {
+    alive();
+    var count = tilesX() * tilesY();
+    var result = StockKitNative.sk_stock_read_revisions(owner.borrow(), count);
+    check(result.status, "stock.revisions");
+    return result.out_revisions;
+  }
+
+  /**
+    A display mesh of `tilesWide` by `tilesHigh` tiles from tile (tileX,
+    tileY). With `merge`, equal faces along rows are joined (not with
+    `rayColors`). Colours come from `rayColors` (one 0xRRGGBBAA per ray of the
+    grid) if given, else from `palette` indexed by source with `original` for
+    untouched stock.
+  **/
+  public function mesh(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, merge:Bool,
+      bottoms:Bool, ?palette:Array<Int>, original:Int = -1, ?rayColors:Array<Int>):StockMesh {
+    alive();
+    var flags = (merge ? StockKitNativeConstants.SK_MESH_MERGE : 0)
+      | (bottoms ? StockKitNativeConstants.SK_MESH_BOTTOMS : 0);
+    var created = StockKitNative.sk_stock_mesh(owner.borrow(), tileX, tileY, tilesWide, tilesHigh, flags);
+    check(created.status, "stock.mesh");
+    var native = created.out_mesh;
+    try {
+      var handle = native.borrow();
+      if (rayColors != null)
+        check(StockKitNative.sk_mesh_color_by_ray(handle, rayColors), "mesh.colorByRay");
+      else if (palette != null)
+        check(StockKitNative.sk_mesh_color_by_source(handle, palette, original, original), "mesh.colorBySource");
+      var info = StockKitNative.sk_mesh_get_info(handle);
+      check(info.status, "mesh.info");
+      var positions = StockKitNative.sk_mesh_copy_positions(handle);
+      var normals = StockKitNative.sk_mesh_copy_normals(handle);
+      var indices = StockKitNative.sk_mesh_copy_indices(handle);
+      var colors = StockKitNative.sk_mesh_copy_colors(handle);
+      var sources = StockKitNative.sk_mesh_copy_triangle_sources(handle);
+      for (status in [positions.status, normals.status, indices.status, colors.status, sources.status])
+        check(status, "mesh.copy");
+      var result = new StockMesh(info.out_info.get_vertex_count(), info.out_info.get_triangle_count(),
+        positions.output, normals.output, indices.output, colors.output, sources.output);
+      native.close();
+      return result;
+    } catch (error:Dynamic) {
+      native.close();
+      throw error;
+    }
+  }
+
   /** The intervals along ray (i, j), bottom to top. */
   public function ray(i:Int, j:Int):Array<StockInterval>
     return rays(i, j, 1, 1)[0];

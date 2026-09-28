@@ -11,6 +11,8 @@
 #define SK_IN_ARRAY(count) __attribute__((annotate("hxi:in_array")))
 #define SK_OUT_ARRAY(count) __attribute__((annotate("hxi:out_array")))
 #define SK_STRUCT_SIZE __attribute__((annotate("hxi:struct_size")))
+#define SK_OUT_BUFFER(size) __attribute__((annotate("hxi:out_buffer=" #size)))
+#define SK_INOUT __attribute__((annotate("hxi:inout")))
 #else
 #define SK_OUT
 #define SK_OWNED
@@ -19,6 +21,8 @@
 #define SK_IN_ARRAY(count)
 #define SK_OUT_ARRAY(count)
 #define SK_STRUCT_SIZE
+#define SK_OUT_BUFFER(size)
+#define SK_INOUT
 #endif
 
 #if defined(_WIN32)
@@ -76,6 +80,10 @@ typedef struct sk_tool_handle { uint32_t id; } sk_tool_handle
     SK_HANDLE SK_HANDLE_DESTROY(sk_tool_destroy);
 typedef struct sk_stock_handle { uint32_t id; } sk_stock_handle
     SK_HANDLE SK_HANDLE_DESTROY(sk_stock_destroy);
+typedef struct sk_snapshot_handle { uint32_t id; } sk_snapshot_handle
+    SK_HANDLE SK_HANDLE_DESTROY(sk_snapshot_destroy);
+typedef struct sk_mesh_handle { uint32_t id; } sk_mesh_handle
+    SK_HANDLE SK_HANDLE_DESTROY(sk_mesh_destroy);
 
 enum { SK_SEGMENT_LINE = 0, SK_SEGMENT_ARC = 1 };
 enum { SK_ZONE_CUTTING = 0, SK_ZONE_SHANK = 1, SK_ZONE_HOLDER = 2, SK_ZONE_COUNT = 3 };
@@ -186,6 +194,8 @@ typedef struct sk_stock_info {
     uint64_t tiles_skipped;
     /** Threads `sk_stock_cut` uses; 0 means one per hardware thread. */
     uint32_t threads;
+    /** Tiles across (x) and down (y); tile (ti, tj) holds rays from (ti, tj) * grid.tile_size. */
+    uint32_t tiles[2];
 } sk_stock_info;
 
 SK_API uint32_t SK_CALL sk_api_version(void);
@@ -230,6 +240,31 @@ SK_API sk_result SK_CALL sk_stock_create_mesh(const sk_grid *grid,
 
 SK_API void SK_CALL sk_stock_destroy(sk_stock_handle stock);
 SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info *out_info SK_OUT);
+
+/**
+ * Each tile's revision, row by row (`tiles[0]` per row). A revision changes
+ * whenever the tile's rays change, by a cut or a restore, so a preview
+ * remeshes only tiles whose revision it has not seen. `revision_capacity`
+ * must be at least the tile count.
+ */
+SK_API sk_result SK_CALL sk_stock_read_revisions(sk_stock_handle stock,
+    uint64_t *out_revisions SK_OUT_ARRAY(revision_capacity), uint32_t revision_capacity);
+
+/**
+ * Captures the stock as it is. Tiles are shared with the stock until either
+ * changes them, so a snapshot costs a pointer per tile plus the tiles later
+ * cuts replace. Use snapshots every few thousand moves to scrub a program:
+ * restore the nearest earlier one and cut forward.
+ */
+SK_API sk_result SK_CALL sk_stock_snapshot(sk_stock_handle stock,
+    sk_snapshot_handle *out_snapshot SK_OUT SK_OWNED);
+SK_API void SK_CALL sk_snapshot_destroy(sk_snapshot_handle snapshot);
+
+/**
+ * Returns the stock to `snapshot`, which may come from this stock or another
+ * with the same grid. Only tiles that differ change revision.
+ */
+SK_API sk_result SK_CALL sk_stock_restore(sk_stock_handle stock, sk_snapshot_handle snapshot);
 
 /**
  * Sets how many threads `sk_stock_cut` uses: 0 (the default) means one per
@@ -298,6 +333,68 @@ typedef struct sk_ray_comparison {
 SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle target,
     uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj,
     sk_ray_comparison *out_comparisons SK_OUT_ARRAY(comparison_capacity), uint32_t comparison_capacity);
+
+enum { SK_MESH_BOTTOMS = 1, SK_MESH_MERGE = 2 };
+
+typedef struct sk_mesh_info {
+    uint32_t struct_size SK_STRUCT_SIZE;
+    uint32_t vertex_count;
+    uint32_t triangle_count;
+    /** Non-zero when faces were merged; per-ray colouring then needs an unmerged mesh. */
+    uint32_t merged;
+} sk_mesh_info;
+
+/**
+ * A display mesh of the tiles [tile_x, tile_x + tiles_x) x [tile_y, tile_y +
+ * tiles_y). Each ray stands for a square column spacing wide: every interval
+ * gets a top face at its exact depth with its stored normal and source,
+ * walls stand where neighbouring columns differ, and SK_MESH_BOTTOMS adds
+ * bottom faces, which close the mesh. SK_MESH_MERGE joins equal faces along
+ * rows. Quads share no vertices.
+ *
+ * A wall between two columns belongs to the mesh with the lower-index column,
+ * so a mesh also depends on the tiles just past its +x and +y edges: rebuild
+ * it when their revisions change too.
+ */
+SK_API sk_result SK_CALL sk_stock_mesh(sk_stock_handle stock, uint32_t tile_x, uint32_t tile_y,
+    uint32_t tiles_x, uint32_t tiles_y, uint32_t flags, sk_mesh_handle *out_mesh SK_OUT SK_OWNED);
+SK_API void SK_CALL sk_mesh_destroy(sk_mesh_handle mesh);
+SK_API sk_result SK_CALL sk_mesh_get_info(sk_mesh_handle mesh, sk_mesh_info *out_info SK_OUT);
+
+/**
+ * Mesh streams as bytes: positions and normals as float xyz per vertex,
+ * indices as uint32 triangles, colours as RGBA8 per vertex (after colouring;
+ * opaque white before), and the source move of each triangle as uint32, for
+ * picking. Pass a null output to read the size.
+ */
+SK_API sk_result SK_CALL sk_mesh_copy_positions(sk_mesh_handle mesh,
+    uint8_t *output SK_OUT_BUFFER(byte_capacity), uint32_t *byte_capacity SK_INOUT);
+SK_API sk_result SK_CALL sk_mesh_copy_normals(sk_mesh_handle mesh,
+    uint8_t *output SK_OUT_BUFFER(byte_capacity), uint32_t *byte_capacity SK_INOUT);
+SK_API sk_result SK_CALL sk_mesh_copy_indices(sk_mesh_handle mesh,
+    uint8_t *output SK_OUT_BUFFER(byte_capacity), uint32_t *byte_capacity SK_INOUT);
+SK_API sk_result SK_CALL sk_mesh_copy_colors(sk_mesh_handle mesh,
+    uint8_t *output SK_OUT_BUFFER(byte_capacity), uint32_t *byte_capacity SK_INOUT);
+SK_API sk_result SK_CALL sk_mesh_copy_triangle_sources(sk_mesh_handle mesh,
+    uint8_t *output SK_OUT_BUFFER(byte_capacity), uint32_t *byte_capacity SK_INOUT);
+
+/**
+ * Colours each quad by its source move: `palette[source]` (RGBA as 0xRRGGBBAA)
+ * for sources inside the palette, `original` for untouched stock and
+ * `fallback` for any other source. Colour by operation with a palette that
+ * maps each move to its operation's colour.
+ */
+SK_API sk_result SK_CALL sk_mesh_color_by_source(sk_mesh_handle mesh,
+    const uint32_t *palette SK_IN_ARRAY(palette_count), uint32_t palette_count,
+    uint32_t original, uint32_t fallback);
+
+/**
+ * Colours each quad by its ray: `ray_colors[j * count_x + i]`, for example a
+ * deviation map from `sk_stock_compare`. Needs a mesh built without
+ * SK_MESH_MERGE and a colour for every ray of the grid.
+ */
+SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh,
+    const uint32_t *ray_colors SK_IN_ARRAY(ray_count), uint32_t ray_count);
 
 #ifdef __cplusplus
 }

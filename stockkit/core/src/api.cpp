@@ -1,6 +1,7 @@
 #include "stockkit.h"
 
 #include "mesh.hpp"
+#include "preview.hpp"
 #include "profile.hpp"
 #include "stock.hpp"
 #include "sweep.hpp"
@@ -8,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <mutex>
 #include <new>
@@ -20,7 +22,7 @@ using namespace stockkit;
 // Handle layout: kind in the top 4 bits, then a 12-bit generation, then a
 // 16-bit slot. Slot 0 is never used, so a zero handle is always invalid. A
 // slot retires when its generation is exhausted instead of wrapping around.
-constexpr uint32_t kKindTool = 1, kKindStock = 2;
+constexpr uint32_t kKindTool = 1, kKindStock = 2, kKindSnapshot = 3, kKindMesh = 4;
 constexpr uint32_t kGenerationMask = 0xFFF;
 
 template <typename T, uint32_t Kind>
@@ -87,6 +89,34 @@ Table<Tool, kKindTool> &tools() {
 Table<Stock, kKindStock> &stocks() {
     static Table<Stock, kKindStock> table;
     return table;
+}
+
+Table<Stock::Snapshot, kKindSnapshot> &snapshots() {
+    static Table<Stock::Snapshot, kKindSnapshot> table;
+    return table;
+}
+
+/** A preview mesh and the grid size its ray indices refer to. */
+struct MeshEntry {
+    PreviewMesh mesh;
+    uint64_t rays = 0;
+};
+
+Table<MeshEntry, kKindMesh> &meshes() {
+    static Table<MeshEntry, kKindMesh> table;
+    return table;
+}
+
+template <typename T>
+sk_result copy_bytes(const std::vector<T> &values, uint8_t *output, uint32_t *byte_capacity) {
+    if (!byte_capacity) return SK_ERROR_INVALID_ARGUMENT;
+    if (values.size() > 0xFFFFFFFFu / sizeof(T)) return SK_ERROR_LIMIT;
+    uint32_t required = uint32_t(values.size() * sizeof(T));
+    uint32_t capacity = *byte_capacity;
+    *byte_capacity = required;
+    if (capacity < required || (required != 0 && !output)) return SK_ERROR_LIMIT;
+    if (required != 0) std::memcpy(output, values.data(), required);
+    return SK_OK;
 }
 
 template <typename F>
@@ -360,7 +390,51 @@ SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info 
         out_info->rays_changed = stats.rays_changed;
         out_info->tiles_skipped = stats.tiles_skipped;
         out_info->threads = s->threads();
+        out_info->tiles[0] = s->tiles_across();
+        out_info->tiles[1] = s->tiles_down();
         return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_read_revisions(sk_stock_handle stock, uint64_t *out_revisions,
+    uint32_t revision_capacity) {
+    return guarded([&]() -> sk_result {
+        Stock *s = stocks().get(stock.id);
+        if (!s) return SK_ERROR_INVALID_HANDLE;
+        const std::vector<uint64_t> &revisions = s->revisions();
+        if (revision_capacity < revisions.size() || (revision_capacity > 0 && !out_revisions))
+            return SK_ERROR_INVALID_ARGUMENT;
+        std::copy(revisions.begin(), revisions.end(), out_revisions);
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_snapshot(sk_stock_handle stock, sk_snapshot_handle *out_snapshot) {
+    return guarded([&]() -> sk_result {
+        if (!out_snapshot) return SK_ERROR_INVALID_ARGUMENT;
+        out_snapshot->id = 0;
+        Stock *s = stocks().get(stock.id);
+        if (!s) return SK_ERROR_INVALID_HANDLE;
+        uint32_t id = snapshots().add(s->snapshot());
+        if (id == 0) return SK_ERROR_LIMIT;
+        out_snapshot->id = id;
+        return SK_OK;
+    });
+}
+
+SK_API void SK_CALL sk_snapshot_destroy(sk_snapshot_handle snapshot) {
+    guarded([&]() -> sk_result {
+        snapshots().remove(snapshot.id);
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_restore(sk_stock_handle stock, sk_snapshot_handle snapshot) {
+    return guarded([&]() -> sk_result {
+        Stock *s = stocks().get(stock.id);
+        Stock::Snapshot *shot = snapshots().get(snapshot.id);
+        if (!s || !shot) return SK_ERROR_INVALID_HANDLE;
+        return s->restore(*shot) ? SK_OK : SK_ERROR_INVALID_ARGUMENT;
     });
 }
 
@@ -502,6 +576,107 @@ SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle
                 out.largest_leftover = c.largest_leftover;
                 out.largest_gouge = c.largest_gouge;
             }
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_stock_mesh(sk_stock_handle stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x,
+    uint32_t tiles_y, uint32_t flags, sk_mesh_handle *out_mesh) {
+    return guarded([&]() -> sk_result {
+        if (!out_mesh) return SK_ERROR_INVALID_ARGUMENT;
+        out_mesh->id = 0;
+        Stock *s = stocks().get(stock.id);
+        if (!s) return SK_ERROR_INVALID_HANDLE;
+        if (flags & ~uint32_t(SK_MESH_BOTTOMS | SK_MESH_MERGE)) return SK_ERROR_INVALID_ARGUMENT;
+        if (uint64_t(tile_x) + tiles_x > s->tiles_across() || uint64_t(tile_y) + tiles_y > s->tiles_down())
+            return SK_ERROR_INVALID_ARGUMENT;
+        auto entry = std::make_unique<MeshEntry>();
+        PreviewOptions options;
+        options.bottoms = flags & SK_MESH_BOTTOMS;
+        options.merge = flags & SK_MESH_MERGE;
+        build_preview(*s, tile_x, tile_y, tiles_x, tiles_y, options, entry->mesh);
+        entry->mesh.colors.assign(entry->mesh.vertex_count(), 0xFFFFFFFFu);
+        entry->rays = uint64_t(s->grid().count[0]) * s->grid().count[1];
+        uint32_t id = meshes().add(std::move(entry));
+        if (id == 0) return SK_ERROR_LIMIT;
+        out_mesh->id = id;
+        return SK_OK;
+    });
+}
+
+SK_API void SK_CALL sk_mesh_destroy(sk_mesh_handle mesh) {
+    guarded([&]() -> sk_result {
+        meshes().remove(mesh.id);
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_mesh_get_info(sk_mesh_handle mesh, sk_mesh_info *out_info) {
+    return guarded([&]() -> sk_result {
+        if (!out_info) return SK_ERROR_INVALID_ARGUMENT;
+        MeshEntry *m = meshes().get(mesh.id);
+        if (!m) return SK_ERROR_INVALID_HANDLE;
+        *out_info = sk_mesh_info{};
+        out_info->struct_size = sizeof(sk_mesh_info);
+        out_info->vertex_count = m->mesh.vertex_count();
+        out_info->triangle_count = m->mesh.triangle_count();
+        out_info->merged = m->mesh.merged ? 1 : 0;
+        return SK_OK;
+    });
+}
+
+#define SK_MESH_COPY(name, field)                                                                  \
+    SK_API sk_result SK_CALL name(sk_mesh_handle mesh, uint8_t *output, uint32_t *byte_capacity) { \
+        return guarded([&]() -> sk_result {                                                       \
+            MeshEntry *m = meshes().get(mesh.id);                                                  \
+            if (!m) return SK_ERROR_INVALID_HANDLE;                                                \
+            return copy_bytes(m->mesh.field, output, byte_capacity);                               \
+        });                                                                                        \
+    }
+
+SK_MESH_COPY(sk_mesh_copy_positions, positions)
+SK_MESH_COPY(sk_mesh_copy_normals, normals)
+SK_MESH_COPY(sk_mesh_copy_indices, indices)
+SK_MESH_COPY(sk_mesh_copy_colors, colors)
+SK_MESH_COPY(sk_mesh_copy_triangle_sources, triangle_sources)
+#undef SK_MESH_COPY
+
+namespace {
+
+/** 0xRRGGBBAA to the bytes R, G, B, A in memory order. */
+uint32_t rgba_bytes(uint32_t rgba) {
+    uint8_t bytes[4] = {uint8_t(rgba >> 24), uint8_t(rgba >> 16), uint8_t(rgba >> 8), uint8_t(rgba)};
+    uint32_t packed;
+    std::memcpy(&packed, bytes, 4);
+    return packed;
+}
+
+} // namespace
+
+SK_API sk_result SK_CALL sk_mesh_color_by_source(sk_mesh_handle mesh, const uint32_t *palette, uint32_t palette_count,
+    uint32_t original, uint32_t fallback) {
+    return guarded([&]() -> sk_result {
+        MeshEntry *m = meshes().get(mesh.id);
+        if (!m) return SK_ERROR_INVALID_HANDLE;
+        if (palette_count > 0 && !palette) return SK_ERROR_INVALID_ARGUMENT;
+        PreviewMesh &p = m->mesh;
+        for (size_t k = 0; k < p.vertex_sources.size(); ++k) {
+            uint32_t source = p.vertex_sources[k];
+            uint32_t color = source == SK_SOURCE_STOCK ? original : source < palette_count ? palette[source] : fallback;
+            p.colors[k] = rgba_bytes(color);
+        }
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, const uint32_t *ray_colors, uint32_t ray_count) {
+    return guarded([&]() -> sk_result {
+        MeshEntry *m = meshes().get(mesh.id);
+        if (!m) return SK_ERROR_INVALID_HANDLE;
+        if (m->mesh.merged) return SK_ERROR_UNSUPPORTED;
+        if (ray_count < m->rays || (ray_count > 0 && !ray_colors)) return SK_ERROR_INVALID_ARGUMENT;
+        PreviewMesh &p = m->mesh;
+        for (size_t k = 0; k < p.vertex_rays.size(); ++k) p.colors[k] = rgba_bytes(ray_colors[p.vertex_rays[k]]);
         return SK_OK;
     });
 }

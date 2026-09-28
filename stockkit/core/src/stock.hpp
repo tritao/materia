@@ -4,8 +4,10 @@
 #include "sweep.hpp"
 #include "tool.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <vector>
 
 namespace stockkit {
@@ -48,6 +50,39 @@ struct RayComparison {
     double leftover = 0, gouge = 0, largest_leftover = 0, largest_gouge = 0;
     uint32_t gouge_source;
 };
+
+/**
+ * The parts of `a` outside `b`, calling `stretch(lo, hi, below, above)` for
+ * each, where `below` and `above` are the `b` intervals touching it from
+ * below and above (null when the stretch ends at an `a` endpoint instead).
+ */
+template <typename F>
+inline void difference(const std::vector<Interval> &a, const std::vector<Interval> &b, F &&stretch) {
+    size_t k = 0;
+    for (const Interval &piece : a) {
+        double lo = piece.lo;
+        const Interval *below = nullptr;
+        while (k < b.size() && b[k].hi <= lo) ++k;
+        size_t m = k;
+        while (lo < piece.hi) {
+            if (m < b.size() && b[m].lo <= lo) {
+                // Inside b: skip past it.
+                below = &b[m];
+                lo = std::max(lo, b[m].hi);
+                ++m;
+                continue;
+            }
+            double hi = piece.hi;
+            const Interval *above = nullptr;
+            if (m < b.size() && b[m].lo < piece.hi) {
+                hi = b[m].lo;
+                above = &b[m];
+            }
+            if (hi > lo) stretch(lo, hi, below && below->hi == lo ? below : nullptr, above);
+            lo = hi;
+        }
+    }
+}
 
 /** Compares two sorted interval lists: `stock` against `target`. */
 RayComparison compare_ray(const std::vector<Interval> &stock, const std::vector<Interval> &target);
@@ -101,6 +136,21 @@ public:
     void set_threads(uint32_t threads);
     uint32_t threads() const { return threads_; }
 
+    /**
+     * Tiles, row by row, and their revisions: a tile's revision changes
+     * whenever its rays change (a cut or a restore), so a preview remeshes
+     * only tiles whose revision it has not seen.
+     */
+    uint32_t tiles_across() const { return tiles_i_; }
+    uint32_t tiles_down() const { return tiles_j_; }
+    const std::vector<uint64_t> &revisions() const { return revisions_; }
+
+    /** An immutable copy of the stock that shares tiles until either side changes them. */
+    struct Snapshot;
+    std::unique_ptr<Snapshot> snapshot() const;
+    /** Returns the stock to `snapshot`, which must come from a stock with the same grid. */
+    bool restore(const Snapshot &snapshot);
+
     uint64_t interval_count() const;
     double volume() const;
     uint64_t bytes() const;
@@ -135,16 +185,26 @@ private:
     bool ray_range(const Bounds &bounds, RayRange &out) const;
     /** Cuts one move from the tiles `owner` owns among `owners`. */
     void cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, Worker &worker);
-    bool cut_tile(Tile &tile, const SweptVolume &sweep, const RayRange &range, uint32_t source, Worker &worker,
+    bool cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source, Worker &worker,
         double &removed_volume);
     double touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, Worker &worker) const;
-    Tile &tile_of(uint32_t i, uint32_t j, uint32_t &local);
-    const Tile &tile_of(uint32_t i, uint32_t j, uint32_t &local) const;
+    /** The tile for writing: a private copy if a snapshot still shares it; bumps its revision. */
+    Tile &mutable_tile(uint32_t index);
+    uint32_t tile_index(uint32_t i, uint32_t j, uint32_t &local) const;
     void write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n);
 
     Grid grid_;
     uint32_t tiles_i_ = 0, tiles_j_ = 0;
-    std::vector<Tile> tiles_;
+    std::vector<std::shared_ptr<Tile>> tiles_;
+    std::vector<uint64_t> revisions_;
+
+public:
+    struct Snapshot {
+        Grid grid;
+        std::vector<std::shared_ptr<Tile>> tiles;
+    };
+
+private:
     CutStats stats_;
     uint32_t threads_ = 0;
     Pool pool_;
