@@ -37,6 +37,12 @@ boundary at each depth.
 multiple internal islands and rejects a tool that cannot clear between an
 island and another boundary.
 
+Pocket operations use a separate plunge feed, defaulting to one quarter of
+the cutting feed. The optional final `plungeFeed` argument sets it explicitly.
+Long entries ramp down at no more than a 10% slope, retrace the ramp at full
+depth, then cut the pass. Short entries plunge vertically at `plungeFeed`.
+Rapid approach stops above the stock surface.
+
 Example:
 
 ```haxe
@@ -52,6 +58,7 @@ var linuxCnc = CamGCodeWriter.write(program);
 The test project creates its own rectangular, rounded and holed plate fixtures.
 It checks CAD curve sampling, pocket coverage, cutter offsets, depth steps,
 hole-before-outer ordering, concave profiles and pockets, island clearance,
+ramps and narrow-pocket plunges,
 direct lowering and
 CAM IR → G-code → CncKit IR
 round trips. The suite also

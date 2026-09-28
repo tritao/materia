@@ -19,7 +19,8 @@ class CamIslandPocketFixture {
     var face = sketch.shape.faces().at(0);
     var tool = new CncTool(10, 0, 0.002);
     var program = new CamJob(0.005, 10000)
-      .pocketFace(face, tool, -0.002, 0.005, 0.001, 0.001).finish();
+      .pocketFace(face, tool, -0.002, 0.005, 0.001, 0.001,
+        "mm", 0.00005, 0.001).finish();
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
     var lowered = program.lower(machine);
@@ -31,7 +32,22 @@ class CamIslandPocketFixture {
     check(hasPocketSpan, "island pocket keeps its operation source span");
 
     var left = -1, right = -1, bossFinishing = 0;
+    var ramps = 0, plunges = 0;
     for (index in 0...program.ops.length) switch program.ops[index] {
+      case Feed(Line(a, b), speed, _, _) if (b.z < a.z - 1e-9):
+        var xy = Math.sqrt(Math.pow(b.x - a.x, 2) +
+          Math.pow(b.y - a.y, 2));
+        if (xy > 1e-9) {
+          ramps++;
+          check(Math.abs(speed - 0.005) < 1e-10 &&
+            (a.z - b.z) / xy <= 0.1 + 1e-9 &&
+            outsideBoss(a) && outsideBoss(b),
+            "island pocket ramps within the allowed clearing region");
+        } else {
+          plunges++;
+          check(Math.abs(speed - 0.001) < 1e-10,
+            "island pocket vertical entry uses configured plunge feed");
+        }
       case Feed(Line(a, b), _, _, _) if (Math.abs(a.z + 0.002) < 1e-9 &&
           Math.abs(b.z + 0.002) < 1e-9 && Math.abs(a.y - 0.015) < 1e-9 &&
           Math.abs(b.y - 0.015) < 1e-9):
@@ -47,6 +63,8 @@ class CamIslandPocketFixture {
       "boss splits the middle clearing row into two passes");
     check(bossFinishing == 4,
       "island boundary gets four rounded outside finishing corners");
+    check(ramps > 0 && plunges > 0,
+      "island pocket uses ramps where possible and slow plunges in short spans");
     var retracted = false;
     for (index in (left + 1)...right) switch program.ops[index] {
       case Rapid(Line(a, b), _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
@@ -105,8 +123,18 @@ class CamIslandPocketFixture {
       imported.ops.length == program.ops.length,
       "island pocket G-code recompiles with the same operation count");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
-      case [Feed(a, _, _, _), Feed(b, _, _, _)],
-           [Rapid(a, _), Rapid(b, _)]:
+      case [Feed(a, feedA, _, _), Feed(b, feedB, _, _)]:
+        check(Math.abs(feedA - feedB) < 1e-8,
+          "island pocket G-code preserves ramp and plunge feeds");
+        for (fraction in [0.0, 0.5, 1.0]) {
+          var original = CncGeometryTools.pointAt(a,
+            CncGeometryTools.length(a) * fraction);
+          var reparsed = CncGeometryTools.pointAt(b,
+            CncGeometryTools.length(b) * fraction);
+          check(original.distanceTo(reparsed) < 1e-8,
+            "island pocket G-code preserves geometry");
+        }
+      case [Rapid(a, _), Rapid(b, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = CncGeometryTools.pointAt(a,
             CncGeometryTools.length(a) * fraction);
