@@ -124,11 +124,21 @@ class AnimationAsset {
 		return -1;
 	}
 
-	/** Returns the clip with this name, or -1. */
+	/**
+	 * Returns the clip with this exact name, or else the clip whose action name
+	 * matches ignoring case, or -1. Blender exports clips as "Armature|Action",
+	 * so "walk" finds "CharacterArmature|Walk".
+	 */
 	public function clipIndex(name:String):Int {
 		for (index in 0...clipNames.length)
 			if (clipNames[index] == name)
 				return index;
+		var wanted = name.toLowerCase();
+		for (index in 0...clipNames.length) {
+			var clip = clipNames[index];
+			if (clip.substr(clip.lastIndexOf("|") + 1).toLowerCase() == wanted)
+				return index;
+		}
 		return -1;
 	}
 

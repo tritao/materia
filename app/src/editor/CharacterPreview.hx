@@ -14,12 +14,14 @@ import nativekit.scene.Transform;
  */
 class CharacterPreview {
 	static inline var PATH_RADIUS:Float = 2.5;
-	static inline var WALK_SPEED:Float = 0.6;
+	/** Walking speed in body heights per second, a relaxed human pace. */
+	static inline var WALK_HEIGHTS_PER_SECOND:Float = 0.75;
 
 	final asset:AnimationAsset;
 	final instance:AnimationInstance;
 	final player:ClipPlayer;
 	final moving:Bool;
+	final walkSpeed:Float;
 	var owner:Null<EditorScene> = null;
 	var model:Null<SkinnedModel> = null;
 	var updatedNodes:Array<NodeId> = [];
@@ -41,6 +43,8 @@ class CharacterPreview {
 		}
 		var current = player.currentClip();
 		moving = current >= 0 && asset.clipNames[current].toLowerCase().indexOf("walk") >= 0;
+		var bounds = instance.bounds();
+		walkSpeed = WALK_HEIGHTS_PER_SECOND * Math.max(bounds[5] - bounds[2], 0.1);
 	}
 
 	/** Advances the animation by wall-clock time and publishes it into scene. */
@@ -54,7 +58,7 @@ class CharacterPreview {
 		if (current == null) return;
 		current.update();
 		if (moving) {
-			angle += elapsed * WALK_SPEED / PATH_RADIUS;
+			angle += elapsed * walkSpeed / PATH_RADIUS;
 			var transaction = scene.runtimeContentScene().beginTransaction();
 			transaction.setTransform(current.root, pathTransform());
 			transaction.commit();
