@@ -41,7 +41,7 @@ class RecipeContractTests {
 			}
 
 			var baseline = type.create();
-			for (material in MaterialLibrary.specs()) {
+			for (material in allowedMaterials(type)) {
 				if (material == baseline.materialSpec()) continue;
 				var variant = type.create(baseline.values().copy().setToken("material", material));
 				check(variant.materialSpec() == material, '${type.id}: material input was ignored');
@@ -52,6 +52,14 @@ class RecipeContractTests {
 					'${type.id}: material variants alias the same part number');
 			}
 		}
+	}
+
+	static function allowedMaterials(type:machinekit.component.ComponentType):Array<String> {
+		for (parameter in type.parameters()) if (parameter.name == "material") return switch parameter.type {
+			case Choice(options): options;
+			default: MaterialLibrary.specs();
+		};
+		return MaterialLibrary.specs();
 	}
 
 	static function cases(type:machinekit.component.ComponentType):Array<ComponentValues> {
