@@ -4,6 +4,7 @@ package tests;
 class Main {
   public static function main():Void {
     OnnxPolicyTests.run();
+    PolicyRuntimeTests.run();
     Sys.println("humanoid tests passed");
   }
 }

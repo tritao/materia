@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "name": "unitree-g1-walk",
+  "source": {
+    "repository": "https://github.com/unitreerobotics/unitree_rl_gym",
+    "commit": "276801e46c5d433564f24658bac64f254b7d2d4b",
+    "file": "deploy/pre_train/g1/motion.pt",
+    "licence": "BSD-3-Clause, Copyright (c) 2016-2023 HangZhou YuShu TECHNOLOGY CO.,LTD. (Unitree Robotics); see LICENSE",
+    "trainedIn": "Isaac Gym (legged_gym), PPO with an LSTM actor, on g1_12dof.urdf; deploy/deploy_mujoco is Unitree's own sim-to-sim run",
+    "conversion": "policies/export_unitree_g1.py: TorchScript to ONNX with the LSTM state as explicit inputs and outputs"
+  },
+  "model": "policy.onnx",
+  "controlPeriod": 0.02,
+  "historyLength": 1,
+  "joints": [
+    "joint/left_hip_pitch_joint",
+    "joint/left_hip_roll_joint",
+    "joint/left_hip_yaw_joint",
+    "joint/left_knee_joint",
+    "joint/left_ankle_pitch_joint",
+    "joint/left_ankle_roll_joint",
+    "joint/right_hip_pitch_joint",
+    "joint/right_hip_roll_joint",
+    "joint/right_hip_yaw_joint",
+    "joint/right_knee_joint",
+    "joint/right_ankle_pitch_joint",
+    "joint/right_ankle_roll_joint"
+  ],
+  "defaultPose": [
+    -0.1,
+    0.0,
+    0.0,
+    0.3,
+    -0.2,
+    0.0,
+    -0.1,
+    0.0,
+    0.0,
+    0.3,
+    -0.2,
+    0.0
+  ],
+  "kp": [
+    100,
+    100,
+    100,
+    150,
+    40,
+    40,
+    100,
+    100,
+    100,
+    150,
+    40,
+    40
+  ],
+  "kd": [
+    2,
+    2,
+    2,
+    4,
+    2,
+    2,
+    2,
+    2,
+    2,
+    4,
+    2,
+    2
+  ],
+  "actionScale": 0.25,
+  "observation": [
+    {
+      "term": "angularVelocity",
+      "scale": 0.25
+    },
+    {
+      "term": "projectedGravity"
+    },
+    {
+      "term": "velocityCommand",
+      "scale": [
+        2.0,
+        2.0,
+        0.25
+      ]
+    },
+    {
+      "term": "jointPosition",
+      "scale": 1.0
+    },
+    {
+      "term": "jointVelocity",
+      "scale": 0.05
+    },
+    {
+      "term": "lastAction"
+    },
+    {
+      "term": "gaitPhase",
+      "period": 0.8
+    }
+  ],
+  "io": {
+    "observation": "obs",
+    "action": "action"
+  },
+  "recurrent": [
+    {
+      "input": "h_in",
+      "output": "h_out"
+    },
+    {
+      "input": "c_in",
+      "output": "c_out"
+    }
+  ],
+  "imu": {
+    "id": "pelvis_imu",
+    "link": "link/pelvis",
+    "position": [
+      0,
+      0,
+      0
+    ],
+    "rotation": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  "command": {
+    "limit": [
+      1.0,
+      1.0,
+      1.0
+    ],
+    "acceleration": [
+      1.0,
+      1.0,
+      2.0
+    ]
+  }
+}
