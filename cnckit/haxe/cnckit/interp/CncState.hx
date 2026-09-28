@@ -1,6 +1,7 @@
 package cnckit.interp;
 
 import cnckit.CncMachine;
+import cnckit.parse.CncSpan;
 
 /** Modal state. A block is committed only after its interpretation succeeds. */
 class CncState {
@@ -14,6 +15,14 @@ class CncState {
   public var spindleDirection:Int = 0;
   public var selectedTool:Int = -1;
   public var motionMode:Int = -1;
+  public var cycleCode:Int = 0;
+  public var cycleDepth:Float = Math.NaN;
+  public var cycleR:Float = Math.NaN;
+  public var cycleQ:Float = Math.NaN;
+  public var cycleP:Float = Math.NaN;
+  public var cycleInitialZ:Float = Math.NaN;
+  public var cycleSpan:Null<CncSpan> = null;
+  public var retractToInitial:Bool = true;
   public var blendTolerance:Float = 0.0;
   public var position:Array<Float>;
   public var ended:Bool = false;
@@ -29,6 +38,11 @@ class CncState {
     result.toolLength = toolLength; result.feedCommand = feedCommand;
     result.spindleSpeed = spindleSpeed; result.spindleDirection = spindleDirection;
     result.selectedTool = selectedTool; result.motionMode = motionMode;
+    result.cycleCode = cycleCode; result.cycleDepth = cycleDepth;
+    result.cycleR = cycleR; result.cycleQ = cycleQ; result.cycleP = cycleP;
+    result.cycleInitialZ = cycleInitialZ;
+    result.cycleSpan = cycleSpan;
+    result.retractToInitial = retractToInitial;
     result.blendTolerance = blendTolerance; result.position = position.copy();
     result.ended = ended;
     return result;

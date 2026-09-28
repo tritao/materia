@@ -6,6 +6,7 @@ import cnckit.ir.CncGeometryTools;
 import cnckit.ir.CncOp;
 import motionkit.path.ArcSegment;
 import motionkit.program.MotionOp;
+import sys.io.File;
 
 class CncKitTests {
   static var assertions = 0;
@@ -242,6 +243,132 @@ class CncKitTests {
     };
     near(recoveredFeed, 0.01,
       "failed block does not commit its feed change");
+    var fixtureMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    fixtureMachine.setToolLength(1, 0.0);
+    fixtureMachine.setToolLength(11, 0.0);
+    fixture("freecad-pocket.ngc", fixtureMachine);
+    fixture("fusion-drill.ngc", fixtureMachine);
+    var compatibility = new CncCompiler(fixtureMachine).compileDetailed(
+      "%\nN10 O100\n/ G0 X1\nG40 G94\nM30\n%");
+    check(compatibility.diagnostics.length == 1 &&
+      compatibility.diagnostics[0].code == "CNC_BLOCK_DELETE_IGNORED",
+      "program delimiters, line numbers, and block delete parse");
+    rejects(fixtureMachine, "G93 M2", "G93 inverse-time");
+    rejects(fixtureMachine, "G95 M2", "G95 units-per-revolution");
+    rejects(fixtureMachine, "G92 X1 M2", "G92 persistent offsets");
+    rejects(fixtureMachine, "G21 F600 G2 X10 R4", "radius cannot reach");
+    var radiusArc = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 F600 G2 X10 R6\nM2");
+    check(radiusArc.diagnostics.length == 0 && radiusArc.ops.length == 2,
+      "reachable R arc compiles");
+    var majorArc = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 F600 G2 X10 R-6\nM2");
+    var minorLength = switch radiusArc.ops[0] {
+      case CncOp.Feed(geometry, _, _, _): CncGeometryTools.length(geometry);
+      case _: throw "minor R arc missing";
+    };
+    var majorLength = switch majorArc.ops[0] {
+      case CncOp.Feed(geometry, _, _, _): CncGeometryTools.length(geometry);
+      case _: throw "major R arc missing";
+    };
+    check(majorLength > minorLength && majorLength > Math.PI * 0.006,
+      "negative R selects the major arc");
+    fixtureMachine.setHomePosition(28, 0.1, 0.2, 0.3);
+    var home = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G90 G0 X10 Y10 Z10\nG28 X0\nM2");
+    var homeLast = switch home.ops[home.ops.length - 2] {
+      case CncOp.Rapid(geometry, _): CncGeometryTools.pointAt(geometry,
+        CncGeometryTools.length(geometry));
+      case _: throw "G28 home motion missing";
+    };
+    near(homeLast.x, 0.1, "G28 uses stored machine X");
+    near(homeLast.y, 0.01, "G28 leaves unspecified Y axis alone");
+    var cycles = new CncCompiler(fixtureMachine).compileDetailed(
+      "G21 G90 G0 Z10\nF600 G99 G81 X10 Z-5 R2\nX20\nG80\n" +
+      "G98 G82 X30 Z-4 R2 P0.2\nG80\nG83 X40 Z-4 R2 Q2\n" +
+      "G80\nG73 X50 Z-4 R2 Q2\nG80\nM2");
+    check(cycles.diagnostics.length == 0, "four drilling cycles compile");
+    var feeds = 0, dwells = 0, cycleLine = 0;
+    for (op in cycles.ops) switch op {
+      case CncOp.Feed(_, _, _, span):
+        feeds++;
+        if (span.line == 2) cycleLine++;
+      case CncOp.Dwell(_, _): dwells++;
+      case _:
+    }
+    check(feeds == 9 && dwells == 1,
+      "G81/G82/G83/G73 expand into feeds and dwell");
+    check(cycleLine == 2, "repeated G81 hole uses initiating source span");
+    rejects(fixtureMachine, "G21 F600 G83 X0 Z-5 R2 M2", "requires positive Q");
+    rejects(fixtureMachine, "G21 F600 G82 X0 Z-5 R2 M2", "requires positive P");
+    rejects(fixtureMachine, "G21 G91 G53 G0 X1 M2", "G53 requires G90");
     Sys.println('CncKit tests passed ($assertions assertions)');
+  }
+
+  static function fixture(name:String, machine:CncMachine):Void {
+    var result = new CncCompiler(machine).compileDetailed(
+      File.getContent('fixtures/$name'));
+    check(result.diagnostics.length == 0, '$name diagnostics: ${result.diagnostics}');
+    var program:motionkit.program.MotionProgram = cast result.program;
+    var motions = 0, length = 0.0;
+    var low = [1e9, 1e9, 1e9], high = [-1e9, -1e9, -1e9];
+    for (op in result.ops) {
+      var geometry = switch op {
+        case CncOp.Rapid(g, _) | CncOp.Feed(g, _, _, _): g;
+        case _: null;
+      };
+      if (geometry == null) continue;
+      motions++;
+      var distance = CncGeometryTools.length(geometry);
+      length += distance;
+      for (point in [CncGeometryTools.pointAt(geometry, 0.0),
+          CncGeometryTools.pointAt(geometry, distance)]) {
+        var coords = [point.x, point.y, point.z];
+        for (axis in 0...3) {
+          low[axis] = Math.min(low[axis], coords[axis]);
+          high[axis] = Math.max(high[axis], coords[axis]);
+        }
+      }
+    }
+    var expectedMotions = name == "freecad-pocket.ngc" ? 9 : 13;
+    var expectedLength = name == "freecad-pocket.ngc" ?
+      0.078 : 0.31149203622419913;
+    var expectedLow = name == "freecad-pocket.ngc" ?
+      [-0.01, 0.0, -0.004] : [0.0, 0.0, -0.01];
+    var expectedHigh = name == "freecad-pocket.ngc" ?
+      [0.01, 0.0, 0.0] : [0.09648, 0.068423, 0.01];
+    check(motions == expectedMotions, '$name golden motion count');
+    near(length, expectedLength, '$name golden total length');
+    for (axis in 0...3) {
+      near(low[axis], expectedLow[axis], '$name lower bound $axis');
+      near(high[axis], expectedHigh[axis], '$name upper bound $axis');
+    }
+    var pathIndex = 0;
+    for (op in result.ops) {
+      var geometry = switch op {
+        case CncOp.Rapid(g, _) | CncOp.Feed(g, _, _, _): g;
+        case _: null;
+      };
+      if (geometry == null) continue;
+      while (pathIndex < program.ops.length && !switch program.ops[pathIndex] {
+        case MotionOp.FollowPath(_, _, _, _): true;
+        case _: false;
+      }) pathIndex++;
+      check(pathIndex < program.ops.length, '$name lowered path missing');
+      var path = switch program.ops[pathIndex++] {
+        case MotionOp.FollowPath(p, _, _, _): p;
+        case _: throw 'unexpected lowered $name operation';
+      };
+      var distance = CncGeometryTools.length(geometry);
+      near(path.length(), distance, '$name lowered path length', 1e-8);
+      for (fraction in [0.0, 0.5, 1.0]) {
+        var authored = CncGeometryTools.pointAt(geometry, distance * fraction);
+        var lowered = path.poseAt(path.length() * fraction);
+        check(Math.abs(authored.x - lowered.x) < 1e-8 &&
+          Math.abs(authored.y - lowered.y) < 1e-8 &&
+          Math.abs(authored.z - lowered.z) < 1e-8,
+          '$name lowered path stays on authored geometry');
+      }
+    }
   }
 }

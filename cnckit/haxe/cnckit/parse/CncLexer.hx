@@ -11,8 +11,14 @@ class CncLexer {
     var lines = source.split("\n");
     for (index in 0...lines.length) {
       var line = lines[index];
+      if (StringTools.trim(line) == "%") continue;
       try {
         var block = lexLine(line, index + 1);
+        var slash = line.indexOf("/");
+        if (slash >= 0 && StringTools.trim(line.substring(0, slash)).length == 0)
+          diagnostics.push(new CncDiagnostic(Warning, "CNC_BLOCK_DELETE_IGNORED",
+            new CncSpan(index + 1, slash + 1, 1),
+            "block-delete marker ignored; block executed"));
         if (block.words.length > 0) blocks.push(block);
       } catch (error:CncDiagnostic) {
         diagnostics.push(error);
@@ -24,6 +30,9 @@ class CncLexer {
   public static function lexLine(line:String, lineNumber:Int):CncBlock {
     var words:Array<CncWord> = [];
     var index = 0;
+    while (index < line.length && (line.charAt(index) == " " ||
+        line.charAt(index) == "\t")) index++;
+    if (index < line.length && line.charAt(index) == "/") index++;
     while (index < line.length) {
       var ch = line.charAt(index);
       if (ch == ";") break;

@@ -14,6 +14,7 @@ class CncMachine {
   public final initialPosition:Array<Float>;
   final offsets:Map<Int, Array<Float>> = new Map();
   final lengths:Map<Int, Float> = new Map();
+  final homes:Map<Int, Array<Float>> = new Map();
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
       zAxisId:String, rapidSpeed:Float, ?initialPosition:Array<Float>,
@@ -47,6 +48,8 @@ class CncMachine {
     this.orientationTolerance = orientationTolerance;
     this.initialPosition = initial.copy();
     for (code in 54...60) offsets.set(code, [0.0, 0.0, 0.0]);
+    homes.set(28, [0.0, 0.0, 0.0]);
+    homes.set(30, [0.0, 0.0, 0.0]);
   }
 
   public function setWorkOffset(code:Int, x:Float, y:Float, z:Float):Void {
@@ -71,5 +74,19 @@ class CncMachine {
     var result = lengths.get(h);
     if (result == null) throw 'Unknown CNC tool length H$h';
     return result;
+  }
+
+  /** Stored G28/G30 positions are absolute machine coordinates in metres. */
+  public function setHomePosition(code:Int, x:Float, y:Float, z:Float):Void {
+    if ((code != 28 && code != 30) || !Math.isFinite(x) ||
+        !Math.isFinite(y) || !Math.isFinite(z))
+      throw "CNC home needs G28 or G30 and finite XYZ metres";
+    homes.set(code, [x, y, z]);
+  }
+
+  public function homePosition(code:Int):Array<Float> {
+    var result = homes.get(code);
+    if (result == null) throw 'Unknown CNC home G$code';
+    return result.copy();
   }
 }
