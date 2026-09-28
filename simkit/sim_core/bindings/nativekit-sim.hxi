@@ -21,6 +21,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_OK = 0;
 	const NKSIM_SHAPE_BOX = 1;
 	const NKSIM_SHAPE_CAPSULE = 3;
+	const NKSIM_SHAPE_COMPOUND = 6;
 	const NKSIM_SHAPE_CONVEX = 5;
 	const NKSIM_SHAPE_PLANE = 4;
 	const NKSIM_SHAPE_SPHERE = 2;
@@ -56,6 +57,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_shape_create(world: nksim_world, desc: ptr<const<nksim_shape_desc>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_box(world: nksim_world, half_extents: ptr<const<f64>>, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_capsule(world: nksim_world, radius: f64, height: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
+	extern fn nksim_shape_create_compound(world: nksim_world, children: ptr<const<nksim_shape>>, poses: ptr<const<nksim_shape_pose>>, count: u32, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	/**
 	 * Copies 12..192 XYZ coordinates (4..64 vertices); MuJoCo compiles their convex polytope.
 	 */
@@ -63,6 +65,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_shape_create_plane(world: nksim_world, normal: ptr<const<f64>>, offset: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_create_sphere(world: nksim_world, radius: f64, out_shape: ptr<nksim_shape> @out) -> nksim_result;
 	extern fn nksim_shape_destroy(world: nksim_world, shape: nksim_shape) -> void;
+	/**
+	 * Forces begin inside margin; detection extends to margin + gap.
+	 */
+	extern fn nksim_shape_set_contact(world: nksim_world, shape: nksim_shape, margin: f64, gap: f64) -> nksim_result;
 	extern fn nksim_snapshot_destroy(snapshot: nksim_snapshot) -> void;
 	extern fn nksim_snapshot_get_body(snapshot: nksim_snapshot, index: u64, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
 	extern fn nksim_snapshot_get_body_count(snapshot: nksim_snapshot, out_count: ptr<u64> @out) -> nksim_result;
@@ -203,6 +209,13 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		type: u32 @offset(4);
 		parameters: array<f64, 4> @offset(8);
 		reserved: array<u64, 2> @offset(40);
+	}
+	/**
+	 * Local pose of one compound child, quaternion in x, y, z, w order.
+	 */
+	struct nksim_shape_pose @layout(56, 8) {
+		position: array<f64, 3> @offset(0);
+		rotation: array<f64, 4> @offset(24);
 	}
 	struct nksim_snapshot_body_page @layout(9240, 8) {
 		struct_size: u32 @offset(0) @struct_size;

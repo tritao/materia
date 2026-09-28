@@ -9,12 +9,23 @@
 
 namespace nksim {
 
+struct BackendShapePart {
+    std::uint32_t type = 0;
+    std::array<double, 4> parameters{};
+    std::vector<float> vertices;
+    std::array<double, 3> position{};
+    std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
+    double margin = 0.0;
+    double gap = 0.0;
+};
+
 struct BackendBodyDesc {
     std::uint32_t motion_type = NKSIM_MOTION_STATIC;
     double mass = 0.0;
     std::uint32_t shape_type = 0;
     std::array<double, 4> shape_parameters{};
     std::vector<float> shape_vertices;
+    std::vector<BackendShapePart> shape_parts;
     std::array<double, 3> position{};
     std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
     std::uint32_t collision_layer = 0;

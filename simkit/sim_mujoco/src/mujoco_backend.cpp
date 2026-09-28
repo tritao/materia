@@ -164,6 +164,48 @@ bool rest_boxes_overlap(const RestBox &a, const RestBox &b) {
     return true;
 }
 
+std::vector<RestBox> rest_piece_boxes(const BodyRecord &body) {
+    std::vector<RestBox> result;
+    const auto body_rotation = normalize(Quat{body.desc.rotation[0], body.desc.rotation[1],
+                                               body.desc.rotation[2], body.desc.rotation[3]});
+    for (const auto &part : body.desc.shape_parts) {
+        if (part.type == NKSIM_SHAPE_PLANE) continue;
+        RestBox box{};
+        Vec3 local_center{part.position[0], part.position[1], part.position[2]};
+        if (part.type == NKSIM_SHAPE_CONVEX && !part.vertices.empty()) {
+            Vec3 minimum{INFINITY, INFINITY, INFINITY}, maximum{-INFINITY, -INFINITY, -INFINITY};
+            for (std::size_t index = 0; index < part.vertices.size(); ++index) {
+                minimum[index % 3] = std::min(minimum[index % 3],
+                    static_cast<double>(part.vertices[index]));
+                maximum[index % 3] = std::max(maximum[index % 3],
+                    static_cast<double>(part.vertices[index]));
+            }
+            for (int axis = 0; axis < 3; ++axis) {
+                local_center[axis] += (minimum[axis] + maximum[axis]) * 0.5;
+                box.half[axis] = (maximum[axis] - minimum[axis]) * 0.5;
+            }
+        } else if (part.type == NKSIM_SHAPE_BOX) {
+            for (int axis = 0; axis < 3; ++axis) box.half[axis] = part.parameters[axis];
+        } else if (part.type == NKSIM_SHAPE_SPHERE) {
+            box.half = {part.parameters[0], part.parameters[0], part.parameters[0]};
+        } else if (part.type == NKSIM_SHAPE_CAPSULE) {
+            box.half = {part.parameters[0], part.parameters[0],
+                        part.parameters[0] + part.parameters[1] * 0.5};
+        }
+        const auto rotation = normalize(multiply(body_rotation, normalize(part.rotation)));
+        const auto offset = rotate(body_rotation, local_center);
+        box.center = {body.desc.position[0] + offset[0],
+                      body.desc.position[1] + offset[1], body.desc.position[2] + offset[2]};
+        for (int axis = 0; axis < 3; ++axis) {
+            Vec3 basis{0.0, 0.0, 0.0};
+            basis[axis] = 1.0;
+            box.axis[axis] = rotate(rotation, basis);
+        }
+        result.push_back(box);
+    }
+    return result;
+}
+
 double rest_shape_radius(const BodyRecord &body) {
     switch (body.desc.shape_type) {
     case NKSIM_SHAPE_BOX:
@@ -181,6 +223,12 @@ double rest_shape_radius(const BodyRecord &body) {
 }
 
 bool geometries_overlap_at_rest(const BodyRecord &a, const BodyRecord &b) {
+    if (a.desc.shape_parts.size() > 1 || b.desc.shape_parts.size() > 1) {
+        for (const auto &first : rest_piece_boxes(a))
+            for (const auto &second : rest_piece_boxes(b))
+                if (rest_boxes_overlap(first, second)) return true;
+        return false;
+    }
     if (a.desc.shape_type == NKSIM_SHAPE_BOX && b.desc.shape_type == NKSIM_SHAPE_BOX)
         return rest_boxes_overlap(rest_box(a), rest_box(b));
     const auto radius_a = rest_shape_radius(a), radius_b = rest_shape_radius(b);
@@ -784,13 +832,30 @@ private:
     // velocity actuators, whose bias (-kp*q - kv*qdot for a position
     // actuator) applies even at ctrl=0 — an idle position actuator dragged a
     // velocity- or effort-commanded joint back toward q=0.
-    // F4: keep direct parent/child pairs out of contact, and keep pairs that
-    // already overlap in the authored rest pose out of contact. Other links
+    // F4: within one articulation, keep direct parent/child pairs out of contact,
+    // and keep pairs that already overlap in the authored rest pose out of contact.
+    // Unrelated environment bodies must never inherit a self-collision exclusion.
+    // Other links
     // in one articulation remain collision-enabled, so a folded arm can
     // contact its own base instead of passing through it. Rest-pose geometry
     // is tested with an oriented-box SAT for the shapes RobotKit supplies;
     // the generic sphere/capsule fallback is conservative for those shapes.
     nksim_result add_self_collision_excludes() {
+        auto is_same_articulation = [&](std::uint64_t first, std::uint64_t second) {
+            std::vector<std::uint64_t> visited{first};
+            for (std::size_t index = 0; index < visited.size(); ++index) {
+                const auto current = visited[index];
+                for (const auto joint_id : joint_order) {
+                    const auto &joint = joints.at(joint_id);
+                    const auto next = joint.desc.body_a == current ? joint.desc.body_b :
+                        joint.desc.body_b == current ? joint.desc.body_a : 0;
+                    if (next == second) return true;
+                    if (next != 0 && std::find(visited.begin(), visited.end(), next) == visited.end())
+                        visited.push_back(next);
+                }
+            }
+            return false;
+        };
         auto is_parent_child = [&](std::uint64_t first, std::uint64_t second) {
             for (const auto joint_id : joint_order) {
                 const auto &joint = joints.at(joint_id);
@@ -803,6 +868,7 @@ private:
         for (std::size_t i = 0; i < body_order.size(); ++i) {
             for (std::size_t j = i + 1; j < body_order.size(); ++j) {
                 const auto first = body_order[i], second = body_order[j];
+                if (!is_same_articulation(first, second)) continue;
                 const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
                 if (!is_parent_child(first, second) &&
                     !geometries_overlap_at_rest(body_a, body_b))
@@ -957,68 +1023,78 @@ private:
             }
         }
 
-        if (desc.shape_type == 0)
+        if (desc.shape_parts.empty())
             return NKSIM_OK;
-        auto *geom = mjs_addGeom(&body, nullptr);
-        if (!geom)
-            return NKSIM_ERROR_OUT_OF_MEMORY;
-        switch (desc.shape_type) {
-        case NKSIM_SHAPE_BOX:
-            geom->type = mjGEOM_BOX;
-            break;
-        case NKSIM_SHAPE_SPHERE:
-            geom->type = mjGEOM_SPHERE;
-            break;
-        case NKSIM_SHAPE_CAPSULE:
-            geom->type = mjGEOM_CAPSULE;
-            break;
-        case NKSIM_SHAPE_PLANE:
-            geom->type = mjGEOM_PLANE;
-            break;
-        case NKSIM_SHAPE_CONVEX: {
-            if (desc.shape_vertices.size() < 12 || desc.shape_vertices.size() > 192 ||
-                desc.shape_vertices.size() % 3 != 0)
-                return NKSIM_ERROR_INVALID_ARGUMENT;
-            auto *mesh = mjs_addMesh(spec, nullptr);
-            if (!mesh) return NKSIM_ERROR_OUT_OF_MEMORY;
-            const auto name = *mjs_getName(body.element) + "_collision";
-            if (mjs_setName(mesh->element, name.c_str()) != 0)
-                return NKSIM_ERROR_BACKEND;
-            mjs_setFloat(mesh->uservert, desc.shape_vertices.data(),
-                         static_cast<int>(desc.shape_vertices.size()));
-            mesh->maxhullvert = 64;
-            geom->type = mjGEOM_MESH;
-            mjs_setString(geom->meshname, name.c_str());
-            break;
+        for (std::size_t index = 0; index < desc.shape_parts.size(); ++index) {
+            const auto &part = desc.shape_parts[index];
+            auto *geom = mjs_addGeom(&body, nullptr);
+            if (!geom) return NKSIM_ERROR_OUT_OF_MEMORY;
+            switch (part.type) {
+            case NKSIM_SHAPE_BOX:
+                geom->type = mjGEOM_BOX;
+                break;
+            case NKSIM_SHAPE_SPHERE:
+                geom->type = mjGEOM_SPHERE;
+                break;
+            case NKSIM_SHAPE_CAPSULE:
+                geom->type = mjGEOM_CAPSULE;
+                break;
+            case NKSIM_SHAPE_PLANE:
+                geom->type = mjGEOM_PLANE;
+                break;
+            case NKSIM_SHAPE_CONVEX: {
+                if (part.vertices.size() < 12 || part.vertices.size() > 192 ||
+                    part.vertices.size() % 3 != 0)
+                    return NKSIM_ERROR_INVALID_ARGUMENT;
+                auto *mesh = mjs_addMesh(spec, nullptr);
+                if (!mesh) return NKSIM_ERROR_OUT_OF_MEMORY;
+                const auto name = *mjs_getName(body.element) + "_collision_" + std::to_string(index);
+                if (mjs_setName(mesh->element, name.c_str()) != 0)
+                    return NKSIM_ERROR_BACKEND;
+                mjs_setFloat(mesh->uservert, part.vertices.data(),
+                             static_cast<int>(part.vertices.size()));
+                mesh->maxhullvert = 64;
+                geom->type = mjGEOM_MESH;
+                mjs_setString(geom->meshname, name.c_str());
+                break;
+            }
+            default:
+                return NKSIM_ERROR_UNSUPPORTED;
+            }
+            if (part.type == NKSIM_SHAPE_PLANE) {
+                const Vec3 normal = normalize(Vec3{part.parameters[0],
+                                                   part.parameters[1],
+                                                   part.parameters[2]});
+                geom->pos[0] = normal[0] * part.parameters[3];
+                geom->pos[1] = normal[1] * part.parameters[3];
+                geom->pos[2] = normal[2] * part.parameters[3];
+                const auto rotation = rotation_from_z(normal);
+                geom->quat[0] = rotation[3];
+                geom->quat[1] = rotation[0];
+                geom->quat[2] = rotation[1];
+                geom->quat[3] = rotation[2];
+                // A zero x/y size is MuJoCo's infinite-plane convention.
+                geom->size[0] = 0.0;
+                geom->size[1] = 0.0;
+                geom->size[2] = 1.0;
+            } else {
+                std::copy(part.position.begin(), part.position.end(), geom->pos);
+                geom->quat[0] = part.rotation[3];
+                geom->quat[1] = part.rotation[0];
+                geom->quat[2] = part.rotation[1];
+                geom->quat[3] = part.rotation[2];
+                if (part.type != NKSIM_SHAPE_CONVEX) {
+                    geom->size[0] = part.parameters[0];
+                    geom->size[1] = part.type == NKSIM_SHAPE_CAPSULE
+                        ? part.parameters[1] * 0.5 : part.parameters[1];
+                    geom->size[2] = part.parameters[2];
+                }
+            }
+            geom->margin = part.margin;
+            geom->gap = part.gap;
+            geom->contype = static_cast<int>(desc.collision_layer);
+            geom->conaffinity = static_cast<int>(desc.collision_mask);
         }
-        default:
-            return NKSIM_ERROR_UNSUPPORTED;
-        }
-        if (desc.shape_type == NKSIM_SHAPE_PLANE) {
-            const Vec3 normal = normalize(Vec3{desc.shape_parameters[0],
-                                               desc.shape_parameters[1],
-                                               desc.shape_parameters[2]});
-            geom->pos[0] = normal[0] * desc.shape_parameters[3];
-            geom->pos[1] = normal[1] * desc.shape_parameters[3];
-            geom->pos[2] = normal[2] * desc.shape_parameters[3];
-            const auto rotation = rotation_from_z(normal);
-            geom->quat[0] = rotation[3];
-            geom->quat[1] = rotation[0];
-            geom->quat[2] = rotation[1];
-            geom->quat[3] = rotation[2];
-            // A zero x/y size is MuJoCo's infinite-plane convention.
-            geom->size[0] = 0.0;
-            geom->size[1] = 0.0;
-            geom->size[2] = 1.0;
-        } else if (desc.shape_type != NKSIM_SHAPE_CONVEX) {
-            geom->size[0] = desc.shape_parameters[0];
-            geom->size[1] = desc.shape_type == NKSIM_SHAPE_CAPSULE
-                ? desc.shape_parameters[1] * 0.5
-                : desc.shape_parameters[1];
-            geom->size[2] = desc.shape_parameters[2];
-        }
-        geom->contype = static_cast<int>(desc.collision_layer);
-        geom->conaffinity = static_cast<int>(desc.collision_mask);
         return NKSIM_OK;
     }
 

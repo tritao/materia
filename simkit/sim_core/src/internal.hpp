@@ -204,6 +204,9 @@ struct Shape {
     nksim_shape handle = 0;
     nksim_shape_desc desc{};
     std::vector<float> convex_vertices;
+    std::vector<BackendShapePart> parts;
+    double margin = 0.0;
+    double gap = 0.0;
 };
 
 struct Body {
@@ -275,6 +278,10 @@ public:
     nksim_result create_shape(const nksim_shape_desc &desc, nksim_shape *out_shape);
     nksim_result create_convex_shape(const double *vertices, std::uint32_t count,
                                     nksim_shape *out_shape);
+    nksim_result create_compound_shape(const nksim_shape *children,
+                                      const nksim_shape_pose *poses, std::uint32_t count,
+                                      nksim_shape *out_shape);
+    nksim_result set_shape_contact(nksim_shape shape, double margin, double gap);
     nksim_result destroy_shape(nksim_shape shape);
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);

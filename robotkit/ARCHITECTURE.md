@@ -804,8 +804,8 @@ freedom — the existing typed joint-command boundary, unchanged.
 `Robot`, `RobotRuntime`, or the native runtime. A `Tool` is a mounted end
 effector: `id`, `flangeTTcp` (the tool center point's pose in the flange
 frame, per the `a_T_b` convention — `flange_T_tcp` maps tool-tip coordinates
-into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`, or
-`Cylinder`, since `model.CollisionApproximation` is a link-geometry
+into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`,
+`Cylinder`, or per-member `Hulls`, since `model.CollisionApproximation` is a link-geometry
 derivation policy, not a shape), and `mass`.
 
 Capability control surfaces are typed interfaces, not

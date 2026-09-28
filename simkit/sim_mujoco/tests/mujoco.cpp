@@ -1536,6 +1536,85 @@ void assembly_closures_compile_as_equalities() {
     }
 }
 
+void compound_shape_preserves_an_l_shaped_gap() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    desc.gravity[2] = -9.81;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double horizontal_half[] = {0.5, 0.05, 0.05};
+    const double vertical_half[] = {0.05, 0.05, 0.5};
+    nksim_shape horizontal = 0, vertical = 0, compound = 0, sphere = 0;
+    assert(nksim_shape_create_box(world, horizontal_half, &horizontal) == NKSIM_OK);
+    assert(nksim_shape_create_box(world, vertical_half, &vertical) == NKSIM_OK);
+    const nksim_shape children[] = {horizontal, vertical};
+    nksim_shape_pose poses[2]{};
+    poses[0].position[0] = 0.5; poses[0].position[2] = 0.05;
+    poses[1].position[0] = 0.95; poses[1].position[2] = 0.5;
+    poses[0].rotation[3] = poses[1].rotation[3] = 1.0;
+    assert(nksim_shape_create_compound(world, children, poses, 2, &compound) == NKSIM_OK);
+    assert(nksim_shape_create_sphere(world, 0.08, &sphere) == NKSIM_OK);
+    const auto obstacle = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
+                                    NKSIM_MOTION_STATIC, 0.0, compound);
+    const auto gap = make_body(world, make_node_xyz(scene, 0.5, 0.0, 1.2),
+                               NKSIM_MOTION_DYNAMIC, 1.0, sphere);
+    const auto contact = make_body(world, make_node_xyz(scene, 0.95, 0.0, 1.2),
+                                   NKSIM_MOTION_DYNAMIC, 1.0, sphere);
+    step_world(world, 20);
+    nksim_body_state gap_state{}, contact_state{};
+    gap_state.struct_size = contact_state.struct_size = sizeof(nksim_body_state);
+    assert(nksim_body_get_state(world, gap, &gap_state) == NKSIM_OK);
+    assert(nksim_body_get_state(world, contact, &contact_state) == NKSIM_OK);
+    assert(std::abs(gap_state.position[0] - 0.5) < 1e-6);
+    assert(gap_state.position[2] < 1.03);
+    assert(contact_state.position[2] > gap_state.position[2] + 0.04);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+double convex_mesh_margin_velocity(double margin, double gap) {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double vertices[] = {
+        -0.1,-0.1,-0.1, 0.1,-0.1,-0.1, -0.1,0.1,-0.1, 0.1,0.1,-0.1,
+        -0.1,-0.1,0.1, 0.1,-0.1,0.1, -0.1,0.1,0.1, 0.1,0.1,0.1};
+    nksim_shape mesh = 0, sphere = 0;
+    assert(nksim_shape_create_convex(world, vertices, 24, &mesh) == NKSIM_OK);
+    assert(nksim_shape_set_contact(world, mesh, margin, gap) == NKSIM_OK);
+    assert(nksim_shape_create_sphere(world, 0.05, &sphere) == NKSIM_OK);
+    const auto obstacle = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
+                                    NKSIM_MOTION_STATIC, 0.0, mesh);
+    const auto moving = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.165),
+                                  NKSIM_MOTION_DYNAMIC, 1.0, sphere);
+    step_world(world, 3);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_body_get_state(world, moving, &state) == NKSIM_OK);
+    const double velocity = state.linear_velocity[2];
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+    return velocity;
+}
+
+void convex_mesh_margin_detects_before_gap_force() {
+    const double physical = convex_mesh_margin_velocity(0.03, 0.0);
+    const double proximity = convex_mesh_margin_velocity(0.0, 0.03);
+    assert(physical > 1e-5);
+    assert(std::abs(proximity) < 1e-8);
+}
+
 } // namespace
 
 int main() {
@@ -1558,5 +1637,7 @@ int main() {
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();
     assembly_closures_compile_as_equalities();
+    compound_shape_preserves_an_l_shaped_gap();
+    convex_mesh_margin_detects_before_gap_force();
     return 0;
 }

@@ -132,6 +132,13 @@ typedef struct rk_simulation_robot_desc {
     uint32_t closure_count;
     rk_simulation_closure_desc closures[64];
     uint32_t virtual_device_profile; /**< 1 full, 2 minimal; zero defaults to full. */
+    /** Optional tool collision geoms, expressed in the flange link frame. */
+    uint32_t tool_link_index;
+    uint32_t tool_piece_count;
+    uint32_t tool_piece_vertex_count[16];
+    double tool_piece_vertices[16 * 64 * 3];
+    double tool_margin;
+    double tool_gap;
 } rk_simulation_robot_desc;
 
 /**

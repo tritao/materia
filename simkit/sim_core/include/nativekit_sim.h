@@ -70,7 +70,8 @@ enum {
     NKSIM_SHAPE_SPHERE = 2,
     NKSIM_SHAPE_CAPSULE = 3,
     NKSIM_SHAPE_PLANE = 4,
-    NKSIM_SHAPE_CONVEX = 5
+    NKSIM_SHAPE_CONVEX = 5,
+    NKSIM_SHAPE_COMPOUND = 6
 };
 
 enum {
@@ -116,6 +117,12 @@ typedef struct nksim_shape_desc {
     double parameters[4];
     uint64_t reserved[2];
 } nksim_shape_desc;
+
+/** Local pose of one compound child, quaternion in x, y, z, w order. */
+typedef struct nksim_shape_pose {
+    double position[3];
+    double rotation[4];
+} nksim_shape_pose;
 
 typedef struct nksim_body_desc {
     uint32_t struct_size NK_STRUCT_SIZE;
@@ -262,6 +269,12 @@ NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_plane(
     nksim_shape *out_shape NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_shape_create(
     nksim_world world, const nksim_shape_desc *desc, nksim_shape *out_shape NK_OUT);
+NKSIM_API nksim_result NKSIM_CALL nksim_shape_create_compound(
+    nksim_world world, const nksim_shape *children, const nksim_shape_pose *poses,
+    uint32_t count, nksim_shape *out_shape NK_OUT);
+/** Forces begin inside margin; detection extends to margin + gap. */
+NKSIM_API nksim_result NKSIM_CALL nksim_shape_set_contact(
+    nksim_world world, nksim_shape shape, double margin, double gap);
 NKSIM_API void NKSIM_CALL nksim_shape_destroy(nksim_world world, nksim_shape shape);
 
 NKSIM_API nksim_result NKSIM_CALL nksim_body_create(

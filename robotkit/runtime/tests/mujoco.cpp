@@ -54,8 +54,65 @@ static void convex_link_and_box_link_build() {
     rk_simulation_destroy(simulation);
 }
 
+static void tool_hulls_collide_only_on_their_pieces() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.links[0].mass = 1.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.tool_link_index = 0;
+    robot_desc.tool_piece_count = 2;
+    robot_desc.tool_piece_vertex_count[0] = 8;
+    robot_desc.tool_piece_vertex_count[1] = 8;
+    for (int piece = 0; piece < 2; ++piece) for (int vertex = 0; vertex < 8; ++vertex) {
+        auto *point = robot_desc.tool_piece_vertices + piece * 64 * 3 + vertex * 3;
+        point[0] = piece == 0 ? ((vertex & 1) ? 1.0 : 0.0) :
+            ((vertex & 1) ? 1.0 : 0.9);
+        point[1] = (vertex & 2) ? 0.05 : -0.05;
+        point[2] = piece == 0 ? ((vertex & 4) ? 0.1 : 0.0) :
+            ((vertex & 4) ? 1.0 : 0.0);
+    }
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    rk_simulation_object_desc obstacle{};
+    obstacle.struct_size = sizeof(obstacle);
+    obstacle.motion_type = 2;
+    obstacle.rotation[3] = 1.0;
+    obstacle.mass = 1.0;
+    obstacle.half_extents[0] = obstacle.half_extents[1] =
+        obstacle.half_extents[2] = 0.05;
+    obstacle.position[0] = 0.5;
+    obstacle.position[2] = 1.2;
+    rk_simulation_object in_gap = 0, on_tool = 0;
+    assert(rk_simulation_spawn_object(simulation, &obstacle, &in_gap) == RK_OK);
+    obstacle.position[0] = 0.95;
+    assert(rk_simulation_spawn_object(simulation, &obstacle, &on_tool) == RK_OK);
+    for (int tick = 0; tick < 20; ++tick)
+        assert(rk_simulation_step(simulation, tick) == RK_OK);
+    rk_simulation_pose gap_pose{}, tool_pose{};
+    gap_pose.struct_size = tool_pose.struct_size = sizeof(rk_simulation_pose);
+    assert(rk_simulation_get_object_pose(simulation, in_gap, &gap_pose) == RK_OK);
+    assert(rk_simulation_get_object_pose(simulation, on_tool, &tool_pose) == RK_OK);
+    assert(gap_pose.position[2] < 1.03);
+    assert(tool_pose.position[2] > gap_pose.position[2] + 0.03);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
     convex_link_and_box_link_build();
+    tool_hulls_collide_only_on_their_pieces();
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.005;
