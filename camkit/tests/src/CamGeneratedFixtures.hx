@@ -59,41 +59,61 @@ class CamGeneratedFixtures {
       new Vector(40, 30), new Vector(0, 30)], true);
     var hole = Curve.circle(5.0,
       new Plane(new Vector(20, 15), Vector.X(), Vector.Z()));
-    var sketch = Sketch.face(outer, [hole]);
+    var smallerHole = Curve.circle(3.0,
+      new Plane(new Vector(8, 15), Vector.X(), Vector.Z()));
+    var sketch = Sketch.face(outer, [hole, smallerHole]);
     var face = sketch.shape.faces().at(0);
     var boundaries = CamContour.fromFaceBoundaries(face, "mm", 0.000001);
-    check(boundaries.length == 2, "CAD face exposes outer and hole contours");
+    check(boundaries.length == 3, "CAD face exposes outer and both hole contours");
     check(Math.abs(Math.abs(boundaries[0].signedArea) - 0.0012) < 1e-8,
       "outer face boundary is first");
     check(Math.abs(Math.abs(boundaries[1].signedArea) - Math.PI * 0.005 * 0.005) < 1e-8,
       'inner face boundary follows the authored five-millimetre radius: ${boundaries[1].signedArea}');
+    check(Math.abs(Math.abs(boundaries[2].signedArea) - Math.PI * 0.003 * 0.003) < 2e-8,
+      'second inner boundary follows the authored three-millimetre radius: ${boundaries[2].signedArea}');
     var rejected = false;
     try CamContour.fromFace(face) catch (_:Dynamic) rejected = true;
     check(rejected, "single-contour face adapter rejects a face with holes");
 
+    var invalidJob = new CamJob(0.005, 10000);
+    rejected = false;
+    try invalidJob.profileFace(face, new CncTool(4, 0, 0.008),
+      -0.002, 0.005, 0.002, "mm", 0.000001)
+    catch (_:Dynamic) rejected = true;
+    check(rejected, "face operation rejects a tool too large for an inner hole");
+    rejected = false;
+    try invalidJob.finish() catch (_:Dynamic) rejected = true;
+    check(rejected, "rejected face leaves the CAM job without partial cuts");
+
     var tool = new CncTool(3, 0, 0.002);
     var program = new CamJob(0.005, 10000)
-      .profile(boundaries[0], tool, -0.002, 0.005, "outside")
-      .profile(boundaries[1], tool, -0.002, 0.005, "inside")
+      .profileFace(face, tool, -0.002, 0.005, 0.002, "mm", 0.000001)
       .finish();
-    var holeFeeds = 0;
-    for (op in program.ops) switch op {
-      case Feed(geometry, _, _, span) if (span.line == 2):
+    var holeFeeds = 0, lastHoleIndex = -1, firstOutsideIndex = program.ops.length;
+    for (index in 0...program.ops.length) switch program.ops[index] {
+      case Feed(geometry, _, _, span) if (span.line == 1 || span.line == 2):
         var start = CncGeometryTools.pointAt(geometry, 0);
         var end = CncGeometryTools.pointAt(geometry, CncGeometryTools.length(geometry));
         if (Math.abs(start.z - end.z) > 1e-9) continue;
         holeFeeds++;
+        lastHoleIndex = index;
+        var cx = span.line == 1 ? 0.02 : 0.008;
+        var expectedRadius = span.line == 1 ? 0.004 : 0.002;
         for (fraction in [0.0, 0.5, 1.0]) {
           var point = CncGeometryTools.pointAt(geometry,
             CncGeometryTools.length(geometry) * fraction);
-          var radius = Math.sqrt(Math.pow(point.x - 0.02, 2) +
+          var radius = Math.sqrt(Math.pow(point.x - cx, 2) +
             Math.pow(point.y - 0.015, 2));
-          check(Math.abs(radius - 0.004) < 0.00002,
+          check(Math.abs(radius - expectedRadius) < 0.00002,
             "hole cutter centre follows the inner offset");
         }
+      case Feed(_, _, _, span) if (span.line == 3):
+        if (index < firstOutsideIndex) firstOutsideIndex = index;
       case _:
     }
-    check(holeFeeds > 8, "hole gets its own inside profile");
+    check(holeFeeds > 16, "both holes get separate inside profiles");
+    check(lastHoleIndex < firstOutsideIndex && firstOutsideIndex < program.ops.length,
+      "face operation finishes both holes before its outer profile");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
     check(program.lower(machine).diagnostics.length == 0,
@@ -114,6 +134,6 @@ class CamGeneratedFixtures {
         }
       case _:
     }
-    face.close(); sketch.close(); outer.close(); hole.close();
+    face.close(); sketch.close(); outer.close(); hole.close(); smallerHole.close();
   }
 }
