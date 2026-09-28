@@ -285,6 +285,10 @@ typedef struct rk_robot_joint_dynamics {
     double armature; /**< Reflected rotor inertia: kg m^2, or kg for a prismatic joint. */
     double damping; /**< Viscous effort per unit joint velocity. */
     double friction_loss; /**< Dry friction effort. */
+    /** Limit softness (see nksim_joint_desc); zeros keep the backend default. */
+    double limit_time_constant;
+    double limit_damping_ratio;
+    double limit_impedance[5];
 } rk_robot_joint_dynamics;
 
 typedef struct rk_robot_runtime_link {
@@ -410,6 +414,14 @@ typedef struct rk_robot_runtime_blueprint {
     rk_robot_joint_coupling couplings[RK_MAX_JOINT_COUPLINGS];
     /** Versioned: absent means no passive dynamics. Indexed by joint. */
     rk_robot_joint_dynamics joint_dynamics[RK_MAX_JOINTS];
+    /**
+     * Versioned: how far, in joint units, an observed position may pass a
+     * joint limit before the runtime faults. Zero keeps limits exact. A robot
+     * that rests on its mechanical stops, such as a legged robot on its knee
+     * stops, needs room for a simulator's or joint's compliant stops.
+     * Commanded positions must still lie within the limits.
+     */
+    double observed_limit_tolerance;
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

@@ -14,6 +14,8 @@ class RobotModel {
   /** Mechanical joint-to-joint relations, independent of actuator transmissions. */
   public final couplings:Array<JointCoupling> = [];
   public final sensors:Array<Sensor> = [];
+  /** Explicit contacts between link collision shapes. */
+  public final contactPairs:Array<ContactPair> = [];
   public final frames:Array<Frame> = [];
   public var collisionApproximation:CollisionApproximation = CollisionApproximation.BoundsBox;
   /**

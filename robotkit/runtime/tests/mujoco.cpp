@@ -441,8 +441,10 @@ static void blueprint_joint_friction_holds_an_arm() {
     assert(run_gravity_arm(gravity_arm(0.0, 0.0), none, 0.4).position > 0.5);
 }
 
-// Rest height of a 10 kg floating sphere robot on a floor, for a contact time constant.
-static double sphere_rest_height(double time_constant) {
+// Rest height of a 10 kg floating sphere robot on a floor, for a contact time
+// constant and contact filter.
+static double sphere_rest_height(double time_constant, uint32_t contact_filter = 0,
+                                 bool ground_plane = false) {
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.005;
@@ -471,6 +473,7 @@ static double sphere_rest_height(double time_constant) {
     sphere.rotation[3] = 1.0;
     sphere.contact_time_constant = time_constant;
     sphere.contact_damping_ratio = 1.0;
+    sphere.contact_filter = contact_filter;
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
     rk_simulation_object_desc floor{};
@@ -479,6 +482,17 @@ static double sphere_rest_height(double time_constant) {
     floor.position[2] = -0.5;
     floor.half_extents[0] = floor.half_extents[1] = 5.0;
     floor.half_extents[2] = 0.5;
+    if (ground_plane) {
+        floor = {};
+        floor.struct_size = sizeof(floor);
+        floor.rotation[3] = 1.0;
+        floor.shape = 1;
+        auto moving = floor;
+        moving.motion_type = 2;
+        moving.mass = 1.0;
+        rk_simulation_object refused = 0;
+        assert(rk_simulation_spawn_object(simulation, &moving, &refused) == RK_ERROR_INVALID_ARGUMENT);
+    }
     rk_simulation_object floor_object = 0;
     assert(rk_simulation_spawn_object(simulation, &floor, &floor_object) == RK_OK);
     for (int tick = 0; tick < 400; ++tick)
@@ -498,7 +512,160 @@ static void link_shape_contact_softness_reaches_the_backend() {
     assert(soft < stiff - 0.005);
 }
 
+// An unpowered arm falls onto its 0.3 rad stop and, since MuJoCo's stops are
+// compliant, rests slightly past it. With exact limits the runtime faults;
+// with an observed-limit tolerance it holds on the stop.
+static rk_result arm_on_its_stop(double tolerance, double &position) {
+    auto model = gravity_arm(0.0);
+    model.joints[0].upper_limit = 0.3;
+    model.observed_limit_tolerance = tolerance;
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 5;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    rk_result result = RK_OK;
+    for (int tick = 0; tick < 200 && result == RK_OK; ++tick)
+        result = rk_simulation_step(simulation, static_cast<uint64_t>(tick) * 10'000'000u);
+    position = state(robot).position[0];
+    rk_simulation_destroy(simulation);
+    return result;
+}
+
+static void observed_limit_tolerance_allows_compliant_stops() {
+    double position = 0.0;
+    assert(arm_on_its_stop(0.0, position) == RK_ERROR_LIMIT);
+    assert(arm_on_its_stop(0.05, position) == RK_OK);
+    assert(position > 0.3 && position < 0.35);
+    auto invalid = gravity_arm(0.0);
+    invalid.observed_limit_tolerance = -0.1;
+    assert(rk_robot_runtime_blueprint_validate(&invalid) == RK_ERROR_INVALID_ARGUMENT);
+}
+
+// A robot can start in a joint pose: set positions move the links it carries
+// before the first step, out-of-limit poses are refused, and reset returns
+// the joints to zero.
+static void robots_start_in_a_joint_pose() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    auto model = gravity_arm(0.0);
+    model.joints[0].lower_limit = -1.0;
+    model.joints[0].upper_limit = 1.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    const double outside[] = {1.5};
+    assert(rk_simulation_set_joint_positions(simulation, 0, outside, 1) == RK_ERROR_INVALID_ARGUMENT);
+    const double pose[] = {-0.5};
+    assert(rk_simulation_set_joint_positions(simulation, 0, pose, 2) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_set_joint_positions(simulation, 0, pose, 1) == RK_OK);
+    // The arm link hangs from the hinge at its origin: -0.5 rad about Y
+    // raises its +X axis, which the link frame's rotation shows.
+    rk_simulation_pose link{};
+    link.struct_size = sizeof(link);
+    assert(rk_simulation_get_link_pose(simulation, 0, 1, &link) == RK_OK);
+    assert(std::abs(link.rotation[1] - std::sin(-0.25)) < 1e-9);
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    assert(std::abs(state(robot).position[0] + 0.5) < 0.01);
+    assert(rk_simulation_set_joint_positions(simulation, 0, pose, 1) == RK_ERROR_INVALID_STATE);
+    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(rk_simulation_reset(simulation) == RK_OK);
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    assert(std::abs(state(robot).position[0]) < 0.01);
+    rk_simulation_destroy(simulation);
+}
+
+// A shape that collides only through pairs passes through the floor; one that
+// also meets the environment rests on it. Pairs must join two links' shapes.
+static void link_shape_contact_filters_reach_the_backend() {
+    assert(sphere_rest_height(0.02, 1) < -1.0);
+    assert(std::abs(sphere_rest_height(0.02, 2) - 0.05) < 0.005);
+    assert(std::abs(sphere_rest_height(0.02, 2, true) - 0.05) < 0.005); // On a ground plane.
+
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    const auto model = gravity_arm(0.0);
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.link_shape_count = 2;
+    for (uint32_t index = 0; index < 2; ++index) {
+        auto &shape = robot_desc.link_shapes[index];
+        shape.link = index;
+        shape.type = RK_LINK_SHAPE_SPHERE;
+        shape.size[0] = 0.05;
+        shape.rotation[3] = 1.0;
+        shape.contact_filter = 1;
+    }
+    robot_desc.contact_pair_count = 1;
+    robot_desc.contact_pairs[0].shape_a = 0;
+    robot_desc.contact_pairs[0].shape_b = 0; // Both on link 0: refused.
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) != RK_OK);
+    robot_desc.contact_pairs[0].shape_b = 1;
+    robot_desc.contact_pairs[0].friction[0] = 0.5;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    rk_simulation_destroy(simulation);
+}
+
+// A link with no shape under the "none" collision approximation touches
+// nothing: a floating robot made of one passes through the floor.
+static void shapeless_link_without_approximation_collides_with_nothing() {
+    rk_simulation_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    desc.backend = 1;
+    rk_simulation simulation = 0;
+    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.floating_base = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    model.links[0].mass = 1.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 0.01;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 0.1;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+    rk_simulation_object_desc floor{};
+    floor.struct_size = sizeof(floor);
+    floor.rotation[3] = 1.0;
+    floor.shape = 1;
+    rk_simulation_object floor_object = 0;
+    assert(rk_simulation_spawn_object(simulation, &floor, &floor_object) == RK_OK);
+    for (int tick = 0; tick < 100; ++tick)
+        assert(rk_simulation_step(simulation, tick) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(rk_simulation_get_robot_pose(simulation, 0, &pose) == RK_OK);
+    assert(pose.position[2] < -1.0);
+    rk_simulation_destroy(simulation);
+}
+
 int main() {
+    shapeless_link_without_approximation_collides_with_nothing();
+    link_shape_contact_filters_reach_the_backend();
+    robots_start_in_a_joint_pose();
+    observed_limit_tolerance_allows_compliant_stops();
     actuator_limit_stalls_then_lifts();
     servo_target_runs_through_the_runtime();
     blueprint_joint_friction_holds_an_arm();

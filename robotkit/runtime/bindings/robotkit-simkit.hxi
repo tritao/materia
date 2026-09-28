@@ -16,6 +16,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * < size[0]: radius.
 	 */
 	const RK_LINK_SHAPE_SPHERE = 2;
+	const RK_MAX_CONTACT_PAIRS = 128;
 	const RK_MAX_LINK_SHAPES = 256;
 	enum rk_simulation_presentation_pose_kind : c_int {
 		RK_SIMULATION_PRESENTATION_ROBOT_BASE = 1;
@@ -195,6 +196,14 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_set_differential_drive(simulation: rk_simulation, robot_index: u32, desc: ptr<const<rk_simulation_differential_drive_desc>>) -> rk_result;
 	/**
+	 * Places one attached robot's joints at positions, in joint order, as a pose
+	 * to start from, such as a humanoid's standing keyframe. Velocities become
+	 * zero. Accepted only while the simulation is stopped, like
+	 * rk_simulation_teleport_robot(); reset returns joints to zero. Fixed joints
+	 * must be given 0.
+	 */
+	extern fn rk_simulation_set_joint_positions(simulation: rk_simulation, robot_index: u32, positions: ptr<const<f64>> @in_array("count"), count: u32) -> rk_result;
+	/**
 	 * Couples one robot's three omni-wheel velocity targets to its kinematic base.
 	 *
 	 * Behaves like rk_simulation_set_differential_drive, including its floor,
@@ -294,13 +303,27 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		axis_parent: array<f64, 3> @offset(40);
 	}
 	/**
+	 * An explicit contact between two of a robot's link shapes, given as indices
+	 * into rk_simulation_robot_desc.link_shapes, with its own surface (see
+	 * rk_simulation_link_shape; zero fields keep the backend default).
+	 */
+	struct rk_simulation_contact_pair @layout(56, 8) {
+		shape_a: u32 @offset(0);
+		shape_b: u32 @offset(4);
+		friction: array<f64, 3> @offset(8);
+		contact_time_constant: f64 @offset(32);
+		contact_damping_ratio: f64 @offset(40);
+		friction_dimensions: u32 @offset(48);
+		reserved0: u32 @offset(52);
+	}
+	/**
 	 * Construction parameters for one shared Simulation owner.
 	 *
 	 * @note struct_size must be initialized to sizeof(rk_simulation_desc). The
 	 * fixed timestep is expressed in seconds and must be positive. Physics
 	 * substeps controls the backend solver subdivisions within one RobotKit tick.
 	 */
-	struct rk_simulation_desc @layout(64, 8) {
+	struct rk_simulation_desc @layout(72, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		fixed_timestep: f64 @offset(8);
 		physics_substeps: u32 @offset(16);
@@ -317,6 +340,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 * < NKSIM_FRICTION_CONE_* from nativekit_sim.h.
 		 */
 		friction_cone: u32 @offset(60);
+		/**
+		 * Constraint solver iteration limits; zero keeps the backend default.
+		 */
+		solver_iterations: u32 @offset(64);
+		line_search_iterations: u32 @offset(68);
 	}
 	/**
 	 * Ideal rolling differential-drive coupling for one robot's kinematic base.
@@ -384,7 +412,12 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		contact_time_constant: f64 @offset(112);
 		contact_damping_ratio: f64 @offset(120);
 		friction_dimensions: u32 @offset(128);
-		reserved0: u32 @offset(132);
+		/**
+		 * NKSIM_CONTACT_* from nativekit_sim.h: 0 collides by layers like other
+		 * links; 1 only through contact pairs; 2 through pairs and with every
+		 * environment object, using this shape's surface.
+		 */
+		contact_filter: u32 @offset(132);
 	}
 	/**
 	 * Editable-scene description for one simulation-owned environment object.
@@ -405,7 +438,14 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 */
 		half_extents: array<f64, 3> @offset(64);
 		mass: f64 @offset(88);
-		reserved: array<u64, 2> @offset(96);
+		/**
+		 * 0 is a box; 1 is an infinite static plane through the object's origin
+		 * facing its +Z axis, such as a ground plane, for which half_extents are
+		 * ignored.
+		 */
+		shape: u32 @offset(96);
+		reserved0: u32 @offset(100);
+		reserved: array<u64, 1> @offset(104);
 	}
 	/**
 	 * Ideal rolling omni-wheel coupling for one robot's kinematic base.
@@ -472,7 +512,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Optional settings for one robot added to a Simulation. An initial_pose whose
 	 * struct_size is zero keeps the default placement.
 	 */
-	struct rk_simulation_robot_desc @layout(1672704, 8) {
+	struct rk_simulation_robot_desc @layout(1679880, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -536,6 +576,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 */
 		link_shape_count: u32 @offset(1637880);
 		link_shapes: array<rk_simulation_link_shape, 256> @offset(1637888);
+		/**
+		 * Optional explicit contacts between link shapes.
+		 */
+		contact_pair_count: u32 @offset(1672704);
+		contact_pairs: array<rk_simulation_contact_pair, 128> @offset(1672712);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

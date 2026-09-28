@@ -26,7 +26,8 @@ class Simulation final {
 public:
     /** Creates an empty shared universe; robots must be added before stepping. */
     Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend = 0,
-               uint32_t integrator = 0, uint32_t friction_cone = 0);
+               uint32_t integrator = 0, uint32_t friction_cone = 0,
+               uint32_t solver_iterations = 0, uint32_t line_search_iterations = 0);
     ~Simulation();
 
     Simulation(const Simulation &) = delete;
@@ -45,6 +46,7 @@ public:
     rk_result reset();
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
+    rk_result set_joint_positions(uint32_t robot_index, const double *positions, uint32_t count);
     /**
      * Moves one kinematic robot base for the next tick without stopping the
      * owner, resetting sensors, or replacing the reset pose.

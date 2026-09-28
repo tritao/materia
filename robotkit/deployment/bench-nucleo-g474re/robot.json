@@ -121,7 +121,10 @@
       "dynamics": {
         "armature": 0,
         "damping": 0,
-        "frictionLoss": 0
+        "frictionLoss": 0,
+        "limitTimeConstant": 0,
+        "limitDampingRatio": 0,
+        "limitImpedance": [0, 0, 0, 0, 0]
       }
     },
     {
@@ -167,7 +170,10 @@
       "dynamics": {
         "armature": 0,
         "damping": 0,
-        "frictionLoss": 0
+        "frictionLoss": 0,
+        "limitTimeConstant": 0,
+        "limitDampingRatio": 0,
+        "limitImpedance": [0, 0, 0, 0, 0]
       }
     }
   ],
@@ -190,5 +196,6 @@
     "footprintLength": null,
     "footprintWidth": null
   },
-  "forkMechanism": null
+  "forkMechanism": null,
+  "contactPairs": []
 }

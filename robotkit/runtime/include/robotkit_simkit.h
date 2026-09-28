@@ -50,6 +50,9 @@ typedef struct rk_simulation_desc {
     /* Optional when struct_size includes this tail; zero keeps backend defaults. */
     uint32_t integrator; /**< NKSIM_INTEGRATOR_* from nativekit_sim.h. */
     uint32_t friction_cone; /**< NKSIM_FRICTION_CONE_* from nativekit_sim.h. */
+    /** Constraint solver iteration limits; zero keeps the backend default. */
+    uint32_t solver_iterations;
+    uint32_t line_search_iterations;
 } rk_simulation_desc;
 
 /**
@@ -74,7 +77,14 @@ typedef struct rk_simulation_object_desc {
     double rotation[4]; /**< Quaternion in x, y, z, w order. */
     double half_extents[3]; /**< Box dimensions used by the default object shape. */
     double mass;
-    uint64_t reserved[2];
+    /**
+     * 0 is a box; 1 is an infinite static plane through the object's origin
+     * facing its +Z axis, such as a ground plane, for which half_extents are
+     * ignored.
+     */
+    uint32_t shape;
+    uint32_t reserved0;
+    uint64_t reserved[1];
 } rk_simulation_object_desc;
 
 typedef struct rk_simulation_pose {
@@ -123,8 +133,30 @@ typedef struct rk_simulation_link_shape {
     double contact_time_constant;
     double contact_damping_ratio;
     uint32_t friction_dimensions;
-    uint32_t reserved0;
+    /**
+     * NKSIM_CONTACT_* from nativekit_sim.h: 0 collides by layers like other
+     * links; 1 only through contact pairs; 2 through pairs and with every
+     * environment object, using this shape's surface.
+     */
+    uint32_t contact_filter;
 } rk_simulation_link_shape;
+
+enum { RK_MAX_CONTACT_PAIRS = 128 };
+
+/**
+ * An explicit contact between two of a robot's link shapes, given as indices
+ * into rk_simulation_robot_desc.link_shapes, with its own surface (see
+ * rk_simulation_link_shape; zero fields keep the backend default).
+ */
+typedef struct rk_simulation_contact_pair {
+    uint32_t shape_a;
+    uint32_t shape_b;
+    double friction[3];
+    double contact_time_constant;
+    double contact_damping_ratio;
+    uint32_t friction_dimensions;
+    uint32_t reserved0;
+} rk_simulation_contact_pair;
 
 /**
  * Optional settings for one robot added to a Simulation. An initial_pose whose
@@ -185,6 +217,9 @@ typedef struct rk_simulation_robot_desc {
      */
     uint32_t link_shape_count;
     rk_simulation_link_shape link_shapes[RK_MAX_LINK_SHAPES];
+    /** Optional explicit contacts between link shapes. */
+    uint32_t contact_pair_count;
+    rk_simulation_contact_pair contact_pairs[RK_MAX_CONTACT_PAIRS];
 } rk_simulation_robot_desc;
 
 /**
@@ -480,6 +515,16 @@ RK_API rk_result RK_CALL rk_simulation_clear_omni_drive(
 RK_API rk_result RK_CALL rk_simulation_get_omni_drive_state(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_omni_drive_state *out_state RK_INOUT);
+/**
+ * Places one attached robot's joints at positions, in joint order, as a pose
+ * to start from, such as a humanoid's standing keyframe. Velocities become
+ * zero. Accepted only while the simulation is stopped, like
+ * rk_simulation_teleport_robot(); reset returns joints to zero. Fixed joints
+ * must be given 0.
+ */
+RK_API rk_result RK_CALL rk_simulation_set_joint_positions(
+    rk_simulation simulation, uint32_t robot_index,
+    const double *positions RK_IN_ARRAY(count), uint32_t count);
 /** Reads one robot base pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
     rk_simulation simulation, uint32_t robot_index,

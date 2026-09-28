@@ -16,7 +16,8 @@
 // - sites read by accelerometer, gyro or orientation sensors become IMU frames.
 //
 // Usage: robotkit_mjcf_import <model.xml> <output-directory>
-// Writes <output-directory>/robot.json and <output-directory>/meshes/*.stl.
+// Writes <output-directory>/robot.json, poses.json (the file's keyframes) and
+// meshes/*.stl.
 
 #include <mujoco/mujoco.h>
 
@@ -140,6 +141,36 @@ struct Summary {
     std::vector<std::string> notes;
 };
 
+// Keyframes as named poses: the root pose, each joint's position and each
+// actuator's control (a position servo's target), keyed by RobotModel ID.
+std::string import_poses(const mjModel *m) {
+    std::string out = "{\n  \"poses\": [";
+    for (int key = 0; key < m->nkey; ++key) {
+        const mjtNum *qpos = m->key_qpos + key * m->nq;
+        out += std::string(key ? "," : "") + "\n    {\"name\": " +
+               json_string(name_of(m, mjOBJ_KEY, key, "key"));
+        if (m->njnt > 0 && m->jnt_type[0] == mjJNT_FREE)
+            out += ", \"rootPosition\": " + array(Vec3{qpos[0], qpos[1], qpos[2]}) +
+                   ", \"rootRotation\": " + array(from_mujoco(qpos + 3));
+        out += ", \"joints\": {";
+        bool first = true;
+        for (int joint = 0; joint < m->njnt; ++joint) {
+            if (m->jnt_type[joint] != mjJNT_HINGE && m->jnt_type[joint] != mjJNT_SLIDE) continue;
+            out += std::string(first ? "" : ", ") +
+                   json_string("joint/" + name_of(m, mjOBJ_JOINT, joint, "joint")) + ": " +
+                   number(qpos[m->jnt_qposadr[joint]]);
+            first = false;
+        }
+        out += "}, \"actuatorTargets\": {";
+        for (int actuator = 0; actuator < m->nu; ++actuator)
+            out += std::string(actuator ? ", " : "") +
+                   json_string("actuator/" + name_of(m, mjOBJ_ACTUATOR, actuator, "actuator")) +
+                   ": " + number(m->key_ctrl[key * m->nu + actuator]);
+        out += "}}";
+    }
+    return out + (m->nkey ? "\n  ]\n}\n" : "]\n}\n");
+}
+
 std::string import_model(const mjModel *m, const std::filesystem::path &out_dir, Summary &summary) {
     // Links: every body except the world, in MuJoCo's depth-first order.
     int root = -1;
@@ -150,39 +181,41 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
         }
     if (root < 0) throw std::runtime_error("the model has no bodies");
 
-    // A geom named in an explicit contact pair takes the first such pair's
-    // friction and solver settings, which override the geoms' own.
-    std::map<int, int> contact_pairs;
-    for (int pair = 0; pair < m->npair; ++pair) {
-        contact_pairs.emplace(m->pair_geom1[pair], pair);
-        contact_pairs.emplace(m->pair_geom2[pair], pair);
-    }
-    const auto collides = [&](int geom) {
-        return m->geom_contype[geom] != 0 || m->geom_conaffinity[geom] != 0 ||
-               contact_pairs.count(geom) != 0;
+    // Geoms without contact bits collide only through explicit pairs. A pair
+    // with a world geom (such as the floor) becomes "pairs and environment"
+    // with that pair's surface; a pair between two robot geoms becomes a
+    // contactPairs entry with its own.
+    std::map<int, int> any_pair, world_pair;
+    for (int pair = 0; pair < m->npair; ++pair)
+        for (const int geom : {m->pair_geom1[pair], m->pair_geom2[pair]}) {
+            any_pair.emplace(geom, pair);
+            const int other = geom == m->pair_geom1[pair] ? m->pair_geom2[pair] : m->pair_geom1[pair];
+            if (m->geom_bodyid[other] == 0) world_pair.emplace(geom, pair);
+        }
+    const auto layered = [&](int geom) {
+        return m->geom_contype[geom] != 0 || m->geom_conaffinity[geom] != 0;
+    };
+    const auto collides = [&](int geom) { return layered(geom) || any_pair.count(geom) != 0; };
+    const auto pair_surface = [&](int pair) {
+        const auto *values = m->pair_friction + 5 * pair; // slide, slide, spin, roll, roll
+        return "{\"friction\": " + array(std::array<double, 3>{values[0], values[2], values[3]}) +
+               ", \"frictionDimensions\": " + std::to_string(m->pair_dim[pair]) +
+               ", \"contactTimeConstant\": " + number(m->pair_solref[2 * pair]) +
+               ", \"contactDampingRatio\": " + number(m->pair_solref[2 * pair + 1]) + "}";
     };
     const auto surface_of = [&](int geom) {
-        const auto pair = contact_pairs.find(geom);
-        std::array<double, 3> friction;
-        double time_constant, damping_ratio;
-        int dimensions;
-        if (pair != contact_pairs.end()) {
-            const auto *values = m->pair_friction + 5 * pair->second; // slide, slide, spin, roll, roll
-            friction = {values[0], values[2], values[3]};
-            time_constant = m->pair_solref[2 * pair->second];
-            damping_ratio = m->pair_solref[2 * pair->second + 1];
-            dimensions = m->pair_dim[pair->second];
-        } else {
-            friction = {m->geom_friction[3 * geom], m->geom_friction[3 * geom + 1],
-                        m->geom_friction[3 * geom + 2]};
-            time_constant = m->geom_solref[2 * geom];
-            damping_ratio = m->geom_solref[2 * geom + 1];
-            dimensions = m->geom_condim[geom];
-        }
-        return "{\"friction\": " + array(friction) + ", \"frictionDimensions\": " +
-               std::to_string(dimensions) + ", \"contactTimeConstant\": " + number(time_constant) +
-               ", \"contactDampingRatio\": " + number(damping_ratio) + "}";
+        if (!layered(geom) && world_pair.count(geom)) return pair_surface(world_pair.at(geom));
+        return "{\"friction\": " +
+               array(std::array<double, 3>{m->geom_friction[3 * geom], m->geom_friction[3 * geom + 1],
+                                           m->geom_friction[3 * geom + 2]}) +
+               ", \"frictionDimensions\": " + std::to_string(m->geom_condim[geom]) +
+               ", \"contactTimeConstant\": " + number(m->geom_solref[2 * geom]) +
+               ", \"contactDampingRatio\": " + number(m->geom_solref[2 * geom + 1]) + "}";
     };
+    const auto contact_of = [&](int geom) {
+        return layered(geom) ? "layers" : world_pair.count(geom) ? "pairs-and-environment" : "pairs";
+    };
+    std::map<int, std::pair<std::string, int>> imported_shapes; // geom -> link ID, shape index
 
     bool floating = false;
     std::vector<std::string> links, joints, frames, sensors, actuators;
@@ -235,9 +268,11 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
                         name_of(m, mjOBJ_GEOM, geom, "geom") + " on " + body_name);
                     continue;
                 }
+                imported_shapes[geom] = {link_id, static_cast<int>(shapes.size())};
                 shapes.push_back("{\"kind\": " + json_string(kind) + ", \"size\": " + array(sizes) +
                                  ", \"position\": " + array(pos) + ", \"rotation\": " +
-                                 array(rot) + ", \"surface\": " + surface_of(geom) + "}");
+                                 array(rot) + ", \"surface\": " + surface_of(geom) +
+                                 ", \"contact\": " + json_string(contact_of(geom)) + "}");
             } else if (type == mjGEOM_MESH && m->geom_dataid[geom] >= 0) {
                 const int mesh = m->geom_dataid[geom];
                 const float *vertices = m->mesh_vert + 3 * m->mesh_vertadr[mesh];
@@ -290,6 +325,8 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
         std::string type = "fixed", joint_name = body_name + "_fixed";
         double lower = 0.0, upper = 0.0, effort = 0.0;
         double joint_armature = 0.0, joint_damping = 0.0, joint_friction = 0.0;
+        std::array<double, 2> limit_solref{0.0, 0.0};
+        std::array<double, 5> limit_solimp{};
         if (joint_count == 1) {
             const int joint = m->body_jntadr[body];
             const auto joint_type = m->jnt_type[joint];
@@ -311,6 +348,8 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
             joint_armature = m->dof_armature[dof];
             joint_damping = m->dof_damping[dof];
             joint_friction = m->dof_frictionloss[dof];
+            limit_solref = {m->jnt_solref[mjNREF * joint], m->jnt_solref[mjNREF * joint + 1]};
+            for (int term = 0; term < 5; ++term) limit_solimp[term] = m->jnt_solimp[mjNIMP * joint + term];
             armature += joint_armature != 0.0;
             damping += joint_damping != 0.0;
             friction += joint_friction != 0.0;
@@ -331,7 +370,9 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
             array(parent_rot) + ", \"childFramePosition\": " + array(anchor) +
             ", \"childFrameRotation\": [0, 0, 0, 1], \"axis\": " + array(axis) +
             ", \"dynamics\": {\"armature\": " + number(joint_armature) + ", \"damping\": " +
-            number(joint_damping) + ", \"frictionLoss\": " + number(joint_friction) + "}}");
+            number(joint_damping) + ", \"frictionLoss\": " + number(joint_friction) +
+            ", \"limitTimeConstant\": " + number(limit_solref[0]) + ", \"limitDampingRatio\": " +
+            number(limit_solref[1]) + ", \"limitImpedance\": " + array(limit_solimp) + "}}");
         ++summary.joints;
     }
 
@@ -399,14 +440,34 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
     if (damping_ratio_actuators)
         summary.notes.push_back(std::to_string(damping_ratio_actuators) +
                                 " actuators set a damping ratio, not stored; servoDamping is 0");
+    std::vector<std::string> contact_pairs;
+    int environment_pairs = 0;
+    for (int pair = 0; pair < m->npair; ++pair) {
+        const auto a = imported_shapes.find(m->pair_geom1[pair]);
+        const auto b = imported_shapes.find(m->pair_geom2[pair]);
+        if (a == imported_shapes.end() || b == imported_shapes.end()) {
+            ++environment_pairs;
+            continue;
+        }
+        if (a->second.first == b->second.first) {
+            summary.notes.push_back("skipped a contact pair within one link");
+            continue;
+        }
+        contact_pairs.push_back("{\"linkA\": " + json_string(a->second.first) + ", \"shapeA\": " +
+            std::to_string(a->second.second) + ", \"linkB\": " + json_string(b->second.first) +
+            ", \"shapeB\": " + std::to_string(b->second.second) + ", \"surface\": " +
+            pair_surface(pair) + "}");
+    }
     if (m->npair)
-        summary.notes.push_back(std::to_string(m->npair) + " explicit contact pairs approximated: " +
-                                "their geoms collide with everything, using the pair's surface");
+        summary.notes.push_back(std::to_string(contact_pairs.size()) + " contact pairs between links; " +
+            std::to_string(environment_pairs) + " with world geoms become environment contact");
     const char *integrators[] = {"euler", "rk4", "implicit", "implicitfast"};
     summary.notes.push_back("scene solver: timestep " + number(m->opt.timestep) + ", integrator " +
                             (m->opt.integrator >= 0 && m->opt.integrator < 4
                                  ? integrators[m->opt.integrator] : "other") +
-                            ", cone " + (m->opt.cone == mjCONE_ELLIPTIC ? "elliptic" : "pyramidal"));
+                            ", cone " + (m->opt.cone == mjCONE_ELLIPTIC ? "elliptic" : "pyramidal") +
+                            ", solver iterations " + std::to_string(m->opt.iterations) +
+                            ", line-search iterations " + std::to_string(m->opt.ls_iterations));
     if (floating) {
         const auto root_pos = vec(m->body_pos + 3 * root);
         summary.notes.push_back("floating base: authored root position " + array(root_pos));
@@ -424,7 +485,8 @@ std::string import_model(const mjModel *m, const std::filesystem::path &out_dir,
            (floating ? "true" : "false") + ",\n  \"links\": " + join(links) +
            ",\n  \"joints\": " + join(joints) + ",\n  \"actuators\": " + join(actuators) +
            ",\n  \"couplings\": [],\n  \"frames\": " + join(frames) + ",\n  \"sensors\": " +
-           join(sensors) + ",\n  \"mobileBase\": null,\n  \"forkMechanism\": null\n}\n";
+           join(sensors) + ",\n  \"mobileBase\": null,\n  \"forkMechanism\": null,\n  \"contactPairs\": " +
+           join(contact_pairs) + "\n}\n";
 }
 
 } // namespace
@@ -447,6 +509,10 @@ int main(int argc, char **argv) {
         std::ofstream out(out_dir / "robot.json");
         out << json;
         if (!out) throw std::runtime_error("cannot write robot.json");
+        std::ofstream poses(out_dir / "poses.json");
+        poses << import_poses(model);
+        if (!poses) throw std::runtime_error("cannot write poses.json");
+        if (model->nkey) summary.notes.push_back(std::to_string(model->nkey) + " keyframes written to poses.json");
         std::printf("imported %d links, %d joints, %d actuators, %d collision shapes, "
                     "%d visual meshes, %d IMUs\n", summary.links, summary.joints,
                     summary.actuators, summary.shapes, summary.meshes, summary.imus);

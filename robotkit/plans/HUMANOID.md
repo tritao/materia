@@ -290,3 +290,76 @@ Found for H2/H5, not fixed here:
 - Contact pairs are approximated by layer collision: every imported shape
   collides with the environment and, unless self-collision is off, with
   other links.
+
+### H2 — Physics fidelity for legged contact
+
+Result: the conformance gate passes. `tools/humanoid/check-conformance.sh`
+imports an MJCF file, steps it in plain MuJoCo (`robotkit_mjcf_reference`)
+and through `RobotModel` → compiler → `Simulation` (`humanoid.Main
+conformance`), and compares every 10–20 ms tick:
+- the torque-driven biped fixture, 1.5 s through landing and toppling: within
+  1.1e-7 m and 1.2e-7 rad;
+- G1 from its `home` keyframe, servos holding and swinging ±0.1 rad, 2 s
+  through toppling and hitting the ground: within 7e-8 m and 3.1e-7 rad.
+The remaining ~1e-8 m offset is the starting pose's single-precision rounding
+in the scene graph.
+
+Added, bottom up:
+- **SimKit:** a servo target mode (`NKSIM_JOINT_TARGET_SERVO`); joint
+  armature, damping, friction loss and limit softness; shape contact
+  surfaces (friction, friction dimensions, soft-contact time constant and
+  damping ratio); contact filters and explicit contact pairs; integrator,
+  friction cone and solver iteration limits; a cylinder shape; setting a
+  joint's position as a starting pose.
+- **RobotKit:** `RK_TARGET_SERVO` with a command `servos` tail (first 64
+  joints); per-joint dynamics on the blueprint; shape surfaces, contact modes
+  and contact pairs on the robot description; solver options on
+  `rk_simulation_desc`; `rk_simulation_set_joint_positions`; ground-plane
+  objects; `observed_limit_tolerance`.
+- **Model:** `Joint` dynamics and limit softness, `Actuator` servo gains,
+  `CollisionShape` surface and contact mode, `RobotModel.contactPairs`, all in
+  schema v6; `JointTarget.servo`, recorded with its terms.
+- **Import:** all of the above from MJCF, keyframes to `poses.json`, and URDF
+  `<dynamics>`.
+- The `TODO.md` actuator-limit regression.
+
+What conformance found, in the order it found them:
+1. Every G1 shape touched the floor, but MJX G1 collides only through its 49
+   explicit pairs (23 with the floor, 26 between links); the foot boxes, 2 mm
+   below the foot capsules, touch only other links. Hence contact modes and
+   pairs.
+2. A servo computed as explicit torque differs from MuJoCo's position
+   actuator, whose damping `implicitfast` integrates implicitly. The servo is
+   now a MuJoCo affine actuator whose gains are set each step and are zero
+   outside servo mode, and its force limit is the joint's actuator force
+   range, as MJCF's `actuatorfrcrange` is: MuJoCo drops an actuator clamped by
+   its own force range from the implicit derivative, but not a joint-clamped one.
+3. The tools used a box floor; G1's scene has a plane, and foot capsules
+   touch the two differently once the feet tilt. Hence ground planes.
+4. A shapeless link under the `none` collision approximation still touched
+   the environment: clearing its mask did not stop the environment's own
+   mask from catching its layer. Fixed in `Simulation`, with a regression test.
+5. G1 sets its own joint-limit softness (`solreflimit`, `solimplimit`).
+   Hence limit softness.
+6. MJX G1 limits the solver to 5 iterations and 8 line-search iterations.
+   Truncated solves depend on constraint order, which differs between the two
+   compiled models, so the gate solves both to convergence (100 and 50); with
+   5 and 8 on both sides they agree to about 1e-4 rad. Policies trained in MJX
+   see the truncated solver; H4 should expect that level of difference.
+
+Also found and fixed on the way:
+- The runtime faulted on any observed position past a joint limit, and
+  compliant stops (MuJoCo's, or a real joint's) always go slightly past. A
+  blueprint may now set `observed_limit_tolerance`; the humanoid tools use
+  0.05 rad. H5 still decides the humanoid default.
+- A runtime test kept four `RobotRuntime`s and two plans on the stack and
+  overflowed it as the blueprint grew; it now allocates them on the heap.
+
+G1 cannot stand on joint servos alone, in either simulator: held at `home`
+it tilts 0.4 rad within 1 s and falls by 1.5 s. `humanoid.Main stand` checks
+standing and passes only once H4's policy balances it.
+
+Still approximated: a pair with any world geom becomes contact with every
+environment object, using that pair's surface. Pairs between two world
+geoms, geom `solmix` and `solimp` on surfaces, and tendon or site actuators
+are not imported.

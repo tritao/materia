@@ -1,7 +1,7 @@
 {
 	"version": 1,
 	"package": { "name": "robotkit-humanoid-tools" },
-	"entry": "humanoid.DropCheck",
+	"entry": "humanoid.Main",
 	"sourceRoots": ["src"],
 	"dependencies": {
 		"nativekit": { "path": "../../../nativekit" },

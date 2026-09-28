@@ -104,9 +104,17 @@ rk_result RK_CALL rk_robot_runtime_blueprint_validate(const rk_robot_runtime_blu
             const auto &dynamics = blueprint->joint_dynamics[joint];
             if (!is_finite(dynamics.armature) || !is_finite(dynamics.damping) ||
                 !is_finite(dynamics.friction_loss) || dynamics.armature < 0.0 ||
-                dynamics.damping < 0.0 || dynamics.friction_loss < 0.0)
+                dynamics.damping < 0.0 || dynamics.friction_loss < 0.0 ||
+                !is_finite(dynamics.limit_time_constant) || dynamics.limit_time_constant < 0.0 ||
+                !is_finite(dynamics.limit_damping_ratio) || dynamics.limit_damping_ratio < 0.0)
                 return RK_ERROR_INVALID_ARGUMENT;
+            for (const double value : dynamics.limit_impedance)
+                if (!is_finite(value)) return RK_ERROR_INVALID_ARGUMENT;
         }
+    if (blueprint->struct_size >= offsetof(rk_robot_runtime_blueprint, observed_limit_tolerance) +
+            sizeof(blueprint->observed_limit_tolerance) &&
+        (!is_finite(blueprint->observed_limit_tolerance) || blueprint->observed_limit_tolerance < 0.0))
+        return RK_ERROR_INVALID_ARGUMENT;
     constexpr auto channels_size = offsetof(rk_robot_runtime_blueprint, coupling_count);
     if (blueprint->struct_size > offsetof(rk_robot_runtime_blueprint, channel_count) &&
         blueprint->struct_size < channels_size) return RK_ERROR_INVALID_ARGUMENT;

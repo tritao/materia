@@ -28,5 +28,5 @@ fi
 git -C "$source_dir" -c advice.detachedHead=false checkout --quiet "$menagerie_commit"
 
 "$importer" "$source_dir/unitree_g1/scene_mjx.xml" "$output/model"
-echo "G1 RobotModel: $output/model/robot.json"
+echo "G1 RobotModel: $output/model/robot.json, keyframes: $output/model/poses.json"
 echo "Licence: $source_dir/unitree_g1/LICENSE"

@@ -626,7 +626,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Passive joint dynamics; zero is none.
 	 */
-	struct rk_robot_joint_dynamics @layout(24, 8) {
+	struct rk_robot_joint_dynamics @layout(80, 8) {
 		/**
 		 * < Reflected rotor inertia: kg m^2, or kg for a prismatic joint.
 		 */
@@ -639,8 +639,14 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Dry friction effort.
 		 */
 		friction_loss: f64 @offset(16);
+		/**
+		 * Limit softness (see nksim_joint_desc); zeros keep the backend default.
+		 */
+		limit_time_constant: f64 @offset(24);
+		limit_damping_ratio: f64 @offset(32);
+		limit_impedance: array<f64, 5> @offset(40);
 	}
-	struct rk_robot_runtime_blueprint @layout(234984, 8) {
+	struct rk_robot_runtime_blueprint @layout(263664, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -715,6 +721,14 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * Versioned: absent means no passive dynamics. Indexed by joint.
 		 */
 		joint_dynamics: array<rk_robot_joint_dynamics, 512> @offset(222696);
+		/**
+		 * Versioned: how far, in joint units, an observed position may pass a
+		 * joint limit before the runtime faults. Zero keeps limits exact. A robot
+		 * that rests on its mechanical stops, such as a legged robot on its knee
+		 * stops, needs room for a simulator's or joint's compliant stops.
+		 * Commanded positions must still lie within the limits.
+		 */
+		observed_limit_tolerance: f64 @offset(263656);
 	}
 	/**
 	 * One compiled joint and its limits in a RobotRuntimeBlueprint.

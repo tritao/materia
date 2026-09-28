@@ -153,6 +153,9 @@ public:
         return endpoint_ != nullptr && endpoint_->supports_trajectory_queue();
     }
 
+    /** The compiled topology and limits this runtime executes. */
+    const rk_robot_runtime_blueprint &blueprint() const noexcept { return blueprint_; }
+
     bool running() const;
 
     struct RuntimeTrajectoryPoint {

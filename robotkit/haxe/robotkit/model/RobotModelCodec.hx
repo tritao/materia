@@ -38,6 +38,17 @@ class RobotModelCodec {
       vector(frame.position, 3, "frame position");
       vector(frame.rotation, 4, "frame rotation");
     }
+    var linkShapes = new Map<String, Int>();
+    for (link in model.links) linkShapes.set(link.id, link.collisionShapes.length);
+    for (pair in model.contactPairs) {
+      if (pair == null) throw "Robot contact pair is null";
+      if (!linkShapes.exists(pair.linkA) || !linkShapes.exists(pair.linkB) || pair.linkA == pair.linkB ||
+          pair.shapeA < 0 || pair.shapeA >= linkShapes.get(pair.linkA) ||
+          pair.shapeB < 0 || pair.shapeB >= linkShapes.get(pair.linkB))
+        throw 'Contact pair ${pair.linkA}/${pair.shapeA} - ${pair.linkB}/${pair.shapeB} references no shape on two links';
+      var error = pair.surface == null ? "contact pair surface is null" : pair.surface.validate();
+      if (error != null) throw error;
+    }
     var joints = new Map<String, Bool>();
     for (joint in model.joints) {
       requireText(joint.id, "joint id");
@@ -54,6 +65,9 @@ class RobotModelCodec {
       nonNegative(joint.armature, "joint armature");
       nonNegative(joint.damping, "joint damping");
       nonNegative(joint.frictionLoss, "joint frictionLoss");
+      nonNegative(joint.limitTimeConstant, "joint limitTimeConstant");
+      nonNegative(joint.limitDampingRatio, "joint limitDampingRatio");
+      vector(joint.limitImpedance, 5, "joint limitImpedance");
       finite(joint.limits.lower, "joint limits.lower");
       finite(joint.limits.upper, "joint limits.upper");
       finite(joint.limits.velocity, "joint limits.velocity");
@@ -122,7 +136,9 @@ class RobotModelCodec {
         childFramePosition: joint.childFramePosition,
         childFrameRotation: joint.childFrameRotation,
         axis: joint.axis,
-        dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss}
+        dynamics: {armature: joint.armature, damping: joint.damping, frictionLoss: joint.frictionLoss,
+          limitTimeConstant: joint.limitTimeConstant, limitDampingRatio: joint.limitDampingRatio,
+          limitImpedance: joint.limitImpedance}
       }],
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
       couplings: [for (coupling in model.couplings) {
@@ -143,7 +159,11 @@ class RobotModelCodec {
         noiseStddev: sensor.noiseStddev, noiseSeed: sensor.noiseSeed
       }],
       mobileBase: mobile,
-      forkMechanism: fork
+      forkMechanism: fork,
+      contactPairs: [for (pair in model.contactPairs) {
+        linkA: pair.linkA, shapeA: pair.shapeA, linkB: pair.linkB, shapeB: pair.shapeB,
+        surface: encodeSurface(pair.surface)
+      }]
     }));
   }
 
@@ -202,6 +222,9 @@ class RobotModelCodec {
       joint.armature = nonNegative(number(dynamics, "armature"), "joint armature");
       joint.damping = nonNegative(number(dynamics, "damping"), "joint damping");
       joint.frictionLoss = nonNegative(number(dynamics, "frictionLoss"), "joint frictionLoss");
+      joint.limitTimeConstant = nonNegative(number(dynamics, "limitTimeConstant"), "joint limitTimeConstant");
+      joint.limitDampingRatio = nonNegative(number(dynamics, "limitDampingRatio"), "joint limitDampingRatio");
+      joint.limitImpedance = vectorField(dynamics, "limitImpedance", 5);
     }
 
     var couplingIds = new Map<String, Bool>();
@@ -265,6 +288,18 @@ class RobotModelCodec {
 
     var mobile:Dynamic = required(root, "mobileBase");
     if (mobile != null) model.mobileBase = readMobile(mobile);
+    for (record in array(root, "contactPairs")) {
+      var linkA = text(record, "linkA"), linkB = text(record, "linkB");
+      var shapeA = fieldInt(record, "shapeA"), shapeB = fieldInt(record, "shapeB");
+      var a = links.get(linkA), b = links.get(linkB);
+      if (a == null || b == null || linkA == linkB || shapeA < 0 || shapeA >= a.collisionShapes.length ||
+          shapeB < 0 || shapeB >= b.collisionShapes.length)
+        throw 'Contact pair $linkA/$shapeA - $linkB/$shapeB references no shape on two links';
+      var surface = readSurface(required(record, "surface"));
+      var error = surface.validate();
+      if (error != null) throw error;
+      model.contactPairs.push(new ContactPair(linkA, shapeA, linkB, shapeB, surface));
+    }
     var fork:Dynamic = required(root, "forkMechanism");
     if (fork != null) model.forkMechanism = readFork(fork);
     return model;
@@ -280,11 +315,24 @@ class RobotModelCodec {
     }
     var surface = shape.surface;
     return {kind: kind, size: size, position: shape.position, rotation: shape.rotation,
-      surface: surface == null ? null : {
-        friction: surface.friction, frictionDimensions: surface.frictionDimensions,
-        contactTimeConstant: surface.contactTimeConstant,
-        contactDampingRatio: surface.contactDampingRatio
+      surface: surface == null ? null : encodeSurface(surface),
+      contact: switch shape.contact {
+        case Layers: "layers";
+        case PairsOnly: "pairs";
+        case PairsAndEnvironment: "pairs-and-environment";
       }};
+  }
+
+  static function encodeSurface(surface:ContactSurface):Dynamic return {
+    friction: surface.friction, frictionDimensions: surface.frictionDimensions,
+    contactTimeConstant: surface.contactTimeConstant,
+    contactDampingRatio: surface.contactDampingRatio
+  };
+
+  static function readSurface(record:Dynamic):ContactSurface {
+    return new ContactSurface(vectorField(record, "friction", 3),
+      fieldInt(record, "frictionDimensions"), number(record, "contactTimeConstant"),
+      number(record, "contactDampingRatio"));
   }
 
   static function readCollisionShape(record:Dynamic):CollisionShape {
@@ -304,10 +352,13 @@ class RobotModelCodec {
     var shape = new CollisionShape(primitive, vectorField(record, "position", 3),
       vectorField(record, "rotation", 4));
     var surface:Dynamic = required(record, "surface");
-    if (surface != null)
-      shape.surface = new ContactSurface(vectorField(surface, "friction", 3),
-        fieldInt(surface, "frictionDimensions"), number(surface, "contactTimeConstant"),
-        number(surface, "contactDampingRatio"));
+    if (surface != null) shape.surface = readSurface(surface);
+    shape.contact = switch text(record, "contact") {
+      case "layers": Layers;
+      case "pairs": PairsOnly;
+      case "pairs-and-environment": PairsAndEnvironment;
+      case other: throw 'Unsupported RobotModel shape contact $other';
+    };
     return shape;
   }
 

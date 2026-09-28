@@ -44,6 +44,16 @@ class ContactSurface {
   }
 }
 
+/** Which contacts a collision shape takes part in. */
+enum ShapeContact {
+  /** Collides like the rest of the robot: with the environment and, unless disabled, other links. */
+  Layers;
+  /** Collides only through the robot's contact pairs. */
+  PairsOnly;
+  /** Collides through contact pairs and with every environment object, using its own surface. */
+  PairsAndEnvironment;
+}
+
 /** One primitive collision shape, posed in its link's frame. */
 class CollisionShape {
   public var primitive:CollisionPrimitive;
@@ -52,6 +62,7 @@ class CollisionShape {
   public var rotation:Array<Float>;
   /** Contact surface; null keeps the simulator's defaults. */
   public var surface:Null<ContactSurface> = null;
+  public var contact:ShapeContact = ShapeContact.Layers;
 
   public function new(primitive:CollisionPrimitive, ?position:Array<Float>,
       ?rotation:Array<Float>) {

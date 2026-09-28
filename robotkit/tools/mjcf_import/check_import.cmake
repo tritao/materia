@@ -8,7 +8,7 @@ if(NOT result EQUAL 0)
 endif()
 message(STATUS "${output}")
 foreach(note IN ITEMS "1 visual meshes" "1 IMUs" "joint dynamics: armature on 2"
-        "2 explicit contact pairs")
+        "2 contact pairs between links; 0 with world geoms")
     string(FIND "${output}" "${note}" found)
     if(found EQUAL -1)
         message(FATAL_ERROR "import summary lacks \"${note}\"")

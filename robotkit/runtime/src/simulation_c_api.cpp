@@ -71,7 +71,9 @@ rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
         const bool has_options = desc->struct_size >= sizeof(*desc);
         *out_simulation = store(std::make_shared<robotkit::Simulation>(
             desc->fixed_timestep, desc->physics_substeps, desc->backend,
-            has_options ? desc->integrator : 0u, has_options ? desc->friction_cone : 0u));
+            has_options ? desc->integrator : 0u, has_options ? desc->friction_cone : 0u,
+            has_options ? desc->solver_iterations : 0u,
+            has_options ? desc->line_search_iterations : 0u));
         return RK_OK;
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;
@@ -221,6 +223,13 @@ rk_result RK_CALL rk_simulation_get_omni_drive_state(rk_simulation simulation,
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = resolve(simulation);
     return value ? value->get_omni_drive_state(robot_index, *out_state)
+                 : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_set_joint_positions(rk_simulation simulation,
+    uint32_t robot_index, const double *positions, uint32_t count) {
+    const auto value = resolve(simulation);
+    return value ? value->set_joint_positions(robot_index, positions, count)
                  : RK_ERROR_INVALID_HANDLE;
 }
 

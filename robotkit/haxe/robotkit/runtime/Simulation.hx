@@ -4,6 +4,7 @@ import RobotKitSimKit;
 import haxe.Int64;
 import robotkit.mobile.Pose2;
 import robotkit.model.CollisionShape.CollisionPrimitive;
+import robotkit.model.CollisionShape.ShapeContact;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.spatial.Vec3;
@@ -25,11 +26,13 @@ class Simulation {
   /**
    * fixedTimestep is one control tick; physics advances physicsSubsteps times
    * per tick. integrator and frictionCone take SimKit's NKSIM_INTEGRATOR_* and
-   * NKSIM_FRICTION_CONE_* values (see SimulationSolver); zero keeps the
+   * NKSIM_FRICTION_CONE_* values (see SimulationSolver), and solverIterations
+   * and lineSearchIterations cap the constraint solver; zero keeps the
    * backend's defaults.
    */
   public function new(?fixedTimestep:Float = 0.01, ?physicsSubsteps:Int = 1, ?backend:Int = 0,
-      ?integrator:Int = 0, ?frictionCone:Int = 0) {
+      ?integrator:Int = 0, ?frictionCone:Int = 0, ?solverIterations:Int = 0,
+      ?lineSearchIterations:Int = 0) {
     if (!Math.isFinite(fixedTimestep) || fixedTimestep <= 0.0 || physicsSubsteps <= 0)
       throw "Simulation requires a positive finite timestep and positive substep count";
     fixedTimestepSeconds = fixedTimestep;
@@ -40,6 +43,8 @@ class Simulation {
     desc.set_backend(backend);
     desc.set_integrator(integrator);
     desc.set_friction_cone(frictionCone);
+    desc.set_solver_iterations(solverIterations);
+    desc.set_line_search_iterations(lineSearchIterations);
     var result = RobotKitSimKit.rk_simulation_create(desc);
     check(result.status, "simulation.create");
     owner = result.out_simulation;
@@ -273,7 +278,27 @@ class Simulation {
           native.set_contact_time_constant(surface.contactTimeConstant);
           native.set_contact_damping_ratio(surface.contactDampingRatio);
         }
+        native.set_contact_filter(switch source.shape.contact {
+          case Layers: 0;
+          case PairsOnly: 1;
+          case PairsAndEnvironment: 2;
+        });
         robotDesc.set_link_shapes(index, native);
+      }
+      var pairs = blueprint.contactPairs;
+      if (pairs.length > RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS)
+        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_CONTACT_PAIRS} contact pairs';
+      robotDesc.set_contact_pair_count(pairs.length);
+      for (index in 0...pairs.length) {
+        var pair = pairs[index];
+        var native = new rk_simulation_contact_pair();
+        native.set_shape_a(pair.shapeA);
+        native.set_shape_b(pair.shapeB);
+        for (axis in 0...3) native.set_friction(axis, pair.surface.friction[axis]);
+        native.set_friction_dimensions(pair.surface.frictionDimensions);
+        native.set_contact_time_constant(pair.surface.contactTimeConstant);
+        native.set_contact_damping_ratio(pair.surface.contactDampingRatio);
+        robotDesc.set_contact_pairs(index, native);
       }
     }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
@@ -502,6 +527,17 @@ class Simulation {
     };
   }
 
+  /**
+   * Places a robot's joints, in joint order, as a pose to start from (such as
+   * a standing keyframe) while the simulation is stopped. Velocities become
+   * zero; reset returns joints to zero.
+   */
+  public function setJointPositions(robotIndex:Int, positions:Array<Float>):Void {
+    ensureLive();
+    check(RobotKitSimKit.rk_simulation_set_joint_positions(owner.borrow(), robotIndex, positions),
+      "simulation.setJointPositions");
+  }
+
   /** Reads one robot base pose without mutating physics or the editable model. */
   public function robotPose(robotIndex:Int):{position:Array<Float>,rotation:Array<Float>} {
     ensureLive();var pose=new rk_simulation_pose();pose.set_struct_size(rk_simulation_pose.size());
@@ -561,6 +597,27 @@ class Simulation {
       rotation:[for(index in 0...4) pose.get_rotation(index)]};
 
   /** Adds a box to the shared physics world and returns its owned object ID. */
+  /**
+   * Adds an infinite static ground plane through `position`, facing the +Z axis
+   * of `rotation` (default: the world XY plane at the origin), while stopped.
+   */
+  public function spawnPlane(?position:Array<Float>, ?rotation:Array<Float>):Int {
+    ensureLive();
+    var at = position == null ? [0.0, 0.0, 0.0] : position;
+    var facing = rotation == null ? [0.0, 0.0, 0.0, 1.0] : rotation;
+    if (at.length != 3 || facing.length != 4)
+      throw "Simulation.spawnPlane requires a three-component position and four-component rotation";
+    var desc = new rk_simulation_object_desc();
+    desc.set_struct_size(rk_simulation_object_desc.size());
+    desc.set_motion_type(0);
+    desc.set_shape(1);
+    for (index in 0...3) desc.set_position(index, at[index]);
+    for (index in 0...4) desc.set_rotation(index, facing[index]);
+    var result = RobotKitSimKit.rk_simulation_spawn_object(owner.borrow(), desc);
+    check(result.status, "simulation.spawnPlane");
+    return result.out_object;
+  }
+
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
       ?dynamicBody:Bool = false, ?mass:Float = 1.0,
       ?orientation:Array<Float>):Int {

@@ -1619,10 +1619,14 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
+    const double tolerance = blueprint_.struct_size >=
+        offsetof(rk_robot_runtime_blueprint, observed_limit_tolerance) +
+            sizeof(blueprint_.observed_limit_tolerance)
+        ? blueprint_.observed_limit_tolerance : 0.0;
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
-        if (next.position[joint] < limits.lower_limit ||
-            next.position[joint] > limits.upper_limit) {
+        if (next.position[joint] < limits.lower_limit - tolerance ||
+            next.position[joint] > limits.upper_limit + tolerance) {
             latch_fault();
             return RK_ERROR_LIMIT;
         }

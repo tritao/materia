@@ -798,6 +798,9 @@ class RobotWorldTests {
     source.joints[2].armature = 0.02;
     source.joints[2].damping = 1.5;
     source.joints[2].frictionLoss = 0.3;
+    source.joints[2].limitTimeConstant = 0.008;
+    source.joints[2].limitDampingRatio = 1.0;
+    source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
     source.actuators[0].servoStiffness = 75.0;
     source.actuators[0].servoDamping = 2.0;
 
@@ -859,6 +862,8 @@ class RobotWorldTests {
     equal(restored.floatingBase, false, "RobotModel codec preserves a fixed base");
     equal(restored.joints[2].damping, 1.5, "RobotModel codec preserves joint damping");
     equal(restored.joints[2].frictionLoss, 0.3, "RobotModel codec preserves joint friction loss");
+    check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
+      "RobotModel codec preserves joint limit softness");
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
     check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
@@ -868,7 +873,8 @@ class RobotWorldTests {
       "a shape without a surface keeps the simulator's defaults");
     var nativeDynamics = RobotRuntimeCompiler.compile(restored).nativeValue().get_joint_dynamics(2);
     check(nativeDynamics.get_armature() == 0.02 && nativeDynamics.get_damping() == 1.5 &&
-      nativeDynamics.get_friction_loss() == 0.3, "joint dynamics reach the native blueprint");
+      nativeDynamics.get_friction_loss() == 0.3 && nativeDynamics.get_limit_time_constant() == 0.008 &&
+      nativeDynamics.get_limit_impedance(2) == 0.01, "joint dynamics reach the native blueprint");
     var negativeDamping = RobotModelCodec.decode(encoded);
     negativeDamping.joints[0].damping = -1.0;
     check(hasDiagnostic(RobotRuntimeCompiler.validate(negativeDamping), "RK_JOINT_DYNAMICS"),
@@ -878,6 +884,20 @@ class RobotWorldTests {
     badSurfaceValue.frictionDimensions = 2;
     check(hasDiagnostic(RobotRuntimeCompiler.validate(badSurface), "RK_COLLISION_SHAPE"),
       "compiler rejects an invalid contact surface");
+
+    var paired = RobotModelCodec.decode(encoded);
+    paired.links[0].collisionShapes[0].contact = ShapeContact.PairsAndEnvironment;
+    paired.contactPairs.push(new robotkit.model.ContactPair(paired.links[0].id, 1,
+      paired.links[1].id, 0, new ContactSurface([0.5, 0.0, 0.0], 3, 0.0, 0.0)));
+    var pairedRestored = RobotModelCodec.decode(RobotModelCodec.encode(paired));
+    check(pairedRestored.links[0].collisionShapes[0].contact == ShapeContact.PairsAndEnvironment &&
+      pairedRestored.contactPairs.length == 1 && pairedRestored.contactPairs[0].shapeA == 1 &&
+      pairedRestored.contactPairs[0].surface.friction[0] == 0.5,
+      "RobotModel codec preserves shape contact modes and contact pairs");
+    paired.contactPairs[0].shapeB = 5;
+    check(hasDiagnostic(RobotRuntimeCompiler.validate(paired), "RK_CONTACT_PAIR"),
+      "compiler rejects a contact pair naming a missing shape");
+    throws(function() RobotModelCodec.encode(paired), "codec rejects a contact pair naming a missing shape");
 
     var servo = robotkit.world.JointTarget.servo(1, 0.3, 0.1, 100.0, 5.0, -2.0);
     var servoCopy = servo.copy();
@@ -990,9 +1010,17 @@ class RobotWorldTests {
     equal(hip.armature, 0.01, "joint armature from a default class is imported");
     equal(hip.damping, 0.5, "joint damping from a default class is imported");
     equal(model.actuators[1].servoStiffness, 50.0, "a position actuator's kp becomes its servo stiffness");
-    var toeSurface = model.links[3].collisionShapes[0].surface;
-    check(toeSurface != null && toeSurface.friction[0] == 0.8 && toeSurface.frictionDimensions == 4 &&
-      toeSurface.contactTimeConstant == 0.01, "a contact pair's surface overrides its geom's");
+    check(model.links[3].collisionShapes[0].contact == ShapeContact.PairsOnly,
+      "a geom without contact bits collides only through its pairs");
+    check(model.links[0].collisionShapes[0].contact == ShapeContact.Layers,
+      "a geom with contact bits collides by layers");
+    equal(model.contactPairs.length, 2, "pairs between robot geoms become contact pairs");
+    var toePair = model.contactPairs[0];
+    check(toePair.linkA == "link/torso" && toePair.linkB == "link/left_foot" && toePair.shapeB == 0 &&
+      toePair.surface.friction[0] == 0.8 && toePair.surface.frictionDimensions == 4 &&
+      toePair.surface.contactTimeConstant == 0.01, "a contact pair keeps its own surface");
+    equal(RobotRuntimeCompiler.compile(model).contactPairs[0].shapeB, 3,
+      "compiled contact pairs index the robot's shapes in link order");
     equal(knee.parentFramePosition[2], -0.38, "the joint frame sits at the joint anchor in the parent");
     equal(knee.childFramePosition[2], 0.02, "the joint frame sits at the joint anchor in the child");
     equal(foot.type, JointType.Fixed, "a jointless body attaches through a fixed joint");

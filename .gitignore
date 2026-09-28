@@ -12,6 +12,7 @@
 /robotkit/device_protocol/target/
 /robotkit/device_virtual/target/
 /robotkit/cadbridge/tests/build/
+/robotkit/cadbridge/tests/mujoco/build/
 /robotkit/worldd/build/
 /automationkit/tests/build/
 /motionkit/tests/build/

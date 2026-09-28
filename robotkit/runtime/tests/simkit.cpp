@@ -1065,6 +1065,13 @@ void shape_descriptor_without_pose_keeps_default_placement() {
     rk_robot_runtime invalid = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &invalid) ==
            RK_ERROR_INVALID_ARGUMENT);
+    // Joint poses move links on this backend too, before the first step.
+    const double joint_pose[] = {0.4};
+    assert(rk_simulation_set_joint_positions(simulation, 0, joint_pose, 1) == RK_OK);
+    rk_simulation_pose link{};
+    link.struct_size = sizeof(link);
+    assert(rk_simulation_get_link_pose(simulation, 0, 1, &link) == RK_OK);
+    assert(std::abs(link.rotation[2] - std::sin(0.2)) < 1e-9); // 0.4 rad about the Z axis.
     assert(rk_simulation_step(simulation, 0) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);

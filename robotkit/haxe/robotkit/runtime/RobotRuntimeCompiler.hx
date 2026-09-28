@@ -93,7 +93,23 @@ class RobotRuntimeCompiler {
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;
       compiled.frictionLoss = joint.frictionLoss;
+      compiled.limitTimeConstant = joint.limitTimeConstant;
+      compiled.limitDampingRatio = joint.limitDampingRatio;
+      compiled.limitImpedance = joint.limitImpedance.copy();
       result.addJoint(compiled);
+    }
+    // Contact pairs refer to shapes by their place in linkCollisionShapes.
+    var firstShape = new Map<String, Int>();
+    var shapeCount = 0;
+    for (link in robot.links) {
+      firstShape.set(link.id, shapeCount);
+      shapeCount += link.collisionShapes.length;
+    }
+    for (pair in robot.contactPairs) {
+      // Validation guarantees both links exist.
+      var firstA:Int = cast firstShape.get(pair.linkA), firstB:Int = cast firstShape.get(pair.linkB);
+      result.contactPairs.push(new RobotRuntimeContactPair(firstA + pair.shapeA,
+        firstB + pair.shapeB, pair.surface));
     }
     for (coupling in robot.couplings) {
       var leader = -1, follower = -1;
@@ -277,7 +293,10 @@ class RobotRuntimeCompiler {
       if (!validUnitVector(joint.axis))
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_AXIS", '$path.axis', "joint axis must be a finite unit vector"));
       if (!(joint.armature >= 0.0) || !(joint.damping >= 0.0) || !(joint.frictionLoss >= 0.0) ||
-          !Math.isFinite(joint.armature) || !Math.isFinite(joint.damping) || !Math.isFinite(joint.frictionLoss))
+          !Math.isFinite(joint.armature) || !Math.isFinite(joint.damping) || !Math.isFinite(joint.frictionLoss) ||
+          !(joint.limitTimeConstant >= 0.0) || !(joint.limitDampingRatio >= 0.0) ||
+          !Math.isFinite(joint.limitTimeConstant) || !Math.isFinite(joint.limitDampingRatio) ||
+          !validVector(joint.limitImpedance, 5))
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_DYNAMICS", path,
           "joint armature, damping and friction loss must be finite and non-negative"));
       if (joint.type == JointType.Floating)
@@ -287,6 +306,24 @@ class RobotRuntimeCompiler {
           && joint.type != JointType.Continuous && joint.type != JointType.Prismatic)
         diagnostics.push(new RobotCompileDiagnostic("RK_JOINT_TYPE", '$path.type',
           'unknown joint type "${joint.type}"'));
+    }
+
+    for (index in 0...robot.contactPairs.length) {
+      var pair = robot.contactPairs[index];
+      var path = 'contactPairs[$index]';
+      var a:Null<robotkit.model.Link> = null, b:Null<robotkit.model.Link> = null;
+      for (link in robot.links) if (link != null) {
+        if (pair != null && link.id == pair.linkA) a = link;
+        if (pair != null && link.id == pair.linkB) b = link;
+      }
+      if (pair == null || a == null || b == null || a == b || pair.shapeA < 0 || pair.shapeB < 0 ||
+          pair.shapeA >= a.collisionShapes.length || pair.shapeB >= b.collisionShapes.length)
+        diagnostics.push(new RobotCompileDiagnostic("RK_CONTACT_PAIR", path,
+          "contact pair must name one shape on each of two different links"));
+      else {
+        var error = pair.surface == null ? "contact pair surface is missing" : pair.surface.validate();
+        if (error != null) diagnostics.push(new RobotCompileDiagnostic("RK_CONTACT_PAIR", path, error));
+      }
     }
 
     var actuatorIds = new Map<String, Bool>();
