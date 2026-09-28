@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "camkit-tests" },
+  "entry": "CamKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "camkit": { "path": ".." }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

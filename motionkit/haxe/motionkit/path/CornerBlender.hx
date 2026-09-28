@@ -17,6 +17,11 @@ class CornerBlender {
     if (tolerance > 0.0) for (i in 0...(count - 1)) {
       var before = path.primitives[i];
       var after = path.primitives[i + 1];
+      if (before.kind() == PathPrimitiveKind.Circular ||
+          after.kind() == PathPrimitiveKind.Circular) {
+        diagnostics.push('corner ${i + 1}: exact stop (circular primitive)');
+        continue;
+      }
       if (before.kind() != PathPrimitiveKind.Line || after.kind() != PathPrimitiveKind.Line) {
         if ((before.kind() == PathPrimitiveKind.Line || before.kind() == PathPrimitiveKind.Arc) &&
             (after.kind() == PathPrimitiveKind.Line || after.kind() == PathPrimitiveKind.Arc)) {
@@ -117,6 +122,7 @@ class CornerBlender {
       arcs[i] = new ArcSegment(center, radius, startAngle, turn);
     }
     var primitives:Array<PathPrimitive> = [];
+    var sourcePrimitiveIndices:Array<Int> = [];
     for (i in 0...count) {
       var primitive = path.primitives[i];
       if (primitive.kind() == PathPrimitiveKind.Line) {
@@ -130,10 +136,16 @@ class CornerBlender {
           arc.startAngle + direction * startCuts[i] / arc.radius,
           arc.sweepAngle - direction * (startCuts[i] + endCuts[i]) / arc.radius));
       } else primitives.push(primitive);
-      if (arcs[i] != null) primitives.push(arcs[i]);
-      if (mixed[i] != null) primitives.push(mixed[i]);
+      sourcePrimitiveIndices.push(i);
+      if (arcs[i] != null) {
+        primitives.push(arcs[i]); sourcePrimitiveIndices.push(i + 1);
+      }
+      if (mixed[i] != null) {
+        primitives.push(mixed[i]); sourcePrimitiveIndices.push(i + 1);
+      }
     }
-    return new BlendedGeometry(new GeometricPath(primitives), diagnostics);
+    return new BlendedGeometry(new GeometricPath(primitives), diagnostics,
+      sourcePrimitiveIndices);
   }
 
   static function distanceToPrimitive(point:PathPoint, primitive:PathPrimitive):Float {
@@ -161,8 +173,12 @@ class CornerBlender {
 class BlendedGeometry {
   public final path:GeometricPath;
   public final diagnostics:Array<String>;
-  public function new(path:GeometricPath, diagnostics:Array<String>) {
+  /** Index of the authored primitive owning each output primitive. */
+  public final sourcePrimitiveIndices:Array<Int>;
+  public function new(path:GeometricPath, diagnostics:Array<String>,
+      sourcePrimitiveIndices:Array<Int>) {
     this.path = path;
     this.diagnostics = diagnostics.copy();
+    this.sourcePrimitiveIndices = sourcePrimitiveIndices.copy();
   }
 }
