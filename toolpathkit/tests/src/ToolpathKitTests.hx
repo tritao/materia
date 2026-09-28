@@ -7,6 +7,7 @@ import toolpathkit.path.Provenance;
 import toolpathkit.path.Provenance.ProvenanceKind;
 import toolpathkit.path.SpindleDirection;
 import toolpathkit.path.ToolpathOp;
+import toolpathkit.setup.TravelEnvelope;
 
 class ToolpathKitTests {
   static function main():Void {
@@ -38,6 +39,14 @@ class ToolpathKitTests {
       case Coolant(true, false, _):
       case _: throw "coolant state";
     }
-    Sys.println("ToolpathKit tests passed (8 assertions)");
+    var halfArc = ToolpathOp.Move(Cut,
+      PathGeometry.Arc(new Point3(0, 0, 0), 1, 0, Math.PI),
+      0.01, 0, Provenance.cam(5));
+    var violations = TravelEnvelope.check([-2, -2, -1], [2, 0.5, 1],
+      [halfArc]);
+    if (violations.length != 1 || violations[0].axis != 1 ||
+        violations[0].provenance.operationIndex != 5)
+      throw "arc extreme travel violation";
+    Sys.println("ToolpathKit tests passed (9 assertions)");
   }
 }

@@ -1,17 +1,16 @@
-package cnckit;
+package toolpathkit.setup;
 
-import cnckit.CncDiagnostic.CncSeverity;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Provenance;
 
 /** Checks the complete authored motion, including arc extrema, in machine space. */
-class CncTravelChecks {
-  public static function check(machine:CncMachine, ops:Array<ToolpathOp>):Array<CncDiagnostic> {
-    var lower = machine.travelLower, upper = machine.travelUpper;
+class TravelEnvelope {
+  public static function check(lower:Array<Float>, upper:Array<Float>,
+      ops:Array<ToolpathOp>):Array<TravelViolation> {
     if (lower == null || upper == null) return [];
-    var diagnostics:Array<CncDiagnostic> = [];
+    var violations:Array<TravelViolation> = [];
     for (op in ops) {
       var geometry:PathGeometry = null, span:Provenance = null;
       switch op {
@@ -39,15 +38,32 @@ class CncTravelChecks {
         var values = [point.x, point.y, point.z];
         for (axis in 0...3) if (values[axis] < lower[axis] - 1e-9 ||
             values[axis] > upper[axis] + 1e-9) {
-          diagnostics.push(new CncDiagnostic(Error, "CNC_TRAVEL", span,
-            '${["X", "Y", "Z"][axis]} travel ${values[axis]} m outside '
-            + '[${lower[axis]}, ${upper[axis]}] m'));
+          violations.push(new TravelViolation(axis, values[axis],
+            lower[axis], upper[axis], span));
           out = true;
           break;
         }
         if (out) break;
       }
     }
-    return diagnostics;
+    return violations;
   }
+}
+
+/** One toolpath point outside the configured machine travel bounds. */
+class TravelViolation {
+  public final axis:Int;
+  public final value:Float;
+  public final lower:Float;
+  public final upper:Float;
+  public final provenance:Provenance;
+
+  public function new(axis:Int, value:Float, lower:Float, upper:Float,
+      provenance:Provenance) {
+    this.axis = axis; this.value = value; this.lower = lower;
+    this.upper = upper; this.provenance = provenance;
+  }
+
+  public function message():String
+    return '${["X", "Y", "Z"][axis]} travel $value m outside [$lower, $upper] m';
 }

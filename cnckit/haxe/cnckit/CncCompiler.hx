@@ -5,6 +5,7 @@ import cnckit.interp.CncInterpreter;
 import cnckit.lower.CncLowering;
 import cnckit.parse.CncLexer;
 import toolpathkit.path.Provenance;
+import toolpathkit.setup.TravelEnvelope;
 import motionkit.program.MotionProgram;
 
 /** Compatibility facade over lexing, modal interpretation, and MotionKit lowering. */
@@ -32,7 +33,10 @@ class CncCompiler {
     var ops = compensated.ops;
     var diagnostics = parsed.diagnostics.concat(interpreter.diagnostics);
     diagnostics = diagnostics.concat(compensated.diagnostics);
-    diagnostics = diagnostics.concat(CncTravelChecks.check(machine, ops));
+    diagnostics = diagnostics.concat([for (violation in
+      TravelEnvelope.check(machine.travelLower, machine.travelUpper, ops))
+      new CncDiagnostic(Error, "CNC_TRAVEL", violation.provenance,
+        violation.message())]);
     var program:Null<MotionProgram> = null;
     var sourceMap = new CncSourceMap();
     try {

@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "toolpathkit-motion-tests" },
+  "entry": "ToolpathMotionTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "toolpathkit-motion": { "path": ".." }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

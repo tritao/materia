@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "package": { "name": "toolpathkit-motion" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "toolpathkit": { "path": ".." },
+    "motionkit": { "path": "../../motionkit" },
+    "motionkit-robot": { "path": "../../motionkit/robot" }
+  },
+  "target": "host"
+}

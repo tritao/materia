@@ -1,7 +1,7 @@
 package camkit;
 
 import cnckit.CncMachine;
-import cnckit.CncTravelChecks;
+import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -41,8 +41,10 @@ class CamSetup {
   /** Rejects a program before export. The cutter tip disk is swept through each path. */
   public function validate(program:CamProgram, machine:CncMachine):Void {
     if (program == null || machine == null) throw "CAM export needs a program and machine";
-    var travel = CncTravelChecks.check(machine, program.ops);
-    if (travel.length > 0) throw 'CAM setup line ${travel[0].span.line}: ${travel[0].message}';
+    var travel = TravelEnvelope.check(machine.travelLower,
+      machine.travelUpper, program.ops);
+    if (travel.length > 0)
+      throw 'CAM setup line ${travel[0].provenance.line}: ${travel[0].message()}';
     var radius = 0.0;
     for (op in program.ops) switch op {
       case ToolChange(number, span):

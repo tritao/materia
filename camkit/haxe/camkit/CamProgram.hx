@@ -3,7 +3,9 @@ package camkit;
 import cnckit.CncCompileResult;
 import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
-import cnckit.CncTravelChecks;
+import toolpathkit.setup.TravelEnvelope;
+import cnckit.CncDiagnostic;
+import cnckit.CncDiagnostic.CncSeverity;
 import toolpathkit.path.ToolpathOp;
 import cnckit.lower.CncLowering;
 
@@ -25,7 +27,10 @@ class CamProgram {
   }
 
   public function lower(machine:CncMachine):CncCompileResult {
-    var diagnostics = CncTravelChecks.check(machine, ops);
+    var diagnostics = [for (violation in
+      TravelEnvelope.check(machine.travelLower, machine.travelUpper, ops))
+      new CncDiagnostic(Error, "CNC_TRAVEL", violation.provenance,
+        violation.message())];
     var lowered = new CncLowering(machine).lower(ops);
     return new CncCompileResult(lowered.program, ops, lowered.sourceMap,
       diagnostics.concat(lowered.diagnostics));
