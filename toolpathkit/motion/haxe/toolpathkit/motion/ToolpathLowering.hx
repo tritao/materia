@@ -8,6 +8,7 @@ import toolpathkit.path.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Provenance;
 import motionkit.event.EventValue;
+import motionkit.event.PathEvent;
 import motionkit.path.ArcSegment;
 import motionkit.path.CircularPlane;
 import motionkit.path.CircularSegment;
@@ -22,6 +23,13 @@ import motionkit.program.InputPredicate;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 
+private typedef PendingOutputEvent = {
+  var boundary:Int;
+  var channel:String;
+  var value:EventValue;
+  var span:Provenance;
+}
+
 /** Converts plain CNC operations to MotionKit paths, barriers, and source map. */
 class ToolpathLowering {
   public final machine:MachineBinding;
@@ -30,8 +38,12 @@ class ToolpathLowering {
   var diagnostics:Array<ToolpathDiagnostic> = [];
   var pending:Array<PathPrimitive> = [];
   var pendingSpans:Array<Provenance> = [];
+  var pendingTolerances:Array<Float> = [];
+  var pendingEvents:Array<PendingOutputEvent> = [];
+  var queuedEvents:Array<PendingOutputEvent> = [];
   var pendingFeed:Float = 0.0;
   var pendingBlend:Float = 0.0;
+  var spindleOn:Bool = false;
 
   public function new(machine:MachineBinding) {
     this.machine = machine;
@@ -41,7 +53,8 @@ class ToolpathLowering {
     motionOps = [];
     sourceMap = new ToolpathSourceMap();
     diagnostics = [];
-    pending = []; pendingSpans = [];
+    pending = []; pendingSpans = []; pendingTolerances = [];
+    pendingEvents = []; queuedEvents = []; spindleOn = false;
     pendingFeed = 0.0; pendingBlend = 0.0;
     for (op in ops) switch op {
       case SetSetup(_, _):
@@ -54,44 +67,62 @@ class ToolpathLowering {
       case Move(_, geometry, speed, blend, span):
         addMove(primitive(geometry), speed, blend, span);
       case Dwell(seconds, span):
-        flush(); add(MotionOp.Dwell(seconds), span);
+        flush(); drainQueued(); add(MotionOp.Dwell(seconds), span);
       case Spindle(direction, rpm, span):
-        flush();
-        add(MotionOp.SetOutput(ToolpathChannels.SpindleDirection,
-          EventValue.Analog(switch direction {
-            case Off: 0.0;
-            case Clockwise: 1.0;
-            case CounterClockwise: -1.0;
-          })), span);
-        add(MotionOp.SetOutput(ToolpathChannels.SpindleSpeed,
-          EventValue.Analog(rpm)), span);
+        var directionValue = EventValue.Analog(switch direction {
+          case Off: 0.0;
+          case Clockwise: 1.0;
+          case CounterClockwise: -1.0;
+        });
+        if (direction != Off && !spindleOn) {
+          flush(); drainQueued();
+          add(MotionOp.SetOutput(ToolpathChannels.SpindleDirection,
+            directionValue), span);
+          add(MotionOp.SetOutput(ToolpathChannels.SpindleSpeed,
+            EventValue.Analog(rpm)), span);
+          add(MotionOp.WaitInput(ToolpathChannels.SpindleAtSpeed,
+            InputPredicate.Equals(EventValue.Digital(true)), null), span);
+        } else {
+          outputEvent(ToolpathChannels.SpindleDirection, directionValue, span);
+          outputEvent(ToolpathChannels.SpindleSpeed, EventValue.Analog(rpm), span);
+        }
+        spindleOn = direction != Off;
       case Coolant(mist, flood, span):
-        flush();
-        add(MotionOp.SetOutput(ToolpathChannels.CoolantMist,
-          EventValue.Digital(mist)), span);
-        add(MotionOp.SetOutput(ToolpathChannels.CoolantFlood,
-          EventValue.Digital(flood)), span);
+        outputEvent(ToolpathChannels.CoolantMist,
+          EventValue.Digital(mist), span);
+        outputEvent(ToolpathChannels.CoolantFlood,
+          EventValue.Digital(flood), span);
       case ToolChange(number, span):
-        flush(); add(MotionOp.WaitInput(ToolpathChannels.toolChange(number),
+        flush(); drainQueued(); add(MotionOp.WaitInput(ToolpathChannels.toolChange(number),
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
       case ToolLengthOffset(_, _, _):
         // Already applied to Z; the controller has nothing to do.
       case OptionalStop(span), ProgramStop(span):
-        flush(); add(MotionOp.WaitInput(ToolpathChannels.OperatorResume,
+        flush(); drainQueued(); add(MotionOp.WaitInput(ToolpathChannels.OperatorResume,
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
-      case End(_): flush();
+      case End(_): flush(); drainQueued();
     }
-    flush();
+    flush(); drainQueued();
     var program = motionOps.length == 0 ? null : new MotionProgram(motionOps);
     return new ToolpathLoweringResult(program, sourceMap, diagnostics.copy());
   }
 
   function addMove(geometry:PathPrimitive, speed:Float, blend:Float,
       span:Provenance):Void {
-    if (pending.length > 0 && (blend == 0.0 || pendingBlend == 0.0 ||
-        Math.abs(speed - pendingFeed) > 1e-12 || blend != pendingBlend)) flush();
+    if (!Math.isFinite(blend) || blend < 0.0)
+      throw "toolpath move needs a nonnegative finite tolerance";
+    if (pending.length > 0 &&
+        (Math.min(blend, pendingTolerances[pendingTolerances.length - 1]) == 0.0 ||
+        Math.abs(speed - pendingFeed) > 1e-12)) flush();
     pending.push(geometry); pendingSpans.push(span);
-    pendingFeed = speed; pendingBlend = blend;
+    pendingTolerances.push(blend);
+    if (pending.length == 1 && queuedEvents.length > 0) {
+      pendingEvents = [for (event in queuedEvents) {
+        boundary:0, channel:event.channel, value:event.value, span:event.span
+      }];
+      queuedEvents = [];
+    }
+    pendingFeed = speed; pendingBlend = Math.max(pendingBlend, blend);
     if (blend == 0.0) flush();
   }
 
@@ -99,7 +130,9 @@ class ToolpathLowering {
     if (pending.length == 0) return;
     if (pending.length > 1 && pendingBlend > 0.0) {
       var authored = new GeometricPath(pending);
-      var blended = CornerBlender.blend(authored, pendingBlend,
+      var corners = [for (i in 0...(pending.length - 1))
+        Math.min(pendingTolerances[i], pendingTolerances[i + 1])];
+      var blended = CornerBlender.blendPerCorner(authored, corners,
         machine.maxBlendTurnAngleRadians);
       var spans = [for (index in blended.sourcePrimitiveIndices)
         pendingSpans[index]];
@@ -109,17 +142,29 @@ class ToolpathLowering {
           pendingSpans[index], blended.diagnostics[warning]));
       }
       emitPath(blended.path.primitives, spans, pendingFeed, authored,
-        pendingBlend);
+        pendingBlend, blended.sourcePrimitiveIndices);
     } else for (index in 0...pending.length)
-      emitPath([pending[index]], [pendingSpans[index]], pendingFeed);
-    pending = []; pendingSpans = [];
+      emitPath([pending[index]], [pendingSpans[index]], pendingFeed,
+        null, 0.0, [index]);
+    pending = []; pendingSpans = []; pendingTolerances = [];
+    pendingEvents = [];
+    pendingBlend = 0.0;
   }
 
   function emitPath(geometry:Array<PathPrimitive>, spans:Array<Provenance>,
-      speed:Float, ?authored:GeometricPath, ?blend:Float = 0.0):Void {
+      speed:Float, ?authored:GeometricPath, ?blend:Float = 0.0,
+      ?sourceIndices:Array<Int>):Void {
     var primitives:Array<PosePrimitive> = [for (primitive in geometry)
       new ToolpathPosePrimitive(primitive, speed, machine.positionTolerance,
         machine.orientationTolerance)];
+    var events:Array<PathEvent> = [];
+    for (event in pendingEvents) {
+      var eventDistance = 0.0;
+      for (i in 0...geometry.length)
+        if (sourceIndices[i] < event.boundary)
+          eventDistance += geometry[i].length();
+      events.push(new PathEvent(eventDistance, event.channel, event.value));
+    }
     var path = new PosePath(machine.frameId, primitives);
     if (authored != null) path.withAuthoredGeometry(authored, blend);
     var index = motionOps.length, distance = 0.0;
@@ -128,7 +173,33 @@ class ToolpathLowering {
       sourceMap.add(index, distance, end, spans[i]);
       distance = end;
     }
-    motionOps.push(MotionOp.FollowPath(path, machine.frameId, speed, []));
+    motionOps.push(MotionOp.FollowPath(path, machine.frameId, speed, events));
+  }
+
+  function outputEvent(channel:String, value:EventValue,
+      span:Provenance):Void {
+    if (pending.length > 0) {
+      pendingEvents.push({boundary:pending.length, channel:channel,
+        value:value, span:span});
+      return;
+    }
+    var last = motionOps.length - 1;
+    if (last >= 0) switch motionOps[last] {
+      case FollowPath(path, frame, speed, events):
+        var attached = events.copy();
+        attached.push(new PathEvent(path.length(), channel, value));
+        motionOps[last] = MotionOp.FollowPath(path, frame, speed, attached);
+        sourceMap.add(last, path.length(), path.length(), span);
+        return;
+      case _:
+    }
+    queuedEvents.push({boundary:0, channel:channel, value:value, span:span});
+  }
+
+  function drainQueued():Void {
+    for (event in queuedEvents)
+      add(MotionOp.SetOutput(event.channel, event.value), event.span);
+    queuedEvents = [];
   }
 
   function add(op:MotionOp, span:Provenance):Void {

@@ -1,6 +1,6 @@
 import camkit.CamContour;
 
-import toolpathkit.path.MoveKind;import camkit.CamGCodeWriter;
+import toolpathkit.path.MoveKind;import cnckit.CncWriter;
 import camkit.CamJob;
 import camkit.CamProgram;
 import camkit.CamSheetProfiles;
@@ -152,7 +152,7 @@ class CamKitTests {
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");
-    var gcode = CamGCodeWriter.write(program, CamTestSetup.standard(), machine);
+    var gcode = CncWriter.write(program.ops, CamTestSetup.standard(), machine);
     var parsed = new CncCompiler(machine).compileDetailed(gcode);
     check(parsed.diagnostics.length == 0,
       'CAM G-code recompiles: ${parsed.diagnostics}');
@@ -160,6 +160,17 @@ class CamKitTests {
       "CAM round trip keeps the operation count");
     for (index in 0...program.ops.length)
       equalOp(program.ops[index], parsed.ops[index], index);
+    var cadProgram = new CamJob(0.005, 12000.0)
+      .profile(fromFace, tool, -0.002, 0.01).finish();
+    var cadCode = CncWriter.write(cadProgram.ops,
+      CamTestSetup.standard(), machine);
+    var cadBack = new CncCompiler(machine).compileDetailed(cadCode);
+    check(cadBack.diagnostics.length == 0,
+      'CAD-to-CAM round trip recompiles: ${cadBack.diagnostics}');
+    check(cadBack.ops.length == cadProgram.ops.length,
+      "CAD-to-CAM round trip keeps operation count");
+    for (index in 0...cadProgram.ops.length)
+      equalOp(cadProgram.ops[index], cadBack.ops[index], index);
     check(gcode.indexOf("T2 M6") >= 0 &&
       gcode.indexOf("S12000 M3") >= 0 && gcode.indexOf("M5") >= 0 &&
       gcode.indexOf("M2") >= 0,
@@ -179,7 +190,7 @@ class CamKitTests {
         0.0, 0.0, source),
       ToolpathOp.End(source)
     ]);
-    var switchCode = CamGCodeWriter.write(switchedProgram,
+    var switchCode = CncWriter.write(switchedProgram.ops,
       new Setup(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005), switchMachine);
     check(switchCode.indexOf("G54") >= 0 && switchCode.indexOf("G55") >= 0,
       "setup switches write G54 and G55");

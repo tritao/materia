@@ -1,0 +1,50 @@
+#pragma once
+
+#include "stock.hpp"
+
+#include <cstdint>
+#include <vector>
+
+namespace stockkit {
+
+/**
+ * A display mesh of part of a Z-grid stock. Each ray stands for a square
+ * column of material spacing wide, centred on the ray: every interval gets a
+ * top face (and optionally a bottom face) at its exact depth with its stored
+ * normal and source, and walls stand where neighbouring columns differ. The
+ * mesh is closed when bottoms are included, and its volume is the stock's.
+ *
+ * Quads never share vertices, so each vertex carries its quad's source and
+ * ray and can be coloured per quad.
+ */
+struct PreviewMesh {
+    std::vector<float> positions; // xyz per vertex
+    std::vector<float> normals;   // xyz per vertex
+    std::vector<uint32_t> indices;
+    std::vector<uint32_t> triangle_sources;
+    std::vector<uint32_t> vertex_sources;
+    /** Ray index (j * count_x + i) of each vertex's column; unset when tops were merged. */
+    std::vector<uint32_t> vertex_rays;
+    std::vector<uint32_t> colors; // RGBA8 per vertex, once coloured
+    bool merged = false;
+
+    uint32_t vertex_count() const { return uint32_t(positions.size() / 3); }
+    uint32_t triangle_count() const { return uint32_t(indices.size() / 3); }
+};
+
+struct PreviewOptions {
+    bool bottoms = false;
+    /** Merge neighbouring top and bottom faces along rows when depth, normal and source agree. */
+    bool merge = true;
+};
+
+/**
+ * Meshes the tiles [tile_x, tile_x + tiles_x) x [tile_y, tile_y + tiles_y).
+ * A wall between two columns belongs to the mesh holding the column with the
+ * lower index, so a mesh also reads the columns just past its +x and +y
+ * edges, and must be rebuilt when those tiles change.
+ */
+void build_preview(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
+    const PreviewOptions &options, PreviewMesh &out);
+
+} // namespace stockkit

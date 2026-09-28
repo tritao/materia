@@ -14,6 +14,9 @@ import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ReachabilityChecker;
 import robotkit.manipulation.WorkPatchPlanner;
 import robotkit.manipulation.BaseObstacle;
+import robotkit.manipulation.ToolBoxObstacle;
+import robotkit.manipulation.ToolClearanceChecker;
+import robotkit.tool.ToolCollisionShape;
 import robotkit.process.ToolpathPoint;
 import robotkit.process.Toolpath;
 import robotkit.work.WorkSurface;
@@ -29,6 +32,9 @@ class PlacementTests {
     testReachabilityCheckerReportsFractionAndFirstFailure();
     testWallSplitIntoReachablePatches();
     testObstacleForcesADifferentBasePose();
+    testConvexToolClearancePreservesEmptyCorner();
+    testToolClearanceChecksJointMotion();
+    testWorkPatchPlannerUsesToolObstacles();
     Sys.println('RobotKit placement tests passed ($assertions assertions)');
     return assertions;
   }
@@ -74,6 +80,70 @@ class PlacementTests {
     var moved = Math.abs(movedPose.x - originalPose.x) > 1e-6 || Math.abs(movedPose.y - originalPose.y) > 1e-6;
     check(moved, "An obstacle at the original candidate forces the planner to choose a different base pose");
     check(withObstacle.patches[0].reachableFraction == 1.0, "The alternate base pose still fully reaches the patch");
+  }
+
+  static function testConvexToolClearancePreservesEmptyCorner():Void {
+    var shape = ToolCollisionShape.Hulls([
+      boxVertices(new Vec3(0.0, 0.0, 0.5), new Vec3(0.05, 0.05, 0.5)),
+      boxVertices(new Vec3(0.45, 0.0, 0.95), new Vec3(0.45, 0.05, 0.05))
+    ], 0.0);
+    var gap = new ToolClearanceChecker(shape, [new ToolBoxObstacle(
+      new Transform3(new Vec3(0.45, 0.0, 0.45), Quat.identity()), new Vec3(0.04, 0.04, 0.04))]);
+    check(gap.isClear(Transform3.identity()), "Tool hulls leave the L-shaped empty corner clear");
+    var cup = new ToolClearanceChecker(shape, [new ToolBoxObstacle(
+      new Transform3(new Vec3(0.85, 0.0, 0.95), Quat.identity()), new Vec3(0.04, 0.04, 0.04))]);
+    check(!cup.isClear(Transform3.identity()), "Tool hull detects an obstacle touching the offset cup");
+  }
+
+  static function testToolClearanceChecksJointMotion():Void {
+    var model = new RobotModel("tool-motion");
+    var base = model.addLink(new Link("base"));
+    var moving = model.addLink(new Link("moving"));
+    var joint = model.addJoint(new Joint("slide", JointType.Prismatic, base, moving));
+    joint.axis = [1.0, 0.0, 0.0];
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    var flange = model.addFrame(new Frame("flange", moving));
+    var manipulator = new Manipulator(model, new KinematicChain(model, base.id, ChainTip.Frame(flange.id)));
+    var checker = new ToolClearanceChecker(ToolCollisionShape.Hulls([
+      boxVertices(Vec3.zero(), new Vec3(0.05, 0.05, 0.05))], 0.0),
+      [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.1, 0.1, 0.1))]);
+    check(checker.isClear(manipulator.forwardKinematics([-1.0])), "Motion starts clear");
+    check(checker.isClear(manipulator.forwardKinematics([1.0])), "Motion ends clear");
+    check(!checker.clearJointSegment(manipulator, [-1.0], [1.0]),
+      "Joint motion checks the obstacle between clear endpoints");
+
+    var path = new Toolpath("base", [
+      new ToolpathPoint(manipulator.tcpPose([-1.0]), 0.05, true),
+      new ToolpathPoint(manipulator.tcpPose([1.0]), 0.05, true)
+    ]);
+    var result = ReachabilityChecker.check(manipulator, path, Transform3.identity(), [-1.0],
+      1e-4, 1e-3, 100, 0.02, checker);
+    check(result.firstFailureIndex == 1, "Reachability rejects a collision along the joint segment");
+  }
+
+  static function testWorkPatchPlannerUsesToolObstacles():Void {
+    var scenario = buildWallScenario();
+    var small = new WorkSurface("small-wall", "map", Transform3.identity(), new Polygon2([
+      new Point2(-0.1, 0.0), new Point2(0.1, 0.0),
+      new Point2(0.1, 0.3), new Point2(-0.1, 0.3)
+    ]));
+    var shape = ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05));
+    var obstacle = new ToolBoxObstacle(Transform3.identity(), new Vec3(10.0, 10.0, 10.0));
+    var plan = WorkPatchPlanner.plan(small, scenario.map_T_surface, scenario.manipulator,
+      0.2, 0.08, 0.0, 0.02, 0.05, 0.0, 0.46, 0.5, scenario.seed,
+      1, 1, 0.02, null, 1e-4, 1e-3, shape, [obstacle]);
+    check(!plan.fullyPlanned, "Work patch planner rejects a path blocked by a 3D tool obstacle");
+  }
+
+  static function boxVertices(centre:Vec3, half:Vec3):Array<Float> {
+    var vertices = [];
+    for (x in [-1.0, 1.0]) for (y in [-1.0, 1.0]) for (z in [-1.0, 1.0]) {
+      vertices.push(centre.x + x * half.x);
+      vertices.push(centre.y + y * half.y);
+      vertices.push(centre.z + z * half.z);
+    }
+    return vertices;
   }
 
   // -- fixtures and helpers ---------------------------------------------

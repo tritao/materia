@@ -2,6 +2,8 @@ package camkit;
 
 import toolpathkit.tool.Tool;
 import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.tool.ToolLibrary;
 import toolpathkit.path.Provenance;
 import toolpathkit.setup.Setup;
 
@@ -24,6 +26,12 @@ class CamProgram {
   public function tool(number:Int):Tool {
     for (tool in tools) if (tool.number == number) return tool;
     throw 'CAM program has no tool $number';
+  }
+
+  public function toolpath():ToolpathProgram {
+    var library = new ToolLibrary();
+    for (tool in tools) library.set(tool);
+    return new ToolpathProgram(ops, library);
   }
 
 }

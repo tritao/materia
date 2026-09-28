@@ -34,6 +34,9 @@ class SceneObjectCommands {
     app.commands.register(new Command("scene.create-plate", "Add mounting plate", function() {
       app.runSceneEdit("Could not add mounting plate", function() app.scene.createMountingPlate());
     }, null, function() return app.canEditObjects() && app.scene.canCreate()));
+    app.commands.register(new Command("scene.create-stock-simulation", "Add stock simulation", function() {
+      app.runSceneEdit("Could not add stock simulation", function() app.scene.createStockSimulation());
+    }, null, function() return app.canEditObjects() && app.scene.canCreate()));
     app.commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
       app.runSceneEdit("Could not add L bracket", function() app.scene.createBracket());
     }, null, function() return app.canEditObjects() && app.scene.canCreate()));

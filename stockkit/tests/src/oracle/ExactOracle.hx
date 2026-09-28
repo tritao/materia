@@ -130,7 +130,7 @@ class ExactOracle {
       geometries:Array<PathGeometry>):Array<CutMove> {
     var tool = Tool.shaped(1, 0.0, profile);
     return [for (index in 0...geometries.length)
-      new CutMove(tool, Path(geometries[index]), false, index,
+      new CutMove(tool, Path(geometries[index]), Cut, index,
         new Provenance(index + 1, 1, 0))];
   }
 

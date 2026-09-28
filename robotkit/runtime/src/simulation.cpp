@@ -358,6 +358,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         require_sim(nksim_world_begin_topology_update(world),
                     "nksim_world_begin_topology_update");
         topology_update = true;
+        const bool has_tool = robot_desc && robot_desc->struct_size >=
+            offsetof(rk_simulation_robot_desc, tool_gap) + sizeof(double) &&
+            robot_desc->tool_piece_count > 0;
+        if (has_tool && (robot_desc->tool_link_index >= blueprint.link_count ||
+                         robot_desc->tool_piece_count > 16))
+            throw std::invalid_argument("invalid tool attachment link or piece count");
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
             nksim_body_desc desc{};
             desc.struct_size = sizeof(desc);
@@ -395,6 +401,38 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                     link_shapes_.push_back(link_shape);
                     desc.shape = link_shape;
                 }
+            }
+            if (has_tool && index == robot_desc->tool_link_index) {
+                if (!std::isfinite(robot_desc->tool_margin) ||
+                    !std::isfinite(robot_desc->tool_gap) ||
+                    robot_desc->tool_margin < 0.0 || robot_desc->tool_gap < 0.0)
+                    throw std::invalid_argument("invalid tool contact margin or gap");
+                std::vector<nksim_shape> children{desc.shape};
+                std::vector<nksim_shape_pose> poses(1);
+                poses[0].rotation[3] = 1.0;
+                for (uint32_t piece = 0; piece < robot_desc->tool_piece_count; ++piece) {
+                    const auto count = robot_desc->tool_piece_vertex_count[piece];
+                    if (count < 4 || count > 64)
+                        throw std::invalid_argument("invalid tool collision hull vertex count");
+                    const auto *vertices = robot_desc->tool_piece_vertices + piece * 64 * 3;
+                    nksim_shape tool_shape = 0;
+                    require_sim(nksim_shape_create_convex(world, vertices, count * 3,
+                                                          &tool_shape), "nksim_shape_create_convex(tool)");
+                    require_sim(nksim_shape_set_contact(world, tool_shape,
+                        robot_desc->tool_margin, robot_desc->tool_gap), "nksim_shape_set_contact(tool)");
+                    link_shapes_.push_back(tool_shape);
+                    children.push_back(tool_shape);
+                    nksim_shape_pose pose{};
+                    pose.rotation[3] = 1.0;
+                    poses.push_back(pose);
+                }
+                nksim_shape compound = 0;
+                require_sim(nksim_shape_create_compound(world, children.data(), poses.data(),
+                    static_cast<uint32_t>(children.size()), &compound),
+                    "nksim_shape_create_compound(tool)");
+                link_shapes_.push_back(compound);
+                desc.shape = compound;
+                has_link_shape = true;
             }
             // Layer 2 is an opt-out category for a robot's own links. It
             // still collides with ordinary layer-1 environment geometry,
@@ -983,6 +1021,63 @@ rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
     if(!binding)return RK_ERROR_INVALID_HANDLE;
     if(link_index>=binding->bodies_.size())return RK_ERROR_INVALID_ARGUMENT;
     return read_body_pose(binding->bodies_[link_index],out_pose);
+}
+
+rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
+                                         std::vector<rk_robot_contact> &out) const {
+    Lock lock(session_);
+    out.clear();
+    const auto handle = std::find(handles_.begin(), handles_.end(), runtime);
+    if (handle == handles_.end()) return RK_ERROR_INVALID_HANDLE;
+    const auto robot_index = static_cast<std::size_t>(handle - handles_.begin());
+    if (robot_index >= bindings_.size()) return RK_ERROR_INVALID_STATE;
+    const auto binding = bindings_[robot_index].lock();
+    if (!binding) return RK_ERROR_INVALID_HANDLE;
+    // The latest tick's contacts while hosted; a stopped session's world holds them otherwise.
+    nksim_snapshot snapshot = nksim_session_latest_snapshot(session_), owned = 0;
+    if (snapshot == 0) {
+        const auto world = stopped_world();
+        if (world == 0 || nksim_world_snapshot(world, &owned) != NKSIM_OK)
+            return RK_ERROR_INVALID_STATE;
+        snapshot = owned;
+    }
+    std::vector<nksim_body> object_bodies(objects_.size(), 0);
+    for (std::size_t object = 0; object < objects_.size(); ++object)
+        nksim_session_get_object_body(session_, objects_[object], &object_bodies[object]);
+    rk_result result_code = RK_OK;
+    uint64_t count = 0;
+    if (nksim_snapshot_get_contact_count(snapshot, &count) != NKSIM_OK)
+        result_code = RK_ERROR_BACKEND;
+    for (uint64_t i = 0; result_code == RK_OK && i < count; ++i) {
+        nksim_contact source{};
+        source.struct_size = sizeof(source);
+        if (nksim_snapshot_get_contact(snapshot, i, &source) != NKSIM_OK) {
+            result_code = RK_ERROR_BACKEND;
+            break;
+        }
+        for (uint32_t link = 0; link < binding->bodies_.size(); ++link) {
+            const auto body = binding->bodies_[link];
+            if (source.body_a != body && source.body_b != body) continue;
+            const auto part = source.body_a == body ? source.part_a : source.part_b;
+            rk_robot_contact result{};
+            result.struct_size = sizeof(result);
+            result.link_index = link;
+            result.tool_piece_index = part - 1;
+            const auto other_body = source.body_a == body ? source.body_b : source.body_a;
+            for (std::size_t object = 0; object < objects_.size(); ++object)
+                if (object_bodies[object] == other_body)
+                    result.other_object = objects_[object];
+            result.distance = source.distance;
+            std::copy_n(source.position, 3, result.position);
+            std::copy_n(source.normal, 3, result.normal);
+            if (source.body_b == body)
+                for (double &axis : result.normal) axis = -axis;
+            result.active = source.active;
+            out.push_back(result);
+        }
+    }
+    if (owned != 0) nksim_snapshot_destroy(owned);
+    return result_code;
 }
 
 rk_result Simulation::read_body_pose(nksim_body body,rk_simulation_pose &out_pose) const {

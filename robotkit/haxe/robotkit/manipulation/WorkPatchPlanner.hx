@@ -11,6 +11,7 @@ import robotkit.work.Provenance;
 import robotkit.work.SourceKind;
 import robotkit.work.RasterToolpathGenerator;
 import robotkit.process.Toolpath;
+import robotkit.tool.ToolCollisionShape;
 
 /**
  * Splits a `WorkSurface` into axis-aligned column patches (no wider than
@@ -28,7 +29,9 @@ class WorkPatchPlanner {
       maxPatchWidth:Float, toolWidth:Float, overlap:Float, standoff:Float, feedRate:Float, leadInOut:Float,
       standoffDistanceMin:Float, standoffDistanceMax:Float, seed:Array<Float>,
       ?standoffSteps:Int = 3, ?lateralSteps:Int = 5, ?clearance:Float = 0.4,
-      ?obstacles:Array<BaseObstacle>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3):WorkPatchPlanResult {
+      ?obstacles:Array<BaseObstacle>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
+      ?toolCollision:ToolCollisionShape, ?toolObstacles:Array<ToolBoxObstacle>,
+      ?toolClearance:Float = 0.0, ?toolJointStep:Float = 0.02):WorkPatchPlanResult {
     if (design == null) throw "Work patch planning requires a design work surface";
     if (map_T_surface == null) throw "Work patch planning requires a map_T_surface transform";
     if (manipulator == null) throw "Work patch planning requires a manipulator";
@@ -36,6 +39,9 @@ class WorkPatchPlanner {
     if (!Math.isFinite(standoffDistanceMin) || !Math.isFinite(standoffDistanceMax) || standoffDistanceMin > standoffDistanceMax)
       throw "Work patch planning requires standoffDistanceMin <= standoffDistanceMax";
     var obstacleList = obstacles == null ? [] : obstacles;
+    var toolObstacleList = toolObstacles == null ? [] : toolObstacles;
+    if (toolObstacleList.length > 0 && toolCollision == null)
+      throw "Tool obstacles require a tool collision shape";
 
     var bounds = design.boundary.bounds();
     var width = bounds.maxX - bounds.minX;
@@ -98,8 +104,11 @@ class WorkPatchPlanner {
           var candidateTransform = new Transform3(candidatePosMap, Quat.fromAxisAngle(new Vec3(0.0, 0.0, 1.0), yaw));
           var candidatePose = candidateTransform.toPose2();
           var base_T_work = candidateTransform.inverse().compose(map_T_surface);
+          var collisionChecker = toolCollision == null || toolObstacleList.length == 0 ? null : new ToolClearanceChecker(toolCollision,
+            [for (obstacle in toolObstacleList) new ToolBoxObstacle(
+              candidateTransform.inverse().compose(obstacle.pose), obstacle.halfExtents)], toolClearance);
           var result = ReachabilityChecker.check(manipulator, patchToolpath, base_T_work, seed,
-            positionTolerance, orientationTolerance);
+            positionTolerance, orientationTolerance, 100, 0.02, collisionChecker, toolJointStep);
 
           if (best == null || result.reachableFraction > best.reachableFraction) {
             best = result;

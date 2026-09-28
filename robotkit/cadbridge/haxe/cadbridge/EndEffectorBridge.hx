@@ -1,49 +1,66 @@
 package cadbridge;
 
-import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
 import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffector.EndEffectorSolvedContext;
 import machinekit.robotics.EndEffectorFrames;
 import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import robotkit.spatial.Quat;
+import robotkit.spatial.Inertia3;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.Tool;
+import robotkit.tool.MassProperties;
 import robotkit.tool.ToolCollisionShape;
+import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 
 /** Convert one end-effector working frame into a RobotKit tool. */
 class EndEffectorBridge {
   public static function toTool(endEffector:EndEffector, frameName:String,
-      ?state:AssemblyState, ?id:String):Tool {
+      ?state:AssemblyState, ?id:String, ?collisionOptions:EndEffectorCollisionOptions,
+      boxCollision:Bool = false):Tool {
     if (endEffector == null) throw "End effector is required";
     endEffector.validate();
-    var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state));
+    var solved = endEffector.solve(state);
+    var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state, solved));
     var transform = new Transform3(new Vec3(converted.position.x,
       converted.position.y, converted.position.z), new Quat(converted.quaternion.x,
       converted.quaternion.y, converted.quaternion.z, converted.quaternion.w));
-    var properties = endEffector.massPropertiesAtMount(state);
+    var properties = endEffector.massPropertiesAtMount(state, solved);
     if (properties.unaccounted.length != 0)
       throw 'End effector has unaccounted BOM mass: ${properties.unaccounted.join(", ")}';
     if (!Math.isFinite(properties.mass) || properties.mass <= 0)
       throw "End effector requires positive mass";
-    var bounds = envelopeBox(endEffector, state);
+    var centre = EndEffectorFrames.pointYToZ(properties.centreOfMass.x,
+      properties.centreOfMass.y, properties.centreOfMass.z);
+    var tensor = properties.inertia;
+    var inertia = tensor == null ? null : new Inertia3(tensor.xx * 1e-6,
+      tensor.xy * 1e-6, tensor.xz * 1e-6, tensor.yy * 1e-6,
+      tensor.yz * 1e-6, tensor.zz * 1e-6)
+      .rotated(new Quat(Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)));
+    var mass = new MassProperties(properties.mass,
+      new Vec3(centre.x * 1e-3, centre.y * 1e-3, centre.z * 1e-3), inertia);
+    var collision:ToolCollisionShape;
+    if (boxCollision) {
+      var bounds = envelopeBox(endEffector, solved);
+      collision = ToolCollisionShape.Box(bounds.halfExtents, bounds.centre);
+    } else {
+      var result = EndEffectorCollision.pieces(endEffector, state, collisionOptions, solved);
+      collision = ToolCollisionShape.Hulls([for (piece in result.pieces) piece.vertices], result.padding);
+    }
     return new Tool(id == null ? frameName : id, frameName, transform,
-      ToolCollisionShape.Box(bounds.halfExtents, bounds.centre), properties.mass);
+      collision, properties.mass, mass);
   }
 
   /** Axis-aligned bounds of all component envelopes in the robot flange frame. */
-  static function envelopeBox(endEffector:EndEffector, state:AssemblyState):{centre:Vec3, halfExtents:Vec3} {
-    var model = new AssemblyModel();
-    endEffector.addTo(model, "");
-    var mount = endEffector.mountReference();
-    var mountPose = state == null ? model.pose(mount.instanceId) : state.worldPose(mount.instanceId);
-    var mountWorld = AssemblyFrames.compose(mountPose,
-      endEffector.memberConnectorFrame(mount.instanceId, mount.connectorName));
-    var mountInverse = AssemblyFrames.inverse(mountWorld);
+  static function envelopeBox(endEffector:EndEffector,
+      solved:EndEffectorSolvedContext):{centre:Vec3, halfExtents:Vec3} {
+    var mountInverse = AssemblyFrames.inverse(solved.mountWorld);
     var minX = Math.POSITIVE_INFINITY, minY = Math.POSITIVE_INFINITY, minZ = Math.POSITIVE_INFINITY;
     var maxX = Math.NEGATIVE_INFINITY, maxY = Math.NEGATIVE_INFINITY, maxZ = Math.NEGATIVE_INFINITY;
     for (member in endEffector.components()) {
+      if (endEffector.collisionExcluded(member.id)) continue;
       var part = member.component.geometry(Envelope);
       var bounds:CadKit.Bounds;
       try bounds = part.shape.bounds() catch (error:Dynamic) {
@@ -52,7 +69,8 @@ class EndEffectorBridge {
       }
       part.close();
       var min = bounds.get_min(), max = bounds.get_max();
-      var pose = state == null ? model.pose(member.id) : state.worldPose(member.id);
+      var pose = solved.poses.get(member.id);
+      if (pose == null) throw 'Missing solved pose for "${member.id}"';
       var relative = AssemblyFrames.compose(mountInverse, pose);
       for (x in [min.get_x(), max.get_x()])
         for (y in [min.get_y(), max.get_y()])

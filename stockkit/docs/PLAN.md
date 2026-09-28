@@ -4,7 +4,7 @@
 
 ```text
 camkit ──┐
-cnckit ──┼─► stockkit (Haxe API) ─► stockkit-core (C++, C ABI, no dependencies)
+toolpathkit ──┼─► stockkit (Haxe API) ─► stockkit-core (C++, C ABI, no dependencies)
 motionkit┘        │
                   └─► cadkit (stock/target tessellation; OCCT oracle in tests only)
 ```
@@ -32,26 +32,39 @@ arrive as triangle buffers, so the core never links OCCT.
 
 0. **Groundwork** (done): references read, tool profile type, exact OCCT
    oracle, fixture set.
-1. **Tool model** (done): `CutterProfile` moved to `cnckit.tool` and carried
-   by `CncTool`; a diameter-only tool simulates as a flat mill. Profiles from
+1. **Tool model** (done): `CutterProfile` moved to `toolpathkit.tool` and carried
+   by `Tool`; a diameter-only tool simulates as a flat mill. Profiles from
    CadKit solids later.
 2. **Motion input** (done for 3-axis): `CutMove` = tool + motion in the
-   workpiece frame + provenance (op index, `CncSpan`); `CutMoves.fromOps`
+   workpiece frame + provenance (op index, `Provenance`); `CutMoves.fromProgram`
    adapts CamKit programs and compiled G-code, using the new
-   `CncOp.ToolLengthOffset` to recover tool tips. Motion is an analytic path
+   `ToolpathOp.ToolLengthOffset` to recover tool tips. Motion is an analytic path
    with a +Z tool axis; sampled 6-DOF poses arrive with phase 7. Work offsets
    are a translation for now.
-3. **Stock core, Z grid:** tiled rays of sorted intervals with endpoint normal
-   and provenance, structure-of-arrays storage; `SweptVolume` with bounds and
-   exact `intersectRay` for revolution tools on lines, arcs and helices; stock
+3. **Stock core, Z grid** (done): tiled rays of sorted
+   intervals with endpoint normal and provenance, structure-of-arrays
+   storage; `SweptVolume` with bounds and exact `intersectRay` for
+   revolution tools on lines (including ramps), XY arcs and helices; stock
    from box or triangle mesh; bulk submission through the C ABI; per-tile
    material bounds to skip air; tile ownership for deterministic threads.
-4. **Diagnostics:** live rapid-into-stock, shank/holder engagement against the
-   live stock, removed volume per operation, target comparison per ray with
-   gouge/leftover attribution. CamKit tests adopt it.
+   X and Y grids return `SK_ERROR_UNSUPPORTED` until phase 6.
+4. **Diagnostics** (done): rapid-into-stock and shank/holder contact against
+   the live stock, per move; removed volume and contact per operation;
+   target comparison per ray with leftover, gouge and the gouging move.
+   CamKit's island-pocket test adopts it. Contact is measured after each
+   move's own cut, so a climbing move whose shank meets material its flutes
+   remove later in the same move is missed. Gouges are measured along Z
+   only until phase 6.
 5. **Preview and editor** (milestone 1): Z-grid mesh, SceneKit colouring by
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
-   pick → operation → `CncSpan`.
+   pick → operation → `Provenance`. The StockKit side is done and headless:
+   column meshes per chunk of tiles with dirty tracking, colouring by source
+   or per ray, snapshots and a timeline, and pick to `CutMove`. The editor
+   has a minimal viewer: a Stock simulation object running a CamKit demo
+   program, with a timeline property, colouring, and picking to the
+   operation and G-code line. Still to do: real programs from a CAM
+   workspace, a G-code editor with two-way highlighting, and chunked child
+   nodes for large stock.
 6. **Tri-dexel and meshing** (milestone 2): X and Y grids updated by every
    move; manifold dual contouring with a QEF over stored normals; STL export.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
@@ -70,13 +83,41 @@ arrive as triangle buffers, so the core never links OCCT.
 The effective ray spacing is always reported; the core never coarsens a grid
 silently.
 
+Measured on the phase 3 core (`stockkit_core_bench`, Release build, 20
+hardware threads): a 200×200 mm box cut by 50,304 moves (a zig-zag pocket at
+six levels in 1.5 mm lines joined by half circles).
+
+| Rays | Tool | 1 thread | All threads | Memory |
+|---|---|---|---|---|
+| 0.25 mm (801×801) | 6 mm flat | 0.34 s | 0.046 s | 39 MB |
+| 0.25 mm (801×801) | 6 mm ball | 1.1 s | 0.14 s | 39 MB |
+| 0.1 mm (2001×2001) | 6 mm flat | 1.6 s | 0.23 s | 244 MB |
+| 0.1 mm (2001×2001) | 6 mm ball | 6.8 s | 0.78 s | 244 MB |
+
+Meshing the whole 0.25 mm stock for preview takes 0.04–0.1 s after the flat
+mill (0.22M triangles merged, 1.3M unmerged) and 0.1–0.18 s after the ball
+mill (1.5M merged: its scallops barely merge, 2.6M unmerged). A dirty 4×4-tile
+chunk remeshes in about a millisecond.
+
+Creating the stock takes about 0.2 s at either spacing. Memory is 48 bytes
+per interval plus 12 per ray. The ball mill costs more because its scallops
+keep material above the tip across its whole footprint, so most rays need the
+exact query. Threads scale about 7–8× on this machine. They share no data:
+each owns fixed tiles and walks the whole move list, skipping tiles it does
+not own.
+
 ## Oracle coverage
 
 The exact oracle handles horizontal lines, vertical lines and XY arcs, which
 covered all CamKit output until CamKit gained ramped pocket entries (lines
-that move in XY and Z together). Ramps, helices and tilted tools need a
-different reference before the simulator's ramp handling can be checked
-exactly; until then the CamKit fixture uses a depth at which CamKit plunges.
+that move in XY and Z together). The oracle's CamKit fixture still uses a
+depth at which CamKit plunges.
+
+Ramps and helices are covered by the sampled reference
+(`tests/src/oracle/SampledReference.hx`), which bounds the swept set from
+inside and outside and shares no code with the core. `CoreFixtures` checks
+the core against it on ramps, helices and a CamKit pocket at a depth where
+CamKit ramps. Tilted tools will need the same treatment.
 
 ### OCCT tangent-fuse findings (OCCT 8.0.1)
 

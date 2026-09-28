@@ -1,5 +1,5 @@
 import camkit.CamContour;
-import camkit.CamGCodeWriter;
+import cnckit.CncWriter;
 import camkit.CamJob;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
@@ -80,7 +80,7 @@ class CamSafeTravelFixture {
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "mixed tool job lowers through MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(
-      CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
+      CncWriter.write(program.ops, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 &&
       imported.ops.length == program.ops.length,
       "mixed tool G-code round trip keeps operation order");

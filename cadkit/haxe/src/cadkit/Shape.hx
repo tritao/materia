@@ -145,7 +145,7 @@ class Shape {
 		}
 		var mesh = Mesh.fromShape(
 			native.borrow(),
-			Geometry.meshOptions(linearDeflection, angularDeflection));
+			Geometry.meshOptions(linearDeflection, angularDeflection), linearDeflection);
 		meshCache.push({
 			linearDeflection: linearDeflection,
 			angularDeflection: angularDeflection,

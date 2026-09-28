@@ -76,6 +76,8 @@ public:
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
+    rk_result get_robot_contacts(rk_robot_runtime runtime,
+                                 std::vector<rk_robot_contact> &out) const;
     rk_result spawn_object(const rk_simulation_object_desc &desc,
                            rk_simulation_object &out_object);
     rk_result remove_object(rk_simulation_object object);

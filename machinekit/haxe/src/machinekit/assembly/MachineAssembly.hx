@@ -9,6 +9,7 @@ import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentPort;
 import machinekit.component.PortInterface;
+import machinekit.component.PortInterfaces;
 import machinekit.component.PortRole;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
@@ -217,7 +218,7 @@ class MachineAssembly {
 		}
 	}
 
-	/** Check structure and complete service wiring; interface mismatches are warnings. */
+	/** Check structure, complete service wiring and physical port compatibility. */
 	public function validate():Array<String> {
 		validateStructure();
 		var connections = checkConnections();
@@ -241,9 +242,8 @@ class MachineAssembly {
 				if ((first.role == Supply && second.role == Supply) ||
 					(first.role == Consumer && second.role == Consumer))
 					throw 'Port connection "$id" has incompatible roles';
-				if (first.iface != Unspecified && second.iface != Unspecified &&
-					Std.string(first.iface) != Std.string(second.iface))
-					warnings.push('Port connection "$id" has mismatched interfaces');
+				if (!PortInterfaces.compatible(first.iface, second.iface))
+					throw 'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}';
 			case _:
 		}
 		return {connected: connected, warnings: warnings};
@@ -357,14 +357,31 @@ class MachineAssembly {
 
 	/** Sum posed component masses; separately report BOM extras with no mass model. */
 	public function massProperties(?state:AssemblyState):MachineAssemblyMassProperties {
-		var model = new AssemblyModel();
-		addTo(model, "");
+		return massPropertiesFromPoses(solvedPoses(state));
+	}
+
+	/** Solve every member pose with one AssemblyModel, or read them from a supplied state. */
+	public function solvedPoses(?state:AssemblyState):Map<String, AssemblyFrame> {
+		var model:Null<AssemblyModel> = null;
+		if (state == null) {
+			model = new AssemblyModel();
+			addTo(model, "");
+		}
+		var result:Map<String, AssemblyFrame> = [];
+		for (member in members)
+			result.set(member.id, state == null ? model.pose(member.id) : state.worldPose(member.id));
+		return result;
+	}
+
+	/** Mass using poses already solved for this assembly. */
+	public function massPropertiesFromPoses(poses:Map<String, AssemblyFrame>):MachineAssemblyMassProperties {
 		var mass = 0.0, weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
 		var posed:Array<{id:String, properties:machinekit.component.MassProperties, pose:AssemblyFrame,
 			centre:Vector}> = [];
 		for (member in members) {
 			var properties = member.component.massProperties();
-			var pose = state == null ? model.pose(member.id) : state.worldPose(member.id);
+			var pose = poses.get(member.id);
+			if (pose == null) throw 'Missing solved pose for "${member.id}"';
 			var centre = properties.centreOfMass;
 			var world = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
 			posed.push({id: member.id, properties: properties, pose: pose,
@@ -384,7 +401,8 @@ class MachineAssembly {
 				case Point(kg, centre) | Attached(kg, _, centre):
 					var worldCentre = switch entry.mass {
 						case Attached(_, instanceId, _):
-							var pose = state == null ? model.pose(instanceId) : state.worldPose(instanceId);
+							var pose = poses.get(instanceId);
+							if (pose == null) throw 'Missing solved pose for "$instanceId"';
 							var point = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
 							new Vector(point.x, point.y, point.z);
 						case _: centre;
@@ -438,6 +456,14 @@ class MachineAssembly {
 		var trace = traceUpstream(portRef(instanceId, portName));
 		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
 		return {port: trace.port, external: trace.external};
+	}
+
+	/** Ordered member/port path from a consumer to its supplied boundary. */
+	public function upstreamChain(instanceId:String, portName:String):Array<String> {
+		checkConnections();
+		var trace = traceUpstream(portRef(instanceId, portName));
+		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
+		return trace.chain.copy();
 	}
 
 	static function unsuppliedMessage(chain:Array<String>):String

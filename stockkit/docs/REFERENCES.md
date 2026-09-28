@@ -72,6 +72,95 @@ Still to read: Schleifstein, Lorenz, …, Kobbelt, "Generalizing feature
 preservation in iso-surface extraction from triple dexel models", CAD 177
 (2024) 103777, which targets several sharp features per cell in CNC models.
 
+## OpenCAMLib (C++, LGPL-2.1-or-later)
+
+<https://github.com/aewallin/opencamlib>, read at 95b036f. Toolpath
+generation (drop-cutter, push-cutter, waterline), not stock simulation. The
+algorithms date from about 2010–2012 (Anders Wallin); the repository is in
+maintenance mode (last push 2025-02, build and packaging only). Licence rules
+out copying code: reimplement from the maths and credit OCL and Wallin's
+offset-ellipse write-up. The formulas below come from reading the code and
+must be confirmed by our own fixtures.
+
+**Why it matters.** For a vertical ray at P, the lowest point of a tool's
+sweep is `min_t [z(t) + h(|P − C(t)|)]`, where `h(r)` is the tool's lower
+profile. OCL's edge drop-cutter computes `max_q [q_z − h(|q − CL|)]` over an
+edge. Reflecting the path (negate z) turns one into the other:
+`z_low(P) = −edgeDrop(CL = P, edge (A_xy, −A_z)→(B_xy, −B_z))`, clamped with
+the endpoint values `z_A + h(|P − A|)` and `z_B + h(|P − B|)`. A ramp is a
+sloped edge, so OCL's per-cutter edge solutions give exact ramp depths.
+
+**Constant-height moves need none of it.** For horizontal lines and XY arcs,
+`h` is monotone, so `z_low = z + h(xy distance from P to the path)`. Only
+ramps and helices need per-cutter maths.
+
+**Per-cutter edge contacts** (edge rotated to run along x at y = d; `R` tool
+radius, `s = √max(0, R² − d²)`, edge `z = z₀ + m·x`, `m = tan α`):
+
+- Flat (a ring): contact at `x = ±s`, the higher of the two.
+- Ball: `cl_z = z₀ + s / cos α − R`.
+- Cone (half-angle β, `c = cot β`, `H = R·c`): if `|m| ≤ c·s/R`, the contact
+  is on the hyperbolic section, `x* = m·d / √(c² − m²)` and
+  `cl_z = z₀ − d·√(c² − m²)`; otherwise it is on the rim at `x = sign(m)·s`,
+  `cl_z = z(x) − H`.
+- Bull-nose (flat radius `r1`, corner radius `r2`): the torus touches the
+  line exactly when the ring of radius `r1` at height `cl_z + r2` touches the
+  radius-`r2` cylinder around the edge. Slicing that cylinder at the ring
+  height gives an ellipse (semi-axes `a = r2/|sin α|` along the edge and
+  `b = r2` across it); the contact is the ellipse's offset curve at distance
+  `r1` passing through the ring centre. Only the y equation needs solving:
+  `d + b·t + r1·a·t / √(b²s² + a²t²) = 0` with `(s, t) = (cos θ, sin θ)`.
+  It is odd and monotone in `t`, so each half-plane has one root; use a
+  bracketed Brent solve, evaluate both mirror solutions, and keep the higher.
+  A horizontal edge is the exact case `cl_z = z − h(d)`; near-horizontal
+  edges make `a` blow up, so switch to the horizontal formula below a slope
+  threshold.
+
+**Closed forms for fixtures** (depth of the sweep's lowest point relative to
+the path at its closest approach, `d` = XY distance to the path line): flat
+`−s·|tan α|`; ball `R − s / cos α`; cone `d·√(cot²β − tan²α)` on the
+hyperbolic branch, else `H − s·|tan α|`; bull-nose at `d = 0`
+`r2 − r2 / cos α − r1·|tan α|`.
+
+**Profiles as primitives.** Decompose `CutterProfile` into explicit rings (one
+per profile vertex), cones or frusta (sloped lines), flat annuli (whose
+contacts are always their rim rings), and tori or spheres (convex arcs). Keep
+each primitive's optimum only when its contact radius lies strictly inside
+that segment's band. OCL relies on implicit rim contacts, which loses
+band-edge contacts for general stacks.
+
+**Arcs and helices** are not in OCL. For a helix, `d²(θ) = ρ² + |P|² −
+2ρ|P|·cos(θ − φ)` and `z(θ) = z₀ + kθ`: a ring gives at most two roots of
+`d(θ) = r_v`; a flat end reaches its lowest point at a range end; spheres and
+tori need a 1-D minimisation of `kθ + h(d(θ))`, split where `d` is monotone
+(at `φ` and `φ + π`) and at the range limits.
+
+**X and Y rays.** Push-cutter along a fibre is the horizontal-ray analogue:
+push the reflected tool along the ray against the path edge. A straight move
+of a convex tool sweeps a convex region, so each ray gets one interval; arcs
+can give several.
+
+**Bugs to avoid.** `ConeCutter::singleEdgeDropCanonical` uses the tool
+length where the derivation needs the cone height `H`, which misplaces the
+contact whenever the tool has a shank (and is a likely cause of OCL issue
+#93). `ConeCutter::facetDrop` short-circuits and never tests the rim once the
+tip matches. Tolerances are absolute (`1e-7`, `1e-10`, `±1e-6` for composite
+bands), with no scale awareness; use scale-relative epsilons.
+
+**No test suite.** CI only builds; the Python examples are visual. Our
+closed forms above, plus dense-sampling comparisons for bull-nose ramps and
+helices, become the fixtures.
+
+**For future CamKit 3D toolpaths.** `BatchDropCutter` (kd-tree of triangles by
+XY bounds, OpenMP), `AdaptivePathDropCutter` (midpoint subdivision until the
+step is small and the path flat), and waterline (push-cutter fibres on an X/Y
+grid, a Weave graph, loop extraction). The same drop and push primitives,
+without the reflection, serve drop-cutter over a mesh.
+
+**Order to implement in phase 3:** profile decomposition; constant-height
+moves; ramps for rings, spheres, cones and tori with endpoint clamping;
+helices; then X and Y rays.
+
 ## Other
 
 - TRMachinist (C#, Apache-2.0,

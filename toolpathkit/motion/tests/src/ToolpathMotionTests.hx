@@ -8,6 +8,10 @@ import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
 import motionkit.program.MotionOp;
+import motionkit.path.CornerBlender;
+import motionkit.path.GeometricPath;
+import motionkit.path.PathPoint;
+import motionkit.path.ArcSegment;
 import machinekit.assembly.LinearAxis;
 import motionkit.robot.MachineKitRobotCompiler;
 import haxe.Int64;
@@ -60,7 +64,35 @@ class ToolpathMotionTests {
     ], [0.0, 0.0, 0.0], Int64.ofInt(1));
     if (compiled.blocks.length == 0) throw "robot binding produced no plans";
     compiled.dispose();
-    Sys.println("ToolpathKit Motion tests passed (5 assertions)");
+    var corners = CornerBlender.blendPerCorner(GeometricPath.lines([
+      new PathPoint(0.0, 0.0), new PathPoint(0.01, 0.0),
+      new PathPoint(0.01, 0.01), new PathPoint(0.02, 0.01)
+    ]), [0.0001, 0.0005], Math.PI * 5.0 / 6.0);
+    if (corners.path.primitives.length != 5)
+      throw "both per-corner tolerances must blend";
+    var first:ArcSegment = cast corners.path.primitives[1];
+    var second:ArcSegment = cast corners.path.primitives[3];
+    if (first.radius >= second.radius)
+      throw "smaller corner tolerance must create a tighter fillet";
+    var eventResult = ToolpathMotion.lower([
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0),
+        new Point3(0.01, 0, 0)), 0.01, 0.0002, origin),
+      ToolpathOp.Coolant(true, false, origin),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0.01, 0, 0),
+        new Point3(0.01, 0.01, 0)), 0.01, 0.0004, origin)
+    ], new MachineBinding("work", "x", "y", "z", 0.2));
+    var eventProgram:motionkit.program.MotionProgram = cast eventResult.program;
+    if (eventProgram == null || eventProgram.ops.length != 1)
+      throw "coolant added a motion stop";
+    switch eventProgram.ops[0] {
+      case MotionOp.FollowPath(_, _, _, events):
+        if (events.length != 2 || events[0].channel != "coolant.mist" ||
+            events[0].distance <= 0.0)
+          throw "coolant must be a position-tied path event";
+      case _: throw "blended path missing";
+    }
+    Sys.println("ToolpathKit Motion tests passed (8 assertions)");
+    MachiningRunTests.run();
     ToolpathScenarioTests.main();
   }
 }

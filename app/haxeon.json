@@ -17,13 +17,17 @@
 		"scenekit": { "path": "../scenekit" },
 		"animkit": { "path": "../animkit" },
 		"humankit": { "path": "../humankit" },
-		"humankit-sim": { "path": "../humankit/sim" }
+		"humankit-sim": { "path": "../humankit/sim" },
+		"stockkit": { "path": "../stockkit" },
+		"camkit": { "path": "../camkit" },
+		"cnckit": { "path": "../cnckit" },
+		"toolpathkit": { "path": "../toolpathkit" }
 	},
 	"native": {
 		"cmake": {
 			"source": "native",
 			"target": "haxeon_app_native",
-			"inputs": ["native/CMakeLists.txt", "../nativekit/CMakeLists.txt", "../nativekit/modules/gpu/CMakeLists.txt", "../uikit/CMakeLists.txt", "../scenekit/scene/CMakeLists.txt", "../scenekit/scene_render/CMakeLists.txt", "../simkit/sim_core/CMakeLists.txt", "../simkit/sim_mujoco/CMakeLists.txt", "../cadkit/CMakeLists.txt", "../cadkit/core/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt", "../animkit/native/CMakeLists.txt", "../animkit/native/include/animkit.h", "../animkit/native/src/api.cpp", "../animkit/native/src/import.cpp", "../animkit/native/src/runtime.cpp"]
+			"inputs": ["native/CMakeLists.txt", "../nativekit/CMakeLists.txt", "../nativekit/modules/gpu/CMakeLists.txt", "../uikit/CMakeLists.txt", "../scenekit/scene/CMakeLists.txt", "../scenekit/scene_render/CMakeLists.txt", "../simkit/sim_core/CMakeLists.txt", "../simkit/sim_mujoco/CMakeLists.txt", "../cadkit/CMakeLists.txt", "../cadkit/core/CMakeLists.txt", "../robotkit/CMakeLists.txt", "../robotkit/runtime/CMakeLists.txt", "../animkit/native/CMakeLists.txt", "../animkit/native/include/animkit.h", "../animkit/native/src/api.cpp", "../animkit/native/src/import.cpp", "../animkit/native/src/runtime.cpp", "../stockkit/core/CMakeLists.txt"]
 		}
 	},
 	"target": "host",

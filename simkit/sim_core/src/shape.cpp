@@ -49,6 +49,20 @@ nksim_result NKSIM_CALL nksim_shape_create_convex(nksim_world world,
                  : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_shape_create_compound(nksim_world world,
+        const nksim_shape *children, const nksim_shape_pose *poses,
+        uint32_t count, nksim_shape *out_shape) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->create_compound_shape(children, poses, count, out_shape)
+                 : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_shape_set_contact(nksim_world world, nksim_shape shape,
+        double margin, double gap) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_shape_contact(shape, margin, gap) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_shape_create_sphere(nksim_world world, double radius,
                                                   nksim_shape *out_shape) {
     if (!out_shape || !std::isfinite(radius) || radius <= 0.0)

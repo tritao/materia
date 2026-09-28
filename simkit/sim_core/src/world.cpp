@@ -555,7 +555,40 @@ nksim_result World::snapshot(std::shared_ptr<Snapshot> &out_snapshot) const {
     result->clock = clock;
     bodies.for_each([&](nksim_body, const Body &body) { result->bodies.push_back(body.state); });
     joints.for_each([&](nksim_joint, const Joint &joint) { result->joints.push_back(joint.state); });
+    std::uint32_t count = 0;
+    auto status = contacts(nullptr, 0, &count);
+    if (status != NKSIM_OK) return status;
+    result->contacts.resize(count);
+    status = contacts(result->contacts.data(), count, &count);
+    if (status != NKSIM_OK) return status;
     out_snapshot = std::move(result);
+    return NKSIM_OK;
+}
+
+nksim_result World::contacts(nksim_contact *out, std::uint32_t capacity,
+                             std::uint32_t *out_count) const {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!out_count || (capacity != 0 && !out)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::vector<BackendContact> values;
+    const auto result = backend->read_contacts(values);
+    if (result != NKSIM_OK) return result;
+    *out_count = static_cast<std::uint32_t>(values.size());
+    for (std::uint32_t i = 0; i < std::min(capacity, *out_count); ++i) {
+        const auto &value = values[i];
+        nksim_contact contact{};
+        contact.struct_size = sizeof(contact);
+        bodies.for_each([&](nksim_body handle, const Body &body) {
+            if (body.backend_body == value.body_a) contact.body_a = handle;
+            if (body.backend_body == value.body_b) contact.body_b = handle;
+        });
+        contact.part_a = value.part_a;
+        contact.part_b = value.part_b;
+        std::copy(value.position.begin(), value.position.end(), contact.position);
+        std::copy(value.normal.begin(), value.normal.end(), contact.normal);
+        contact.distance = value.distance;
+        contact.active = value.active ? 1u : 0u;
+        out[i] = contact;
+    }
     return NKSIM_OK;
 }
 
@@ -601,6 +634,86 @@ nksim_result World::create_convex_shape(const double *vertices, std::uint32_t co
     for (std::uint32_t i = 0; i < count * 3; ++i)
         stored->convex_vertices.push_back(static_cast<float>(vertices[i]));
     *out_shape = shape;
+    return NKSIM_OK;
+}
+
+nksim_result World::create_compound_shape(const nksim_shape *children,
+        const nksim_shape_pose *poses, std::uint32_t count, nksim_shape *out_shape) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!children || !poses || !out_shape || count == 0 || count > 64)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::vector<BackendShapePart> parts;
+    parts.reserve(count);
+    std::array<double, 3> half{};
+    for (std::uint32_t index = 0; index < count; ++index) {
+        const auto *child = shapes.get(children[index]);
+        if (!child) return NKSIM_ERROR_INVALID_HANDLE;
+        if (child->desc.type == NKSIM_SHAPE_COMPOUND || child->desc.type == NKSIM_SHAPE_PLANE)
+            return NKSIM_ERROR_UNSUPPORTED;
+        BackendShapePart part{};
+        part.type = child->desc.type;
+        std::copy(std::begin(child->desc.parameters), std::end(child->desc.parameters),
+                  part.parameters.begin());
+        part.vertices = child->convex_vertices;
+        part.margin = child->margin;
+        part.gap = child->gap;
+        double quaternion_length = 0.0;
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!std::isfinite(poses[index].position[axis])) return NKSIM_ERROR_INVALID_ARGUMENT;
+            part.position[axis] = poses[index].position[axis];
+        }
+        for (int axis = 0; axis < 4; ++axis) {
+            if (!std::isfinite(poses[index].rotation[axis])) return NKSIM_ERROR_INVALID_ARGUMENT;
+            part.rotation[axis] = poses[index].rotation[axis];
+            quaternion_length += part.rotation[axis] * part.rotation[axis];
+        }
+        if (quaternion_length < 1e-20) return NKSIM_ERROR_INVALID_ARGUMENT;
+        normalize_quaternion(part.rotation);
+        double radius = 0.0;
+        switch (part.type) {
+        case NKSIM_SHAPE_BOX:
+            radius = std::sqrt(part.parameters[0] * part.parameters[0] +
+                               part.parameters[1] * part.parameters[1] +
+                               part.parameters[2] * part.parameters[2]);
+            break;
+        case NKSIM_SHAPE_SPHERE: radius = part.parameters[0]; break;
+        case NKSIM_SHAPE_CAPSULE: radius = part.parameters[0] + part.parameters[1] * 0.5; break;
+        case NKSIM_SHAPE_CONVEX:
+            for (std::size_t vertex = 0; vertex < part.vertices.size(); vertex += 3) {
+                const double x = part.vertices[vertex], y = part.vertices[vertex + 1],
+                             z = part.vertices[vertex + 2];
+                radius = std::max(radius, std::sqrt(x*x + y*y + z*z));
+            }
+            break;
+        default: return NKSIM_ERROR_UNSUPPORTED;
+        }
+        for (int axis = 0; axis < 3; ++axis)
+            half[axis] = std::max(half[axis], std::abs(part.position[axis]) + radius);
+        parts.push_back(std::move(part));
+    }
+    auto [handle, shape] = shapes.create();
+    if (!shape) return NKSIM_ERROR_OUT_OF_MEMORY;
+    shape->handle = handle;
+    shape->desc.struct_size = sizeof(shape->desc);
+    shape->desc.type = NKSIM_SHAPE_COMPOUND;
+    for (int axis = 0; axis < 3; ++axis) shape->desc.parameters[axis] = half[axis];
+    shape->parts = std::move(parts);
+    *out_shape = handle;
+    return NKSIM_OK;
+}
+
+nksim_result World::set_shape_contact(nksim_shape shape_handle, double margin, double gap) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!std::isfinite(margin) || !std::isfinite(gap) || margin < 0.0 || gap < 0.0)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    auto *shape = shapes.get(shape_handle);
+    if (!shape) return NKSIM_ERROR_INVALID_HANDLE;
+    bool in_use = false;
+    bodies.for_each([&](nksim_body, const Body &body) { in_use |= body.desc.shape == shape_handle; });
+    if (in_use) return NKSIM_ERROR_INVALID_STATE;
+    shape->margin = margin;
+    shape->gap = gap;
+    for (auto &part : shape->parts) { part.margin = margin; part.gap = gap; }
     return NKSIM_OK;
 }
 
@@ -654,10 +767,21 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
     std::copy_n(desc.center_of_mass, 3, backend_desc.center_of_mass.begin());
     std::copy_n(desc.inertia_tensor, 9, backend_desc.inertia_tensor.begin());
     if (shape) {
-        backend_desc.shape_type = shape->desc.type;
+        backend_desc.shape_type = shape->desc.type == NKSIM_SHAPE_COMPOUND
+            ? NKSIM_SHAPE_BOX : shape->desc.type;
         backend_desc.shape_vertices = shape->convex_vertices;
         std::copy(std::begin(shape->desc.parameters), std::end(shape->desc.parameters),
                   backend_desc.shape_parameters.begin());
+        if (shape->desc.type == NKSIM_SHAPE_COMPOUND) backend_desc.shape_parts = shape->parts;
+        else {
+            BackendShapePart part{};
+            part.type = shape->desc.type;
+            part.parameters = backend_desc.shape_parameters;
+            part.vertices = shape->convex_vertices;
+            part.margin = shape->margin;
+            part.gap = shape->gap;
+            backend_desc.shape_parts.push_back(std::move(part));
+        }
     }
     std::uint64_t backend_body = 0;
     result = backend->body_create(backend_desc, &backend_body);
@@ -1034,6 +1158,12 @@ nksim_result NKSIM_CALL nksim_world_snapshot(nksim_world world, nksim_snapshot *
         return NKSIM_ERROR_OUT_OF_MEMORY;
     *out_snapshot = handle;
     return NKSIM_OK;
+}
+
+nksim_result NKSIM_CALL nksim_world_get_contacts(nksim_world world,
+    nksim_contact *out, uint32_t capacity, uint32_t *out_count) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->contacts(out, capacity, out_count) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 } // extern "C"

@@ -71,6 +71,8 @@ run "$haxeon" run --project "$robotkit_dir/cadbridge/tests/haxeon.json"
 if ensure_mujoco; then
   say "MuJoCo wall-finishing scenario"
   run "$haxeon" run --project "$robotkit_dir/tests/mujoco/haxeon.json"
+  say "MuJoCo end-effector proximity"
+  run "$haxeon" run --project "$robotkit_dir/cadbridge/tests/mujoco/haxeon.json"
 else
   printf '\n== MuJoCo wall-finishing scenario ==\n'
   printf 'SKIP: simkit/vendor/mujoco is unavailable.\n'

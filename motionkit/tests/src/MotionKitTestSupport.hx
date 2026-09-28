@@ -228,7 +228,9 @@ class MotionKitTestSupport {
     var program = cncProgram(cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G3 X20 Y20 I0 J10\nM5\nM2\n");
     var motion = new ManipulatorMotion(robot, binding.compiler,
-      function(_) return null, function() return runtime.pollEvents());
+      function(channel) return channel == "spindle.at_speed" ?
+        EventValue.Digital(true) : null,
+      function() return runtime.pollEvents());
     motion.run(program);
     check(motion.running, 'CNC program starts: ${motion.failure}');
     var trace:Array<Float> = [];

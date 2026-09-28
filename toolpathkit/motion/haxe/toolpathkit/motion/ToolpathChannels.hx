@@ -4,6 +4,7 @@ package toolpathkit.motion;
 class ToolpathChannels {
   public static inline var SpindleDirection = "spindle.direction";
   public static inline var SpindleSpeed = "spindle.speed";
+  public static inline var SpindleAtSpeed = "spindle.at_speed";
   public static inline var CoolantMist = "coolant.mist";
   public static inline var CoolantFlood = "coolant.flood";
   public static inline var OperatorResume = "cnc.operator.resume";

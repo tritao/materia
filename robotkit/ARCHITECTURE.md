@@ -804,9 +804,36 @@ freedom — the existing typed joint-command boundary, unchanged.
 `Robot`, `RobotRuntime`, or the native runtime. A `Tool` is a mounted end
 effector: `id`, `flangeTTcp` (the tool center point's pose in the flange
 frame, per the `a_T_b` convention — `flange_T_tcp` maps tool-tip coordinates
-into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`, or
-`Cylinder`, since `model.CollisionApproximation` is a link-geometry
+into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`,
+`Cylinder`, or per-member `Hulls`, since `model.CollisionApproximation` is a link-geometry
 derivation policy, not a shape), and `mass`.
+The CadBridge also carries `MassProperties` in the flange frame: mass in kg,
+centre of mass in metres, and centroidal `Inertia3` in kg m² when known.
+Legacy tools that declare only scalar mass retain that API, but a load check
+requires a known centre of mass. `WorkpieceLoad` supplies a part's mass
+properties and its pose at one pick; the tool and part are combined with the
+parallel-axis theorem.
+
+`PayloadChecker.checkPath` samples the manipulator's joint path and checks
+carried mass and gravity moment about the flange against a `RobotLoadChart`
+at every sample. `ReachLoadChart` is a simple piecewise chart by flange
+distance from the base; robot-specific charts can implement the interface
+with joint-dependent limits. A pose outside the chart fails. This is a static
+gravity check with configurable joint sampling, so acceleration loads and
+unsampled motion between points need separate analysis.
+
+Suction capacity is checked separately from runtime vacuum actuation.
+`cadbridge.SuctionCapacityBridge.toGrip` converts one connected MachineKit
+`SuctionCup` to a flange-frame `SuctionGrip`. The cup needs an effective sealed
+area; the caller supplies a minimum vacuum guaranteed at that cup, friction
+coefficient for the actual cup and workpiece surface, and safety factor. A
+generator's catalog rating only bounds the requested vacuum and does not
+establish delivered pressure. `SuctionCapacityChecker.checkPath` samples
+workpiece COM acceleration and flange pose, checks normal and tangential
+holding margins, and requires a cup moment rating for nonzero overturning
+moment. It models one sealed cup; it does not predict leakage, deformation,
+or load sharing across cups. The motion samples must include acceleration from
+flange rotation. This is a design check, not a live hold sensor.
 
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
@@ -1104,6 +1131,20 @@ different one. Each returned `WorkPatch` carries its own sub-`WorkSurface`,
 false if any patch's best candidate fell short of full reachability. Base
 motion between patches is left entirely to the existing `Navigator`/`GoTo`
 against each patch's `basePose`.
+
+When a tool collision shape and map-frame `ToolBoxObstacle`s are supplied,
+the planner transforms the obstacles into each candidate's base frame and
+checks every solved flange pose. `ToolClearanceChecker` uses separating axes
+for each convex tool piece against each oriented box, preserving the empty
+space between pieces. It also samples the joint-space segment between
+successive solved poses (default maximum step 0.02 radians or metres per
+joint). Hull padding and requested planning clearance are added to the
+separation test. This is a sampled path check; callers needing a tighter
+path guarantee must use a smaller joint step or continuous collision check.
+`FinishSurface`, `Paint`, and `Sand` accept an optional `ToolPlanningContext`
+with the mounted `Tool`, map-frame obstacle boxes, clearance, and sampling
+step. The skill checks that the tool and manipulator agree on the flange-to-TCP
+transform, then rejects a blocked patch before navigation or process output.
 
 ## Simulated wall-finishing robot (M9)
 

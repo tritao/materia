@@ -13,6 +13,7 @@ class AppTests {
 		if (MachineKitRecipeProjectTests.main() != 0) return 1;
     if (WorkspaceSaveWorkerTests.main() != 0) return 1;
     if (SceneEditingTests.main() != 0) return 1;
+    if (StockSimulationTests.main() != 0) return 1;
     ScriptedSetupTests.run();
     if (HumanSimulationTests.main() != 0) return 1;
     SceneDocumentTests.run();

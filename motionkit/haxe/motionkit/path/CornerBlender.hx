@@ -4,10 +4,24 @@ package motionkit.path;
 class CornerBlender {
   public static function blend(path:GeometricPath, tolerance:Float,
       maxTurnAngleRadians:Float):BlendedGeometry {
-    if (path == null || !Math.isFinite(tolerance) || tolerance < 0.0 ||
+    if (path == null || !Math.isFinite(tolerance) || tolerance < 0.0)
+      throw "Invalid corner blend request";
+    return blendPerCorner(path,
+      [for (_ in 0...Std.int(Math.max(0, path.primitives.length - 1))) tolerance],
+      maxTurnAngleRadians);
+  }
+
+  /** Each entry bounds deviation at the join after its authored primitive. */
+  public static function blendPerCorner(path:GeometricPath,
+      cornerTolerances:Array<Float>, maxTurnAngleRadians:Float):BlendedGeometry {
+    if (path == null || cornerTolerances == null ||
+        cornerTolerances.length != path.primitives.length - 1 ||
         !Math.isFinite(maxTurnAngleRadians) || maxTurnAngleRadians <= 0.0 ||
         maxTurnAngleRadians >= Math.PI)
       throw "Invalid corner blend request";
+    for (tolerance in cornerTolerances)
+      if (!Math.isFinite(tolerance) || tolerance < 0.0)
+        throw "Invalid corner blend tolerance";
     var count = path.primitives.length;
     var arcs:Array<Null<ArcSegment>> = [for (_ in 0...count) null];
     var mixed:Array<Null<PathPrimitive>> = [for (_ in 0...count) null];
@@ -15,7 +29,9 @@ class CornerBlender {
     var endCuts = [for (_ in 0...count) 0.0];
     var diagnostics:Array<String> = [];
     var diagnosticCorners:Array<Int> = [];
-    if (tolerance > 0.0) for (i in 0...(count - 1)) {
+    for (i in 0...(count - 1)) {
+      var tolerance = cornerTolerances[i];
+      if (tolerance == 0.0) continue;
       var before = path.primitives[i];
       var after = path.primitives[i + 1];
       if (before.kind() == PathPrimitiveKind.Circular ||

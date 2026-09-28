@@ -1,7 +1,7 @@
 import camkit.CamContour;
 
 import toolpathkit.path.MoveKind;import toolpathkit.setup.Fixture;
-import camkit.CamGCodeWriter;
+import cnckit.CncWriter;
 import camkit.CamJob;
 import camkit.CamProgram;
 import toolpathkit.path.PathGeometry;
@@ -34,14 +34,14 @@ class CamSetupFixture {
       case ToolpathOp.SetSetup("1", _): true;
       case _: false;
     }, "CAM job emits its setup switch");
-    check(CamGCodeWriter.write(program, clear, machine).indexOf("G1") >= 0,
+    check(CncWriter.write(program.ops, clear, machine).indexOf("G1") >= 0,
       "generated plate exports with a clear setup");
     var clamp = new Fixture("edge-clamp", 0.018, 0.022,
       0.0005, 0.005, -0.003, 0.006);
     var occupied = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.003, 0.008, [clamp]);
     var collision = "";
-    try CamGCodeWriter.write(program, occupied, machine)
+    try CncWriter.write(program.ops, occupied, machine)
     catch (error:Dynamic) collision = Std.string(error);
     check(collision.indexOf("line 1") >= 0 &&
       collision.indexOf("edge-clamp") >= 0,
@@ -49,7 +49,7 @@ class CamSetupFixture {
     var tooShallow = new Setup(-0.01, 0.05, -0.01, 0.04,
       0.0, -0.001, 0.008);
     var depthError = "";
-    try CamGCodeWriter.write(program, tooShallow, machine)
+    try CncWriter.write(program.ops, tooShallow, machine)
     catch (error:Dynamic) depthError = Std.string(error);
     check(depthError.indexOf("below stock bottom") >= 0,
       "setup rejects a cut below planned stock depth");
@@ -61,7 +61,7 @@ class CamSetupFixture {
         new Point3(0.01, 0.0, 0.008)), 0.0, 0.0, new Provenance(2, 1, 1)),
       ToolpathOp.End(new Provenance(3, 1, 1))
     ]);
-    try CamGCodeWriter.write(traverse, highClearance, machine)
+    try CncWriter.write(traverse.ops, highClearance, machine)
     catch (error:Dynamic) rapidError = Std.string(error);
     check(rapidError.indexOf("below safe Z") >= 0,
       "setup rejects lateral rapids below its safe Z: " + rapidError);
@@ -83,7 +83,7 @@ class CamSetupFixture {
       [new Fixture("arc-clamp", 0.019, 0.021,
         0.029, 0.031, -0.003, 0.006)]);
     var arcError = "";
-    try CamGCodeWriter.write(arcProgram, arcClamp, machine)
+    try CncWriter.write(arcProgram.ops, arcClamp, machine)
     catch (error:Dynamic) arcError = Std.string(error);
     check(arcError.indexOf("line 5") >= 0 &&
       arcError.indexOf("arc-clamp") >= 0,

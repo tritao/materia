@@ -34,7 +34,7 @@ class OracleFixtures {
 
     // Flat end mill slot: stadium footprint times depth.
     var d = 0.002;
-    var flat = removal(CutterProfile.flat(2 * r, 0.02), [slot(d)]);
+    var flat = removal(CutterProfile.flat(2 * r, 0.02), [slot(d)], "flat slot");
     relative(flat.removed, (2 * r * length + Math.PI * r * r) * d,
       "flat slot removes a stadium prism");
     rays(flat.stock, new Vector(0.02, 0.01, 0.05), new Vector(0, 0, -1), 0.1,
@@ -48,7 +48,7 @@ class OracleFixtures {
     d = 0.004;
     var ballSection = Math.PI * r * r / 2 + 2 * r * (d - r);
     var ballTool = 2 / 3 * Math.PI * r * r * r + Math.PI * r * r * (d - r);
-    var ball = removal(CutterProfile.ball(2 * r, 0.02), [slot(d)]);
+    var ball = removal(CutterProfile.ball(2 * r, 0.02), [slot(d)], "ball slot");
     relative(ball.removed, ballSection * length + ballTool,
       "ball slot removes its section swept plus the tool");
     var offset = 0.002;
@@ -59,7 +59,7 @@ class OracleFixtures {
 
     // 90 degree V-bit engraving shallower than its cone.
     d = 0.002;
-    var vee = removal(CutterProfile.vee(2 * r, Math.PI / 2, 0.02), [slot(d)]);
+    var vee = removal(CutterProfile.vee(2 * r, Math.PI / 2, 0.02), [slot(d)], "V groove");
     relative(vee.removed, d * d * length + Math.PI * d * d * d / 3,
       "V groove removes a triangle swept plus a cone");
     vee.stock.close();
@@ -71,14 +71,14 @@ class OracleFixtures {
         : r - corner + Math.sqrt(corner * corner - (corner - h) * (corner - h));
     var bullSectionArea = integrate(h -> 2 * bullRadius(h), 0, d);
     var bullToolVolume = integrate(h -> Math.PI * bullRadius(h) * bullRadius(h), 0, d);
-    var bull = removal(CutterProfile.bullNose(2 * r, corner, 0.02), [slot(d)]);
+    var bull = removal(CutterProfile.bullNose(2 * r, corner, 0.02), [slot(d)], "bull-nose slot");
     relative(bull.removed, bullSectionArea * length + bullToolVolume,
       "bull-nose slot removes its section swept plus the tool");
     bull.stock.close();
 
     // Plunge from above the stock: only the part below the top is removed.
     var plunge = removal(CutterProfile.flat(2 * r, 0.02),
-      [Line(new Point3(0.02, 0.01, 0.001), new Point3(0.02, 0.01, -0.003))]);
+      [Line(new Point3(0.02, 0.01, 0.001), new Point3(0.02, 0.01, -0.003))], "plunge");
     relative(plunge.removed, Math.PI * r * r * 0.003, "plunge removes a cylinder");
     plunge.stock.close();
 
@@ -86,7 +86,7 @@ class OracleFixtures {
     d = 0.004;
     var rho = 0.005;
     var arc = removal(CutterProfile.ball(2 * r, 0.02),
-      [Arc(new Point3(0.02, 0.01, -d), rho, 0, Math.PI)]);
+      [Arc(new Point3(0.02, 0.01, -d), rho, 0, Math.PI)], "ball half arc");
     relative(arc.removed, ballSection * rho * Math.PI + ballTool,
       "ball arc removes its section revolved plus the tool");
     rays(arc.stock, new Vector(0.02, 0.01 + rho, 0.05), new Vector(0, 0, -1), 0.1,
@@ -95,7 +95,7 @@ class OracleFixtures {
 
     // Full circle: the section revolved all the way round, with no caps.
     var circle = removal(CutterProfile.ball(2 * r, 0.02),
-      [Arc(new Point3(0.02, 0.01, -d), rho, Math.PI / 2, -2 * Math.PI)]);
+      [Arc(new Point3(0.02, 0.01, -d), rho, Math.PI / 2, -2 * Math.PI)], "ball full circle");
     Assert.near(circle.removed / (ballSection * rho * 2 * Math.PI), 1.0,
       "full-circle arc removes its section revolved once", VOLUME_TOLERANCE);
     circle.stock.close();
@@ -127,10 +127,10 @@ class OracleFixtures {
       .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
       .finish();
     // Moves wholly above the stock cannot cut it; skipping them saves booleans.
-    var moves = [for (move in CutMoves.fromOps(program.ops, program.tool))
+    var moves = [for (move in CutMoves.fromProgram(program.toolpath()))
       if (switch move.motion { case Path(geometry): lowestPoint(geometry) < 0.0; }) move];
     Assert.check(moves.length > 5, "CAM pocket produces cutting moves");
-    var result = removalOf(moves);
+    var result = removalOf(moves, "CAM pocket");
     // A round cutter leaves a tool-radius fillet in each inside corner.
     var cornerRadius = 0.001;
     relative(result.removed,
@@ -152,15 +152,17 @@ class OracleFixtures {
     };
 
   static function removal(profile:CutterProfile,
-      moves:Array<PathGeometry>):{stock:Part, removed:Float}
-    return removalOf(ExactOracle.pathMoves(profile, moves));
+      moves:Array<PathGeometry>, label:String):{stock:Part, removed:Float}
+    return removalOf(ExactOracle.pathMoves(profile, moves), label);
 
-  static function removalOf(moves:Array<CutMove>):{stock:Part, removed:Float} {
+  /** Cuts `moves` exactly, and checks StockKit core's stock against the result ray by ray. */
+  static function removalOf(moves:Array<CutMove>, label:String):{stock:Part, removed:Float} {
     var blank = Part.box(STOCK_X, STOCK_Y, STOCK_Z, Min, Min, Max);
     try {
       var stock = ExactOracle.cut(blank, moves);
       var removed = blank.volume() - stock.volume();
       blank.close();
+      CoreComparison.againstOracle(stock, moves, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0, label);
       return {stock: stock, removed: removed};
     } catch (error:Dynamic) {
       blank.close();

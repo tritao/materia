@@ -27,6 +27,11 @@ class MotionKitBootstrapTests {
       Sys.println('C7 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_BLEND_ONLY") == "1") {
+      plannerTests.testToleranceBlend();
+      Sys.println('Blend focused tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_MACHINEKIT_ONLY") == "1") {
       processTests.testLinearAxisCompilesToRobotModel();
       processTests.testCompiledXYZGantryRunsThroughSimulation();

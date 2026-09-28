@@ -12,6 +12,13 @@ import materia.project.MaterialLibrary;
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
+	/** Return a non-null key to declare this component a changer half.
+	 * EndEffectorSet compares both halves' keys and their couplingConnector()
+	 * values when a tool is added. */
+	public function couplingKey():Null<String> return null;
+	public function couplingConnector():Null<String> return null;
+	/** Declare which ports drive or observe runtime capabilities. */
+	public function runtimePortIntents():Array<RuntimePortIntent> return [];
 	public final designation:String;
 	public var materialId:String;
 	/** True when this component was built from explicit, non-catalog specifications. */
@@ -151,6 +158,7 @@ class MachineComponent {
 			case PushIn(tubeOd): if (!Math.isFinite(tubeOd) || tubeOd <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
 			case Thread(name): if (name == null || name.length == 0) throw 'Invalid port interface "$designation/${entry.name}"';
 			case Plug(name, pins): if (name == null || name.length == 0 || pins <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Coupling(key, channel): if (key == null || key.length == 0 || channel <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
 			case Unspecified:
 		}
 		for (existing in portList) if (existing.name == entry.name)

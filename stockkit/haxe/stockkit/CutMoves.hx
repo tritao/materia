@@ -4,36 +4,32 @@ import toolpathkit.tool.Tool;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;
+import toolpathkit.path.ToolpathProgram;
 
-/** Builds cut moves from CNC operations. */
+/** Builds stock moves from a controller-independent toolpath. */
 class CutMoves {
   /**
-    Tool-tip moves in the workpiece frame from CNC ops, as produced by CamKit
-    or by `CncCompiler.compileDetailed` (cutter compensation already
-    resolved). Op geometry is in work coordinates and includes the active
+    Tool-tip moves in the workpiece frame. Op geometry includes the active
     G43 tool length. Each point is shifted by the optional stock origin and
-    by the tool length in effect. Tool numbers are resolved with `tools`.
+    by the tool length in effect. Tool numbers are resolved with the program library.
     Moves made before any tool change are
     skipped: there is no tool in the spindle to simulate.
   **/
-  public static function fromOps(ops:Array<ToolpathOp>, tools:Int->Tool,
+  public static function fromProgram(program:ToolpathProgram,
       ?workOrigin:Point3):Array<CutMove> {
+    var ops = program.ops;
     var origin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
     var moves:Array<CutMove> = [];
     var tool:Null<Tool> = null;
     var toolLength = 0.0;
     for (index in 0...ops.length) switch ops[index] {
       case ToolChange(number, _):
-        tool = tools(number);
+        tool = program.tools.tool(number);
       case ToolLengthOffset(_, length, _):
         toolLength = length;
-      case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
-          Move(Retract, geometry, _, _, span):
+      case Move(kind, geometry, _, _, provenance):
         if (tool != null) moves.push(new CutMove(tool,
-          Path(shift(geometry, origin, toolLength)), true, index, span));
-      case Move(_, geometry, _, _, span):
-        if (tool != null) moves.push(new CutMove(tool,
-          Path(shift(geometry, origin, toolLength)), false, index, span));
+          Path(shift(geometry, origin, toolLength)), kind, index, provenance));
       case SetSetup(_, _):
       case MachineMove(Rapid, _, _, _, _),
           MachineMove(Link, _, _, _, _),

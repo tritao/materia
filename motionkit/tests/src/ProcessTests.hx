@@ -507,7 +507,7 @@ class ProcessTests extends MotionKitTestSupport {
       physical.linkCollisionHulls[0] == null && hasTenMillimetreVertex,
       "physical assembly passes upstream hulls in link order and SI units");
     var cnc = new CncMachine("work", "x", "y", "z", 0.08);
-    var result = MotionKitTestSupport.compileCnc(MotionKitTestSupport.cncBinding(cnc, blueprint), cnc, 
+    var result = MotionKitTestSupport.compileCnc(MotionKitTestSupport.cncBinding(cnc, blueprint), cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
       [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(990));
     check(result.blocks.length > 0, "physical gantry CNC compiles through ProgramCompiler");
@@ -577,8 +577,10 @@ class ProcessTests extends MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]);
     var binding = MotionKitTestSupport.cncBinding(cnc, blueprint);
     var motion = new ManipulatorMotion(robot, binding.compiler,
-      function(_) return null, function() return runtime.pollEvents());
-    motion.run(MotionKitTestSupport.cncProgram(cnc, 
+      function(channel) return channel == "spindle.at_speed" ?
+        EventValue.Digital(true) : null,
+      function() return runtime.pollEvents());
+    motion.run(MotionKitTestSupport.cncProgram(cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n"));
     for (tick in 0...3000) {
       motion.update(0.01);

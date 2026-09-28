@@ -138,6 +138,13 @@ typedef struct rk_simulation_robot_desc {
     uint32_t closure_count;
     rk_simulation_closure_desc closures[64];
     uint32_t virtual_device_profile; /**< 1 full, 2 minimal; zero defaults to full. */
+    /** Optional tool collision geoms, expressed in the flange link frame. */
+    uint32_t tool_link_index;
+    uint32_t tool_piece_count;
+    uint32_t tool_piece_vertex_count[16];
+    double tool_piece_vertices[16 * 64 * 3];
+    double tool_margin;
+    double tool_gap;
 } rk_simulation_robot_desc;
 
 /**
@@ -453,6 +460,24 @@ RK_API rk_result RK_CALL rk_simulation_get_robot_pose(
 RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
     rk_simulation_pose *out_pose RK_INOUT);
+/** Contact involving one robot link. tool_piece_index is -1 for link geometry. */
+typedef struct rk_robot_contact {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t link_index;
+    int32_t tool_piece_index;
+    rk_simulation_object other_object; /**< Zero for another robot link. */
+    double distance;
+    double position[3];
+    double normal[3];
+    uint32_t active;
+    uint32_t reserved;
+} rk_robot_contact;
+RK_API rk_result RK_CALL rk_simulation_get_robot_contacts(
+    rk_simulation simulation, rk_robot_runtime runtime, rk_robot_contact *out,
+    uint32_t capacity, uint32_t *out_count RK_OUT);
+RK_API rk_result RK_CALL rk_simulation_get_robot_contact(
+    rk_simulation simulation, rk_robot_runtime runtime, uint32_t index,
+    rk_robot_contact *out_contact RK_INOUT);
 /** Adds one environment body from the editable scene while stopped. */
 RK_API rk_result RK_CALL rk_simulation_spawn_object(
     rk_simulation simulation, const rk_simulation_object_desc *desc,

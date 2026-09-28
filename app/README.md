@@ -66,7 +66,19 @@ face hover, and publication.
 fields contributed by `editor/ObjectKindRegistry`. `editor/SelectionModel` owns
 object, feature, face, and edge selection with a separate revision.
 `editor/ObjectKindRegistry` supplies creation defaults, CAD sessions, kind-specific
-properties, menu entries, and hover support. `EditorSceneTree` caches child lists
+properties, menu entries, and hover support.
+
+A **Stock simulation** object (Add ▸ Machining) cuts a machining program from a
+block of stock with StockKit and shows the result in place of a box. The app has
+no CAM workspace yet, so the program is a built-in CamKit demo sized to the
+block: an island pocket and four drilled holes, written to G-code and compiled
+back with CncKit so every surface maps to a real G-code line. Its inspector has
+a timeline (moves cut), colouring by operation or by deviation from the
+finished part (leftover yellow, gouge red), rapids through stock, shank
+contact, the deepest gouge, and the operation and G-code line of the last
+surface clicked in the viewport. The timeline and colouring are view state and
+do not enter undo history. `StockSimulationSession` holds the simulation;
+`editor/StockSimulationKind` supplies its properties. `EditorSceneTree` caches child lists
 by content revision. Inspector bindings retain object identity so undo works
 after changing selection. `ProjectDocumentSession` owns the document path and
 atomic file publication; `SceneDocumentController` coordinates file commands

@@ -16,6 +16,8 @@ import robotkit.spatial.Transform3;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.ToolBoxObstacle;
+import robotkit.manipulation.ToolPlanningContext;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.HolonomicDrivePlant;
@@ -42,6 +44,8 @@ import robotkit.skill.Paint;
 import robotkit.skill.Sand;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SimulatedSander;
+import robotkit.tool.Tool;
+import robotkit.tool.ToolCollisionShape;
 import robotkit.work.WorkSurface;
 import robotkit.work.Polygon2;
 import robotkit.work.Point2;
@@ -188,6 +192,32 @@ class ConstructionSkillTests {
     var sandedOn = false;
     for (event in sander.history) if (event.contactForce > 0.0) sandedOn = true;
     check(sandedOn, "Sand commands a contact-force setpoint on the simulated sander");
+
+    // A skill must pass its mounted tool and cell obstacles to the planner,
+    // then stop before navigation or process output when the tool is blocked.
+    var mounted = new Tool("paint-head", "paint head", Transform3.identity(),
+      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+    var cell = new ToolPlanningContext(mounted, [new ToolBoxObstacle(
+      Transform3.identity(), new Vec3(10.0, 10.0, 10.0))]);
+    var blockedPaint = new Paint(navigator, manipulator, robot,
+      registered.frame_T_surface, registered, spec, observe, new SimulatedSprayer(),
+      0.3, 2.0, seed, paintMotion, null, cell);
+    var blockedStatus = runToCompletion(blockedPaint);
+    check(switch blockedStatus { case Failed(_): true; case _: false; },
+      "Paint rejects a path blocked by a 3D obstacle at planning time");
+    check(blockedPaint.coverage() == null,
+      "Blocked Paint does not start coverage or process execution");
+
+    var wrongTcp = new Tool("wrong-tcp", "wrong TCP",
+      new Transform3(new Vec3(0.01, 0.0, 0.0), Quat.identity()),
+      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+    var rejected = false;
+    try {
+      new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered,
+        spec, observe, new SimulatedSprayer(), 0.3, 2.0, seed, paintMotion, null,
+        new ToolPlanningContext(wrongTcp, cell.obstacles));
+    } catch (_:Dynamic) rejected = true;
+    check(rejected, "Paint rejects a tool whose TCP differs from the manipulator TCP");
 
     writer.close();
     robot.close();

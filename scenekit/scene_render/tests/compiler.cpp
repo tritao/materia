@@ -912,6 +912,43 @@ void tagged_strokes_pick_only_when_visible() {
     assert(face.node == node && face.subelement.value != 0x40000002u);
 }
 
+// Picking must not depend on scene units: a 0.1 mm triangle in a metre-scale
+// scene is as pickable as a large one, while a triangle seen edge-on is not.
+void small_triangles_pick_at_any_scale() {
+    auto scene = std::make_shared<Scene>();
+    const float size = 1.0e-4f;
+    const auto geometry = scene->reserve_geometry_id();
+    auto &resource = scene->geometry_store().create(geometry);
+    resource.bounds.valid = true;
+    resource.bounds.minimum = {0.0f, 0.0f, 0.0f};
+    resource.bounds.maximum = {size, size, size};
+    auto &payload = resource.edit_payload();
+    payload.vertices = {{{0.0f, 0.0f, 0.0f}}, {{size, 0.0f, 0.0f}}, {{0.0f, size, 0.0f}},
+                        // Vertical: edge-on to a vertical ray.
+                        {{0.5f * size, 0.0f, 0.0f}}, {{0.5f * size, size, 0.0f}},
+                        {{0.5f * size, 0.0f, size}}};
+    const auto material = scene->reserve_material_id();
+    scene->material_store().create(material);
+    const auto node = scene->reserve_node_id();
+    Transaction transaction(scene);
+    transaction.add_create(node);
+    ChangeSet changes;
+    assert(scene->commit(transaction, changes) == NKS_OK);
+    transaction.close();
+    Transaction configure(scene);
+    configure.add_geometry(node, geometry);
+    configure.add_material(node, material);
+    assert(scene->commit(configure, changes) == NKS_OK);
+    configure.close();
+    nkscene::SceneSpatialIndex index(scene->snapshot());
+    const auto hit = index.pick_ray({{0.25f * size, 0.25f * size, 1.0f}, {0.0f, 0.0f, -1.0f}});
+    assert(hit.node == node && hit.subelement.value == 1u);
+    const auto outside = index.pick_ray({{0.75f * size, 0.75f * size, 1.0f}, {0.0f, 0.0f, -1.0f}});
+    assert(!outside.node.valid());
+    const auto edge_on = index.pick_ray({{0.5f * size, 0.9f * size, 1.0f}, {0.0f, 0.0f, -1.0f}});
+    assert(!edge_on.node.valid());
+}
+
 void runtime_pose_overrides_render_and_pick_without_mutating_snapshot() {
     auto scene = std::make_shared<Scene>();
     const auto geometry = scene->reserve_geometry_id();
@@ -1168,6 +1205,7 @@ int main() {
     mixed_hierarchy_and_empty_batches_remain_incremental();
     spatial_queries_and_cpu_picking_are_snapshot_bound();
     tagged_strokes_pick_only_when_visible();
+    small_triangles_pick_at_any_scale();
     runtime_pose_overrides_render_and_pick_without_mutating_snapshot();
     geometry_edits_refresh_bounds_and_picking_for_new_snapshots();
     spatial_index_refits_transform_changes_and_requests_rebuilds();

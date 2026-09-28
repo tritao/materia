@@ -5,6 +5,9 @@ import haxe.Int64;
 import nativekit.sim.SimFrame;
 import nativekit.sim.SimSession;
 import robotkit.mobile.Pose2;
+import robotkit.tool.ToolCollisionShape;
+import robotkit.tool.ToolCollisionShapes;
+import robotkit.spatial.Vec3;
 
 /**
  * The robots taking part in one SimKit session.
@@ -73,23 +76,27 @@ class Simulation {
 
   /** Adds topology before the first start or step. */
   public function addRobot(blueprint:RobotRuntimeBlueprint, ?initialPose:Pose2,
-      ?virtualDevice:VirtualDeviceOptions):RobotRuntime {
+      ?virtualDevice:VirtualDeviceOptions, ?tool:ToolCollisionShape,
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
     return addRobotWithPose(blueprint, initialPose == null ? null :
       makePose([initialPose.x, initialPose.y, 0.0],
         [0.0, 0.0, Math.sin(initialPose.yaw * 0.5), Math.cos(initialPose.yaw * 0.5)]),
-      virtualDevice);
+      virtualDevice, null, null, null, tool, toolLink, toolMargin, toolGap);
   }
 
-  /** Adds a robot with a full 3D pose that reset restores. */
+  /** Adds a robot with a resettable 3D pose. Tool padding defaults to a proximity
+   * gap; pass toolMargin to make it physical.
+   */
   public function addRobotAtPose(blueprint:RobotRuntimeBlueprint, position:Array<Float>,
       rotation:Array<Float>, ?virtualDevice:VirtualDeviceOptions,
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
-      ?closures:Array<SimulationClosure>):RobotRuntime {
+      ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
     return addRobotWithPose(blueprint, makePose(position, rotation), virtualDevice, linkCollisionBoxes,
-      linkCollisionHulls, closures);
+      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap);
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
@@ -97,7 +104,8 @@ class Simulation {
       ?virtualDevice:VirtualDeviceOptions,
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
-      ?closures:Array<SimulationClosure>):RobotRuntime {
+      ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null) {
@@ -213,11 +221,82 @@ class Simulation {
         robotDesc.set_closures(index, native);
       }
     }
+    if (tool != null) {
+      var hulls:Array<Array<Float>> = switch tool {
+        case NoCollision: [];
+        case Hulls(pieces, _): pieces;
+        case Box(half, centre):
+          var c = centre == null ? Vec3.zero() : centre;
+          [[for (index in 0...8) for (axis in 0...3)
+            (axis == 0 ? c.x : axis == 1 ? c.y : c.z) +
+            ((index & (1 << axis)) == 0 ? -1 : 1) *
+            (axis == 0 ? half.x : axis == 1 ? half.y : half.z)]];
+        case Cylinder(_, _): throw "Simulation tool collision supports Hulls or Box";
+      };
+      if (hulls.length > 0) {
+        ToolCollisionShapes.bounds(tool);
+        if (hulls.length > 16) throw "Simulation tool supports at most 16 convex pieces";
+        var link = toolLink == null ? blueprint.linkCount - 1 : toolLink;
+        if (link < 0 || link >= blueprint.linkCount)
+          throw "Simulation tool link is outside the robot";
+        var padding = switch tool { case Hulls(_, value): value; case _: 0.0; };
+        var margin = toolMargin == null ? 0.0 : toolMargin;
+        var gap = toolGap == null ? padding : toolGap;
+        if (!Math.isFinite(margin) || !Math.isFinite(gap) || margin < 0 || gap < 0)
+          throw "Simulation tool margin and gap are invalid";
+        if (robotDesc == null) {
+          robotDesc = new rk_simulation_robot_desc();
+          robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+        }
+        robotDesc.set_tool_link_index(link);
+        robotDesc.set_tool_piece_count(hulls.length);
+        robotDesc.set_tool_margin(margin);
+        robotDesc.set_tool_gap(gap);
+        for (piece in 0...hulls.length) {
+          var vertices = hulls[piece];
+          if (vertices == null || vertices.length < 12 || vertices.length > 192 ||
+              vertices.length % 3 != 0)
+            throw "Simulation tool hull needs 4..64 vertices";
+          robotDesc.set_tool_piece_vertex_count(piece, Std.int(vertices.length / 3));
+          for (index in 0...vertices.length) {
+            if (!Math.isFinite(vertices[index])) throw "Simulation tool hull vertex is not finite";
+            robotDesc.set_tool_piece_vertices(piece * 64 * 3 + index, vertices[index]);
+          }
+        }
+      }
+    }
     var result = RobotKitSimKit.rk_simulation_add_robot(owner.borrow(), blueprint.nativeValue(), robotDesc);
     check(result.status, "simulation.addRobot");
     var runtime = new RobotRuntime(result.out_runtime, blueprint);
+    runtime.simulation = this;
     robots.push(runtime);
     return runtime;
+  }
+
+  /** Contacts for a runtime attached to this simulation. */
+  public function robotContacts(runtime:RobotRuntime):Array<RobotContact> {
+    ensureLive();
+    if (runtime == null || runtime.simulation != this)
+      throw "Runtime does not belong to this simulation";
+    var countResult = RobotKitSimKit.rk_simulation_get_robot_contacts(
+      owner.borrow(), runtime.owner.borrow(), null, 0);
+    check(countResult.status, "simulation.robotContacts");
+    var contacts:Array<RobotContact> = [];
+    for (index in 0...countResult.out_count) {
+      var value = new rk_robot_contact();
+      value.set_struct_size(rk_robot_contact.size());
+      var result = RobotKitSimKit.rk_simulation_get_robot_contact(owner.borrow(),
+        runtime.owner.borrow(), index, value);
+      check(result.status, "simulation.robotContact");
+      value = result.out_contact;
+      contacts.push({linkIndex: value.get_link_index(),
+        toolPieceIndex: value.get_tool_piece_index(), otherObject: value.get_other_object(),
+        distance: value.get_distance(),
+        position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
+        normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
+        active: value.get_active() != 0});
+    }
+    return contacts;
   }
 
   /** Advances once. timestampNs is a legacy hint, not source or receive time. */

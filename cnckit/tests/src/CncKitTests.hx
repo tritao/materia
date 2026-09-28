@@ -1,4 +1,5 @@
 import cnckit.CncCompiler;
+import cnckit.CncWriter;
 import CncTestCompiler.CncTestCompileResult;
 import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
@@ -8,6 +9,9 @@ import toolpathkit.path.GeometryTools;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.ArcPlane;
 import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
+import toolpathkit.path.Provenance;
+import toolpathkit.setup.Setup;
 import motionkit.path.ArcSegment;
 import motionkit.path.CircularSegment;
 import motionkit.program.MotionOp;
@@ -49,7 +53,7 @@ class CncKitTests {
       case MotionOp.SetOutput("spindle.direction", _): true;
       case _: false;
     }, "spindle starts before first motion");
-    var firstPath = switch program.ops[2] {
+    var firstPath = switch program.ops[3] {
       case MotionOp.FollowPath(path, _, _, _): path;
       case _: throw "rapid must be a FollowPath";
     };
@@ -159,22 +163,30 @@ class CncKitTests {
       case _: false;
     }, "M3 follows tool change");
     check(switch ordered.ops[3] {
+      case MotionOp.WaitInput("spindle.at_speed", _, _): true;
+      case _: false;
+    }, "spindle start waits for speed feedback");
+    check(switch ordered.ops[4] {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
     }, "motion follows spindle start");
     var stopped = new CncTestCompiler(machine).compile("M3 M8\nM5 M9 G0 X1\nM2");
-    check(switch stopped.ops[5] {
-      case MotionOp.SetOutput("spindle.speed", _): true;
+    check(switch stopped.ops[3] {
+      case MotionOp.FollowPath(_, _, _, events):
+        Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
+          event.distance == 0.0);
       case _: false;
-    }, "M5 stops spindle before coolant and motion");
-    check(switch stopped.ops[6] {
-      case MotionOp.SetOutput("coolant.mist", _): true;
+    }, "M5 spindle stop is tied to path start");
+    check(switch stopped.ops[3] {
+      case MotionOp.FollowPath(_, _, _, events):
+        Lambda.exists(events, function(event) return event.channel == "coolant.mist" &&
+          event.distance == 0.0);
       case _: false;
-    }, "M9 follows M5 before motion");
-    check(switch stopped.ops[8] {
+    }, "M9 coolant change is tied to path start");
+    check(stopped.ops.length == 4 && switch stopped.ops[3] {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
-    }, "M5 and M9 precede motion");
+    }, "spindle and coolant changes add no stop before motion");
     var partialCompiler = new CncTestCompiler(machine);
     var partial = partialCompiler.compile(
       "G21 G90 G64 P1 F600 G1 X10\nG1 Y10\nG1 Y0\nG1 X20\nM2");
@@ -581,7 +593,93 @@ class CncKitTests {
       travelResult.diagnostics[0].span.line == 1,
       "travel error identifies the G-code line");
     rejects(travelMachine, "G21 F600 G3 X10 Y0 I5 J0", "Y travel");
+    writerRoundTrip();
     Sys.println('CncKit tests passed ($assertions assertions)');
+  }
+
+  static function writerRoundTrip():Void {
+    var machine = new CncMachine("work", "x", "y", "z", 0.2,
+      [0.0, 0.0, 0.01]);
+    machine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
+    machine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
+    machine.toolLibrary.set(new Tool(1, 0.0, 0.002));
+    var p = Provenance.cam(10);
+    var authored = [
+      ToolpathOp.SetSetup("1", p),
+      ToolpathOp.ToolChange(1, p),
+      ToolpathOp.Spindle(Clockwise, 12000, p),
+      ToolpathOp.Coolant(true, false, p),
+      ToolpathOp.Move(Rapid, PathGeometry.Line(
+        new Point3(-0.1, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
+        0.0, 0.0, p),
+      ToolpathOp.Move(Cut, PathGeometry.Line(
+        new Point3(0.01, 0.0, 0.01), new Point3(0.02, 0.0, 0.01)),
+        0.01, 0.0002, p),
+      ToolpathOp.Move(Cut, PathGeometry.Arc(
+        new Point3(0.02, 0.005, 0.01), 0.005, -Math.PI / 2,
+        Math.PI / 2), 0.01, 0.0002, p),
+      ToolpathOp.Move(Cut, PathGeometry.Line(
+        new Point3(0.025, 0.005, 0.01),
+        new Point3(0.03, 0.005, 0.01)), 0.01, 0.0, p),
+      ToolpathOp.SetSetup("2", p),
+      ToolpathOp.Move(Rapid, PathGeometry.Line(
+        new Point3(-0.07, 0.005, 0.01),
+        new Point3(0.01, 0.005, 0.01)), 0.0, 0.0, p),
+      ToolpathOp.Coolant(false, false, p),
+      ToolpathOp.Spindle(Off, 0.0, p),
+      ToolpathOp.End(p)
+    ];
+    var setup = new Setup(-0.2, 0.2, -0.1, 0.1,
+      0.0, -0.01, 0.005);
+    var gcode = CncWriter.write(authored, setup, machine);
+    check(gcode.indexOf("G54") >= 0 && gcode.indexOf("G55") >= 0 &&
+      gcode.indexOf("G64 P0.2") >= 0 && gcode.split("G61").length == 3,
+      "writer maps setups and per-move tolerance to LinuxCNC");
+    var back = new CncCompiler(machine).compileDetailed(gcode);
+    check(back.diagnostics.length == 0,
+      'hand-built toolpath recompiles: ${back.diagnostics}');
+    check(back.ops.length == authored.length,
+      "hand-built round trip keeps operation count");
+    for (index in 0...authored.length) switch [authored[index], back.ops[index]] {
+      case [ToolpathOp.SetSetup(a, _), ToolpathOp.SetSetup(b, _)]:
+        check(a == b, 'setup $index');
+      case [ToolpathOp.Move(_, a, feedA, toleranceA, _),
+            ToolpathOp.Move(_, b, feedB, toleranceB, _)]:
+        var lengthA = GeometryTools.length(a), lengthB = GeometryTools.length(b);
+        near(lengthA, lengthB, 'path length $index', 1e-8);
+        var endA = GeometryTools.pointAt(a, lengthA);
+        var endB = GeometryTools.pointAt(b, lengthB);
+        near(endA.x, endB.x, 'path X $index', 1e-8);
+        near(endA.y, endB.y, 'path Y $index', 1e-8);
+        near(endA.z, endB.z, 'path Z $index', 1e-8);
+        near(feedA, feedB, 'path feed $index', 1e-8);
+        near(toleranceA, toleranceB, 'path tolerance $index', 1e-9);
+      case [ToolpathOp.ToolChange(a, _), ToolpathOp.ToolChange(b, _)]:
+        check(a == b, 'tool $index');
+      case [ToolpathOp.Spindle(a, rpmA, _), ToolpathOp.Spindle(b, rpmB, _)]:
+        check(a == b, 'spindle direction $index');
+        near(rpmA, rpmB, 'spindle speed $index');
+      case [ToolpathOp.Coolant(mistA, floodA, _),
+            ToolpathOp.Coolant(mistB, floodB, _)]:
+        check(mistA == mistB && floodA == floodB, 'coolant $index');
+      case [ToolpathOp.End(_), ToolpathOp.End(_)]: check(true, "end");
+      case _: check(false, 'operation $index round trip');
+    }
+    var rejected = false;
+    try CncWriter.write([ToolpathOp.SetSetup("fixture-only", p)], setup, machine)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("cannot map setup") >= 0;
+    check(rejected, "writer rejects setups without a controller mapping");
+    rejected = false;
+    try CncWriter.write([ToolpathOp.MachineMove(Cut,
+      PathGeometry.Arc(new Point3(0.02, 0.005, 0.01), 0.005,
+        -Math.PI / 2, Math.PI / 2), 0.01, 0.0, p)], setup, machine)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("line for machine move") >= 0;
+    check(rejected, "writer rejects machine arcs it cannot express");
+    rejected = false;
+    try CncWriter.write([ToolpathOp.ToolLengthOffset(1, 0.001, p)],
+      setup, machine)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("disagrees") >= 0;
+    check(rejected, "writer rejects a mismatched H tool length");
   }
 
   static function fixture(name:String, machine:CncMachine):Void {

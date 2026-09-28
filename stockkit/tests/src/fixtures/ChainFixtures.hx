@@ -94,8 +94,11 @@ class ChainFixtures {
     var stock = box.translated(origin);
     box.close();
     try {
-      var result = ExactOracle.cut(stock, ExactOracle.pathMoves(profile, moves));
+      var cutMoves = ExactOracle.pathMoves(profile, moves);
+      var result = ExactOracle.cut(stock, cutMoves);
       var removed = stock.volume() - result.volume();
+      CoreComparison.againstOracle(result, cutMoves, origin.x, origin.y, origin.z - thickness,
+        origin.x + width, origin.y + height, origin.z, label);
       result.close();
       stock.close();
       Assert.near(removed / expected, 1.0, '$label removes a tube along its path',

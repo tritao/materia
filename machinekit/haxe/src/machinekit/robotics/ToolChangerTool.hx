@@ -16,7 +16,8 @@ class ToolChangerTool extends MachineComponent {
 	public final thickness:Float;
 
 	/** Generic coupling dimensions shared with the matching robot-side half. */
-	public function interfaceKey():String return 'generic:$airChannels:${Dimension.format(diameter)}';
+	override public function couplingKey():String return 'generic:$airChannels:${Dimension.format(diameter)}';
+	override public function couplingConnector():String return "master";
 
 	public function new(airChannels:Int, diameter:Float = 60, thickness:Float = 12) {
 		if (airChannels < 1 || !Math.isFinite(diameter) || diameter <= 0 ||

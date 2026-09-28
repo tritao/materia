@@ -1,5 +1,8 @@
 import fixtures.ChainFixtures;
+import fixtures.CoreComparison;
+import fixtures.CoreFixtures;
 import fixtures.OracleFixtures;
+import fixtures.SampledReferenceFixtures;
 import toolpathkit.tool.CutterProfile;
 import toolpathkit.tool.CutterSegment;
 import toolpathkit.tool.CutterZone;
@@ -8,9 +11,12 @@ class StockKitTests {
   public static function main():Void {
     profiles();
     CutMoveTests.run();
+    SampledReferenceFixtures.run();
+    CoreFixtures.run();
     OracleFixtures.run();
     ChainFixtures.run();
-    Sys.println('StockKit tests passed (${Assert.count} assertions)');
+    Sys.println('StockKit tests passed (${Assert.count} assertions, '
+      + '${CoreComparison.raysCompared} core rays checked against references)');
   }
 
   static function profiles():Void {

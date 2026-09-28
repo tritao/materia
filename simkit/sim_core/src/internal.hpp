@@ -204,6 +204,9 @@ struct Shape {
     nksim_shape handle = 0;
     nksim_shape_desc desc{};
     std::vector<float> convex_vertices;
+    std::vector<BackendShapePart> parts;
+    double margin = 0.0;
+    double gap = 0.0;
 };
 
 struct Body {
@@ -253,6 +256,7 @@ struct Snapshot {
     Clock clock;
     std::vector<nksim_body_state> bodies;
     std::vector<nksim_joint_state> joints;
+    std::vector<nksim_contact> contacts;
 };
 
 class World {
@@ -271,10 +275,16 @@ public:
     nksim_result apply_forces(const nksim_body_force *forces, std::uint32_t count);
     nksim_result set_joint_targets(const nksim_joint_target *targets, std::uint32_t count);
     nksim_result snapshot(std::shared_ptr<Snapshot> &out_snapshot) const;
+    nksim_result contacts(nksim_contact *out, std::uint32_t capacity,
+                          std::uint32_t *out_count) const;
 
     nksim_result create_shape(const nksim_shape_desc &desc, nksim_shape *out_shape);
     nksim_result create_convex_shape(const double *vertices, std::uint32_t count,
                                     nksim_shape *out_shape);
+    nksim_result create_compound_shape(const nksim_shape *children,
+                                      const nksim_shape_pose *poses, std::uint32_t count,
+                                      nksim_shape *out_shape);
+    nksim_result set_shape_contact(nksim_shape shape, double margin, double gap);
     nksim_result destroy_shape(nksim_shape shape);
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);

@@ -23,6 +23,16 @@ class CncControllerSetup {
     return Std.string(code - 53);
   }
 
+  public function gCodeForSetup(id:String, dialect:CncDialect):Int {
+    var number = Std.parseInt(id);
+    if (number == null || number < 1 || number > 6 ||
+        Std.string(number) != id)
+      throw 'CNC controller cannot map setup $id to G54-G59';
+    return switch dialect {
+      case LinuxCnc: number + 53;
+    };
+  }
+
   public function setWorkOffset(code:Int, x:Float, y:Float, z:Float):Void {
     setupId(code);
     if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z))

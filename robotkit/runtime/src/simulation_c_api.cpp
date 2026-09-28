@@ -3,6 +3,7 @@
 #include "runtime_abi.hpp"
 
 #include <memory>
+#include <algorithm>
 #include <cstddef>
 #include <cmath>
 #include <mutex>
@@ -253,6 +254,35 @@ rk_result RK_CALL rk_simulation_get_link_pose(rk_simulation simulation,uint32_t 
     if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
     const auto value=resolve(simulation);
     return value?value->get_link_pose(robot_index,link_index,*out_pose):RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_simulation_get_robot_contacts(rk_simulation simulation,
+    rk_robot_runtime runtime, rk_robot_contact *out, uint32_t capacity,
+    uint32_t *out_count) {
+    if (!out_count || (capacity != 0 && !out)) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    std::vector<rk_robot_contact> contacts;
+    const auto status = value->get_robot_contacts(runtime, contacts);
+    if (status != RK_OK) return status;
+    *out_count = static_cast<uint32_t>(contacts.size());
+    for (uint32_t i = 0; i < std::min(capacity, *out_count); ++i)
+        out[i] = contacts[i];
+    return RK_OK;
+}
+
+rk_result RK_CALL rk_simulation_get_robot_contact(rk_simulation simulation,
+    rk_robot_runtime runtime, uint32_t index, rk_robot_contact *out_contact) {
+    if (!out_contact || out_contact->struct_size < sizeof(*out_contact))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    std::vector<rk_robot_contact> contacts;
+    const auto status = value->get_robot_contacts(runtime, contacts);
+    if (status != RK_OK) return status;
+    if (index >= contacts.size()) return RK_ERROR_INVALID_ARGUMENT;
+    *out_contact = contacts[index];
+    return RK_OK;
 }
 
 rk_result RK_CALL rk_simulation_spawn_object(rk_simulation simulation,
