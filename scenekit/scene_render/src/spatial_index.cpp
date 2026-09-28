@@ -181,12 +181,18 @@ Vec3 scale_add(Vec3 origin, Vec3 direction, float distance) noexcept {
 
 bool ray_hits_triangle(const Ray &ray, Vec3 first, Vec3 second, Vec3 third,
                        float &distance) noexcept {
-    constexpr float epsilon = 1.0e-7f;
+    // The determinant is |e1| |e2| sin(angle) cos(ray to normal) for a unit ray,
+    // so compare it with the edge lengths: this rejects degenerate triangles and
+    // ones seen edge-on at any scene scale, instead of every triangle smaller
+    // than a fixed area.
+    constexpr float relative_epsilon = 1.0e-6f;
     const auto edge_one = subtract(second, first);
     const auto edge_two = subtract(third, first);
     const auto perpendicular = cross(ray.direction, edge_two);
     const auto determinant = dot(edge_one, perpendicular);
-    if (std::abs(determinant) < epsilon)
+    const auto scale = std::sqrt(dot(edge_one, edge_one) * dot(edge_two, edge_two) *
+                                 dot(ray.direction, ray.direction));
+    if (!(std::abs(determinant) > relative_epsilon * scale))
         return false;
     const auto inverse = 1.0f / determinant;
     const auto offset = subtract(ray.origin, first);
