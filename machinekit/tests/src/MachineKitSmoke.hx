@@ -6,6 +6,7 @@ import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
@@ -104,14 +105,24 @@ private class MasslessTestPart extends MachineComponent {
 	public function new() super("TEST-MASSLESS", "Massless test part", "steel", true);
 }
 
+private class MissingMassCentre extends MachineComponent {
+	public function new() {
+		super("MISSING-CENTRE", "Invalid declared mass", "steel", true);
+		var centre:Vector = null;
+		declareMass(1, centre);
+	}
+}
+
 private class PortTestComponent extends MachineComponent {
 	public function new(name:String) super(name, name, "steel", true);
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(1, 1, 1);
 
 	public function definePort(name:String, kind:PortKind, role:PortRole, iface:PortInterface,
 			required:Bool = false, ?connector:String):Void
 		addPort({name: name, kind: kind, role: role, iface: iface, required: required, connector: connector});
 
 	public function defineBridge(from:String, to:String):Void addBridge(from, to);
+	public function defineConversion(from:String, to:String):Void addConversion(from, to);
 
 	public function defineConnector(name:String):Void addConnector(name, Mount, AssemblyFrames.identity());
 }
@@ -132,6 +143,7 @@ class MachineKitSmoke {
 		near(declared.centreOfMass.x, 1, "declared centre of mass");
 		check(switch declared.source { case Declared: true; default: false; }, "declared mass source");
 		check(declared.inertia == null, "declared mass does not silently invent inertia");
+		throws(() -> new MissingMassCentre(), "declared centre of mass");
 		throws(() -> new MasslessTestPart().massProperties(), "has no geometry or declared mass");
 
 		var block = new MassTestBlock();
@@ -150,6 +162,12 @@ class MachineKitSmoke {
 		near(combinedInertia.zz, 0.63, "parallel axis inertia about z", 1e-8);
 		check(combined.unaccountedInertia.length == 0, "computed inertia is fully accounted");
 		check(combined.unaccounted.length == 1 && combined.unaccounted[0] == "RAIL-CUT", "unaccounted BOM extras");
+		assembly.addBomItem({partNumber: "TUBE-MASS", description: "Tube", quantity: 1,
+			material: "polyurethane"}, 2, Point(0.001, new Vector(10, 0, 5)));
+		var withTube = assembly.massProperties();
+		near(withTube.mass, combined.mass + 0.002, "BOM extra mass uses quantity");
+		check(withTube.unaccounted.length == 1 && withTube.unaccounted[0] == "RAIL-CUT",
+			"mass-accounted BOM line is not unaccounted");
 
 		var inner = new MachineAssembly();
 		inner.addComponent("a", block);
@@ -215,6 +233,7 @@ class MachineKitSmoke {
 		var generator = new PortTestComponent("GENERATOR");
 		generator.definePort("air", Pneumatic, Consumer, PushIn(6), true);
 		generator.definePort("vacuum", Vacuum, Supply, PushIn(6));
+		generator.defineConversion("air", "vacuum");
 		var cup = new PortTestComponent("CUP");
 		cup.definePort("vacuum", Vacuum, Consumer, PushIn(6), true);
 
@@ -227,7 +246,8 @@ class MachineKitSmoke {
 		throws(() -> tool.connectPorts("missing", "changer", "none", "cup", "vacuum"), "Unknown port");
 		throws(() -> tool.exposePort("bad", "cup", "none"), "Unknown port");
 		tool.connectPorts("supply", "changer", "toolAir", "manifold", "in",
-			{partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"});
+			{partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"},
+			Point(0.001, new Vector(0, 0, 0)));
 		tool.connectPorts("air", "manifold", "out", "generator", "air");
 		tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
 		tool.exposePort("robotAir", "changer", "robotAir");
@@ -246,6 +266,44 @@ class MachineKitSmoke {
 		check(includedSource.instanceId == "tool/changer" && includedSource.portName == "robotAir",
 			"included service path retains its source");
 		check(station.billOfMaterials().quantity("TUBE-6") == 1, "included line is counted once");
+		var vacuumSource = new PortTestComponent("VACUUM-SOURCE");
+		vacuumSource.definePort("vacuum", Vacuum, Supply, PushIn(6));
+		var reversed = new MachineAssembly();
+		reversed.addComponent("generator", vacuumSource);
+		reversed.addComponent("cup", cup);
+		reversed.connectPorts("reverse", "cup", "vacuum", "generator", "vacuum");
+		check(reversed.upstream("cup", "vacuum").instanceId == "generator",
+			"consumer-first connection traces to its supply");
+		var incompleteTool = new MachineAssembly();
+		incompleteTool.addComponent("cup", cup);
+		incompleteTool.exposePort("vacuum", "cup", "vacuum");
+		var parent = new MachineAssembly();
+		parent.include("tool", incompleteTool);
+		throws(() -> parent.validate(), "Required consumer port");
+		parent.exposePort("tool/vacuum", "tool/cup", "vacuum");
+		check(parent.validate().length == 0, "parent must explicitly re-expose an included required input");
+		var connectedParent = new MachineAssembly();
+		connectedParent.include("tool", incompleteTool);
+		connectedParent.addComponent("source", vacuumSource);
+		connectedParent.connectPorts("feed", "tool/cup", "vacuum", "source", "vacuum");
+		check(connectedParent.validate().length == 0,
+			"parent can connect an included required input directly");
+		var unwired = new MachineAssembly();
+		unwired.addComponent("cup", cup);
+		unwired.addTo(new AssemblyModel(), "");
+		unwired.massProperties();
+		throws(() -> unwired.validate(), "Required consumer port");
+		var unrelated = new PortTestComponent("UNRELATED");
+		unrelated.definePort("power", ElectricalPower, Consumer, Unspecified, true);
+		unrelated.definePort("air", Pneumatic, Supply, Unspecified);
+		var power = new PortTestComponent("POWER");
+		power.definePort("output", ElectricalPower, Supply, Unspecified);
+		var misleading = new MachineAssembly();
+		misleading.addComponent("device", unrelated);
+		misleading.addComponent("power", power);
+		misleading.connectPorts("feed", "power", "output", "device", "power");
+		check(misleading.upstream("device", "air").instanceId == "device",
+			"upstream does not infer service conversion from unrelated power");
 
 		var unconnected = new MachineAssembly();
 		unconnected.addComponent("cup", cup);

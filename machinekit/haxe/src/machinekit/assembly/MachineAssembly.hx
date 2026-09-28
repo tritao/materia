@@ -20,6 +20,11 @@ typedef MachineAssemblyComponent = { var id:String; var component:MachineCompone
 typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:String; }
 typedef PortRef = { var instanceId:String; var portName:String; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
+/** BOM-only mass is a point-mass estimate in the assembly frame. */
+enum AssemblyBomMass {
+	Unknown;
+	Point(kg:Float, centreOfMass:Vector);
+}
 typedef MachineAssemblyMassProperties = {
 	var mass:Float;
 	var centreOfMass:Vector;
@@ -49,9 +54,9 @@ class MachineAssembly {
 	final members:Array<AssemblyMember> = [];
 	final included:Array<MachineSubassembly> = [];
 	final externalConnectors:Array<{name:String, instanceId:String, connectorName:String}> = [];
-	final externalPorts:Array<{name:String, instanceId:String, portName:String}> = [];
+	final externalPorts:Array<{name:String, instanceId:String, portName:String, inherited:Bool}> = [];
 	final operations:Array<MachineAssemblyOperation> = [];
-	final bomItems:Array<{item:BomItem, quantity:Int}> = [];
+	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
 
 	public function new() {}
@@ -68,7 +73,7 @@ class MachineAssembly {
 		if (id == null || id.length == 0 || assembly == null || assembly == this)
 			throw "Included assembly needs a distinct id and assembly";
 		for (entry in included) if (entry.id == id) throw 'Duplicate included assembly "$id"';
-		assembly.validate();
+		assembly.validateStructure();
 		for (member in assembly.members) {
 			var localPose = pose == null ? member.pose : AssemblyFrames.compose(pose, member.pose);
 			addComponent(join(id, member.id), member.component, localPose);
@@ -78,9 +83,21 @@ class MachineAssembly {
 		for (connector in assembly.externalConnectors)
 			exposeConnector(join(id, connector.name), join(id, connector.instanceId), connector.connectorName);
 		for (port in assembly.externalPorts)
-			exposePort(join(id, port.name), join(id, port.instanceId), port.portName);
+			externalPorts.push({name: join(id, port.name), instanceId: join(id, port.instanceId),
+				portName: port.portName, inherited: true});
 		for (operation in assembly.operations) addOperation(prefixed(operation, id));
-		for (entry in assembly.bomItems) addBomItem(entry.item, entry.quantity);
+		for (entry in assembly.bomItems) {
+			var mass = switch entry.mass {
+				case Unknown: Unknown;
+				case Point(kg, centre):
+					if (pose == null) Point(kg, centre);
+					else {
+						var point = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
+						Point(kg, new Vector(point.x, point.y, point.z));
+					}
+			};
+			addBomItem(entry.item, entry.quantity, mass);
+		}
 		included.push({id: id, assembly: assembly});
 	}
 
@@ -106,9 +123,20 @@ class MachineAssembly {
 		addOperation(Couple(id, source, target, ratio, offset));
 
 	public function connectPorts(id:String, fromInstance:String, fromPort:String,
-			toInstance:String, toPort:String, ?line:BomItem):Void {
-		addOperation(ConnectPorts(id, portRef(fromInstance, fromPort), portRef(toInstance, toPort), line));
-		if (line != null) addBomItem(line);
+			toInstance:String, toPort:String, ?line:BomItem,
+			lineMass:AssemblyBomMass = Unknown):Void {
+		var from = portRef(fromInstance, fromPort), to = portRef(toInstance, toPort);
+		var first = requirePort(from), second = requirePort(to);
+		if ((first.role == Consumer && second.role != Consumer) ||
+			(first.role == Passive && second.role == Supply)) {
+			var old = from; from = to; to = old;
+		}
+		if (line == null) switch lineMass {
+			case Point(_, _): throw "Connection line mass needs a BOM item";
+			case Unknown:
+		}
+		addOperation(ConnectPorts(id, from, to, line));
+		if (line != null) addBomItem(line, 1, lineMass);
 	}
 
 	/** Add a calculated connector on one member, such as a screw seat above a housing face. */
@@ -134,22 +162,33 @@ class MachineAssembly {
 	public function exposePort(name:String, instanceId:String, portName:String):Void {
 		if (name == null || name.length == 0) throw "External assembly port needs a name";
 		requirePort(portRef(instanceId, portName));
-		for (existing in externalPorts) if (existing.name == name)
+		for (existing in externalPorts) if (existing.name == name) {
+			if (existing.inherited && existing.instanceId == instanceId && existing.portName == portName) {
+				existing.inherited = false;
+				return;
+			}
 			throw 'Duplicate external assembly port "$name"';
-		externalPorts.push({name: name, instanceId: instanceId, portName: portName});
+		}
+		externalPorts.push({name: name, instanceId: instanceId, portName: portName, inherited: false});
 	}
 
-	public function addBomItem(item:BomItem, quantity:Int = 1):Void {
+	public function addBomItem(item:BomItem, quantity:Int = 1,
+			mass:AssemblyBomMass = Unknown):Void {
 		if (item == null || quantity <= 0) throw "Assembly BOM entry needs an item and positive quantity";
-		bomItems.push({item: item, quantity: quantity});
+		switch mass {
+			case Point(kg, centre):
+				if (!Math.isFinite(kg) || kg <= 0 || centre == null ||
+					!Math.isFinite(centre.x) || !Math.isFinite(centre.y) || !Math.isFinite(centre.z))
+					throw "Assembly BOM mass and centre must be finite and positive";
+			case Unknown:
+		}
+		bomItems.push({item: item, quantity: quantity, mass: mass});
 	}
 
-	/** Check relationships that depend on the full operation set. */
-	public function validate():Array<String> {
+	/** Check CAD tree and coupling relationships without requiring service wiring. */
+	public function validateStructure():Void {
 		var parents:Map<String, String> = [];
 		var joints:Map<String, Bool> = [];
-		var connected:Map<String, Bool> = [];
-		var warnings:Array<String> = [];
 		for (op in operations) switch op {
 			case Mate(id, _, parent, child, _, _, _):
 				if (parents.exists(child.instanceId)) throw 'Assembly member "${child.instanceId}" has two parent joints';
@@ -157,21 +196,7 @@ class MachineAssembly {
 				joints.set(id, true);
 			case Constrain(id, _, _, _, _, _, _): joints.set(id, true);
 			case Couple(_, _, _, _, _):
-			case ConnectPorts(id, from, to, _):
-				var first = requirePort(from), second = requirePort(to);
-				var fromKey = portKey(from), toKey = portKey(to);
-				if (fromKey == toKey) throw 'Port connection "$id" joins a port to itself';
-				if (connected.exists(fromKey) || connected.exists(toKey))
-					throw 'Port connection "$id" uses a port more than once';
-				connected.set(fromKey, true);
-				connected.set(toKey, true);
-				if (first.kind != second.kind) throw 'Port connection "$id" has mismatched kinds';
-				if ((first.role == Supply && second.role == Supply) ||
-					(first.role == Consumer && second.role == Consumer))
-					throw 'Port connection "$id" has incompatible roles';
-				if (first.iface != Unspecified && second.iface != Unspecified &&
-					Std.string(first.iface) != Std.string(second.iface))
-					warnings.push('Port connection "$id" has mismatched interfaces');
+			case ConnectPorts(_, _, _, _):
 		}
 		for (member in members) {
 			var seen:Map<String, Bool> = [];
@@ -188,6 +213,31 @@ class MachineAssembly {
 					throw 'Assembly coupling "$id" refers to a missing joint';
 			case _:
 		}
+	}
+
+	/** Check structure and complete service wiring; interface mismatches are warnings. */
+	public function validate():Array<String> {
+		validateStructure();
+		var connected:Map<String, Bool> = [];
+		var warnings:Array<String> = [];
+		for (op in operations) switch op {
+			case ConnectPorts(id, from, to, _):
+				var first = requirePort(from), second = requirePort(to);
+				var fromKey = portKey(from), toKey = portKey(to);
+				if (fromKey == toKey) throw 'Port connection "$id" joins a port to itself';
+				if (connected.exists(fromKey) || connected.exists(toKey))
+					throw 'Port connection "$id" uses a port more than once';
+				connected.set(fromKey, true);
+				connected.set(toKey, true);
+				if (first.kind != second.kind) throw 'Port connection "$id" has mismatched kinds';
+				if ((first.role == Supply && second.role == Supply) ||
+					(first.role == Consumer && second.role == Consumer))
+					throw 'Port connection "$id" has incompatible roles';
+				if (first.iface != Unspecified && second.iface != Unspecified &&
+					Std.string(first.iface) != Std.string(second.iface))
+					warnings.push('Port connection "$id" has mismatched interfaces');
+			case _:
+		}
 		for (member in members) for (port in member.component.ports())
 			if (port.required && port.role == Consumer &&
 				!connected.exists(portKey(portRef(member.id, port.name))) &&
@@ -198,7 +248,7 @@ class MachineAssembly {
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
 	public function addTo(model:AssemblyModel, prefix:String, ?pose:AssemblyFrame):Void {
-		validate();
+		validateStructure();
 		for (member in members) {
 			var localPose = pose == null ? member.pose : AssemblyFrames.compose(pose, member.pose);
 			member.component.addTo(model, join(prefix, member.id), localPose);
@@ -254,8 +304,19 @@ class MachineAssembly {
 			weightedZ += properties.mass * world.z;
 		}
 		var unaccounted:Array<String> = [];
-		for (entry in bomItems) if (unaccounted.indexOf(entry.item.partNumber) < 0)
-			unaccounted.push(entry.item.partNumber);
+		for (entry in bomItems) {
+			switch entry.mass {
+				case Unknown:
+					if (unaccounted.indexOf(entry.item.partNumber) < 0)
+						unaccounted.push(entry.item.partNumber);
+				case Point(kg, centre):
+					var itemMass = kg * entry.item.quantity * entry.quantity;
+					mass += itemMass;
+					weightedX += itemMass * centre.x;
+					weightedY += itemMass * centre.y;
+					weightedZ += itemMass * centre.z;
+			}
+		}
 		var combinedCentre = mass == 0 ? new Vector() :
 			new Vector(weightedX / mass, weightedY / mass, weightedZ / mass);
 		var inertia = InertiaTensor.zero();
@@ -270,6 +331,14 @@ class MachineAssembly {
 			inertia = inertia.add(tensor.rotated(pose.qx, pose.qy, pose.qz, pose.qw)
 				.shifted(entry.properties.mass, centre.x - combinedCentre.x,
 					centre.y - combinedCentre.y, centre.z - combinedCentre.z));
+		}
+		// BOM-only masses are represented as point masses at their declared centres.
+		for (entry in bomItems) switch entry.mass {
+			case Point(kg, centre):
+				var itemMass = kg * entry.item.quantity * entry.quantity;
+				inertia = inertia.shifted(itemMass, centre.x - combinedCentre.x,
+					centre.y - combinedCentre.y, centre.z - combinedCentre.z);
+			case Unknown:
 		}
 		return {mass: mass, centreOfMass: combinedCentre,
 			inertia: unaccountedInertia.length == 0 ? inertia : null,
@@ -304,12 +373,9 @@ class MachineAssembly {
 			}
 			for (bridge in requireMember(current.instanceId).bridges())
 				if (bridge.to == current.portName) previous.push(portRef(current.instanceId, bridge.from));
-			// A generator's supplied service may depend on a different input kind.
-			if (previous.length == 0 && currentPort.role == Supply)
-				for (input in requireMember(current.instanceId).ports())
-					if (input.role == Consumer && input.name != current.portName &&
-						isConnected(portRef(current.instanceId, input.name)))
-						previous.push(portRef(current.instanceId, input.name));
+			for (conversion in requireMember(current.instanceId).conversions())
+				if (conversion.to == current.portName)
+					previous.push(portRef(current.instanceId, conversion.from));
 			if (previous.length == 0) {
 				if (currentPort.role != Supply) throw 'Port "$instanceId/$portName" has no upstream supply';
 				return current;
@@ -383,7 +449,8 @@ class MachineAssembly {
 	}
 
 	function isExposed(instanceId:String, portName:String):Bool {
-		for (entry in externalPorts) if (entry.instanceId == instanceId && entry.portName == portName) return true;
+		for (entry in externalPorts) if (!entry.inherited && entry.instanceId == instanceId &&
+			entry.portName == portName) return true;
 		return false;
 	}
 

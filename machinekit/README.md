@@ -158,12 +158,25 @@ less twice that profile's pitch-line differential.
 
 `MachineComponent.massProperties()` computes mass, centre of mass, and centroidal
 inertia from Preview geometry and material density. Mass is in kg, positions in
-mm, and inertia in kg mm². Components with catalog values can declare mass and
-optionally inertia. When a declared mass has no inertia, its tensor is `null`.
+mm, and inertia in kg mm². Components with catalog values can declare mass with
+an explicit centre of mass and optionally inertia. When a declared mass has no
+inertia, its tensor is `null`.
 `MachineAssembly.massProperties(?state)` rotates and combines member tensors at
 the solved poses; it returns `null` inertia and lists the affected member IDs in
 `unaccountedInertia` if any tensor is missing. Its `unaccounted` list continues
-to identify extra BOM items omitted from the mass rollup.
+to identify extra BOM items omitted from the mass rollup. `addBomItem(item,
+quantity, Point(kg, centreOfMass))` and `connectPorts(..., line,
+Point(kg, centreOfMass))` account for BOM-only masses. The mass is per item;
+these entries use a point-mass inertia approximation at the supplied centre.
+
+`MachineAssembly.addTo` checks CAD joints and tree structure, so a partially
+wired assembly can still be shown and weighed. Call `validate()` to check
+service connections and required inputs. Included ports remain addressable by
+their prefixed names, but a required input must be connected or explicitly
+re-exposed by the containing assembly. Supply and Consumer connection arguments
+can be given in either order. Components declare service passages with
+`addBridge` and changes of service kind with `addConversion`; `upstream()`
+follows only those declared routes.
 
 `machinekit.assembly` composes standalone `MachineComponent`s into small
 machines, the same way `examples/MotorShaftBearings.hx` does, but as reusable

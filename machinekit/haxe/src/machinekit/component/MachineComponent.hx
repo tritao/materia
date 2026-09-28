@@ -27,6 +27,7 @@ class MachineComponent {
 	final connectorList:Array<Connector> = [];
 	final portList:Array<ComponentPort> = [];
 	final bridgeList:Array<PortBridge> = [];
+	final conversionList:Array<PortBridge> = [];
 
 	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false) {
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
@@ -88,9 +89,12 @@ class MachineComponent {
 	}
 
 	/** Vendor mass overrides the geometry estimate, including after material changes. */
-	function declareMass(kg:Float, ?centreOfMass:Vector, ?inertia:InertiaTensor):Void {
+	function declareMass(kg:Float, centreOfMass:Vector, ?inertia:InertiaTensor):Void {
 		if (!Math.isFinite(kg) || kg <= 0) throw 'Component "$designation" needs a positive declared mass';
-		declaredMass = new MassProperties(kg, centreOfMass == null ? new Vector() : centreOfMass, Declared, inertia);
+		if (centreOfMass == null || !Math.isFinite(centreOfMass.x) ||
+			!Math.isFinite(centreOfMass.y) || !Math.isFinite(centreOfMass.z))
+			throw 'Component "$designation" needs a finite declared centre of mass';
+		declaredMass = new MassProperties(kg, centreOfMass, Declared, inertia);
 	}
 
 	public function toolSpecs():Array<ToolSpec> return [];
@@ -126,6 +130,7 @@ class MachineComponent {
 	}
 
 	public function bridges():Array<PortBridge> return bridgeList.copy();
+	public function conversions():Array<PortBridge> return conversionList.copy();
 
 	/** Adds an instance with every connector frame so it can be mated by name. */
 	public function addTo(model:AssemblyModel, id:String, ?pose:AssemblyFrame):Void {
@@ -161,5 +166,15 @@ class MachineComponent {
 		for (existing in bridgeList) if (existing.from == from && existing.to == to)
 			throw 'Duplicate port bridge "$designation/$from->$to"';
 		bridgeList.push({from: from, to: to});
+	}
+
+	/** Declare a service conversion, such as pneumatic air producing vacuum. */
+	function addConversion(from:String, to:String):Void {
+		var input = port(from), output = port(to);
+		if (from == to || input.role != Consumer || output.role != Supply)
+			throw 'Port conversion "$designation/$from->$to" needs a Consumer input and Supply output';
+		for (existing in conversionList) if (existing.to == to)
+			throw 'Port conversion "$designation/$to" has multiple inputs';
+		conversionList.push({from: from, to: to});
 	}
 }

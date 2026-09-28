@@ -29,6 +29,7 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
 import cadbridge.MachineAssemblyMassBridge;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.component.MachineComponent;
 import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -67,6 +68,12 @@ class CadBridgeTests {
       "MachineKit payload is within RobotKit limits");
     check(MachineAssemblyMassBridge.payloadViolation(assembly, new LoadLimits(3, 0.15, 1),
       0.5, 0.2, 0.2, 0.2) != null, "MachineKit payload moment violates RobotKit limits");
+
+    assembly.addBomItem({partNumber: "TUBE", description: "Tube", quantity: 1,
+      material: "polyurethane"}, 1, Point(0.1, new Vector(100, 0, 50)));
+    MachineAssemblyMassBridge.applyToLink(assembly, link);
+    check(approx(link.mass, 2.1, 1e-12) && approx(link.centerOfMass[0], 0.1, 1e-12),
+      "accounted tubing contributes to RobotKit link mass");
 
     var missingTensor = new MachineAssembly();
     missingTensor.addComponent("declared", new BridgeMassPart(false));
