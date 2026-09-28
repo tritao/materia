@@ -24,6 +24,7 @@ start.
 | [`motionkit/`](motionkit/) | Transport-neutral trajectories, machine-axis views, and motion planning |
 | [`automationkit/`](automationkit/) | Facility, mission, task, fleet, and traffic models above RobotKit |
 | [`cadkit/`](cadkit/) | Headless CAD core and C ABI above Open CASCADE |
+| [`animkit/`](animkit/) | glTF character import and skeletal animation above ozz-animation |
 
 The native components are kept as sibling projects so they can be built and
 tested independently. Their focused instructions live in each package's
@@ -129,6 +130,7 @@ Use the package README files for focused native build and test commands:
 - [NativeKit](nativekit/README.md) and [UIKit](uikit/README.md) for platform and UI work;
 - [SceneKit](scenekit/README.md) and [SimKit](simkit/README.md) for scene and simulation work;
 - [CadKit](cadkit/README.md) for the headless CAD core;
+- [AnimKit](animkit/README.md) for glTF characters and skeletal animation;
 - [Haxeon](haxeon/README.md) for compiler, runtime, and project-tool development.
 
 When changing a submodule, publish its commit before updating the corresponding

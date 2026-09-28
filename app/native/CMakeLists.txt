@@ -59,8 +59,16 @@ if(UNIX AND NOT APPLE)
     target_link_options(cadkit-core PRIVATE "LINKER:-z,defs")
 endif()
 
+# AnimKit imports glTF characters and poses them with ozz-animation.
+set(AK_BUILD_SHARED ON CACHE BOOL "Build AnimKit as a shared library" FORCE)
+set(MATERIA_OWN_BUILD_TESTING ${BUILD_TESTING})
+set(BUILD_TESTING OFF)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/animkit/native" animkit)
+set(BUILD_TESTING ${MATERIA_OWN_BUILD_TESTING})
+
 set(MATERIA_RUNTIME_TARGETS nativekit nativekit_gpu nativekit_ui nativekit_scene
-    nativekit_scene_render nativekit_sim_core motionkit_core robotkit_runtime cadkit-core)
+    nativekit_scene_render nativekit_sim_core motionkit_core robotkit_runtime cadkit-core
+    animkit_core)
 if(MATERIA_ENABLE_MUJOCO)
     list(APPEND MATERIA_RUNTIME_TARGETS nativekit_sim_mujoco)
 endif()

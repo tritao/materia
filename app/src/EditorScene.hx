@@ -1738,6 +1738,20 @@ class EditorScene {
     rebuildPresentation(updatedNodes);
   }
 
+  /** The SceneKit scene, for runtime-only content that is not part of the document. */
+  public function runtimeContentScene():Scene return scene;
+
+  /**
+   * Publishes per-frame changes to runtime-only nodes, such as an animated
+   * character. Document and environment revisions stay unchanged, so UI caches
+   * and simulation remain valid while the viewport re-renders.
+   */
+  public function publishRuntimeNodes(nodes:Array<NodeId>):Void {
+    requireRenderRefresh();
+    markVisualChanged();
+    rebuildPresentation(nodes);
+  }
+
   function queueRenderChanges(changes:ChangeSet):Void presentation.queueRenderChanges(changes);
 
   function requireRenderRefresh():Void presentation.requireRenderRefresh();
