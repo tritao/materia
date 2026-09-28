@@ -19,7 +19,9 @@ class SuctionCup extends MachineComponent {
 	public final ratedMomentNm:Null<Float>;
 
 	public function new(diameter:Float, height:Float,
-			?effectiveAreaMm2:Float, ?ratedMomentNm:Float) {
+			?effectiveAreaMm2:Float, ?ratedMomentNm:Float,
+			?catalogDesignation:String, ?vacuumInterface:PortInterface,
+			?catalogDescription:String) {
 		if (!Math.isFinite(diameter) || diameter <= 0 || !Math.isFinite(height) || height <= 0)
 			throw "Suction cup needs positive dimensions";
 		var nominalArea = Math.PI * diameter * diameter / 4;
@@ -30,15 +32,20 @@ class SuctionCup extends MachineComponent {
 			throw "Suction cup moment rating must be positive and finite";
 		var ratingId = effectiveAreaMm2 == null ? "" : '-A${Dimension.format(effectiveAreaMm2)}';
 		if (ratedMomentNm != null) ratingId += '-M${Dimension.format(ratedMomentNm)}';
-		super('SUCTION-CUP-${Dimension.format(diameter)}-${Dimension.format(height)}$ratingId',
-			"Generic suction cup", "rubber", true);
+		super(catalogDesignation == null
+			? 'SUCTION-CUP-${Dimension.format(diameter)}-${Dimension.format(height)}$ratingId'
+			: catalogDesignation,
+			catalogDesignation == null ? "Generic suction cup" :
+				(catalogDescription == null ? 'Catalog suction cup $catalogDesignation' : catalogDescription),
+			"rubber", catalogDesignation == null);
 		this.diameter = diameter;
 		this.height = height;
 		this.effectiveAreaMm2 = effectiveAreaMm2;
 		this.ratedMomentNm = ratedMomentNm;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("contact", Face, Solids.axial(0, 0, height));
-		addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: PushIn(6), required: true});
+		addPort({name: "vacuum", kind: Vacuum, role: Consumer,
+			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: true});
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part

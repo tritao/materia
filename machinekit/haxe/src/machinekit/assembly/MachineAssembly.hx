@@ -9,6 +9,7 @@ import machinekit.component.BomItem;
 import machinekit.component.MachineComponent;
 import machinekit.component.ComponentPort;
 import machinekit.component.PortInterface;
+import machinekit.component.PortInterfaces;
 import machinekit.component.PortRole;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
@@ -241,8 +242,7 @@ class MachineAssembly {
 				if ((first.role == Supply && second.role == Supply) ||
 					(first.role == Consumer && second.role == Consumer))
 					throw 'Port connection "$id" has incompatible roles';
-				if (first.iface != Unspecified && second.iface != Unspecified &&
-					Std.string(first.iface) != Std.string(second.iface))
+				if (!PortInterfaces.compatible(first.iface, second.iface))
 					warnings.push('Port connection "$id" has mismatched interfaces');
 			case _:
 		}

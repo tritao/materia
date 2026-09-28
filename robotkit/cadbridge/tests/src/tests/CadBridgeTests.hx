@@ -37,6 +37,7 @@ import cadbridge.EndEffectorRuntimeBridge;
 import cadbridge.EndEffectorControlBinding;
 import cadbridge.SuctionCapacityBridge;
 import eoat.EndEffectorExample;
+import eoat.SchmalzEndEffectorExample;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.component.MachineComponent;
@@ -54,6 +55,11 @@ import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
 import robotkit.tool.SimulatedGripper;
 import robotkit.tool.SimulatedVacuum;
+import robotkit.tool.SuctionCapacityChecker;
+import robotkit.tool.SuctionMotionSample;
+import robotkit.tool.WorkpieceLoad;
+import robotkit.tool.MassProperties;
+import robotkit.spatial.Inertia3;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
 import haxe.Int64;
@@ -73,6 +79,7 @@ class CadBridgeTests {
     testMachineAssemblyMassBridge();
     testEndEffectorBridge();
     testSuctionCapacityBridge();
+    testSchmalzEndEffector();
     testEndEffectorRuntimeBridge();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
@@ -253,6 +260,27 @@ class CadBridgeTests {
     try MachineAssemblyMassBridge.payloadViolation(assembly, limits, 0.5, 0.2, 0.2, 0.2)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("UNMODELLED-LINE") >= 0;
     check(rejected, "unaccounted BOM mass prevents a payload decision");
+  }
+
+  static function testSchmalzEndEffector():Void {
+    var effector = SchmalzEndEffectorExample.build();
+    check(effector.validate().length == 0 &&
+      effector.billOfMaterials().quantity("10.07.09.00001") == 1,
+      "catalog EOAT validates with its hose and matching fitting");
+    var grip = SuctionCapacityBridge.toGrip(effector, "cup", 60, 0.5, 2);
+    check(approx(grip.normalCapacityN(), 69, 1e-9),
+      "Schmalz theoretical force yields the documented area at 60 kPa");
+    var tool = EndEffectorBridge.toTool(effector, "contact");
+    check(tool.mass > 0.038 && tool.flangeTTcp.translation.z > 0.1,
+      "catalog parts and hose contribute to the robot tool mass and TCP");
+    var load = new WorkpieceLoad("panel", new MassProperties(1, Vec3.zero(), Inertia3.zero()),
+      grip.flangeTCup);
+    var down = new Transform3(Vec3.zero(), Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI));
+    var resting = new SuctionMotionSample(down, Vec3.zero());
+    var accelerated = new SuctionMotionSample(down, new Vec3(15, 0, 0));
+    check(SuctionCapacityChecker.checkPath(load, grip, [resting]).safe &&
+      !SuctionCapacityChecker.checkPath(load, grip, [resting, accelerated]).safe,
+      "catalog cup holds the static sample and rejects excessive sideways acceleration");
   }
 
   static function testSuctionCapacityBridge():Void {

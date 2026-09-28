@@ -4,6 +4,12 @@ import machinekit.component.MassProperties.MassSource;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
+import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
+import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
+import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
+import eoat.SchmalzEndEffectorExample;
+import machinekit.component.PortInterfaces;
+import machinekit.component.PortInterface;
 import machinekit.robotics.FrameBar;
 import machinekit.robotics.ParallelGripper;
 import machinekit.robotics.ToolChangerMaster;
@@ -11,6 +17,35 @@ import machinekit.robotics.ToolChangerTool;
 
 class EndEffectorComponentTests {
 	public static function run():Void {
+		var vendorCup = new SchmalzSuctionCup("10.01.01.11401");
+		var vendorEjector = new SchmalzVacuumGenerator("10.02.01.00563");
+		var vendorFitting = new SchmalzPushInFitting("10.08.02.00203");
+		if (!PortInterfaces.compatible(vendorCup.port("vacuum").iface,
+				vendorFitting.port("thread").iface) ||
+			PortInterfaces.compatible(Thread("G1/4-F"), Thread("G1/4-F")) ||
+			PortInterfaces.compatible(Thread("G1/4-F"), Thread("G1/8-M")))
+			throw "Threaded vacuum connections need matching size and opposite sex";
+		if (vendorCup.codeOnly || vendorEjector.codeOnly || vendorFitting.codeOnly ||
+			vendorCup.bom.description.indexOf("SAF 40") < 0 ||
+			vendorEjector.bom.description.indexOf("SBP 05") < 0 ||
+			vendorCup.bom.material != "nitrile rubber NBR" ||
+			vendorEjector.bom.material != "plastic" ||
+			vendorFitting.bom.material != "brass" ||
+			vendorCup.bom.partNumber != "10.01.01.11401" ||
+			vendorEjector.bom.partNumber != "10.02.01.00563" ||
+			vendorFitting.bom.partNumber != "10.08.02.00203")
+			throw "Schmalz parts must retain catalog identity in the BOM";
+		if (Math.abs((cast vendorCup.effectiveAreaMm2:Float) - 1150) > 1e-9 ||
+			Math.abs(vendorCup.massProperties().mass - 0.0136) > 1e-9 ||
+			Math.abs(vendorEjector.massProperties().mass - 0.0075) > 1e-9 ||
+			Math.abs(vendorFitting.massProperties().mass - 0.015) > 1e-9)
+			throw "Schmalz force-derived area or declared masses are incorrect";
+		var example = SchmalzEndEffectorExample.build();
+		if (example.validate().length != 0 ||
+			example.upstreamChain("cup", "vacuum").join(" ← ").indexOf("fitting/thread") < 0 ||
+			example.billOfMaterials().lines().length != 6 ||
+			example.massPropertiesAtMount().unaccounted.length != 0)
+			throw "Schmalz EOAT must validate with a complete service chain, BOM and mass";
 		var master = new ToolChangerMaster(2);
 		var tool = new ToolChangerTool(2);
 		if (master.port("airOut2").name != "airOut2" || tool.port("airIn2").name != "airIn2" ||

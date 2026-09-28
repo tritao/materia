@@ -8,7 +8,9 @@ project of its own.
 
 - [ ] **Vendor catalogs (M per vendor).** Eins, Schunk, Zimmer, SMC or Piab via
   `Catalog<T>`: coupling key, ports, declared mass and centre, envelope
-  geometry and provenance, using the same API as the generic parts.
+  geometry and provenance, using the same API as the generic parts. A Schmalz
+  cup, ejector and fitting now provide the first pneumatic slice; changer
+  halves and broader vendor coverage remain.
 - [ ] **Vendor STEP files as envelopes (M).** Load a vendor model for
   collision and appearance, then declare connectors and ports by hand. Vendor
   files usually allow internal use but not redistribution, so keep them outside
@@ -79,9 +81,8 @@ project of its own.
 
 ## Suggested priorities
 
-1. One vendor catalog slice: makes the layer usable with real parts and tests
-   the abstractions against a real vendor.
-2. Design report: show the configuration BOM, service chains, payload and
+1. Design report: show the configuration BOM, service chains, payload and
    suction margins in one reviewable artifact.
+2. Extend the vendor catalog to a matching changer pair and more cup sizes.
 3. Document and editor persistence: needed once someone must author tools
    interactively.
