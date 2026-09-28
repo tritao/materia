@@ -824,6 +824,11 @@ deterministic. `Simulated*` classes implement each interface by recording
 every commanded state change, with its timestamp, into a `history` array
 (e.g. `SimulatedSprayer.history:Array<SprayerEvent>`) so tests and coverage
 tracking can observe exactly what was commanded and when.
+`SimulatedGripper` requires a contact observation after closing before it
+reports a grasp. `SimulatedVacuum` requires a measured vacuum magnitude at or
+above its configured hold threshold after enabling before it reports a hold.
+Both record sensor observations separately from commands; opening or disabling
+clears the observed pickup.
 
 `cadbridge.EndEffectorRuntimeBridge` builds a `ToolRuntime` from a selected
 `EndEffectorSet` configuration and working frame. Each explicit control binding
