@@ -8,7 +8,7 @@ import cnckit.CncCompiler;
 import cnckit.CncMachine;
 import stockkit.CutMoves;
 import stockkit.Stock;
-import stockkit.StockGrid;
+import stockkit.StockLattice;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -222,9 +222,9 @@ class CamIslandPocketFixture {
     solids.push(part);
     for (solid in solids) solid.close();
     // Rays off the part's round coordinates.
-    var grid = new StockGrid(-0.00487, -0.00491, 0.00025, 200, 160);
-    var target = Stock.fromMesh(grid, mesh);
-    var stock = Stock.box(grid, -0.005, -0.005, -0.01, 0.045, 0.035, 0);
+    var lattice = new StockLattice(-0.00487, -0.00491, -0.00987, 0.00025, 200, 160, 40);
+    var target = Stock.fromMesh(lattice, mesh);
+    var stock = Stock.box(lattice, -0.005, -0.005, -0.01, 0.045, 0.035, 0);
     var report = stock.cut(CutMoves.fromProgram(program.toolpath()));
     check(report.rapidContacts().length == 0, "island pocket never rapids through stock");
     check(report.collisions().length == 0, "island pocket keeps the shank out of the stock");

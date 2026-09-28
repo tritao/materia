@@ -81,24 +81,37 @@ struct Hit {
 
 } // namespace
 
-bool cast_mesh_z(Stock &stock, const double *positions, uint32_t position_count,
-    const uint32_t *indices, uint32_t index_count, std::string &error) {
+bool cast_mesh(DexelGrid &stock, const double *world_positions, uint32_t position_count,
+    const uint32_t *world_indices, uint32_t index_count, std::string &error) {
     if (position_count % 3 != 0 || index_count % 3 != 0) {
         error = "mesh positions and indices must come in triples";
         return false;
     }
     const uint32_t vertices = position_count / 3;
     for (uint32_t k = 0; k < index_count; ++k)
-        if (indices[k] >= vertices) {
+        if (world_indices[k] >= vertices) {
             error = "mesh index out of range";
             return false;
         }
     for (uint32_t k = 0; k < position_count; ++k)
-        if (!std::isfinite(positions[k])) {
+        if (!std::isfinite(world_positions[k])) {
             error = "mesh positions must be finite";
             return false;
         }
     const Grid &grid = stock.grid();
+    // Cast in (u, v, w) with the ray along w. For Y rays (x, z, y) is a
+    // reflection, so triangles are reversed to keep their outward side;
+    // normals come back to world axes by the same permutation.
+    const uint32_t axes[3] = {grid.u_axis(), grid.v_axis(), grid.axis};
+    const bool reflected = grid.axis == 1;
+    std::vector<double> permuted(position_count);
+    for (uint32_t k = 0; k < position_count; k += 3)
+        for (int c = 0; c < 3; ++c) permuted[k + c] = world_positions[k + axes[c]];
+    std::vector<uint32_t> reordered(world_indices, world_indices + index_count);
+    if (reflected)
+        for (uint32_t t = 0; t + 2 < index_count; t += 3) std::swap(reordered[t + 1], reordered[t + 2]);
+    const double *positions = permuted.data();
+    const uint32_t *indices = reordered.data();
     const double s = grid.spacing;
     std::vector<std::vector<Hit>> hits(static_cast<size_t>(grid.count[0]) * grid.count[1]);
     for (uint32_t t = 0; t < index_count; t += 3) {
@@ -113,7 +126,9 @@ bool cast_mesh_z(Stock &stock, const double *positions, uint32_t position_count,
         double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
         double length = std::sqrt(nx * nx + ny * ny + nz * nz);
         // After reordering the normal points up; the mesh's own normal is flipped for down-facing faces.
-        float normal[3] = {float(facing * nx / length), float(facing * ny / length), float(facing * nz / length)};
+        float local[3] = {float(facing * nx / length), float(facing * ny / length), float(facing * nz / length)};
+        float normal[3];
+        for (int c = 0; c < 3; ++c) normal[axes[c]] = local[c];
         double xmin = std::min({p[0][0], p[1][0], p[2][0]}), xmax = std::max({p[0][0], p[1][0], p[2][0]});
         double ymin = std::min({p[0][1], p[1][1], p[2][1]}), ymax = std::max({p[0][1], p[1][1], p[2][1]});
         int64_t i0 = std::max<int64_t>(0, int64_t(std::ceil((xmin - grid.origin[0]) / s)) - 1);

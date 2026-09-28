@@ -67,6 +67,14 @@ arrive as triangle buffers, so the core never links OCCT.
    nodes for large stock.
 6. **Tri-dexel and meshing** (milestone 2): X and Y grids updated by every
    move; manifold dual contouring with a QEF over stored normals; STL export.
+   Done so far: the sweep query answers X and Y rays (closed form for level
+   moves and plunges, scan and refine for ramps and helices), and the stock
+   is a lattice with a grid per axis that every move cuts. X and Y rays
+   match the OCCT oracle to 1e-9 m and lie within the sampled reference's
+   bounds. Haxeon's FFI now returns several outputs and queried typed arrays
+   in one call, so ray reads, sweep queries and cuts are single calls. Next:
+   dual contouring over the three grids, then per-axis target comparison in
+   the viewer.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
    adapter, holder/spindle against fixtures via RobotKit/SimKit collision.
 
@@ -93,6 +101,11 @@ six levels in 1.5 mm lines joined by half circles).
 | 0.25 mm (801×801) | 6 mm ball | 1.1 s | 0.14 s | 39 MB |
 | 0.1 mm (2001×2001) | 6 mm flat | 1.6 s | 0.23 s | 244 MB |
 | 0.1 mm (2001×2001) | 6 mm ball | 6.8 s | 0.78 s | 244 MB |
+
+Tri-dexel (the same program on 801×801 Z rays plus X and Y grids through
+30 mm of stock at 0.25 mm, 801×120 rays each): flat mill 1.0 s on one thread
+and 0.13 s on all, ball mill 3.6 s and 0.37 s; 54–74 MB. Most moves are
+level, whose X and Y rays are closed form (a capsule or an annular sector).
 
 Meshing the whole 0.25 mm stock for preview takes 0.04–0.1 s after the flat
 mill (0.22M triangles merged, 1.3M unmerged) and 0.1–0.18 s after the ball

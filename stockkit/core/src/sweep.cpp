@@ -119,6 +119,50 @@ double path_distance(const Motion &m, double x, double y) {
  * each stretch between them is tested at its middle. Pairs go to `out`.
  */
 void offset_spans(const Motion &m, double reach, double c, std::vector<double> &out) {
+    if (!m.arc) {
+        // A capsule is convex: its end discs and the strip between them meet
+        // the line in overlapping intervals, whose union is one.
+        double lo = kInf, hi = -kInf;
+        double ax, ay, az, bx, by, bz;
+        m.position(0, ax, ay, az);
+        m.position(1, bx, by, bz);
+        for (const double *end : {&ax, &bx}) {
+            double x0 = *end, y0 = end == &ax ? ay : by, dy = c - y0;
+            if (std::fabs(dy) > reach) continue;
+            double w = std::sqrt(reach * reach - dy * dy);
+            lo = std::min(lo, x0 - w);
+            hi = std::max(hi, x0 + w);
+        }
+        double dx = bx - ax, dy = by - ay, length = std::hypot(dx, dy);
+        if (length > 0) {
+            dx /= length;
+            dy /= length;
+            double a = -kInf, b = kInf;
+            // Sides of the strip, where (x - ax) dy - (c - ay) dx = +-reach.
+            if (dy != 0) {
+                double p = ax + (-reach + (c - ay) * dx) / dy, q = ax + (reach + (c - ay) * dx) / dy;
+                a = std::max(a, std::min(p, q));
+                b = std::min(b, std::max(p, q));
+            } else if (std::fabs((c - ay) * dx) > reach) {
+                b = -kInf;
+            }
+            // Ends of the strip, where (x - ax) dx + (c - ay) dy = 0 or length.
+            if (dx != 0) {
+                double p = ax + (0.0 - (c - ay) * dy) / dx, q = ax + (length - (c - ay) * dy) / dx;
+                a = std::max(a, std::min(p, q));
+                b = std::min(b, std::max(p, q));
+            } else if ((c - ay) * dy < 0 || (c - ay) * dy > length) {
+                b = -kInf;
+            }
+            if (a <= b) {
+                lo = std::min(lo, a);
+                hi = std::max(hi, b);
+            }
+        }
+        out.clear();
+        if (lo < hi) out.insert(out.end(), {lo, hi});
+        return;
+    }
     thread_local std::vector<double> cuts;
     cuts.clear();
     auto disc = [&](double x0, double y0, double r) {

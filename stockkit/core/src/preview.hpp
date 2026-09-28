@@ -44,7 +44,7 @@ struct PreviewOptions {
  * lower index, so a mesh also reads the columns just past its +x and +y
  * edges, and must be rebuilt when those tiles change.
  */
-void build_preview(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
+void build_preview(const DexelGrid &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
     const PreviewOptions &options, PreviewMesh &out);
 
 } // namespace stockkit

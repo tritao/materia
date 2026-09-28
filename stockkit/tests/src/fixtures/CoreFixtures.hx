@@ -12,7 +12,8 @@ import oracle.ExactOracle;
 import stockkit.CutMove;
 import stockkit.CutMoves;
 import stockkit.Stock;
-import stockkit.StockGrid;
+import stockkit.StockAxis;
+import stockkit.StockLattice;
 import stockkit.StockPreview;
 import stockkit.StockTimeline;
 
@@ -52,23 +53,27 @@ class CoreFixtures {
       .finish();
     var moves = CutMoves.fromProgram(program.toolpath());
     Assert.check(moves.length > 20, "pocket has enough moves to scrub");
-    var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0004);
+    var lattice = new StockLattice(0, 0, -STOCK_Z + 0.0002, 0.0004, 101, 51, 25);
     function fresh(count:Int):Stock {
-      var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+      var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
       stock.cut(moves.slice(0, count));
       return stock;
     }
+    // Every grid must scrub back, not only the Z grid the preview reads.
     function same(a:Stock, b:Stock):Bool {
-      var x = a.rays(0, 0, grid.countX, grid.countY), y = b.rays(0, 0, grid.countX, grid.countY);
-      for (k in 0...x.length) {
-        if (x[k].length != y[k].length) return false;
-        for (n in 0...x[k].length)
-          if (x[k][n].lo != y[k][n].lo || x[k][n].hi != y[k][n].hi || x[k][n].hiSource != y[k][n].hiSource)
-            return false;
+      for (axis in [StockAxis.X, StockAxis.Z]) {
+        var grid = lattice.grid(axis);
+        var x = a.rays(0, 0, grid.countU, grid.countV, axis), y = b.rays(0, 0, grid.countU, grid.countV, axis);
+        for (k in 0...x.length) {
+          if (x[k].length != y[k].length) return false;
+          for (n in 0...x[k].length)
+            if (x[k][n].lo != y[k][n].lo || x[k][n].hi != y[k][n].hi || x[k][n].hiSource != y[k][n].hiSource)
+              return false;
+        }
       }
       return true;
     }
-    var timeline = new StockTimeline(Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0), moves, 7);
+    var timeline = new StockTimeline(Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0), moves, 7);
     var stock = timeline.stock;
     Assert.check(timeline.position == moves.length && stock.history.length == moves.length,
       "timeline starts at the program's end");
@@ -133,8 +138,8 @@ class CoreFixtures {
       .pocket(contour, tool, -0.008, 0.01, 0.003, 0.004)
       .finish();
     var moves = CutMoves.fromProgram(program.toolpath());
-    var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0005);
-    var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+    var lattice = StockLattice.covering(0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0, 0.0005);
+    var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var report = stock.cut(moves);
     // Steps of 4 mm with 3 mm flutes leave 1 mm above the flutes at each
     // level for the shank to rub; the holder, 10 mm up, stays above the
@@ -157,7 +162,7 @@ class CoreFixtures {
     var short = Tool.shaped(4, 0.0, CutterProfile.flat(0.004, 0.003).withHolder(0.02, 0.03));
     var deeper = [for (move in CutMoves.fromProgram(new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
       .pocket(contour, short, -0.006, 0.01, 0.003, 0.002).finish().toolpath())) move];
-    var fresh = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+    var fresh = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var hits = [for (outcome in fresh.cut(deeper).moves) if (outcome.holderContact > 0) outcome];
     Assert.check(hits.length > 0, "a holder 3 mm above the tip hits a 6 mm pocket");
     fresh.dispose();
@@ -182,9 +187,9 @@ class CoreFixtures {
     var mesh = part.shape.tessellate(1e-6, 0.1);
     for (p in [blank, pocketTool, pocket, part]) p.close();
     // Rays off the pocket's round coordinates.
-    var grid = new StockGrid(0.00013, 0.00017, 0.0005, 80, 40);
-    var target = Stock.fromMesh(grid, mesh);
-    var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+    var lattice = new StockLattice(0.00013, 0.00017, -STOCK_Z + 0.00019, 0.0005, 80, 40, 20);
+    var target = Stock.fromMesh(lattice, mesh);
+    var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     stock.cut(moves);
     var comparison = stock.compare(target);
     Assert.near(comparison.gougeVolume(), 0, "CamKit's pocket does not gouge its part", 1e-15);
@@ -267,12 +272,13 @@ class CoreFixtures {
 
   /** Stock cast from CadKit tessellations matches the analytic solids. */
   static function meshStock():Void {
-    var grid = StockGrid.covering(-0.0198, -0.0098, 0.0198, 0.0098, 0.0004);
+    var lattice = new StockLattice(-0.0198, -0.0098, -0.00018, 0.0004, 100, 50, 32);
+    var grid = lattice.grid(Z);
     var part = Part.box(0.03, 0.015, 0.01, Center, Center, Min);
     var mesh = part.shape.tessellate(1e-5, 0.1);
     part.close();
-    var fromMesh = Stock.fromMesh(grid, mesh);
-    var box = Stock.box(grid, -0.015, -0.0075, 0, 0.015, 0.0075, 0.01);
+    var fromMesh = Stock.fromMesh(lattice, mesh);
+    var box = Stock.box(lattice, -0.015, -0.0075, 0, 0.015, 0.0075, 0.01);
     Assert.near(fromMesh.intervalCount(), box.intervalCount(), "box mesh covers the box's rays", 0);
     Assert.near(fromMesh.volume(), box.volume(), "box mesh volume matches the box", 1e-15);
     var inside = fromMesh.ray(40, 20);
@@ -287,13 +293,13 @@ class CoreFixtures {
     var cylinder = Part.cylinder(radius, 0.012);
     var cylinderMesh = cylinder.shape.tessellate(1e-6, 0.05);
     cylinder.close();
-    var stock = Stock.fromMesh(grid, cylinderMesh);
-    var rays = stock.rays(0, 0, grid.countX, grid.countY);
+    var stock = Stock.fromMesh(lattice, cylinderMesh);
+    var rays = stock.rays(0, 0, grid.countU, grid.countV);
     var wrong = 0;
-    for (j in 0...grid.countY)
-      for (i in 0...grid.countX) {
-        var d = Math.sqrt(grid.x(i) * grid.x(i) + grid.y(j) * grid.y(j));
-        var ray = rays[j * grid.countX + i];
+    for (j in 0...grid.countV)
+      for (i in 0...grid.countU) {
+        var d = Math.sqrt(grid.u(i) * grid.u(i) + grid.v(j) * grid.v(j));
+        var ray = rays[j * grid.countU + i];
         // Chords of the tessellation lie at most the deflection inside the circle.
         if (d < radius - 2e-6) {
           if (ray.length != 1 || ray[0].lo != 0 || ray[0].hi != 0.012) wrong++;
@@ -315,8 +321,8 @@ class CoreFixtures {
       new CutMove(tool, Path(Line(new Point3(0.02, 0.002, -0.001), new Point3(0.02, 0.018, -0.001))),
         Rapid, 1, span)
     ];
-    var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0005);
-    var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+    var lattice = new StockLattice(0, 0, -STOCK_Z + 0.00025, 0.0005, 81, 41, 20);
+    var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var report = stock.cut(moves);
     var removed = report.removed();
     Assert.check(removed.length == 2 && removed[0] > 0 && removed[1] > 0, "both moves remove material");
@@ -332,7 +338,7 @@ class CoreFixtures {
     var untouched = stock.ray(2, 2);
     Assert.check(untouched[0].hiSource == Stock.ORIGINAL, "untouched stock keeps its original surface");
     // The same moves on one thread give the same stock.
-    var single = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
+    var single = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     single.setThreads(1);
     var again = single.cut(moves).removed();
     Assert.check(again[0] == removed[0] && again[1] == removed[1], "one thread removes the same volumes");

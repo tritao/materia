@@ -7,9 +7,11 @@ import toolpathkit.tool.CutterProfile;
 import haxe.io.Bytes;
 
 /**
-  In-process stock on a Z dexel grid, held by StockKit core. Each ray keeps
+  In-process stock on a `StockLattice`, held by StockKit core: a grid of rays
+  along Z, and along X and Y too when the lattice is tri-dexel. Each ray keeps
   sorted material intervals whose ends record the outward normal and the move
-  that made them.
+  that made them. Every cut updates every grid; volumes, per-move removal and
+  contact, tiles and previews use the Z grid.
 
   Only the cutting zone of each tool removes material; its shank and holder
   are swept too, and their overlap with the stock is reported per move. Moves
@@ -20,19 +22,22 @@ class Stock {
   /** Source of surfaces no move has touched. */
   public static inline final ORIGINAL = -1;
 
+  public final lattice:StockLattice;
+  /** The Z grid. */
   public final grid:StockGrid;
   public final history:Array<CutMove> = [];
   final owner:Ownedsk_stock_handle;
   final tools:Array<NativeTool> = [];
   var disposed = false;
 
-  function new(grid:StockGrid, owner:Ownedsk_stock_handle) {
-    this.grid = grid;
+  function new(lattice:StockLattice, owner:Ownedsk_stock_handle) {
+    this.lattice = lattice;
+    this.grid = lattice.grid(Z);
     this.owner = owner;
   }
 
   /** A solid box; rays on its sides count as inside. */
-  public static function box(grid:StockGrid, minX:Float, minY:Float, minZ:Float,
+  public static function box(lattice:StockLattice, minX:Float, minY:Float, minZ:Float,
       maxX:Float, maxY:Float, maxZ:Float):Stock {
     var box = new sk_box();
     box.set_struct_size(sk_box.size());
@@ -42,9 +47,9 @@ class Stock {
     box.set_max(0, maxX);
     box.set_max(1, maxY);
     box.set_max(2, maxZ);
-    var created = StockKitNative.sk_stock_create_box(nativeGrid(grid), box);
+    var created = StockKitNative.sk_stock_create_box(nativeLattice(lattice), box);
     check(created.status, "stock.box");
-    return new Stock(grid, created.out_stock);
+    return new Stock(lattice, created.out_stock);
   }
 
   /**
@@ -52,19 +57,18 @@ class Stock {
     `positions` holds xyz triples and `indices` vertex triples. A ray through
     a shared edge or vertex is counted exactly once.
   **/
-  public static function fromTriangles(grid:StockGrid, positions:Array<Float>,
+  public static function fromTriangles(lattice:StockLattice, positions:Array<Float>,
       indices:Array<Int>):Stock {
-    var created = StockKitNative.sk_stock_create_mesh(nativeGrid(grid), positions,
-      indices);
+    var created = StockKitNative.sk_stock_create_mesh(nativeLattice(lattice), positions, indices);
     check(created.status, "stock.fromTriangles");
-    return new Stock(grid, created.out_stock);
+    return new Stock(lattice, created.out_stock);
   }
 
   /** Stock from a CadKit tessellation (vertex and index buffers in native layout). */
-  public static function fromMesh(grid:StockGrid, mesh:cadkit.Mesh):Stock {
+  public static function fromMesh(lattice:StockLattice, mesh:cadkit.Mesh):Stock {
     var positions = [for (k in 0...mesh.vertexCount * 3) mesh.vertices.getDouble(8 * k)];
     var indices = [for (k in 0...mesh.indexCount) mesh.indices.getInt32(4 * k)];
-    return fromTriangles(grid, positions, indices);
+    return fromTriangles(lattice, positions, indices);
   }
 
   /**
@@ -91,8 +95,7 @@ class Stock {
       while (end < moves.length && moves[end].tool == moves[start].tool) end++;
       var first = history.length;
       var native = [for (index in start...end) nativeMove(moves[index], first + index - start)];
-      var result = StockKitNative.sk_stock_cut(owner.borrow(), toolFor(moves[start].tool).borrow(),
-        native, native.length);
+      var result = StockKitNative.sk_stock_cut(owner.borrow(), toolFor(moves[start].tool).borrow(), native);
       check(result.status, "stock.cut");
       for (index in start...end) {
         var outcome = result.out_results[index - start];
@@ -107,17 +110,19 @@ class Stock {
   }
 
   /**
-    Compares this stock with `target` ray by ray; `target` must use the same
-    grid, for example `Stock.fromMesh(stock.grid, part.shape.tessellate(...))`.
+    Compares this stock with `target` ray by ray along `axis` (Z by default);
+    `target` must use the same lattice, for example
+    `Stock.fromMesh(stock.lattice, part.shape.tessellate(...))`.
   **/
-  public function compare(target:Stock):StockComparison {
+  public function compare(target:Stock, ?axis:StockAxis):StockComparison {
     alive();
     target.alive();
-    var result = StockKitNative.sk_stock_compare(owner.borrow(), target.owner.borrow(), 0, 0,
-      grid.countX, grid.countY, grid.countX * grid.countY);
+    var along = gridAlong(axis);
+    var result = StockKitNative.sk_stock_compare(owner.borrow(), target.owner.borrow(), nativeAxis(along.axis),
+      0, 0, along.countU, along.countV, along.rayCount());
     check(result.status, "stock.compare");
     var rays = result.out_comparisons;
-    return new StockComparison(grid, [for (ray in rays) ray.get_leftover()],
+    return new StockComparison(along, [for (ray in rays) ray.get_leftover()],
       [for (ray in rays) ray.get_gouge()], [for (ray in rays) ray.get_largest_leftover()],
       [for (ray in rays) ray.get_largest_gouge()],
       [for (ray in rays) {
@@ -132,10 +137,10 @@ class Stock {
     alive();
     var created = StockKitNative.sk_stock_snapshot(owner.borrow());
     check(created.status, "stock.snapshot");
-    return new StockSnapshot(grid, history.copy(), created.out_snapshot);
+    return new StockSnapshot(lattice, history.copy(), created.out_snapshot);
   }
 
-  /** Returns the stock and its history to `snapshot`, which must share its grid. */
+  /** Returns the stock and its history to `snapshot`, which must share its lattice. */
   public function restore(snapshot:StockSnapshot):Void {
     alive();
     check(StockKitNative.sk_stock_restore(owner.borrow(), snapshot.borrow()), "stock.restore");
@@ -143,18 +148,18 @@ class Stock {
     for (move in snapshot.history) history.push(move);
   }
 
-  /** Tiles across (x) and down (y); tile (tx, ty) holds rays from (tx, ty) times the tile size. */
+  /** Z-grid tiles across (x) and down (y); tile (tx, ty) holds rays from (tx, ty) times the tile size. */
   public function tilesX():Int
-    return info().get_tiles(0);
+    return info().get_grids(2).get_tiles(0);
 
   public function tilesY():Int
-    return info().get_tiles(1);
+    return info().get_grids(2).get_tiles(1);
 
-  /** Each tile's revision, row by row; it changes whenever the tile's rays change. */
+  /** Each Z-grid tile's revision, row by row; it changes whenever the tile's rays change. */
   public function tileRevisions():Array<haxe.Int64> {
     alive();
     var count = tilesX() * tilesY();
-    var result = StockKitNative.sk_stock_read_revisions(owner.borrow(), count);
+    var result = StockKitNative.sk_stock_read_revisions(owner.borrow(), StockKitNativeConstants.SK_AXIS_Z, count);
     check(result.status, "stock.revisions");
     return result.out_revisions;
   }
@@ -199,36 +204,38 @@ class Stock {
     }
   }
 
-  /** The intervals along ray (i, j), bottom to top. */
-  public function ray(i:Int, j:Int):Array<StockInterval>
-    return rays(i, j, 1, 1)[0];
+  /** The intervals along ray (i, j) of the grid along `axis` (Z by default), in increasing order. */
+  public function ray(i:Int, j:Int, ?axis:StockAxis):Array<StockInterval>
+    return rays(i, j, 1, 1, axis)[0];
 
-  /** Intervals of every ray in a block, i fastest. */
-  public function rays(i0:Int, j0:Int, ni:Int, nj:Int):Array<Array<StockInterval>> {
+  /** Intervals of every ray in a block of the grid along `axis` (Z by default), i fastest. */
+  public function rays(i0:Int, j0:Int, ni:Int, nj:Int, ?axis:StockAxis):Array<Array<StockInterval>> {
     alive();
-    if (i0 < 0 || j0 < 0 || ni < 0 || nj < 0 || i0 + ni > grid.countX || j0 + nj > grid.countY)
+    var along = gridAlong(axis);
+    if (i0 < 0 || j0 < 0 || ni < 0 || nj < 0 || i0 + ni > along.countU || j0 + nj > along.countV)
       throw "stock ray block is outside the grid";
-    var counts = StockKitNative.sk_stock_read_counts(owner.borrow(), i0, j0, ni, nj, ni * nj);
-    check(counts.status, "stock.readCounts");
-    var total = 0;
-    for (count in counts.out_counts) total += count;
-    var read = StockKitNative.sk_stock_read_intervals(owner.borrow(), i0, j0, ni, nj, total);
-    check(read.status, "stock.readIntervals");
+    var read = StockKitNative.sk_stock_read_rays(owner.borrow(), nativeAxis(along.axis), i0, j0, ni, nj, ni * nj);
+    check(read.status, "stock.readRays");
     var result:Array<Array<StockInterval>> = [];
     var at = 0;
-    for (count in counts.out_counts) {
+    for (count in read.out_counts) {
       result.push([for (k in 0...count) interval(read.out_intervals[at + k])]);
       at += count;
     }
     return result;
   }
 
-  /** Material volume: interval lengths times spacing squared. */
-  public function volume():Float
-    return info().get_volume();
+  /** Material volume as the grid along `axis` (Z by default) measures it: interval lengths times spacing squared. */
+  public function volume(?axis:StockAxis):Float
+    return info().get_grids(nativeAxis(gridAlong(axis).axis)).get_volume();
 
-  public function intervalCount():Float
-    return haxe.Int64.toFloat(info().get_interval_count());
+  /** Intervals over every grid. */
+  public function intervalCount():Float {
+    var total = 0.0;
+    var stockInfo = info();
+    for (axis in 0...3) total += haxe.Int64.toFloat(stockInfo.get_grids(axis).get_interval_count());
+    return total;
+  }
 
   /** Rays whose sweep the core evaluated over every cut so far. */
   public function raysTested():Float
@@ -252,20 +259,12 @@ class Stock {
   **/
   public static function sweep(tool:Tool, geometry:PathGeometry, axis:StockAxis, u:Float,
       v:Float):Array<StockInterval> {
-    var nativeAxis = switch axis {
-      case X: StockKitNativeConstants.SK_AXIS_X;
-      case Y: StockKitNativeConstants.SK_AXIS_Y;
-      case Z: StockKitNativeConstants.SK_AXIS_Z;
-    };
     var cutting = new NativeTool(tool);
     try {
       var move = nativeMove(new CutMove(tool, Path(geometry), Cut, 0,
         new toolpathkit.path.Provenance(1, 1, 0)), 0);
-      var counted = StockKitNative.sk_sweep_count_ray(cutting.borrow(), move, nativeAxis, u, v);
-      check(counted.status, "sweep.count");
-      var read = StockKitNative.sk_sweep_read_ray(cutting.borrow(), move, nativeAxis, u, v,
-        counted.out_count);
-      check(read.status, "sweep.read");
+      var read = StockKitNative.sk_sweep_ray(cutting.borrow(), move, nativeAxis(axis), u, v);
+      check(read.status, "sweep");
       var result = [for (native in read.out_intervals) interval(native)];
       cutting.dispose();
       return result;
@@ -293,15 +292,29 @@ class Stock {
     if (disposed) throw "stock has been disposed";
   }
 
-  static function nativeGrid(grid:StockGrid):sk_grid {
-    var native = new sk_grid();
-    native.set_struct_size(sk_grid.size());
-    native.set_axis(StockKitNativeConstants.SK_AXIS_Z);
-    native.set_origin(0, grid.originX);
-    native.set_origin(1, grid.originY);
-    native.set_spacing(grid.spacing);
-    native.set_count(0, grid.countX);
-    native.set_count(1, grid.countY);
+  function gridAlong(axis:Null<StockAxis>):StockGrid {
+    if (axis == null) return grid;
+    return lattice.grid(axis);
+  }
+
+  static function nativeAxis(axis:StockAxis):Int
+    return switch axis {
+      case X: StockKitNativeConstants.SK_AXIS_X;
+      case Y: StockKitNativeConstants.SK_AXIS_Y;
+      case Z: StockKitNativeConstants.SK_AXIS_Z;
+    };
+
+  static function nativeLattice(lattice:StockLattice):sk_lattice {
+    var native = new sk_lattice();
+    native.set_struct_size(sk_lattice.size());
+    native.set_axes(lattice.triDexel ? StockKitNativeConstants.SK_AXES_ALL : StockKitNativeConstants.SK_AXES_Z);
+    native.set_origin(0, lattice.originX);
+    native.set_origin(1, lattice.originY);
+    native.set_origin(2, lattice.originZ);
+    native.set_spacing(lattice.spacing);
+    native.set_count(0, lattice.countX);
+    native.set_count(1, lattice.countY);
+    native.set_count(2, lattice.countZ);
     native.set_tile_size(0);
     return native;
   }

@@ -1,11 +1,11 @@
 package stockkit;
 
 /**
-  Stock compared with a target part ray by ray, along +Z. Leftover is stock
-  outside the target and gouge is target missing from the stock, as lengths
-  along each ray; volumes multiply by the ray spacing squared. Z rays see
-  floors and ceilings; a wall gouged sideways shows only where a ray falls in
-  the gouge, until the X and Y grids exist.
+  Stock compared with a target part ray by ray along one grid's rays.
+  Leftover is stock outside the target and gouge is target missing from the
+  stock, as lengths along each ray; volumes multiply by the ray spacing
+  squared. Z rays see floors and ceilings; X and Y rays see walls, so a wall
+  gouged sideways shows on them.
 **/
 class StockComparison {
   public final grid:StockGrid;

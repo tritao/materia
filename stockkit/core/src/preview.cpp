@@ -94,7 +94,7 @@ struct Open {
 
 } // namespace
 
-void build_preview(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
+void build_preview(const DexelGrid &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
     const PreviewOptions &options, PreviewMesh &out) {
     out = PreviewMesh{};
     out.merged = options.merge;
