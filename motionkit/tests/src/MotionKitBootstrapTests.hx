@@ -2201,8 +2201,10 @@ class MotionKitBootstrapTests {
 
     machine.abort();
     check(machine.isMoving(), "normal abort remains moving while the runtime stops");
-    check(machine.moveAxes([new AxisTarget("x", 0.01)], options) == null,
+    var replacementTargets = [new AxisTarget("x", 0.01)];
+    check(machine.moveAxes(replacementTargets, options) == null,
       "move after abort is deferred until the runtime reaches rest");
+    replacementTargets[0] = new AxisTarget("x", 0.04);
     var queuedTargets = [new AxisTarget("x", 0.025)];
     check(machine.queueAxes(queuedTargets, options) == null,
       "queued move waits behind the deferred replacement");
@@ -2232,6 +2234,9 @@ class MotionKitBootstrapTests {
     check(replacement != null, "deferred replacement starts after the stop settles");
     near(cast(replacement, Trajectory).evaluate(0.0).positions[0], settledPosition,
       "replacement starts from the position where the stop settled", 1e-5);
+    near(cast(replacement, Trajectory).evaluate(
+      cast(replacement, Trajectory).durationSeconds()).positions[0], 0.01,
+      "deferred replacement uses targets captured before caller mutation", 1e-5);
     runMotion(machine, simulation);
     near(robot.snapshot().positions.get(0), 0.025,
       "queued move uses targets captured before the caller mutates its array", 1e-5);

@@ -56,8 +56,8 @@ class MotionSystem {
   var plannedEndPositions:Null<Array<Float>> = null;
   /** True while stopping so that deferred work can start from rest. */
   var stoppingForReplacement:Bool = false;
-  /** Work deferred until a replacement stop reaches rest, in order. */
-  var afterStop:Array<Void -> Void> = [];
+  /** Copied commands deferred until a replacement stop reaches rest, in order. */
+  var afterStop:Array<MotionRequest> = [];
   /** Logical axis of the active jog, which a further jog can change without stopping. */
   var activeJogAxis:Null<String> = null;
   final modelRevision:Int64;
@@ -111,7 +111,8 @@ class MotionSystem {
   }
 
   /** True while a trajectory is active, held, or waiting to start after a stop. */
-  public function isMoving():Bool return activeTrajectory != null || afterStop.length > 0;
+  public function isMoving():Bool
+    return activeTrajectory != null || stoppingForReplacement || afterStop.length > 0;
 
   public function trajectory():Null<Trajectory> return activeTrajectory;
 
@@ -149,15 +150,13 @@ class MotionSystem {
     var retargeted = retargetNativeAxes(targets, options);
     if (retargeted != null) return retargeted;
     var planned = planAxesFrom(robot.snapshot().positions.toArray(), targets, options);
-    return replaceMotion(planned,
-      () -> planAxesFrom(robot.snapshot().positions.toArray(), targets, options));
+    return replaceMotion(planned, MotionRequestCapture.axes(targets, options));
   }
 
   /** Adds a coordinated axis move behind all motion already in the buffer. */
   public function queueAxes(targets:Array<AxisTarget>, ?options:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
-      var captured = targets == null ? null : targets.copy();
-      afterStop.push(() -> queueAxes(captured, options));
+      afterStop.push(MotionRequestCapture.queuedAxes(targets, options));
       return null;
     }
     var trajectoryValue = planAxesFrom(planningStartPositions(), targets, options);
@@ -172,7 +171,7 @@ class MotionSystem {
     if (trajectoryValue.jointCount() != jointCount)
       throw 'Queued trajectory has ${trajectoryValue.jointCount()} joints; robot has $jointCount';
     if (afterStop.length > 0) {
-      afterStop.push(() -> queueTrajectory(trajectoryValue));
+      afterStop.push(MotionRequestCapture.queuedTrajectory(trajectoryValue));
       return;
     }
     enqueueTrajectory(trajectoryValue);
@@ -185,16 +184,14 @@ class MotionSystem {
   public function moveLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
     var planned = planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options);
-    return replaceMotion(planned,
-      () -> planLinearPathFrom(robot.snapshot().positions.toArray(), target, feed, options));
+    return replaceMotion(planned, MotionRequestCapture.linear(target, feed, options));
   }
 
   /** Adds a straight Cartesian move behind all motion already in the buffer. */
   public function queueLinear(target:PathPoint, feed:Feed,
       ?options:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
-      var captured = target == null ? null : new PathPoint(target.x, target.y, target.z);
-      afterStop.push(() -> queueLinear(captured, feed, options));
+      afterStop.push(MotionRequestCapture.queuedLinear(target, feed, options));
       return null;
     }
     var trajectoryValue = planLinearPathFrom(planningStartPositions(), target, feed, options);
@@ -222,8 +219,7 @@ class MotionSystem {
   public function queuePath(path:GeometricPath, ?pathOptions:PathPlanningOptions,
       ?motionOptions:MotionOptions):Null<Trajectory> {
     if (afterStop.length > 0) {
-      var captured = path == null ? null : new GeometricPath(path.primitives);
-      afterStop.push(() -> queuePath(captured, pathOptions, motionOptions));
+      afterStop.push(MotionRequestCapture.queuedPath(path, pathOptions, motionOptions));
       return null;
     }
     var trajectoryValue = planPathFrom(planningStartPositions(), path,
@@ -280,23 +276,21 @@ class MotionSystem {
 
   /**
    * Starts `planned` now when the machine is at rest. Otherwise stops along
-   * the current path and starts a fresh `replan` from where it came to rest.
+   * the current path and plans the captured request from where it came to rest.
    */
-  function replaceMotion(planned:Trajectory, replan:Void -> Trajectory,
-      ?jogAxis:String):Null<Trajectory> {
+  function replaceMotion(planned:Trajectory, request:MotionRequest):Null<Trajectory> {
     if (!isMotionInProgress()) {
       clearBufferedMotion();
       beginImmediate(planned);
-      activeJogAxis = jogAxis;
+      activeJogAxis = switch request {
+        case Jog(axisId, _, _, _): axisId;
+        case _: null;
+      };
       return planned;
     }
     discardNativeTrajectory(planned);
     queuedTrajectories = [];
-    afterStop = [() -> {
-      clearBufferedMotion();
-      beginImmediate(replan());
-      activeJogAxis = jogAxis;
-    }];
+    afterStop = [request];
     held = false;
     stoppingForReplacement = true;
     beginStop();
@@ -339,8 +333,41 @@ class MotionSystem {
       held = false;
       var actions = afterStop;
       afterStop = [];
-      for (action in actions) action();
+      for (action in actions) executeAfterStop(action);
       return;
+    }
+  }
+
+  function executeAfterStop(request:MotionRequest):Void {
+    switch request {
+      case Axes(targets, options):
+        clearBufferedMotion();
+        beginImmediate(planAxesFrom(robot.snapshot().positions.toArray(),
+          targets, options));
+      case Linear(target, feed, options):
+        clearBufferedMotion();
+        beginImmediate(planLinearPathFrom(robot.snapshot().positions.toArray(),
+          target, feed, options));
+      case Path(path, pathOptions, motionOptions):
+        clearBufferedMotion();
+        beginImmediate(planPathFrom(robot.snapshot().positions.toArray(),
+          path, pathOptions, motionOptions));
+      case Jog(axisId, velocity, durationSeconds, acceleration):
+        clearBufferedMotion();
+        var axisValue = axis(axisId);
+        if (axisValue == null) throw 'Unknown motion axis "$axisId"';
+        beginImmediate(axisPlanner.planJog(robot.snapshot().positions.toArray(),
+          axisValue, velocity, durationSeconds, acceleration).trajectory);
+        activeJogAxis = axisId;
+      case Queued(command):
+        switch command {
+          case Axes(targets, options): queueAxes(targets, options);
+          case Linear(target, feed, options): queueLinear(target, feed, options);
+          case Path(path, pathOptions, motionOptions):
+            queuePath(path, pathOptions, motionOptions);
+          case Trajectory(segments):
+            queueTrajectory(Trajectory.fromSegments(segments));
+        }
     }
   }
 
@@ -401,7 +428,8 @@ class MotionSystem {
       return axisPlanner.planJog(start, axisValue, velocity,
         durationSeconds, acceleration).trajectory;
     }
-    return replaceMotion(planJog(), planJog, axisValue.id);
+    return replaceMotion(planJog(), MotionRequestCapture.jog(axisValue.id,
+      velocity, durationSeconds, acceleration));
   }
 
   /**
