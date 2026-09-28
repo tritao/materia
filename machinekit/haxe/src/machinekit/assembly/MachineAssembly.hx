@@ -284,6 +284,26 @@ class MachineAssembly {
 	public function components():Array<MachineAssemblyComponent>
 		return [for (member in members) {id: member.id, component: member.component}];
 
+	/** Parent links in the mate tree; constraints do not attach members. */
+	public function mateParents():Map<String, String> {
+		var result:Map<String, String> = [];
+		for (op in operations) switch op {
+			case Mate(_, _, parent, child, _, _, _): result.set(child.instanceId, parent.instanceId);
+			case _:
+		}
+		return result;
+	}
+
+	/** A member connector in that member's local frame. */
+	public function memberConnectorFrame(instanceId:String, connectorName:String):AssemblyFrame {
+		requireConnector(ref(instanceId, connectorName));
+		for (entry in memberConnectorFrames)
+			if (entry.instanceId == instanceId && entry.name == connectorName) return copyFrame(entry.frame);
+		for (connector in requireMember(instanceId).connectors())
+			if (connector.name == connectorName) return copyFrame(connector.frame);
+		throw 'Unknown connector "$instanceId/$connectorName"';
+	}
+
 	public function subassemblies():Array<MachineSubassembly> return included.copy();
 
 	public function billOfMaterials():Bom {
