@@ -17,6 +17,7 @@ import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
 import machinekit.document.MachineKitRecipes;
 import machinekit.document.MachineKitDocumentAssembly;
+import machinekit.component.Solids;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.Placement;
@@ -907,6 +908,9 @@ class MachineKitSmoke {
 		near(horizontalMiter.volume() + verticalMiter.volume(), analyticCornerVolume,
 			"two 20 mm mitred tubes preserve analytic stock volume");
 		checkOverlap(horizontalMiter, verticalMiter, 0, "L-corner mitres meet without overlap");
+		var miterUnion = Solids.union([mitreCorner.geometry("horizontal"), mitreCorner.geometry("vertical")]);
+		near(miterUnion.volume(), analyticCornerVolume, "mitred L-corner union matches analytic stock volume");
+		miterUnion.close();
 		near(mitreCorner.cutList()[0].totalLength, 220, "mitred corner cut list uses long points");
 
 		var copeFrame = new FrameAssembly(), copeTube = new RoundTube(20, 2);
