@@ -18,13 +18,15 @@ var head = human.pose.bonePosition(HumanBone.Head);  // model space, metres
 ## Standard skeleton
 
 `HumanBone` names about 30 bones: pelvis, spine segments, neck, and head, plus
-shoulder, upper arm, forearm, hand, three knuckles, thigh, shin, foot, and toe
-on each side. The names describe anatomy only. An asset's own hierarchy may
+shoulder, upper arm, forearm, hand, three knuckles, thigh, shin, foot, toe, and
+toe tip on each side. The names describe anatomy only. An asset's own hierarchy may
 differ; the Quaternius rig, for example, parents its feet to the body as IK
 controls rather than to the shins.
 
-`RigMapping` maps each standard bone to an asset joint name. Presets cover
-Quaternius and Mixamo; Mixamo namespaces such as `mixamorig:` are ignored.
+`RigMapping` maps each standard bone to an asset joint name, optionally with
+alternatives tried in order (Quaternius rigs without toe bones end the foot at
+`Foot.L_end`). Presets cover Quaternius and Mixamo; Mixamo namespaces such as
+`mixamorig:` are ignored.
 `HumanoidRig.detect` picks the first preset that provides every required
 bone, and reports the missing bones otherwise. Adding another character
 source means adding one mapping.
@@ -51,6 +53,34 @@ the thumb side, held at a chosen distance along the prop. Attachments move in
 the same `advance` as the mesh, and `changedNodes` lists every node a frame
 touched.
 
+## Body description and collision proxy
+
+`HumanDescription.measure` reads stature, shoulder and hip width, torso, and
+limb segment lengths from a rest pose. `scaledTo` describes the same body at
+another stature; its `scale` is then the uniform scale for the character's
+visual root.
+
+`HumanBodyProxy.standard` stands the body in with fifteen capsules between
+standard bones: head, abdomen, chest, and upper arm, forearm, hand, thigh,
+shin, and foot on each side. Radii are proportions of stature and lengths
+follow the rig's bones. The head reaches the crown, shins stop short of the
+ankle so they never sink below the sole, and feet run to the toe tips.
+`place(pose, root)` returns every capsule's centre and orientation (the
+capsule's local +Z along its bones) through the character's root transform.
+
+`HumanBodyView` draws the capsules or a skeleton of thin bones beneath the
+character root, as a `HumanDisplay` of `Mesh`, `Capsules`, or `Skeleton`, to
+check the proxy against the mesh.
+
+## Simulation
+
+The `humankit/sim` package (`humankit-sim`) puts a person in a SimKit session:
+`HumanActor` turns the proxy into one kinematic session actor and
+`pushPose(time, pose, root)` adds a keyframe in simulation time. The person
+pushes what they walk into and is never pushed back. A writer that steps the
+session pushes one keyframe per tick; one following a realtime session pushes a
+few ticks ahead, and the session interpolates between keyframes.
+
 ## Tests
 
 ```sh
@@ -60,14 +90,19 @@ touched.
 The test uses the bundled Quaternius worker and CreativeTrio wrench (both
 CC0). It checks rig detection and rejection, anatomical landmarks, rigid hand
 frames, and that an attached prop tracks the palm through a walk cycle. It
-also checks that the prop adds exactly one draw call.
+also checks that the prop adds exactly one draw call, the measured
+description, capsule placement against the bones, crown, and floor, uniform
+scaling, and that the body view draws only the shown mode and follows the pose.
+The app suite covers a person joining the application simulation.
 
 ## Editor preview
 
 ```sh
 ./app/run-built.sh --perspective --character=animkit/assets/quaternius/worker.glb \
-  --character-hold=animkit/assets/props/wrench.glb
+  --character-hold=animkit/assets/props/wrench.glb [--character-display=capsules|skeleton]
 ```
 
 Humanoid characters become HumanKit characters; other assets still preview as
-plain AnimKit models.
+plain AnimKit models. A humanoid preview also joins the application
+simulation as a person: once a simulation is applied it lives on simulation
+time, stands still while the simulation is paused, and walks with each step.

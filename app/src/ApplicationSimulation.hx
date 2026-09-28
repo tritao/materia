@@ -56,6 +56,9 @@ class ApplicationSimulation {
   var running:Bool = false;
   var presentAssemblyPhysics:Bool = false;
   var presentationEpoch:Int = 0;
+  final participants:Array<SessionParticipant> = [];
+  var participantRevision:Int = 0;
+  var appliedParticipantRevision:Int = -1;
 
   public function new(world:RobotWorld,?backend:Int=DETERMINISTIC) {
     this.world=world;this.backend=DETERMINISTIC;setBackend(backend);
@@ -74,7 +77,25 @@ class ApplicationSimulation {
 
   public function pending(configuration:SensorConfiguration, scene:EditorScene):Bool
     return appliedDocumentRevision != configuration.revision() ||
-      appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend||appliedTimestep!=timestep;
+      appliedEnvironmentRevision != scene.environmentRevision||appliedBackend!=backend||appliedTimestep!=timestep||
+      appliedParticipantRevision != participantRevision;
+
+  /** Adds a participant to every session built from the next rebuild on. */
+  public function addParticipant(participant:SessionParticipant):Void {
+    if (participants.indexOf(participant) >= 0) return;
+    participants.push(participant);
+    participantRevision++;
+  }
+
+  /**
+   * Removes a participant from the next rebuild on. It leaves the live session
+   * now; a body it placed there stays, unmoving, until that rebuild.
+   */
+  public function removeParticipant(participant:SessionParticipant):Void {
+    if (!participants.remove(participant)) return;
+    participant.leave();
+    participantRevision++;
+  }
 
   /** Builds the complete candidate before changing any live world adapter. */
   public function rebuild(configuration:SensorConfiguration, scene:EditorScene,
@@ -89,7 +110,7 @@ class ApplicationSimulation {
     try {
       var models = configuration.robotModels();
       var assembly = session == null ? null : session.projectAssemblyDefinition;
-      if (models.length == 0 && assembly == null) throw "Nothing to simulate";
+      if (models.length == 0 && assembly == null && participants.length == 0) throw "Nothing to simulate";
       for (configured in models) {
         var id=configured.id;
         var existing = world.robot(id);
@@ -224,7 +245,6 @@ class ApplicationSimulation {
           object.dynamicBody?object.mass:0.0);
         candidateObjects.push({id:object.id,object:created});
       }
-      if (running) createdSpace.session.start();
 
       var previousSimulation = simulation;
       var previousSpace = space;
@@ -242,6 +262,10 @@ class ApplicationSimulation {
         for (robot in previousRobots) world.attach(robot);
         throw failure;
       }
+      // Nothing below can fail: participants move to the new session, which
+      // then starts if the old one was running.
+      for (participant in participants) participant.join(createdSpace.session);
+      if (running) createdSpace.session.start();
       simulation = candidate;
       space = candidateSpace;
       simulatedIds = [for (robot in candidateRobots) robot.id()];
@@ -253,6 +277,7 @@ class ApplicationSimulation {
       appliedEnvironmentRevision = scene.environmentRevision;
       appliedBackend=backend;
       appliedTimestep=timestep;
+      appliedParticipantRevision = participantRevision;
       error = null;
       collisionWarnings = candidateWarnings;
       presentAssemblyPhysics = running;
@@ -384,6 +409,7 @@ class ApplicationSimulation {
   }
   public function clear():Void {
     stop();
+    for (participant in participants) participant.leave();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
@@ -392,6 +418,7 @@ class ApplicationSimulation {
     presentAssemblyPhysics = false;
     releaseSpace(space, simulation); simulation = null; space = null;
     appliedDocumentRevision=-1;appliedEnvironmentRevision=-1;appliedBackend=-1;appliedTimestep=-1;
+    appliedParticipantRevision=-1;
   }
   public function dispose():Void clear();
 }

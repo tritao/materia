@@ -16,7 +16,8 @@
 		"cadbridge": { "path": "../robotkit/cadbridge" },
 		"scenekit": { "path": "../scenekit" },
 		"animkit": { "path": "../animkit" },
-		"humankit": { "path": "../humankit" }
+		"humankit": { "path": "../humankit" },
+		"humankit-sim": { "path": "../humankit/sim" }
 	},
 	"native": {
 		"cmake": {

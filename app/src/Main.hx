@@ -143,12 +143,12 @@ class Main {
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
-          arg.indexOf("--character-hold=") != 0) {
+          arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
-          "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] [--character-hold=GLTF]]");
+          "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] [--character-hold=GLTF] [--character-display=mesh|capsules|skeleton]]");
         return 2;
       }
 
@@ -222,11 +222,14 @@ class Main {
       for (arg in args) if (arg.indexOf("--character=") == 0) {
         var clip:Null<String> = null;
         var hold:Null<String> = null;
+        var display = humankit.HumanDisplay.Mesh;
         for (option in args) {
           if (option.indexOf("--character-clip=") == 0) clip = option.substr(17);
           if (option.indexOf("--character-hold=") == 0) hold = option.substr(17);
+          if (option.indexOf("--character-display=") == 0)
+            display = humankit.HumanDisplays.parse(option.substr(20));
         }
-        editor.enableCharacterPreview(arg.substr(12), clip, hold);
+        editor.enableCharacterPreview(arg.substr(12), clip, hold, display);
       }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
@@ -811,13 +814,25 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Shows an animated glTF character walking around the origin; it is not saved. */
-  public function enableCharacterPreview(path:String, ?clipName:String, ?propPath:String):Void {
-    if (characterPreview != null) characterPreview.dispose();
-    characterPreview = new CharacterPreview(path, clipName, propPath);
+  public function enableCharacterPreview(path:String, ?clipName:String, ?propPath:String,
+      display:humankit.HumanDisplay = humankit.HumanDisplay.Mesh):Void {
+    releaseCharacterPreview();
+    var preview = new CharacterPreview(path, clipName, propPath, display);
+    characterPreview = preview;
+    // A humanoid preview walks through the shared simulation as a person.
+    simulation.addParticipant(preview);
     if (hostContext != null) hostContext.requestFrame();
   }
 
   public function hasCharacterPreview():Bool return characterPreview != null;
+
+  function releaseCharacterPreview():Void {
+    var preview = characterPreview;
+    if (preview == null) return;
+    simulation.removeParticipant(preview);
+    preview.dispose();
+    characterPreview = null;
+  }
 
   public function enableComponentLab(?storyId:String):Void {
     componentLab = new ComponentLab(storyId);

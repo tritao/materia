@@ -1,9 +1,11 @@
 import animkit.AnimationAsset;
 import humankit.CapsulePlacement;
 import humankit.HumanBodyProxy;
+import humankit.HumanBodyView;
 import humankit.HumanBone;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
+import humankit.HumanDisplay;
 import humankit.HumanPose;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
@@ -64,6 +66,7 @@ class HumanKitTests {
 		var after = drawCalls(scene);
 		if (after != before + 1)
 			throw 'Attaching a one-mesh prop changed draw calls from $before to $after';
+		bodyView(scene, human);
 		human.dispose();
 		scene.dispose();
 		Sys.println("humankit tests: ok");
@@ -127,6 +130,36 @@ class HumanKitTests {
 		var tallCrown = capsuleEnd(tall.capsules[head], scaled[head], 1.0)[2] + tall.capsules[head].radius;
 		if (Math.abs(tallCrown - height * 2.0) > 0.02)
 			throw 'The scaled head reaches $tallCrown, not ${height * 2.0}';
+	}
+
+	/** The capsule and skeleton views draw only when shown and follow the pose. */
+	static function bodyView(scene:Scene, human:HumanCharacter):Void {
+		var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
+		var base = drawCalls(scene);
+		var view = new HumanBodyView(scene, human.root, proxy, human.pose);
+		if (drawCalls(scene) != base)
+			throw "A new body view draws before it is shown";
+		view.show(Capsules);
+		if (drawCalls(scene) != base + proxy.capsules.length)
+			throw 'The capsule view draws ${drawCalls(scene) - base} parts, not ${proxy.capsules.length}';
+		view.show(Skeleton);
+		var bones = drawCalls(scene) - base;
+		if (bones < 15 || bones + proxy.capsules.length != view.nodes().length)
+			throw 'The skeleton view draws $bones bones';
+		view.show(Mesh);
+		if (drawCalls(scene) != base)
+			throw "Returning to the mesh still draws the body view";
+
+		human.advance(0.1);
+		view.update(human.pose);
+		var placement = proxy.place(human.pose)[0];
+		var snapshot = scene.snapshot();
+		// The character root sits at the origin, so model space is world space.
+		var world = snapshot.findNode(view.nodes()[0]).worldTransform();
+		for (axis in 0...3)
+			if (Math.abs(world.element(12 + axis) - placement.center[axis]) > 1e-4)
+				throw "The first capsule node is not where the proxy places it";
+		snapshot.dispose();
 	}
 
 	static function inRange(value:Float, low:Float, high:Float, label:String):Void
