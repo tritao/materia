@@ -11,6 +11,10 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
+import machinekit.component.ComponentParameter;
+import machinekit.component.ComponentParameterType;
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValue;
 import machinekit.component.MachineComponent;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
@@ -103,6 +107,16 @@ class MachineKitSmoke {
 			"Unknown catalog designation");
 		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
 		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
+		var angleType = new ComponentType("test.angle",
+			[new ComponentParameter("angle", ComponentParameterType.Angle, ComponentValue.Number(3))],
+			function(_:ComponentValues) return DeepGrooveBearing.metric("608"));
+		check(angleType.key(null).indexOf("angle:1:3") >= 0,
+			"angle keys round above the signed 32-bit integer range");
+		var scalarType = new ComponentType("test.scalar",
+			[new ComponentParameter("scalar", ComponentParameterType.Scalar, ComponentValue.Number(3))],
+			function(_:ComponentValues) return DeepGrooveBearing.metric("608"));
+		check(scalarType.key(null).indexOf("scalar:1:3") >= 0,
+			"scalar keys round above the signed 32-bit integer range");
 		var screwRecipe = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
 		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
 		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
@@ -221,7 +235,7 @@ class MachineKitSmoke {
 		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
 			"document BOM groups recipe instances by values");
 		var saved = DocumentCodec.encode(document);
-		check(DocumentCodec.VERSION == 8, "document version 8");
+		check(DocumentCodec.VERSION == 9, "document version 9");
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
@@ -261,6 +275,19 @@ class MachineKitSmoke {
 		check(loadedLegacy.definition(first.definitionId).property("machinekit.partNumber") == null,
 			"version 7 derived metadata is discarded");
 		loadedLegacy.close();
+		var versionEight:Dynamic = haxe.Json.parse(saved);
+		Reflect.setField(versionEight, "version", 8);
+		var versionEightDefinitions:Array<Dynamic> = cast Reflect.field(versionEight, "definitions");
+		for (record in versionEightDefinitions) {
+			var properties:Dynamic = Reflect.field(record, "properties");
+			var keptProperties:Array<Dynamic> = properties == null ? [] : cast properties;
+			keptProperties.push({name: "machinekit.partNumber", type: "text", value: "version-eight"});
+			Reflect.setField(record, "properties", keptProperties);
+		}
+		var loadedVersionEight = DocumentCodec.decode(haxe.Json.stringify(versionEight));
+		check(loadedVersionEight.definition(first.definitionId).property("machinekit.partNumber") != null,
+			"legacy property cleanup only runs for version 7");
+		loadedVersionEight.close();
 		check(document.undo() && second.resolvedToken("designation") == "608", "recipe override undo");
 		check(MachineKitDocuments.bom(document).quantity("608-2Z") == 2, "BOM follows undo");
 		check(document.redo() && second.resolvedToken("designation") == "6000", "recipe override redo");
@@ -564,6 +591,7 @@ class MachineKitSmoke {
 		check(Dimension.format(0.1 + 0.2) == "0.3", "0.1 + 0.2 formats as 0.3");
 		check(Dimension.format(20) == "20", "whole numbers format without a decimal point");
 		check(Dimension.format(6.35) == "6.35", "6.35 formats exactly");
+		check(Dimension.format(3000000.001) == "3000000.001", "large dimensions format beyond the integer range");
 		check(Dimension.format(0.0625) == "0.063", "values round to 0.001");
 		check(Dimension.format(-2.5) == "-2.5", "negative values keep their sign");
 		check(Dimension.format(-0.0001) == "0", "values rounding to zero lose their sign");

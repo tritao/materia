@@ -2,6 +2,8 @@ package app;
 
 import cadkit.parametric.InstanceElement;
 import cadkit.parametric.ElementId;
+import cadkit.parametric.DocumentCodec;
+import machinekit.document.MachineKitRecipes;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -15,6 +17,135 @@ class MachineKitRecipeProjectTests {
 			if (property != null && property.value == id) return cast element;
 		}
 		return null;
+	}
+
+	static function json(text:String):Dynamic return haxe.Json.parse(text);
+	static function jsonText(value:Dynamic):String return haxe.Json.stringify(value);
+
+	static function occurrenceRecord(root:Dynamic, id:String):Dynamic {
+		var elements:Array<Dynamic> = cast Reflect.field(root, "elements");
+		for (element in elements) if (Reflect.field(element, "kind") == "instance") {
+			var properties:Array<Dynamic> = cast Reflect.field(element, "properties");
+			for (property in properties) if (Reflect.field(property, "name") == "machinekit.occurrence"
+				&& Reflect.field(property, "value") == id) return element;
+		}
+		throw 'Recipe occurrence "$id" not found in saved document';
+	}
+
+	static function definitionRecord(root:Dynamic, occurrenceId:String):Dynamic {
+		var definitionId:String = Reflect.field(occurrenceRecord(root, occurrenceId), "definition");
+		var definitions:Array<Dynamic> = cast Reflect.field(root, "definitions");
+		for (definition in definitions) if (Reflect.field(definition, "id") == definitionId) return definition;
+		throw 'Definition "$definitionId" not found in saved document';
+	}
+
+	static function inputRecord(definition:Dynamic, name:String):Dynamic {
+		var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
+		for (input in inputs) if (Reflect.field(input, "name") == name) return input;
+		throw 'Input "$name" not found in saved definition';
+	}
+
+	static function changedDefault(text:String, occurrenceId:String, name:String, value:Dynamic,
+			editedByUser:Bool):String {
+		var root = json(text);
+		var input = inputRecord(definitionRecord(root, occurrenceId), name);
+		Reflect.setField(input, "value", value);
+		Reflect.setField(input, "editedByUser", editedByUser);
+		return jsonText(root);
+	}
+
+	static function hasDiagnostic(diagnostics:Array<String>, fragment:String):Bool {
+		for (diagnostic in diagnostics) if (diagnostic.indexOf(fragment) >= 0) return true;
+		return false;
+	}
+
+	static function assertReconciledLoads(freshText:String, savedText:String, diagnostic:String):String {
+		var diagnostics:Array<String> = [];
+		var result = MachineKitRecipes.reconcile(freshText, savedText, diagnostics);
+		check(hasDiagnostic(diagnostics, diagnostic), 'reconciliation reports "$diagnostic"');
+		var loaded = DocumentCodec.decode(result.text);
+		loaded.close();
+		return result.text;
+	}
+
+	static function reconciliationRegressions(sourceText:String):Void {
+		var changedSource = changedDefault(sourceText, "bearingB", "designation", "6000", false);
+		var diagnostics:Array<String> = [];
+		var result = MachineKitRecipes.reconcile(changedSource, sourceText, diagnostics);
+		var loaded = DocumentCodec.decode(result.text);
+		check(occurrence(loaded, "bearingB").resolvedToken("designation") == "6000",
+			"source default changes replace an untouched saved default");
+		loaded.close();
+
+		var changedAgain = changedDefault(sourceText, "bearingB", "designation", "6001", false);
+		var userEdit = changedDefault(sourceText, "bearingB", "designation", "6000", true);
+		diagnostics = [];
+		result = MachineKitRecipes.reconcile(changedAgain, userEdit, diagnostics);
+		loaded = DocumentCodec.decode(result.text);
+		check(occurrence(loaded, "bearingB").resolvedToken("designation") == "6000",
+			"an explicitly edited default wins over a later source change");
+		loaded.close();
+
+		var savedDocument = DocumentCodec.decode(sourceText);
+		var firstScrew:InstanceElement = cast occurrence(savedDocument, "screw1");
+		var secondScrew:InstanceElement = cast occurrence(savedDocument, "screw2");
+		var secondLength = secondScrew.resolved("length");
+		var newLength = firstScrew.resolved("length") + 2;
+		firstScrew.makeUnique("screw1 saved length");
+		savedDocument.definition(firstScrew.definitionId).setUserEditedDefault("length", newLength);
+		var uniqueSavedText = DocumentCodec.encode(savedDocument);
+		savedDocument.close();
+		diagnostics = [];
+		result = MachineKitRecipes.reconcile(sourceText, uniqueSavedText, diagnostics);
+		loaded = DocumentCodec.decode(result.text);
+		firstScrew = cast occurrence(loaded, "screw1");
+		secondScrew = cast occurrence(loaded, "screw2");
+		check(firstScrew.resolved("length") == newLength && secondScrew.resolved("length") == secondLength
+			&& firstScrew.definitionId.value != secondScrew.definitionId.value,
+			"a makeUnique length edit remains isolated to screw1 after reload");
+		loaded.close();
+
+		var newInputSource = json(sourceText);
+		var bearingDefinition = definitionRecord(newInputSource, "bearingB");
+		var bearingInputs:Array<Dynamic> = cast Reflect.field(bearingDefinition, "inputs");
+		bearingInputs.push({name: "newClearance", kind: "length", unit: "mm", value: 0.25,
+			allowedValues: null, editedByUser: false});
+		assertReconciledLoads(jsonText(newInputSource), sourceText, "new input \"newClearance\"");
+
+		var removedInputSaved = json(sourceText);
+		var oldBearingDefinition = definitionRecord(removedInputSaved, "bearingB");
+		var oldInputs:Array<Dynamic> = cast Reflect.field(oldBearingDefinition, "inputs");
+		oldInputs.push({name: "obsoleteClearance", kind: "length", unit: "mm", value: 0.25,
+			allowedValues: null, editedByUser: false});
+		assertReconciledLoads(sourceText, jsonText(removedInputSaved), "obsoleteClearance");
+
+		var droppedRowSource = json(sourceText);
+		var designation = inputRecord(definitionRecord(droppedRowSource, "bearingB"), "designation");
+		var allowed:Array<String> = cast Reflect.field(designation, "allowedValues");
+		allowed.remove("608");
+		Reflect.setField(designation, "value", "6000");
+		assertReconciledLoads(jsonText(droppedRowSource), sourceText, "is no longer valid");
+
+		var oldVersionSaved = json(sourceText);
+		Reflect.setField(oldVersionSaved, "version", 8);
+		var definitions:Array<Dynamic> = cast Reflect.field(oldVersionSaved, "definitions");
+		for (definition in definitions) {
+			var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
+			for (index in 0...inputs.length) {
+				var oldInput = inputs[index], legacyInput:Dynamic = {};
+				for (field in Reflect.fields(oldInput)) if (field != "editedByUser")
+					Reflect.setField(legacyInput, field, Reflect.field(oldInput, field));
+				inputs[index] = legacyInput;
+			}
+		}
+		Reflect.setField(inputRecord(definitionRecord(oldVersionSaved, "bearingB"), "designation"), "value", "6000");
+		diagnostics = [];
+		result = MachineKitRecipes.reconcile(sourceText, jsonText(oldVersionSaved), diagnostics);
+		loaded = DocumentCodec.decode(result.text);
+		check(occurrence(loaded, "bearingB").resolvedToken("designation") == "6000"
+			&& hasDiagnostic(diagnostics, "re-save this project"),
+			"version 8 edited defaults are recovered and prompt the user to re-save");
+		loaded.close();
 	}
 
 	static function removeToolInputs(projectText:String):String {
@@ -47,6 +178,7 @@ class MachineKitRecipeProjectTests {
 		var manifest = root + "/machinekit/examples/materia.project.json";
 		var generated = MateriaProjectRunner.loadProject(manifest);
 		check(generated.recipeDocument != null, "generated preview carries a recipe document");
+		reconciliationRegressions(cast generated.recipeDocument);
 		var session = new ProjectDocumentSession();
 		var destination = "/tmp/materia-machinekit-recipe-" + Sys.getPid() + ".materia.json";
 		try {
