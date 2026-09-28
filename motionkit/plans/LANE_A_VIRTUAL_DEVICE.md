@@ -600,6 +600,9 @@ path-time firing across HOLD and replacement. The in-process RKD6 test covers
 spray on/off without HOLD, with HOLD, and STOP, and checks application within
 one device step tick of each planned path position.
 
+Suite result after the coupling follow-up: the combined RobotKit/MotionKit
+native CTest run passed 17/17, including the RKD6 event virtual-device test.
+
 ### A9 — Minimal RKD6 profile and RKD5 retirement
 
 Protocol version 10 adds the `SESSION_ACK6` profile. The minimal reference
@@ -621,3 +624,16 @@ plan; RobotClient → robotd → Rust minimal device covers the TCP route.
 Host-side per-cycle sampling remains for cyclic simulation endpoints.
 
 The initial minimal profile and deployment work is commit `f6beb9ab`.
+
+Suite result after the coupling follow-up: the combined RobotKit/MotionKit
+native CTest run passed 17/17, including the minimal-profile RKD6 and serial
+PTY tests.
+
+### A7 follow-up — RobotModel v5 joint couplings
+
+After merging Plan C's `JointCoupling` contract from `main`, the marked
+joint-to-actuator conversion point validates each authored follower polynomial
+against its leader, then derives exact follower coefficients before applying
+actuator transmissions. A lead-screw/carriage RKD6 virtual-device test checks
+step counts and the offset-plus-ratio relation, and rejects a mismatched
+follower trajectory at submission.

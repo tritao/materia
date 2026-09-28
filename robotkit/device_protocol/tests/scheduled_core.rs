@@ -30,6 +30,15 @@ fn replace_respects_committed_horizon() {
         [[0.0, 1.0, 0.0, 0.0, 0.0, 0.0]], true).unwrap();
     assert_eq!(core.push_segment(jump), Err(QueueError::BadBoundary));
 }
+
+#[test]
+fn segment_revision_is_checked_by_the_shared_core() {
+    let mut core = ScheduledCore::<1, 4>::new(1_000, [10.0], [-10.0], [10.0], 500);
+    core.queue_begin(2, 0).unwrap();
+    assert_eq!(core.push_segment_for_revision(1, line(0, 1_000, true)),
+        Err(QueueError::StaleRevision));
+    assert_eq!(core.push_segment_for_revision(2, line(0, 1_000, true)), Ok(()));
+}
 #[test]
 fn evaluates_and_stops_on_link_loss() {
     let mut core = ScheduledCore::<1, 4>::new(1_000, [2.0], [-10.0], [10.0], 500);
@@ -202,6 +211,25 @@ fn hold_accounts_for_path_acceleration() {
         assert!((board.velocity - previous).abs() <= 0.00201,
                 "t={t} previous={previous} current={}", board.velocity);
     }
+}
+
+#[test]
+fn hold_brakes_when_toppra_path_uses_full_acceleration() {
+    let mut core = ScheduledCore::<1, 4>::new(1_000, [2.0], [-10.0], [10.0], 5_000);
+    let mut board = TestBoard::default();
+    core.queue_begin(1, 0).unwrap();
+    // q=t² is at the full 2 units/s² acceleration limit.
+    core.push_segment(ScheduledSegment::new(1, 0, 1_000, 2,
+        [[0.0, 0.0, 1.0, 0.0, 0.0, 0.0]], true).unwrap()).unwrap();
+    core.commit(1_000).unwrap();
+    board.tick = 250;
+    core.tick(&mut board);
+    let rate_before = core.rate();
+    assert!(rate_before > 0.0);
+    core.hold();
+    board.tick = 251;
+    core.tick(&mut board);
+    assert!(core.rate() < rate_before, "HOLD must brake in its first cycle");
 }
 
 #[test]

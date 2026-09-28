@@ -51,6 +51,9 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
         submitted, endpoint->diagnostic_code());
     assert(submitted == RK_OK);
     if (replace) {
+        // Wait for device status proving it received the segment boundary.
+        for (std::uint64_t now = 130'000'000; now <= 180'000'000; now += 10'000'000)
+            assert(endpoint->sample(now, state) == RK_OK);
         auto late = plan;
         late.plan_id = 9;
         late.replace_after_plan_id = 8;
@@ -67,7 +70,8 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
             1'020'000'000, blueprint) == RK_OK);
     }
     const auto end_ns = replace ? 2'220'000'000ULL : hold ? 1'420'000'000ULL : 1'220'000'000ULL;
-    for (std::uint64_t now = 130'000'000; now <= end_ns; now += 10'000'000) {
+    for (std::uint64_t now = replace ? 190'000'000 : 130'000'000;
+         now <= end_ns; now += 10'000'000) {
         if (cut && now == 330'000'000) endpoint->cut_link(true);
         if (hold && (now == 330'000'000 || now == 530'000'000)) {
             rk_robot_command command{};
@@ -125,6 +129,9 @@ void dual_drive_layout() {
         blueprint) == RK_OK);
     for (std::uint64_t now = 130'000'000; now <= 1'220'000'000; now += 10'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
+    assert(!state.trajectory_active);
+    assert(state.trajectory_tag == 50);
+    assert(state.trajectory_tag_time_ns >= 1'000'000'000);
     auto positions = endpoint->actuator_positions();
     assert(positions.size() == 2);
     assert(std::abs(positions[0] - 0.01) <= 1.0 / 400'000 + 1e-6);
@@ -154,6 +161,135 @@ void dual_drive_layout() {
         assert(missed->sample(now, state) == RK_OK);
     assert(state.safety == RK_SAFETY_FAULT);
     assert(missed->diagnostic_code() == RK_FAULT_DUAL_DRIVE_SKEW);
+}
+
+void lead_screw_carriage_coupling() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 2;
+    blueprint.owner_period_ns = 10'000'000;
+    for (auto &joint : blueprint.joints) {
+        joint.lower_limit = -10;
+        joint.upper_limit = 10;
+        joint.max_velocity = 10;
+        joint.max_acceleration = 10;
+    }
+    // One screw revolution advances the carriage by 8 mm, from a 1 mm offset.
+    blueprint.coupling_count = 1;
+    blueprint.couplings[0] = {0, 1, 0.008, 0.001};
+    VirtualDeviceConfig6 config;
+    config.fingerprint.fill(9);
+    config.clock_bound_ns = 5'000'000;
+    config.actuators = {{0, 1.0, 0.0, 3'200.0, 1.0},
+                        {1, 1.0, 0.001, 400'000.0, 0.01}};
+    config.actuators[0].id = "screw";
+    config.actuators[1].id = "carriage";
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.plan_id = 55;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.start_position[1] = 0.001;
+    plan.segments.segment_count = 1;
+    auto &segment = plan.segments.segments[0];
+    segment.duration_ns = 1'000'000'000;
+    segment.degree = 1;
+    segment.joint_count = 2;
+    segment.coefficients[0].value[1] = 0.01;
+    segment.coefficients[1].value[0] = 0.001;
+    segment.coefficients[1].value[1] = 0.00008;
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 1'220'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    const auto positions = endpoint->actuator_positions();
+    assert(positions.size() == 2);
+    int screw_steps = 0, carriage_steps = 0;
+    for (const auto &record : endpoint->step_log()) {
+        if (record.actuator == 0) ++screw_steps;
+        if (record.actuator == 1) ++carriage_steps;
+    }
+    assert(std::abs(screw_steps - 32) <= 1);
+    assert(std::abs(carriage_steps - 32) <= 1);
+    assert(std::abs(0.001 + positions[1] - (0.001 + 0.008 * positions[0])) <=
+        1.0 / 400'000 + 0.008 / 3'200);
+
+    auto invalid = plan;
+    invalid.plan_id = 56;
+    invalid.segments.segments[0].coefficients[1].value[1] += 0.001;
+    auto fresh = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(fresh);
+    fresh->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        fresh->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        fresh->sample(now, state);
+    assert(fresh->submit_device_plan(invalid, 0, 120'000'000, 20'000'000,
+        blueprint) != RK_OK);
+}
+
+void minimal_midstream_replacement() {
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 1;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -10;
+    blueprint.joints[0].upper_limit = 10;
+    blueprint.joints[0].max_velocity = 1;
+    blueprint.joints[0].max_acceleration = 10;
+    VirtualDeviceConfig6 config;
+    config.profile = 2;
+    config.fingerprint.fill(4);
+    config.clock_bound_ns = 5'000'000;
+    config.steps_per_unit = {1'000};
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.plan_id = 70;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.segments.segment_count = 1;
+    plan.segments.segments[0].duration_ns = 1'000'000'000;
+    plan.segments.segments[0].degree = 1;
+    plan.segments.segments[0].joint_count = 1;
+    plan.segments.segments[0].coefficients[0].value[1] = 0.5;
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 320'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    const auto boundary = state.committed_until_ns;
+    assert(boundary >= 80'000'000 && boundary < 1'000'000'000);
+    auto replacement = plan;
+    replacement.plan_id = 71;
+    replacement.replace_after_plan_id = 70;
+    replacement.start_position[0] = 0.5 * static_cast<double>(boundary) / 1e9;
+    replacement.start_velocity[0] = 0.5;
+    replacement.segments.segments[0].duration_ns = 300'000'000;
+    replacement.segments.segments[0].coefficients[0].value[0] =
+        replacement.start_position[0];
+    assert(endpoint->submit_device_plan(replacement, boundary, 320'000'000,
+        boundary + 20'000'000, blueprint) == RK_OK);
+    for (std::uint64_t now = 330'000'000; now <= 1'700'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    assert(state.safety == RK_SAFETY_READY);
+    assert(state.trajectory_tag == 71);
+    assert(state.trajectory_tag_time_ns >= 300'000'000);
+    assert(std::abs(state.position[0] - (replacement.start_position[0] + 0.15)) < 1e-4);
 }
 
 std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
@@ -235,6 +371,8 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
 
 int main() {
     dual_drive_layout();
+    lead_screw_carriage_coupling();
+    minimal_midstream_replacement();
     const auto ordinary_events = run_event_pair(false, false);
     const auto held_events = run_event_pair(true, false);
     run_event_pair(false, true);

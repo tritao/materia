@@ -93,9 +93,13 @@ std::shared_ptr<Rkd6Endpoint> DeviceSerialEndpoint::open(const char *path, unsig
     const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> fingerprint,
     double target_error, std::uint32_t step_tick_hz,
     std::uint64_t link_loss_timeout_ns, std::uint64_t clock_bound_ns,
-    std::uint64_t link_latency_ns) {
+    std::uint64_t link_latency_ns, rk_result *error) {
+    if (error) *error = RK_ERROR_BACKEND;
     const auto speed = baud_value(baud);
-    if (!path || !*path || !speed) return {};
+    if (!path || !*path || !speed) {
+        if (error) *error = RK_ERROR_UNSUPPORTED;
+        return {};
+    }
     const auto fd = ::open(path, O_RDWR | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) return {};
     termios settings{};
@@ -110,6 +114,6 @@ std::shared_ptr<Rkd6Endpoint> DeviceSerialEndpoint::open(const char *path, unsig
     if (session == 0) session = 1;
     return Rkd6Endpoint::attach(std::make_unique<PosixRkd6Transport>(fd, baud), blueprint,
         fingerprint, session, target_error, clock_bound_ns, link_latency_ns,
-        step_tick_hz, link_loss_timeout_ns);
+        step_tick_hz, link_loss_timeout_ns, {}, error);
 }
 } // namespace robotkit

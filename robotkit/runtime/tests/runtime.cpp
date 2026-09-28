@@ -20,6 +20,7 @@ public:
     bool fail_sample = false;
     int discard_count = 0;
     int emergency_stop_count = 0;
+    int sample_count = 0;
 
     rk_result apply(const rk_robot_command &command) override {
         if (command.kind == RK_COMMAND_EMERGENCY_STOP)
@@ -28,6 +29,7 @@ public:
     }
 
     rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        ++sample_count;
         if (fail_sample)
             return RK_ERROR_STALE_STATE;
         state.struct_size = sizeof(state);
@@ -1671,6 +1673,15 @@ void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &so
     }
 }
 
+void presampled_publication_does_not_sample_again(const rk_robot_runtime_blueprint &blueprint) {
+    auto endpoint = std::make_shared<FaultEndpoint>();
+    robotkit::RobotRuntime runtime(blueprint, endpoint);
+    rk_robot_state sampled{};
+    assert(endpoint->sample(100, sampled) == RK_OK);
+    assert(runtime.publish_presampled(100, sampled) == RK_OK);
+    assert(endpoint->sample_count == 1);
+}
+
 void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (auto &joint : blueprint.joints) {
@@ -1804,6 +1815,7 @@ int main() {
         joint.parent_frame_rotation[3] = joint.child_frame_rotation[3] = 1.0;
         joint.axis[2] = 1.0;
     }
+    presampled_publication_does_not_sample_again(blueprint);
     same_cycle_target_batches_merge_per_joint(blueprint);
     partial_targets_and_ordered_trajectory_commands(blueprint);
     unsupported_trajectory_queue_is_rejected(blueprint);

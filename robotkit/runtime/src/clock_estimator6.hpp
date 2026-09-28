@@ -36,6 +36,7 @@ private:
     bool ready_ = false;
     bool sync_lost_ = false;
     bool sent_ = false;
+    std::uint8_t bad_samples_ = 0;
     std::uint64_t last_send_ns_ = 0;
     void fit();
 };

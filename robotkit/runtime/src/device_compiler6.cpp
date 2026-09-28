@@ -144,16 +144,16 @@ CompiledDevicePlan6 compile_device_segments6(
     std::uint64_t expected_ns = 0;
     std::int64_t converted_time_ns = 0;
     for (std::size_t i = 0; i < segments.size(); ++i) {
-        const auto &source = segments[i];
+        auto source = segments[i];
         if (source.joint_count != blueprint.joint_count || source.degree > max_degree ||
             source.degree > 5 || source.duration_ns == 0 ||
             source.time_from_start_ns != expected_ns ||
             source.time_from_start_ns > UINT64_MAX - source.duration_ns ||
             host_plan_start_ns > UINT64_MAX - source.time_from_start_ns - source.duration_ns)
             return reject("invalid or unsupported segment");
-        // This is the joint-to-actuator conversion boundary. A follower
-        // inconsistent with the compiled mechanical relation cannot reach a
-        // device channel, even when this compiler is called directly.
+        // Resolve joint-to-joint couplings before converting joints to actuator
+        // coordinates. Validate the authored follower first, then use the
+        // exact relation for the trajectory sent to the device.
         if (blueprint.coupling_count > RK_MAX_JOINT_COUPLINGS)
             return reject("invalid joint coupling layout");
         for (std::uint32_t relation = 0; relation < blueprint.coupling_count; ++relation) {
@@ -166,8 +166,11 @@ CompiledDevicePlan6 compile_device_segments6(
                 const auto expected = coupling.ratio *
                     source.coefficients[coupling.leader].value[degree] +
                     (degree == 0 ? coupling.offset : 0.0);
-                if (std::abs(source.coefficients[coupling.follower].value[degree] - expected) > 1e-6)
+                if (!std::isfinite(expected) ||
+                    !std::isfinite(source.coefficients[coupling.follower].value[degree]) ||
+                    std::abs(source.coefficients[coupling.follower].value[degree] - expected) > 1e-6)
                     return reject("coupled follower trajectory mismatch");
+                source.coefficients[coupling.follower].value[degree] = expected;
             }
         }
         expected_ns += source.duration_ns;
@@ -205,9 +208,8 @@ CompiledDevicePlan6 compile_device_segments6(
                 factor *= scale;
             }
         }
-        // Joint -> actuator transmission conversion lives here. Plan C's
-        // JointCoupling v5 will validate/derive follower joints immediately
-        // before this loop when that model contract lands on main.
+        // Joint-to-actuator transmissions remain distinct from the resolved
+        // joint-to-joint couplings above.
         for (std::size_t actuator = 0; actuator < actuator_count; ++actuator) {
             const auto joint = layout.empty() ? actuator : layout[actuator].joint;
             const auto ratio = layout.empty() ? 1.0 : layout[actuator].ratio;

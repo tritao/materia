@@ -54,7 +54,8 @@ impl VirtualDevice {
         Some(Self {
             steps: StepGenerator::new(steps_per_unit, [0; ACTUATORS],
                 [0.0; ACTUATORS], tick_hz)?,
-            board: VirtualBoard::new(tick_hz, offset_ticks, drift_ppm, steps_per_unit),
+            board: VirtualBoard::new_with_actuator_count(
+                tick_hz, offset_ticks, drift_ppm, steps_per_unit, count),
             core: None,
             events: None,
             final_safe_applied: false,
@@ -211,7 +212,6 @@ impl VirtualDevice {
                     return false;
                 };
                 if header.actuator_count as usize != self.count
-                    || header.queue_revision != self.core.as_ref().unwrap().revision()
                     || (self.profile == 2 && (header.degree > 1 ||
                         self.core.as_ref().unwrap().remaining_capacity() <= CAPACITY - MINIMAL_CAPACITY))
                 {
@@ -240,7 +240,8 @@ impl VirtualDevice {
                 ) else {
                     return false;
                 };
-                self.core.as_mut().unwrap().push_segment(segment).is_ok()
+                self.core.as_mut().unwrap()
+                    .push_segment_for_revision(header.queue_revision, segment).is_ok()
             }
             7 => {
                 let Ok(commit) = Commit6::decode(payload) else {
@@ -580,7 +581,7 @@ pub unsafe extern "C" fn rkd_virtual_step_log(
     };
     let count = device
         .board
-        .records()
+        .step_records()
         .iter()
         .filter(|row| matches!(row.output, Output::Step(_, _)))
         .count();
@@ -588,7 +589,7 @@ pub unsafe extern "C" fn rkd_virtual_step_log(
         return count;
     }
     let mut index = 0;
-    for row in device.board.records() {
+    for row in device.board.step_records() {
         if let Output::Step(actuator, forward) = row.output {
             *records.add(index) = StepRecord {
                 ticks: row.ticks,

@@ -199,6 +199,11 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
         self.len += 1;
         Ok(())
     }
+    pub fn push_segment_for_revision(&mut self, revision: u64,
+                                     segment: ScheduledSegment<A>) -> Result<(), QueueError> {
+        if revision != self.revision { return Err(QueueError::StaleRevision); }
+        self.push_segment(segment)
+    }
     pub fn commit(&mut self, through_ticks: u64) -> Result<(), QueueError> {
         if through_ticks < self.committed_until || self.len == 0 ||
            through_ticks > self.segments[self.len - 1].unwrap().end_ticks() ||
@@ -280,8 +285,17 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
                 let (_, path_velocity) = segment.evaluate(self.path_clock, self.tick_hz);
                 let path_acceleration = segment.acceleration(self.path_clock, self.tick_hz);
                 for a in 0..A {
-                    let margin = (self.max_acceleration[a] -
-                        path_acceleration[a].abs() * self.rate * self.rate).max(0.0);
+                    // On HOLD, spend the actuator's acceleration budget on
+                    // braking even when the authored path is accelerating at
+                    // its limit. A zero residual margin would leave rate=1.
+                    let margin = if self.target_rate < self.rate {
+                        (self.max_acceleration[a] + path_acceleration[a] *
+                            self.rate * self.rate * path_velocity[a].signum())
+                            .clamp(0.05 * self.max_acceleration[a], self.max_acceleration[a])
+                    } else {
+                        (self.max_acceleration[a] -
+                            path_acceleration[a].abs() * self.rate * self.rate).max(0.0)
+                    };
                     rate_step = rate_step.min(0.9 * margin / path_velocity[a].abs().max(1e-6) * dt);
                 }
                 break;

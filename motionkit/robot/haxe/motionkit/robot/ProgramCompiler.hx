@@ -8,6 +8,7 @@ import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
+import motionkit.robot.OpwKinematics;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.CornerBlender;
 import motionkit.path.ArcSegment;
@@ -87,7 +88,9 @@ class ProgramCompiler {
       throw "Program compiler selector must use its kinematics solver";
     if (configurationSelector != null) {
       this.configurationSelector = configurationSelector;
-    } else if (Std.isOfType(solver, OpwKinematics)) {
+    // Haxeon currently misidentifies an OPW object through this interface as
+    // KinematicsSolver when Std.isOfType checks its concrete class.
+    } else if (Reflect.field(solver, "nativePathSample") != null) {
       var arm:OpwKinematics = cast solver;
       var lower:Array<Float> = [], upper:Array<Float> = [];
       for (joint in 0...count) {
