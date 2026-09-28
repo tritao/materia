@@ -7,9 +7,11 @@ import machinekit.robotics.EndEffectorFrames;
 import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import robotkit.spatial.Quat;
+import robotkit.spatial.Inertia3;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.Tool;
+import robotkit.tool.MassProperties;
 import robotkit.tool.ToolCollisionShape;
 import cadbridge.EndEffectorCollision.EndEffectorCollisionOptions;
 
@@ -30,6 +32,15 @@ class EndEffectorBridge {
       throw 'End effector has unaccounted BOM mass: ${properties.unaccounted.join(", ")}';
     if (!Math.isFinite(properties.mass) || properties.mass <= 0)
       throw "End effector requires positive mass";
+    var centre = EndEffectorFrames.pointYToZ(properties.centreOfMass.x,
+      properties.centreOfMass.y, properties.centreOfMass.z);
+    var tensor = properties.inertia;
+    var inertia = tensor == null ? null : new Inertia3(tensor.xx * 1e-6,
+      tensor.xy * 1e-6, tensor.xz * 1e-6, tensor.yy * 1e-6,
+      tensor.yz * 1e-6, tensor.zz * 1e-6)
+      .rotated(new Quat(Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)));
+    var mass = new MassProperties(properties.mass,
+      new Vec3(centre.x * 1e-3, centre.y * 1e-3, centre.z * 1e-3), inertia);
     var collision:ToolCollisionShape;
     if (boxCollision) {
       var bounds = envelopeBox(endEffector, solved);
@@ -39,7 +50,7 @@ class EndEffectorBridge {
       collision = ToolCollisionShape.Hulls([for (piece in result.pieces) piece.vertices], result.padding);
     }
     return new Tool(id == null ? frameName : id, frameName, transform,
-      collision, properties.mass);
+      collision, properties.mass, mass);
   }
 
   /** Axis-aligned bounds of all component envelopes in the robot flange frame. */

@@ -9,10 +9,17 @@ import robotkit.model.Frame;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
+import robotkit.spatial.Inertia3;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.PayloadChecker;
+import robotkit.manipulation.RobotPayloadLimit;
+import robotkit.manipulation.ReachLoadBand;
+import robotkit.manipulation.ReachLoadChart;
 import robotkit.tool.Tool;
+import robotkit.tool.MassProperties;
+import robotkit.tool.WorkpieceLoad;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.SimulatedSprayer;
 
@@ -25,6 +32,8 @@ class ToolTests {
     testTcpOffsetUnderRotation();
     testIkToTcpTarget();
     testSimulatedSprayerStateHistory();
+    testWorkpieceMassRollup();
+    testPayloadChartAcrossJointMotion();
     Sys.println('RobotKit tool tests passed ($assertions assertions)');
     return assertions;
   }
@@ -81,6 +90,68 @@ class ToolTests {
       "Later flow command overwrites the recorded flow and advances the timestamp");
     check(approx(sprayer.flow(), 0.8, 1e-9) && approx(sprayer.pressure(), 3.0, 1e-9),
       "Simulated sprayer exposes its latest commanded state");
+  }
+
+  static function testWorkpieceMassRollup():Void {
+    var tool = new MassProperties(2.0, new Vec3(0.1, 0, 0),
+      new Inertia3(0.02, 0, 0, 0.03, 0, 0.04));
+    var part = new WorkpieceLoad("pick-a", new MassProperties(1.0,
+      new Vec3(0.1, 0, 0), new Inertia3(0.01, 0, 0, 0.02, 0, 0.01)),
+      new Transform3(new Vec3(0, 0.2, 0),
+        Quat.fromAxisAngle(new Vec3(0, 0, 1), Math.PI * 0.5)));
+    var combined = tool.combined(part.atFlange());
+    check(approx(combined.massKg, 3.0, 1e-12) &&
+      approx(combined.centerOfMass.x, 1.0 / 15.0, 1e-12) &&
+      approx(combined.centerOfMass.y, 0.1, 1e-12),
+      "Pick-specific workpiece pose changes the combined flange centre of mass");
+    check(combined.inertia != null && approx(combined.inertia.zz, 7.0 / 60.0, 1e-12),
+      "Combined centroidal inertia uses the parallel-axis theorem");
+    var rotated = new Inertia3(1, 0, 0, 2, 0, 3)
+      .rotated(Quat.fromAxisAngle(new Vec3(1, 0, 0), Math.PI * 0.5));
+    check(approx(rotated.xx, 1, 1e-12) && approx(rotated.yy, 3, 1e-12) &&
+      approx(rotated.zz, 2, 1e-12), "Inertia rotates with the workpiece frame");
+  }
+
+  static function testPayloadChartAcrossJointMotion():Void {
+    var model = new RobotModel("payload-slide");
+    var base = model.addLink(new Link("base"));
+    var carriage = model.addLink(new Link("carriage"));
+    var joint = model.addJoint(new Joint("slide", JointType.Prismatic, base, carriage));
+    joint.axis = [1.0, 0.0, 0.0];
+    joint.limits.lower = 0.0;
+    joint.limits.upper = 3.0;
+    var flange = model.addFrame(new Frame("flange", carriage));
+    var manipulator = new Manipulator(model,
+      new KinematicChain(model, base.id, ChainTip.Frame(flange.id)));
+    var tool = new Tool("pickup", "pickup", Transform3.identity(),
+      ToolCollisionShape.NoCollision, 1.0,
+      new MassProperties(1.0, new Vec3(0.1, 0, 0), Inertia3.zero()));
+    var part = new WorkpieceLoad("part-a", new MassProperties(2.0,
+      new Vec3(0.1, 0, 0), Inertia3.zero()), Transform3.identity());
+    var chart = new ReachLoadChart([
+      new ReachLoadBand(0.5, new RobotPayloadLimit(4.0, 4.0)),
+      new ReachLoadBand(2.0, new RobotPayloadLimit(4.0, 2.0))
+    ]);
+    var bare = PayloadChecker.checkPath(manipulator, tool, null, chart, [[0.2], [1.2]], 0.1);
+    check(bare.safe, "Tool alone fits the load chart through the move");
+    var loaded = PayloadChecker.checkPath(manipulator, tool, part, chart,
+      [[0.2], [1.2]], 0.1);
+    check(!loaded.safe && loaded.firstFailureSegment == 1 &&
+      loaded.segmentFraction > 0 && loaded.segmentFraction < 1 &&
+      loaded.reason != null && loaded.reason.indexOf("moment") >= 0,
+      "Workpiece load violates the chart between two sampled waypoints");
+    check(loaded.checkedSamples > 2, "Payload checker samples the joint path between waypoints");
+    var outside = PayloadChecker.checkPath(manipulator, tool, null, chart, [[2.0]]);
+    check(outside.safe, "Last chart band includes its reach boundary");
+    var beyond = PayloadChecker.checkPath(manipulator, tool, null, chart, [[2.1]]);
+    check(!beyond.safe && beyond.reason != null && beyond.reason.indexOf("outside") >= 0,
+      "Robot poses beyond the load chart are rejected");
+    var missingCentre = false;
+    try PayloadChecker.checkPath(manipulator,
+      new Tool("mass-only", "mass-only", Transform3.identity(), NoCollision, 1.0),
+      null, chart, [[0.2]])
+    catch (error:Dynamic) missingCentre = Std.string(error).indexOf("centre of mass") >= 0;
+    check(missingCentre, "Payload check rejects legacy tools with mass but no centre of mass");
   }
 
   // -- fixtures --------------------------------------------------------

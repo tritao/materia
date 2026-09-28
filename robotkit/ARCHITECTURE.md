@@ -807,6 +807,20 @@ frame, per the `a_T_b` convention — `flange_T_tcp` maps tool-tip coordinates
 into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`,
 `Cylinder`, or per-member `Hulls`, since `model.CollisionApproximation` is a link-geometry
 derivation policy, not a shape), and `mass`.
+The CadBridge also carries `MassProperties` in the flange frame: mass in kg,
+centre of mass in metres, and centroidal `Inertia3` in kg m² when known.
+Legacy tools that declare only scalar mass retain that API, but a load check
+requires a known centre of mass. `WorkpieceLoad` supplies a part's mass
+properties and its pose at one pick; the tool and part are combined with the
+parallel-axis theorem.
+
+`PayloadChecker.checkPath` samples the manipulator's joint path and checks
+carried mass and gravity moment about the flange against a `RobotLoadChart`
+at every sample. `ReachLoadChart` is a simple piecewise chart by flange
+distance from the base; robot-specific charts can implement the interface
+with joint-dependent limits. A pose outside the chart fails. This is a static
+gravity check with configurable joint sampling, so acceleration loads and
+unsampled motion between points need separate analysis.
 
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:

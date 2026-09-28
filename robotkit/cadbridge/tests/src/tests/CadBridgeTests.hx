@@ -267,6 +267,8 @@ class CadBridgeTests {
       tool.flangeTTcp.rotation.angularDistance(Quat.identity()) < 1e-9,
       "contact frame converts from connector +Y to robot +Z");
     check(approx(tool.mass, 3, 1e-12), "attached tube contributes to RobotKit tool mass");
+    check(tool.massProperties != null && approx(tool.massProperties.massKg, 3, 1e-12),
+      "end effector bridge preserves complete tool mass properties");
     check(switch tool.collision { case Hulls(pieces, _): pieces.length == 1; case _: false; },
       "end effector emits convex hull collision by default");
     var boxTool = EndEffectorBridge.toTool(endEffector, "contact", null, null, null, true);
@@ -288,6 +290,22 @@ class CadBridgeTests {
     check(inspection.id == "inspection" &&
       inspection.flangeTTcp.translation.norm() < 1e-12,
       "each working frame produces a separate RobotKit tool");
+
+    var payloadEffector = new EndEffector();
+    payloadEffector.addComponent("body", new BridgePayloadPart());
+    payloadEffector.mount("body", "mount");
+    payloadEffector.workingFrame("contact", "body", "mount", true);
+    var payloadTool = EndEffectorBridge.toTool(payloadEffector, "contact");
+    var payloadMass = payloadTool.massProperties;
+    check(payloadMass != null && approx(payloadMass.centerOfMass.x, 0, 1e-12) &&
+      approx(payloadMass.centerOfMass.y, 0, 1e-12) &&
+      approx(payloadMass.centerOfMass.z, 0.1, 1e-12),
+      "MachineKit +Y centre of mass becomes RobotKit +Z in metres");
+    check(payloadMass != null && payloadMass.inertia != null &&
+      approx(payloadMass.inertia.xx, 1, 1e-9) &&
+      approx(payloadMass.inertia.yy, 3, 1e-9) &&
+      approx(payloadMass.inertia.zz, 2, 1e-9),
+      "bridge rotates centroidal inertia into RobotKit axes and kg m²");
 
     var set = EndEffectorExample.build();
     var shortTool = EndEffectorBridge.toTool(set.configuration("short"), "contact", null, "short/contact");
@@ -688,6 +706,18 @@ private class BridgeEndEffectorPart extends MachineComponent {
 
   override public function geometry(detail:ComponentDetail = Preview):Part
     return Part.box(20, 10, 30);
+}
+
+private class BridgePayloadPart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-PAYLOAD", "payload conversion fixture", "steel", true);
+    addConnector("mount", Mount, AssemblyFrames.identity());
+    declareMass(2, new Vector(0, 100, 0),
+      new InertiaTensor(1000000, 0, 0, 2000000, 0, 3000000));
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(20, 20, 20);
 }
 
 private class BridgeRuntimePart extends MachineComponent {

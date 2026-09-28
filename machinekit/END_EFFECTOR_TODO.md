@@ -31,9 +31,9 @@ project of its own.
 
 ## Engineering checks
 
-- [ ] **Payload with workpiece (S).** Add the grasped part's mass and centre of
-  mass per pick and check the robot load chart across the motion, not only at
-  a static pose.
+- [x] **Payload with workpiece (S).** Combine the grasped part's mass, centre
+  and inertia at its pick pose with the tool, then sample the joint path against
+  a robot-supplied static mass and flange-moment chart.
 - [ ] **Suction capacity (M).** Cup area × vacuum level against part mass,
   acceleration and a safety factor. Needs vacuum level and cup area as port or
   component properties.
@@ -77,8 +77,8 @@ project of its own.
 
 ## Suggested priorities
 
-1. Suction capacity and payload-with-workpiece checks: they answer the
-   questions people ask about a tool and build on existing mass and port data.
+1. Suction capacity: use the per-pick workpiece load and vacuum port data to
+   check the cup's holding margin under acceleration.
 2. One vendor catalog slice: makes the layer usable with real parts and tests
    the abstractions against a real vendor.
 3. Document and editor persistence: needed once someone must author tools
