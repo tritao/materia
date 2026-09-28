@@ -72,8 +72,20 @@ void add_joint(rk_robot_runtime_blueprint &model, uint32_t type, uint32_t parent
     ++model.joint_count;
 }
 
-// A 3R arm on a kinematic base, hung out along +X; links collide as boxes.
-Blueprint make_arm() {
+// A 3R arm on a kinematic base, hung out along +X, or with `ur_class` a UR-class
+// 6R arm; links collide as boxes.
+Blueprint make_arm(bool ur_class, bool self_collision) {
+    if (ur_class) {
+        auto ur = new_blueprint(7, RK_COLLISION_APPROXIMATION_BOUNDS_BOX);
+        const double offsets[6][3] = {{0, 0, 0.089159}, {0, 0.13585, 0}, {0, -0.1197, 0.425},
+                                      {0, 0, 0.39225}, {0, 0.10915, 0}, {0, 0, 0.09465}};
+        const double axes[6][3] = {{0, 0, 1}, {0, 1, 0}, {0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 1, 0}};
+        for (uint32_t joint = 0; joint < 6; ++joint)
+            add_joint(*ur, RK_RUNTIME_JOINT_REVOLUTE, joint, joint + 1, -6.28, 6.28, 300.0, offsets[joint],
+                      axes[joint]);
+        if (!self_collision) ur->self_collision = RK_SELF_COLLISION_DISABLED;
+        return ur;
+    }
     auto model = new_blueprint(4, RK_COLLISION_APPROXIMATION_BOUNDS_BOX);
     const double base[3] = {0, 0, 0}, reach[3] = {0.4, 0, 0};
     const double y[3] = {0, 1, 0}, z[3] = {0, 0, 1};
@@ -103,7 +115,7 @@ struct Humanoid {
     RobotDesc desc;
 };
 Humanoid make_humanoid(double x, double y, double z, uint32_t filter, double tolerance,
-                       double pitch) {
+                       double pitch, bool g1_dynamics) {
     Humanoid value{new_blueprint(5, RK_COLLISION_APPROXIMATION_NONE), new_desc(x, y, z)};
     value.desc->initial_pose.rotation[1] = std::sin(0.5 * pitch);
     value.desc->initial_pose.rotation[3] = std::cos(0.5 * pitch);
@@ -118,6 +130,13 @@ Humanoid make_humanoid(double x, double y, double z, uint32_t filter, double tol
     add_joint(model, RK_RUNTIME_JOINT_REVOLUTE, 1, 2, -0.05, 0.05, 50.0, knee, axis);
     add_joint(model, RK_RUNTIME_JOINT_REVOLUTE, 0, 3, -0.05, 0.05, 50.0, hip_r, axis);
     add_joint(model, RK_RUNTIME_JOINT_REVOLUTE, 3, 4, -0.05, 0.05, 50.0, knee, axis);
+    // Like G1's joints: reflected rotor inertia, and dry friction, whose
+    // constraint rows are present every step.
+    if (g1_dynamics)
+        for (uint32_t joint = 0; joint < model.joint_count; ++joint) {
+            model.joint_dynamics[joint].armature = 0.02;
+            model.joint_dynamics[joint].friction_loss = 0.3;
+        }
     auto &desc = *value.desc;
     desc.link_shape_count = 5;
     for (uint32_t link = 0; link < 5; ++link) {
@@ -169,6 +188,9 @@ struct Options {
     uint32_t humanoid_filter = 0;
     double humanoid_tolerance = 0.0;
     double humanoid_height = 0.8;
+    bool humanoid_dynamics = true; // Armature and friction loss on the humanoid's joints, as G1 has.
+    bool ur_arm = false;         // A UR-class 6R arm instead of the 3R arm.
+    bool arm_self_collision = true;
     double humanoid_pitch = 0.0; // Radians about Y: a tilted start topples forward.
     double humanoid_x = 10.0;
     double timestep = 0.01;
@@ -219,7 +241,7 @@ struct Scene {
     rk_simulation simulation = 0;
     rk_robot_runtime arm = 0, gantry = 0, humanoid = 0;
     int arm_index = -1, gantry_index = -1, humanoid_index = -1;
-    uint32_t arm_links = 4, gantry_links = 4, humanoid_links = 5;
+    uint32_t arm_links = 4, gantry_links = 4, humanoid_links = 5, arm_joints = 3;
     rk_simulation_object floor = 0, box = 0;
     std::vector<rk_result> results;
     Trace arm_trace, gantry_trace;
@@ -228,6 +250,7 @@ struct Scene {
     double timestep = 0.01;
     uint32_t stride = 1; // Record every stride-th tick.
     double arm_error = 0.0, gantry_error = 0.0; // Worst distance from the commanded position.
+    uint32_t arm_contacts = 0, gantry_contacts = 0; // Most active contacts either had in one tick.
     ~Scene() { if (simulation) rk_simulation_destroy(simulation); }
 };
 
@@ -267,14 +290,16 @@ void build(Scene &scene, const Options &options) {
     const auto add_humanoid = [&] {
         auto humanoid = make_humanoid(options.humanoid_x, 0.0, options.humanoid_height,
                                       options.humanoid_filter, options.humanoid_tolerance,
-                                      options.humanoid_pitch);
+                                      options.humanoid_pitch, options.humanoid_dynamics);
         scene.humanoid_index = next++;
         assert(rk_simulation_add_robot(scene.simulation, humanoid.blueprint.get(),
                                        humanoid.desc.get(), &scene.humanoid) == RK_OK);
     };
     if (options.humanoid && options.humanoid_first) add_humanoid();
     if (options.arm) {
-        auto model = make_arm();
+        auto model = make_arm(options.ur_arm, options.arm_self_collision);
+        scene.arm_links = options.ur_arm ? 7 : 4;
+        scene.arm_joints = options.ur_arm ? 6 : 3;
         auto desc_arm = new_desc(options.arm_position[0], options.arm_position[1], options.arm_position[2]);
         scene.arm_index = next++;
         assert(rk_simulation_add_robot(scene.simulation, model.get(), desc_arm.get(),
@@ -353,10 +378,10 @@ void run(Scene &scene, uint32_t ticks, uint32_t first_tick = 0) {
         const double t = tick * scene.timestep;
         double arm_targets[3] = {}, gantry_targets[3] = {};
         if (scene.arm) {
-            const double targets[3] = {0.8 * std::sin(1.3 * t), 0.5 * std::sin(2.1 * t) - 0.2,
-                                       0.6 * std::sin(0.9 * t)};
+            const double targets[6] = {0.8 * std::sin(1.3 * t), 0.5 * std::sin(2.1 * t) - 0.2,
+                                       0.6 * std::sin(0.9 * t), 0.2, 0.3 * std::sin(t), 0.0};
             std::copy(targets, targets + 3, arm_targets);
-            const auto command = position_command(++scene.sequence, 3, targets);
+            const auto command = position_command(++scene.sequence, scene.arm_joints, targets);
             EXPECT(rk_robot_runtime_submit(scene.arm, &command) == RK_OK, "arm submit tick %u", tick);
         }
         if (scene.gantry) {
@@ -382,6 +407,17 @@ void run(Scene &scene, uint32_t ticks, uint32_t first_tick = 0) {
             for (int joint = 0; joint < 3; ++joint)
                 scene.gantry_error = std::fmax(scene.gantry_error,
                                                std::fabs(state.position[joint] - gantry_targets[joint]));
+        }
+        for (int robot = 0; robot < 2; ++robot) {
+            const auto runtime = robot == 0 ? scene.arm : scene.gantry;
+            if (!runtime) continue;
+            rk_robot_contact contacts[64]{};
+            uint32_t count = 0;
+            if (rk_simulation_get_robot_contacts(scene.simulation, runtime, contacts, 64, &count) != RK_OK) continue;
+            uint32_t active = 0;
+            for (uint32_t i = 0; i < count && i < 64; ++i) active += contacts[i].active != 0;
+            auto &most = robot == 0 ? scene.arm_contacts : scene.gantry_contacts;
+            most = std::max(most, active);
         }
         if ((tick + 1) % scene.stride != 0) continue;
         if (scene.arm) record(scene, scene.arm_trace, scene.arm, scene.arm_index, scene.arm_links);
@@ -448,6 +484,40 @@ static void far_humanoid_does_not_change_arm_and_gantry(bool humanoid_first, dou
     const auto arm = snapshot(mixed.arm), gantry = snapshot(mixed.gantry);
     EXPECT(arm.safety != RK_SAFETY_FAULT && gantry.safety != RK_SAFETY_FAULT,
            "arm safety %d gantry safety %d", arm.safety, gantry.safety);
+}
+
+// An arm with constraints of its own, here a UR-class arm whose boxes touch
+// each other (self contacts), solves them in the same MuJoCo model as every
+// other robot. Adding a robot that never touches it then changes its poses
+// only at solver round-off (1e-16 to 4e-12 in these jobs); with no active
+// constraint on the arm (self collision off) the arm stays bit for bit.
+static void arm_constraints_see_only_solver_round_off() {
+    for (const bool self_collision : {false, true}) {
+        Options options;
+        options.gantry = false;
+        options.ur_arm = true;
+        options.arm_self_collision = self_collision;
+        Scene alone;
+        build(alone, options);
+        run(alone, TICKS);
+        options.humanoid = true;
+        options.humanoid_pitch = 0.5;
+        options.floor_box = true;
+        options.humanoid_filter = 2;
+        Scene mixed;
+        build(mixed, options);
+        run(mixed, TICKS);
+        const auto difference = mixed.arm_trace.pose_difference(alone.arm_trace, 6, 7);
+        std::printf("UR-class arm, self collision %s: up to %u active contacts, poses change by %.3g with a far humanoid\n",
+                    self_collision ? "on" : "off", alone.arm_contacts, difference);
+        EXPECT(count_failed(alone) == 0 && count_failed(mixed) == 0, "steps fail");
+        EXPECT(difference < 1e-9, "the arm's poses changed by %.3g", difference);
+        if (!self_collision)
+            EXPECT(alone.arm_contacts == 0 && difference == 0.0 && mixed.arm_trace == alone.arm_trace,
+                   "an arm with no constraints changed by %.3g", difference);
+        else
+            EXPECT(alone.arm_contacts > 0, "the arm never touched itself, so the case shows nothing");
+    }
 }
 
 // The world owns timestep, integrator and solver limits, so a scene that adds
@@ -717,6 +787,7 @@ static void realtime_session_survives_a_humanoid_fault() {
 }
 
 int main() {
+    arm_constraints_see_only_solver_round_off();
     mixed_scene_steps_coherently_and_repeatably();
     realtime_session_survives_a_humanoid_fault();
     contacts_follow_the_contact_filter();
