@@ -3,6 +3,7 @@ package robotkit.skill;
 import robotkit.localization.LocalizationState;
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.ToolPlanningContext;
 import robotkit.manipulation.WorkPatch;
 import robotkit.manipulation.WorkPatchPlanner;
 import robotkit.navigation.NavigationGoal;
@@ -73,6 +74,7 @@ class FinishSurface implements Skill {
   public final processChannel:String;
   public final seed:Array<Float>;
   public final obstacles:Array<BaseObstacle>;
+  public final toolPlanning:Null<ToolPlanningContext>;
 
   /** Cumulative coverage across every executed patch; available once planning succeeds. */
   public var coverage(default, null):Null<CoverageMap> = null;
@@ -89,7 +91,7 @@ class FinishSurface implements Skill {
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot,
       runner:SurfacePlanRunner, toolAdapter:ChannelToolAdapter, processChannel:String,
-      seed:Array<Float>, ?obstacles:Array<BaseObstacle>) {
+      seed:Array<Float>, ?obstacles:Array<BaseObstacle>, ?toolPlanning:ToolPlanningContext) {
     if (navigator == null || manipulator == null || robot == null || map_T_surface == null ||
         surface == null || spec == null || observePerception == null || runner == null ||
         toolAdapter == null || processChannel == null || seed == null)
@@ -106,6 +108,11 @@ class FinishSurface implements Skill {
     this.processChannel = processChannel;
     this.seed = seed.copy();
     this.obstacles = obstacles == null ? [] : obstacles;
+    if (toolPlanning != null &&
+        (toolPlanning.tool.flangeTTcp.translation.sub(manipulator.flangeTTcp.translation).norm() > 1e-6 ||
+         toolPlanning.tool.flangeTTcp.rotation.angularDistance(manipulator.flangeTTcp.rotation) > 1e-6))
+      throw "FinishSurface mounted tool TCP does not match the manipulator TCP";
+    this.toolPlanning = toolPlanning;
   }
 
   public function start():Void {
@@ -113,7 +120,12 @@ class FinishSurface implements Skill {
     try {
       var result = WorkPatchPlanner.plan(surface, map_T_surface, manipulator,
         spec.maxPatchWidth, spec.toolWidth, spec.overlap, spec.standoff, spec.feedRate, spec.leadInOut,
-        spec.standoffDistanceMin, spec.standoffDistanceMax, seed, 3, 3, 0.4, obstacles);
+        spec.standoffDistanceMin, spec.standoffDistanceMax, seed, 3, 3, 0.4, obstacles,
+        1e-4, 1e-3,
+        toolPlanning == null ? null : toolPlanning.tool.collision,
+        toolPlanning == null ? null : toolPlanning.obstacles,
+        toolPlanning == null ? 0.0 : toolPlanning.clearance,
+        toolPlanning == null ? 0.02 : toolPlanning.maxJointStep);
       if (result.patches.length == 0) {
         lifecycle.fail("work patch planner produced no patches");
         return;

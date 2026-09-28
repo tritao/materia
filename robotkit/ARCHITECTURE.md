@@ -1114,6 +1114,10 @@ successive solved poses (default maximum step 0.02 radians or metres per
 joint). Hull padding and requested planning clearance are added to the
 separation test. This is a sampled path check; callers needing a tighter
 path guarantee must use a smaller joint step or continuous collision check.
+`FinishSurface`, `Paint`, and `Sand` accept an optional `ToolPlanningContext`
+with the mounted `Tool`, map-frame obstacle boxes, clearance, and sampling
+step. The skill checks that the tool and manipulator agree on the flange-to-TCP
+transform, then rejects a blocked patch before navigation or process output.
 
 ## Simulated wall-finishing robot (M9)
 

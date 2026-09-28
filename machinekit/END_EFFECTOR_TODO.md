@@ -54,9 +54,10 @@ project of its own.
 
 ## Planning and runtime
 
-- [ ] **Planner uses tool collision (M).** Check the tool's convex pieces
+- [x] **Planner uses tool collision (M).** Check the tool's convex pieces
   against the cell during motion planning, with the proximity margin as a
-  planning clearance.
+  planning clearance; `FinishSurface` and its Paint/Sand variants accept the
+  mounted tool and cell obstacles.
 - [ ] **Tool-aware task skills (M).** Choose a tool configuration and working
   frame per part in AutomationKit `Pick`/`Place` tasks, and schedule tool
   changes.

@@ -2,6 +2,7 @@ package robotkit.skill;
 
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.ToolPlanningContext;
 import robotkit.navigation.Navigator;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.spatial.Transform3;
@@ -24,7 +25,7 @@ class Paint implements Skill {
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot, sprayer:Sprayer,
       litersPerMinute:Float, pressureBar:Float, seed:Array<Float>,
-      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>) {
+      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>, ?toolPlanning:ToolPlanningContext) {
     if (sprayer == null) throw "Paint requires a sprayer";
     var adapter = new ChannelToolAdapter();
     adapter.bind("surface.process", function(event) {
@@ -37,7 +38,7 @@ class Paint implements Skill {
       sprayer.setPressure(on ? pressureBar : 0.0, event.scheduledTimeNs);
     });
     finish = new FinishSurface(navigator, manipulator, robot, map_T_surface, surface, spec,
-      observePerception, runner, adapter, "surface.process", seed, obstacles);
+      observePerception, runner, adapter, "surface.process", seed, obstacles, toolPlanning);
   }
 
   public function coverage():Null<CoverageMap> return finish.coverage;

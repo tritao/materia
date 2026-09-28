@@ -2,6 +2,7 @@ package robotkit.skill;
 
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.ToolPlanningContext;
 import robotkit.navigation.Navigator;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.spatial.Transform3;
@@ -25,7 +26,7 @@ class Sand implements Skill {
       map_T_surface:Transform3, surface:WorkSurface, spec:FinishSpec,
       observePerception:RobotSnapshot -> PerceptionSnapshot, sander:Sander,
       speedRpm:Float, contactForceNewtons:Float, seed:Array<Float>,
-      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>) {
+      runner:SurfacePlanRunner, ?obstacles:Array<BaseObstacle>, ?toolPlanning:ToolPlanningContext) {
     if (sander == null) throw "Sand requires a sander";
     var adapter = new ChannelToolAdapter();
     adapter.bind("surface.process", function(event) {
@@ -38,7 +39,7 @@ class Sand implements Skill {
       sander.setContactForce(on ? contactForceNewtons : 0.0, event.scheduledTimeNs);
     });
     finish = new FinishSurface(navigator, manipulator, robot, map_T_surface, surface, spec,
-      observePerception, runner, adapter, "surface.process", seed, obstacles);
+      observePerception, runner, adapter, "surface.process", seed, obstacles, toolPlanning);
   }
 
   public function coverage():Null<CoverageMap> return finish.coverage;
