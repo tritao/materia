@@ -865,6 +865,17 @@ The runtime accepts both kinds as externally published sensors at authored
 mounts, allowing a simulation sensor producer to publish them without a native
 physics sensor.
 
+`cadbridge.EndEffectorVacuumFeedback` is a deterministic simulation producer
+for one suction cup with a dedicated collision piece. After each physics step,
+it reads that piece's contact distances and feeds the selected tool's pressure
+sensor adapter. An enabled vacuum command and geometric cup touch produce a
+caller-specified sealed pressure; proximity alone, contact loss, or a disabled
+command produce zero. Contact is only a seal proxy: this model does not predict
+leakage, evacuation time, or seal quality. Designs with multiple cups or a cup
+merged into another collision piece need a richer model and are rejected.
+The test uses distance rather than the contact's `active` force flag because
+MuJoCo cannot apply force between a fixed obstacle and a kinematic flange.
+
 `cadbridge.EndEffectorRuntimeBridge` builds a `ToolRuntime` from a selected
 `EndEffectorSet` configuration and working frame. Each explicit control binding
 names a digital output channel and its actuator inlet in the coupled assembly;

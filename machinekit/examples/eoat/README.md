@@ -34,6 +34,14 @@ Runtime bindings are derived from the coupled configuration's port intents. An
 explicit valve controls vacuum when present; otherwise the generator's air
 inlet is the default simulated vacuum command point.
 
+For a single-cup tool with a pressure sensor, `EndEffectorVacuumFeedback` can
+sample MuJoCo contacts after each simulation step and feed pressure observations
+to the selected `ToolRuntime`. It treats geometric touch on the cup's own hull as
+a seal and requires the caller to choose the sealed pressure. This is a simple
+runtime feedback model, not a prediction of leakage or evacuation time. Call
+`feedback.sample(timestampNs)` after each `Simulation.step()` with timestamps
+from the same monotonic clock used for tool selection.
+
 Run the example checks with:
 
 ```sh
