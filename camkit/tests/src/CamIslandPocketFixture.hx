@@ -31,12 +31,12 @@ class CamIslandPocketFixture {
     check(hasFaceRef, "face pocket preserves CAD face reference");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
-    var lowered = program.lower(machine);
+    var lowered = CamTestLowering.lower(program, machine);
     check(lowered.program != null && lowered.diagnostics.length == 0,
       "island pocket lowers through MotionKit");
     var hasPocketSpan = false;
     for (entry in lowered.sourceMap.entries)
-      if (entry.span.line == 1) hasPocketSpan = true;
+      if (entry.provenance.line == 1) hasPocketSpan = true;
     check(hasPocketSpan, "island pocket keeps its operation source span");
 
     var left = -1, right = -1, bossFinishing = 0;
@@ -158,7 +158,7 @@ class CamIslandPocketFixture {
     var twoBossFace = twoBossSketch.shape.faces().at(0);
     var twoBossProgram = new CamJob(0.005, 10000)
       .pocketFace(twoBossFace, tool, -0.001, 0.005, 0.001).finish();
-    check(twoBossProgram.lower(machine).diagnostics.length == 0,
+    check(CamTestLowering.lower(twoBossProgram, machine).diagnostics.length == 0,
       "face pocket supports two separate islands");
     for (op in twoBossProgram.ops) switch op {
       case Move(Cut, geometry, _, _, _):

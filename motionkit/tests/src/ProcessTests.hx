@@ -29,7 +29,6 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
-import motionkit.robot.CncMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;
@@ -508,7 +507,7 @@ class ProcessTests extends MotionKitTestSupport {
       physical.linkCollisionHulls[0] == null && hasTenMillimetreVertex,
       "physical assembly passes upstream hulls in link order and SI units");
     var cnc = new CncMachine("work", "x", "y", "z", 0.08);
-    var result = new CncMotionBinding(cnc, blueprint).compile(
+    var result = MotionKitTestSupport.compileCnc(MotionKitTestSupport.cncBinding(cnc, blueprint), cnc, 
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
       [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(990));
     check(result.blocks.length > 0, "physical gantry CNC compiles through ProgramCompiler");
@@ -576,10 +575,10 @@ class ProcessTests extends MotionKitTestSupport {
     var robot = new SimulatedRobot("physical-cnc", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var binding = new CncMotionBinding(cnc, blueprint);
+    var binding = MotionKitTestSupport.cncBinding(cnc, blueprint);
     var motion = new ManipulatorMotion(robot, binding.compiler,
       function(_) return null, function() return runtime.pollEvents());
-    motion.run(new CncCompiler(cnc).compile(
+    motion.run(MotionKitTestSupport.cncProgram(cnc, 
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n"));
     for (tick in 0...3000) {
       motion.update(0.01);
@@ -598,17 +597,17 @@ class ProcessTests extends MotionKitTestSupport {
       new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 200), 0.1, 0.4);
     var cnc = new CncMachine("work", "x", "y", "z", 0.08);
-    var binding = new CncMotionBinding(cnc, blueprint);
+    var binding = MotionKitTestSupport.cncBinding(cnc, blueprint);
     check(cnc.travelLower != null && cnc.travelUpper != null,
       "CNC binding derives a machine travel envelope");
     var travelError = "";
-    try binding.compile("G21 G0 X500\nM2\n", [0.0, 0.0, 0.0],
+    try MotionKitTestSupport.compileCnc(binding, cnc, "G21 G0 X500\nM2\n", [0.0, 0.0, 0.0],
       Int64.ofInt(899))
     catch (error:Dynamic) travelError = Std.string(error);
     check(travelError.indexOf("G-code line 1") >= 0 &&
       travelError.indexOf("X travel") >= 0,
       'bound CNC travel error names the G-code line and axis: $travelError');
-    var result = binding.compile("G21 G90 G17\nS12000 M3\nG0 X10 Y10\n" +
+    var result = MotionKitTestSupport.compileCnc(binding, cnc, "G21 G90 G17\nS12000 M3\nG0 X10 Y10\n" +
       "F600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
       [0.0, 0.0, 0.0], Int64.ofInt(900));
     check(result.blocks.length > 0, "CNC ProgramCompiler emits execution blocks");
@@ -620,7 +619,7 @@ class ProcessTests extends MotionKitTestSupport {
     near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
     result.dispose();
     cnc.setTool(new Tool(2, 0.0, 0.002));
-    var compensated = binding.compile("G21 G90 F600 G41 D2 G1 X10\n" +
+    var compensated = MotionKitTestSupport.compileCnc(binding, cnc, "G21 G90 F600 G41 D2 G1 X10\n" +
       "G1 X20\nG1 X20 Y10\nG40 G1 X20 Y20\nM2\n",
       [0.0, 0.0, 0.0], Int64.ofInt(925));
     check(compensated.blocks.length > 0,
@@ -628,7 +627,7 @@ class ProcessTests extends MotionKitTestSupport {
     compensated.dispose();
     for (arc in ["G17 G2 X5 Y5 Z5 I5 J0",
         "G18 G3 X5 Y5 Z5 I5 K0", "G19 G2 X5 Y5 Z5 J5 K0"]) {
-      var helix = binding.compile('G21 G90 F600 $arc\nM2\n',
+      var helix = MotionKitTestSupport.compileCnc(binding, cnc, 'G21 G90 F600 $arc\nM2\n',
         [0.0, 0.0, 0.0], Int64.ofInt(950));
       var block = helix.blocks[helix.blocks.length - 1];
       var finalPlan = block.plans[block.plans.length - 1];

@@ -83,7 +83,7 @@ class CamGeneratedFixtures {
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
     for (program in [lProgram, uProgram]) {
-      check(program.lower(machine).diagnostics.length == 0,
+      check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
         "concave pocket lowers through MotionKit");
       var imported = new CncCompiler(machine).compileDetailed(
         CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
@@ -235,9 +235,9 @@ class CamGeneratedFixtures {
     }
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
-    check(program.lower(machine).diagnostics.length == 0,
+    check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "concave profile lowers through MotionKit");
-    check(inside.lower(machine).diagnostics.length == 0,
+    check(CamTestLowering.lower(inside, machine).diagnostics.length == 0,
       "concave inside profile lowers through MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
@@ -402,7 +402,7 @@ class CamGeneratedFixtures {
       "face operation finishes both holes before its outer profile");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
-    check(program.lower(machine).diagnostics.length == 0,
+    check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "holed plate lowers to MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(CamGCodeWriter.write(program, CamTestSetup.standard(), machine));
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,

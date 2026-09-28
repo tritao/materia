@@ -1,5 +1,5 @@
 import cnckit.CncCompiler;
-import cnckit.CncCompileResult;
+import CncTestCompiler.CncTestCompileResult;
 import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import cnckit.CncDialect;
@@ -25,11 +25,11 @@ class CncKitTests {
       '$message: expected $expected, got $actual');
   static function rejects(machine:CncMachine, source:String, expected:String):Void {
     var error = "";
-    try new CncCompiler(machine).compile(source)
+    try new CncTestCompiler(machine).compile(source)
     catch (caught:Dynamic) error = Std.string(caught);
     check(error.indexOf(expected) >= 0, 'expected "$expected" in "$error"');
   }
-  static function hasError(result:CncCompileResult, line:Int,
+  static function hasError(result:CncTestCompileResult, line:Int,
       fragment:String):Bool {
     for (diagnostic in result.diagnostics)
       if (diagnostic.severity == Error && diagnostic.span.line == line &&
@@ -43,7 +43,7 @@ class CncKitTests {
     machine.setToolLength(2, 0.012);
     var source = "G21 G90 G54 G17\nS12000 M3\nG0 X0 Y0 Z10\nF600 G1 Z0\n" +
       "G1 X20\nG1 Y20\nG2 X0 Y20 I-10 J0\nG1 Y0\nM5 M9\nM2\n";
-    var program = new CncCompiler(machine).compile(source);
+    var program = new CncTestCompiler(machine).compile(source);
     check(program.ops.length >= 9, "pocket emits motion and spindle operations");
     check(switch program.ops[0] {
       case MotionOp.SetOutput("spindle.direction", _): true;
@@ -65,7 +65,7 @@ class CncKitTests {
     }
     check(arcs >= 1, "pocket includes an arc path");
 
-    var incremental = new CncCompiler(machine).compile(
+    var incremental = new CncTestCompiler(machine).compile(
       "G20 G91\nG0 X1\nF60 G1 Y1\nG3 X-1 Y-1 I-1 J0\nM2");
     var rapid = switch incremental.ops[0] {
       case MotionOp.FollowPath(path, _, _, _): path;
@@ -78,7 +78,7 @@ class CncKitTests {
       case _: throw "incremental feed is not a path";
     };
     near(feed, 0.0254, "inch feed converts from units/minute to m/s");
-    var modal = new CncCompiler(machine).compile(
+    var modal = new CncTestCompiler(machine).compile(
       "G21 G90 G55\nF600 G1 X10\nY10\nG91 X5\nM2");
     var modalEnd = switch modal.ops[modal.ops.length - 1] {
       case MotionOp.FollowPath(path, _, _, _): path.poseAt(path.length());
@@ -86,7 +86,7 @@ class CncKitTests {
     };
     near(modalEnd.x, 0.015, "G1 and G91 remain modal across lines");
     near(modalEnd.y, 0.01, "Y coordinate uses persisted G1 mode");
-    var blend = new CncCompiler(machine).compile(
+    var blend = new CncTestCompiler(machine).compile(
       "G21 G90 G64 P1 F600\nG1 X10\nG1 Y10\nG61\nG1 X20\nM2");
     var blended = switch blend.ops[0] {
       case MotionOp.FollowPath(path, _, _, _): path;
@@ -96,7 +96,7 @@ class CncKitTests {
       "G64 retains authored geometry for task-space validation");
     near(blended.blendTolerance, 0.001, "G64 P converts to metres");
     check(blend.ops.length == 2, "G61 splits the blended path at an exact stop");
-    var inchBlend = new CncCompiler(machine).compile(
+    var inchBlend = new CncTestCompiler(machine).compile(
       "G64 P0.1 G20 F60 G1 X1\nG1 Y1\nM2");
     var inchPath = switch inchBlend.ops[0] {
       case MotionOp.FollowPath(path, _, _, _): path;
@@ -105,7 +105,7 @@ class CncKitTests {
     near(inchPath.blendTolerance, 0.00254,
       "G64 P uses the block unit mode regardless of word order");
 
-    var tool = new CncCompiler(machine).compile(
+    var tool = new CncTestCompiler(machine).compile(
       "G21 G90 G43 H2\nG0 Z10\nT3 M6\nM0\nM2");
     var toolPath = switch tool.ops[0] {
       case MotionOp.FollowPath(path, _, _, _): path;
@@ -121,7 +121,7 @@ class CncKitTests {
     rejects(machine, "G41", "line 1 column 1");
     rejects(machine, "G64 P1 G61\nG1 X1 F100", "multiple path-control");
     rejects(machine, "G43 H9", "line 1 column 5");
-    var ordered = new CncCompiler(machine).compile("T1 M6 M3 G0 Z5\nM2");
+    var ordered = new CncTestCompiler(machine).compile("T1 M6 M3 G0 Z5\nM2");
     check(switch ordered.ops[0] {
       case MotionOp.WaitInput("cnc.tool_change.1", _, null): true;
       case _: false;
@@ -134,7 +134,7 @@ class CncKitTests {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
     }, "motion follows spindle start");
-    var stopped = new CncCompiler(machine).compile("M3 M8\nM5 M9 G0 X1\nM2");
+    var stopped = new CncTestCompiler(machine).compile("M3 M8\nM5 M9 G0 X1\nM2");
     check(switch stopped.ops[5] {
       case MotionOp.SetOutput("spindle.speed", _): true;
       case _: false;
@@ -147,7 +147,7 @@ class CncKitTests {
       case MotionOp.FollowPath(_, _, _, _): true;
       case _: false;
     }, "M5 and M9 precede motion");
-    var partialCompiler = new CncCompiler(machine);
+    var partialCompiler = new CncTestCompiler(machine);
     var partial = partialCompiler.compile(
       "G21 G90 G64 P1 F600 G1 X10\nG1 Y10\nG1 Y0\nG1 X20\nM2");
     check(partialCompiler.warnings.length > 0, "unblendable corner warns");
@@ -156,11 +156,11 @@ class CncKitTests {
     check(partial.ops.length == 1, "fallback keeps the combined path");
     var strictMachine = new CncMachine("work", "x", "y", "z", 0.2,
       null, 0.0005, 0.02, CncDialect.LinuxCnc, 0.5);
-    var strictCompiler = new CncCompiler(strictMachine);
+    var strictCompiler = new CncTestCompiler(strictMachine);
     strictCompiler.compile("G21 G64 P1 F600 G1 X10\nG1 Y10\nM2");
     check(strictCompiler.warnings.length == 1,
       "machine blend corner limit controls exact stops");
-    var circle = new CncCompiler(machine).compile(
+    var circle = new CncTestCompiler(machine).compile(
       "G21 G90 F600 G0 X10 Y0\nG2 X10 Y0 I-10 J0\nM2");
     var circlePath = switch circle.ops[1] {
       case MotionOp.FollowPath(path, _, _, _): path;
@@ -169,9 +169,9 @@ class CncKitTests {
     near(circlePath.length(), 2 * Math.PI * 0.01,
       "G2 full circle circumference", 1e-7);
     var arcMachine = new CncMachine("work", "x", "y", "z", 0.2);
-    var cw = new CncCompiler(arcMachine).compile(
+    var cw = new CncTestCompiler(arcMachine).compile(
       "G21 G91 F600 G2 X10 I5 J0\nM2");
-    var ccw = new CncCompiler(arcMachine).compile(
+    var ccw = new CncTestCompiler(arcMachine).compile(
       "G21 G91 F600 G3 X10 I5 J0\nM2");
     var cwPath = switch cw.ops[0] {
       case MotionOp.FollowPath(path, _, _, _): path;
@@ -181,8 +181,8 @@ class CncKitTests {
       case MotionOp.FollowPath(path, _, _, _): path;
       case _: throw "CCW arc missing";
     };
-    var cwPrimitive:cnckit.CncPosePrimitive = cast cwPath.primitives[0];
-    var ccwPrimitive:cnckit.CncPosePrimitive = cast ccwPath.primitives[0];
+    var cwPrimitive:toolpathkit.motion.ToolpathPosePrimitive = cast cwPath.primitives[0];
+    var ccwPrimitive:toolpathkit.motion.ToolpathPosePrimitive = cast ccwPath.primitives[0];
     var cwArc:ArcSegment = cast cwPrimitive.geometry;
     var ccwArc:ArcSegment = cast ccwPrimitive.geometry;
     check(cwArc.sweepAngle < 0.0 && ccwArc.sweepAngle > 0.0,
@@ -191,14 +191,14 @@ class CncKitTests {
     near(ccwArc.center.x, 0.005, "G91 CCW centre is relative to start");
     rejects(machine, "G21 G90 F600 G0 X10\nG2 X0 Y10 I-10 J0",
       "arc endpoint is not on its centre circle");
-    var relativeTool = new CncCompiler(machine).compile(
+    var relativeTool = new CncTestCompiler(machine).compile(
       "G21 G91 G43 H2 G0 Z10\nG49 G0 Z10\nM2");
     var finalRelative = switch relativeTool.ops[relativeTool.ops.length - 1] {
       case MotionOp.FollowPath(path, _, _, _): path.poseAt(path.length());
       case _: throw "relative G49 motion missing";
     };
     near(finalRelative.z, 0.02, "G43/G49 do not shift relative moves");
-    var lengthOps = new CncCompiler(machine).compileDetailed(
+    var lengthOps = new CncTestCompiler(machine).compileDetailed(
       "G21 G90 G43 H2\nG0 Z10\nG49\nM2").ops;
     var offsets = [for (op in lengthOps) switch op {
       case ToolLengthOffset(number, length, span): '$number:$length:${span.line}';
@@ -206,11 +206,11 @@ class CncKitTests {
     }].filter(entry -> entry != null);
     check(offsets.length == 2 && offsets[0] == '2:${machine.toolLength(2)}:1'
       && offsets[1] == "0:0:3", "G43 and G49 record the tool length they apply");
-    var lowercase = new CncCompiler(machine).compile(
+    var lowercase = new CncTestCompiler(machine).compile(
       "g21 g90 (comment) f600 g1 x1 ; tail\nm30");
     check(lowercase.ops.length == 1, "lowercase and comments parse");
     rejects(machine, "M30\nG0 X1", "code after M2/M30");
-    var detailed = new CncCompiler(arcMachine).compileDetailed(
+    var detailed = new CncTestCompiler(arcMachine).compileDetailed(
       "G21 G90 G64 P1 F600 G1 X10\nG1 Y10\nG1 Xoops\nG2 X0 Y0 I0 J0\n" +
       "G1 X20\nM2\nG1 X30");
     check(detailed.diagnostics.length == 3,
@@ -241,18 +241,18 @@ class CncKitTests {
     };
     near(GeometryTools.pointAt(recoveredGeometry, 0.0).y, 0.01,
       "failed arc leaves the modal position at the previous valid line");
-    var firstMap = detailed.sourceMap.spanAt(0, 0.002);
-    var secondMap = detailed.sourceMap.spanAt(0, 0.014);
+    var firstMap = detailed.sourceMap.provenanceAt(0, 0.002);
+    var secondMap = detailed.sourceMap.provenanceAt(0, 0.014);
     check(firstMap != null && firstMap.line == 1 &&
       secondMap != null && secondMap.line == 2,
       "distance along a blended MotionOp maps to the authored lines");
-    check(detailed.sourceMap.spanAt(0, 1.0) == null,
+    check(detailed.sourceMap.provenanceAt(0, 1.0) == null,
       "source map rejects distance outside the path");
-    var empty = new CncCompiler(arcMachine).compileDetailed("(nothing)\n");
+    var empty = new CncTestCompiler(arcMachine).compileDetailed("(nothing)\n");
     check(empty.program == null && empty.diagnostics.length == 1 &&
       empty.diagnostics[0].code == "CNC_EMPTY",
       "empty source has a structured diagnostic");
-    var rollback = new CncCompiler(arcMachine).compileDetailed(
+    var rollback = new CncTestCompiler(arcMachine).compileDetailed(
       "G21 G90 F600 G1 X10\nF1 G2 X20 I0 J0\nG1 X20");
     check(rollback.diagnostics.length == 1 && rollback.ops.length == 2,
       "failed block is skipped without discarding later motion");
@@ -267,7 +267,7 @@ class CncKitTests {
     fixtureMachine.setToolLength(11, 0.0);
     fixture("freecad-pocket.ngc", fixtureMachine);
     fixture("fusion-drill.ngc", fixtureMachine);
-    var compatibility = new CncCompiler(fixtureMachine).compileDetailed(
+    var compatibility = new CncTestCompiler(fixtureMachine).compileDetailed(
       "%\nN10 O100\n/ G0 X1\nG40 G94\nM30\n%");
     check(compatibility.diagnostics.length == 1 &&
       compatibility.diagnostics[0].code == "CNC_BLOCK_DELETE_IGNORED",
@@ -276,11 +276,11 @@ class CncKitTests {
     rejects(fixtureMachine, "G95 M2", "G95 units-per-revolution");
     rejects(fixtureMachine, "G92 X1 M2", "G92 persistent offsets");
     rejects(fixtureMachine, "G21 F600 G2 X10 R4", "radius cannot reach");
-    var radiusArc = new CncCompiler(fixtureMachine).compileDetailed(
+    var radiusArc = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 F600 G2 X10 R6\nM2");
     check(radiusArc.diagnostics.length == 0 && radiusArc.ops.length == 2,
       "reachable R arc compiles");
-    var majorArc = new CncCompiler(fixtureMachine).compileDetailed(
+    var majorArc = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 F600 G2 X10 R-6\nM2");
     var minorLength = switch radiusArc.ops[0] {
       case ToolpathOp.Move(Cut, geometry, _, _, _): GeometryTools.length(geometry);
@@ -293,7 +293,7 @@ class CncKitTests {
     check(majorLength > minorLength && majorLength > Math.PI * 0.006,
       "negative R selects the major arc");
     fixtureMachine.setHomePosition(28, 0.1, 0.2, 0.3);
-    var home = new CncCompiler(fixtureMachine).compileDetailed(
+    var home = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G0 X10 Y10 Z10\nG28 X0\nM2");
     var homeLast = switch home.ops[home.ops.length - 2] {
       case ToolpathOp.Move(Rapid, geometry, _, _, _): GeometryTools.pointAt(geometry,
@@ -302,7 +302,7 @@ class CncKitTests {
     };
     near(homeLast.x, 0.1, "G28 uses stored machine X");
     near(homeLast.y, 0.01, "G28 leaves unspecified Y axis alone");
-    var xyHelix = new CncCompiler(fixtureMachine).compileDetailed(
+    var xyHelix = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 F600 G2 X5 Y5 Z10 I5 J0\nM2");
     check(xyHelix.diagnostics.length == 0, "G17 helix compiles");
     var xyGeometry = switch xyHelix.ops[0] {
@@ -324,16 +324,16 @@ class CncKitTests {
       case MotionOp.FollowPath(path, _, _, _): path;
       case _: throw "G17 helix path missing";
     };
-    var xyPrimitive:cnckit.CncPosePrimitive = cast xyPath.primitives[0];
+    var xyPrimitive:toolpathkit.motion.ToolpathPosePrimitive = cast xyPath.primitives[0];
     var xyCircular:CircularSegment = cast xyPrimitive.geometry;
     near(xyCircular.length(), GeometryTools.length(xyGeometry),
       "G17 helix lowering keeps 3D length");
-    var helixSpan = xyHelix.sourceMap.spanAt(0, xyCircular.length() * 0.5);
+    var helixSpan = xyHelix.sourceMap.provenanceAt(0, xyCircular.length() * 0.5);
     check(helixSpan != null && helixSpan.line == 1,
       "helical path maps to its G-code line");
-    var xzCw = new CncCompiler(fixtureMachine).compileDetailed(
+    var xzCw = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G18 F600 G2 X5 Z5 I5 K0\nM2");
-    var xzCcw = new CncCompiler(fixtureMachine).compileDetailed(
+    var xzCcw = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G18 F600 G3 X5 Z5 I5 K0\nM2");
     var xzCwSweep = switch xzCw.ops[0] {
       case ToolpathOp.Move(Cut, PathGeometry.Circular(_, _, _, sweep, ArcPlane.XZ, _), _, _, _): sweep;
@@ -346,7 +346,7 @@ class CncKitTests {
     check(xzCwSweep > Math.PI && xzCcwSweep < 0.0 &&
       Math.abs(xzCcwSweep) < Math.PI,
       "G18 direction uses LinuxCNC positive-Y viewpoint");
-    var xzHelix = new CncCompiler(fixtureMachine).compileDetailed(
+    var xzHelix = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G91 G18 F600 G3 X5 Y10 Z5 I5 K0\nM2");
     var xzGeometry = switch xzHelix.ops[0] {
       case ToolpathOp.Move(Cut, g, _, _, _): g;
@@ -357,7 +357,7 @@ class CncKitTests {
     near(xzEnd.x, 0.005, "G18 helix preview X");
     near(xzEnd.y, 0.01, "G18 helix rises on Y");
     near(xzEnd.z, 0.005, "G18 helix preview Z");
-    var yzHelix = new CncCompiler(fixtureMachine).compileDetailed(
+    var yzHelix = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G19 F600 G2 X10 Y5 Z5 J5 K0\nM2");
     var yzGeometry = switch yzHelix.ops[0] {
       case ToolpathOp.Move(Cut, PathGeometry.Circular(_, _, _, sweep, ArcPlane.YZ, rise), _, _, _):
@@ -374,7 +374,7 @@ class CncKitTests {
     near(yzEnd.x, 0.01, "G19 helix preview X");
     near(yzEnd.y, 0.005, "G19 helix preview Y");
     near(yzEnd.z, 0.005, "G19 helix preview Z");
-    var xzRadius = new CncCompiler(fixtureMachine).compileDetailed(
+    var xzRadius = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G18 F600 G3 X5 Y10 Z5 R5\nM2");
     check(xzRadius.diagnostics.length == 0 && xzRadius.ops.length == 2,
       "G18 helical R arc compiles");
@@ -382,7 +382,7 @@ class CncKitTests {
     rejects(fixtureMachine, "G19 F600 G2 Y5 Z5 I1 J5", "G19 arc centre uses J/K");
     rejects(fixtureMachine, "G17 F600 G2 X5 Y5 K1 I5", "G17 arc centre uses I/J");
     rejects(fixtureMachine, "G18 F600 G2 X10 Z10 I5 K0", "arc endpoint is not on its centre circle");
-    var cycles = new CncCompiler(fixtureMachine).compileDetailed(
+    var cycles = new CncTestCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G0 Z10\nF600 G99 G81 X10 Z-5 R2\nX20\nG80\n" +
       "G98 G82 X30 Z-4 R2 P0.2\nG80\nG83 X40 Z-4 R2 Q2\n" +
       "G80\nG73 X50 Z-4 R2 Q2\nG80\nM2");
@@ -403,7 +403,7 @@ class CncKitTests {
     rejects(fixtureMachine, "G21 F600 G83 X0 Z-5 R2 M2", "requires positive Q");
     rejects(fixtureMachine, "G21 F600 G82 X0 Z-5 R2 M2", "requires positive P");
     rejects(fixtureMachine, "G21 G91 G53 G0 X1 M2", "G53 requires G90");
-    var activeCycleG53 = new CncCompiler(machine).compileDetailed(
+    var activeCycleG53 = new CncTestCompiler(machine).compileDetailed(
       "G21 G90 F600 G81 X0 Y0 Z-1 R2\nG53 X0\nG80\nM2");
     check(hasError(activeCycleG53, 2, "G53 requires G80"),
       "G53 in an active cycle reports its own line");
@@ -415,7 +415,7 @@ class CncKitTests {
     }
     check(secondLineOps == 0, "rejected G53 does not drill another hole");
     rejects(fixtureMachine, "G80 G0 X1\nM2", "multiple motion G codes");
-    var endOutputs = new CncCompiler(fixtureMachine).compileDetailed(
+    var endOutputs = new CncTestCompiler(fixtureMachine).compileDetailed(
       "S1000 M3 M7 M8\nM30");
     var endOps = endOutputs.ops;
     check(endOps.length >= 3 && switch endOps[endOps.length - 3] {
@@ -434,7 +434,7 @@ class CncKitTests {
       case ToolpathOp.Coolant(_, false, _): true;
       case _: false;
     }, "M30 turns off flood coolant before End");
-    var m2Outputs = new CncCompiler(fixtureMachine).compileDetailed(
+    var m2Outputs = new CncTestCompiler(fixtureMachine).compileDetailed(
       "S1000 M3 M8\nM2");
     check(switch m2Outputs.ops[m2Outputs.ops.length - 2] {
       case ToolpathOp.Coolant(_, false, _): true;
@@ -442,7 +442,7 @@ class CncKitTests {
     }, "M2 also turns off active coolant");
     var compensatedMachine = new CncMachine("work", "x", "y", "z", 0.2);
     compensatedMachine.setTool(new Tool(2, 0.012, 0.002));
-    var compUnsupported = new CncCompiler(compensatedMachine).compileDetailed(
+    var compUnsupported = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 G90 F600 T2 M6\nG0 X0 Y0\nG41 D2 G1 X5\nG1 Y5\n" +
       "G28\nG81 X5 Y5 Z-1 R2\nG40 G1 X10\nM2");
     check(hasError(compUnsupported, 5, "G28/G30 require G40"),
@@ -456,7 +456,7 @@ class CncKitTests {
     compensatedMachine.setToolLength(2, 0.013);
     near(compensatedMachine.tool(2).diameter, 0.002,
       "legacy tool-length setter preserves cutter diameter");
-    var inside = new CncCompiler(compensatedMachine).compileDetailed(
+    var inside = new CncTestCompiler(compensatedMachine).compileDetailed(
       File.getContent("fixtures/comp-inside.ngc"));
     check(inside.diagnostics.length == 0, "inside cutter fixture compiles");
     var insideFirst = switch inside.ops[1] {
@@ -472,7 +472,7 @@ class CncKitTests {
     };
     near(insideSecond.x, insideFirst.x, "inside corner remains connected X");
     near(insideSecond.y, insideFirst.y, "inside corner remains connected Y");
-    var outside = new CncCompiler(compensatedMachine).compileDetailed(
+    var outside = new CncTestCompiler(compensatedMachine).compileDetailed(
       File.getContent("fixtures/comp-outside.ngc"));
     check(outside.diagnostics.length == 0 && outside.ops.length == 6,
       "outside corner adds a round cutter-radius join");
@@ -483,23 +483,23 @@ class CncKitTests {
       case _: throw "outside corner join missing";
     };
     near(outsideJoin, 0.001, "outside join uses cutter radius");
-    var rightComp = new CncCompiler(compensatedMachine).compileDetailed(
+    var rightComp = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 F600 G42 D2 G1 X10\nG1 X20\nG40 G1 X30\nM2");
     var rightStart = switch rightComp.ops[1] {
       case ToolpathOp.Move(Cut, g, _, _, _): GeometryTools.pointAt(g, 0.0);
       case _: throw "G42 contour missing";
     };
     near(rightStart.y, -0.001, "G42 offsets to the right");
-    var loadedComp = new CncCompiler(compensatedMachine).compileDetailed(
+    var loadedComp = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 F600 T2 M6\nG41 G1 X10\nG1 X20\nG40 G1 X30\nM2");
     check(loadedComp.diagnostics.length == 0,
       "G41 uses the declared loaded tool without D");
-    var withControls = new CncCompiler(compensatedMachine).compileDetailed(
+    var withControls = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 F600 G41 D2 G1 X10\nM8\nG1 X20\nG40\nM9\nG1 X30\nM2");
     check(withControls.diagnostics.length == 0 &&
       withControls.ops.length == 6,
       "coolant operations remain ordered around compensated motion");
-    var arcComp = new CncCompiler(compensatedMachine).compileDetailed(
+    var arcComp = new CncTestCompiler(compensatedMachine).compileDetailed(
       File.getContent("fixtures/comp-arc.ngc"));
     check(arcComp.diagnostics.length == 0, "arc compensation fixture compiles");
     var arcRadius = switch arcComp.ops[1] {
@@ -507,7 +507,7 @@ class CncKitTests {
       case _: throw "compensated arc missing";
     };
     near(arcRadius, 0.009, "G41 offsets CCW arc inward");
-    var mixedComp = new CncCompiler(compensatedMachine).compileDetailed(
+    var mixedComp = new CncTestCompiler(compensatedMachine).compileDetailed(
       File.getContent("fixtures/comp-line-arc.ngc"));
     check(mixedComp.diagnostics.length == 0,
       "inside line-to-arc corner offsets without gouging");
@@ -525,7 +525,7 @@ class CncKitTests {
     rejects(compensatedMachine,
       "G21 F600 G41 D2 G1 X10\nG1 X10.5\nG1 Y10\nG40 G1 Y20\nM2",
       "gouge at inside corner");
-    var xzComp = new CncCompiler(compensatedMachine).compileDetailed(
+    var xzComp = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 G18 F600 G41 D2 G1 X10 Z0\nG3 X15 Z5 I5 K0\n" +
       "G40 G1 X15 Z20\nM2");
     var xzCompRadius = switch xzComp.ops[1] {
@@ -546,7 +546,7 @@ class CncKitTests {
       "gouges arc radius");
     var travelMachine = new CncMachine("work", "x", "y", "z", 0.2);
     travelMachine.setTravelEnvelope([0.0, 0.0, 0.0], [0.02, 0.02, 0.02]);
-    var travelResult = new CncCompiler(travelMachine).compileDetailed(
+    var travelResult = new CncTestCompiler(travelMachine).compileDetailed(
       "G21 G0 X25\nG0 X10\nM2");
     check(travelResult.diagnostics.length >= 1 &&
       travelResult.diagnostics[0].code == "CNC_TRAVEL" &&
@@ -557,7 +557,7 @@ class CncKitTests {
   }
 
   static function fixture(name:String, machine:CncMachine):Void {
-    var result = new CncCompiler(machine).compileDetailed(
+    var result = new CncTestCompiler(machine).compileDetailed(
       File.getContent('fixtures/$name'));
     check(result.diagnostics.length == 0, '$name diagnostics: ${result.diagnostics}');
     var program:motionkit.program.MotionProgram = cast result.program;

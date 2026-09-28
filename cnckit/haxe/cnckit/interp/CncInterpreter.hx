@@ -1,7 +1,6 @@
 package cnckit.interp;
 
 import toolpathkit.path.MoveKind;
-import cnckit.CncChannels;
 import cnckit.interp.CncInterpOp;
 import cnckit.CncDiagnostic;
 import cnckit.CncDiagnostic.CncSeverity;

@@ -20,13 +20,10 @@ class MotionKitBootstrapTests {
 
     if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
       plannerTests.testCircularSegments();
-      processTests.testCncProgramBinding();
-      processTests.testPhysicalAssemblyCncBinding();
       Sys.println('CNC focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
     if (Sys.getEnv("MOTIONKIT_C7_ONLY") == "1") {
-      processTests.testVirtualCncProgram();
       Sys.println('C7 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
@@ -51,9 +48,6 @@ class MotionKitBootstrapTests {
     programTests.testProgramStartTolerances();
     kinematicsTests.testPathConfigurationSelector();
     kinematicsTests.testAxisKinematics();
-    processTests.testCncProgramBinding();
-    processTests.testPhysicalAssemblyCncBinding();
-    processTests.testVirtualCncProgram();
     programTests.testManipulatorMotion();
     programTests.testManipulatorSessionTransitions();
     programTests.testProcessRunVirtualArmRecovery();

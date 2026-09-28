@@ -5,11 +5,30 @@
   },
   "entry": "ToolpathMotionTests",
   "sourceRoots": [
-    "src"
+    "src",
+    "../../../motionkit/tests/src"
   ],
   "dependencies": {
     "toolpathkit-motion": {
       "path": ".."
+    },
+    "cnckit": {
+      "path": "../../../cnckit"
+    },
+    "cadbridge": {
+      "path": "../../../robotkit/cadbridge"
+    },
+    "machinekit": {
+      "path": "../../../machinekit"
+    },
+    "processkit": {
+      "path": "../../../processkit"
+    },
+    "nativekit": {
+      "path": "../../../nativekit"
+    },
+    "robotkit": {
+      "path": "../../../robotkit"
     }
   },
   "target": "host",

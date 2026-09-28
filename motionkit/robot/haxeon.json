@@ -5,8 +5,6 @@
   "scopeSourceRoots": false,
   "dependencies": {
     "motionkit": { "path": ".." },
-    "cnckit": { "path": "../../cnckit" },
-    "toolpathkit": { "path": "../../toolpathkit" },
     "robotkit": { "path": "../../robotkit" },
     "machinekit": { "path": "../../machinekit" }
   },

@@ -1,6 +1,5 @@
 package camkit;
 
-import cnckit.CncChannels;
 import cnckit.CncMachine;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;

@@ -77,7 +77,7 @@ class CamSafeTravelFixture {
 
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(profileTool); machine.setTool(drillTool);
-    check(program.lower(machine).diagnostics.length == 0,
+    check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "mixed tool job lowers through MotionKit");
     var imported = new CncCompiler(machine).compileDetailed(
       CamGCodeWriter.write(program, CamTestSetup.standard(), machine));

@@ -1,13 +1,7 @@
 package camkit;
 
-import cnckit.CncCompileResult;
-import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
-import toolpathkit.setup.TravelEnvelope;
-import cnckit.CncDiagnostic;
-import cnckit.CncDiagnostic.CncSeverity;
 import toolpathkit.path.ToolpathOp;
-import cnckit.lower.CncLowering;
 
 /** CNC IR produced directly by CAM, with operation numbers as source spans. */
 class CamProgram {
@@ -26,13 +20,4 @@ class CamProgram {
     throw 'CAM program has no tool $number';
   }
 
-  public function lower(machine:CncMachine):CncCompileResult {
-    var diagnostics = [for (violation in
-      TravelEnvelope.check(machine.travelLower, machine.travelUpper, ops))
-      new CncDiagnostic(Error, "CNC_TRAVEL", violation.provenance,
-        violation.message())];
-    var lowered = new CncLowering(machine).lower(ops);
-    return new CncCompileResult(lowered.program, ops, lowered.sourceMap,
-      diagnostics.concat(lowered.diagnostics));
-  }
 }

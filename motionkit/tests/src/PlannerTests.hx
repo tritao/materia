@@ -28,7 +28,6 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
-import motionkit.robot.CncMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;
@@ -669,9 +668,9 @@ class PlannerTests extends MotionKitTestSupport {
       var blueprint = MachineKitRobotCompiler.compileXYZGantry(
         new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 200), 0.1, 0.4);
-      var binding = new CncMotionBinding(
+      var binding = MotionKitTestSupport.cncBinding(
         new CncMachine("work", "x", "y", "z", 0.08), blueprint);
-      var primitive = new cnckit.CncPosePrimitive(circular, 0.05, 0.0005, 0.02);
+      var primitive = new toolpathkit.motion.ToolpathPosePrimitive(circular, 0.05, 0.0005, 0.02);
       var path = new PosePath("work", [primitive]).withAuthoredGeometry(authored, 0.001);
       var compiled = binding.compiler.compile(new MotionProgram([
         MotionOp.FollowPath(path, "work", 0.05, [])]),

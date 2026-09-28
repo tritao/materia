@@ -4,7 +4,8 @@
   "entry": "CamKitTests",
   "sourceRoots": ["src"],
   "dependencies": {
-    "camkit": { "path": ".." }
+    "camkit": { "path": ".." },
+    "toolpathkit-motion": { "path": "../../toolpathkit/motion" }
   },
   "target": "host",
   "outputDir": "build"

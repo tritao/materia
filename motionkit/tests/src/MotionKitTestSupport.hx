@@ -28,7 +28,9 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
-import motionkit.robot.CncMotionBinding;
+import toolpathkit.motion.MachineBinding;
+import toolpathkit.motion.ToolpathMotion;
+import toolpathkit.motion.ToolpathMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;
@@ -114,6 +116,44 @@ import robotkit.world.TrajectorySegment;
 
 
 class MotionKitTestSupport {
+  public static function cncBinding(cnc:CncMachine,
+      blueprint:MotionSystemBlueprint):ToolpathMotionBinding {
+    var machine = new MachineBinding(cnc.frameId, cnc.xAxisId, cnc.yAxisId,
+      cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
+      cnc.positionTolerance, cnc.orientationTolerance,
+      cnc.maxBlendTurnAngleRadians);
+    if (cnc.travelLower != null && cnc.travelUpper != null)
+      machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
+    var binding = new ToolpathMotionBinding(machine, blueprint);
+    cnc.setTravelEnvelope(machine.travelLower, machine.travelUpper);
+    return binding;
+  }
+
+  public static function cncProgram(cnc:CncMachine, source:String):MotionProgram {
+    var parsed = new CncCompiler(cnc).compileDetailed(source);
+    for (diagnostic in parsed.diagnostics)
+      if (diagnostic.severity == cnckit.CncDiagnostic.CncSeverity.Error)
+        throw diagnostic.toString();
+    var machine = new MachineBinding(cnc.frameId, cnc.xAxisId, cnc.yAxisId,
+      cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
+      cnc.positionTolerance, cnc.orientationTolerance,
+      cnc.maxBlendTurnAngleRadians);
+    if (cnc.travelLower != null && cnc.travelUpper != null)
+      machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
+    var lowered = ToolpathMotion.lower(parsed.ops, machine);
+    if (lowered.program == null) throw "G-code contains no executable motion or barrier";
+    return lowered.program;
+  }
+
+  public static function compileCnc(binding:ToolpathMotionBinding,
+      cnc:CncMachine, source:String, joints:Array<Float>,
+      planId:Int64):motionkit.robot.CompiledProgram {
+    var parsed = new CncCompiler(cnc).compileDetailed(source);
+    for (diagnostic in parsed.diagnostics)
+      if (diagnostic.severity == cnckit.CncDiagnostic.CncSeverity.Error)
+        throw diagnostic.toString();
+    return binding.compile(parsed.ops, joints, planId);
+  }
   public static var assertions:Int = 0;
   public function new() {}
 
@@ -180,8 +220,8 @@ class MotionKitTestSupport {
       [for (joint in blueprint.model.joints) joint.name]);
     var cnc = new CncMachine("work", "x", "y", "z", 0.01,
       null, 0.001);
-    var binding = new CncMotionBinding(cnc, blueprint);
-    var program = new CncCompiler(cnc).compile(
+    var binding = cncBinding(cnc, blueprint);
+    var program = cncProgram(cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G3 X20 Y20 I0 J10\nM5\nM2\n");
     var motion = new ManipulatorMotion(robot, binding.compiler,
       function(_) return null, function() return runtime.pollEvents());

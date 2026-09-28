@@ -130,21 +130,22 @@ class CamKitTests {
       "concave pocket clearing generates cutter passes");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
     machine.setTool(tool);
-    var lowered = program.lower(machine);
+    var lowered = CamTestLowering.lower(program, machine);
     check(lowered.diagnostics.length == 0 && lowered.program != null,
       "CAM IR lowers directly to executable MotionKit paths");
     var tight = new CncMachine("work", "x", "y", "z", 0.2);
     tight.setTravelEnvelope([0.0, 0.0, -0.01], [0.02, 0.02, 0.01]);
-    var overTravel = program.lower(tight);
-    check(overTravel.diagnostics.length > 0 &&
-      overTravel.diagnostics[0].code == "CNC_TRAVEL" &&
-      overTravel.diagnostics[0].span.line == 1,
+    var travelMessage = "";
+    try CamTestLowering.lower(program, tight)
+    catch (error:Dynamic) travelMessage = Std.string(error);
+    check(travelMessage.indexOf("X travel") >= 0 &&
+      travelMessage.indexOf("cam:1") >= 0,
       "direct CAM lowering checks machine travel with operation source span");
     var hasProfileSpan = false, hasPocketSpan = false, hasDrillSpan = false;
     for (entry in lowered.sourceMap.entries) {
-      if (entry.span.line == 1) hasProfileSpan = true;
-      if (entry.span.line == 2) hasPocketSpan = true;
-      if (entry.span.line == 3) hasDrillSpan = true;
+      if (entry.provenance.line == 1) hasProfileSpan = true;
+      if (entry.provenance.line == 2) hasPocketSpan = true;
+      if (entry.provenance.line == 3) hasDrillSpan = true;
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");

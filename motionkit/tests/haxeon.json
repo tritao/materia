@@ -1,17 +1,40 @@
 {
   "version": 1,
-  "package": { "name": "motionkit-tests" },
+  "package": {
+    "name": "motionkit-tests"
+  },
   "entry": "MotionKitBootstrapTests",
-  "sourceRoots": ["src"],
+  "sourceRoots": [
+    "src"
+  ],
   "dependencies": {
-    "cnckit": { "path": "../../cnckit" },
-    "toolpathkit": { "path": "../../toolpathkit" },
-    "cadbridge": { "path": "../../robotkit/cadbridge" },
-    "machinekit": { "path": "../../machinekit" },
-    "processkit": { "path": "../../processkit" },
-    "motionkit-robot": { "path": "../robot" },
-    "nativekit": { "path": "../../nativekit" },
-    "robotkit": { "path": "../../robotkit" }
+    "cnckit": {
+      "path": "../../cnckit"
+    },
+    "toolpathkit": {
+      "path": "../../toolpathkit"
+    },
+    "cadbridge": {
+      "path": "../../robotkit/cadbridge"
+    },
+    "machinekit": {
+      "path": "../../machinekit"
+    },
+    "processkit": {
+      "path": "../../processkit"
+    },
+    "motionkit-robot": {
+      "path": "../robot"
+    },
+    "nativekit": {
+      "path": "../../nativekit"
+    },
+    "robotkit": {
+      "path": "../../robotkit"
+    },
+    "toolpathkit-motion": {
+      "path": "../../toolpathkit/motion"
+    }
   },
   "native": {
     "cmake": {

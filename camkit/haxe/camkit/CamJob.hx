@@ -3,7 +3,6 @@ package camkit;
 import toolpathkit.path.MoveKind;
 import cadkit.Face;
 import toolpathkit.tool.Tool;
-import cnckit.CncChannels;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;

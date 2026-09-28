@@ -61,5 +61,6 @@ class ToolpathMotionTests {
     if (compiled.blocks.length == 0) throw "robot binding produced no plans";
     compiled.dispose();
     Sys.println("ToolpathKit Motion tests passed (5 assertions)");
+    ToolpathScenarioTests.main();
   }
 }
