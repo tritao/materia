@@ -50,6 +50,21 @@ class SimulationHarness {
     space.session.reset();
   }
 
+  /** Restores one robot's initial body pose and runtime state. Stops first:
+   * the session must be stopped for this edit, as it must for Simulation's. */
+  public function resetRobot(robotIndex:Int):Void {
+    stop();
+    simulation.resetRobot(robotIndex);
+  }
+
+  /** Teleports one robot base while leaving the shared clock untouched.
+   * Stops first: the session must be stopped for this edit. */
+  public function teleportRobot(robotIndex:Int, position:Array<Float>,
+      ?rotation:Array<Float>):Void {
+    stop();
+    simulation.teleportRobot(robotIndex, position, rotation);
+  }
+
   /** Adds a box to the shared physics world and returns its owned session object. */
   public function spawnBox(position:Array<Float>, halfExtents:Array<Float>,
       ?dynamicBody:Bool = false, ?mass:Float = 1.0, ?orientation:Array<Float>):SimObject {

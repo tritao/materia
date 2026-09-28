@@ -1232,7 +1232,7 @@ class RobotWorldTests {
     var simulation = simulationHarness.simulation;
     simulation.addRobot(blueprint);
     var yaw = Math.PI * 0.5;
-    simulation.teleportRobot(0, [2.0, 3.0, 0.0],
+    simulationHarness.teleportRobot(0, [2.0, 3.0, 0.0],
       [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)]);
     var truth = new SimulationTruthLocalization(simulation, 0);
     var source = new RobotSnapshot("truth", Int64.ofInt(5), Int64.ofInt(500),
@@ -2133,7 +2133,7 @@ class RobotWorldTests {
       model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var startYaw = 0.5;
-    simulation.teleportRobot(0, [1.0, 2.0, 0.3],
+    simulationHarness.teleportRobot(0, [1.0, 2.0, 0.3],
       [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
     var plant = new DifferentialDrivePlant(simulationHarness, 0, base);
     check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
@@ -2254,7 +2254,7 @@ class RobotWorldTests {
       "DifferentialDrivePlant and the wheels stop during a direct normal stop");
 
     // Driving and teleporting never replace the reset pose chosen at add time.
-    simulation.resetRobot(0);
+    simulationHarness.resetRobot(0);
     simulationHarness.step(Int64.ofInt(tick++));
     var reset = simulation.robotPose(0);
     check(Math.abs(reset.position[0]) < 1e-6 && Math.abs(reset.position[1]) < 1e-6 &&
@@ -2288,7 +2288,7 @@ class RobotWorldTests {
       model.name, [for (link in model.links) link.name], [for (joint in model.joints) joint.name]);
     var base = MobileBase.fromBlueprint(robot, blueprint);
     var startYaw = 0.5;
-    simulation.teleportRobot(0, [1.0, 2.0, 0.3],
+    simulationHarness.teleportRobot(0, [1.0, 2.0, 0.3],
       [0.0, 0.0, Math.sin(startYaw * 0.5), Math.cos(startYaw * 0.5)]);
     var plant = new HolonomicDrivePlant(simulationHarness, 0, base);
     check(Math.abs(plant.pose.x - 1.0) < 1e-9 && Math.abs(plant.pose.y - 2.0) < 1e-9 &&
@@ -3953,7 +3953,7 @@ class RobotWorldTests {
     var before = robot.snapshot();
     equal(before.sensors.get(1).values.get(0), 1.75, "adapter exposes scene ray distance");
     simulationHarness.reset();
-    simulation.teleportRobot(0, [1.0, 0.0, 0.0]);
+    simulationHarness.teleportRobot(0, [1.0, 0.0, 0.0]);
     simulationHarness.step(Int64.ofInt(100));
     var after = robot.snapshot();
     equal(after.sourceSequence, before.sourceSequence, "reset repeats source sequence");
@@ -3979,9 +3979,9 @@ class RobotWorldTests {
     var simulation = simulationHarness.simulation;
     var yaw = Math.PI * 0.5;
     simulation.addRobot(blueprint, new Pose2(3.0, 2.0, yaw));
-    simulation.teleportRobot(0, [8.0, 9.0, 0.0],
+    simulationHarness.teleportRobot(0, [8.0, 9.0, 0.0],
       [0.0, 0.0, Math.sin(0.2), Math.cos(0.2)]);
-    simulation.resetRobot(0);
+    simulationHarness.resetRobot(0);
     var reset = simulation.robotPose(0);
     check(Math.abs(reset.position[0] - 3.0) < 1e-9 &&
       Math.abs(reset.position[1] - 2.0) < 1e-9 &&
@@ -3989,7 +3989,7 @@ class RobotWorldTests {
       Math.abs(reset.rotation[2] - Math.sin(yaw * 0.5)) < 1e-9 &&
       Math.abs(reset.rotation[3] - Math.cos(yaw * 0.5)) < 1e-9,
       "resetRobot restores the initial pose supplied to addRobot");
-    simulation.teleportRobot(0, [5.0, 6.0, 0.0]);
+    simulationHarness.teleportRobot(0, [5.0, 6.0, 0.0]);
     simulationHarness.reset();
     var resetAll = simulation.robotPose(0);
     check(Math.abs(resetAll.position[0] - 3.0) < 1e-9 &&

@@ -29,10 +29,10 @@ class SimulationPoseResetTests {
     }
     simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), position, rotation,
       null, null, null, null, ToolCollisionShape.Hulls([piece], 0.005), 0);
-    simulation.teleportRobot(0, [4.0, 5.0, 6.0]);
-    simulation.resetRobot(0);
+    simulationHarness.teleportRobot(0, [4.0, 5.0, 6.0]);
+    simulationHarness.resetRobot(0);
     checkPose(simulation, position, rotation, 'resetRobot on backend $backend');
-    simulation.teleportRobot(0, [7.0, 8.0, 9.0]);
+    simulationHarness.teleportRobot(0, [7.0, 8.0, 9.0]);
     simulationHarness.reset();
     checkPose(simulation, position, rotation, 'reset on backend $backend');
     simulationHarness.dispose();
