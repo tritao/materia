@@ -14,6 +14,7 @@ import humankit.HumanDisplay;
 import humankit.HumanGrip;
 import humankit.HumanPose;
 import humankit.HumanoidRig;
+import humankit.HumanWalker;
 import humankit.sim.HumanActor;
 import nativekit.scene.NodeId;
 import nativekit.scene.Transform;
@@ -32,6 +33,8 @@ import nativekit.sim.SimSession;
  * physics so the actor always has a keyframe to move towards. It stands still
  * while the simulation is paused and walks by the wall clock without one.
  * A humanoid can be drawn as its mesh, its collision capsules, or its skeleton.
+ * It walks a route of floor points with HumanWalker, looping round the
+ * default circle or idling at the end of a given route.
  */
 class CharacterPreview implements SessionParticipant {
 	static inline var PATH_RADIUS:Float = 2.5;
@@ -56,6 +59,10 @@ class CharacterPreview implements SessionParticipant {
 	var moving:Bool = false;
 	var walkSpeed:Float = 1.0;
 	var angle:Float = 0.0;
+	/** Floor points a humanoid walks, and whether it loops back to the start. */
+	final route:Array<Array<Float>>;
+	final loopRoute:Bool;
+	var walker:Null<HumanWalker> = null;
 	var lastTime:Float = -1.0;
 	/** The humanoid's rest pose and collision proxy, or null for other assets. */
 	final restPose:Null<HumanPose>;
@@ -68,9 +75,20 @@ class CharacterPreview implements SessionParticipant {
 	var simulationTime:Float = 0.0;
 
 	/** Loads the character, and optionally a prop for its right hand. */
-	public function new(path:String, ?clipName:String, ?propPath:String, display:HumanDisplay = Mesh) {
+	/** A null route walks the default circle round the origin. */
+	public function new(path:String, ?clipName:String, ?propPath:String, display:HumanDisplay = Mesh,
+			?route:Array<Array<Float>>) {
 		this.path = path;
 		this.display = display;
+		loopRoute = route == null;
+		this.route = route != null ? route : [
+			for (index in 0...48) {
+				var turn = index * Math.PI * 2.0 / 48;
+				[PATH_RADIUS * Math.cos(turn), PATH_RADIUS * Math.sin(turn)];
+			}
+		];
+		if (this.route.length < 2)
+			throw "A character route needs at least two points";
 		this.clipName = clipName;
 		asset = AnimationAsset.load(path);
 		for (warning in asset.warnings)
@@ -86,6 +104,7 @@ class CharacterPreview implements SessionParticipant {
 		if (detected != null) {
 			var rest = new AnimationInstance(asset);
 			var bounds = rest.bounds();
+			walkSpeed = WALK_HEIGHTS_PER_SECOND * Math.max(bounds[5] - bounds[2], 0.1);
 			measuredPose = new HumanPose(detected, rest.readJointMatrices());
 			rest.dispose();
 			measuredProxy = HumanBodyProxy.standard(measuredPose,
@@ -131,6 +150,9 @@ class CharacterPreview implements SessionParticipant {
 			if (target < simulationTime) {
 				angle = 0.0;
 				simulationTime = 0.0;
+				var walking = walker;
+				if (walking != null)
+					walking.follow(route, walkSpeed, loopRoute);
 			}
 			elapsed = target - simulationTime;
 			simulationTime = target;
@@ -141,8 +163,15 @@ class CharacterPreview implements SessionParticipant {
 		}
 		var root:NodeId;
 		var character = human;
+		var walking = walker;
 		if (character != null) {
-			character.advance(elapsed);
+			if (walking != null) {
+				walking.advance(elapsed);
+				var transaction = scene.runtimeContentScene().beginTransaction();
+				transaction.setTransform(character.root, matrixTransform(walking.rootTransform()));
+				transaction.commit();
+			} else
+				character.advance(elapsed);
 			root = character.root;
 		} else {
 			var presented = model;
@@ -202,9 +231,15 @@ class CharacterPreview implements SessionParticipant {
 			updatedNodes = [presented.root].concat(presented.primitiveNodes);
 			root = presented.root;
 		}
-		startClip();
+		var character = human;
+		if (character != null && (clipName == null || clipName.toLowerCase().indexOf("walk") >= 0)) {
+			var created = new HumanWalker(character, clipName != null ? clipName : "walk");
+			created.follow(route, walkSpeed, loopRoute);
+			walker = created;
+		} else
+			startClip();
 		var transaction = sceneKit.beginTransaction();
-		transaction.setTransform(root, pathTransform());
+		transaction.setTransform(root, matrixTransform(rootMatrix()));
 		transaction.commit();
 	}
 
@@ -243,8 +278,24 @@ class CharacterPreview implements SessionParticipant {
 
 	/** The character root's placement as a column-major matrix. */
 	function rootMatrix():Array<Float> {
+		var walking = walker;
+		if (walking != null)
+			return walking.rootTransform();
+		if (rig != null) {
+			// A humanoid not yet walking stands at the route's start, facing along it.
+			var heading = Math.atan2(route[1][1] - route[0][1], route[1][0] - route[0][0]);
+			var c = Math.cos(heading), s = Math.sin(heading);
+			return [c, s, 0.0, 0.0, -s, c, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, route[0][0], route[0][1], 0.0, 1.0];
+		}
 		var transform = pathTransform();
 		return [for (index in 0...16) transform.element(index)];
+	}
+
+	static function matrixTransform(matrix:Array<Float>):Transform {
+		var transform = Transform.identity();
+		for (index in 0...16)
+			transform.set(index, matrix[index]);
+		return transform;
 	}
 
 	function releaseInstances():Void {
@@ -257,6 +308,7 @@ class CharacterPreview implements SessionParticipant {
 		instance = null;
 		model = null;
 		view = null;
+		walker = null;
 	}
 
 	public function dispose():Void {
