@@ -120,9 +120,8 @@ class MachineKitRecipes {
 		register();
 		var tracePath = Sys.getEnv("MATERIA_RECONCILE_TRACE");
 		if (tracePath != null) {
-			var trace = sys.io.File.append(tracePath);
-			trace.writeString("reconcile\n");
-			trace.close();
+			var previous = sys.FileSystem.exists(tracePath) ? sys.io.File.getContent(tracePath) : "";
+			sys.io.File.saveContent(tracePath, previous + "reconcile\n");
 		}
 		var savedVersion = documentVersion(savedText);
 		var saved:cadkit.parametric.Document;

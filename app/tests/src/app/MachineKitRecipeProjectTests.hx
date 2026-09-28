@@ -256,7 +256,12 @@ class MachineKitRecipeProjectTests {
 			var oldDefinitions:Array<Dynamic> = cast Reflect.field(oldVersionSaved, "definitions");
 			for (definition in oldDefinitions) {
 				var inputs:Array<Dynamic> = cast Reflect.field(definition, "inputs");
-				for (input in inputs) Reflect.deleteField(input, "editedByUser");
+				for (index in 0...inputs.length) {
+					var oldInput = inputs[index], legacyInput:Dynamic = {};
+					for (field in Reflect.fields(oldInput)) if (field != "editedByUser")
+						Reflect.setField(legacyInput, field, Reflect.field(oldInput, field));
+					inputs[index] = legacyInput;
+				}
 			}
 			Reflect.setField(project, "recipeDocument", jsonText(oldVersionSaved));
 			File.saveContent(destination, jsonText(project));
