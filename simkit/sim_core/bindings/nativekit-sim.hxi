@@ -9,11 +9,30 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	const NKSIM_ERROR_STALE_ID = -6;
 	const NKSIM_ERROR_UNSUPPORTED = -5;
 	const NKSIM_ERROR_WRONG_THREAD = -7;
+	const NKSIM_FRICTION_CONE_DEFAULT = 0;
+	const NKSIM_FRICTION_CONE_ELLIPTIC = 2;
+	const NKSIM_FRICTION_CONE_PYRAMIDAL = 1;
+	const NKSIM_INTEGRATOR_DEFAULT = 0;
+	/**
+	 * < Semi-implicit Euler.
+	 */
+	const NKSIM_INTEGRATOR_EULER = 1;
+	/**
+	 * < Implicit in velocity-dependent forces.
+	 */
+	const NKSIM_INTEGRATOR_IMPLICIT_FAST = 2;
+	const NKSIM_INTEGRATOR_RK4 = 3;
 	const NKSIM_JOINT_FIXED = 1;
 	const NKSIM_JOINT_PRISMATIC = 3;
 	const NKSIM_JOINT_REVOLUTE = 2;
 	const NKSIM_JOINT_TARGET_EFFORT = 3;
 	const NKSIM_JOINT_TARGET_POSITION = 1;
+	/**
+	 * Joint-space servo evaluated every physics substep:
+	 * effort = stiffness * (target - q) + damping * (velocity - qdot) + feedforward,
+	 * clamped to max_force. This is the command legged-robot controllers emit.
+	 */
+	const NKSIM_JOINT_TARGET_SERVO = 4;
 	const NKSIM_JOINT_TARGET_VELOCITY = 2;
 	const NKSIM_MOTION_DYNAMIC = 2;
 	const NKSIM_MOTION_KINEMATIC = 1;
@@ -78,6 +97,10 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * band beyond margin where contacts are detected without force.
 	 */
 	extern fn nksim_shape_set_contact(world: nksim_world, shape: nksim_shape, margin: f64, gap: f64) -> nksim_result;
+	/**
+	 * Sets a shape's contact surface; like its margin, only before a body uses it.
+	 */
+	extern fn nksim_shape_set_surface(world: nksim_world, shape: nksim_shape, surface: ptr<const<nksim_surface>>) -> nksim_result;
 	extern fn nksim_snapshot_destroy(snapshot: nksim_snapshot) -> void;
 	extern fn nksim_snapshot_get_body(snapshot: nksim_snapshot, index: u64, out_state: ptr<nksim_body_state> @inout) -> nksim_result;
 	extern fn nksim_snapshot_get_body_count(snapshot: nksim_snapshot, out_count: ptr<u64> @out) -> nksim_result;
@@ -195,7 +218,7 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		ratio: f64 @offset(16);
 		offset: f64 @offset(24);
 	}
-	struct nksim_joint_desc @layout(208, 8) {
+	struct nksim_joint_desc @layout(232, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		type: u32 @offset(4);
 		body_a: nksim_body @offset(8);
@@ -212,13 +235,16 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		/**
 		 * Joint-frame orientation relative to body_a/body_b (x, y, z, w),
 		 * appended after the original fields so an old struct prefix remains
-		 * valid. A struct_size smaller than sizeof(nksim_joint_desc) means the
+		 * valid. A struct_size that ends before rotation_b means the
 		 * caller predates these fields; backends must treat them as identity
 		 * rather than reading past the caller's actual struct.
 		 */
 		rotation_a: array<f64, 4> @offset(112);
 		rotation_b: array<f64, 4> @offset(144);
 		reserved: array<u64, 4> @offset(176);
+		armature: f64 @offset(208);
+		damping: f64 @offset(216);
+		friction_loss: f64 @offset(224);
 	}
 	struct nksim_joint_state @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -229,12 +255,16 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		reserved0: u32 @offset(32);
 		reserved: array<u64, 2> @offset(40);
 	}
-	struct nksim_joint_target @layout(32, 8) {
+	struct nksim_joint_target @layout(64, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		joint: nksim_joint @offset(4);
 		mode: u32 @offset(8);
 		target: f64 @offset(16);
 		max_force: f64 @offset(24);
+		velocity: f64 @offset(32);
+		stiffness: f64 @offset(40);
+		damping: f64 @offset(48);
+		feedforward: f64 @offset(56);
 	}
 	struct nksim_shape_desc @layout(56, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -269,13 +299,35 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 		scene_changes: nkscene_change_set @offset(28);
 		reserved: array<u64, 4> @offset(32);
 	}
-	struct nksim_world_desc @layout(80, 8) {
+	/**
+	 * Contact surface of a shape. Zero fields keep the backend default. Friction
+	 * coefficients are sliding, torsional and rolling; friction_dimensions is 1
+	 * (frictionless), 3 (sliding), 4 (with torsional) or 6 (with rolling).
+	 * contact_time_constant (s) and contact_damping_ratio set how stiff and how
+	 * damped the soft contact is.
+	 */
+	struct nksim_surface @layout(48, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		friction_dimensions: u32 @offset(4);
+		friction: array<f64, 3> @offset(8);
+		contact_time_constant: f64 @offset(32);
+		contact_damping_ratio: f64 @offset(40);
+	}
+	struct nksim_world_desc @layout(88, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		scene: nkscene_scene @offset(4);
 		fixed_timestep: f64 @offset(8);
 		physics_substeps: u32 @offset(16);
 		gravity: array<f64, 3> @offset(24);
 		reserved: array<u64, 4> @offset(48);
+		/**
+		 * < NKSIM_INTEGRATOR_*.
+		 */
+		integrator: u32 @offset(80);
+		/**
+		 * < NKSIM_FRICTION_CONE_*.
+		 */
+		friction_cone: u32 @offset(84);
 	}
 	handle nksim_body : u32;
 	handle nksim_joint : u32;

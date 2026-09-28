@@ -17,6 +17,11 @@ struct BackendShapePart {
     std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
     double margin = 0.0;
     double gap = 0.0;
+    /** Contact surface; zero fields keep the backend default (see nksim_surface). */
+    std::uint32_t friction_dimensions = 0;
+    std::array<double, 3> friction{};
+    double contact_time_constant = 0.0;
+    double contact_damping_ratio = 0.0;
 };
 
 struct BackendBodyDesc {
@@ -63,6 +68,9 @@ struct BackendJointDesc {
     /** Joint-frame orientation relative to body_a/body_b; identity when the caller's ABI struct predates these fields. */
     std::array<double, 4> rotation_a{0.0, 0.0, 0.0, 1.0};
     std::array<double, 4> rotation_b{0.0, 0.0, 0.0, 1.0};
+    double armature = 0.0;
+    double damping = 0.0;
+    double friction_loss = 0.0;
 };
 
 struct BackendJointState {
@@ -77,6 +85,11 @@ struct BackendJointTarget {
     std::uint32_t mode = 0;
     double target = 0.0;
     double max_force = 0.0;
+    /* NKSIM_JOINT_TARGET_SERVO terms. */
+    double velocity = 0.0;
+    double stiffness = 0.0;
+    double damping = 0.0;
+    double feedforward = 0.0;
 };
 
 struct BackendJointCoupling {

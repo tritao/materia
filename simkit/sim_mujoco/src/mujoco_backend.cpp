@@ -41,6 +41,11 @@ struct JointRecord {
     std::uint32_t target_mode = 0;
     double target = 0.0;
     double target_max_force = 0.0;
+    // NKSIM_JOINT_TARGET_SERVO terms.
+    double target_velocity = 0.0;
+    double target_stiffness = 0.0;
+    double target_damping = 0.0;
+    double target_feedforward = 0.0;
 };
 
 double dot(const Vec3 &a, const Vec3 &b) {
@@ -292,6 +297,16 @@ public:
         spec->option.gravity[0] = desc.gravity[0];
         spec->option.gravity[1] = desc.gravity[1];
         spec->option.gravity[2] = desc.gravity[2];
+        switch (desc.integrator) {
+        case NKSIM_INTEGRATOR_EULER: spec->option.integrator = mjINT_EULER; break;
+        case NKSIM_INTEGRATOR_IMPLICIT_FAST: spec->option.integrator = mjINT_IMPLICITFAST; break;
+        case NKSIM_INTEGRATOR_RK4: spec->option.integrator = mjINT_RK4; break;
+        default: break;
+        }
+        if (desc.friction_cone == NKSIM_FRICTION_CONE_PYRAMIDAL)
+            spec->option.cone = mjCONE_PYRAMIDAL;
+        else if (desc.friction_cone == NKSIM_FRICTION_CONE_ELLIPTIC)
+            spec->option.cone = mjCONE_ELLIPTIC;
         return rebuild();
     }
 
@@ -529,7 +544,7 @@ public:
             if (found == joints.end())
                 return NKSIM_ERROR_INVALID_HANDLE;
             if (targets[index].mode < NKSIM_JOINT_TARGET_POSITION ||
-                targets[index].mode > NKSIM_JOINT_TARGET_EFFORT ||
+                targets[index].mode > NKSIM_JOINT_TARGET_SERVO ||
                 !std::isfinite(targets[index].target) ||
                 !std::isfinite(targets[index].max_force))
                 return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -542,6 +557,10 @@ public:
             record.target_mode = targets[index].mode;
             record.target = targets[index].target;
             record.target_max_force = targets[index].max_force;
+            record.target_velocity = targets[index].velocity;
+            record.target_stiffness = targets[index].stiffness;
+            record.target_damping = targets[index].damping;
+            record.target_feedforward = targets[index].feedforward;
         }
         return NKSIM_OK;
     }
@@ -1116,6 +1135,9 @@ private:
             } else {
                 joint->limited = mjLIMITED_FALSE;
             }
+            joint->armature = incoming->desc.armature;
+            joint->damping[0] = incoming->desc.damping;
+            joint->frictionloss = incoming->desc.friction_loss;
         }
 
         if (desc.shape_parts.empty())
@@ -1197,6 +1219,13 @@ private:
             // creates a force constraint only below geom margin.
             geom->margin = part.margin;
             geom->gap = part.gap;
+            // Zero surface fields keep MuJoCo's defaults.
+            if (part.friction_dimensions != 0)
+                geom->condim = static_cast<int>(part.friction_dimensions);
+            for (int axis = 0; axis < 3; ++axis)
+                if (part.friction[axis] > 0.0) geom->friction[axis] = part.friction[axis];
+            if (part.contact_time_constant > 0.0) geom->solref[0] = part.contact_time_constant;
+            if (part.contact_damping_ratio > 0.0) geom->solref[1] = part.contact_damping_ratio;
             geom->contype = static_cast<int>(desc.collision_layer);
             geom->conaffinity = static_cast<int>(desc.collision_mask);
         }
@@ -1326,6 +1355,16 @@ private:
             case NKSIM_JOINT_TARGET_VELOCITY:
                 torque = m_qacc[dof] + bias;
                 break;
+            case NKSIM_JOINT_TARGET_SERVO: {
+                // A plain joint-space PD with feedforward, the law a motor
+                // driver runs; unlike the modes above it neither sees the
+                // mass matrix nor cancels gravity.
+                const auto q = data->qpos[model->jnt_qposadr[model_id]];
+                torque = joint.target_stiffness * (joint.target - q) +
+                    joint.target_damping * (joint.target_velocity - data->qvel[dof]) +
+                    joint.target_feedforward;
+                break;
+            }
             case NKSIM_JOINT_TARGET_EFFORT:
             default:
                 torque = joint.target;

@@ -207,6 +207,7 @@ struct Shape {
     std::vector<BackendShapePart> parts;
     double margin = 0.0;
     double gap = 0.0;
+    nksim_surface surface{};
 };
 
 struct Body {
@@ -285,6 +286,7 @@ public:
                                       const nksim_shape_pose *poses, std::uint32_t count,
                                       nksim_shape *out_shape);
     nksim_result set_shape_contact(nksim_shape shape, double margin, double gap);
+    nksim_result set_shape_surface(nksim_shape shape, const nksim_surface &surface);
     nksim_result destroy_shape(nksim_shape shape);
     nksim_result create_body(const nksim_body_desc &desc, nksim_body *out_body);
     nksim_result destroy_body(nksim_body body);
@@ -344,6 +346,7 @@ NKSIM_API nksim_result create_world_with_backend(
     nksim_world *out_world);
 
 bool valid_struct_size(std::uint32_t provided, std::size_t required) noexcept;
+void copy_surface(const nksim_surface &surface, BackendShapePart &part) noexcept;
 bool finite_positive(double value) noexcept;
 
 } // namespace nksim

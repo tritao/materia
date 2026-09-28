@@ -63,6 +63,13 @@ nksim_result NKSIM_CALL nksim_shape_set_contact(nksim_world world, nksim_shape s
     return value ? value->set_shape_contact(shape, margin, gap) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_shape_set_surface(nksim_world world, nksim_shape shape,
+        const nksim_surface *surface) {
+    if (!surface) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_shape_surface(shape, *surface) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_shape_create_sphere(nksim_world world, double radius,
                                                   nksim_shape *out_shape) {
     if (!out_shape || !std::isfinite(radius) || radius <= 0.0)

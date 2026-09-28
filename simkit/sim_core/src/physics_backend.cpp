@@ -230,6 +230,9 @@ public:
                 return NKSIM_ERROR_INVALID_HANDLE;
             switch (targets[index].mode) {
             case NKSIM_JOINT_TARGET_POSITION:
+            case NKSIM_JOINT_TARGET_SERVO:
+                // Joints here follow their targets exactly, so a servo's
+                // position target is reached at once, as a position target is.
                 joint->state.position = targets[index].target;
                 joint->state.velocity = 0.0;
                 break;
