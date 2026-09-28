@@ -326,7 +326,8 @@ class CncCompensator {
     case Rapid(_, span), Feed(_, _, _, span): span;
     case CutterCompStart(_, _, _, span), CutterCompEnd(span): span;
     case Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
-        ToolChange(_, span), OptionalStop(span), ProgramStop(span), End(span): span;
+        ToolChange(_, span), ToolLengthOffset(_, _, span), OptionalStop(span),
+        ProgramStop(span), End(span): span;
   };
   static function replaceGeometry(op:CncOp, geometry:CncGeometry):CncOp
     return switch op {

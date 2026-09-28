@@ -1,7 +1,7 @@
-package stockkit.tool;
+package cnckit.tool;
 
-import stockkit.tool.CutterSegment;
-import stockkit.tool.CutterZone;
+import cnckit.tool.CutterSegment;
+import cnckit.tool.CutterZone;
 
 /**
   A rotating tool as a surface of revolution about its axis. Segments run
@@ -126,6 +126,24 @@ class CutterProfile {
 
   public function topRadius():Float
     return endOf(segments[segments.length - 1]).r;
+
+  /** Widest diameter of the cutting zone. */
+  public function cuttingDiameter():Float {
+    var widest = 0.0;
+    for (segment in segments) {
+      if (zoneOf(segment) != Cutting) continue;
+      widest = Math.max(widest, Math.max(startOf(segment).r, endOf(segment).r));
+      switch segment {
+        case Arc(cr, cz, r0, z0, r1, z1, _):
+          // An arc bulges outwards past its ends when it crosses angle 0.
+          var arc = arcAngles(cr, cz, r0, z0, r1, z1);
+          if (Math.min(arc.start, arc.end) < 0.0 && Math.max(arc.start, arc.end) > 0.0)
+            widest = Math.max(widest, cr + arc.radius);
+        case Line(_, _, _, _, _):
+      }
+    }
+    return 2 * widest;
+  }
 
   /** Height of the top of the cutting zone. */
   public function fluteLength():Float {

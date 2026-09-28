@@ -17,6 +17,7 @@ class CamJob {
   var selectedTool:Int = -1;
   var operationNumber:Int = 0;
   var ops:Array<CncOp> = [];
+  var tools:Array<CncTool> = [];
 
   public function new(safeZ:Float, spindleRpm:Float, ?initial:CncPoint) {
     if (!Math.isFinite(safeZ) || !Math.isFinite(spindleRpm) ||
@@ -130,7 +131,7 @@ class CamJob {
     result.push(CncOp.Spindle(CncChannels.SpindleSpeed, 0.0, endSpan));
     result.push(CncOp.Spindle(CncChannels.SpindleDirection, 0.0, endSpan));
     result.push(CncOp.End(endSpan));
-    return new CamProgram(result);
+    return new CamProgram(result, tools);
   }
 
   function cutLoop(contour:CamContour, depth:Float, feed:Float,
@@ -320,6 +321,12 @@ class CamJob {
   }
 
   function selectTool(tool:CncTool, span:CncSpan):Void {
+    var known = false;
+    for (used in tools) if (used.number == tool.number) {
+      if (used != tool) throw 'CAM job uses two different tools numbered ${tool.number}';
+      known = true;
+    }
+    if (!known) tools.push(tool);
     if (selectedTool != tool.number) {
       if (selectedTool >= 0) {
         ops.push(CncOp.Spindle(CncChannels.SpindleSpeed, 0.0, span));

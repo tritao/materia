@@ -6,7 +6,7 @@ import cadkit.modeling.Vector;
 import cnckit.ir.CncGeometry;
 import cnckit.ir.CncPoint;
 import oracle.ExactOracle;
-import stockkit.tool.CutterProfile;
+import cnckit.tool.CutterProfile;
 
 /**
   Multi-move toolpaths whose moves join tangentially, cut with the exact

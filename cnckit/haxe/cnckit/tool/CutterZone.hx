@@ -1,4 +1,4 @@
-package stockkit.tool;
+package cnckit.tool;
 
 /** What happens when this part of a tool meets stock. */
 enum CutterZone {

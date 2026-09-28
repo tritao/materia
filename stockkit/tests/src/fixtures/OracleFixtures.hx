@@ -10,7 +10,7 @@ import cnckit.ir.CncGeometry;
 import cnckit.ir.CncOp;
 import cnckit.ir.CncPoint;
 import oracle.ExactOracle;
-import stockkit.tool.CutterProfile;
+import cnckit.tool.CutterProfile;
 
 /**
   Reference cases for the simulator: each builds exact stock with the OCCT

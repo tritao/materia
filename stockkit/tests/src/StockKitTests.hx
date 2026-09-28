@@ -1,8 +1,8 @@
 import fixtures.ChainFixtures;
 import fixtures.OracleFixtures;
-import stockkit.tool.CutterProfile;
-import stockkit.tool.CutterSegment;
-import stockkit.tool.CutterZone;
+import cnckit.tool.CutterProfile;
+import cnckit.tool.CutterSegment;
+import cnckit.tool.CutterZone;
 
 class StockKitTests {
   public static function main():Void {

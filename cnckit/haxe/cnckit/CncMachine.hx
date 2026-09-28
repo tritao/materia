@@ -68,7 +68,7 @@ class CncMachine {
 
   public function setToolLength(h:Int, length:Float):Void {
     var old = tools.get(h);
-    setTool(new CncTool(h, length, old == null ? 0.0 : old.diameter));
+    setTool(old == null ? new CncTool(h, length, 0.0) : old.withLength(length));
   }
 
   public function toolLength(h:Int):Float {

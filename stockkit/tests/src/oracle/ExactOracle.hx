@@ -10,7 +10,7 @@ import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.ir.CncGeometry;
 import cnckit.ir.CncPoint;
-import stockkit.tool.CutterProfile;
+import cnckit.tool.CutterProfile;
 
 /**
   Exact reference results built with OCCT booleans through CadKit. Tools point
@@ -299,7 +299,7 @@ class ExactOracle {
       return origin.add(side.scale(offset + s)).add(up.scale(z));
     var curves:Array<Curve> = [];
     function add(curve:Curve):Void curves.push(curve);
-    function segmentCurve(segment:stockkit.tool.CutterSegment, sign:Float,
+    function segmentCurve(segment:cnckit.tool.CutterSegment, sign:Float,
         reversed:Bool):Void {
       switch segment {
         case Line(r0, z0, r1, z1, _):
