@@ -1,7 +1,12 @@
 import haxe.Int64;
+import haxe.io.Bytes;
 import cnckit.CncMachine;
 import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
+import cadkit.modeling.AssemblyModel;
+import cadbridge.AssemblySimulationBridge;
+import cadbridge.AssemblyPhysicalPartView;
+import materia.assembly.AssemblyFrames;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
 import motionkit.AxisTarget;
@@ -109,6 +114,7 @@ class MotionKitBootstrapTests {
   public static function main():Void {
     if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
       testCncProgramBinding();
+      testPhysicalAssemblyCncBinding();
       Sys.println('CNC focused tests passed ($assertions assertions)');
       return;
     }
@@ -131,6 +137,7 @@ class MotionKitBootstrapTests {
     testPathConfigurationSelector();
     testAxisKinematics();
     testCncProgramBinding();
+    testPhysicalAssemblyCncBinding();
     testVirtualCncProgram();
     testManipulatorMotion();
     testSimplePathTimingContract();
@@ -1505,6 +1512,156 @@ class MotionKitBootstrapTests {
     var cornerEnd = robot.snapshot();
     near(cornerEnd.positions.get(0), 0.04, "line path reaches its X endpoint", 1e-5);
     near(cornerEnd.positions.get(1), 0.03, "line path reaches its Y endpoint", 1e-5);
+    simulation.dispose();
+  }
+
+  static function testPhysicalAssemblyCncBinding():Void {
+    var assembly = new AssemblyModel();
+    var axes = [new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
+      new LinearAxis(23, 10, 80)];
+    var ids = ["x", "y", "z"];
+    var bindings:Array<motionkit.robot.MachineKitRobotCompiler.AssemblyAxisBinding> = [];
+    for (index in 0...3) {
+      var id = ids[index], axis = axes[index];
+      axis.motor.addTo(assembly, '$id.motor');
+      axis.coupling.addTo(assembly, '$id.coupling');
+      axis.carriage.addTo(assembly, '$id.carriage');
+      assembly.mate('$id.shaft', "continuous", '$id.motor', "shaftTip",
+        '$id.coupling', "axis");
+      assembly.mateOnAxis('$id.travel', "prismatic", '$id.motor', "shaftTip",
+        '$id.carriage', "bore", {x: 0, y: 1, z: 0}, axis.travelMin,
+        {lower: axis.travelMin, upper: axis.travelMax, velocity: 100, effort: null});
+      var ratio = 2 * Math.PI / axis.nut.travelPerRevolution();
+      assembly.couple('$id.lead', '$id.travel', '$id.shaft', ratio,
+        -axis.travelMin * ratio);
+      if (index > 0) {
+        assembly.connector('${ids[index - 1]}.carriage', "stage", AssemblyFrames.identity());
+        assembly.connector('$id.motor', "stage", AssemblyFrames.identity());
+        assembly.mate('$id.mount', "fixed", '${ids[index - 1]}.carriage', "stage",
+          '$id.motor', "stage");
+      }
+      bindings.push({id: id, axis: axis, motorOccurrenceId: '$id.motor',
+        shaftJointId: '$id.shaft', travelJointId: '$id.travel'});
+    }
+    var definition = assembly.definition("physical-gantry");
+    var vertices = Bytes.alloc(4 * 24);
+    var support = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
+      0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
+    for (index in 0...support.length) vertices.setDouble(index * 8, support[index]);
+    var parts = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001, parts: [
+      for (component in definition.definitions) {
+        id: component.id, name: component.id, red: 0.5, green: 0.5, blue: 0.5,
+        materialId: "steel", materialDensity: 7850.0, volume: 1000.0,
+        centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [1000.0, 0.0, 0.0, 0.0, 1000.0, 0.0, 0.0, 0.0, 1000.0],
+        vertexCount: 4, indexCount: 0, vertices: vertices,
+        normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
+      }
+    ]});
+    var physical = AssemblySimulationBridge.toRobotModel(definition, parts);
+    var mismatched = bindings.copy();
+    mismatched[0] = {id: "x", axis: axes[0], motorOccurrenceId: "wrong.motor",
+      shaftJointId: "x.shaft", travelJointId: "x.travel"};
+    var rejected = false;
+    try MachineKitRobotCompiler.compileAssemblyAxes(physical.model, mismatched,
+      0.1, 0.4) catch (_:Dynamic) rejected = true;
+    check(rejected && physical.model.actuators.length == 0,
+      "assembly drive attachment rejects a mismatched motor without changing the model");
+    var blueprint = MachineKitRobotCompiler.compileAssemblyAxes(physical.model,
+      bindings, 0.1, 0.4);
+    check(blueprint.model.links.length == 10 && blueprint.model.actuators.length == 3,
+      "physical gantry keeps part links and attaches three motor actuators");
+    check(blueprint.model.couplings.length == 3,
+      "physical gantry keeps its lead-screw joint couplings");
+    var hasTenMillimetreVertex = false;
+    for (value in physical.linkCollisionHulls[1])
+      if (Math.abs(value - 0.01) < 1e-12) hasTenMillimetreVertex = true;
+    check(physical.linkCollisionHulls.length == blueprint.model.links.length &&
+      physical.linkCollisionHulls[0] == null && hasTenMillimetreVertex,
+      "physical assembly passes upstream hulls in link order and SI units");
+    var cnc = new CncMachine("work", "x", "y", "z", 0.08);
+    var result = new CncMotionBinding(cnc, blueprint).compile(
+      "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
+      [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(990));
+    check(result.blocks.length > 0, "physical gantry CNC compiles through ProgramCompiler");
+    var plans = result.blocks[result.blocks.length - 1].plans;
+    var end = plans[plans.length - 1].evaluate(plans[plans.length - 1].durationSeconds).positions;
+    var kinematics = new AxisKinematics(blueprint);
+    near(kinematics.forward(end).x, 0.01, "physical gantry arc ends at X", 1e-5);
+    near(kinematics.forward(end).y, 0.02, "physical gantry arc ends at Y", 1e-5);
+    var endState = plans[plans.length - 1].evaluate(plans[plans.length - 1].durationSeconds);
+    var endSpeed = 0.0;
+    for (speed in endState.velocities) endSpeed = Math.max(endSpeed, Math.abs(speed));
+    check(endSpeed <= 1e-6, 'physical gantry ends at rest (speed=$endSpeed)');
+    var lastSegments = plans[plans.length - 1].segments();
+    var terminal = lastSegments[lastSegments.length - 1];
+    var terminalSeconds = Int64.toFloat(terminal.durationNs) * 1e-9;
+    var terminalSpeed = 0.0;
+    for (coefficients in terminal.coefficients) {
+      var speed = 0.0;
+      for (degree in 1...coefficients.length)
+        speed += degree * coefficients[degree] * Math.pow(terminalSeconds, degree - 1);
+      terminalSpeed = Math.max(terminalSpeed, Math.abs(speed));
+    }
+    check(terminalSpeed <= 1e-6,
+      'physical gantry terminal polynomial ends at rest (speed=$terminalSpeed)');
+    var maximumCouplingResidual = 0.0;
+    for (block in result.blocks) for (plan in block.plans) for (segment in plan.segments())
+      for (coupling in blueprint.model.couplings) {
+        var leader = -1, follower = -1;
+        for (joint in 0...blueprint.model.joints.length) {
+          if (blueprint.model.joints[joint].id == coupling.leader) leader = joint;
+          if (blueprint.model.joints[joint].id == coupling.follower) follower = joint;
+        }
+        for (degree in 0...segment.coefficients[leader].length)
+          maximumCouplingResidual = Math.max(maximumCouplingResidual,
+            Math.abs(segment.coefficients[follower][degree] -
+              coupling.ratio * segment.coefficients[leader][degree] -
+              (degree == 0 ? coupling.offset : 0.0)));
+      }
+    check(maximumCouplingResidual <= 1e-6,
+      'physical gantry path preserves coupling polynomial (residual=$maximumCouplingResidual)');
+    for (block in result.blocks) for (plan in block.plans) {
+      var segments = plan.segments();
+      for (first in [0, 75, 150, 225]) if (first < segments.length) {
+        var state = plan.evaluate(Int64.toFloat(segments[first].timeFromStartNs) * 1e-9);
+        for (coupling in blueprint.model.couplings) {
+          var leader = -1, follower = -1;
+          for (joint in 0...blueprint.model.joints.length) {
+            if (blueprint.model.joints[joint].id == coupling.leader) leader = joint;
+            if (blueprint.model.joints[joint].id == coupling.follower) follower = joint;
+          }
+          check(Math.abs(state.accelerations[follower] -
+            coupling.ratio * state.accelerations[leader]) < 1e-6,
+            'physical gantry chunk acceleration follows coupling at $first');
+        }
+      }
+    }
+    result.dispose();
+    for (channel in ["spindle.speed", "spindle.direction"])
+      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
+        ProcessEventValue.Analog(0.0)));
+    var simulation = new Simulation(0.01);
+    var runtime = simulation.addRobotAtPose(blueprint.runtime,
+      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], null, null,
+      physical.linkCollisionHulls);
+    var robot = new SimulatedRobot("physical-cnc", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var binding = new CncMotionBinding(cnc, blueprint);
+    var motion = new ManipulatorMotion(robot, binding.compiler,
+      function(_) return null, function() return runtime.pollEvents());
+    motion.run(new CncCompiler(cnc).compile(
+      "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n"));
+    for (tick in 0...3000) {
+      motion.update(0.01);
+      simulation.step(Int64.ofInt(tick));
+      if (!motion.running) break;
+    }
+    check(motion.completed, 'physical assembly CNC completes: ${motion.failure}');
+    var finalPose = kinematics.forward(robot.snapshot().positions.toArray());
+    near(finalPose.x, 0.01, "physical assembly CNC executes X", 2e-4);
+    near(finalPose.y, 0.02, "physical assembly CNC executes Y", 2e-4);
     simulation.dispose();
   }
 

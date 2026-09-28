@@ -9,11 +9,81 @@ import robotkit.model.Link;
 import robotkit.model.RobotModel;
 import robotkit.model.Transmission;
 
+/** Stable joint IDs from a physical MachineKit axis assembly. */
+typedef AssemblyAxisBinding = {
+  var id:String;
+  var axis:LinearAxis;
+  var motorOccurrenceId:String;
+  var shaftJointId:String;
+  var travelJointId:String;
+}
+
 /** MachineKit mechanical-design to RobotKit execution-model bridge. */
 class MachineKitRobotCompiler {
   public static inline final MILLIMETRES_TO_METRES:Float = 0.001;
   public static inline final DEFAULT_MAX_VELOCITY:Float = 0.15;
   public static inline final DEFAULT_MAX_ACCELERATION:Float = 0.5;
+
+  /** Attach MachineKit drives to the part-level assembly model. The motor
+   * drives its shaft joint; the existing lead-screw JointCoupling relates
+   * shaft rotation to carriage travel. No second joint topology is built. */
+  public static function compileAssemblyAxes(model:RobotModel,
+      bindings:Array<AssemblyAxisBinding>,
+      ?maxVelocity:Float = DEFAULT_MAX_VELOCITY,
+      ?maxAcceleration:Float = DEFAULT_MAX_ACCELERATION):MotionSystemBlueprint {
+    if (model == null || bindings == null || bindings.length == 0)
+      throw "Assembly axes need a physical robot model and bindings";
+    if (!Math.isFinite(maxVelocity) || maxVelocity <= 0 ||
+        !Math.isFinite(maxAcceleration) || maxAcceleration <= 0)
+      throw "Assembly axis limits must be finite and positive";
+    var axes:Array<MotionAxisBlueprint> = [];
+    var used = new Map<String, Bool>();
+    // Validate the entire mapping before changing the supplied model.
+    for (binding in bindings) {
+      if (binding == null) throw "Assembly axis binding is required";
+      requireId(binding.id);
+      requireAxis(binding.axis, binding.id);
+      if (used.exists(binding.id)) throw 'Duplicate assembly axis "${binding.id}"';
+      used.set(binding.id, true);
+      var shaft:Null<Joint> = null, travel:Null<Joint> = null;
+      for (joint in model.joints) {
+        if (joint.id == binding.shaftJointId) shaft = joint;
+        if (joint.id == binding.travelJointId) travel = joint;
+      }
+      if (shaft == null || travel == null || shaft.type != JointType.Continuous ||
+          travel.type != JointType.Prismatic || shaft.parent.id != binding.motorOccurrenceId)
+        throw 'Assembly axis "${binding.id}" has no matching motor shaft and carriage joints';
+      var expected = 2.0 * Math.PI /
+        (binding.axis.transmission.lead * binding.axis.transmission.direction *
+          MILLIMETRES_TO_METRES);
+      var matched = false;
+      for (coupling in model.couplings)
+        if (coupling.leader == travel.id && coupling.follower == shaft.id &&
+            Math.abs(coupling.ratio - expected) <= Math.abs(expected) * 1e-8)
+          matched = true;
+      if (!matched)
+        throw 'Assembly axis "${binding.id}" has no matching lead-screw joint coupling';
+      for (actuator in model.actuators) switch actuator.transmission {
+        case SimpleTransmission(jointId, _, _) if (jointId == shaft.id):
+          throw 'Assembly motor shaft "${shaft.id}" already has an actuator';
+        case _:
+      }
+      axes.push(new MotionAxisBlueprint(binding.id, [travel.id, shaft.id],
+        0.0, binding.axis.stroke * MILLIMETRES_TO_METRES,
+        maxVelocity, maxAcceleration));
+    }
+    for (index in 0...bindings.length) {
+      var binding = bindings[index];
+      var shaftId = binding.shaftJointId;
+      var ratio = 2.0 * Math.PI /
+        (binding.axis.transmission.lead * binding.axis.transmission.direction *
+          MILLIMETRES_TO_METRES);
+      model.addActuator(new Actuator('${binding.id}.motor.${binding.axis.motor.designation}',
+        0.0, maxVelocity * Math.abs(ratio),
+        Transmission.SimpleTransmission(shaftId, 1.0, 0.0)));
+    }
+    return MotionSystemBlueprint.fromRobotModel(model, axes);
+  }
 
   /**
    * Compiles one MachineKit LinearAxis and its logical axis mapping. The

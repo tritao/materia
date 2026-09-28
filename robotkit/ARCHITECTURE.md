@@ -177,9 +177,10 @@ SimKit compiles them to MuJoCo joint equalities or enforces them exactly in its
 deterministic backend.
 
 The physical assembly model is intended to become the single RobotModel driven
-by the motion stack. MachineKit motor parts will attach actuators to its joints;
-`MachineKitRobotCompiler` will then only derive those actuators and their
-transmissions, rather than build a second robot topology.
+by the motion stack. `MachineKitRobotCompiler.compileAssemblyAxes` attaches
+actuators from MachineKit motor parts to existing shaft joints and derives
+logical axes through the model's lead-screw couplings. It does not create a
+second topology. The complete gantry scene artifact remains to be produced.
 
 The native runtime remains joint-space. The
 Haxe runtime compiler converts each actuator's rate limit to joint units as

@@ -391,6 +391,23 @@ from MachineKit motor parts into the physical assembly model yet, so the CNC
 program cannot drive that intended single model without bypassing the actuator
 contract. That attachment belongs to the physical assembly compiler work.
 
+### Physical assembly actuator attachment follow-up
+
+`MachineKitRobotCompiler.compileAssemblyAxes` now binds named MachineKit motor
+parts to their existing continuous shaft joints. It checks the corresponding
+lead-screw joint coupling and derives logical axis maps from the part-level
+`RobotModel`; it does not create another topology. The bridge passes upstream
+convex hulls in link order to `Simulation.addRobotAtPose`. A three-axis
+motor/coupling/carriage assembly fixture runs a G17 CNC program through
+`ProgramCompiler` in deterministic simulation. Fixed mounting joints receive
+stationary validation limits, and lead-screw joint jump checks use the axis
+scale. Native TOPP-RA normalizes joint coordinates by their velocity limits
+before solving its LP, keeping rotary and linear coefficients comparable.
+
+The fixture has representative part mass and hull data. A complete MachineKit
+gantry scene artifact with every physical part and upstream generated hulls is
+still needed for final collision and MuJoCo acceptance.
+
 ### C1 — Native path representation and adaptive lowering
 
 Added validated native C2 joint-path samples and continuous piecewise-quadratic

@@ -17,6 +17,8 @@ import cadkit.modeling.AssemblyState;
 
 typedef AssemblySimulationModel = {
   var model:RobotModel;
+  /** Link-order hulls in SI units for Simulation.addRobotAtPose. */
+  var linkCollisionHulls:Array<Null<Array<Float>>>;
   var closureIds:Array<String>;
   var closures:Array<AssemblySimulationClosure>;
 }
@@ -65,6 +67,7 @@ class AssemblySimulationBridge {
     root.mass = 0.001;
     root.inertiaTensor = [1e-6, 0, 0, 0, 1e-6, 0, 0, 0, 1e-6];
     var links = new Map<String, Link>();
+    var linkCollisionHulls:Array<Null<Array<Float>>> = [null];
     for (occurrence in definition.occurrences) {
       var part = parts.get(occurrence.definition);
       if (part == null) throw 'Assembly occurrence "${occurrence.id}" has no physical part';
@@ -81,6 +84,14 @@ class AssemblySimulationBridge {
       link.centerOfMass = [for (coordinate in part.centerOfMass) coordinate * scale];
       link.inertiaTensor = [for (component in part.inertia) component * part.density * Math.pow(scale, 5)];
       links.set(occurrence.id, link);
+      var hull = part.collisionHull;
+      if (hull != null) {
+        if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
+          throw 'Assembly occurrence "${occurrence.id}" has an invalid collision hull';
+        for (coordinate in hull) if (!Math.isFinite(coordinate))
+          throw 'Assembly occurrence "${occurrence.id}" has a non-finite collision hull';
+        linkCollisionHulls.push([for (coordinate in hull) coordinate * scale]);
+      } else linkCollisionHulls.push(null);
     }
     var roots = AssemblyDefinitionCodec.rootOccurrences(definition);
     var placement = new AssemblyState(definition, savedState);
@@ -141,7 +152,8 @@ class AssemblySimulationBridge {
       model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
     }
-    return {model: model, closureIds: closures, closures: closureGeometry};
+    return {model: model, linkCollisionHulls: linkCollisionHulls,
+      closureIds: closures, closures: closureGeometry};
   }
 
   static function occurrenceDefinition(definition:AssemblyDefinition, id:String):String {
