@@ -4,6 +4,6 @@ package machinekit.component;
 class Dimension {
 	/** Decimal text for `value` rounded to 0.001 mm. */
 	public static function format(value:Float):String {
-		return Std.string(Math.round(value * 1000) / 1000);
+		return Std.string(Math.fround(value * 1000) / 1000);
 	}
 }

@@ -8,6 +8,7 @@ class MotionKitBootstrapTests {
     var processTests:ProcessTests = new ProcessTests();
 
     if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
+      plannerTests.testCircularSegments();
       processTests.testCncProgramBinding();
       processTests.testPhysicalAssemblyCncBinding();
       Sys.println('CNC focused tests passed (${MotionKitTestSupport.assertions} assertions)');

@@ -3,7 +3,10 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import cadkit.InertiaTensor;
 import machinekit.assembly.LinearAxis;
+import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
@@ -11,7 +14,15 @@ import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
+import machinekit.component.ComponentParameter;
+import machinekit.component.ComponentParameterType;
+import machinekit.component.ComponentType;
+import machinekit.component.ComponentValue;
 import machinekit.component.MachineComponent;
+import machinekit.component.MassProperties.MassSource;
+import machinekit.component.PortKind;
+import machinekit.component.PortRole;
+import machinekit.component.PortInterface;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
@@ -72,7 +83,265 @@ import machinekit.transmission.TimingBeltProfile;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
+private class MassTestBlock extends MachineComponent {
+	public function new(?declared:Float, withInertia:Bool = false) {
+		super("TEST-BLOCK", "10 mm test block", "aluminium 6061", true);
+		addConnector("origin", Mount, AssemblyFrames.identity());
+		addConnector("right", Mount, {x: 20, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1});
+		if (declared != null) declareMass(declared, new Vector(1, 2, 3),
+			withInertia ? new InertiaTensor(2, 0, 0, 3, 0, 4) : null);
+	}
+
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 10, 10);
+}
+
+private class MassTestTube extends MachineComponent {
+	public function new() super("TEST-TUBE", "Rectangular test tube", "aluminium 6061", true);
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return new RectTube(40, 20, 2).geometry(100);
+}
+
+private class MasslessTestPart extends MachineComponent {
+	public function new() super("TEST-MASSLESS", "Massless test part", "steel", true);
+}
+
+private class MissingMassCentre extends MachineComponent {
+	public function new() {
+		super("MISSING-CENTRE", "Invalid declared mass", "steel", true);
+		var centre:Vector = null;
+		declareMass(1, centre);
+	}
+}
+
+private class PortTestComponent extends MachineComponent {
+	public function new(name:String) super(name, name, "steel", true);
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(1, 1, 1);
+
+	public function definePort(name:String, kind:PortKind, role:PortRole, iface:PortInterface,
+			required:Bool = false, ?connector:String):Void
+		addPort({name: name, kind: kind, role: role, iface: iface, required: required, connector: connector});
+
+	public function defineBridge(from:String, to:String):Void addBridge(from, to);
+	public function defineConversion(from:String, to:String):Void addConversion(from, to);
+
+	public function defineConnector(name:String):Void addConnector(name, Mount, AssemblyFrames.identity());
+}
+
 class MachineKitSmoke {
+	static function massProperties():Void {
+		var tube = new MassTestTube();
+		var expected = (40 * 20 - 36 * 16) * 100 * 1e-9 * 2700;
+		near(tube.massProperties().mass, expected, "rectangular tube analytic mass", 1e-9);
+		near(tube.massProperties().centreOfMass.z, 50, "tube centre of mass");
+		check(tube.massProperties() == tube.massProperties(), "component mass estimate is cached");
+		check(switch tube.massProperties().source { case Computed(Preview): true; default: false; },
+			"preview mass source");
+		tube.setMaterial("steel");
+		near(tube.massProperties().mass, expected * 7850 / 2700, "material change refreshes mass", 1e-9);
+		var declared = new MassTestBlock(0.5).massProperties();
+		near(declared.mass, 0.5, "declared mass overrides geometry");
+		near(declared.centreOfMass.x, 1, "declared centre of mass");
+		check(switch declared.source { case Declared: true; default: false; }, "declared mass source");
+		check(declared.inertia == null, "declared mass does not silently invent inertia");
+		throws(() -> new MissingMassCentre(), "declared centre of mass");
+		throws(() -> new MasslessTestPart().massProperties(), "has no geometry or declared mass");
+
+		var block = new MassTestBlock();
+		var assembly = new MachineAssembly();
+		assembly.addComponent("a", block);
+		assembly.addComponent("b", block);
+		assembly.addMate("link", "fixed", "a", "right", "b", "origin");
+		assembly.addBomItem({partNumber: "RAIL-CUT", description: "Unmodelled rail", quantity: 1, material: "steel"});
+		var combined = assembly.massProperties();
+		near(combined.mass, 0.0054, "two block mass", 1e-9);
+		near(combined.centreOfMass.x, 10, "solved assembly centre of mass x");
+		near(combined.centreOfMass.z, 5, "solved assembly centre of mass z");
+		var combinedInertia:InertiaTensor = cast combined.inertia;
+		near(combinedInertia.xx, 0.09, "two block axial inertia", 1e-8);
+		near(combinedInertia.yy, 0.63, "parallel axis inertia", 1e-8);
+		near(combinedInertia.zz, 0.63, "parallel axis inertia about z", 1e-8);
+		check(combined.unaccountedInertia.length == 0, "computed inertia is fully accounted");
+		check(combined.unaccounted.length == 1 && combined.unaccounted[0] == "RAIL-CUT", "unaccounted BOM extras");
+		assembly.addBomItem({partNumber: "TUBE-MASS", description: "Tube", quantity: 1,
+			material: "polyurethane"}, 2, Point(0.001, new Vector(10, 0, 5)));
+		var withTube = assembly.massProperties();
+		near(withTube.mass, combined.mass + 0.002, "BOM extra mass uses quantity");
+		check(withTube.unaccounted.length == 1 && withTube.unaccounted[0] == "RAIL-CUT",
+			"mass-accounted BOM line is not unaccounted");
+
+		var inner = new MachineAssembly();
+		inner.addComponent("a", block);
+		inner.addComponent("b", block);
+		inner.addMate("link", "fixed", "a", "right", "b", "origin");
+		var outer = new MachineAssembly();
+		outer.include("unit", inner);
+		near(outer.massProperties().mass, inner.massProperties().mass, "included assembly mass", 1e-9);
+		near(outer.massProperties().centreOfMass.x, inner.massProperties().centreOfMass.x,
+			"included assembly centre of mass");
+		var outerInertia:InertiaTensor = cast outer.massProperties().inertia;
+		var innerInertia:InertiaTensor = cast inner.massProperties().inertia;
+		near(outerInertia.yy, innerInertia.yy,
+			"included assembly inertia");
+
+		var moving = new MachineAssembly();
+		moving.addComponent("a", block);
+		moving.addComponent("b", block);
+		moving.addMateOnAxis("slide", "prismatic", "a", "origin", "b", "origin",
+			{x: 1, y: 0, z: 0}, 20);
+		var model = new AssemblyModel();
+		moving.addTo(model, "");
+		var state = model.initialState();
+		state.setJoint("slide", 30);
+		near(moving.massProperties(state).centreOfMass.x, 15, "configured moving centre of mass");
+		var movingInertia:InertiaTensor = cast moving.massProperties(state).inertia;
+		near(movingInertia.yy, 1.305, "configured moving inertia", 1e-8);
+
+		var missing = new MachineAssembly();
+		missing.addComponent("declared", new MassTestBlock(0.5));
+		var incomplete = missing.massProperties();
+		check(incomplete.inertia == null && incomplete.unaccountedInertia[0] == "declared",
+			"declared mass reports missing inertia");
+		var rotated = new MachineAssembly();
+		rotated.addComponent("declared", new MassTestBlock(1, true),
+			{x: 0, y: 0, z: 0, qx: 0, qy: 0, qz: Math.sqrt(0.5), qw: Math.sqrt(0.5)});
+		var rotatedInertia:InertiaTensor = cast rotated.massProperties().inertia;
+		near(rotatedInertia.xx, 3, "declared tensor rotates into assembly frame");
+		near(rotatedInertia.yy, 2, "declared tensor y moment rotates into assembly frame");
+	}
+
+	static function ports():Void {
+		var changer = new PortTestComponent("CHANGER");
+		changer.defineConnector("airFace");
+		changer.definePort("robotAir", Pneumatic, Supply, PushIn(6), false, "airFace");
+		changer.definePort("toolAir", Pneumatic, Passive, PushIn(6));
+		changer.defineBridge("robotAir", "toolAir");
+		check(changer.ports().length == 2 && changer.bridges().length == 1,
+			"component ports and bridge are available");
+		throws(() -> changer.definePort("robotAir", Pneumatic, Supply, Unspecified), "Duplicate port");
+		throws(() -> changer.definePort("badTube", Pneumatic, Supply, PushIn(0)), "Invalid port interface");
+		throws(() -> changer.definePort("bad", Pneumatic, Supply, Unspecified, false, "missing"), "Missing connector");
+		throws(() -> changer.defineBridge("robotAir", "missing"), "Missing port");
+		var wrongBridge = new PortTestComponent("BRIDGE");
+		wrongBridge.definePort("air", Pneumatic, Consumer, Unspecified);
+		wrongBridge.definePort("vacuum", Vacuum, Supply, Unspecified);
+		throws(() -> wrongBridge.defineBridge("air", "vacuum"), "same kind");
+
+		var manifold = new PortTestComponent("MANIFOLD");
+		manifold.definePort("in", Pneumatic, Passive, PushIn(6));
+		manifold.definePort("out", Pneumatic, Passive, PushIn(6));
+		manifold.defineBridge("in", "out");
+		var generator = new PortTestComponent("GENERATOR");
+		generator.definePort("air", Pneumatic, Consumer, PushIn(6), true);
+		generator.definePort("vacuum", Vacuum, Supply, PushIn(6));
+		generator.defineConversion("air", "vacuum");
+		var cup = new PortTestComponent("CUP");
+		cup.definePort("vacuum", Vacuum, Consumer, PushIn(6), true);
+
+		var tool = new MachineAssembly();
+		tool.addComponent("changer", changer);
+		tool.addComponent("manifold", manifold);
+		tool.addComponent("generator", generator);
+		tool.addComponent("cup", cup);
+		throws(() -> tool.connectPorts("missing", "none", "air", "cup", "vacuum"), "Unknown assembly member");
+		throws(() -> tool.connectPorts("missing", "changer", "none", "cup", "vacuum"), "Unknown port");
+		throws(() -> tool.exposePort("bad", "cup", "none"), "Unknown port");
+		tool.connectPorts("supply", "changer", "toolAir", "manifold", "in",
+			{partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"},
+			Point(0.001, new Vector(0, 0, 0)));
+		tool.connectPorts("air", "manifold", "out", "generator", "air");
+		tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
+		tool.exposePort("robotAir", "changer", "robotAir");
+		check(tool.validate().length == 0, "compatible service path validates");
+		check(tool.billOfMaterials().quantity("TUBE-6") == 1, "connection line reaches BOM");
+		var source = tool.upstream("cup", "vacuum");
+		check(source.instanceId == "changer" && source.portName == "robotAir",
+			"cup vacuum traces through generator, manifold, and changer bridge");
+		var model = new AssemblyModel();
+		tool.addTo(model, "tool");
+		check(model.definition().joints.length == 0, "port connections are not CAD mates");
+		var station = new MachineAssembly();
+		station.include("tool", tool);
+		check(station.port("tool/robotAir").instanceId == "tool/changer", "included air port is prefixed");
+		var includedSource = station.upstream("tool/cup", "vacuum");
+		check(includedSource.instanceId == "tool/changer" && includedSource.portName == "robotAir",
+			"included service path retains its source");
+		check(station.billOfMaterials().quantity("TUBE-6") == 1, "included line is counted once");
+		var vacuumSource = new PortTestComponent("VACUUM-SOURCE");
+		vacuumSource.definePort("vacuum", Vacuum, Supply, PushIn(6));
+		var reversed = new MachineAssembly();
+		reversed.addComponent("generator", vacuumSource);
+		reversed.addComponent("cup", cup);
+		reversed.connectPorts("reverse", "cup", "vacuum", "generator", "vacuum");
+		check(reversed.upstream("cup", "vacuum").instanceId == "generator",
+			"consumer-first connection traces to its supply");
+		var incompleteTool = new MachineAssembly();
+		incompleteTool.addComponent("cup", cup);
+		incompleteTool.exposePort("vacuum", "cup", "vacuum");
+		var parent = new MachineAssembly();
+		parent.include("tool", incompleteTool);
+		throws(() -> parent.validate(), "Required consumer port");
+		parent.exposePort("tool/vacuum", "tool/cup", "vacuum");
+		check(parent.validate().length == 0, "parent must explicitly re-expose an included required input");
+		var connectedParent = new MachineAssembly();
+		connectedParent.include("tool", incompleteTool);
+		connectedParent.addComponent("source", vacuumSource);
+		connectedParent.connectPorts("feed", "tool/cup", "vacuum", "source", "vacuum");
+		check(connectedParent.validate().length == 0,
+			"parent can connect an included required input directly");
+		var unwired = new MachineAssembly();
+		unwired.addComponent("cup", cup);
+		unwired.addTo(new AssemblyModel(), "");
+		unwired.massProperties();
+		throws(() -> unwired.validate(), "Required consumer port");
+		var unrelated = new PortTestComponent("UNRELATED");
+		unrelated.definePort("power", ElectricalPower, Consumer, Unspecified, true);
+		unrelated.definePort("air", Pneumatic, Supply, Unspecified);
+		var power = new PortTestComponent("POWER");
+		power.definePort("output", ElectricalPower, Supply, Unspecified);
+		var misleading = new MachineAssembly();
+		misleading.addComponent("device", unrelated);
+		misleading.addComponent("power", power);
+		misleading.connectPorts("feed", "power", "output", "device", "power");
+		check(misleading.upstream("device", "air").instanceId == "device",
+			"upstream does not infer service conversion from unrelated power");
+
+		var unconnected = new MachineAssembly();
+		unconnected.addComponent("cup", cup);
+		throws(() -> unconnected.validate(), "Required consumer port");
+		unconnected.exposePort("vacuum", "cup", "vacuum");
+		check(unconnected.validate().length == 0, "exposed consumer can be supplied by parent assembly");
+
+		var badKind = new MachineAssembly();
+		badKind.addComponent("changer", changer);
+		badKind.addComponent("cup", cup);
+		badKind.connectPorts("wrong", "changer", "toolAir", "cup", "vacuum");
+		throws(() -> badKind.validate(), "mismatched kinds");
+		var supplier = new PortTestComponent("SUPPLIER");
+		supplier.definePort("air", Pneumatic, Supply, PushIn(6));
+		var doubleSupply = new MachineAssembly();
+		doubleSupply.addComponent("a", supplier);
+		doubleSupply.addComponent("b", supplier);
+		doubleSupply.connectPorts("wrong", "a", "air", "b", "air");
+		throws(() -> doubleSupply.validate(), "incompatible roles");
+		var consumer = new PortTestComponent("CONSUMER");
+		consumer.definePort("air", Pneumatic, Consumer, PushIn(6));
+		var doubleConsumer = new MachineAssembly();
+		doubleConsumer.addComponent("a", consumer);
+		doubleConsumer.addComponent("b", consumer);
+		doubleConsumer.connectPorts("wrong", "a", "air", "b", "air");
+		throws(() -> doubleConsumer.validate(), "incompatible roles");
+		var threaded = new PortTestComponent("THREADED");
+		threaded.definePort("air", Pneumatic, Consumer, Thread("G1/8"));
+		var warning = new MachineAssembly();
+		warning.addComponent("a", supplier);
+		warning.addComponent("b", threaded);
+		warning.connectPorts("adapter-needed", "a", "air", "b", "air");
+		check(warning.validate().length == 1, "interface mismatch is a warning");
+		warning.addComponent("c", threaded);
+		warning.connectPorts("branch", "a", "air", "c", "air");
+		throws(() -> warning.validate(), "more than once");
+	}
+
 	static function componentRecipes():Void {
 		for (recipe in MachineKitComponents.all()) {
 			var original = recipe.create();
@@ -103,6 +372,16 @@ class MachineKitSmoke {
 			"Unknown catalog designation");
 		var pulley = MachineKitComponents.byId("machinekit.transmission.timing-pulley");
 		throws(() -> pulley.create(new ComponentValues().setToken("profile", "UNKNOWN")), "Invalid choice");
+		var angleType = new ComponentType("test.angle",
+			[new ComponentParameter("angle", ComponentParameterType.Angle, ComponentValue.Number(3))],
+			function(_:ComponentValues) return DeepGrooveBearing.metric("608"));
+		check(angleType.key(null).indexOf("angle:1:3") >= 0,
+			"angle keys round above the signed 32-bit integer range");
+		var scalarType = new ComponentType("test.scalar",
+			[new ComponentParameter("scalar", ComponentParameterType.Scalar, ComponentValue.Number(3))],
+			function(_:ComponentValues) return DeepGrooveBearing.metric("608"));
+		check(scalarType.key(null).indexOf("scalar:1:3") >= 0,
+			"scalar keys round above the signed 32-bit integer range");
 		var screwRecipe = MachineKitComponents.byId("machinekit.standard.socket-head-cap-screw");
 		var steelScrew = screwRecipe.create(new ComponentValues().setToken("material", "steel C45"));
 		check(steelScrew.bom.material == "steel C45", "non-default screw material reaches the BOM");
@@ -221,7 +500,7 @@ class MachineKitSmoke {
 		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
 			"document BOM groups recipe instances by values");
 		var saved = DocumentCodec.encode(document);
-		check(DocumentCodec.VERSION == 8, "document version 8");
+		check(DocumentCodec.VERSION == 9, "document version 9");
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
@@ -261,6 +540,19 @@ class MachineKitSmoke {
 		check(loadedLegacy.definition(first.definitionId).property("machinekit.partNumber") == null,
 			"version 7 derived metadata is discarded");
 		loadedLegacy.close();
+		var versionEight:Dynamic = haxe.Json.parse(saved);
+		Reflect.setField(versionEight, "version", 8);
+		var versionEightDefinitions:Array<Dynamic> = cast Reflect.field(versionEight, "definitions");
+		for (record in versionEightDefinitions) {
+			var properties:Dynamic = Reflect.field(record, "properties");
+			var keptProperties:Array<Dynamic> = properties == null ? [] : cast properties;
+			keptProperties.push({name: "machinekit.partNumber", type: "text", value: "version-eight"});
+			Reflect.setField(record, "properties", keptProperties);
+		}
+		var loadedVersionEight = DocumentCodec.decode(haxe.Json.stringify(versionEight));
+		check(loadedVersionEight.definition(first.definitionId).property("machinekit.partNumber") != null,
+			"legacy property cleanup only runs for version 7");
+		loadedVersionEight.close();
 		check(document.undo() && second.resolvedToken("designation") == "608", "recipe override undo");
 		check(MachineKitDocuments.bom(document).quantity("608-2Z") == 2, "BOM follows undo");
 		check(document.redo() && second.resolvedToken("designation") == "6000", "recipe override redo");
@@ -564,6 +856,7 @@ class MachineKitSmoke {
 		check(Dimension.format(0.1 + 0.2) == "0.3", "0.1 + 0.2 formats as 0.3");
 		check(Dimension.format(20) == "20", "whole numbers format without a decimal point");
 		check(Dimension.format(6.35) == "6.35", "6.35 formats exactly");
+		check(Dimension.format(3000000.001) == "3000000.001", "large dimensions format beyond the integer range");
 		check(Dimension.format(0.0625) == "0.063", "values round to 0.001");
 		check(Dimension.format(-2.5) == "-2.5", "negative values keep their sign");
 		check(Dimension.format(-0.0001) == "0", "values rounding to zero lose their sign");
@@ -1889,6 +2182,7 @@ class MachineKitSmoke {
 	}
 
 	static function assembly():Void {
+		assemblyValidation();
 		var example = new MotorShaftBearings();
 		check(example.screw.designation == "ISO4762-M3x10", "selected mount screw");
 		var plate = example.plate.geometry();
@@ -1938,6 +2232,52 @@ class MachineKitSmoke {
 		throws(() -> duplicate.add({partNumber: "X", description: "b", quantity: 1, material: null}), "conflicting");
 	}
 
+	static function assemblyValidation():Void {
+		var bearing = DeepGrooveBearing.metric("608");
+		var invalid = new MachineAssembly();
+		invalid.addComponent("a", bearing);
+		throws(() -> invalid.addMate("x", "fixed", "missing", "axis", "a", "axis"), "Unknown assembly member");
+		throws(() -> invalid.addMate("x", "fixed", "a", "missing", "a", "axis"), "Unknown connector");
+		throws(() -> invalid.exposeConnector("x", "a", "missing"), "Unknown connector");
+		invalid.addComponent("b", bearing);
+		throws(() -> invalid.addMate("x", "invalid", "a", "axis", "b", "axis"), "Unsupported assembly joint");
+		invalid.addMate("first", "fixed", "a", "axis", "b", "axis");
+		throws(() -> invalid.addMate("first", "fixed", "a", "axis", "b", "axis"), "Duplicate assembly operation");
+		invalid.addComponent("c", bearing);
+		invalid.addMate("second", "fixed", "c", "axis", "b", "axis");
+		throws(() -> invalid.validate(), "two parent joints");
+
+		var cycle = new MachineAssembly();
+		cycle.addComponent("a", bearing);
+		cycle.addComponent("b", bearing);
+		cycle.addMate("ab", "fixed", "a", "axis", "b", "axis");
+		cycle.addMate("ba", "fixed", "b", "axis", "a", "axis");
+		throws(() -> cycle.validate(), "cycle");
+		throws(() -> new MachineAssembly().include("nested", cycle), "cycle");
+
+		var coupling = new MachineAssembly();
+		coupling.addComponent("a", bearing);
+		coupling.addComponent("b", bearing);
+		coupling.addMate("ab", "fixed", "a", "axis", "b", "axis");
+		coupling.addCoupling("drive", "ab", "missing", 1);
+		throws(() -> coupling.validate(), "missing joint");
+
+		var inner = new MachineAssembly();
+		inner.addComponent("a", bearing);
+		inner.addComponent("b", bearing);
+		inner.addMate("ab", "fixed", "a", "axis", "b", "axis");
+		inner.validate();
+		var outer = new MachineAssembly();
+		outer.include("unit", inner);
+		outer.validate();
+		throws(() -> outer.include("unit", inner), "Duplicate included assembly");
+		check(outer.subassemblies().length == 1 && outer.subassemblies()[0].assembly == inner,
+			"included assembly remains identifiable");
+		var model = new AssemblyModel();
+		outer.addTo(model, "");
+		check(model.definition().joints.length == 1, "included joint is prefixed and valid");
+	}
+
 	static function catalogMetadata():Void {
 		check(ParallelKey.catalog().metadata("2x2").standard == "DIN 6885-1", "key standard metadata");
 		check(RetainingRing.catalog().metadata("8").dimensionKind == Nominal, "ring dimension metadata");
@@ -1982,6 +2322,7 @@ class MachineKitSmoke {
 		documentRecipes();
 		documentPreview();
 		MachineKitReferenceTests.run();
+		massProperties();
 		dimensions();
 		catalogMetadata();
 		bearings();
@@ -2000,6 +2341,7 @@ class MachineKitSmoke {
 		catalogExtras();
 		robotics();
 		assembly();
+		ports();
 		trace("MachineKit smoke passed");
 	}
 }

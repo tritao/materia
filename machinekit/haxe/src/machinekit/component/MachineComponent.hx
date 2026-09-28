@@ -2,6 +2,9 @@ package machinekit.component;
 
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Part;
+import cadkit.modeling.Vector;
+import cadkit.InertiaTensor;
+import machinekit.component.MassProperties.MassSource;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.MaterialLibrary;
 
@@ -16,9 +19,15 @@ class MachineComponent {
 	public var bom(get, never):BomItem;
 	public final description:String;
 	var cachedBom:Null<BomItem>;
+	var cachedMass:Null<MassProperties>;
+	var cachedMassMaterialId:Null<String>;
+	var declaredMass:Null<MassProperties>;
 	/** Null for code-only parts and assemblies outside the v1 recipe registry. */
 	public var type(get, never):Null<ComponentType>;
 	final connectorList:Array<Connector> = [];
+	final portList:Array<ComponentPort> = [];
+	final bridgeList:Array<PortBridge> = [];
+	final conversionList:Array<PortBridge> = [];
 
 	function new(designation:String, description:String, ?material:String, codeOnly:Bool = false) {
 		if (designation == null || designation.length == 0) throw "Machine component needs a designation";
@@ -36,6 +45,8 @@ class MachineComponent {
 	public function setMaterial(spec:String):Void {
 		materialId = MaterialLibrary.fromSpec(spec);
 		cachedBom = null;
+		cachedMass = null;
+		cachedMassMaterialId = null;
 	}
 
 	function get_bom():BomItem {
@@ -51,6 +62,40 @@ class MachineComponent {
 
 	public function geometry(detail:ComponentDetail = Preview):Part
 		throw 'Component "$designation" does not generate geometry';
+
+	/** The preview shape supplies volume and centroid; its density is kg/m³. */
+	public function massProperties():MassProperties {
+		if (declaredMass != null) return declaredMass;
+		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
+		var part:Part;
+		try part = geometry(Preview) catch (error:Dynamic) {
+			if (Std.string(error) == 'Component "$designation" does not generate geometry')
+				throw 'Component "$designation" has no geometry or declared mass';
+			throw error;
+		}
+		try {
+			var physical = part.massProperties();
+			var density = MaterialLibrary.require(materialId).physical.density;
+			var mass = physical.volume * 1e-9 * density;
+			cachedMass = new MassProperties(mass, physical.centerOfMass, Computed(Preview),
+				physical.inertiaAtDensity(density * 1e-9));
+			cachedMassMaterialId = materialId;
+		} catch (error:Dynamic) {
+			part.close();
+			throw error;
+		}
+		part.close();
+		return cachedMass;
+	}
+
+	/** Vendor mass overrides the geometry estimate, including after material changes. */
+	function declareMass(kg:Float, centreOfMass:Vector, ?inertia:InertiaTensor):Void {
+		if (!Math.isFinite(kg) || kg <= 0) throw 'Component "$designation" needs a positive declared mass';
+		if (centreOfMass == null || !Math.isFinite(centreOfMass.x) ||
+			!Math.isFinite(centreOfMass.y) || !Math.isFinite(centreOfMass.z))
+			throw 'Component "$designation" needs a finite declared centre of mass';
+		declaredMass = new MassProperties(kg, centreOfMass, Declared, inertia);
+	}
 
 	public function toolSpecs():Array<ToolSpec> return [];
 
@@ -77,6 +122,16 @@ class MachineComponent {
 		throw 'Missing connector "$designation/$name"';
 	}
 
+	public function ports():Array<ComponentPort> return portList.copy();
+
+	public function port(name:String):ComponentPort {
+		for (entry in portList) if (entry.name == name) return entry;
+		throw 'Missing port "$designation/$name"';
+	}
+
+	public function bridges():Array<PortBridge> return bridgeList.copy();
+	public function conversions():Array<PortBridge> return conversionList.copy();
+
 	/** Adds an instance with every connector frame so it can be mated by name. */
 	public function addTo(model:AssemblyModel, id:String, ?pose:AssemblyFrame):Void {
 		model.add(id, pose);
@@ -87,5 +142,39 @@ class MachineComponent {
 		for (existing in connectorList) if (existing.name == name)
 			throw 'Duplicate connector "$designation/$name"';
 		connectorList.push({name: name, role: role, frame: frame});
+	}
+
+	function addPort(entry:ComponentPort):Void {
+		if (entry == null || entry.name == null || entry.name.length == 0 || entry.kind == null ||
+			entry.role == null || entry.iface == null) throw 'Invalid port on "$designation"';
+		switch entry.iface {
+			case PushIn(tubeOd): if (!Math.isFinite(tubeOd) || tubeOd <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Thread(name): if (name == null || name.length == 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Plug(name, pins): if (name == null || name.length == 0 || pins <= 0) throw 'Invalid port interface "$designation/${entry.name}"';
+			case Unspecified:
+		}
+		for (existing in portList) if (existing.name == entry.name)
+			throw 'Duplicate port "$designation/${entry.name}"';
+		if (entry.connector != null) connector(entry.connector);
+		portList.push(entry);
+	}
+
+	function addBridge(from:String, to:String):Void {
+		var input = port(from), output = port(to);
+		if (from == to || input.kind != output.kind)
+			throw 'Port bridge "$designation/$from->$to" needs distinct ports of the same kind';
+		for (existing in bridgeList) if (existing.from == from && existing.to == to)
+			throw 'Duplicate port bridge "$designation/$from->$to"';
+		bridgeList.push({from: from, to: to});
+	}
+
+	/** Declare a service conversion, such as pneumatic air producing vacuum. */
+	function addConversion(from:String, to:String):Void {
+		var input = port(from), output = port(to);
+		if (from == to || input.role != Consumer || output.role != Supply)
+			throw 'Port conversion "$designation/$from->$to" needs a Consumer input and Supply output';
+		for (existing in conversionList) if (existing.to == to)
+			throw 'Port conversion "$designation/$to" has multiple inputs';
+		conversionList.push({from: from, to: to});
 	}
 }

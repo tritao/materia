@@ -41,7 +41,13 @@ class RecipeContractTests {
 			}
 
 			var baseline = type.create();
-			for (material in MaterialLibrary.specs()) {
+			var materialOptions = MaterialLibrary.specs();
+			for (parameter in type.parameters()) if (parameter.name == "material")
+				materialOptions = switch parameter.type {
+					case Choice(options): options;
+					default: materialOptions;
+				};
+			for (material in materialOptions) {
 				if (material == baseline.materialSpec()) continue;
 				var variant = type.create(baseline.values().copy().setToken("material", material));
 				check(variant.materialSpec() == material, '${type.id}: material input was ignored');

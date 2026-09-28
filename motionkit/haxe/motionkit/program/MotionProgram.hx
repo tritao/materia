@@ -59,7 +59,7 @@ class MotionProgram {
       case WaitInput(channel, predicate, timeoutSeconds):
         if (!hasId(channel)) 'Motion program op $index needs an input channel ID';
         else if (predicate == null) 'Motion program op $index needs an input predicate';
-        else if (!validPositive(timeoutSeconds))
+        else if (timeoutSeconds != null && !validPositive(timeoutSeconds))
           'Motion program op $index timeout must be finite and positive';
         else validatePredicate(predicate, index);
     };

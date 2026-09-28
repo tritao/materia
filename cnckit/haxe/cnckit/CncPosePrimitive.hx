@@ -7,7 +7,7 @@ import motionkit.path.PathPoint;
 import motionkit.path.PosePrimitive;
 import motionkit.path.PoseWaypoint;
 
-/** Keeps the exact planar line, arc, or fillet geometry for ProgramCompiler. */
+/** Keeps exact line, arc, helix, or fillet geometry for ProgramCompiler. */
 class CncPosePrimitive implements PosePrimitive {
   public final geometry:PathPrimitive;
   public final feed:Float;

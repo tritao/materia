@@ -1,0 +1,6 @@
+(2 mm cutter, compensated quarter circle)
+G21 G90 G17 F600
+G41 D2 G1 X10 Y0
+G3 X20 Y10 I0 J10
+G40 G1 X20 Y20
+M2

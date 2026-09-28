@@ -71,6 +71,17 @@ int main() {
     assert_close(properties.center_of_mass.y, 10.0);
     assert_close(properties.center_of_mass.z, 15.0);
     assert(cad_shape_mass_properties(shape, nullptr) == CAD_ERROR_INVALID_ARGUMENT);
+    cad_physical_properties physical{};
+    assert(cad_shape_physical_properties(shape, &physical) == CAD_OK);
+    assert_close(physical.volume, volume);
+    assert_close(physical.center_of_mass.z, 15.0);
+    assert_close(physical.inertia.xx, 650000.0);
+    assert_close(physical.inertia.yy, 500000.0);
+    assert_close(physical.inertia.zz, 250000.0);
+    assert_close(physical.inertia.xy, 0.0);
+    assert_close(physical.inertia.xz, 0.0);
+    assert_close(physical.inertia.yz, 0.0);
+    assert(cad_shape_physical_properties(shape, nullptr) == CAD_ERROR_INVALID_ARGUMENT);
 
     const auto step_path = std::filesystem::temp_directory_path() /
         "cadkit-core-smoke.step";

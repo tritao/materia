@@ -118,6 +118,12 @@ class MachineKitRecipes {
 	public static function reconcileDocument(fresh:cadkit.parametric.Document, savedText:String,
 			diagnostics:Array<String>):Bool {
 		register();
+		var tracePath = Sys.getEnv("MATERIA_RECONCILE_TRACE");
+		if (tracePath != null && tracePath.length > 0) {
+			var previous = sys.FileSystem.exists(tracePath) ? sys.io.File.getContent(tracePath) : "";
+			sys.io.File.saveContent(tracePath, previous + "reconcile\n");
+		}
+		var savedVersion = documentVersion(savedText);
 		var saved:cadkit.parametric.Document;
 		try saved = DocumentCodec.decode(savedText) catch (error:Dynamic) throw error;
 		try {
@@ -197,6 +203,7 @@ class MachineKitRecipes {
 			}
 
 			var processedDefaults:Map<String, Bool> = new Map();
+			var reportedLegacyDefaults = false;
 			for (entry in entries) {
 				var groupKey = entry.freshDefinition.id.value + ":" + entry.oldDefinition.id.value;
 				var definition = targetDefinitions.get(groupKey);
@@ -213,24 +220,30 @@ class MachineKitRecipes {
 							diagnostics.push('Saved recipe definition for "${entry.id}" has new input "${input.name}" in source; using its new default');
 							continue;
 						}
-						if (oldInput.editedByUser) {
-							if (oldInput.kind != input.kind) {
-								diagnostics.push('Saved input "${input.name}" on "${entry.id}" changed type in source');
-								continue;
-							}
-							var value = input.isNumeric()
-								? UnitConversion.fromCanonical(oldInput.defaultValue, input.kind, input.unit)
-								: oldInput.defaultValue;
-							try input.normalize(value, input.unit)
-							catch (error:Dynamic) {
-								diagnostics.push('Saved input "${input.name}" on "${entry.id}" is no longer valid: ${Std.string(error)}');
-								continue;
-							}
-							definition.setUserEditedTypedDefault(input.name, value);
+						if (oldInput.kind != input.kind) {
+							diagnostics.push('Saved input "${input.name}" on "${entry.id}" changed type in source');
+							continue;
 						}
+						var value = input.isNumeric()
+							? UnitConversion.fromCanonical(oldInput.defaultValue, input.kind, input.unit)
+							: oldInput.defaultValue;
+						var normalized:Dynamic;
+						try normalized = input.normalize(value, input.unit)
+						catch (error:Dynamic) {
+							diagnostics.push('Saved input "${input.name}" on "${entry.id}" is no longer valid: ${Std.string(error)}');
+							continue;
+						}
+						var legacyEdit = savedVersion < DocumentCodec.VERSION
+							&& Std.string(normalized) != Std.string(input.defaultValue);
+						if (legacyEdit && !reportedLegacyDefaults) {
+							diagnostics.push('Saved defaults were recovered from a pre-v9 project; re-save this project to record edited defaults explicitly');
+							reportedLegacyDefaults = true;
+						}
+						if (oldInput.editedByUser || legacyEdit)
+							definition.setUserEditedTypedDefault(input.name, value);
 					}
 					for (oldInput in entry.oldDefinition.inputs())
-						if (oldInput.editedByUser && !freshInputs.exists(oldInput.name))
+						if (!freshInputs.exists(oldInput.name))
 							diagnostics.push('Saved input "${oldInput.name}" on "${entry.id}" was removed from source');
 				}
 
@@ -290,6 +303,12 @@ class MachineKitRecipes {
 		return Json.stringify({recipe: definition.recipe, values: values});
 	}
 
+	static function documentVersion(text:String):Int {
+		var root:Dynamic = Json.parse(text), version:Dynamic = Reflect.field(root, "version");
+		if (!Std.isOfType(version, Int)) throw "Saved recipe document has no integer version";
+		return cast version;
+	}
+
 	static function watchDocument(document:cadkit.parametric.Document, identity:String):Void {
 		if (watchedDocuments.exists(identity)) return;
 		watchedDocuments.set(identity, true);
@@ -303,7 +322,7 @@ class MachineKitRecipes {
 	}
 
 	static function migrateLegacyProperties(document:cadkit.parametric.Document, version:Int):Void {
-		if (version >= 8) return;
+		if (version != 7) return;
 		var derived = ["machinekit.partNumber", "machinekit.material", "machinekit.catalog.source",
 			"machinekit.catalog.designation"];
 		for (definition in document.allDefinitions())

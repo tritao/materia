@@ -87,6 +87,22 @@ class ModelingSmoke {
 		near(properties.centerOfMass.y, 0);
 		near(properties.centerOfMass.z, 3);
 		near(properties.mass(2), properties.volume * 2);
+		var inertiaBox = Part.box(10, 20, 30);
+		var tensor = inertiaBox.massProperties().inertia;
+		near(tensor.xx, 650000);
+		near(tensor.yy, 500000);
+		near(tensor.zz, 250000);
+		near(tensor.xy, 0);
+		near(inertiaBox.massProperties().inertiaAtDensity(2).xx, 1300000);
+		var turned = tensor.rotated(0, 0, Math.sin(Math.PI / 8), Math.cos(Math.PI / 8));
+		near(turned.xx, 575000);
+		near(turned.xy, 75000);
+		var rotatedShape = Shape.fromOwnedHandle(CadKit.shapeRotateChecked(
+			inertiaBox.shape.borrowHandle(), cadkit.Geometry.vec3(0, 0, 1), Math.PI / 4));
+		near(rotatedShape.massProperties().inertia.xx, turned.xx);
+		near(rotatedShape.massProperties().inertia.xy, turned.xy);
+		rotatedShape.close();
+		inertiaBox.close();
 		var invalidDensity = false;
 		try properties.mass(-1) catch (_:Dynamic) invalidDensity = true;
 		check(invalidDensity, "density must be finite and nonnegative");

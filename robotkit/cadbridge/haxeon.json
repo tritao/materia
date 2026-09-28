@@ -8,6 +8,7 @@
 		"projectkit": { "path": "../../projectkit" },
 		"robotkit": { "path": ".." },
 		"cadkit": { "path": "../../cadkit" },
+		"machinekit": { "path": "../../machinekit" },
 		"bimkit": { "path": "../../bimkit" }
 	},
 	"target": "host"

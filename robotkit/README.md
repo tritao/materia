@@ -300,6 +300,15 @@ and source/receive clocks. `Payload`, `LoadState`, and `LoadLimits` represent
 load knowledge and a configured mass, load-moment, and lift-height envelope;
 runtime joint limits remain authoritative.
 
+`cadbridge.MachineAssemblyMassBridge` brings a MachineKit assembly into these
+checks. `applyToLink(assembly, link, ?state)` sets RobotKit link mass, centre of
+mass, and centroidal inertia in SI units. `payloadViolation(assembly, limits,
+liftHeightMeters, lengthMeters, widthMeters, heightMeters, ?state)` uses the
+assembly's +X centre coordinate as the forward load arm and returns RobotKit's
+load-limit violation, if any. Author the assembly origin at the payload base
+for that check. Both calls reject BOM extras without modelled mass; link
+conversion also rejects declared members without inertia and names them.
+
 Fork axes can use model-owned joint limits and IDs. Compile the model once and
 construct both views from its blueprint:
 

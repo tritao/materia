@@ -117,6 +117,8 @@ class PathPlanner {
     if (!options.exactStop) for (index in 1...planningPath.primitives.length) {
       var before = planningPath.primitives[index - 1];
       var after = planningPath.primitives[index];
+      if (before.kind() == PathPrimitiveKind.Circular ||
+          after.kind() == PathPrimitiveKind.Circular) continue;
       var beforeTangent = before.tangentAt(before.length());
       var afterTangent = after.tangentAt(0.0);
       var tangentDot = 0.0;
@@ -173,6 +175,10 @@ class PathPlanner {
         var arc:ArcSegment = cast primitive;
         count = Std.int(Math.ceil(Math.abs(arc.sweepAngle) * 16.0));
       }
+      if (primitive.kind() == PathPrimitiveKind.Circular) {
+        var circular:motionkit.path.CircularSegment = cast primitive;
+        count = Std.int(Math.ceil(Math.abs(circular.sweepAngle) * 16.0));
+      }
       if (primitive.kind() == PathPrimitiveKind.Blend) count = 32;
       var distances:Array<Float> = [];
       var positions:Array<Array<Float>> = [];
@@ -183,14 +189,18 @@ class PathPlanner {
         var point = primitive.pointAt(distance);
         var tangent = primitive.tangentAt(distance);
         var curvature = primitive.curvatureAt(distance);
+        var secondDerivative = primitive.kind() == PathPrimitiveKind.Circular ?
+          (cast primitive:motionkit.path.CircularSegment).secondDerivativeAt(distance) :
+          [-tangent[1] * curvature, tangent[0] * curvature, 0.0];
         var q = start.copy();
         var qPrime = [for (_ in start) 0.0];
         var qDoublePrime = [for (_ in start) 0.0];
         for (entry in [{axis: xAxis, position: point.x, prime: tangent[0],
-            second: -tangent[1] * curvature},
+            second: secondDerivative[0]},
             {axis: yAxis, position: point.y, prime: tangent[1],
-              second: tangent[0] * curvature},
-            {axis: zAxis, position: point.z, prime: tangent[2], second: 0.0}]) {
+              second: secondDerivative[1]},
+            {axis: zAxis, position: point.z, prime: tangent[2],
+              second: secondDerivative[2]}]) {
           entry.axis.writeLogicalPosition(q, entry.position);
           entry.axis.writeLogicalDelta(qPrime, entry.prime);
           entry.axis.writeLogicalDelta(qDoublePrime, entry.second);
@@ -306,6 +316,9 @@ class PathPlanner {
           var distance = arc.length() * Math.max(0.0, Math.min(1.0, fraction));
           closest = Math.min(closest, point.distanceTo(arc.pointAt(distance)));
         }
+      } else if (primitive.kind() == PathPrimitiveKind.Circular) {
+        var circular:motionkit.path.CircularSegment = cast primitive;
+        closest = Math.min(closest, circular.distanceTo(point));
       } else {
         for (sample in 0...129)
           closest = Math.min(closest,

@@ -20,6 +20,32 @@ class CncMotionBinding {
     solver = new AxisKinematics(blueprint, machine.xAxisId,
       machine.yAxisId, machine.zAxisId);
     var count = solver.jointCount();
+    var envelopeLower:Array<Float> = [];
+    var envelopeUpper:Array<Float> = [];
+    for (axis in [solver.x, solver.y, solver.z]) {
+      var low = axis.lowerLimit, high = axis.upperLimit;
+      var zero = [for (_ in 0...count) 0.0];
+      var one = zero.copy();
+      axis.writeLogicalPosition(zero, 0.0);
+      axis.writeLogicalPosition(one, 1.0);
+      for (joint in axis.jointIndices) {
+        var bounds = blueprint.model.joints[joint].limits;
+        var scale = one[joint] - zero[joint];
+        if (bounds.lower < bounds.upper && Math.abs(scale) > 1e-12) {
+          var a = (bounds.lower - zero[joint]) / scale;
+          var b = (bounds.upper - zero[joint]) / scale;
+          low = Math.max(low, Math.min(a, b));
+          high = Math.min(high, Math.max(a, b));
+        }
+      }
+      envelopeLower.push(low); envelopeUpper.push(high);
+    }
+    if (machine.travelLower != null && machine.travelUpper != null)
+      for (axis in 0...3) {
+        envelopeLower[axis] = Math.max(envelopeLower[axis], machine.travelLower[axis]);
+        envelopeUpper[axis] = Math.min(envelopeUpper[axis], machine.travelUpper[axis]);
+      }
+    machine.setTravelEnvelope(envelopeLower, envelopeUpper);
     var limits = new ValidationLimits(count, Int64.ofInt(blueprint.runtime.revision),
       Int64.ofInt(blueprint.runtime.calibrationRevision));
     var velocity = [for (_ in 0...count) 0.0];

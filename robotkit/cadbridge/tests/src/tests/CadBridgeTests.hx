@@ -6,6 +6,7 @@ import cadkit.Geometry;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Curve;
 import cadkit.modeling.Vector;
+import cadkit.InertiaTensor;
 import cadkit.parametric.ElementReference;
 import bimkit.BimDocument;
 import robotkit.spatial.Vec3;
@@ -26,6 +27,11 @@ import cadbridge.WallBridge;
 import cadbridge.BimFrameBridge;
 import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblyPhysicalPartView;
+import cadbridge.MachineAssemblyMassBridge;
+import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.MachineAssembly.AssemblyBomMass;
+import machinekit.component.MachineComponent;
+import robotkit.material.LoadLimits;
 import robotkit.runtime.RobotRuntimeCompiler;
 import cadkit.modeling.AssemblyModel;
 import materia.assembly.AssemblyFrames;
@@ -36,6 +42,7 @@ class CadBridgeTests {
   static var assertions = 0;
 
   public static function main():Void {
+    testMachineAssemblyMassBridge();
     testAssemblySimulationBridge();
     testFaceBridgeOnPlainBoxFace();
     testFaceBridgePreservesConcaveWireOrder();
@@ -43,6 +50,44 @@ class CadBridgeTests {
     testBimFrameHierarchy();
     testBimWallToPatchPlanEndToEnd();
     Sys.println('CadBridge tests passed ($assertions assertions)');
+  }
+
+  static function testMachineAssemblyMassBridge():Void {
+    var assembly = new MachineAssembly();
+    assembly.addComponent("tool", new BridgeMassPart(true));
+    var link = new Link("tool");
+    MachineAssemblyMassBridge.applyToLink(assembly, link);
+    check(approx(link.mass, 2, 1e-12) && approx(link.centerOfMass[0], 0.1, 1e-12) &&
+      approx(link.centerOfMass[2], 0.05, 1e-12), "MachineKit mass and centre convert to RobotKit SI units");
+    check(approx(link.inertiaTensor[0], 2, 1e-12) &&
+      approx(link.inertiaTensor[1], 0.25, 1e-12) &&
+      approx(link.inertiaTensor[3], 0.25, 1e-12) &&
+      approx(link.inertiaTensor[4], 3, 1e-12), "centroidal inertia converts to row-major kg m²");
+    var limits = new LoadLimits(3, 0.25, 1);
+    check(MachineAssemblyMassBridge.payloadViolation(assembly, limits, 0.5, 0.2, 0.2, 0.2) == null,
+      "MachineKit payload is within RobotKit limits");
+    check(MachineAssemblyMassBridge.payloadViolation(assembly, new LoadLimits(3, 0.15, 1),
+      0.5, 0.2, 0.2, 0.2) != null, "MachineKit payload moment violates RobotKit limits");
+
+    assembly.addBomItem({partNumber: "TUBE", description: "Tube", quantity: 1,
+      material: "polyurethane"}, 1, Point(0.1, new Vector(100, 0, 50)));
+    MachineAssemblyMassBridge.applyToLink(assembly, link);
+    check(approx(link.mass, 2.1, 1e-12) && approx(link.centerOfMass[0], 0.1, 1e-12),
+      "accounted tubing contributes to RobotKit link mass");
+
+    var missingTensor = new MachineAssembly();
+    missingTensor.addComponent("declared", new BridgeMassPart(false));
+    var rejected = false;
+    try MachineAssemblyMassBridge.applyToLink(missingTensor, new Link("missing"))
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("declared") >= 0;
+    check(rejected, "missing declared inertia identifies the member");
+
+    assembly.addBomItem({partNumber: "UNMODELLED-LINE", description: "line", quantity: 1,
+      material: "steel"});
+    rejected = false;
+    try MachineAssemblyMassBridge.payloadViolation(assembly, limits, 0.5, 0.2, 0.2, 0.2)
+    catch (error:Dynamic) rejected = Std.string(error).indexOf("UNMODELLED-LINE") >= 0;
+    check(rejected, "unaccounted BOM mass prevents a payload decision");
   }
 
   static function testAssemblySimulationBridge():Void {
@@ -285,5 +330,13 @@ class CadBridgeTests {
   static function check(value:Bool, message:String):Void {
     assertions++;
     if (!value) throw 'assertion failed: $message';
+  }
+}
+
+private class BridgeMassPart extends MachineComponent {
+  public function new(withInertia:Bool) {
+    super("BRIDGE-MASS", "declared bridge mass", "steel", true);
+    declareMass(2, new Vector(100, 0, 50), withInertia ?
+      new InertiaTensor(2000000, 250000, 0, 3000000, 0, 4000000) : null);
   }
 }

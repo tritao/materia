@@ -156,7 +156,7 @@ class ManipulatorMotion {
             };
             if (!matches) {
               barrierElapsed += dt;
-              if (barrierElapsed >= timeoutSeconds)
+              if (timeoutSeconds != null && barrierElapsed >= timeoutSeconds)
                 throw 'WaitInput "$channel" timed out after $timeoutSeconds seconds';
             }
             matches;

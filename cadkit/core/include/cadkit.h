@@ -70,6 +70,26 @@ typedef struct cad_mass_properties {
     cad_vec3 center_of_mass;
 } cad_mass_properties;
 
+/* Symmetric inertia matrix about the center of mass, for unit density.
+ * Values have length^5 units because volume supplies the mass measure.
+ */
+typedef struct cad_inertia_tensor {
+    double xx;
+    double xy;
+    double xz;
+    double yy;
+    double yz;
+    double zz;
+} cad_inertia_tensor;
+
+/* Kept separate from cad_mass_properties to preserve the existing C ABI. */
+typedef struct cad_physical_properties {
+    double volume;
+    double surface_area;
+    cad_vec3 center_of_mass;
+    cad_inertia_tensor inertia;
+} cad_physical_properties;
+
 /* Zero is invalid. Handles are opaque, process-local values with kind and generation checks. */
 typedef uint32_t cad_shape CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_shape_destroy);
 typedef uint32_t cad_mesh CADKIT_HXI_HANDLE CADKIT_HXI_HANDLE_DESTROY(cad_mesh_destroy);
@@ -402,6 +422,9 @@ CADKIT_API cad_result cad_shape_volume(
 CADKIT_API cad_result cad_shape_mass_properties(
     cad_shape shape,
     cad_mass_properties* out_properties CADKIT_HXI_OUT);
+CADKIT_API cad_result cad_shape_physical_properties(
+    cad_shape shape,
+    cad_physical_properties* out_properties CADKIT_HXI_OUT);
 
 CADKIT_API cad_result cad_shape_kind_get(
     cad_shape shape,
