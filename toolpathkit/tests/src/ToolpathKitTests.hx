@@ -1,9 +1,11 @@
 import toolpathkit.ToolpathKit;
 import toolpathkit.path.GeometryTools;
+import toolpathkit.path.MoveKind;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.Provenance.ProvenanceKind;
+import toolpathkit.path.ToolpathOp;
 
 class ToolpathKitTests {
   static function main():Void {
@@ -17,6 +19,13 @@ class ToolpathKitTests {
     if (Provenance.cam(4).operationIndex != 4 ||
         Provenance.cam(4).kind != ProvenanceKind.Cam)
       throw "CAM provenance";
-    Sys.println("ToolpathKit tests passed (4 assertions)");
+    var move = ToolpathOp.Move(MoveKind.Cut, line, 0.01, 0.0001,
+      Provenance.cam(4));
+    switch move {
+      case Move(Cut, _, feed, tolerance, _):
+        if (feed != 0.01 || tolerance != 0.0001) throw "move parameters";
+      case _: throw "move kind";
+    }
+    Sys.println("ToolpathKit tests passed (5 assertions)");
   }
 }

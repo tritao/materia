@@ -225,7 +225,7 @@ class CncKitTests {
     check(detailed.program != null && detailed.ops.length >= 4,
       "valid lines still produce preview and executable program");
     var feedGeometry = switch detailed.ops[0] {
-      case ToolpathOp.Feed(geometry, _, _, span):
+      case ToolpathOp.Move(Cut, geometry, _, _, span):
         check(span.line == 1, "IR feed keeps its source span");
         geometry;
       case _: throw "first preview operation must be feed";
@@ -236,7 +236,7 @@ class CncKitTests {
       GeometryTools.length(feedGeometry));
     near(previewEnd.x, 0.01, "preview endpoint needs no MotionKit lowering");
     var recoveredGeometry = switch detailed.ops[2] {
-      case ToolpathOp.Feed(geometry, _, _, _): geometry;
+      case ToolpathOp.Move(Cut, geometry, _, _, _): geometry;
       case _: throw "recovered move missing";
     };
     near(GeometryTools.pointAt(recoveredGeometry, 0.0).y, 0.01,
@@ -257,7 +257,7 @@ class CncKitTests {
     check(rollback.diagnostics.length == 1 && rollback.ops.length == 2,
       "failed block is skipped without discarding later motion");
     var recoveredFeed = switch rollback.ops[1] {
-      case ToolpathOp.Feed(_, speed, _, _): speed;
+      case ToolpathOp.Move(Cut, _, speed, _, _): speed;
       case _: throw "feed after error missing";
     };
     near(recoveredFeed, 0.01,
@@ -283,11 +283,11 @@ class CncKitTests {
     var majorArc = new CncCompiler(fixtureMachine).compileDetailed(
       "G21 F600 G2 X10 R-6\nM2");
     var minorLength = switch radiusArc.ops[0] {
-      case ToolpathOp.Feed(geometry, _, _, _): GeometryTools.length(geometry);
+      case ToolpathOp.Move(Cut, geometry, _, _, _): GeometryTools.length(geometry);
       case _: throw "minor R arc missing";
     };
     var majorLength = switch majorArc.ops[0] {
-      case ToolpathOp.Feed(geometry, _, _, _): GeometryTools.length(geometry);
+      case ToolpathOp.Move(Cut, geometry, _, _, _): GeometryTools.length(geometry);
       case _: throw "major R arc missing";
     };
     check(majorLength > minorLength && majorLength > Math.PI * 0.006,
@@ -296,7 +296,7 @@ class CncKitTests {
     var home = new CncCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G0 X10 Y10 Z10\nG28 X0\nM2");
     var homeLast = switch home.ops[home.ops.length - 2] {
-      case ToolpathOp.Rapid(geometry, _): GeometryTools.pointAt(geometry,
+      case ToolpathOp.Move(Rapid, geometry, _, _, _): GeometryTools.pointAt(geometry,
         GeometryTools.length(geometry));
       case _: throw "G28 home motion missing";
     };
@@ -306,10 +306,10 @@ class CncKitTests {
       "G21 G90 F600 G2 X5 Y5 Z10 I5 J0\nM2");
     check(xyHelix.diagnostics.length == 0, "G17 helix compiles");
     var xyGeometry = switch xyHelix.ops[0] {
-      case ToolpathOp.Feed(PathGeometry.Circular(_, _, _, _, ArcPlane.XY, rise), _, _, _):
+      case ToolpathOp.Move(Cut, PathGeometry.Circular(_, _, _, _, ArcPlane.XY, rise), _, _, _):
         near(rise, 0.01, "G17 helix rises on Z");
         switch xyHelix.ops[0] {
-          case ToolpathOp.Feed(geometry, _, _, _): geometry;
+          case ToolpathOp.Move(Cut, geometry, _, _, _): geometry;
           case _: throw "G17 helix missing";
         };
       case _: throw "G17 helix needs circular IR";
@@ -336,11 +336,11 @@ class CncKitTests {
     var xzCcw = new CncCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G18 F600 G3 X5 Z5 I5 K0\nM2");
     var xzCwSweep = switch xzCw.ops[0] {
-      case ToolpathOp.Feed(PathGeometry.Circular(_, _, _, sweep, ArcPlane.XZ, _), _, _, _): sweep;
+      case ToolpathOp.Move(Cut, PathGeometry.Circular(_, _, _, sweep, ArcPlane.XZ, _), _, _, _): sweep;
       case _: throw "G18 CW arc missing";
     };
     var xzCcwSweep = switch xzCcw.ops[0] {
-      case ToolpathOp.Feed(PathGeometry.Circular(_, _, _, sweep, ArcPlane.XZ, _), _, _, _): sweep;
+      case ToolpathOp.Move(Cut, PathGeometry.Circular(_, _, _, sweep, ArcPlane.XZ, _), _, _, _): sweep;
       case _: throw "G18 CCW arc missing";
     };
     check(xzCwSweep > Math.PI && xzCcwSweep < 0.0 &&
@@ -349,7 +349,7 @@ class CncKitTests {
     var xzHelix = new CncCompiler(fixtureMachine).compileDetailed(
       "G21 G91 G18 F600 G3 X5 Y10 Z5 I5 K0\nM2");
     var xzGeometry = switch xzHelix.ops[0] {
-      case ToolpathOp.Feed(g, _, _, _): g;
+      case ToolpathOp.Move(Cut, g, _, _, _): g;
       case _: throw "G18 relative helix missing";
     };
     var xzEnd = GeometryTools.pointAt(xzGeometry,
@@ -360,11 +360,11 @@ class CncKitTests {
     var yzHelix = new CncCompiler(fixtureMachine).compileDetailed(
       "G21 G90 G19 F600 G2 X10 Y5 Z5 J5 K0\nM2");
     var yzGeometry = switch yzHelix.ops[0] {
-      case ToolpathOp.Feed(PathGeometry.Circular(_, _, _, sweep, ArcPlane.YZ, rise), _, _, _):
+      case ToolpathOp.Move(Cut, PathGeometry.Circular(_, _, _, sweep, ArcPlane.YZ, rise), _, _, _):
         check(sweep < 0.0, "G19 CW uses positive-X viewpoint");
         near(rise, 0.01, "G19 helix rises on X");
         switch yzHelix.ops[0] {
-          case ToolpathOp.Feed(g, _, _, _): g;
+          case ToolpathOp.Move(Cut, g, _, _, _): g;
           case _: throw "G19 helix missing";
         };
       case _: throw "G19 helix needs circular IR";
@@ -389,7 +389,7 @@ class CncKitTests {
     check(cycles.diagnostics.length == 0, "four drilling cycles compile");
     var feeds = 0, dwells = 0, cycleLine = 0;
     for (op in cycles.ops) switch op {
-      case ToolpathOp.Feed(_, _, _, span):
+      case ToolpathOp.Move(Cut, _, _, _, span):
         feeds++;
         if (span.line == 2) cycleLine++;
       case ToolpathOp.Dwell(_, _): dwells++;
@@ -407,7 +407,7 @@ class CncKitTests {
       "G53 in an active cycle reports its own line");
     var secondLineOps = 0;
     for (op in activeCycleG53.ops) switch op {
-      case ToolpathOp.Rapid(_, span), ToolpathOp.Feed(_, _, _, span):
+      case ToolpathOp.Move(Rapid, _, _, _, span), ToolpathOp.Move(Cut, _, _, _, span):
         if (span.line == 2) secondLineOps++;
       case _:
     }
@@ -458,14 +458,14 @@ class CncKitTests {
       File.getContent("fixtures/comp-inside.ngc"));
     check(inside.diagnostics.length == 0, "inside cutter fixture compiles");
     var insideFirst = switch inside.ops[1] {
-      case ToolpathOp.Feed(g, _, _, _): GeometryTools.pointAt(g,
+      case ToolpathOp.Move(Cut, g, _, _, _): GeometryTools.pointAt(g,
         GeometryTools.length(g));
       case _: throw "inside first contour missing";
     };
     near(insideFirst.x, 0.019, "inside corner trims first line X");
     near(insideFirst.y, 0.001, "inside corner trims first line Y");
     var insideSecond = switch inside.ops[2] {
-      case ToolpathOp.Feed(g, _, _, _): GeometryTools.pointAt(g, 0.0);
+      case ToolpathOp.Move(Cut, g, _, _, _): GeometryTools.pointAt(g, 0.0);
       case _: throw "inside second contour missing";
     };
     near(insideSecond.x, insideFirst.x, "inside corner remains connected X");
@@ -475,7 +475,7 @@ class CncKitTests {
     check(outside.diagnostics.length == 0 && outside.ops.length == 6,
       "outside corner adds a round cutter-radius join");
     var outsideJoin = switch outside.ops[2] {
-      case ToolpathOp.Feed(PathGeometry.Arc(_, radius, _, sweep), _, _, _):
+      case ToolpathOp.Move(Cut, PathGeometry.Arc(_, radius, _, sweep), _, _, _):
         near(sweep, -Math.PI * 0.5, "outside join follows corner turn");
         radius;
       case _: throw "outside corner join missing";
@@ -484,7 +484,7 @@ class CncKitTests {
     var rightComp = new CncCompiler(compensatedMachine).compileDetailed(
       "G21 F600 G42 D2 G1 X10\nG1 X20\nG40 G1 X30\nM2");
     var rightStart = switch rightComp.ops[1] {
-      case ToolpathOp.Feed(g, _, _, _): GeometryTools.pointAt(g, 0.0);
+      case ToolpathOp.Move(Cut, g, _, _, _): GeometryTools.pointAt(g, 0.0);
       case _: throw "G42 contour missing";
     };
     near(rightStart.y, -0.001, "G42 offsets to the right");
@@ -501,7 +501,7 @@ class CncKitTests {
       File.getContent("fixtures/comp-arc.ngc"));
     check(arcComp.diagnostics.length == 0, "arc compensation fixture compiles");
     var arcRadius = switch arcComp.ops[1] {
-      case ToolpathOp.Feed(PathGeometry.Arc(_, radius, _, _), _, _, _): radius;
+      case ToolpathOp.Move(Cut, PathGeometry.Arc(_, radius, _, _), _, _, _): radius;
       case _: throw "compensated arc missing";
     };
     near(arcRadius, 0.009, "G41 offsets CCW arc inward");
@@ -510,12 +510,12 @@ class CncKitTests {
     check(mixedComp.diagnostics.length == 0,
       "inside line-to-arc corner offsets without gouging");
     var mixedLineEnd = switch mixedComp.ops[1] {
-      case ToolpathOp.Feed(g, _, _, _): GeometryTools.pointAt(g,
+      case ToolpathOp.Move(Cut, g, _, _, _): GeometryTools.pointAt(g,
         GeometryTools.length(g));
       case _: throw "mixed compensated line missing";
     };
     var mixedArcStart = switch mixedComp.ops[2] {
-      case ToolpathOp.Feed(g, _, _, _): GeometryTools.pointAt(g, 0.0);
+      case ToolpathOp.Move(Cut, g, _, _, _): GeometryTools.pointAt(g, 0.0);
       case _: throw "mixed compensated arc missing";
     };
     near(mixedLineEnd.distanceTo(mixedArcStart), 0.0,
@@ -527,7 +527,7 @@ class CncKitTests {
       "G21 G18 F600 G41 D2 G1 X10 Z0\nG3 X15 Z5 I5 K0\n" +
       "G40 G1 X15 Z20\nM2");
     var xzCompRadius = switch xzComp.ops[1] {
-      case ToolpathOp.Feed(PathGeometry.Circular(_, radius, _, _, ArcPlane.XZ, _), _, _, _): radius;
+      case ToolpathOp.Move(Cut, PathGeometry.Circular(_, radius, _, _, ArcPlane.XZ, _), _, _, _): radius;
       case _: throw "G18 compensated arc missing";
     };
     near(xzCompRadius, 0.004, "G18 G41 follows positive-Y side convention");
@@ -563,7 +563,7 @@ class CncKitTests {
     var low = [1e9, 1e9, 1e9], high = [-1e9, -1e9, -1e9];
     for (op in result.ops) {
       var geometry = switch op {
-        case ToolpathOp.Rapid(g, _) | ToolpathOp.Feed(g, _, _, _): g;
+        case ToolpathOp.Move(Rapid, g, _, _, _) | ToolpathOp.Move(Cut, g, _, _, _): g;
         case _: null;
       };
       if (geometry == null) continue;
@@ -595,7 +595,7 @@ class CncKitTests {
     var pathIndex = 0;
     for (op in result.ops) {
       var geometry = switch op {
-        case ToolpathOp.Rapid(g, _) | ToolpathOp.Feed(g, _, _, _): g;
+        case ToolpathOp.Move(Rapid, g, _, _, _) | ToolpathOp.Move(Cut, g, _, _, _): g;
         case _: null;
       };
       if (geometry == null) continue;

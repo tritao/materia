@@ -109,7 +109,7 @@ class CutMoveTests {
     var motions = 0, loaded = false;
     for (op in program.ops) switch op {
       case ToolChange(_, _): loaded = true;
-      case Rapid(_, _) | Feed(_, _, _, _): if (loaded) motions++;
+      case Move(Rapid, _, _, _, _) | Move(Cut, _, _, _, _): if (loaded) motions++;
       case _:
     }
     var moves = CutMoves.fromOps(program.ops, program.tool);

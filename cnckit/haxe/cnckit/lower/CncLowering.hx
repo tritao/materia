@@ -46,9 +46,9 @@ class CncLowering {
     pending = []; pendingSpans = [];
     pendingFeed = 0.0; pendingBlend = 0.0;
     for (op in ops) switch op {
-      case Rapid(geometry, span):
+      case Move(Rapid, geometry, _, _, span):
         addMove(primitive(geometry), machine.rapidSpeed, 0.0, span);
-      case Feed(geometry, speed, blend, span):
+      case Move(_, geometry, speed, blend, span):
         addMove(primitive(geometry), speed, blend, span);
       case Dwell(seconds, span):
         flush(); add(MotionOp.Dwell(seconds), span);

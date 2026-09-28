@@ -33,7 +33,7 @@ class CamSafeTravelFixture {
     var firstRapid = false, toolChanges = 0;
     var profilePlunges = 0, drillFeeds = 0, xyRapids = 0;
     for (op in program.ops) switch op {
-      case Rapid(Line(a, b), _):
+      case Move(Rapid, Line(a, b), _, _, _):
         if (!firstRapid) {
           firstRapid = true;
           check(Math.abs(a.x - b.x) < 1e-10 &&
@@ -48,7 +48,7 @@ class CamSafeTravelFixture {
             "profile and drill XY rapids stay at safe Z");
         }
         current = b;
-      case Feed(Line(a, b), speed, _, span):
+      case Move(Cut, Line(a, b), speed, _, span):
         if (Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < 1e-9 &&
             b.z < a.z - 1e-9) {
           if (span.line == 1 || span.line == 3) {
@@ -62,7 +62,7 @@ class CamSafeTravelFixture {
           }
         }
         current = b;
-      case Feed(geometry, _, _, _):
+      case Move(Cut, geometry, _, _, _):
         current = GeometryTools.pointAt(geometry,
           GeometryTools.length(geometry));
       case ToolChange(_, _):
@@ -85,13 +85,13 @@ class CamSafeTravelFixture {
       imported.ops.length == program.ops.length,
       "mixed tool G-code round trip keeps operation order");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
-      case [Feed(a, speedA, _, _), Feed(b, speedB, _, _)]:
+      case [Move(Cut, a, speedA, _, _), Move(Cut, b, speedB, _, _)]:
         check(Math.abs(speedA - speedB) < 1e-8,
           "mixed tool G-code preserves feed selection");
         check(GeometryTools.pointAt(a, GeometryTools.length(a))
           .distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "mixed tool G-code preserves feed endpoints");
-      case [Rapid(a, _), Rapid(b, _)]:
+      case [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
         check(GeometryTools.pointAt(a, GeometryTools.length(a))
           .distanceTo(GeometryTools.pointAt(b, GeometryTools.length(b))) < 1e-8,
           "mixed tool G-code preserves rapid endpoints");

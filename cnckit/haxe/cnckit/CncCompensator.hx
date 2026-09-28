@@ -1,5 +1,6 @@
 package cnckit;
 
+import toolpathkit.path.MoveKind;
 import cnckit.CncDiagnostic.CncSeverity;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
@@ -319,11 +320,11 @@ class CncCompensator {
     case _: false;
   };
   static function geometry(op:ToolpathOp):Null<PathGeometry> return switch op {
-    case Rapid(g, _), Feed(g, _, _, _): g;
+    case Move(_, g, _, _, _): g;
     case _: null;
   };
   static function opSpan(op:ToolpathOp):Provenance return switch op {
-    case Rapid(_, span), Feed(_, _, _, span): span;
+    case Move(_, _, _, _, span): span;
     case CutterCompStart(_, _, _, span), CutterCompEnd(span): span;
     case Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
         ToolChange(_, span), ToolLengthOffset(_, _, span), OptionalStop(span),
@@ -331,8 +332,7 @@ class CncCompensator {
   };
   static function replaceGeometry(op:ToolpathOp, geometry:PathGeometry):ToolpathOp
     return switch op {
-      case Rapid(_, span): ToolpathOp.Rapid(geometry, span);
-      case Feed(_, speed, blend, span): ToolpathOp.Feed(geometry, speed, blend, span);
+      case Move(kind, _, speed, blend, span): ToolpathOp.Move(kind, geometry, speed, blend, span);
       case _: throw "cutter compensation needs motion";
     };
   static function coords(p:Point3, plane:ArcPlane):Array<Float> return switch plane {

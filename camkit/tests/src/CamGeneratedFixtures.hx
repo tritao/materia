@@ -46,7 +46,7 @@ class CamGeneratedFixtures {
       .pocket(u, tool, -0.001, 0.005, 0.001).finish();
     var levels = new Map<String, Bool>();
     for (op in lProgram.ops) switch op {
-      case Feed(Line(start, end), _, _, _)
+      case Move(Cut, Line(start, end), _, _, _)
         if (Math.abs(start.z - end.z) < 1e-9):
         levels.set(Std.string(Math.round(start.z * 1000000)), true);
       case _:
@@ -59,7 +59,7 @@ class CamGeneratedFixtures {
 
     var leftIndex = -1, rightIndex = -1;
     for (index in 0...uProgram.ops.length) switch uProgram.ops[index] {
-      case Feed(Line(a, b), _, _, _) if (Math.abs(a.z + 0.001) < 1e-9 &&
+      case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z + 0.001) < 1e-9 &&
           Math.abs(b.z + 0.001) < 1e-9 && Math.abs(a.y - 0.02) < 1e-9 &&
           Math.abs(b.y - 0.02) < 1e-9):
         if (a.x < 0.01 && b.x < 0.01) leftIndex = index;
@@ -70,7 +70,7 @@ class CamGeneratedFixtures {
       "U pocket has separate left and right clearing passes");
     var retracted = false;
     for (index in (leftIndex + 1)...rightIndex) switch uProgram.ops[index] {
-      case Rapid(Line(a, b), _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
+      case Move(Rapid, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
         retracted = true;
       case _:
     }
@@ -91,8 +91,8 @@ class CamGeneratedFixtures {
         imported.ops.length == program.ops.length,
         "concave pocket G-code preserves operation count");
       for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
-        case [Feed(a, _, _, _), Feed(b, _, _, _)],
-             [Rapid(a, _), Rapid(b, _)]:
+        case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
+             [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
           for (fraction in [0.0, 0.5, 1.0]) {
             var original = GeometryTools.pointAt(a,
               GeometryTools.length(a) * fraction);
@@ -110,7 +110,7 @@ class CamGeneratedFixtures {
       program:camkit.CamProgram, depth:Float,
       check:Bool->String->Void):Void {
     for (op in program.ops) switch op {
-      case Feed(Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 &&
+      case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 &&
           Math.abs(b.z - depth) < 1e-9):
         for (fraction in [0.0, 0.5, 1.0]) {
           var point = new toolpathkit.path.Point3(a.x + (b.x - a.x) * fraction,
@@ -132,7 +132,7 @@ class CamGeneratedFixtures {
       if (!inside(point, contour.vertices)) continue;
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
-        case Feed(geometry, _, _, _):
+        case Move(Cut, geometry, _, _, _):
           var start = GeometryTools.pointAt(geometry, 0);
           var end = GeometryTools.pointAt(geometry,
             GeometryTools.length(geometry));
@@ -181,7 +181,7 @@ class CamGeneratedFixtures {
       .profile(contour, tool, -0.002, 0.005, "outside").finish();
     var arcs = 0, cornerMeeting = 0;
     for (op in program.ops) switch op {
-      case Feed(geometry, _, _, span) if (span.line == 1):
+      case Move(Cut, geometry, _, _, span) if (span.line == 1):
         switch geometry {
           case Arc(_, _, _, _): arcs++;
           case _:
@@ -210,7 +210,7 @@ class CamGeneratedFixtures {
       .profile(contour, tool, -0.002, 0.005, "inside").finish();
     var insideArcs = 0;
     for (op in inside.ops) switch op {
-      case Feed(Arc(center, radius, _, sweep), _, _, _):
+      case Move(Cut, Arc(center, radius, _, sweep), _, _, _):
         insideArcs++;
         check(Math.abs(center.x - 0.01) < 1e-9 &&
           Math.abs(center.y - 0.01) < 1e-9 &&
@@ -227,7 +227,7 @@ class CamGeneratedFixtures {
         .profile(reversed, tool, -0.002, 0.005, side).finish();
       var reversedArcs = 0;
       for (op in reversedProgram.ops) switch op {
-        case Feed(Arc(_, _, _, _), _, _, _): reversedArcs++;
+        case Move(Cut, Arc(_, _, _, _), _, _, _): reversedArcs++;
         case _:
       }
       check(reversedArcs == (side == "outside" ? 5 : 1),
@@ -243,8 +243,8 @@ class CamGeneratedFixtures {
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
       "concave profile G-code recompiles with the same operations");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
-      case [Feed(a, _, _, _), Feed(b, _, _, _)],
-           [Rapid(a, _), Rapid(b, _)]:
+      case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
+           [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);
@@ -261,8 +261,8 @@ class CamGeneratedFixtures {
       insideImported.ops.length == inside.ops.length,
       "concave inside G-code recompiles with the same operations");
     for (index in 0...inside.ops.length) switch [inside.ops[index], insideImported.ops[index]] {
-      case [Feed(a, _, _, _), Feed(b, _, _, _)],
-           [Rapid(a, _), Rapid(b, _)]:
+      case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
+           [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);
@@ -377,7 +377,7 @@ class CamGeneratedFixtures {
       .finish();
     var holeFeeds = 0, lastHoleIndex = -1, firstOutsideIndex = program.ops.length;
     for (index in 0...program.ops.length) switch program.ops[index] {
-      case Feed(geometry, _, _, span) if (span.line == 1 || span.line == 2):
+      case Move(Cut, geometry, _, _, span) if (span.line == 1 || span.line == 2):
         var start = GeometryTools.pointAt(geometry, 0);
         var end = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
         if (Math.abs(start.z - end.z) > 1e-9) continue;
@@ -393,7 +393,7 @@ class CamGeneratedFixtures {
           check(Math.abs(radius - expectedRadius) < 0.00002,
             "hole cutter centre follows the inner offset");
         }
-      case Feed(_, _, _, span) if (span.line == 3):
+      case Move(Cut, _, _, _, span) if (span.line == 3):
         if (index < firstOutsideIndex) firstOutsideIndex = index;
       case _:
     }
@@ -408,8 +408,8 @@ class CamGeneratedFixtures {
     check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
       "holed plate G-code round trips through CncKit");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
-      case [Feed(a, _, _, _), Feed(b, _, _, _)],
-           [Rapid(a, _), Rapid(b, _)]:
+      case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
+           [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);

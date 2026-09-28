@@ -1,5 +1,6 @@
 package camkit;
 
+import toolpathkit.path.MoveKind;
 import cadkit.Face;
 import toolpathkit.tool.Tool;
 import cnckit.CncChannels;
@@ -462,7 +463,7 @@ class CamJob {
 
   function rapid(target:Point3, span:Provenance):Void {
     if (current.distanceTo(target) > 1e-12)
-      ops.push(ToolpathOp.Rapid(PathGeometry.Line(current, target), span));
+      ops.push(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(current, target), 0.0, 0.0, span));
     current = target;
   }
 
@@ -473,13 +474,13 @@ class CamJob {
 
   function feedTo(target:Point3, speed:Float, span:Provenance):Void {
     if (current.distanceTo(target) > 1e-12)
-      ops.push(ToolpathOp.Feed(PathGeometry.Line(current, target), speed, 0.0, span));
+      ops.push(ToolpathOp.Move(MoveKind.Cut, PathGeometry.Line(current, target), speed, 0.0, span));
     current = target;
   }
 
   function feedGeometry(geometry:PathGeometry, speed:Float,
       span:Provenance):Void {
-    ops.push(ToolpathOp.Feed(geometry, speed, 0.0, span));
+    ops.push(ToolpathOp.Move(MoveKind.Cut, geometry, speed, 0.0, span));
     current = toolpathkit.path.GeometryTools.pointAt(geometry,
       toolpathkit.path.GeometryTools.length(geometry));
   }

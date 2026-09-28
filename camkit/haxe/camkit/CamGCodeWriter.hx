@@ -20,12 +20,12 @@ class CamGCodeWriter {
     while (index < program.ops.length) {
       var op = program.ops[index];
       switch op {
-      case Rapid(geometry, _):
+      case Move(Rapid, geometry, _, _, _):
         switch geometry {
           case Line(_, end): lines.push('G0 ${xyz(end)}');
           case _: throw "CAM rapid export needs a line";
         }
-      case Feed(geometry, speed, blend, _):
+      case Move(_, geometry, speed, blend, _):
         if (blend != 0.0) throw "CAM G-code export needs exact-stop feeds";
         var command = 'F${number(speed * 60000.0)} ';
         switch geometry {

@@ -1,5 +1,6 @@
 package cnckit.interp;
 
+import toolpathkit.path.MoveKind;
 import cnckit.CncChannels;
 import cnckit.CncDiagnostic;
 import cnckit.CncDiagnostic.CncSeverity;
@@ -371,8 +372,8 @@ class CncInterpreter {
         fail(line, column(i, column(j, column(k, column(r, 1)))),
           "I/J/K/R require G2 or G3");
       if (start.distanceTo(end) <= 1e-12) return;
-      if (mode == 0) ops.push(ToolpathOp.Rapid(PathGeometry.Line(start, end), span));
-      else ops.push(ToolpathOp.Feed(PathGeometry.Line(start, end), feed(line), state.blendTolerance, span));
+      if (mode == 0) ops.push(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(start, end), 0.0, 0.0, span));
+      else ops.push(ToolpathOp.Move(MoveKind.Cut, PathGeometry.Line(start, end), feed(line), state.blendTolerance, span));
     } else {
       if (machineCoordinates) fail(line, span.column, "G53 requires G0/G1 motion");
       var plane = state.plane;
@@ -419,7 +420,7 @@ class CncInterpreter {
         PathGeometry.Circular(center, radius, begin, sweep,
           plane == 17 ? ArcPlane.XY : plane == 18 ? ArcPlane.XZ : ArcPlane.YZ,
           rise);
-      ops.push(ToolpathOp.Feed(geometry, feed(line), state.blendTolerance, span));
+      ops.push(ToolpathOp.Move(MoveKind.Cut, geometry, feed(line), state.blendTolerance, span));
     }
     state.position = target;
   }
@@ -518,7 +519,7 @@ class CncInterpreter {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
     var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      ops.push(ToolpathOp.Rapid(PathGeometry.Line(start, end), span));
+      ops.push(ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(start, end), 0.0, 0.0, span));
     state.position = target.copy();
   }
 
@@ -526,7 +527,7 @@ class CncInterpreter {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
     var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      ops.push(ToolpathOp.Feed(PathGeometry.Line(start, end), speed, 0.0, span));
+      ops.push(ToolpathOp.Move(MoveKind.Cut, PathGeometry.Line(start, end), speed, 0.0, span));
     state.position = target.copy();
   }
 

@@ -1,5 +1,6 @@
 import camkit.CamContour;
-import camkit.CamFixture;
+
+import toolpathkit.path.MoveKind;import camkit.CamFixture;
 import camkit.CamGCodeWriter;
 import camkit.CamJob;
 import camkit.CamProgram;
@@ -50,8 +51,8 @@ class CamSetupFixture {
       0.0, -0.003, 0.009);
     var rapidError = "";
     var traverse = new CamProgram([
-      ToolpathOp.Rapid(PathGeometry.Line(new Point3(0.0, 0.0, 0.008),
-        new Point3(0.01, 0.0, 0.008)), new Provenance(2, 1, 1)),
+      ToolpathOp.Move(MoveKind.Rapid, PathGeometry.Line(new Point3(0.0, 0.0, 0.008),
+        new Point3(0.01, 0.0, 0.008)), 0.0, 0.0, new Provenance(2, 1, 1)),
       ToolpathOp.End(new Provenance(3, 1, 1))
     ]);
     try CamGCodeWriter.write(traverse, highClearance, machine)
@@ -67,7 +68,7 @@ class CamSetupFixture {
     check(blockedSafeZ, "setup rejects a safe Z below a fixture top");
     var arcProgram = new CamProgram([
       ToolpathOp.ToolChange(7, new Provenance(4, 1, 1)),
-      ToolpathOp.Feed(PathGeometry.Arc(new Point3(0.02, 0.02, -0.001),
+      ToolpathOp.Move(MoveKind.Cut, PathGeometry.Arc(new Point3(0.02, 0.02, -0.001),
         0.01, 0.0, Math.PI), 0.01, 0.0, new Provenance(5, 1, 1)),
       ToolpathOp.End(new Provenance(6, 1, 1))
     ]);

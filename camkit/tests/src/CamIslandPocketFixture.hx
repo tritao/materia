@@ -34,7 +34,7 @@ class CamIslandPocketFixture {
     var left = -1, right = -1, bossFinishing = 0;
     var ramps = 0, plunges = 0;
     for (index in 0...program.ops.length) switch program.ops[index] {
-      case Feed(Line(a, b), speed, _, _) if (b.z < a.z - 1e-9):
+      case Move(Cut, Line(a, b), speed, _, _) if (b.z < a.z - 1e-9):
         var xy = Math.sqrt(Math.pow(b.x - a.x, 2) +
           Math.pow(b.y - a.y, 2));
         if (xy > 1e-9) {
@@ -48,12 +48,12 @@ class CamIslandPocketFixture {
           check(Math.abs(speed - 0.001) < 1e-10,
             "island pocket vertical entry uses configured plunge feed");
         }
-      case Feed(Line(a, b), _, _, _) if (Math.abs(a.z + 0.002) < 1e-9 &&
+      case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z + 0.002) < 1e-9 &&
           Math.abs(b.z + 0.002) < 1e-9 && Math.abs(a.y - 0.015) < 1e-9 &&
           Math.abs(b.y - 0.015) < 1e-9):
         if (a.x < 0.015 && b.x < 0.015) left = index;
         if (a.x > 0.025 && b.x > 0.025) right = index;
-      case Feed(Arc(center, _, _, _), _, _, _) if (Math.abs(center.z + 0.002) < 1e-9 &&
+      case Move(Cut, Arc(center, _, _, _), _, _, _) if (Math.abs(center.z + 0.002) < 1e-9 &&
           center.x >= 0.015 && center.x <= 0.025 &&
           center.y >= 0.011 && center.y <= 0.019):
         bossFinishing++;
@@ -67,7 +67,7 @@ class CamIslandPocketFixture {
       "island pocket uses ramps where possible and slow plunges in short spans");
     var retracted = false;
     for (index in (left + 1)...right) switch program.ops[index] {
-      case Rapid(Line(a, b), _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
+      case Move(Rapid, Line(a, b), _, _, _) if (a.z < 0 && b.z >= 0.005 - 1e-9):
         retracted = true;
       case _:
     }
@@ -75,7 +75,7 @@ class CamIslandPocketFixture {
 
     var cutterRadius = tool.diameter * 0.5;
     for (op in program.ops) switch op {
-      case Feed(geometry, _, _, _):
+      case Move(Cut, geometry, _, _, _):
         var start = GeometryTools.pointAt(geometry, 0);
         var end = GeometryTools.pointAt(geometry,
           GeometryTools.length(geometry));
@@ -95,7 +95,7 @@ class CamIslandPocketFixture {
       if (!outsideBoss(point)) continue;
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
-        case Feed(geometry, _, _, _):
+        case Move(Cut, geometry, _, _, _):
           var start = GeometryTools.pointAt(geometry, 0);
           var end = GeometryTools.pointAt(geometry,
             GeometryTools.length(geometry));
@@ -123,7 +123,7 @@ class CamIslandPocketFixture {
       imported.ops.length == program.ops.length,
       "island pocket G-code recompiles with the same operation count");
     for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
-      case [Feed(a, feedA, _, _), Feed(b, feedB, _, _)]:
+      case [Move(Cut, a, feedA, _, _), Move(Cut, b, feedB, _, _)]:
         check(Math.abs(feedA - feedB) < 1e-8,
           "island pocket G-code preserves ramp and plunge feeds");
         for (fraction in [0.0, 0.5, 1.0]) {
@@ -134,7 +134,7 @@ class CamIslandPocketFixture {
           check(original.distanceTo(reparsed) < 1e-8,
             "island pocket G-code preserves geometry");
         }
-      case [Rapid(a, _), Rapid(b, _)]:
+      case [Move(Rapid, a, _, _, _), Move(Rapid, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
           var original = GeometryTools.pointAt(a,
             GeometryTools.length(a) * fraction);
@@ -153,7 +153,7 @@ class CamIslandPocketFixture {
     check(twoBossProgram.lower(machine).diagnostics.length == 0,
       "face pocket supports two separate islands");
     for (op in twoBossProgram.ops) switch op {
-      case Feed(geometry, _, _, _):
+      case Move(Cut, geometry, _, _, _):
         var a = GeometryTools.pointAt(geometry, 0);
         var b = GeometryTools.pointAt(geometry,
           GeometryTools.length(geometry));

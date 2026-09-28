@@ -49,8 +49,8 @@ class CamSetup {
         var tool = machine.tool(number);
         if (tool.diameter <= 0.0) fail(span, 'tool $number needs a positive diameter');
         radius = tool.diameter * 0.5;
-      case Rapid(geometry, span): checkPath(geometry, span, radius, false);
-      case Feed(geometry, _, _, span): checkPath(geometry, span, radius, true);
+      case Move(Rapid, geometry, _, _, span): checkPath(geometry, span, radius, false);
+      case Move(_, geometry, _, _, span): checkPath(geometry, span, radius, true);
       case _:
     }
   }

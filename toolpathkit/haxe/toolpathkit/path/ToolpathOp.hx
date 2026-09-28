@@ -6,8 +6,8 @@ import toolpathkit.path.ArcPlane;
 
 /** Controller-independent CNC operations in LinuxCNC block order. */
 enum ToolpathOp {
-  Rapid(geometry:PathGeometry, span:Provenance);
-  Feed(geometry:PathGeometry, speed:Float, blendTolerance:Float, span:Provenance);
+  Move(kind:MoveKind, geometry:PathGeometry, feed:Float,
+    tolerance:Float, provenance:Provenance);
   Dwell(seconds:Float, span:Provenance);
   Spindle(channel:String, value:Float, span:Provenance);
   Coolant(channel:String, enabled:Bool, span:Provenance);

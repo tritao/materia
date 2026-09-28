@@ -15,7 +15,7 @@ class CncTravelChecks {
     for (op in ops) {
       var geometry:PathGeometry = null, span:Provenance = null;
       switch op {
-        case Rapid(g, s), Feed(g, _, _, s): geometry = g; span = s;
+        case Move(_, g, _, _, s): geometry = g; span = s;
         case _:
       }
       if (geometry == null) continue;

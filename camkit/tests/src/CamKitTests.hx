@@ -1,5 +1,6 @@
 import camkit.CamContour;
-import camkit.CamGCodeWriter;
+
+import toolpathkit.path.MoveKind;import camkit.CamGCodeWriter;
 import camkit.CamJob;
 import camkit.CamSheetProfiles;
 import cadkit.modeling.Sketch;
@@ -76,7 +77,7 @@ class CamKitTests {
       "profile, pocket rings, and drills create ordered CNC geometry");
     var outsideArcs = 0;
     for (op in program.ops) switch op {
-      case ToolpathOp.Feed(PathGeometry.Arc(_, radius, _, sweep), _, _, span):
+      case ToolpathOp.Move(Cut, PathGeometry.Arc(_, radius, _, sweep), _, _, span):
         if (span.line == 1) {
           outsideArcs++;
           near(radius, 0.001, "outside profile joins by cutter radius");
@@ -90,7 +91,7 @@ class CamKitTests {
       .profile(contour, tool, -0.005, 0.01, "outside", 0.002).finish();
     var levels:Array<Float> = [];
     for (op in stepped.ops) switch op {
-      case ToolpathOp.Feed(PathGeometry.Arc(center, _, _, _), _, _, _):
+      case ToolpathOp.Move(Cut, PathGeometry.Arc(center, _, _, _), _, _, _):
         if (levels.length == 0 || Math.abs(center.z - levels[levels.length - 1]) > 1e-9)
           levels.push(center.z);
       case _:
@@ -103,7 +104,7 @@ class CamKitTests {
       var sample = new Point3(x * 0.001, y * 0.001, -0.001);
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
-        case ToolpathOp.Feed(PathGeometry.Line(a, b), _, _, span):
+        case ToolpathOp.Move(Cut, PathGeometry.Line(a, b), _, _, span):
           if (span.line == 2 && Math.abs(a.z + 0.001) < 1e-9 &&
               Math.abs(b.z + 0.001) < 1e-9)
             best = Math.min(best, distanceToLine(sample, a, b));
@@ -161,9 +162,9 @@ class CamKitTests {
 
   static function equalOp(left:ToolpathOp, right:ToolpathOp, index:Int):Void {
     switch [left, right] {
-      case [ToolpathOp.Rapid(a, _), ToolpathOp.Rapid(b, _)]: equalGeometry(a, b, index);
-      case [ToolpathOp.Feed(a, speedA, blendA, _),
-            ToolpathOp.Feed(b, speedB, blendB, _)]:
+      case [ToolpathOp.Move(Rapid, a, _, _, _), ToolpathOp.Move(Rapid, b, _, _, _)]: equalGeometry(a, b, index);
+      case [ToolpathOp.Move(Cut, a, speedA, blendA, _),
+            ToolpathOp.Move(Cut, b, speedB, blendB, _)]:
         equalGeometry(a, b, index);
         near(speedA, speedB, 'feed $index', 1e-8);
         near(blendA, blendB, 'blend $index');
