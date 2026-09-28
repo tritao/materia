@@ -811,13 +811,38 @@ derivation policy, not a shape), and `mass`.
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
 `SurfaceTool` (enable/disable, standoff), `Sander` (speed, contact force),
-`Sprayer` (flow, pressure), and `Gripper` (open/close, observed grasp
-state). Every command method takes the caller's `timestampNs` explicitly —
+`Sprayer` (flow, pressure), `Gripper` (open/close, observed grasp state),
+and `Vacuum` (enable/disable, observed holding state). `ToolRuntime` pairs
+one mounted `Tool` with any combination of these typed capabilities, so
+one end effector can grip and apply vacuum independently. `ChannelToolAdapter`
+maps digital process channels to gripper and vacuum commands. `ToolRuntimeSelection`
+routes events to one active configuration and applies each old channel's safe
+value when switching tools. Every command
+method takes the caller's `timestampNs` explicitly —
 simulated implementations never read a wall clock, keeping planners
 deterministic. `Simulated*` classes implement each interface by recording
 every commanded state change, with its timestamp, into a `history` array
 (e.g. `SimulatedSprayer.history:Array<SprayerEvent>`) so tests and coverage
 tracking can observe exactly what was commanded and when.
+`SimulatedGripper` requires a contact observation after closing before it
+reports a grasp. `SimulatedVacuum` requires a measured vacuum magnitude at or
+above its configured hold threshold after enabling before it reports a hold.
+Both record sensor observations separately from commands; opening or disabling
+clears the observed pickup.
+`SimulatedToolSensorAdapter` routes `tool_contact` (0/1) and
+`tool_vacuum_kpa` (non-negative vacuum magnitude) `SensorFrame` values from a
+robot snapshot to the selected tool. Bindings use configuration-specific sensor
+IDs. Frames require the `robotkit.monotonic` source clock so observations older
+than the tool selection can be ignored; repeated sequences are ignored too.
+The runtime accepts both kinds as externally published sensors at authored
+mounts, allowing a simulation sensor producer to publish them without a native
+physics sensor.
+
+`cadbridge.EndEffectorRuntimeBridge` builds a `ToolRuntime` from a selected
+`EndEffectorSet` configuration and working frame. Each explicit control binding
+names a digital output channel and its actuator inlet in the coupled assembly;
+the bridge checks the inlet's role, service kind, and upstream supply before
+binding it. Configuration-qualified tool IDs keep swappable tools distinct.
 
 `Manipulator` carries the mounted tool's `flangeTTcp` (identity when no
 tool is attached) and exposes it at the TCP level: `tcpPose(q)` is

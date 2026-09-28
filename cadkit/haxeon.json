@@ -8,8 +8,8 @@
   ],
   "scopeSourceRoots": false,
   "dependencies": {
-    "kinematics": {
-      "path": "../kinematics"
+    "projectkit": {
+      "path": "../projectkit"
     }
   },
   "ffi": {

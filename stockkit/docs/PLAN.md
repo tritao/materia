@@ -4,7 +4,7 @@
 
 ```text
 camkit ──┐
-cnckit ──┼─► stockkit (Haxe API) ─► stockkit-core (C++, C ABI, no dependencies)
+toolpathkit ──┼─► stockkit (Haxe API) ─► stockkit-core (C++, C ABI, no dependencies)
 motionkit┘        │
                   └─► cadkit (stock/target tessellation; OCCT oracle in tests only)
 ```
@@ -32,13 +32,13 @@ arrive as triangle buffers, so the core never links OCCT.
 
 0. **Groundwork** (done): references read, tool profile type, exact OCCT
    oracle, fixture set.
-1. **Tool model** (done): `CutterProfile` moved to `cnckit.tool` and carried
-   by `CncTool`; a diameter-only tool simulates as a flat mill. Profiles from
+1. **Tool model** (done): `CutterProfile` moved to `toolpathkit.tool` and carried
+   by `Tool`; a diameter-only tool simulates as a flat mill. Profiles from
    CadKit solids later.
 2. **Motion input** (done for 3-axis): `CutMove` = tool + motion in the
-   workpiece frame + provenance (op index, `CncSpan`); `CutMoves.fromOps`
+   workpiece frame + provenance (op index, `Provenance`); `CutMoves.fromProgram`
    adapts CamKit programs and compiled G-code, using the new
-   `CncOp.ToolLengthOffset` to recover tool tips. Motion is an analytic path
+   `ToolpathOp.ToolLengthOffset` to recover tool tips. Motion is an analytic path
    with a +Z tool axis; sampled 6-DOF poses arrive with phase 7. Work offsets
    are a translation for now.
 3. **Stock core, Z grid** (done): tiled rays of sorted
@@ -57,7 +57,7 @@ arrive as triangle buffers, so the core never links OCCT.
    only until phase 6.
 5. **Preview and editor** (milestone 1): Z-grid mesh, SceneKit colouring by
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
-   pick → operation → `CncSpan`. The StockKit side is done and headless:
+   pick → operation → `Provenance`. The StockKit side is done and headless:
    column meshes per chunk of tiles with dirty tracking, colouring by source
    or per ray, snapshots and a timeline, and pick to `CutMove`. The editor
    has a minimal viewer: a Stock simulation object running a CamKit demo

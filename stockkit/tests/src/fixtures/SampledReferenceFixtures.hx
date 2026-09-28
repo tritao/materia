@@ -3,9 +3,9 @@ package fixtures;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncPoint;
-import cnckit.tool.CutterProfile;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.Point3;
+import toolpathkit.tool.CutterProfile;
 import oracle.ExactOracle;
 import oracle.SampledReference;
 
@@ -28,8 +28,8 @@ class SampledReferenceFixtures {
     var flat = CutterProfile.flat(2 * R, 0.02);
     var ball = CutterProfile.ball(2 * R, 0.02);
     var depth = 0.002;
-    var slot:CncGeometry = Line(new CncPoint(0.01, 0.01, -depth),
-      new CncPoint(0.03, 0.01, -depth));
+    var slot:PathGeometry = Line(new Point3(0.01, 0.01, -depth),
+      new Point3(0.03, 0.01, -depth));
 
     // Flat slot: the tool bottom to its top, wherever the ray is under the stadium.
     brackets(flat, slot, 0.02, 0.012, [{lo: -depth, hi: -depth + 0.02}], "flat slot middle");
@@ -51,15 +51,15 @@ class SampledReferenceFixtures {
       "ball slot floor");
 
     // Plunge: the lowest tip height to the highest top.
-    var plunge:CncGeometry = Line(new CncPoint(0.02, 0.01, 0.001),
-      new CncPoint(0.02, 0.01, -0.003));
+    var plunge:PathGeometry = Line(new Point3(0.02, 0.01, 0.001),
+      new Point3(0.02, 0.01, -0.003));
     brackets(flat, plunge, 0.021, 0.01, [{lo: -0.003, hi: 0.021}], "plunge");
 
     // Ball ramp: the ball's centre sweeps a 3D segment, so the lowest point
     // on the ray is the lowest point of a capsule of the ball's radius.
     var hemisphere = CutterProfile.ball(2 * R, R);
-    var a = new CncPoint(0.01, 0.01, -0.001), b = new CncPoint(0.03, 0.012, -0.004);
-    var ramp:CncGeometry = Line(a, b);
+    var a = new Point3(0.01, 0.01, -0.001), b = new Point3(0.03, 0.012, -0.004);
+    var ramp:PathGeometry = Line(a, b);
     for (ray in [{x: 0.02, y: 0.0125}, {x: 0.012, y: 0.0085}, {x: 0.031, y: 0.013},
         {x: 0.0285, y: 0.009}]) {
       var lowest = capsuleLowest(a, b, R, ray.x, ray.y);
@@ -82,8 +82,8 @@ class SampledReferenceFixtures {
   /** Outer minus inner shrinks as samples are added. */
   static function convergence():Void {
     var bull = CutterProfile.bullNose(2 * R, 0.001, 0.01);
-    var ramp:CncGeometry = Line(new CncPoint(0.01, 0.01, 0.0), new CncPoint(0.03, 0.015, -0.002));
-    var arc:CncGeometry = Arc(new CncPoint(0.02, 0.01, -0.001), 0.002, 0.3, 2.5);
+    var ramp:PathGeometry = Line(new Point3(0.01, 0.01, 0.0), new Point3(0.03, 0.015, -0.002));
+    var arc:PathGeometry = Arc(new Point3(0.02, 0.01, -0.001), 0.002, 0.3, 2.5);
     for (move in [ramp, arc]) for (ray in [{x: 0.021, y: 0.0135}, {x: 0.019, y: 0.0105}]) {
       var previous = Math.POSITIVE_INFINITY;
       for (samples in [16, 128, 1024]) {
@@ -105,7 +105,7 @@ class SampledReferenceFixtures {
     // the helix axis is always under the tool, so it is cut from the final
     // tip height up to the starting tool top.
     var flat = CutterProfile.flat(2 * R, 0.01);
-    var helix:CncGeometry = Circular(new CncPoint(0.02, 0.01, 0.0), 0.001, 0.0,
+    var helix:PathGeometry = Circular(new Point3(0.02, 0.01, 0.0), 0.001, 0.0,
       4 * Math.PI, XY, -0.002);
     brackets(flat, helix, 0.02, 0.01, [{lo: -0.002, hi: 0.01}], "helix axis");
     // Off-axis rays: bounds stay nested and tight.
@@ -116,7 +116,7 @@ class SampledReferenceFixtures {
     Assert.check(SampledReference.measure(bounds.outer) - SampledReference.measure(bounds.inner) < 1e-5,
       "helix edge ray: bounds are tight");
     var refused = false;
-    try SampledReference.sweep(flat, Circular(new CncPoint(0, 0, 0), 0.001, 0, 1, XZ, 0),
+    try SampledReference.sweep(flat, Circular(new Point3(0, 0, 0), 0.001, 0, 1, XZ, 0),
       0, 0, 10) catch (_:Dynamic) refused = true;
     Assert.check(refused, "arcs outside the XY plane are refused");
   }
@@ -124,11 +124,11 @@ class SampledReferenceFixtures {
   /** The exact oracle's stock lies within the reference's remaining-material bounds. */
   static function againstOracle():Void {
     var ball = CutterProfile.ball(2 * R, 0.02);
-    var cases:Array<{name:String, moves:Array<CncGeometry>, rays:Array<{x:Float, y:Float}>}> = [
-      {name: "ball slot", moves: [Line(new CncPoint(0.01, 0.01, -0.004),
-        new CncPoint(0.03, 0.01, -0.004))],
+    var cases:Array<{name:String, moves:Array<PathGeometry>, rays:Array<{x:Float, y:Float}>}> = [
+      {name: "ball slot", moves: [Line(new Point3(0.01, 0.01, -0.004),
+        new Point3(0.03, 0.01, -0.004))],
         rays: [{x: 0.02, y: 0.012}, {x: 0.0315, y: 0.0105}, {x: 0.02, y: 0.0129}]},
-      {name: "ball arc", moves: [Arc(new CncPoint(0.02, 0.01, -0.004), 0.005, 0, Math.PI)],
+      {name: "ball arc", moves: [Arc(new Point3(0.02, 0.01, -0.004), 0.005, 0, Math.PI)],
         rays: [{x: 0.02, y: 0.015}, {x: 0.0245, y: 0.0115}, {x: 0.0172, y: 0.0131}]}
     ];
     for (fixture in cases) {
@@ -153,7 +153,7 @@ class SampledReferenceFixtures {
   }
 
   /** The reference brackets a known swept set. */
-  static function brackets(profile:CutterProfile, move:CncGeometry, x:Float, y:Float,
+  static function brackets(profile:CutterProfile, move:PathGeometry, x:Float, y:Float,
       exact:Array<Span>, message:String):Void {
     var bounds = SampledReference.sweep(profile, move, x, y, 1000);
     Assert.check(SampledReference.contains(bounds.inner, exact, bounds.outer, SLACK),
@@ -167,7 +167,7 @@ class SampledReferenceFixtures {
     and `b` on the vertical line at (x, y): the lower of the end spheres and
     the cylinder around the segment, clipped to its length.
   **/
-  static function capsuleLowest(a:CncPoint, b:CncPoint, radius:Float, x:Float, y:Float):Float {
+  static function capsuleLowest(a:Point3, b:Point3, radius:Float, x:Float, y:Float):Float {
     var lowest = Math.POSITIVE_INFINITY;
     for (end in [a, b]) {
       var dx = x - end.x, dy = y - end.y, h = radius * radius - dx * dx - dy * dy;

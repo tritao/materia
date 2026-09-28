@@ -2,12 +2,13 @@ package cnckit;
 
 import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.interp.CncInterpreter;
-import cnckit.lower.CncLowering;
 import cnckit.parse.CncLexer;
-import cnckit.parse.CncSpan;
-import motionkit.program.MotionProgram;
+import toolpathkit.path.Provenance;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.GeometryOffset;
+import toolpathkit.setup.TravelEnvelope;
 
-/** Compatibility facade over lexing, modal interpretation, and MotionKit lowering. */
+/** Parses and interprets G-code into the shared toolpath format. */
 class CncCompiler {
   public final machine:CncMachine;
   public var warnings(default, null):Array<String> = [];
@@ -17,36 +18,39 @@ class CncCompiler {
     this.machine = machine;
   }
 
-  /** Returns all diagnostics and the surviving preview/lowered operations. */
+  /** Returns diagnostics and the surviving toolpath operations. */
   public function compileDetailed(source:String):CncCompileResult {
     warnings = [];
     if (source == null) {
       var error = new CncDiagnostic(Error, "CNC_NULL_SOURCE",
-        new CncSpan(1, 1, 0), "CNC source must not be null");
-      return new CncCompileResult(null, [], new CncSourceMap(), [error]);
+        new Provenance(1, 1, 0), "CNC source must not be null");
+      return new CncCompileResult([], [error]);
     }
     var parsed = CncLexer.parse(source);
     var interpreter = new CncInterpreter(machine);
     var interpreted = interpreter.interpret(parsed.blocks);
     var compensated = CncCompensator.resolve(interpreted);
-    var ops = compensated.ops;
+    var machineOps = compensated.ops;
     var diagnostics = parsed.diagnostics.concat(interpreter.diagnostics);
     diagnostics = diagnostics.concat(compensated.diagnostics);
-    diagnostics = diagnostics.concat(CncTravelChecks.check(machine, ops));
-    var program:Null<MotionProgram> = null;
-    var sourceMap = new CncSourceMap();
-    try {
-      var lowered = new CncLowering(machine).lower(ops);
-      program = lowered.program;
-      sourceMap = lowered.sourceMap;
-      diagnostics = diagnostics.concat(lowered.diagnostics);
-    } catch (error:Dynamic) {
-      diagnostics.push(new CncDiagnostic(Error, "CNC_LOWER",
-        new CncSpan(1, 1, 0), Std.string(error)));
+    diagnostics = diagnostics.concat([for (violation in
+      TravelEnvelope.check(machine.travelLower, machine.travelUpper, machineOps))
+      new CncDiagnostic(Error, "CNC_TRAVEL", violation.provenance,
+        violation.message())]);
+    var ops:Array<ToolpathOp> = [];
+    var offset = machine.controller.workOffset(54);
+    for (op in machineOps) switch op {
+      case SetSetup(id, _):
+        offset = machine.controller.workOffset(Std.parseInt(id) + 53);
+        ops.push(op);
+      case Move(kind, geometry, feed, tolerance, provenance):
+        ops.push(ToolpathOp.Move(kind, GeometryOffset.translate(geometry,
+          [-offset[0], -offset[1], -offset[2]]), feed, tolerance, provenance));
+      case _: ops.push(op);
     }
-    if (program == null && diagnostics.length == 0)
+    if (ops.length == 0 && diagnostics.length == 0)
       diagnostics.push(new CncDiagnostic(Error, "CNC_EMPTY",
-        new CncSpan(1, 1, 0), "G-code contains no executable motion or barrier"));
+        new Provenance(1, 1, 0), "G-code contains no executable motion or barrier"));
     diagnostics.sort(function(a, b) {
       if (a.span.line != b.span.line) return a.span.line - b.span.line;
       return a.span.column - b.span.column;
@@ -54,16 +58,6 @@ class CncCompiler {
     warnings = [for (diagnostic in diagnostics)
       if (diagnostic.severity == Warning)
         'G-code line ${diagnostic.span.line}: ${diagnostic.message}'];
-    return new CncCompileResult(program, ops, sourceMap, diagnostics);
-  }
-
-  /** Legacy entry point: throw the first error so existing MotionKit callers stay stable. */
-  public function compile(source:String):MotionProgram {
-    if (source == null) throw "CNC source must not be null";
-    var result = compileDetailed(source);
-    for (diagnostic in result.diagnostics)
-      if (diagnostic.severity == Error) throw diagnostic.toString();
-    if (result.program == null) throw "G-code contains no executable motion or barrier";
-    return result.program;
+    return new CncCompileResult(ops, diagnostics);
   }
 }

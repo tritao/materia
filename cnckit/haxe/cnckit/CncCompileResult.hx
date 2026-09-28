@@ -1,20 +1,14 @@
 package cnckit;
 
-import cnckit.ir.CncOp;
-import motionkit.program.MotionProgram;
+import toolpathkit.path.ToolpathOp;
 
-/** Detailed compilation result; program is null when no executable op survives. */
+/** G-code compilation result independent of motion execution. */
 class CncCompileResult {
-  public final program:Null<MotionProgram>;
-  public final ops:Array<CncOp>;
-  public final sourceMap:CncSourceMap;
+  public final ops:Array<ToolpathOp>;
   public final diagnostics:Array<CncDiagnostic>;
 
-  public function new(program:Null<MotionProgram>, ops:Array<CncOp>,
-      sourceMap:CncSourceMap, diagnostics:Array<CncDiagnostic>) {
-    this.program = program;
+  public function new(ops:Array<ToolpathOp>, diagnostics:Array<CncDiagnostic>) {
     this.ops = ops.copy();
-    this.sourceMap = sourceMap;
     this.diagnostics = diagnostics.copy();
   }
 }

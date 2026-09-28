@@ -28,7 +28,6 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
-import motionkit.robot.CncMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;

@@ -1,5 +1,19 @@
 package eoat;
 
+import cadkit.modeling.Part;
+import machinekit.assembly.MachineAssembly;
+import machinekit.component.ComponentDetail;
+import machinekit.component.MachineComponent;
+
+private class ExampleAirSource extends MachineComponent {
+	public function new() {
+		super("EXAMPLE-AIR-SOURCE", "Test cell air source", "steel", true);
+		addPort({name: "air", kind: Pneumatic, role: Supply, iface: PushIn(6), required: false});
+	}
+
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 10, 10);
+}
+
 /** Smoke checks for both generic changer configurations. */
 class EndEffectorExampleChecks {
 	static function check(value:Bool, message:String):Void if (!value) throw message;
@@ -25,12 +39,33 @@ class EndEffectorExampleChecks {
 			"Tool contact should move with bar length");
 		for (configuration in [short, long]) {
 			var source = configuration.upstream("tool/cup", "vacuum");
-			check(source.instanceId == "robot/master" && source.portName == "airIn1",
+			check(source.port.instanceId == "robot/master" && source.port.portName == "airIn1" && source.external,
 				"Cup vacuum should trace to robot-side air");
 			var signal = configuration.upstream("tool/changer", "signalIn");
-			check(signal.instanceId == "robot/master" && signal.portName == "signalIn",
+			check(signal.port.instanceId == "robot/master" && signal.port.portName == "signalIn" && signal.external,
 				"Tool signal should trace to robot-side signal");
 		}
+		var cell = new MachineAssembly();
+		cell.include("tool", short);
+		cell.addComponent("airSource", new ExampleAirSource());
+		cell.connectPorts("feed", "airSource", "air", "tool/robot/master", "airIn1");
+		cell.exposePort("robotSignal", "tool/robot/master", "signalIn");
+		cell.exposePort("lock", "tool/robot/master", "lock");
+		check(cell.validate().length == 0, "Cell with an air source validates");
+		var supplied = cell.upstream("tool/tool/cup", "vacuum");
+		check(!supplied.external && supplied.port.instanceId == "airSource" &&
+			supplied.port.portName == "air", "Cell vacuum trace reaches its air source");
+
+		var unfed = new MachineAssembly();
+		unfed.include("tool", short);
+		unfed.exposePort("robotSignal", "tool/robot/master", "signalIn");
+		unfed.exposePort("lock", "tool/robot/master", "lock");
+		var failure = "";
+		try unfed.validate() catch (error:Dynamic) failure = Std.string(error);
+		check(failure.indexOf("tool/tool/cup/vacuum") >= 0 &&
+			failure.indexOf("tool/robot/master/airIn1") >= 0 &&
+			failure.indexOf("is not supplied") >= 0,
+			"Unfed cell reports the complete cup service chain");
 	}
 
 	public static function main():Void {

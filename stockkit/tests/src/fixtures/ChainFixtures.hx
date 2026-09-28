@@ -3,10 +3,10 @@ package fixtures;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncPoint;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.Point3;
 import oracle.ExactOracle;
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.CutterProfile;
 
 /**
   Multi-move toolpaths whose moves join tangentially, cut with the exact
@@ -41,7 +41,7 @@ class ChainFixtures {
         }
     var refused = false;
     try ExactOracle.sweptSolid(CutterProfile.ball(2 * r, 0.02),
-      Arc(new CncPoint(0, 0, 0), r, 0, Math.PI / 2)).close()
+      Arc(new Point3(0, 0, 0), r, 0, Math.PI / 2)).close()
     catch (_:Dynamic) refused = true;
     Assert.check(refused, "a ball-mill arc of the ball's own radius is refused");
     for (tool in tools)
@@ -53,8 +53,8 @@ class ChainFixtures {
       corner:Float, origin:Vector, label:String):Void {
     var a = 0.012, b = 0.007, z = origin.z - depth;
     var x0 = origin.x + 0.005, y0 = origin.y + 0.005;
-    function p(x:Float, y:Float):CncPoint return new CncPoint(x0 + x, y0 + y, z);
-    var moves:Array<CncGeometry> = [
+    function p(x:Float, y:Float):Point3 return new Point3(x0 + x, y0 + y, z);
+    var moves:Array<PathGeometry> = [
       Line(p(corner, 0), p(corner + a, 0)),
       Arc(p(corner + a, corner), corner, -Math.PI / 2, Math.PI / 2),
       Line(p(2 * corner + a, corner), p(2 * corner + a, corner + b)),
@@ -74,8 +74,8 @@ class ChainFixtures {
       origin:Vector, label:String):Void {
     var a = 0.008, z = origin.z - depth;
     var x0 = origin.x + 0.005, y0 = origin.y + 0.005;
-    function p(x:Float, y:Float):CncPoint return new CncPoint(x0 + x, y0 + y, z);
-    var moves:Array<CncGeometry> = [
+    function p(x:Float, y:Float):Point3 return new Point3(x0 + x, y0 + y, z);
+    var moves:Array<PathGeometry> = [
       Line(p(0, 0), p(a, 0)),
       Arc(p(a, corner), corner, -Math.PI / 2, Math.PI / 2),
       Arc(p(a + 2 * corner, corner), corner, Math.PI, -Math.PI / 2),
@@ -87,7 +87,7 @@ class ChainFixtures {
       2 * cut.halfSectionArea() * length + cut.volume(), label);
   }
 
-  static function check(profile:CutterProfile, moves:Array<CncGeometry>,
+  static function check(profile:CutterProfile, moves:Array<PathGeometry>,
       origin:Vector, expected:Float, label:String):Void {
     var width = 0.04, height = 0.03, thickness = 0.01;
     var box = Part.box(width, height, thickness, Min, Min, Max);

@@ -1,33 +1,37 @@
 package camkit;
 
-import cnckit.CncCompileResult;
-import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.CncTravelChecks;
-import cnckit.ir.CncOp;
-import cnckit.lower.CncLowering;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.tool.ToolLibrary;
+import toolpathkit.path.Provenance;
+import toolpathkit.setup.Setup;
 
 /** CNC IR produced directly by CAM, with operation numbers as source spans. */
 class CamProgram {
-  public final ops:Array<CncOp>;
+  public final ops:Array<ToolpathOp>;
   /** Every tool the program changes to, one per tool number. */
-  public final tools:Array<CncTool>;
+  public final tools:Array<Tool>;
+  public final setup:Null<Setup>;
 
-  public function new(ops:Array<CncOp>, ?tools:Array<CncTool>) {
+  public function new(ops:Array<ToolpathOp>, ?tools:Array<Tool>, ?setup:Setup) {
     if (ops == null || ops.length == 0) throw "CAM program needs operations";
     this.ops = ops.copy();
+    this.setup = setup;
+    if (setup != null)
+      this.ops.unshift(ToolpathOp.SetSetup(setup.id, Provenance.cam(0)));
     this.tools = tools == null ? [] : tools.copy();
   }
 
-  public function tool(number:Int):CncTool {
+  public function tool(number:Int):Tool {
     for (tool in tools) if (tool.number == number) return tool;
     throw 'CAM program has no tool $number';
   }
 
-  public function lower(machine:CncMachine):CncCompileResult {
-    var diagnostics = CncTravelChecks.check(machine, ops);
-    var lowered = new CncLowering(machine).lower(ops);
-    return new CncCompileResult(lowered.program, ops, lowered.sourceMap,
-      diagnostics.concat(lowered.diagnostics));
+  public function toolpath():ToolpathProgram {
+    var library = new ToolLibrary();
+    for (tool in tools) library.set(tool);
+    return new ToolpathProgram(ops, library);
   }
+
 }

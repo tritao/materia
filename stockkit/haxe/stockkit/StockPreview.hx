@@ -75,7 +75,7 @@ class StockPreview {
   /**
     The move that made the surface under a picked triangle of chunk `chunk`,
     or null for untouched stock: the link from a click on the preview to the
-    operation and source line (`move.opIndex`, `move.span`).
+    operation and source line (`move.opIndex`, `move.provenance`).
   **/
   public function pick(chunk:Int, triangle:Int):Null<CutMove> {
     var mesh = meshes[chunk];

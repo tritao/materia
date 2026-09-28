@@ -10,8 +10,16 @@ import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.tool.ChannelToolAdapter;
 import robotkit.tool.SimulatedSprayer;
+import robotkit.tool.SimulatedGripper;
+import robotkit.tool.SimulatedVacuum;
+import robotkit.tool.Tool;
+import robotkit.tool.ToolRuntime;
+import robotkit.tool.ToolRuntimeSelection;
+import robotkit.tool.SimulatedToolSensorAdapter;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
+import robotkit.world.RobotSnapshot;
+import robotkit.world.SensorFrame;
 
 /** Toolpath authoring and B1 process-path conversion acceptance. */
 class ProcessTests {
@@ -21,6 +29,8 @@ class ProcessTests {
     assertions = 0;
     testToolpathConversion();
     testScheduledToolEvents();
+    testMultiCapabilityTool();
+    testSelectedToolSensorFrames();
     Sys.println('RobotKit process tests passed ($assertions assertions)');
     return assertions;
   }
@@ -73,6 +83,115 @@ class ProcessTests {
       Int64.compare(sprayer.history[1].timestampNs, Int64.ofInt(400)) == 0,
       "Sprayer timestamps use scheduled trajectory time");
   }
+
+  static function testMultiCapabilityTool():Void {
+    var gripper = new SimulatedGripper();
+    var vacuum = new SimulatedVacuum();
+    var tool = new Tool("combination", "combination", Transform3.identity());
+    var runtime = new ToolRuntime(tool, gripper, vacuum);
+    check(runtime.tool == tool && runtime.gripper == gripper && runtime.vacuum == vacuum,
+      "One mounted tool exposes both independent capabilities");
+
+    var adapter = new ChannelToolAdapter();
+    adapter.bindGripper("tool.grip", runtime.gripper);
+    adapter.bindVacuum("tool.vacuum", runtime.vacuum);
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.grip",
+      ProcessEventValue.Digital(true), Int64.ofInt(100), Int64.ofInt(105), 1));
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(200), Int64.ofInt(205), 1));
+    check(!gripper.isGrasped() && !vacuum.isHolding(),
+      "Commands alone do not claim a successful pickup");
+    gripper.observeContact(false, Int64.ofInt(220));
+    vacuum.observeVacuumKpa(20, Int64.ofInt(230));
+    check(!gripper.isGrasped() && !vacuum.isHolding(),
+      "Missed contact and low vacuum report no pickup");
+    gripper.observeContact(true, Int64.ofInt(240));
+    vacuum.observeVacuumKpa(45, Int64.ofInt(250));
+    check(gripper.isGrasped() && vacuum.isHolding(),
+      "Contact and sufficient vacuum confirm independent pickups");
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.grip",
+      ProcessEventValue.Digital(false), Int64.ofInt(300), Int64.ofInt(305), 1));
+    check(gripper.isOpen() && vacuum.isHolding(), "Opening the gripper leaves vacuum active");
+    adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
+      ProcessEventValue.Digital(false), Int64.ofInt(400), Int64.ofInt(405), 1));
+    check(!vacuum.isEnabled() && !vacuum.isHolding(), "Vacuum off releases its pickup");
+    gripper.close(Int64.ofInt(450));
+    vacuum.enable(Int64.ofInt(460));
+    check(!gripper.isGrasped() && !vacuum.isHolding() && vacuum.vacuumKpa() == 0,
+      "New commands require fresh feedback after a release");
+    gripper.observeContact(true, Int64.ofInt(470));
+    vacuum.observeVacuumKpa(40, Int64.ofInt(480));
+    check(gripper.isGrasped() && vacuum.isHolding(),
+      "Feedback at the vacuum threshold confirms a new pickup");
+    gripper.observeContact(false, Int64.ofInt(490));
+    vacuum.observeVacuumKpa(39, Int64.ofInt(500));
+    check(!gripper.isGrasped() && !vacuum.isHolding(),
+      "Lost contact or pressure clears observed pickup");
+    check(gripper.history.length == 3 && vacuum.history.length == 3 &&
+      Int64.compare(vacuum.history[0].timestampNs, Int64.ofInt(200)) == 0,
+      "Each capability records its own scheduled commands");
+    check(gripper.observations.length == 4 && vacuum.observations.length == 4 &&
+      Int64.compare(vacuum.observations[1].timestampNs, Int64.ofInt(250)) == 0,
+      "Sensor observations are recorded separately from commands");
+    var rejected = false;
+    try adapter.apply(new FiredProcessEvent(Int64.ofInt(1), "tool.vacuum",
+      ProcessEventValue.Analog(1.0), Int64.ofInt(500), Int64.ofInt(505), 1))
+    catch (_:Dynamic) rejected = true;
+    check(rejected && vacuum.history.length == 3,
+      "Vacuum rejects non-digital events without changing state");
+    rejected = false;
+    try vacuum.observeVacuumKpa(Math.NaN, Int64.ofInt(510)) catch (_:Dynamic) rejected = true;
+    check(rejected && vacuum.observations.length == 4,
+      "Invalid vacuum measurements do not change observed state");
+  }
+
+  static function testSelectedToolSensorFrames():Void {
+    var first = new ToolRuntime(new Tool("first", "first", Transform3.identity()),
+      new SimulatedGripper(), new SimulatedVacuum());
+    first.bindGripper("first.close");
+    first.bindVacuum("first.vacuum");
+    var second = new ToolRuntime(new Tool("second", "second", Transform3.identity()),
+      new SimulatedGripper());
+    second.bindGripper("second.close");
+    var selection = new ToolRuntimeSelection();
+    var sensors = new SimulatedToolSensorAdapter(selection);
+    sensors.bindGripperContact(first, "first/contact");
+    sensors.bindVacuumPressure(first, "first/pressure");
+    sensors.bindGripperContact(second, "second/contact");
+    selection.select(first, Int64.ofInt(100));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "first.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(101), Int64.ofInt(101), 1));
+    selection.apply(new FiredProcessEvent(Int64.ofInt(1), "first.vacuum",
+      ProcessEventValue.Digital(true), Int64.ofInt(102), Int64.ofInt(102), 1));
+    var missed = new RobotSnapshot("robot", Int64.ofInt(1), Int64.ofInt(110),
+      [], [], [], 0, 0, null, [toolSensor("first/contact", "tool_contact", 1, 110, 0),
+        toolSensor("first/pressure", "tool_vacuum_kpa", 1, 110, 20)]);
+    check(sensors.applySnapshot(missed) == 2 && !first.gripper.isGrasped() &&
+      !first.vacuum.isHolding(), "missed pickup sensor frames leave both capabilities unheld");
+    var pickup = new RobotSnapshot("robot", Int64.ofInt(2), Int64.ofInt(120),
+      [], [], [], 0, 0, null, [toolSensor("first/contact", "tool_contact", 2, 120, 1),
+        toolSensor("first/pressure", "tool_vacuum_kpa", 2, 120, 45)]);
+    check(sensors.applySnapshot(pickup) == 2 && first.gripper.isGrasped() &&
+      first.vacuum.isHolding(), "fresh sensor frames confirm both pickups");
+    check(sensors.applySnapshot(pickup) == 0, "repeated snapshot sequences do not replay feedback");
+
+    selection.select(second, Int64.ofInt(150));
+    check(!first.gripper.isGrasped() && !first.vacuum.isHolding(),
+      "tool change releases the previous configuration");
+    selection.apply(new FiredProcessEvent(Int64.ofInt(2), "second.close",
+      ProcessEventValue.Digital(true), Int64.ofInt(151), Int64.ofInt(151), 1));
+    check(!sensors.apply(toolSensor("first/contact", "tool_contact", 3, 160, 1)) &&
+      !sensors.apply(toolSensor("second/contact", "tool_contact", 1, 140, 1)),
+      "inactive and pre-selection observations are ignored");
+    check(sensors.apply(toolSensor("second/contact", "tool_contact", 2, 170, 1)) &&
+      second.gripper.isGrasped(), "active tool accepts fresh contact feedback");
+    check(sensors.apply(toolSensor("second/contact", "tool_contact", 3, 180, 0)) &&
+      !second.gripper.isGrasped(), "lost contact clears the active grasp");
+  }
+
+  static function toolSensor(id:String, kind:String, sequence:Int, timestamp:Int, value:Float):SensorFrame
+    return new SensorFrame(id, kind, "tool", Int64.ofInt(sequence), Int64.ofInt(timestamp),
+      [value], Int64.ofInt(timestamp), "", null, null, "robotkit.monotonic");
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool
     return Math.abs(a - b) <= tolerance;

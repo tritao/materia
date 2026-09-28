@@ -5,14 +5,14 @@ import camkit.CamJob;
 import cadkit.modeling.Align;
 import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
 import oracle.ExactOracle;
 import stockkit.CutMove;
 import stockkit.CutMoves;
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.CutterProfile;
 
 /**
   Reference cases for the simulator: each builds exact stock with the OCCT
@@ -28,9 +28,9 @@ class OracleFixtures {
 
   public static function run():Void {
     var r = 0.003, length = 0.02;
-    var a = new CncPoint(0.01, 0.01, 0), b = new CncPoint(0.03, 0.01, 0);
-    function slot(depth:Float):CncGeometry
-      return Line(new CncPoint(a.x, a.y, -depth), new CncPoint(b.x, b.y, -depth));
+    var a = new Point3(0.01, 0.01, 0), b = new Point3(0.03, 0.01, 0);
+    function slot(depth:Float):PathGeometry
+      return Line(new Point3(a.x, a.y, -depth), new Point3(b.x, b.y, -depth));
 
     // Flat end mill slot: stadium footprint times depth.
     var d = 0.002;
@@ -78,7 +78,7 @@ class OracleFixtures {
 
     // Plunge from above the stock: only the part below the top is removed.
     var plunge = removal(CutterProfile.flat(2 * r, 0.02),
-      [Line(new CncPoint(0.02, 0.01, 0.001), new CncPoint(0.02, 0.01, -0.003))], "plunge");
+      [Line(new Point3(0.02, 0.01, 0.001), new Point3(0.02, 0.01, -0.003))], "plunge");
     relative(plunge.removed, Math.PI * r * r * 0.003, "plunge removes a cylinder");
     plunge.stock.close();
 
@@ -86,7 +86,7 @@ class OracleFixtures {
     d = 0.004;
     var rho = 0.005;
     var arc = removal(CutterProfile.ball(2 * r, 0.02),
-      [Arc(new CncPoint(0.02, 0.01, -d), rho, 0, Math.PI)], "ball half arc");
+      [Arc(new Point3(0.02, 0.01, -d), rho, 0, Math.PI)], "ball half arc");
     relative(arc.removed, ballSection * rho * Math.PI + ballTool,
       "ball arc removes its section revolved plus the tool");
     rays(arc.stock, new Vector(0.02, 0.01 + rho, 0.05), new Vector(0, 0, -1), 0.1,
@@ -95,7 +95,7 @@ class OracleFixtures {
 
     // Full circle: the section revolved all the way round, with no caps.
     var circle = removal(CutterProfile.ball(2 * r, 0.02),
-      [Arc(new CncPoint(0.02, 0.01, -d), rho, Math.PI / 2, -2 * Math.PI)], "ball full circle");
+      [Arc(new Point3(0.02, 0.01, -d), rho, Math.PI / 2, -2 * Math.PI)], "ball full circle");
     Assert.near(circle.removed / (ballSection * rho * 2 * Math.PI), 1.0,
       "full-circle arc removes its section revolved once", VOLUME_TOLERANCE);
     circle.stock.close();
@@ -103,7 +103,7 @@ class OracleFixtures {
     // Caps reaching round into the sweep are refused, not mis-checked.
     var refused = false;
     try ExactOracle.sweptSolid(CutterProfile.ball(2 * r, 0.02),
-      Arc(new CncPoint(0.02, 0.01, -d), rho, 0, 1.9 * Math.PI)).close()
+      Arc(new Point3(0.02, 0.01, -d), rho, 0, 1.9 * Math.PI)).close()
     catch (_:Dynamic) refused = true;
     Assert.check(refused, "an arc whose caps overlap its sweep is refused");
 
@@ -116,18 +116,18 @@ class OracleFixtures {
   **/
   static function camProgram():Void {
     var contour = new CamContour([
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
-      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
     ]);
-    var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
+    var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
     // One 2 mm level: a 10% ramp would need 20 mm, longer than the first
     // 18 mm pass, so CamKit plunges vertically. The oracle cannot build the
     // swept solid of a ramp (XY and Z together) and would refuse it.
-    var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
+    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
       .finish();
     // Moves wholly above the stock cannot cut it; skipping them saves booleans.
-    var moves = [for (move in CutMoves.fromOps(program.ops, program.tool))
+    var moves = [for (move in CutMoves.fromProgram(program.toolpath()))
       if (switch move.motion { case Path(geometry): lowestPoint(geometry) < 0.0; }) move];
     Assert.check(moves.length > 5, "CAM pocket produces cutting moves");
     var result = removalOf(moves, "CAM pocket");
@@ -144,7 +144,7 @@ class OracleFixtures {
     result.stock.close();
   }
 
-  static function lowestPoint(geometry:CncGeometry):Float
+  static function lowestPoint(geometry:PathGeometry):Float
     return switch geometry {
       case Line(start, end): Math.min(start.z, end.z);
       case Arc(center, _, _, _): center.z;
@@ -152,7 +152,7 @@ class OracleFixtures {
     };
 
   static function removal(profile:CutterProfile,
-      moves:Array<CncGeometry>, label:String):{stock:Part, removed:Float}
+      moves:Array<PathGeometry>, label:String):{stock:Part, removed:Float}
     return removalOf(ExactOracle.pathMoves(profile, moves), label);
 
   /** Cuts `moves` exactly, and checks StockKit core's stock against the result ray by ray. */

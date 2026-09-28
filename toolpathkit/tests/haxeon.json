@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "toolpathkit-tests" },
+  "entry": "ToolpathKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "toolpathkit": { "path": ".." }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

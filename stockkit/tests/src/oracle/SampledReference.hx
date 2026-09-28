@@ -1,7 +1,7 @@
 package oracle;
 
-import cnckit.ir.CncGeometry;
-import cnckit.tool.CutterProfile;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.tool.CutterProfile;
 import stockkit.CutMove;
 
 /** A closed interval of heights along a +Z ray, in metres. */
@@ -14,7 +14,7 @@ typedef Span = {lo:Float, hi:Float};
 typedef SpanBounds = {inner:Array<Span>, outer:Array<Span>};
 
 /** One tool motion for the reference: the tool shape and its tip path. */
-typedef ReferenceMove = {profile:CutterProfile, geometry:CncGeometry};
+typedef ReferenceMove = {profile:CutterProfile, geometry:PathGeometry};
 
 /**
   Brute-force reference for the material one move sweeps along a vertical ray,
@@ -38,7 +38,7 @@ typedef ReferenceMove = {profile:CutterProfile, geometry:CncGeometry};
 **/
 class SampledReference {
   /** Bounds on the set of heights that `geometry` sweeps `profile` through along the ray at (x, y). */
-  public static function sweep(profile:CutterProfile, geometry:CncGeometry,
+  public static function sweep(profile:CutterProfile, geometry:PathGeometry,
       x:Float, y:Float, samples:Int):SpanBounds {
     if (samples < 1) throw "sampled reference needs at least one sample step";
     var path = new SampledPath(geometry);
@@ -160,9 +160,9 @@ class SampledReference {
 /** A tool-tip path with constant-speed parameter t in [0, 1]. */
 private class SampledPath {
   public final length:Float;
-  final geometry:CncGeometry;
+  final geometry:PathGeometry;
 
-  public function new(geometry:CncGeometry) {
+  public function new(geometry:PathGeometry) {
     this.geometry = geometry;
     length = switch geometry {
       case Line(a, b):

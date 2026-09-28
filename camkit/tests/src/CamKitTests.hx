@@ -1,6 +1,8 @@
 import camkit.CamContour;
-import camkit.CamGCodeWriter;
+
+import toolpathkit.path.MoveKind;import cnckit.CncWriter;
 import camkit.CamJob;
+import camkit.CamProgram;
 import camkit.CamSheetProfiles;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
@@ -10,11 +12,13 @@ import cadkit.sketch.SketchEntity;
 import cadkit.sketch.SketchPoint;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncGeometryTools;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.GeometryTools;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
+import toolpathkit.path.Provenance;
+import toolpathkit.setup.Setup;
 
 class CamKitTests {
   static var assertions = 0;
@@ -65,18 +69,26 @@ class CamKitTests {
       "cadkit face edges become a CAM contour");
     face.close(); cadFace.close();
 
-    var tool = new CncTool(2, 0.0, 0.002);
+    var tool = new Tool(2, 0.0, 0.002);
     var job = new CamJob(0.005, 12000.0);
     job.profile(contour, tool, -0.002, 0.01);
     job.pocket(contour, tool, -0.001, 0.01, 0.001);
-    job.drill([new CncPoint(0.015, 0.015, 0.0),
-      new CncPoint(0.025, 0.015, 0.0)], tool, -0.003, 0.001, 0.005);
+    job.drill([new Point3(0.015, 0.015, 0.0),
+      new Point3(0.025, 0.015, 0.0)], tool, -0.003, 0.001, 0.005);
     var program = job.finish();
+    var moveKinds = new Map<String, Bool>();
+    for (op in program.ops) switch op {
+      case ToolpathOp.Move(kind, _, _, _, _):
+        moveKinds.set(Std.string(kind), true);
+      case _:
+    }
+    for (kind in ["Cut", "Plunge", "Ramp", "Link", "Retract"])
+      check(moveKinds.exists(kind), 'CAM emits $kind moves');
     check(program.ops.length > 30,
       "profile, pocket rings, and drills create ordered CNC geometry");
     var outsideArcs = 0;
     for (op in program.ops) switch op {
-      case CncOp.Feed(CncGeometry.Arc(_, radius, _, sweep), _, _, span):
+      case ToolpathOp.Move(Cut, PathGeometry.Arc(_, radius, _, sweep), _, _, span):
         if (span.line == 1) {
           outsideArcs++;
           near(radius, 0.001, "outside profile joins by cutter radius");
@@ -90,7 +102,7 @@ class CamKitTests {
       .profile(contour, tool, -0.005, 0.01, "outside", 0.002).finish();
     var levels:Array<Float> = [];
     for (op in stepped.ops) switch op {
-      case CncOp.Feed(CncGeometry.Arc(center, _, _, _), _, _, _):
+      case ToolpathOp.Move(Cut, PathGeometry.Arc(center, _, _, _), _, _, _):
         if (levels.length == 0 || Math.abs(center.z - levels[levels.length - 1]) > 1e-9)
           levels.push(center.z);
       case _:
@@ -100,10 +112,10 @@ class CamKitTests {
     near(levels[1], -0.004, "second profile depth");
     near(levels[2], -0.005, "final profile depth");
     for (x in 11...30) for (y in 11...20) {
-      var sample = new CncPoint(x * 0.001, y * 0.001, -0.001);
+      var sample = new Point3(x * 0.001, y * 0.001, -0.001);
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
-        case CncOp.Feed(CncGeometry.Line(a, b), _, _, span):
+        case ToolpathOp.Move(Cut, PathGeometry.Line(a, b), _, _, span):
           if (span.line == 2 && Math.abs(a.z + 0.001) < 1e-9 &&
               Math.abs(b.z + 0.001) < 1e-9)
             best = Math.min(best, distanceToLine(sample, a, b));
@@ -112,34 +124,35 @@ class CamKitTests {
       check(best <= tool.diameter * 0.5 + 1e-8,
         'pocket clears grid point $x,$y within cutter radius');
     }
-    var concave = new CamContour([new CncPoint(0, 0, 0),
-      new CncPoint(0.02, 0, 0), new CncPoint(0.02, 0.01, 0),
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0, 0.01, 0)]);
+    var concave = new CamContour([new Point3(0, 0, 0),
+      new Point3(0.02, 0, 0), new Point3(0.02, 0.01, 0),
+      new Point3(0.01, 0.005, 0), new Point3(0, 0.01, 0)]);
     check(new CamJob(0.005, 12000.0)
       .pocket(concave, tool, -0.001, 0.01, 0.001)
       .finish().ops.length > 0,
       "concave pocket clearing generates cutter passes");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    machine.setTool(tool);
-    var lowered = program.lower(machine);
+    machine.toolLibrary.set(tool);
+    var lowered = CamTestLowering.lower(program, machine);
     check(lowered.diagnostics.length == 0 && lowered.program != null,
       "CAM IR lowers directly to executable MotionKit paths");
     var tight = new CncMachine("work", "x", "y", "z", 0.2);
     tight.setTravelEnvelope([0.0, 0.0, -0.01], [0.02, 0.02, 0.01]);
-    var overTravel = program.lower(tight);
-    check(overTravel.diagnostics.length > 0 &&
-      overTravel.diagnostics[0].code == "CNC_TRAVEL" &&
-      overTravel.diagnostics[0].span.line == 1,
+    var travelMessage = "";
+    try CamTestLowering.lower(program, tight)
+    catch (error:Dynamic) travelMessage = Std.string(error);
+    check(travelMessage.indexOf("X travel") >= 0 &&
+      travelMessage.indexOf("cam:1") >= 0,
       "direct CAM lowering checks machine travel with operation source span");
     var hasProfileSpan = false, hasPocketSpan = false, hasDrillSpan = false;
     for (entry in lowered.sourceMap.entries) {
-      if (entry.span.line == 1) hasProfileSpan = true;
-      if (entry.span.line == 2) hasPocketSpan = true;
-      if (entry.span.line == 3) hasDrillSpan = true;
+      if (entry.provenance.line == 1) hasProfileSpan = true;
+      if (entry.provenance.line == 2) hasPocketSpan = true;
+      if (entry.provenance.line == 3) hasDrillSpan = true;
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");
-    var gcode = CamGCodeWriter.write(program, CamTestSetup.standard(), machine);
+    var gcode = CncWriter.write(program.ops, CamTestSetup.standard(), machine);
     var parsed = new CncCompiler(machine).compileDetailed(gcode);
     check(parsed.diagnostics.length == 0,
       'CAM G-code recompiles: ${parsed.diagnostics}');
@@ -147,10 +160,53 @@ class CamKitTests {
       "CAM round trip keeps the operation count");
     for (index in 0...program.ops.length)
       equalOp(program.ops[index], parsed.ops[index], index);
+    var cadProgram = new CamJob(0.005, 12000.0)
+      .profile(fromFace, tool, -0.002, 0.01).finish();
+    var cadCode = CncWriter.write(cadProgram.ops,
+      CamTestSetup.standard(), machine);
+    var cadBack = new CncCompiler(machine).compileDetailed(cadCode);
+    check(cadBack.diagnostics.length == 0,
+      'CAD-to-CAM round trip recompiles: ${cadBack.diagnostics}');
+    check(cadBack.ops.length == cadProgram.ops.length,
+      "CAD-to-CAM round trip keeps operation count");
+    for (index in 0...cadProgram.ops.length)
+      equalOp(cadProgram.ops[index], cadBack.ops[index], index);
     check(gcode.indexOf("T2 M6") >= 0 &&
       gcode.indexOf("S12000 M3") >= 0 && gcode.indexOf("M5") >= 0 &&
       gcode.indexOf("M2") >= 0,
       "LinuxCNC export includes tool, spindle, and program commands");
+    var switchMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    switchMachine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
+    switchMachine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
+    var source = Provenance.cam(99);
+    var switchedProgram = new CamProgram([
+      ToolpathOp.SetSetup("1", source),
+      ToolpathOp.Move(Rapid, PathGeometry.Line(
+        new Point3(0.0, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
+        0.0, 0.0, source),
+      ToolpathOp.SetSetup("2", source),
+      ToolpathOp.Move(Rapid, PathGeometry.Line(
+        new Point3(-0.09, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
+        0.0, 0.0, source),
+      ToolpathOp.End(source)
+    ]);
+    var switchCode = CncWriter.write(switchedProgram.ops,
+      new Setup(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005), switchMachine);
+    check(switchCode.indexOf("G54") >= 0 && switchCode.indexOf("G55") >= 0,
+      "setup switches write G54 and G55");
+    var switchedBack = new CncCompiler(switchMachine).compileDetailed(switchCode);
+    check(switchedBack.diagnostics.length == 0,
+      'G54/G55 round trip recompiles: ${switchedBack.diagnostics}');
+    var setupIds:Array<String> = [];
+    var lastWorkX = 0.0;
+    for (op in switchedBack.ops) switch op {
+      case ToolpathOp.SetSetup(id, _): setupIds.push(id);
+      case ToolpathOp.Move(_, PathGeometry.Line(_, end), _, _, _):
+        lastWorkX = end.x;
+      case _:
+    }
+    check(setupIds.join(",") == "1,2", "G54/G55 round trip keeps setup IDs");
+    near(lastWorkX, 0.01, "G55 round trip keeps the work endpoint");
     CamGeneratedFixtures.run(check);
     CamIslandPocketFixture.run(check);
     CamPocketEntryFixture.run(check);
@@ -159,42 +215,46 @@ class CamKitTests {
     Sys.println('CamKit tests passed ($assertions assertions)');
   }
 
-  static function equalOp(left:CncOp, right:CncOp, index:Int):Void {
+  static function equalOp(left:ToolpathOp, right:ToolpathOp, index:Int):Void {
     switch [left, right] {
-      case [CncOp.Rapid(a, _), CncOp.Rapid(b, _)]: equalGeometry(a, b, index);
-      case [CncOp.Feed(a, speedA, blendA, _),
-            CncOp.Feed(b, speedB, blendB, _)]:
+      case [ToolpathOp.Move(kindA, a, speedA, blendA, _),
+            ToolpathOp.Move(kindB, b, speedB, blendB, _)]:
+        var travelA = kindA == Rapid || kindA == Link || kindA == Retract;
+        var travelB = kindB == Rapid || kindB == Link || kindB == Retract;
+        check(travelA == travelB, 'move class $index');
         equalGeometry(a, b, index);
-        near(speedA, speedB, 'feed $index', 1e-8);
-        near(blendA, blendB, 'blend $index');
-      case [CncOp.ToolChange(a, _), CncOp.ToolChange(b, _)]:
+        if (!travelA) {
+          near(speedA, speedB, 'feed $index', 1e-8);
+          near(blendA, blendB, 'blend $index');
+        }
+      case [ToolpathOp.ToolChange(a, _), ToolpathOp.ToolChange(b, _)]:
         check(a == b, 'tool change $index');
-      case [CncOp.Spindle(channelA, valueA, _),
-            CncOp.Spindle(channelB, valueB, _)]:
+      case [ToolpathOp.Spindle(channelA, valueA, _),
+            ToolpathOp.Spindle(channelB, valueB, _)]:
         check(channelA == channelB, 'spindle channel $index');
         near(valueA, valueB, 'spindle value $index');
-      case [CncOp.End(_), CncOp.End(_)]: check(true, 'end $index');
+      case [ToolpathOp.End(_), ToolpathOp.End(_)]: check(true, 'end $index');
       case _: throw 'CAM round trip changed operation $index';
     }
   }
 
-  static function equalGeometry(a:CncGeometry, b:CncGeometry, index:Int):Void {
-    near(CncGeometryTools.length(a), CncGeometryTools.length(b),
+  static function equalGeometry(a:PathGeometry, b:PathGeometry, index:Int):Void {
+    near(GeometryTools.length(a), GeometryTools.length(b),
       'geometry length $index', 1e-8);
     for (fraction in [0.0, 0.25, 0.5, 0.75, 1.0]) {
-      var first = CncGeometryTools.pointAt(a, CncGeometryTools.length(a) * fraction);
-      var second = CncGeometryTools.pointAt(b, CncGeometryTools.length(b) * fraction);
+      var first = GeometryTools.pointAt(a, GeometryTools.length(a) * fraction);
+      var second = GeometryTools.pointAt(b, GeometryTools.length(b) * fraction);
       near(first.distanceTo(second), 0.0,
         'geometry sample $index/$fraction', 1e-8);
     }
   }
 
-  static function distanceToLine(point:CncPoint, a:CncPoint, b:CncPoint):Float {
+  static function distanceToLine(point:Point3, a:Point3, b:Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var denominator = dx * dx + dy * dy;
     var fraction = denominator == 0.0 ? 0.0 : Math.max(0.0, Math.min(1.0,
       ((point.x - a.x) * dx + (point.y - a.y) * dy) / denominator));
-    return point.distanceTo(new CncPoint(a.x + fraction * dx,
+    return point.distanceTo(new Point3(a.x + fraction * dx,
       a.y + fraction * dy, point.z));
   }
 }

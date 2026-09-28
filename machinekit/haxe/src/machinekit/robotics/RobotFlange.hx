@@ -17,6 +17,8 @@ import machinekit.component.ConnectorRole;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 import machinekit.standard.ClearanceFit;
 import machinekit.standard.SocketHeadCapScrew;
 
@@ -44,7 +46,8 @@ typedef RobotFlangeSpec = {
  *
  * CAD frame: mounting face at z=0, flange plate behind it (z=-thickness..0), pilot boss toward +Z
  * (z=0..pilotHeight). Connectors: `face` (the mounting face), `bolt1`..`boltN` and `pin`, all at
- * z=0 with +Y along +Z, pointing out of the face into the mated part. A mated part's `Mount`
+ * z=0 with +Y along +Z, pointing out of the face into the mated part. The `face` connector's
+ * +X points toward the locating pin. A mated part's `Mount`
  * connector follows the same rule, so `mate(flange.face, part.mount)` stacks the part in front of
  * the face; `mountingCutout` is the matching tool in that part's frame.
  */
@@ -113,7 +116,7 @@ class RobotFlange extends MachineComponent {
 		flangeDiameter = spec.pitchCircle + 2 * screw.spec.headDiameter;
 		thickness = 1.5 * screw.diameter;
 		pilotHeight = 0.5 * screw.diameter;
-		addConnector("face", Face, Solids.axial(0, 0, 0));
+		addConnector("face", Face, pinAlignedFrame(0));
 		var i = 1;
 		for (point in boltPattern()) addConnector('bolt${i++}', Mount, Solids.axial(point.x, point.y, 0));
 		var pin = pinPoint();
@@ -134,6 +137,10 @@ class RobotFlange extends MachineComponent {
 		var r = boltCircleDiameter / 2, angle = Math.PI / boltCount;
 		return {x: r * Math.cos(angle), y: r * Math.sin(angle)};
 	}
+
+	/** Connector +X points from the flange centre toward its locating pin. */
+	public function pinAlignedFrame(z:Float):AssemblyFrame
+		return AssemblyFrames.compose(Solids.axial(0, 0, z), AssemblyFrames.turnY(Math.PI / boltCount));
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var boss = Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight);

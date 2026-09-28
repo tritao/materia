@@ -1,9 +1,9 @@
 package stockkit;
 
 import StockKitNative;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.tool.CutterProfile;
 import haxe.io.Bytes;
 
 /**
@@ -250,12 +250,12 @@ class Stock {
     (x, y), for checking the core against references. Uses the tool's
     cutting zone, as `cut` does.
   **/
-  public static function sweep(tool:CncTool, geometry:CncGeometry, x:Float,
+  public static function sweep(tool:Tool, geometry:PathGeometry, x:Float,
       y:Float):Array<StockInterval> {
     var cutting = new NativeTool(tool);
     try {
-      var move = nativeMove(new CutMove(tool, Path(geometry), false, 0,
-        new cnckit.parse.CncSpan(1, 1, 0)), 0);
+      var move = nativeMove(new CutMove(tool, Path(geometry), Cut, 0,
+        new toolpathkit.path.Provenance(1, 1, 0)), 0);
       var counted = StockKitNative.sk_sweep_count_ray(cutting.borrow(), move,
         StockKitNativeConstants.SK_AXIS_Z, x, y);
       check(counted.status, "sweep.count");
@@ -271,7 +271,7 @@ class Stock {
     }
   }
 
-  function toolFor(tool:CncTool):NativeTool {
+  function toolFor(tool:Tool):NativeTool {
     for (known in tools) if (known.tool == tool) return known;
     var created = new NativeTool(tool);
     tools.push(created);
@@ -326,7 +326,7 @@ class Stock {
     return native;
   }
 
-  static function arc(native:sk_move, center:cnckit.ir.CncPoint, radius:Float,
+  static function arc(native:sk_move, center:toolpathkit.path.Point3, radius:Float,
       startAngle:Float, sweepAngle:Float, rise:Float):Void {
     native.set_kind(StockKitNativeConstants.SK_MOVE_ARC);
     native.set_center(0, center.x);
@@ -356,11 +356,11 @@ class Stock {
 
 /** A tool registered with the core: its flutes cut, its shank and holder are checked for contact. */
 private class NativeTool {
-  public final tool:CncTool;
+  public final tool:Tool;
   final owner:Ownedsk_tool_handle;
   var disposed = false;
 
-  public function new(tool:CncTool) {
+  public function new(tool:Tool) {
     this.tool = tool;
     var segments:Array<sk_profile_segment> = [];
     for (segment in tool.profile().segments) {

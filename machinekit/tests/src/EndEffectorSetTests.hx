@@ -5,6 +5,8 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
+import machinekit.robotics.ToolChangerMaster;
+import machinekit.robotics.ToolChangerTool;
 import materia.assembly.AssemblyFrames;
 
 private class TestChangerMaster extends MachineComponent {
@@ -12,7 +14,7 @@ private class TestChangerMaster extends MachineComponent {
 		super("TEST-MASTER", "Test changer master", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());
 		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
-		addPort({name: "airIn", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
 		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
 		addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: Unspecified, required: true});
 		addBridge("airIn", "airOut");
@@ -75,6 +77,14 @@ class EndEffectorSetTests {
 		return result;
 	}
 
+	static function genericTool(channels:Int, diameter:Float):EndEffector {
+		var result = new EndEffector();
+		result.addComponent("half", new ToolChangerTool(channels, diameter));
+		result.mount("half", "master");
+		result.exposePort("air", "half", "airIn1");
+		return result;
+	}
+
 	public static function run():Void {
 		var set = new EndEffectorSet();
 		set.addComponent("master", new TestChangerMaster());
@@ -97,12 +107,27 @@ class EndEffectorSetTests {
 			short.portNames().indexOf("coupleAir") >= 0)
 			throw "Configuration has the wrong robot-side interface";
 		var upstream = short.upstream("tool/cup", "vacuum");
-		if (upstream.instanceId != "robot/master" || upstream.portName != "airIn")
-			throw 'Wrong changer upstream: ${upstream.instanceId}/${upstream.portName}';
+		if (upstream.port.instanceId != "robot/master" || upstream.port.portName != "airIn" || !upstream.external)
+			throw 'Wrong changer upstream: ${upstream.port.instanceId}/${upstream.port.portName}';
 		if (short.components().length != 3 || long.components().length != 3)
 			throw "Configuration contains inactive components";
 		set.addTool("unmapped", tool(1, 20, true));
 		fails(() -> set.configuration("unmapped"), "Required consumer port");
+		var missingPort = new EndEffector();
+		missingPort.addComponent("plate", new TestChangerPlate(1, 20));
+		missingPort.mount("plate", "mount");
+		fails(() -> set.addTool("missing-port", missingPort), "does not expose mapped port");
 		fails(() -> set.configuration("missing"), "Unknown changer tool");
+
+		var generic = new EndEffectorSet();
+		generic.addComponent("master", new ToolChangerMaster(1, 60));
+		generic.mount("master", "robot");
+		generic.exposePort("coupledAir", "master", "airOut1");
+		generic.changer("coupling", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
+		generic.addTool("matching", genericTool(1, 60));
+		if (generic.toolIds().indexOf("matching") < 0) throw "Matching generic changer was rejected";
+		fails(() -> generic.addTool("wrong-diameter", genericTool(1, 55)), "does not fit");
+		fails(() -> generic.addTool("wrong-channels", genericTool(2, 60)), "does not fit");
+		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching ToolChangerTool");
 	}
 }

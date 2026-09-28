@@ -17,19 +17,19 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
 
 ## Current state (phases 0–5)
 
-- Tool shapes live in CncKit so any `CncTool` can carry one:
-  `cnckit.tool.CutterProfile` describes a tool as a surface of revolution from
+- Tool shapes live in ToolpathKit so any `Tool` can carry one:
+  `toolpathkit.tool.CutterProfile` describes a tool as a surface of revolution from
   its tip upwards, with each segment marked as cutting, shank or holder. Flat,
   ball, bull-nose, V-bit and tapered-ball constructors are provided,
   `withShank`/`withHolder` stack non-cutting sections on top, and `below`
-  clips a tool at the stock surface. `CncTool.shaped` builds a tool from a
+  clips a tool at the stock surface. `Tool.shaped` builds a tool from a
   profile; a diameter-only tool simulates as a flat mill.
 - `stockkit.CutMove` is one tool motion through the stock (tool, motion in the
-  workpiece frame, rapid or feed, source op index and span).
-  `CutMoves.fromOps(ops, tools, ?workOrigin)` builds them from CamKit programs
-  (`program.tool`) or compiled G-code (`machine.tool`). CNC op geometry is in
-  machine coordinates and includes the active G43 tool length, which the new
-  `CncOp.ToolLengthOffset` records, so the adapter recovers tool-tip positions.
+  workpiece frame, move kind, source operation, tool and provenance).
+  `CutMoves.fromProgram(program, ?workOrigin)` builds them from a
+  `ToolpathProgram` with a tool library; CamKit exposes `program.toolpath()`. Toolpath
+  geometry is in work coordinates and includes the active G43 tool length,
+  which `ToolpathOp.ToolLengthOffset` records for recovering tool-tip positions.
 - The test project holds the exact reference (`tests/src/oracle/ExactOracle.hx`):
   it builds each move's swept solid with OCCT through CadKit, subtracts it from
   stock, and reads exact material intervals along any ray. It covers
@@ -99,7 +99,7 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   triangles or from a CadKit mesh, and cuts `CutMove`s, one native call per
   run of moves with the same tool. It keeps the move history, so an
   interval end's source leads back to its `CutMove`, and from there to the
-  op and `CncSpan`. `cut` returns a `CutReport` with each move's
+  op and `Provenance`. `cut` returns a `CutReport` with each move's
   `MoveOutcome`, rapid contacts, collisions and totals per operation.
   `compare` returns a `StockComparison` with leftover and gouge volumes,
   the deepest gouge and the moves that gouged.
@@ -119,7 +119,7 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     seeking restores the nearest one and cuts forward, history included),
     `StockPreview` keeps chunk meshes and rebuilds only chunks whose tiles
     changed, and `StockPreview.pick(chunk, triangle)` gives the `CutMove`
-    under a picked triangle, hence its operation and `CncSpan`.
+    under a picked triangle, hence its operation and `Provenance`.
   - The app's **Stock simulation** object shows a CamKit demo program cut
     with StockKit, with a timeline, colouring by operation or deviation, and
     click-to-G-code-line picking (see `app/README.md`). It meshes the whole

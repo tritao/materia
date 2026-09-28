@@ -9,6 +9,24 @@ class ChannelToolAdapter {
 
   public function new() {}
 
+  /** A true output closes the gripper; false opens it. */
+  public function bindGripper(channel:String, gripper:Gripper):Void {
+    if (gripper == null) throw "Gripper channel binding requires a gripper";
+    bind(channel, function(event) {
+      if (digital(event.value, "Gripper")) gripper.close(event.scheduledTimeNs);
+      else gripper.open(event.scheduledTimeNs);
+    });
+  }
+
+  /** A true output enables vacuum; false releases it. */
+  public function bindVacuum(channel:String, vacuum:Vacuum):Void {
+    if (vacuum == null) throw "Vacuum channel binding requires a vacuum";
+    bind(channel, function(event) {
+      if (digital(event.value, "Vacuum")) vacuum.enable(event.scheduledTimeNs);
+      else vacuum.disable(event.scheduledTimeNs);
+    });
+  }
+
   public function bindSprayerFlow(channel:String, sprayer:Sprayer, onFlow:Float):Void {
     if (sprayer == null || !Math.isFinite(onFlow) || onFlow < 0.0)
       throw "Invalid sprayer channel binding";
@@ -67,6 +85,13 @@ class ChannelToolAdapter {
       case Digital(enabled): enabled ? onValue : 0.0;
       case Analog(number): number;
       case Process(_, _): throw "Numeric tool channel needs a digital or analog event";
+    };
+  }
+
+  static function digital(value:ProcessEventValue, capability:String):Bool {
+    return switch value {
+      case Digital(enabled): enabled;
+      case Analog(_), Process(_, _): throw '$capability channel needs a digital event';
     };
   }
 }

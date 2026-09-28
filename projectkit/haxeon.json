@@ -6,10 +6,5 @@
   "sourceRoots": [
     "src"
   ],
-  "target": "host",
-  "dependencies": {
-    "kinematics": {
-      "path": "../kinematics"
-    }
-  }
+  "target": "host"
 }

@@ -1,6 +1,6 @@
 package cnckit;
 
-import cnckit.parse.CncSpan;
+import toolpathkit.path.Provenance;
 
 enum CncSeverity {
   Error;
@@ -11,10 +11,10 @@ enum CncSeverity {
 class CncDiagnostic {
   public final severity:CncSeverity;
   public final code:String;
-  public final span:CncSpan;
+  public final span:Provenance;
   public final message:String;
 
-  public function new(severity:CncSeverity, code:String, span:CncSpan,
+  public function new(severity:CncSeverity, code:String, span:Provenance,
       message:String) {
     this.severity = severity;
     this.code = code;

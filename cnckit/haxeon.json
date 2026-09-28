@@ -4,7 +4,7 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {
-    "motionkit": { "path": "../motionkit" }
+    "toolpathkit": { "path": "../toolpathkit" }
   },
   "target": "host"
 }

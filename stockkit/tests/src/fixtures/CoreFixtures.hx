@@ -3,11 +3,11 @@ package fixtures;
 import camkit.CamContour;
 import camkit.CamJob;
 import cadkit.modeling.Part;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncPoint;
-import cnckit.parse.CncSpan;
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.Point3;
+import toolpathkit.path.Provenance;
+import toolpathkit.tool.CutterProfile;
 import oracle.ExactOracle;
 import stockkit.CutMove;
 import stockkit.CutMoves;
@@ -42,14 +42,14 @@ class CoreFixtures {
   /** Scrubbing a CamKit pocket matches cutting afresh, and the preview follows it. */
   static function timelineAndPreview():Void {
     var contour = new CamContour([
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
-      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
     ]);
-    var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
-    var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
+    var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
+    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.004, 0.01, 0.0015, 0.002)
       .finish();
-    var moves = CutMoves.fromOps(program.ops, program.tool);
+    var moves = CutMoves.fromProgram(program.toolpath());
     Assert.check(moves.length > 20, "pocket has enough moves to scrub");
     var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0004);
     function fresh(count:Int):Stock {
@@ -100,7 +100,7 @@ class CoreFixtures {
         }
       if (picked != null) break;
     }
-    Assert.check(picked != null && moves.indexOf(picked) >= 0 && picked.span != null,
+    Assert.check(picked != null && moves.indexOf(picked) >= 0 && picked.provenance != null,
       "a picked cut surface names its move and source span");
     // Surfaces are coloured by their move's operation.
     var mesh = preview.meshes[changed[0]];
@@ -122,16 +122,16 @@ class CoreFixtures {
   /** A pocket deeper than the flutes: the shank rubs, and the holder too once it is low enough. */
   static function collisions():Void {
     var contour = new CamContour([
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
-      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
     ]);
     // 3 mm of flutes on a 6 mm shank, then a 20 mm holder 10 mm above the tip.
     var profile = CutterProfile.flat(0.004, 0.003).withShank(0.004, 0.007).withHolder(0.02, 0.03);
-    var tool = CncTool.shaped(3, 0.0, profile);
-    var program = new CamJob(0.02, 12000, new CncPoint(0, 0, 0.02))
+    var tool = Tool.shaped(3, 0.0, profile);
+    var program = new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
       .pocket(contour, tool, -0.008, 0.01, 0.003, 0.004)
       .finish();
-    var moves = CutMoves.fromOps(program.ops, program.tool);
+    var moves = CutMoves.fromProgram(program.toolpath());
     var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0005);
     var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var report = stock.cut(moves);
@@ -153,9 +153,9 @@ class CoreFixtures {
     Assert.near(removedTotal, report.removedVolume(), "operation totals add up to the cut", 1e-15);
     Assert.check(rubbed > 0, "operation totals carry the shank contact");
     // Cut 2 mm deeper with a short holder reach: now the holder hits.
-    var short = CncTool.shaped(4, 0.0, CutterProfile.flat(0.004, 0.003).withHolder(0.02, 0.03));
-    var deeper = [for (move in CutMoves.fromOps(new CamJob(0.02, 12000, new CncPoint(0, 0, 0.02))
-      .pocket(contour, short, -0.006, 0.01, 0.003, 0.002).finish().ops, n -> short)) move];
+    var short = Tool.shaped(4, 0.0, CutterProfile.flat(0.004, 0.003).withHolder(0.02, 0.03));
+    var deeper = [for (move in CutMoves.fromProgram(new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
+      .pocket(contour, short, -0.006, 0.01, 0.003, 0.002).finish().toolpath())) move];
     var fresh = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var hits = [for (outcome in fresh.cut(deeper).moves) if (outcome.holderContact > 0) outcome];
     Assert.check(hits.length > 0, "a holder 3 mm above the tip hits a 6 mm pocket");
@@ -166,14 +166,14 @@ class CoreFixtures {
   /** A CamKit pocket compared with the finished part, then with a deliberate dip below the floor. */
   static function targetComparison():Void {
     var contour = new CamContour([
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
-      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
     ]);
-    var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
-    var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
+    var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
+    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
       .finish();
-    var moves = CutMoves.fromOps(program.ops, program.tool);
+    var moves = CutMoves.fromProgram(program.toolpath());
     var blank = Part.box(STOCK_X, STOCK_Y, STOCK_Z, Min, Min, Max);
     var pocketTool = Part.box(0.02, 0.01, 0.003, Min, Min, Min);
     var pocket = pocketTool.translated(new cadkit.modeling.Vector(0.01, 0.005, -0.002));
@@ -193,9 +193,9 @@ class CoreFixtures {
       "leftover is the corner fillets", 0.25 * (4 - Math.PI) * r * r * 0.002);
     Assert.near(comparison.thickestLeftover(), 0.002, "corner leftover is the pocket's full depth", 1e-12);
     // A stray move 0.1 mm below the floor gouges, and is named.
-    var span = new CncSpan(99, 1, 0);
-    var stray = new CutMove(tool, Path(Line(new CncPoint(0.015, 0.008, -0.0021),
-      new CncPoint(0.025, 0.008, -0.0021))), false, 99, span);
+    var span = new Provenance(99, 1, 0);
+    var stray = new CutMove(tool, Path(Line(new Point3(0.015, 0.008, -0.0021),
+      new Point3(0.025, 0.008, -0.0021))), Cut, 99, span);
     stock.cut([stray]);
     var gouged = stock.compare(target);
     Assert.near(gouged.deepestGouge(), 0.0001, "the dip is 0.1 mm deep", 1e-12);
@@ -215,8 +215,8 @@ class CoreFixtures {
 
   static function ramps():Void {
     var r = 0.003;
-    var ramp:CncGeometry = Line(new CncPoint(0.008, 0.007, 0.001),
-      new CncPoint(0.032, 0.013, -0.004));
+    var ramp:PathGeometry = Line(new Point3(0.008, 0.007, 0.001),
+      new Point3(0.032, 0.013, -0.004));
     for (tool in [
       {name: "flat", profile: CutterProfile.flat(2 * r, 0.02)},
       {name: "ball", profile: CutterProfile.ball(2 * r, 0.02)},
@@ -226,14 +226,14 @@ class CoreFixtures {
     ])
       sampled(tool.profile, [ramp], '${tool.name} ramp');
     // A ramp whose floor rises: the tool climbs out of the stock.
-    sampled(CutterProfile.ball(2 * r, 0.02), [Line(new CncPoint(0.03, 0.012, -0.005),
-      new CncPoint(0.012, 0.008, 0.002))], "ball climbing ramp");
+    sampled(CutterProfile.ball(2 * r, 0.02), [Line(new Point3(0.03, 0.012, -0.005),
+      new Point3(0.012, 0.008, 0.002))], "ball climbing ramp");
   }
 
   static function helices():Void {
     var r = 0.003;
-    function helix(radius:Float, turns:Float):CncGeometry
-      return Circular(new CncPoint(0.02, 0.01, 0.001), radius, 0.3, -2 * Math.PI * turns, XY, -0.004);
+    function helix(radius:Float, turns:Float):PathGeometry
+      return Circular(new Point3(0.02, 0.01, 0.001), radius, 0.3, -2 * Math.PI * turns, XY, -0.004);
     sampled(CutterProfile.flat(2 * r, 0.02), [helix(0.002, 2)], "flat helix inside its radius");
     sampled(CutterProfile.ball(2 * r, 0.02), [helix(0.004, 1.5)], "ball helix wider than its radius");
     sampled(CutterProfile.bullNose(2 * r, 0.001, 0.02), [helix(0.0025, 3)], "bull-nose helix");
@@ -245,14 +245,14 @@ class CoreFixtures {
   **/
   static function rampedPocket():Void {
     var contour = new CamContour([
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
-      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
     ]);
-    var tool = CncTool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
-    var program = new CamJob(0.005, 12000, new CncPoint(0, 0, 0.005))
+    var tool = Tool.shaped(2, 0.0, CutterProfile.flat(0.002, 0.02));
+    var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.001, 0.01, 0.0015, 0.002)
       .finish();
-    var moves = CutMoves.fromOps(program.ops, program.tool);
+    var moves = CutMoves.fromProgram(program.toolpath());
     var ramped = false;
     for (move in moves) switch move.motion {
       case Path(Line(start, end)):
@@ -306,13 +306,13 @@ class CoreFixtures {
 
   /** Surfaces remember the move that made them, and rapids through stock are reported. */
   static function provenance():Void {
-    var tool = CncTool.shaped(1, 0.0, CutterProfile.flat(0.006, 0.02));
-    var span = new CncSpan(1, 1, 0);
+    var tool = Tool.shaped(1, 0.0, CutterProfile.flat(0.006, 0.02));
+    var span = new Provenance(1, 1, 0);
     var moves = [
-      new CutMove(tool, Path(Line(new CncPoint(0.01, 0.01, -0.002), new CncPoint(0.03, 0.01, -0.002))),
-        false, 0, span),
-      new CutMove(tool, Path(Line(new CncPoint(0.02, 0.002, -0.001), new CncPoint(0.02, 0.018, -0.001))),
-        true, 1, span)
+      new CutMove(tool, Path(Line(new Point3(0.01, 0.01, -0.002), new Point3(0.03, 0.01, -0.002))),
+        Cut, 0, span),
+      new CutMove(tool, Path(Line(new Point3(0.02, 0.002, -0.001), new Point3(0.02, 0.018, -0.001))),
+        Rapid, 1, span)
     ];
     var grid = StockGrid.covering(0, 0, STOCK_X, STOCK_Y, 0.0005);
     var stock = Stock.box(grid, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
@@ -343,7 +343,7 @@ class CoreFixtures {
     stock.dispose();
   }
 
-  static function sampled(profile:CutterProfile, geometry:Array<CncGeometry>, label:String):Void
+  static function sampled(profile:CutterProfile, geometry:Array<PathGeometry>, label:String):Void
     CoreComparison.againstSampled(ExactOracle.pathMoves(profile, geometry), 0, 0, -STOCK_Z,
       STOCK_X, STOCK_Y, 0, SAMPLES, label);
 }

@@ -235,7 +235,7 @@ class MachineKitSmoke {
 	static function ports():Void {
 		var changer = new PortTestComponent("CHANGER");
 		changer.defineConnector("airFace");
-		changer.definePort("robotAir", Pneumatic, Supply, PushIn(6), false, "airFace");
+		changer.definePort("robotAir", Pneumatic, Consumer, PushIn(6), false, "airFace");
 		changer.definePort("toolAir", Pneumatic, Passive, PushIn(6));
 		changer.defineBridge("robotAir", "toolAir");
 		check(changer.ports().length == 2 && changer.bridges().length == 1,
@@ -248,6 +248,10 @@ class MachineKitSmoke {
 		wrongBridge.definePort("air", Pneumatic, Consumer, Unspecified);
 		wrongBridge.definePort("vacuum", Vacuum, Supply, Unspecified);
 		throws(() -> wrongBridge.defineBridge("air", "vacuum"), "same kind");
+		var supplyInlet = new PortTestComponent("SUPPLY-INLET");
+		supplyInlet.definePort("in", Pneumatic, Supply, Unspecified);
+		supplyInlet.definePort("out", Pneumatic, Passive, Unspecified);
+		throws(() -> supplyInlet.defineBridge("in", "out"), "Supply inlet");
 
 		var manifold = new PortTestComponent("MANIFOLD");
 		manifold.definePort("in", Pneumatic, Passive, PushIn(6));
@@ -277,7 +281,7 @@ class MachineKitSmoke {
 		check(tool.validate().length == 0, "compatible service path validates");
 		check(tool.billOfMaterials().quantity("TUBE-6") == 1, "connection line reaches BOM");
 		var source = tool.upstream("cup", "vacuum");
-		check(source.instanceId == "changer" && source.portName == "robotAir",
+		check(source.port.instanceId == "changer" && source.port.portName == "robotAir" && source.external,
 			"cup vacuum traces through generator, manifold, and changer bridge");
 		var model = new AssemblyModel();
 		tool.addTo(model, "tool");
@@ -293,7 +297,7 @@ class MachineKitSmoke {
 		check(station.port("airSupply").instanceId == "tool/changer", "port can be re-exposed under a new name");
 		check(top.portNames().length == 0, "a containing assembly does not inherit exposed ports");
 		var includedSource = station.upstream("tool/cup", "vacuum");
-		check(includedSource.instanceId == "tool/changer" && includedSource.portName == "robotAir",
+		check(includedSource.port.instanceId == "tool/changer" && includedSource.port.portName == "robotAir" && includedSource.external,
 			"included service path retains its source");
 		check(station.billOfMaterials().quantity("TUBE-6") == 1, "included line is counted once");
 		var vacuumSource = new PortTestComponent("VACUUM-SOURCE");
@@ -302,14 +306,14 @@ class MachineKitSmoke {
 		reversed.addComponent("generator", vacuumSource);
 		reversed.addComponent("cup", cup);
 		reversed.connectPorts("reverse", "cup", "vacuum", "generator", "vacuum");
-		check(reversed.upstream("cup", "vacuum").instanceId == "generator",
+		check(reversed.upstream("cup", "vacuum").port.instanceId == "generator",
 			"consumer-first connection traces to its supply");
 		var unfinished = new MachineAssembly();
 		unfinished.addComponent("source", vacuumSource);
 		unfinished.addComponent("cup", cup);
 		unfinished.addComponent("gripper", generator);
 		unfinished.connectPorts("vacuum", "source", "vacuum", "cup", "vacuum");
-		check(unfinished.upstream("cup", "vacuum").instanceId == "source",
+		check(unfinished.upstream("cup", "vacuum").port.instanceId == "source",
 			"upstream works while another required input is unconnected");
 		throws(() -> unfinished.validate(), "Required consumer port");
 		var incompleteTool = new MachineAssembly();
@@ -341,7 +345,7 @@ class MachineKitSmoke {
 		misleading.addComponent("device", unrelated);
 		misleading.addComponent("power", power);
 		misleading.connectPorts("feed", "power", "output", "device", "power");
-		check(misleading.upstream("device", "air").instanceId == "device",
+		check(misleading.upstream("device", "air").port.instanceId == "device",
 			"upstream does not infer service conversion from unrelated power");
 
 		var unconnected = new MachineAssembly();
@@ -2107,8 +2111,15 @@ class MachineKitSmoke {
 		near(flange.connector("bolt1").frame.x, 25, "robot flange bolt1 x");
 		near(flange.connector("bolt2").frame.y, 25, "robot flange bolt2 y");
 		near(flange.connector("face").frame.z, 0, "robot flange face connector");
+		var pin = flange.pinPoint();
+		var flangeX = AssemblyFrames.transformVector(flange.connector("face").frame, 1, 0, 0);
+		near(flangeX.x, pin.x / 25, "flange X points toward locating pin X");
+		near(flangeX.y, pin.y / 25, "flange X points toward locating pin Y");
 
 		var eoat = new EndEffectorPlate(flange);
+		var plateX = AssemblyFrames.transformVector(eoat.connector("robot").frame, 1, 0, 0);
+		near(plateX.x, flangeX.x, "adapter mount X follows flange pin");
+		near(plateX.y, flangeX.y, "adapter mount Y follows flange pin");
 		check(eoat.designation == "EOAT-50-9-4xM5-PCD70.5", "end effector plate designation");
 		near(eoat.thickness, flange.thickness, "end effector plate default thickness");
 		// Default tool circle: flange bolt circle + flange head + tool head + 2 mm web.

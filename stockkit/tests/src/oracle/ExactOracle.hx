@@ -8,12 +8,12 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncPoint;
-import cnckit.parse.CncSpan;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.Point3;
+import toolpathkit.path.Provenance;
 import stockkit.CutMove;
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.CutterProfile;
 
 /**
   Exact reference results built with OCCT booleans through CadKit. Tools point
@@ -24,7 +24,7 @@ import cnckit.tool.CutterProfile;
 **/
 class ExactOracle {
   /** The tool as a solid with its tip at `tip`. */
-  public static function toolSolid(profile:CutterProfile, tip:CncPoint):Part {
+  public static function toolSolid(profile:CutterProfile, tip:Point3):Part {
     var section = sectionFace(profile, new Vector(tip.x, tip.y, tip.z),
       Vector.X(), 0.0, true);
     try {
@@ -44,7 +44,7 @@ class ExactOracle {
     wrong solid fails here instead of skewing a comparison.
   **/
   public static function sweptSolid(profile:CutterProfile,
-      geometry:CncGeometry):Part {
+      geometry:PathGeometry):Part {
     if (!profile.isRadiallyMonotonic())
       throw "exact oracle needs a tool whose radius never shrinks upwards";
     var section = 2 * profile.halfSectionArea(), tool = profile.volume();
@@ -127,11 +127,11 @@ class ExactOracle {
 
   /** Moves of one tool along plain geometry, for fixtures without a program. */
   public static function pathMoves(profile:CutterProfile,
-      geometries:Array<CncGeometry>):Array<CutMove> {
-    var tool = CncTool.shaped(1, 0.0, profile);
+      geometries:Array<PathGeometry>):Array<CutMove> {
+    var tool = Tool.shaped(1, 0.0, profile);
     return [for (index in 0...geometries.length)
-      new CutMove(tool, Path(geometries[index]), false, index,
-        new CncSpan(index + 1, 1, 0))];
+      new CutMove(tool, Path(geometries[index]), Cut, index,
+        new Provenance(index + 1, 1, 0))];
   }
 
   /**
@@ -179,8 +179,8 @@ class ExactOracle {
     }
   }
 
-  static function horizontalLine(profile:CutterProfile, start:CncPoint,
-      end:CncPoint):Part {
+  static function horizontalLine(profile:CutterProfile, start:Point3,
+      end:Point3):Part {
     var a = new Vector(start.x, start.y, start.z);
     var b = new Vector(end.x, end.y, end.z);
     var along = b.subtract(a);
@@ -231,7 +231,7 @@ class ExactOracle {
     the one from the lowest tip position; above that tool's top, the top radius
     continues to the highest position's top.
   **/
-  static function verticalLine(profile:CutterProfile, lower:CncPoint,
+  static function verticalLine(profile:CutterProfile, lower:Point3,
       rise:Float):Part {
     var parts:Array<Part> = [];
     try {
@@ -246,7 +246,7 @@ class ExactOracle {
     }
   }
 
-  static function arc(profile:CutterProfile, center:CncPoint, radius:Float,
+  static function arc(profile:CutterProfile, center:Point3, radius:Float,
       startAngle:Float, sweep:Float):Part {
     var maxRadius = 0.0;
     for (segment in profile.segments)
@@ -312,7 +312,7 @@ class ExactOracle {
       return origin.add(side.scale(offset + s)).add(up.scale(z));
     var curves:Array<Curve> = [];
     function add(curve:Curve):Void curves.push(curve);
-    function segmentCurve(segment:cnckit.tool.CutterSegment, sign:Float,
+    function segmentCurve(segment:toolpathkit.tool.CutterSegment, sign:Float,
         reversed:Bool):Void {
       switch segment {
         case Line(r0, z0, r1, z1, _):

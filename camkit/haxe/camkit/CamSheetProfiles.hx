@@ -1,6 +1,6 @@
 package camkit;
 
-import cnckit.ir.CncPoint;
+import toolpathkit.path.Point3;
 import materia.sheet.SheetPartPlacement;
 import materia.sheet.SheetCutPlan;
 import cadkit.units.LengthUnits;
@@ -27,10 +27,10 @@ class CamSheetProfiles {
     var x = value.x * scale, y = value.y * scale;
     var width = value.width * scale, height = value.height * scale;
     return new CamContour([
-      new CncPoint(x, y, surfaceZMetres),
-      new CncPoint(x + width, y, surfaceZMetres),
-      new CncPoint(x + width, y + height, surfaceZMetres),
-      new CncPoint(x, y + height, surfaceZMetres)
+      new Point3(x, y, surfaceZMetres),
+      new Point3(x + width, y, surfaceZMetres),
+      new Point3(x + width, y + height, surfaceZMetres),
+      new Point3(x, y + height, surfaceZMetres)
     ]);
   }
 }

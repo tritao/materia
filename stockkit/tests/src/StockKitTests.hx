@@ -3,9 +3,9 @@ import fixtures.CoreComparison;
 import fixtures.CoreFixtures;
 import fixtures.OracleFixtures;
 import fixtures.SampledReferenceFixtures;
-import cnckit.tool.CutterProfile;
-import cnckit.tool.CutterSegment;
-import cnckit.tool.CutterZone;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.CutterSegment;
+import toolpathkit.tool.CutterZone;
 
 class StockKitTests {
   public static function main():Void {

@@ -32,9 +32,12 @@ class CutReport {
     var totals:Array<OperationTotals> = [];
     for (outcome in moves) {
       var entry:Null<OperationTotals> = null;
-      for (candidate in totals) if (candidate.opIndex == outcome.move.opIndex) entry = candidate;
+      for (candidate in totals) if (candidate.toolId == outcome.move.toolId &&
+          candidate.operationId == outcome.move.operationId &&
+          (candidate.operationId != null || candidate.opIndex == outcome.move.opIndex))
+        entry = candidate;
       if (entry == null) {
-        entry = new OperationTotals(outcome.move.opIndex);
+        entry = new OperationTotals(outcome.move);
         totals.push(entry);
       }
       entry.add(outcome);

@@ -1,50 +1,52 @@
 package stockkit;
 
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
+import toolpathkit.path.ToolpathProgram;
 
-/** Builds cut moves from CNC operations. */
+/** Builds stock moves from a controller-independent toolpath. */
 class CutMoves {
   /**
-    Tool-tip moves in the workpiece frame from CNC ops, as produced by CamKit
-    or by `CncCompiler.compileDetailed` (cutter compensation already
-    resolved). Op geometry is in machine coordinates and includes the active
-    G43 tool length, so each point is shifted by `-workOrigin` and by the tool
-    length in effect. Tool numbers are resolved with `tools`, for example
-    `machine.tool` or `camProgram.tool`. Moves made before any tool change are
+    Tool-tip moves in the workpiece frame. Op geometry includes the active
+    G43 tool length. Each point is shifted by the optional stock origin and
+    by the tool length in effect. Tool numbers are resolved with the program library.
+    Moves made before any tool change are
     skipped: there is no tool in the spindle to simulate.
   **/
-  public static function fromOps(ops:Array<CncOp>, tools:Int->CncTool,
-      ?workOrigin:CncPoint):Array<CutMove> {
-    var origin = workOrigin == null ? new CncPoint(0, 0, 0) : workOrigin;
+  public static function fromProgram(program:ToolpathProgram,
+      ?workOrigin:Point3):Array<CutMove> {
+    var ops = program.ops;
+    var origin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
     var moves:Array<CutMove> = [];
-    var tool:Null<CncTool> = null;
+    var tool:Null<Tool> = null;
     var toolLength = 0.0;
     for (index in 0...ops.length) switch ops[index] {
       case ToolChange(number, _):
-        tool = tools(number);
+        tool = program.tools.tool(number);
       case ToolLengthOffset(_, length, _):
         toolLength = length;
-      case Rapid(geometry, span):
+      case Move(kind, geometry, _, _, provenance):
         if (tool != null) moves.push(new CutMove(tool,
-          Path(shift(geometry, origin, toolLength)), true, index, span));
-      case Feed(geometry, _, _, span):
-        if (tool != null) moves.push(new CutMove(tool,
-          Path(shift(geometry, origin, toolLength)), false, index, span));
-      case CutterCompStart(_, _, _, _), CutterCompEnd(_):
-        throw "cut moves need cutter compensation resolved first";
+          Path(shift(geometry, origin, toolLength)), kind, index, provenance));
+      case SetSetup(_, _):
+      case MachineMove(Rapid, _, _, _, _),
+          MachineMove(Link, _, _, _, _),
+          MachineMove(Retract, _, _, _, _):
+        // Machine travel does not remove stock in the current work setup.
+      case MachineMove(_, _, _, _, _):
+        throw "stock simulation needs a setup transform for machine-coordinate cuts";
       case Dwell(_, _), Spindle(_, _, _), Coolant(_, _, _), OptionalStop(_),
           ProgramStop(_), End(_):
     }
     return moves;
   }
 
-  static function shift(geometry:CncGeometry, origin:CncPoint,
-      toolLength:Float):CncGeometry {
-    function at(point:CncPoint):CncPoint
-      return new CncPoint(point.x - origin.x, point.y - origin.y,
+  static function shift(geometry:PathGeometry, origin:Point3,
+      toolLength:Float):PathGeometry {
+    function at(point:Point3):Point3
+      return new Point3(point.x - origin.x, point.y - origin.y,
         point.z - origin.z - toolLength);
     return switch geometry {
       case Line(start, end): Line(at(start), at(end));
