@@ -42,14 +42,30 @@ class EndEffectorSet extends EndEffector {
 
 	public function addTool(id:String, tool:EndEffector):Void {
 		if (changerRef == null) throw "End effector set needs a changer before adding tools";
+		var changer = changerRef;
 		if (id == null || id.length == 0 || tool == null || tool == this)
 			throw "Changer tool needs a distinct id and end effector";
 		if (tools.exists(id)) throw 'Duplicate changer tool "$id"';
 		tool.mountReference();
-		for (mapping in changerRef.ports)
+		for (mapping in changer.ports)
 			try tool.port(mapping.tool) catch (_:Dynamic)
 				throw 'Changer tool "$id" does not expose mapped port "${mapping.tool}"';
+		var master = componentAt(this, changer.instanceId);
+		if (Std.isOfType(master, ToolChangerMaster)) {
+			var mount = tool.mountReference();
+			var half = componentAt(tool, mount.instanceId);
+			if (changer.connectorName != "tool" || mount.connectorName != "master" ||
+				!Std.isOfType(half, ToolChangerTool))
+				throw 'Changer tool "$id" needs a matching ToolChangerTool mount';
+			if ((cast master : ToolChangerMaster).interfaceKey() != (cast half : ToolChangerTool).interfaceKey())
+				throw 'Changer tool "$id" does not fit the master interface';
+		}
 		tools.set(id, tool);
+	}
+
+	function componentAt(assembly:MachineAssembly, instanceId:String):machinekit.component.MachineComponent {
+		for (member in assembly.components()) if (member.id == instanceId) return member.component;
+		throw 'Unknown assembly member "$instanceId"';
 	}
 
 	public function toolIds():Array<String> return [for (id in tools.keys()) id];

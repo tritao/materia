@@ -138,6 +138,9 @@ class CadBridgeTests {
     var longTool = EndEffectorBridge.toTool(set.configuration("long"), "contact", null, "long/contact");
     check(shortTool.id == "short/contact" && longTool.id == "long/contact" &&
       shortTool.id != longTool.id, "configuration-qualified RobotKit tool IDs are distinct");
+    var tcpX = shortTool.flangeTTcp.transformVector(new Vec3(1, 0, 0));
+    check(approx(tcpX.x, 1, 1e-9) && approx(tcpX.y, 0, 1e-9) &&
+      approx(tcpX.z, 0, 1e-9), "cup TCP X retains the flange locating-pin direction");
     var forwardBox = switch shortTool.collision {
       case Box(half, centre): centre != null &&
         approx(centre.z - half.z, 0, 1e-6) &&
