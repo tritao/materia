@@ -77,6 +77,22 @@ path clock within joint acceleration limits. Non-final chunks declare that
 more motion follows, so a late refill triggers controlled underflow braking.
 The runtime rejects plans that violate joint limits and bounds queue depth.
 
+## What “validated” means
+
+`ValidationReport.guarantees()` summarizes each check as `Proven`,
+`Sampled(resolutionNs)`, `Unchecked`, or `Failed`. Joint position, velocity,
+and acceleration bounds are checked against polynomial extrema over the full
+trajectory when those limits are claimed. Jerk and continuity are reported
+separately; either can be `Unchecked` if its limit was not supplied. An
+unchecked check is not a safety guarantee.
+
+Cartesian task-space deviation is checked at samples no more than 1 ms apart
+for timed paths and manipulator programs. `Sampled` describes coverage at
+those points, not a continuous bound between them. The report retains the
+actual sampling resolution and any unresolved assumptions. Each execution
+plan exposes the summary through `plan.guarantees()`; active manipulator
+programs include it in `ManipulatorProgress.guarantees`.
+
 `motionkit.trajectory.Trajectory.fromPositionSamples` builds degree-1 native
 segments. Native velocity is each segment's chord slope; acceleration and
 jerk are zero within that segment. Robots used with MotionKit must support

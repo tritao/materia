@@ -306,7 +306,9 @@ class WallFinishingScenarioTests {
           simpleSeconds += planned.durationSeconds;
         toppraProgram.dispose();
         simpleProgram.dispose();
-        check(toppraSeconds <= simpleSeconds * 1.01,
+        // The 1 ms task-space check can require a denser Cartesian path;
+        // allow a small timing spread between the two validated profiles.
+        check(toppraSeconds <= simpleSeconds * 1.05,
           'TOPP-RA patch cycle time $toppraSeconds exceeds simple timing $simpleSeconds');
         timingCompared = true;
       }

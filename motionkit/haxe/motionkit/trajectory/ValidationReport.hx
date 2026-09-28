@@ -55,6 +55,25 @@ class ValidationReport {
       if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED) return true;
     return false;
   }
+
+  /** Summarizes each check without treating sampled coverage as a proof. */
+  public function guarantees():ValidationGuarantees {
+    return new ValidationGuarantees(
+      guarantee(MotionKitNativeConstants.MK_CHECK_POSITION),
+      guarantee(MotionKitNativeConstants.MK_CHECK_VELOCITY),
+      guarantee(MotionKitNativeConstants.MK_CHECK_ACCELERATION),
+      guarantee(MotionKitNativeConstants.MK_CHECK_JERK),
+      guarantee(MotionKitNativeConstants.MK_CHECK_CONTINUITY),
+      guarantee(MotionKitNativeConstants.MK_CHECK_TASK_SPACE));
+  }
+
+  function guarantee(index:Int):ValidationGuarantee {
+    var check = checks[index];
+    if (check.status == MotionKitNativeConstants.MK_CHECK_FAILED) return Failed;
+    if (check.status != MotionKitNativeConstants.MK_CHECK_PASSED) return Unchecked;
+    return check.method == MotionKitNativeConstants.MK_CHECK_METHOD_SAMPLED ?
+      Sampled(check.resolutionNs) : Proven;
+  }
 }
 
 class ValidationCheck {

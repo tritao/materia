@@ -123,7 +123,8 @@ class ManipulatorMotion {
           }
       }
     }
-    return new ManipulatorProgress(blockIndex, op, distance);
+    return new ManipulatorProgress(blockIndex, op, distance,
+      planIndex < block.plans.length ? block.plans[planIndex].guarantees() : null);
   }
 
   function advance(dt:Float):Void {
