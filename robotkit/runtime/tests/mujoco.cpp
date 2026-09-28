@@ -110,7 +110,8 @@ static void tool_hulls_collide_only_on_their_pieces() {
     rk_simulation_destroy(simulation);
 }
 
-static void tool_piece_contact_is_reported(double obstacle_z, bool expected_active) {
+static void tool_piece_contact_is_reported(double obstacle_z, bool expected_active,
+                                            bool fixed_obstacle = false) {
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.01;
@@ -142,7 +143,7 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
     rk_simulation_object_desc obstacle{};
     obstacle.struct_size = sizeof(obstacle);
-    obstacle.motion_type = 2;
+    obstacle.motion_type = fixed_obstacle ? 0 : 2;
     obstacle.rotation[3] = 1.0;
     obstacle.mass = 1.0;
     obstacle.half_extents[0] = obstacle.half_extents[1] =
@@ -174,6 +175,7 @@ int main() {
     tool_hulls_collide_only_on_their_pieces();
     tool_piece_contact_is_reported(1.07, false);
     tool_piece_contact_is_reported(1.04, true);
+    tool_piece_contact_is_reported(1.07, false, true);
     rk_simulation_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.fixed_timestep = 0.005;

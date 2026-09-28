@@ -28,7 +28,7 @@ class EndEffectorContactMuJoCo {
       [0, 0, 0], [0, 0, 0, 1], null, null, null, null, tool.collision, 0);
     var obstacle = simulation.spawnBox([
       cup.centre.x, cup.centre.y, cup.centre.z + cup.halfExtents.z + 0.007],
-      [0.005, 0.005, 0.005], true);
+      [0.005, 0.005, 0.005]);
     simulation.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
     if (contacts.length == 0) throw "Example cup proximity was not reported";

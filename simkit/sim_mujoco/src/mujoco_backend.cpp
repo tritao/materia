@@ -612,8 +612,15 @@ public:
     nksim_result read_contacts(std::vector<nksim::BackendContact> &out) override {
         out.clear();
         if (!model || !data) return NKSIM_OK;
+        std::unordered_set<std::uint64_t> reported_pairs;
+        const auto pair_key = [](int first, int second) {
+            const auto low = static_cast<std::uint32_t>(std::min(first, second));
+            const auto high = static_cast<std::uint32_t>(std::max(first, second));
+            return (static_cast<std::uint64_t>(low) << 32) | high;
+        };
         for (int i = 0; i < data->ncon; ++i) {
             const auto &source = data->contact[i];
+            reported_pairs.insert(pair_key(source.geom[0], source.geom[1]));
             nksim::BackendContact contact{};
             auto first = geom_owner.find(source.geom[0]);
             auto second = geom_owner.find(source.geom[1]);
@@ -630,6 +637,54 @@ public:
             contact.distance = source.dist;
             contact.active = source.efc_address >= 0;
             out.push_back(contact);
+        }
+        // MuJoCo does not create contacts between two bodies with no dynamic
+        // degrees of freedom. A tool on a kinematic flange still needs to
+        // report its proximity to a fixed cell obstacle.
+        for (int first = 0; first < model->ngeom; ++first) {
+            const auto first_owner = geom_owner.find(first);
+            if (first_owner == geom_owner.end() ||
+                bodies.at(first_owner->second.first).desc.motion_type == NKSIM_MOTION_DYNAMIC)
+                continue;
+            for (int second = first + 1; second < model->ngeom; ++second) {
+                const auto second_owner = geom_owner.find(second);
+                if (second_owner == geom_owner.end() ||
+                    first_owner->second.first == second_owner->second.first ||
+                    bodies.at(second_owner->second.first).desc.motion_type == NKSIM_MOTION_DYNAMIC ||
+                    reported_pairs.count(pair_key(first, second)) != 0)
+                    continue;
+                if ((model->geom_contype[first] & model->geom_conaffinity[second]) == 0 &&
+                    (model->geom_contype[second] & model->geom_conaffinity[first]) == 0)
+                    continue;
+                const int body_a = model->geom_bodyid[first];
+                const int body_b = model->geom_bodyid[second];
+                // Both fixed objects can share MuJoCo's world weld despite
+                // belonging to different application bodies.
+                const int signature = (std::min(body_a, body_b) << 16) +
+                                      std::max(body_a, body_b);
+                if (std::binary_search(model->exclude_signature,
+                    model->exclude_signature + model->nexclude, signature)) continue;
+                const double detection = model->geom_margin[first] + model->geom_margin[second] +
+                    model->geom_gap[first] + model->geom_gap[second];
+                if (detection <= 0.0) continue;
+                mjtNum fromto[6]{};
+                const double distance = mj_geomDistance(model, data, first, second, detection, fromto);
+                if (!std::isfinite(distance) || distance >= detection) continue;
+                nksim::BackendContact contact{};
+                contact.body_a = first_owner->second.first;
+                contact.part_a = first_owner->second.second;
+                contact.body_b = second_owner->second.first;
+                contact.part_b = second_owner->second.second;
+                contact.distance = distance;
+                for (int axis = 0; axis < 3; ++axis)
+                    contact.position[axis] = (fromto[axis] + fromto[axis + 3]) * 0.5;
+                const Vec3 delta{fromto[3] - fromto[0], fromto[4] - fromto[1],
+                                 fromto[5] - fromto[2]};
+                contact.normal = normalize(delta);
+                // Neither body can receive a MuJoCo contact force.
+                contact.active = false;
+                out.push_back(contact);
+            }
         }
         return NKSIM_OK;
     }

@@ -54,7 +54,7 @@ class SimulationPoseResetTests {
     var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
       [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
       ToolCollisionShape.Hulls([cup], 0.03), 0);
-    var obstacle = simulation.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01], true);
+    var obstacle = simulation.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01]);
     simulation.step(Int64.ofInt(0));
     var contacts = runtime.toolProximity();
     if (contacts.length == 0 || contacts[0].toolPieceIndex != 0 || contacts[0].active ||
