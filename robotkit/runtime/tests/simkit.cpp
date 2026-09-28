@@ -57,13 +57,100 @@ rk_robot_state snapshot(rk_robot_runtime runtime) {
     return value;
 }
 
-void convex_link_and_box_link_build() {
-    rk_simulation_desc desc{};
+rk_result from_sim(nksim_result result) {
+    switch (result) {
+    case NKSIM_OK: return RK_OK;
+    case NKSIM_ERROR_INVALID_ARGUMENT: return RK_ERROR_INVALID_ARGUMENT;
+    case NKSIM_ERROR_INVALID_HANDLE: return RK_ERROR_INVALID_HANDLE;
+    case NKSIM_ERROR_INVALID_STATE: return RK_ERROR_INVALID_STATE;
+    case NKSIM_ERROR_OUT_OF_MEMORY: return RK_ERROR_OUT_OF_MEMORY;
+    default: return RK_ERROR_BACKEND;
+    }
+}
+
+// A session an owning test drives directly, with a Simulation joined to it
+// (rk_simulation_create_in_session), standing in for the deleted self-owned
+// rk_simulation_create() mode.
+struct SessionFixture {
+    nkscene_scene scene = 0;
+    nksim_world world = 0;
+    nksim_session session = 0;
+    rk_simulation simulation = RK_INVALID_SIMULATION;
+
+    explicit SessionFixture(double fixed_timestep, uint32_t physics_substeps = 1) {
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc world_desc{};
+        world_desc.struct_size = sizeof(world_desc);
+        world_desc.scene = scene;
+        world_desc.fixed_timestep = fixed_timestep;
+        world_desc.physics_substeps = physics_substeps;
+        world_desc.gravity[2] = -9.81;
+        assert(nksim_world_create(&world_desc, &world) == NKSIM_OK);
+        nksim_session_desc session_desc{};
+        session_desc.struct_size = sizeof(session_desc);
+        session_desc.scene = scene;
+        session_desc.world = world;
+        assert(nksim_session_create(&session_desc, &session) == NKSIM_OK);
+        assert(rk_simulation_create_in_session(session, &simulation) == RK_OK);
+    }
+    SessionFixture(const SessionFixture &) = delete;
+    SessionFixture &operator=(const SessionFixture &) = delete;
+    ~SessionFixture() {
+        if (simulation != RK_INVALID_SIMULATION) rk_simulation_destroy(simulation);
+        if (session != 0) nksim_session_destroy(session);
+        if (world != 0) nksim_world_destroy(world);
+        if (scene != 0) nkscene_scene_destroy(scene);
+    }
+};
+
+// Stand-ins for the deleted rk_simulation_step/start/stop/reset, driving the
+// session directly. Losing robotkit's specific rejection codes (for instance
+// RK_ERROR_SAFETY_STOPPED) is expected: the session only reports NKSIM_OK or
+// a generic backend/invalid-state failure to a caller outside robotkit.
+rk_result step(nksim_session session, uint64_t timestamp_ns) {
+    return from_sim(nksim_session_step(session, timestamp_ns, nullptr));
+}
+rk_result start(nksim_session session) { return from_sim(nksim_session_start(session)); }
+rk_result stop(nksim_session session) { return from_sim(nksim_session_stop(session)); }
+rk_result reset(nksim_session session) { return from_sim(nksim_session_reset(session)); }
+
+nksim_object spawn_object(nksim_session session, uint32_t motion_type, const double position[3],
+                          const double rotation[4], const double half_extents[3],
+                          double mass = 0.0) {
+    nksim_object_desc desc{};
     desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    desc.motion_type = motion_type;
+    desc.shape.struct_size = sizeof(desc.shape);
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    std::copy_n(half_extents, 3, desc.shape.parameters);
+    desc.pose.struct_size = sizeof(desc.pose);
+    std::copy_n(position, 3, desc.pose.position);
+    std::copy_n(rotation, 4, desc.pose.rotation);
+    desc.mass = mass;
+    nksim_object object = 0;
+    assert(nksim_session_create_object(session, &desc, &object) == NKSIM_OK);
+    return object;
+}
+
+void remove_object(nksim_session session, nksim_object object) {
+    assert(nksim_session_destroy_object(session, object) == NKSIM_OK);
+}
+
+void object_pose(nksim_session session, nksim_object object, double out_position[3],
+                 double out_rotation[4]) {
+    nksim_body body = 0;
+    assert(nksim_session_get_object_body(session, object, &body) == NKSIM_OK);
+    nksim_body_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_session_get_body_state(session, body, &state) == NKSIM_OK);
+    std::copy_n(state.position, 3, out_position);
+    std::copy_n(state.rotation, 4, out_rotation);
+}
+
+void convex_link_and_box_link_build() {
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     auto model = blueprint(101);
     rk_simulation_robot_desc robot_desc{};
     robot_desc.struct_size = sizeof(robot_desc);
@@ -80,22 +167,18 @@ void convex_link_and_box_link_build() {
     robot_desc.collision_half_extents[5] = 0.4;
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
-    assert(rk_simulation_start(simulation) == RK_OK);
+    assert(start(session) == RK_OK);
     rk_simulation_presentation presentation = 0;
     assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
     rk_simulation_presentation_destroy(presentation);
-    assert(rk_simulation_stop(simulation) == RK_OK);
-    assert(rk_simulation_step(simulation, 0) == RK_OK);
-    rk_simulation_destroy(simulation);
+    assert(stop(session) == RK_OK);
+    assert(step(session, 0) == RK_OK);
 }
 
 void shared_world_steps_once() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = RK_INVALID_SIMULATION;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
 
     const auto first_model = blueprint(11);
     const auto second_model = blueprint(12);
@@ -111,7 +194,7 @@ void shared_world_steps_once() {
 
     // Participating runtimes cannot own the shared simulation clock.
     assert(rk_robot_runtime_start(first) == RK_ERROR_INVALID_STATE);
-    assert(rk_simulation_step(simulation, 1000) == RK_OK);
+    assert(step(session, 1000) == RK_OK);
     rk_simulation_clock clock{};
     clock.struct_size = sizeof(clock);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
@@ -141,7 +224,7 @@ void shared_world_steps_once() {
     assert(rk_simulation_add_robot(simulation, &first_model, nullptr, &late) ==
            RK_ERROR_INVALID_STATE);
 
-    assert(rk_simulation_step(simulation, 2000) == RK_OK);
+    assert(step(session, 2000) == RK_OK);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
     assert(clock.step_index == 2);
     assert(snapshot(first).sequence == 2);
@@ -169,7 +252,7 @@ void shared_world_steps_once() {
     assert(found_first_base);
     rk_simulation_presentation_destroy(presentation);
 
-    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(stop(session) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
     pose.rotation[3] = 1.0;
@@ -183,37 +266,30 @@ void shared_world_steps_once() {
     assert(std::abs(observed_pose.position[0] - 4.0) < 1e-6);
     assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
     assert(snapshot(first).sequence == 0);
-    rk_simulation_object_desc object_desc{};
-    object_desc.struct_size = sizeof(object_desc);
-    object_desc.motion_type = 0;
-    object_desc.half_extents[0] = object_desc.half_extents[1] = object_desc.half_extents[2] = 0.25;
-    object_desc.rotation[3] = 1.0;
-    rk_simulation_object object = RK_INVALID_SIMULATION_OBJECT;
-    assert(rk_simulation_spawn_object(simulation, &object_desc, &object) == RK_OK);
-    assert(object != RK_INVALID_SIMULATION_OBJECT);
+    // Environment bodies are session objects now, not simulation-owned ones.
+    const double object_position[3] = {0.0, 0.0, 0.0};
+    const double object_rotation[4] = {0.0, 0.0, 0.0, 1.0};
+    const double object_half_extents[3] = {0.25, 0.25, 0.25};
+    auto object = spawn_object(session, NKSIM_MOTION_STATIC, object_position, object_rotation,
+        object_half_extents);
+    assert(object != NKSIM_INVALID_OBJECT);
     pose.position[2] = 2.0;
-    assert(rk_simulation_teleport_object(simulation, object, &pose) == RK_OK);
-    assert(rk_simulation_get_object_pose(simulation, object, &observed_pose) == RK_OK);
-    assert(std::abs(observed_pose.position[2] - 2.0) < 1e-6);
+    nksim_pose object_target{};
+    object_target.struct_size = sizeof(object_target);
+    std::copy_n(pose.position, 3, object_target.position);
+    std::copy_n(pose.rotation, 4, object_target.rotation);
+    assert(nksim_session_teleport_object(session, object, &object_target) == NKSIM_OK);
+    double read_position[3], read_rotation[4];
+    object_pose(session, object, read_position, read_rotation);
+    assert(std::abs(read_position[2] - 2.0) < 1e-6);
     assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
     presentation_info = {};
     presentation_info.struct_size = sizeof(presentation_info);
     assert(rk_simulation_presentation_get_info(presentation, &presentation_info) == RK_OK);
-    assert(presentation_info.pose_count == 7);
-    bool found_environment = false;
-    for (uint32_t index = 0; index < presentation_info.pose_count; ++index) {
-        rk_simulation_presentation_pose item{};
-        item.struct_size = sizeof(item);
-        assert(rk_simulation_presentation_get_pose(presentation, index, &item) == RK_OK);
-        if (item.kind == RK_SIMULATION_PRESENTATION_ENVIRONMENT && item.object_id == object) {
-            found_environment = true;
-            assert(std::abs(item.position[2] - 2.0) < 1e-6);
-        }
-    }
-    assert(found_environment);
+    assert(presentation_info.pose_count == 6); // Robot poses only; the object is read from the session.
     rk_simulation_presentation_destroy(presentation);
-    assert(rk_simulation_remove_object(simulation, object) == RK_OK);
-    assert(rk_simulation_reset(simulation) == RK_OK);
+    remove_object(session, object);
+    assert(reset(session) == RK_OK);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
     assert(clock.step_index == 0);
 
@@ -224,12 +300,9 @@ void shared_world_steps_once() {
 }
 
 void failed_command_phase_does_not_advance() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = RK_INVALID_SIMULATION;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = blueprint(21);
     rk_robot_runtime first = RK_INVALID_ROBOT_RUNTIME;
     rk_robot_runtime second = RK_INVALID_ROBOT_RUNTIME;
@@ -247,7 +320,7 @@ void failed_command_phase_does_not_advance() {
     assert(rk_robot_runtime_submit(second, &emergency) == RK_OK);
     assert(rk_robot_runtime_submit(second, &rejected_target) == RK_OK);
     /* Emergency stop arbitrates over the later motion request in one cycle. */
-    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    assert(step(session, 100) == RK_OK);
     assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
 
     rk_simulation_clock clock{};
@@ -257,7 +330,11 @@ void failed_command_phase_does_not_advance() {
 
     const auto rejected_after_stop = target(-0.8, 3);
     assert(rk_robot_runtime_submit(second, &rejected_after_stop) == RK_OK);
-    assert(rk_simulation_step(simulation, 200) == RK_ERROR_SAFETY_STOPPED);
+    // Stepping the session directly reports a generic backend failure, not
+    // robotkit's specific RK_ERROR_SAFETY_STOPPED (only visible inside
+    // robotkit when it owned the clock itself); the tick still does not
+    // advance, which is the invariant under test.
+    assert(step(session, 200) == RK_ERROR_BACKEND);
     assert(rk_simulation_get_clock(simulation, &clock) == RK_OK);
     assert(clock.step_index == 1);
     assert(std::abs(snapshot(first).position[0] - 0.02) < 1e-12);
@@ -267,22 +344,18 @@ void failed_command_phase_does_not_advance() {
     clear_stop.sequence = 4;
     clear_stop.kind = RK_COMMAND_RESET_SAFETY;
     assert(rk_robot_runtime_submit(second, &clear_stop) == RK_OK);
-    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    assert(step(session, 200) == RK_OK);
     assert(std::abs(snapshot(first).position[0] - 0.04) < 1e-12);
-    rk_simulation_destroy(simulation);
 }
 
 void realtime_presentation_keeps_one_revision() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.005;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = RK_INVALID_SIMULATION;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.005);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = blueprint(21);
     rk_robot_runtime runtime = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &runtime) == RK_OK);
-    assert(rk_simulation_start(simulation) == RK_OK);
+    assert(start(session) == RK_OK);
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
 
     rk_simulation_presentation presentation = RK_INVALID_SIMULATION_PRESENTATION;
@@ -304,84 +377,75 @@ void realtime_presentation_keeps_one_revision() {
     assert(live.step_index > captured.step_index);
 
     rk_simulation_presentation_destroy(presentation);
-    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(stop(session) == RK_OK);
     rk_simulation_destroy(simulation);
 }
 
 void velocity_targets_advance_joint_coordinates() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = RK_INVALID_SIMULATION;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = blueprint(31);
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     const auto command = velocity_target(2.0, 1);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    assert(step(session, 100) == RK_OK);
     auto state = snapshot(robot);
     assert(std::abs(state.velocity[0] - 2.0) < 1e-12);
     assert(std::abs(state.position[0] - 0.02) < 1e-12);
-    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    assert(step(session, 200) == RK_OK);
     state = snapshot(robot);
     assert(std::abs(state.position[0] - 0.04) < 1e-12);
     rk_simulation_destroy(simulation);
 }
 
 void sensor_geometry_and_reset() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     auto model = blueprint(1);
     // Root identity must follow topology, not link array order.
     model.joints[0].parent_link = 1;
     model.joints[0].child_link = 0;
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
-    rk_simulation_object_desc box{};
-    box.struct_size = sizeof(box);
-    box.position[0] = 2.0;
-    box.rotation[2] = box.rotation[3] = std::sqrt(0.5); // quarter turn
-    box.half_extents[0] = 0.5;
-    box.half_extents[1] = box.half_extents[2] = 0.25;
-    rk_simulation_object object = 0;
-    assert(rk_simulation_spawn_object(simulation, &box, &object) == RK_OK);
-    assert(rk_simulation_step(simulation, 100) == RK_OK);
+    const double box_position[3] = {2.0, 0.0, 0.0};
+    const double box_rotation[4] = {0.0, 0.0, std::sqrt(0.5), std::sqrt(0.5)}; // quarter turn
+    const double box_half_extents[3] = {0.5, 0.25, 0.25};
+    auto object = spawn_object(session, NKSIM_MOTION_STATIC, box_position, box_rotation,
+        box_half_extents);
+    assert(step(session, 100) == RK_OK);
     const auto before = snapshot(robot);
     assert(std::abs(before.sensors[2].values[0] - 1.75) < 1e-6);
     assert(before.sensors[2].values[2] == 10.0);
-    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    assert(step(session, 200) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 1);
     assert(std::abs(snapshot(robot).sensors[1].values[5] - 9.81) < 1e-9);
     assert(before.sensors[1].sequence == 0); // Old observation remains unchanged.
-    assert(rk_simulation_stop(simulation) == RK_OK);
-    assert(rk_simulation_reset(simulation) == RK_OK);
+    assert(stop(session) == RK_OK);
+    assert(reset(session) == RK_OK);
     assert(snapshot(robot).sensor_count == 0);
-    assert(rk_simulation_step(simulation, 300) == RK_OK);
+    assert(step(session, 300) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 0);
     assert(std::abs(snapshot(robot).sensors[2].values[0] - 1.75) < 1e-6);
-    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(stop(session) == RK_OK);
     rk_simulation_pose pose{};
     pose.struct_size = sizeof(pose);
     pose.rotation[1] = std::sqrt(0.5);
     pose.rotation[3] = std::sqrt(0.5);
     assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
-    assert(rk_simulation_step(simulation, 400) == RK_OK);
+    assert(step(session, 400) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 0); // Teleport primes derivative.
-    assert(rk_simulation_step(simulation, 500) == RK_OK);
+    assert(step(session, 500) == RK_OK);
     assert(std::abs(snapshot(robot).sensors[1].values[3] + 9.81) < 1e-9);
     assert(std::abs(snapshot(robot).sensors[1].values[5]) < 1e-9);
-    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(stop(session) == RK_OK);
     pose.rotation[1] = 0.0;
     pose.rotation[3] = 1.0;
     assert(rk_simulation_teleport_robot(simulation, 0, &pose) == RK_OK);
-    assert(rk_simulation_remove_object(simulation, object) == RK_OK);
-    assert(rk_simulation_step(simulation, 600) == RK_OK);
+    remove_object(session, object);
+    assert(step(session, 600) == RK_OK);
     assert(snapshot(robot).sensors[2].values[0] == 10.0);
     rk_simulation_destroy(simulation);
 
@@ -398,12 +462,9 @@ void sensor_geometry_and_reset() {
 }
 
 void driving_base_keeps_owner_sensors_and_reset_pose() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = RK_INVALID_SIMULATION;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = blueprint(1);
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
@@ -413,8 +474,8 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
     rk_simulation_pose observed{};
     observed.struct_size = sizeof(observed);
 
-    assert(rk_simulation_step(simulation, 100) == RK_OK);
-    assert(rk_simulation_step(simulation, 200) == RK_OK);
+    assert(step(session, 100) == RK_OK);
+    assert(step(session, 200) == RK_OK);
     assert(snapshot(robot).sensors[1].sequence == 1);
     // Driving between external steps keeps the derivative history: the IMU
     // publishes on every tick instead of re-priming after each pose update.
@@ -423,7 +484,7 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
     for (int tick = 1; tick <= 5; ++tick) {
         pose.position[0] = 0.1 * tick;
         assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
-        assert(rk_simulation_step(simulation, 200 + 100 * tick) == RK_OK);
+        assert(step(session, 200 + 100 * tick) == RK_OK);
         const auto imu = snapshot(robot).sensors[1];
         assert(imu.sequence == static_cast<uint64_t>(1 + tick));
         assert(std::abs(imu.values[3] - (tick == 1 ? 1000.0 : 0.0)) < 1e-2);
@@ -437,7 +498,7 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
         pose.rotation[2] = std::sin(0.005 * tick);
         pose.rotation[3] = std::cos(0.005 * tick);
         assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
-        assert(rk_simulation_step(simulation, 700 + 100 * tick) == RK_OK);
+        assert(step(session, 700 + 100 * tick) == RK_OK);
         const auto imu = snapshot(robot).sensors[1];
         assert(std::abs(imu.values[2] - 1.0) < 1e-3);
         assert(std::abs(imu.values[0]) < 1e-6 && std::abs(imu.values[1]) < 1e-6);
@@ -450,7 +511,7 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
     assert(clock.step_index == 10);
 
     // Driving is also accepted by the realtime owner without stopping it.
-    assert(rk_simulation_start(simulation) == RK_OK);
+    assert(start(session) == RK_OK);
     pose.position[0] = 1.5;
     assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
     for (int attempt = 0; attempt < 200; ++attempt) {
@@ -459,12 +520,12 @@ void driving_base_keeps_owner_sensors_and_reset_pose() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     }
     assert(std::abs(observed.position[0] - 1.5) < 1e-6);
-    assert(rk_simulation_step(simulation, 1000) == RK_ERROR_INVALID_STATE); // Still running.
-    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(step(session, 1000) == RK_ERROR_INVALID_STATE); // Still running.
+    assert(stop(session) == RK_OK);
 
     // Driving never replaces the reset pose, including the kinematic node.
     assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
-    assert(rk_simulation_step(simulation, 2000) == RK_OK);
+    assert(step(session, 2000) == RK_OK);
     assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
     assert(std::abs(observed.position[0]) < 1e-6);
 
@@ -519,18 +580,14 @@ rk_robot_command lifecycle(rk_command_kind kind, uint64_t sequence) {
     return value;
 }
 
-rk_simulation make_simulation(double timestep) {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = timestep;
-    desc.physics_substeps = 1;
-    rk_simulation simulation = RK_INVALID_SIMULATION;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
-    return simulation;
+SessionFixture make_fixture(double timestep) {
+    return SessionFixture(timestep);
 }
 
 void normal_stop_zeroes_wheel_velocities() {
-    auto simulation = make_simulation(0.01);
+    auto fixture = make_fixture(0.01);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
@@ -538,8 +595,8 @@ void normal_stop_zeroes_wheel_velocities() {
     uint64_t time = 0;
     auto command = wheel_targets(2.0, 3.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     auto state = snapshot(robot);
     assert(state.velocity[0] == 2.0 && state.velocity[1] == 3.0);
     assert(std::abs(state.position[0] - 0.04) < 1e-12);
@@ -548,12 +605,12 @@ void normal_stop_zeroes_wheel_velocities() {
     // odometry (encoder positions) stops changing although nothing latches.
     command = lifecycle(RK_COMMAND_STOP, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     const auto stopped = snapshot(robot);
     assert(stopped.mode == RK_ROBOT_MODE_STOPPING && stopped.safety == RK_SAFETY_STOPPING);
     assert(stopped.velocity[0] == 0.0 && stopped.velocity[1] == 0.0);
     for (int tick = 0; tick < 5; ++tick) {
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
         state = snapshot(robot);
         assert(state.velocity[0] == 0.0 && state.velocity[1] == 0.0);
         assert(state.position[0] == stopped.position[0]);
@@ -564,7 +621,7 @@ void normal_stop_zeroes_wheel_velocities() {
     // A new command resumes motion without a safety reset.
     command = wheel_targets(1.0, 1.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     state = snapshot(robot);
     assert(state.mode == RK_ROBOT_MODE_TRACKING && state.velocity[0] == 1.0);
     assert(state.position[0] > stopped.position[0]);
@@ -580,7 +637,9 @@ rk_simulation_differential_drive_state drive_state(rk_simulation simulation) {
 
 void differential_drive_follows_applied_wheel_targets() {
     constexpr double dt = 0.02;
-    auto simulation = make_simulation(dt);
+    auto fixture = make_fixture(dt);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
@@ -625,13 +684,13 @@ void differential_drive_follows_applied_wheel_targets() {
     uint64_t time = 0;
     auto command = wheel_targets(5.0, 5.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     plant = drive_state(simulation);
     assert(plant.left_wheel_rate == 5.0 && plant.right_wheel_rate == 5.0);
     assert(std::abs(plant.x - (1.0 + 0.01 * std::cos(start_yaw))) < 1e-12);
     assert(std::abs(plant.y - (2.0 + 0.01 * std::sin(start_yaw))) < 1e-12);
     for (int tick = 1; tick < 10; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     plant = drive_state(simulation);
     assert(std::abs(plant.x - (1.0 + 0.1 * std::cos(start_yaw))) < 1e-12);
     assert(std::abs(plant.y - (2.0 + 0.1 * std::sin(start_yaw))) < 1e-12);
@@ -656,7 +715,7 @@ void differential_drive_follows_applied_wheel_targets() {
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     const double arc_start_yaw = plant.yaw;
     for (int tick = 0; tick < 5; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     plant = drive_state(simulation);
     assert(std::abs(plant.yaw - (arc_start_yaw + 5 * dt)) < 1e-12);
     imu = snapshot(robot).sensors[1];
@@ -669,7 +728,7 @@ void differential_drive_follows_applied_wheel_targets() {
     // clamped, applied rate rather than the requested one.
     command = wheel_targets(4.25, 11.75, ++sequence, 10.0);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     plant = drive_state(simulation);
     assert(plant.left_wheel_rate == 4.25 && plant.right_wheel_rate == 10.0);
 
@@ -677,12 +736,12 @@ void differential_drive_follows_applied_wheel_targets() {
     command = lifecycle(RK_COMMAND_STOP, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     const auto before_stop = drive_state(simulation);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     plant = drive_state(simulation);
     assert(plant.left_wheel_rate == 0.0 && plant.right_wheel_rate == 0.0);
     assert(plant.x == before_stop.x && plant.y == before_stop.y && plant.yaw == before_stop.yaw);
     for (int tick = 0; tick < 3; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     assert(drive_state(simulation).x == before_stop.x);
     imu = snapshot(robot).sensors[1];
     for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-4);
@@ -691,16 +750,16 @@ void differential_drive_follows_applied_wheel_targets() {
     // cleared targets.
     command = wheel_targets(5.0, 5.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     command = lifecycle(RK_COMMAND_EMERGENCY_STOP, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     const auto before_estop = drive_state(simulation);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     assert(drive_state(simulation).x == before_estop.x);
     command = lifecycle(RK_COMMAND_RESET_SAFETY, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 3; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     assert(drive_state(simulation).x == before_estop.x);
 
     // Placing the base mid-motion is a jump, not a velocity: the plant carries
@@ -708,7 +767,7 @@ void differential_drive_follows_applied_wheel_targets() {
     command = wheel_targets(5.0, 5.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 3; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     const auto moving = drive_state(simulation);
     rk_simulation_pose placed{};
     placed.struct_size = sizeof(placed);
@@ -723,7 +782,7 @@ void differential_drive_follows_applied_wheel_targets() {
     assert(plant.x == moving.x && plant.y == moving.y + 0.6 &&
            std::abs(plant.yaw - moving.yaw) < 1e-12);
     for (int tick = 0; tick < 2; ++tick) {
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
         imu = snapshot(robot).sensors[1];
         assert(imu.sequence == imu_sequence + 1 + tick); // Sensors keep running.
         assert(std::abs(imu.values[3]) < 1e-2 && std::abs(imu.values[4]) < 1e-2);
@@ -734,11 +793,11 @@ void differential_drive_follows_applied_wheel_targets() {
 
     // Teleport does not change the authored reset pose. Reset returns the
     // plant to the original zero pose, at rest.
-    assert(rk_simulation_stop(simulation) == RK_OK);
+    assert(stop(session) == RK_OK);
     assert(rk_simulation_reset_robot(simulation, 0) == RK_OK);
     plant = drive_state(simulation);
     assert(plant.x == 0.0 && plant.y == 0.0 && std::abs(plant.yaw) < 1e-12);
-    assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
     assert(drive_state(simulation).x == 0.0);
     assert(rk_simulation_clear_differential_drive(simulation, 0) == RK_OK);
     assert(drive_state(simulation).enabled == 0);
@@ -754,7 +813,9 @@ void differential_drive_follows_applied_wheel_targets() {
 // hand SimKit their exact double-precision twist instead.
 void driven_base_far_from_origin_reads_exact_imu() {
     constexpr double dt = 0.02;
-    auto simulation = make_simulation(dt);
+    auto fixture = make_fixture(dt);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
@@ -780,9 +841,9 @@ void driven_base_far_from_origin_reads_exact_imu() {
     auto command = wheel_targets(7.0, 7.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 3; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     for (int tick = 0; tick < 100; ++tick) {
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
         const auto imu = snapshot(robot).sensors[1];
         for (int axis = 0; axis < 3; ++axis) assert(std::abs(imu.values[axis]) < 1e-9);
         assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
@@ -801,7 +862,7 @@ void driven_base_far_from_origin_reads_exact_imu() {
     command = lifecycle(RK_COMMAND_STOP, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 3; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     auto imu = snapshot(robot).sensors[1];
     assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
     assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
@@ -814,7 +875,7 @@ void driven_base_far_from_origin_reads_exact_imu() {
     for (int tick = 1; tick <= 50; ++tick) {
         pose.position[0] = from_x + 0.013 * tick;
         assert(rk_simulation_drive_robot_base(simulation, 0, &pose) == RK_OK);
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
         if (tick < 3) continue; // Start-up step, then the IMU's first difference.
         imu = snapshot(robot).sensors[1];
         assert(std::abs(imu.values[3]) < 1e-6 && std::abs(imu.values[4]) < 1e-6);
@@ -827,7 +888,9 @@ void driven_base_far_from_origin_reads_exact_imu() {
 // roll and pitch (turning them with the heading) instead of snapping upright.
 void differential_drive_keeps_authored_tilt() {
     constexpr double dt = 0.02;
-    auto simulation = make_simulation(dt);
+    auto fixture = make_fixture(dt);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = wheeled_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
@@ -862,7 +925,7 @@ void differential_drive_keeps_authored_tilt() {
     rk_simulation_pose observed{};
     observed.struct_size = sizeof(observed);
     for (int tick = 1; tick <= 20; ++tick) {
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
         plant = drive_state(simulation);
         assert(std::abs(plant.yaw - (yaw + tick * dt)) < 1e-12);
         assert(rk_simulation_get_robot_pose(simulation, 0, &observed) == RK_OK);
@@ -937,7 +1000,9 @@ rk_simulation_omni_drive_state omni_state(rk_simulation simulation) {
 
 void omni_drive_follows_applied_wheel_targets() {
     constexpr double dt = 0.02;
-    auto simulation = make_simulation(dt);
+    auto fixture = make_fixture(dt);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     const auto model = omni_blueprint();
     rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
@@ -989,7 +1054,7 @@ void omni_drive_follows_applied_wheel_targets() {
     auto command = omni_targets(0.0, 0.5, 0.0, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 10; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     plant = omni_state(simulation);
     for (uint32_t wheel = 0; wheel < 3; ++wheel)
         assert(plant.wheel_rates[wheel] == command.targets[wheel].target);
@@ -1011,7 +1076,7 @@ void omni_drive_follows_applied_wheel_targets() {
     command = omni_targets(vx, vy, omega, ++sequence);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     for (int tick = 0; tick < 25; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     plant = omni_state(simulation);
     const double end_yaw = arc_start_yaw + 25 * dt * omega;
     assert(std::abs(plant.yaw - end_yaw) < 1e-9);
@@ -1026,7 +1091,7 @@ void omni_drive_follows_applied_wheel_targets() {
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     const auto before_stop = omni_state(simulation);
     for (int tick = 0; tick < 3; ++tick)
-        assert(rk_simulation_step(simulation, time += 100) == RK_OK);
+        assert(step(session, time += 100) == RK_OK);
     plant = omni_state(simulation);
     for (uint32_t wheel = 0; wheel < 3; ++wheel) assert(plant.wheel_rates[wheel] == 0.0);
     assert(plant.x == before_stop.x && plant.y == before_stop.y && plant.yaw == before_stop.yaw);
@@ -1077,8 +1142,6 @@ void robots_attach_to_a_shared_session() {
     assert(nksim_session_create_actor(session, &part, 1, &person) == NKSIM_OK);
 
     // The session's owner, not the robots, controls the clock.
-    assert(rk_simulation_step(simulation, 0) == RK_ERROR_INVALID_STATE);
-    assert(rk_simulation_start(simulation) == RK_ERROR_INVALID_STATE);
     assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
     const auto sample = snapshot(robot);
     assert(std::abs(sample.sensors[2].values[0] - 1.75) < 1e-6);

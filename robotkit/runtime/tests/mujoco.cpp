@@ -1,4 +1,6 @@
 #include "robotkit_simkit.h"
+#include "nativekit_sim_mujoco.h"
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -10,14 +12,96 @@ static rk_robot_state state(rk_robot_runtime robot) {
     return value;
 }
 
-static void convex_link_and_box_link_build() {
-    rk_simulation_desc desc{};
+// A session an owning test drives directly, with a Simulation joined to it
+// (rk_simulation_create_in_session) on the MuJoCo backend, standing in for
+// the deleted self-owned rk_simulation_create(..., backend=1) mode.
+struct SessionFixture {
+    nkscene_scene scene = 0;
+    nksim_world world = 0;
+    nksim_session session = 0;
+    rk_simulation simulation = RK_INVALID_SIMULATION;
+
+    explicit SessionFixture(double fixed_timestep, uint32_t physics_substeps = 1) {
+        assert(nkscene_scene_create(&scene) == NKS_OK);
+        nksim_world_desc world_desc{};
+        world_desc.struct_size = sizeof(world_desc);
+        world_desc.scene = scene;
+        world_desc.fixed_timestep = fixed_timestep;
+        world_desc.physics_substeps = physics_substeps;
+        world_desc.gravity[2] = -9.81;
+        assert(nksim_mujoco_world_create(&world_desc, &world) == NKSIM_OK);
+        nksim_session_desc session_desc{};
+        session_desc.struct_size = sizeof(session_desc);
+        session_desc.scene = scene;
+        session_desc.world = world;
+        assert(nksim_session_create(&session_desc, &session) == NKSIM_OK);
+        assert(rk_simulation_create_in_session(session, &simulation) == RK_OK);
+    }
+    SessionFixture(const SessionFixture &) = delete;
+    SessionFixture &operator=(const SessionFixture &) = delete;
+    ~SessionFixture() {
+        if (simulation != RK_INVALID_SIMULATION) rk_simulation_destroy(simulation);
+        if (session != 0) nksim_session_destroy(session);
+        if (world != 0) nksim_world_destroy(world);
+        if (scene != 0) nkscene_scene_destroy(scene);
+    }
+};
+
+static rk_result from_sim(nksim_result result) {
+    switch (result) {
+    case NKSIM_OK: return RK_OK;
+    case NKSIM_ERROR_INVALID_ARGUMENT: return RK_ERROR_INVALID_ARGUMENT;
+    case NKSIM_ERROR_INVALID_HANDLE: return RK_ERROR_INVALID_HANDLE;
+    case NKSIM_ERROR_INVALID_STATE: return RK_ERROR_INVALID_STATE;
+    case NKSIM_ERROR_OUT_OF_MEMORY: return RK_ERROR_OUT_OF_MEMORY;
+    default: return RK_ERROR_BACKEND;
+    }
+}
+
+static rk_result step(nksim_session session, uint64_t timestamp_ns) {
+    return from_sim(nksim_session_step(session, timestamp_ns, nullptr));
+}
+static rk_result start(nksim_session session) { return from_sim(nksim_session_start(session)); }
+static rk_result stop(nksim_session session) { return from_sim(nksim_session_stop(session)); }
+static rk_result reset(nksim_session session) { return from_sim(nksim_session_reset(session)); }
+
+static nksim_object spawn_object(nksim_session session, uint32_t motion_type,
+                                 const double position[3], const double rotation[4],
+                                 const double half_extents[3], double mass = 0.0) {
+    nksim_object_desc desc{};
     desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.005;
-    desc.physics_substeps = 1;
-    desc.backend = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    desc.motion_type = motion_type;
+    desc.shape.struct_size = sizeof(desc.shape);
+    desc.shape.type = NKSIM_SHAPE_BOX;
+    std::copy_n(half_extents, 3, desc.shape.parameters);
+    desc.pose.struct_size = sizeof(desc.pose);
+    std::copy_n(position, 3, desc.pose.position);
+    std::copy_n(rotation, 4, desc.pose.rotation);
+    desc.mass = mass;
+    nksim_object object = 0;
+    assert(nksim_session_create_object(session, &desc, &object) == NKSIM_OK);
+    return object;
+}
+
+static void remove_object(nksim_session session, nksim_object object) {
+    assert(nksim_session_destroy_object(session, object) == NKSIM_OK);
+}
+
+static void object_pose(nksim_session session, nksim_object object, double out_position[3],
+                        double out_rotation[4]) {
+    nksim_body body = 0;
+    assert(nksim_session_get_object_body(session, object, &body) == NKSIM_OK);
+    nksim_body_state value{};
+    value.struct_size = sizeof(value);
+    assert(nksim_session_get_body_state(session, body, &value) == NKSIM_OK);
+    std::copy_n(value.position, 3, out_position);
+    std::copy_n(value.rotation, 4, out_rotation);
+}
+
+static void convex_link_and_box_link_build() {
+    SessionFixture fixture(0.005);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     rk_robot_runtime_blueprint model{};
     model.struct_size = sizeof(model);
     model.link_count = 2;
@@ -45,23 +129,18 @@ static void convex_link_and_box_link_build() {
     robot_desc.collision_half_extents[5] = 0.4;
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
-    assert(rk_simulation_start(simulation) == RK_OK);
+    assert(start(session) == RK_OK);
     rk_simulation_presentation presentation = 0;
     assert(rk_simulation_capture_presentation(simulation, &presentation) == RK_OK);
     rk_simulation_presentation_destroy(presentation);
-    assert(rk_simulation_stop(simulation) == RK_OK);
-    assert(rk_simulation_step(simulation, 0) == RK_OK);
-    rk_simulation_destroy(simulation);
+    assert(stop(session) == RK_OK);
+    assert(step(session, 0) == RK_OK);
 }
 
 static void tool_hulls_collide_only_on_their_pieces() {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 2;
-    desc.backend = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01, 2);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     rk_robot_runtime_blueprint model{};
     model.struct_size = sizeof(model);
     model.link_count = 1;
@@ -86,39 +165,28 @@ static void tool_hulls_collide_only_on_their_pieces() {
     }
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
-    rk_simulation_object_desc obstacle{};
-    obstacle.struct_size = sizeof(obstacle);
-    obstacle.motion_type = 2;
-    obstacle.rotation[3] = 1.0;
-    obstacle.mass = 1.0;
-    obstacle.half_extents[0] = obstacle.half_extents[1] =
-        obstacle.half_extents[2] = 0.05;
-    obstacle.position[0] = 0.5;
-    obstacle.position[2] = 1.2;
-    rk_simulation_object in_gap = 0, on_tool = 0;
-    assert(rk_simulation_spawn_object(simulation, &obstacle, &in_gap) == RK_OK);
-    obstacle.position[0] = 0.95;
-    assert(rk_simulation_spawn_object(simulation, &obstacle, &on_tool) == RK_OK);
+    const double half_extents[3] = {0.05, 0.05, 0.05};
+    const double rotation[4] = {0.0, 0.0, 0.0, 1.0};
+    const double in_gap_position[3] = {0.5, 0.0, 1.2};
+    const double on_tool_position[3] = {0.95, 0.0, 1.2};
+    auto in_gap = spawn_object(session, NKSIM_MOTION_DYNAMIC, in_gap_position, rotation,
+        half_extents, 1.0);
+    auto on_tool = spawn_object(session, NKSIM_MOTION_DYNAMIC, on_tool_position, rotation,
+        half_extents, 1.0);
     for (int tick = 0; tick < 20; ++tick)
-        assert(rk_simulation_step(simulation, tick) == RK_OK);
-    rk_simulation_pose gap_pose{}, tool_pose{};
-    gap_pose.struct_size = tool_pose.struct_size = sizeof(rk_simulation_pose);
-    assert(rk_simulation_get_object_pose(simulation, in_gap, &gap_pose) == RK_OK);
-    assert(rk_simulation_get_object_pose(simulation, on_tool, &tool_pose) == RK_OK);
-    assert(gap_pose.position[2] < 1.03);
-    assert(tool_pose.position[2] > gap_pose.position[2] + 0.03);
-    rk_simulation_destroy(simulation);
+        assert(step(session, tick) == RK_OK);
+    double gap_position[3], gap_rotation[4], tool_position[3], tool_rotation[4];
+    object_pose(session, in_gap, gap_position, gap_rotation);
+    object_pose(session, on_tool, tool_position, tool_rotation);
+    assert(gap_position[2] < 1.03);
+    assert(tool_position[2] > gap_position[2] + 0.03);
 }
 
 static void tool_piece_contact_is_reported(double obstacle_z, bool expected_active,
                                             bool fixed_obstacle = false) {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.01;
-    desc.physics_substeps = 2;
-    desc.backend = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.01, 2);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     rk_robot_runtime_blueprint model{};
     model.struct_size = sizeof(model);
     model.link_count = 1;
@@ -141,17 +209,12 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     }
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
-    rk_simulation_object_desc obstacle{};
-    obstacle.struct_size = sizeof(obstacle);
-    obstacle.motion_type = fixed_obstacle ? 0 : 2;
-    obstacle.rotation[3] = 1.0;
-    obstacle.mass = 1.0;
-    obstacle.half_extents[0] = obstacle.half_extents[1] =
-        obstacle.half_extents[2] = 0.05;
-    obstacle.position[2] = obstacle_z;
-    rk_simulation_object object = 0;
-    assert(rk_simulation_spawn_object(simulation, &obstacle, &object) == RK_OK);
-    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    const double half_extents[3] = {0.05, 0.05, 0.05};
+    const double rotation[4] = {0.0, 0.0, 0.0, 1.0};
+    const double position[3] = {0.0, 0.0, obstacle_z};
+    auto object = spawn_object(session, fixed_obstacle ? NKSIM_MOTION_STATIC : NKSIM_MOTION_DYNAMIC,
+        position, rotation, half_extents, 1.0);
+    assert(step(session, 0) == RK_OK);
     uint32_t count = 0;
     assert(rk_simulation_get_robot_contacts(simulation, robot, nullptr, 0, &count) == RK_OK);
     bool found = false;
@@ -167,7 +230,6 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
         }
     }
     assert(found);
-    rk_simulation_destroy(simulation);
 }
 
 int main() {
@@ -176,13 +238,10 @@ int main() {
     tool_piece_contact_is_reported(1.07, false);
     tool_piece_contact_is_reported(1.04, true);
     tool_piece_contact_is_reported(1.07, false, true);
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.005;
-    desc.physics_substeps = 2;
-    desc.backend = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+
+    SessionFixture fixture(0.005, 2);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
     rk_robot_runtime_blueprint model{};
     model.struct_size = sizeof(model);
     model.link_count = 2;
@@ -209,16 +268,11 @@ int main() {
 
     // Falling box crosses and leaves the LiDAR plane. Contact response is
     // checked independently by the sim_mujoco backend's plane-drop fixture.
-    rk_simulation_object_desc box{};
-    box.struct_size = sizeof(box);
-    box.position[0] = 2.0;
-    box.position[2] = 1.0;
-    box.rotation[3] = 1.0;
-    box.half_extents[0] = box.half_extents[1] = box.half_extents[2] = 0.25;
-    box.mass = 1.0;
-    box.motion_type = 2;
-    rk_simulation_object falling = 0;
-    assert(rk_simulation_spawn_object(simulation, &box, &falling) == RK_OK);
+    const double box_position[3] = {2.0, 0.0, 1.0};
+    const double box_rotation[4] = {0.0, 0.0, 0.0, 1.0};
+    const double box_half_extents[3] = {0.25, 0.25, 0.25};
+    auto falling = spawn_object(session, NKSIM_MOTION_DYNAMIC, box_position, box_rotation,
+        box_half_extents, 1.0);
 
     rk_robot_command command{};
     command.struct_size = sizeof(command);
@@ -229,7 +283,7 @@ int main() {
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
     bool saw_motion = false, saw_specific_force = false, saw_occlusion = false;
     for (int tick = 0; tick < 400; ++tick) {
-        assert(rk_simulation_step(simulation, tick) == RK_OK);
+        assert(step(session, tick) == RK_OK);
         const auto sample = state(robot);
         if (tick == 0) {
             assert(sample.sensors[0].sequence == 0);
@@ -250,15 +304,14 @@ int main() {
     assert(saw_motion && saw_specific_force && saw_occlusion);
     assert(std::abs(final.position[0] - 0.5) < 0.05);
     assert(final.sensors[1].values[0] == 20.0);
-    assert(rk_simulation_stop(simulation) == RK_OK);
-    assert(rk_simulation_remove_object(simulation, falling) == RK_OK);
-    assert(rk_simulation_step(simulation, 500) == RK_OK);
+    assert(stop(session) == RK_OK);
+    remove_object(session, falling);
+    assert(step(session, 500) == RK_OK);
     assert(state(robot).sensors[1].values[0] == 20.0);
-    assert(rk_simulation_stop(simulation) == RK_OK);
-    assert(rk_simulation_reset(simulation) == RK_OK);
-    assert(rk_simulation_step(simulation, 0) == RK_OK);
+    assert(stop(session) == RK_OK);
+    assert(reset(session) == RK_OK);
+    assert(step(session, 0) == RK_OK);
     assert(std::abs(state(robot).position[0]) < 1e-9);
     assert(state(robot).sensors[0].sequence == 0);
-    rk_simulation_destroy(simulation);
     std::puts("MuJoCo articulated IMU and moving-occluder LiDAR tests passed");
 }

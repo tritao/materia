@@ -87,6 +87,13 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * velocity over the tick is the motion from where the previous tick left it.
 	 */
 	extern fn nksim_session_drive_object(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>) -> nksim_result;
+	/**
+	 * The session object bound to a body, for a body a session participant
+	 * observes in a contact or elsewhere. Returns NKSIM_ERROR_INVALID_HANDLE if
+	 * the body is not a current session object's body (for instance, a robot
+	 * link or an actor part).
+	 */
+	extern fn nksim_session_find_object(session: nksim_session, body: nksim_body, out_object: ptr<nksim_object> @out) -> nksim_result;
 	extern fn nksim_session_get_actor_body(session: nksim_session, actor: nksim_actor, part: u32, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_session_get_object_body(session: nksim_session, object: nksim_object, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_session_get_status(session: nksim_session, out_status: ptr<nksim_session_status> @inout) -> nksim_result;

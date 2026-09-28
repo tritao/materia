@@ -23,14 +23,12 @@ class VirtualDeviceEndpoint;
  * their joint targets and base drives, and publish their samples from the
  * tick's snapshot.
  *
- * A Simulation either attaches to a session its caller owns, or owns a
- * private scene, world, and session of its own; only the latter controls the
- * clock (step, start, stop, reset) through this object.
+ * A Simulation attaches to a session its caller owns and outlives. The
+ * session's owner controls the clock (step, start, stop, reset) and the
+ * environment (session objects and actors), not this object.
  */
 class Simulation final {
 public:
-    /** Owns a private session; robots must be added before stepping. */
-    Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend = 0);
     /** Takes part in a session the caller owns and outlives this object. */
     explicit Simulation(nksim_session session);
     ~Simulation();
@@ -41,14 +39,7 @@ public:
     /** Adds one simulation-owned runtime before the topology is sealed. */
     rk_result add_robot(const rk_robot_runtime_blueprint &blueprint, rk_robot_runtime &out_runtime,
                         const rk_simulation_robot_desc *robot_desc = nullptr);
-    /** Starts the shared realtime owner thread after all robots are attached. */
-    rk_result start();
-    /** Stops the shared realtime owner thread without destroying the universe. */
-    rk_result stop();
-    /** Applies all robot mailboxes and advances the physics host exactly once. */
-    rk_result step(uint64_t timestamp_ns);
     rk_result cut_virtual_device_link(uint32_t robot_index, bool cut);
-    rk_result reset();
     rk_result reset_robot(uint32_t robot_index);
     rk_result teleport_robot(uint32_t robot_index, const rk_simulation_pose &pose);
     /**
@@ -78,14 +69,9 @@ public:
                             rk_simulation_pose &out_pose) const;
     rk_result get_robot_contacts(rk_robot_runtime runtime,
                                  std::vector<rk_robot_contact> &out) const;
-    rk_result spawn_object(const rk_simulation_object_desc &desc,
-                           rk_simulation_object &out_object);
-    rk_result remove_object(rk_simulation_object object);
-    rk_result teleport_object(rk_simulation_object object, const rk_simulation_pose &pose);
-    rk_result get_object_pose(rk_simulation_object object, rk_simulation_pose &out_pose) const;
     rk_result capture_presentation(rk_simulation_presentation_info &out_info,
         std::vector<rk_simulation_presentation_pose> &out_poses) const;
-    /** Robot and environment poses from a frame captured from this session. */
+    /** Robot poses from a frame captured from this session. */
     rk_result present_frame(nksim_frame frame, rk_simulation_presentation_info &out_info,
                             std::vector<rk_simulation_presentation_pose> &out_poses) const;
     /** Returns the number of completed shared physics steps. */
@@ -170,10 +156,6 @@ private:
         double rates[3] = {0.0, 0.0, 0.0};
     };
 
-    // A private scene, world, and session this object owns, or zero.
-    nkscene_scene owned_scene_ = 0;
-    nksim_world owned_world_ = 0;
-    nksim_session owned_session_ = 0;
     nksim_session session_ = 0;
     nksim_participant participant_ = 0;
     nkscene_scene scene_ = 0;
@@ -202,8 +184,6 @@ private:
     // measured from it.
     std::vector<rk_simulation_pose> robot_tick_poses_;
     std::vector<DrivePlant> drives_;
-    /** Session objects spawned through this simulation, in spawn order. */
-    std::vector<nksim_object> objects_;
     std::chrono::nanoseconds period_;
 };
 

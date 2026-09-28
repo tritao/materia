@@ -57,27 +57,6 @@ std::shared_ptr<const Presentation> resolve_presentation(rk_simulation_presentat
 
 extern "C" {
 
-rk_result RK_CALL rk_simulation_create(const rk_simulation_desc *desc,
-                                       rk_simulation *out_simulation) {
-    if (!desc || desc->struct_size < sizeof(*desc) || !out_simulation ||
-        !std::isfinite(desc->fixed_timestep) || desc->fixed_timestep <= 0.0 ||
-        desc->physics_substeps == 0 || desc->backend > 1)
-        return RK_ERROR_INVALID_ARGUMENT;
-    *out_simulation = RK_INVALID_SIMULATION;
-#ifndef RK_HAS_MUJOCO
-    if (desc->backend == 1) return RK_ERROR_UNSUPPORTED;
-#endif
-    try {
-        *out_simulation = store(std::make_shared<robotkit::Simulation>(
-            desc->fixed_timestep, desc->physics_substeps, desc->backend));
-        return RK_OK;
-    } catch (const std::bad_alloc &) {
-        return RK_ERROR_OUT_OF_MEMORY;
-    } catch (...) {
-        return RK_ERROR_BACKEND;
-    }
-}
-
 rk_result RK_CALL rk_simulation_create_in_session(nksim_session session,
                                                   rk_simulation *out_simulation) {
     if (!out_simulation)
@@ -125,24 +104,12 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
         robot_desc) : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_simulation_step(rk_simulation simulation, uint64_t timestamp_ns) {
-    const auto value = resolve(simulation);
-    return value ? value->step(timestamp_ns) : RK_ERROR_INVALID_HANDLE;
-}
 rk_result RK_CALL rk_simulation_cut_virtual_device_link(
     rk_simulation simulation, uint32_t robot_index, uint32_t cut) {
     if (cut > 1) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = resolve(simulation);
     return value ? value->cut_virtual_device_link(robot_index, cut != 0) :
         RK_ERROR_INVALID_HANDLE;
-}
-rk_result RK_CALL rk_simulation_start(rk_simulation simulation) {
-    const auto value = resolve(simulation);
-    return value ? value->start() : RK_ERROR_INVALID_HANDLE;
-}
-rk_result RK_CALL rk_simulation_stop(rk_simulation simulation) {
-    const auto value = resolve(simulation);
-    return value ? value->stop() : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_get_clock(rk_simulation simulation,
@@ -155,11 +122,6 @@ rk_result RK_CALL rk_simulation_get_clock(rk_simulation simulation,
     out_clock->step_index = value->step_index();
     out_clock->simulation_time = value->simulation_time();
     return RK_OK;
-}
-
-rk_result RK_CALL rk_simulation_reset(rk_simulation simulation) {
-    const auto value = resolve(simulation);
-    return value ? value->reset() : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_reset_robot(rk_simulation simulation, uint32_t robot_index) {
@@ -283,39 +245,6 @@ rk_result RK_CALL rk_simulation_get_robot_contact(rk_simulation simulation,
     if (index >= contacts.size()) return RK_ERROR_INVALID_ARGUMENT;
     *out_contact = contacts[index];
     return RK_OK;
-}
-
-rk_result RK_CALL rk_simulation_spawn_object(rk_simulation simulation,
-                                             const rk_simulation_object_desc *desc,
-                                             rk_simulation_object *out_object) {
-    if (!desc || !out_object)
-        return RK_ERROR_INVALID_ARGUMENT;
-    const auto value = resolve(simulation);
-    return value ? value->spawn_object(*desc, *out_object) : RK_ERROR_INVALID_HANDLE;
-}
-
-rk_result RK_CALL rk_simulation_remove_object(rk_simulation simulation,
-                                              rk_simulation_object object) {
-    const auto value = resolve(simulation);
-    return value ? value->remove_object(object) : RK_ERROR_INVALID_HANDLE;
-}
-
-rk_result RK_CALL rk_simulation_teleport_object(rk_simulation simulation,
-                                                rk_simulation_object object,
-                                                const rk_simulation_pose *pose) {
-    if (!pose)
-        return RK_ERROR_INVALID_ARGUMENT;
-    const auto value = resolve(simulation);
-    return value ? value->teleport_object(object, *pose)
-                 : RK_ERROR_INVALID_HANDLE;
-}
-
-rk_result RK_CALL rk_simulation_get_object_pose(rk_simulation simulation,
-                                                 rk_simulation_object object,
-                                                 rk_simulation_pose *out_pose) {
-    if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
-    const auto value=resolve(simulation);
-    return value?value->get_object_pose(object,*out_pose):RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_simulation_capture_presentation(

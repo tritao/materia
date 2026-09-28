@@ -128,6 +128,14 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_drive_object(
     nksim_session session, nksim_object object, const nksim_pose *pose);
 NKSIM_API nksim_result NKSIM_CALL nksim_session_get_object_body(
     nksim_session session, nksim_object object, nksim_body *out_body NK_OUT);
+/**
+ * The session object bound to a body, for a body a session participant
+ * observes in a contact or elsewhere. Returns NKSIM_ERROR_INVALID_HANDLE if
+ * the body is not a current session object's body (for instance, a robot
+ * link or an actor part).
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_find_object(
+    nksim_session session, nksim_body body, nksim_object *out_object NK_OUT);
 
 /**
  * Adds a group of 1..256 kinematic bodies while stopped. Actor bodies push

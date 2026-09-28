@@ -3,9 +3,6 @@
 #include "simulation_robot.hpp"
 #include "runtime_registry.hpp"
 #include "sensor_math.hpp"
-#ifdef RK_HAS_MUJOCO
-#include "nativekit_sim_mujoco.h"
-#endif
 
 #include <algorithm>
 #include <cmath>
@@ -145,40 +142,6 @@ rk_result from_sim(nksim_result result) {
 
 } // namespace
 
-Simulation::Simulation(double fixed_timestep, uint32_t physics_substeps, uint32_t backend)
-    : fixed_timestep_(fixed_timestep),
-      period_(static_cast<int64_t>(fixed_timestep * 1'000'000'000.0)) {
-    if (fixed_timestep <= 0.0 || physics_substeps == 0)
-        throw std::invalid_argument("invalid simulation timing");
-    try {
-        require_scene(nkscene_scene_create(&owned_scene_), "nkscene_scene_create");
-        nksim_world_desc desc{};
-        desc.struct_size = sizeof(desc);
-        desc.scene = owned_scene_;
-        desc.fixed_timestep = fixed_timestep_;
-        desc.physics_substeps = physics_substeps;
-        std::copy_n(gravity_, 3, desc.gravity);
-        if (backend == 0)
-            require_sim(nksim_world_create(&desc, &owned_world_), "nksim_world_create");
-#ifdef RK_HAS_MUJOCO
-        else if (backend == 1)
-            require_sim(nksim_mujoco_world_create(&desc, &owned_world_),
-                        "nksim_mujoco_world_create");
-#endif
-        else throw std::invalid_argument("simulation backend unavailable");
-        nksim_session_desc session_desc{};
-        session_desc.struct_size = sizeof(session_desc);
-        session_desc.scene = owned_scene_;
-        session_desc.world = owned_world_;
-        require_sim(nksim_session_create(&session_desc, &owned_session_), "nksim_session_create");
-        session_ = owned_session_;
-        attach();
-    } catch (...) {
-        cleanup();
-        throw;
-    }
-}
-
 Simulation::Simulation(nksim_session session) : session_(session) {
     nksim_session_status status{};
     status.struct_size = sizeof(status);
@@ -235,7 +198,6 @@ Simulation::~Simulation() {
     // No tick may call back into this object once teardown starts.
     if (participant_ != 0) nksim_session_remove_participant(session_, participant_);
     participant_ = 0;
-    stop();
     runtimes_.clear();
     for (const auto handle : handles_)
         internal::destroy_runtime(handle);
@@ -551,14 +513,6 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
 }
 
 namespace { rk_result set_body_pose(nksim_world,nksim_body,const double[3],const double[4]); }
-
-rk_result Simulation::reset() {
-    if (owned_session_ == 0) return RK_ERROR_INVALID_STATE;
-    Lock lock(session_);
-    rejected_ = RK_OK;
-    const auto result = nksim_session_reset(session_);
-    return result == NKSIM_OK ? RK_OK : rejected_ != RK_OK ? rejected_ : from_sim(result);
-}
 
 rk_result Simulation::reset_robots() {
     const auto world = stopped_world();
@@ -1041,9 +995,6 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             return RK_ERROR_INVALID_STATE;
         snapshot = owned;
     }
-    std::vector<nksim_body> object_bodies(objects_.size(), 0);
-    for (std::size_t object = 0; object < objects_.size(); ++object)
-        nksim_session_get_object_body(session_, objects_[object], &object_bodies[object]);
     rk_result result_code = RK_OK;
     uint64_t count = 0;
     if (nksim_snapshot_get_contact_count(snapshot, &count) != NKSIM_OK)
@@ -1064,9 +1015,9 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             result.link_index = link;
             result.tool_piece_index = part - 1;
             const auto other_body = source.body_a == body ? source.body_b : source.body_a;
-            for (std::size_t object = 0; object < objects_.size(); ++object)
-                if (object_bodies[object] == other_body)
-                    result.other_object = objects_[object];
+            nksim_object other_object = 0;
+            if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK)
+                result.other_object = other_object;
             result.distance = source.distance;
             std::copy_n(source.position, 3, result.position);
             std::copy_n(source.normal, 3, result.normal);
@@ -1089,76 +1040,6 @@ rk_result Simulation::read_body_pose(nksim_body body,rk_simulation_pose &out_pos
     return RK_OK;
 }
 
-rk_result Simulation::spawn_object(const rk_simulation_object_desc &desc,
-                                   rk_simulation_object &out_object) {
-    Lock lock(session_);
-    out_object = RK_INVALID_SIMULATION_OBJECT;
-    if (stopped_world() == 0 || desc.struct_size < sizeof(desc) ||
-        desc.motion_type > NKSIM_MOTION_DYNAMIC ||
-        (desc.motion_type == NKSIM_MOTION_DYNAMIC && desc.mass <= 0.0) ||
-        !valid_pose(desc.position, desc.rotation))
-        return RK_ERROR_INVALID_ARGUMENT;
-    for (int index = 0; index < 3; ++index)
-        if (!std::isfinite(desc.half_extents[index]) || desc.half_extents[index] <= 0.0)
-            return RK_ERROR_INVALID_ARGUMENT;
-    nksim_object_desc object{};
-    object.struct_size = sizeof(object);
-    object.motion_type = desc.motion_type;
-    object.shape.struct_size = sizeof(object.shape);
-    object.shape.type = NKSIM_SHAPE_BOX;
-    std::copy_n(desc.half_extents, 3, object.shape.parameters);
-    object.pose.struct_size = sizeof(object.pose);
-    std::copy_n(desc.position, 3, object.pose.position);
-    std::copy_n(desc.rotation, 4, object.pose.rotation);
-    object.mass = desc.mass;
-    nksim_object handle = 0;
-    const auto result = nksim_session_create_object(session_, &object, &handle);
-    if (result != NKSIM_OK) return from_sim(result);
-    objects_.push_back(handle);
-    out_object = handle;
-    return RK_OK;
-}
-
-rk_result Simulation::remove_object(rk_simulation_object object) {
-    Lock lock(session_);
-    if (stopped_world() == 0 || object == RK_INVALID_SIMULATION_OBJECT)
-        return RK_ERROR_INVALID_STATE;
-    const auto found = std::find(objects_.begin(), objects_.end(), object);
-    if (found == objects_.end()) return RK_ERROR_INVALID_HANDLE;
-    const auto result = nksim_session_destroy_object(session_, object);
-    if (result != NKSIM_OK) return from_sim(result);
-    objects_.erase(found);
-    return RK_OK;
-}
-
-rk_result Simulation::teleport_object(rk_simulation_object object,
-                                       const rk_simulation_pose &pose) {
-    Lock lock(session_);
-    if (stopped_world() == 0)
-        return RK_ERROR_INVALID_STATE;
-    if (std::find(objects_.begin(), objects_.end(), object) == objects_.end())
-        return RK_ERROR_INVALID_HANDLE;
-    if (pose.struct_size < sizeof(pose) || !valid_pose(pose.position, pose.rotation))
-        return RK_ERROR_INVALID_ARGUMENT;
-    nksim_pose value{};
-    value.struct_size = sizeof(value);
-    std::copy_n(pose.position, 3, value.position);
-    std::copy_n(pose.rotation, 4, value.rotation);
-    return from_sim(nksim_session_teleport_object(session_, object, &value));
-}
-
-rk_result Simulation::get_object_pose(rk_simulation_object object,
-                                      rk_simulation_pose &out_pose) const {
-    Lock lock(session_);
-    if (out_pose.struct_size < sizeof(out_pose)) return RK_ERROR_INVALID_ARGUMENT;
-    if (std::find(objects_.begin(), objects_.end(), object) == objects_.end())
-        return RK_ERROR_INVALID_HANDLE;
-    nksim_body body = 0;
-    if (nksim_session_get_object_body(session_, object, &body) != NKSIM_OK)
-        return RK_ERROR_BACKEND;
-    return read_body_pose(body, out_pose);
-}
-
 rk_result Simulation::capture_presentation(rk_simulation_presentation_info &out_info,
         std::vector<rk_simulation_presentation_pose> &out_poses) const {
     if (out_info.struct_size < sizeof(out_info)) return RK_ERROR_INVALID_ARGUMENT;
@@ -1177,14 +1058,13 @@ rk_result Simulation::present_frame(nksim_frame frame, rk_simulation_presentatio
     nksim_clock clock{};
     clock.struct_size = sizeof(clock);
     if (nksim_frame_get_clock(frame, &clock) != NKSIM_OK) return RK_ERROR_INVALID_HANDLE;
-    auto add = [&](uint32_t kind, uint32_t robot_index, uint32_t link_index, uint32_t object_id,
+    auto add = [&](uint32_t kind, uint32_t robot_index, uint32_t link_index,
                    const double position[3], const double rotation[4]) {
         rk_simulation_presentation_pose item{};
         item.struct_size = sizeof(item);
         item.kind = kind;
         item.robot_index = robot_index;
         item.link_index = link_index;
-        item.object_id = object_id;
         std::copy_n(position, 3, item.position);
         std::copy_n(rotation, 4, item.rotation);
         out_poses.push_back(item);
@@ -1198,37 +1078,21 @@ rk_result Simulation::present_frame(nksim_frame frame, rk_simulation_presentatio
     for (uint32_t robot_index = 0; robot_index < robot_base_bodies_.size(); ++robot_index) {
         nksim_body_state state{};
         if (!body(robot_base_bodies_[robot_index], state)) return RK_ERROR_BACKEND;
-        add(RK_SIMULATION_PRESENTATION_ROBOT_BASE, robot_index, 0, 0, state.position,
+        add(RK_SIMULATION_PRESENTATION_ROBOT_BASE, robot_index, 0, state.position,
             state.rotation);
         const auto binding = bindings_[robot_index].lock();
         if (!binding) return RK_ERROR_INVALID_HANDLE;
         for (uint32_t link_index = 0; link_index < binding->bodies_.size(); ++link_index) {
             if (!body(binding->bodies_[link_index], state)) return RK_ERROR_BACKEND;
-            add(RK_SIMULATION_PRESENTATION_ROBOT_LINK, robot_index, link_index, 0,
+            add(RK_SIMULATION_PRESENTATION_ROBOT_LINK, robot_index, link_index,
                 state.position, state.rotation);
         }
-    }
-    for (const auto object : objects_) {
-        nksim_pose pose{};
-        pose.struct_size = sizeof(pose);
-        if (nksim_frame_get_object_pose(frame, object, &pose) != NKSIM_OK)
-            return RK_ERROR_BACKEND;
-        add(RK_SIMULATION_PRESENTATION_ENVIRONMENT, 0, 0, object, pose.position, pose.rotation);
     }
     if (out_poses.size() > std::numeric_limits<uint32_t>::max()) return RK_ERROR_OUT_OF_MEMORY;
     out_info.step_index = clock.step_index;
     out_info.simulation_time = clock.time;
     out_info.pose_count = static_cast<uint32_t>(out_poses.size());
     return RK_OK;
-}
-
-rk_result Simulation::step(uint64_t timestamp_ns) {
-    if (owned_session_ == 0) return RK_ERROR_INVALID_STATE;
-    Lock lock(session_);
-    if (runtimes_.empty()) return RK_ERROR_INVALID_STATE;
-    rejected_ = RK_OK;
-    const auto result = nksim_session_step(session_, timestamp_ns, nullptr);
-    return result == NKSIM_OK ? RK_OK : rejected_ != RK_OK ? rejected_ : from_sim(result);
 }
 
 rk_result Simulation::cut_virtual_device_link(uint32_t robot_index, bool cut) {
@@ -1314,18 +1178,6 @@ rk_result Simulation::publish(const nksim_tick &tick) {
     return RK_OK;
 }
 
-rk_result Simulation::start() {
-    if (owned_session_ == 0) return RK_ERROR_INVALID_STATE;
-    Lock lock(session_);
-    if (runtimes_.empty()) return RK_ERROR_INVALID_STATE;
-    return from_sim(nksim_session_start(session_));
-}
-
-rk_result Simulation::stop() {
-    if (owned_session_ == 0) return RK_ERROR_INVALID_STATE;
-    return from_sim(nksim_session_stop(session_));
-}
-
 uint64_t Simulation::step_index() const {
     nksim_session_status status{};
     status.struct_size = sizeof(status);
@@ -1341,19 +1193,6 @@ double Simulation::simulation_time() const {
 void Simulation::cleanup() noexcept {
     if (participant_ != 0) nksim_session_remove_participant(session_, participant_);
     participant_ = 0;
-    if (owned_session_ != 0) {
-        // Destroying the world tears down the complete backend at once. Per-
-        // handle destruction here recompiles whole-model backends for every
-        // link immediately before the model itself is discarded.
-        nksim_session_destroy(owned_session_);
-        owned_session_ = 0;
-        if (owned_world_ != 0) nksim_world_destroy(owned_world_);
-        owned_world_ = 0;
-        if (owned_scene_ != 0) nkscene_scene_destroy(owned_scene_);
-        owned_scene_ = 0;
-        session_ = 0;
-        return;
-    }
     if (session_ == 0) return;
     // A borrowed session keeps its world: remove this simulation's robots from
     // it when it is stopped, or leave them to the world's owner otherwise.

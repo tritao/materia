@@ -379,6 +379,16 @@ public:
         return NKSIM_OK;
     }
 
+    nksim_result find_object(nksim_body body, nksim_object &out) {
+        std::lock_guard lock(mutex);
+        for (const auto &[id, object] : objects_)
+            if (object.part.body == body) {
+                out = id;
+                return NKSIM_OK;
+            }
+        return NKSIM_ERROR_INVALID_HANDLE;
+    }
+
     nksim_result create_actor(const nksim_actor_part *parts, uint32_t count, nksim_actor &out) {
         std::lock_guard lock(mutex);
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
@@ -987,6 +997,13 @@ nksim_result NKSIM_CALL nksim_session_get_object_body(nksim_session session, nks
     if (!out_body) return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->object_body(object, *out_body);
+}
+
+nksim_result NKSIM_CALL nksim_session_find_object(nksim_session session, nksim_body body,
+                                                  nksim_object *out_object) {
+    if (!out_object) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->find_object(body, *out_object);
 }
 
 nksim_result NKSIM_CALL nksim_session_create_actor(nksim_session session,
