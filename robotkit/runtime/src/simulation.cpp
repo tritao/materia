@@ -1192,6 +1192,8 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
         return RK_ERROR_BACKEND;
     const auto simulation_ns = (step_index_ + 1) * static_cast<std::uint64_t>(period_.count());
     std::size_t binding_index = 0;
+    std::vector<rk_robot_state> virtual_samples(runtimes_.size());
+    std::vector<rk_result> virtual_sample_results(runtimes_.size(), RK_OK);
     for (auto it = bindings_.begin(); it != bindings_.end();) {
         const auto binding = it->lock();
         if (!binding) {
@@ -1205,6 +1207,8 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
             rk_robot_state state{};
             const auto result = virtual_devices_[binding_index]->sample(simulation_ns, state);
             if (result != RK_OK && result != RK_ERROR_STALE_STATE) return result;
+            virtual_samples[binding_index] = state;
+            virtual_sample_results[binding_index] = result;
             const auto positions = virtual_devices_[binding_index]->joint_positions();
             if (positions.size() != binding->joints_.size()) return RK_ERROR_BACKEND;
             for (std::size_t joint = 0; joint < positions.size(); ++joint) {
@@ -1244,8 +1248,10 @@ rk_result Simulation::advance(uint64_t timestamp_ns) {
     step_index_ = result.step_index;
     simulation_time_ = result.simulation_time;
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
-        const auto sample_result = runtimes_[index]->publish_sample(
-            virtual_devices_[index] ? simulation_ns : timestamp_ns);
+        const auto sample_result = virtual_devices_[index]
+            ? runtimes_[index]->publish_presampled(simulation_ns, virtual_samples[index],
+                                                  virtual_sample_results[index])
+            : runtimes_[index]->publish_sample(timestamp_ns);
         if (sample_result != RK_OK)
             return sample_result;
     }

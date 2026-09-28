@@ -1528,6 +1528,18 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 }
 
 rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
+    return publish_sample_impl(timestamp_ns, nullptr, RK_OK);
+}
+
+rk_result RobotRuntime::publish_presampled(uint64_t timestamp_ns,
+                                           const rk_robot_state &sample,
+                                           rk_result sample_result) {
+    return publish_sample_impl(timestamp_ns, &sample, sample_result);
+}
+
+rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
+                                            const rk_robot_state *sample,
+                                            rk_result sample_result) {
     std::lock_guard owner_lock(owner_mutex_);
     last_owner_timestamp_ns_ = timestamp_ns;
     rk_robot_state next;
@@ -1550,7 +1562,7 @@ rk_result RobotRuntime::publish_sample(uint64_t timestamp_ns) {
     next.source_timestamp_ns = 0;
     next.received_timestamp_ns = 0;
     next.sensor_count = 0;
-    const auto result = endpoint_->sample(timestamp_ns, next);
+    const auto result = sample ? (next = *sample, sample_result) : endpoint_->sample(timestamp_ns, next);
     if (endpoint_->executes_trajectory_queue())
         control_.diagnostic_code = endpoint_->diagnostic_code();
     next.mode = runtime_mode;

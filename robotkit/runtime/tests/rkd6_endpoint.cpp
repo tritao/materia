@@ -110,6 +110,42 @@ int main() {
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
     {
+        auto wrong = std::make_unique<MockLink>();
+        wrong->fingerprint.fill(4);
+        rk_result reason = RK_OK;
+        auto rejected = Rkd6Endpoint::attach(std::move(wrong), blueprint,
+            std::array<std::uint8_t, 16>{7, 7, 7, 7, 7, 7, 7, 7,
+                7, 7, 7, 7, 7, 7, 7, 7},
+            89, 1e-6, 500'000, 100'000, 40'000, 500'000'000, {}, &reason);
+        assert(!rejected && reason == RK_ERROR_MODEL_MISMATCH);
+        auto fast = blueprint;
+        fast.owner_period_ns = 1'000'000;
+        auto short_queue = std::make_unique<MockLink>();
+        short_queue->fingerprint.fill(4);
+        reason = RK_OK;
+        rejected = Rkd6Endpoint::attach(std::move(short_queue), fast,
+            std::array<std::uint8_t, 16>{4, 4, 4, 4, 4, 4, 4, 4,
+                4, 4, 4, 4, 4, 4, 4, 4},
+            90, 1e-6, 500'000, 100'000, 40'000, 500'000'000, {}, &reason);
+        assert(!rejected && reason == RK_ERROR_UNSUPPORTED);
+    }
+    {
+        auto mismatched = std::make_unique<MockLink>();
+        auto *device = mismatched.get();
+        device->fingerprint.fill(7);
+        auto endpoint = Rkd6Endpoint::attach(std::move(mismatched), blueprint,
+            device->fingerprint, 88, 1e-6, 500'000, 100'000);
+        assert(endpoint);
+        rk_robot_state state{};
+        assert(endpoint->sample(0, state) == RK_OK);
+        device_wire6::QueueStatus6 wrong{};
+        wrong.queue_revision = 7;
+        device->push(14, wrong);
+        assert(endpoint->sample(200'000, state) == RK_OK);
+        assert(endpoint->diagnostic_code() != 0);
+        assert(std::string(endpoint->fault_reason()) == "queue_revision_mismatch");
+    }
+    {
         auto bench = blueprint;
         bench.joint_count = 2;
         bench.joints[1] = bench.joints[0];
@@ -171,6 +207,10 @@ int main() {
     late.replace_after_plan_id = 8;
     assert(endpoint->submit_device_plan(late, 500'000'000, 100'400'000,
         520'000'000, blueprint) == RK_ERROR_INVALID_STATE);
+    // The device has only received the first plan's segment; an anchor beyond
+    // its received horizon cannot be repaired by later pending host segments.
+    assert(endpoint->submit_device_plan(late, 2'000'000'000,
+        100'400'000, 2'020'000'000, blueprint) == RK_ERROR_INVALID_STATE);
     auto replacement = plan;
     replacement.plan_id = 9;
     replacement.replace_after_plan_id = 8;
@@ -180,6 +220,13 @@ int main() {
     assert(endpoint->submit_device_plan(replacement, 1'000'000'000,
         100'400'000, 1'020'000'000, blueprint) == RK_OK);
     assert(observed->queue_begin_frames == 2 && observed->segment_frames == 2);
+    status.queue_revision = 2;
+    status.path_clock_ticks = endpoint->committed_until_ticks() + 2'000'000;
+    status.remaining_segments = 4;
+    observed->push(14, status);
+    assert(endpoint->sample(150'000'000, state) == RK_OK);
+    assert(endpoint->bookkeeping_counts().first == 0);
+    assert(endpoint->bookkeeping_counts().second == 1);
     observed->jump_ticks = 10'000;
     assert(endpoint->sample(200'000'000, state) == RK_OK);
     assert(endpoint->sample(200'200'000, state) == RK_OK);

@@ -88,7 +88,7 @@ enum {
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 19 /**< Adds joint couplings and configured RKD6 serial construction. */
+    RK_API_VERSION = 20 /**< Adds queue revision diagnostics and precise serial errors. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -460,7 +460,8 @@ typedef struct rk_plan_submission {
 
 /** Non-latched runtime diagnostic; safety remains READY. */
 enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
-    RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5 };
+    RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
+    RK_FAULT_QUEUE_REVISION_MISMATCH = 6 };
 
 typedef uint32_t rk_session_state;
 enum {

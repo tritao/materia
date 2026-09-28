@@ -172,11 +172,15 @@ public:
     /** Internal phases used by Simulation to coordinate multiple runtimes. */
     rk_result apply_pending_commands(uint64_t owner_time_ns = 0);
     rk_result publish_sample(uint64_t timestamp_ns);
+    rk_result publish_presampled(uint64_t timestamp_ns, const rk_robot_state &sample,
+                                rk_result sample_result = RK_OK);
     void discard_pending_commands() noexcept;
     void reset_state() noexcept;
     void set_externally_driven(bool value) noexcept;
 
 private:
+    rk_result publish_sample_impl(uint64_t timestamp_ns, const rk_robot_state *sample,
+                                  rk_result sample_result);
     struct QueuedEvent {
         uint64_t time_ns = 0;
         uint64_t plan_id = 0;

@@ -43,15 +43,19 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
     const rk_robot_runtime_blueprint &blueprint, std::array<std::uint8_t, 16> fingerprint,
     std::uint64_t session, double target_error, std::uint64_t clock_bound_ns,
     std::uint64_t link_latency_ns, std::uint32_t step_tick_hz,
-    std::uint64_t link_loss_timeout_ns, std::span<const DeviceActuator6> layout) {
+    std::uint64_t link_loss_timeout_ns, std::span<const DeviceActuator6> layout,
+    rk_result *error) {
+    if (error) *error = RK_ERROR_BACKEND;
     const auto actuator_count = layout.empty() ? blueprint.joint_count : layout.size();
     if (!transport || session == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
         actuator_count == 0 || actuator_count > device_wire6::MAX_ACTUATORS ||
         !std::isfinite(target_error) || target_error < 0 || clock_bound_ns == 0 ||
         step_tick_hz == 0 || link_loss_timeout_ns == 0 ||
-        blueprint.channel_count > RK_MAX_PROCESS_CHANNELS)
+        blueprint.channel_count > RK_MAX_PROCESS_CHANNELS) {
+        if (error) *error = RK_ERROR_INVALID_ARGUMENT;
         return {};
+    }
     fingerprint = fingerprint_device_layout6(fingerprint, layout,
         std::span(blueprint.channels, blueprint.channel_count));
     device_wire6::SessionBegin6 begin{};
@@ -113,13 +117,19 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
             break;
         }
     }
+    if (acknowledged && ack.device_fingerprint != fingerprint) {
+        if (error) *error = RK_ERROR_MODEL_MISMATCH;
+        return {};
+    }
     if (!acknowledged || ack.session != session || ack.protocol_version != device_wire6::PROTOCOL_VERSION ||
-        ack.device_fingerprint != fingerprint || ack.status != 1 ||
+        ack.status != 1 ||
         ack.actuator_count != actuator_count || ack.device_tick_hz == 0 ||
         ack.step_tick_hz == 0 || ack.segment_capacity == 0 || ack.max_degree > 5 ||
         (ack.profile != 1 && ack.profile != 2) ||
-        (ack.profile == 2 && ack.max_degree != 1))
+        (ack.profile == 2 && ack.max_degree != 1)) {
+        if (error) *error = RK_ERROR_UNSUPPORTED;
         return {};
+    }
     const auto period_ns = blueprint.owner_period_ns ? blueprint.owner_period_ns : 10'000'000ULL;
     const auto allowance_ns = blueprint.serial_processing_allowance_ns
         ? blueprint.serial_processing_allowance_ns : 2'000'000ULL;
@@ -139,12 +149,14 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
             static_cast<unsigned long long>(minimum_period_ns),
             static_cast<unsigned long long>(period_ns),
             transport->baud(), ack.segment_capacity);
+        if (error) *error = RK_ERROR_UNSUPPORTED;
         return {};
     }
     auto endpoint = std::shared_ptr<Rkd6Endpoint>(new Rkd6Endpoint(
         std::move(transport), ack, target_error, clock_bound_ns, link_latency_ns,
         std::vector<DeviceActuator6>(layout.begin(), layout.end()), blueprint.joint_count));
     endpoint->owner_period_ns_ = period_ns;
+    if (error) *error = RK_OK;
     return endpoint;
 }
 
@@ -188,6 +200,17 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     const auto replace_ticks = clock_.map_host_ns(host_epoch_ns_ + base_time_ns);
     if (plan.replace_after_plan_id && replace_ticks < committed_until_ticks_)
         return RK_ERROR_INVALID_STATE;
+    if (plan.replace_after_plan_id) {
+        const auto received_until = sent_.empty() ? 0 :
+            sent_.back().header.t0_ticks + sent_.back().header.duration_ticks;
+        // A reported commit proves that its segment boundary reached the
+        // device. Transport send completion alone does not prove reception.
+        if (replace_ticks > received_until ||
+            replace_ticks > status_.committed_until_ticks ||
+            std::none_of(sent_.begin(), sent_.end(), [&](const auto &segment) {
+                return segment.header.t0_ticks + segment.header.duration_ticks == replace_ticks;
+            })) return RK_ERROR_INVALID_STATE;
+    }
     auto compiled = compile_device_segments6(
         std::span(plan.segments.segments, plan.segments.segment_count), plan.plan_id,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
@@ -251,6 +274,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
     }
     device_wire6::QueueBegin6 begin{};
     begin.queue_revision = ++revision_;
+    revision_boundary_ticks_ = replace_ticks;
     begin.replace_after_ticks = replace_ticks;
     begin.actuator_count = ack_.actuator_count;
     for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
@@ -274,6 +298,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         while (!sent_.empty() && sent_.back().header.t0_ticks >= replace_ticks)
             sent_.pop_back();
         next_commit_ = std::min(next_commit_, sent_.size());
+        for (auto &segment : pending_)
+            segment.header.queue_revision = revision_;
     }
     for (auto &segment : compiled.segments) {
         segment.header.queue_revision = revision_;
@@ -329,7 +355,23 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns,
                     reply.device_rx_ticks, reply.device_tx_ticks);
         } else if (decoded.kind == 14) {
-            device_wire6::decode(decoded.payload, status_);
+            if (device_wire6::decode(decoded.payload, status_)) {
+                queue_revision_mismatch_ = status_.queue_revision > revision_ ||
+                    (revision_ != 0 && status_.queue_revision < revision_ &&
+                     status_.path_clock_ticks >= revision_boundary_ticks_);
+                std::size_t retired = 0;
+                while (retired < sent_.size() &&
+                       sent_[retired].header.t0_ticks +
+                           sent_[retired].header.duration_ticks < status_.path_clock_ticks)
+                    ++retired;
+                if (retired != 0) {
+                    sent_.erase(sent_.begin(), sent_.begin() + retired);
+                    next_commit_ = next_commit_ > retired ? next_commit_ - retired : 0;
+                }
+                while (path_maps_.size() > 1 &&
+                       path_maps_[1].device_start_ticks <= status_.path_clock_ticks)
+                    path_maps_.erase(path_maps_.begin());
+            }
         } else if (decoded.kind == 15) {
             if (decoded.payload.size() < device_wire6::State6Header::SIZE ||
                 !device_wire6::decode(decoded.payload.first(device_wire6::State6Header::SIZE),

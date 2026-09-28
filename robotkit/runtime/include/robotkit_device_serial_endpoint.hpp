@@ -15,6 +15,7 @@ public:
         std::uint32_t step_tick_hz = 40'000,
         std::uint64_t link_loss_timeout_ns = 500'000'000,
         std::uint64_t clock_bound_ns = 30'000'000,
-        std::uint64_t link_latency_ns = 100'000);
+        std::uint64_t link_latency_ns = 100'000,
+        rk_result *error = nullptr);
 };
 } // namespace robotkit

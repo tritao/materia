@@ -129,10 +129,11 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
     try {
         const auto copied = robotkit::internal::copy_blueprint(blueprint);
         const auto period = owner_period(copied);
+        rk_result endpoint_error = RK_ERROR_BACKEND;
         auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, copied,
             fingerprint, max_target_error, step_tick_hz, link_loss_timeout_ns,
-            clock_bound_ns, link_latency_ns);
-        if (!endpoint) return RK_ERROR_BACKEND;
+            clock_bound_ns, link_latency_ns, &endpoint_error);
+        if (!endpoint) return endpoint_error;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
             copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
