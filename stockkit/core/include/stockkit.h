@@ -280,6 +280,8 @@ SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info 
  * Each tile's revision in the grid along `axis`, row by row (`tiles[0]` per
  * row). A revision changes whenever the tile's rays change, by a cut or a
  * restore, so a preview remeshes only tiles whose revision it has not seen.
+ * A Z tile's revision also changes when X or Y rays change within its
+ * footprint in x and y, which a contoured mesh of it reads.
  * `revision_capacity` must be at least the grid's tile count.
  */
 SK_API sk_result SK_CALL sk_stock_read_revisions(sk_stock_handle stock, uint32_t axis,
@@ -361,7 +363,7 @@ SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle
     uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj,
     sk_ray_comparison *out_comparisons SK_OUT_ARRAY(comparison_capacity), uint32_t comparison_capacity);
 
-enum { SK_MESH_BOTTOMS = 1, SK_MESH_MERGE = 2 };
+enum { SK_MESH_BOTTOMS = 1, SK_MESH_MERGE = 2, SK_MESH_CONTOUR = 4 };
 
 typedef struct sk_mesh_info {
     uint32_t struct_size SK_STRUCT_SIZE;
@@ -369,19 +371,37 @@ typedef struct sk_mesh_info {
     uint32_t triangle_count;
     /** Non-zero when faces were merged; per-ray colouring then needs an unmerged mesh. */
     uint32_t merged;
+    /**
+     * Contoured meshes: crossing edges whose ray had no surface near the
+     * edge, drawn at the edge's middle facing along it. Non-zero where the
+     * lattice cuts through the stock, else a sign that the grids disagree.
+     */
+    uint32_t unmatched_edges;
 } sk_mesh_info;
 
 /**
- * A display mesh of the Z grid's tiles [tile_x, tile_x + tiles_x) x [tile_y,
- * tile_y + tiles_y). Each ray stands for a square column spacing wide: every interval
- * gets a top face at its exact depth with its stored normal and source,
- * walls stand where neighbouring columns differ, and SK_MESH_BOTTOMS adds
- * bottom faces, which close the mesh. SK_MESH_MERGE joins equal faces along
- * rows. Quads share no vertices.
+ * A display mesh of the stock over the Z grid's tiles [tile_x, tile_x +
+ * tiles_x) x [tile_y, tile_y + tiles_y). Quads share no vertices.
  *
- * A wall between two columns belongs to the mesh with the lower-index column,
- * so a mesh also depends on the tiles just past its +x and +y edges: rebuild
- * it when their revisions change too.
+ * By default each Z ray stands for a square column spacing wide: every
+ * interval gets a top face at its exact depth with its stored normal and
+ * source, walls stand where neighbouring columns differ, and SK_MESH_BOTTOMS
+ * adds bottom faces, which close the mesh. SK_MESH_MERGE joins equal faces
+ * along rows.
+ *
+ * SK_MESH_CONTOUR (alone; the stock needs all three grids) dual-contours the
+ * lattice instead, giving a closed surface through the stock's full depth.
+ * Nodes are inside or outside by their Z rays; each edge between nodes of
+ * opposite sign crosses the surface where the ray along it has an interval
+ * end, with that end's normal and source. Each cell gets one vertex, the
+ * least-squares meeting point of its crossings' planes clamped to the cell,
+ * so flat faces stay flat and edges and corners stay sharp; each crossing
+ * edge becomes a quad with its crossing's normal and source. Features
+ * thinner than a cell can be lost.
+ *
+ * A mesh also reads the rays just past its +x and +y edges: rebuild it when
+ * the tiles holding them change too. Z tile revisions also change when X or
+ * Y rays in their footprint do.
  */
 SK_API sk_result SK_CALL sk_stock_mesh(sk_stock_handle stock, uint32_t tile_x, uint32_t tile_y,
     uint32_t tiles_x, uint32_t tiles_y, uint32_t flags, sk_mesh_handle *out_mesh SK_OUT SK_OWNED);

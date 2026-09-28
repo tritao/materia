@@ -72,9 +72,12 @@ arrive as triangle buffers, so the core never links OCCT.
    is a lattice with a grid per axis that every move cuts. X and Y rays
    match the OCCT oracle to 1e-9 m and lie within the sampled reference's
    bounds. Haxeon's FFI now returns several outputs and queried typed arrays
-   in one call, so ray reads, sweep queries and cuts are single calls. Next:
-   dual contouring over the three grids, then per-axis target comparison in
-   the viewer.
+   in one call, so ray reads, sweep queries and cuts are single calls. Dual
+   contouring over the three grids gives closed meshes with exact crossings
+   and sharp edges (a box exactly; curved surfaces within their chord
+   error), and the preview and app use it on tri-dexel stock. Not yet
+   manifold: features thinner than a cell can merge at a shared vertex.
+   Next: per-axis target comparison in the viewer.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
    adapter, holder/spindle against fixtures via RobotKit/SimKit collision.
 
@@ -110,7 +113,11 @@ level, whose X and Y rays are closed form (a capsule or an annular sector).
 Meshing the whole 0.25 mm stock for preview takes 0.04–0.1 s after the flat
 mill (0.22M triangles merged, 1.3M unmerged) and 0.1–0.18 s after the ball
 mill (1.5M merged: its scallops barely merge, 2.6M unmerged). A dirty 4×4-tile
-chunk remeshes in about a millisecond.
+chunk remeshes in about a millisecond. Contouring the tri-dexel stock (a
+closed surface, sides and bottom included) takes 0.7 s after the flat mill
+(3.3M triangles) and 0.9 s after the ball mill (3.7M); a 4×4-tile chunk takes
+2–8 ms. Marking the Z tiles over changed X and Y rays costs no measurable cut
+time.
 
 Creating the stock takes about 0.2 s at either spacing. Memory is 48 bytes
 per interval plus 12 per ray. The ball mill costs more because its scallops

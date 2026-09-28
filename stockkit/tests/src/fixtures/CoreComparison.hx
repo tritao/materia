@@ -9,6 +9,7 @@ import stockkit.Stock;
 import stockkit.StockAxis;
 import stockkit.StockLattice;
 import stockkit.StockInterval;
+import stockkit.StockMesh;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.tool.CutterProfile;
 import toolpathkit.tool.Tool;
@@ -23,6 +24,15 @@ class CoreComparison {
   public static inline final DEPTH_TOLERANCE = 1e-9;
   /** Rays across the box's x extent; offsets keep them off the box's round coordinates. */
   static inline final RAYS_ACROSS = 9;
+  /** Cells across the box's x extent when contouring it. */
+  static inline final CELLS_ACROSS = 60;
+  /**
+    Contoured volume against the oracle's, as a fraction of the volume
+    removed: dual contouring cuts chords across curved surfaces. The worst
+    case is a V-bit following an arc or S-curve (0.7%, a small groove of
+    curved cone); straight slots and flat-mill corners stay under 0.06%.
+  **/
+  static inline final CONTOUR_TOLERANCE = 0.01;
 
   public static var raysCompared = 0;
 
@@ -53,6 +63,42 @@ class CoreComparison {
       stock.dispose();
       throw error;
     }
+    contourAgainstOracle(oracle, moves, minX, minY, minZ, maxX, maxY, maxZ, label);
+  }
+
+  /**
+    Contours the core stock on a finer lattice with a cell of margin all
+    round, and compares the volume the mesh encloses with the oracle's.
+  **/
+  static function contourAgainstOracle(oracle:Part, moves:Array<CutMove>, minX:Float, minY:Float,
+      minZ:Float, maxX:Float, maxY:Float, maxZ:Float, label:String):Void {
+    var spacing = Math.min((maxX - minX) / CELLS_ACROSS, (maxZ - minZ) / 12);
+    var lattice = StockLattice.covering(minX, minY, minZ, maxX, maxY, maxZ, spacing);
+    var stock = Stock.box(lattice, minX, minY, minZ, maxX, maxY, maxZ);
+    try {
+      stock.cut(moves);
+      var mesh = stock.contour(0, 0, stock.tilesX(), stock.tilesY());
+      stock.dispose();
+      var box = (maxX - minX) * (maxY - minY) * (maxZ - minZ), expected = oracle.volume();
+      Assert.near(enclosed(mesh), expected, '$label: contoured volume', CONTOUR_TOLERANCE * (box - expected));
+    } catch (error:Dynamic) {
+      stock.dispose();
+      throw error;
+    }
+  }
+
+  /** The volume a closed mesh encloses, by the divergence theorem. */
+  public static function enclosed(mesh:StockMesh):Float {
+    var total = 0.0;
+    inline function coordinate(vertex:Int, axis:Int):Float
+      return mesh.positions.getFloat(12 * vertex + 4 * axis);
+    for (t in 0...mesh.triangleCount) {
+      var a = mesh.indices.getInt32(12 * t), b = mesh.indices.getInt32(12 * t + 4), c = mesh.indices.getInt32(12 * t + 8);
+      total += (coordinate(a, 0) * (coordinate(b, 1) * coordinate(c, 2) - coordinate(b, 2) * coordinate(c, 1))
+        - coordinate(a, 1) * (coordinate(b, 0) * coordinate(c, 2) - coordinate(b, 2) * coordinate(c, 0))
+        + coordinate(a, 2) * (coordinate(b, 0) * coordinate(c, 1) - coordinate(b, 1) * coordinate(c, 0))) / 6;
+    }
+    return total;
   }
 
   /**

@@ -139,6 +139,28 @@ struct CutStats {
     }
 };
 
+/**
+ * Z-grid tiles whose footprint (in x and y) holds X or Y rays that changed.
+ * A contoured mesh reads all three grids, so these tiles take a new revision
+ * too: a finishing pass that moves a wall less than a spacing may change no
+ * Z ray at all.
+ */
+struct SurfaceMarks {
+    Lattice lattice;
+    uint32_t tiles_x = 0, tiles_y = 0;
+    std::vector<uint8_t> dirty; // one flag per Z tile, row by row
+
+    void reset(const Lattice &l);
+    /**
+     * Rays of the grid along `axis` (0 or 1) with first index `i` changed
+     * between `lo` and `hi` along them: flags the Z tiles holding the nodes
+     * of the lattice edges that stretch touches, with a node to spare each
+     * way. One call covers a whole X or Y tile, whose rays lie in one row
+     * (or column) of Z tiles.
+     */
+    void mark(uint32_t axis, uint32_t i, double lo, double hi);
+};
+
 /** Per-thread scratch and results for one cut. */
 struct CutWorker {
     std::vector<Span> spans;
@@ -146,6 +168,15 @@ struct CutWorker {
     CutStats stats;
     struct Record { uint32_t move, tile; MoveResult result; };
     std::vector<Record> records;
+    SurfaceMarks marks;
+};
+
+/** One ray's intervals where the grid stores them; valid until the grid changes. */
+struct RayView {
+    const double *lo = nullptr, *hi = nullptr;
+    const float *lo_normal = nullptr, *hi_normal = nullptr; // xyz per interval
+    const uint32_t *lo_source = nullptr, *hi_source = nullptr;
+    uint32_t count = 0;
 };
 
 /**
@@ -164,6 +195,7 @@ public:
     double ray_v(uint32_t j) const { return grid_.origin[1] + grid_.spacing * j; }
 
     void read(uint32_t i, uint32_t j, std::vector<Interval> &out) const;
+    RayView view(uint32_t i, uint32_t j) const;
     uint32_t count(uint32_t i, uint32_t j) const;
     /** Replaces a ray's intervals; call `pack` after a series of writes. */
     void write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals);
@@ -183,17 +215,23 @@ public:
     /**
      * Tiles, row by row, and their revisions: a tile's revision changes
      * whenever its rays change (a cut or a restore), so a preview remeshes
-     * only tiles whose revision it has not seen.
+     * only tiles whose revision it has not seen. The stock also renews a Z
+     * tile's revision when X or Y rays in its footprint change.
      */
     uint32_t tiles_across() const { return tiles_i_; }
     uint32_t tiles_down() const { return tiles_j_; }
     const std::vector<uint64_t> &revisions() const { return revisions_; }
+    /** Gives a tile a new revision without changing it. */
+    void touch(uint32_t index) { ++revisions_[index]; }
 
     /** An immutable copy of the stock that shares tiles until either side changes them. */
     struct Snapshot;
     std::unique_ptr<Snapshot> snapshot() const;
-    /** Returns the stock to `snapshot`, which must come from a stock with the same grid. */
-    bool restore(const Snapshot &snapshot);
+    /**
+     * Returns the stock to `snapshot`, which must come from a stock with the
+     * same grid. With `changed`, flags each tile that took the snapshot's.
+     */
+    bool restore(const Snapshot &snapshot, std::vector<uint8_t> *changed = nullptr);
 
     /** Material length along every ray, times spacing^2: the stock's volume as this grid sees it. */
     double volume() const;
@@ -291,6 +329,9 @@ public:
     uint64_t bytes() const;
 
 private:
+    /** Renews the revision of every Z tile a worker marked during the last cut. */
+    void touch_marked();
+
     Lattice lattice_;
     std::array<std::unique_ptr<DexelGrid>, 3> grids_;
     CutStats stats_;

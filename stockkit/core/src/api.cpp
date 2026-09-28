@@ -1,6 +1,7 @@
 #include "stockkit.h"
 
 #include "mesh.hpp"
+#include "contour.hpp"
 #include "preview.hpp"
 #include "profile.hpp"
 #include "stock.hpp"
@@ -100,6 +101,7 @@ Table<Stock::Snapshot, kKindSnapshot> &snapshots() {
 struct MeshEntry {
     PreviewMesh mesh;
     uint64_t rays = 0;
+    uint64_t unmatched = 0;
 };
 
 Table<MeshEntry, kKindMesh> &meshes() {
@@ -595,15 +597,23 @@ SK_API sk_result SK_CALL sk_stock_mesh(sk_stock_handle stock, uint32_t tile_x, u
         out_mesh->id = 0;
         Stock *s = stocks().get(stock.id);
         if (!s) return SK_ERROR_INVALID_HANDLE;
-        if (flags & ~uint32_t(SK_MESH_BOTTOMS | SK_MESH_MERGE)) return SK_ERROR_INVALID_ARGUMENT;
+        if (flags & ~uint32_t(SK_MESH_BOTTOMS | SK_MESH_MERGE | SK_MESH_CONTOUR)) return SK_ERROR_INVALID_ARGUMENT;
+        if ((flags & SK_MESH_CONTOUR) && flags != SK_MESH_CONTOUR) return SK_ERROR_INVALID_ARGUMENT;
         const DexelGrid &z = s->z();
         if (uint64_t(tile_x) + tiles_x > z.tiles_across() || uint64_t(tile_y) + tiles_y > z.tiles_down())
             return SK_ERROR_INVALID_ARGUMENT;
         auto entry = std::make_unique<MeshEntry>();
-        PreviewOptions options;
-        options.bottoms = flags & SK_MESH_BOTTOMS;
-        options.merge = flags & SK_MESH_MERGE;
-        build_preview(z, tile_x, tile_y, tiles_x, tiles_y, options, entry->mesh);
+        if (flags & SK_MESH_CONTOUR) {
+            if (!s->grid(0) || !s->grid(1)) return SK_ERROR_UNSUPPORTED;
+            ContourStats stats;
+            build_contour(*s, tile_x, tile_y, tiles_x, tiles_y, entry->mesh, &stats);
+            entry->unmatched = stats.unmatched;
+        } else {
+            PreviewOptions options;
+            options.bottoms = flags & SK_MESH_BOTTOMS;
+            options.merge = flags & SK_MESH_MERGE;
+            build_preview(z, tile_x, tile_y, tiles_x, tiles_y, options, entry->mesh);
+        }
         entry->mesh.colors.assign(entry->mesh.vertex_count(), 0xFFFFFFFFu);
         entry->rays = uint64_t(z.grid().count[0]) * z.grid().count[1];
         uint32_t id = meshes().add(std::move(entry));
@@ -630,6 +640,7 @@ SK_API sk_result SK_CALL sk_mesh_get_info(sk_mesh_handle mesh, sk_mesh_info *out
         out_info->vertex_count = m->mesh.vertex_count();
         out_info->triangle_count = m->mesh.triangle_count();
         out_info->merged = m->mesh.merged ? 1 : 0;
+        out_info->unmatched_edges = uint32_t(std::min<uint64_t>(m->unmatched, 0xFFFFFFFFu));
         return SK_OK;
     });
 }

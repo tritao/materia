@@ -128,6 +128,21 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     positions and normals, uint32 indices, RGBA8 colours) plus each
     triangle's source move for picking. Colouring is by source through a
     palette (so by operation) or per ray (so by deviation from a target).
+  - On a tri-dexel stock `SK_MESH_CONTOUR` (`Stock.contour` in Haxe)
+    dual-contours the lattice instead, into a closed surface. Nodes are
+    inside or outside by their Z rays; each edge between nodes of opposite
+    sign lies on a ray of the grid along it, whose interval end gives the
+    crossing's exact point, normal and source. Each cell gets the
+    least-squares meeting point of its crossings' planes, clamped to the
+    cell, so floors and walls stay flat and edges and corners stay sharp;
+    each crossing edge becomes a quad with its crossing's normal and source.
+    Curved surfaces are cut by chords (the ball slot in the core tests comes
+    out 0.16% of its removed volume off at a sixth of the tool radius), and
+    features thinner than a cell can be lost. Chunks own disjoint edges and
+    join exactly. A Z tile's revision also changes when X or Y rays in its
+    footprint do, so a finishing pass that moves a wall by less than a
+    spacing still remeshes its chunk. `StockPreview` and the app use
+    contoured meshes on tri-dexel stock.
   - Tiles are copy-on-write and carry revisions. `sk_stock_snapshot` and
     `sk_stock_restore` share tiles, so a snapshot costs a pointer per tile
     plus whatever later cuts replace.
@@ -162,7 +177,14 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     tie rules, provenance, handle validation, shank and holder contact,
     target comparison, snapshots and revisions, closed preview meshes whose
     volume equals the stock's (also when built in chunks), colouring, and
-    bit-identical results with 1, 2, 3, 8 and all threads.
+    bit-identical results with 1, 2, 3, 8 and all threads. Contoured meshes
+    must be closed and oriented; a box comes out exactly (every vertex on
+    it, face normals only, volume to float precision, the same in chunks),
+    flat and ball slots within their chord error, and a 0.1 mm wall shave
+    that no Z ray sees moves the wall and renews the Z tiles along it.
+  - Every oracle and chain fixture also contours the core stock on a
+    60-cell-wide lattice and requires the enclosed volume to match the
+    OCCT result within 1% of the removed volume.
 
 Build the core and run its checks and benchmark:
 

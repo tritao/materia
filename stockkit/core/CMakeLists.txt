@@ -18,6 +18,7 @@ endif()
 
 add_library(stockkit_core ${SK_LIBRARY_TYPE}
     src/api.cpp
+    src/contour.cpp
     src/mesh.cpp
     src/pool.cpp
     src/preview.cpp

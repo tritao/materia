@@ -165,17 +165,38 @@ class Stock {
   }
 
   /**
-    A display mesh of `tilesWide` by `tilesHigh` tiles from tile (tileX,
-    tileY). With `merge`, equal faces along rows are joined (not with
-    `rayColors`). Colours come from `rayColors` (one 0xRRGGBBAA per ray of the
-    grid) if given, else from `palette` indexed by source with `original` for
-    untouched stock.
+    A column mesh of `tilesWide` by `tilesHigh` Z tiles from tile (tileX,
+    tileY): each Z ray drawn as a square column spacing wide with exact
+    depths. With `merge`, equal faces along rows are joined (not with
+    `rayColors`); `bottoms` closes the columns. Colours come from `rayColors`
+    (one 0xRRGGBBAA per ray of the Z grid) if given, else from `palette`
+    indexed by source with `original` for untouched stock.
   **/
   public function mesh(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, merge:Bool,
       bottoms:Bool, ?palette:Array<Int>, original:Int = -1, ?rayColors:Array<Int>):StockMesh {
-    alive();
     var flags = (merge ? StockKitNativeConstants.SK_MESH_MERGE : 0)
       | (bottoms ? StockKitNativeConstants.SK_MESH_BOTTOMS : 0);
+    return meshWith(flags, tileX, tileY, tilesWide, tilesHigh, palette, original, rayColors);
+  }
+
+  /**
+    A closed surface over `tilesWide` by `tilesHigh` Z tiles from tile (tileX,
+    tileY), dual-contoured from all three grids: walls and floors at the
+    rays' exact crossings with their normals and sources, sharp edges and
+    corners kept, features thinner than a spacing possibly lost. Needs a
+    tri-dexel lattice. Colours as for `mesh`; with `rayColors` each quad
+    takes the colour of the Z ray through its inside node.
+  **/
+  public function contour(tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, ?palette:Array<Int>,
+      original:Int = -1, ?rayColors:Array<Int>):StockMesh {
+    if (!lattice.triDexel) throw "stock.contour needs a tri-dexel lattice";
+    return meshWith(StockKitNativeConstants.SK_MESH_CONTOUR, tileX, tileY, tilesWide, tilesHigh, palette,
+      original, rayColors);
+  }
+
+  function meshWith(flags:Int, tileX:Int, tileY:Int, tilesWide:Int, tilesHigh:Int, palette:Null<Array<Int>>,
+      original:Int, rayColors:Null<Array<Int>>):StockMesh {
+    alive();
     var created = StockKitNative.sk_stock_mesh(owner.borrow(), tileX, tileY, tilesWide, tilesHigh, flags);
     check(created.status, "stock.mesh");
     var native = created.out_mesh;

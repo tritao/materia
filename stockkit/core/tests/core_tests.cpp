@@ -4,10 +4,12 @@
 #include "stockkit.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -686,7 +688,7 @@ void snapshots() {
 }
 
 struct MeshData {
-    std::vector<float> positions;
+    std::vector<float> positions, normals;
     std::vector<uint32_t> indices, sources, colors;
 };
 
@@ -780,6 +782,173 @@ void preview_mesh() {
     check(sk_stock_mesh(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0] + 1, 1, 0, &m) == SK_ERROR_INVALID_ARGUMENT, "tile range is checked");
     sk_stock_destroy(s);
     sk_tool_destroy(t);
+}
+
+/** A contoured mesh of tiles and the edges it drew without a matching ray surface. */
+MeshData contour_of(sk_stock_handle s, uint32_t tx, uint32_t ty, uint32_t nx, uint32_t ny, uint32_t *unmatched) {
+    sk_mesh_handle m{};
+    MeshData d = mesh_of(s, tx, ty, nx, ny, SK_MESH_CONTOUR, &m);
+    sk_mesh_info info{};
+    info.struct_size = sizeof info;
+    check(sk_mesh_get_info(m, &info) == SK_OK, "contour mesh info");
+    *unmatched = info.unmatched_edges;
+    d.normals = mesh_stream<float>(m, sk_mesh_copy_normals);
+    sk_mesh_destroy(m);
+    return d;
+}
+
+/**
+ * Closed and consistently oriented: after welding equal positions, every
+ * directed edge of a non-degenerate triangle is matched by as many edges
+ * the other way.
+ */
+bool closed_surface(const std::vector<const MeshData *> &parts) {
+    std::map<std::array<float, 3>, uint32_t> welded;
+    std::map<std::pair<uint32_t, uint32_t>, int> edges;
+    for (const MeshData *d : parts)
+        for (size_t k = 0; k < d->indices.size(); k += 3) {
+            uint32_t id[3];
+            for (int c = 0; c < 3; ++c) {
+                const float *p = &d->positions[3 * d->indices[k + c]];
+                id[c] = welded.emplace(std::array<float, 3>{p[0], p[1], p[2]}, uint32_t(welded.size())).first->second;
+            }
+            if (id[0] == id[1] || id[1] == id[2] || id[2] == id[0]) continue;
+            for (int c = 0; c < 3; ++c) {
+                uint32_t a = id[c], b = id[(c + 1) % 3];
+                if (a < b) ++edges[{a, b}];
+                else --edges[{b, a}];
+            }
+        }
+    for (const auto &e : edges)
+        if (e.second != 0) return false;
+    return true;
+}
+
+void contour_mesh() {
+    // A box between the nodes of its lattice: exact faces, edges and corners.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        const double lo[3] = {1.1, 2.2, 0.7}, hi[3] = {48.3, 27.9, 18.35};
+        sk_stock_handle s = box_stock(g, lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+        sk_stock_info info = info_of(s);
+        uint32_t unmatched = 0;
+        MeshData d = contour_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], &unmatched);
+        check(unmatched == 0, "box: every crossing is on a ray surface");
+        check(closed_surface({&d}), "box: the contoured mesh is closed");
+        near(enclosed(d), (hi[0] - lo[0]) * (hi[1] - lo[1]) * (hi[2] - lo[2]), 1e-3, "box: contoured volume");
+        double off = 0;
+        bool axial = true;
+        for (size_t v = 0; v < d.positions.size() / 3; ++v) {
+            double gap = 1e9;
+            for (int c = 0; c < 3; ++c) {
+                double p = d.positions[3 * v + c];
+                off = std::max(off, std::max(lo[c] - p, p - hi[c]));
+                gap = std::min({gap, std::fabs(p - lo[c]), std::fabs(p - hi[c])});
+            }
+            off = std::max(off, gap);
+            int ones = 0;
+            for (int c = 0; c < 3; ++c) ones += std::fabs(d.normals[3 * v + c]) == 1;
+            axial = axial && ones == 1;
+        }
+        check(off < 1e-5, "box: every vertex lies on the box (" + std::to_string(off) + " off)");
+        check(axial, "box: normals are the faces' normals");
+        // Chunks of 3 x 2 tiles own disjoint edges and join exactly.
+        std::vector<MeshData> pieces;
+        size_t triangles = 0;
+        for (uint32_t ty = 0; ty < info.grids[SK_AXIS_Z].tiles[1]; ty += 2)
+            for (uint32_t tx = 0; tx < info.grids[SK_AXIS_Z].tiles[0]; tx += 3) {
+                pieces.push_back(contour_of(s, tx, ty, std::min(3u, info.grids[SK_AXIS_Z].tiles[0] - tx),
+                    std::min(2u, info.grids[SK_AXIS_Z].tiles[1] - ty), &unmatched));
+                triangles += pieces.back().indices.size();
+            }
+        std::vector<const MeshData *> parts;
+        for (const MeshData &p : pieces) parts.push_back(&p);
+        check(triangles == d.indices.size(), "box: chunks hold the same triangles as one mesh");
+        check(closed_surface(parts), "box: chunks join into a closed surface");
+        // Stock past the lattice is closed off half a cell outside the last nodes.
+        sk_stock_destroy(s);
+        s = box_stock(g, -5, -5, -5, 60, 40, 30);
+        d = contour_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], &unmatched);
+        check(unmatched > 0 && closed_surface({&d}), "box past the lattice: closed at the lattice's edge");
+        near(enclosed(d), 50.0 * 30 * 20, 1e-3, "box past the lattice: the lattice's cells");
+        sk_stock_destroy(s);
+    }
+    // Slots: the flat mill's walls and rounded ends, and the ball mill's floor.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        const double pi = 3.14159265358979323846;
+        struct Case { const char *name; sk_tool_handle tool; double removed, tolerance; };
+        Case cases[] = {
+            {"flat slot", flat(6, 20), (30 * 6 + pi * 9) * 5, 1e-3},
+            {"ball slot", ball(6, 20), 30 * (pi * 9 / 2 + 12) + (2 * pi * 27 / 3 + pi * 9 * 2), 2e-3},
+        };
+        for (Case &c : cases) {
+            sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+            cut(s, c.tool, {line_move(10, 15, 15, 40, 15, 15, 7)}, c.name);
+            sk_stock_info info = info_of(s);
+            uint32_t unmatched = 0;
+            MeshData d = contour_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], &unmatched);
+            std::string name = c.name;
+            check(unmatched == 0, name + ": every crossing is on a ray surface");
+            check(closed_surface({&d}), name + ": closed");
+            double volume = enclosed(d);
+            near(volume, 30000 - c.removed, c.tolerance * c.removed,
+                name + ": contoured volume (" + std::to_string(30000 - volume) + " removed)");
+            bool cut_faces = false, walls = false;
+            for (size_t k = 0; k < d.sources.size(); ++k) {
+                if (d.sources[k] != 7) continue;
+                cut_faces = true;
+                const float *n = &d.normals[3 * d.indices[3 * k]];
+                walls = walls || (std::fabs(n[2]) < 1e-6 && std::fabs(n[1]) > 0.99);
+            }
+            check(cut_faces && walls, name + ": its walls carry the move's source and wall normals");
+            sk_stock_destroy(s);
+            sk_tool_destroy(c.tool);
+        }
+    }
+    // A finishing pass shaving 0.1 mm off a wall changes no Z ray, yet renews
+    // the Z tiles it passes over and moves the contoured wall.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+        sk_tool_handle t = flat(6, 30);
+        sk_stock_info info = info_of(s);
+        uint32_t unmatched = 0;
+        const uint32_t tiles_x = info.grids[SK_AXIS_Z].tiles[0], tiles_y = info.grids[SK_AXIS_Z].tiles[1];
+        MeshData before = contour_of(s, 0, 0, tiles_x, tiles_y, &unmatched);
+        std::vector<uint64_t> z_before = revisions_of(s);
+        sk_snapshot_handle shot{};
+        check(sk_stock_snapshot(s, &shot) == SK_OK, "shave snapshot");
+        cut(s, t, {line_move(-2.9, -5, -1, -2.9, 35, -1, 3)}, "shave the -x wall");
+        info = info_of(s);
+        near(info.grids[SK_AXIS_Z].volume, 30000, 1e-9, "shave: the Z grid sees nothing");
+        near(info.grids[SK_AXIS_X].volume, 30000 - 0.1 * 30 * 20, 1e-6, "shave: the X grid sees it");
+        std::vector<uint64_t> z_after = revisions_of(s);
+        bool renewed = z_after[0] != z_before[0] && z_after[(tiles_y - 1) * tiles_x] != z_before[(tiles_y - 1) * tiles_x];
+        bool spared = z_after[tiles_x - 1] == z_before[tiles_x - 1] && z_after[tiles_y * tiles_x - 1] == z_before[tiles_y * tiles_x - 1];
+        check(renewed && spared, "shave: renews the revisions of the Z tiles along the wall only");
+        MeshData after = contour_of(s, 0, 0, tiles_x, tiles_y, &unmatched);
+        near(enclosed(before) - enclosed(after), 0.1 * 30 * 20, 1e-3, "shave: the contoured wall moves");
+        z_before = z_after;
+        check(sk_stock_restore(s, shot) == SK_OK, "shave restore");
+        z_after = revisions_of(s);
+        check(z_after[0] != z_before[0] && z_after[(tiles_y - 1) * tiles_x] != z_before[(tiles_y - 1) * tiles_x],
+            "shave: restoring X and Y tiles renews the Z tiles over them");
+        sk_snapshot_destroy(shot);
+        sk_stock_destroy(s);
+        sk_tool_destroy(t);
+    }
+    // Contouring needs all three grids and takes no other flags.
+    {
+        sk_stock_handle s = box_stock(grid(0, 0, 0.5, 20, 20), 0, 0, 0, 5, 5, 5);
+        sk_mesh_handle m{};
+        check(sk_stock_mesh(s, 0, 0, 1, 1, SK_MESH_CONTOUR, &m) == SK_ERROR_UNSUPPORTED, "contour needs X and Y grids");
+        sk_stock_destroy(s);
+        s = box_stock(lattice(0, 0, 0, 0.5, 20, 20, 20), 0, 0, 0, 5, 5, 5);
+        check(sk_stock_mesh(s, 0, 0, 1, 1, SK_MESH_CONTOUR | SK_MESH_BOTTOMS, &m) == SK_ERROR_INVALID_ARGUMENT,
+            "contour takes no column flags");
+        sk_stock_destroy(s);
+    }
 }
 
 /** A zig-zag of short lines, arcs, ramps and a helix over several levels, cut at each thread count. */
@@ -1200,6 +1369,7 @@ int main() {
     target_comparison();
     snapshots();
     preview_mesh();
+    contour_mesh();
     std::printf("%d of %d checks passed\n", checks - failures, checks);
     return failures == 0 ? 0 : 1;
 }

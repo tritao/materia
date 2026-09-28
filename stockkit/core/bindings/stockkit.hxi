@@ -15,6 +15,7 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	const SK_ERROR_OUT_OF_MEMORY = -3;
 	const SK_ERROR_UNSUPPORTED = -5;
 	const SK_MESH_BOTTOMS = 1;
+	const SK_MESH_CONTOUR = 4;
 	const SK_MESH_MERGE = 2;
 	const SK_MOVE_ARC = 1;
 	const SK_MOVE_LINE = 0;
@@ -87,16 +88,28 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	extern fn sk_stock_destroy(stock: sk_stock_handle) -> void;
 	extern fn sk_stock_get_info(stock: sk_stock_handle, out_info: ptr<sk_stock_info> @out) -> sk_result;
 	/**
-	 * A display mesh of the Z grid's tiles [tile_x, tile_x + tiles_x) x [tile_y,
-	 * tile_y + tiles_y). Each ray stands for a square column spacing wide: every interval
-	 * gets a top face at its exact depth with its stored normal and source,
-	 * walls stand where neighbouring columns differ, and SK_MESH_BOTTOMS adds
-	 * bottom faces, which close the mesh. SK_MESH_MERGE joins equal faces along
-	 * rows. Quads share no vertices.
+	 * A display mesh of the stock over the Z grid's tiles [tile_x, tile_x +
+	 * tiles_x) x [tile_y, tile_y + tiles_y). Quads share no vertices.
 	 *
-	 * A wall between two columns belongs to the mesh with the lower-index column,
-	 * so a mesh also depends on the tiles just past its +x and +y edges: rebuild
-	 * it when their revisions change too.
+	 * By default each Z ray stands for a square column spacing wide: every
+	 * interval gets a top face at its exact depth with its stored normal and
+	 * source, walls stand where neighbouring columns differ, and SK_MESH_BOTTOMS
+	 * adds bottom faces, which close the mesh. SK_MESH_MERGE joins equal faces
+	 * along rows.
+	 *
+	 * SK_MESH_CONTOUR (alone; the stock needs all three grids) dual-contours the
+	 * lattice instead, giving a closed surface through the stock's full depth.
+	 * Nodes are inside or outside by their Z rays; each edge between nodes of
+	 * opposite sign crosses the surface where the ray along it has an interval
+	 * end, with that end's normal and source. Each cell gets one vertex, the
+	 * least-squares meeting point of its crossings' planes clamped to the cell,
+	 * so flat faces stay flat and edges and corners stay sharp; each crossing
+	 * edge becomes a quad with its crossing's normal and source. Features
+	 * thinner than a cell can be lost.
+	 *
+	 * A mesh also reads the rays just past its +x and +y edges: rebuild it when
+	 * the tiles holding them change too. Z tile revisions also change when X or
+	 * Y rays in their footprint do.
 	 */
 	extern fn sk_stock_mesh(stock: sk_stock_handle, tile_x: u32, tile_y: u32, tiles_x: u32, tiles_y: u32, flags: u32, out_mesh: ptr<sk_mesh_handle> @out @owned) -> sk_result;
 	/**
@@ -110,6 +123,8 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 	 * Each tile's revision in the grid along `axis`, row by row (`tiles[0]` per
 	 * row). A revision changes whenever the tile's rays change, by a cut or a
 	 * restore, so a preview remeshes only tiles whose revision it has not seen.
+	 * A Z tile's revision also changes when X or Y rays change within its
+	 * footprint in x and y, which a contoured mesh of it reads.
 	 * `revision_capacity` must be at least the grid's tile count.
 	 */
 	extern fn sk_stock_read_revisions(stock: sk_stock_handle, axis: u32, out_revisions: ptr<u64> @out_array("revision_capacity"), revision_capacity: u32) -> sk_result;
@@ -212,7 +227,7 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		count: array<u32, 3> @offset(40);
 		tile_size: u32 @offset(52);
 	}
-	struct sk_mesh_info @layout(16, 4) {
+	struct sk_mesh_info @layout(20, 4) {
 		struct_size: u32 @offset(0) @struct_size;
 		vertex_count: u32 @offset(4);
 		triangle_count: u32 @offset(8);
@@ -220,6 +235,12 @@ interface StockKitNative @target("portable-abi64") @library("stockkit_core") {
 		 * Non-zero when faces were merged; per-ray colouring then needs an unmerged mesh.
 		 */
 		merged: u32 @offset(12);
+		/**
+		 * Contoured meshes: crossing edges whose ray had no surface near the
+		 * edge, drawn at the edge's middle facing along it. Non-zero where the
+		 * lattice cuts through the stock, else a sign that the grids disagree.
+		 */
+		unmatched_edges: u32 @offset(16);
 	}
 	/**
 	 * One tool-tip motion with the tool axis along +Z. A line runs from `start`

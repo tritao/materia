@@ -2,9 +2,10 @@ package stockkit;
 
 /**
   Keeps display meshes of a stock in chunks of tiles and rebuilds only the
-  chunks whose tiles changed since the last `update`. A chunk also depends on
-  the tiles just past its +x and +y edges, whose walls it draws. Headless:
-  hand the meshes to a renderer.
+  chunks whose tiles changed since the last `update`: contoured surfaces for
+  a tri-dexel stock, else columns. A chunk also depends on the tiles just
+  past its +x and +y edges, whose rays it reads. Headless: hand the meshes to
+  a renderer.
 **/
 class StockPreview {
   public final stock:Stock;
@@ -60,8 +61,12 @@ class StockPreview {
             if (changedTile[ty * tilesX + tx]) dirty = true;
         if (!dirty && meshes[cy * chunksX + cx] != null) continue;
         meshes[cy * chunksX + cx] = switch coloring {
+          case BySource(_, original) if (stock.lattice.triDexel):
+            stock.contour(x0, y0, x1 - x0, y1 - y0, palette, original);
           case BySource(_, original):
             stock.mesh(x0, y0, x1 - x0, y1 - y0, true, false, palette, original, rayColors);
+          case ByDeviation(_, _, _, _, _) if (stock.lattice.triDexel):
+            stock.contour(x0, y0, x1 - x0, y1 - y0, null, 0, rayColors);
           case ByDeviation(_, _, _, _, _):
             stock.mesh(x0, y0, x1 - x0, y1 - y0, false, false, null, 0, rayColors);
         };

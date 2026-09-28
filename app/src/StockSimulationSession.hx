@@ -122,13 +122,13 @@ class StockSimulationSession {
     var stock = timeline.stock;
     var mesh = if (colorBy == "operation") {
       var palette = [for (move in stock.history) operationColour(move)];
-      stock.mesh(0, 0, stock.tilesX(), stock.tilesY(), true, true, palette, UNTOUCHED);
+      stock.contour(0, 0, stock.tilesX(), stock.tilesY(), palette, UNTOUCHED);
     } else {
       var comparison = stock.compare(target);
       var colours = [for (k in 0...comparison.gouge.length)
         comparison.largestGouge[k] > TOLERANCE ? GOUGE
         : comparison.largestLeftover[k] > TOLERANCE ? LEFTOVER : ON_TARGET];
-      stock.mesh(0, 0, stock.tilesX(), stock.tilesY(), false, true, null, UNTOUCHED, colours);
+      stock.contour(0, 0, stock.tilesX(), stock.tilesY(), null, UNTOUCHED, colours);
     }
     var geometry = new GeometryData();
     geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
