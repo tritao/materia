@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.assembly.LinearAxis;
+import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
@@ -12,6 +13,7 @@ import machinekit.component.Bom;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
+import machinekit.component.MassProperties.MassSource;
 import machinekit.component.MachineKitComponents;
 import machinekit.component.ComponentValues;
 import machinekit.document.MachineKitDocuments;
@@ -72,7 +74,77 @@ import machinekit.transmission.TimingBeltProfile;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
+private class MassTestBlock extends MachineComponent {
+	public function new(?declared:Float) {
+		super("TEST-BLOCK", "10 mm test block", "aluminium 6061", true);
+		addConnector("origin", Mount, AssemblyFrames.identity());
+		addConnector("right", Mount, {x: 20, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1});
+		if (declared != null) declareMass(declared, new Vector(1, 2, 3));
+	}
+
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 10, 10);
+}
+
+private class MassTestTube extends MachineComponent {
+	public function new() super("TEST-TUBE", "Rectangular test tube", "aluminium 6061", true);
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return new RectTube(40, 20, 2).geometry(100);
+}
+
+private class MasslessTestPart extends MachineComponent {
+	public function new() super("TEST-MASSLESS", "Massless test part", "steel", true);
+}
+
 class MachineKitSmoke {
+	static function massProperties():Void {
+		var tube = new MassTestTube();
+		var expected = (40 * 20 - 36 * 16) * 100 * 1e-9 * 2700;
+		near(tube.massProperties().mass, expected, "rectangular tube analytic mass", 1e-9);
+		near(tube.massProperties().centreOfMass.z, 50, "tube centre of mass");
+		check(tube.massProperties() == tube.massProperties(), "component mass estimate is cached");
+		check(switch tube.massProperties().source { case Computed(Preview): true; default: false; },
+			"preview mass source");
+		tube.setMaterial("steel");
+		near(tube.massProperties().mass, expected * 7850 / 2700, "material change refreshes mass", 1e-9);
+		var declared = new MassTestBlock(0.5).massProperties();
+		near(declared.mass, 0.5, "declared mass overrides geometry");
+		near(declared.centreOfMass.x, 1, "declared centre of mass");
+		check(switch declared.source { case Declared: true; default: false; }, "declared mass source");
+		throws(() -> new MasslessTestPart().massProperties(), "has no geometry or declared mass");
+
+		var block = new MassTestBlock();
+		var assembly = new MachineAssembly();
+		assembly.addComponent("a", block);
+		assembly.addComponent("b", block);
+		assembly.addMate("link", "fixed", "a", "right", "b", "origin");
+		assembly.addBomItem({partNumber: "RAIL-CUT", description: "Unmodelled rail", quantity: 1, material: "steel"});
+		var combined = assembly.massProperties();
+		near(combined.mass, 0.0054, "two block mass", 1e-9);
+		near(combined.centreOfMass.x, 10, "solved assembly centre of mass x");
+		near(combined.centreOfMass.z, 5, "solved assembly centre of mass z");
+		check(combined.unaccounted.length == 1 && combined.unaccounted[0] == "RAIL-CUT", "unaccounted BOM extras");
+
+		var inner = new MachineAssembly();
+		inner.addComponent("a", block);
+		inner.addComponent("b", block);
+		inner.addMate("link", "fixed", "a", "right", "b", "origin");
+		var outer = new MachineAssembly();
+		outer.include("unit", inner);
+		near(outer.massProperties().mass, inner.massProperties().mass, "included assembly mass", 1e-9);
+		near(outer.massProperties().centreOfMass.x, inner.massProperties().centreOfMass.x,
+			"included assembly centre of mass");
+
+		var moving = new MachineAssembly();
+		moving.addComponent("a", block);
+		moving.addComponent("b", block);
+		moving.addMateOnAxis("slide", "prismatic", "a", "origin", "b", "origin",
+			{x: 1, y: 0, z: 0}, 20);
+		var model = new AssemblyModel();
+		moving.addTo(model, "");
+		var state = model.initialState();
+		state.setJoint("slide", 30);
+		near(moving.massProperties(state).centreOfMass.x, 15, "configured moving centre of mass");
+	}
 	static function componentRecipes():Void {
 		for (recipe in MachineKitComponents.all()) {
 			var original = recipe.create();
@@ -1982,6 +2054,7 @@ class MachineKitSmoke {
 		documentRecipes();
 		documentPreview();
 		MachineKitReferenceTests.run();
+		massProperties();
 		dimensions();
 		catalogMetadata();
 		bearings();

@@ -23,6 +23,9 @@ class MachineKitReferenceTests {
 	}
 
 	public static function run():Void {
+		// The 608 preview is an approximation of a catalog bearing (about 12 g).
+		near(DeepGrooveBearing.metric("608").massProperties().mass, 0.012, 0.0018,
+			"608 preview mass");
 		// SKF bearing catalog: ISO 15 boundary dimensions and minimum rs, in mm.
 		for (reference in [
 				{name: "625", bore: 5.0, outside: 16.0, width: 5.0, rs: 0.3},
