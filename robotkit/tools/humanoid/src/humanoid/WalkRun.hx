@@ -65,6 +65,8 @@ typedef WalkResult = {
   worstEstimateError:Float,
   /** Mean of (estimated - true) down vector over the run after 2 s, per axis: the filter's bias. */
   meanEstimateError:Array<Float>,
+  /** Policy targets clamped into a joint's travel, out of all those sent. */
+  clampedTargets:Int,
   recording:Null<String>
 };
 
@@ -113,7 +115,7 @@ class WalkRun {
     var session = new PolicySession(robot, controller, null, PHYSICS_STEP);
     session.start(scenario.warmup);
 
-    var result:WalkResult = {samples: [], fell: false, fallTime: 0.0, worstTilt: 0.0, lowest: 9.0, worstEstimateError: 0.0, meanEstimateError: [0.0, 0.0, 0.0],
+    var result:WalkResult = {samples: [], fell: false, fallTime: 0.0, worstTilt: 0.0, lowest: 9.0, worstEstimateError: 0.0, meanEstimateError: [0.0, 0.0, 0.0], clampedTargets: 0,
       recording: scenario.record};
     var errSum = [0.0, 0.0, 0.0], errCount = 0;
     var ticks = Std.int(Math.round(scenario.seconds / PHYSICS_STEP));
@@ -156,6 +158,7 @@ class WalkRun {
         break;
       }
     }
+    result.clampedTargets = controller.clampedTargets;
     if (errCount > 0) result.meanEstimateError = [for (v in errSum) round(v / errCount, 4)];
     if (writer != null) writer.close();
     robot.close();

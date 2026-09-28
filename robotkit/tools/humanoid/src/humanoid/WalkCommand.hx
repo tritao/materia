@@ -41,7 +41,7 @@ class WalkCommand {
     var result = WalkRun.run(scenario);
     var last = result.samples[result.samples.length - 1];
     Sys.println('ran ${last.t} s: ended at (${last.x}, ${last.y}, ${last.z}), yaw ${last.yaw}, worst tilt ${result.worstTilt} rad, '
-      + 'worst gravity-estimate error ${result.worstEstimateError} rad (mean bias ${result.meanEstimateError}), fell: ${result.fell}');
+      + 'worst gravity-estimate error ${result.worstEstimateError} rad (mean bias ${result.meanEstimateError}), ${result.clampedTargets} targets clamped into joint travel, fell: ${result.fell}');
     if (result.fell) {
       Sys.println('FAIL: fell at t=${result.fallTime}');
       Sys.exit(1);
