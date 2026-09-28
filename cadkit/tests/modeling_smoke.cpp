@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
+#include <string>
 #include <vector>
 
 namespace {
@@ -25,6 +26,23 @@ cad_shape circle(double x, double y, double z, double radius) {
 }
 void valid(cad_shape shape) { uint8_t result=0; ok(cad_shape_valid(shape,&result)); check(result==1); }
 void near(double actual,double expected,double tolerance=1e-6) { check(std::abs(actual-expected)<tolerance); }
+// Ball-mill (radius r, height h) cross-section in the vertical plane through
+// `o` along +x: material from x-r(z) to x+r(z), or from the axis if `half`.
+cad_shape ball_section(cad_vec3 o,double offset,double r,double h,bool half) {
+    const double m=r*std::sqrt(0.5);
+    auto p=[&](double s,double z){ return cad_vec3{o.x+offset+s,o.y,o.z+z}; };
+    std::vector<cad_shape_ref> edges;
+    auto line=[&](cad_vec3 a,cad_vec3 b){ cad_shape e=0; ok(cad_line(a,b,&e)); edges.push_back({keep(e)}); };
+    auto arc=[&](cad_vec3 a,cad_vec3 mid,cad_vec3 b){ cad_shape e=0; ok(cad_arc(a,mid,b,&e)); edges.push_back({keep(e)}); };
+    arc(p(0,0),p(m,r-m),p(r,r)); line(p(r,r),p(r,h));
+    if(half) { line(p(r,h),p(0,h)); line(p(0,h),p(0,0)); }
+    else { line(p(r,h),p(-r,h)); line(p(-r,h),p(-r,r)); arc(p(-r,r),p(-m,r-m),p(0,0)); }
+    cad_shape wire=0, face=0; ok(cad_wire(edges.data(),edges.size(),&wire)); keep(wire);
+    ok(cad_planar_face(wire,nullptr,0,&face)); return keep(face);
+}
+cad_shape revolve(cad_shape face,cad_vec3 origin,double angle) {
+    cad_shape solid=0; ok(cad_shape_revolve(face,origin,{0,0,1},angle,&solid)); return keep(solid);
+}
 }
 int main() {
     cad_vec3 points[]={{-40,-25,0},{40,-25,0},{40,25,0},{-40,25,0}};
@@ -107,6 +125,50 @@ int main() {
     cad_shape pipe=0; ok(cad_sweep(disk,spine,&pipe)); keep(pipe); valid(pipe);
     ok(cad_shape_volume(pipe,&volume)); near(volume,20*std::acos(-1));
     cad_shape offset=0; ok(cad_wire_offset(loft_wires[0].shape,1,&offset)); keep(offset); valid(offset);
+    // A ball mill swept round a half circle and fused with whole tools at its
+    // ends. The tool spheres are tangent to the swept torus, and OCCT 8.0.1
+    // reports success for this fuse while returning two solids with invalid
+    // topology. CadKit must reject it rather than return it.
+    {
+        const double pi=std::acos(-1);
+        auto swept_arc=[&](double unit,cad_vec3 c,cad_shape* out) {
+            const double r=0.003*unit, h=0.02*unit, rho=0.005*unit;
+            c={c.x*unit,c.y*unit,c.z*unit};
+            cad_shape body=revolve(ball_section(c,rho,r,h,false),c,pi);
+            cad_shape start=revolve(ball_section({c.x+rho,c.y,c.z},0,r,h,true),{c.x+rho,c.y,c.z},2*pi);
+            cad_shape end=revolve(ball_section({c.x-rho,c.y,c.z},0,r,h,true),{c.x-rho,c.y,c.z},2*pi);
+            cad_shape caps=0; ok(cad_fuse(start,end,&caps)); keep(caps);
+            const cad_result result=cad_fuse(caps,body,out);
+            if(result==CAD_OK) {
+                keep(*out); valid(*out);
+                ok(cad_shape_volume(*out,&volume));
+                near(volume,2*(pi*r*r/4+r*(h-r))*rho*pi+2.0/3*pi*r*r*r+pi*r*r*(h-r),1e-7*volume);
+            }
+            return result;
+        };
+        cad_shape swept=99;
+        check(swept_arc(1,{0.02,0,0},&swept)==CAD_ERROR_OPERATION_FAILED && swept==0);
+        check(std::string(cad_last_error()).find("invalid topology")!=std::string::npos);
+        // The same sweep in millimetres fuses correctly.
+        ok(swept_arc(1000,{0.02,0.01,-0.004},&swept));
+    }
+    // A ball-mill section whose inner edge meets the revolution axis
+    // tangentially revolves into a horn torus. OCCT 8.0.1 builds it invalid at
+    // this position; CadKit must fail or return a valid solid of the right
+    // volume.
+    {
+        const double pi=std::acos(-1), r=0.003, h=0.02;
+        const cad_vec3 c{0.27,0.108,-0.054};
+        cad_shape horn=99;
+        const cad_result result=cad_shape_revolve(ball_section(c,r,r,h,false),c,{0,0,1},pi/2,&horn);
+        if(result==CAD_OK) {
+            keep(horn); valid(horn);
+            ok(cad_shape_volume(horn,&volume)); near(volume,2*(pi*r*r/4+r*(h-r))*r*pi/2,1e-7*volume);
+        } else {
+            check(result==CAD_ERROR_OPERATION_FAILED && horn==0);
+            std::printf("horn torus revolve rejected: %s\n",cad_last_error());
+        }
+    }
     cad_shape box=0; ok(cad_box(10,10,10,&box)); keep(box);
     uint32_t face_count=0; ok(cad_shape_subshape_count(box,CAD_SHAPE_FACE,&face_count));
     cad_shape top=0;
