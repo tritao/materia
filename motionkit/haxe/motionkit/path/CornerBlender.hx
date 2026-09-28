@@ -14,12 +14,14 @@ class CornerBlender {
     var startCuts = [for (_ in 0...count) 0.0];
     var endCuts = [for (_ in 0...count) 0.0];
     var diagnostics:Array<String> = [];
+    var diagnosticCorners:Array<Int> = [];
     if (tolerance > 0.0) for (i in 0...(count - 1)) {
       var before = path.primitives[i];
       var after = path.primitives[i + 1];
       if (before.kind() == PathPrimitiveKind.Circular ||
           after.kind() == PathPrimitiveKind.Circular) {
         diagnostics.push('corner ${i + 1}: exact stop (circular primitive)');
+        diagnosticCorners.push(i + 1);
         continue;
       }
       if (before.kind() != PathPrimitiveKind.Line || after.kind() != PathPrimitiveKind.Line) {
@@ -36,11 +38,13 @@ class CornerBlender {
           if (Math.abs(incoming[2]) > 1e-9 || Math.abs(outgoing[2]) > 1e-9 ||
               Math.abs(corner.z - after.pointAt(0.0).z) > 1e-9) {
             diagnostics.push('corner ${i + 1}: exact stop (nonplanar primitive)');
+            diagnosticCorners.push(i + 1);
             continue;
           }
           if (turn < 1e-6) continue;
           if (turn >= maxTurnAngleRadians) {
             diagnostics.push('corner ${i + 1}: exact stop (turn angle $turn exceeds blend limit)');
+            diagnosticCorners.push(i + 1);
             continue;
           }
           var cut = Math.min(tolerance * 1.5,
@@ -65,6 +69,7 @@ class CornerBlender {
           }
           if (accepted == null || cut <= 1e-9) {
             diagnostics.push('corner ${i + 1}: exact stop (blend tolerance unavailable)');
+            diagnosticCorners.push(i + 1);
             continue;
           }
           mixed[i] = accepted;
@@ -77,8 +82,10 @@ class CornerBlender {
         var alignment = 0.0;
         for (coordinate in 0...3)
           alignment += incoming[coordinate] * outgoing[coordinate];
-        if (alignment < 0.99999)
+        if (alignment < 0.99999) {
           diagnostics.push('corner ${i + 1}: exact stop (nonlinear primitive)');
+          diagnosticCorners.push(i + 1);
+        }
         continue;
       }
       var first:LineSegment = cast before;
@@ -90,6 +97,7 @@ class CornerBlender {
       if (Math.abs(incoming[2]) > 1e-9 || Math.abs(outgoing[2]) > 1e-9 ||
           Math.abs(first.end.z - second.end.z) > 1e-9) {
         diagnostics.push('corner ${i + 1}: exact stop (nonplanar line)');
+        diagnosticCorners.push(i + 1);
         continue;
       }
       var dot = Math.max(-1.0, Math.min(1.0,
@@ -100,6 +108,7 @@ class CornerBlender {
       if (magnitude < 1e-6) continue;
       if (magnitude >= maxTurnAngleRadians || magnitude >= Math.PI - 1e-6) {
         diagnostics.push('corner ${i + 1}: exact stop (turn angle $magnitude exceeds blend limit)');
+        diagnosticCorners.push(i + 1);
         continue;
       }
       var halfTangent = Math.tan(magnitude * 0.5);
@@ -108,6 +117,7 @@ class CornerBlender {
         0.45 * Math.min(first.length(), second.length()));
       if (cut <= 1e-9) {
         diagnostics.push('corner ${i + 1}: exact stop (insufficient line length)');
+        diagnosticCorners.push(i + 1);
         continue;
       }
       radius = cut / halfTangent;
@@ -145,7 +155,7 @@ class CornerBlender {
       }
     }
     return new BlendedGeometry(new GeometricPath(primitives), diagnostics,
-      sourcePrimitiveIndices);
+      sourcePrimitiveIndices, diagnosticCorners);
   }
 
   static function distanceToPrimitive(point:PathPoint, primitive:PathPrimitive):Float {
@@ -173,12 +183,15 @@ class CornerBlender {
 class BlendedGeometry {
   public final path:GeometricPath;
   public final diagnostics:Array<String>;
+  /** One-based authored corner index for each diagnostic. */
+  public final diagnosticCorners:Array<Int>;
   /** Index of the authored primitive owning each output primitive. */
   public final sourcePrimitiveIndices:Array<Int>;
   public function new(path:GeometricPath, diagnostics:Array<String>,
-      sourcePrimitiveIndices:Array<Int>) {
+      sourcePrimitiveIndices:Array<Int>, diagnosticCorners:Array<Int>) {
     this.path = path;
     this.diagnostics = diagnostics.copy();
+    this.diagnosticCorners = diagnosticCorners.copy();
     this.sourcePrimitiveIndices = sourcePrimitiveIndices.copy();
   }
 }
