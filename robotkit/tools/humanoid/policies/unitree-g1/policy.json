@@ -7,7 +7,8 @@
     "file": "deploy/pre_train/g1/motion.pt",
     "licence": "BSD-3-Clause, Copyright (c) 2016-2023 HangZhou YuShu TECHNOLOGY CO.,LTD. (Unitree Robotics); see LICENSE",
     "trainedIn": "Isaac Gym (legged_gym), PPO with an LSTM actor, on g1_12dof.urdf; deploy/deploy_mujoco is Unitree's own sim-to-sim run",
-    "conversion": "policies/export_unitree_g1.py: TorchScript to ONNX with the LSTM state as explicit inputs and outputs"
+    "conversion": "policies/export_unitree_g1.py: TorchScript to ONNX with the LSTM state as explicit inputs and outputs",
+    "note": "the policy turns clockwise for a positive yaw command, in Unitree's own plain-MuJoCo run as well, so the yaw scale is negative: RobotKit commands follow REP-103 (positive turns counter-clockwise seen from above)"
   },
   "model": "policy.onnx",
   "controlPeriod": 0.02,
@@ -82,7 +83,7 @@
       "scale": [
         2.0,
         2.0,
-        0.25
+        -0.25
       ]
     },
     {

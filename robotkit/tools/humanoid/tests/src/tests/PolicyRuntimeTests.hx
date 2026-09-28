@@ -64,7 +64,7 @@ class PolicyRuntimeTests {
     };
     expect(0, 0.25, "gyro x scale"); expect(1, -0.5, "gyro y"); expect(2, 1.0, "gyro z");
     expect(3, 0.0, "gravity x"); expect(4, 0.1, "gravity y"); expect(5, -0.99, "gravity z");
-    expect(6, 1.0, "command vx * 2"); expect(7, -0.5, "command vy * 2"); expect(8, 0.25, "command wz * 0.25");
+    expect(6, 1.0, "command vx * 2"); expect(7, -0.5, "command vy * 2"); expect(8, -0.25, "command wz * -0.25 (the policy turns clockwise for a positive input)");
     expect(9, 0.01, "q - default 0"); expect(20, 0.12, "q - default 11");
     expect(21, 0.1 * 1 * 0.05, "dq 0"); expect(32, 0.1 * 12 * 0.05, "dq 11");
     expect(33, 0.5, "last action 0"); expect(44, 0.5 - 1.1, "last action 11");
@@ -151,6 +151,19 @@ class PolicyRuntimeTests {
     if (drift > 0.02) throw 'a 3 g shock tilted the estimate by $drift rad';
     var length = Math.sqrt(shocked[0] * shocked[0] + shocked[1] * shocked[1] + shocked[2] * shocked[2]);
     if (!near(length, 1.0, 1e-9)) throw "the estimate must stay a unit vector";
+    // A robot that starts leaning 0.3 rad (the first, moving samples are not trusted), then stands still,
+    // is found within a second; a moving one is not pulled towards a gravity the accelerometer misreads.
+    var still = new GravityEstimator();
+    still.update([0.5, 0.0, 0.0], [0.0, g * Math.sin(0.3), g * Math.cos(0.3)], 0.0); // moving: not trusted, starts upright
+    var leaning = [0.0, g * Math.sin(0.3), g * Math.cos(0.3)];
+    var found = [0.0, 0.0, -1.0];
+    for (step in 0...200) found = still.update([0.0, 0.0, 0.0], leaning, 0.002 * 5.0);
+    if (!near(found[1], -Math.sin(0.3), 0.01)) throw 'a still robot was not found leaning: ${found[1]}';
+    var moving = new GravityEstimator();
+    moving.update([0.0, 0.5, 0.0], [0.0, g * Math.sin(0.3), g * Math.cos(0.3)], 0.0);
+    var unmoved = [0.0, 0.0, -1.0];
+    for (step in 0...200) unmoved = moving.update([0.0, Std.int(step / 25) % 2 == 0 ? 0.5 : -0.5, 0.0], leaning, 0.002 * 5.0); // swings out and back
+    if (!near(unmoved[1], 0.0, 0.05)) throw 'a turning robot was pulled towards a misread gravity';
   }
 
   static function controllerChecksSpecAgainstModelAndNetwork():Void {

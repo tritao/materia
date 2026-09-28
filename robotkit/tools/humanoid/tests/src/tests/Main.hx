@@ -5,6 +5,7 @@ class Main {
   public static function main():Void {
     OnnxPolicyTests.run();
     PolicyRuntimeTests.run();
+    WalkTests.run();
     Sys.println("humanoid tests passed");
   }
 }

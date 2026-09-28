@@ -33,6 +33,9 @@ class PolicyController {
   /** Model joint index of each policy joint, and of each joint that only holds a pose. */
   final policyJoints:Array<Int>;
   final holdJoints:Array<Int> = [];
+  /** Travel limits of each policy joint; a target is clamped into them, as the runtime rejects one outside. */
+  final lower:Array<Float> = [];
+  final upper:Array<Float> = [];
   final holdPose:Array<Float> = [];
   final imuRotation:Array<Float>;
   final observationTensor:String;
@@ -45,6 +48,8 @@ class PolicyController {
   var imuReady:Bool = false;
   /** Policy evaluations so far; the gait clock is this times the control period. */
   public var evaluations(default, null):Int = 0;
+  /** Policy targets that had to be clamped into a joint's travel so far. */
+  public var clampedTargets(default, null):Int = 0;
   /** Enables the privileged state debugging tools compare the estimator to; never set it in a real controller. */
   public var debugTruth:Null<() -> DebugTruth> = null;
 
@@ -84,6 +89,10 @@ class PolicyController {
       if (index < 0) throw 'policy spec "${spec.name}": the model has no joint "$id"';
       if (policyJoints.indexOf(index) >= 0) throw 'policy spec "${spec.name}": joint "$id" is listed twice';
       policyJoints.push(index);
+      var limits = model.joints[index].limits;
+      var limited = limits.upper > limits.lower;
+      lower.push(limited ? limits.lower : -Math.POSITIVE_INFINITY);
+      upper.push(limited ? limits.upper : Math.POSITIVE_INFINITY);
     }
     var hold = spec.hold;
     if (hold != null)
@@ -188,10 +197,22 @@ class PolicyController {
     for (value in action) if (!Math.isFinite(value)) throw "the policy produced a non-finite action";
     for (state in spec.recurrent) recurrentState.set(state.input, outputs.get(state.output));
     lastAction = action.copy();
-    var targets = [for (i in 0...policyJoints.length)
-      JointTarget.servo(policyJoints[i], spec.defaultPose[i] + spec.actionScale * action[i], 0.0, spec.kp[i], spec.kd[i], 0.0)];
+    var targets = [for (i in 0...policyJoints.length) {
+      var wanted = spec.defaultPose[i] + spec.actionScale * action[i];
+      var clamped = Math.max(lower[i], Math.min(upper[i], wanted));
+      if (clamped != wanted) clampedTargets++;
+      JointTarget.servo(policyJoints[i], clamped, 0.0, spec.kp[i], spec.kd[i], 0.0);
+    }];
     return targets.concat(holdTargets());
   }
+
+  /**
+   * Feeds the IMU's latest sample to the gravity filter. Call it on every
+   * sensor update, which may be much faster than the control period: the
+   * filter integrates the gyroscope between policy evaluations, and sampling it
+   * only once per evaluation aliases the gait's impacts into a tilt bias.
+   */
+  public function observeImu(sensors:Array<SensorFrame>):Void readImu(sensors);
 
   function readImu(sensors:Array<SensorFrame>):Void {
     var frame:Null<SensorFrame> = null;
