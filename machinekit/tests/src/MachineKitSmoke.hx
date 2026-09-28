@@ -12,6 +12,7 @@ import machinekit.catalog.Catalog;
 import machinekit.catalog.CatalogMetadata.Conformance;
 import machinekit.catalog.CatalogMetadata.DimensionKind;
 import machinekit.component.Bom;
+import machinekit.component.BomItem;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.ComponentParameter;
@@ -195,6 +196,27 @@ class MachineKitSmoke {
 		near(moving.massProperties(state).centreOfMass.x, 15, "configured moving centre of mass");
 		var movingInertia:InertiaTensor = cast moving.massProperties(state).inertia;
 		near(movingInertia.yy, 1.305, "configured moving inertia", 1e-8);
+		var tubeItem:BomItem = {partNumber: "MOVING-TUBE", description: "Tube", quantity: 1, material: "polyurethane"};
+		moving.addBomItem(tubeItem, 1, Attached(0.001, "b", new Vector(0, 0, 0)));
+		moving.addBomItem({partNumber: "FIXED-TUBE", description: "Fixed tube", quantity: 1,
+			material: "polyurethane"}, 1, Point(0.001, new Vector(0, 0, 0)));
+		var at30 = moving.massProperties(state);
+		state.setJoint("slide", 40);
+		var at40 = moving.massProperties(state);
+		near(at40.centreOfMass.x - at30.centreOfMass.x,
+			10 * (block.massProperties().mass + 0.001) / at40.mass,
+			"moving member and attached tube shift centre of mass", 1e-9);
+		throws(() -> moving.addBomItem(tubeItem, 1, Attached(0.001, "missing", new Vector())),
+			"Unknown assembly member");
+		var offsetInner = new MachineAssembly();
+		offsetInner.addComponent("part", block);
+		offsetInner.addBomItem(tubeItem, 1, Attached(0.001, "part", new Vector(2, 0, 0)));
+		var offsetOuter = new MachineAssembly();
+		offsetOuter.include("unit", offsetInner,
+			{x: 50, y: 0, z: 0, qx: 0, qy: 0, qz: 0, qw: 1});
+		near(offsetOuter.massProperties().centreOfMass.x,
+			50 + (0.001 * 2) /
+			(block.massProperties().mass + 0.001), "included attached mass follows include pose");
 
 		var missing = new MachineAssembly();
 		missing.addComponent("declared", new MassTestBlock(0.5));
@@ -247,7 +269,7 @@ class MachineKitSmoke {
 		throws(() -> tool.exposePort("bad", "cup", "none"), "Unknown port");
 		tool.connectPorts("supply", "changer", "toolAir", "manifold", "in",
 			{partNumber: "TUBE-6", description: "6 mm tube", quantity: 1, material: "polyurethane"},
-			Point(0.001, new Vector(0, 0, 0)));
+			Attached(0.001, "changer", new Vector(0, 0, 0)));
 		tool.connectPorts("air", "manifold", "out", "generator", "air");
 		tool.connectPorts("vacuum", "generator", "vacuum", "cup", "vacuum");
 		tool.exposePort("robotAir", "changer", "robotAir");

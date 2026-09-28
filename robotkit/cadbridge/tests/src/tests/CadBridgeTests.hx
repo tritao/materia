@@ -70,7 +70,7 @@ class CadBridgeTests {
       0.5, 0.2, 0.2, 0.2) != null, "MachineKit payload moment violates RobotKit limits");
 
     assembly.addBomItem({partNumber: "TUBE", description: "Tube", quantity: 1,
-      material: "polyurethane"}, 1, Point(0.1, new Vector(100, 0, 50)));
+      material: "polyurethane"}, 1, Attached(0.1, "tool", new Vector(100, 0, 50)));
     MachineAssemblyMassBridge.applyToLink(assembly, link);
     check(approx(link.mass, 2.1, 1e-12) && approx(link.centerOfMass[0], 0.1, 1e-12),
       "accounted tubing contributes to RobotKit link mass");

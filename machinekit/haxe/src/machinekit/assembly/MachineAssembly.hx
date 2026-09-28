@@ -20,10 +20,11 @@ typedef MachineAssemblyComponent = { var id:String; var component:MachineCompone
 typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:String; }
 typedef PortRef = { var instanceId:String; var portName:String; }
 typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
-/** BOM-only mass is a point-mass estimate in the assembly frame. */
+/** BOM-only mass is a point-mass estimate, fixed or attached to a member. */
 enum AssemblyBomMass {
 	Unknown;
 	Point(kg:Float, centreOfMass:Vector);
+	Attached(kg:Float, instanceId:String, centreOfMass:Vector);
 }
 typedef MachineAssemblyMassProperties = {
 	var mass:Float;
@@ -87,6 +88,7 @@ class MachineAssembly {
 		for (entry in assembly.bomItems) {
 			var mass = switch entry.mass {
 				case Unknown: Unknown;
+				case Attached(kg, instanceId, centre): Attached(kg, join(id, instanceId), centre);
 				case Point(kg, centre):
 					if (pose == null) Point(kg, centre);
 					else {
@@ -130,7 +132,7 @@ class MachineAssembly {
 			var old = from; from = to; to = old;
 		}
 		if (line == null) switch lineMass {
-			case Point(_, _): throw "Connection line mass needs a BOM item";
+			case Point(_, _) | Attached(_, _, _): throw "Connection line mass needs a BOM item";
 			case Unknown:
 		}
 		addOperation(ConnectPorts(id, from, to, line));
@@ -170,11 +172,15 @@ class MachineAssembly {
 			mass:AssemblyBomMass = Unknown):Void {
 		if (item == null || quantity <= 0) throw "Assembly BOM entry needs an item and positive quantity";
 		switch mass {
-			case Point(kg, centre):
+			case Point(kg, centre) | Attached(kg, _, centre):
 				if (!Math.isFinite(kg) || kg <= 0 || centre == null ||
 					!Math.isFinite(centre.x) || !Math.isFinite(centre.y) || !Math.isFinite(centre.z))
 					throw "Assembly BOM mass and centre must be finite and positive";
 			case Unknown:
+		}
+		switch mass {
+			case Attached(_, instanceId, _): requireMember(instanceId);
+			case _:
 		}
 		bomItems.push({item: item, quantity: quantity, mass: mass});
 	}
@@ -307,17 +313,26 @@ class MachineAssembly {
 			weightedZ += properties.mass * world.z;
 		}
 		var unaccounted:Array<String> = [];
+		var bomPoints:Array<{mass:Float, centre:Vector}> = [];
 		for (entry in bomItems) {
 			switch entry.mass {
 				case Unknown:
 					if (unaccounted.indexOf(entry.item.partNumber) < 0)
 						unaccounted.push(entry.item.partNumber);
-				case Point(kg, centre):
+				case Point(kg, centre) | Attached(kg, _, centre):
+					var worldCentre = switch entry.mass {
+						case Attached(_, instanceId, _):
+							var pose = state == null ? model.pose(instanceId) : state.worldPose(instanceId);
+							var point = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
+							new Vector(point.x, point.y, point.z);
+						case _: centre;
+					};
 					var itemMass = kg * entry.item.quantity * entry.quantity;
+					bomPoints.push({mass: itemMass, centre: worldCentre});
 					mass += itemMass;
-					weightedX += itemMass * centre.x;
-					weightedY += itemMass * centre.y;
-					weightedZ += itemMass * centre.z;
+					weightedX += itemMass * worldCentre.x;
+					weightedY += itemMass * worldCentre.y;
+					weightedZ += itemMass * worldCentre.z;
 			}
 		}
 		var combinedCentre = mass == 0 ? new Vector() :
@@ -336,13 +351,9 @@ class MachineAssembly {
 					centre.y - combinedCentre.y, centre.z - combinedCentre.z));
 		}
 		// BOM-only masses are represented as point masses at their declared centres.
-		for (entry in bomItems) switch entry.mass {
-			case Point(kg, centre):
-				var itemMass = kg * entry.item.quantity * entry.quantity;
-				inertia = inertia.shifted(itemMass, centre.x - combinedCentre.x,
-					centre.y - combinedCentre.y, centre.z - combinedCentre.z);
-			case Unknown:
-		}
+		for (point in bomPoints) inertia = inertia.shifted(point.mass,
+			point.centre.x - combinedCentre.x, point.centre.y - combinedCentre.y,
+			point.centre.z - combinedCentre.z);
 		return {mass: mass, centreOfMass: combinedCentre,
 			inertia: unaccountedInertia.length == 0 ? inertia : null,
 			unaccounted: unaccounted, unaccountedInertia: unaccountedInertia};
