@@ -5,6 +5,7 @@
   "sourceRoots": ["src"],
   "dependencies": {
     "cnckit": { "path": "../../cnckit" },
+    "toolpathkit": { "path": "../../toolpathkit" },
     "cadbridge": { "path": "../../robotkit/cadbridge" },
     "machinekit": { "path": "../../machinekit" },
     "motionkit-robot": { "path": "../robot" },

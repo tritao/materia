@@ -5,10 +5,10 @@ import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometryTools;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.GeometryTools;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
 
 /** Generated plate pocket with a central raised boss. */
 class CamIslandPocketFixture {
@@ -17,7 +17,7 @@ class CamIslandPocketFixture {
     var boss = rectangle(15, 11, 25, 19);
     var sketch = Sketch.face(outer, [boss]);
     var face = sketch.shape.faces().at(0);
-    var tool = new CncTool(10, 0, 0.002);
+    var tool = new Tool(10, 0, 0.002);
     var program = new CamJob(0.005, 10000)
       .pocketFace(face, tool, -0.002, 0.005, 0.001, 0.001,
         "mm", 0.00005, 0.001).finish();
@@ -76,13 +76,13 @@ class CamIslandPocketFixture {
     var cutterRadius = tool.diameter * 0.5;
     for (op in program.ops) switch op {
       case Feed(geometry, _, _, _):
-        var start = CncGeometryTools.pointAt(geometry, 0);
-        var end = CncGeometryTools.pointAt(geometry,
-          CncGeometryTools.length(geometry));
+        var start = GeometryTools.pointAt(geometry, 0);
+        var end = GeometryTools.pointAt(geometry,
+          GeometryTools.length(geometry));
         if (Math.abs(start.z - end.z) > 1e-9) continue;
         for (fraction in [0.0, 0.25, 0.5, 0.75, 1.0]) {
-          var point = CncGeometryTools.pointAt(geometry,
-            CncGeometryTools.length(geometry) * fraction);
+          var point = GeometryTools.pointAt(geometry,
+            GeometryTools.length(geometry) * fraction);
           check(outsideBoss(point) &&
             bossDistance(point) >= cutterRadius - 1e-8,
             "island pocket keeps the full cutter outside the boss");
@@ -90,23 +90,23 @@ class CamIslandPocketFixture {
       case _:
     }
     for (ix in 0...40) for (iy in 0...30) {
-      var point = new CncPoint((ix + 0.5) * 0.001,
+      var point = new Point3((ix + 0.5) * 0.001,
         (iy + 0.5) * 0.001, -0.002);
       if (!outsideBoss(point)) continue;
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
         case Feed(geometry, _, _, _):
-          var start = CncGeometryTools.pointAt(geometry, 0);
-          var end = CncGeometryTools.pointAt(geometry,
-            CncGeometryTools.length(geometry));
+          var start = GeometryTools.pointAt(geometry, 0);
+          var end = GeometryTools.pointAt(geometry,
+            GeometryTools.length(geometry));
           if (Math.abs(start.z + 0.002) > 1e-9 ||
               Math.abs(end.z + 0.002) > 1e-9) continue;
           switch geometry {
             case Line(a, b): best = Math.min(best, segmentDistance(point, a, b));
             case Arc(_, _, _, _):
               for (sample in 0...65) {
-                var position = CncGeometryTools.pointAt(geometry,
-                  CncGeometryTools.length(geometry) * sample / 64);
+                var position = GeometryTools.pointAt(geometry,
+                  GeometryTools.length(geometry) * sample / 64);
                 best = Math.min(best, point.distanceTo(position));
               }
             case _:
@@ -127,19 +127,19 @@ class CamIslandPocketFixture {
         check(Math.abs(feedA - feedB) < 1e-8,
           "island pocket G-code preserves ramp and plunge feeds");
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = CncGeometryTools.pointAt(a,
-            CncGeometryTools.length(a) * fraction);
-          var reparsed = CncGeometryTools.pointAt(b,
-            CncGeometryTools.length(b) * fraction);
+          var original = GeometryTools.pointAt(a,
+            GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b,
+            GeometryTools.length(b) * fraction);
           check(original.distanceTo(reparsed) < 1e-8,
             "island pocket G-code preserves geometry");
         }
       case [Rapid(a, _), Rapid(b, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = CncGeometryTools.pointAt(a,
-            CncGeometryTools.length(a) * fraction);
-          var reparsed = CncGeometryTools.pointAt(b,
-            CncGeometryTools.length(b) * fraction);
+          var original = GeometryTools.pointAt(a,
+            GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b,
+            GeometryTools.length(b) * fraction);
           check(original.distanceTo(reparsed) < 1e-8,
             "island pocket G-code preserves geometry");
         }
@@ -154,13 +154,13 @@ class CamIslandPocketFixture {
       "face pocket supports two separate islands");
     for (op in twoBossProgram.ops) switch op {
       case Feed(geometry, _, _, _):
-        var a = CncGeometryTools.pointAt(geometry, 0);
-        var b = CncGeometryTools.pointAt(geometry,
-          CncGeometryTools.length(geometry));
+        var a = GeometryTools.pointAt(geometry, 0);
+        var b = GeometryTools.pointAt(geometry,
+          GeometryTools.length(geometry));
         if (Math.abs(a.z - b.z) > 1e-9) continue;
         for (fraction in [0.0, 0.5, 1.0]) {
-          var point = CncGeometryTools.pointAt(geometry,
-            CncGeometryTools.length(geometry) * fraction);
+          var point = GeometryTools.pointAt(geometry,
+            GeometryTools.length(geometry) * fraction);
           var x = Math.max(0.005, Math.min(0.009, point.x));
           var y = Math.max(0.005, Math.min(0.009, point.y));
           check(Math.sqrt(Math.pow(point.x - x, 2) +
@@ -176,7 +176,7 @@ class CamIslandPocketFixture {
     var tightFace = tightSketch.shape.faces().at(0);
     var rejectedJob = new CamJob(0.005, 10000), rejected = false;
     try rejectedJob.pocketFace(tightFace,
-      new CncTool(11, 0, 0.004), -0.001, 0.005, 0.001)
+      new Tool(11, 0, 0.004), -0.001, 0.005, 0.001)
     catch (_:Dynamic) rejected = true;
     check(rejected, "pocket rejects an island closer than the cutter radius to the wall");
     rejected = false;
@@ -190,18 +190,18 @@ class CamIslandPocketFixture {
     return Curve.polyline([new Vector(x0, y0), new Vector(x1, y0),
       new Vector(x1, y1), new Vector(x0, y1)], true);
 
-  static function outsideBoss(point:CncPoint):Bool
+  static function outsideBoss(point:Point3):Bool
     return point.x <= 0.015 || point.x >= 0.025 ||
       point.y <= 0.011 || point.y >= 0.019;
 
-  static function bossDistance(point:CncPoint):Float {
+  static function bossDistance(point:Point3):Float {
     var x = Math.max(0.015, Math.min(0.025, point.x));
     var y = Math.max(0.011, Math.min(0.019, point.y));
     return Math.sqrt(Math.pow(point.x - x, 2) +
       Math.pow(point.y - y, 2));
   }
 
-  static function segmentDistance(point:CncPoint, a:CncPoint, b:CncPoint):Float {
+  static function segmentDistance(point:Point3, a:Point3, b:Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var t = Math.max(0.0, Math.min(1.0,
       ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));

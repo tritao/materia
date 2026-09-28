@@ -1,7 +1,7 @@
-package cnckit.ir;
+package toolpathkit.path;
 
 /** Arc planes in G-code coordinate order. */
-enum CncPlane {
+enum ArcPlane {
   XY;
   XZ;
   YZ;

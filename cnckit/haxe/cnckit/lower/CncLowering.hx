@@ -6,9 +6,9 @@ import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.CncMachine;
 import cnckit.CncPosePrimitive;
 import cnckit.CncSourceMap;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncOp;
-import cnckit.parse.CncSpan;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Provenance;
 import motionkit.event.EventValue;
 import motionkit.path.ArcSegment;
 import motionkit.path.CircularPlane;
@@ -31,7 +31,7 @@ class CncLowering {
   var sourceMap:CncSourceMap = new CncSourceMap();
   var diagnostics:Array<CncDiagnostic> = [];
   var pending:Array<PathPrimitive> = [];
-  var pendingSpans:Array<CncSpan> = [];
+  var pendingSpans:Array<Provenance> = [];
   var pendingFeed:Float = 0.0;
   var pendingBlend:Float = 0.0;
 
@@ -39,7 +39,7 @@ class CncLowering {
     this.machine = machine;
   }
 
-  public function lower(ops:Array<CncOp>):CncLoweringResult {
+  public function lower(ops:Array<ToolpathOp>):CncLoweringResult {
     motionOps = [];
     sourceMap = new CncSourceMap();
     diagnostics = [];
@@ -74,7 +74,7 @@ class CncLowering {
   }
 
   function addMove(geometry:PathPrimitive, speed:Float, blend:Float,
-      span:CncSpan):Void {
+      span:Provenance):Void {
     if (pending.length > 0 && (blend == 0.0 || pendingBlend == 0.0 ||
         Math.abs(speed - pendingFeed) > 1e-12 || blend != pendingBlend)) flush();
     pending.push(geometry); pendingSpans.push(span);
@@ -102,7 +102,7 @@ class CncLowering {
     pending = []; pendingSpans = [];
   }
 
-  function emitPath(geometry:Array<PathPrimitive>, spans:Array<CncSpan>,
+  function emitPath(geometry:Array<PathPrimitive>, spans:Array<Provenance>,
       speed:Float, ?authored:GeometricPath, ?blend:Float = 0.0):Void {
     var primitives:Array<PosePrimitive> = [for (primitive in geometry)
       new CncPosePrimitive(primitive, speed, machine.positionTolerance,
@@ -118,12 +118,12 @@ class CncLowering {
     motionOps.push(MotionOp.FollowPath(path, machine.frameId, speed, []));
   }
 
-  function add(op:MotionOp, span:CncSpan):Void {
+  function add(op:MotionOp, span:Provenance):Void {
     sourceMap.add(motionOps.length, 0.0, 0.0, span);
     motionOps.push(op);
   }
 
-  static function primitive(geometry:CncGeometry):PathPrimitive return switch geometry {
+  static function primitive(geometry:PathGeometry):PathPrimitive return switch geometry {
     case Line(start, end): new LineSegment(point(start), point(end));
     case Arc(center, radius, startAngle, sweep):
       new ArcSegment(point(center), radius, startAngle, sweep);
@@ -136,6 +136,6 @@ class CncLowering {
         }, rise);
   };
 
-  static function point(value:cnckit.ir.CncPoint):PathPoint
+  static function point(value:toolpathkit.path.Point3):PathPoint
     return new PathPoint(value.x, value.y, value.z);
 }

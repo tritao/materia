@@ -4,20 +4,20 @@ import cnckit.CncChannels;
 import cnckit.CncDiagnostic;
 import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPlane;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ArcPlane;
+import toolpathkit.path.Point3;
 import cnckit.parse.CncBlock;
-import cnckit.parse.CncSpan;
+import toolpathkit.path.Provenance;
 import cnckit.parse.CncWord;
 
 /** Interprets LinuxCNC blocks into plain metre geometry and ordered CNC ops. */
 class CncInterpreter {
   public final machine:CncMachine;
   public var state(default, null):CncState;
-  public var ops(default, null):Array<CncOp> = [];
+  public var ops(default, null):Array<ToolpathOp> = [];
   public var diagnostics(default, null):Array<CncDiagnostic> = [];
 
   public function new(machine:CncMachine) {
@@ -25,7 +25,7 @@ class CncInterpreter {
     state = new CncState(machine);
   }
 
-  public function interpret(blocks:Array<CncBlock>):Array<CncOp> {
+  public function interpret(blocks:Array<CncBlock>):Array<ToolpathOp> {
     state = new CncState(machine);
     ops = [];
     diagnostics = [];
@@ -219,7 +219,7 @@ class CncInterpreter {
       if (state.cutterSide != 0) fail(line, word.column,
         "M6 requires G40 before tool change");
       state.activeTool = state.selectedTool;
-      ops.push(CncOp.ToolChange(state.selectedTool, block.span));
+      ops.push(ToolpathOp.ToolChange(state.selectedTool, block.span));
     }
     if (spindleCode == 3 || spindleCode == 4) {
       state.spindleDirection = spindleCode == 3 ? 1 : -1;
@@ -243,7 +243,7 @@ class CncInterpreter {
       var dwellP:CncWord = cast p;
       if (dwellP.value <= 0.0) fail(line, dwellP.column,
         "G4 P seconds must be positive");
-      ops.push(CncOp.Dwell(dwellP.value, block.span));
+      ops.push(ToolpathOp.Dwell(dwellP.value, block.span));
     }
     if (unitChange >= 0) state.metric = unitChange == 21;
     if (distanceChange >= 0) state.absolute = distanceChange == 90;
@@ -253,7 +253,7 @@ class CncInterpreter {
           "cutter compensation plane cannot change before G40");
     if (planeChange >= 0) state.plane = planeChange;
     if (cutterChange == 40 && state.cutterSide != 0) {
-      ops.push(CncOp.CutterCompEnd(block.span));
+      ops.push(ToolpathOp.CutterCompEnd(block.span));
       state.cutterSide = 0;
     }
     if (cutterChange == 41 || cutterChange == 42) {
@@ -264,16 +264,16 @@ class CncInterpreter {
       var number = d == null ? state.activeTool : integer(d, line);
       if (number < 0) fail(line, gWords[0].column,
         "G41/G42 requires a loaded tool or D number");
-      var tool:CncTool = null;
+      var tool:Tool = null;
       try tool = machine.tool(number)
       catch (error:Dynamic) fail(line, d == null ? gWords[0].column : d.column,
         Std.string(error));
       if (tool.diameter <= 0.0) fail(line, d == null ? gWords[0].column : d.column,
         "G41/G42 requires a positive tool diameter");
       state.cutterSide = cutterChange == 41 ? 1 : -1;
-      ops.push(CncOp.CutterCompStart(state.cutterSide, tool.diameter * 0.5,
-        state.plane == 17 ? CncPlane.XY :
-          state.plane == 18 ? CncPlane.XZ : CncPlane.YZ, block.span));
+      ops.push(ToolpathOp.CutterCompStart(state.cutterSide, tool.diameter * 0.5,
+        state.plane == 17 ? ArcPlane.XY :
+          state.plane == 18 ? ArcPlane.XZ : ArcPlane.YZ, block.span));
     }
     if (retractChange >= 0) state.retractToInitial = retractChange == 98;
     if (setToolOffset) {
@@ -281,11 +281,11 @@ class CncInterpreter {
       var number = integer(hWord, line);
       try state.toolLength = machine.toolLength(number)
       catch (error:Dynamic) fail(line, hWord.column, Std.string(error));
-      ops.push(CncOp.ToolLengthOffset(number, state.toolLength, block.span));
+      ops.push(ToolpathOp.ToolLengthOffset(number, state.toolLength, block.span));
     }
     if (clearToolOffset) {
       state.toolLength = 0.0;
-      ops.push(CncOp.ToolLengthOffset(0, 0.0, block.span));
+      ops.push(ToolpathOp.ToolLengthOffset(0, 0.0, block.span));
     }
     if (setBlend && lineBlend != state.blendTolerance) {
       state.blendTolerance = lineBlend;
@@ -331,8 +331,8 @@ class CncInterpreter {
     }
     for (word in mWords) switch integer(word, line) {
       case 0, 1:
-        ops.push(integer(word, line) == 1 ? CncOp.OptionalStop(block.span) :
-          CncOp.ProgramStop(block.span));
+        ops.push(integer(word, line) == 1 ? ToolpathOp.OptionalStop(block.span) :
+          ToolpathOp.ProgramStop(block.span));
       case _:
     }
     if (endCode >= 0) {
@@ -343,15 +343,15 @@ class CncInterpreter {
       }
       if (state.coolantMist) coolant(CncChannels.CoolantMist, false, block.span);
       if (state.coolantFlood) coolant(CncChannels.CoolantFlood, false, block.span);
-      ops.push(CncOp.End(block.span)); state.ended = true;
+      ops.push(ToolpathOp.End(block.span)); state.ended = true;
     }
   }
 
   function move(line:Int, mode:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, i:Null<CncWord>, j:Null<CncWord>,
       k:Null<CncWord>, r:Null<CncWord>, machineCoordinates:Bool,
-      span:CncSpan):Void {
-    var start = new CncPoint(state.position[0], state.position[1], state.position[2]);
+      span:Provenance):Void {
+    var start = new Point3(state.position[0], state.position[1], state.position[2]);
     var offset = machine.workOffset(state.wcs);
     var words = [x, y, z];
     var target = state.position.copy();
@@ -363,7 +363,7 @@ class CncInterpreter {
         value + offset[axis] + (axis == 2 ? state.toolLength : 0.0) :
         target[axis] + value;
     }
-    var end = new CncPoint(target[0], target[1], target[2]);
+    var end = new Point3(target[0], target[1], target[2]);
     if (mode < 2) {
       if (machineCoordinates && !state.absolute)
         fail(line, span.column, "G53 requires G90 absolute mode");
@@ -371,8 +371,8 @@ class CncInterpreter {
         fail(line, column(i, column(j, column(k, column(r, 1)))),
           "I/J/K/R require G2 or G3");
       if (start.distanceTo(end) <= 1e-12) return;
-      if (mode == 0) ops.push(CncOp.Rapid(CncGeometry.Line(start, end), span));
-      else ops.push(CncOp.Feed(CncGeometry.Line(start, end), feed(line), state.blendTolerance, span));
+      if (mode == 0) ops.push(ToolpathOp.Rapid(PathGeometry.Line(start, end), span));
+      else ops.push(ToolpathOp.Feed(PathGeometry.Line(start, end), feed(line), state.blendTolerance, span));
     } else {
       if (machineCoordinates) fail(line, span.column, "G53 requires G0/G1 motion");
       var plane = state.plane;
@@ -415,17 +415,17 @@ class CncInterpreter {
       var sweep = arcSweep(start, end, center, orientedMode, plane);
       var rise = finish[2] - origin[2];
       var geometry = plane == 17 && Math.abs(rise) <= 1e-12 ?
-        CncGeometry.Arc(center, radius, begin, sweep) :
-        CncGeometry.Circular(center, radius, begin, sweep,
-          plane == 17 ? CncPlane.XY : plane == 18 ? CncPlane.XZ : CncPlane.YZ,
+        PathGeometry.Arc(center, radius, begin, sweep) :
+        PathGeometry.Circular(center, radius, begin, sweep,
+          plane == 17 ? ArcPlane.XY : plane == 18 ? ArcPlane.XZ : ArcPlane.YZ,
           rise);
-      ops.push(CncOp.Feed(geometry, feed(line), state.blendTolerance, span));
+      ops.push(ToolpathOp.Feed(geometry, feed(line), state.blendTolerance, span));
     }
     state.position = target;
   }
 
   function home(code:Int, x:Null<CncWord>, y:Null<CncWord>,
-      z:Null<CncWord>, span:CncSpan):Void {
+      z:Null<CncWord>, span:Provenance):Void {
     var axes = [x, y, z], intermediate = state.position.copy();
     var offset = machine.workOffset(state.wcs);
     var anyAxis = false;
@@ -445,7 +445,7 @@ class CncInterpreter {
 
   function drill(code:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, r:Null<CncWord>, q:Null<CncWord>,
-      p:Null<CncWord>, l:Null<CncWord>, span:CncSpan, line:Int):Void {
+      p:Null<CncWord>, l:Null<CncWord>, span:Provenance, line:Int):Void {
     var offset = machine.workOffset(state.wcs), scale = unitScale();
     if (r != null) state.cycleR = state.absolute ?
       r.value * scale + offset[2] + state.toolLength :
@@ -488,7 +488,7 @@ class CncInterpreter {
       var depth = state.cycleDepth;
       if (code == 81 || code == 82) {
         feedTo([state.position[0], state.position[1], depth], speed, span);
-        if (code == 82) ops.push(CncOp.Dwell(state.cycleP, span));
+        if (code == 82) ops.push(ToolpathOp.Dwell(state.cycleP, span));
       } else {
         var lastCut = plane, guard = 0;
         while (lastCut > depth + 1e-12) {
@@ -514,24 +514,24 @@ class CncInterpreter {
     }
   }
 
-  function rapidTo(target:Array<Float>, span:CncSpan):Void {
-    var start = new CncPoint(state.position[0], state.position[1], state.position[2]);
-    var end = new CncPoint(target[0], target[1], target[2]);
+  function rapidTo(target:Array<Float>, span:Provenance):Void {
+    var start = new Point3(state.position[0], state.position[1], state.position[2]);
+    var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      ops.push(CncOp.Rapid(CncGeometry.Line(start, end), span));
+      ops.push(ToolpathOp.Rapid(PathGeometry.Line(start, end), span));
     state.position = target.copy();
   }
 
-  function feedTo(target:Array<Float>, speed:Float, span:CncSpan):Void {
-    var start = new CncPoint(state.position[0], state.position[1], state.position[2]);
-    var end = new CncPoint(target[0], target[1], target[2]);
+  function feedTo(target:Array<Float>, speed:Float, span:Provenance):Void {
+    var start = new Point3(state.position[0], state.position[1], state.position[2]);
+    var end = new Point3(target[0], target[1], target[2]);
     if (start.distanceTo(end) > 1e-12)
-      ops.push(CncOp.Feed(CncGeometry.Line(start, end), speed, 0.0, span));
+      ops.push(ToolpathOp.Feed(PathGeometry.Line(start, end), speed, 0.0, span));
     state.position = target.copy();
   }
 
-  static function radiusCenter(start:CncPoint, end:CncPoint, radius:Float,
-      mode:Int, plane:Int, line:Int, column:Int):CncPoint {
+  static function radiusCenter(start:Point3, end:Point3, radius:Float,
+      mode:Int, plane:Int, line:Int, column:Int):Point3 {
     var a = coordinates(start, plane), b = coordinates(end, plane);
     var dx = b[0] - a[0], dy = b[1] - a[1];
     var chord = Math.sqrt(dx * dx + dy * dy), magnitude = Math.abs(radius);
@@ -553,8 +553,8 @@ class CncInterpreter {
       (firstSweep >= secondSweep ? first : second);
   }
 
-  static function arcSweep(start:CncPoint, end:CncPoint,
-      center:CncPoint, mode:Int, plane:Int):Float {
+  static function arcSweep(start:Point3, end:Point3,
+      center:Point3, mode:Int, plane:Int):Float {
     var a = coordinates(start, plane), b = coordinates(end, plane);
     var c = coordinates(center, plane);
     var begin = Math.atan2(a[1] - c[1], a[0] - c[0]);
@@ -565,31 +565,31 @@ class CncInterpreter {
     return sweep;
   }
 
-  static function centerFromOffsets(start:CncPoint, plane:Int,
-      first:Float, second:Float):CncPoint {
+  static function centerFromOffsets(start:Point3, plane:Int,
+      first:Float, second:Float):Point3 {
     var origin = coordinates(start, plane);
     return fromCoordinates(origin[0] + first, origin[1] + second,
       origin[2], plane);
   }
 
-  static function coordinates(point:CncPoint, plane:Int):Array<Float>
+  static function coordinates(point:Point3, plane:Int):Array<Float>
     return plane == 17 ? [point.x, point.y, point.z] :
       plane == 18 ? [point.x, point.z, point.y] :
       [point.y, point.z, point.x];
 
   static function fromCoordinates(u:Float, v:Float, axial:Float,
-      plane:Int):CncPoint
-    return plane == 17 ? new CncPoint(u, v, axial) :
-      plane == 18 ? new CncPoint(u, axial, v) :
-      new CncPoint(axial, u, v);
+      plane:Int):Point3
+    return plane == 17 ? new Point3(u, v, axial) :
+      plane == 18 ? new Point3(u, axial, v) :
+      new Point3(axial, u, v);
 
-  function spindle(channel:String, value:Float, span:CncSpan):Void
-    ops.push(CncOp.Spindle(channel, value, span));
+  function spindle(channel:String, value:Float, span:Provenance):Void
+    ops.push(ToolpathOp.Spindle(channel, value, span));
 
-  function coolant(channel:String, enabled:Bool, span:CncSpan):Void {
+  function coolant(channel:String, enabled:Bool, span:Provenance):Void {
     if (channel == CncChannels.CoolantMist) state.coolantMist = enabled;
     if (channel == CncChannels.CoolantFlood) state.coolantFlood = enabled;
-    ops.push(CncOp.Coolant(channel, enabled, span));
+    ops.push(ToolpathOp.Coolant(channel, enabled, span));
   }
 
   static function gColumn(words:Array<CncWord>, code:Int):Int {
@@ -620,5 +620,5 @@ class CncInterpreter {
     return word == null ? fallback : word.column;
 
   static function fail(line:Int, column:Int, message:String):Void
-    throw new CncDiagnostic(Error, "CNC_INTERPRET", new CncSpan(line, column, 1), message);
+    throw new CncDiagnostic(Error, "CNC_INTERPRET", new Provenance(line, column, 1), message);
 }

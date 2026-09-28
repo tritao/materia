@@ -1,4 +1,4 @@
-package cnckit.tool;
+package toolpathkit.tool;
 
 /**
   One piece of a tool half-profile. `r` is the distance from the tool axis and

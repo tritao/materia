@@ -1,9 +1,9 @@
-package cnckit;
+package toolpathkit.tool;
 
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.CutterProfile;
 
 /** Declared cutter dimensions in metres, with an optional exact shape. */
-class CncTool {
+class Tool {
   /** Flute length assumed for a tool with neither a shape nor a length. */
   public static inline final DEFAULT_FLUTE_LENGTH = 0.05;
 
@@ -29,8 +29,8 @@ class CncTool {
 
   /** A tool whose diameter comes from its shape. */
   public static function shaped(number:Int, length:Float,
-      cutter:CutterProfile):CncTool
-    return new CncTool(number, length, cutter.cuttingDiameter(), cutter);
+      cutter:CutterProfile):Tool
+    return new Tool(number, length, cutter.cuttingDiameter(), cutter);
 
   /**
     The shape to simulate. Without an explicit shape this is a flat end mill
@@ -45,6 +45,6 @@ class CncTool {
   }
 
   /** The same tool with a different stored length. */
-  public function withLength(length:Float):CncTool
-    return new CncTool(number, length, diameter, cutter);
+  public function withLength(length:Float):Tool
+    return new Tool(number, length, diameter, cutter);
 }

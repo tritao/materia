@@ -1,7 +1,7 @@
-package cnckit.tool;
+package toolpathkit.tool;
 
-import cnckit.tool.CutterSegment;
-import cnckit.tool.CutterZone;
+import toolpathkit.tool.CutterSegment;
+import toolpathkit.tool.CutterZone;
 
 /**
   A rotating tool as a surface of revolution about its axis. Segments run

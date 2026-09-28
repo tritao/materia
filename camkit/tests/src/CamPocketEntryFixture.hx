@@ -1,14 +1,14 @@
 import camkit.CamContour;
 import camkit.CamJob;
 import camkit.CamProgram;
-import cnckit.CncTool;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
 
 /** Long and short pocket spans exercise ramp and plunge entry. */
 class CamPocketEntryFixture {
   public static function run(check:Bool->String->Void):Void {
-    var tool = new CncTool(12, 0, 0.002);
+    var tool = new Tool(12, 0, 0.002);
     var large = rectangle(0.02, 0.01);
     var program = new CamJob(0.005, 10000)
       .pocket(large, tool, -0.002, 0.005, 0.001, 0.001, 0.001)
@@ -87,7 +87,7 @@ class CamPocketEntryFixture {
   }
 
   static function rectangle(width:Float, height:Float):CamContour
-    return new CamContour([new CncPoint(0, 0, 0),
-      new CncPoint(width, 0, 0), new CncPoint(width, height, 0),
-      new CncPoint(0, height, 0)]);
+    return new CamContour([new Point3(0, 0, 0),
+      new Point3(width, 0, 0), new Point3(width, height, 0),
+      new Point3(0, height, 0)]);
 }

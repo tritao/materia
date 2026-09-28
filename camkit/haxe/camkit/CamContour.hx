@@ -7,15 +7,15 @@ import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SolvedSketch;
 import cadkit.units.LengthUnits;
 import cadkit.modeling.Vector;
-import cnckit.ir.CncPoint;
+import toolpathkit.path.Point3;
 
 /** One simple closed XY boundary, in machine metres. */
 class CamContour {
-  public final vertices:Array<CncPoint>;
+  public final vertices:Array<Point3>;
   public final z:Float;
   public final signedArea:Float;
 
-  public function new(vertices:Array<CncPoint>) {
+  public function new(vertices:Array<Point3>) {
     if (vertices == null) throw "CAM contour needs vertices";
     var values = vertices.copy();
     if (values.length > 1 && values[0].distanceTo(values[values.length - 1]) < 1e-9)
@@ -50,10 +50,10 @@ class CamContour {
       solved:SolvedSketch):CamContour {
     if (authored == null || solved == null) throw "CAM needs a solved sketch";
     var scale = unitScale(authored.units);
-    var segments:Array<Array<CncPoint>> = [];
+    var segments:Array<Array<Point3>> = [];
     for (entity in authored.entities()) {
       if (entity.construction) continue;
-      var sampled:Array<CncPoint> = [];
+      var sampled:Array<Point3> = [];
       switch entity.kind {
         case "line":
           for (id in [entity.first, entity.second]) {
@@ -87,21 +87,21 @@ class CamContour {
     if (edges == null || edges.length == 0 ||
         !Math.isFinite(chordToleranceMetres) || chordToleranceMetres <= 0.0)
       throw "CAM needs edges and a positive chord tolerance";
-    var scale = unitScale(unit), segments:Array<Array<CncPoint>> = [];
+    var scale = unitScale(unit), segments:Array<Array<Point3>> = [];
     for (edge in edges) {
       if (edge == null) throw "CAM edge must not be null";
       var shape = edge.cloneShape();
-      var sampled:Array<CncPoint> = [];
+      var sampled:Array<Point3> = [];
       try {
-        function sample(parameter:Float):CncPoint {
+        function sample(parameter:Float):Point3 {
           var position = shape.positionAt(parameter);
-          return new CncPoint(position.get_x() * scale,
+          return new Point3(position.get_x() * scale,
             position.get_y() * scale, position.get_z() * scale);
         }
-        function subdivide(a:Float, b:Float, start:CncPoint,
-            end:CncPoint, depth:Int):Void {
+        function subdivide(a:Float, b:Float, start:Point3,
+            end:Point3, depth:Int):Void {
           var midpoint = sample((a + b) * 0.5);
-          var chord = new CncPoint((start.x + end.x) * 0.5,
+          var chord = new Point3((start.x + end.x) * 0.5,
             (start.y + end.y) * 0.5, (start.z + end.z) * 0.5);
           if (midpoint.distanceTo(chord) > chordToleranceMetres) {
             if (depth >= 12)
@@ -176,7 +176,7 @@ class CamContour {
       if (turn * orientation <= 1e-12)
         throw "CAM offset clearing needs a convex contour";
     }
-    var shifted:Array<CncPoint> = [];
+    var shifted:Array<Point3> = [];
     for (i in 0...vertices.length) {
       var previous = vertices[(i + vertices.length - 1) % vertices.length];
       var current = vertices[i], next = vertices[(i + 1) % vertices.length];
@@ -189,7 +189,7 @@ class CamContour {
       var bY = current.y + orientation * bx / bl * distance;
       var denominator = cross(ax, ay, bx, by);
       var t = cross(bX - aX, bY - aY, bx, by) / denominator;
-      shifted.push(new CncPoint(aX + ax * t, aY + ay * t, z));
+      shifted.push(new Point3(aX + ax * t, aY + ay * t, z));
     }
     var result = new CamContour(shifted);
     if (distance > 0.0 && (Math.abs(result.signedArea) >= Math.abs(signedArea) ||
@@ -207,7 +207,7 @@ class CamContour {
     return result;
   }
 
-  static function connect(segments:Array<Array<CncPoint>>):CamContour {
+  static function connect(segments:Array<Array<Point3>>):CamContour {
     if (segments.length == 0) throw "CAM contour has no edges";
     var remaining = segments.copy(), points = remaining.shift().copy();
     while (remaining.length > 0) {
@@ -233,9 +233,9 @@ class CamContour {
   }
 
   static function sketchPoint(authored:ConstrainedSketch, x:Float, y:Float,
-      scale:Float):CncPoint {
+      scale:Float):Point3 {
     var world = authored.plane.toWorld(new Vector(x, y, 0.0));
-    return new CncPoint(world.x * scale, world.y * scale, world.z * scale);
+    return new Point3(world.x * scale, world.y * scale, world.z * scale);
   }
 
   static function unitScale(unit:String):Float {
@@ -247,8 +247,8 @@ class CamContour {
   static function cross(ax:Float, ay:Float, bx:Float, by:Float):Float
     return ax * by - ay * bx;
 
-  static function intersects(a:CncPoint, b:CncPoint,
-      c:CncPoint, d:CncPoint):Bool {
+  static function intersects(a:Point3, b:Point3,
+      c:Point3, d:Point3):Bool {
     var abx = b.x - a.x, aby = b.y - a.y;
     var cdx = d.x - c.x, cdy = d.y - c.y;
     var den = cross(abx, aby, cdx, cdy);

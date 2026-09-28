@@ -4,7 +4,7 @@ import cnckit.CncDiagnostic.CncSeverity;
 import cnckit.interp.CncInterpreter;
 import cnckit.lower.CncLowering;
 import cnckit.parse.CncLexer;
-import cnckit.parse.CncSpan;
+import toolpathkit.path.Provenance;
 import motionkit.program.MotionProgram;
 
 /** Compatibility facade over lexing, modal interpretation, and MotionKit lowering. */
@@ -22,7 +22,7 @@ class CncCompiler {
     warnings = [];
     if (source == null) {
       var error = new CncDiagnostic(Error, "CNC_NULL_SOURCE",
-        new CncSpan(1, 1, 0), "CNC source must not be null");
+        new Provenance(1, 1, 0), "CNC source must not be null");
       return new CncCompileResult(null, [], new CncSourceMap(), [error]);
     }
     var parsed = CncLexer.parse(source);
@@ -42,11 +42,11 @@ class CncCompiler {
       diagnostics = diagnostics.concat(lowered.diagnostics);
     } catch (error:Dynamic) {
       diagnostics.push(new CncDiagnostic(Error, "CNC_LOWER",
-        new CncSpan(1, 1, 0), Std.string(error)));
+        new Provenance(1, 1, 0), Std.string(error)));
     }
     if (program == null && diagnostics.length == 0)
       diagnostics.push(new CncDiagnostic(Error, "CNC_EMPTY",
-        new CncSpan(1, 1, 0), "G-code contains no executable motion or barrier"));
+        new Provenance(1, 1, 0), "G-code contains no executable motion or barrier"));
     diagnostics.sort(function(a, b) {
       if (a.span.line != b.span.line) return a.span.line - b.span.line;
       return a.span.column - b.span.column;

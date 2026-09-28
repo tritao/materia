@@ -7,9 +7,9 @@ import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometryTools;
-import cnckit.ir.CncOp;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.GeometryTools;
+import toolpathkit.path.ToolpathOp;
 
 /** CAD fixtures authored locally so CamKit tests have no example-project dependency. */
 class CamGeneratedFixtures {
@@ -22,24 +22,24 @@ class CamGeneratedFixtures {
 
   static function concavePockets(check:Bool->String->Void):Void {
     var l = new CamContour([
-      new cnckit.ir.CncPoint(0, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.03, 0),
-      new cnckit.ir.CncPoint(0, 0.03, 0)
+      new toolpathkit.path.Point3(0, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.03, 0),
+      new toolpathkit.path.Point3(0, 0.03, 0)
     ]);
     var u = new CamContour([
-      new cnckit.ir.CncPoint(0, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0.03, 0),
-      new cnckit.ir.CncPoint(0.02, 0.03, 0),
-      new cnckit.ir.CncPoint(0.02, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.03, 0),
-      new cnckit.ir.CncPoint(0, 0.03, 0)
+      new toolpathkit.path.Point3(0, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0.03, 0),
+      new toolpathkit.path.Point3(0.02, 0.03, 0),
+      new toolpathkit.path.Point3(0.02, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.03, 0),
+      new toolpathkit.path.Point3(0, 0.03, 0)
     ]);
-    var tool = new CncTool(8, 0, 0.002);
+    var tool = new Tool(8, 0, 0.002);
     var lProgram = new CamJob(0.005, 10000)
       .pocket(l, tool, -0.003, 0.005, 0.001, 0.001).finish();
     var uProgram = new CamJob(0.005, 10000)
@@ -77,7 +77,7 @@ class CamGeneratedFixtures {
     check(retracted, "U pocket retracts before crossing its open notch");
     var rejected = false;
     try new CamJob(0.005, 10000).pocket(u,
-      new CncTool(9, 0, 0.012), -0.001, 0.005, 0.004)
+      new Tool(9, 0, 0.012), -0.001, 0.005, 0.004)
     catch (_:Dynamic) rejected = true;
     check(rejected, "U pocket rejects a tool wider than its arms");
     var machine = new CncMachine("work", "x", "y", "z", 0.2);
@@ -94,10 +94,10 @@ class CamGeneratedFixtures {
         case [Feed(a, _, _, _), Feed(b, _, _, _)],
              [Rapid(a, _), Rapid(b, _)]:
           for (fraction in [0.0, 0.5, 1.0]) {
-            var original = CncGeometryTools.pointAt(a,
-              CncGeometryTools.length(a) * fraction);
-            var reparsed = CncGeometryTools.pointAt(b,
-              CncGeometryTools.length(b) * fraction);
+            var original = GeometryTools.pointAt(a,
+              GeometryTools.length(a) * fraction);
+            var reparsed = GeometryTools.pointAt(b,
+              GeometryTools.length(b) * fraction);
             check(original.distanceTo(reparsed) < 1e-8,
               "concave pocket G-code preserves toolpath geometry");
           }
@@ -113,7 +113,7 @@ class CamGeneratedFixtures {
       case Feed(Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 &&
           Math.abs(b.z - depth) < 1e-9):
         for (fraction in [0.0, 0.5, 1.0]) {
-          var point = new cnckit.ir.CncPoint(a.x + (b.x - a.x) * fraction,
+          var point = new toolpathkit.path.Point3(a.x + (b.x - a.x) * fraction,
             a.y + (b.y - a.y) * fraction, depth);
           var clearance = Math.POSITIVE_INFINITY;
           for (i in 0...contour.vertices.length)
@@ -127,23 +127,23 @@ class CamGeneratedFixtures {
       case _:
     }
     for (ix in 0...30) for (iy in 0...30) {
-      var point = new cnckit.ir.CncPoint((ix + 0.5) * 0.001,
+      var point = new toolpathkit.path.Point3((ix + 0.5) * 0.001,
         (iy + 0.5) * 0.001, depth);
       if (!inside(point, contour.vertices)) continue;
       var best = Math.POSITIVE_INFINITY;
       for (op in program.ops) switch op {
         case Feed(geometry, _, _, _):
-          var start = CncGeometryTools.pointAt(geometry, 0);
-          var end = CncGeometryTools.pointAt(geometry,
-            CncGeometryTools.length(geometry));
+          var start = GeometryTools.pointAt(geometry, 0);
+          var end = GeometryTools.pointAt(geometry,
+            GeometryTools.length(geometry));
           if (Math.abs(start.z - depth) > 1e-9 ||
               Math.abs(end.z - depth) > 1e-9) continue;
           switch geometry {
             case Line(a, b): best = Math.min(best, segmentDistance(point, a, b));
             case Arc(_, _, _, _):
               for (sample in 0...65) {
-                var center = CncGeometryTools.pointAt(geometry,
-                  CncGeometryTools.length(geometry) * sample / 64);
+                var center = GeometryTools.pointAt(geometry,
+                  GeometryTools.length(geometry) * sample / 64);
                 best = Math.min(best, point.distanceTo(center));
               }
             case _:
@@ -155,8 +155,8 @@ class CamGeneratedFixtures {
     }
   }
 
-  static function inside(point:cnckit.ir.CncPoint,
-      polygon:Array<cnckit.ir.CncPoint>):Bool {
+  static function inside(point:toolpathkit.path.Point3,
+      polygon:Array<toolpathkit.path.Point3>):Bool {
     var hit = false;
     for (i in 0...polygon.length) {
       var a = polygon[i], b = polygon[(i + 1) % polygon.length];
@@ -169,14 +169,14 @@ class CamGeneratedFixtures {
 
   static function concavePlate(check:Bool->String->Void):Void {
     var contour = new CamContour([
-      new cnckit.ir.CncPoint(0, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.03, 0),
-      new cnckit.ir.CncPoint(0, 0.03, 0)
+      new toolpathkit.path.Point3(0, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.03, 0),
+      new toolpathkit.path.Point3(0, 0.03, 0)
     ]);
-    var tool = new CncTool(5, 0, 0.002);
+    var tool = new Tool(5, 0, 0.002);
     var program = new CamJob(0.005, 10000)
       .profile(contour, tool, -0.002, 0.005, "outside").finish();
     var arcs = 0, cornerMeeting = 0;
@@ -186,13 +186,13 @@ class CamGeneratedFixtures {
           case Arc(_, _, _, _): arcs++;
           case _:
         }
-        var start = CncGeometryTools.pointAt(geometry, 0);
-        var end = CncGeometryTools.pointAt(geometry,
-          CncGeometryTools.length(geometry));
+        var start = GeometryTools.pointAt(geometry, 0);
+        var end = GeometryTools.pointAt(geometry,
+          GeometryTools.length(geometry));
         if (Math.abs(start.z - end.z) > 1e-9) continue;
         for (fraction in [0.0, 0.25, 0.5, 0.75, 1.0]) {
-          var point = CncGeometryTools.pointAt(geometry,
-            CncGeometryTools.length(geometry) * fraction);
+          var point = GeometryTools.pointAt(geometry,
+            GeometryTools.length(geometry) * fraction);
           var clearance = Math.POSITIVE_INFINITY;
           for (i in 0...contour.vertices.length)
             clearance = Math.min(clearance, segmentDistance(point,
@@ -246,10 +246,10 @@ class CamGeneratedFixtures {
       case [Feed(a, _, _, _), Feed(b, _, _, _)],
            [Rapid(a, _), Rapid(b, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = CncGeometryTools.pointAt(a,
-            CncGeometryTools.length(a) * fraction);
-          var reparsed = CncGeometryTools.pointAt(b,
-            CncGeometryTools.length(b) * fraction);
+          var original = GeometryTools.pointAt(a,
+            GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b,
+            GeometryTools.length(b) * fraction);
           check(original.distanceTo(reparsed) < 1e-8,
             "concave G-code preserves the cutter path");
         }
@@ -264,10 +264,10 @@ class CamGeneratedFixtures {
       case [Feed(a, _, _, _), Feed(b, _, _, _)],
            [Rapid(a, _), Rapid(b, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = CncGeometryTools.pointAt(a,
-            CncGeometryTools.length(a) * fraction);
-          var reparsed = CncGeometryTools.pointAt(b,
-            CncGeometryTools.length(b) * fraction);
+          var original = GeometryTools.pointAt(a,
+            GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b,
+            GeometryTools.length(b) * fraction);
           check(original.distanceTo(reparsed) < 1e-8,
             "concave inside G-code preserves the cutter path");
         }
@@ -275,28 +275,28 @@ class CamGeneratedFixtures {
     }
     var rejected = false;
     try new CamJob(0.005, 10000).profile(contour,
-      new CncTool(6, 0, 0.05), -0.002, 0.005, "outside")
+      new Tool(6, 0, 0.05), -0.002, 0.005, "outside")
     catch (_:Dynamic) rejected = true;
     check(rejected, "oversized cutter is rejected at the narrow concave feature");
     var narrowNotch = new CamContour([
-      new cnckit.ir.CncPoint(0, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0, 0),
-      new cnckit.ir.CncPoint(0.03, 0.03, 0),
-      new cnckit.ir.CncPoint(0.02, 0.03, 0),
-      new cnckit.ir.CncPoint(0.02, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.01, 0),
-      new cnckit.ir.CncPoint(0.01, 0.03, 0),
-      new cnckit.ir.CncPoint(0, 0.03, 0)
+      new toolpathkit.path.Point3(0, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0, 0),
+      new toolpathkit.path.Point3(0.03, 0.03, 0),
+      new toolpathkit.path.Point3(0.02, 0.03, 0),
+      new toolpathkit.path.Point3(0.02, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.01, 0),
+      new toolpathkit.path.Point3(0.01, 0.03, 0),
+      new toolpathkit.path.Point3(0, 0.03, 0)
     ]);
     rejected = false;
     try new CamJob(0.005, 10000).profile(narrowNotch,
-      new CncTool(7, 0, 0.012), -0.002, 0.005, "outside")
+      new Tool(7, 0, 0.012), -0.002, 0.005, "outside")
     catch (_:Dynamic) rejected = true;
     check(rejected, "outside cutter wider than a U notch is rejected");
   }
 
-  static function segmentDistance(point:cnckit.ir.CncPoint,
-      a:cnckit.ir.CncPoint, b:cnckit.ir.CncPoint):Float {
+  static function segmentDistance(point:toolpathkit.path.Point3,
+      a:toolpathkit.path.Point3, b:toolpathkit.path.Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var t = Math.max(0.0, Math.min(1.0,
       ((point.x - a.x) * dx + (point.y - a.y) * dy) / (dx * dx + dy * dy)));
@@ -363,7 +363,7 @@ class CamGeneratedFixtures {
 
     var invalidJob = new CamJob(0.005, 10000);
     rejected = false;
-    try invalidJob.profileFace(face, new CncTool(4, 0, 0.008),
+    try invalidJob.profileFace(face, new Tool(4, 0, 0.008),
       -0.002, 0.005, 0.002, "mm", 0.000001)
     catch (_:Dynamic) rejected = true;
     check(rejected, "face operation rejects a tool too large for an inner hole");
@@ -371,23 +371,23 @@ class CamGeneratedFixtures {
     try invalidJob.finish() catch (_:Dynamic) rejected = true;
     check(rejected, "rejected face leaves the CAM job without partial cuts");
 
-    var tool = new CncTool(3, 0, 0.002);
+    var tool = new Tool(3, 0, 0.002);
     var program = new CamJob(0.005, 10000)
       .profileFace(face, tool, -0.002, 0.005, 0.002, "mm", 0.000001)
       .finish();
     var holeFeeds = 0, lastHoleIndex = -1, firstOutsideIndex = program.ops.length;
     for (index in 0...program.ops.length) switch program.ops[index] {
       case Feed(geometry, _, _, span) if (span.line == 1 || span.line == 2):
-        var start = CncGeometryTools.pointAt(geometry, 0);
-        var end = CncGeometryTools.pointAt(geometry, CncGeometryTools.length(geometry));
+        var start = GeometryTools.pointAt(geometry, 0);
+        var end = GeometryTools.pointAt(geometry, GeometryTools.length(geometry));
         if (Math.abs(start.z - end.z) > 1e-9) continue;
         holeFeeds++;
         lastHoleIndex = index;
         var cx = span.line == 1 ? 0.02 : 0.008;
         var expectedRadius = span.line == 1 ? 0.004 : 0.002;
         for (fraction in [0.0, 0.5, 1.0]) {
-          var point = CncGeometryTools.pointAt(geometry,
-            CncGeometryTools.length(geometry) * fraction);
+          var point = GeometryTools.pointAt(geometry,
+            GeometryTools.length(geometry) * fraction);
           var radius = Math.sqrt(Math.pow(point.x - cx, 2) +
             Math.pow(point.y - 0.015, 2));
           check(Math.abs(radius - expectedRadius) < 0.00002,
@@ -411,10 +411,10 @@ class CamGeneratedFixtures {
       case [Feed(a, _, _, _), Feed(b, _, _, _)],
            [Rapid(a, _), Rapid(b, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
-          var original = CncGeometryTools.pointAt(a,
-            CncGeometryTools.length(a) * fraction);
-          var reparsed = CncGeometryTools.pointAt(b,
-            CncGeometryTools.length(b) * fraction);
+          var original = GeometryTools.pointAt(a,
+            GeometryTools.length(a) * fraction);
+          var reparsed = GeometryTools.pointAt(b,
+            GeometryTools.length(b) * fraction);
           check(original.distanceTo(reparsed) < 1e-8,
             "holed plate G-code preserves cutter path geometry");
         }

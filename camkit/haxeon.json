@@ -5,6 +5,7 @@
   "scopeSourceRoots": false,
   "dependencies": {
     "cnckit": { "path": "../cnckit" },
+    "toolpathkit": { "path": "../toolpathkit" },
     "cadkit": { "path": "../cadkit" },
     "manufacturingkit": { "path": "../manufacturingkit" }
   },

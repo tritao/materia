@@ -4,7 +4,8 @@
   "sourceRoots": ["haxe"],
   "scopeSourceRoots": false,
   "dependencies": {
-    "cnckit": { "path": "../cnckit" }
+    "cnckit": { "path": "../cnckit" },
+    "toolpathkit": { "path": "../toolpathkit" }
   },
   "target": "host"
 }

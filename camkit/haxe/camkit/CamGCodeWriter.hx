@@ -2,11 +2,11 @@ package camkit;
 
 import cnckit.CncChannels;
 import cnckit.CncMachine;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncGeometryTools;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPlane;
-import cnckit.ir.CncPoint;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.GeometryTools;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ArcPlane;
+import toolpathkit.path.Point3;
 
 /** Small LinuxCNC post for CAM IR, using millimetres and absolute XYZ. */
 class CamGCodeWriter {
@@ -15,7 +15,7 @@ class CamGCodeWriter {
     if (program == null) throw "G-code export needs a CAM program";
     if (setup == null) throw "G-code export needs a CAM setup";
     setup.validate(program, machine);
-    var lines = ["G21 G90 G17 G61"], plane = CncPlane.XY;
+    var lines = ["G21 G90 G17 G61"], plane = ArcPlane.XY;
     var index = 0;
     while (index < program.ops.length) {
       var op = program.ops[index];
@@ -32,9 +32,9 @@ class CamGCodeWriter {
           case Line(_, end): command += 'G1 ${xyz(end)}';
           case Arc(center, _, _, sweep):
             if (plane != XY) { command += "G17 "; plane = XY; }
-            var start = CncGeometryTools.pointAt(geometry, 0.0);
-            var end = CncGeometryTools.pointAt(geometry,
-              CncGeometryTools.length(geometry));
+            var start = GeometryTools.pointAt(geometry, 0.0);
+            var end = GeometryTools.pointAt(geometry,
+              GeometryTools.length(geometry));
             command += '${sweep < 0.0 ? "G2" : "G3"} ${xyz(end)} '
               + 'I${millimetres(center.x - start.x)} '
               + 'J${millimetres(center.y - start.y)}';
@@ -47,9 +47,9 @@ class CamGCodeWriter {
               };
               plane = arcPlane;
             }
-            var start = CncGeometryTools.pointAt(geometry, 0.0);
-            var end = CncGeometryTools.pointAt(geometry,
-              CncGeometryTools.length(geometry));
+            var start = GeometryTools.pointAt(geometry, 0.0);
+            var end = GeometryTools.pointAt(geometry,
+              GeometryTools.length(geometry));
             var clockwise = arcPlane == XZ ? sweep > 0.0 : sweep < 0.0;
             command += '${clockwise ? "G2" : "G3"} ${xyz(end)} ';
             command += switch arcPlane {
@@ -105,7 +105,7 @@ class CamGCodeWriter {
     return lines.join("\n") + "\n";
   }
 
-  static function xyz(point:CncPoint):String
+  static function xyz(point:Point3):String
     return 'X${millimetres(point.x)} Y${millimetres(point.y)} Z${millimetres(point.z)}';
 
   static function millimetres(metres:Float):String

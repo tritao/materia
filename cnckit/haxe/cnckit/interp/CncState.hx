@@ -1,7 +1,7 @@
 package cnckit.interp;
 
 import cnckit.CncMachine;
-import cnckit.parse.CncSpan;
+import toolpathkit.path.Provenance;
 
 /** Modal state. A block is committed only after its interpretation succeeds. */
 class CncState {
@@ -26,7 +26,7 @@ class CncState {
   public var cycleQ:Float = Math.NaN;
   public var cycleP:Float = Math.NaN;
   public var cycleInitialZ:Float = Math.NaN;
-  public var cycleSpan:Null<CncSpan> = null;
+  public var cycleSpan:Null<Provenance> = null;
   public var retractToInitial:Bool = true;
   public var blendTolerance:Float = 0.0;
   public var position:Array<Float>;

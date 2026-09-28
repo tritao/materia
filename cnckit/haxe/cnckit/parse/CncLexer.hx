@@ -1,5 +1,6 @@
 package cnckit.parse;
 
+import toolpathkit.path.Provenance;
 import cnckit.CncDiagnostic;
 import cnckit.CncDiagnostic.CncSeverity;
 
@@ -17,7 +18,7 @@ class CncLexer {
         var slash = line.indexOf("/");
         if (slash >= 0 && StringTools.trim(line.substring(0, slash)).length == 0)
           diagnostics.push(new CncDiagnostic(Warning, "CNC_BLOCK_DELETE_IGNORED",
-            new CncSpan(index + 1, slash + 1, 1),
+            new Provenance(index + 1, slash + 1, 1),
             "block-delete marker ignored; block executed"));
         if (block.words.length > 0) blocks.push(block);
       } catch (error:CncDiagnostic) {
@@ -62,12 +63,12 @@ class CncLexer {
       if (!Math.isFinite(number)) fail(lineNumber, column, index - column + 1,
         'non-finite $letter number');
       words.push(new CncWord(letter, number,
-        new CncSpan(lineNumber, column, index - column + 1)));
+        new Provenance(lineNumber, column, index - column + 1)));
     }
-    return new CncBlock(words, new CncSpan(lineNumber, 1, line.length));
+    return new CncBlock(words, new Provenance(lineNumber, 1, line.length));
   }
 
   static function fail(line:Int, column:Int, length:Int, message:String):Void
-    throw new CncDiagnostic(Error, "CNC_LEX", new CncSpan(line, column, length),
+    throw new CncDiagnostic(Error, "CNC_LEX", new Provenance(line, column, length),
       message);
 }

@@ -1,6 +1,6 @@
 package camkit;
 
-import cnckit.ir.CncPoint;
+import toolpathkit.path.Point3;
 
 typedef CamPocketPass = {y:Float, left:Float, right:Float};
 
@@ -90,7 +90,7 @@ class CamPocketPlanner {
   }
 
   /** A segment's radius-r neighbourhood has one interval on a horizontal row. */
-  static function capsuleSlice(a:CncPoint, b:CncPoint, y:Float,
+  static function capsuleSlice(a:Point3, b:Point3, y:Float,
       radius:Float):Null<{left:Float, right:Float}> {
     if (y < Math.min(a.y, b.y) - radius ||
         y > Math.max(a.y, b.y) + radius) return null;
@@ -118,7 +118,7 @@ class CamPocketPlanner {
   }
 
   static function distance(x:Float, y:Float,
-      a:CncPoint, b:CncPoint):Float {
+      a:Point3, b:Point3):Float {
     var dx = b.x - a.x, dy = b.y - a.y;
     var t = Math.max(0.0, Math.min(1.0,
       ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy)));

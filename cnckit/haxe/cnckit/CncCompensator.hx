@@ -1,17 +1,17 @@
 package cnckit;
 
 import cnckit.CncDiagnostic.CncSeverity;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncGeometryTools;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPlane;
-import cnckit.ir.CncPoint;
-import cnckit.parse.CncSpan;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.GeometryTools;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ArcPlane;
+import toolpathkit.path.Point3;
+import toolpathkit.path.Provenance;
 
 /** Bounded line/arc cutter-radius offsets with explicit entry and exit moves. */
 class CncCompensator {
-  public static function resolve(ops:Array<CncOp>):CncCompensationResult {
-    var output:Array<CncOp> = [], diagnostics:Array<CncDiagnostic> = [];
+  public static function resolve(ops:Array<ToolpathOp>):CncCompensationResult {
+    var output:Array<ToolpathOp> = [], diagnostics:Array<CncDiagnostic> = [];
     var index = 0;
     while (index < ops.length) {
       switch ops[index] {
@@ -56,8 +56,8 @@ class CncCompensator {
     return new CncCompensationResult(output, diagnostics);
   }
 
-  static function compensate(section:Array<CncOp>, exit:CncOp, side:Int,
-      radius:Float, plane:CncPlane, span:CncSpan):Array<CncOp> {
+  static function compensate(section:Array<ToolpathOp>, exit:ToolpathOp, side:Int,
+      radius:Float, plane:ArcPlane, span:Provenance):Array<ToolpathOp> {
     var positions:Array<Int> = [];
     for (cursor in 0...section.length)
       if (geometry(section[cursor]) != null) positions.push(cursor);
@@ -66,37 +66,37 @@ class CncCompensator {
     var entry = section[positions[0]], lead = geometry(entry);
     if (lead == null || !isLine(lead)) fail(span,
       "G41/G42 lead-in must be a line");
-    if (CncGeometryTools.length(lead) < radius - 1e-10)
+    if (GeometryTools.length(lead) < radius - 1e-10)
       fail(opSpan(entry), "cutter compensation lead-in is shorter than tool radius");
     var exitGeometry = geometry(exit);
     if (exitGeometry == null || !isLine(exitGeometry))
       fail(opSpan(exit), "G40 requires a linear lead-out");
-    if (CncGeometryTools.length(exitGeometry) < 2.0 * radius - 1e-10)
+    if (GeometryTools.length(exitGeometry) < 2.0 * radius - 1e-10)
       fail(opSpan(exit), "G40 lead-out is shorter than tool diameter");
-    var contours:Array<CncOp> = [for (cursor in 1...positions.length)
+    var contours:Array<ToolpathOp> = [for (cursor in 1...positions.length)
       section[positions[cursor]]];
-    var shifted:Array<CncGeometry> = [];
+    var shifted:Array<PathGeometry> = [];
     for (op in contours) {
       var g = geometry(op);
       if (g == null) fail(opSpan(op),
         "cutter compensation contour cannot contain a barrier");
       shifted.push(offset(g, side, radius, plane, opSpan(op)));
     }
-    var output:Array<CncOp> = section.slice(0, positions[0]);
-    var leadStart = CncGeometryTools.pointAt(lead, 0.0);
-    var first = CncGeometryTools.pointAt(shifted[0], 0.0);
-    output.push(replaceGeometry(entry, CncGeometry.Line(leadStart, first)));
+    var output:Array<ToolpathOp> = section.slice(0, positions[0]);
+    var leadStart = GeometryTools.pointAt(lead, 0.0);
+    var first = GeometryTools.pointAt(shifted[0], 0.0);
+    output.push(replaceGeometry(entry, PathGeometry.Line(leadStart, first)));
     for (cursor in (positions[0] + 1)...positions[1])
       output.push(section[cursor]);
     var handed = side * (plane == XZ ? -1 : 1);
     for (cursor in 0...shifted.length) {
       if (cursor + 1 < shifted.length) {
-        var corner = CncGeometryTools.pointAt(geometry(contours[cursor]),
-          CncGeometryTools.length(geometry(contours[cursor])));
+        var corner = GeometryTools.pointAt(geometry(contours[cursor]),
+          GeometryTools.length(geometry(contours[cursor])));
         var current = shifted[cursor], next = shifted[cursor + 1];
-        var endPoint = CncGeometryTools.pointAt(current,
-          CncGeometryTools.length(current));
-        var nextStart = CncGeometryTools.pointAt(next, 0.0);
+        var endPoint = GeometryTools.pointAt(current,
+          GeometryTools.length(current));
+        var nextStart = GeometryTools.pointAt(next, 0.0);
         if (endPoint.distanceTo(nextStart) > 1e-9) {
           var turn = cross(tangent(geometry(contours[cursor]), true, plane),
             tangent(geometry(contours[cursor + 1]), false, plane));
@@ -124,15 +124,15 @@ class CncCompensator {
       appendGap(output, section, positions, cursor + 1);
     }
     var finalGeometry = shifted[shifted.length - 1];
-    var finalPoint = CncGeometryTools.pointAt(finalGeometry,
-      CncGeometryTools.length(finalGeometry));
-    var exitEnd = CncGeometryTools.pointAt(exitGeometry,
-      CncGeometryTools.length(exitGeometry));
-    output.push(replaceGeometry(exit, CncGeometry.Line(finalPoint, exitEnd)));
+    var finalPoint = GeometryTools.pointAt(finalGeometry,
+      GeometryTools.length(finalGeometry));
+    var exitEnd = GeometryTools.pointAt(exitGeometry,
+      GeometryTools.length(exitGeometry));
+    output.push(replaceGeometry(exit, PathGeometry.Line(finalPoint, exitEnd)));
     return output;
   }
 
-  static function appendGap(output:Array<CncOp>, section:Array<CncOp>,
+  static function appendGap(output:Array<ToolpathOp>, section:Array<ToolpathOp>,
       positions:Array<Int>, motionIndex:Int):Void {
     var from = positions[motionIndex] + 1;
     var to = motionIndex + 1 < positions.length ?
@@ -140,8 +140,8 @@ class CncCompensator {
     for (cursor in from...to) output.push(section[cursor]);
   }
 
-  static function offset(g:CncGeometry, side:Int, radius:Float,
-      plane:CncPlane, span:CncSpan):CncGeometry {
+  static function offset(g:PathGeometry, side:Int, radius:Float,
+      plane:ArcPlane, span:Provenance):PathGeometry {
     var handed = side * (plane == XZ ? -1 : 1);
     return switch g {
       case Line(start, end):
@@ -154,29 +154,29 @@ class CncCompensator {
           "cutter compensation needs nonzero planar motion");
         var du = -handed * dy * radius / length;
         var dv = handed * dx * radius / length;
-        CncGeometry.Line(point(a[0] + du, a[1] + dv, a[2], plane),
+        PathGeometry.Line(point(a[0] + du, a[1] + dv, a[2], plane),
           point(b[0] + du, b[1] + dv, b[2], plane));
       case Arc(center, r, angle, sweep):
         if (plane != XY) fail(span, "cutter plane does not match arc plane");
         var shifted = r - handed * (sweep > 0.0 ? 1 : -1) * radius;
         if (shifted <= 1e-12) fail(span, "cutter compensation gouges arc radius");
-        CncGeometry.Arc(center, shifted, angle, sweep);
+        PathGeometry.Arc(center, shifted, angle, sweep);
       case Circular(center, r, angle, sweep, arcPlane, rise):
         if (arcPlane != plane || Math.abs(rise) > 1e-9)
           fail(span, "cutter compensation requires arcs in its active plane");
         var shifted = r - handed * (sweep > 0.0 ? 1 : -1) * radius;
         if (shifted <= 1e-12) fail(span, "cutter compensation gouges arc radius");
-        CncGeometry.Circular(center, shifted, angle, sweep, plane, 0.0);
+        PathGeometry.Circular(center, shifted, angle, sweep, plane, 0.0);
     };
   }
 
-  static function intersection(a:CncGeometry, b:CncGeometry,
-      corner:CncPoint, plane:CncPlane):Null<CncPoint> {
-    var candidates:Array<CncPoint> = [];
+  static function intersection(a:PathGeometry, b:PathGeometry,
+      corner:Point3, plane:ArcPlane):Null<Point3> {
+    var candidates:Array<Point3> = [];
     var aLine = isLine(a), bLine = isLine(b);
     if (aLine && bLine) {
-      var p = coords(CncGeometryTools.pointAt(a, 0.0), plane);
-      var q = coords(CncGeometryTools.pointAt(b, 0.0), plane);
+      var p = coords(GeometryTools.pointAt(a, 0.0), plane);
+      var q = coords(GeometryTools.pointAt(b, 0.0), plane);
       var da = tangent(a, false, plane), db = tangent(b, false, plane);
       var den = cross(da, db);
       if (Math.abs(den) > 1e-12) {
@@ -185,7 +185,7 @@ class CncCompensator {
       }
     } else if (aLine != bLine) {
       var line = aLine ? a : b, arc = aLine ? b : a;
-      var p = coords(CncGeometryTools.pointAt(line, 0.0), plane);
+      var p = coords(GeometryTools.pointAt(line, 0.0), plane);
       var d = tangent(line, false, plane), c = arcCenter(arc, plane);
       var radius = arcRadius(arc);
       var fx = p[0] - c[0], fy = p[1] - c[1];
@@ -211,7 +211,7 @@ class CncCompensator {
           my - height * dx / d, ca[2], plane));
       }
     }
-    var best:Null<CncPoint> = null, score = Math.POSITIVE_INFINITY;
+    var best:Null<Point3> = null, score = Math.POSITIVE_INFINITY;
     for (candidate in candidates) {
       if (!contains(a, candidate, plane) || !contains(b, candidate, plane)) continue;
       var distance = candidate.distanceTo(corner);
@@ -220,10 +220,10 @@ class CncCompensator {
     return best;
   }
 
-  static function contains(g:CncGeometry, p:CncPoint, plane:CncPlane):Bool {
+  static function contains(g:PathGeometry, p:Point3, plane:ArcPlane):Bool {
     if (isLine(g)) {
-      var start = coords(CncGeometryTools.pointAt(g, 0.0), plane);
-      var end = coords(CncGeometryTools.pointAt(g, CncGeometryTools.length(g)), plane);
+      var start = coords(GeometryTools.pointAt(g, 0.0), plane);
+      var end = coords(GeometryTools.pointAt(g, GeometryTools.length(g)), plane);
       var value = coords(p, plane), dx = end[0] - start[0], dy = end[1] - start[1];
       var length2 = dx * dx + dy * dy;
       var t = ((value[0] - start[0]) * dx + (value[1] - start[1]) * dy) / length2;
@@ -239,13 +239,13 @@ class CncCompensator {
     return false;
   }
 
-  static function clip(g:CncGeometry, atStart:Bool, p:CncPoint,
-      plane:CncPlane, span:CncSpan):CncGeometry {
+  static function clip(g:PathGeometry, atStart:Bool, p:Point3,
+      plane:ArcPlane, span:Provenance):PathGeometry {
     if (isLine(g)) {
-      var start = CncGeometryTools.pointAt(g, 0.0);
-      var end = CncGeometryTools.pointAt(g, CncGeometryTools.length(g));
-      var result = atStart ? CncGeometry.Line(p, end) : CncGeometry.Line(start, p);
-      if (CncGeometryTools.length(result) <= 1e-10) fail(span,
+      var start = GeometryTools.pointAt(g, 0.0);
+      var end = GeometryTools.pointAt(g, GeometryTools.length(g));
+      var result = atStart ? PathGeometry.Line(p, end) : PathGeometry.Line(start, p);
+      if (GeometryTools.length(result) <= 1e-10) fail(span,
         "cutter compensation gouges a line segment");
       return result;
     }
@@ -265,29 +265,29 @@ class CncCompensator {
     var newStart = atStart ? start + sweep * fraction : start;
     var newSweep = atStart ? sweep * (1.0 - fraction) : sweep * fraction;
     return switch g {
-      case Arc(center, radius, _, _): CncGeometry.Arc(center, radius, newStart, newSweep);
+      case Arc(center, radius, _, _): PathGeometry.Arc(center, radius, newStart, newSweep);
       case Circular(center, radius, _, _, arcPlane, _):
-        CncGeometry.Circular(center, radius, newStart, newSweep, arcPlane, 0.0);
+        PathGeometry.Circular(center, radius, newStart, newSweep, arcPlane, 0.0);
       case _: throw "line already handled";
     };
   }
 
-  static function roundJoin(corner:CncPoint, from:CncPoint, to:CncPoint,
-      plane:CncPlane, direction:Int, radius:Float):CncGeometry {
+  static function roundJoin(corner:Point3, from:Point3, to:Point3,
+      plane:ArcPlane, direction:Int, radius:Float):PathGeometry {
     var c = coords(corner, plane), a = coords(from, plane), b = coords(to, plane);
     var start = Math.atan2(a[1] - c[1], a[0] - c[0]);
     var end = Math.atan2(b[1] - c[1], b[0] - c[0]);
     var sweep = end - start;
     if (direction > 0) while (sweep <= 0.0) sweep += 2.0 * Math.PI;
     else while (sweep >= 0.0) sweep -= 2.0 * Math.PI;
-    return plane == XY ? CncGeometry.Arc(corner, radius, start, sweep) :
-      CncGeometry.Circular(corner, radius, start, sweep, plane, 0.0);
+    return plane == XY ? PathGeometry.Arc(corner, radius, start, sweep) :
+      PathGeometry.Circular(corner, radius, start, sweep, plane, 0.0);
   }
 
-  static function tangent(g:CncGeometry, atEnd:Bool, plane:CncPlane):Array<Float> {
+  static function tangent(g:PathGeometry, atEnd:Bool, plane:ArcPlane):Array<Float> {
     if (isLine(g)) {
-      var a = coords(CncGeometryTools.pointAt(g, 0.0), plane);
-      var b = coords(CncGeometryTools.pointAt(g, CncGeometryTools.length(g)), plane);
+      var a = coords(GeometryTools.pointAt(g, 0.0), plane);
+      var b = coords(GeometryTools.pointAt(g, GeometryTools.length(g)), plane);
       var dx = b[0] - a[0], dy = b[1] - a[1];
       var length = Math.sqrt(dx * dx + dy * dy);
       return [dx / length, dy / length];
@@ -297,65 +297,65 @@ class CncCompensator {
     return [-Math.sin(angle) * sign, Math.cos(angle) * sign];
   }
 
-  static function arcCenter(g:CncGeometry, plane:CncPlane):Array<Float>
+  static function arcCenter(g:PathGeometry, plane:ArcPlane):Array<Float>
     return switch g {
       case Arc(center, _, _, _), Circular(center, _, _, _, _, _): coords(center, plane);
       case _: throw "not an arc";
     };
-  static function arcRadius(g:CncGeometry):Float return switch g {
+  static function arcRadius(g:PathGeometry):Float return switch g {
     case Arc(_, radius, _, _), Circular(_, radius, _, _, _, _): radius;
     case _: throw "not an arc";
   };
-  static function arcStart(g:CncGeometry):Float return switch g {
+  static function arcStart(g:PathGeometry):Float return switch g {
     case Arc(_, _, start, _), Circular(_, _, start, _, _, _): start;
     case _: throw "not an arc";
   };
-  static function arcSweep(g:CncGeometry):Float return switch g {
+  static function arcSweep(g:PathGeometry):Float return switch g {
     case Arc(_, _, _, sweep), Circular(_, _, _, sweep, _, _): sweep;
     case _: throw "not an arc";
   };
-  static function isLine(g:CncGeometry):Bool return switch g {
+  static function isLine(g:PathGeometry):Bool return switch g {
     case Line(_, _): true;
     case _: false;
   };
-  static function geometry(op:CncOp):Null<CncGeometry> return switch op {
+  static function geometry(op:ToolpathOp):Null<PathGeometry> return switch op {
     case Rapid(g, _), Feed(g, _, _, _): g;
     case _: null;
   };
-  static function opSpan(op:CncOp):CncSpan return switch op {
+  static function opSpan(op:ToolpathOp):Provenance return switch op {
     case Rapid(_, span), Feed(_, _, _, span): span;
     case CutterCompStart(_, _, _, span), CutterCompEnd(span): span;
     case Dwell(_, span), Spindle(_, _, span), Coolant(_, _, span),
         ToolChange(_, span), ToolLengthOffset(_, _, span), OptionalStop(span),
         ProgramStop(span), End(span): span;
   };
-  static function replaceGeometry(op:CncOp, geometry:CncGeometry):CncOp
+  static function replaceGeometry(op:ToolpathOp, geometry:PathGeometry):ToolpathOp
     return switch op {
-      case Rapid(_, span): CncOp.Rapid(geometry, span);
-      case Feed(_, speed, blend, span): CncOp.Feed(geometry, speed, blend, span);
+      case Rapid(_, span): ToolpathOp.Rapid(geometry, span);
+      case Feed(_, speed, blend, span): ToolpathOp.Feed(geometry, speed, blend, span);
       case _: throw "cutter compensation needs motion";
     };
-  static function coords(p:CncPoint, plane:CncPlane):Array<Float> return switch plane {
+  static function coords(p:Point3, plane:ArcPlane):Array<Float> return switch plane {
     case XY: [p.x, p.y, p.z];
     case XZ: [p.x, p.z, p.y];
     case YZ: [p.y, p.z, p.x];
   };
-  static function point(u:Float, v:Float, axial:Float, plane:CncPlane):CncPoint
+  static function point(u:Float, v:Float, axial:Float, plane:ArcPlane):Point3
     return switch plane {
-      case XY: new CncPoint(u, v, axial);
-      case XZ: new CncPoint(u, axial, v);
-      case YZ: new CncPoint(axial, u, v);
+      case XY: new Point3(u, v, axial);
+      case XZ: new Point3(u, axial, v);
+      case YZ: new Point3(axial, u, v);
     };
   static function cross(a:Array<Float>, b:Array<Float>):Float
     return a[0] * b[1] - a[1] * b[0];
-  static function fail(span:CncSpan, message:String):Void
+  static function fail(span:Provenance, message:String):Void
     throw new CncDiagnostic(Error, "CNC_COMP", span, message);
 }
 
 class CncCompensationResult {
-  public final ops:Array<CncOp>;
+  public final ops:Array<ToolpathOp>;
   public final diagnostics:Array<CncDiagnostic>;
-  public function new(ops:Array<CncOp>, diagnostics:Array<CncDiagnostic>) {
+  public function new(ops:Array<ToolpathOp>, diagnostics:Array<CncDiagnostic>) {
     this.ops = ops;
     this.diagnostics = diagnostics;
   }

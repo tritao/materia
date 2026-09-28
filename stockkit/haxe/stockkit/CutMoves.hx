@@ -1,9 +1,9 @@
 package stockkit;
 
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
 
 /** Builds cut moves from CNC operations. */
 class CutMoves {
@@ -16,11 +16,11 @@ class CutMoves {
     `machine.tool` or `camProgram.tool`. Moves made before any tool change are
     skipped: there is no tool in the spindle to simulate.
   **/
-  public static function fromOps(ops:Array<CncOp>, tools:Int->CncTool,
-      ?workOrigin:CncPoint):Array<CutMove> {
-    var origin = workOrigin == null ? new CncPoint(0, 0, 0) : workOrigin;
+  public static function fromOps(ops:Array<ToolpathOp>, tools:Int->Tool,
+      ?workOrigin:Point3):Array<CutMove> {
+    var origin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
     var moves:Array<CutMove> = [];
-    var tool:Null<CncTool> = null;
+    var tool:Null<Tool> = null;
     var toolLength = 0.0;
     for (index in 0...ops.length) switch ops[index] {
       case ToolChange(number, _):
@@ -41,10 +41,10 @@ class CutMoves {
     return moves;
   }
 
-  static function shift(geometry:CncGeometry, origin:CncPoint,
-      toolLength:Float):CncGeometry {
-    function at(point:CncPoint):CncPoint
-      return new CncPoint(point.x - origin.x, point.y - origin.y,
+  static function shift(geometry:PathGeometry, origin:Point3,
+      toolLength:Float):PathGeometry {
+    function at(point:Point3):Point3
+      return new Point3(point.x - origin.x, point.y - origin.y,
         point.z - origin.z - toolLength);
     return switch geometry {
       case Line(start, end): Line(at(start), at(end));

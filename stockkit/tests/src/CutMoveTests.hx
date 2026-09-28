@@ -1,11 +1,12 @@
 import camkit.CamContour;
-import camkit.CamJob;
+
+import toolpathkit.path.ToolpathOp;import camkit.CamJob;
 import cnckit.CncCompiler;
 import cnckit.CncMachine;
-import cnckit.CncTool;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncPoint;
-import cnckit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.Point3;
+import toolpathkit.tool.CutterProfile;
 import stockkit.CutMove;
 import stockkit.CutMoves;
 
@@ -18,23 +19,23 @@ class CutMoveTests {
 
   static function tools():Void {
     var ball = CutterProfile.ball(0.006, 0.02).withHolder(0.02, 0.03);
-    var tool = CncTool.shaped(4, 0.08, ball);
+    var tool = Tool.shaped(4, 0.08, ball);
     Assert.near(tool.diameter, 0.006, "shaped tool takes its cutting diameter", 1e-15);
     Assert.check(tool.profile() == ball, "shaped tool simulates its own shape");
     Assert.check(tool.withLength(0.09).cutter == ball, "a new length keeps the shape");
     var rejected = false;
-    try new CncTool(4, 0.08, 0.008, ball) catch (_:Dynamic) rejected = true;
+    try new Tool(4, 0.08, 0.008, ball) catch (_:Dynamic) rejected = true;
     Assert.check(rejected, "a diameter that contradicts the shape is rejected");
 
-    var plain = new CncTool(5, 0.0, 0.004);
+    var plain = new Tool(5, 0.0, 0.004);
     Assert.near(plain.profile().cuttingDiameter(), 0.004,
       "a diameter-only tool simulates as a flat mill", 1e-15);
-    Assert.near(plain.profile().height(), CncTool.DEFAULT_FLUTE_LENGTH,
+    Assert.near(plain.profile().height(), Tool.DEFAULT_FLUTE_LENGTH,
       "with the default flute length when its length is unknown", 1e-15);
-    Assert.near(new CncTool(5, 0.03, 0.004).profile().height(), 0.03,
+    Assert.near(new Tool(5, 0.03, 0.004).profile().height(), 0.03,
       "or flutes over its whole length", 1e-15);
     rejected = false;
-    try new CncTool(6, 0.0, 0.0).profile() catch (_:Dynamic) rejected = true;
+    try new Tool(6, 0.0, 0.0).profile() catch (_:Dynamic) rejected = true;
     Assert.check(rejected, "a tool with no size has nothing to simulate");
 
     var machine = new CncMachine("cnc", "x", "y", "z", 0.1);
@@ -47,7 +48,7 @@ class CutMoveTests {
     var machine = new CncMachine("cnc", "x", "y", "z", 0.1);
     machine.setWorkOffset(54, 0.1, 0.2, 0.3);
     var ball = CutterProfile.ball(0.006, 0.02);
-    machine.setTool(CncTool.shaped(1, 0.05, ball));
+    machine.setTool(Tool.shaped(1, 0.05, ball));
     var compiled = new CncCompiler(machine).compileDetailed([
       "G21 G90 G54",
       "G0 X0 Y0 Z50",
@@ -62,7 +63,7 @@ class CutMoveTests {
       "M2"
     ].join("\n"));
     var moves = CutMoves.fromOps(compiled.ops, machine.tool,
-      new CncPoint(0.1, 0.2, 0.3));
+      new Point3(0.1, 0.2, 0.3));
     Assert.check(moves.length == 5, "moves before the first tool change are skipped");
     Assert.check([for (move in moves) move.span.line].join(",") == "5,6,7,8,10",
       "each move keeps its source line");
@@ -87,18 +88,18 @@ class CutMoveTests {
     Assert.near(end(moves[4]).z, 0.01, "after G49 the programmed Z is the tip");
 
     var rejected = false;
-    try CutMoves.fromOps([cnckit.ir.CncOp.CutterCompEnd(moves[0].span)], machine.tool)
+    try CutMoves.fromOps([toolpathkit.path.ToolpathOp.CutterCompEnd(moves[0].span)], machine.tool)
     catch (_:Dynamic) rejected = true;
     Assert.check(rejected, "unresolved cutter compensation is rejected");
   }
 
   static function camProgram():Void {
     var contour = new CamContour([
-      new CncPoint(0.01, 0.005, 0), new CncPoint(0.03, 0.005, 0),
-      new CncPoint(0.03, 0.015, 0), new CncPoint(0.01, 0.015, 0)
+      new Point3(0.01, 0.005, 0), new Point3(0.03, 0.005, 0),
+      new Point3(0.03, 0.015, 0), new Point3(0.01, 0.015, 0)
     ]);
-    var small = new CncTool(2, 0.0, 0.002);
-    var large = CncTool.shaped(3, 0.0, CutterProfile.bullNose(0.006, 0.001, 0.02));
+    var small = new Tool(2, 0.0, 0.002);
+    var large = Tool.shaped(3, 0.0, CutterProfile.bullNose(0.006, 0.001, 0.02));
     var program = new CamJob(0.005, 12000)
       .pocket(contour, small, -0.002, 0.01, 0.0015, 0.001)
       .profile(contour, large, -0.003, 0.01)
@@ -117,15 +118,15 @@ class CutMoveTests {
       "moves follow the CAM tool changes");
     var rejected = false;
     try new CamJob(0.005, 12000).pocket(contour, small, -0.002, 0.01, 0.0015, 0.001)
-      .profile(contour, new CncTool(2, 0.0, 0.004), -0.003, 0.01)
+      .profile(contour, new Tool(2, 0.0, 0.004), -0.003, 0.01)
     catch (_:Dynamic) rejected = true;
     Assert.check(rejected, "a CAM job cannot reuse a tool number for another tool");
   }
 
-  static function end(move:CutMove):CncPoint
+  static function end(move:CutMove):Point3
     return switch move.motion {
       case Path(geometry):
-        cnckit.ir.CncGeometryTools.pointAt(geometry,
-          cnckit.ir.CncGeometryTools.length(geometry));
+        toolpathkit.path.GeometryTools.pointAt(geometry,
+          toolpathkit.path.GeometryTools.length(geometry));
     };
 }

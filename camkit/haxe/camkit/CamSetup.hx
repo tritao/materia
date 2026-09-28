@@ -2,11 +2,11 @@ package camkit;
 
 import cnckit.CncMachine;
 import cnckit.CncTravelChecks;
-import cnckit.ir.CncGeometry;
-import cnckit.ir.CncGeometryTools;
-import cnckit.ir.CncOp;
-import cnckit.ir.CncPoint;
-import cnckit.parse.CncSpan;
+import toolpathkit.path.PathGeometry;
+import toolpathkit.path.GeometryTools;
+import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.Point3;
+import toolpathkit.path.Provenance;
 
 /** Stock, clearance and clamp checks in the same work coordinates as CAM IR. */
 class CamSetup {
@@ -55,11 +55,11 @@ class CamSetup {
     }
   }
 
-  function checkPath(geometry:CncGeometry, span:CncSpan, radius:Float,
+  function checkPath(geometry:PathGeometry, span:Provenance, radius:Float,
       cutting:Bool):Void {
-    var length = CncGeometryTools.length(geometry);
-    var start = CncGeometryTools.pointAt(geometry, 0.0);
-    var end = CncGeometryTools.pointAt(geometry, length);
+    var length = GeometryTools.length(geometry);
+    var start = GeometryTools.pointAt(geometry, 0.0);
+    var end = GeometryTools.pointAt(geometry, length);
     if (cutting && Math.min(start.z, end.z) < stockBottom - 1e-9)
       fail(span, 'cut goes below stock bottom $stockBottom');
     if (!cutting && (Math.abs(start.x - end.x) > 1e-9 ||
@@ -76,7 +76,7 @@ class CamSetup {
     segments = Std.int(Math.max(1, segments));
     var previous = start;
     for (index in 1...(segments + 1)) {
-      var current = CncGeometryTools.pointAt(geometry,
+      var current = GeometryTools.pointAt(geometry,
         length * index / segments);
       var margin = switch geometry {
         case Line(_, _): 0.0;
@@ -90,7 +90,7 @@ class CamSetup {
     }
   }
 
-  static function intersectsFixture(a:CncPoint, b:CncPoint, radius:Float,
+  static function intersectsFixture(a:Point3, b:Point3, radius:Float,
       fixture:CamFixture):Bool {
     // A cutter tip below the clamp can still leave its shank inside it.
     if (Math.min(a.z, b.z) > fixture.maxZ) return false;
@@ -114,6 +114,6 @@ class CamSetup {
     return true;
   }
 
-  static function fail(span:CncSpan, detail:String):Void
+  static function fail(span:Provenance, detail:String):Void
     throw 'CAM setup line ${span.line}: $detail';
 }

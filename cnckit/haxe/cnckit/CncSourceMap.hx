@@ -1,6 +1,6 @@
 package cnckit;
 
-import cnckit.parse.CncSpan;
+import toolpathkit.path.Provenance;
 
 /** Maps MotionOp indices and path distance in metres to source locations. */
 class CncSourceMap {
@@ -9,10 +9,10 @@ class CncSourceMap {
   public function new() {}
 
   public function add(opIndex:Int, startDistance:Float, endDistance:Float,
-      span:CncSpan):Void
+      span:Provenance):Void
     entries.push(new CncSourceMapEntry(opIndex, startDistance, endDistance, span));
 
-  public function spanAt(opIndex:Int, distance:Float):Null<CncSpan> {
+  public function spanAt(opIndex:Int, distance:Float):Null<Provenance> {
     if (!Math.isFinite(distance) || distance < 0.0) return null;
     var last:Null<CncSourceMapEntry> = null;
     for (entry in entries) if (entry.opIndex == opIndex) {
@@ -31,10 +31,10 @@ class CncSourceMapEntry {
   public final opIndex:Int;
   public final startDistance:Float;
   public final endDistance:Float;
-  public final span:CncSpan;
+  public final span:Provenance;
 
   public function new(opIndex:Int, startDistance:Float, endDistance:Float,
-      span:CncSpan) {
+      span:Provenance) {
     this.opIndex = opIndex;
     this.startDistance = startDistance;
     this.endDistance = endDistance;
