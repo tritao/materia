@@ -72,7 +72,8 @@ public:
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
     rk_result get_robot_contacts(rk_robot_runtime runtime,
-                                 std::vector<rk_robot_contact> &out) const;
+                                 std::vector<rk_robot_contact> &out,
+                                 uint64_t *step_index = nullptr) const;
     rk_result capture_presentation(rk_simulation_presentation_info &out_info,
         std::vector<rk_simulation_presentation_pose> &out_poses) const;
     /** Robot poses from a frame captured from this session. */
