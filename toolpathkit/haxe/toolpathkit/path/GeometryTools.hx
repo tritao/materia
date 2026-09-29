@@ -36,4 +36,33 @@ class GeometryTools {
         }
     };
   }
+
+  /** Unit tangent in the direction of travel at a distance along a path. */
+  public static function tangentAt(geometry:PathGeometry, distance:Float):Point3 {
+    var total = length(geometry);
+    if (!(total > 0.0) || !Math.isFinite(distance) ||
+        distance < 0.0 || distance > total)
+      throw "CNC geometry tangent needs a nonzero path and in-range distance";
+    var alpha = distance / total;
+    return switch geometry {
+      case Line(start, end):
+        new Point3((end.x - start.x) / total,
+          (end.y - start.y) / total, (end.z - start.z) / total);
+      case Arc(_, _, startAngle, sweep):
+        var angle = startAngle + sweep * alpha;
+        var direction = sweep < 0.0 ? -1.0 : 1.0;
+        new Point3(-Math.sin(angle) * direction,
+          Math.cos(angle) * direction, 0.0);
+      case Circular(_, radius, startAngle, sweep, plane, rise):
+        var angle = startAngle + sweep * alpha;
+        var du = -radius * Math.sin(angle) * sweep / total;
+        var dv = radius * Math.cos(angle) * sweep / total;
+        var axial = rise / total;
+        switch plane {
+          case XY: new Point3(du, dv, axial);
+          case XZ: new Point3(du, axial, dv);
+          case YZ: new Point3(axial, du, dv);
+        }
+    };
+  }
 }

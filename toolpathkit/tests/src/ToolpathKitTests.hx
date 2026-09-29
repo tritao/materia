@@ -76,6 +76,7 @@ class ToolpathKitTests {
     if (placedViolations.length != 1 || placedViolations[0].axis != 0 ||
         placedViolations[0].provenance.operationIndex != 7)
       throw "travel check must place work geometry and preserve provenance";
-    Sys.println("ToolpathKit tests passed (14 assertions)");
+    var coverage = ToolpathCoreCoverage.run();
+    Sys.println('ToolpathKit tests passed (${14 + coverage} assertions)');
   }
 }
