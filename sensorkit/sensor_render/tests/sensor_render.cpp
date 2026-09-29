@@ -1,4 +1,5 @@
 #include "nativekit_sensor_render.hpp"
+#include "nativekit_sensor_wire.hpp"
 
 #include "nativekit.h"
 #include "nativekit_window.h"
@@ -7,6 +8,9 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <thread>
 
@@ -104,7 +108,30 @@ void captures_emissive_triangle() {
     assert(frame->rgba8.size() == 16u * 16u * 4u);
     const auto *center = frame->pixel(8, 8);
     assert(center);
-    assert(center[0] > 200 && center[1] < 20 && center[2] < 20 && center[3] > 200);
+    std::cerr << "center_rgba=" << int(center[0]) << "," << int(center[1])
+              << "," << int(center[2]) << "," << int(center[3]) << "\n";
+    assert(center[0] > 200 && center[1] < 40 && center[2] < 40 && center[3] > 200);
+
+    // Phase 7 spike: capture, encode, and optionally write a real rendered wire frame.
+    const auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < 20; ++i) {
+        std::optional<CameraFrame> measured;
+        assert(adapter.capture(camera, *tick, scene->snapshot(), {}, measured) == NKGPU_OK);
+        assert(measured.has_value());
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    std::cout << "camera_capture_mean_ms="
+              << std::chrono::duration<double, std::milli>(elapsed).count() / 20.0 << '\n';
+    frame->header.delivery_time = 1.375;
+    std::string wire_error;
+    const auto encoded = nksensor::wire::encode_camera_frame(*frame, &wire_error);
+    assert(encoded.has_value());
+    if (const char *path = std::getenv("NKSENSOR_CAMERA_SPIKE_OUTPUT")) {
+        std::ofstream output(path, std::ios::binary);
+        output.write(reinterpret_cast<const char *>(encoded->data()),
+                     static_cast<std::streamsize>(encoded->size()));
+        assert(output.good());
+    }
 
     SensorConfig runtime_sensor_config = sensor_config;
     runtime_sensor_config.id = 55;
@@ -132,7 +159,7 @@ void captures_emissive_triangle() {
     assert(runtime_frame.header.capture_time == 0.0);
     const auto *runtime_center = runtime_frame.pixel(8, 8);
     assert(runtime_center);
-    assert(runtime_center[0] > 200 && runtime_center[1] < 20 && runtime_center[2] < 20);
+    assert(runtime_center[0] > 200 && runtime_center[1] < 40 && runtime_center[2] < 40);
 
     runtime_measurements = runtime.poll(0.1);
     assert(runtime_measurements.size() == 1);

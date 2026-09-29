@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "robotkit-world-tests" },
 	"entry": "tests.RobotWorldTests",
-	"sourceRoots": ["src"],
+	"sourceRoots": ["src", "../../sensorkit/sensor_io/haxe"],
 	"dependencies": {
 		"nativekit": { "path": "../../nativekit" },
 		"robotkit": { "path": ".." },
