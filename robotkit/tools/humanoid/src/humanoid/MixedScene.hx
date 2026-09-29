@@ -13,6 +13,8 @@ import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
+import robotkit.runtime.SimulationSpace;
 
 /**
  * Mixed-scene safety (robotkit/plans/MIXED_SCENE.md): a UR-class arm, an XYZ
@@ -104,7 +106,8 @@ class MixedScene {
   /** Runs the job; with `humanoid`, the G1 falls 10 m away and is commanded every tick. */
   static function job(humanoid:Null<RobotModel>):{trace:Array<Float>, failedSteps:Int,
       safeties:Array<Int>, humanoidSafety:Int} {
-    var simulation = new Simulation(TIMESTEP, SUBSTEPS, 1);
+    var harness = new SimulationHarness(TIMESTEP, SUBSTEPS, SimulationSpace.MUJOCO);
+    var simulation = harness.simulation;
     var armBlueprint = arm(), gantryBlueprint = gantry();
     var armRuntime = simulation.addRobotAtPose(armBlueprint, [0.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]);
     var gantryRuntime = simulation.addRobotAtPose(gantryBlueprint, [3.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0]);
@@ -120,7 +123,7 @@ class MixedScene {
       g1 = simulation.addRobotAtPose(blueprint, [10.0, 0.0, 0.8], [0.0, Math.sin(0.3), 0.0, Math.cos(0.3)]);
       g1Zero = [for (_ in humanoid.joints) 0.0];
     }
-    simulation.spawnPlane();
+    harness.spawnPlane();
     var failed = 0;
     var trace:Array<Float> = [];
     var sequence = 1;
@@ -130,19 +133,20 @@ class MixedScene {
       // A policy-like client: a fresh batch every tick, also after the fall.
       if (g1 != null) try g1.submitPositions(g1Zero, sequence) catch (error:Dynamic) {}
       sequence++;
-      try simulation.step(Int64.ofInt(tick)) catch (error:Dynamic) failed++;
+      try harness.step(Int64.ofInt(tick)) catch (error:Dynamic) failed++;
       trace = trace.concat(robotsTrace(simulation, present, counts));
     }
     var result = {trace: trace, failedSteps: failed,
       safeties: [for (runtime in present) runtime.snapshot().safety],
       humanoidSafety: g1 == null ? -1 : g1.snapshot().safety};
-    simulation.dispose();
+    harness.dispose();
     return result;
   }
 
   /** Drops the G1 onto a robot link; returns the G1's base height after `seconds`. */
   static function dropOnto(humanoid:RobotModel, name:String, surfaceTop:Float, seconds:Float):Float {
-    var simulation = new Simulation(TIMESTEP, SUBSTEPS, 1);
+    var harness = new SimulationHarness(TIMESTEP, SUBSTEPS, SimulationSpace.MUJOCO);
+    var simulation = harness.simulation;
     var machine:Null<RobotRuntime> = null;
     var boxes:Array<Null<Array<Float>>>;
     var blueprint:RobotRuntimeBlueprint;
@@ -160,12 +164,12 @@ class MixedScene {
     // G1's authored base height puts its feet on the floor: 0.793 m up.
     var g1 = simulation.addRobotAtPose(g1Blueprint, [3.0, 0.0, surfaceTop + 0.793 + 0.02],
       [0.0, 0.0, 0.0, 1.0]);
-    simulation.spawnPlane();
+    harness.spawnPlane();
     g1.submitPositions([for (_ in humanoid.joints) 0.0], 1);
     var ticks = Std.int(Math.round(seconds / TIMESTEP));
-    for (tick in 0...ticks) simulation.step(Int64.ofInt(tick));
+    for (tick in 0...ticks) harness.step(Int64.ofInt(tick));
     var height = simulation.robotPose(1).position[2];
-    simulation.dispose();
+    harness.dispose();
     return height;
   }
 
