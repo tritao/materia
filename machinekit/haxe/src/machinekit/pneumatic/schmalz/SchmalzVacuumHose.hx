@@ -33,6 +33,15 @@ class SchmalzVacuumHose extends RoutedHose {
 		return table;
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.schmalz-vacuum-hose");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, SchmalzVacuumHose) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("stock", stock.designation).setToken("route", machinekit.component.MachineKitAdditionalRecipes.routeText(route)).setToken("material", materialSpec());
+
 	public function new(stockDesignation:String, route:Array<Vector>) {
 		var row = catalog().get(stockDesignation);
 		var length = 0.0;

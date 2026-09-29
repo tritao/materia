@@ -76,3 +76,4 @@ else()
 endif()
 set_target_properties(onnxruntime::onnxruntime PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES "${ROBOTKIT_ONNXRUNTIME_DIR}/include")
+set_property(GLOBAL PROPERTY RK_ONNXRUNTIME_RUNTIME_FILES "${RK_ONNXRUNTIME_RUNTIME_FILES}")

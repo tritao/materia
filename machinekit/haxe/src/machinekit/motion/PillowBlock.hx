@@ -126,6 +126,8 @@ class PillowBlock extends MachineComponent {
 		addConnector("bolt2", Mount, AssemblyFrames.alongY(boltSpacing / 2, 0, 0, 0, 1, 0));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var base = Part.box(length, baseHeight, baseWidth, Align.Center, Align.Min, Align.Center);
 		var barrelRadius = overallHeight - shaftHeight;

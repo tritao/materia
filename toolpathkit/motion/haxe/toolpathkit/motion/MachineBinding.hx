@@ -1,6 +1,6 @@
 package toolpathkit.motion;
 
-import toolpathkit.setup.Setup;
+import toolpathkit.setup.TravelEnvelope;
 
 /** Machine axes and execution limits, independent of a G-code controller. */
 class MachineBinding {
@@ -12,13 +12,10 @@ class MachineBinding {
   public final positionTolerance:Float;
   public final orientationTolerance:Float;
   public final maxBlendTurnAngleRadians:Float;
-  public final initialPosition:Array<Float>;
-  public var travelLower(default, null):Null<Array<Float>> = null;
-  public var travelUpper(default, null):Null<Array<Float>> = null;
-  final setupOffsets:Map<String, Array<Float>> = new Map();
+  public var travel(default, null):Null<TravelEnvelope> = null;
 
   public function new(frameId:String, xAxisId:String, yAxisId:String,
-      zAxisId:String, rapidSpeed:Float, ?initialPosition:Array<Float>,
+      zAxisId:String, rapidSpeed:Float,
       positionTolerance:Float = 0.0005,
       orientationTolerance:Float = 0.02,
       maxBlendTurnAngleRadians:Float = Math.PI * 5.0 / 6.0) {
@@ -33,46 +30,12 @@ class MachineBinding {
         !Math.isFinite(maxBlendTurnAngleRadians) ||
         maxBlendTurnAngleRadians <= 0.0 || maxBlendTurnAngleRadians >= Math.PI)
       throw "machine binding needs positive speed and tolerances";
-    var initial = initialPosition == null ? [0.0, 0.0, 0.0] : initialPosition;
-    if (initial.length != 3) throw "machine binding needs three initial coordinates";
-    for (value in initial) if (!Math.isFinite(value))
-      throw "machine binding initial coordinates must be finite";
     this.frameId = frameId; this.xAxisId = xAxisId; this.yAxisId = yAxisId;
     this.zAxisId = zAxisId; this.rapidSpeed = rapidSpeed;
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.maxBlendTurnAngleRadians = maxBlendTurnAngleRadians;
-    this.initialPosition = initial.copy();
-    setupOffsets.set("1", [0.0, 0.0, 0.0]);
   }
 
-  public function setSetupOffset(id:String, offset:Array<Float>):Void {
-    if (id == null || id.length == 0 || offset == null || offset.length != 3)
-      throw "setup needs an ID and three coordinates";
-    for (value in offset) if (!Math.isFinite(value))
-      throw "setup coordinates must be finite";
-    setupOffsets.set(id, offset.copy());
-  }
-
-  public function registerSetup(setup:Setup):Void {
-    if (setup == null) throw "machine binding needs a setup";
-    setSetupOffset(setup.id, [setup.workOrigin.x,
-      setup.workOrigin.y, setup.workOrigin.z]);
-  }
-
-  public function setupOffset(id:String):Array<Float> {
-    var result = setupOffsets.get(id);
-    if (result == null) throw 'Unknown setup $id';
-    return result.copy();
-  }
-
-  public function setTravelEnvelope(lower:Array<Float>, upper:Array<Float>):Void {
-    if (lower == null || upper == null || lower.length != 3 || upper.length != 3)
-      throw "machine travel envelope needs three lower and upper coordinates";
-    for (axis in 0...3)
-      if (!Math.isFinite(lower[axis]) || !Math.isFinite(upper[axis]) ||
-          lower[axis] >= upper[axis])
-        throw "machine travel envelope needs finite ordered bounds";
-    travelLower = lower.copy(); travelUpper = upper.copy();
-  }
+  public function setTravel(value:Null<TravelEnvelope>):Void travel = value;
 }

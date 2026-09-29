@@ -5,7 +5,10 @@ class IntegrationMain {
     var arguments = Sys.args();
     var port = parsePort(arguments);
     var host = parseHost(arguments);
-    if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run(host, port);
+    if (arguments.indexOf("--outbound-scheduler") >= 0) OutboundSchedulerIntegration.run(port);
+    else if (arguments.indexOf("--perception") >= 0) PerceptionTcpIntegration.run(host, port);
+    else if (arguments.indexOf("--subscriptions") >= 0) SubscriptionIntegration.run(host, port);
+    else if (arguments.indexOf("--smoke") >= 0) RobotClientSmoke.run(host, port);
     else if (arguments.indexOf("--lease-timeout") >= 0)
       RobotSessionIntegration.runLeaseTimeout(host, port);
     else if (arguments.indexOf("--device") >= 0)

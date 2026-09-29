@@ -114,17 +114,8 @@ enum {
 /* Persistent recording                                                      */
 /* ------------------------------------------------------------------------- */
 
-enum { RK_RECORDING_FORMAT_VERSION = 1 };
-typedef uint32_t rk_recording_event_kind;
-enum {
-    RK_RECORDING_COMMAND = 1,
-    RK_RECORDING_SNAPSHOT = 2,
-    RK_RECORDING_SENSOR = 3,
-    RK_RECORDING_FAULT = 4,
-    RK_RECORDING_WORLD = 5,
-    RK_RECORDING_WORLD_EVENT = 6,
-    RK_RECORDING_PROCESS_EVENT = 7
-};
+typedef uint32_t rk_recording_compression;
+enum { RK_RECORDING_COMPRESSION_NONE = 0, RK_RECORDING_COMPRESSION_LZ4 = 1 };
 
 typedef uint32_t rk_recording_state;
 enum {
@@ -150,17 +141,23 @@ typedef struct rk_recording_writer_status {
 
 typedef struct rk_recording_message {
     uint32_t struct_size RK_STRUCT_SIZE;
-    rk_recording_event_kind kind;
     uint32_t schema_version;
     uint32_t payload_size;
     uint64_t ordinal;
     uint64_t recording_timestamp_ns;
+    char topic[128];
 } rk_recording_message;
 
 RK_API rk_result RK_CALL rk_recording_writer_create(const char *path RK_UTF8,
-    uint64_t queue_capacity_bytes, rk_recording_writer_handle *out_writer RK_OUT RK_OWNED);
+    uint64_t queue_capacity_bytes, rk_recording_compression compression,
+    rk_recording_writer_handle *out_writer RK_OUT RK_OWNED);
+RK_API rk_result RK_CALL rk_recording_writer_register_channel(rk_recording_writer_handle writer,
+    const char *topic RK_UTF8, const char *schema_name RK_UTF8,
+    const char *schema_encoding RK_UTF8, const uint8_t *schema_data RK_IN_ARRAY(schema_data_len),
+    uint32_t schema_data_len, const char *message_encoding RK_UTF8,
+    uint32_t *out_channel_id RK_OUT);
 RK_API rk_result RK_CALL rk_recording_writer_enqueue(rk_recording_writer_handle writer,
-    rk_recording_event_kind kind, uint32_t schema_version, uint64_t ordinal,
+    uint32_t channel_id, uint64_t ordinal,
     uint64_t recording_timestamp_ns,
     const uint8_t *payload RK_IN_ARRAY(payload_size), uint32_t payload_size);
 RK_API rk_result RK_CALL rk_recording_writer_get_status(rk_recording_writer_handle writer,
@@ -174,6 +171,10 @@ RK_API rk_result RK_CALL rk_recording_reader_open(const char *path RK_UTF8,
 RK_API rk_result RK_CALL rk_recording_reader_next(rk_recording_reader_handle reader,
     rk_recording_message *message, uint8_t *payload RK_OUT_BUFFER(inout_payload_size),
     uint32_t *inout_payload_size RK_INOUT);
+/** UTF-8 schema name, newline, then exact schema data for the last message. */
+RK_API rk_result RK_CALL rk_recording_reader_schema(rk_recording_reader_handle reader,
+    uint8_t *schema RK_OUT_BUFFER(inout_schema_size),
+    uint32_t *inout_schema_size RK_INOUT);
 RK_API void RK_CALL rk_recording_reader_destroy(rk_recording_reader_handle reader);
 
 /* ------------------------------------------------------------------------- */

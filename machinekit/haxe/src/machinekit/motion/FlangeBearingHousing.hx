@@ -61,6 +61,8 @@ class FlangeBearingHousing extends MachineComponent {
 		return [{x: h, y: h}, {x: -h, y: h}, {x: -h, y: -h}, {x: h, y: -h}];
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.box(face, face, depth);
 		var boreTool = Part.cylinderSpan((bearing.outside + allowance) / 2, -0.1, depth + 0.1);
@@ -96,7 +98,7 @@ class FlangeBearingHousing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, FlangeBearingHousing) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return new ComponentValues().setToken("bearing", this.bearing.spec.designation)

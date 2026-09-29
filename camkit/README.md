@@ -1,17 +1,22 @@
 # CamKit
 
-CamKit produces `toolpathkit.path.ToolpathOp` directly from CAD or sheet geometry. It
+CamKit produces `ToolpathProgram` directly from CAD or sheet geometry. It
 supports 2.5D outside and inside profiles, pocket clearing,
 and drilled hole centres. Profiles and pockets use configurable depth steps.
 Coordinates are metres; feeds are metres/second.
-`ToolpathMotion.lower(program.ops, binding)` sends the operations to MotionKit.
-`cnckit.CncWriter.write(program.ops, setup, cncMachine)` validates
-the setup and exports LinuxCNC millimetre G-code. Each CAM operation carries
+`CamJob.finish(?setup)` returns the program with its tool library and setups;
+there is no separate CAM program wrapper.
+`ToolpathMotion.lower(program, binding)` sends the program to MotionKit.
+`CncWriter.write(program, controller, binding.travel)` validates optional
+stock data and machine travel, then exports LinuxCNC millimetre G-code.
+Each CAM operation carries
 its operation ID and, when available, a CAD feature reference.
 
-`toolpathkit.setup.Setup` records the stock rectangle, top and bottom, safe Z,
-work origin, and optional `Fixture` rectangular keep-outs. All bounds are metres in the program's
-work coordinates. Export checks machine travel, depth below stock bottom,
+`Setup` requires an ID and work origin. Its optional `SetupStock` records the
+stock rectangle, top and bottom, safe Z, and `Fixture` rectangular keep-outs.
+All bounds are metres in the program's
+work coordinates. With an envelope, export checks machine travel. When stock
+data is present it checks depth below stock bottom,
 lateral rapids below safe Z and fixture intersections along lines and arcs.
 The fixture check conservatively expands each rectangular keep-out by the
 cutter radius and includes the curved path between arc endpoints. It treats
@@ -63,12 +68,14 @@ Example:
 ```haxe
 var tool = new Tool(2, 0.0, 0.002);
 var contour = CamSheetProfiles.fromPlan(sheetPlan, "gantry-bracket");
-var setup = new Setup(0.0, 0.05, 0.0, 0.05, 0.0, -0.003, 0.005);
+var setup = new Setup("1", new Point3(0, 0, 0),
+  new SetupStock(0.0, 0.05, 0.0, 0.05, 0.0, -0.003, 0.005));
 var program = new CamJob(0.005, 12000)
   .profile(contour, tool, -0.002, 0.01)
   .finish(setup);
-var previewAndExecution = ToolpathMotion.lower(program.ops, machineBinding);
-var linuxCnc = CncWriter.write(program.ops, setup, cncMachine);
+var previewAndExecution = ToolpathMotion.lower(program, machineBinding);
+var controller = new CncController(LinuxCnc, program.tools);
+var linuxCnc = CncWriter.write(program, controller, machineBinding.travel);
 ```
 
 The test project creates its own rectangular, rounded and holed plate fixtures,
@@ -82,11 +89,11 @@ round trips. The suite also
 checks the generic manufacturingkit sheet placement adapter using locally
 authored input; it does not depend on a MachineKit example. The island pocket
 is also cut with StockKit and compared with the finished part: no gouge, no
-rapid or shank through stock, and leftover only in the inside corners. Build
-StockKit core (see `stockkit/README.md`), then run with it and the cadkit
-native build on `LD_LIBRARY_PATH`:
+rapid or shank through stock, and leftover only in the inside corners.
+Haxeon builds StockKit core from its package manifest. With the CadKit native
+build on `LD_LIBRARY_PATH`, run:
 
 ```sh
-LD_LIBRARY_PATH=build/stockkit-core:/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
+LD_LIBRARY_PATH=/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
   ./haxeon/scripts/haxeon run --project camkit/tests/haxeon.json
 ```

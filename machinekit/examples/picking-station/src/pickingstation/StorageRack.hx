@@ -4,6 +4,7 @@ import materia.assembly.AssemblyFrames;
 import machinekit.component.Bom;
 import machinekit.component.MachineComponent;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.InstancePath;
 import machinekit.standard.SocketHeadCapScrew;
 
 /** Composes one rack, its shelves, bins, indicators, frame, and feet. */
@@ -74,15 +75,15 @@ class StorageRack extends MachineAssembly {
 				AssemblyFrames.translation(0, 0, config.shelfZ(shelfIndex)));
 		for (position in positionsList) {
 			var id = positionLocalId(position);
-			addComponent(id, bin, position.placement);
-			addComponent('$id/indicator', indicator, position.indicatorPlacement);
+			addComponentAt(InstancePath.of(id), bin, position.placement);
+			addComponentAt(InstancePath.of('$id/indicator'), indicator, position.indicatorPlacement);
 		}
 		var x = config.rackWidth / 2 - PickingStationConfig.FRAME_SIZE / 2;
 		var y = config.rackDepth / 2 - PickingStationConfig.FRAME_SIZE / 2;
 		for (corner in [
 			{name: "front-left", x: -x, y: -y}, {name: "front-right", x: x, y: -y},
 			{name: "back-left", x: -x, y: y}, {name: "back-right", x: x, y: y}])
-			addComponent('feet/${corner.name}', foot, AssemblyFrames.translation(corner.x, corner.y, 0));
+			addComponentAt(InstancePath.of('feet/${corner.name}'), foot, AssemblyFrames.translation(corner.x, corner.y, 0));
 		addBomItem(SocketHeadCapScrew.metric("M5", 12).bom, config.shelfCount * 4);
 	}
 

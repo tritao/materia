@@ -66,6 +66,17 @@ class ShaftCoupling extends MachineComponent {
 		}
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.shaft-coupling");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, ShaftCoupling) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("boreA", boreA).setNumber("boreB", boreB).setNumber("outerDiameter", outerDiameter).setNumber("length", length).setToken("setScrews", haxe.Json.stringify(setScrews)).setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.cylinderSpan(outerDiameter / 2, 0, length);
 		var boreATool = Part.cylinderSpan(boreA / 2, -0.1, length / 2 + 0.1);

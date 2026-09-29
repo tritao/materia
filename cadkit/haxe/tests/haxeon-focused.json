@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": {"name": "cadkit-assembly-focused"},
+  "entry": "AssemblyFocused",
+  "sourceRoots": ["."],
+  "dependencies": {"cadkit": {"path": "../.."}, "projectkit": {"path": "../../../projectkit"}},
+  "target": "host",
+  "outputDir": "build/assembly-focused"
+}

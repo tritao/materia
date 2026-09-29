@@ -142,6 +142,8 @@ class RobotFlange extends MachineComponent {
 	public function pinAlignedFrame(z:Float):AssemblyFrame
 		return AssemblyFrames.compose(Solids.axial(0, 0, z), AssemblyFrames.turnY(Math.PI / boltCount));
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var boss = Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight);
 		var body = Solids.union([Part.cylinderSpan(flangeDiameter / 2, -thickness, 0), boss]);
@@ -208,7 +210,7 @@ class RobotFlange extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, RobotFlange) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return new ComponentValues().setNumber("pitchCircleDiameter", this.spec.pitchCircle)

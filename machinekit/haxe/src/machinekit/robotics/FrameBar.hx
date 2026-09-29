@@ -25,6 +25,17 @@ class FrameBar extends MachineComponent {
 		addConnector("end", Mount, Solids.axial(0, 0, length));
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.frame-bar");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, FrameBar) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("length", length).setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(width, depth, length);
 }

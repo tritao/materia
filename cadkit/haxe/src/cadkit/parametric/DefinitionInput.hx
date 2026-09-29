@@ -16,7 +16,7 @@ class DefinitionInput {
 			throw new ParametricError("definition input name must not be empty");
 		this.name = name;
 		this.kind = switch kind {
-			case TypedProperty.TypeBoolean, TypedProperty.TypeInteger, TypedProperty.TypeToken: kind;
+			case TypedProperty.TypeBoolean, TypedProperty.TypeInteger, TypedProperty.TypeText, TypedProperty.TypeToken: kind;
 			default: ParameterKind.validate(kind);
 		};
 		this.unit = isNumeric() ? UnitConversion.validateUnit(this.kind, unit) :
@@ -49,7 +49,8 @@ class DefinitionInput {
 		return new DefinitionInput(name, TypedProperty.TypeToken, "1", value, allowedValues);
 
 	public function isNumeric():Bool return kind != TypedProperty.TypeBoolean &&
-		kind != TypedProperty.TypeInteger && kind != TypedProperty.TypeToken;
+		kind != TypedProperty.TypeInteger && kind != TypedProperty.TypeToken &&
+		kind != TypedProperty.TypeText;
 
 	public function normalize(value:Dynamic, ?sourceUnit:String):Dynamic {
 		if (isNumeric()) {
@@ -64,6 +65,8 @@ class DefinitionInput {
 				if (!Std.isOfType(value, Bool)) throw new ParametricError("boolean input requires a bool: " + name);
 			case TypedProperty.TypeInteger:
 				if (!Std.isOfType(value, Int)) throw new ParametricError("integer input requires an integer: " + name);
+			case TypedProperty.TypeText:
+				if (!Std.isOfType(value, String)) throw new ParametricError("text input requires a string: " + name);
 			case TypedProperty.TypeToken:
 				if (!Std.isOfType(value, String) || allowedValues.indexOf(cast(value, String)) < 0)
 					throw new ParametricError("token is outside allowed values: " + name);

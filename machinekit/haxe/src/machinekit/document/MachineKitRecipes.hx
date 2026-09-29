@@ -47,6 +47,17 @@ class MachineKitRecipes {
 		return null;
 	}
 
+	static function setOptional(values:ComponentValues, name:String,
+			inner:ComponentParameterType, text:String):Void {
+		var decoded:Dynamic = Json.parse(text);
+		if (decoded == null) { values.setUnset(name); return; }
+		switch inner {
+			case Scalar | Length | Angle: values.setNumber(name, cast decoded);
+			case Text | Choice(_) | CatalogDesignation(_): values.setToken(name, cast decoded);
+			case _: throw 'Unsupported optional recipe input "$name"';
+		}
+	}
+
 	public static function component(instance:InstanceElement):MachineComponent {
 		var type = typeOrNull(instance.document.definition(instance.definitionId).recipe);
 		if (type == null) throw 'Instance is not a MachineKit recipe: ${instance.id.value}';
@@ -59,11 +70,12 @@ class MachineKitRecipes {
 		var values = new ComponentValues();
 		for (parameter in type.parameters()) {
 			var raw = instance.resolvedValue(parameter.name);
-			switch parameter.type {
+				switch parameter.type {
+				case Optional(inner): setOptional(values, parameter.name, inner, cast raw);
 				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
-				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
+				case Text | Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
 			}
 		}
 		var built = type.create(values);
@@ -89,10 +101,11 @@ class MachineKitRecipes {
 			if (!inputNames.exists(name)) continue;
 			var raw = instance.resolvedValue(name);
 			switch parameter.type {
-				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
+			case Optional(inner): setOptional(values, parameter.name, inner, cast raw);
+			case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
-				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
+				case Text | Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
 			}
 		}
 		return tool.resolve(values);
@@ -286,6 +299,7 @@ class MachineKitRecipes {
 		var result = new Map<String, InstanceElement>();
 		for (element in document.allElements()) if (element.kind == "instance") {
 			var instance:InstanceElement = cast element;
+			if (typeOrNull(document.definition(instance.definitionId).recipe) == null) continue;
 			var property = instance.property("machinekit.occurrence");
 			var id:String = property == null ? instance.name : cast property.value;
 			if (id == null || id.length == 0 || result.exists(id))

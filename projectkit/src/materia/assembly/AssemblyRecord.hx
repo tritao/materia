@@ -1,19 +1,19 @@
 package materia.assembly;
 
 /** Rigid frame in the artifact's length unit; quaternion order is x, y, z, w. */
-typedef AssemblyFrame = {
-	var x:Float;
-	var y:Float;
-	var z:Float;
-	var qx:Float;
-	var qy:Float;
-	var qz:Float;
-	var qw:Float;
+@:wire typedef AssemblyFrame = {
+	@:id(1) var x:Float;
+	@:id(2) var y:Float;
+	@:id(3) var z:Float;
+	@:id(4) var qx:Float;
+	@:id(5) var qy:Float;
+	@:id(6) var qz:Float;
+	@:id(7) var qw:Float;
 }
 
-typedef AssemblyConnector = {
-	var name:String;
-	var frame:AssemblyFrame;
+@:wire typedef AssemblyConnector = {
+	@:id(1) var name:String;
+	@:id(2) var frame:AssemblyFrame;
 }
 
 typedef AssemblyInstance = {

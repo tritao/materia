@@ -6,7 +6,6 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.CncCompiler;
-import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -80,17 +79,17 @@ class CamGeneratedFixtures {
       new Tool(9, 0, 0.012), -0.001, 0.005, 0.004)
     catch (_:Dynamic) rejected = true;
     check(rejected, "U pocket rejects a tool wider than its arms");
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     for (program in [lProgram, uProgram]) {
       check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
         "concave pocket lowers through MotionKit");
-      var imported = new CncCompiler(machine).compileDetailed(
-        CncWriter.write(program.ops, CamTestSetup.standard(), machine));
+      var imported = machine.compileDetailed(
+        machine.export(program, CamTestSetup.standard()));
       check(imported.diagnostics.length == 0 &&
-        imported.ops.length == program.ops.length,
+        imported.program.ops.length == program.ops.length,
         "concave pocket G-code preserves operation count");
-      for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+      for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
         case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
              [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
           for (fraction in [0.0, 0.5, 1.0]) {
@@ -107,7 +106,7 @@ class CamGeneratedFixtures {
   }
 
   static function checkPocketCoverage(contour:CamContour,
-      program:camkit.CamProgram, depth:Float,
+      program:toolpathkit.path.ToolpathProgram, depth:Float,
       check:Bool->String->Void):Void {
     for (op in program.ops) switch op {
       case Move(Cut, Line(a, b), _, _, _) if (Math.abs(a.z - depth) < 1e-9 &&
@@ -233,16 +232,16 @@ class CamGeneratedFixtures {
       check(reversedArcs == (side == "outside" ? 5 : 1),
         "concave offset follows the contour's winding");
     }
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "concave profile lowers through MotionKit");
     check(CamTestLowering.lower(inside, machine).diagnostics.length == 0,
       "concave inside profile lowers through MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(CncWriter.write(program.ops, CamTestSetup.standard(), machine));
-    check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
+    var imported = machine.compileDetailed(machine.export(program, CamTestSetup.standard()));
+    check(imported.diagnostics.length == 0 && imported.program.ops.length == program.ops.length,
       "concave profile G-code recompiles with the same operations");
-    for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+    for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
       case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
            [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
@@ -255,12 +254,12 @@ class CamGeneratedFixtures {
         }
       case _:
     }
-    var insideImported = new CncCompiler(machine).compileDetailed(
-      CncWriter.write(inside.ops, CamTestSetup.standard(), machine));
+    var insideImported = machine.compileDetailed(
+      machine.export(inside, CamTestSetup.standard()));
     check(insideImported.diagnostics.length == 0 &&
-      insideImported.ops.length == inside.ops.length,
+      insideImported.program.ops.length == inside.ops.length,
       "concave inside G-code recompiles with the same operations");
-    for (index in 0...inside.ops.length) switch [inside.ops[index], insideImported.ops[index]] {
+    for (index in 0...inside.ops.length) switch [inside.ops[index], insideImported.program.ops[index]] {
       case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
            [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {
@@ -400,14 +399,14 @@ class CamGeneratedFixtures {
     check(holeFeeds > 16, "both holes get separate inside profiles");
     check(lastHoleIndex < firstOutsideIndex && firstOutsideIndex < program.ops.length,
       "face operation finishes both holes before its outer profile");
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "holed plate lowers to MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(CncWriter.write(program.ops, CamTestSetup.standard(), machine));
-    check(imported.diagnostics.length == 0 && imported.ops.length == program.ops.length,
+    var imported = machine.compileDetailed(machine.export(program, CamTestSetup.standard()));
+    check(imported.diagnostics.length == 0 && imported.program.ops.length == program.ops.length,
       "holed plate G-code round trips through CncKit");
-    for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+    for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
       case [Move(Cut, a, _, _, _), Move(Cut, b, _, _, _)],
            [Move(_, a, _, _, _), Move(_, b, _, _, _)]:
         for (fraction in [0.0, 0.5, 1.0]) {

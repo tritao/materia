@@ -26,7 +26,10 @@ class ComponentParameter {
 
 	public function validate(value:ComponentValue):Void {
 		if (value == null) throw 'Missing component parameter "$name"';
-		switch type {
+			switch type {
+			case Optional(inner):
+				if (value != Unset)
+					new ComponentParameter(name, inner, value, unit, minimum, maximum);
 			case Scalar | Length | Angle:
 				switch value {
 					case Number(v): validateNumber(v);
@@ -40,6 +43,11 @@ class ComponentParameter {
 			case Bool:
 				switch value {
 					case Boolean(_):
+					default: wrongType();
+				}
+			case Text:
+				switch value {
+					case Token(v): if (v == null) wrongType();
 					default: wrongType();
 				}
 			case Choice(options):

@@ -6,12 +6,14 @@ import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import camkit.CamJob;
 import cnckit.CncCompiler;
-import cnckit.CncMachine;
+import cnckit.CncController;
+import cnckit.CncDialect;
 import cnckit.CncWriter;
 import toolpathkit.path.Point3;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;
+import toolpathkit.setup.SetupStock;
 import toolpathkit.tool.CutterProfile;
 import toolpathkit.tool.Tool;
 import haxe.io.Bytes;
@@ -68,15 +70,17 @@ class StockSimulationSession {
     this.height = height;
     this.depth = depth;
     var program = demoProgram();
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
-    for (tool in program.program.tools) machine.toolLibrary.set(tool);
-    var setup = new Setup(0, width, 0, height, 0, -depth, program.safeZ);
-    var text = CncWriter.write(program.program.ops, setup, machine);
+    var controller = new CncController(LinuxCnc, program.program.tools);
+    var setup = new Setup("1", new Point3(0, 0, 0),
+      new SetupStock(0, width, 0, height, 0, -depth, program.safeZ));
+    var authored = new ToolpathProgram(program.program.ops,
+      program.program.tools, [setup]);
+    var text = CncWriter.write(authored, controller);
     gcode = text.split("\n");
-    var compiled = new CncCompiler(machine).compileDetailed(text);
+    var compiled = CncCompiler.compileDetailed(text, controller);
     if (compiled.diagnostics.length > 0)
       throw "Stock simulation program does not compile: " + compiled.diagnostics[0];
-    if (compiled.ops.length != program.program.ops.length)
+    if (compiled.program.ops.length != program.program.ops.length)
       throw "Stock simulation G-code does not match its CAM operations";
     // Compiled ops follow the CAM ops one for one; each CAM op records its operation number.
     operations = [for (op in program.program.ops) {
@@ -85,7 +89,7 @@ class StockSimulationSession {
     }];
     // Work coordinates put the block's top corner at the origin; the object centres the
     // block, so object = work - (width / 2, height / 2, -depth / 2).
-    moves = CutMoves.fromProgram(new ToolpathProgram(compiled.ops, machine.toolLibrary),
+    moves = CutMoves.fromProgram(compiled.program,
       new Point3(width / 2, height / 2, -depth / 2));
     // Rays at cell centres, so none lies exactly on the program's millimetre-round walls,
     // where cut stock and the finished part's mesh could disagree about which side it is on.
@@ -197,7 +201,7 @@ class StockSimulationSession {
     return OPERATION_COLOURS[(operationOf(move) - 1) % OPERATION_COLOURS.length];
 
   /** Work-coordinate geometry of the demo, in metres. */
-  function demoProgram():{program:camkit.CamProgram, safeZ:Float, outer:Array<Float>,
+  function demoProgram():{program:ToolpathProgram, safeZ:Float, outer:Array<Float>,
       boss:Array<Float>, pocketDepth:Float, holes:Array<Point3>, holeDiameter:Float, holeDepth:Float} {
     var size = Math.min(width, height);
     var margin = 0.15 * size;
@@ -239,7 +243,7 @@ class StockSimulationSession {
     fillets there, which show as leftover) and minus the drilled holes as
     cylinders (the drill's cone tip shows as leftover below them).
   **/
-  function finishedPart(program:{program:camkit.CamProgram, safeZ:Float, outer:Array<Float>,
+  function finishedPart(program:{program:ToolpathProgram, safeZ:Float, outer:Array<Float>,
       boss:Array<Float>, pocketDepth:Float, holes:Array<Point3>, holeDiameter:Float, holeDepth:Float}):Part {
     var parts:Array<Part> = [];
     function place(part:Part, x:Float, y:Float, z:Float):Part {

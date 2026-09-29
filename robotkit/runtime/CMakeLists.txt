@@ -29,7 +29,7 @@ add_library(RobotKit::runtime ALIAS robotkit_runtime)
 
 target_compile_features(robotkit_runtime PUBLIC cxx_std_20)
 target_link_libraries(robotkit_runtime PUBLIC motionkit_core
-    PRIVATE robotkit_mcap_headers robotkit_device_virtual)
+    PRIVATE robotkit_mcap_headers robotkit_device_virtual robotkit_lz4)
 target_include_directories(robotkit_runtime PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../device_virtual/include)
 target_compile_definitions(robotkit_runtime PRIVATE RK_BUILDING_LIBRARY)
@@ -133,7 +133,7 @@ if(RK_BUILD_TESTS)
 
     add_executable(robotkit_recording_tests tests/recording.cpp)
     target_compile_features(robotkit_recording_tests PRIVATE cxx_std_20)
-    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime)
+    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime robotkit_mcap_headers)
     add_test(NAME robotkit_recording COMMAND robotkit_recording_tests)
     set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 

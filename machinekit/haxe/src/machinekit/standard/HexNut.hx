@@ -67,6 +67,8 @@ class HexNut extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, spec.height));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.prism(cadkit.modeling.Polygon.regular(6, spec.acrossFlats), 0, spec.height);
 		if (detail == Envelope) return body;

@@ -9,11 +9,12 @@ class Welcome {
   @:id(5) public var controlGranted:Bool;
   @:id(6) public var leaseId:haxe.Int64;
   @:id(7) public var leaseTimeoutMs:Int;
+  @:id(8) public var capabilities:Array<String>;
 
   public function new(?protocolVersion:Int = 1, ?serverName:String = "robotd",
       ?sessionId:haxe.Int64 = null, ?robotId:haxe.Int64 = null,
       ?controlGranted:Bool = false, ?leaseId:haxe.Int64 = null,
-      ?leaseTimeoutMs:Int = 0) {
+      ?leaseTimeoutMs:Int = 0, ?capabilities:Array<String>) {
     this.protocolVersion = protocolVersion;
     this.serverName = serverName;
     this.sessionId = sessionId == null ? haxe.Int64.ofInt(0) : sessionId;
@@ -21,5 +22,6 @@ class Welcome {
     this.controlGranted = controlGranted;
     this.leaseId = leaseId == null ? haxe.Int64.ofInt(0) : leaseId;
     this.leaseTimeoutMs = leaseTimeoutMs;
+    this.capabilities = capabilities == null ? [] : capabilities;
   }
 }

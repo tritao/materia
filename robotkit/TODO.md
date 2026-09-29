@@ -1,5 +1,25 @@
 # RobotKit follow-ups
 
+## Perception foundations (robotkit/plans/PERCEPTION.md)
+
+- Add `robotkit/tools/recording/foxglove-export` when Foxglove export is needed; the user explicitly said "you can ignore the foxstudio toolf or nwo" during Phase 3 of this session.
+- Support ONNX exports with dynamically sized output tensors.
+- Add a TCP observer test that measures subscription delivery rate under frame timing jitter.
+- Separate inference and policy native dependencies from consumers that do not use them.
+- Expand detector unit coverage for decode, NMS, exact drop accounting, and non-default
+  camera aspect ratios through the Haxe entry point.
+- Consider a second TCP connection for bulk data; UDP, QUIC, and HTTP model distribution, health, and recording download remain outside RKF1.
+- Estimate cross-process clock offsets when a bounded mapping can be measured.
+- Export a nanosecond-valued RKD6 mapping snapshot; test skew uncertainty and
+  expiry policies against measured device drift.
+- Add world fusion, tracking, and shared maps after observations are available.
+- Consider `perceptiond` as a separate execution host.
+- Evaluate GPU execution providers and inference backends beyond the pinned CPU ONNX Runtime.
+- Reconsider OpenCV only for camera capture, calibration, undistortion, or heavier image processing; use vendored `stb_image` for JPEG decode.
+- Add `jpeg` and `depth32f` detector inputs and depth/intrinsics lifting into planar `Detection`.
+- Add segmentation, pose, and occupancy observations and fault/world-event robot stream cases.
+- Decide on production sensorkit camera integration after the Phase 7 spike.
+
 ## Humanoid (robotkit/plans/HUMANOID.md)
 
 - H3 sensing the policy run does not use yet: encoder quantization, IMU noise,

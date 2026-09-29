@@ -6,13 +6,10 @@ import machinekit.component.MachineComponent;
 import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
-import machinekit.component.RuntimePortIntent;
 import machinekit.component.Solids;
 
 /** Generic normally closed valve in a vacuum line, commanded by a signal. */
 class VacuumControlValve extends MachineComponent {
-	override public function runtimePortIntents():Array<RuntimePortIntent>
-		return [RuntimePortIntent.VacuumValve("control")];
 
 	public function new(tubeOdMm:Float = 4) {
 		if (!Math.isFinite(tubeOdMm) || tubeOdMm <= 0)
@@ -27,7 +24,19 @@ class VacuumControlValve extends MachineComponent {
 		addBridge("vacuumIn", "vacuumOut");
 		addPort({name: "control", kind: Signal, role: Consumer,
 			iface: Plug("digital-valve", 2), required: true});
+		addCapability(VacuumValve("control"));
 	}
+
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.vacuum-control-valve");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, VacuumControlValve) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("tubeOdMm", switch port("vacuumIn").iface { case PushIn(d): d; case _: 0; }).setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(18, 16, 26);

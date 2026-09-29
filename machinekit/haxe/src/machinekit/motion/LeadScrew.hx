@@ -32,6 +32,8 @@ class LeadScrew extends MachineComponent {
 		addConnector("output", Axis, Solids.axial(0, 0, length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
 
@@ -45,7 +47,7 @@ class LeadScrew extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrew) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return ComponentRecipeSupport.threadValues(this.thread).setNumber("length", this.totalLength)

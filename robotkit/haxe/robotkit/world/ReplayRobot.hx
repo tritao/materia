@@ -15,6 +15,7 @@ class ReplayRobot implements Robot {
   final descriptionValue:RobotDescription;
   final capabilitiesValue:RobotCapabilities;
   final source:Array<ReplayObservation> = [];
+  final eventRing = new RobotEventRing();
   var index:Int = 0;
   var listener:Null<RobotId->Void> = null;
   var closed:Bool = false;
@@ -27,6 +28,7 @@ class ReplayRobot implements Robot {
     logicalId = id;
     this.generatedCommands = generatedCommands == null ? new RobotRecording() : generatedCommands;
     buildTimeline(recording);
+    if (source.length > 0) for (event in source[0].events) eventRing.restore(event);
     descriptionValue = description == null ? new RobotDescription(id, id, [], []) : description;
     capabilitiesValue = capabilities == null
       ? new RobotCapabilities(id, source.length == 0 ? 0 : source[0].snapshot.positions.length,
@@ -44,6 +46,8 @@ class ReplayRobot implements Robot {
   }
 
   public function sensors():Array<SensorFrame> return snapshot().sensors.toArray();
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent>
+    return eventRing.events(afterOrdinal, max);
 
   public function fault():Null<RobotFault> {
     ensureLive();
@@ -64,6 +68,7 @@ class ReplayRobot implements Robot {
   public function advance():Bool {
     if (closed || source.length == 0 || index + 1 >= source.length) return false;
     index++;
+    for (event in source[index].events) eventRing.restore(event);
     var value = listener;
     if (value != null) value(logicalId);
     return true;
@@ -100,7 +105,10 @@ class ReplayRobot implements Robot {
           if (current.faultCode == 0) currentFault = null;
           source.push(new ReplayObservation(current, currentFault));
         }
-      case Command(_), WorldEvent(_), RobotSnapshot(_), Sensor(_, _), Fault(_), ProcessEvent(_):
+      case Channel(robotId, "perception.image_detections", payload) if (robotId == logicalId):
+        var event:RobotEvent = cast payload;
+        source.push(new ReplayObservation(current, currentFault, [event]));
+      case Command(_), WorldEvent(_), RobotSnapshot(_), Sensor(_, _), Fault(_), ProcessEvent(_), Channel(_, _, _):
     }
   }
 
@@ -124,8 +132,10 @@ class ReplayRobot implements Robot {
 private class ReplayObservation {
   public final snapshot:RobotSnapshot;
   public final fault:Null<RobotFault>;
-  public function new(snapshot:RobotSnapshot, fault:Null<RobotFault>) {
+  public final events:Array<RobotEvent>;
+  public function new(snapshot:RobotSnapshot, fault:Null<RobotFault>, ?events:Array<RobotEvent>) {
     this.snapshot = RobotRecording.copyRobotSnapshot(snapshot);
     this.fault = fault == null ? null : new RobotFault(fault.id, fault.code, fault.message, fault.fatal);
+    this.events = events == null ? [] : events.copy();
   }
 }

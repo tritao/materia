@@ -1,6 +1,9 @@
 package machinekit.motion;
 
 import CadKit;
+import haxe.Json;
+import machinekit.component.ComponentValues;
+import machinekit.standard.ParallelKeySpec;
 import cadkit.modeling.Axis;
 import cadkit.modeling.Part;
 import cadkit.modeling.Selection;
@@ -13,6 +16,18 @@ import machinekit.component.Solids;
 import machinekit.standard.ParallelKey;
 import machinekit.standard.BearingFit;
 import machinekit.standard.BearingFit.BearingShaftFit;
+
+private typedef RecipeKey = {
+	var size:String;
+	var length:Float;
+	var codeOnly:Bool;
+	var spec:ParallelKeySpec;
+}
+private typedef RecipeKeyway = {
+	var name:String;
+	var z0:Float;
+	var key:RecipeKey;
+}
 
 /** One constant-diameter length of a stepped shaft, in millimetres. */
 typedef ShaftSection = {
@@ -73,6 +88,7 @@ typedef ShaftGroove = {
 class SteppedShaft extends MachineComponent {
 	public final sections:Array<ShaftSection>;
 	public final totalLength:Float;
+	final namedFaces:Array<{name:String, z:Float}>;
 	final keyways:Array<ShaftKeyway>;
 	final grooves:Array<ShaftGroove>;
 	public final detail:ShaftDetail;
@@ -94,6 +110,7 @@ class SteppedShaft extends MachineComponent {
 		super("SHAFT-" + sizes.join("-") + featureSuffix,
 			"Stepped shaft " + sizes.join(" / ") + detailDescription(resolvedDetail), "steel C45");
 		this.sections = sections.copy();
+		this.namedFaces = resolvedFaces;
 		totalLength = total;
 		this.detail = resolvedDetail;
 		validateDetail();
@@ -276,6 +293,74 @@ class SteppedShaft extends MachineComponent {
 		if (detail.shoulders != null && detail.shoulders.length > 0) result += ", detailed shoulders";
 		return result;
 	}
+
+	public function recipeValues():ComponentValues {
+		var keyData = [for (entry in keyways) {
+			name: entry.name, z0: entry.z0, key: {
+				size: '${Dimension.format(entry.key.spec.width)}x${Dimension.format(entry.key.spec.height)}',
+				length: entry.key.length, codeOnly: entry.key.codeOnly, spec: entry.key.spec
+			}
+		}];
+		return new ComponentValues().setToken("sections", Json.stringify(sections))
+			.setToken("faces", Json.stringify(namedFaces))
+			.setToken("keyways", Json.stringify(keyData))
+			.setToken("grooves", Json.stringify(grooves))
+			.setToken("shaftDetail", Json.stringify(detail)).setToken("material", materialSpec());
+	}
+
+	static function rows(text:String):Array<Dynamic> return Json.parse(text);
+	static function field(object:Dynamic, name:String):Dynamic return Reflect.field(object, name);
+
+	public static function fromRecipe(values:ComponentValues):SteppedShaft {
+		var sections:Array<ShaftSection> = [for (row in rows(values.token("sections")))
+			{diameter: cast field(row, "diameter"), length: cast field(row, "length")}];
+		var faces:Array<{name:String, z:Float}> = [for (row in rows(values.token("faces")))
+			{name: cast field(row, "name"), z: cast field(row, "z")}];
+		var rebuilt:Array<ShaftKeyway> = [];
+		for (entry in rows(values.token("keyways"))) {
+			var keyData = field(entry, "key");
+			var specData = field(keyData, "spec");
+			var spec:ParallelKeySpec = {
+				minShaft: cast field(specData, "minShaft"), maxShaft: cast field(specData, "maxShaft"),
+				width: cast field(specData, "width"), height: cast field(specData, "height"),
+				shaftDepth: cast field(specData, "shaftDepth"), hubDepth: cast field(specData, "hubDepth")
+			};
+			var key = field(keyData, "codeOnly") == true ?
+				ParallelKey.custom(spec, cast field(keyData, "length")) :
+				ParallelKey.metric(cast field(keyData, "size"), cast field(keyData, "length"));
+			rebuilt.push({name: cast field(entry, "name"), z0: cast field(entry, "z0"), key: key});
+		}
+		var grooves:Array<ShaftGroove> = [for (row in rows(values.token("grooves")))
+			{name: cast field(row, "name"), z0: cast field(row, "z0"),
+				width: cast field(row, "width"), diameter: cast field(row, "diameter")}];
+		var raw = Json.parse(values.token("shaftDetail"));
+		var shouldersRaw:Array<Dynamic> = cast field(raw, "shoulders");
+		var shoulders:Array<ShaftShoulderDetail> = shouldersRaw == null ? null : [for (row in shouldersRaw)
+			{z: cast field(row, "z"), fillet: cast field(row, "fillet"),
+				reliefWidth: cast field(row, "reliefWidth"), reliefDiameter: cast field(row, "reliefDiameter")}];
+		var inputRaw = field(raw, "inputThread"), outputRaw = field(raw, "outputThread");
+		var inputThread:ShaftThreadEnd = inputRaw == null ? null :
+			{diameter: cast field(inputRaw, "diameter"), pitch: cast field(inputRaw, "pitch"),
+				length: cast field(inputRaw, "length")};
+		var outputThread:ShaftThreadEnd = outputRaw == null ? null :
+			{diameter: cast field(outputRaw, "diameter"), pitch: cast field(outputRaw, "pitch"),
+				length: cast field(outputRaw, "length")};
+		var detail:ShaftDetail = {inputChamfer: cast field(raw, "inputChamfer"),
+			outputChamfer: cast field(raw, "outputChamfer"), inputThread: inputThread,
+			outputThread: outputThread, shoulders: shoulders};
+		return new SteppedShaft(sections, faces, rebuilt, grooves, detail);
+	}
+
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.stepped-shaft");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, SteppedShaft) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return recipeValues().setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ownedParts:Array<Part> = [];

@@ -25,4 +25,12 @@ class EditorWorkspaceLayout {
       DockNode.Tabs(["hierarchy", "bim", "sensors"], "hierarchy"), main);
   }
 
+  /** Simulation focus: a wide viewport with telemetry below and runtime controls beside it. */
+  public static function simulateLayout():DockNode {
+    var main = DockNode.Split(DockSplitAxis.Vertical, 0.68,
+      DockNode.Panel("perspective"),
+      DockNode.Tabs(["telemetry", "console"], "telemetry"));
+    return DockNode.Split(DockSplitAxis.Horizontal, 0.74, main,
+      DockNode.Tabs(["sensors", "inspector", "hierarchy"], "sensors"));
+  }
 }

@@ -119,6 +119,32 @@ the local clock and leaves aggregate source time zero: unrelated robot clocks
 cannot be meaningfully combined using a maximum. Per-robot source times remain
 available without reinterpretation.
 
+`robotkit.time.ClockMapping` is the sanctioned representation for comparing
+timestamps from different clocks. It names a directed nanosecond-to-nanosecond
+relationship, provenance, offset, skew and skew uncertainty in parts per
+billion, an anchor error bound, `validFromNs`, and optional `validUntilNs` in
+the target clock. The offset is defined at that target
+clock anchor: if `sourceAnchor = validFromNs - offsetNs`, then
+`target = source + offsetNs + round((source - sourceAnchor) * skewPpb / 1e9)`.
+Negative half-nanosecond corrections round toward positive infinity, matching
+Haxe's `Math.round` rule. The mapped error bound is the anchor bound plus
+`ceil(abs(source - sourceAnchor) * skewUncertaintyPpb / 1e9)`.
+`ClockMappings` follows only registered directed edges, sums their bounds,
+and chooses the valid path with the lowest bound. Equal-bound paths that
+disagree by more than one nanosecond return no mapping. Identity has zero error. A mapping outside its
+validity or representable nanosecond range also returns no result. This model
+does not estimate a relationship or enable absolute command deadlines.
+
+RKD6's `ClockEstimator6` currently maps host monotonic nanoseconds to **device
+ticks**, fitting rate and offset from low-RTT samples. Its reported
+`uncertainty_ns` is a measured bound; deployment's `clock_sync_bound_ns` is
+the maximum accepted uncertainty, not that measurement. RKD6 rejects late
+or inconsistent samples, faults after lost sync, and reserves link latency
+plus twice the current uncertainty for its committed horizon. Since the
+estimator exposes neither a nanosecond-valued device epoch nor a mapping
+snapshot, it cannot yet register a valid `ClockMapping`. No clock edge is
+inferred from the configured bound.
+
 ### Ownership
 
 The existing ownership matrix below is normative: `RobotWorld` owns attached
@@ -723,6 +749,38 @@ the owner, and closes that connection. A replacement controller receives a
 new session and must explicitly reset safety before motion can resume. World
 composition and multi-robot discovery remain in `RobotWorld`.
 
+outbound RKF1 traffic is classified centrally as essential, numeric sensor, or
+camera. Essential messages enter NativeKit's writer queue immediately. Sensor
+and camera frames occupy one latest-wins slot per connection and sensor ID;
+each sensor sequence is offered once per session. The main loop flushes slots
+round-robin while the transport's queued bytes are below half its configured
+capacity. A frame may cross that threshold, but cannot consume the last 64 KiB
+of the transport queue. `--bulk-budget-bytes` changes the threshold while
+preserving that reserve. Frames larger than capacity minus the reserve are
+dropped. Replaced and oversized frames count as drops; only new drop counts
+are logged, at most once per second per connection. A full bulk queue leaves
+its slot pending; an essential send failure still closes the connection.
+The transport writer thread performs socket I/O, so this scheduler only
+enqueues from the robotd loop. TCP still delivers bytes in order: an essential
+frame can follow a bulk frame already handed to the socket. The budget reserves
+NativeKit queue capacity and prevents bulk queue exhaustion from closing a
+control lease. The reserve is finite: a controller that stops reading entirely
+can still fill it with essential state and fault traffic, after which robotd
+closes that connection. There is no fixed stall timeout; the time depends on
+state size, publish rate, and socket backpressure. The reserve also does not
+remove TCP serialization latency.
+
+`Hello` may request `essential`, `sensor`, and `camera` families with a maximum
+rate per family (Hz; zero is unlimited). Missing or empty subscriptions retain
+legacy delivery of every family. Essential traffic is always delivered. Numeric
+and camera rate limits apply independently to each sensor ID using robotd's
+monotonic clock; filtered sequences are not retried on later snapshots.
+`RobotClient` requests essential and numeric sensor traffic by default; callers
+opt in to camera frames before connecting. `Welcome.capabilities` lists the
+families robotd can emit. The published RKF1 `@:wire` field IDs and types and
+`RobotMessageType` values are checked against `schema/rkf1.lock.json` in the
+test suite; new fields use fresh IDs.
+
 Recording stores commands, snapshots, sensor-bearing world snapshots, faults,
 and world events. `ReplayRobot` and `WorldBehaviorRunner` consume the same
 public boundary, so behavior code can be exercised against simulated, remote,
@@ -730,23 +788,86 @@ or recorded state without backend conditionals. `worldd` is only a headless
 composition of `RobotWorld` plus `Simulation`; it does not create a parallel
 domain model.
 
-Persistent recording is an adapter below the world boundary. Haxe owns the
-versioned RobotKit payload contract; a small C ABI owns a bounded queue and the
-MCAP reader/writer. Neither MCAP headers nor MCAP concepts appear in `Robot`,
-`RobotWorld`, behavior contexts, or runtime observation contracts. The writer
-uses one channel/schema per event kind and no compression. File order and the
-recording ordinal—not unrelated source clocks—define deterministic replay.
+Persistent recording is an adapter below the world boundary. Haxe registers
+typed `RecordingChannel<T>` codecs backed by RKF1-locked `@:wire` classes. The
+MCAP schema for each channel embeds its field IDs, names, and types. Messages
+are MessagePack, including raw camera bytes; the native C ABI treats payloads
+as opaque bytes and handles the bounded queue and MCAP I/O. New channels use
+the same registration path as the seven core channels. Neither MCAP headers
+nor MCAP concepts appear in `Robot`, `RobotWorld`, or behavior contracts.
+Recording-specific `Recording*Msg` classes carry fields that are absent from
+their RKF1 live messages, including recording robot identity and nested world
+state; sharing those classes would couple a live protocol change to recording
+only metadata. `RobotRecordingEvent.Channel(...)` permits extensions without
+editing the core event enum. Typed core cases remain useful to behavior and
+replay code and are converted through the same channel registry.
 
-The current format uses MCAP log time for the independent wall-clock recording
-timestamp and publish time for the full-width event ordinal. Reader cursors are
-incremental and schema-validating. Writer queues are bounded by payload bytes,
-in-memory retention is optional, and a companion terminal-status record keeps
-write failures and drop counts visible across process restarts.
+Recording format v6 defaults to LZ4 chunk compression and also supports no
+compression. MCAP log time stores the independent wall-clock recording time;
+publish time stores the full-width arrival ordinal used for deterministic
+replay. The incremental reader rejects older versions and can skip unknown
+channels or reject them in strict mode. In-memory retention is optional, and
+a companion terminal-status record keeps write failures and drop counts visible
+across process restarts. `robotkit/tools/recording/dump` uses embedded schemas
+to print a recording as JSON lines for inspection.
 
 World-level behaviors leave command deadlines unset. Nonzero world-command
 deadlines are currently rejected rather than ignored or translated without a
 clock mapping. Local runtime behaviors may use bounded `IntentBuffer` expiry;
 source timestamps are never silently reused as receive or command time.
+
+## Perception
+
+`SerialDeployment` schema v5 may declare perception pipelines separately from
+the device layout. Each entry names a camera sensor, a model path and SHA-256,
+a pipeline implementation, an execution `host`, and its `consumers`.
+The section is strict and remains outside the RKD6 device fingerprint. Older
+v3/v4 deployments remain valid without it. A `worldd` host cannot serve a
+`local` consumer without a network round trip.
+
+`PerceptionHost` routes camera `SensorFrame`s by sensor ID to code-defined
+`PerceptionPipeline`s. `ObjectDetectorPipeline` accepts raw `rgb8` and enqueues
+it to `RobotKit::inference`; one native worker keeps the newest pending frame,
+performs bilinear letterboxing and normalization, then runs the pinned CPU
+ONNX Runtime. Haxe polls completed tensors, maps pixel boxes back through the
+reported letterbox transform, thresholds them and applies per-class NMS.
+The submitter never waits for inference. The humanoid policy has its separate
+small-tensor API but links the same ONNX Runtime shared library.
+Configured detectors read the model bytes once, hash those bytes against the
+deployment digest, and load that same buffer into ONNX Runtime.
+The current inference ABI requires statically sized output tensors; exported
+models with a dynamic anchor count are rejected at session creation. Destroying
+a session stops pending work and joins the worker, so it blocks until an
+in-flight ONNX Runtime `Run` returns.
+
+`ImageDetectionObservation` is independent of `RobotSnapshot` and planar
+`Detection`. It retains the source image's sequence, frame and source/receive
+clocks, plus a completion timestamp on `robotkit.monotonic`, model identity
+and digest, and dropped-frame count. The `Robot.events(afterOrdinal, max)`
+boundary exposes them in a bounded per-robot ring. Its ordinal is assigned
+when an observation enters the boundary; a late reader receives an `Overflow`
+marker before retained events. `WorldBehaviorContext` receives new events
+alongside each snapshot, and a new event can trigger an update even if the
+snapshot itself has not changed. `events()` belongs on `Robot` so live,
+simulated, and replay adapters expose one behavior-facing stream without a
+separate observation side channel. `WorldBehaviorRunner.reset()` sets its
+cursor back to zero, so its next update intentionally redelivers up to 256
+retained events. `ReplayRobot` gives each recorded observation its own advance
+step, preserving event arrival order even when the snapshot did not change.
+
+`robotd` submits each new camera sequence to its configured pipelines and
+polls completed observations without waiting for inference. The observation
+family uses RKF1 message type 19 and a latest-wins slot per producer. Clients
+that consume robotd observations subscribe to `observation` before connecting;
+`Welcome` advertises it. A worldd instance with
+`--remote=HOST:PORT --deployment=FILE` enables camera input for its
+worldd-hosted pipelines before the Hello exchange. `RemoteRobot`
+assigns a new ordinal as each delivered observation enters its own robot
+boundary; the wire also carries the producing boundary's ordinal.
+`WorldHost` can run pipelines placed at `worldd` over subscribed remote camera
+frames. `RecordingRobot` stores observations on the registered
+`perception.image_detections` MessagePack channel, and `ReplayRobot` restores
+their original ordinals in recording order.
 
 ## 3D spatial types
 

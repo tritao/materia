@@ -77,6 +77,8 @@ class EndEffectorPlate extends MachineComponent {
 	public function toolBoltPattern():Array<{x:Float, y:Float}>
 		return circle(toolBoltCircleDiameter, toolBoltCount);
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
@@ -142,7 +144,7 @@ class EndEffectorPlate extends MachineComponent {
 				try {
 					new EndEffectorPlate(new RobotFlange(40, 4), 12, 65, 4, designation);
 					compatible.push(designation);
-				} catch (_:Dynamic) {}
+				} catch (_:String) {}
 			}
 			toolScrewCatalogCache = new FilteredCatalogIndex(screws, compatible);
 		}
@@ -160,7 +162,7 @@ class EndEffectorPlate extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, EndEffectorPlate) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return new ComponentValues().setNumber("flangePitchCircle", this.flange.spec.pitchCircle)

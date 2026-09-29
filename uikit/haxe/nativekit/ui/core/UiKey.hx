@@ -8,6 +8,8 @@ class UiKey {
 	public static inline var Backspace:Int = 259;
 	public static inline var Delete:Int = 261;
 	public static inline var F2:Int = 291;
+	public static inline var F5:Int = 294;
+	public static inline var F10:Int = 299;
 	public static inline var Down:Int = 264;
 	public static inline var Up:Int = 265;
 	public static inline var PageUp:Int = 266;

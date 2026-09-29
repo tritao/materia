@@ -1,7 +1,7 @@
 package machinekit.component;
 
-enum PortRole {
-	Supply;
-	Consumer;
-	Passive;
+@:wire enum PortRole {
+	@:id(1) Supply;
+	@:id(2) Consumer;
+	@:id(3) Passive;
 }

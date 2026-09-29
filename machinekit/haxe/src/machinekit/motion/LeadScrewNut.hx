@@ -93,6 +93,8 @@ class LeadScrewNut extends MachineComponent {
 	public function mountScrewPart(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(mountScrew, length);
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength);
 		var flange = Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness);
@@ -117,7 +119,7 @@ class LeadScrewNut extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, LeadScrewNut) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return ComponentRecipeSupport.threadValues(this.thread).setInteger("boltCount", this.boltCount)

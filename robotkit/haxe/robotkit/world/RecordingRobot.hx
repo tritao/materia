@@ -8,6 +8,7 @@ class RecordingRobot implements Robot {
   public var recordingError(default, null):Null<String> = null;
 
   var lastRecordedFaultCode:Int = 0;
+  var lastRecordedEventOrdinal:haxe.Int64 = haxe.Int64.ofInt(0);
 
   public function new(source:Robot, recording:RobotRecordingSink) {
     if (source == null || recording == null)
@@ -22,6 +23,7 @@ class RecordingRobot implements Robot {
   public function capabilities():RobotCapabilities return source.capabilities();
 
   public function snapshot():RobotSnapshot {
+    captureEvents();
     var observation = source.snapshot();
     record(function() recording.recordSnapshot(observation));
     if (observation.faultCode == 0) {
@@ -35,6 +37,21 @@ class RecordingRobot implements Robot {
   }
 
   public function sensors():Array<SensorFrame> return source.sensors();
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent> {
+    captureEvents();
+    return source.events(afterOrdinal, max);
+  }
+
+  function captureEvents():Void {
+    var available:Array<RobotEvent>;
+    do {
+      available = source.events(lastRecordedEventOrdinal, 256);
+      for (event in available) {
+        lastRecordedEventOrdinal = RobotEventRing.ordinalOf(event);
+        record(function() recording.recordRobotEvent(source.id(), event));
+      }
+    } while (available.length == 256);
+  }
   public function fault():Null<RobotFault> return source.fault();
 
   public function submit(command:RobotCommand):Void {

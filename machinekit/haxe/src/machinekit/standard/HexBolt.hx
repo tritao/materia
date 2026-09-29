@@ -89,6 +89,8 @@ class HexBolt extends MachineComponent {
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var shank = Part.cylinderSpan(diameter / 2, -length, 0);
 		var head = detail == Envelope

@@ -3,6 +3,8 @@ package machinekit.robotics;
 import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.Diagnostics;
+import machinekit.assembly.MachineAssemblyDescription;
 import machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -26,6 +28,42 @@ class EndEffector extends MachineAssembly {
 	public var primaryFrame(default, null):Null<String>;
 
 	public function new() super();
+
+	override public function describe():MachineAssemblyDescription {
+		var description = super.describe();
+		description.machine.endEffector = {mount: mountRef == null ? null :
+			{instanceId: mountRef.instanceId, connectorName: mountRef.connectorName},
+			frames: [for (frame in frames) {name: frame.name, instanceId: frame.instanceId,
+				connectorName: frame.connectorName}], primaryFrame: primaryFrame,
+			collisionExclusions: [for (member in components()) if (collisionExclusions.exists(member.id)) member.id]};
+		return description;
+	}
+
+	public static function fromDescription(description:MachineAssemblyDescription):EndEffector {
+		var saved = description.machine.endEffector;
+		if (saved == null) throw "Description has no end-effector data";
+		var base = MachineAssembly.fromDescription(description);
+		var result = new EndEffector();
+		base.copyInto(result);
+		if (saved.mount != null) result.mount(saved.mount.instanceId, saved.mount.connectorName);
+		for (frame in saved.frames) result.workingFrame(frame.name, frame.instanceId,
+			frame.connectorName, frame.name == saved.primaryFrame);
+		for (id in saved.collisionExclusions) result.excludeFromCollision(id);
+		return result;
+	}
+
+	/** Own a stable builder snapshot when a changer accepts this tool. */
+	override public function snapshot():EndEffector {
+		var result = new EndEffector();
+		copyInto(result);
+		if (mountRef != null) result.mountRef = {instanceId: mountRef.instanceId,
+			connectorName: mountRef.connectorName};
+		for (frame in frames) result.frames.push({name: frame.name, instanceId: frame.instanceId,
+			connectorName: frame.connectorName});
+		result.primaryFrame = primaryFrame;
+		for (id in collisionExclusions.keys()) result.collisionExclusions.set(id, true);
+		return result;
+	}
 
 	public function mount(instanceId:String, connector:String):Void {
 		if (mountRef != null) throw "End effector already has a mount";
@@ -66,25 +104,44 @@ class EndEffector extends MachineAssembly {
 		throw 'Unknown working frame "$name"';
 	}
 
-	override public function validate():Array<String> {
-		var warnings = super.validate();
-		if (mountRef == null) throw "End effector needs a mount";
-		var mount = mountRef;
-		memberConnectorFrame(mount.instanceId, mount.connectorName);
-		var parents = mateParents();
-		if (parents.exists(mount.instanceId)) throw "End effector mount must be on a root member";
-		for (member in components()) {
-			var current = member.id;
-			while (parents.exists(current)) current = parents.get(current);
-			if (current != mount.instanceId) throw 'End effector member "${member.id}" is not attached to the mount root';
+	override public function check():Diagnostics {
+		var result = super.check();
+		if (mountRef == null) result.error("eoat.missing-mount", "mount", "End effector needs a mount");
+		else {
+			var mount = mountRef;
+			if (!hasMemberConnector(mount.instanceId, mount.connectorName))
+				result.error("eoat.invalid-mount", mount.instanceId + "/" + mount.connectorName,
+					'Unknown connector "${mount.instanceId}/${mount.connectorName}"');
+			var parents = mateParents();
+			if (parents.exists(mount.instanceId)) result.error("eoat.nonroot-mount", mount.instanceId,
+				"End effector mount must be on a root member");
+			for (member in components()) {
+				var current = member.id;
+				var seen:Map<String, Bool> = [];
+				while (parents.exists(current) && !seen.exists(current)) {
+					seen.set(current, true);
+					current = parents.get(current);
+				}
+				if (!seen.exists(current) && current != mount.instanceId)
+					result.error("eoat.detached-member", member.id,
+						'End effector member "${member.id}" is not attached to the mount root');
+			}
 		}
-		for (frame in frames) memberConnectorFrame(frame.instanceId, frame.connectorName);
-		return warnings;
+		for (frame in frames) if (!hasMemberConnector(frame.instanceId, frame.connectorName))
+			result.error("eoat.invalid-frame", frame.name,
+				'Unknown connector "${frame.instanceId}/${frame.connectorName}"');
+		return result;
+	}
+
+	override public function validate():Array<String> {
+		var result = check();
+		result.throwIfErrors();
+		return result.warnings();
 	}
 
 	/** MachineKit frame in mm, relative to the robot-facing mount connector. */
 	public function mountTFrame(name:String, ?state:AssemblyState,
-			?solved:EndEffectorSolvedContext):AssemblyFrame {
+			?solved:EndEffectorSolvedContext):ConnectorFrame {
 		if (mountRef == null) throw "End effector needs a mount";
 		var frame:Null<WorkingFrame> = null;
 		for (entry in frames) if (entry.name == name) frame = entry;
@@ -94,7 +151,7 @@ class EndEffector extends MachineAssembly {
 		if (pose == null) throw 'Missing solved pose for "${frame.instanceId}"';
 		var frameWorld = AssemblyFrames.compose(pose,
 			memberConnectorFrame(frame.instanceId, frame.connectorName));
-		return AssemblyFrames.compose(AssemblyFrames.inverse(context.mountWorld), frameWorld);
+		return new ConnectorFrame(AssemblyFrames.compose(AssemblyFrames.inverse(context.mountWorld), frameWorld));
 	}
 
 	/** Centre in mm and centroidal inertia in kg mm², both in the mount frame. */

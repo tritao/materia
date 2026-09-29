@@ -72,11 +72,7 @@ class SensorPanel {
       new KeyedView("remove",removeSensor)
     ],actionRowStyle());
     var applySimulation = new Button(simulation.appliedRevision == 0 ? "Apply" : "Rebuild", null,
-      function() {
-        log(simulation.rebuild(sensors,scene,session) ? "Shared simulation configuration applied" :
-          "Simulation rebuild rejected: " + simulation.error);
-        commands.refresh();
-      }, "sensor-apply");
+      function() commands.execute("sim.rebuild"), "sensor-apply");
     applySimulation.variant = ButtonVariant.Primary;
     var runtimeActions=new Column("sensor-runtime-actions",[
       new KeyedView("configuration",new Row("sensor-configuration-actions",[
@@ -86,20 +82,11 @@ class SensorPanel {
         commands.execute("editor.redo");},"sensor-redo")),
       new KeyedView("apply",applySimulation)],actionRowStyle())),
       new KeyedView("playback",new Row("sensor-playback-actions",[
-      new KeyedView("run",new Button("Run",null,function(){
-        try {simulation.start();log("Simulation running");} catch(error:Dynamic){log("Run rejected: "+Std.string(error));}
-        commands.refresh();
-      },"sensor-run")),
-      new KeyedView("pause",new Button("Pause",null,function(){
-        simulation.stop();log("Simulation paused");commands.refresh();
-      },"sensor-pause")),
-      new KeyedView("reset",new Button("Reset",null,function(){
-        log(simulation.reset() ? "Shared simulation reset" : "No simulation to reset");
-        commands.refresh();
-      },"sensor-reset")),
-      new KeyedView("design",new Button("Design",null,function(){
-        simulation.clear();log("Returned to design mode");commands.refresh();
-      },"sensor-design"))
+      new KeyedView("run",new Button("Run",null,function() commands.execute("sim.play"),"sensor-run")),
+      new KeyedView("pause",new Button("Pause",null,function() commands.execute("sim.pause"),"sensor-pause")),
+      new KeyedView("step",new Button("Step",null,function() commands.execute("sim.step"),"sensor-step")),
+      new KeyedView("reset",new Button("Reset",null,function() commands.execute("sim.reset"),"sensor-reset")),
+      new KeyedView("design",new Button("Design",null,function() commands.execute("sim.stop"),"sensor-design"))
       ],actionRowStyle()))
     ],actionColumnStyle());
     var backendActions=new Row("sensor-backend-actions",[

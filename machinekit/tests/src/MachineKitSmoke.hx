@@ -6,6 +6,10 @@ import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.InstancePath;
+import machinekit.component.PortInterfaces;
+import machinekit.units.Millimetres;
+import machinekit.units.KgMm2;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
@@ -94,11 +98,14 @@ private class MassTestBlock extends MachineComponent {
 			withInertia ? new InertiaTensor(2, 0, 0, 3, 0, 4) : null);
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 10, 10);
 }
 
 private class MassTestTube extends MachineComponent {
 	public function new() super("TEST-TUBE", "Rectangular test tube", "aluminium 6061", true);
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return new RectTube(40, 20, 2).geometry(100);
 }
@@ -117,6 +124,8 @@ private class MissingMassCentre extends MachineComponent {
 
 private class PortTestComponent extends MachineComponent {
 	public function new(name:String) super(name, name, "steel", true);
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(1, 1, 1);
 
 	public function definePort(name:String, kind:PortKind, role:PortRole, iface:PortInterface,
@@ -130,11 +139,13 @@ private class PortTestComponent extends MachineComponent {
 }
 
 class MachineKitSmoke {
-	static function massProperties():Void {
+	public static function massProperties():Void {
 		var tube = new MassTestTube();
 		var expected = (40 * 20 - 36 * 16) * 100 * 1e-9 * 2700;
 		near(tube.massProperties().mass, expected, "rectangular tube analytic mass", 1e-9);
 		near(tube.massProperties().centreOfMass.z, 50, "tube centre of mass");
+		check(new MassTestTube().massProperties().mass > 0,
+			"Geometry-only override must provide computed mass");
 		check(tube.massProperties() == tube.massProperties(), "component mass estimate is cached");
 		check(switch tube.massProperties().source { case Computed(Preview): true; default: false; },
 			"preview mass source");
@@ -152,12 +163,22 @@ class MachineKitSmoke {
 		var assembly = new MachineAssembly();
 		assembly.addComponent("a", block);
 		assembly.addComponent("b", block);
+		throws(() -> assembly.encode(), "Code-only member");
 		assembly.addMate("link", "fixed", "a", "right", "b", "origin");
 		assembly.addBomItem({partNumber: "RAIL-CUT", description: "Unmodelled rail", quantity: 1, material: "steel"});
 		var combined = assembly.massProperties();
 		near(combined.mass, 0.0054, "two block mass", 1e-9);
 		near(combined.centreOfMass.x, 10, "solved assembly centre of mass x");
 		near(combined.centreOfMass.z, 5, "solved assembly centre of mass z");
+		var childFirst = new MachineAssembly();
+		for (id in ["a", "b", "c"]) childFirst.addComponent(id, block);
+		childFirst.addMate("second", "fixed", "b", "right", "c", "origin");
+		childFirst.addMate("first", "fixed", "a", "right", "b", "origin");
+		var childFirstPoses = childFirst.solvedPoses();
+		var middlePose = childFirstPoses.get("b"), leafPose = childFirstPoses.get("c");
+		if (middlePose == null || leafPose == null) throw "Child-first MachineAssembly poses are missing";
+		near(middlePose.x, 20, "child-first MachineAssembly middle pose");
+		near(leafPose.x, 40, "child-first MachineAssembly leaf pose");
 		var combinedInertia:InertiaTensor = cast combined.inertia;
 		near(combinedInertia.xx, 0.09, "two block axial inertia", 1e-8);
 		near(combinedInertia.yy, 0.63, "parallel axis inertia", 1e-8);
@@ -184,6 +205,9 @@ class MachineKitSmoke {
 		var innerInertia:InertiaTensor = cast inner.massProperties().inertia;
 		near(outerInertia.yy, innerInertia.yy,
 			"included assembly inertia");
+		inner.addComponent("late", block);
+		check(outer.subassemblies()[0].assembly.components().length == 2,
+			"include keeps a snapshot of the source builder");
 
 		var moving = new MachineAssembly();
 		moving.addComponent("a", block);
@@ -232,7 +256,23 @@ class MachineKitSmoke {
 		near(rotatedInertia.yy, 2, "declared tensor y moment rotates into assembly frame");
 	}
 
-	static function ports():Void {
+	public static function ports():Void {
+		var path = InstancePath.of("robot/tool/cup");
+		check(path.segments().join(",") == "robot,tool,cup" && path.parent() == "robot/tool",
+			"instance path exposes segments and parent");
+		throws(() -> new InstancePath("bad/name"), "cannot contain");
+		var pathAssembly = new MachineAssembly();
+		throws(() -> pathAssembly.addComponent("bad/name", new MassTestBlock()), "cannot contain");
+		check(PortInterfaces.compatible(PushIn(6), PushIn(6)) &&
+			!PortInterfaces.compatible(PushIn(6), PushIn(8)) &&
+			PortInterfaces.compatible(Plug("M12", 4), Plug("M12", 4)) &&
+			!PortInterfaces.compatible(Plug("M12", 4), Plug("M12", 5)) &&
+			PortInterfaces.compatible(Thread("G1/8-M"), Thread("G1/8-F")),
+			"port interfaces compare by value with thread mating rules");
+		check(Math.abs((new Millimetres(250)).metres().raw() - 0.25) < 1e-12 &&
+			Math.abs((new KgMm2(1000000)).kgM2() - 1) < 1e-12,
+			"unit conversions at bridge boundaries");
+
 		var changer = new PortTestComponent("CHANGER");
 		changer.defineConnector("airFace");
 		changer.definePort("robotAir", Pneumatic, Consumer, PushIn(6), false, "airFace");
@@ -347,6 +387,34 @@ class MachineKitSmoke {
 		misleading.connectPorts("feed", "power", "output", "device", "power");
 		check(misleading.upstream("device", "air").port.instanceId == "device",
 			"upstream does not infer service conversion from unrelated power");
+
+		var diagnosticsAssembly = new MachineAssembly();
+		diagnosticsAssembly.addComponent("cupA", cup);
+		diagnosticsAssembly.addComponent("cupB", cup);
+		var diagnosticsSource = new PortTestComponent("DIAGNOSTICS-SOURCE");
+		diagnosticsSource.definePort("air", Pneumatic, Supply, PushIn(6));
+		diagnosticsAssembly.addComponent("source", diagnosticsSource);
+		diagnosticsAssembly.connectPorts("bad-kind", "source", "air", "cupA", "vacuum");
+		var findings = diagnosticsAssembly.check().items;
+		check(findings.length == 2 && findings[0].code == "port.kind-mismatch" &&
+			findings[0].subject == "bad-kind" &&
+			findings[1].code == "port.required-unconnected" && findings[1].subject == "cupB/vacuum",
+			"diagnostics collect independent connection and required-port faults");
+		throws(() -> diagnosticsAssembly.validate(), "mismatched kinds");
+		var structure = new MachineAssembly();
+		structure.addComponent("root", new MassTestBlock());
+		structure.addComponent("child", new MassTestBlock());
+		structure.addMate("first", "fixed", "root", "right", "child", "origin");
+		structure.addMate("second", "fixed", "root", "origin", "child", "right");
+		structure.addCoupling("missing-joints", "absent-a", "absent-b", 1);
+		var structuralFindings = structure.check().items;
+		check(structuralFindings.length == 2 && structuralFindings[0].code == "assembly.multiple-parents" &&
+			structuralFindings[0].subject == "child" &&
+			structuralFindings[1].code == "assembly.missing-coupling-joint" &&
+			structuralFindings[1].subject == "missing-joints",
+			"diagnostics collect independent structural faults");
+		throws(() -> structure.validateStructure(), "two parent joints");
+
 
 		var unconnected = new MachineAssembly();
 		unconnected.addComponent("cup", cup);
@@ -501,6 +569,19 @@ class MachineKitSmoke {
 				"MachineKit defines typed tool inputs with defaults");
 		}
 		registryDocument.close();
+		var routeDocument = new Document();
+		var routeType = MachineKitComponents.byId("machinekit.pneumatic.routed-hose");
+		var routeDefinition = MachineKitDocuments.define(routeDocument, routeType,
+			routeType.defaults().setToken("route", '[{"x":0,"y":0,"z":0},{"x":0,"y":0,"z":80},{"x":30,"y":0,"z":80}]'));
+		var routeInstance = routeDocument.createInstance("Hose", routeDefinition);
+		check(MachineKitRecipes.component(routeInstance).connector("end").frame.x == 30,
+			"text route input builds the saved connector frame");
+		var reloadedRoute = DocumentCodec.decode(DocumentCodec.encode(routeDocument));
+		var reloadedInstance:cadkit.parametric.InstanceElement = cast reloadedRoute.element(routeInstance.id);
+		check(MachineKitRecipes.component(reloadedInstance).connector("end").frame.x == 30,
+			"text route input survives document save and reload");
+		reloadedRoute.close();
+		routeDocument.close();
 		var document = new Document();
 		var type = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
 		var definition = MachineKitDocuments.define(document, type);
@@ -1308,6 +1389,7 @@ class MachineKitSmoke {
 		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
 		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
 		var pair = GearPair.mesh(pinion, gear);
+		MachineAssemblyDescriptionTests.roundTrip(pair, "gear pair");
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
 		near(pair.operatingPressureAngle, SpurGear.STANDARD_PRESSURE_ANGLE, "gear pair operating pressure angle");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
@@ -1443,6 +1525,7 @@ class MachineKitSmoke {
 	static function flangeBearingAssembly():Void {
 		var bearing = DeepGrooveBearing.metric("6204");
 		var block = new FlangeBearingAssembly(bearing);
+		MachineAssemblyDescriptionTests.roundTrip(block, "flange bearing assembly");
 		check(block.housing.fit == BearingHousingFit.Slip, "flange assembly uses a named housing fit");
 		check(block.housing.mountScrew == "M6", "flange assembly mount screw size");
 		near(block.housing.face, 68.4, "flange housing face leaves 1 mm around the M6 heads");
@@ -1591,6 +1674,7 @@ class MachineKitSmoke {
 
 	static function linearAxis():Void {
 		var axis = new LinearAxis();
+		MachineAssemblyDescriptionTests.roundTrip(axis, "linear axis");
 		check(axis.motor.designation == "23HS22-2804S", "linear axis motor designation");
 		check(axis.bearing.designation == "6000-2Z", "linear axis default bearing matches the 10 mm screw");
 		check(axis.coupling.designation == "COUPLING-6.35x10-18x30", "linear axis coupling joins motor and screw");
@@ -1788,6 +1872,7 @@ class MachineKitSmoke {
 	static function pickingFrames():Void {
 		var config = PickingStationConfig.defaults();
 		var rack = new StorageRack(config), frame = rack.frame;
+		MachineAssemblyDescriptionTests.roundTrip(rack, "storage rack", false);
 		var clearWidth = config.rackWidth - 2 * frame.profile.size;
 		var clearDepth = config.rackDepth - 2 * frame.profile.size;
 		for (cut in frame.memberCuts()) {
@@ -2330,8 +2415,9 @@ class MachineKitSmoke {
 		outer.include("unit", inner);
 		outer.validate();
 		throws(() -> outer.include("unit", inner), "Duplicate included assembly");
-		check(outer.subassemblies().length == 1 && outer.subassemblies()[0].assembly == inner,
-			"included assembly remains identifiable");
+		check(outer.subassemblies().length == 1 && outer.subassemblies()[0].id == "unit" &&
+			outer.subassemblies()[0].assembly != inner && outer.subassemblies()[0].assembly.components().length == 2,
+			"included assembly keeps an identified snapshot");
 		var model = new AssemblyModel();
 		outer.addTo(model, "");
 		check(model.definition().joints.length == 1, "included joint is prefixed and valid");
@@ -2376,6 +2462,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		MachineAssemblyDescriptionTests.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();
 		EndEffectorComponentTests.run();

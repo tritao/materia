@@ -10,6 +10,8 @@ import machinekit.structural.TSlotExtrusion;
 
 /** Extrusion frame for the storage rack. Member stock is exposed through cutList(). */
 class RackFrame extends MachineComponent {
+	override public function componentType():machinekit.component.ComponentType return PickingStationRecipes.rackFrame();
+	override public function values():machinekit.component.ComponentValues return PickingStationRecipes.values(this);
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;

@@ -87,6 +87,20 @@ class RoutedHose extends MachineComponent {
 		declareMass(mass, new Vector(weightedX, weightedY, weightedZ), tensor);
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.routed-hose");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, RoutedHose) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", designation)
+			.setToken("route", machinekit.component.MachineKitAdditionalRecipes.routeText(route))
+			.setNumber("outerDiameterMm", outerDiameterMm).setNumber("innerDiameterMm", innerDiameterMm)
+			.setNumber("massPerMetreKg", massPerMetreKg).setToken("service", Std.string(serviceKind)).setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var pieces:Array<Part> = [];
 		return Solids.building(pieces, tracked -> {

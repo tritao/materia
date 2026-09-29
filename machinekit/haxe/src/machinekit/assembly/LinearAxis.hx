@@ -65,6 +65,26 @@ class Carriage extends MachineComponent {
 			addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.assembly.carriage");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, Carriage) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues {
+		var values = machinekit.component.ComponentRecipeSupport.threadValues(nut.thread);
+		values.setNumber("boreDiameter", boreDiameter).setNumber("width", width)
+			.setNumber("length", length).setNumber("guideSpacing", guideSpacing)
+			.setNumber("guideSeatDiameter", guideSeatDiameter)
+			.setToken("guideSeatFit", Std.string(guideSeatFit))
+			.setBoolean("hasRailMount", hasRailMount).setNumber("railMountY", railMountY)
+			.setInteger("nutBoltCount", nut.boltCount);
+		return values.setToken("material", materialSpec());
+	}
+
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.box(width, width, length);
 		if (detail == Envelope) return body;
@@ -219,6 +239,11 @@ class LinearAxis extends MachineAssembly {
 		frame.point("railStart", 0, railY, screwStart);
 		frame.point("railEnd", 0, railY, screwStart + length);
 		frame.member("rail", "railStart", "railEnd", rail);
+		var sectionArea = rail.width * rail.height -
+			(rail.width - 2 * rail.wall) * (rail.height - 2 * rail.wall);
+		addBomItem(railBomItem(), 1, machinekit.assembly.MachineAssembly.AssemblyBomMass.Point(
+			sectionArea * length * 1e-9 * 7850,
+			new cadkit.modeling.Vector(0, railY, screwStart + length / 2)));
 		configureAssembly();
 	}
 
@@ -329,12 +354,6 @@ class LinearAxis extends MachineAssembly {
 	}
 
 	public function bom():Bom return billOfMaterials();
-
-	override public function billOfMaterials():Bom {
-		var result = super.billOfMaterials();
-		result.add(railBomItem());
-		return result;
-	}
 
 	/** Instance id to component, for geometry generation by a preview or exporter. Excludes the
 	 * frame rail, which is generated through `frame.geometry("rail")` instead.

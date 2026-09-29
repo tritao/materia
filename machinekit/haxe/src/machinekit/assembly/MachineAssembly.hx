@@ -11,8 +11,24 @@ import machinekit.component.ComponentPort;
 import machinekit.component.PortInterface;
 import machinekit.component.PortInterfaces;
 import machinekit.component.PortRole;
+import machinekit.component.ComponentValue;
+import machinekit.component.ComponentValues;
+import machinekit.component.MachineKitComponents;
+import machinekit.assembly.MachineAssemblyDescription;
+import machinekit.assembly.MachineAssemblyDescription.MemberSource;
+import machinekit.assembly.MachineAssemblyDescription.SavedValue;
+import machinekit.assembly.MachineAssemblyDescription.PortRecord;
+import machinekit.assembly.MachineAssemblyDescription.ServiceLinkRecord;
+import haxeon.wire.JsonWire;
+import haxeon.Equality;
+import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyDefinitionFlattener;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -22,7 +38,7 @@ typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:St
 typedef PortRef = { var instanceId:String; var portName:String; }
 typedef UpstreamResult = { var port:PortRef; var external:Bool; }
 private typedef ServiceTrace = { var port:PortRef; var external:Bool; var supplied:Bool; var chain:Array<String>; }
-typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
+typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; var pose:Null<AssemblyFrame>; }
 /** BOM-only mass is a point-mass estimate, fixed or attached to a member. */
 enum AssemblyBomMass {
 	Unknown;
@@ -38,92 +54,565 @@ typedef MachineAssemblyMassProperties = {
 	var unaccountedInertia:Array<String>;
 }
 
-enum MachineAssemblyOperation {
-	Mate(id:String, kind:AssemblyJointType, parent:MachineAssemblyConnector,
-		child:MachineAssemblyConnector, value:Float, axis:Null<AssemblyVector>, limits:Null<AssemblyJointLimits>);
-	Constrain(id:String, kind:AssemblyJointType, parent:MachineAssemblyConnector,
-		child:MachineAssemblyConnector, axis:Null<AssemblyVector>, tolerance:Null<Float>, limits:Null<AssemblyJointLimits>);
-	Couple(id:String, source:String, target:String, ratio:Float, offset:Float);
-	ConnectPorts(id:String, from:PortRef, to:PortRef, line:Null<BomItem>);
-}
-
 private typedef AssemblyMember = {
 	var id:String;
 	var component:MachineComponent;
-	var pose:AssemblyFrame;
 }
+private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; var mechanical:AssemblyDefinition;}
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
 	final members:Array<AssemblyMember> = [];
+	final mechanical:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION,
+		id: "assembly", lengthUnit: "mm", definitions: [], occurrences: [], joints: [], couplings: []};
 	final included:Array<MachineSubassembly> = [];
 	final externalConnectors:Array<{name:String, instanceId:String, connectorName:String}> = [];
 	final externalPorts:Array<{name:String, instanceId:String, portName:String}> = [];
-	final operations:Array<MachineAssemblyOperation> = [];
+	final portConnections:Array<machinekit.assembly.MachineAssemblyDescription.PortConnectionRecord> = [];
+	final portRecords:Array<PortRecord> = [];
+	final portBridges:Array<ServiceLinkRecord> = [];
+	final portConversions:Array<ServiceLinkRecord> = [];
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
+	final nestedEntries:Array<MutableIncludedRecord> = [];
+	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
 
+	/** Capture a portable description. Code-only members remain visible but cannot be saved. */
+	public function describe():MachineAssemblyDescription {
+		validateStructure();
+		var mechanical = cloneDefinition(this.mechanical);
+		var sources:Array<machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
+		var sourceById:Map<String, machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
+		for (member in members) {
+			var component = member.component;
+			var recipe = component.componentType();
+			var source:MemberSource = if (recipe == null) MemberSource.Code(component.designation)
+			else {
+				var values = component.values();
+				var names = values.names();
+				names.sort(Reflect.compare);
+				MemberSource.Typed(recipe.id, [for (name in names) {name: name, value: switch values.get(name) {
+					case Number(value): SavedValue.Number(value);
+					case Integer(value): SavedValue.Integer(value);
+					case Boolean(value): SavedValue.Boolean(value);
+					case Token(value): SavedValue.Token(value);
+					case Unset: SavedValue.Unset;
+					case null: throw 'Missing value "$name"';
+				}}]);
+			};
+			var record = {occurrence: member.id, source: source, material: component.materialSpec()};
+			sources.push(record);
+			sourceById.set(member.id, record);
+		}
+		// The model initially gives every occurrence its own connector definition.
+		// Intern definitions with the same recipe identity and connector geometry.
+		mechanical.occurrences.sort((a, b) -> Reflect.compare(a.id, b.id));
+		var shared:Map<String, Array<String>> = [];
+		var kept:Array<materia.assembly.AssemblyDefinition.AssemblyComponentDefinition> = [];
+		for (occurrence in mechanical.occurrences) {
+			var source = sourceById.get(occurrence.id);
+			if (source == null) throw 'Missing source for "${occurrence.id}"';
+			var definition = null;
+			for (candidate in mechanical.definitions) if (candidate.id == occurrence.definition) definition = candidate;
+			if (definition == null) throw 'Missing mechanical definition for "${occurrence.id}"';
+			var key = definitionKey(occurrence.id, requireMember(occurrence.id));
+			var candidates = shared.get(key);
+			var existing:Null<String> = null;
+			if (candidates != null) for (id in candidates) for (item in kept)
+				if (item.id == id && Equality.equals(item.connectors, definition.connectors)) existing = id;
+			if (existing != null) occurrence.definition = existing;
+			else {
+				kept.push(definition);
+				if (candidates == null) {candidates = []; shared.set(key, candidates);}
+				candidates.push(definition.id);
+			}
+		}
+		mechanical.definitions = kept;
+		mechanical.exposedConnectors = [for (entry in externalConnectors) {name: entry.name,
+			occurrence: entry.instanceId, connector: entry.connectorName}];
+		if (nestedEntries.length > 0) mechanical = nestedMechanical(mechanical);
+		canonicalizeDefinition(mechanical);
+		sources.sort((a, b) -> Reflect.compare(a.occurrence, b.occurrence));
+		var emptyTools:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
+		var savedPorts:Array<PortRecord> = [];
+		for (port in portRecords) savedPorts.push({occurrence: port.occurrence, name: port.name,
+			kind: port.kind, role: port.role, iface: port.iface, required: port.required,
+			connector: port.connector});
+		savedPorts.sort((a, b) -> Reflect.compare(a.occurrence + "/" + a.name, b.occurrence + "/" + b.name));
+		var savedConnections = [for (connection in portConnections) {id: connection.id,
+			fromInstance: connection.fromInstance, fromPort: connection.fromPort,
+			toInstance: connection.toInstance, toPort: connection.toPort}];
+		savedConnections.sort((a, b) -> Reflect.compare(a.id, b.id));
+		return {schemaVersion: 2, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
+			members: sources,
+			ports: savedPorts,
+			included: [for (entry in nestedEntries) {id: entry.id, pose: copyFrame(entry.pose),
+				mechanical: FrozenAssemblyDefinitions.freeze(entry.mechanical)}],
+			portConnections: savedConnections,
+			portExposures: [for (entry in externalPorts) {name: entry.name,
+				instanceId: entry.instanceId, portName: entry.portName}],
+			connectorExposures: [for (entry in externalConnectors) {name: entry.name,
+				instanceId: entry.instanceId, connectorName: entry.connectorName}],
+			memberConnectors: [for (entry in memberConnectorFrames) {instanceId: entry.instanceId,
+				name: entry.name, frame: copyFrame(entry.frame)}],
+			tools: emptyTools,
+			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
+				mass: switch entry.mass {
+					case Unknown: machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown;
+					case Point(kg, centre): machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Point(kg, centre.x, centre.y, centre.z);
+					case Attached(kg, id, centre): machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Attached(kg, id, centre.x, centre.y, centre.z);
+				}}]
+		}};
+	}
+
+	static function canonicalizeDefinition(definition:AssemblyDefinition):Void {
+		definition.definitions.sort((a, b) -> Reflect.compare(a.id, b.id));
+		for (component in definition.definitions)
+			component.connectors.sort((a, b) -> Reflect.compare(a.name, b.name));
+		definition.occurrences.sort((a, b) -> Reflect.compare(a.id, b.id));
+		definition.joints.sort((a, b) -> Reflect.compare(a.id, b.id));
+		if (definition.couplings != null) definition.couplings.sort((a, b) -> Reflect.compare(a.id, b.id));
+		if (definition.exposedConnectors != null)
+			definition.exposedConnectors.sort((a, b) -> Reflect.compare(a.name, b.name));
+		if (definition.assemblies != null) {
+			definition.assemblies.sort((a, b) -> Reflect.compare(a.id, b.id));
+			for (nested in definition.assemblies) {
+				nested.definitions.sort((a, b) -> Reflect.compare(a.id, b.id));
+				for (component in nested.definitions)
+					component.connectors.sort((a, b) -> Reflect.compare(a.name, b.name));
+				nested.occurrences.sort((a, b) -> Reflect.compare(a.id, b.id));
+				nested.joints.sort((a, b) -> Reflect.compare(a.id, b.id));
+				if (nested.couplings != null) nested.couplings.sort((a, b) -> Reflect.compare(a.id, b.id));
+				if (nested.exposedConnectors != null)
+					nested.exposedConnectors.sort((a, b) -> Reflect.compare(a.name, b.name));
+			}
+		}
+	}
+
+	/** Generated wire codec; reject every unbuildable member before emitting a file. */
+	public function encode():String {
+		var description = describe();
+		var problems = new Diagnostics();
+		checkSavableMembers(description.machine.members, "", problems);
+		if (description.machine.tools != null) for (tool in description.machine.tools)
+			checkSavableMembers(tool.machine.members, tool.id + "/", problems);
+		problems.throwIfErrors();
+		return JsonWire.encode(description);
+	}
+
+	static function checkSavableMembers(members:haxe.ds.ReadOnlyArray<machinekit.assembly.MachineAssemblyDescription.MemberRecord>,
+			prefix:String, problems:Diagnostics):Void
+		for (member in members) switch member.source {
+			case Code(designation): problems.error("assembly.code-member", prefix + member.occurrence,
+				'Code-only member "$designation" has no rebuild recipe');
+			case _:
+		}
+
+	public static function decode(text:String):MachineAssembly
+		return fromDescription(JsonWire.decode(text));
+
+	/** Rebuild through registered recipes; no component object is stored in the description. */
+	public static function fromDescription(description:MachineAssemblyDescription):MachineAssembly {
+		if (description == null || description.machine == null) throw "Missing machine assembly description";
+		var savedMechanical = FrozenAssemblyDefinitions.thaw(description.mechanical);
+		AssemblyDefinitionCodec.validate(savedMechanical);
+		var mechanical = AssemblyDefinitionFlattener.flatten(savedMechanical);
+		var result = new MachineAssembly();
+		var sources:Map<String, machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
+		for (member in description.machine.members) {
+			if (sources.exists(member.occurrence)) throw 'Duplicate member source "${member.occurrence}"';
+			sources.set(member.occurrence, member);
+		}
+		for (occurrence in mechanical.occurrences) {
+			var member = sources.get(occurrence.id);
+			if (member == null) throw 'Missing member source "${occurrence.id}"';
+			var component = switch member.source {
+				case Code(designation): throw 'Code-only member "$designation" has no rebuild recipe';
+				case Typed(typeId, saved):
+					var values = new ComponentValues();
+					for (entry in saved) values.set(entry.name, switch entry.value {
+						case SavedValue.Number(value): ComponentValue.Number(value);
+						case SavedValue.Integer(value): ComponentValue.Integer(value);
+						case SavedValue.Boolean(value): ComponentValue.Boolean(value);
+						case SavedValue.Token(value): ComponentValue.Token(value);
+						case SavedValue.Unset: ComponentValue.Unset;
+					});
+					MachineKitComponents.byId(typeId).create(values);
+			};
+			component.setMaterial(member.material);
+			result.addComponentAt(InstancePath.of(occurrence.id), component, occurrence.initialPose);
+		}
+		for (saved in description.machine.ports) {
+			var port = result.requireMember(saved.occurrence).port(saved.name);
+			if (port.kind != saved.kind || port.role != saved.role || port.required != saved.required ||
+				port.connector != saved.connector || !Equality.equals(port.iface, saved.iface))
+				throw 'Saved port "${saved.occurrence}/${saved.name}" differs from its recipe';
+		}
+		for (connector in description.machine.memberConnectors)
+			result.addMemberConnector(connector.instanceId, connector.name, connector.frame);
+		for (joint in mechanical.joints) {
+			if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree)
+				result.addMateOnAxis(joint.id, joint.type, joint.parent, joint.parentConnector,
+					joint.child, joint.childConnector, joint.axis, joint.defaultValue, joint.limits);
+			else result.addConstraintOnAxis(joint.id, joint.type, joint.parent, joint.parentConnector,
+				joint.child, joint.childConnector, joint.axis, joint.closureTolerance, joint.limits);
+		}
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
+			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset);
+		for (connection in description.machine.portConnections)
+			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
+				connection.toInstance, connection.toPort);
+		for (entry in description.machine.portExposures)
+			result.exposePort(entry.name, entry.instanceId, entry.portName);
+		for (entry in description.machine.connectorExposures)
+			result.exposeConnector(entry.name, entry.instanceId, entry.connectorName);
+		for (entry in description.machine.bomExtras) {
+			var mass:AssemblyBomMass = switch entry.mass {
+				case machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown: AssemblyBomMass.Unknown;
+				case machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Point(kg, x, y, z): AssemblyBomMass.Point(kg, new Vector(x, y, z));
+				case machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Attached(kg, id, x, y, z): AssemblyBomMass.Attached(kg, id, new Vector(x, y, z));
+			};
+			result.addBomItem(entry.item, entry.quantity, mass);
+		}
+		if (description.machine.included != null) for (entry in description.machine.included)
+			result.nestedEntries.push({id: entry.id, pose: copyFrame(entry.pose),
+				mechanical: FrozenAssemblyDefinitions.thaw(entry.mechanical)});
+		for (entry in result.nestedEntries)
+			result.included.push({id: entry.id, assembly: result.rebuildIncluded(entry.id, entry.pose),
+				pose: copyFrame(entry.pose)});
+		return result;
+	}
+
+	function rebuildIncluded(id:String, pose:AssemblyFrame):MachineAssembly {
+		var prefix = id + "/";
+		var child = new MachineAssembly();
+		var inverse = AssemblyFrames.inverse(pose);
+		for (occurrence in mechanical.occurrences) if (StringTools.startsWith(occurrence.id, prefix))
+			child.addComponentAt(InstancePath.of(occurrence.id.substr(prefix.length)),
+				copyComponent(requireMember(occurrence.id)),
+				AssemblyFrames.compose(inverse, occurrence.initialPose));
+		for (connector in memberConnectorFrames) if (StringTools.startsWith(connector.instanceId, prefix))
+			child.addMemberConnector(connector.instanceId.substr(prefix.length), connector.name, connector.frame);
+		for (joint in mechanical.joints) if (StringTools.startsWith(joint.id, prefix) &&
+			StringTools.startsWith(joint.parent, prefix) && StringTools.startsWith(joint.child, prefix)) {
+			var parent = joint.parent.substr(prefix.length), member = joint.child.substr(prefix.length);
+			if (joint.role == AssemblyJointRole.Tree)
+				child.addMateOnAxis(joint.id.substr(prefix.length), joint.type, parent, joint.parentConnector,
+					member, joint.childConnector, joint.axis, joint.defaultValue, joint.limits);
+			else child.addConstraintOnAxis(joint.id.substr(prefix.length), joint.type, parent,
+					joint.parentConnector, member, joint.childConnector, joint.axis,
+					joint.closureTolerance, joint.limits);
+		}
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
+			if (StringTools.startsWith(coupling.id, prefix))
+				child.addCoupling(coupling.id.substr(prefix.length), coupling.source.substr(prefix.length),
+					coupling.target.substr(prefix.length), coupling.ratio, coupling.offset);
+		for (connection in portConnections) if (StringTools.startsWith(connection.id, prefix) &&
+			StringTools.startsWith(connection.fromInstance, prefix) &&
+			StringTools.startsWith(connection.toInstance, prefix))
+			child.connectPorts(connection.id.substr(prefix.length),
+				connection.fromInstance.substr(prefix.length), connection.fromPort,
+				connection.toInstance.substr(prefix.length), connection.toPort);
+		for (connector in externalConnectors) if (StringTools.startsWith(connector.name, prefix) &&
+			StringTools.startsWith(connector.instanceId, prefix))
+			child.exposeConnector(connector.name.substr(prefix.length),
+				connector.instanceId.substr(prefix.length), connector.connectorName);
+		return child;
+	}
+
+	/** Copy builder state for a derived assembly or an owned tool snapshot. */
+	public function copyInto(target:MachineAssembly):Void {
+		for (member in members) target.members.push({id: member.id,
+			component: copyComponent(member.component)});
+		var copy = cloneDefinition(mechanical);
+		target.mechanical.definitions = copy.definitions;
+		target.mechanical.occurrences = copy.occurrences;
+		target.mechanical.joints = copy.joints;
+		target.mechanical.couplings = copy.couplings;
+		for (entry in included) target.included.push({id: entry.id,
+			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
+		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
+			pose: copyFrame(entry.pose), mechanical: cloneDefinition(entry.mechanical)});
+		for (entry in externalConnectors) target.externalConnectors.push({name: entry.name,
+			instanceId: entry.instanceId, connectorName: entry.connectorName});
+		for (entry in externalPorts) target.externalPorts.push({name: entry.name,
+			instanceId: entry.instanceId, portName: entry.portName});
+		for (entry in portConnections) target.portConnections.push({id: entry.id,
+			fromInstance: entry.fromInstance, fromPort: entry.fromPort,
+			toInstance: entry.toInstance, toPort: entry.toPort});
+		for (entry in portRecords) target.portRecords.push({occurrence: entry.occurrence,
+			name: entry.name, kind: entry.kind, role: entry.role, iface: entry.iface,
+			required: entry.required, connector: entry.connector});
+		for (entry in portBridges) target.portBridges.push({occurrence: entry.occurrence,
+			fromPort: entry.fromPort, toPort: entry.toPort});
+		for (entry in portConversions) target.portConversions.push({occurrence: entry.occurrence,
+			fromPort: entry.fromPort, toPort: entry.toPort});
+		for (entry in bomItems) target.bomItems.push({item: copyBomItem(entry.item), quantity: entry.quantity,
+			mass: entry.mass});
+		for (entry in memberConnectorFrames) target.memberConnectorFrames.push({instanceId: entry.instanceId,
+			name: entry.name, frame: copyFrame(entry.frame)});
+	}
+
+	public function snapshot():MachineAssembly {
+		var result = new MachineAssembly();
+		copyInto(result);
+		return result;
+	}
+
+	static function copyComponent(component:MachineComponent):MachineComponent {
+		var recipe = component.componentType();
+		if (recipe == null) return component;
+		var result = recipe.create(component.values());
+		result.setMaterial(component.materialSpec());
+		return result;
+	}
+
+	static function copyBomItem(item:BomItem):BomItem return {partNumber: item.partNumber,
+		description: item.description, quantity: item.quantity, material: item.material,
+		typeId: item.typeId, valuesKey: item.valuesKey};
+
+	static function cloneDefinition(value:AssemblyDefinition):AssemblyDefinition
+		return AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(value));
+
+	/** Move included members into reusable subdefinitions while retaining flat side-record IDs. */
+	function nestedMechanical(flat:AssemblyDefinition):AssemblyDefinition {
+		flat.assemblies = [];
+		for (index in 0...nestedEntries.length) {
+			var entry = nestedEntries[index];
+			var child = cloneDefinition(entry.mechanical);
+			var prefix = entry.id + "/";
+			syncNestedConnectors(child.definitions, child.occurrences, child.assemblies,
+				prefix, flat);
+			var subId = 'machinekit-sub-$index';
+			var imported:Map<String, String> = [];
+			if (child.assemblies != null) for (sub in child.assemblies)
+				imported.set(sub.id, subId + "-" + sub.id);
+			if (child.assemblies != null) for (sub in child.assemblies) {
+				sub.id = imported.get(sub.id);
+				for (occurrence in sub.occurrences) if (occurrence.assembly != null) {
+					occurrence.assembly = imported.get(occurrence.assembly);
+					occurrence.definition = occurrence.assembly;
+				}
+				flat.assemblies.push(sub);
+			}
+			for (occurrence in child.occurrences) if (occurrence.assembly != null) {
+				occurrence.assembly = imported.get(occurrence.assembly);
+				occurrence.definition = occurrence.assembly;
+			}
+			var sub:AssemblySubdefinition = {id: subId, definitions: child.definitions,
+				occurrences: child.occurrences, joints: child.joints,
+				couplings: child.couplings == null ? [] : child.couplings,
+				exposedConnectors: child.exposedConnectors == null ? [] : child.exposedConnectors};
+			flat.assemblies.push(sub);
+			var childFlat = AssemblyDefinitionFlattener.flatten(entry.mechanical);
+			var internalJoints:Map<String, Bool> = [];
+			for (joint in childFlat.joints) internalJoints.set(prefix + joint.id, true);
+			flat.joints = [for (joint in flat.joints) if (!internalJoints.exists(joint.id)) joint];
+			var internalCouplings:Map<String, Bool> = [];
+			if (childFlat.couplings != null) for (coupling in childFlat.couplings)
+				internalCouplings.set(prefix + coupling.id, true);
+			if (flat.couplings != null)
+				flat.couplings = [for (coupling in flat.couplings) if (!internalCouplings.exists(coupling.id)) coupling];
+			var keptOccurrences:Array<materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence> = [];
+			var insertAt = -1;
+			for (occurrence in flat.occurrences) {
+				if (StringTools.startsWith(occurrence.id, prefix)) {
+					if (insertAt < 0) insertAt = keptOccurrences.length;
+				} else keptOccurrences.push(occurrence);
+			}
+			if (insertAt < 0) throw 'Included assembly "${entry.id}" has no members';
+			keptOccurrences.insert(insertAt, {id: entry.id, definition: subId,
+				assembly: subId, initialPose: copyFrame(entry.pose)});
+			flat.occurrences = keptOccurrences;
+			for (joint in flat.joints) {
+				if (StringTools.startsWith(joint.parent, prefix)) {
+					joint.parentConnector = exposeNested(sub, flat.assemblies,
+						joint.parent.substr(prefix.length), joint.parentConnector);
+					joint.parent = entry.id;
+				}
+				if (StringTools.startsWith(joint.child, prefix)) {
+					joint.childConnector = exposeNested(sub, flat.assemblies,
+						joint.child.substr(prefix.length), joint.childConnector);
+					joint.child = entry.id;
+				}
+			}
+			if (flat.exposedConnectors != null) for (connector in flat.exposedConnectors)
+				if (StringTools.startsWith(connector.occurrence, prefix)) {
+					connector.connector = exposeNested(sub, flat.assemblies,
+						connector.occurrence.substr(prefix.length), connector.connector);
+					connector.occurrence = entry.id;
+				}
+		}
+		var referenced:Map<String, Bool> = [];
+		for (occurrence in flat.occurrences) if (occurrence.assembly == null)
+			referenced.set(occurrence.definition, true);
+		flat.definitions = [for (definition in flat.definitions) if (referenced.exists(definition.id)) definition];
+		AssemblyDefinitionCodec.validate(flat);
+		return flat;
+	}
+
+	static function syncNestedConnectors(
+			definitions:Array<materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>,
+			occurrences:Array<materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence>,
+			library:Array<AssemblySubdefinition>, prefix:String, current:AssemblyDefinition):Void {
+		for (occurrence in occurrences) {
+			if (occurrence.assembly != null) {
+				var nested = requireSubdefinition(library, occurrence.assembly);
+				syncNestedConnectors(nested.definitions, nested.occurrences, library,
+					prefix + occurrence.id + "/", current);
+				continue;
+			}
+			var currentId = prefix + occurrence.id;
+			var currentOccurrence:Null<materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence> = null;
+			for (candidate in current.occurrences) if (candidate.id == currentId) currentOccurrence = candidate;
+			if (currentOccurrence == null) throw 'Missing included member "$currentId"';
+			var live:Null<materia.assembly.AssemblyDefinition.AssemblyComponentDefinition> = null;
+			var destination:Null<materia.assembly.AssemblyDefinition.AssemblyComponentDefinition> = null;
+			for (candidate in current.definitions) if (candidate.id == currentOccurrence.definition) live = candidate;
+			for (candidate in definitions) if (candidate.id == occurrence.definition) destination = candidate;
+			if (live == null || destination == null) throw 'Missing included definition "$currentId"';
+			destination.connectors = [for (connector in live.connectors)
+				{name: connector.name, frame: copyFrame(connector.frame)}];
+		}
+	}
+
+	static function exposeNested(sub:AssemblySubdefinition, library:Array<AssemblySubdefinition>,
+			path:String, connector:String):String {
+		var direct = false;
+		for (candidate in sub.occurrences) if (candidate.id == path) direct = true;
+		if (!direct) {
+			var slash = path.indexOf("/");
+			if (slash < 0) throw 'Missing nested member "$path"';
+			var head = path.substr(0, slash), tail = path.substr(slash + 1);
+			var found = requireNestedOccurrence(sub, head);
+			if (found.assembly == null) throw 'Missing nested member "$path"';
+			var child = requireSubdefinition(library, found.assembly);
+			connector = exposeNested(child, library, tail, connector);
+			path = head;
+		}
+		if (sub.exposedConnectors == null) sub.exposedConnectors = [];
+		for (exposed in sub.exposedConnectors)
+			if (exposed.occurrence == path && exposed.connector == connector) return exposed.name;
+		var name = '__machinekit_${sub.exposedConnectors.length}';
+		sub.exposedConnectors.push({name: name, occurrence: path, connector: connector});
+		return name;
+	}
+
+	static function requireNestedOccurrence(sub:AssemblySubdefinition, id:String):
+			materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence {
+		for (candidate in sub.occurrences) if (candidate.id == id) return candidate;
+		throw 'Missing nested member "$id"';
+	}
+
+	static function requireSubdefinition(library:Array<AssemblySubdefinition>, id:String):AssemblySubdefinition {
+		for (candidate in library) if (candidate.id == id) return candidate;
+		throw 'Missing nested definition for "$id"';
+	}
+
 	public function addComponent(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
+		InstancePath.segment(id);
+		addComponentPath(id, component, pose);
+	}
+
+	public function addComponentAt(path:InstancePath, component:MachineComponent, ?pose:AssemblyFrame):Void
+		addComponentPath(path, component, pose);
+
+	function addComponentPath(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
 		if (id == null || id.length == 0 || component == null) throw "Assembly component needs an id and component";
+		InstancePath.of(id);
 		for (member in members) if (member.id == id) throw 'Duplicate assembly component "$id"';
-		members.push({id: id, component: component,
-			pose: pose == null ? AssemblyFrames.identity() : copyFrame(pose)});
+		members.push({id: id, component: component});
+		mechanical.definitions.push({id: id, connectors: [for (connector in component.connectors())
+			{name: connector.name, frame: copyFrame(connector.frame)}]});
+		mechanical.occurrences.push({id: id, definition: id,
+			initialPose: pose == null ? AssemblyFrames.identity() : copyFrame(pose)});
+		for (port in component.ports()) portRecords.push({occurrence: id, name: port.name,
+			kind: port.kind, role: port.role, iface: port.iface, required: port.required,
+			connector: port.connector});
+		for (link in component.bridges()) portBridges.push({occurrence: id,
+			fromPort: link.from, toPort: link.to});
+		for (link in component.conversions()) portConversions.push({occurrence: id,
+			fromPort: link.from, toPort: link.to});
 	}
 
 	/** Include another assembly below a local namespace, optionally moving all of its parts. */
 	public function include(id:String, assembly:MachineAssembly, ?pose:AssemblyFrame):Void {
 		if (id == null || id.length == 0 || assembly == null || assembly == this)
 			throw "Included assembly needs a distinct id and assembly";
+		InstancePath.segment(id);
 		for (entry in included) if (entry.id == id) throw 'Duplicate included assembly "$id"';
 		assembly.validateStructure();
 		for (member in assembly.members) {
-			var localPose = pose == null ? member.pose : AssemblyFrames.compose(pose, member.pose);
-			addComponent(join(id, member.id), member.component, localPose);
+			var memberPose = assembly.occurrencePose(member.id);
+			var localPose = pose == null ? memberPose : AssemblyFrames.compose(pose, memberPose);
+			addComponentPath(join(id, member.id), member.component, localPose);
 		}
 		for (connector in assembly.memberConnectorFrames)
 			addMemberConnector(join(id, connector.instanceId), connector.name, connector.frame);
 		for (connector in assembly.externalConnectors)
 			exposeConnector(join(id, connector.name), join(id, connector.instanceId), connector.connectorName);
 		// Ports define required service inputs, so each containing assembly must expose its own interface.
-		for (operation in assembly.operations) addOperation(prefixed(operation, id));
+		for (joint in assembly.mechanical.joints) addJoint({id: join(id, joint.id), type: joint.type,
+			role: joint.role, parent: join(id, joint.parent), parentConnector: joint.parentConnector,
+			child: join(id, joint.child), childConnector: joint.childConnector,
+			axis: joint.axis, limits: joint.limits, defaultValue: joint.defaultValue},
+			joint.closureTolerance);
+		if (assembly.mechanical.couplings != null) for (coupling in assembly.mechanical.couplings)
+			addCoupling(join(id, coupling.id), join(id, coupling.source), join(id, coupling.target),
+				coupling.ratio, coupling.offset);
+		for (connection in assembly.portConnections)
+			connectPorts(join(id, connection.id), join(id, connection.fromInstance),
+				connection.fromPort, join(id, connection.toInstance), connection.toPort);
 		for (entry in assembly.bomItems) {
 			var mass = switch entry.mass {
-				case Unknown: Unknown;
-				case Attached(kg, instanceId, centre): Attached(kg, join(id, instanceId), centre);
-				case Point(kg, centre):
-					if (pose == null) Point(kg, centre);
+				case AssemblyBomMass.Unknown: AssemblyBomMass.Unknown;
+				case AssemblyBomMass.Attached(kg, instanceId, centre): AssemblyBomMass.Attached(kg, join(id, instanceId), centre);
+				case AssemblyBomMass.Point(kg, centre):
+					if (pose == null) AssemblyBomMass.Point(kg, centre);
 					else {
 						var point = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
-						Point(kg, new Vector(point.x, point.y, point.z));
+						AssemblyBomMass.Point(kg, new Vector(point.x, point.y, point.z));
 					}
 			};
 			addBomItem(entry.item, entry.quantity, mass);
 		}
-		included.push({id: id, assembly: assembly});
+		included.push({id: id, assembly: assembly.snapshot(), pose: pose == null ? null : copyFrame(pose)});
+		nestedEntries.push({id: id, pose: pose == null ? AssemblyFrames.identity() : copyFrame(pose),
+			mechanical: FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical)});
 	}
 
 	public function addMate(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, value:Float = 0):Void
-		addOperation(Mate(id, cast kind, ref(parent, parentConnector), ref(child, childConnector), value, null, null));
+		addMateOnAxis(id, kind, parent, parentConnector, child, childConnector,
+			{x: 0, y: 1, z: 0}, value);
 
 	public function addMateOnAxis(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, axis:AssemblyVector, value:Float = 0,
 			?limits:AssemblyJointLimits):Void
-		addOperation(Mate(id, cast kind, ref(parent, parentConnector), ref(child, childConnector), value, axis, limits));
+		addJoint({id: id, type: cast kind, role: AssemblyJointRole.Tree, parent: parent,
+			parentConnector: parentConnector, child: child, childConnector: childConnector,
+			axis: axis, limits: resolvedLimits(limits), defaultValue: value});
 
 	public function addConstraint(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, ?tolerance:Float):Void
-		addOperation(Constrain(id, cast kind, ref(parent, parentConnector), ref(child, childConnector), null, tolerance, null));
+		addConstraintOnAxis(id, kind, parent, parentConnector, child, childConnector,
+			{x: 0, y: 1, z: 0}, tolerance);
 
 	public function addConstraintOnAxis(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, axis:AssemblyVector, ?tolerance:Float,
 			?limits:AssemblyJointLimits):Void
-		addOperation(Constrain(id, cast kind, ref(parent, parentConnector), ref(child, childConnector), axis, tolerance, limits));
+		addJoint({id: id, type: cast kind, role: AssemblyJointRole.Closure, parent: parent,
+			parentConnector: parentConnector, child: child, childConnector: childConnector,
+			axis: axis, limits: resolvedLimits(limits), defaultValue: 0}, tolerance);
 
-	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void
-		addOperation(Couple(id, source, target, ratio, offset));
+	public function addCoupling(id:String, source:String, target:String, ratio:Float, offset:Float = 0):Void {
+		requireOperationId(id);
+		if (source == null || source.length == 0 || target == null || target.length == 0)
+			throw 'Assembly coupling "$id" needs source and target';
+		mechanical.couplings.push({id: id, source: source, target: target, ratio: ratio, offset: offset});
+	}
 
 	public function connectPorts(id:String, fromInstance:String, fromPort:String,
 			toInstance:String, toPort:String, ?line:BomItem,
@@ -138,7 +627,9 @@ class MachineAssembly {
 			case Point(_, _) | Attached(_, _, _): throw "Connection line mass needs a BOM item";
 			case Unknown:
 		}
-		addOperation(ConnectPorts(id, from, to, line));
+		requireOperationId(id);
+		portConnections.push({id: id, fromInstance: from.instanceId, fromPort: from.portName,
+			toInstance: to.instanceId, toPort: to.portName});
 		if (line != null) addBomItem(line, 1, lineMass);
 	}
 
@@ -146,11 +637,11 @@ class MachineAssembly {
 	public function addMemberConnector(instanceId:String, name:String, frame:AssemblyFrame):Void {
 		if (name == null || name.length == 0) throw "Assembly connector needs a name";
 		requireMember(instanceId);
-		for (entry in memberConnectorFrames) if (entry.instanceId == instanceId && entry.name == name)
-			throw 'Duplicate assembly connector "$instanceId/$name"';
-		for (connector in requireMember(instanceId).connectors()) if (connector.name == name)
+		var definition = mechanicalDefinition(instanceId);
+		for (connector in definition.connectors) if (connector.name == name)
 			throw 'Duplicate assembly connector "$instanceId/$name"';
 		memberConnectorFrames.push({instanceId: instanceId, name: name, frame: copyFrame(frame)});
+		definition.connectors.push({name: name, frame: copyFrame(frame)});
 	}
 
 	/** Publish a stable assembly-level name that resolves to one member connector. */
@@ -188,139 +679,132 @@ class MachineAssembly {
 		bomItems.push({item: item, quantity: quantity, mass: mass});
 	}
 
-	/** Check CAD tree and coupling relationships without requiring service wiring. */
+	/** Collect structural and service faults without stopping at the first one. */
+	public function check():Diagnostics {
+		var result = new Diagnostics();
+		checkStructure(result);
+		checkServices(result);
+		return result;
+	}
+
 	public function validateStructure():Void {
+		var result = new Diagnostics();
+		checkStructure(result);
+		result.throwIfErrors();
+	}
+
+	public function validate():Array<String> {
+		var result = check();
+		result.throwIfErrors();
+		return result.warnings();
+	}
+
+	function checkStructure(result:Diagnostics):Void {
 		var parents:Map<String, String> = [];
 		var joints:Map<String, Bool> = [];
-		for (op in operations) switch op {
-			case Mate(id, _, parent, child, _, _, _):
-				if (parents.exists(child.instanceId)) throw 'Assembly member "${child.instanceId}" has two parent joints';
-				parents.set(child.instanceId, parent.instanceId);
-				joints.set(id, true);
-			case Constrain(id, _, _, _, _, _, _): joints.set(id, true);
-			case Couple(_, _, _, _, _):
-			case ConnectPorts(_, _, _, _):
+		for (joint in mechanical.joints) {
+			if (joint.role == AssemblyJointRole.Tree) {
+				if (parents.exists(joint.child))
+					result.error("assembly.multiple-parents", joint.child,
+						'Assembly member "${joint.child}" has two parent joints');
+				else parents.set(joint.child, joint.parent);
+			}
+			joints.set(joint.id, true);
 		}
+		var cycles:Map<String, Bool> = [];
 		for (member in members) {
 			var seen:Map<String, Bool> = [];
 			var current = member.id;
 			while (parents.exists(current)) {
-				if (seen.exists(current)) throw 'Assembly mate cycle at "$current"';
+				if (seen.exists(current)) {
+					if (!cycles.exists(current)) result.error("assembly.mate-cycle", current,
+						'Assembly mate cycle at "$current"');
+					cycles.set(current, true);
+					break;
+				}
 				seen.set(current, true);
 				current = parents.get(current);
 			}
 		}
-		for (op in operations) switch op {
-			case Couple(id, source, target, _, _):
-				if (!joints.exists(source) || !joints.exists(target))
-					throw 'Assembly coupling "$id" refers to a missing joint';
-			case _:
-		}
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
+			if (!joints.exists(coupling.source) || !joints.exists(coupling.target))
+				result.error("assembly.missing-coupling-joint", coupling.id,
+					'Assembly coupling "${coupling.id}" refers to a missing joint');
 	}
 
-	/** Check structure, complete service wiring and physical port compatibility. */
-	public function validate():Array<String> {
-		validateStructure();
-		var connections = checkConnections();
-		checkRequiredPorts(connections.connected);
-		return connections.warnings;
+	function checkServices(result:Diagnostics, required:Bool = true):Void {
+		var connected:Map<String, Bool> = [];
+		for (connection in portConnections) {
+			var id = connection.id;
+			var from = portRef(connection.fromInstance, connection.fromPort);
+			var to = portRef(connection.toInstance, connection.toPort);
+			var first = requirePort(from), second = requirePort(to);
+			var fromKey = portKey(from), toKey = portKey(to);
+			if (fromKey == toKey) result.error("port.self-connection", id,
+				'Port connection "$id" joins a port to itself');
+			if (connected.exists(fromKey) || connected.exists(toKey))
+				result.error("port.reused", id, 'Port connection "$id" uses a port more than once');
+			connected.set(fromKey, true);
+			connected.set(toKey, true);
+			if (first.kind != second.kind) result.error("port.kind-mismatch", id,
+				'Port connection "$id" has mismatched kinds');
+			if ((first.role == Supply && second.role == Supply) ||
+				(first.role == Consumer && second.role == Consumer))
+				result.error("port.role-mismatch", id, 'Port connection "$id" has incompatible roles');
+			if (!PortInterfaces.compatible(first.iface, second.iface))
+				result.error("port.interface-mismatch", id,
+					'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}');
+		}
+		if (required) for (port in portRecords)
+			if (port.required && port.role == Consumer) {
+				var reference = portRef(port.occurrence, port.name);
+				if (connected.exists(portKey(reference))) {
+					try {
+						var trace = traceUpstream(reference);
+						if (!trace.supplied) result.error("port.unsupplied", '${port.occurrence}/${port.name}',
+							unsuppliedMessage(trace.chain));
+					} catch (error:String) result.error("port.service-cycle", '${port.occurrence}/${port.name}', error);
+				} else if (!isExposed(port.occurrence, port.name))
+					result.error("port.required-unconnected", '${port.occurrence}/${port.name}',
+						'Required consumer port "${port.occurrence}/${port.name}" is unconnected');
+			}
 	}
 
 	function checkConnections():{connected:Map<String, Bool>, warnings:Array<String>} {
+		var result = new Diagnostics();
+		checkServices(result, false);
+		result.throwIfErrors();
 		var connected:Map<String, Bool> = [];
-		var warnings:Array<String> = [];
-		for (op in operations) switch op {
-			case ConnectPorts(id, from, to, _):
-				var first = requirePort(from), second = requirePort(to);
-				var fromKey = portKey(from), toKey = portKey(to);
-				if (fromKey == toKey) throw 'Port connection "$id" joins a port to itself';
-				if (connected.exists(fromKey) || connected.exists(toKey))
-					throw 'Port connection "$id" uses a port more than once';
-				connected.set(fromKey, true);
-				connected.set(toKey, true);
-				if (first.kind != second.kind) throw 'Port connection "$id" has mismatched kinds';
-				if ((first.role == Supply && second.role == Supply) ||
-					(first.role == Consumer && second.role == Consumer))
-					throw 'Port connection "$id" has incompatible roles';
-				if (!PortInterfaces.compatible(first.iface, second.iface))
-					throw 'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}';
-			case _:
+		for (connection in portConnections) {
+			connected.set(portKey(portRef(connection.fromInstance, connection.fromPort)), true);
+			connected.set(portKey(portRef(connection.toInstance, connection.toPort)), true);
 		}
-		return {connected: connected, warnings: warnings};
-	}
-
-	function checkRequiredPorts(connected:Map<String, Bool>):Void {
-		var deepestFailure:Null<Array<String>> = null;
-		for (member in members) for (port in member.component.ports())
-			if (port.required && port.role == Consumer) {
-				var reference = portRef(member.id, port.name);
-				if (connected.exists(portKey(reference))) {
-					var trace = traceUpstream(reference);
-					if (!trace.supplied && (deepestFailure == null || trace.chain.length > deepestFailure.length))
-						deepestFailure = trace.chain;
-				}
-				else if (!isExposed(member.id, port.name))
-					throw 'Required consumer port "${member.id}/${port.name}" is unconnected';
-			}
-		if (deepestFailure != null) throw unsuppliedMessage(deepestFailure);
+		return {connected: connected, warnings: result.warnings()};
 	}
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
 	public function addTo(model:AssemblyModel, prefix:String, ?pose:AssemblyFrame):Void {
 		validateStructure();
-		for (member in members) {
-			var localPose = pose == null ? member.pose : AssemblyFrames.compose(pose, member.pose);
-			member.component.addTo(model, join(prefix, member.id), localPose);
+		for (occurrence in mechanical.occurrences) {
+			var localPose = pose == null ? occurrence.initialPose :
+				AssemblyFrames.compose(pose, occurrence.initialPose);
+			var id = join(prefix, occurrence.id);
+			model.add(id, localPose);
+			for (connector in mechanicalDefinition(occurrence.definition).connectors)
+				model.connector(id, connector.name, connector.frame);
 		}
-		for (connector in memberConnectorFrames)
-			model.connector(join(prefix, connector.instanceId), connector.name, connector.frame);
-		// Included assemblies can have internal mates before the mate that attaches
-		// their root. Apply the complete tree parent-first, then loop closures.
-		var pending:Array<MachineAssemblyOperation> = [];
-		for (op in operations) switch op {
-			case Mate(_, _, _, _, _, _, _): pending.push(op);
-			case _:
+		for (joint in mechanical.joints) {
+			if (joint.role == AssemblyJointRole.Tree)
+				model.mateOnAxis(join(prefix, joint.id), joint.type, join(prefix, joint.parent),
+					joint.parentConnector, join(prefix, joint.child), joint.childConnector,
+					joint.axis, joint.defaultValue, joint.limits);
+			else model.constrainOnAxis(join(prefix, joint.id), joint.type, join(prefix, joint.parent),
+					joint.parentConnector, join(prefix, joint.child), joint.childConnector,
+					joint.axis, joint.closureTolerance, joint.limits);
 		}
-		while (pending.length > 0) {
-			var progressed = false;
-			for (op in pending.copy()) switch op {
-				case Mate(_, _, parent, _, _, _, _):
-					var parentPending = false;
-					for (other in pending) switch other {
-						case Mate(_, _, _, child, _, _, _): if (child.instanceId == parent.instanceId) parentPending = true;
-						case _:
-					}
-					if (!parentPending) {
-						addOperationToModel(model, prefix, op);
-						pending.remove(op);
-						progressed = true;
-					}
-				case _:
-			}
-			if (!progressed) throw "Assembly mate cycle";
-		}
-		for (op in operations) switch op {
-			case Mate(_, _, _, _, _, _, _):
-			case _: addOperationToModel(model, prefix, op);
-		}
-	}
-
-	function addOperationToModel(model:AssemblyModel, prefix:String, op:MachineAssemblyOperation):Void {
-		switch op {
-			case Mate(id, kind, parent, child, value, axis, limits):
-				if (axis == null) model.mate(join(prefix, id), kind, join(prefix, parent.instanceId),
-					parent.connectorName, join(prefix, child.instanceId), child.connectorName, value);
-				else model.mateOnAxis(join(prefix, id), kind, join(prefix, parent.instanceId),
-					parent.connectorName, join(prefix, child.instanceId), child.connectorName, axis, value, limits);
-			case Constrain(id, kind, parent, child, axis, tolerance, limits):
-				if (axis == null) model.constrain(join(prefix, id), kind, join(prefix, parent.instanceId),
-					parent.connectorName, join(prefix, child.instanceId), child.connectorName, tolerance);
-				else model.constrainOnAxis(join(prefix, id), kind, join(prefix, parent.instanceId),
-					parent.connectorName, join(prefix, child.instanceId), child.connectorName, axis, tolerance, limits);
-			case Couple(id, source, target, ratio, offset):
-				model.couple(join(prefix, id), join(prefix, source), join(prefix, target), ratio, offset);
-			case ConnectPorts(_, _, _, _):
-		}
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
+			model.couple(join(prefix, coupling.id), join(prefix, coupling.source),
+				join(prefix, coupling.target), coupling.ratio, coupling.offset);
 	}
 
 	public function components():Array<MachineAssemblyComponent>
@@ -329,19 +813,15 @@ class MachineAssembly {
 	/** Parent links in the mate tree; constraints do not attach members. */
 	public function mateParents():Map<String, String> {
 		var result:Map<String, String> = [];
-		for (op in operations) switch op {
-			case Mate(_, _, parent, child, _, _, _): result.set(child.instanceId, parent.instanceId);
-			case _:
-		}
+		for (joint in mechanical.joints) if (joint.role == AssemblyJointRole.Tree)
+			result.set(joint.child, joint.parent);
 		return result;
 	}
 
 	/** A member connector in that member's local frame. */
 	public function memberConnectorFrame(instanceId:String, connectorName:String):AssemblyFrame {
 		requireConnector(ref(instanceId, connectorName));
-		for (entry in memberConnectorFrames)
-			if (entry.instanceId == instanceId && entry.name == connectorName) return copyFrame(entry.frame);
-		for (connector in requireMember(instanceId).connectors())
+		for (connector in mechanicalDefinition(instanceId).connectors)
 			if (connector.name == connectorName) return copyFrame(connector.frame);
 		throw 'Unknown connector "$instanceId/$connectorName"';
 	}
@@ -360,16 +840,15 @@ class MachineAssembly {
 		return massPropertiesFromPoses(solvedPoses(state));
 	}
 
-	/** Solve every member pose with one AssemblyModel, or read them from a supplied state. */
+	/** Solve every member pose from one AssemblyState, or read them from a supplied state. */
 	public function solvedPoses(?state:AssemblyState):Map<String, AssemblyFrame> {
-		var model:Null<AssemblyModel> = null;
 		if (state == null) {
-			model = new AssemblyModel();
-			addTo(model, "");
+			state = new AssemblyState(cloneDefinition(mechanical));
+			state.checkClosures();
 		}
 		var result:Map<String, AssemblyFrame> = [];
 		for (member in members)
-			result.set(member.id, state == null ? model.pose(member.id) : state.worldPose(member.id));
+			result.set(member.id, state.worldPose(member.id));
 		return result;
 	}
 
@@ -379,7 +858,12 @@ class MachineAssembly {
 		var posed:Array<{id:String, properties:machinekit.component.MassProperties, pose:AssemblyFrame,
 			centre:Vector}> = [];
 		for (member in members) {
-			var properties = member.component.massProperties();
+			var key = definitionKey(member.id, member.component);
+			var properties = massByDefinition.get(key);
+			if (properties == null) {
+				properties = member.component.massProperties();
+				massByDefinition.set(key, properties);
+			}
 			var pose = poses.get(member.id);
 			if (pose == null) throw 'Missing solved pose for "${member.id}"';
 			var centre = properties.centreOfMass;
@@ -439,6 +923,12 @@ class MachineAssembly {
 			unaccounted: unaccounted, unaccountedInertia: unaccountedInertia};
 	}
 
+	static function definitionKey(id:String, component:MachineComponent):String {
+		var recipe = component.componentType();
+		return recipe == null ? "code:" + id + "|" + component.materialSpec() :
+			"typed:" + recipe.id + "|" + recipe.key(component.values()) + "|" + component.materialSpec();
+	}
+
 	public function connectorNames():Array<String>
 		return [for (connector in externalConnectors) connector.name];
 
@@ -480,15 +970,15 @@ class MachineAssembly {
 			chain.push('${current.instanceId}/${current.portName}');
 			var currentPort = requirePort(current);
 			var previous:Array<PortRef> = [];
-			for (op in operations) switch op {
-				case ConnectPorts(_, from, to, _): if (portKey(to) == key) previous.push(from);
-				case _:
-			}
-			for (bridge in requireMember(current.instanceId).bridges())
-				if (bridge.to == current.portName) previous.push(portRef(current.instanceId, bridge.from));
-			for (conversion in requireMember(current.instanceId).conversions())
-				if (conversion.to == current.portName)
-					previous.push(portRef(current.instanceId, conversion.from));
+			for (connection in portConnections)
+				if (portKey(portRef(connection.toInstance, connection.toPort)) == key)
+					previous.push(portRef(connection.fromInstance, connection.fromPort));
+			for (bridge in portBridges) if (bridge.occurrence == current.instanceId &&
+				bridge.toPort == current.portName)
+				previous.push(portRef(current.instanceId, bridge.fromPort));
+			for (conversion in portConversions) if (conversion.occurrence == current.instanceId &&
+				conversion.toPort == current.portName)
+				previous.push(portRef(current.instanceId, conversion.fromPort));
 			if (previous.length == 0) {
 				if (currentPort.role == Supply)
 					return {port: current, external: false, supplied: true, chain: chain};
@@ -507,30 +997,52 @@ class MachineAssembly {
 		throw 'Missing assembly connector "$name"';
 	}
 
-	public static function join(prefix:String, id:String):String
-		return prefix == null || prefix.length == 0 ? id : '$prefix/$id';
-
-	function addOperation(op:MachineAssemblyOperation):Void {
-		var id = operationId(op);
-		if (id == null || id.length == 0) throw "Assembly operation needs an id";
-		for (existing in operations) if (operationId(existing) == id)
-			throw 'Duplicate assembly operation "$id"';
-		switch op {
-			case Mate(_, kind, parent, child, _, _, _) | Constrain(_, kind, parent, child, _, _, _):
-				if (kind != AssemblyJointType.Fixed && kind != AssemblyJointType.Revolute &&
-					kind != AssemblyJointType.Continuous && kind != AssemblyJointType.Prismatic)
-					throw 'Unsupported assembly joint "$kind"';
-				requireConnector(parent);
-				requireConnector(child);
-			case Couple(_, source, target, _, _):
-				if (source == null || source.length == 0 || target == null || target.length == 0)
-					throw 'Assembly coupling "$id" needs source and target';
-			case ConnectPorts(_, from, to, _):
-				requirePort(from);
-				requirePort(to);
-		}
-		operations.push(op);
+	public static function join(prefix:String, id:String):String {
+		var child = InstancePath.of(id);
+		return prefix == null || prefix.length == 0 ? child : InstancePath.of(prefix + "/" + id);
 	}
+
+	function addJoint(joint:KinematicJoint, ?tolerance:Float):Void {
+		requireOperationId(joint.id);
+		if (joint.type != AssemblyJointType.Fixed && joint.type != AssemblyJointType.Revolute &&
+			joint.type != AssemblyJointType.Continuous && joint.type != AssemblyJointType.Prismatic)
+			throw 'Unsupported assembly joint "${joint.type}"';
+		requireConnector(ref(joint.parent, joint.parentConnector));
+		requireConnector(ref(joint.child, joint.childConnector));
+		var saved:KinematicJoint = {id: joint.id, type: joint.type, role: joint.role,
+			parent: joint.parent, parentConnector: joint.parentConnector,
+			child: joint.child, childConnector: joint.childConnector,
+			axis: {x: joint.axis.x, y: joint.axis.y, z: joint.axis.z},
+			limits: {lower: joint.limits.lower, upper: joint.limits.upper,
+				velocity: joint.limits.velocity, effort: joint.limits.effort},
+			defaultValue: joint.defaultValue};
+		if (joint.role == AssemblyJointRole.Closure && tolerance != null)
+			saved.closureTolerance = tolerance;
+		mechanical.joints.push(saved);
+	}
+
+	function requireOperationId(id:String):Void {
+		if (id == null || id.length == 0) throw "Assembly operation needs an id";
+		for (joint in mechanical.joints) if (joint.id == id)
+			throw 'Duplicate assembly operation "$id"';
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings) if (coupling.id == id)
+			throw 'Duplicate assembly operation "$id"';
+		for (existing in portConnections) if (existing.id == id)
+			throw 'Duplicate assembly operation "$id"';
+	}
+
+	function occurrencePose(id:String):AssemblyFrame {
+		for (occurrence in mechanical.occurrences) if (occurrence.id == id) return occurrence.initialPose;
+		throw 'Missing mechanical occurrence "$id"';
+	}
+
+	function mechanicalDefinition(id:String):materia.assembly.AssemblyDefinition.AssemblyComponentDefinition {
+		for (definition in mechanical.definitions) if (definition.id == id) return definition;
+		throw 'Missing mechanical definition "$id"';
+	}
+
+	static function resolvedLimits(limits:Null<AssemblyJointLimits>):AssemblyJointLimits
+		return limits == null ? {lower: null, upper: null, velocity: null, effort: null} : limits;
 
 	function requireMember(id:String):MachineComponent {
 		for (member in members) if (member.id == id) return member.component;
@@ -538,29 +1050,41 @@ class MachineAssembly {
 	}
 
 	function requireConnector(reference:MachineAssemblyConnector):Void {
-		var component = requireMember(reference.instanceId);
+		requireMember(reference.instanceId);
 		if (reference.connectorName == null || reference.connectorName.length == 0)
 			throw 'Unknown connector "${reference.instanceId}/${reference.connectorName}"';
-		for (entry in memberConnectorFrames)
-			if (entry.instanceId == reference.instanceId && entry.name == reference.connectorName) return;
-		for (connector in component.connectors()) if (connector.name == reference.connectorName) return;
+		for (connector in mechanicalDefinition(reference.instanceId).connectors)
+			if (connector.name == reference.connectorName) return;
 		throw 'Unknown connector "${reference.instanceId}/${reference.connectorName}"';
 	}
 
+	public function hasPort(name:String):Bool {
+		for (entry in externalPorts) if (entry.name == name) return true;
+		return false;
+	}
+
+	public function hasMemberConnector(instanceId:String, connectorName:String):Bool {
+		for (occurrence in mechanical.occurrences) if (occurrence.id == instanceId)
+			for (connector in mechanicalDefinition(occurrence.definition).connectors)
+				if (connector.name == connectorName) return true;
+		return false;
+	}
+
 	function requirePort(reference:PortRef):ComponentPort {
-		var component = requireMember(reference.instanceId);
+		requireMember(reference.instanceId);
 		if (reference.portName == null || reference.portName.length == 0)
 			throw 'Unknown port "${reference.instanceId}/${reference.portName}"';
-		for (port in component.ports()) if (port.name == reference.portName) return port;
+		for (port in portRecords) if (port.occurrence == reference.instanceId &&
+			port.name == reference.portName) return {name: port.name, kind: port.kind,
+				role: port.role, iface: port.iface, required: port.required, connector: port.connector};
 		throw 'Unknown port "${reference.instanceId}/${reference.portName}"';
 	}
 
 	function isConnected(reference:PortRef):Bool {
 		var key = portKey(reference);
-		for (op in operations) switch op {
-			case ConnectPorts(_, from, to, _): if (portKey(from) == key || portKey(to) == key) return true;
-			case _:
-		}
+		for (connection in portConnections)
+			if (portKey(portRef(connection.fromInstance, connection.fromPort)) == key ||
+				portKey(portRef(connection.toInstance, connection.toPort)) == key) return true;
 		return false;
 	}
 
@@ -575,27 +1099,8 @@ class MachineAssembly {
 	static function portRef(instanceId:String, portName:String):PortRef
 		return {instanceId: instanceId, portName: portName};
 
-	static function operationId(op:MachineAssemblyOperation):String return switch op {
-		case Mate(id, _, _, _, _, _, _) | Constrain(id, _, _, _, _, _, _) | Couple(id, _, _, _, _) |
-			ConnectPorts(id, _, _, _): id;
-	}
-
 	static function ref(instanceId:String, connectorName:String):MachineAssemblyConnector
 		return {instanceId: instanceId, connectorName: connectorName};
-
-	static function prefixed(op:MachineAssemblyOperation, prefix:String):MachineAssemblyOperation return switch op {
-		case Mate(id, kind, parent, child, value, axis, limits):
-			Mate(join(prefix, id), kind, ref(join(prefix, parent.instanceId), parent.connectorName),
-				ref(join(prefix, child.instanceId), child.connectorName), value, axis, limits);
-		case Constrain(id, kind, parent, child, axis, tolerance, limits):
-			Constrain(join(prefix, id), kind, ref(join(prefix, parent.instanceId), parent.connectorName),
-				ref(join(prefix, child.instanceId), child.connectorName), axis, tolerance, limits);
-		case Couple(id, source, target, ratio, offset):
-			Couple(join(prefix, id), join(prefix, source), join(prefix, target), ratio, offset);
-		case ConnectPorts(id, from, to, line):
-			ConnectPorts(join(prefix, id), portRef(join(prefix, from.instanceId), from.portName),
-				portRef(join(prefix, to.instanceId), to.portName), line);
-	}
 
 	static function copyFrame(frame:AssemblyFrame):AssemblyFrame
 		return {x: frame.x, y: frame.y, z: frame.z, qx: frame.qx, qy: frame.qy, qz: frame.qz, qw: frame.qw};

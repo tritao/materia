@@ -169,6 +169,8 @@ class Pedestal extends MachineComponent {
 		return result;
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
@@ -275,7 +277,7 @@ class Pedestal extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, Pedestal) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return new ComponentValues().setNumber("flangePitchCircle", this.flange.spec.pitchCircle)

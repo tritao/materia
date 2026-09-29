@@ -105,8 +105,8 @@ class CadBridgeTests {
     var solved = effector.solve();
     var pose = effector.mountTFrame("tip");
     var reused = effector.mountTFrame("tip", null, solved);
-    check(approx(pose.x, reused.x, 1e-9) && approx(pose.y, reused.y, 1e-9) &&
-      approx(pose.z, reused.z, 1e-9), "shared solve preserves TCP pose");
+    check(approx(pose.raw().x, reused.raw().x, 1e-9) && approx(pose.raw().y, reused.raw().y, 1e-9) &&
+      approx(pose.raw().z, reused.raw().z, 1e-9), "shared solve preserves TCP pose");
     check(approx(effector.massPropertiesAtMount().mass,
       effector.massPropertiesAtMount(null, solved).mass, 1e-9),
       "shared solve preserves mount mass");
@@ -367,6 +367,26 @@ class CadBridgeTests {
       "bridge rotates centroidal inertia into RobotKit axes and kg m²");
 
     var set = EndEffectorExample.build();
+    var rebuiltSet = machinekit.robotics.EndEffectorSet.fromDescription(
+      haxeon.wire.JsonWire.decode(set.encode()));
+    for (id in ["short", "long"]) {
+      var original = EndEffectorBridge.toTool(set.configuration(id), "contact", null, id + "/contact");
+      var restored = EndEffectorBridge.toTool(rebuiltSet.configuration(id), "contact", null, id + "/contact");
+      check(approx(original.flangeTTcp.translation.x, restored.flangeTTcp.translation.x, 1e-12) &&
+        approx(original.flangeTTcp.translation.y, restored.flangeTTcp.translation.y, 1e-12) &&
+        approx(original.flangeTTcp.translation.z, restored.flangeTTcp.translation.z, 1e-12) &&
+        approx(original.mass, restored.mass, 1e-12),
+        "saved EOAT configuration changes RobotKit TCP or mass");
+      var originalBounds = ToolCollisionShapes.bounds(original.collision);
+      var restoredBounds = ToolCollisionShapes.bounds(restored.collision);
+      check(approx(originalBounds.centre.x, restoredBounds.centre.x, 1e-12) &&
+        approx(originalBounds.centre.y, restoredBounds.centre.y, 1e-12) &&
+        approx(originalBounds.centre.z, restoredBounds.centre.z, 1e-12) &&
+        approx(originalBounds.halfExtents.x, restoredBounds.halfExtents.x, 1e-12) &&
+        approx(originalBounds.halfExtents.y, restoredBounds.halfExtents.y, 1e-12) &&
+        approx(originalBounds.halfExtents.z, restoredBounds.halfExtents.z, 1e-12),
+        "saved EOAT configuration changes RobotKit collision bounds");
+    }
     var shortTool = EndEffectorBridge.toTool(set.configuration("short"), "contact", null, "short/contact");
     var longTool = EndEffectorBridge.toTool(set.configuration("long"), "contact", null, "long/contact");
     check(shortTool.id == "short/contact" && longTool.id == "long/contact" &&
@@ -594,6 +614,19 @@ class CadBridgeTests {
     check(translated.linkCollisionHulls.length == translated.model.links.length &&
       hull != null && hull.length <= 64 * 3,
       "physical-part view supplies bounded hulls to the bridge");
+    var nestedDefinition = assembly.definition("bridge-nested");
+    nestedDefinition.occurrences[1].definition = "slider-sub";
+    nestedDefinition.occurrences[1].assembly = "slider-sub";
+    nestedDefinition.assemblies = [{id: "slider-sub",
+      definitions: [{id: "slider-part", connectors: nestedDefinition.definitions[1].connectors}],
+      occurrences: [{id: "body", definition: "slider-part", initialPose: AssemblyFrames.identity()}],
+      joints: [], exposedConnectors: [{name: "mount", occurrence: "body", connector: "mount"}]}];
+    parts.parts[1].id = "slider/slider-part";
+    var nestedModel = AssemblySimulationBridge.toRobotModel(nestedDefinition, parts);
+    check(nestedModel.model.links.length == translated.model.links.length &&
+      nestedModel.model.joints.length == translated.model.joints.length &&
+      nestedModel.model.links[2].name == "slider/body",
+      "nested assembly flattens before RobotKit translation");
   }
 
   /**

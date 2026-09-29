@@ -152,6 +152,8 @@ class SpurGear extends MachineComponent {
 	public function pitchToothThickness():Float
 		return Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.prism(profile(), 0, faceWidth);
 
@@ -171,7 +173,7 @@ class SpurGear extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, SpurGear) ? recipeType() : null;
 
 	override public function values():ComponentValues return new ComponentValues()
 		.setNumber("moduleSize", moduleSize).setInteger("teeth", teeth).setNumber("faceWidth", faceWidth)

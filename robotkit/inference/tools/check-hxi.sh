@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+module_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+robotkit_dir=$(dirname "$module_dir")
+materia_dir=$(dirname "$robotkit_dir")
+haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
+output=${1:-"$module_dir/bindings/robotkit-inference.hxi"}
+"$haxeon_dir/scripts/haxeon-ffi-audit" \
+    --target=x86_64-linux-gnu \
+    --target=x86_64-w64-windows-gnu \
+    --target=x86_64-apple-darwin \
+    --target=arm64-apple-darwin \
+    --profile=portable-abi64 \
+    --library=robotkit_inference \
+    --interface=RobotKitInference \
+    --depends=RobotKitRuntime \
+    --dependency-hxi="$robotkit_dir/runtime/bindings/robotkit-runtime.hxi" \
+    --include="$module_dir/include" \
+    --include="$robotkit_dir/runtime/include" \
+    --exclude-header="$robotkit_dir/runtime/include/robotkit_runtime.h" \
+    --source-label=inference/bindings/robotkit_inference_import.h \
+    --output="$output" \
+    "$module_dir/bindings/robotkit_inference_import.h"
+echo "check-hxi: wrote $output"

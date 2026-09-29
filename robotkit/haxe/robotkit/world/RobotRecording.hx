@@ -81,6 +81,22 @@ class RobotRecording implements RobotRecordingSink {
     append(RobotRecordingEvent.ProcessEvent(value), robotId);
   }
 
+  public function recordRobotEvent(robotId:RobotId, value:RobotEvent):Void {
+    if (value == null) throw "Robot event is required";
+    switch value {
+      case Observation(_, _): recordChannel(robotId, "perception.image_detections", value);
+      case Overflow(_, _): // The next observation's ordinal preserves this gap.
+    }
+  }
+
+  public function recordChannel(robotId:RobotId, name:String, payload:Dynamic):Void {
+    if (name == null || name.length == 0 || payload == null)
+      throw "Recording channel requires a name and payload";
+    var event = RobotRecordingEvent.Channel(robotId, name, payload);
+    events.push(event);
+    append(event, robotId);
+  }
+
   /** Records one owner-thread world notification in arrival order. */
   public function recordEvent(event:RobotWorldEvent):Void switch event {
     case RobotAttached(id): pushWorldEvent(RobotAttached(id), id);
@@ -135,7 +151,7 @@ class RobotRecording implements RobotRecordingSink {
       case Fault(value): faults.push(new RobotFault(value.id, value.code, value.message, value.fatal));
       case World(value): worlds.push(value);
       case ProcessEvent(value): processEvents.push(value);
-      case Sensor(_, _), WorldEvent(_):
+      case Sensor(_, _), WorldEvent(_), Channel(_, _, _):
     }
     if (Int64.compare(entry.ordinal, nextOrdinal) >= 0)
       nextOrdinal = Int64.add(entry.ordinal, Int64.ofInt(1));

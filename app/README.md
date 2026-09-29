@@ -49,6 +49,14 @@ or the Scene root to clear object selection.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
   selected box moves it on its current Z plane with snapping and one undo step.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
+- The toolbar's transport group drives the shared simulation through `sim.*` commands
+  (`editor/SimulationCommands`): Play/Pause (`F5`), Step (`F10`), Reset (`Shift+F5`), and
+  Design, which discards the running simulation and returns to the editor pose. Play and Step
+  build or rebuild pending configuration first; the Sensors panel buttons call the same commands.
+- Design (`Ctrl+1`) and Simulate (`Ctrl+2`) modes switch dock layout only; the document,
+  selection, and undo history are shared. Each mode remembers its layout for the session,
+  Reset workspace restores the active mode's default, and only the Design layout is saved to
+  disk. Play or Step enters Simulate, and Design returns to the mode it came from.
 - New (`Ctrl+N`) starts a fresh scene; in demo mode it restores the starter objects.
 - Open (`Ctrl+O`), Save (`Ctrl+S`), and Save As (`Ctrl+Shift+S`) use native file
   dialogs. The toolbar shows the current filename and `*` for unsaved changes.

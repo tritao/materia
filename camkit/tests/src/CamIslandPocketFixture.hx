@@ -5,7 +5,6 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
 import cnckit.CncCompiler;
-import cnckit.CncMachine;
 import stockkit.CutMoves;
 import stockkit.Stock;
 import stockkit.StockLattice;
@@ -33,7 +32,7 @@ class CamIslandPocketFixture {
       case _:
     }
     check(hasFaceRef, "face pocket preserves CAD face reference");
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     var lowered = CamTestLowering.lower(program, machine);
     check(lowered.program != null && lowered.diagnostics.length == 0,
@@ -130,12 +129,12 @@ class CamIslandPocketFixture {
         'island pocket covers the plate grid point ${point.x},${point.y}: $best');
     }
 
-    var imported = new CncCompiler(machine).compileDetailed(
-      CncWriter.write(program.ops, CamTestSetup.standard(), machine));
+    var imported = machine.compileDetailed(
+      machine.export(program, CamTestSetup.standard()));
     check(imported.diagnostics.length == 0 &&
-      imported.ops.length == program.ops.length,
+      imported.program.ops.length == program.ops.length,
       "island pocket G-code recompiles with the same operation count");
-    for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+    for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
       case [Move(Cut, a, feedA, _, _), Move(Cut, b, feedB, _, _)]:
         check(Math.abs(feedA - feedB) < 1e-8,
           "island pocket G-code preserves ramp and plunge feeds");
@@ -204,7 +203,7 @@ class CamIslandPocketFixture {
     finished part: nothing gouged, no rapid through stock, no shank contact,
     and leftover only in the pocket's four inside corners.
   **/
-  static function simulate(program:camkit.CamProgram, tool:Tool,
+  static function simulate(program:toolpathkit.path.ToolpathProgram, tool:Tool,
       check:Bool->String->Void):Void {
     var solids:Array<Part> = [];
     function box(width:Float, depth:Float, height:Float, x:Float, y:Float, z:Float):Part {
@@ -225,7 +224,7 @@ class CamIslandPocketFixture {
     var lattice = new StockLattice(-0.00487, -0.00491, -0.00987, 0.00025, 200, 160, 40);
     var target = Stock.fromMesh(lattice, mesh);
     var stock = Stock.box(lattice, -0.005, -0.005, -0.01, 0.045, 0.035, 0);
-    var report = stock.cut(CutMoves.fromProgram(program.toolpath()));
+    var report = stock.cut(CutMoves.fromProgram(program));
     check(report.rapidContacts().length == 0, "island pocket never rapids through stock");
     check(report.collisions().length == 0, "island pocket keeps the shank out of the stock");
     // Walls gouged sideways show only on the X and Y grids.

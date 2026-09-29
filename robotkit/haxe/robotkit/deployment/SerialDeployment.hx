@@ -10,6 +10,8 @@ import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventValue;
+import robotkit.inference.InferenceSession;
+import robotkit.perception.PerceptionPipelineRegistry;
 
 /** A canonical semantic robot model plus its physical device configuration. */
 class SerialDeployment {
@@ -26,6 +28,7 @@ class SerialDeployment {
   public final clockSyncBoundNs:haxe.Int64;
   public final channels:Array<ProcessChannelDeclaration>;
   public final cameras:Map<String, CameraCalibration>;
+  public final perception:Array<PerceptionPipelineConfig>;
 
   public function new(path:String) {
     var directory = Path.directory(path);
@@ -41,9 +44,7 @@ class SerialDeployment {
       if (!Std.isOfType(cameraRows, Array)) throw "robotd: deployment cameras must be an array";
       for (entry in (cast cameraRows:Array<Dynamic>)) {
         if (entry == null) throw "robotd: deployment camera cannot be null";
-        for (field in Reflect.fields(entry))
-          if (["sensorId", "calibration", "sha256"].indexOf(field) < 0)
-            throw 'robotd: unknown camera field $field';
+        exactKeys(entry, ["sensorId", "calibration", "sha256"], "camera");
         var sensorId = requiredString(entry, "sensorId");
         if (cameras.exists(sensorId)) throw 'robotd: duplicate camera $sensorId';
         var sensor:Null<robotkit.model.Sensor> = null;
@@ -74,6 +75,64 @@ class SerialDeployment {
         try parsedCalibration = CameraCalibration.fromJson(bytes.toString())
         catch (_:Dynamic) throw 'robotd: camera $sensorId calibration JSON is invalid';
         cameras.set(sensorId, parsedCalibration);
+      }
+    }
+    perception = [];
+    var configured:Dynamic = Reflect.field(config, "perception");
+    if (configured != null) {
+      if (version != 5) throw "robotd: perception requires deployment schema version 5";
+      if (!Std.isOfType(configured, Array)) throw "robotd: perception must be an array";
+      var rows:Array<Dynamic> = cast configured;
+      for (entry in rows) {
+        if (entry == null) throw "robotd: perception entry cannot be null";
+        exactKeys(entry, ["id", "input", "pipeline", "model", "modelSha256", "host", "consumers", "options"], "perception");
+        var id = requiredString(entry, "id");
+        for (existing in perception) if (existing.id == id) throw 'robotd: duplicate perception id $id';
+        var input = requiredString(entry, "input");
+        var sensor:Null<robotkit.model.Sensor> = null;
+        for (candidate in robot.sensors) if (candidate.id == input) sensor = candidate;
+        if (sensor == null || sensor.kind != "camera" || sensor.frame == null)
+          throw 'robotd: perception input $input must name a camera with an existing frame';
+        var pipeline = requiredString(entry, "pipeline");
+        if (!PerceptionPipelineRegistry.supports(pipeline))
+          throw 'robotd: unknown perception pipeline $pipeline';
+        var modelFile = Path.join([directory, requiredString(entry, "model")]);
+        var digest = requiredString(entry, "modelSha256").toLowerCase();
+        if (!~/^[0-9a-f]{64}$/.match(digest) || InferenceSession.modelDigest(modelFile) != digest)
+          throw 'robotd: perception model SHA-256 mismatch for $id';
+        var host = requiredString(entry, "host");
+        if (host != "robotd" && host != "worldd") throw 'robotd: unsupported perception host $host';
+        var consumersValue:Dynamic = Reflect.field(entry, "consumers");
+        if (!Std.isOfType(consumersValue, Array)) throw 'robotd: perception consumers for $id must be an array';
+        var consumerRows:Array<Dynamic> = cast consumersValue;
+        if (consumerRows.length == 0) throw 'robotd: perception $id needs consumers';
+        var consumers:Array<String> = [];
+        for (consumer in consumerRows) {
+          if (consumer != "local" && consumer != "worldd") throw 'robotd: unsupported perception consumer $consumer';
+          if (consumers.indexOf(consumer) >= 0) throw 'robotd: duplicate perception consumer $consumer';
+          consumers.push(consumer);
+        }
+        if (host == "worldd" && consumers.indexOf("local") >= 0)
+          throw 'robotd: worldd perception cannot serve a local consumer without a network round trip';
+        var options:Dynamic = Reflect.field(entry, "options");
+        if (options == null) options = {};
+        exactKeys(options, ["scoreThreshold", "maxRateHz", "iouThreshold", "threads",
+          "dynamicWidth", "dynamicHeight"], "perception options");
+        var score = optionalNumber(options, "scoreThreshold", 0.4);
+        var rate = optionalNumber(options, "maxRateHz", 0.0);
+        var iou = optionalNumber(options, "iouThreshold", 0.5);
+        var threads = optionalNumber(options, "threads", 1);
+        var dynamicWidth = optionalNumber(options, "dynamicWidth", 0);
+        var dynamicHeight = optionalNumber(options, "dynamicHeight", 0);
+        if (score < 0 || score > 1 || iou < 0 || iou > 1 || rate < 0)
+          throw 'robotd: perception options for $id are out of range';
+        if (threads < 1 || threads > 64 || threads != Math.floor(threads) ||
+            dynamicWidth < 0 || dynamicWidth > 8192 || dynamicWidth != Math.floor(dynamicWidth) ||
+            dynamicHeight < 0 || dynamicHeight > 8192 || dynamicHeight != Math.floor(dynamicHeight))
+          throw 'robotd: inference dimensions or threads for $id are invalid';
+        perception.push(new PerceptionPipelineConfig(id, input, pipeline, modelFile,
+          digest, host, consumers, score, rate, iou,
+          Std.int(threads), Std.int(dynamicWidth), Std.int(dynamicHeight)));
       }
     }
     channels = [];
@@ -175,5 +234,18 @@ class SerialDeployment {
     if (!Std.isOfType(source, Int) || source <= 0)
       throw 'robotd: deployment $field must be a positive integer nanosecond count';
     return haxe.Int64.ofInt(source);
+  }
+
+  static function exactKeys(value:Dynamic, allowed:Array<String>, section:String):Void {
+    for (key in Reflect.fields(value))
+      if (allowed.indexOf(key) < 0) throw 'robotd: unknown $section key $key';
+  }
+
+  static function optionalNumber(value:Dynamic, field:String, fallback:Float):Float {
+    var source:Dynamic = Reflect.field(value, field);
+    if (source == null) return fallback;
+    if ((!Std.isOfType(source, Int) && !Std.isOfType(source, Float)) || !Math.isFinite(source))
+      throw 'robotd: perception $field must be a finite number';
+    return source;
   }
 }

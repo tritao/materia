@@ -69,6 +69,8 @@ class ShaftCollar extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, spec.width));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.cut(Part.cylinderSpan(spec.outerDiameter / 2, 0, spec.width),
 			[Part.cylinderSpan(spec.boreDiameter / 2, -0.1, spec.width + 0.1)]);

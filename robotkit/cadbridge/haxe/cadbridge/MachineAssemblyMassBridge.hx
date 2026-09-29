@@ -7,6 +7,9 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorFrames;
+import machinekit.units.Millimetres;
+import machinekit.units.KgMm2;
+import machinekit.units.Kilograms;
 import robotkit.material.LoadLimits;
 import robotkit.material.Payload;
 import robotkit.model.Link;
@@ -41,11 +44,11 @@ class MachineAssemblyMassBridge {
     if (link == null) throw "Robot link is required";
     var properties = complete(assembly, state, true);
     var tensor:InertiaTensor = cast properties.inertia;
-    link.mass = properties.mass;
-    link.centerOfMass = [properties.centreOfMass.x * 1e-3,
-      properties.centreOfMass.y * 1e-3, properties.centreOfMass.z * 1e-3];
+    link.mass = (new Kilograms(properties.mass)).raw();
+    link.centerOfMass = [(new Millimetres(properties.centreOfMass.x)).metres().raw(),
+      (new Millimetres(properties.centreOfMass.y)).metres().raw(), (new Millimetres(properties.centreOfMass.z)).metres().raw()];
     link.inertiaTensor = [for (value in [tensor.xx, tensor.xy, tensor.xz,
-      tensor.xy, tensor.yy, tensor.yz, tensor.xz, tensor.yz, tensor.zz]) value * 1e-6];
+      tensor.xy, tensor.yy, tensor.yz, tensor.xz, tensor.yz, tensor.zz]) (new KgMm2(value)).kgM2()];
   }
 
   /** Evaluate the RobotKit load envelope using the assembly's mass and centre of mass. */
@@ -56,7 +59,7 @@ class MachineAssemblyMassBridge {
     var properties = complete(assembly, state, false);
     var centre = properties.centreOfMass;
     var payload = new Payload(properties.mass, lengthMeters, widthMeters, heightMeters,
-      centre.x * 1e-3, centre.y * 1e-3, centre.z * 1e-3);
+      (new Millimetres(centre.x)).metres().raw(), (new Millimetres(centre.y)).metres().raw(), (new Millimetres(centre.z)).metres().raw());
     return limits.violation(payload, liftHeightMeters);
   }
 }

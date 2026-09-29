@@ -1,329 +1,304 @@
 package robotkit.world;
 
 import haxe.Int64;
-import haxe.Json;
-import haxe.io.Bytes;
+import robotkit.protocol.RecordingCommandMsg;
+import robotkit.protocol.RecordingFaultMsg;
+import robotkit.protocol.RecordingImageMsg;
+import robotkit.protocol.RecordingJointTargetMsg;
+import robotkit.protocol.RecordingPlanMsg;
+import robotkit.protocol.RecordingProcessEventMsg;
+import robotkit.protocol.RecordingProcessValueMsg;
+import robotkit.protocol.RecordingSegmentMsg;
+import robotkit.protocol.RecordingSensorMsg;
+import robotkit.protocol.RecordingSnapshotMsg;
+import robotkit.protocol.RecordingTimedEventMsg;
+import robotkit.protocol.RecordingWorldEventMsg;
+import robotkit.protocol.RecordingWorldMsg;
 
-/** Stable JSON payload contract stored inside MCAP messages. Wide integers are strings. */
+/** Typed conversions between world values and v6 MessagePack payloads. */
 class RobotRecordingCodec {
-  public static inline final VERSION:Int = 5;
+  public static inline final VERSION:Int = 6;
 
-  public static function encode(entry:RobotRecordingEntry):Bytes {
-    var root:Dynamic = {
-      version: VERSION,
-      ordinal: Int64.toStr(entry.ordinal),
-      recordingTimestampNs: Int64.toStr(entry.recordingTimestampNs),
-      robotId: entry.robotId,
-      sourceSequence: Int64.toStr(entry.sourceSequence),
-      sourceTimestampNs: Int64.toStr(entry.sourceTimestampNs),
-      sourceClockId: entry.sourceClockId
-    };
-    switch entry.event {
-      case Command(value):
-        Reflect.setField(root, "type", "command");
-        switch value { case JointTargets(targets, expiryNs):
-          Reflect.setField(root, "payload", {kind:"jointTargets",
-            targets:[for (target in targets) jointTargetRecord(target)],
-            expiryNs:expiryNs == null ? null : Int64.toStr(expiryNs)});
-        case TrajectoryChunk(chunk):
-          Reflect.setField(root, "payload", {kind:"trajectorySegmentChunk",
-              tag:Int64.toStr(chunk.tag),
-              segments:[for (segment in chunk.segments) {
-                timeFromStartNs:Int64.toStr(segment.timeFromStartNs),
-                durationNs:Int64.toStr(segment.durationNs),
-                coefficients:segment.coefficients
-              }]});
-        case ExecutionPlan(plan):
-          Reflect.setField(root, "payload", {kind:"executionPlan",
-            planId:Int64.toStr(plan.planId),
-            modelRevision:Int64.toStr(plan.modelRevision),
-            calibrationRevision:Int64.toStr(plan.calibrationRevision),
-            requiredCapabilities:plan.requiredCapabilities,
-            startPosition:plan.startPosition.toArray(),
-            startVelocity:plan.startVelocity.toArray(),
-            startAcceleration:plan.startAcceleration.toArray(),
-            positionTolerances:plan.positionTolerances.toArray(),
-            velocityTolerances:plan.velocityTolerances.toArray(),
-            accelerationTolerances:plan.accelerationTolerances.toArray(),
-            endsAtRest:plan.endsAtRest,
-            jerkUnchecked:plan.jerkUnchecked,
-            replaceAfterPlanId:Int64.toStr(plan.replaceAfterPlanId),
-            replaceAfterTimeNs:Int64.toStr(plan.replaceAfterTimeNs),
-            events:[for (event in plan.events) {
-              timeNs:Int64.toStr(event.timeNs), channel:event.channel,
-              value:eventValue(event.value), holdPolicy:holdPolicy(event.holdPolicy)
-            }],
-            segments:[for (segment in plan.segments) {
-              timeFromStartNs:Int64.toStr(segment.timeFromStartNs),
-              durationNs:Int64.toStr(segment.durationNs),
-              coefficients:segment.coefficients
-            }]});
-        case Hold:
-          Reflect.setField(root, "payload", {kind:"hold"});
-        case Resume:
-          Reflect.setField(root, "payload", {kind:"resume"});
-        case Abort:
-          Reflect.setField(root, "payload", {kind:"abort"});
-        }
-      case RobotSnapshot(value): Reflect.setField(root, "type", "snapshot"); Reflect.setField(root, "payload", snapshot(value));
-      case Sensor(robotId, value): Reflect.setField(root, "type", "sensor"); Reflect.setField(root, "robotId", robotId); Reflect.setField(root, "payload", sensor(value));
-      case Fault(value): Reflect.setField(root, "type", "fault"); Reflect.setField(root, "payload", {id:value.id, code:value.code, message:value.message, fatal:value.fatal});
-      case World(value):
-        Reflect.setField(root, "type", "world");
-        Reflect.setField(root, "payload", {sequence:Std.string(value.sequence), topologyRevision:Std.string(value.topologyRevision),
-          sourceTimestampNs:Int64.toStr(value.sourceTimestampNs), receivedTimestampNs:Int64.toStr(value.receivedTimestampNs),
-          robots:[for (robot in value.robots()) snapshot(robot)]});
-      case WorldEvent(value):
-        Reflect.setField(root, "type", "worldEvent");
-        Reflect.setField(root, "payload", switch value {case RobotAttached(id):{kind:"attached",robotId:id};case RobotDetached(id):{kind:"detached",robotId:id};case RobotChanged(id):{kind:"changed",robotId:id};});
-      case ProcessEvent(value):
-        Reflect.setField(root, "type", "processEvent");
-        Reflect.setField(root, "payload", {
-          planId:Int64.toStr(value.planId), channel:value.channel,
-          value:eventValue(value.value), scheduledTimeNs:Int64.toStr(value.scheduledTimeNs),
-          appliedOwnerTimeNs:Int64.toStr(value.appliedOwnerTimeNs), cause:value.cause
-        });
-    }
-    return Bytes.ofString(Json.stringify(root));
-  }
-
-  public static function decode(bytes:Bytes):RobotRecordingEntry {
-    var root:Dynamic;
-    try root = Json.parse(bytes.toString()) catch (_:Dynamic) throw "Malformed RobotKit recording payload";
-    var version = fieldInt(root, "version");
-    if (version < 1 || version > VERSION) throw "Unsupported RobotKit recording schema";
-    var ordinal = wide(root, "ordinal"), robotId = string(root, "robotId");
-    var sequence = wide(root, "sourceSequence"), timestamp = wide(root, "sourceTimestampNs");
-    var clock = string(root, "sourceClockId"), payload:Dynamic = Reflect.field(root, "payload");
-    var event:RobotRecordingEvent = switch string(root, "type") {
-      case "command":
-        var expiry = nullableWide(payload, "expiryNs");
-        switch string(payload, "kind") {
-          case "jointPosition" if (version == 1):
-            Command(JointTargets([JointTarget.position(fieldInt(payload,"joint"),
-              fieldFloat(payload,"target"))], expiry));
-          case "jointTargets" if (version >= 2):
-            var targets:Array<JointTarget> = [];
-            for (item in array(payload, "targets")) {
-              var mode = readJointTargetMode(string(item, "mode"));
-              targets.push(mode == Servo
-                ? JointTarget.servo(fieldInt(item, "joint"), fieldFloat(item, "target"),
-                  fieldFloat(item, "velocity"), fieldFloat(item, "stiffness"),
-                  fieldFloat(item, "damping"), fieldFloat(item, "feedforward"))
-                : new JointTarget(fieldInt(item, "joint"), mode, fieldFloat(item, "target")));
-            }
-            Command(JointTargets(JointTarget.copyBatch(targets), expiry));
-          case "trajectorySegmentChunk" if (version >= 3):
-            var spliceTag = nullableWide(payload, "spliceTag");
-            if (spliceTag != null && Int64.compare(spliceTag, Int64.ofInt(0)) != 0)
-              throw "Spliced trajectory recordings are unsupported";
-            var segments:Array<TrajectorySegment> = [];
-            for (item in array(payload, "segments")) {
-              var coefficients:Array<Array<Float>> = [];
-              for (row in array(item, "coefficients"))
-                coefficients.push(floats({values:row}, "values"));
-              segments.push(new TrajectorySegment(wide(item, "timeFromStartNs"),
-                wide(item, "durationNs"), coefficients));
-            }
-            Command(TrajectoryChunk(TrajectoryChunk.fromSegments(segments,
-              nullableWide(payload, "tag"))));
-          case "executionPlan" if (version >= 4):
-            var segments:Array<TrajectorySegment> = [];
-            for (item in array(payload, "segments")) {
-              var coefficients:Array<Array<Float>> = [];
-              for (row in array(item, "coefficients"))
-                coefficients.push(floats({values:row}, "values"));
-              segments.push(new TrajectorySegment(wide(item, "timeFromStartNs"),
-                wide(item, "durationNs"), coefficients));
-            }
-            Command(ExecutionPlan(new ExecutionPlanSubmission(
-              wide(payload, "planId"), wide(payload, "modelRevision"),
-              wide(payload, "calibrationRevision"), fieldInt(payload, "requiredCapabilities"),
-              floats(payload, "startPosition"), floats(payload, "startVelocity"),
-              floats(payload, "startAcceleration"), segments,
-              wide(payload, "replaceAfterPlanId"), wide(payload, "replaceAfterTimeNs"),
-              optionalFloats(payload, "positionTolerances"),
-              optionalFloats(payload, "velocityTolerances"),
-              optionalFloats(payload, "accelerationTolerances"),
-              optionalFieldBool(payload, "endsAtRest", true),
-              version >= 5 ? [for (item in array(payload,"events"))
-                new ProcessTimedEvent(wide(item,"timeNs"), string(item,"channel"),
-                  readEventValue(Reflect.field(item,"value")),
-                  readHoldPolicy(string(item,"holdPolicy")))] : [],
-              optionalFieldBool(payload, "jerkUnchecked", false))));
-          case "hold" if (version >= 4): Command(Hold);
-          case "resume" if (version >= 4): Command(Resume);
-          case "abort" if (version >= 4): Command(Abort);
-          case _: throw "Unsupported RobotKit command payload";
-        }
-      case "snapshot": RobotSnapshot(readSnapshot(payload));
-      case "sensor": Sensor(robotId, readSensor(payload));
-      case "fault": Fault(new RobotFault(string(payload,"id"),fieldInt(payload,"code"),string(payload,"message"),fieldBool(payload,"fatal")));
-      case "world":
-        var robots = new Map<RobotId,RobotSnapshot>();
-        for (item in array(payload,"robots")) { var value=readSnapshot(item); robots.set(value.id,value); }
-        World(new WorldSnapshot(fieldIntString(payload,"sequence"),fieldIntString(payload,"topologyRevision"),wide(payload,"sourceTimestampNs"),robots,wide(payload,"receivedTimestampNs")));
-      case "worldEvent":
-        var id=string(payload,"robotId");
-        WorldEvent(switch string(payload,"kind") {case "attached":RobotAttached(id);case "detached":RobotDetached(id);case "changed":RobotChanged(id);case _:throw "Unsupported RobotKit world event";});
-      case "processEvent" if (version >= 5):
-        ProcessEvent(new FiredProcessEvent(wide(payload,"planId"),
-          string(payload,"channel"), readEventValue(Reflect.field(payload,"value")),
-          wide(payload,"scheduledTimeNs"), wide(payload,"appliedOwnerTimeNs"),
-          fieldInt(payload,"cause")));
-      case _: throw "Unsupported RobotKit recording event type";
-    };
-    return new RobotRecordingEntry(ordinal, robotId, event, sequence, timestamp, clock,
-      wide(root, "recordingTimestampNs"), version);
-  }
-
-  static function eventValue(value:ProcessEventValue):Dynamic return switch value {
-    case Digital(enabled): {kind:"digital", digital:enabled};
-    case Analog(number): {kind:"analog", analog:number};
-    case Process(command, argument): {kind:"process", command:command, argument:argument};
-  };
-  static function readEventValue(value:Dynamic):ProcessEventValue return switch string(value,"kind") {
-    case "digital": ProcessEventValue.Digital(fieldBool(value,"digital"));
-    case "analog": ProcessEventValue.Analog(fieldFloat(value,"analog"));
-    case "process": ProcessEventValue.Process(string(value,"command"),fieldFloat(value,"argument"));
-    case _: throw "Unsupported process event value";
-  };
-  static function holdPolicy(value:ProcessHoldPolicy):String return switch value {
-    case Keep: "keep";
-    case SafeWhileHeld: "safeWhileHeld";
-    case RestoreOnResume: "restoreOnResume";
-  };
-  static function readHoldPolicy(value:String):ProcessHoldPolicy return switch value {
-    case "keep": ProcessHoldPolicy.Keep;
-    case "safeWhileHeld": ProcessHoldPolicy.SafeWhileHeld;
-    case "restoreOnResume": ProcessHoldPolicy.RestoreOnResume;
-    case _: throw "Unsupported process hold policy";
-  };
-
-  static function snapshot(v:RobotSnapshot):Dynamic return {id:v.id, sourceSequence:Int64.toStr(v.sourceSequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,positions:v.positions.toArray(),velocities:v.velocities.toArray(),efforts:v.efforts.toArray(),mode:v.mode,faultCode:v.faultCode,safety:v.safety,trajectoryQueueDepth:v.trajectoryQueueDepth,trajectoryActive:v.trajectoryActive,trajectoryTimeNs:Int64.toStr(v.trajectoryTimeNs),trajectoryDurationNs:Int64.toStr(v.trajectoryDurationNs),trajectoryTag:Int64.toStr(v.trajectoryTag),trajectoryTagTimeNs:Int64.toStr(v.trajectoryTagTimeNs),sessionState:v.sessionState,activePlanId:Int64.toStr(v.activePlanId),committedUntilNs:Int64.toStr(v.committedUntilNs),queueEndTimeNs:Int64.toStr(v.queueEndTimeNs),sensors:[for(s in v.sensors.toArray()) sensor(s)]};
-  static function sensor(v:SensorFrame):Dynamic return {sensorId:v.sensorId,kind:v.kind,frameId:v.frameId,sequence:Int64.toStr(v.sequence),sourceTimestampNs:Int64.toStr(v.sourceTimestampNs),receivedTimestampNs:Int64.toStr(v.receivedTimestampNs),sourceClockId:v.sourceClockId,receivedClockId:v.receivedClockId,values:v.values.toArray(),linkId:v.linkId,mountPosition:v.mountPosition.toArray(),mountRotation:v.mountRotation.toArray(),image:v.image==null?null:cameraImage(v.image)};
-  static function readSnapshot(v:Dynamic):RobotSnapshot return new RobotSnapshot(string(v,"id"),wide(v,"sourceSequence"),wide(v,"sourceTimestampNs"),floats(v,"positions"),floats(v,"velocities"),floats(v,"efforts"),fieldInt(v,"mode"),fieldInt(v,"faultCode"),wide(v,"receivedTimestampNs"),[for(s in array(v,"sensors")) readSensor(s)],string(v,"sourceClockId"),string(v,"receivedClockId"),optionalFieldInt(v,"safety",0),optionalFieldInt(v,"trajectoryQueueDepth",0),optionalFieldBool(v,"trajectoryActive",false),nullableWide(v,"trajectoryTimeNs"),nullableWide(v,"trajectoryDurationNs"),nullableWide(v,"trajectoryTag"),nullableWide(v,"trajectoryTagTimeNs"),optionalFieldInt(v,"sessionState",0),nullableWide(v,"activePlanId"),nullableWide(v,"committedUntilNs"),nullableWide(v,"queueEndTimeNs"));
-  static function readSensor(v:Dynamic):SensorFrame {
-    var position = floats(v, "mountPosition");
-    var rotation = floats(v, "mountRotation");
-    if (position.length != 3) throw "Sensor mount position must contain three values";
-    if (rotation.length != 4) throw "Sensor mount rotation must contain four values";
-    var norm = 0.0;
-    for (value in rotation) norm += value * value;
-    if (!Math.isFinite(norm) || Math.abs(norm - 1.0) > 0.000001)
-      throw "Sensor mount rotation must be a unit quaternion";
-    return new SensorFrame(string(v,"sensorId"),string(v,"kind"),string(v,"frameId"),
-      wide(v,"sequence"),wide(v,"sourceTimestampNs"),floats(v,"values"),
-      wide(v,"receivedTimestampNs"),string(v,"linkId"),position,rotation,
-      string(v,"sourceClockId"),string(v,"receivedClockId"),readCameraImage(v));
-  }
-  static function cameraImage(value:CameraImage):Dynamic return {width:value.width,
-    height:value.height,encoding:value.encoding,bytes:encodeBase64(value.bytes())};
-  static function readCameraImage(value:Dynamic):Null<CameraImage> {
-    var image = Reflect.field(value, "image");
-    if (image == null) return null;
-    var width = fieldInt(image, "width");
-    var height = fieldInt(image, "height");
-    var encoding = string(image, "encoding");
-    var encoded = string(image, "bytes");
-    try {
-      return new CameraImage(width, height, encoding, decodeBase64(encoded));
-    } catch (_:Dynamic) {
-      throw "Malformed camera image in RobotKit recording";
-    }
-  }
-  static inline var BASE64_ALPHABET:String =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  static function encodeBase64(bytes:Bytes):String {
-    var result = new StringBuf();
-    var index = 0;
-    while (index < bytes.length) {
-      var first = bytes.get(index++);
-      var hasSecond = index < bytes.length;
-      var second = hasSecond ? bytes.get(index++) : 0;
-      var hasThird = index < bytes.length;
-      var third = hasThird ? bytes.get(index++) : 0;
-      var packed = (first << 16) | (second << 8) | third;
-      result.addChar(BASE64_ALPHABET.charCodeAt((packed >>> 18) & 63));
-      result.addChar(BASE64_ALPHABET.charCodeAt((packed >>> 12) & 63));
-      result.addChar(hasSecond ? BASE64_ALPHABET.charCodeAt((packed >>> 6) & 63) : 61);
-      result.addChar(hasThird ? BASE64_ALPHABET.charCodeAt(packed & 63) : 61);
-    }
-    return result.toString();
-  }
-  static function decodeBase64(value:String):Bytes {
-    if (value == null || value.length == 0 || value.length % 4 != 0)
-      throw "Invalid base64 length";
-    var padding = value.charAt(value.length - 1) == "=" ? 1 : 0;
-    if (value.charAt(value.length - 2) == "=") padding++;
-    var outputLength = Std.int(value.length / 4) * 3 - padding;
-    var result = Bytes.alloc(outputLength);
-    var outputIndex = 0;
-    for (index in 0...Std.int(value.length / 4)) {
-      var offset = index * 4;
-      var last = index == Std.int(value.length / 4) - 1;
-      var first = base64Digit(value.charAt(offset));
-      var second = base64Digit(value.charAt(offset + 1));
-      var thirdChar = value.charAt(offset + 2);
-      var fourthChar = value.charAt(offset + 3);
-      if (first < 0 || second < 0 || (!last && (thirdChar == "=" || fourthChar == "=")) ||
-          (thirdChar == "=" && fourthChar != "="))
-        throw "Invalid base64 data";
-      var third = thirdChar == "=" ? 0 : base64Digit(thirdChar);
-      var fourth = fourthChar == "=" ? 0 : base64Digit(fourthChar);
-      if (third < 0 || fourth < 0) throw "Invalid base64 data";
-      var packed = (first << 18) | (second << 12) | (third << 6) | fourth;
-      if (outputIndex < outputLength) result.set(outputIndex++, (packed >>> 16) & 255);
-      if (outputIndex < outputLength) result.set(outputIndex++, (packed >>> 8) & 255);
-      if (outputIndex < outputLength) result.set(outputIndex++, packed & 255);
+  public static function command(value:RobotCommand, robotId:RobotId):RecordingCommandMsg {
+    var result = new RecordingCommandMsg();
+    result.robotId = robotId;
+    result.targets = [];
+    result.expiryNs = Int64.ofInt(0);
+    result.tag = Int64.ofInt(0);
+    result.segments = [];
+    result.plan = null;
+    switch value {
+      case JointTargets(targets, expiryNs):
+        result.kind = 1;
+        result.targets = [for (target in targets) jointTarget(target)];
+        result.expiryNs = expiryNs == null ? Int64.ofInt(0) : expiryNs;
+      case TrajectoryChunk(chunk):
+        result.kind = 2;
+        result.tag = chunk.tag;
+        result.segments = [for (segment in chunk.segments) segmentMsg(segment)];
+      case ExecutionPlan(plan): result.kind = 3; result.plan = planMsg(plan);
+      case Hold: result.kind = 4;
+      case Resume: result.kind = 5;
+      case Abort: result.kind = 6;
     }
     return result;
   }
-  static function base64Digit(value:String):Int {
-    if (value.length != 1) return -1;
-    return BASE64_ALPHABET.indexOf(value);
-  }
-  static function jointTargetMode(value:JointTargetMode):String return switch value {
-    case Position: "position";
-    case Velocity: "velocity";
-    case Effort: "effort";
-    case Servo: "servo";
+
+  public static function readCommand(msg:RecordingCommandMsg):RobotCommand return switch msg.kind {
+    case 1: JointTargets([for (target in msg.targets) readJointTarget(target)],
+      Int64.compare(msg.expiryNs, Int64.ofInt(0)) == 0 ? null : msg.expiryNs);
+    case 2: TrajectoryChunk(TrajectoryChunk.fromSegments(
+      [for (segment in msg.segments) readSegment(segment)], msg.tag));
+    case 3: ExecutionPlan(readPlan(msg.plan));
+    case 4: Hold;
+    case 5: Resume;
+    case 6: Abort;
+    case _: throw "Unsupported recorded command kind";
   };
-  /** A servo target records its terms too, so a replay applies the same servo. */
-  static function jointTargetRecord(target:JointTarget):Dynamic {
-    var record:Dynamic = {joint:target.joint, mode:jointTargetMode(target.mode), target:target.target};
-    if (target.mode == Servo) {
-      Reflect.setField(record, "velocity", target.servoVelocity);
-      Reflect.setField(record, "stiffness", target.stiffness);
-      Reflect.setField(record, "damping", target.damping);
-      Reflect.setField(record, "feedforward", target.feedforward);
-    }
-    return record;
+
+  static function jointTarget(value:JointTarget):RecordingJointTargetMsg {
+    var msg = new RecordingJointTargetMsg();
+    msg.joint = value.joint;
+    msg.mode = switch value.mode {
+      case Position: 1; case Velocity: 2; case Effort: 3; case Servo: 4;
+    };
+    msg.target = value.target;
+    msg.velocity = value.servoVelocity;
+    msg.stiffness = value.stiffness;
+    msg.damping = value.damping;
+    msg.feedforward = value.feedforward;
+    return msg;
   }
-  static function readJointTargetMode(value:String):JointTargetMode return switch value {
-    case "position": Position;
-    case "velocity": Velocity;
-    case "effort": Effort;
-    case "servo": Servo;
-    case _: throw "Unsupported RobotKit joint target mode";
+  static function readJointTarget(msg:RecordingJointTargetMsg):JointTarget return switch msg.mode {
+    case 1: JointTarget.position(msg.joint, msg.target);
+    case 2: JointTarget.velocity(msg.joint, msg.target);
+    case 3: JointTarget.effort(msg.joint, msg.target);
+    case 4: JointTarget.servo(msg.joint, msg.target, msg.velocity,
+      msg.stiffness, msg.damping, msg.feedforward);
+    case _: throw "Unsupported recorded joint target mode";
   };
-  static function string(v:Dynamic,n:String):String {var x=Reflect.field(v,n);if(!Std.isOfType(x,String))throw 'Invalid recording field $n';return x;}
-  static function wide(v:Dynamic,n:String):Int64 {
-    try {
-      return Int64.parseString(string(v,n));
-    } catch(_:Dynamic) {
-      throw 'Invalid recording integer $n';
-    }
+  static function segmentMsg(value:TrajectorySegment):RecordingSegmentMsg {
+    var msg = new RecordingSegmentMsg();
+    msg.timeFromStartNs = value.timeFromStartNs;
+    msg.durationNs = value.durationNs;
+    msg.coefficients = [for (row in value.coefficients) row.copy()];
+    return msg;
   }
-  static function nullableWide(v:Dynamic,n:String):Null<Int64> {var x=Reflect.field(v,n);return x==null?null:wide(v,n);}
-  static function optionalFloats(v:Dynamic,n:String):Null<Array<Float>>
-    return Reflect.field(v,n)==null ? null : floats(v,n);
-  static function fieldInt(v:Dynamic,n:String):Int {var x=Reflect.field(v,n);if(!Std.isOfType(x,Int))throw 'Invalid recording field $n';return x;}
-  static function optionalFieldInt(v:Dynamic,n:String,defaultValue:Int):Int {var x=Reflect.field(v,n);if(x==null)return defaultValue;if(!Std.isOfType(x,Int))throw 'Invalid recording field $n';return x;}
-  static function optionalFieldBool(v:Dynamic,n:String,defaultValue:Bool):Bool {var x=Reflect.field(v,n);if(x==null)return defaultValue;if(!Std.isOfType(x,Bool))throw 'Invalid recording field $n';return x;}
-  static function fieldIntString(v:Dynamic,n:String):Int {var x=Std.parseInt(string(v,n));if(x==null)throw 'Invalid recording field $n';return x;}
-  static function fieldFloat(v:Dynamic,n:String):Float {var x=Reflect.field(v,n);if(!Std.isOfType(x,Float)&&!Std.isOfType(x,Int))throw 'Invalid recording field $n';var result:Float=x;if(!Math.isFinite(result))throw 'Non-finite recording field $n';return result;}
-  static function fieldBool(v:Dynamic,n:String):Bool {var x=Reflect.field(v,n);if(!Std.isOfType(x,Bool))throw 'Invalid recording field $n';return x;}
-  static function array(v:Dynamic,n:String):Array<Dynamic> {var x=Reflect.field(v,n);if(!Std.isOfType(x,Array))throw 'Invalid recording field $n';return cast x;}
-  static function floats(v:Dynamic,n:String):Array<Float> return [for(x in array(v,n)) {if(!Std.isOfType(x,Float)&&!Std.isOfType(x,Int))throw 'Invalid recording field $n';var result:Float=cast x;if(!Math.isFinite(result))throw 'Non-finite recording field $n';result;}];
+  static function readSegment(msg:RecordingSegmentMsg):TrajectorySegment
+    return new TrajectorySegment(msg.timeFromStartNs, msg.durationNs, msg.coefficients);
+
+  static function planMsg(value:ExecutionPlanSubmission):RecordingPlanMsg {
+    var msg = new RecordingPlanMsg();
+    msg.planId = value.planId;
+    msg.modelRevision = value.modelRevision;
+    msg.calibrationRevision = value.calibrationRevision;
+    msg.requiredCapabilities = value.requiredCapabilities;
+    msg.startPosition = value.startPosition.toArray();
+    msg.startVelocity = value.startVelocity.toArray();
+    msg.startAcceleration = value.startAcceleration.toArray();
+    msg.positionTolerances = value.positionTolerances.toArray();
+    msg.velocityTolerances = value.velocityTolerances.toArray();
+    msg.accelerationTolerances = value.accelerationTolerances.toArray();
+    msg.endsAtRest = value.endsAtRest;
+    msg.jerkUnchecked = value.jerkUnchecked;
+    msg.segments = [for (segment in value.segments) segmentMsg(segment)];
+    msg.events = [for (event in value.events) timedEvent(event)];
+    msg.replaceAfterPlanId = value.replaceAfterPlanId;
+    msg.replaceAfterTimeNs = value.replaceAfterTimeNs;
+    return msg;
+  }
+  static function readPlan(msg:RecordingPlanMsg):ExecutionPlanSubmission {
+    finiteArray(msg.startPosition, "plan start position");
+    finiteArray(msg.startVelocity, "plan start velocity");
+    finiteArray(msg.startAcceleration, "plan start acceleration");
+    finiteArray(msg.positionTolerances, "plan position tolerances");
+    finiteArray(msg.velocityTolerances, "plan velocity tolerances");
+    finiteArray(msg.accelerationTolerances, "plan acceleration tolerances");
+    return new ExecutionPlanSubmission(msg.planId, msg.modelRevision,
+      msg.calibrationRevision, msg.requiredCapabilities, msg.startPosition,
+      msg.startVelocity, msg.startAcceleration,
+      [for (segment in msg.segments) readSegment(segment)], msg.replaceAfterPlanId,
+      msg.replaceAfterTimeNs, msg.positionTolerances, msg.velocityTolerances,
+      msg.accelerationTolerances, msg.endsAtRest,
+      [for (event in msg.events) readTimedEvent(event)], msg.jerkUnchecked);
+  }
+  static function timedEvent(value:ProcessTimedEvent):RecordingTimedEventMsg {
+    var msg = new RecordingTimedEventMsg();
+    msg.timeNs = value.timeNs;
+    msg.channel = value.channel;
+    msg.value = processValue(value.value);
+    msg.holdPolicy = switch value.holdPolicy {
+      case Keep: 1; case SafeWhileHeld: 2; case RestoreOnResume: 3;
+    };
+    return msg;
+  }
+  static function readTimedEvent(msg:RecordingTimedEventMsg):ProcessTimedEvent
+    return new ProcessTimedEvent(msg.timeNs, msg.channel, readProcessValue(msg.value),
+      switch msg.holdPolicy {
+        case 1: Keep; case 2: SafeWhileHeld; case 3: RestoreOnResume;
+        case _: throw "Unsupported recorded process hold policy";
+      });
+  static function processValue(value:ProcessEventValue):RecordingProcessValueMsg {
+    var msg = new RecordingProcessValueMsg();
+    msg.digital = false; msg.analog = 0.0; msg.command = ""; msg.argument = 0.0;
+    switch value {
+      case Digital(enabled): msg.kind = 1; msg.digital = enabled;
+      case Analog(number): msg.kind = 2; msg.analog = number;
+      case Process(command, argument): msg.kind = 3; msg.command = command; msg.argument = argument;
+    }
+    return msg;
+  }
+  static function readProcessValue(msg:RecordingProcessValueMsg):ProcessEventValue
+    return switch msg.kind {
+      case 1: Digital(msg.digital);
+      case 2: Analog(msg.analog);
+      case 3: Process(msg.command, msg.argument);
+      case _: throw "Unsupported recorded process value";
+    };
+
+  public static function sensor(value:SensorFrame, robotId:RobotId):RecordingSensorMsg {
+    var msg = new RecordingSensorMsg();
+    msg.robotId = robotId;
+    msg.sensorId = value.sensorId;
+    msg.kind = value.kind;
+    msg.frameId = value.frameId;
+    msg.sequence = value.sequence;
+    msg.sourceTimestampNs = value.sourceTimestampNs;
+    msg.receivedTimestampNs = value.receivedTimestampNs;
+    msg.sourceClockId = value.sourceClockId;
+    msg.receivedClockId = value.receivedClockId;
+    msg.values = value.values.toArray();
+    msg.linkId = value.linkId;
+    msg.mountPosition = value.mountPosition.toArray();
+    msg.mountRotation = value.mountRotation.toArray();
+    msg.image = null;
+    if (value.image != null) {
+      var image = new RecordingImageMsg();
+      image.width = value.image.width;
+      image.height = value.image.height;
+      image.encoding = value.image.encoding;
+      image.pixels = value.image.bytes();
+      msg.image = image;
+    }
+    return msg;
+  }
+  public static function readSensor(msg:RecordingSensorMsg):SensorFrame {
+    finiteArray(msg.values, "sensor values");
+    if (msg.mountPosition == null || msg.mountPosition.length != 3 ||
+        msg.mountRotation == null || msg.mountRotation.length != 4)
+      throw "Recorded sensor mount dimensions are invalid";
+    finiteArray(msg.mountPosition, "sensor mount position");
+    finiteArray(msg.mountRotation, "sensor mount rotation");
+    var norm = 0.0;
+    for (value in msg.mountRotation) norm += value * value;
+    if (Math.abs(norm - 1.0) > 0.000001)
+      throw "Recorded sensor mount rotation is not a unit quaternion";
+    return new SensorFrame(msg.sensorId, msg.kind, msg.frameId, msg.sequence,
+      msg.sourceTimestampNs, msg.values, msg.receivedTimestampNs, msg.linkId,
+      msg.mountPosition, msg.mountRotation, msg.sourceClockId, msg.receivedClockId,
+      msg.image == null ? null : new CameraImage(msg.image.width, msg.image.height,
+        msg.image.encoding, msg.image.pixels));
+  }
+
+  public static function snapshot(value:RobotSnapshot):RecordingSnapshotMsg {
+    var msg = new RecordingSnapshotMsg();
+    msg.id = value.id;
+    msg.sourceSequence = value.sourceSequence;
+    msg.sourceTimestampNs = value.sourceTimestampNs;
+    msg.receivedTimestampNs = value.receivedTimestampNs;
+    msg.sourceClockId = value.sourceClockId;
+    msg.receivedClockId = value.receivedClockId;
+    msg.positions = value.positions.toArray();
+    msg.velocities = value.velocities.toArray();
+    msg.efforts = value.efforts.toArray();
+    msg.sensors = [for (sensor in value.sensors.toArray()) RobotRecordingCodec.sensor(sensor, value.id)];
+    msg.mode = value.mode;
+    msg.faultCode = value.faultCode;
+    msg.safety = value.safety;
+    msg.trajectoryQueueDepth = value.trajectoryQueueDepth;
+    msg.trajectoryActive = value.trajectoryActive;
+    msg.trajectoryTimeNs = value.trajectoryTimeNs;
+    msg.trajectoryDurationNs = value.trajectoryDurationNs;
+    msg.trajectoryTag = value.trajectoryTag;
+    msg.trajectoryTagTimeNs = value.trajectoryTagTimeNs;
+    msg.sessionState = value.sessionState;
+    msg.activePlanId = value.activePlanId;
+    msg.committedUntilNs = value.committedUntilNs;
+    msg.queueEndTimeNs = value.queueEndTimeNs;
+    return msg;
+  }
+  public static function readSnapshot(msg:RecordingSnapshotMsg):RobotSnapshot {
+    finiteArray(msg.positions, "snapshot positions");
+    finiteArray(msg.velocities, "snapshot velocities");
+    finiteArray(msg.efforts, "snapshot efforts");
+    return new RobotSnapshot(msg.id, msg.sourceSequence, msg.sourceTimestampNs,
+      msg.positions, msg.velocities, msg.efforts, msg.mode, msg.faultCode,
+      msg.receivedTimestampNs, [for (sensor in msg.sensors) readSensor(sensor)],
+      msg.sourceClockId, msg.receivedClockId, msg.safety, msg.trajectoryQueueDepth,
+      msg.trajectoryActive, msg.trajectoryTimeNs, msg.trajectoryDurationNs,
+      msg.trajectoryTag, msg.trajectoryTagTimeNs, msg.sessionState, msg.activePlanId,
+      msg.committedUntilNs, msg.queueEndTimeNs);
+  }
+
+  static function finiteArray(values:Array<Float>, label:String):Void {
+    if (values == null) throw 'Recorded $label is missing';
+    for (value in values) if (!Math.isFinite(value)) throw 'Recorded $label is not finite';
+  }
+
+  public static function fault(value:RobotFault):RecordingFaultMsg {
+    var msg = new RecordingFaultMsg();
+    msg.id = value.id; msg.code = value.code; msg.message = value.message; msg.fatal = value.fatal;
+    return msg;
+  }
+  public static function readFault(msg:RecordingFaultMsg):RobotFault
+    return new RobotFault(msg.id, msg.code, msg.message, msg.fatal);
+
+  public static function world(value:WorldSnapshot):RecordingWorldMsg {
+    var msg = new RecordingWorldMsg();
+    msg.sequence = value.sequence;
+    msg.topologyRevision = value.topologyRevision;
+    msg.sourceTimestampNs = value.sourceTimestampNs;
+    msg.receivedTimestampNs = value.receivedTimestampNs;
+    msg.robots = [for (robot in value.robots()) snapshot(robot)];
+    return msg;
+  }
+  public static function readWorld(msg:RecordingWorldMsg):WorldSnapshot {
+    var robots = new Map<RobotId, RobotSnapshot>();
+    for (snapshot in msg.robots) {
+      var value = readSnapshot(snapshot);
+      robots.set(value.id, value);
+    }
+    return new WorldSnapshot(msg.sequence, msg.topologyRevision,
+      msg.sourceTimestampNs, robots, msg.receivedTimestampNs);
+  }
+  public static function worldEvent(value:RobotWorldEvent):RecordingWorldEventMsg {
+    var msg = new RecordingWorldEventMsg();
+    switch value {
+      case RobotAttached(id): msg.kind = 1; msg.robotId = id;
+      case RobotDetached(id): msg.kind = 2; msg.robotId = id;
+      case RobotChanged(id): msg.kind = 3; msg.robotId = id;
+    }
+    return msg;
+  }
+  public static function readWorldEvent(msg:RecordingWorldEventMsg):RobotWorldEvent
+    return switch msg.kind {
+      case 1: RobotAttached(msg.robotId);
+      case 2: RobotDetached(msg.robotId);
+      case 3: RobotChanged(msg.robotId);
+      case _: throw "Unsupported recorded world event";
+    };
+  public static function processEvent(value:FiredProcessEvent, robotId:RobotId):RecordingProcessEventMsg {
+    var msg = new RecordingProcessEventMsg();
+    msg.robotId = robotId;
+    msg.planId = value.planId;
+    msg.channel = value.channel;
+    msg.value = processValue(value.value);
+    msg.scheduledTimeNs = value.scheduledTimeNs;
+    msg.appliedOwnerTimeNs = value.appliedOwnerTimeNs;
+    msg.cause = value.cause;
+    return msg;
+  }
+  public static function readProcessEvent(msg:RecordingProcessEventMsg):FiredProcessEvent
+    return new FiredProcessEvent(msg.planId, msg.channel, readProcessValue(msg.value),
+      msg.scheduledTimeNs, msg.appliedOwnerTimeNs, msg.cause);
 }

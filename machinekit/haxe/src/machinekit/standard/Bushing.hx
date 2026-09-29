@@ -42,6 +42,8 @@ class Bushing extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, this.length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.cut(Part.cylinderSpan(outerDiameter / 2, 0, length),
 			[Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)]);
@@ -56,7 +58,7 @@ class Bushing extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, Bushing) ? recipeType() : null;
 
 	override public function values():ComponentValues {
 		return new ComponentValues().set("boreDiameter", Number(this.boreDiameter))

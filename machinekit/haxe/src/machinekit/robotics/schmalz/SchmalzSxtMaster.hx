@@ -46,8 +46,6 @@ class SchmalzSxtMaster extends MachineComponent {
 		return table;
 	}
 
-	override public function couplingKey():String return 'schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}';
-	override public function couplingConnector():String return "tool";
 
 	public function new(designation:String) {
 		var row = catalog().get(designation);
@@ -59,14 +57,26 @@ class SchmalzSxtMaster extends MachineComponent {
 			addPort({name: 'airIn$i', kind: Pneumatic, role: Consumer,
 				iface: Thread(row.outsideThread), required: false});
 			addPort({name: 'airOut$i', kind: Pneumatic, role: Supply,
-				iface: Coupling(couplingKey(), i), required: false});
+				iface: Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', i), required: false});
 			addBridge('airIn$i', 'airOut$i');
 		}
+		addCapability(Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', "tool"));
 		var x = row.widthMm, y = row.depthMm, z = row.lengthMm, m = row.massKg;
 		declareMass(m, new Vector(0, 0, z / 2),
 			new InertiaTensor(m * (y * y + z * z) / 12, 0, 0,
 				m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12));
 	}
+
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.schmalz-sxt-master");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, SchmalzSxtMaster) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(spec.widthMm, spec.depthMm, spec.lengthMm);

@@ -7,6 +7,7 @@ import toolpathkit.tool.ToolLibrary;
 import camkit.CamJob;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.Point3;
+import toolpathkit.setup.Setup;
 import toolpathkit.tool.CutterProfile;
 import stockkit.CutMoves;
 
@@ -31,7 +32,7 @@ class CutMoveTests {
       Move(Ramp, Line(start, end), 0.001, 0, source),
       Move(Retract, Line(end, start), 0, 0, source),
       MachineMove(Rapid, Line(start, end), 0, 0, source)
-    ], library);
+    ], library, [new Setup("1", new Point3(0, 0, 0))]);
     var moves = CutMoves.fromProgram(program);
     Assert.check(moves.length == 2 && moves[0].kind == Ramp &&
       moves[1].kind == Retract && moves[1].rapid,
@@ -45,6 +46,22 @@ class CutMoveTests {
         Assert.near(a.z, -0.001, "tool length shifts the start to its tip", 1e-12);
         Assert.near(b.z, -0.004, "tool length shifts the end to its tip", 1e-12);
       case _: Assert.check(false, "ramp remains a line");
+    }
+    var placed = new ToolpathProgram([
+      ToolChange(8, source),
+      Move(Cut, Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
+        0.01, 0, source),
+      SetSetup("2", source),
+      Move(Cut, Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
+        0.01, 0, source)
+    ], library, [new Setup("1", new Point3(0, 0, 0)),
+      new Setup("2", new Point3(0.1, 0, 0))]);
+    var placedMoves = CutMoves.fromProgram(placed);
+    switch [placedMoves[0].motion, placedMoves[1].motion] {
+      case [Path(Line(_, first)), Path(Line(_, second))]:
+        Assert.near(second.x - first.x, 0.1,
+          "stock moves follow the program's active setup", 1e-12);
+      case _: Assert.check(false, "placed stock cuts remain lines");
     }
   }
 
@@ -85,7 +102,7 @@ class CutMoveTests {
       .pocket(contour, small, -0.002, 0.01, 0.0015, 0.001)
       .profile(contour, large, -0.003, 0.01)
       .finish();
-    Assert.check(program.tool(3) == large, "CAM programs keep the tools they use");
+    Assert.check(program.tools.tool(3) == large, "CAM programs keep the tools they use");
     // CAM retracts before each tool change; the first retract has no tool loaded.
     var motions = 0, loaded = false;
     for (op in program.ops) switch op {
@@ -93,7 +110,7 @@ class CutMoveTests {
       case Move(_, _, _, _, _): if (loaded) motions++;
       case _:
     }
-    var moves = CutMoves.fromProgram(program.toolpath());
+    var moves = CutMoves.fromProgram(program);
     Assert.check(moves.length == motions, "every CAM motion with a tool loaded becomes a cut move");
     Assert.check(moves[0].tool == small && moves[moves.length - 1].tool == large,
       "moves follow the CAM tool changes");

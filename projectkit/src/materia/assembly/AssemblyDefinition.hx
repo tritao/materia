@@ -15,81 +15,109 @@ enum abstract AssemblyJointRole(String) from String to String {
 	var Closure = "closure";
 }
 
-typedef AssemblyVector = {
-	var x:Float;
-	var y:Float;
-	var z:Float;
+@:wire typedef AssemblyVector = {
+	@:id(1) var x:Float;
+	@:id(2) var y:Float;
+	@:id(3) var z:Float;
 }
 
 /** Missing limits are unbounded. Velocity and effort are optional metadata. */
-typedef AssemblyJointLimits = {
-	var lower:Null<Float>;
-	var upper:Null<Float>;
-	var velocity:Null<Float>;
-	var effort:Null<Float>;
+@:wire typedef AssemblyJointLimits = {
+	@:id(1) var lower:Null<Float>;
+	@:id(2) var upper:Null<Float>;
+	@:id(3) var velocity:Null<Float>;
+	@:id(4) var effort:Null<Float>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */
-typedef AssemblyComponentDefinition = {
-	var id:String;
-	var connectors:Array<AssemblyConnector>;
+@:wire typedef AssemblyComponentDefinition = {
+	@:id(1) var id:String;
+	@:id(2) var connectors:Array<AssemblyConnector>;
 }
 
 /** An occurrence references shared component data and has a local initial pose. */
-typedef AssemblyComponentOccurrence = {
-	var id:String;
-	var definition:String;
-	var initialPose:AssemblyFrame;
+@:wire typedef AssemblyComponentOccurrence = {
+	@:id(1) var id:String;
+	@:id(2) var definition:String;
+	@:id(3) var initialPose:AssemblyFrame;
+	/** References an entry in AssemblyDefinition.assemblies. */
+	@:id(4) @:optional var assembly:String;
 }
 
 /** A persistent kinematic edge or closure. The axis is unit length in the parent connector frame. */
-typedef KinematicJoint = {
-	var id:String;
-	var type:AssemblyJointType;
-	var role:AssemblyJointRole;
-	var parent:String;
-	var parentConnector:String;
-	var child:String;
-	var childConnector:String;
-	var axis:AssemblyVector;
-	var limits:AssemblyJointLimits;
-	var defaultValue:Float;
+@:wire typedef KinematicJoint = {
+	@:id(1) var id:String;
+	@:id(2) var type:AssemblyJointType;
+	@:id(3) var role:AssemblyJointRole;
+	@:id(4) var parent:String;
+	@:id(5) var parentConnector:String;
+	@:id(6) var child:String;
+	@:id(7) var childConnector:String;
+	@:id(8) var axis:AssemblyVector;
+	@:id(9) var limits:AssemblyJointLimits;
+	@:id(10) var defaultValue:Float;
+	/** Maximum closure position residual in the assembly length unit. */
+	@:id(11) @:optional var closureTolerance:Float;
 }
 
 /** Target coordinate = source coordinate × ratio + offset. */
-typedef AssemblyJointCoupling = {
-	var id:String;
-	var source:String;
-	var target:String;
-	var ratio:Float;
-	var offset:Float;
+@:wire typedef AssemblyJointCoupling = {
+	@:id(1) var id:String;
+	@:id(2) var source:String;
+	@:id(3) var target:String;
+	@:id(4) var ratio:Float;
+	@:id(5) var offset:Float;
 }
 
-/** Versioned assembly design data. Runtime joint coordinates live in AssemblyStateRecord. */
-typedef AssemblyDefinition = {
-	var schemaVersion:Int;
-	var id:String;
-	@:optional var lengthUnit:String;
-	var definitions:Array<AssemblyComponentDefinition>;
-	var occurrences:Array<AssemblyComponentOccurrence>;
-	var joints:Array<KinematicJoint>;
-	@:optional var couplings:Array<AssemblyJointCoupling>;
+/** A connector exported from a member of an assembly definition. */
+@:wire typedef AssemblyExposedConnector = {
+	@:id(1) var name:String;
+	@:id(2) var occurrence:String;
+	@:id(3) var connector:String;
 }
 
-typedef AssemblyJointCoordinate = {
-	var joint:String;
-	var value:Float;
+/** Reusable nested assembly. Occurrences may reference another entry in the root table. */
+@:wire typedef AssemblySubdefinition = {
+	@:id(1) var id:String;
+	@:id(2) var definitions:Array<AssemblyComponentDefinition>;
+	@:id(3) var occurrences:Array<AssemblyComponentOccurrence>;
+	@:id(4) var joints:Array<KinematicJoint>;
+	@:id(5) @:optional var couplings:Array<AssemblyJointCoupling>;
+	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
 }
 
-typedef AssemblyRootPose = {
-	var occurrence:String;
-	var pose:AssemblyFrame;
+/**
+ * Versioned assembly design data. `assemblies` is a reusable definition table;
+ * an occurrence with `assembly` set names a table entry and exposes only its
+ * declared connectors. Flattening prefixes nested occurrence and joint IDs
+ * with their occurrence path. Runtime coordinates live in AssemblyStateRecord.
+ */
+@:wire typedef AssemblyDefinition = {
+	@:id(1) var schemaVersion:Int;
+	@:id(2) var id:String;
+	@:id(3) @:optional var lengthUnit:String;
+	@:id(4) var definitions:Array<AssemblyComponentDefinition>;
+	@:id(5) var occurrences:Array<AssemblyComponentOccurrence>;
+	@:id(6) var joints:Array<KinematicJoint>;
+	@:id(7) @:optional var couplings:Array<AssemblyJointCoupling>;
+	@:id(8) @:optional var assemblies:Array<AssemblySubdefinition>;
+	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
+}
+
+@:wire typedef AssemblyJointCoordinate = {
+	@:id(1) var joint:String;
+	@:id(2) var value:Float;
+}
+
+@:wire typedef AssemblyRootPose = {
+	@:id(1) var occurrence:String;
+	@:id(2) var pose:AssemblyFrame;
 }
 
 /** A saved configuration, separate from the persistent assembly definition. */
-typedef AssemblyStateRecord = {
-	var schemaVersion:Int;
-	var definition:String;
-	var jointCoordinates:Array<AssemblyJointCoordinate>;
-	var rootPoses:Array<AssemblyRootPose>;
+@:wire typedef AssemblyStateRecord = {
+	@:id(1) var schemaVersion:Int;
+	@:id(2) var definition:String;
+	@:id(3) var jointCoordinates:Array<AssemblyJointCoordinate>;
+	@:id(4) var rootPoses:Array<AssemblyRootPose>;
 }

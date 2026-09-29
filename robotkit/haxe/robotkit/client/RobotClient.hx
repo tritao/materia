@@ -15,6 +15,7 @@ import robotkit.protocol.JointTargetValue;
 import robotkit.protocol.JointTargets;
 import robotkit.protocol.RobotCapabilities;
 import robotkit.protocol.CameraFrameData;
+import robotkit.protocol.ImageDetectionObservationMsg;
 import robotkit.protocol.RobotDescription;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotFrame.RobotFrameStream;
@@ -24,6 +25,7 @@ import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.SafetyReset;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.protocol.Stop;
+import robotkit.protocol.StreamSubscription;
 import robotkit.protocol.PlanSubmission;
 import robotkit.protocol.PathControl;
 import robotkit.transport.NativeTransport;
@@ -46,7 +48,13 @@ class RobotClient {
   public var faultListener:Null<Fault->Void> = null;
   public var sensorListener:Null<SensorFrameMsg->Void> = null;
   public var cameraListener:Null<CameraFrameData->Void> = null;
+  public var imageDetectionListener:Null<ImageDetectionObservationMsg->Void> = null;
+  public var subscribeObservations:Bool = false;
   public var statusListener:Null<Void->Void> = null;
+  /** Add camera before connect when full images are needed. */
+  public var subscribeCamera:Null<Bool> = null;
+  public var sensorMaxRateHz:Float = 0.0;
+  public var cameraMaxRateHz:Float = 0.0;
 
   var nativeRuntime:Null<NativeKitRuntime> = null;
   var eventPump:Null<NativeKitEvents> = null;
@@ -68,6 +76,9 @@ class RobotClient {
     this.clientName = clientName;
     this.requestedRole = requestedRole;
   }
+
+  public function subscriptionLocked():Bool
+    return subscription != null || nativeRuntime != null || owned != null;
 
   /** Connects to robotd and starts the NativeKit event subscription. */
   public function connect(host:String, port:Int):Void {
@@ -303,7 +314,14 @@ class RobotClient {
             var statusChanged = statusListener;
             if (statusChanged != null)
               statusChanged();
-            send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1", requestedRole)));
+            var requested = [new StreamSubscription("essential"),
+              new StreamSubscription("sensor", sensorMaxRateHz)];
+            if (subscribeCamera == true || (subscribeCamera == null && cameraListener != null))
+              requested.push(new StreamSubscription("camera", cameraMaxRateHz));
+            if (subscribeObservations)
+              requested.push(new StreamSubscription("observation"));
+            send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1",
+              requestedRole, requested)));
           } else if (kind == EventKind.TransportData) {
             receive(currentTransport);
           } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {
@@ -412,6 +430,11 @@ class RobotClient {
       var listener = cameraListener;
       if (listener != null)
         listener(camera);
+    case RobotMessageType.ImageDetectionObservation:
+      if (!validSession(frame)) return;
+      var observation = RobotProtocol.decodeImageDetectionObservation(frame);
+      var listener = imageDetectionListener;
+      if (listener != null) listener(observation);
     case _:
   }
 

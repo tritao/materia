@@ -1,7 +1,7 @@
 package cnckit;
 
-import cnckit.CncMachine;
-import toolpathkit.setup.Setup;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -10,12 +10,33 @@ import toolpathkit.path.Point3;
 
 /** LinuxCNC post for shared toolpath operations, in millimetres. */
 class CncWriter {
-  public static function write(ops:Array<ToolpathOp>, setup:Setup,
-      machine:CncMachine):String {
-    if (ops == null) throw "G-code export needs operations";
-    if (setup == null) throw "G-code export needs a setup";
-    if (machine == null) throw "G-code export needs a controller";
-    setup.validate(ops, machine.toolLibrary, machine.travelLower, machine.travelUpper);
+  public static function write(program:ToolpathProgram, controller:CncController,
+      ?travel:TravelEnvelope):String {
+    if (program == null || controller == null)
+      throw "G-code export needs a program and controller";
+    var ops = program.ops;
+    var activeSetup = program.setups[0];
+    var activeTool:Null<Int> = null;
+    var bySetup = new Map<String, Array<ToolpathOp>>();
+    for (setup in program.setups) bySetup.set(setup.id, []);
+    for (op in ops) switch op {
+      case SetSetup(id, provenance):
+        for (setup in program.setups) if (setup.id == id) activeSetup = setup;
+        if (activeTool != null)
+          bySetup.get(activeSetup.id).push(ToolpathOp.ToolChange(activeTool,
+            provenance));
+      case ToolChange(number, _):
+        activeTool = number;
+        bySetup.get(activeSetup.id).push(op);
+      case _: bySetup.get(activeSetup.id).push(op);
+    }
+    for (setup in program.setups)
+      if (setup.stock != null) setup.validate(bySetup.get(setup.id), program.tools);
+    if (travel != null) {
+      var violations = travel.check(program);
+      if (violations.length > 0)
+        throw 'CNC export line ${violations[0].provenance.line}: ${violations[0].message()}';
+    }
     var lines = ["G21 G90 G17 G61"], plane = ArcPlane.XY;
     var activeTolerance = 0.0;
     function setTolerance(tolerance:Float):Void {
@@ -30,7 +51,7 @@ class CncWriter {
       var op = ops[index];
       switch op {
       case SetSetup(id, _):
-        lines.push('G${machine.controller.gCodeForSetup(id, machine.dialect)}');
+        lines.push('G${controller.gCodeForSetup(id)}');
       case MachineMove(kind, geometry, speed, tolerance, _):
         switch geometry {
           case Line(_, end):
@@ -86,7 +107,7 @@ class CncWriter {
       case Dwell(seconds, _): lines.push('G4 P${number(seconds)}');
       case ToolChange(number, _): lines.push('T$number M6');
       case ToolLengthOffset(number, length, _):
-        if (number > 0 && Math.abs(machine.controller.toolLength(number) - length) > 1e-9)
+        if (number > 0 && Math.abs(controller.toolLength(number) - length) > 1e-9)
           throw 'CNC G-code H$number length disagrees with controller setup';
         lines.push(number == 0 ? "G49" : 'G43 H$number');
       case OptionalStop(_): lines.push("M1");

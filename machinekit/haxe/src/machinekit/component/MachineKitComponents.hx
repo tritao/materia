@@ -26,15 +26,24 @@ import machinekit.transmission.Rack;
 import machinekit.transmission.TimingPulley;
 
 /** Registered, editable single-part generators. Parts whose inputs include lists, such as
- * SteppedShaft and ShaftCoupling, remain code-only until a list input type exists.
+ * SteppedShaft and ShaftCoupling, use text inputs for structured feature lists.
  */
 class MachineKitComponents {
 	static var types:Null<Array<ComponentType>>;
+	static final extensions:Array<ComponentType> = [];
 
-	public static function all():Array<ComponentType> return entries().copy();
+	/** Applications register their component recipes before loading saved assemblies. */
+	public static function register(type:ComponentType):Void {
+		for (existing in entries()) if (existing.id == type.id) throw 'Duplicate component type "${type.id}"';
+		for (existing in extensions) if (existing.id == type.id) throw 'Duplicate component type "${type.id}"';
+		extensions.push(type);
+	}
+
+	public static function all():Array<ComponentType> return entries().concat(extensions);
 
 	public static function byId(id:String):ComponentType {
 		for (type in entries()) if (type.id == id) return type;
+		for (type in extensions) if (type.id == id) return type;
 		throw 'Unknown machine component type "$id"';
 	}
 
@@ -43,7 +52,8 @@ class MachineKitComponents {
 		return types;
 	}
 
-	static function build():Array<ComponentType> return [
+	static function build():Array<ComponentType> {
+		var result:Array<ComponentType> = [
 			DeepGrooveBearing.recipeType(),
 			SocketHeadCapScrew.recipeType(),
 			HexBolt.recipeType(),
@@ -71,5 +81,8 @@ class MachineKitComponents {
 			Rack.recipeType(),
 			TimingPulley.standardRecipeType(),
 			TimingPulley.customRecipeType()
-	];
+		];
+		for (type in MachineKitAdditionalRecipes.all()) result.push(type);
+		return result;
+	}
 }

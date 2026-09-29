@@ -25,13 +25,16 @@ class RobotHost {
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] [--listen=IPv4] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
-        + "[--deployment=FILE] [--camera-fixture] [--help]");
+        + "[--deployment=FILE] [--camera-fixture] [--camera-fixture-stream] "
+        + "[--bulk-budget-bytes=N] [--help]");
       return;
     }
     var port = parsePort();
     var listenAddress = parseListenAddress();
     var robotId = parseRobotId();
+    var bulkBudgetBytes = parseBulkBudget();
     var deploymentPath = optionValue("--deployment=");
+    var perceptionFixtureModel = optionValue("--perception-fixture-model=");
     var deployment = deploymentPath == null ? null : new RobotDeployment(deploymentPath);
     var serialPath = deployment == null ? null : deployment.serialPath;
     var baud = deployment == null ? 115200 : deployment.baud;
@@ -49,9 +52,12 @@ class RobotHost {
       throw "robotd: --deployment requires --server";
     if (deployment != null && args.indexOf("--in-memory") >= 0)
       throw "robotd: --deployment cannot be combined with --in-memory";
+    if (perceptionFixtureModel != null && deployment != null)
+      throw "robotd: perception fixture requires the demo robot";
     var behavior = parseBehavior();
     var multiJoint = args.indexOf("--multi-joint") >= 0;
-    var cameraFixture = args.indexOf("--camera-fixture") >= 0;
+    var cameraFixtureStream = args.indexOf("--camera-fixture-stream") >= 0 || perceptionFixtureModel != null;
+    var cameraFixture = args.indexOf("--camera-fixture") >= 0 || cameraFixtureStream;
     if (cameraFixture && deployment != null)
       throw "robotd: --camera-fixture requires the demo robot";
     var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.robot;
@@ -102,6 +108,16 @@ class RobotHost {
       var camera = robot.addSensor(new robotkit.model.Sensor("camera", "camera", 0,
         "demo/camera"));
       camera.frame = mount;
+      if (cameraFixtureStream) {
+        var secondCamera = robot.addSensor(new robotkit.model.Sensor("camera-right", "camera", 0,
+          "demo/camera-right"));
+        secondCamera.frame = mount;
+        if (perceptionFixtureModel == null) {
+          var oversizeCamera = robot.addSensor(new robotkit.model.Sensor("camera-oversize", "camera", 0,
+            "demo/camera-oversize"));
+          oversizeCamera.frame = mount;
+        }
+      }
     }
     }
     var blueprint = RobotRuntimeCompiler.compile(robot);
@@ -125,7 +141,35 @@ class RobotHost {
         }
         if (serverRuntime == null) throw "robotd: failed to create runtime";
         var hostedRuntime:RobotRuntime = serverRuntime;
-        if (cameraFixture) {
+        var fixtureTick:Null<Void->Void> = null;
+        if (cameraFixtureStream) {
+          var largeFixture = perceptionFixtureModel == null ||
+            args.indexOf("--perception-stall-large") >= 0;
+          var fixtureWidth = largeFixture ? 640 : 8;
+          var fixtureHeight = largeFixture ? 480 : 4;
+          var pixels = haxe.io.Bytes.alloc(fixtureWidth * fixtureHeight * 3);
+          for (index in 0...pixels.length) pixels.set(index,
+            perceptionFixtureModel == null ? index % 251 : 51);
+          var image = new robotkit.world.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
+          var oversizeImage = perceptionFixtureModel == null
+            ? new robotkit.world.CameraImage(1920, 1080, "rgb8", haxe.io.Bytes.alloc(1920 * 1080 * 3))
+            : null;
+          var fixtureSequence = haxe.Int64.ofInt(0);
+          var nextFixtureNs = haxe.Int64.ofInt(0);
+          fixtureTick = function() {
+            var now = nativekit.ffi.NativeKit.nk_time_now_ns();
+            if (haxe.Int64.compare(now, nextFixtureNs) < 0) return;
+            fixtureSequence = haxe.Int64.add(fixtureSequence, haxe.Int64.ofInt(1));
+            if (oversizeImage != null && haxe.Int64.compare(fixtureSequence, haxe.Int64.ofInt(1)) == 0)
+              hostedRuntime.publishCameraFrame("demo/camera-oversize", oversizeImage,
+                fixtureSequence, now, "camera.fixture");
+            hostedRuntime.publishCameraFrame("demo/camera", image, fixtureSequence,
+              now, "camera.fixture");
+            hostedRuntime.publishCameraFrame("demo/camera-right", image, fixtureSequence,
+              now, "camera.fixture");
+            nextFixtureNs = haxe.Int64.add(now, haxe.Int64.ofInt(20000000));
+          };
+        } else if (cameraFixture) {
           var pixels = haxe.io.Bytes.alloc(6);
           for (index in 0...6) pixels.set(index, index + 1);
           hostedRuntime.publishCameraFrame("demo/camera",
@@ -133,7 +177,12 @@ class RobotHost {
             haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
         }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
-          port, robotId, behavior, listenAddress);
+          port, robotId, behavior, listenAddress, bulkBudgetBytes, fixtureTick,
+          deployment != null ? deployment.perception : perceptionFixtureModel == null ? [] :
+            [new robotkit.deployment.PerceptionPipelineConfig("front_objects", "demo/camera",
+              "object_detector", perceptionFixtureModel,
+              robotkit.inference.InferenceSession.modelDigest(perceptionFixtureModel),
+              "robotd", ["local", "worldd"], 0.4, 0.0, 0.5)]);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
         if (serverSimulation != null) serverSimulation.dispose();
@@ -184,6 +233,15 @@ class RobotHost {
       }
     }
     return 17890;
+  }
+
+  function parseBulkBudget():Int {
+    var raw = optionValue("--bulk-budget-bytes=");
+    if (raw == null) return 0;
+    var value = Std.parseInt(raw);
+    if (value == null || value <= 0 || value > 4 * 1024 * 1024 - OutboundScheduler.MIN_ESSENTIAL_RESERVE)
+      throw "robotd: --bulk-budget-bytes must leave at least 65536 bytes for essential traffic";
+    return value;
   }
 
   function parseListenAddress():String {

@@ -19,11 +19,24 @@ class ComponentValues {
 	public function setInteger(name:String, value:Int):ComponentValues return set(name, Integer(value));
 	public function setBoolean(name:String, value:Bool):ComponentValues return set(name, Boolean(value));
 	public function setToken(name:String, value:String):ComponentValues return set(name, Token(value));
+	public function setUnset(name:String):ComponentValues return set(name, Unset);
 	public function names():Array<String> return [for (name in entries.keys()) name];
 
 	public function number(name:String):Float return switch (required(name)) {
 		case Number(value): value;
 		default: throw 'Component value "$name" is not numeric';
+	};
+
+	public function optionalNumber(name:String):Null<Float> return switch (required(name)) {
+		case Unset: null;
+		case Number(value): value == 0 ? null : value;
+		default: throw 'Component value "$name" is not optional numeric';
+	};
+
+	public function optionalToken(name:String):Null<String> return switch (required(name)) {
+		case Unset: null;
+		case Token(value): value;
+		default: throw 'Component value "$name" is not optional text';
 	};
 
 	public function integer(name:String):Int return switch (required(name)) {

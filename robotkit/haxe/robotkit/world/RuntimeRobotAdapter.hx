@@ -20,6 +20,7 @@ class RuntimeRobotAdapter implements Robot {
   var observedSequence:Int64 = Int64.ofInt(-1);
   var observedReceipt:Int64 = Int64.ofInt(-1);
   var currentSensors:Array<SensorFrame> = [];
+  final eventRing = new RobotEventRing();
   var closed:Bool = false;
 
   public function new(id:RobotId, runtime:RobotRuntime, name:String,
@@ -91,6 +92,12 @@ class RuntimeRobotAdapter implements Robot {
       return new RobotFault(logicalId, value.faultCode, "ramp_limit", true);
     return new RobotFault(logicalId, value.faultCode, faultMessage, true);
   }
+
+  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent>
+    return eventRing.events(afterOrdinal, max);
+
+  public function publishObservation(value:robotkit.perception.ImageDetectionObservation):RobotEvent
+    return eventRing.publish(value);
 
   public function submit(command:RobotCommand):Void {
     ensureOpen();

@@ -3,7 +3,7 @@ package cadbridge;
 import cadkit.modeling.AssemblyState;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
-import machinekit.component.RuntimePortIntent;
+import machinekit.component.ComponentCapability;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.EndEffectorFrames;
@@ -76,15 +76,15 @@ class EndEffectorRuntimeBridge {
     var sensorId:Null<String> = null;
     var hasGripper = false, hasVacuum = false, hasLock = false;
     var hasExplicitVacuumValve = false;
-    for (member in configuration.components()) for (intent in member.component.runtimePortIntents())
+    for (member in configuration.components()) for (intent in member.component.capabilities())
       switch intent {
         case VacuumValve(_): hasExplicitVacuumValve = true;
         case _:
       }
-    for (member in configuration.components()) for (intent in member.component.runtimePortIntents()) {
+    for (member in configuration.components()) for (intent in member.component.capabilities()) {
       var prefix = '$configurationId/${member.id}';
       switch intent {
-        case Gripper(openPort, closePort):
+        case Grip(_, _, openPort, closePort):
           if (hasGripper || openPort == closePort) throw "Ambiguous gripper runtime ports";
           requireInlet(configuration, member.id, openPort, [PortKind.Pneumatic, PortKind.Signal]);
           requireInlet(configuration, member.id, closePort, [PortKind.Pneumatic, PortKind.Signal]);
@@ -114,6 +114,7 @@ class EndEffectorRuntimeBridge {
           if (signal.role != PortRole.Supply || signal.kind != PortKind.Signal)
             throw 'Pressure sensor "$prefix" needs a signal supply';
           sensorId = '$prefix.$signalPort';
+        case _:
       }
     }
     if (sensorId != null && !hasVacuum)
@@ -145,7 +146,7 @@ class EndEffectorRuntimeBridge {
     var configuration = set.configuration(configurationId);
     var solved = configuration.solve(state);
     for (member in configuration.components())
-      for (intent in member.component.runtimePortIntents()) switch intent {
+      for (intent in member.component.capabilities()) switch intent {
         case VacuumPressureSensor(_, signalPort):
           var port = member.component.port(signalPort);
           var connector = port.connector == null ? "mount" : port.connector;
@@ -155,7 +156,7 @@ class EndEffectorRuntimeBridge {
             configuration.memberConnectorFrame(member.id, connector));
           var mountRelative = AssemblyFrames.compose(
             AssemblyFrames.inverse(solved.mountWorld), mountWorld);
-          var frame = EndEffectorFrames.toRobotFrame(mountRelative);
+          var frame = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(mountRelative));
           var mappedLinkId = blueprint.identity == null ? null :
             blueprint.identity.linkId(flangeLinkIndex);
           if (flangeLinkId != null && mappedLinkId != null && flangeLinkId != mappedLinkId)

@@ -11,14 +11,17 @@ class ComponentType {
 	final keepDesignation:Bool;
 	final materialInDesignation:Bool;
 	final defaultMaterial:String;
+	final bomExcludedInputs:Array<String>;
 
 	public function new(id:String, inputs:Array<ComponentParameter>, build:ComponentValues->MachineComponent,
-			keepDesignation:Bool = false, materialInDesignation:Bool = false) {
+			keepDesignation:Bool = false, materialInDesignation:Bool = false,
+			?bomExcludedInputs:Array<String>) {
 		if (id == null || id.length == 0 || inputs == null || build == null)
 			throw "Incomplete component type";
 		this.id = id;
 		this.keepDesignation = keepDesignation;
 		this.materialInDesignation = materialInDesignation;
+		this.bomExcludedInputs = bomExcludedInputs == null ? [] : bomExcludedInputs.copy();
 		var seen:Map<String, Bool> = [];
 		for (input in inputs) {
 			if (seen.exists(input.name)) throw 'Duplicate component input "${input.name}"';
@@ -77,9 +80,15 @@ class ComponentType {
 		return component.values();
 	}
 
-	public function key(values:ComponentValues):String {
+	public function key(values:ComponentValues):String return keyFor(values, false);
+
+	/** BOM identity omits recipe inputs that only place or route a physical part. */
+	public function bomKey(values:ComponentValues):String return keyFor(values, true);
+
+	function keyFor(values:ComponentValues, bom:Bool):String {
 		var parts:Array<String> = [];
 		for (input in inputs) {
+			if (bom && bomExcludedInputs.indexOf(input.name) >= 0) continue;
 			var value = values == null ? null : values.get(input.name);
 			if (value == null) value = input.defaultValue;
 			if (input.name == "material" && switch value {
@@ -87,6 +96,7 @@ class ComponentType {
 				default: false;
 			}) continue;
 			var text = switch value {
+				case Unset: "unset";
 				case Number(number): switch input.type {
 					case Scalar: Std.string(Math.fround(number * 1e9) / 1e9);
 					case Length: Dimension.format(number);

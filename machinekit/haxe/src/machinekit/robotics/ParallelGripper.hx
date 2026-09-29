@@ -8,12 +8,9 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
-import machinekit.component.RuntimePortIntent;
 
 /** Generic two-jaw pneumatic gripper envelope; stroke is the total jaw travel. */
 class ParallelGripper extends MachineComponent {
-	override public function runtimePortIntents():Array<RuntimePortIntent>
-		return [Gripper("open", "close")];
 	public final width:Float;
 	public final depth:Float;
 	public final length:Float;
@@ -33,7 +30,19 @@ class ParallelGripper extends MachineComponent {
 		addConnector("tcp", Face, Solids.axial(0, 0, length));
 		addPort({name: "open", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
 		addPort({name: "close", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
+		addCapability(Grip(stroke, null, "open", "close"));
 	}
+
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.parallel-gripper");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, ParallelGripper) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("length", length).setNumber("stroke", stroke).setToken("material", materialSpec());
+
+	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(detail == Envelope ? width + stroke : width, depth, length);

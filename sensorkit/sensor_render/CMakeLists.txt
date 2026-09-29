@@ -24,7 +24,7 @@ if(NK_BUILD_TESTS AND UNIX AND NOT APPLE AND NOT ANDROID AND NOT EMSCRIPTEN)
         target_include_directories(nativekit_sensor_render_tests PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/../../scenekit/scene/src")
         target_link_libraries(nativekit_sensor_render_tests PRIVATE NativeKit::sensor_render
-            NativeKit::scene NativeKit::gpu NativeKit::nativekit)
+            NativeKit::scene NativeKit::gpu NativeKit::nativekit NativeKit::sensor_io)
         add_test(NAME sensor_render
             COMMAND ${NKSENSOR_RENDER_XVFB_RUN} -a $<TARGET_FILE:nativekit_sensor_render_tests>)
         set_tests_properties(sensor_render PROPERTIES LABELS "sensor;render;graphics;gpu"

@@ -1,6 +1,5 @@
 import camkit.CamContour;
 import camkit.CamJob;
-import camkit.CamProgram;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;

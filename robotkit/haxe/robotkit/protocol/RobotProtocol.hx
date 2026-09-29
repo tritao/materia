@@ -7,6 +7,15 @@ import robotkit.world.CameraImage;
 
 /** Typed RobotKit message helpers; the frame envelope remains independent. */
 class RobotProtocol {
+  public static function imageDetectionObservation(value:ImageDetectionObservationMsg,
+      ?sessionId:haxe.Int64):RobotFrame
+    return message(RobotMessageType.ImageDetectionObservation, MessagePack.encode(value),
+      sessionId, value.ordinal, value.completedTimestampNs);
+
+  public static function decodeImageDetectionObservation(frame:RobotFrame):ImageDetectionObservationMsg {
+    expect(frame, RobotMessageType.ImageDetectionObservation);
+    return MessagePack.decode(frame.payload);
+  }
   public static function hello(value:Hello, ?sessionId:haxe.Int64 = null):RobotFrame
     return message(RobotMessageType.Hello, MessagePack.encode(value), sessionId);
 

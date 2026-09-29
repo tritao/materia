@@ -6,6 +6,7 @@ import materia.assembly.AssemblyRecord;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyDefinitionFlattener;
 import materia.project.Appearance;
 import materia.project.Appearance.Appearances;
 import materia.project.MaterialLibrary;
@@ -200,7 +201,10 @@ class SceneArtifact {
 		var assemblyDefinition = data.assemblyDefinition;
 		if (assemblyDefinition != null) {
 			AssemblyDefinitionCodec.validate(assemblyDefinition);
-			if (assembly != null && assembly.instances.length != assemblyDefinition.occurrences.length)
+			var topLevelCount = assemblyDefinition.occurrences.length;
+			assemblyDefinition = AssemblyDefinitionFlattener.flatten(assemblyDefinition);
+			if (assembly != null && assembly.instances.length != assemblyDefinition.occurrences.length &&
+				assembly.instances.length != topLevelCount)
 				throw "Assembly snapshot does not match its occurrences";
 			for (definition in assemblyDefinition.definitions) if (!ids.exists(definition.id))
 				throw 'Assembly component definition "${definition.id}" has no geometry part';

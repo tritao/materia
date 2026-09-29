@@ -12,13 +12,50 @@ import materia.project.MaterialLibrary;
  * `geometry()` returns a new owned Part in the component's CAD frame; the caller closes it.
  */
 class MachineComponent {
-	/** Return a non-null key to declare this component a changer half.
-	 * EndEffectorSet compares both halves' keys and their couplingConnector()
-	 * values when a tool is added. */
-	public function couplingKey():Null<String> return null;
-	public function couplingConnector():Null<String> return null;
-	/** Declare which ports drive or observe runtime capabilities. */
-	public function runtimePortIntents():Array<RuntimePortIntent> return [];
+	final capabilityList:Array<ComponentCapability> = [];
+
+	public function capabilities():Array<ComponentCapability> return capabilityList.copy();
+
+	public function coupling():Null<{key:String, connector:String}> {
+		for (capability in capabilityList) switch capability {
+			case Coupling(key, connector): return {key: key, connector: connector};
+			case _:
+		}
+		return null;
+	}
+
+	/** Compatibility view for existing runtime clients. */
+	public function runtimePortIntents():Array<RuntimePortIntent> {
+		var result:Array<RuntimePortIntent> = [];
+		for (capability in capabilityList) switch capability {
+			case Grip(_, _, openPort, closePort): result.push(RuntimePortIntent.Gripper(openPort, closePort));
+			case VacuumActuator(port): result.push(RuntimePortIntent.VacuumActuator(port));
+			case VacuumValve(port): result.push(RuntimePortIntent.VacuumValve(port));
+			case VacuumPressureSensor(vacuumPort, signalPort):
+				result.push(RuntimePortIntent.VacuumPressureSensor(vacuumPort, signalPort));
+			case ChangerLock(port): result.push(RuntimePortIntent.ChangerLock(port));
+			case _:
+		}
+		return result;
+	}
+
+	function addCapability(capability:ComponentCapability):Void {
+		if (capability == null) throw 'Null capability on "$designation"';
+		switch capability {
+			case Coupling(key, connector):
+				if (key == null || key.length == 0) throw 'Coupling on "$designation" needs a key';
+				this.connector(connector);
+				if (coupling() != null) throw 'Duplicate coupling capability on "$designation"';
+			case Suction(_, _, vacuumPort, contactConnector):
+				port(vacuumPort); connector(contactConnector);
+			case Grip(_, _, openPort, closePort): port(openPort); port(closePort);
+			case VacuumSource(_, outputPort): port(outputPort);
+			case VacuumActuator(inletPort) | VacuumValve(inletPort) | ChangerLock(inletPort): port(inletPort);
+			case VacuumPressureSensor(vacuumPort, signalPort): port(vacuumPort); port(signalPort);
+		}
+		capabilityList.push(capability);
+	}
+
 	public final designation:String;
 	public var materialId:String;
 	/** True when this component was built from explicit, non-catalog specifications. */
@@ -59,7 +96,7 @@ class MachineComponent {
 	function get_bom():BomItem {
 		if (cachedBom != null) return cachedBom;
 		var recipe = type;
-		var valuesKey = recipe == null ? null : recipe.key(values());
+		var valuesKey = recipe == null ? null : recipe.bomKey(values());
 		cachedBom = {partNumber: recipe == null ? designation : recipe.partNumber(this),
 			description: description, quantity: 1,
 			material: MaterialLibrary.require(materialId).physical.spec,
@@ -67,19 +104,24 @@ class MachineComponent {
 		return cachedBom;
 	}
 
+	public function hasGeometry():Bool {
+		try {
+			var part = geometry(Preview);
+			part.close();
+			return true;
+		} catch (_:NoGeometry) return false;
+	}
+
 	public function geometry(detail:ComponentDetail = Preview):Part
-		throw 'Component "$designation" does not generate geometry';
+		throw new NoGeometry(designation);
 
 	/** The preview shape supplies volume and centroid; its density is kg/m³. */
 	public function massProperties():MassProperties {
 		if (declaredMass != null) return declaredMass;
 		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
 		var part:Part;
-		try part = geometry(Preview) catch (error:Dynamic) {
-			if (Std.string(error) == 'Component "$designation" does not generate geometry')
-				throw 'Component "$designation" has no geometry or declared mass';
-			throw error;
-		}
+		try part = geometry(Preview) catch (_:NoGeometry)
+			throw 'Component "$designation" has no geometry or declared mass';
 		try {
 			var physical = part.massProperties();
 			var density = MaterialLibrary.require(materialId).physical.density;
@@ -119,7 +161,7 @@ class MachineComponent {
 	function get_type():Null<ComponentType> return componentType();
 
 	public function values():ComponentValues
-		throw 'Component "$designation" is code-only';
+		throw 'Component "$designation" has no recipe values';
 
 	public function connectors():Array<Connector>
 		return connectorList.copy();
@@ -130,6 +172,11 @@ class MachineComponent {
 	}
 
 	public function ports():Array<ComponentPort> return portList.copy();
+
+	public function hasPort(name:String):Bool {
+		for (entry in portList) if (entry.name == name) return true;
+		return false;
+	}
 
 	public function port(name:String):ComponentPort {
 		for (entry in portList) if (entry.name == name) return entry;

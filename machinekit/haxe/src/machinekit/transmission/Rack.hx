@@ -55,6 +55,8 @@ class Rack extends MachineComponent {
 		addConnector("pitch", ConnectorRole.Pitch, Solids.axial(faceWidth / 2, 0, 0));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var a = moduleSize, b = 1.25 * moduleSize, p = Math.PI * moduleSize, halfThickness = p / 4;
 		var bottom = -b - barHeight;
@@ -97,7 +99,7 @@ class Rack extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, Rack) ? recipeType() : null;
 
 	override public function values():ComponentValues return new ComponentValues()
 		.setNumber("moduleSize", moduleSize).setInteger("teethCount", teethCount).setNumber("faceWidth", faceWidth)

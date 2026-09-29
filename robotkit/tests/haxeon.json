@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "robotkit-world-tests" },
 	"entry": "tests.RobotWorldTests",
-	"sourceRoots": ["src"],
+	"sourceRoots": ["src", "../../sensorkit/sensor_io/haxe"],
 	"dependencies": {
 		"nativekit": { "path": "../../nativekit" },
 		"robotkit": { "path": ".." },
@@ -25,7 +25,13 @@
 				"../../motionkit/native/src/generator.cpp",
 				"../../motionkit/native/vendor/ruckig/CMakeLists.txt",
 				"../../nativekit/CMakeLists.txt",
-				"../../simkit/CMakeLists.txt"
+				"../../simkit/CMakeLists.txt",
+				"../inference/CMakeLists.txt",
+				"../inference/src/inference.cpp",
+				"../inference/include/robotkit_inference.h",
+				"../policy/CMakeLists.txt",
+				"../policy/src/policy.cpp",
+				"../policy/include/robotkit_policy.h"
 			]
 		}
 	},

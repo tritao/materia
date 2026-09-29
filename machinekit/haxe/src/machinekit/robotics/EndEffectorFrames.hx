@@ -2,6 +2,8 @@ package machinekit.robotics;
 
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import machinekit.units.Millimetres;
+import machinekit.units.Metres;
 
 /** Frame conversions for end effector (EOAT) integration with RobotKit. */
 class EndEffectorFrames {
@@ -18,13 +20,14 @@ class EndEffectorFrames {
 	}
 
 	/** Convert a millimetre frame to metres with a plain position and quaternion. */
-	public static function toMetres(frame:AssemblyFrame):{position:{x:Float, y:Float, z:Float},
-			quaternion:{x:Float, y:Float, z:Float, w:Float}} {
-		return {position: {x: frame.x / 1000, y: frame.y / 1000, z: frame.z / 1000},
+	public static function toMetres(frame:AssemblyFrame):RobotFrame {
+		var x:Metres = (new Millimetres(frame.x)).metres();
+		var y:Metres = (new Millimetres(frame.y)).metres();
+		var z:Metres = (new Millimetres(frame.z)).metres();
+		return {position: {x: x.raw(), y: y.raw(), z: z.raw()},
 			quaternion: {x: frame.qx, y: frame.qy, z: frame.qz, w: frame.qw}};
 	}
 
-	public static function toRobotFrame(frame:AssemblyFrame):{position:{x:Float, y:Float, z:Float},
-			quaternion:{x:Float, y:Float, z:Float, w:Float}}
-		return toMetres(approachYToZ(frame));
+	public static function toRobotFrame(frame:ConnectorFrame):RobotFrame
+		return toMetres(approachYToZ(frame.raw()));
 }

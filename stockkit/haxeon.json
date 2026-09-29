@@ -10,5 +10,33 @@
   "ffi": {
     "interfaces": ["core/bindings/stockkit.hxi"]
   },
+  "native": {
+    "cmake": {
+      "source": "core",
+      "target": "stockkit_core",
+      "library": "stockkit_core",
+      "inputs": [
+        "core/CMakeLists.txt",
+        "core/include/stockkit.h",
+        "core/src/api.cpp",
+        "core/src/contour.cpp",
+        "core/src/contour.hpp",
+        "core/src/mesh.cpp",
+        "core/src/mesh.hpp",
+        "core/src/pool.cpp",
+        "core/src/pool.hpp",
+        "core/src/preview.cpp",
+        "core/src/preview.hpp",
+        "core/src/profile.cpp",
+        "core/src/profile.hpp",
+        "core/src/stock.cpp",
+        "core/src/stock.hpp",
+        "core/src/sweep.cpp",
+        "core/src/sweep.hpp",
+        "core/src/tool.cpp",
+        "core/src/tool.hpp"
+      ]
+    }
+  },
   "target": "host"
 }

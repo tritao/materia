@@ -1,4 +1,5 @@
 #include "nativekit_sensor_render.hpp"
+#include "nativekit_sensor_wire.hpp"
 
 #include "nativekit.h"
 #include "nativekit_window.h"
@@ -7,6 +8,9 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <thread>
 
@@ -48,6 +52,8 @@ std::shared_ptr<Scene> make_colored_scene() {
     auto &material_resource = scene->material_store().create(material);
     auto &material_state = material_resource.edit_state();
     material_state.base_color = {0.0f, 0.0f, 0.0f, 1.0f};
+    // Metallic black has no dielectric F0 specular term; only emissive red remains.
+    material_state.metallic = 1.0f;
     material_state.emissive = {1.0f, 0.0f, 0.0f};
 
     const auto node = scene->reserve_node_id();
@@ -226,6 +232,58 @@ void captures_emissive_triangle() {
     assert(nk_window_destroy(window) == NK_OK);
 }
 
+/** Optional Phase 7 wire fixture and timing probe, separate from the render contract test. */
+void camera_spike() {
+    nk_window window{};
+    nk_surface surface{};
+    nkgpu_renderer renderer{};
+    nk_window_options options{};
+    options.struct_size = sizeof(options);
+    options.width = 32;
+    options.height = 32;
+    options.title = "SensorKit camera spike";
+    assert(nk_window_create(&options, &window) == NK_OK);
+    assert(nkgpu_surface_create(window, 32, 32, &surface) == NKGPU_OK);
+    assert(wait_for_surface(surface));
+    assert(nkgpu_renderer_create(surface, &renderer) == NKGPU_OK);
+    auto scene = make_colored_scene();
+    SensorConfig config;
+    config.id = 50;
+    config.frame = 11;
+    CameraConfig image;
+    image.projection.width = 16;
+    image.projection.height = 16;
+    image.projection.fov_y = 1.5707963267948966f;
+    image.projection.near_plane = 0.1f;
+    image.projection.far_plane = 10.0f;
+    CameraSensor camera(config, image);
+    auto tick = camera.trigger(1.25);
+    assert(tick.has_value());
+    SceneCameraAdapter adapter(renderer);
+    std::optional<CameraFrame> frame;
+    const auto start = std::chrono::steady_clock::now();
+    for (int i = 0; i < 20; ++i) {
+        assert(adapter.capture(camera, *tick, scene->snapshot(), {}, frame) == NKGPU_OK);
+        assert(frame.has_value());
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - start;
+    std::cout << "camera_capture_mean_ms="
+              << std::chrono::duration<double, std::milli>(elapsed).count() / 20.0 << '\n';
+    frame->header.delivery_time = 1.375;
+    std::string error;
+    const auto encoded = nksensor::wire::encode_camera_frame(*frame, &error);
+    assert(encoded.has_value());
+    if (const char *path = std::getenv("NKSENSOR_CAMERA_SPIKE_OUTPUT")) {
+        std::ofstream output(path, std::ios::binary);
+        output.write(reinterpret_cast<const char *>(encoded->data()),
+                     static_cast<std::streamsize>(encoded->size()));
+        assert(output.good());
+    }
+    assert(nkgpu_renderer_destroy(renderer) == NKGPU_OK);
+    assert(nkgpu_surface_destroy(surface) == NKGPU_OK);
+    assert(nk_window_destroy(window) == NK_OK);
+}
+
 } // namespace
 
 int main() {
@@ -235,6 +293,7 @@ int main() {
     if (nk_init(&init) != NK_OK)
         return 1;
     captures_emissive_triangle();
+    if (std::getenv("NKSENSOR_RUN_CAMERA_SPIKE")) camera_spike();
     nk_shutdown();
     return 0;
 }

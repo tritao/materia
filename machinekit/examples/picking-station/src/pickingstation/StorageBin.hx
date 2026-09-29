@@ -16,6 +16,8 @@ typedef StorageBinEnvelope = {
 
 /** Open-top storage bin. The Envelope detail is the external package envelope. */
 class StorageBin extends MachineComponent {
+	override public function componentType():machinekit.component.ComponentType return PickingStationRecipes.bin();
+	override public function values():machinekit.component.ComponentValues return PickingStationRecipes.values(this);
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;

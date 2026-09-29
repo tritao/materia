@@ -233,6 +233,7 @@ class DocumentCodec {
 	}
 
 	public static function decode(text:String, clone:Bool = false, evaluate:Bool = true):Document {
+		AssemblyMemberEvaluator.register();
 		var document:Null<Document> = null;
 		try {
 			var root:Dynamic = Json.parse(text);

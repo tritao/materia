@@ -7,7 +7,9 @@ import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.CompiledProgram;
 import motionkit.robot.StartTolerances;
-import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.path.Point3;
+import toolpathkit.setup.TravelEnvelope;
 
 /** Binds pure CncKit programs to the physical joints of a direct XYZ machine. */
 class ToolpathMotionBinding {
@@ -44,12 +46,16 @@ class ToolpathMotionBinding {
       }
       envelopeLower.push(low); envelopeUpper.push(high);
     }
-    if (machine.travelLower != null && machine.travelUpper != null)
+    if (machine.travel != null)
       for (axis in 0...3) {
-        envelopeLower[axis] = Math.max(envelopeLower[axis], machine.travelLower[axis]);
-        envelopeUpper[axis] = Math.min(envelopeUpper[axis], machine.travelUpper[axis]);
+        var lower = [machine.travel.lower.x, machine.travel.lower.y, machine.travel.lower.z];
+        var upper = [machine.travel.upper.x, machine.travel.upper.y, machine.travel.upper.z];
+        envelopeLower[axis] = Math.max(envelopeLower[axis], lower[axis]);
+        envelopeUpper[axis] = Math.min(envelopeUpper[axis], upper[axis]);
       }
-    machine.setTravelEnvelope(envelopeLower, envelopeUpper);
+    machine.setTravel(new TravelEnvelope(
+      new Point3(envelopeLower[0], envelopeLower[1], envelopeLower[2]),
+      new Point3(envelopeUpper[0], envelopeUpper[1], envelopeUpper[2])));
     var limits = new ValidationLimits(count, Int64.ofInt(blueprint.runtime.revision),
       Int64.ofInt(blueprint.runtime.calibrationRevision));
     var velocity = [for (_ in 0...count) 0.0];
@@ -96,15 +102,9 @@ class ToolpathMotionBinding {
       [for (joint in blueprint.model.joints) joint.id], blueprint.model.couplings);
   }
 
-  public function compile(ops:Array<ToolpathOp>, initialJoints:Array<Float>,
+  public function compile(program:ToolpathProgram, initialJoints:Array<Float>,
       firstPlanId:Int64):CompiledProgram {
-    var current = solver.forward(initialJoints);
-    var initial = machine.initialPosition;
-    if (Math.abs(current.x - initial[0]) > machine.positionTolerance ||
-        Math.abs(current.y - initial[1]) > machine.positionTolerance ||
-        Math.abs(current.z - initial[2]) > machine.positionTolerance)
-      throw "CNC machine initial position differs from commanded joints";
-    var lowered = ToolpathMotion.lower(ops, machine);
+    var lowered = ToolpathMotion.lower(program, machine);
     if (lowered.program == null) throw "toolpath has no executable motion";
     return compiler.compile(lowered.program, initialJoints, firstPlanId);
   }

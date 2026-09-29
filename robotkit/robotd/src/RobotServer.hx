@@ -40,6 +40,13 @@ import robotkit.runtime.RobotRuntimeError;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.transport.NativeTransport;
 import robotkit.world.RobotSensorFrames;
+import robotkit.world.RuntimeRobotAdapter;
+import robotkit.world.RobotEvent;
+import robotkit.world.RobotEventRing;
+import robotkit.perception.PerceptionHost;
+import robotkit.perception.PerceptionPipelineRegistry;
+import robotkit.deployment.PerceptionPipelineConfig;
+import robotkit.protocol.ImageDetectionObservationMsg;
 
 private enum ControlOwner {
   None;
@@ -67,6 +74,14 @@ class RobotServer {
   final observerStreams:Map<Int, RobotFrameStream> = new Map<Int, RobotFrameStream>();
   final observerSessions:Map<Int, haxe.Int64> = new Map<Int, haxe.Int64>();
   final observerHello:Map<Int, Bool> = new Map<Int, Bool>();
+  final outbound:Map<Int, OutboundScheduler> = new Map<Int, OutboundScheduler>();
+  final bulkBudgetBytes:Int;
+  final fixtureTick:Null<Void->Void>;
+  final perception:Null<PerceptionHost>;
+  final perceptionConsumers:Map<String, Array<String>> = new Map<String, Array<String>>();
+  final perceptionSequences:Map<String, Int64> = new Map<String, Int64>();
+  final producedEvents = new RobotEventRing();
+  final hostedRobot:RuntimeRobotAdapter;
   var stream:RobotFrameStream;
   final snapshots = new RobotSnapshotMailbox();
   var sessionId:haxe.Int64 = haxe.Int64.ofInt(0);
@@ -87,14 +102,25 @@ class RobotServer {
 
   public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
       simulation:Null<SimulationHarness>, port:Int, robotId:Int, ?behavior:RobotBehavior,
-      ?listenAddress:String = "127.0.0.1") {
+      ?listenAddress:String = "127.0.0.1", ?bulkBudgetBytes:Int = 0,
+      ?fixtureTick:Void->Void, ?perceptionConfigs:Array<PerceptionPipelineConfig>) {
     this.robot = robot;
     this.blueprint = blueprint;
     this.runtime = runtime;
+    hostedRobot = new RuntimeRobotAdapter("robotd", runtime, robot.name,
+      [for (link in robot.links) link.name], [for (joint in robot.joints) joint.name]);
     this.simulation = simulation;
     this.port = port;
     this.listenAddress = listenAddress;
     this.robotId = robotId;
+    this.bulkBudgetBytes = bulkBudgetBytes;
+    this.fixtureTick = fixtureTick;
+    var pipelines:Array<robotkit.perception.PerceptionPipeline> = [];
+    if (perceptionConfigs != null) for (config in perceptionConfigs) if (config.host == "robotd") {
+      pipelines.push(PerceptionPipelineRegistry.create(config, "robotd/" + config.id));
+      perceptionConsumers.set(config.id, config.consumers.copy());
+    }
+    perception = pipelines.length == 0 ? null : new PerceptionHost(pipelines);
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     if (behaviorRunner != null) controlOwner = LocalBehavior;
     nativeRuntime = NativeKitRuntime.start();
@@ -120,11 +146,14 @@ class RobotServer {
     try {
       var stopped = false;
       while (!stopped) {
+        if (fixtureTick != null) fixtureTick();
         publishSnapshot(false);
+        pollPerception();
         var hadEvent = false;
         while (nativeRuntime.events.poll())
           hadEvent = true;
         checkControlLeaseTimeout();
+        flushBulk();
         if (!hadEvent) {
           nativeRuntime.events.wait(0.01);
           checkControlLeaseTimeout();
@@ -141,17 +170,59 @@ class RobotServer {
 
   /** Runs one event-pump iteration; useful to tests and embedded hosts. */
   public function poll():Bool {
+    if (fixtureTick != null) fixtureTick();
     publishSnapshot(false);
+    pollPerception();
     var hadEvent = false;
     while (nativeRuntime.events.poll())
       hadEvent = true;
     checkControlLeaseTimeout();
+    flushBulk();
     return hadEvent;
+  }
+
+  /** Current-session drop count for test and host diagnostics. */
+  public function outboundDropCount(connectionId:Int, family:OutboundFamily):Int {
+    var scheduler = outbound.get(connectionId);
+    return scheduler == null ? 0 : scheduler.dropCount(family);
+  }
+
+  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent>
+    return hostedRobot.events(afterOrdinal, max);
+
+  function pollPerception():Void {
+    if (perception == null) return;
+    for (observation in perception.poll()) {
+      var consumers = perceptionConsumers.get(observation.pipelineId);
+      if (consumers == null) continue;
+      var event = producedEvents.publish(observation);
+      if (consumers.indexOf("local") >= 0) {
+        var local = hostedRobot.publishObservation(observation);
+        if (behaviorRunner != null) behaviorRunner.offerEvent(local);
+      }
+      if (consumers.indexOf("worldd") < 0) continue;
+      var ordinal = RobotEventRing.ordinalOf(event);
+      var message = ImageDetectionObservationMsg.fromObservation(Int64.ofInt(robotId), ordinal, observation);
+      if (client != null && helloComplete) offerObservation(client, message);
+      for (observer in observers.copy())
+        if (observerHello.get(observer.rawValue()) == true) offerObservation(observer, message);
+    }
+  }
+
+  function offerObservation(target:TransportHandle, value:ImageDetectionObservationMsg):Void {
+    var scheduler = outbound.get(target.rawValue());
+    if (scheduler == null || !scheduler.shouldOffer(OutboundFamily.Observation,
+        value.producerId, value.ordinal, NativeKit.nk_time_now_ns())) return;
+    var targetSession = target == client ? sessionId : observerSessions.get(target.rawValue());
+    if (targetSession == null) return;
+    scheduler.offer(OutboundFamily.Observation, value.producerId, value.ordinal,
+      RobotProtocol.imageDetectionObservation(value, targetSession));
   }
 
   public function dispose():Void {
     if (disposed)
       return;
+    hostedRobot.close();
     disposed = true;
     subscription.dispose();
     var currentClient = client;
@@ -168,6 +239,8 @@ class RobotServer {
     observerStreams.clear();
     observerSessions.clear();
     observerHello.clear();
+    outbound.clear();
+    if (perception != null) perception.dispose();
     listener.close();
     if (simulation != null) simulation.stop();
     else runtime.stop();
@@ -205,8 +278,16 @@ class RobotServer {
     var accepted = new TransportHandle(NativeKitEventBytes.readU32(data, 4));
     if (!accepted.isValid())
       return;
+    var scheduler:OutboundScheduler;
+    try scheduler = new OutboundScheduler(accepted, bulkBudgetBytes)
+    catch (error:Dynamic) {
+      Sys.println('robotd: rejecting connection: $error');
+      NativeTransport.close(accepted);
+      return;
+    }
     if (client == null) {
       client = accepted;
+      outbound.set(accepted.rawValue(), scheduler);
       stream = new RobotFrameStream();
       servedState = false;
       helloComplete = false;
@@ -217,6 +298,7 @@ class RobotServer {
       lastSentSnapshotSequence = haxe.Int64.ofInt(-1);
     } else {
       observers.push(accepted);
+      outbound.set(accepted.rawValue(), scheduler);
       observerStreams.set(accepted.rawValue(), new RobotFrameStream());
       observerSessions.set(accepted.rawValue(), nextSessionId);
       observerHello.set(accepted.rawValue(), false);
@@ -260,7 +342,8 @@ class RobotServer {
   function handleFrame(frame:RobotFrame):Void {
     switch frame.messageType {
     case RobotMessageType.Hello:
-      handleHello(RobotProtocol.decodeHello(frame));
+      try handleHello(RobotProtocol.decodeHello(frame))
+      catch (error:Dynamic) sendFault(400, 'invalid Hello payload: $error', false);
     case RobotMessageType.JointTarget:
       handleLegacyJointTarget(frame, RobotProtocol.decodeJointTarget(frame));
     case RobotMessageType.JointTargets:
@@ -316,11 +399,27 @@ class RobotServer {
           observerSession));
       return;
     }
-    var value = RobotProtocol.decodeHello(frame);
+    var value:Hello;
+    try value = RobotProtocol.decodeHello(frame)
+    catch (error:Dynamic) {
+      sendTo(transport, observerSession, new RobotFrame(RobotMessageType.Fault,
+        MessagePack.encode(new Fault(Int64.ofInt(robotId), 400,
+          'invalid Hello payload: $error', false)), 0, null, observerSession));
+      return;
+    }
     if (value.protocolVersion != 1) return;
+    try {
+      outbound.get(transport.rawValue()).configure(value.subscriptions);
+    } catch (_:Dynamic) {
+      sendTo(transport, observerSession, new RobotFrame(RobotMessageType.Fault,
+        MessagePack.encode(new Fault(Int64.ofInt(robotId), 422,
+          "invalid stream subscriptions", false)), 0, null, observerSession));
+      return;
+    }
     sendTo(transport, observerSession, RobotProtocol.welcome(
       new robotkit.protocol.Welcome(1, "robotd", observerSession,
-        Int64.ofInt(robotId), false, Int64.ofInt(0), 0), observerSession));
+        Int64.ofInt(robotId), false, Int64.ofInt(0), 0,
+        OutboundPolicy.capabilities()), observerSession));
     sendTo(transport, observerSession, RobotProtocol.description(new RobotDescription(
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
@@ -341,6 +440,13 @@ class RobotServer {
       sendFault(426, "unsupported RobotKit protocol version", true);
       return;
     }
+    var scheduler = client == null ? null : outbound.get(client.rawValue());
+    try {
+      if (scheduler != null) scheduler.configure(value.subscriptions);
+    } catch (_:Dynamic) {
+      sendFault(422, "invalid stream subscriptions", false);
+      return;
+    }
     controllerGranted = value.requestedRole == "controller" &&
       switch controlOwner { case None: true; case _: false; };
     if (controllerGranted) {
@@ -350,7 +456,8 @@ class RobotServer {
     send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
       sessionId, Int64.ofInt(robotId), controllerGranted,
       controllerGranted ? sessionId : Int64.ofInt(0),
-      controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0), sessionId));
+      controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0,
+      OutboundPolicy.capabilities()), sessionId));
     send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
@@ -564,6 +671,13 @@ class RobotServer {
     var latest = snapshots.latest();
     if (latest == null)
       return;
+    if (perception != null) for (sensor in RobotSensorFrames.fromRuntimeSnapshot(latest)) {
+      if (sensor.image == null) continue;
+      var last = perceptionSequences.get(sensor.sensorId);
+      if (last != null && Int64.compare(sensor.sequence, last) == 0) continue;
+      perceptionSequences.set(sensor.sensorId, sensor.sequence);
+      perception.submit(sensor);
+    }
     applyBehavior(latest);
     if (!forceSend && Int64.compare(latest.sequence, lastPublishedSnapshotSequence) <= 0)
       return;
@@ -573,7 +687,7 @@ class RobotServer {
       lastSentSnapshotSequence = latest.sequence;
       sendState(latest);
     }
-    for (observer in observers) {
+    for (observer in observers.copy()) {
       var key = observer.rawValue();
       var observerSession = observerSessions.get(key);
       if (observerHello.get(key) == true && observerSession != null)
@@ -634,7 +748,12 @@ class RobotServer {
       snapshot.committedUntilNs, snapshot.queueEndTimeNs);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
+    var scheduler = outbound.get(target.rawValue());
+    if (scheduler == null) return;
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot)) {
+      var family = sensor.image == null ? OutboundFamily.Sensor : OutboundFamily.Camera;
+      if (!scheduler.shouldOffer(family, sensor.sensorId, sensor.sequence,
+          NativeKit.nk_time_now_ns())) continue;
       if (sensor.image != null) {
         var image = sensor.image;
         var format = switch image.encoding {
@@ -648,10 +767,12 @@ class RobotServer {
           sensor.receivedTimestampNs, image.width, image.height, format, null,
           sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray(),
           sensor.sourceClockId, sensor.receivedClockId);
-        sendTo(target, targetSession, RobotProtocol.cameraFrame(camera,
-          image.bytes(), targetSession, sensor.sequence, sensor.sourceTimestampNs));
+        scheduler.offer(OutboundFamily.Camera, sensor.sensorId, sensor.sequence,
+          RobotProtocol.cameraFrame(camera, image.bytes(), targetSession,
+            sensor.sequence, sensor.sourceTimestampNs));
       } else {
-        sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
+        scheduler.offer(OutboundFamily.Sensor, sensor.sensorId, sensor.sequence,
+          RobotProtocol.sensorFrame(new SensorFrameMsg(
           snapshot.robotId, sensor.sensorId, sensor.kind, sensor.frameId, sensor.sequence,
           sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray(),
           sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray()),
@@ -676,11 +797,41 @@ class RobotServer {
   function sendTo(target:Null<TransportHandle>, targetSession:haxe.Int64,
       frame:RobotFrame):Void {
     if (target == null) return;
+    if (OutboundPolicy.family(frame.messageType) != OutboundFamily.Essential)
+      throw "bulk RKF1 frames must use the outbound scheduler";
     try {
       NativeTransport.send(target, frame.encode());
     } catch (_:Dynamic) {
       if (client != null && client.rawValue() == target.rawValue())
         closeClient(target);
+      else closeObserver(target);
+    }
+  }
+
+  function flushBulk():Void {
+    var currentClient = client;
+    if (currentClient != null && helloComplete)
+      flushTo(currentClient, sessionId);
+    for (observer in observers.copy()) {
+      var key = observer.rawValue();
+      var observerSession = observerSessions.get(key);
+      if (observerHello.get(key) == true && observerSession != null)
+        flushTo(observer, observerSession);
+    }
+  }
+
+  function flushTo(target:TransportHandle, targetSession:Int64):Void {
+    var scheduler = outbound.get(target.rawValue());
+    if (scheduler == null) return;
+    try {
+      if (!scheduler.flush()) {
+        if (client != null && client.rawValue() == target.rawValue()) closeClient(target);
+        else closeObserver(target);
+        return;
+      }
+      scheduler.logDrops(NativeKit.nk_time_now_ns(), targetSession);
+    } catch (_:Dynamic) {
+      if (client != null && client.rawValue() == target.rawValue()) closeClient(target);
       else closeObserver(target);
     }
   }
@@ -693,6 +844,7 @@ class RobotServer {
       controllerGranted = false;
       lastLeaseRenewalNs = Int64.ofInt(0);
     }
+    outbound.remove(currentClient.rawValue());
     try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
   }
 
@@ -713,6 +865,7 @@ class RobotServer {
     observerStreams.remove(value.rawValue());
     observerSessions.remove(value.rawValue());
     observerHello.remove(value.rawValue());
+    outbound.remove(value.rawValue());
     try { NativeTransport.close(value); } catch (_:Dynamic) {}
   }
 }

@@ -66,7 +66,7 @@ import robotkit.world.RobotRecordingEvent;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.McapRecordingReader;
 import robotkit.world.McapRecordingStatus;
-import robotkit.world.RobotRecordingCodec;
+import robotkit.world.RecordingChannels;
 import robotkit.world.RobotRecordingEntry;
 import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventValue;
@@ -224,12 +224,26 @@ class RobotWorldTests {
     assertions += ProcessTests.run();
     assertions += WorkTests.run();
     assertions += PerceptionTests.run();
+    assertions += PerceptionInferenceTests.run();
+    assertions += RobotEventTests.run();
+    assertions += ClockMappingTests.run();
     assertions += PlacementTests.run();
     assertions += WallFinishingScenarioTests.run();
     assertions += ConstructionSkillTests.run();
     assertions += TerrainTests.run();
     assertions += ExcavatorTests.run();
     Sys.println('RobotKit world tests passed ($assertions assertions)');
+  }
+
+  static function roundTripRecording(entry:RobotRecordingEntry):RobotRecordingEntry {
+    var channels = new RecordingChannels();
+    var name = RecordingChannels.nameOf(entry.event);
+    var channel = channels.get(name);
+    if (channel == null) throw 'Missing recording channel $name';
+    var decoded = channel.decode(channel.encode(entry));
+    return new RobotRecordingEntry(entry.ordinal, decoded.robotId, decoded.event,
+      entry.sourceSequence, entry.sourceTimestampNs, entry.sourceClockId,
+      entry.recordingTimestampNs);
   }
 
   static function testPolynomialTrajectoryChunk():Void {
@@ -242,25 +256,13 @@ class RobotWorldTests {
       "polynomial chunk copy keeps coefficients");
     var recording = new RobotRecording();
     recording.recordCommand(RobotCommand.TrajectoryChunk(chunk));
-    var replayed = RobotRecordingCodec.decode(
-      RobotRecordingCodec.encode(recording.entries[0]));
+    var replayed = roundTripRecording(recording.entries[0]);
     switch replayed.event {
       case Command(TrajectoryChunk(value)):
         check(value.segments.length == 1 && value.segments[0].degree == 1,
           "polynomial chunk survives recording round trip");
       case _: throw "Expected recorded polynomial chunk";
     }
-    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
-      '{"version":4,"ordinal":"0","recordingTimestampNs":"0","robotId":"r",'
-      + '"sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock",'
-      + '"type":"command","payload":{"kind":"trajectoryChunk","points":[]}}')),
-      "legacy point-chunk recordings are unsupported");
-    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
-      '{"version":4,"ordinal":"0","recordingTimestampNs":"0","robotId":"r",'
-      + '"sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock",'
-      + '"type":"command","payload":{"kind":"trajectorySegmentChunk",'
-      + '"spliceTag":"7","segments":[]}}')),
-      "legacy spliced recordings are unsupported");
   }
 
   static function testMcapRobustness():Void {
@@ -295,35 +297,12 @@ class RobotWorldTests {
 
     var failurePath='/tmp/robotkit-${Sys.getPid()}-write-failure';
     sys.FileSystem.createDirectory(failurePath);
-    var failed=new McapRobotRecording(failurePath,1024,false);
-    // The native writer cannot open a directory as an MCAP file.
-    Sys.sleep(0.02);
-    throws(failed.close,"asynchronous MCAP write-open failure is visible");
-    var failureStatus=McapRecordingReader.status(failurePath);
-    var failureStatusValue:McapRecordingStatus=cast failureStatus;
-    check(failureStatus!=null&&failureStatusValue.error.length>0,
-      "write failure survives process restart");
-    sys.FileSystem.deleteFile(failurePath+".incomplete");
-    sys.FileSystem.deleteFile(failurePath+".incomplete.status");
+    throws(function() new McapRobotRecording(failurePath,1024,false),
+      "MCAP writer creation reports output open failure synchronously");
+    check(!sys.FileSystem.exists(failurePath+".incomplete"),
+      "failed writer creation removes its incomplete marker");
     sys.FileSystem.deleteDirectory(failurePath);
 
-    var mismatchPath='/tmp/robotkit-${Sys.getPid()}-schema-mismatch.mcap';
-    var mismatchEntry=new RobotRecordingEntry(Int64.ofInt(0),"mismatch",
-      RobotRecordingEvent.Sensor("mismatch",new SensorFrame("sensor","imu","frame",
-        Int64.ofInt(1),Int64.ofInt(1),[1.0])));
-    var opened=RobotKitRuntime.rk_recording_writer_create(mismatchPath,Int64.ofInt(4096));
-    equal(opened.status,RobotKitRuntimeConstants.RK_OK,"schema mismatch fixture opens");
-    var payload=RobotRecordingCodec.encode(mismatchEntry);
-    equal(RobotKitRuntime.rk_recording_writer_enqueue(opened.out_writer.borrow(),1,5,
-      mismatchEntry.ordinal,mismatchEntry.recordingTimestampNs,payload),RobotKitRuntimeConstants.RK_OK,
-      "schema mismatch fixture writes payload to wrong channel");
-    equal(RobotKitRuntime.rk_recording_writer_finish(opened.out_writer.borrow()),RobotKitRuntimeConstants.RK_OK,
-      "schema mismatch fixture closes");
-    opened.out_writer.close();
-    var mismatchReader=new McapRecordingReader(mismatchPath);
-    throws(function(){mismatchReader.next();},"payload type must match MCAP channel schema");
-    mismatchReader.close();sys.FileSystem.deleteFile(mismatchPath);
-    sys.FileSystem.deleteFile(mismatchPath+".incomplete.status");
   }
 
   static function testReplayCorrectness():Void {
@@ -393,7 +372,7 @@ class RobotWorldTests {
         check(false, "recording retains a joint target batch");
     }
 
-    var decoded = RobotRecordingCodec.decode(RobotRecordingCodec.encode(recording.entries[0]));
+    var decoded = roundTripRecording(recording.entries[0]);
     switch decoded.event {
       case Command(JointTargets(targets, _)):
         equal(targets.length, 3, "recording codec round-trips every target in a batch");
@@ -403,17 +382,6 @@ class RobotWorldTests {
         equal(targets[2].target, 3.5, "recording codec preserves effort values");
       case _:
         check(false, "recording codec decodes a command batch");
-    }
-
-    var legacy = RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
-      '{"version":1,"ordinal":"0","recordingTimestampNs":"1","robotId":"old","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"unspecified","type":"command","payload":{"kind":"jointPosition","joint":2,"target":0.75,"expiryNs":null}}'));
-    switch legacy.event {
-      case Command(JointTargets(targets, _)):
-        equal(targets.length, 1, "legacy single-target command becomes a one-target batch");
-        equal(Std.string(targets[0].mode), Std.string(robotkit.world.JointTargetMode.Position),
-          "legacy recording defaults to position mode");
-      case _:
-        check(false, "legacy command recording remains replayable");
     }
 
     var replay = new ReplayRobot("batch-robot", recording);
@@ -918,7 +886,7 @@ class RobotWorldTests {
     servoHarness.dispose();
     var servoRecording = new RobotRecording();
     servoRecording.recordCommand(RobotCommand.JointTargets([servo], null));
-    switch RobotRecordingCodec.decode(RobotRecordingCodec.encode(servoRecording.entries[0])).event {
+    switch roundTripRecording(servoRecording.entries[0]).event {
       case Command(JointTargets(targets, _)):
         check(targets[0].mode == robotkit.world.JointTargetMode.Servo &&
           targets[0].stiffness == 100.0 && targets[0].feedforward == -2.0,
@@ -3652,10 +3620,31 @@ class RobotWorldTests {
       Int64.ofInt(9), Int64.ofInt(150), [], Int64.ofInt(160), "link/base",
       [0.2, 0.0, 0.8], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2",
       "host.monotonic", new CameraImage(2, 1, "rgb8", cameraBytes));
+    var corruptSensor = robotkit.world.RobotRecordingCodec.sensor(camera, "robot-a");
+    corruptSensor.mountPosition = [0.0, 0.0];
+    var decodeError = "";
+    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    catch (error:Dynamic) decodeError = Std.string(error);
+    check(decodeError.indexOf("mount dimensions") >= 0,
+      "recorded sensor mount position requires three finite values");
+    corruptSensor.mountPosition = [0.0, 0.0, 0.0];
+    corruptSensor.mountRotation = [0.0, 0.0, 0.0, 2.0];
+    decodeError = "";
+    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    catch (error:Dynamic) decodeError = Std.string(error);
+    check(decodeError.indexOf("unit quaternion") >= 0,
+      "recorded sensor mount rotation requires unit length");
     var first = new RobotSnapshot("robot-a", Int64.parseString("9007199254740995"),
       Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
       Int64.parseString("9223372036854775002"), [sensor, camera], "robot-a.reset-2", "host.monotonic",
       RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
+    var corruptSnapshot = robotkit.world.RobotRecordingCodec.snapshot(first);
+    corruptSnapshot.positions = [Math.sqrt(-1.0)];
+    decodeError = "";
+    try robotkit.world.RobotRecordingCodec.readSnapshot(corruptSnapshot)
+    catch (error:Dynamic) decodeError = Std.string(error);
+    check(decodeError.indexOf("not finite") >= 0,
+      "recorded snapshot rejects non-finite joint values");
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
     writer.recordCommand(RobotCommand.JointTargets([
@@ -3675,6 +3664,30 @@ class RobotWorldTests {
     writer.close();
 
     var loaded = McapRecordingReader.load(path);
+    var v5Path = Sys.getCwd() + "/robotkit/tests/fixtures/recording-v5.mcap";
+    if (!sys.FileSystem.exists(v5Path))
+      v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
+    var v5Error = "";
+    try McapRecordingReader.load(v5Path) catch (error:Dynamic) v5Error = Std.string(error);
+    check(v5Error.indexOf("schema version is not 6") >= 0,
+      "Haxe reader rejects a pre-v6 MCAP file");
+    var fixtureRoot = v5Path.substr(0, v5Path.lastIndexOf("/") + 1);
+    var mismatchPath = fixtureRoot + "recording-schema-mismatch.mcap";
+    var mismatch = new McapRecordingReader(mismatchPath, null, true);
+    var schemaError = "";
+    try mismatch.next() catch (error:Dynamic) schemaError = Std.string(error);
+    mismatch.close();
+    check(schemaError.indexOf("schema mismatch") >= 0,
+      "strict Haxe reader rejects an embedded schema mismatch");
+    mismatch = new McapRecordingReader(mismatchPath);
+    check(mismatch.next() == null && mismatch.skippedUnknown == 1,
+      "non-strict Haxe reader counts an embedded schema mismatch");
+    mismatch.close();
+    var foreignPath = fixtureRoot + "recording-foreign.mcap";
+    var foreign = new McapRecordingReader(foreignPath);
+    check(foreign.next() == null && foreign.skippedUnknown == 1,
+      "file-level v6 metadata permits a foreign MCAP channel");
+    foreign.close();
     equal(loaded.entries.length, 7, "MCAP reload preserves every event type");
     equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
     equal(loaded.processEvents[0].scheduledTimeNs, Int64.ofInt(300),
@@ -3709,22 +3722,54 @@ class RobotWorldTests {
     replay.close();
     if (Sys.getEnv("ROBOTKIT_KEEP_MCAP") == null) sys.FileSystem.deleteFile(path);
     else Sys.println('RobotKit MCAP fixture: $path');
-    var unsupported = haxe.io.Bytes.ofString('{"version":5,"ordinal":"0","robotId":"","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"x","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}');
-    var legacyV2 = RobotRecordingCodec.decode(haxe.io.Bytes.ofString(
-      '{"version":2,"ordinal":"0","recordingTimestampNs":"1","robotId":"x","sourceSequence":"0","sourceTimestampNs":"0","sourceClockId":"clock","type":"worldEvent","payload":{"kind":"changed","robotId":"x"}}'));
-    equal(legacyV2.schemaVersion, 2, "recording reader accepts schema v2");
-    throws(function() RobotRecordingCodec.decode(unsupported), "unsupported recording schema rejected");
-    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString("{")), "malformed recording payload rejected");
-    var invalidMount:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[2]).toString());
-    Reflect.setField(Reflect.field(invalidMount, "payload"), "mountPosition", [0.0, 0.0]);
-    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidMount))),
-      "recording rejects malformed sensor mount shapes");
-    var invalidNumber:Dynamic = haxe.Json.parse(RobotRecordingCodec.encode(loaded.entries[0]).toString());
-    var commandTargets:Array<Dynamic> = cast Reflect.field(
-      Reflect.field(invalidNumber, "payload"), "targets");
-    Reflect.setField(commandTargets[0], "target", 1e400);
-    throws(function() RobotRecordingCodec.decode(haxe.io.Bytes.ofString(haxe.Json.stringify(invalidNumber))),
-      "recording rejects non-finite numeric payloads");
+    for (compression in ["none", "lz4"]) {
+      var variantPath = '/tmp/robotkit-${Sys.getPid()}-$compression-v6.mcap';
+      var channels = new RecordingChannels();
+      channels.register(new TestRecordingChannel());
+      var pixels = haxe.io.Bytes.alloc(512 * 1024 * 3);
+      for (index in 0...pixels.length) pixels.set(index, index % 251);
+      var variant = new McapRobotRecording(variantPath, 2 * 1024 * 1024, false,
+        compression, channels);
+      variant.recordSensor("camera-robot", new SensorFrame("camera", "camera", "optical",
+        Int64.ofInt(1), Int64.ofInt(2), [], Int64.ofInt(3), "mount", null, null,
+        "clock", "host", new CameraImage(512, 1024, "rgb8", pixels)));
+      var custom = new TestRecordingPayload();
+      custom.robotId = "camera-robot"; custom.value = 42;
+      variant.recordChannel("camera-robot", "custom", custom);
+      variant.close();
+      var known = new McapRecordingReader(variantPath);
+      var sensorEntry = known.next();
+      check(sensorEntry != null, "camera event round-trips with " + compression);
+      var decoded = McapRecordingReader.load(variantPath);
+      switch decoded.entries[0].event {
+        case Sensor(_, frame):
+          var image:CameraImage = cast frame.image;
+          check(image.bytes().length == pixels.length && image.bytes().get(1001) == pixels.get(1001),
+            "large raw camera image round-trips with " + compression);
+        case _: throw "Expected camera event";
+      }
+      equal(known.next(), null, "unknown custom channel is skipped");
+      equal(known.skippedUnknown, 1, "unknown custom channel is counted");
+      known.close();
+      var strict = new McapRecordingReader(variantPath, null, true);
+      strict.next();
+      throws(function() strict.next(), "strict reader rejects unknown custom channel");
+      strict.close();
+      var customReader = new McapRecordingReader(variantPath, channels);
+      customReader.next();
+      var customEntry = customReader.next();
+      if (customEntry == null) throw "Expected custom channel event";
+      switch customEntry.event {
+        case Channel(robotId, "custom", payload):
+          var value:TestRecordingPayload = cast payload;
+          check(robotId == "camera-robot" && value.value == 42,
+            "custom channel payload round-trips with " + compression);
+        case _: throw "Expected custom channel event";
+      }
+      customReader.close();
+      sys.FileSystem.deleteFile(variantPath);
+      sys.FileSystem.deleteFile(variantPath + ".incomplete.status");
+    }
   }
 
   static function testExternalSensorRuntime():Void {
@@ -4410,6 +4455,30 @@ class RobotWorldTests {
     var snapshot = host.step(Int64.ofInt(3000));
     check(snapshot.robot(robot.id()) != null,
       "worldd composes one world and one shared simulation");
+    var deploymentPath = Sys.getCwd() +
+      "/robotkit/tests/fixtures/device-deployment/perception-worldd.json";
+    if (!sys.FileSystem.exists(deploymentPath))
+      deploymentPath = Sys.getCwd() + "/fixtures/device-deployment/perception-worldd.json";
+    var remote = host.addRemoteRobot("worldd-camera", false,
+      new SerialDeployment(deploymentPath));
+    var pixels = haxe.io.Bytes.alloc(8 * 4 * 3);
+    for (index in 0...pixels.length) pixels.set(index, 51);
+    remote.onCamera(new robotkit.protocol.CameraFrameData(new CameraFrame(
+      Int64.ofInt(42), "front_camera", "camera", "frame/front", Int64.ofInt(1),
+      Int64.ofInt(10), Int64.ofInt(20), 8, 4, PixelFormat.RGB8), pixels));
+    var worldObservation = false;
+    for (index in 0...500) {
+      host.step(Int64.ofInt(4000 + index));
+      for (event in remote.events(Int64.ofInt(0), 8)) switch event {
+        case robotkit.world.RobotEvent.Observation(_, value):
+          if (value.sensorId == "front_camera" && value.sourceFrameId == "frame/front")
+            worldObservation = true;
+        case _:
+      }
+      if (worldObservation) break;
+      Sys.sleep(0.005);
+    }
+    check(worldObservation, "worldd-hosted perception consumes subscribed remote camera frames");
     host.close();
   }
 
@@ -4896,6 +4965,7 @@ private class FakeRobot implements Robot {
     0
   );
   public function sensors():Array<SensorFrame> return [];
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.world.RobotEvent> return [];
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;

@@ -5,4 +5,5 @@ interface RobotRecordingSink {
   function recordCommand(command:RobotCommand, ?robotId:RobotId):Void;
   function recordSnapshot(snapshot:RobotSnapshot):Void;
   function recordFault(fault:RobotFault):Void;
+  function recordRobotEvent(robotId:RobotId, event:RobotEvent):Void;
 }

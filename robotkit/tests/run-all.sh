@@ -44,7 +44,15 @@ ensure_mujoco() {
 }
 
 say "Haxe world tests"
+run python3 "$robotkit_dir/tools/recording/generate_schemas.py" check \
+  --lock "$robotkit_dir/schema/rkf1.lock.json" \
+  --output "$robotkit_dir/haxe/robotkit/world/RecordingSchemas.hx"
 run "$haxeon" run --project "$robotkit_dir/tests/haxeon.json"
+
+if [[ "${ROBOTKIT_TEST_SENSORKIT_SPIKE:-0}" == "1" ]]; then
+  say "SensorKit camera spike"
+  run "$haxeon" run --project "$robotkit_dir/tests/spike/haxeon.json"
+fi
 
 say "Device protocol host and MCU tests"
 run cargo test --manifest-path "$robotkit_dir/device_protocol/Cargo.toml" --features std
@@ -79,8 +87,16 @@ else
 fi
 
 say "World TCP integration"
+run python3 -m tools.wire.rkf1 check --source "$robotkit_dir/haxe/robotkit/protocol" --lock "$robotkit_dir/schema/rkf1.lock.json"
+run python3 -m unittest tools.wire.tests.test_rkf1
+run "$haxeon" run --project "$robotkit_dir/tests/integration/haxeon.json" -- --outbound-scheduler
 run "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_SUBSCRIPTIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_SESSIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_LEASE_TIMEOUT=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_BULK=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_PERCEPTION=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_PERCEPTION_STALL=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_MALFORMED_HELLO=1 "$robotkit_dir/tests/world-tcp.sh"
 
 printf '\nAll available RobotKit suites passed.\n'

@@ -15,7 +15,7 @@ class Solids {
 			return fn(parts);
 		} catch (error:Dynamic) {
 			for (part in parts) if (part != null && !part.shape.isClosed())
-				try part.close() catch (_:Dynamic) {}
+				try part.close() catch (_:String) {}
 			throw error;
 		}
 	}
