@@ -5,6 +5,7 @@ import visionkit.CameraModel;
 import visionkit.CameraCalibration;
 import visionkit.ImageView;
 import visionkit.UndistortMap;
+import visionkit.MarkerDetector;
 import haxe.io.Bytes;
 
 class VisionKitSmokeTests {
@@ -38,6 +39,17 @@ class VisionKitSmokeTests {
           new ImageView(64, 48, 64, 2, output));
         if (output.get(24 * 64 + 32) != 173) throw "image remap failed";
         map.dispose();
+        var half = 0.1;
+        var objectPoints = [
+          {x:0.0,y:half,z:half}, {x:0.0,y:-half,z:half},
+          {x:0.0,y:-half,z:-half}, {x:0.0,y:half,z:-half}];
+        var cameraPoints = [for (p in objectPoints) {x:p.x + 1.0, y:p.y, z:p.z}];
+        var imagePoints = model.project(cameraPoints);
+        var estimate = model.solvePnP(objectPoints, imagePoints, true);
+        if (estimate.camera_T_object.x < 0.999 || estimate.camera_T_object.x > 1.001)
+          throw "PnP failed";
+        var detector = new MarkerDetector(MarkerDetector.ARUCO_4X4_50);
+        detector.dispose();
         trace("VisionKit smoke passed");
     }
 }

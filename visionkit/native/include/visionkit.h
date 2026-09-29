@@ -45,7 +45,8 @@ typedef enum vk_result {
     VK_ERROR_INVALID_HANDLE = -2,
     VK_ERROR_OUT_OF_MEMORY = -3,
     VK_ERROR_BACKEND = -4,
-    VK_ERROR_UNSUPPORTED = -5
+    VK_ERROR_UNSUPPORTED = -5,
+    VK_ERROR_LIMIT = -6
 } vk_result;
 
 /** OpenCV plumb-bob uses k1,k2,p1,p2,k3. Fisheye is unsupported. */
@@ -117,6 +118,61 @@ VK_API void vk_undistort_map_destroy(vk_undistort_map map);
 VK_API vk_result vk_undistort_image(vk_undistort_map map,
                                     const vk_image_view *src,
                                     const vk_image_view *dst);
+
+typedef enum vk_pnp_method {
+    VK_PNP_ITERATIVE = 0,
+    VK_PNP_IPPE_SQUARE = 1
+} vk_pnp_method;
+
+/** A_T_B: pose of B in A. Quaternion order is x,y,z,w. */
+typedef struct vk_pose3 {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    double x, y, z;
+    double qx, qy, qz, qw;
+} vk_pose3;
+
+/** For IPPE-square, object points are marker top-left, top-right,
+ * bottom-right, bottom-left in its Materia YZ plane (+X out of the marker). */
+VK_API vk_result vk_solve_pnp(const vk_camera_model *model,
+    const vk_point3 *object_points VK_IN_ARRAY(count),
+    const vk_pixel *image_points VK_IN_ARRAY(count), uint32_t count,
+    uint32_t method, vk_pose3 *out_camera_T_object,
+    double *out_reprojection_errors VK_OUT_ARRAY(count));
+
+typedef enum vk_marker_dictionary {
+    VK_ARUCO_4X4_50 = 1,
+    VK_ARUCO_5X5_100 = 2,
+    VK_APRILTAG_36H11 = 3
+} vk_marker_dictionary;
+
+typedef struct vk_marker_detector_params {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    double min_marker_perimeter_rate;
+    uint32_t corner_refinement;
+} vk_marker_detector_params;
+
+typedef uint32_t vk_marker_detector VK_HANDLE VK_HANDLE_DESTROY(vk_marker_detector_destroy);
+#define VK_INVALID_MARKER_DETECTOR ((vk_marker_detector)0)
+
+/** Corner order: top-left, top-right, bottom-right, bottom-left. */
+typedef struct vk_marker_observation {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    uint32_t id;
+    vk_pixel corners[4];
+    vk_pose3 camera_T_marker;
+    double rms_reprojection_error;
+    double confidence;
+} vk_marker_observation;
+
+VK_API vk_result vk_marker_detector_create(uint32_t dictionary,
+    const vk_marker_detector_params *params,
+    vk_marker_detector *out_detector VK_OUT VK_OWNED);
+VK_API void vk_marker_detector_destroy(vk_marker_detector detector);
+/** Returns VK_ERROR_LIMIT if capacity is too small and reports the required count. */
+VK_API vk_result vk_marker_detect(vk_marker_detector detector,
+    const vk_image_view *image, const vk_camera_model *model, double marker_size_m,
+    vk_marker_observation *out_markers VK_OUT_ARRAY(capacity),
+    uint32_t capacity, uint32_t *out_count VK_OUT);
 
 #ifdef __cplusplus
 }

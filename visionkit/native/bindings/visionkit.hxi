@@ -7,6 +7,11 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 		VK_DISTORTION_NONE = 0;
 		VK_DISTORTION_PLUMB_BOB = 1;
 	}
+	enum vk_marker_dictionary : c_int {
+		VK_ARUCO_4X4_50 = 1;
+		VK_ARUCO_5X5_100 = 2;
+		VK_APRILTAG_36H11 = 3;
+	}
 	enum vk_output_model_policy : c_int {
 		VK_KEEP_ALL_PIXELS = 0;
 		VK_CROP_VALID = 1;
@@ -16,6 +21,10 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 		VK_PIXEL_GRAY8 = 2;
 		VK_PIXEL_DEPTH32F = 3;
 	}
+	enum vk_pnp_method : c_int {
+		VK_PNP_ITERATIVE = 0;
+		VK_PNP_IPPE_SQUARE = 1;
+	}
 	enum vk_result : c_int {
 		VK_OK = 0;
 		VK_ERROR_INVALID_ARGUMENT = -1;
@@ -23,11 +32,23 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 		VK_ERROR_OUT_OF_MEMORY = -3;
 		VK_ERROR_BACKEND = -4;
 		VK_ERROR_UNSUPPORTED = -5;
+		VK_ERROR_LIMIT = -6;
 	}
+	/**
+	 * Returns VK_ERROR_LIMIT if capacity is too small and reports the required count.
+	 */
+	extern fn vk_marker_detect(detector: vk_marker_detector, image: ptr<const<vk_image_view>>, model: ptr<const<vk_camera_model>>, marker_size_m: f64, out_markers: ptr<vk_marker_observation> @out_array("capacity"), capacity: u32, out_count: ptr<u32> @out) -> vk_result;
+	extern fn vk_marker_detector_create(dictionary: u32, params: ptr<const<vk_marker_detector_params>>, out_detector: ptr<vk_marker_detector> @out @owned) -> vk_result;
+	extern fn vk_marker_detector_destroy(detector: vk_marker_detector) -> void;
 	/**
 	 * Projects Materia camera-frame metre points. Points behind the camera are invalid.
 	 */
 	extern fn vk_project_points(model: ptr<const<vk_camera_model>>, points: ptr<const<vk_point3>> @in_array("count"), count: u32, out_pixels: ptr<vk_pixel> @out_array("count")) -> vk_result;
+	/**
+	 * For IPPE-square, object points are marker top-left, top-right,
+	 * bottom-right, bottom-left in its Materia YZ plane (+X out of the marker).
+	 */
+	extern fn vk_solve_pnp(model: ptr<const<vk_camera_model>>, object_points: ptr<const<vk_point3>> @in_array("count"), image_points: ptr<const<vk_pixel>> @in_array("count"), count: u32, method: u32, out_camera_T_object: ptr<vk_pose3>, out_reprojection_errors: ptr<f64> @out_array("count")) -> vk_result;
 	/**
 	 * Remaps into caller-owned storage. Depth32f uses nearest-neighbour sampling.
 	 */
@@ -72,6 +93,22 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 		buffer_bytes: u32 @offset(20);
 		data: ptr<u8> @offset(24) @borrowed @length_field("buffer_bytes");
 	}
+	struct vk_marker_detector_params @layout(24, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		min_marker_perimeter_rate: f64 @offset(8);
+		corner_refinement: u32 @offset(16);
+	}
+	/**
+	 * Corner order: top-left, top-right, bottom-right, bottom-left.
+	 */
+	struct vk_marker_observation @layout(152, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		id: u32 @offset(4);
+		corners: array<vk_pixel, 4> @offset(8);
+		camera_T_marker: vk_pose3 @offset(72);
+		rms_reprojection_error: f64 @offset(136);
+		confidence: f64 @offset(144);
+	}
 	/**
 	 * Pixel centre coordinates, with origin at the top left.
 	 */
@@ -87,6 +124,20 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 		y: f64 @offset(8);
 		z: f64 @offset(16);
 	}
+	/**
+	 * A_T_B: pose of B in A. Quaternion order is x,y,z,w.
+	 */
+	struct vk_pose3 @layout(64, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		x: f64 @offset(8);
+		y: f64 @offset(16);
+		z: f64 @offset(24);
+		qx: f64 @offset(32);
+		qy: f64 @offset(40);
+		qz: f64 @offset(48);
+		qw: f64 @offset(56);
+	}
+	handle vk_marker_detector : u32 @destroy("vk_marker_detector_destroy");
 	/**
 	 * Unit ray in the Materia camera frame.
 	 */

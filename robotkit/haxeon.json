@@ -5,7 +5,8 @@
 	"scopeSourceRoots": false,
 	"dependencies": {
 		"nativekit": { "path": "../nativekit" },
-		"simkit": { "path": "../simkit" }
+		"simkit": { "path": "../simkit" },
+		"visionkit": { "path": "../visionkit" }
 	},
 	"ffi": {
 		"interfaces": [

@@ -1,9 +1,12 @@
 {
   "version": 1,
-  "package": { "name": "visionkit-tests" },
-  "entry": "tests.VisionKitSmokeTests",
-  "sourceRoots": ["src"],
-  "dependencies": { "visionkit": { "path": ".." } },
+  "package": { "name": "visionkit-robotkit-tests" },
+  "entry": "tests.VisionKitRobotKitTests",
+  "sourceRoots": ["robotkit-src"],
+  "dependencies": {
+    "visionkit": { "path": ".." },
+    "robotkit": { "path": "../../robotkit" }
+  },
   "native": {
     "cmake": {
       "source": "../native",
@@ -13,5 +16,5 @@
     }
   },
   "target": "host",
-  "outputDir": "build"
+  "outputDir": "build-robotkit"
 }

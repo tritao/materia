@@ -72,4 +72,26 @@ class CameraModel {
       throw 'Unprojection failed with VisionKit error ${result.status}';
     return [for (p in result.out_rays) {x: p.get_x(), y: p.get_y(), z: p.get_z()}];
   }
+
+  /** Object points are metres in the object's Materia frame. */
+  public function solvePnP(objectPoints:Array<{x:Float,y:Float,z:Float}>,
+      pixels:Array<{x:Float,y:Float}>, ippeSquare:Bool = false):PoseEstimate {
+    if (objectPoints == null || pixels == null || objectPoints.length != pixels.length ||
+        objectPoints.length < 4) throw "PnP requires matching points";
+    var objects:Array<vk_point3> = [];
+    var images:Array<vk_pixel> = [];
+    for (p in objectPoints) {
+      var n = new vk_point3(); n.set_x(p.x); n.set_y(p.y); n.set_z(p.z);
+      objects.push(n);
+    }
+    for (p in pixels) {
+      var n = new vk_pixel(); n.set_x(p.x); n.set_y(p.y);
+      images.push(n);
+    }
+    var pose = new vk_pose3(); pose.set_struct_size(vk_pose3.size());
+    var result = VisionKitNative.vk_solve_pnp(native(), objects, images,
+      ippeSquare ? 1 : 0, pose);
+    if (result.status != 0) throw 'PnP failed with VisionKit error ${result.status}';
+    return new PoseEstimate(Pose3.fromNative(pose), result.out_reprojection_errors);
+  }
 }

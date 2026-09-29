@@ -29,6 +29,30 @@ Source and destination buffers must be separate.
 `CameraCalibration` serializes as JSON schema version 1, with the camera model,
 RMS reprojection error, calibration time, board description, and source.
 
+## Pose and markers
+
+`vk_solve_pnp` accepts object points in a Materia object frame and pixels in
+the calibrated image. It returns `camera_T_object` with a quaternion ordered
+`x,y,z,w` and a pixel reprojection error for each point. Iterative PnP accepts
+general 3D points. IPPE-square accepts exactly four corners of a square in its
+local YZ plane, ordered top-left, top-right, bottom-right, bottom-left. In that
+marker frame, +X points into the scene, +Y left, and +Z up. IPPE results whose
+RMS reprojection error exceeds two pixels are checked against an independent
+iterative solve; the lower-error result is returned.
+
+`MarkerDetector` supports ArUco 4×4/50, ArUco 5×5/100, and AprilTag 36h11.
+Detection returns marker IDs, four pixel corners, `camera_T_marker`, RMS pixel
+reprojection error, and a confidence of `1 / (1 + RMS/2)`. This is a geometric
+fit score: 1 means zero error, 0.5 means two pixels RMS. It does not estimate
+the probability that a decoded marker ID is correct. Detection is synchronous;
+callers should run it off time-critical owner and robotd threads.
+
+RobotKit's `VisionKitFiducialDetector` consumes raw RGB8 `SensorFrame` images
+matching a `CameraCalibration`, converts marker poses to RobotKit `Pose3`, and
+feeds the existing `FiducialPerception` interface. RobotKit's Haxe dependency
+on VisionKit is always available; its native build enables VisionKit with
+`RK_BUILD_VISIONKIT=ON` when an application uses the adapter.
+
 The Haxe smoke test can be compiled with
 `./haxeon/scripts/haxeon build --compiler-only --project visionkit/tests/haxeon.json`.
 Run its `main.hl` with the repository's `haxeon/.tools/hashlink/hl`, with the

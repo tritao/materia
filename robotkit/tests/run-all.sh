@@ -4,7 +4,7 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 robotkit_dir="$repo_dir/robotkit"
 haxeon="$repo_dir/haxeon/scripts/haxeon"
-cadkit_build="$repo_dir/cadkit/build/debug"
+cadkit_build="${CADKIT_BUILD_ROOT:-$repo_dir/cadkit/build/debug}"
 cadkit_library="$cadkit_build/core/libcadkit-core.so"
 mujoco_source="$repo_dir/simkit/vendor/mujoco"
 
