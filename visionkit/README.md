@@ -10,6 +10,25 @@ Configure the native kit with `cmake -S visionkit/native -B <build-dir>
 The OpenCV install is shared between worktrees; see `native/THIRD_PARTY.md`.
 `VK_OPENCV_THREADS` caps OpenCV internal worker threads and defaults to 1.
 
+## Camera geometry
+
+`vk_camera_model` stores image dimensions, pinhole intrinsics, and either no
+distortion or plumb-bob coefficients `k1,k2,p1,p2,k3`. The public API uses
+Materia's camera frame: +X forward, +Y left, +Z up. Metre points project to
+pixel centres; unprojection returns **unit** rays. OpenCV's camera frame is
+converted inside the library. Points behind the camera are rejected.
+
+An undistortion map keeps the input dimensions. `VK_KEEP_ALL_PIXELS` keeps as
+much source content as possible and may add black borders; `VK_CROP_VALID`
+zooms to valid pixels. Map creation returns the matching distortion-free
+pinhole model. Remapping supports RGB8, gray8, and depth32f image views with
+explicit byte strides and buffer lengths. RGB and gray use linear sampling;
+depth uses nearest-neighbour sampling. Pixels outside the source become zero.
+Source and destination buffers must be separate.
+
+`CameraCalibration` serializes as JSON schema version 1, with the camera model,
+RMS reprojection error, calibration time, board description, and source.
+
 The Haxe smoke test can be compiled with
 `./haxeon/scripts/haxeon build --compiler-only --project visionkit/tests/haxeon.json`.
 Run its `main.hl` with the repository's `haxeon/.tools/hashlink/hl`, with the

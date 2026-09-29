@@ -23,3 +23,4 @@ Release with position independent code and the flags in `cmake/OpenCV.cmake`.
 The initial configure-to-install build took about 114 seconds on this host.
 The final configuration has `WITH_VTK=OFF` and `WITH_OBSENSOR=OFF`; the
 installed `lib/` contains exactly the six static module archives listed above.
+VisionKit links system zlib alongside the static OpenCV archives.
