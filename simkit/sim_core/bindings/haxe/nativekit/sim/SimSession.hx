@@ -82,6 +82,9 @@ class SimSession {
     public function isRunning():Bool
         return status().get_running() != 0;
 
+    public function isSealed():Bool
+        return status().get_sealed() != 0;
+
     public function stepIndex():haxe.Int64
         return status().get_step_index();
 

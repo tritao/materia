@@ -7,6 +7,8 @@ class Place extends HumanActionBase {
 	public final ramp:Float;
 	/** False once the part should be released by the simulation layer. */
 	public var grip(default, null):Bool = true;
+	/** True after the hands have reached the placing point. */
+	public var atTarget(default, null):Bool = false;
 	var stage:Int = 0;
 	var elapsed:Float = 0.0;
 
@@ -33,13 +35,18 @@ class Place extends HumanActionBase {
 			var weight = ramp == 0.0 ? 1.0 : Math.min(1.0, elapsed / ramp);
 			setWeight(weight);
 			if (weight >= 1.0) {
-				grip = false;
-				worker.setGrip(false);
+				atTarget = true;
 				stage = 1;
+				elapsed = 0.0;
 			}
 		} else if (stage == 1) {
-			stage = 2;
-			elapsed = 0.0;
+			elapsed += seconds;
+			if (elapsed >= 0.15) {
+				grip = false;
+				worker.setGrip(false);
+				stage = 2;
+				elapsed = 0.0;
+			}
 		} else {
 			elapsed += seconds;
 			var weight = ramp == 0.0 ? 0.0 : Math.max(0.0, 1.0 - elapsed / ramp);
