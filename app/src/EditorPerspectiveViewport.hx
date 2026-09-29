@@ -446,13 +446,15 @@ class EditorPerspectiveViewport implements View {
       canvas.fillRect(new Rect(mount.x-3,mount.y-3,6,6),Color.rgba(1.0,0.75,0.2,0.95));
       if(sensor.kind!="lidar"||sensor.values.length==0)continue;
       var rotation=multiplyQuaternion(linkRotation,sensor.mountRotation.toArray()),path=new PathBuilder();
-      var values=sensor.values.toArray();
+      var values=sensor.values.toArray(),visibleRays=0;
       for(index in 0...values.length){var angle=index*6.283185307179586/values.length;
         var direction=rotateVector(rotation,[Math.cos(angle),Math.sin(angle),0.0]);
         var hit=camera.project(origin[0]+direction[0]*values[index],origin[1]+direction[1]*values[index],
           origin[2]+direction[2]*values[index],width,height);
-        if(hit!=null)path.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);}
-      canvas.strokeTransient(path.build(),Color.rgba(0.25,0.8,1.0,0.55),1.0);
+        if(hit!=null){path.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);visibleRays++;}}
+      // Every ray can project to nothing (behind the camera, clipped, or a range that is not finite yet);
+      // stroking the empty path would hand the renderer nothing to draw.
+      if(visibleRays>0)canvas.strokeTransient(path.build(),Color.rgba(0.25,0.8,1.0,0.55),1.0);
     }
     }
   }
