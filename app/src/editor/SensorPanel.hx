@@ -31,9 +31,31 @@ class SensorPanel {
     var commands = app.commands;
     var viewportWidth = app.viewportWidth;
     var fillStyle = function() return ReferenceEditorApp.fillStyle();
-    var actionRowStyle = function() return ReferenceEditorApp.actionRowStyle();
-    var actionColumnStyle = function() return ReferenceEditorApp.actionColumnStyle();
+    // The panel is dense with small buttons; give them a little more room than the app-wide defaults.
+    var actionRowStyle = function() {
+      var rowStyle = ReferenceEditorApp.actionRowStyle();
+      rowStyle.childGap = 6.0;
+      rowStyle.rowGap = 6.0;
+      return rowStyle;
+    };
+    var actionColumnStyle = function() {
+      var columnStyle = ReferenceEditorApp.actionColumnStyle();
+      columnStyle.childGap = 8.0;
+      return columnStyle;
+    };
+    var listStyle = function() {
+      var result = new LayoutStyle();
+      result.width = LayoutAxis.grow();
+      result.childGap = 6.0;
+      return result;
+    };
     var sectionHeading = function(label:String) return app.sectionHeading(label);
+    // A section heading needs air above it to read as the start of a new group.
+    var spacedHeading = function(label:String) {
+      var heading = app.sectionHeading(label);
+      heading.style.padding = new Insets(0.0, 12.0, 0.0, 0.0);
+      return heading;
+    };
     var textLines = function(key:String, lines:Array<String>) return ReferenceEditorApp.textLines(key, lines);
     var log = function(message:String) app.log(message);
     var documentChanged = function() app.documentChanged();
@@ -111,14 +133,14 @@ class SensorPanel {
       new KeyedView("ownership",ownership==null?new Text("Origin: document"):
         textLines("script-origin",["Origin: script",ownership.reference,
           'configuration v${ownership.configurationVersion}'])),
-      new KeyedView("robots-heading",sectionHeading("ROBOTS")),
-      new KeyedView("robots",new Column("sensor-robots",robotRows)),
-      new KeyedView("backend-heading",sectionHeading("PHYSICS · "+simulation.userBackendName().toUpperCase())),
+      new KeyedView("robots-heading",spacedHeading("ROBOTS")),
+      new KeyedView("robots",new Column("sensor-robots",robotRows,listStyle())),
+      new KeyedView("backend-heading",spacedHeading("PHYSICS · "+simulation.userBackendName().toUpperCase())),
       new KeyedView("backend-actions",backendActions),
-      new KeyedView("devices-heading",sectionHeading("DEVICES")),
+      new KeyedView("devices-heading",spacedHeading("DEVICES")),
       new KeyedView("actions",actions),
-      new KeyedView("list",new Column("sensor-list",rows)),
-      new KeyedView("runtime-heading",sectionHeading("SIMULATION")),
+      new KeyedView("list",new Column("sensor-list",rows,listStyle())),
+      new KeyedView("runtime-heading",spacedHeading("SIMULATION")),
       new KeyedView("runtime-actions",runtimeActions)];
     if (simulation.collisionWarnings.length > 0)
       content.push(new KeyedView("collision-warnings",
@@ -212,6 +234,7 @@ class SensorPanel {
       content.push(new KeyedView("script-diagnostics",textLines("script-diagnostic-lines",ownership.diagnostics)));
     var contentStyle=new LayoutStyle();contentStyle.width=LayoutAxis.stretch();
     contentStyle.height=LayoutAxis.fit();contentStyle.padding=new Insets(8.0,8.0,8.0,8.0);
+    contentStyle.childGap=6.0;
     return new ScrollView("sensor-scroll",new Column("sensor-panel",content,contentStyle),style);
   }
 
