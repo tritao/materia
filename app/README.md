@@ -80,6 +80,14 @@ position; a looping track must end where it starts.
   (`editor/SimulationCommands`): Play/Pause (`F5`), Step (`F10`), Reset (`Shift+F5`), and
   Design, which discards the running simulation and returns to the editor pose. Play and Step
   build or rebuild pending configuration first; the Sensors panel buttons call the same commands.
+- A Start tab opens beside the 3D view on a plain launch, with new-file shortcuts, recent files,
+  and the bundled examples listed in `editor/ExampleCatalog`. `--snapshot --example=ID[,ID...]`
+  opens the same examples headlessly, in order, for checks (`--example-settle=SECONDS` lets a
+  running simulation step between them). "Show this page at startup" and the recent-file list are
+  stored in `preferences.json` beside the workspace layout.
+- The Console is a read-only text area over a 1000-line log: select with the mouse, copy with
+  `Ctrl+C`, scroll with the wheel, or use **Copy all** (`console.copy-all`). It follows new output
+  until you scroll away from the end.
 - Design (`Ctrl+1`) and Simulate (`Ctrl+2`) modes switch dock layout only; the document,
   selection, and undo history are shared. Each mode remembers its layout for the session,
   Reset workspace restores the active mode's default, and only the Design layout is saved to

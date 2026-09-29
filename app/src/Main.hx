@@ -93,6 +93,8 @@ import nativekit.ui.widgets.layout.SplitViewOptions;
 import nativekit.ui.widgets.controls.TabItem;
 import nativekit.ui.widgets.controls.Tabs;
 import nativekit.ui.widgets.text.Text;
+import nativekit.ui.widgets.text.TextArea;
+import nativekit.editorkit.TextDocument;
 import nativekit.ui.widgets.text.TextField;
 import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeView;
@@ -146,6 +148,7 @@ class Main {
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
+          arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
@@ -160,7 +163,8 @@ class Main {
           "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
           "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] " +
           "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] " +
-          "[--worker-demo=rack-to-table [--worker-demo-step=N]]");
+          "[--worker-demo=rack-to-table [--worker-demo-step=N]] " +
+          "[--example=ID[,ID...] [--example-settle=SECONDS]]");
         return 2;
       }
 
@@ -177,6 +181,23 @@ class Main {
           generated.localCentersByDefinition, generated.metresPerUnit,
           generated.physical, generated.recipeDocument);
       }
+      // Opens bundled examples in order, exactly as the Start page does, for headless checks.
+      var settleSeconds = 0.0;
+      for (arg in args) if (arg.indexOf("--example-settle=") == 0) settleSeconds = Std.parseFloat(arg.substr(17));
+      for (arg in args) if (arg.indexOf("--example=") == 0)
+        for (id in arg.substr(10).split(",")) {
+          var entry = ExampleCatalog.find(id);
+          if (entry == null) throw 'Unknown example "$id"';
+          ExampleCatalog.open(editor, entry);
+          Sys.println('Opened example ${entry.id}: document "${editor.session.label()}", ' +
+            '${editor.scene.records().length} scene records');
+          // Let a running simulation step, as the interactive editor does between frames.
+          var until = Sys.time() + settleSeconds;
+          while (Sys.time() < until) {
+            editor.tick();
+            Sys.sleep(0.016);
+          }
+        }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--worker-demo=rack-to-table") >= 0) {
         editor.enableWorkerDemo(workerDemoSteps(args), false);
@@ -491,7 +512,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sceneGeneration:Int = 0;
   var treeModel:EditorSceneTree;
   final telemetry:TelemetryPanel;
+  static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
+  // The console view edits nothing: it is a read-only text area over this document, so its text is
+  // selectable and copyable. logLengths holds each entry's code-point length for trimming old lines.
+  final consoleDocument:TextDocument = new TextDocument("");
+  final logLengths:Array<Int> = [];
   var gridVisible:Bool;
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
@@ -615,8 +641,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     telemetry = new TelemetryPanel(appearance.theme.tokens.surface,
       appearance.theme.tokens.textSecondary, demo);
-    logLines = demo ? ["Demo scene ready", "Select a box; edit position or visibility",
-      "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"];
+    logLines = [];
+    for (line in demo ? ["Demo scene ready", "Select a box; edit position or visibility",
+        "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"])
+      log(line);
     gridVisible = true;
     gridSnapEnabled = false;
     gridSpacing = EditorGrid.STEP;
@@ -1005,7 +1033,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     robot: robotDiagnosticState(),
     panels: workspace.panelIds(),
     workspace: Json.parse(workspace.snapshotJson()),
-    recentLog: logLines.copy()
+    recentLog: logLines.slice(Std.int(Math.max(0, logLines.length - 8)))
   } : {
     mode: "component-lab",
     lab: componentLab.diagnosticState()
@@ -1473,34 +1501,28 @@ class ReferenceEditorApp implements DesktopUiApplication {
       rows.push(new KeyedView("stale-discard", sceneAction("stale-discard-command",
         "editor.discard-stale-edits", "Discard stale edits", IconName.Trash)));
     }
-    for (index in 0...logLines.length) rows.push(new KeyedView(
-      "log:" + index,
-      new Text(
-        "> " + logLines[index],
-        null,
-        Color.rgba(
-          0.22,
-          0.38,
-          0.44,
-          1.0
-        )
-      )
-    ));
-    return new Column(
-      "console-panel",
-      [
-        new KeyedView("heading", sectionHeading("CONSOLE")),
-        new KeyedView(
-          "logs",
-          new Column(
-            "console-lines",
-            rows,
-            fillStyle()
-          )
-        )
-      ],
-      style
-    );
+    var logStyle = fillStyle();
+    logStyle.padding = new Insets(4.0, 2.0, 4.0, 2.0);
+    logStyle.background = appearance.theme.tokens.surface;
+    var logView = TextArea.withDocument("console-log", consoleDocument, null, logStyle, "Console output", null,
+      appearance.theme.tokens.text);
+    logView.readOnly = true;
+    logView.followTail = true;
+    var copyAll = new CommandButton("console-copy-all", "console.copy-all", commands);
+    copyAll.displayLabel = "Copy all";
+    copyAll.leadingIcon = IconName.Copy;
+    var headerStyle = new LayoutStyle();
+    headerStyle.width = LayoutAxis.grow();
+    headerStyle.direction = LayoutDirection.LeftToRight;
+    headerStyle.childAlignY = LayoutAlignmentY.Center;
+    headerStyle.childGap = 8.0;
+    rows.unshift(new KeyedView("header", new Row("console-header", [
+      new KeyedView("heading", sectionHeading("CONSOLE")),
+      new KeyedView("space", new Spacer("console-header-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
+      new KeyedView("copy-all", copyAll)
+    ], headerStyle)));
+    rows.push(new KeyedView("log", logView));
+    return new Column("console-panel", rows, style);
   }
 
   function sectionHeading(label:String):Text {
@@ -1540,6 +1562,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     SceneViewCommands.install(this);
     SimulationCommands.install(this);
     commands.register(new Command("start.show", "Show Start page", showStartPage));
+    commands.register(new Command("console.copy-all", "Copy console output", function() {
+      ui.clipboard.writeText(consoleDocument.text);
+      log("Console output copied");
+    }));
     for (candidate in EditorMode.all()) {
       var target = candidate;
       commands.register(new Command("editor.mode." + target.id, target.label + " mode",
@@ -1780,7 +1806,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
   function log(message:String):Void {
     if (logLines == null) return;
     logLines.push(message);
-    while (logLines.length > 8) logLines.shift();
+    var before = consoleDocument.codepointCount;
+    consoleDocument.replace(before, before, "> " + message + "\n");
+    logLengths.push(consoleDocument.codepointCount - before);
+    while (logLines.length > MAX_LOG_LINES) {
+      logLines.shift();
+      consoleDocument.replace(0, logLengths.shift(), "");
+    }
   }
 
   static function fillStyle():LayoutStyle {
