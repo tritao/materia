@@ -452,7 +452,10 @@ private class ReferenceEditorLaunchOptions {
 /** Shared/app integration object passed to a platform frame loop. */
 class ReferenceEditorApp implements DesktopUiApplication {
   public static inline var WORKSPACE_KEY:String = "reference-editor";
-  static inline var TOOLBAR_HEIGHT:Float = 44.0;
+  static inline var FILE_BAR_HEIGHT:Float = 34.0;
+  static inline var CONTEXT_BAR_HEIGHT:Float = 40.0;
+  // File tier, one-pixel divider, and mode/transport tier.
+  static inline var TOOLBAR_HEIGHT:Float = 75.0;
   static inline var STATUS_HEIGHT:Float = 28.0;
 
   public final ui:UiContext;
@@ -678,7 +681,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.frame-selected", "scene.reset-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
         "scene.toggle-grid", "editor.toggle-dark-theme", "editor.command-palette", "workspace.reset"
-      ], Math.max(8.0, viewportWidth - 228.0), TOOLBAR_HEIGHT, commands, ui.commandContext,
+      ], Math.max(8.0, viewportWidth - 228.0), FILE_BAR_HEIGHT, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; invalidateView(); },
         function(_) { toolbarMenuVisible = false; invalidateView(); });
       windowLayers.push(new StackChild("editor-more-menu", toolbarMenu, 0.0, 0.0, 25));
@@ -1027,17 +1030,35 @@ class ReferenceEditorApp implements DesktopUiApplication {
     };
   }
 
+  /** Two tiers: file and document actions above, mode and simulation controls below. */
   function topBar():View {
     var compact = toolbarDensity != Full;
-    var minimal = toolbarDensity == Minimal;
-    var barStyle = fillStyle();
-    barStyle.height = LayoutAxis.fixed(TOOLBAR_HEIGHT);
-    barStyle.direction = LayoutDirection.LeftToRight;
-    barStyle.childAlignY = LayoutAlignmentY.Center;
-    barStyle.childGap = 6.0;
-    barStyle.padding = new Insets(10.0, 5.0, 10.0, 5.0);
-    barStyle.background = simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar;
+    var stack = new LayoutStyle();
+    stack.width = LayoutAxis.grow();
+    stack.height = LayoutAxis.fixed(TOOLBAR_HEIGHT);
+    stack.direction = LayoutDirection.TopToBottom;
+    var divider = new Spacer("toolbar-tier-divider", LayoutAxis.grow(), LayoutAxis.fixed(1.0));
+    divider.style.background = appearance.theme.tokens.border;
+    return new Column("editor-toolbar", [
+      new KeyedView("file", fileBar(compact)),
+      new KeyedView("divider", divider),
+      new KeyedView("context", contextBar(compact))
+    ], stack);
+  }
 
+  function toolbarRowStyle(height:Float, background:Color):LayoutStyle {
+    var style = fillStyle();
+    style.height = LayoutAxis.fixed(height);
+    style.direction = LayoutDirection.LeftToRight;
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 6.0;
+    style.padding = new Insets(10.0, 3.0, 10.0, 3.0);
+    style.background = background;
+    return style;
+  }
+
+  function fileBar(compact:Bool):View {
+    var minimal = toolbarDensity == Minimal;
     var titleStyle = new LayoutStyle();
     titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
     var items:Array<KeyedView> = [
@@ -1048,16 +1069,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
     ];
     if (!minimal) {
-      items.push(new KeyedView("modes", modeSwitcher(compact)));
       items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
       items.push(new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact)));
-      items.push(new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
-        "Frame", IconName.Inspect, compact)));
     }
     items.push(new KeyedView("space", new Spacer("toolbar-space", LayoutAxis.grow(),
-      LayoutAxis.fixed(1.0))));
-    items.push(new KeyedView("transport", transportGroup(compact, minimal)));
-    items.push(new KeyedView("space-end", new Spacer("toolbar-space-end", LayoutAxis.grow(),
       LayoutAxis.fixed(1.0))));
     var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
     items.push(new KeyedView("status", new Text(documentLabel, null, appearance.theme.tokens.textSecondary,
@@ -1071,7 +1086,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
     more.accessibilityLabel = "More editor actions";
     more.selected = toolbarMenuVisible;
     items.push(new KeyedView("more", more));
-    return new Row("editor-toolbar-row", items, barStyle);
+    return new Row("editor-file-bar", items, toolbarRowStyle(FILE_BAR_HEIGHT, appearance.toolbar));
+  }
+
+  // The mode strip is tinted while a simulation is active, so the non-editing state is obvious.
+  function contextBar(compact:Bool):View {
+    var items:Array<KeyedView> = [
+      new KeyedView("modes", modeSwitcher(compact)),
+      new KeyedView("space", new Spacer("context-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
+      new KeyedView("transport", transportGroup(compact)),
+      new KeyedView("space-end", new Spacer("context-space-end", LayoutAxis.grow(), LayoutAxis.fixed(1.0))),
+      new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
+        "Frame", IconName.Inspect, compact))
+    ];
+    return new Row("editor-context-bar", items, toolbarRowStyle(CONTEXT_BAR_HEIGHT,
+      simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar));
   }
 
   /** Segmented mode buttons; the active mode reads as selected through its command's checked state. */
@@ -1088,7 +1117,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   /** Play/Pause, Step, Reset, and return-to-design controls for the shared simulation. */
-  function transportGroup(compact:Bool, minimal:Bool):View {
+  function transportGroup(compact:Bool):View {
     var style = new LayoutStyle();
     style.direction = LayoutDirection.LeftToRight;
     style.childAlignY = LayoutAlignmentY.Center;
@@ -1098,14 +1127,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ? toolbarAction("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause, true)
       : toolbarAction("toolbar-sim-play", "sim.play", "Play", IconName.Play, true, true);
     var items:Array<KeyedView> = [new KeyedView("play-pause", playPause)];
-    if (!minimal) {
-      items.push(new KeyedView("step", toolbarAction("toolbar-sim-step", "sim.step", "Step",
-        IconName.StepForward, true)));
-      items.push(new KeyedView("reset", toolbarAction("toolbar-sim-reset", "sim.reset", "Reset",
-        IconName.Reset, true)));
-      items.push(new KeyedView("stop", toolbarAction("toolbar-sim-stop", "sim.stop", "Design",
-        IconName.Stop, true)));
-    }
+    items.push(new KeyedView("step", toolbarAction("toolbar-sim-step", "sim.step", "Step",
+      IconName.StepForward, true)));
+    items.push(new KeyedView("reset", toolbarAction("toolbar-sim-reset", "sim.reset", "Reset",
+      IconName.Reset, true)));
+    items.push(new KeyedView("stop", toolbarAction("toolbar-sim-stop", "sim.stop", "Design",
+      IconName.Stop, true)));
     if (!compact) {
       var state = running ? "Running" : simulation.isActive() ? "Paused" : "Design";
       if (simulation.isActive() && simulation.pending(sensors, scene)) state += " · Rebuild pending";
