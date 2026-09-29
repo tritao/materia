@@ -18,10 +18,24 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	const RK_LINK_SHAPE_SPHERE = 2;
 	const RK_MAX_CONTACT_PAIRS = 128;
 	const RK_MAX_LINK_SHAPES = 256;
+	/**
+	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
+	 * other_object is nonzero only for Object contacts. RobotLink contacts carry
+	 * zero-based other_robot/other_link; World covers unowned geometry.
+	 */
+	enum rk_contact_other_kind : c_int {
+		RK_CONTACT_OTHER_WORLD = 0;
+		RK_CONTACT_OTHER_OBJECT = 1;
+		RK_CONTACT_OTHER_ROBOT_LINK = 2;
+	}
 	enum rk_simulation_presentation_pose_kind : c_int {
 		RK_SIMULATION_PRESENTATION_ROBOT_BASE = 1;
 		RK_SIMULATION_PRESENTATION_ROBOT_LINK = 2;
 	}
+	extern fn rk_robot_contact_list_count(list: rk_robot_contact_list, out_count: ptr<u32> @out) -> rk_result;
+	extern fn rk_robot_contact_list_destroy(list: rk_robot_contact_list) -> void;
+	extern fn rk_robot_contact_list_get(list: rk_robot_contact_list, index: u32, out_contact: ptr<rk_robot_contact> @inout) -> rk_result;
+	extern fn rk_robot_contact_list_step_index(list: rk_robot_contact_list, out_step_index: ptr<u64> @out) -> rk_result;
 	/**
 	 * Adds one robot binding before the simulation is started or stepped.
 	 *
@@ -42,6 +56,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Copies the complete clock and every presentation pose under one simulation lock.
 	 */
 	extern fn rk_simulation_capture_presentation(simulation: rk_simulation, out_presentation: ptr<rk_simulation_presentation> @out @owned) -> rk_result;
+	extern fn rk_simulation_capture_robot_contacts(simulation: rk_simulation, runtime: rk_robot_runtime, out_list: ptr<rk_robot_contact_list> @out @owned) -> rk_result;
 	/**
 	 * Removes a robot's differential-drive coupling, if it has one; its base stays where it is.
 	 */
@@ -221,12 +236,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * This does not change the pose restored by reset or resetRobot.
 	 */
 	extern fn rk_simulation_teleport_robot(simulation: rk_simulation, robot_index: u32, pose: ptr<const<rk_simulation_pose>>) -> rk_result;
-	/**
-	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
-	 * other_object is the session object (nksim_object) the caller created that
-	 * the link touches, or zero for another robot link or an unowned body.
-	 */
-	struct rk_robot_contact @layout(80, 8) {
+	struct rk_robot_contact @layout(96, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		link_index: u32 @offset(4);
 		tool_piece_index: i32 @offset(8);
@@ -236,6 +246,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		normal: array<f64, 3> @offset(48);
 		active: u32 @offset(72);
 		reserved: u32 @offset(76);
+		other_kind: rk_contact_other_kind @offset(80);
+		other_robot: u32 @offset(84);
+		other_link: u32 @offset(88);
+		reserved2: u32 @offset(92);
 	}
 	/**
 	 * Read-only clock values published by a Simulation tick.
@@ -490,6 +504,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		linear: array<f64, 3> @offset(8);
 		angular: array<f64, 3> @offset(32);
 	}
+	handle rk_robot_contact_list : u32 @destroy("rk_robot_contact_list_destroy");
 	/**
 	 * Opaque handle for one shared simulation universe and clock.
 	 */

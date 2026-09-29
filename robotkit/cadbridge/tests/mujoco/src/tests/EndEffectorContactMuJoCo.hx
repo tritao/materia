@@ -132,6 +132,7 @@ class EndEffectorContactMuJoCo {
     simulationHarness.spawnBox([bounds.centre.x, bounds.centre.y,
       bounds.centre.z + bounds.halfExtents.z + 0.007], [0.005, 0.005, 0.005]);
     simulationHarness.step(Int64.ofInt(2));
+    var nearbyStep = simulation.stepIndex();
     var nearbyFrame = pressureFrame(robot, authored.id);
     if (nearbyFrame.values.get(0) != 0 || vacuum.isHolding() ||
         vacuum.vacuumKpa() != 0 || nearbyFrame.sourceClockId != "robotkit.simulation")
@@ -141,7 +142,13 @@ class EndEffectorContactMuJoCo {
     simulationHarness.step(Int64.ofInt(3));
     var touching = false;
     for (contact in robot.contacts())
-      if (contact.toolPieceIndex == cupIndex && contact.distance <= 0) touching = true;
+      if (contact.toolPieceIndex == cupIndex && contact.distance <= 0) {
+        if (Int64.compare(contact.stepIndex, simulation.stepIndex()) != 0)
+          throw "Captured contact step must match the session tick";
+        if (Int64.compare(contact.stepIndex, nearbyStep) <= 0)
+          throw "Captured contact step must increase with session steps";
+        touching = true;
+      }
     var touchingFrame = pressureFrame(robot, authored.id);
     if (!touching || touchingFrame.values.get(0) != 55 ||
         Int64.compare(touchingFrame.sequence, nearbyFrame.sequence) <= 0 ||
