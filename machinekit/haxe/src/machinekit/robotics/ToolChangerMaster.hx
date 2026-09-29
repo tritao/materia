@@ -44,6 +44,8 @@ class ToolChangerMaster extends MachineComponent {
 		addPort({name: "lock", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.cylinderSpan(diameter / 2, 0, thickness);
 }

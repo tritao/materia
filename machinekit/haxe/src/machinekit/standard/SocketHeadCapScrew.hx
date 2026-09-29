@@ -104,6 +104,8 @@ class SocketHeadCapScrew extends MachineComponent {
 		addConnector("tip", Face, Solids.axial(0, 0, -length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var head = Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight);
 		var shank = Part.cylinderSpan(diameter / 2, -length, 0);

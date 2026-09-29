@@ -24,6 +24,8 @@ class PneumaticManifold extends MachineComponent {
 		}
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(20, 10, 12 + 8 * outlets);
 }

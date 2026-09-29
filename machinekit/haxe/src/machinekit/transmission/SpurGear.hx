@@ -152,6 +152,8 @@ class SpurGear extends MachineComponent {
 	public function pitchToothThickness():Float
 		return Math.PI * moduleSize / 2 + 2 * moduleSize * profileShift * Math.tan(pressureAngle) - backlash;
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.prism(profile(), 0, faceWidth);
 

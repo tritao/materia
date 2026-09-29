@@ -68,6 +68,8 @@ class SchmalzSxtMaster extends MachineComponent {
 				m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(spec.widthMm, spec.depthMm, spec.lengthMm);
 }

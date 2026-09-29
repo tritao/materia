@@ -61,6 +61,8 @@ class FlangeBearingHousing extends MachineComponent {
 		return [{x: h, y: h}, {x: -h, y: h}, {x: -h, y: -h}, {x: h, y: -h}];
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.box(face, face, depth);
 		var boreTool = Part.cylinderSpan((bearing.outside + allowance) / 2, -0.1, depth + 0.1);

@@ -81,6 +81,8 @@ class ParallelKey extends MachineComponent {
 		addConnector("seat", Face, Solids.axial(0, 0, length / 2));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.prism([
 			new Vector(-spec.width / 2, 0), new Vector(spec.width / 2, 0),

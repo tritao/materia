@@ -55,6 +55,8 @@ class LinearRail extends MachineComponent {
 				AssemblyFrames.alongY(0, 0, holePositions[i], 0, 1, 0));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		return Part.prism([
 			new Vector(-spec.railWidth / 2, -spec.railHeight),

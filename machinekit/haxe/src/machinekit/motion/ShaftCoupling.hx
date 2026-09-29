@@ -66,6 +66,8 @@ class ShaftCoupling extends MachineComponent {
 		}
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.cylinderSpan(outerDiameter / 2, 0, length);
 		var boreATool = Part.cylinderSpan(boreA / 2, -0.1, length / 2 + 0.1);

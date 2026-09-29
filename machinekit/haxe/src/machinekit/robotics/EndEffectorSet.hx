@@ -1,6 +1,7 @@
 package machinekit.robotics;
 
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.Diagnostics;
 
 typedef ChangerPortMap = {robot:String, tool:String};
 
@@ -50,9 +51,11 @@ class EndEffectorSet extends EndEffector {
 			throw "Changer tool needs a distinct id and end effector";
 		if (tools.exists(id)) throw 'Duplicate changer tool "$id"';
 		tool.mountReference();
-		for (mapping in changer.ports)
-			try tool.port(mapping.tool) catch (_:Dynamic)
-				throw 'Changer tool "$id" does not expose mapped port "${mapping.tool}"';
+		var findings = new Diagnostics();
+		for (mapping in changer.ports) if (!tool.hasPort(mapping.tool))
+			findings.error("changer.missing-tool-port", id + "/" + mapping.tool,
+				'Changer tool "$id" does not expose mapped port "${mapping.tool}"');
+		findings.throwIfErrors();
 		var master = componentAt(this, changer.instanceId);
 		var mount = tool.mountReference();
 		var half = componentAt(tool, mount.instanceId);
@@ -74,6 +77,20 @@ class EndEffectorSet extends EndEffector {
 		throw 'Unknown assembly member "$instanceId"';
 	}
 
+
+	override public function check():Diagnostics {
+		var result = super.check();
+		if (changerRef == null) result.error("changer.missing", "changer", "End effector set needs a changer");
+		for (id in tools.keys()) {
+			var tool = tools.get(id);
+			for (finding in tool.check().items)
+				result.add(finding.severity, finding.code, id + "/" + finding.subject, finding.message);
+			if (changerRef != null) for (mapping in changerRef.ports)
+				if (!tool.hasPort(mapping.tool)) result.error("changer.missing-tool-port", id + "/" + mapping.tool,
+					'Changer tool "$id" does not expose mapped port "${mapping.tool}"');
+		}
+		return result;
+	}
 
 	public function toolIds():Array<String> return [for (id in tools.keys()) id];
 

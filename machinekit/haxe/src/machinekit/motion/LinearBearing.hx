@@ -69,6 +69,8 @@ class LinearBearing extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, spec.length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {

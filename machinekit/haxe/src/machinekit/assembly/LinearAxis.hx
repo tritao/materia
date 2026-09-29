@@ -65,6 +65,8 @@ class Carriage extends MachineComponent {
 			addConnector("railMount", Mount, Solids.axial(0, this.railMountY, length / 2));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.box(width, width, length);
 		if (detail == Envelope) return body;

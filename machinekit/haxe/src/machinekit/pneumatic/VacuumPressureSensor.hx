@@ -29,6 +29,8 @@ class VacuumPressureSensor extends MachineComponent {
 			iface: Plug("analog-vacuum-kpa", 3), required: false});
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(20, 15, 25);
 }

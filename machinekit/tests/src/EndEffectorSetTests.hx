@@ -24,6 +24,8 @@ private class TestChangerMaster extends MachineComponent {
 		declareMass(5, new Vector(), InertiaTensor.zero());
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -37,6 +39,8 @@ private class CoupledMaster extends MachineComponent {
 	}
 	override public function couplingKey():String return "test:master";
 	override public function couplingConnector():String return "couple";
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -49,6 +53,8 @@ private class CoupledPlate extends MachineComponent {
 	}
 	override public function couplingKey():String return "test:tool";
 	override public function couplingConnector():String return "mount";
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -65,6 +71,8 @@ private class TestChangerPlate extends MachineComponent {
 		declareMass(mass, new Vector(), InertiaTensor.zero());
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -76,6 +84,8 @@ private class TestChangerCup extends MachineComponent {
 		addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: Unspecified, required: true});
 		declareMass(0.5, new Vector(), InertiaTensor.zero());
 	}
+
+	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
@@ -122,6 +132,12 @@ class EndEffectorSetTests {
 	}
 
 	public static function run():Void {
+		var emptySet = new EndEffectorSet();
+		var emptyFindings = emptySet.check().items;
+		if (emptyFindings.length != 2 || emptyFindings[0].code != "eoat.missing-mount" ||
+			emptyFindings[1].code != "changer.missing")
+			throw "End effector set diagnostics must report mount and changer faults";
+
 		var sxtSet = new EndEffectorSet();
 		sxtSet.addComponent("master", new SchmalzSxtMaster("10.07.13.00013"));
 		sxtSet.mount("master", "robot");

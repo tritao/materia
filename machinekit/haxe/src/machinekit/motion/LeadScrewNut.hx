@@ -93,6 +93,8 @@ class LeadScrewNut extends MachineComponent {
 	public function mountScrewPart(length:Float):SocketHeadCapScrew
 		return SocketHeadCapScrew.metric(mountScrew, length);
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength);
 		var flange = Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness);

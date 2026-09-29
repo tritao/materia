@@ -94,11 +94,15 @@ private class MassTestBlock extends MachineComponent {
 			withInertia ? new InertiaTensor(2, 0, 0, 3, 0, 4) : null);
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(10, 10, 10);
 }
 
 private class MassTestTube extends MachineComponent {
 	public function new() super("TEST-TUBE", "Rectangular test tube", "aluminium 6061", true);
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return new RectTube(40, 20, 2).geometry(100);
 }
@@ -117,6 +121,8 @@ private class MissingMassCentre extends MachineComponent {
 
 private class PortTestComponent extends MachineComponent {
 	public function new(name:String) super(name, name, "steel", true);
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(1, 1, 1);
 
 	public function definePort(name:String, kind:PortKind, role:PortRole, iface:PortInterface,
@@ -356,6 +362,34 @@ class MachineKitSmoke {
 		misleading.connectPorts("feed", "power", "output", "device", "power");
 		check(misleading.upstream("device", "air").port.instanceId == "device",
 			"upstream does not infer service conversion from unrelated power");
+
+		var diagnosticsAssembly = new MachineAssembly();
+		diagnosticsAssembly.addComponent("cupA", cup);
+		diagnosticsAssembly.addComponent("cupB", cup);
+		var diagnosticsSource = new PortTestComponent("DIAGNOSTICS-SOURCE");
+		diagnosticsSource.definePort("air", Pneumatic, Supply, PushIn(6));
+		diagnosticsAssembly.addComponent("source", diagnosticsSource);
+		diagnosticsAssembly.connectPorts("bad-kind", "source", "air", "cupA", "vacuum");
+		var findings = diagnosticsAssembly.check().items;
+		check(findings.length == 2 && findings[0].code == "port.kind-mismatch" &&
+			findings[0].subject == "bad-kind" &&
+			findings[1].code == "port.required-unconnected" && findings[1].subject == "cupB/vacuum",
+			"diagnostics collect independent connection and required-port faults");
+		throws(() -> diagnosticsAssembly.validate(), "mismatched kinds");
+		var structure = new MachineAssembly();
+		structure.addComponent("root", new MassTestBlock());
+		structure.addComponent("child", new MassTestBlock());
+		structure.addMate("first", "fixed", "root", "right", "child", "origin");
+		structure.addMate("second", "fixed", "root", "origin", "child", "right");
+		structure.addCoupling("missing-joints", "absent-a", "absent-b", 1);
+		var structuralFindings = structure.check().items;
+		check(structuralFindings.length == 2 && structuralFindings[0].code == "assembly.multiple-parents" &&
+			structuralFindings[0].subject == "child" &&
+			structuralFindings[1].code == "assembly.missing-coupling-joint" &&
+			structuralFindings[1].subject == "missing-joints",
+			"diagnostics collect independent structural faults");
+		throws(() -> structure.validateStructure(), "two parent joints");
+
 
 		var unconnected = new MachineAssembly();
 		unconnected.addComponent("cup", cup);

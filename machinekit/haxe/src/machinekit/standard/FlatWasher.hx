@@ -66,6 +66,8 @@ class FlatWasher extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, spec.thickness));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Solids.cut(Part.cylinderSpan(outerDiameter / 2, 0, thickness),
 			[Part.cylinderSpan(innerDiameter / 2, -0.1, thickness + 0.1)]);

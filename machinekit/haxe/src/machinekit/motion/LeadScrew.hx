@@ -32,6 +32,8 @@ class LeadScrew extends MachineComponent {
 		addConnector("output", Axis, Solids.axial(0, 0, length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.cylinderSpan(thread.screwDiameter / 2, 0, totalLength);
 

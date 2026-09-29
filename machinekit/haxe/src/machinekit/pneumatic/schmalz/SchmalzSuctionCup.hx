@@ -69,6 +69,8 @@ class SchmalzSuctionCup extends SuctionCup {
 			new InertiaTensor(transverse, 0, 0, transverse, 0, axial));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.cylinderSpan(spec.envelopeDiameterMm / 2, 0, spec.heightMm);
 }

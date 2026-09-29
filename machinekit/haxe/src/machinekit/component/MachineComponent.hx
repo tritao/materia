@@ -67,6 +67,8 @@ class MachineComponent {
 		return cachedBom;
 	}
 
+	public function hasGeometry():Bool return false;
+
 	public function geometry(detail:ComponentDetail = Preview):Part
 		throw 'Component "$designation" does not generate geometry';
 
@@ -74,12 +76,8 @@ class MachineComponent {
 	public function massProperties():MassProperties {
 		if (declaredMass != null) return declaredMass;
 		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
-		var part:Part;
-		try part = geometry(Preview) catch (error:Dynamic) {
-			if (Std.string(error) == 'Component "$designation" does not generate geometry')
-				throw 'Component "$designation" has no geometry or declared mass';
-			throw error;
-		}
+		if (!hasGeometry()) throw 'Component "$designation" has no geometry or declared mass';
+		var part = geometry(Preview);
 		try {
 			var physical = part.massProperties();
 			var density = MaterialLibrary.require(materialId).physical.density;
@@ -130,6 +128,11 @@ class MachineComponent {
 	}
 
 	public function ports():Array<ComponentPort> return portList.copy();
+
+	public function hasPort(name:String):Bool {
+		for (entry in portList) if (entry.name == name) return true;
+		return false;
+	}
 
 	public function port(name:String):ComponentPort {
 		for (entry in portList) if (entry.name == name) return entry;

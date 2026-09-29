@@ -76,6 +76,8 @@ class TimingPulley extends MachineComponent {
 				{name: 'CUSTOM-${family}-P${Dimension.format(pitch)}-PLD${Dimension.format(pld)}', pitch: pitch, pld: pld};
 		};
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.prism(profile(), 0, thickness);
 		return Solids.cut(body, [Part.cylinderSpan(boreDiameter / 2, -0.1, thickness + 0.1)]);

@@ -48,6 +48,8 @@ class SuctionCup extends MachineComponent {
 			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: true});
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.cylinderSpan(diameter / 2, 0, height);
 }

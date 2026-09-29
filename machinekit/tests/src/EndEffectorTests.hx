@@ -17,6 +17,8 @@ private class EndEffectorTestPart extends MachineComponent {
 		declareMass(mass, new Vector(0, 0, 0), new InertiaTensor(1, 0, 0, 2, 0, 3));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -71,6 +73,14 @@ class EndEffectorTests {
 		var inertia = rotatedMass.inertia;
 		close(inertia.xx, 2, "rotated inertia xx");
 		close(inertia.yy, 1, "rotated inertia yy");
+
+		var broken = new EndEffector();
+		broken.addComponent("plate", new EndEffectorTestPart("BROKEN", 1));
+		broken.workingFrame("bad", "absent", "tip");
+		var findings = broken.check().items;
+		if (findings.length != 2 || findings[0].code != "eoat.missing-mount" ||
+			findings[1].code != "eoat.invalid-frame" || findings[1].subject != "bad")
+			throw "End effector diagnostics must collect mount and frame faults";
 
 		var missing = new EndEffector();
 		missing.addComponent("plate", new EndEffectorTestPart("PLATE", 1));

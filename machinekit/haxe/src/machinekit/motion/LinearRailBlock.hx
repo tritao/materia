@@ -50,6 +50,8 @@ class LinearRailBlock extends MachineComponent {
 					AssemblyFrames.alongY(x, spec.blockHeight - spec.railHeight, z, 0, 1, 0));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var top = spec.blockHeight - spec.railHeight;
 		return Part.prism([

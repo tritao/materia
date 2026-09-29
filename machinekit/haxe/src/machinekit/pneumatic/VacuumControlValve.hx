@@ -29,6 +29,8 @@ class VacuumControlValve extends MachineComponent {
 			iface: Plug("digital-valve", 2), required: true});
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(18, 16, 26);
 }

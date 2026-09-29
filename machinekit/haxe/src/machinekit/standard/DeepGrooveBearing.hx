@@ -104,6 +104,8 @@ class DeepGrooveBearing extends MachineComponent {
 		addConnector("back", Face, Solids.axial(0, 0, spec.width));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ri = bore / 2, ro = outside / 2, b = width;
 		if (detail == Envelope)

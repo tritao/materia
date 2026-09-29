@@ -35,6 +35,8 @@ class ParallelGripper extends MachineComponent {
 		addPort({name: "close", kind: Pneumatic, role: Consumer, iface: PushIn(6), required: true});
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(detail == Envelope ? width + stroke : width, depth, length);
 }

@@ -25,6 +25,8 @@ class FrameBar extends MachineComponent {
 		addConnector("end", Mount, Solids.axial(0, 0, length));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.box(width, depth, length);
 }

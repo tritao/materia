@@ -72,6 +72,8 @@ class RetainingRing extends MachineComponent {
 		addConnector("seat", Axis, Solids.axial(0, 0, spec.thickness / 2));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var id = spec.grooveDiameter / 2, od = spec.outerDiameter / 2;
 		var angle = detail == Envelope ? Math.PI * 2 : Math.PI * 2 - GAP;

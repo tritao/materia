@@ -188,24 +188,50 @@ class MachineAssembly {
 		bomItems.push({item: item, quantity: quantity, mass: mass});
 	}
 
-	/** Check CAD tree and coupling relationships without requiring service wiring. */
+	/** Collect structural and service faults without stopping at the first one. */
+	public function check():Diagnostics {
+		var result = new Diagnostics();
+		checkStructure(result);
+		checkServices(result);
+		return result;
+	}
+
 	public function validateStructure():Void {
+		var result = new Diagnostics();
+		checkStructure(result);
+		result.throwIfErrors();
+	}
+
+	public function validate():Array<String> {
+		var result = check();
+		result.throwIfErrors();
+		return result.warnings();
+	}
+
+	function checkStructure(result:Diagnostics):Void {
 		var parents:Map<String, String> = [];
 		var joints:Map<String, Bool> = [];
 		for (op in operations) switch op {
 			case Mate(id, _, parent, child, _, _, _):
-				if (parents.exists(child.instanceId)) throw 'Assembly member "${child.instanceId}" has two parent joints';
-				parents.set(child.instanceId, parent.instanceId);
+				if (parents.exists(child.instanceId))
+					result.error("assembly.multiple-parents", child.instanceId,
+						'Assembly member "${child.instanceId}" has two parent joints');
+				else parents.set(child.instanceId, parent.instanceId);
 				joints.set(id, true);
 			case Constrain(id, _, _, _, _, _, _): joints.set(id, true);
-			case Couple(_, _, _, _, _):
-			case ConnectPorts(_, _, _, _):
+			case _:
 		}
+		var cycles:Map<String, Bool> = [];
 		for (member in members) {
 			var seen:Map<String, Bool> = [];
 			var current = member.id;
 			while (parents.exists(current)) {
-				if (seen.exists(current)) throw 'Assembly mate cycle at "$current"';
+				if (seen.exists(current)) {
+					if (!cycles.exists(current)) result.error("assembly.mate-cycle", current,
+						'Assembly mate cycle at "$current"');
+					cycles.set(current, true);
+					break;
+				}
 				seen.set(current, true);
 				current = parents.get(current);
 			}
@@ -213,56 +239,59 @@ class MachineAssembly {
 		for (op in operations) switch op {
 			case Couple(id, source, target, _, _):
 				if (!joints.exists(source) || !joints.exists(target))
-					throw 'Assembly coupling "$id" refers to a missing joint';
+					result.error("assembly.missing-coupling-joint", id,
+						'Assembly coupling "$id" refers to a missing joint');
 			case _:
 		}
 	}
 
-	/** Check structure, complete service wiring and physical port compatibility. */
-	public function validate():Array<String> {
-		validateStructure();
-		var connections = checkConnections();
-		checkRequiredPorts(connections.connected);
-		return connections.warnings;
-	}
-
-	function checkConnections():{connected:Map<String, Bool>, warnings:Array<String>} {
+	function checkServices(result:Diagnostics, required:Bool = true):Void {
 		var connected:Map<String, Bool> = [];
-		var warnings:Array<String> = [];
 		for (op in operations) switch op {
 			case ConnectPorts(id, from, to, _):
 				var first = requirePort(from), second = requirePort(to);
 				var fromKey = portKey(from), toKey = portKey(to);
-				if (fromKey == toKey) throw 'Port connection "$id" joins a port to itself';
+				if (fromKey == toKey) result.error("port.self-connection", id,
+					'Port connection "$id" joins a port to itself');
 				if (connected.exists(fromKey) || connected.exists(toKey))
-					throw 'Port connection "$id" uses a port more than once';
+					result.error("port.reused", id, 'Port connection "$id" uses a port more than once');
 				connected.set(fromKey, true);
 				connected.set(toKey, true);
-				if (first.kind != second.kind) throw 'Port connection "$id" has mismatched kinds';
+				if (first.kind != second.kind) result.error("port.kind-mismatch", id,
+					'Port connection "$id" has mismatched kinds');
 				if ((first.role == Supply && second.role == Supply) ||
 					(first.role == Consumer && second.role == Consumer))
-					throw 'Port connection "$id" has incompatible roles';
+					result.error("port.role-mismatch", id, 'Port connection "$id" has incompatible roles');
 				if (!PortInterfaces.compatible(first.iface, second.iface))
-					throw 'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}';
+					result.error("port.interface-mismatch", id,
+						'Port connection "$id" has mismatched interfaces: ${Std.string(first.iface)} and ${Std.string(second.iface)}');
 			case _:
 		}
-		return {connected: connected, warnings: warnings};
-	}
-
-	function checkRequiredPorts(connected:Map<String, Bool>):Void {
-		var deepestFailure:Null<Array<String>> = null;
-		for (member in members) for (port in member.component.ports())
+		if (required) for (member in members) for (port in member.component.ports())
 			if (port.required && port.role == Consumer) {
 				var reference = portRef(member.id, port.name);
 				if (connected.exists(portKey(reference))) {
-					var trace = traceUpstream(reference);
-					if (!trace.supplied && (deepestFailure == null || trace.chain.length > deepestFailure.length))
-						deepestFailure = trace.chain;
-				}
-				else if (!isExposed(member.id, port.name))
-					throw 'Required consumer port "${member.id}/${port.name}" is unconnected';
+					try {
+						var trace = traceUpstream(reference);
+						if (!trace.supplied) result.error("port.unsupplied", '${member.id}/${port.name}',
+							unsuppliedMessage(trace.chain));
+					} catch (error:String) result.error("port.service-cycle", '${member.id}/${port.name}', error);
+				} else if (!isExposed(member.id, port.name))
+					result.error("port.required-unconnected", '${member.id}/${port.name}',
+						'Required consumer port "${member.id}/${port.name}" is unconnected');
 			}
-		if (deepestFailure != null) throw unsuppliedMessage(deepestFailure);
+	}
+
+	function checkConnections():{connected:Map<String, Bool>, warnings:Array<String>} {
+		var result = new Diagnostics();
+		checkServices(result, false);
+		result.throwIfErrors();
+		var connected:Map<String, Bool> = [];
+		for (op in operations) switch op {
+			case ConnectPorts(_, from, to, _): connected.set(portKey(from), true); connected.set(portKey(to), true);
+			case _:
+		}
+		return {connected: connected, warnings: result.warnings()};
 	}
 
 	/** Populate an existing model. All member and joint ids receive the supplied prefix. */
@@ -517,6 +546,19 @@ class MachineAssembly {
 			if (entry.instanceId == reference.instanceId && entry.name == reference.connectorName) return;
 		for (connector in component.connectors()) if (connector.name == reference.connectorName) return;
 		throw 'Unknown connector "${reference.instanceId}/${reference.connectorName}"';
+	}
+
+	public function hasPort(name:String):Bool {
+		for (entry in externalPorts) if (entry.name == name) return true;
+		return false;
+	}
+
+	public function hasMemberConnector(instanceId:String, connectorName:String):Bool {
+		for (entry in memberConnectorFrames)
+			if (entry.instanceId == instanceId && entry.name == connectorName) return true;
+		for (member in members) if (member.id == instanceId)
+			for (connector in member.component.connectors()) if (connector.name == connectorName) return true;
+		return false;
 	}
 
 	function requirePort(reference:PortRef):ComponentPort {

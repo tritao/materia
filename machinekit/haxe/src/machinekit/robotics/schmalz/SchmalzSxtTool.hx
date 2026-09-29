@@ -67,6 +67,8 @@ class SchmalzSxtTool extends MachineComponent {
 			new InertiaTensor(transverse, 0, 0, transverse, 0, m * r * r / 2));
 	}
 
+	override public function hasGeometry():Bool return true;
+
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return Part.cylinderSpan(spec.envelopeDiameterMm / 2, 0, spec.lengthMm);
 }
