@@ -11,6 +11,8 @@ import robotkit.policy.VelocityReference.VelocityCommand;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
+import robotkit.runtime.SimulationSpace;
 import robotkit.world.McapRobotRecording;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotRecording;
@@ -47,6 +49,7 @@ typedef WalkRig = {
   model:RobotModel,
   spec:PolicySpec,
   policy:OnnxPolicy,
+  harness:SimulationHarness,
   simulation:Simulation,
   runtime:RobotRuntime,
   simulated:SimulatedRobot
@@ -92,12 +95,14 @@ class WalkRun {
     blueprint.observedLimitTolerance = 0.05;
 
     // One simulation tick is one physics step of 2 ms, the IMU's period; the policy runs every 10th.
-    var simulation = new Simulation(PHYSICS_STEP, 1, 1, null, INTEGRATOR_EULER, 0, 100, 50);
+    var harness = new SimulationHarness(PHYSICS_STEP, 1, SimulationSpace.MUJOCO,
+      {integrator: INTEGRATOR_EULER, solverIterations: 100, lineSearchIterations: 50});
+    var simulation = harness.simulation;
     var runtime = simulation.addRobotAtPose(blueprint, [0.0, 0.0, 0.793], [0.0, 0.0, 0.0, 1.0]);
-    simulation.spawnPlane();
+    harness.spawnPlane();
     var simulated = new SimulatedRobot("g1", runtime, model.name, [for (link in model.links) link.name],
       [for (joint in model.joints) joint.name]);
-    return {model: model, spec: spec, policy: policy, simulation: simulation, runtime: runtime, simulated: simulated};
+    return {model: model, spec: spec, policy: policy, harness: harness, simulation: simulation, runtime: runtime, simulated: simulated};
   }
 
   public static function run(scenario:WalkScenario):WalkResult {
@@ -122,7 +127,7 @@ class WalkRun {
     var nextReport = scenario.report;
     for (tick in 0...ticks) {
       var t = tick * PHYSICS_STEP;
-      simulation.step(Int64.ofInt(tick));
+      rig.harness.step(Int64.ofInt(tick));
       // The command is a cyclic reference: refreshed every tick with a deadline a few ticks ahead.
       var segment = scenario.commands[0];
       for (candidate in scenario.commands) if (candidate.from <= t + 1e-9) segment = candidate;
@@ -162,7 +167,7 @@ class WalkRun {
     if (errCount > 0) result.meanEstimateError = [for (v in errSum) round(v / errCount, 4)];
     if (writer != null) writer.close();
     robot.close();
-    simulation.dispose();
+    rig.harness.dispose();
     policy.dispose();
     return result;
   }
@@ -181,14 +186,14 @@ class WalkRun {
         case Command(JointTargets(targets, _)):
           rig.runtime.submitTargets(targets, sequence++);
         case RobotSnapshot(recorded):
-          rig.simulation.step(Int64.ofInt(steps++));
+          rig.harness.step(Int64.ofInt(steps++));
           var now = rig.runtime.snapshot();
           for (joint in 0...recorded.positions.length)
             worstJoint = Math.max(worstJoint, Math.abs(now.q.get(joint) - recorded.positions.get(joint)));
           worstTime = Math.max(worstTime, Math.abs(Int64.toInt(now.sourceTimestampNs - recorded.sourceTimestampNs)) * 1e-9);
         case _:
       }
-    rig.simulation.dispose();
+    rig.harness.dispose();
     rig.policy.dispose();
     return {steps: steps, worstJoint: worstJoint, worstTime: worstTime};
   }
