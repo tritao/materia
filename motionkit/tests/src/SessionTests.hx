@@ -1,6 +1,5 @@
 import haxe.Int64;
 import haxe.io.Bytes;
-import cnckit.CncMachine;
 import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
 import cadkit.modeling.AssemblyModel;

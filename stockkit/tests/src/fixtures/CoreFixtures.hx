@@ -51,7 +51,7 @@ class CoreFixtures {
     var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.004, 0.01, 0.0015, 0.002)
       .finish();
-    var moves = CutMoves.fromProgram(program.toolpath());
+    var moves = CutMoves.fromProgram(program);
     Assert.check(moves.length > 20, "pocket has enough moves to scrub");
     var lattice = new StockLattice(0, 0, -STOCK_Z + 0.0002, 0.0004, 101, 51, 25);
     function fresh(count:Int):Stock {
@@ -137,7 +137,7 @@ class CoreFixtures {
     var program = new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
       .pocket(contour, tool, -0.008, 0.01, 0.003, 0.004)
       .finish();
-    var moves = CutMoves.fromProgram(program.toolpath());
+    var moves = CutMoves.fromProgram(program);
     var lattice = StockLattice.covering(0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0, 0.0005);
     var stock = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var report = stock.cut(moves);
@@ -161,7 +161,7 @@ class CoreFixtures {
     // Cut 2 mm deeper with a short holder reach: now the holder hits.
     var short = Tool.shaped(4, 0.0, CutterProfile.flat(0.004, 0.003).withHolder(0.02, 0.03));
     var deeper = [for (move in CutMoves.fromProgram(new CamJob(0.02, 12000, new Point3(0, 0, 0.02))
-      .pocket(contour, short, -0.006, 0.01, 0.003, 0.002).finish().toolpath())) move];
+      .pocket(contour, short, -0.006, 0.01, 0.003, 0.002).finish())) move];
     var fresh = Stock.box(lattice, 0, 0, -STOCK_Z, STOCK_X, STOCK_Y, 0);
     var hits = [for (outcome in fresh.cut(deeper).moves) if (outcome.holderContact > 0) outcome];
     Assert.check(hits.length > 0, "a holder 3 mm above the tip hits a 6 mm pocket");
@@ -179,7 +179,7 @@ class CoreFixtures {
     var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
       .finish();
-    var moves = CutMoves.fromProgram(program.toolpath());
+    var moves = CutMoves.fromProgram(program);
     var blank = Part.box(STOCK_X, STOCK_Y, STOCK_Z, Min, Min, Max);
     var pocketTool = Part.box(0.02, 0.01, 0.003, Min, Min, Min);
     var pocket = pocketTool.translated(new cadkit.modeling.Vector(0.01, 0.005, -0.002));
@@ -282,7 +282,7 @@ class CoreFixtures {
     var program = new CamJob(0.005, 12000, new Point3(0, 0, 0.005))
       .pocket(contour, tool, -0.001, 0.01, 0.0015, 0.002)
       .finish();
-    var moves = CutMoves.fromProgram(program.toolpath());
+    var moves = CutMoves.fromProgram(program);
     var ramped = false;
     for (move in moves) switch move.motion {
       case Path(Line(start, end)):

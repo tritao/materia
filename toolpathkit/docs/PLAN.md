@@ -22,11 +22,11 @@ Replace `Rapid` and `Feed` with `Move(kind, geometry, feed, tolerance, provenanc
 
 ## T3: Motion adapter
 
-Create `toolpathkit/motion`, package `toolpathkit-motion`, depending on ToolpathKit, MotionKit, MotionKit Robot and later ProcessKit. Move CNC lowering, pose primitives, source maps, channels and robot binding into the adapter. Move pure travel geometry checks into ToolpathKit. Move CNC/C7 scenario tests into adapter tests. Replace `CncCompiler.compile(): MotionProgram` and `CamProgram.lower(machine)` with producer to format to adapter execution. Gate: CncKit depends only on ToolpathKit; CamKit depends on ToolpathKit, CadKit and ManufacturingKit; MotionKit and MotionKit Robot have no CncKit dependency; C7 passes 2,845 assertions.
+Create `toolpathkit/motion`, package `toolpathkit-motion`, depending on ToolpathKit, MotionKit, MotionKit Robot and later ProcessKit. Move CNC lowering, pose primitives, source maps, channels and robot binding into the adapter. Move pure travel geometry checks into ToolpathKit. Move CNC/C7 scenario tests into adapter tests. Replace direct CNC and CAM motion compilation with producer to format to adapter execution. Gate: CncKit depends only on ToolpathKit; CamKit depends on ToolpathKit, CadKit and ManufacturingKit; MotionKit and MotionKit Robot have no CncKit dependency; C7 passes 2,845 assertions.
 
 ## T4: Machine model
 
-Put setup work frame, stock bounds, fixtures and safe Z in `toolpathkit.setup`; ToolLibrary and TravelEnvelope in ToolpathKit; MachineBinding in ToolpathKit Motion; and G54–G59, G28/G30, H/D mapping in CncControllerSetup. CncKit emits work-frame moves and `SetSetup`; CamKit emits its setup. Gate: CamSetup stock/clamp checks use ToolpathKit setup and G54/G55 round-trip passes.
+Put setup work frame, stock bounds, fixtures and safe Z in `toolpathkit.setup`; ToolLibrary and TravelEnvelope in ToolpathKit; MachineBinding in ToolpathKit Motion; and G54–G59, G28/G30, H/D mapping in CncController. CncKit emits work-frame moves and `SetSetup`; CamKit emits its setup. Gate: CamSetup stock/clamp checks use ToolpathKit setup and G54/G55 round-trip passes.
 
 ## T5: G-code writer
 

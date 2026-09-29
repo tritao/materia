@@ -6,10 +6,12 @@ import toolpathkit.tool.Tool;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.SpindleDirection;
 import toolpathkit.setup.Setup;
+import toolpathkit.tool.ToolLibrary;
 
 /** 2.5D toolpath producer. All inputs here are metres and metres/second. */
 class CamJob {
@@ -285,13 +287,17 @@ class CamJob {
     return this;
   }
 
-  public function finish(?setup:Setup):CamProgram {
+  public function finish(?setup:Setup):ToolpathProgram {
     if (ops.length == 0) throw "CAM job has no operations";
     var result = ops.copy();
     var endSpan = Provenance.cam(operationNumber + 1);
     result.push(ToolpathOp.Spindle(Off, 0.0, endSpan));
     result.push(ToolpathOp.End(endSpan));
-    return new CamProgram(result, tools, setup);
+    var library = new ToolLibrary();
+    for (tool in tools) library.set(tool);
+    var placed = setup == null ? new Setup("1", new Point3(0.0, 0.0, 0.0)) : setup;
+    if (setup != null) result.unshift(ToolpathOp.SetSetup(placed.id, Provenance.cam(0)));
+    return new ToolpathProgram(result, library, [placed]);
   }
 
   function cutLoop(contour:CamContour, depth:Float, feed:Float,

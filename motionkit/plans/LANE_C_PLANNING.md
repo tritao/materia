@@ -300,9 +300,9 @@ small `cnckit-robot` adapter if it needs RobotKit.
   supported).
 - **Spindle and coolant:** `SetOutput` events on declared channels
   (`spindle.speed`, `spindle.direction`, `coolant.mist`, `coolant.flood`).
-- **Machine binding:** a `CncMachine` description maps machine axes to
-  `MotionSystem` axes, with rapid limits and work-offset storage. Probing is
-  out of scope for v1.
+- **Machine binding:** `MachineBinding` maps physical axes to `MotionSystem`
+  axes and supplies travel limits. `ToolpathProgram` carries setup positions;
+  the CNC controller maps G54–G59 to those setups.
 
 Tests:
 - a small program (square pocket outline with arcs, `G54` offset, spindle

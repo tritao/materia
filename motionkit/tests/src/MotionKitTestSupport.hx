@@ -1,6 +1,5 @@
 import haxe.Int64;
 import haxe.io.Bytes;
-import cnckit.CncMachine;
 import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
 import cadkit.modeling.AssemblyModel;
@@ -28,7 +27,6 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
-import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
 import motionkit.robot.ProgramCompiler;
@@ -117,47 +115,31 @@ import robotkit.world.TrajectorySegment;
 
 
 class MotionKitTestSupport {
-  public static function cncBinding(cnc:CncMachine,
+  public static function cncBinding(cnc:MotionCncRig,
       blueprint:MotionSystemBlueprint):ToolpathMotionBinding {
-    var machine = new MachineBinding(cnc.frameId, cnc.xAxisId, cnc.yAxisId,
-      cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
-      cnc.positionTolerance, cnc.orientationTolerance,
-      cnc.maxBlendTurnAngleRadians);
-    for (code in 54...60)
-      machine.setSetupOffset(cnc.controller.setupId(code), cnc.controller.workOffset(code));
-    if (cnc.travelLower != null && cnc.travelUpper != null)
-      machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
-    var binding = new ToolpathMotionBinding(machine, blueprint);
-    cnc.setTravelEnvelope(machine.travelLower, machine.travelUpper);
-    return binding;
+    return new ToolpathMotionBinding(cnc.binding, blueprint);
   }
 
-  public static function cncProgram(cnc:CncMachine, source:String):MotionProgram {
-    var parsed = new CncCompiler(cnc).compileDetailed(source);
+  public static function cncProgram(cnc:MotionCncRig, source:String):MotionProgram {
+    var parsed = CncCompiler.compileDetailed(source, cnc.controller,
+      cnc.start, cnc.binding.travel);
     for (diagnostic in parsed.diagnostics)
       if (diagnostic.severity == cnckit.CncDiagnostic.CncSeverity.Error)
         throw diagnostic.toString();
-    var machine = new MachineBinding(cnc.frameId, cnc.xAxisId, cnc.yAxisId,
-      cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
-      cnc.positionTolerance, cnc.orientationTolerance,
-      cnc.maxBlendTurnAngleRadians);
-    for (code in 54...60)
-      machine.setSetupOffset(cnc.controller.setupId(code), cnc.controller.workOffset(code));
-    if (cnc.travelLower != null && cnc.travelUpper != null)
-      machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
-    var lowered = ToolpathMotion.lower(parsed.ops, machine);
+    var lowered = ToolpathMotion.lower(parsed.program, cnc.binding);
     if (lowered.program == null) throw "G-code contains no executable motion or barrier";
     return lowered.program;
   }
 
   public static function compileCnc(binding:ToolpathMotionBinding,
-      cnc:CncMachine, source:String, joints:Array<Float>,
+      cnc:MotionCncRig, source:String, joints:Array<Float>,
       planId:Int64):motionkit.robot.CompiledProgram {
-    var parsed = new CncCompiler(cnc).compileDetailed(source);
+    var parsed = CncCompiler.compileDetailed(source, cnc.controller,
+      cnc.start, cnc.binding.travel);
     for (diagnostic in parsed.diagnostics)
       if (diagnostic.severity == cnckit.CncDiagnostic.CncSeverity.Error)
         throw diagnostic.toString();
-    return binding.compile(parsed.ops, joints, planId);
+    return binding.compile(parsed.program, joints, planId);
   }
   public static var assertions:Int = 0;
   public function new() {}
@@ -224,7 +206,7 @@ class MotionKitTestSupport {
     var robot = new SimulatedRobot("cnc-gantry", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
-    var cnc = new CncMachine("work", "x", "y", "z", 0.01,
+    var cnc = new MotionCncRig("work", "x", "y", "z", 0.01,
       null, 0.001);
     var binding = cncBinding(cnc, blueprint);
     var program = cncProgram(cnc,
@@ -254,7 +236,7 @@ class MotionKitTestSupport {
             (q[1] - 0.01) * (q[1] - 0.01)),
           Math.sqrt((q[0] - 0.02) * (q[0] - 0.02) +
             (q[1] - 0.02) * (q[1] - 0.02)));
-      check(Math.min(lineError, arcError) <= cnc.positionTolerance + 1e-5,
+      check(Math.min(lineError, arcError) <= cnc.binding.positionTolerance + 1e-5,
         "CNC recorded position stays on the authored rapid or arc");
       if (!holdIssued && !linkCut && q[0] > 0.0105 && q[1] > 0.0101) {
         if (linkLoss) {
@@ -289,8 +271,8 @@ class MotionKitTestSupport {
         if (quiet >= 20) break;
       }
       check(quiet >= 20, "CNC link loss reaches a controlled stop");
-      check(previous[0] <= 0.02 + cnc.positionTolerance &&
-        previous[1] <= 0.02 + cnc.positionTolerance,
+      check(previous[0] <= 0.02 + cnc.binding.positionTolerance &&
+        previous[1] <= 0.02 + cnc.binding.positionTolerance,
         "CNC link-loss stop stays within the programmed axis bounds");
       simulationHarness.dispose();
       return trace;

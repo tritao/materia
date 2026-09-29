@@ -1,6 +1,5 @@
 import haxe.Int64;
 import haxe.io.Bytes;
-import cnckit.CncMachine;
 import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
 import cadkit.modeling.AssemblyModel;
@@ -671,7 +670,7 @@ class PlannerTests extends MotionKitTestSupport {
         new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 200), 0.1, 0.4);
       var binding = MotionKitTestSupport.cncBinding(
-        new CncMachine("work", "x", "y", "z", 0.08), blueprint);
+        new MotionCncRig("work", "x", "y", "z", 0.08), blueprint);
       var primitive = new toolpathkit.motion.ToolpathPosePrimitive(circular, 0.05, 0.0005, 0.02);
       var path = new PosePath("work", [primitive]).withAuthoredGeometry(authored, 0.001);
       var compiled = binding.compiler.compile(new MotionProgram([

@@ -1,7 +1,5 @@
-import cnckit.CncCompiler;
 import cnckit.CncWriter;
 import CncTestCompiler.CncTestCompileResult;
-import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import cnckit.CncDialect;
 import cnckit.CncDiagnostic.CncSeverity;
@@ -12,6 +10,8 @@ import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.setup.Setup;
+import toolpathkit.setup.SetupStock;
+import toolpathkit.path.ToolpathProgram;
 import motionkit.path.ArcSegment;
 import motionkit.path.CircularSegment;
 import motionkit.program.MotionOp;
@@ -27,7 +27,7 @@ class CncKitTests {
       ?tolerance:Float = 1e-9):Void
     check(Math.abs(actual - expected) <= tolerance,
       '$message: expected $expected, got $actual');
-  static function rejects(machine:CncMachine, source:String, expected:String):Void {
+  static function rejects(machine:CncTestRig, source:String, expected:String):Void {
     var error = "";
     try new CncTestCompiler(machine).compile(source)
     catch (caught:Dynamic) error = Std.string(caught);
@@ -42,7 +42,7 @@ class CncKitTests {
   }
 
   public static function main():Void {
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CncTestRig("work", "x", "y", "z", 0.2);
     machine.controller.setWorkOffset(54, 0.1, 0.2, 0.0);
     machine.controller.setToolLength(2, 0.012);
     var source = "G21 G90 G54 G17\nS12000 M3\nG0 X0 Y0 Z10\nF600 G1 Z0\n" +
@@ -61,21 +61,25 @@ class CncKitTests {
       "G54 applies X offset");
     near(firstPath.poseAt(firstPath.length()).z, 0.01,
       "G0 Z mm converts to metres");
-    var switchingMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var switchingMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     switchingMachine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
     switchingMachine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
-    var switched = new CncCompiler(switchingMachine).compileDetailed(
+    var switched = switchingMachine.compileDetailed(
       "G21 G90 G54 G0 X10\nG55 G0 X10\nM2");
     check(switched.diagnostics.length == 0, "G54/G55 compile without errors");
-    check(switch switched.ops[0] {
+    near(switched.program.setups[0].workOrigin.x, 0.1,
+      "G54 setup position comes from the controller");
+    near(switched.program.setups[1].workOrigin.x, 0.2,
+      "G55 setup position comes from the controller");
+    check(switch switched.program.ops[0] {
       case ToolpathOp.SetSetup("1", _): true;
       case _: false;
     }, "G54 selects setup one");
-    check(switch switched.ops[2] {
+    check(switch switched.program.ops[2] {
       case ToolpathOp.SetSetup("2", _): true;
       case _: false;
     }, "G55 selects setup two");
-    var switchedWork = switch switched.ops[3] {
+    var switchedWork = switch switched.program.ops[3] {
       case ToolpathOp.Move(Rapid, PathGeometry.Line(_, end), _, _, _): end;
       case _: throw "G55 work move missing";
     };
@@ -194,7 +198,7 @@ class CncKitTests {
     check(partialCompiler.warnings[0].indexOf("G-code line 3") >= 0,
       "blend warning names the corner line");
     check(partial.ops.length == 1, "fallback keeps the combined path");
-    var strictMachine = new CncMachine("work", "x", "y", "z", 0.2,
+    var strictMachine = new CncTestRig("work", "x", "y", "z", 0.2,
       null, 0.0005, 0.02, CncDialect.LinuxCnc, 0.5);
     var strictCompiler = new CncTestCompiler(strictMachine);
     strictCompiler.compile("G21 G64 P1 F600 G1 X10\nG1 Y10\nM2");
@@ -208,7 +212,7 @@ class CncKitTests {
     };
     near(circlePath.length(), 2 * Math.PI * 0.01,
       "G2 full circle circumference", 1e-7);
-    var arcMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var arcMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     var cw = new CncTestCompiler(arcMachine).compile(
       "G21 G91 F600 G2 X10 I5 J0\nM2");
     var ccw = new CncTestCompiler(arcMachine).compile(
@@ -302,7 +306,7 @@ class CncKitTests {
     };
     near(recoveredFeed, 0.01,
       "failed block does not commit its feed change");
-    var fixtureMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var fixtureMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     fixtureMachine.controller.setToolLength(1, 0.0);
     fixtureMachine.controller.setToolLength(11, 0.0);
     fixture("freecad-pocket.ngc", fixtureMachine);
@@ -480,7 +484,7 @@ class CncKitTests {
       case ToolpathOp.Coolant(_, false, _): true;
       case _: false;
     }, "M2 also turns off active coolant");
-    var compensatedMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var compensatedMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     compensatedMachine.toolLibrary.set(new Tool(2, 0.012, 0.002));
     var compUnsupported = new CncTestCompiler(compensatedMachine).compileDetailed(
       "G21 G90 F600 T2 M6\nG0 X0 Y0\nG41 D2 G1 X5\nG1 Y5\n" +
@@ -584,7 +588,7 @@ class CncKitTests {
     rejects(compensatedMachine,
       "G21 F600 G41 D3 G1 X30\nG3 X40 Y10 I0 J10\nG40 G1 X40 Y40\nM2",
       "gouges arc radius");
-    var travelMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var travelMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     travelMachine.setTravelEnvelope([0.0, 0.0, 0.0], [0.02, 0.02, 0.02]);
     var travelResult = new CncTestCompiler(travelMachine).compileDetailed(
       "G21 G0 X25\nG0 X10\nM2");
@@ -598,7 +602,7 @@ class CncKitTests {
   }
 
   static function writerRoundTrip():Void {
-    var machine = new CncMachine("work", "x", "y", "z", 0.2,
+    var machine = new CncTestRig("work", "x", "y", "z", 0.2,
       [0.0, 0.0, 0.01]);
     machine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
     machine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
@@ -629,18 +633,20 @@ class CncKitTests {
       ToolpathOp.Spindle(Off, 0.0, p),
       ToolpathOp.End(p)
     ];
-    var setup = new Setup(-0.2, 0.2, -0.1, 0.1,
-      0.0, -0.01, 0.005);
-    var gcode = CncWriter.write(authored, setup, machine);
+    var setup = new Setup("1", new Point3(0.1, 0, 0),
+      new SetupStock(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005));
+    var secondSetup = new Setup("2", new Point3(0.2, 0, 0));
+    var gcode = CncWriter.write(new ToolpathProgram(authored,
+      machine.toolLibrary, [setup, secondSetup]), machine.controller);
     check(gcode.indexOf("G54") >= 0 && gcode.indexOf("G55") >= 0 &&
       gcode.indexOf("G64 P0.2") >= 0 && gcode.split("G61").length == 3,
       "writer maps setups and per-move tolerance to LinuxCNC");
-    var back = new CncCompiler(machine).compileDetailed(gcode);
+    var back = machine.compileDetailed(gcode);
     check(back.diagnostics.length == 0,
       'hand-built toolpath recompiles: ${back.diagnostics}');
-    check(back.ops.length == authored.length,
+    check(back.program.ops.length == authored.length,
       "hand-built round trip keeps operation count");
-    for (index in 0...authored.length) switch [authored[index], back.ops[index]] {
+    for (index in 0...authored.length) switch [authored[index], back.program.ops[index]] {
       case [ToolpathOp.SetSetup(a, _), ToolpathOp.SetSetup(b, _)]:
         check(a == b, 'setup $index');
       case [ToolpathOp.Move(_, a, feedA, toleranceA, _),
@@ -666,23 +672,26 @@ class CncKitTests {
       case _: check(false, 'operation $index round trip');
     }
     var rejected = false;
-    try CncWriter.write([ToolpathOp.SetSetup("fixture-only", p)], setup, machine)
+    try CncWriter.write(new ToolpathProgram([ToolpathOp.SetSetup("fixture-only", p)],
+      machine.toolLibrary, [new Setup("fixture-only", new Point3(0, 0, 0))]),
+      machine.controller)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("cannot map setup") >= 0;
     check(rejected, "writer rejects setups without a controller mapping");
     rejected = false;
-    try CncWriter.write([ToolpathOp.MachineMove(Cut,
+    try CncWriter.write(new ToolpathProgram([ToolpathOp.MachineMove(Cut,
       PathGeometry.Arc(new Point3(0.02, 0.005, 0.01), 0.005,
-        -Math.PI / 2, Math.PI / 2), 0.01, 0.0, p)], setup, machine)
+        -Math.PI / 2, Math.PI / 2), 0.01, 0.0, p)], machine.toolLibrary,
+      [setup]), machine.controller)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("line for machine move") >= 0;
     check(rejected, "writer rejects machine arcs it cannot express");
     rejected = false;
-    try CncWriter.write([ToolpathOp.ToolLengthOffset(1, 0.001, p)],
-      setup, machine)
+    try CncWriter.write(new ToolpathProgram([ToolpathOp.ToolLengthOffset(1, 0.001, p)],
+      machine.toolLibrary, [setup]), machine.controller)
     catch (error:Dynamic) rejected = Std.string(error).indexOf("disagrees") >= 0;
     check(rejected, "writer rejects a mismatched H tool length");
   }
 
-  static function fixture(name:String, machine:CncMachine):Void {
+  static function fixture(name:String, machine:CncTestRig):Void {
     var result = new CncTestCompiler(machine).compileDetailed(
       File.getContent('fixtures/$name'));
     check(result.diagnostics.length == 0, '$name diagnostics: ${result.diagnostics}');

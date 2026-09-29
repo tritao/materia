@@ -18,7 +18,8 @@ class CutMoves {
   public static function fromProgram(program:ToolpathProgram,
       ?workOrigin:Point3):Array<CutMove> {
     var ops = program.ops;
-    var origin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
+    var stockOrigin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
+    var origin = program.setups[0].workOrigin;
     var moves:Array<CutMove> = [];
     var tool:Null<Tool> = null;
     var toolLength = 0.0;
@@ -29,8 +30,9 @@ class CutMoves {
         toolLength = length;
       case Move(kind, geometry, _, _, provenance):
         if (tool != null) moves.push(new CutMove(tool,
-          Path(shift(geometry, origin, toolLength)), kind, index, provenance));
-      case SetSetup(_, _):
+          Path(shift(geometry, origin, stockOrigin, toolLength)), kind, index, provenance));
+      case SetSetup(id, _):
+        for (setup in program.setups) if (setup.id == id) origin = setup.workOrigin;
       case MachineMove(Rapid, _, _, _, _),
           MachineMove(Link, _, _, _, _),
           MachineMove(Retract, _, _, _, _):
@@ -43,11 +45,12 @@ class CutMoves {
     return moves;
   }
 
-  static function shift(geometry:PathGeometry, origin:Point3,
+  static function shift(geometry:PathGeometry, origin:Point3, stockOrigin:Point3,
       toolLength:Float):PathGeometry {
     function at(point:Point3):Point3
-      return new Point3(point.x - origin.x, point.y - origin.y,
-        point.z - origin.z - toolLength);
+      return new Point3(point.x + origin.x - stockOrigin.x,
+        point.y + origin.y - stockOrigin.y,
+        point.z + origin.z - stockOrigin.z - toolLength);
     return switch geometry {
       case Line(start, end): Line(at(start), at(end));
       case Arc(center, radius, startAngle, sweep):

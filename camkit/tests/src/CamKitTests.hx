@@ -2,7 +2,6 @@ import camkit.CamContour;
 
 import toolpathkit.path.MoveKind;import cnckit.CncWriter;
 import camkit.CamJob;
-import camkit.CamProgram;
 import camkit.CamSheetProfiles;
 import cadkit.modeling.Sketch;
 import cadkit.modeling.Vector;
@@ -11,7 +10,6 @@ import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
 import cadkit.sketch.SketchPoint;
 import cnckit.CncCompiler;
-import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
@@ -19,6 +17,9 @@ import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.setup.Setup;
+import toolpathkit.setup.SetupStock;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.tool.ToolLibrary;
 
 class CamKitTests {
   static var assertions = 0;
@@ -131,12 +132,12 @@ class CamKitTests {
       .pocket(concave, tool, -0.001, 0.01, 0.001)
       .finish().ops.length > 0,
       "concave pocket clearing generates cutter passes");
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CamTestRig();
     machine.toolLibrary.set(tool);
     var lowered = CamTestLowering.lower(program, machine);
     check(lowered.diagnostics.length == 0 && lowered.program != null,
       "CAM IR lowers directly to executable MotionKit paths");
-    var tight = new CncMachine("work", "x", "y", "z", 0.2);
+    var tight = new CamTestRig();
     tight.setTravelEnvelope([0.0, 0.0, -0.01], [0.02, 0.02, 0.01]);
     var travelMessage = "";
     try CamTestLowering.lower(program, tight)
@@ -152,34 +153,33 @@ class CamKitTests {
     }
     check(hasProfileSpan && hasPocketSpan && hasDrillSpan,
       "CAM source map identifies each authored operation");
-    var gcode = CncWriter.write(program.ops, CamTestSetup.standard(), machine);
-    var parsed = new CncCompiler(machine).compileDetailed(gcode);
+    var gcode = machine.export(program, CamTestSetup.standard());
+    var parsed = machine.compileDetailed(gcode);
     check(parsed.diagnostics.length == 0,
       'CAM G-code recompiles: ${parsed.diagnostics}');
-    check(parsed.ops.length == program.ops.length,
+    check(parsed.program.ops.length == program.ops.length,
       "CAM round trip keeps the operation count");
     for (index in 0...program.ops.length)
-      equalOp(program.ops[index], parsed.ops[index], index);
+      equalOp(program.ops[index], parsed.program.ops[index], index);
     var cadProgram = new CamJob(0.005, 12000.0)
       .profile(fromFace, tool, -0.002, 0.01).finish();
-    var cadCode = CncWriter.write(cadProgram.ops,
-      CamTestSetup.standard(), machine);
-    var cadBack = new CncCompiler(machine).compileDetailed(cadCode);
+    var cadCode = machine.export(cadProgram, CamTestSetup.standard());
+    var cadBack = machine.compileDetailed(cadCode);
     check(cadBack.diagnostics.length == 0,
       'CAD-to-CAM round trip recompiles: ${cadBack.diagnostics}');
-    check(cadBack.ops.length == cadProgram.ops.length,
+    check(cadBack.program.ops.length == cadProgram.ops.length,
       "CAD-to-CAM round trip keeps operation count");
     for (index in 0...cadProgram.ops.length)
-      equalOp(cadProgram.ops[index], cadBack.ops[index], index);
+      equalOp(cadProgram.ops[index], cadBack.program.ops[index], index);
     check(gcode.indexOf("T2 M6") >= 0 &&
       gcode.indexOf("S12000 M3") >= 0 && gcode.indexOf("M5") >= 0 &&
       gcode.indexOf("M2") >= 0,
       "LinuxCNC export includes tool, spindle, and program commands");
-    var switchMachine = new CncMachine("work", "x", "y", "z", 0.2);
+    var switchMachine = new CamTestRig();
     switchMachine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
     switchMachine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
     var source = Provenance.cam(99);
-    var switchedProgram = new CamProgram([
+    var switchedProgram = new ToolpathProgram([
       ToolpathOp.SetSetup("1", source),
       ToolpathOp.Move(Rapid, PathGeometry.Line(
         new Point3(0.0, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
@@ -189,17 +189,19 @@ class CamKitTests {
         new Point3(-0.09, 0.0, 0.01), new Point3(0.01, 0.0, 0.01)),
         0.0, 0.0, source),
       ToolpathOp.End(source)
-    ]);
-    var switchCode = CncWriter.write(switchedProgram.ops,
-      new Setup(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005), switchMachine);
+    ], new ToolLibrary(), [new Setup("1", new Point3(0.1, 0, 0)),
+      new Setup("2", new Point3(0.2, 0, 0))]);
+    var switchCode = switchMachine.export(switchedProgram,
+      new Setup("1", new Point3(0.1, 0, 0),
+      new SetupStock(-0.2, 0.2, -0.1, 0.1, 0.0, -0.01, 0.005)));
     check(switchCode.indexOf("G54") >= 0 && switchCode.indexOf("G55") >= 0,
       "setup switches write G54 and G55");
-    var switchedBack = new CncCompiler(switchMachine).compileDetailed(switchCode);
+    var switchedBack = switchMachine.compileDetailed(switchCode);
     check(switchedBack.diagnostics.length == 0,
       'G54/G55 round trip recompiles: ${switchedBack.diagnostics}');
     var setupIds:Array<String> = [];
     var lastWorkX = 0.0;
-    for (op in switchedBack.ops) switch op {
+    for (op in switchedBack.program.ops) switch op {
       case ToolpathOp.SetSetup(id, _): setupIds.push(id);
       case ToolpathOp.Move(_, PathGeometry.Line(_, end), _, _, _):
         lastWorkX = end.x;

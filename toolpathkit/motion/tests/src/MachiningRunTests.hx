@@ -22,8 +22,11 @@ import toolpathkit.path.Point3;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;
+import toolpathkit.setup.SetupStock;
 import toolpathkit.tool.Tool;
+import toolpathkit.tool.ToolLibrary;
 
 class MachiningRunTests {
   public static function run():Void {
@@ -49,11 +52,11 @@ class MachiningRunTests {
       new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
       new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)
     ]);
-    var setup = new Setup(0.0, 0.02, 0.0, 0.02,
-      0.01, 0.008, 0.014);
+    var setup = new Setup("1", new Point3(0, 0, 0),
+      new SetupStock(0.0, 0.02, 0.0, 0.02, 0.01, 0.008, 0.014));
     var cam = new CamJob(0.014, 12000).pocket(contour,
       new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(setup);
-    var baseline = ToolpathMotion.lower(cam.ops, binding);
+    var baseline = ToolpathMotion.lower(cam, binding);
     var controlledOps = cam.ops.copy();
     var firstMove = -1;
     for (index in 0...controlledOps.length) if (firstMove < 0)
@@ -66,7 +69,8 @@ class MachiningRunTests {
       ToolpathOp.Coolant(true, false, Provenance.cam(90)));
     controlledOps.insert(controlledOps.length - 2,
       ToolpathOp.Coolant(false, false, Provenance.cam(90)));
-    var lowered = ToolpathMotion.lower(controlledOps, binding);
+    var lowered = ToolpathMotion.lower(new ToolpathProgram(controlledOps,
+      cam.tools, cam.setups), binding);
     var program:MotionProgram = cast lowered.program;
     if (program == null) throw "CAM pocket did not lower";
     var baselineProgram:MotionProgram = cast baseline.program;
@@ -149,12 +153,12 @@ class MachiningRunTests {
     var position = robot.snapshot().positions;
     var start = new Point3(position.get(0), position.get(1), position.get(2));
     var finish = new Point3(start.x + 0.01, start.y, start.z);
-    var faultPath = ToolpathMotion.lower([
+    var faultPath = ToolpathMotion.lower(new ToolpathProgram([
       ToolpathOp.Spindle(Clockwise, 12000, Provenance.cam(91)),
       ToolpathOp.Coolant(true, false, Provenance.cam(91)),
       ToolpathOp.Move(Cut, PathGeometry.Line(start, finish),
         0.01, 0.0, Provenance.cam(91))
-    ], binding);
+    ], new ToolLibrary(), [setup]), binding);
     var faultRun = new MachiningRun(new MachiningRecipe(0.01),
       cast faultPath.program, motion);
     faultRun.start();

@@ -1,6 +1,5 @@
 import haxe.Int64;
 import haxe.io.Bytes;
-import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
@@ -511,7 +510,7 @@ class ProcessTests extends MotionKitTestSupport {
     check(physical.linkCollisionHulls.length == blueprint.model.links.length &&
       physical.linkCollisionHulls[0] == null && hasTenMillimetreVertex,
       "physical assembly passes upstream hulls in link order and SI units");
-    var cnc = new CncMachine("work", "x", "y", "z", 0.08);
+    var cnc = new MotionCncRig("work", "x", "y", "z", 0.08);
     var result = MotionKitTestSupport.compileCnc(MotionKitTestSupport.cncBinding(cnc, blueprint), cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
       [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(990));
@@ -604,9 +603,9 @@ class ProcessTests extends MotionKitTestSupport {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(
       new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 200), 0.1, 0.4);
-    var cnc = new CncMachine("work", "x", "y", "z", 0.08);
+    var cnc = new MotionCncRig("work", "x", "y", "z", 0.08);
     var binding = MotionKitTestSupport.cncBinding(cnc, blueprint);
-    check(cnc.travelLower != null && cnc.travelUpper != null,
+    check(cnc.binding.travel != null,
       "CNC binding derives a machine travel envelope");
     var travelError = "";
     try MotionKitTestSupport.compileCnc(binding, cnc, "G21 G0 X500\nM2\n", [0.0, 0.0, 0.0],
@@ -626,7 +625,7 @@ class ProcessTests extends MotionKitTestSupport {
     near(end[0], 0.01, "CNC arc ends at X", 1e-5);
     near(end[1], 0.02, "CNC arc ends at Y", 1e-5);
     result.dispose();
-    cnc.toolLibrary.set(new Tool(2, 0.0, 0.002));
+    cnc.controller.toolLibrary.set(new Tool(2, 0.0, 0.002));
     var compensated = MotionKitTestSupport.compileCnc(binding, cnc, "G21 G90 F600 G41 D2 G1 X10\n" +
       "G1 X20\nG1 X20 Y10\nG40 G1 X20 Y20\nM2\n",
       [0.0, 0.0, 0.0], Int64.ofInt(925));
