@@ -1,13 +1,20 @@
 package humankit.sim;
 
 import humankit.HumanBody;
+import humankit.HumanAction;
 import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanJob;
+import humankit.HumanJobSpec;
+import humankit.HumanJobBuilder;
+import humankit.HumanJobBuildResult;
+import humankit.Wait;
+import humankit.HumanJobTargets;
 import humankit.HumanLimb;
 import humankit.Pick;
 import humankit.Place;
 import nativekit.sim.SimFrame;
+import nativekit.sim.MotionType;
 import nativekit.sim.SimActor;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
@@ -53,6 +60,9 @@ class HumanWorker {
 	/** Parts in a hand, with their offset from the hand capsule. */
 	var held:Array<{object:SimObject, hand:HumanLimb, offset:SimPose}> = [];
 	var job:Null<HumanJob>;
+	var loopSpec:Null<HumanJobSpec>;
+	var loopTargets:Null<HumanJobTargets>;
+	var loopObjects:Null<Map<String, SimObject>>;
 	var bindings:Array<{action:Dynamic, object:SimObject, hand:HumanLimb, grasp:Array<Float>}> = [];
 	var links:Array<{id:String, pose:Void->SimPose, radius:Float}> = [];
 	var pending:Array<{time:Float, object:SimObject, hand:HumanLimb, kind:Int, carrier:Null<SimPose>,
@@ -93,8 +103,40 @@ class HumanWorker {
 		if (this.job != null && !this.job.isDone()) throw "Worker already has a running job";
 		job.bind(body);
 		this.job = job;
+		loopSpec = null;
 		lastAction = null;
 		lastGrip = false;
+	}
+
+	/** Resolves a document job and binds its dynamic parts to the session. */
+	public function runSpec(spec:HumanJobSpec, targets:HumanJobTargets, objectsById:Map<String, SimObject>):Void {
+		if (this.job != null && !this.job.isDone()) throw "Worker already has a running job";
+		bindings = [];
+		var built:HumanJobBuildResult;
+		try built = HumanJobBuilder.build(spec, targets, body) catch (error:Dynamic) {
+			var failed = new HumanJob(body).add(new Wait(1.0));
+			run(failed);
+			failed.abort('Cannot resolve job targets: $error');
+			return;
+		}
+		var seen:Array<HumanAction> = [];
+		var failure:Null<String> = null;
+		for (hold in built.holds) {
+			if (seen.indexOf(hold.action) >= 0) continue;
+			seen.push(hold.action);
+			var object = objectsById.get(hold.objectId);
+			if (object == null || object.motion != Dynamic) {
+				failure = 'Job object "${hold.objectId}" is missing or not a dynamic SimObject';
+				break;
+			}
+			if (Std.isOfType(hold.action, Pick)) bindPick(cast hold.action, object, hold.grasp, hold.hand);
+			else bindPlace(cast hold.action, object, hold.grasp, hold.hand);
+		}
+		run(built.job);
+		if (failure != null) built.job.abort(failure);
+		loopSpec = spec.loop && failure == null ? spec : null;
+		loopTargets = targets;
+		loopObjects = objectsById;
 	}
 
 	public function currentJobDone():Bool
@@ -125,6 +167,13 @@ class HumanWorker {
 	/** Call before stepping the session. Jobs and actor poses run three ticks ahead. */
 	public function advance():Void {
 		if (disposed) throw "Worker is disposed";
+		if (loopSpec != null && job != null && job.isDone()) {
+			if (job.failure() != null) loopSpec = null;
+			else {
+				var spec = loopSpec, targets = loopTargets, objects = loopObjects;
+				if (spec != null && targets != null && objects != null) runSpec(spec, targets, objects);
+			}
+		}
 		var now = session.simulationTime();
 		var dt = session.fixedTimestep();
 		flushPending(now + dt);

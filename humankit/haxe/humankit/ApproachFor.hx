@@ -17,14 +17,16 @@ class ApproachFor extends HumanActionBase {
 	public final target:Array<Float>;
 	public final limb:HumanLimb;
 	public final speed:Float;
+	public final bothHands:Bool;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
 
-	public function new(target:Array<Float>, limb:HumanLimb, speed:Float = 1.0) {
+	public function new(target:Array<Float>, limb:HumanLimb, speed:Float = 1.0, bothHands:Bool = false) {
 		super();
 		this.target = target.copy();
 		this.limb = limb;
 		this.speed = speed;
+		this.bothHands = bothHands;
 	}
 
 	override public function start(worker:HumanBody):Void {
@@ -51,8 +53,9 @@ class ApproachFor extends HumanActionBase {
 		var uy = distance > 1e-8 ? dy / distance : root[1];
 		// Stand so the shoulder (model +X forward, +Y left of the root) sits
 		// `ahead` metres behind the target along the facing direction.
-		var standX = target[0] - ux * (ahead + shoulder[0]) + uy * shoulder[1];
-		var standY = target[1] - uy * (ahead + shoulder[0]) - ux * shoulder[1];
+		var lateral = bothHands ? 0.0 : shoulder[1];
+		var standX = target[0] - ux * (ahead + shoulder[0]) + uy * lateral;
+		var standY = target[1] - uy * (ahead + shoulder[0]) - ux * lateral;
 		faceAngle = Math.atan2(uy, ux);
 		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005)
 			worker.walker.continueAlong([[root[12], root[13]], [standX, standY]], speed);

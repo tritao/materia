@@ -105,6 +105,7 @@ class HumanJobSpec {
       normalized.push(clean);
       index++;
     }
+    if (loop && normalized.length == 0) throw "A looping job needs at least one step";
     return new HumanJobSpec(loop, normalized);
   }
 

@@ -3,6 +3,7 @@ import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanJob;
+import humankit.HumanJobSpec;
 import humankit.HumanBone;
 import humankit.HumanoidRig;
 import humankit.Pick;
@@ -51,18 +52,18 @@ class HumanSimTests {
         session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05),
             new SimPose(partStart[0], partStart[1], surface - 0.05));
         session.createObject(MotionType.Static, SimShape.box(4.0, 4.0, 0.1), new SimPose(0.0, 0.0, -0.05));
-        var pickPoint = [partStart[0], partStart[1], surface + 2 * partHalf + 0.01];
-        var pick = new Pick(pickPoint, [ArmR], 0.3);
         var placePoint = [partStart[0] + 1.0, partStart[1], surface + partHalf];
-        session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05),
+        var table = session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05),
             new SimPose(placePoint[0], placePoint[1], surface - 0.05));
-        var place = new Place(placePoint, [ArmR], 0.35);
-        var job = new HumanJob().add(new ApproachFor(pickPoint, ArmR)).add(pick)
-            .add(new ApproachFor(placePoint, ArmR)).add(place)
-            .add(new WalkTo([0.3, 0.0], 1.0));
-        worker.bindPick(pick, part, pickPoint);
-        worker.bindPlace(place, part, placePoint);
-        worker.run(job);
+        var targets = new JobTargets();
+        targets.boxes.set("part", {center: partStart.copy(), halfExtents: [partHalf, partHalf, partHalf], yaw: 0.0});
+        targets.boxes.set("table", {center: [placePoint[0], placePoint[1], surface - 0.05],
+            halfExtents: [0.2, 0.2, 0.05], yaw: 0.0});
+        var objectsById:Map<String, nativekit.sim.SimObject> = new Map();
+        objectsById.set("part", part);
+        objectsById.set("table", table);
+        var spec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"},{"action":"place","onto":"table"}]}');
+        worker.runSpec(spec, targets, objectsById);
         var noCarrier = session.objectCarrier(part);
         var sawHold = false, sawRelease = false;
         var beforeRelease:Null<SimPose> = null;
@@ -78,7 +79,7 @@ class HumanSimTests {
                 Math.pow(currentPose.y - partStart[1], 2) + Math.pow(currentPose.z - partStart[2], 2)) > 0.01)
                 throw 'The reach disturbed the part before the grip at tick $tick: ${currentPose.x}, ${currentPose.y}, ${currentPose.z}';
             if (carrier != noCarrier) sawHold = true;
-            if (job.currentAction() == place && carrier != noCarrier && beforeRelease != null) {
+            if (sawHold && carrier != noCarrier && beforeRelease != null) {
                 var moving = Math.sqrt(Math.pow(currentPose.x - beforeRelease.x, 2) +
                     Math.pow(currentPose.y - beforeRelease.y, 2) +
                     Math.pow(currentPose.z - beforeRelease.z, 2));
@@ -93,7 +94,7 @@ class HumanSimTests {
                 if (jump > 0.05) throw 'Part jumped away from the hand on release: $jump';
             }
             beforeRelease = currentPose;
-            if (job.isDone()) break;
+            if (worker.currentJobDone()) break;
         }
         var finalPose:SimPose = null;
         var speed = Math.POSITIVE_INFINITY;
@@ -118,8 +119,8 @@ class HumanSimTests {
             finalPose = current;
         }
         if (!sawHold || !sawRelease || samples == 0 || !seenStart || !leftStart ||
-            job.failure() != null || !job.isDone())
-            throw 'Worker did not complete job or zone transitions: ${job.failure()} samples=$samples start=$seenStart left=$leftStart';
+            worker.currentJobFailure() != null || !worker.currentJobDone())
+            throw 'Worker did not complete job or zone transitions: ${worker.currentJobFailure()} samples=$samples start=$seenStart left=$leftStart';
         var horizontal = Math.sqrt(Math.pow(finalPose.x - placePoint[0], 2) +
             Math.pow(finalPose.y - placePoint[1], 2));
         var vertical = Math.abs(finalPose.z - placePoint[2]);
@@ -127,8 +128,8 @@ class HumanSimTests {
         var tilt = 2 * Math.asin(Math.min(1.0, Math.sqrt(finalPose.qx * finalPose.qx + finalPose.qy * finalPose.qy)));
         if (tilt > 0.035) throw 'Placed part rests tilted by $tilt rad';
         if (horizontal > 0.02 || vertical > 0.01 || speed > 0.001)
-            throw 'Placed part missed target: horizontal=$horizontal vertical=$vertical speed=$speed residual=${place.placementError} pose=${finalPose.x}, ${finalPose.y}, ${finalPose.z}';
-        Sys.println('human sim placement: pick=${pick.pickError} horizontal=$horizontal vertical=$vertical speed=$speed residual=${place.placementError}');
+            throw 'Placed part missed target: horizontal=$horizontal vertical=$vertical speed=$speed pose=${finalPose.x}, ${finalPose.y}, ${finalPose.z}';
+        Sys.println('human sim placement: horizontal=$horizontal vertical=$vertical speed=$speed');
         var now = session.simulationTime();
         robot.pushKeyframe(now, [new SimPose(3.0, 0.0, 1.5)]);
         robot.pushKeyframe(now + 0.5, [new SimPose(2.0, 0.0, 1.5)]);
@@ -151,6 +152,69 @@ class HumanSimTests {
         human.dispose();
         scene.dispose();
         releaseMidWalk(asset, rig);
+        bothHands(asset, rig);
+    }
+
+    static function bothHands(asset:AnimationAsset, rig:HumanoidRig):Void {
+        var scene = Scene.create();
+        var world = MujocoSimWorld.create(scene, {timestep: 1.0 / 60.0, physicsSubsteps: 4,
+            gravity: [0.0, 0.0, -9.81]});
+        var session = new SimSession(scene, world.nativeHandle());
+        var human = new HumanCharacter(scene, asset, rig, null, "both hands worker");
+        human.advance(0.0);
+        var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
+        var worker = new HumanWorker(session, human, proxy, new SimPose(0, 0, 0));
+        var part = session.createObject(MotionType.Dynamic, SimShape.box(0.18, 0.08, 0.04),
+            new SimPose(0.9, 0.0, 1.10), 0.2);
+        session.createObject(MotionType.Static, SimShape.box(0.25, 0.25, 0.05), new SimPose(0.9, 0, 1.01));
+        var table = session.createObject(MotionType.Static, SimShape.box(0.3, 0.3, 0.05),
+            new SimPose(1.9, 0, 1.01));
+        session.createObject(MotionType.Static, SimShape.box(4, 4, 0.1), new SimPose(0, 0, -0.05));
+        var targets = new JobTargets();
+        targets.boxes.set("wide-part", {center: [0.9, 0, 1.10], halfExtents: [0.18, 0.08, 0.04], yaw: 0.0});
+        targets.boxes.set("table", {center: [1.9, 0, 1.01], halfExtents: [0.3, 0.3, 0.05], yaw: 0.0});
+        var objects:Map<String, nativekit.sim.SimObject> = new Map();
+        objects.set("wide-part", part);
+        objects.set("table", table);
+        var spec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"wide-part","hand":"both"},{"action":"place","onto":"table","hand":"both"}]}');
+        worker.runSpec(spec, targets, objects);
+        for (tick in 0...900) {
+            worker.advance();
+            session.step();
+            if (worker.currentJobDone()) break;
+        }
+        if (!worker.currentJobDone() || worker.currentJobFailure() != null)
+            throw 'Both-hands job failed: ${worker.currentJobFailure()}';
+        for (_ in 0...240) { worker.advance(); session.step(); }
+        var frame = session.capture();
+        var pose = frame.objectPose(part);
+        frame.dispose();
+        if (Math.abs(pose.x - 1.9) > 0.02 || Math.abs(pose.y) > 0.02 || Math.abs(pose.z - 1.10) > 0.01)
+            throw 'Both-hands part missed table: ${pose.x}, ${pose.y}, ${pose.z}';
+        objects.set("wide-part", table);
+        worker.runSpec(spec, targets, objects);
+        if (worker.currentJobFailure() == null || worker.currentJobFailure().indexOf("dynamic") < 0)
+            throw "A non-dynamic job object did not fail";
+        var missing = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"gone"}]}');
+        worker.runSpec(missing, targets, objects);
+        if (worker.currentJobFailure() == null || worker.currentJobFailure().indexOf("gone") < 0)
+            throw "An unresolved job object did not fail";
+        var loop = HumanJobSpec.parse('{"version":1,"loop":true,"steps":[{"action":"wait","seconds":0.5}]}');
+        worker.runSpec(loop, targets, objects);
+        for (tick in 0...100) {
+            worker.advance();
+            session.step();
+            if (worker.currentJobDone()) break;
+        }
+        if (!worker.currentJobDone() || worker.currentJobFailure() != null) throw "Loop's first pass failed";
+        worker.advance();
+        session.step();
+        if (worker.currentJobDone()) throw "Loop did not start its second pass";
+        worker.dispose();
+        session.dispose();
+        world.dispose();
+        human.dispose();
+        scene.dispose();
     }
 
     static function expectedSeparation(frame:SimFrame, worker:HumanWorker, point:SimPose, radius:Float):Float {
