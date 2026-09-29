@@ -47,4 +47,6 @@ local-Y axis convention when converting those records.
 Run the direct ProjectKit suite with
 `./haxeon/scripts/haxeon run --project=projectkit/tests/haxeon.json` from the
 repository root. It exercises units, assembly codecs and frames, scene artifact
-versions, and materials without loading a downstream kit.
+versions, and materials without loading a downstream kit or any native library.
+The suite currently has 50 assertions; keep it passing when changing the
+portable assembly or scene records consumed by other kits.
