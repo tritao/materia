@@ -1,6 +1,19 @@
 import animkit.AnimationAsset;
 import humankit.CapsulePlacement;
 import humankit.HumanBodyProxy;
+import humankit.HumanBody;
+import humankit.HumanJob;
+import humankit.HumanCarryPosture;
+import humankit.ApproachFor;
+import humankit.WalkTo;
+import humankit.Reach;
+import humankit.ReleaseLimb;
+import humankit.Pick;
+import humankit.Place;
+import humankit.Carry;
+import humankit.Press;
+import humankit.Wait;
+import humankit.PlayClip;
 import humankit.HumanBodyView;
 import humankit.HumanBone;
 import humankit.HumanCapsule;
@@ -84,6 +97,7 @@ class HumanKitTests {
 		reaching(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
 		reachTask(scene, worker, rig);
+		jobs(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
 	}
@@ -369,6 +383,94 @@ class HumanKitTests {
 		if (distance(released, target) < 0.02)
 			throw "The reach did not release cleanly; the wrist is still pinned to the target";
 		human.dispose();
+	}
+
+	/** World-space actions, persistent carry IK, failure, and cancellation. */
+	static function jobs(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "JobWorker");
+		var body = new HumanBody(human);
+		body.advance(0.0);
+		var shoulder = human.pose.bonePosition(HumanBone.UpperArmR);
+		var pickPoint = body.toWorld([shoulder[0] + 0.32, shoulder[1] - 0.03, shoulder[2] - 0.18]);
+		var approach = new ApproachFor(pickPoint, ArmR);
+		var pick = new Pick(pickPoint, [ArmR], 0.25);
+		var placePoint = [1.7, -0.15, pickPoint[2]];
+		var job = new HumanJob(body)
+			.add(approach)
+			.add(pick)
+			.add(new Carry(HumanCarryPosture.RightHand))
+			.add(new WalkTo([1.2, 0.0], 1.0))
+			.add(new Place(placePoint, [ArmR], 0.2))
+			.add(new Press(placePoint, ArmR, 0.1, 0.1))
+			.add(new Wait(0.05))
+			.add(new PlayClip("wave", 0.1));
+		var approached = false, picked = false, carried = false, advanced = false, fullSpeed = false;
+		var step = 1.0 / 60.0;
+		for (_ in 0...900) {
+			var before = body.rootTransform()[12];
+			job.advance(step);
+			if (!approached && job.currentIndex() > 0) {
+				approached = true;
+				var root = body.rootTransform();
+				var dx = pickPoint[0] - root[12], dy = pickPoint[1] - root[13];
+				var range = Math.sqrt(dx * dx + dy * dy);
+				var shoulderNow = body.toWorld(human.pose.bonePosition(HumanBone.UpperArmR));
+				var reachLength = body.description.upperArm + body.description.forearm;
+				if (distance(shoulderNow, pickPoint) > reachLength + 0.02 ||
+					(root[0] * dx + root[1] * dy) / range < 0.99)
+					throw 'Approach did not stand within reach facing the target: $root';
+			}
+			if (pick.grip && !picked && !body.isCarrying(ArmR)) {
+				picked = true;
+				var hand = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
+				if (distance(hand, pickPoint) > 0.02)
+					throw 'The pick hand missed its world target: $hand vs $pickPoint';
+			}
+			if (body.isCarrying(ArmR) && body.walker.isWalking()) {
+				carried = true;
+				var hand = human.pose.bonePosition(HumanBone.HandR);
+				if (distance(hand, body.carryTargetModel(ArmR)) > 0.03)
+					throw 'The carrying hand left its chest-relative pose: $hand';
+				var delta = body.rootTransform()[12] - before;
+				if (delta > 1e-4) advanced = true;
+				if (delta / step > 0.8 && delta / step < 1.1) fullSpeed = true;
+			}
+			if (job.isDone()) break;
+		}
+		if (!approached || !picked || !carried || !advanced || !fullSpeed || !job.isDone() ||
+			job.failure() != null || body.grip)
+			throw 'The action job did not finish physically: approach=$approached pick=$picked carry=$carried walk=$advanced failure=${job.failure()}';
+		body.setCarry([ArmL, ArmR]);
+		body.advance(0.0);
+		for (hand in [ArmL, ArmR]) {
+			var bone = hand == ArmL ? HumanBone.HandL : HumanBone.HandR;
+			if (distance(human.pose.bonePosition(bone), body.carryTargetModel(hand)) > 0.03)
+				throw 'Two-hand carry missed the $hand hand target';
+		}
+		human.dispose();
+
+		var unreachableHuman = new HumanCharacter(scene, asset, rig, null, "UnreachableWorker");
+		var unreachableBody = new HumanBody(unreachableHuman);
+		var unreachable = new HumanJob(unreachableBody).add(new ApproachFor([0.5, 0.0, 5.0], ArmR));
+		unreachable.advance(step);
+		var reason = unreachable.failure();
+		if (!unreachable.isDone() || reason == null || reason.indexOf("Action 0") < 0 ||
+			reason.indexOf("above reachable") < 0)
+			throw 'An unreachable approach did not explain its failure: ${unreachable.failure()}';
+		var tooLow = new HumanJob(unreachableBody).add(new ApproachFor([0.5, 0.0, 0.1], ArmR));
+		tooLow.advance(step);
+		var lowReason = tooLow.failure();
+		if (lowReason == null || lowReason.indexOf("below waist") < 0)
+			throw 'A low target did not explain its failure: $lowReason';
+		var cancel = new HumanJob(unreachableBody).add(new Reach(ArmR, [0.4, -0.2, 1.3], 0.1))
+			.add(new Wait(1.0)).add(new ReleaseLimb(ArmR, 0.1));
+		for (_ in 0...10) cancel.advance(step);
+		cancel.cancel();
+		unreachableBody.advance(0.0);
+		if (unreachableBody.reachWeight(ArmR) != 0.0 ||
+			unreachableBody.reachTargetWorld(ArmR) != null || unreachableBody.walker.isWalking())
+			throw "Cancelling a job left IK or walking active";
+		unreachableHuman.dispose();
 	}
 
 	static function distance(a:Array<Float>, b:Array<Float>):Float {
