@@ -148,7 +148,7 @@ class Main {
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
-          arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 &&
+          arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
@@ -164,7 +164,7 @@ class Main {
           "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] " +
           "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] " +
           "[--worker-demo=rack-to-table [--worker-demo-step=N]] " +
-          "[--example=ID[,ID...] [--example-settle=SECONDS]]");
+          "[--example=ID[,ID...] [--example-settle=SECONDS] [--example-play]]");
         return 2;
       }
 
@@ -191,6 +191,11 @@ class Main {
           ExampleCatalog.open(editor, entry);
           Sys.println('Opened example ${entry.id}: document "${editor.session.label()}", ' +
             '${editor.scene.records().length} scene records');
+          if (args.indexOf("--example-play") >= 0) {
+            if (!editor.simulation.rebuild(editor.sensors, editor.scene, editor.session))
+              Sys.println('Play rejected: ${editor.simulation.error}');
+            else editor.simulation.start();
+          }
           // Let a running simulation step, as the interactive editor does between frames.
           var until = Sys.time() + settleSeconds;
           while (Sys.time() < until) {
