@@ -5,6 +5,7 @@ import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import robotkit.model.RobotModel;
@@ -55,6 +56,8 @@ class AssemblySimulationBridge {
   public static function toRobotModel(definition:AssemblyDefinition,
       artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord):AssemblySimulationModel {
     AssemblyDefinitionCodec.validate(definition);
+    var sourceDefinition = definition;
+    definition = AssemblyDefinitionFlattener.flatten(definition);
     if (artifact == null || artifact.parts == null || artifact.metresPerUnit <= 0)
       throw "Assembly simulation needs a valid scene artifact";
     var scale = artifact.metresPerUnit;
@@ -94,7 +97,7 @@ class AssemblySimulationBridge {
       } else linkCollisionHulls.push(null);
     }
     var roots = AssemblyDefinitionCodec.rootOccurrences(definition);
-    var placement = new AssemblyState(definition, savedState);
+    var placement = new AssemblyState(sourceDefinition, savedState);
     for (occurrence in definition.occurrences) if (roots.exists(occurrence.id)) {
       var joint = model.addJoint(new Joint("root-" + occurrence.id, JointType.Fixed,
         root, links.get(occurrence.id)));

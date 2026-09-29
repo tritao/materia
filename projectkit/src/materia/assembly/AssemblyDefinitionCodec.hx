@@ -1,6 +1,7 @@
 package materia.assembly;
 
 import haxe.Json;
+import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
@@ -20,15 +21,26 @@ import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
 class AssemblyDefinitionCodec {
-	public static inline var VERSION:Int = 1;
+	public static inline var VERSION:Int = 2;
 
 	public static function encode(definition:AssemblyDefinition):String {
 		validate(definition);
-		return Json.stringify(definition);
+		return JsonWire.encode(definition);
 	}
 
 	public static function decode(text:String):AssemblyDefinition {
 		var raw:Dynamic = Json.parse(text);
+		if (!Reflect.hasField(raw, "schemaVersion")) {
+			var result:AssemblyDefinition = JsonWire.decode(text);
+			validate(result);
+			return result;
+		}
+		if (integerField(raw, "schemaVersion") != 1)
+			throw "Unsupported legacy assembly definition version";
+		return decodeLegacy(raw);
+	}
+
+	static function decodeLegacy(raw:Dynamic):AssemblyDefinition {
 		var definitions:Array<AssemblyComponentDefinition> = [];
 		for (item in arrayField(raw, "definitions")) {
 			var connectors:Array<AssemblyConnector> = [];
@@ -52,9 +64,10 @@ class AssemblyDefinitionCodec {
 					effort: optionalNumberField(limits, "effort")},
 				defaultValue: numberField(item, "defaultValue")});
 		}
-		var result:AssemblyDefinition = {schemaVersion: integerField(raw, "schemaVersion"),
+		var result:AssemblyDefinition = {schemaVersion: VERSION,
 			id: textField(raw, "id"), definitions: definitions, occurrences: occurrences, joints: joints};
-		result.lengthUnit = Reflect.hasField(raw, "lengthUnit") ? textField(raw, "lengthUnit") : "mm";
+		result.lengthUnit = Reflect.hasField(raw, "lengthUnit") && Reflect.field(raw, "lengthUnit") != null
+			? textField(raw, "lengthUnit") : "mm";
 		if (Reflect.hasField(raw, "couplings") && Reflect.field(raw, "couplings") != null) {
 			var couplings:Array<AssemblyJointCoupling> = [];
 			for (item in arrayField(raw, "couplings")) couplings.push({id: textField(item, "id"),
@@ -68,24 +81,39 @@ class AssemblyDefinitionCodec {
 
 	public static function encodeState(definition:AssemblyDefinition, state:AssemblyStateRecord):String {
 		validateState(definition, state);
-		return Json.stringify(state);
+		return JsonWire.encode(state);
 	}
 
 	public static function decodeState(definition:AssemblyDefinition, text:String):AssemblyStateRecord {
 		var raw:Dynamic = Json.parse(text);
+		if (!Reflect.hasField(raw, "schemaVersion")) {
+			var decoded:AssemblyStateRecord = JsonWire.decode(text);
+			validateState(definition, decoded);
+			return decoded;
+		}
+		if (integerField(raw, "schemaVersion") != 1)
+			throw "Unsupported legacy assembly state version";
 		var coordinates:Array<AssemblyJointCoordinate> = [];
 		for (item in arrayField(raw, "jointCoordinates"))
 			coordinates.push({joint: textField(item, "joint"), value: numberField(item, "value")});
 		var roots:Array<AssemblyRootPose> = [];
 		for (item in arrayField(raw, "rootPoses"))
 			roots.push({occurrence: textField(item, "occurrence"), pose: readFrame(field(item, "pose"))});
-		var state:AssemblyStateRecord = {schemaVersion: integerField(raw, "schemaVersion"),
+		var state:AssemblyStateRecord = {schemaVersion: VERSION,
 			definition: textField(raw, "definition"), jointCoordinates: coordinates, rootPoses: roots};
 		validateState(definition, state);
 		return state;
 	}
 
 	public static function validate(definition:AssemblyDefinition):Void {
+		if (definition != null && definition.assemblies != null && definition.assemblies.length > 0) {
+			validateFlat(AssemblyDefinitionFlattener.flatten(definition));
+			return;
+		}
+		validateFlat(definition);
+	}
+
+	static function validateFlat(definition:AssemblyDefinition):Void {
 		if (definition == null || definition.schemaVersion != VERSION || !validText(definition.id) ||
 			definition.definitions == null || definition.definitions.length == 0 ||
 			definition.definitions.length > 1000 || definition.occurrences == null ||
@@ -112,10 +140,18 @@ class AssemblyDefinitionCodec {
 		var occurrences = new Map<String, AssemblyComponentOccurrence>();
 		for (occurrence in definition.occurrences) {
 			if (occurrence == null || !validText(occurrence.id) || occurrences.exists(occurrence.id) ||
-				!definitions.exists(occurrence.definition))
+				occurrence.assembly != null || !definitions.exists(occurrence.definition))
 				throw "Assembly definition has an invalid or duplicate occurrence";
 			AssemblyCodec.validateFrame(occurrence.initialPose);
 			occurrences.set(occurrence.id, occurrence);
+		}
+		var exposedNames = new Map<String, Bool>();
+		if (definition.exposedConnectors != null) for (exposed in definition.exposedConnectors) {
+			var member = exposed == null ? null : occurrences.get(exposed.occurrence);
+			if (exposed == null || !validText(exposed.name) || exposedNames.exists(exposed.name) ||
+				member == null || !hasConnector(definitions.get(member.definition), exposed.connector))
+				throw "Assembly has an invalid or duplicate exposed connector";
+			exposedNames.set(exposed.name, true);
 		}
 
 		var joints = new Map<String, Bool>(), incoming = new Map<String, String>();
@@ -171,6 +207,8 @@ class AssemblyDefinitionCodec {
 
 	public static function validateState(definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
 		validate(definition);
+		state = AssemblyDefinitionFlattener.flattenState(definition, state);
+		definition = AssemblyDefinitionFlattener.flatten(definition);
 		if (state == null || state.schemaVersion != VERSION || state.definition != definition.id ||
 			state.jointCoordinates == null || state.rootPoses == null ||
 			state.jointCoordinates.length > definition.joints.length ||
@@ -238,6 +276,7 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function rootOccurrences(definition:AssemblyDefinition):Map<String, Bool> {
+		definition = AssemblyDefinitionFlattener.flatten(definition);
 		var hasParent = new Map<String, Bool>();
 		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) hasParent.set(joint.child, true);
 		var result = new Map<String, Bool>();

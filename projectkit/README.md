@@ -39,6 +39,15 @@ coordinates and root placements separately from the definition. Scene artifact
 version 6 can carry both payloads; geometry part IDs identify component
 definitions so repeated occurrences can share one geometry payload.
 
+Schema version 2 adds a reusable `assemblies` table. An occurrence selects a
+subassembly by setting `assembly` and `definition` to its table ID. Each entry
+can expose connectors from its members, including connectors passed through a
+deeper subassembly. `AssemblyDefinitionFlattener` prefixes nested IDs with the
+occurrence path and resolves exposed connectors before solving or simulation.
+Saved root poses may name a subassembly occurrence; flattening carries those
+poses to its leaf roots. Definitions and states use generated JSON wire codecs.
+The decoder upgrades version 1 flat JSON files and states.
+
 The legacy codec remains available for existing scene artifacts. Its joint
 records did not store tree-versus-closure roles or explicit axes; the
 `fromLegacy()` adapter uses a deterministic spanning tree and the historical

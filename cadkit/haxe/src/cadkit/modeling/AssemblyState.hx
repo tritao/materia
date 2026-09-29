@@ -11,6 +11,7 @@ import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -38,6 +39,8 @@ class AssemblyState {
 
 	public function new(definition:AssemblyDefinition, ?state:AssemblyStateRecord) {
 		AssemblyDefinitionCodec.validate(definition);
+		if (state != null) state = AssemblyDefinitionFlattener.flattenState(definition, state);
+		definition = AssemblyDefinitionFlattener.flatten(definition);
 		this.definition = definition;
 		for (component in definition.definitions) components.set(component.id, component);
 		for (occurrence in definition.occurrences) occurrences.set(occurrence.id, occurrence);

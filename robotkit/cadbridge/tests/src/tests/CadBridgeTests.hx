@@ -594,6 +594,19 @@ class CadBridgeTests {
     check(translated.linkCollisionHulls.length == translated.model.links.length &&
       hull != null && hull.length <= 64 * 3,
       "physical-part view supplies bounded hulls to the bridge");
+    var nestedDefinition = assembly.definition("bridge-nested");
+    nestedDefinition.occurrences[1].definition = "slider-sub";
+    nestedDefinition.occurrences[1].assembly = "slider-sub";
+    nestedDefinition.assemblies = [{id: "slider-sub",
+      definitions: [{id: "slider-part", connectors: nestedDefinition.definitions[1].connectors}],
+      occurrences: [{id: "body", definition: "slider-part", initialPose: AssemblyFrames.identity()}],
+      joints: [], exposedConnectors: [{name: "mount", occurrence: "body", connector: "mount"}]}];
+    parts.parts[1].id = "slider/slider-part";
+    var nestedModel = AssemblySimulationBridge.toRobotModel(nestedDefinition, parts);
+    check(nestedModel.model.links.length == translated.model.links.length &&
+      nestedModel.model.joints.length == translated.model.joints.length &&
+      nestedModel.model.links[2].name == "slider/body",
+      "nested assembly flattens before RobotKit translation");
   }
 
   /**
