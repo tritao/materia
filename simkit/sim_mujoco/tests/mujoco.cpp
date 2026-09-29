@@ -1396,9 +1396,17 @@ void distant_kinematic_pairs_skip_distance_calls() {
     nksim_shape shape = 0;
     assert(nksim_shape_create_box(world, half, &shape) == NKSIM_OK);
     assert(nksim_shape_set_contact(world, shape, 0.0, 0.03) == NKSIM_OK);
-    for (int index = 0; index < 16; ++index)
-        make_body(world, make_node_xyz(scene, 100.0 + index * 10.0, 0.0, 0.0),
-            NKSIM_MOTION_KINEMATIC, 1.0, shape);
+    nksim_shape tool_pieces[16]{};
+    nksim_shape_pose tool_poses[16]{};
+    for (int index = 0; index < 16; ++index) {
+        tool_pieces[index] = shape;
+        tool_poses[index].position[0] = 100.0 + index * 10.0;
+        tool_poses[index].rotation[3] = 1.0;
+    }
+    nksim_shape tool = 0;
+    assert(nksim_shape_create_compound(world, tool_pieces, tool_poses, 16, &tool) == NKSIM_OK);
+    make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
+        NKSIM_MOTION_KINEMATIC, 1.0, tool);
     for (int index = 0; index < 50; ++index)
         make_body(world, make_node_xyz(scene, 1000.0 + index * 10.0, 0.0, 0.0),
             NKSIM_MOTION_STATIC, 0.0, shape);
