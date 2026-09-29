@@ -2,6 +2,7 @@
 
 #include "profile.hpp"
 
+#include <cstdint>
 #include <vector>
 
 namespace stockkit {
@@ -55,6 +56,16 @@ public:
     /** Swept intervals along the +Z ray through (x, y), sorted and disjoint. */
     void intersect_z(double x, double y, std::vector<Span> &out) const;
 
+    /**
+     * Swept intervals along the ray through (u, v) on `axis`, sorted and
+     * disjoint: Z rays run along +Z through (x, y) = (u, v), X rays along +X
+     * through (y, z) = (u, v) and Y rays along +Y through (x, z) = (u, v).
+     * At each height the tool is a disc, so a level move sweeps a 2D offset
+     * of its path (closed form); a plunge sweeps its widest section; ramps
+     * and helices scan and refine.
+     */
+    void intersect(uint32_t axis, double u, double v, std::vector<Span> &out) const;
+
 private:
     struct Range { double t0, t1; };
     struct Minimum { double value, t; const Piece *piece; };
@@ -66,6 +77,8 @@ private:
     Minimum minimise(const Run &run, double sigma, const Range &range, double x, double y) const;
     double closest(const Range &range, double x, double y) const;
     void normal_at(const Minimum &minimum, double sigma, double x, double y, float out[3]) const;
+
+    void intersect_horizontal(uint32_t axis, double across, double z, std::vector<Span> &out) const;
 
     const Profile &profile_;
     Motion motion_;

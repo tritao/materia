@@ -4,8 +4,19 @@ import toolpathkit.path.PathGeometry;
 import toolpathkit.tool.CutterProfile;
 import stockkit.CutMove;
 
-/** A closed interval of heights along a +Z ray, in metres. */
+/** A closed interval of positions along a ray, in metres. */
 typedef Span = {lo:Float, hi:Float};
+
+/**
+  The direction of a ray and how it is named: a `Z` ray runs along +Z at
+  (u, v) = (x, y), an `X` ray along +X at (u, v) = (y, z) and a `Y` ray along
+  +Y at (u, v) = (x, z). Spans are the ray's own coordinate (z, x or y).
+**/
+enum ReferenceAxis {
+  X;
+  Y;
+  Z;
+}
 
 /**
   Sets along a ray that bracket an unknown one: `inner` is certainly inside
@@ -17,8 +28,8 @@ typedef SpanBounds = {inner:Array<Span>, outer:Array<Span>};
 typedef ReferenceMove = {profile:CutterProfile, geometry:PathGeometry};
 
 /**
-  Brute-force reference for the material one move sweeps along a vertical ray,
-  for moves the exact OCCT oracle refuses (ramps, helices). It shares no code
+  Brute-force reference for the material one move sweeps along a ray, for
+  moves the exact OCCT oracle refuses (ramps, helices). It shares no code
   with the simulator core and bounds the answer instead of approximating it.
 
   The tool axis is +Z and the tool tip follows the path, whose parameter
@@ -33,10 +44,60 @@ typedef ReferenceMove = {profile:CutterProfile, geometry:PathGeometry};
     from its (radius, height) to the tool's full, mirrored cross-section, so
     each grown tool meets the ray in a set computed in closed form.
 
+  Vertical rays meet each tool in heights along a vertical line of the
+  section. Horizontal rays meet it in a chord of the horizontal disc at the
+  ray's height: radius R(h) for the tool and G(h) for the grown tool, where
+  G(h) is the widest point at height h within `rho` of the profile.
+
   Checks against these bounds are set containment, so a wrong reference can
   only raise a false alarm, never pass a wrong answer.
 **/
 class SampledReference {
+  /**
+    Bounds on the set of positions that `geometry` sweeps `profile` through
+    along the `axis` ray at (u, v); see `ReferenceAxis` for the naming.
+  **/
+  public static function sweepAlong(axis:ReferenceAxis, profile:CutterProfile,
+      geometry:PathGeometry, u:Float, v:Float, samples:Int):SpanBounds
+    return switch axis {
+      case Z: sweep(profile, geometry, u, v, samples);
+      case X: sweepHorizontal(profile, geometry, true, u, v, samples);
+      case Y: sweepHorizontal(profile, geometry, false, u, v, samples);
+    };
+
+  /**
+    Horizontal rays: along +X at (y, z) when `alongX`, else along +Y at
+    (x, z). At height h above the tip each pose is a disc of radius R(h),
+    and grown by `rho` a disc of radius G(h), about the pose's axis.
+  **/
+  static function sweepHorizontal(profile:CutterProfile, geometry:PathGeometry,
+      alongX:Bool, u:Float, v:Float, samples:Int):SpanBounds {
+    if (samples < 1) throw "sampled reference needs at least one sample step";
+    var path = new SampledPath(geometry);
+    var section = new Section(profile);
+    var rho = path.length / (2 * samples) * (1 + 1e-9);
+    var inner:Array<Span> = [], outer:Array<Span> = [];
+    for (i in 0...samples + 1) {
+      var t = i / samples;
+      var d = Math.abs(u - (alongX ? path.y(t) : path.x(t)));
+      if (d > section.reach + rho) continue;
+      var h = v - path.z(t);
+      var centre = alongX ? path.x(t) : path.y(t);
+      var radius = section.radius(h);
+      if (radius >= d) {
+        var half = Math.sqrt(radius * radius - d * d);
+        inner.push({lo: centre - half, hi: centre + half});
+        outer.push({lo: centre - half, hi: centre + half});
+      }
+      var grown = section.grown(h, rho);
+      if (grown >= d) {
+        var half = Math.sqrt(grown * grown - d * d);
+        outer.push({lo: centre - half, hi: centre + half});
+      }
+    }
+    return {inner: merge(inner), outer: merge(outer)};
+  }
+
   /** Bounds on the set of heights that `geometry` sweeps `profile` through along the ray at (x, y). */
   public static function sweep(profile:CutterProfile, geometry:PathGeometry,
       x:Float, y:Float, samples:Int):SpanBounds {
@@ -69,10 +130,15 @@ class SampledReference {
     remains.
   **/
   public static function remaining(initial:Array<Span>, moves:Array<ReferenceMove>,
-      x:Float, y:Float, samples:Int):SpanBounds {
+      x:Float, y:Float, samples:Int):SpanBounds
+    return remainingAlong(Z, initial, moves, x, y, samples);
+
+  /** `remaining` along the `axis` ray at (u, v); see `ReferenceAxis` for the naming. */
+  public static function remainingAlong(axis:ReferenceAxis, initial:Array<Span>,
+      moves:Array<ReferenceMove>, u:Float, v:Float, samples:Int):SpanBounds {
     var inner = merge(initial), outer = merge(initial);
     for (move in moves) {
-      var swept = sweep(move.profile, move.geometry, x, y, samples);
+      var swept = sweepAlong(axis, move.profile, move.geometry, u, v, samples);
       inner = subtract(inner, swept.outer);
       outer = subtract(outer, swept.inner);
     }
@@ -274,6 +340,97 @@ private class Section {
     return SampledReference.merge(spans);
   }
 
+  /**
+    The tool's radius R(h) at height `h` above the tip, the larger one at a
+    horizontal step, or -1 outside the tool's heights. Each segment gives its
+    widest point at that height; R is the widest of those.
+  **/
+  public function radius(h:Float):Float {
+    var widest = -1.0;
+    for (segment in profile.segments) switch segment {
+      case Line(r0, z0, r1, z1, _):
+        if (h < Math.min(z0, z1) || h > Math.max(z0, z1)) continue;
+        if (z1 == z0) widest = Math.max(widest, Math.max(r0, r1));
+        else widest = Math.max(widest, r0 + (r1 - r0) * (h - z0) / (z1 - z0));
+      case Arc(cr, cz, r0, z0, r1, z1, _):
+        if (h < Math.min(z0, z1) || h > Math.max(z0, z1)) continue;
+        var arc = ArcGeometry.of(cr, cz, r0, z0, r1, z1);
+        // Points cz + R sin(a) = h, on either side of the centre.
+        var a = Math.asin(Math.max(-1.0, Math.min(1.0, (h - cz) / arc.radius)));
+        for (angle in [a, Math.PI - a]) if (arc.covers(angle))
+          widest = Math.max(widest, cr + arc.radius * Math.cos(angle));
+    }
+    return widest;
+  }
+
+  /**
+    The radius G(h) of the tool grown by `rho` at height `h` above the tip, or
+    -1 where the grown tool does not reach. A point at radius r >= 0 is within
+    `rho` of the tool exactly when its (r, h) is within `rho` of the half
+    section {0 <= r' <= R(h')}; the widest such point at height h comes from
+    the profile curve, so G(h) is the widest point at height h of the union of
+    discs of radius `rho` centred on the profile, taken segment by segment,
+    and the grown tool at height h is the disc of radius G(h).
+  **/
+  public function grown(h:Float, rho:Float):Float {
+    var widest = -1.0;
+    for (segment in profile.segments) switch segment {
+      case Line(r0, z0, r1, z1, _):
+        // The profile allows a rounding-sized dip in height; order the ends.
+        widest = Math.max(widest, z0 <= z1 ? grownLine(r0, z0, r1, z1, h, rho)
+          : grownLine(r1, z1, r0, z0, h, rho));
+      case Arc(cr, cz, r0, z0, r1, z1, _):
+        widest = Math.max(widest, grownArc(ArcGeometry.of(cr, cz, r0, z0, r1, z1), cr, r0, z0,
+          r1, z1, h, rho));
+    }
+    return widest;
+  }
+
+  /**
+    Widest point at height `h` within `rho` of segment A-B with z0 <= z1:
+    the maximum over its heights z in reach of r(z) + sqrt(rho² - (z - h)²),
+    a linear plus a concave function of z, found where its slope vanishes and
+    clamped to the heights in reach.
+  **/
+  static function grownLine(r0:Float, z0:Float, r1:Float, z1:Float, h:Float,
+      rho:Float):Float {
+    var lo = Math.max(z0, h - rho), hi = Math.min(z1, h + rho);
+    if (lo > hi) return -1;
+    if (z1 == z0) return Math.max(r0, r1) + lift(rho, z0 - h);
+    var slope = (r1 - r0) / (z1 - z0);
+    // d/dz: slope - (z - h) / sqrt(rho² - (z - h)²) = 0.
+    var z = Math.max(lo, Math.min(hi, h + rho * slope / Math.sqrt(1 + slope * slope)));
+    return r0 + slope * (z - z0) + lift(rho, z - h);
+  }
+
+  /**
+    Widest point at height `h` within `rho` of a profile arc. That set is the
+    discs about the two ends and the points whose angle about the centre lies
+    in the arc's range and whose distance from the centre is within `rho` of
+    the arc radius; the latter is bounded by the circles of radius R ± rho
+    and radial pieces that lie inside the end discs. So the widest point is
+    an end disc's, or a crossing of the line with one of those circles at an
+    angle in range.
+  **/
+  static function grownArc(arc:ArcGeometry, cr:Float, r0:Float, z0:Float, r1:Float,
+      z1:Float, h:Float, rho:Float):Float {
+    var widest = -1.0;
+    if (Math.abs(z0 - h) <= rho) widest = Math.max(widest, r0 + lift(rho, z0 - h));
+    if (Math.abs(z1 - h) <= rho) widest = Math.max(widest, r1 + lift(rho, z1 - h));
+    var dz = h - arc.cz;
+    for (circle in [arc.radius + rho, arc.radius - rho]) {
+      if (circle <= 0 || Math.abs(dz) > circle) continue;
+      var dr = Math.sqrt(circle * circle - dz * dz);
+      for (side in [dr, -dr]) if (arc.covers(Math.atan2(dz, side)))
+        widest = Math.max(widest, cr + side);
+    }
+    return widest;
+  }
+
+  /** sqrt(rho² - dz²), zero where rounding takes it below. */
+  static function lift(rho:Float, dz:Float):Float
+    return Math.sqrt(Math.max(0.0, rho * rho - dz * dz));
+
   /** The rho-neighbourhood of segment A-B, on the line r = d. */
   static function capsule(ar:Float, az:Float, br:Float, bz:Float, d:Float,
       rho:Float, spans:Array<Span>):Void {
@@ -377,6 +534,15 @@ private class ArcGeometry {
     var radius = Math.sqrt((r0 - cr) * (r0 - cr) + (z0 - cz) * (z0 - cz));
     return new ArcGeometry(cz, radius, Math.min(start, start + sweep),
       Math.max(start, start + sweep));
+  }
+
+  /** True when angle `a`, taken modulo a turn, lies in [low, high]. */
+  public function covers(a:Float):Bool {
+    for (turn in -2...3) {
+      var turned = a + 2 * Math.PI * turn;
+      if (turned >= low - 1e-12 && turned <= high + 1e-12) return true;
+    }
+    return false;
   }
 
   /** Range of cz + R sin(a) for a in [lo, hi]. */

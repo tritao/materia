@@ -1,40 +1,32 @@
 package stockkit;
 
 /**
-  A lattice of +Z rays: ray (i, j) passes through
-  (originX + i * spacing, originY + j * spacing). Units are metres.
+  The rays of a `StockLattice` along one axis: ray (i, j) passes through
+  (u, v) = (originU + i * spacing, originV + j * spacing), where u and v are
+  the other two axes in order: (x, y) for Z rays, (y, z) for X rays and
+  (x, z) for Y rays. Units are metres.
 **/
 class StockGrid {
-  public final originX:Float;
-  public final originY:Float;
+  public final axis:StockAxis;
+  public final originU:Float;
+  public final originV:Float;
   public final spacing:Float;
-  public final countX:Int;
-  public final countY:Int;
+  public final countU:Int;
+  public final countV:Int;
 
-  public function new(originX:Float, originY:Float, spacing:Float, countX:Int,
-      countY:Int) {
-    if (!(spacing > 0.0) || !Math.isFinite(spacing))
-      throw "stock grid spacing must be positive and finite";
-    if (countX < 1 || countY < 1) throw "stock grid needs at least one ray each way";
-    if (!Math.isFinite(originX) || !Math.isFinite(originY))
-      throw "stock grid origin must be finite";
-    this.originX = originX;
-    this.originY = originY;
+  public function new(axis:StockAxis, originU:Float, originV:Float, spacing:Float, countU:Int,
+      countV:Int) {
+    this.axis = axis;
+    this.originU = originU;
+    this.originV = originV;
     this.spacing = spacing;
-    this.countX = countX;
-    this.countY = countY;
+    this.countU = countU;
+    this.countV = countV;
   }
 
-  /** Rays from (minX, minY) at `spacing`, as many as fit up to (maxX, maxY). */
-  public static function covering(minX:Float, minY:Float, maxX:Float, maxY:Float,
-      spacing:Float):StockGrid {
-    if (!(maxX >= minX) || !(maxY >= minY)) throw "stock grid bounds are inverted";
-    return new StockGrid(minX, minY, spacing,
-      Math.floor((maxX - minX) / spacing + 1e-9) + 1,
-      Math.floor((maxY - minY) / spacing + 1e-9) + 1);
-  }
+  public function u(i:Int):Float return originU + spacing * i;
 
-  public function x(i:Int):Float return originX + spacing * i;
+  public function v(j:Int):Float return originV + spacing * j;
 
-  public function y(j:Int):Float return originY + spacing * j;
+  public function rayCount():Int return countU * countV;
 }

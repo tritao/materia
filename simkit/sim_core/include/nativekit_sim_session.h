@@ -279,6 +279,13 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_get_body_state(
 /** Joint targets, kinematic drives, and state writes for the next tick. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_submit_joint_targets(
     nksim_session session, const nksim_joint_target *targets, uint32_t count);
+/**
+ * Forces and torques, world frame, applied at bodies' centres of mass for the
+ * next tick only, on top of any others submitted for it. Repeat every tick to
+ * push for longer.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_submit_forces(
+    nksim_session session, const nksim_body_force *forces NK_IN_ARRAY(count), uint32_t count);
 NKSIM_API nksim_result NKSIM_CALL nksim_session_drive_bodies(
     nksim_session session, const nksim_body_state *states, uint32_t count);
 NKSIM_API nksim_result NKSIM_CALL nksim_session_set_body_states(

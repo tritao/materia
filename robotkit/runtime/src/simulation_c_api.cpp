@@ -5,6 +5,7 @@
 #include <memory>
 #include <algorithm>
 #include <cstddef>
+#include <cstring>
 #include <cmath>
 #include <mutex>
 #include <unordered_map>
@@ -18,6 +19,13 @@ struct Presentation {
     rk_simulation_presentation_info info{};
     std::vector<rk_simulation_presentation_pose> poses;
 };
+struct ContactList {
+    uint64_t step_index = 0;
+    std::vector<rk_robot_contact> contacts;
+};
+std::mutex contact_lists_mutex;
+std::unordered_map<rk_robot_contact_list, std::shared_ptr<const ContactList>> contact_lists;
+rk_robot_contact_list next_contact_list = 1;
 std::mutex presentations_mutex;
 std::unordered_map<rk_simulation_presentation, std::shared_ptr<const Presentation>> presentations;
 rk_simulation_presentation next_presentation = 1;
@@ -53,9 +61,69 @@ std::shared_ptr<const Presentation> resolve_presentation(rk_simulation_presentat
     const auto found = presentations.find(handle);
     return found == presentations.end() ? nullptr : found->second;
 }
+std::shared_ptr<const ContactList> resolve_contact_list(rk_robot_contact_list handle) {
+    std::lock_guard lock(contact_lists_mutex);
+    const auto found = contact_lists.find(handle);
+    return found == contact_lists.end() ? nullptr : found->second;
+}
 } // namespace
 
 extern "C" {
+
+rk_result RK_CALL rk_simulation_capture_robot_contacts(rk_simulation simulation,
+    rk_robot_runtime runtime, rk_robot_contact_list *out_list) {
+    if (!out_list) return RK_ERROR_INVALID_ARGUMENT;
+    *out_list = RK_INVALID_ROBOT_CONTACT_LIST;
+    const auto value = resolve(simulation);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        auto list = std::make_shared<ContactList>();
+        const auto status = value->get_robot_contacts(runtime, list->contacts, &list->step_index);
+        if (status != RK_OK) return status;
+        std::lock_guard lock(contact_lists_mutex);
+        while (next_contact_list == RK_INVALID_ROBOT_CONTACT_LIST ||
+               contact_lists.count(next_contact_list) != 0) ++next_contact_list;
+        *out_list = next_contact_list++;
+        contact_lists.emplace(*out_list, std::move(list));
+        return RK_OK;
+    } catch (const std::bad_alloc &) { return RK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return RK_ERROR_BACKEND; }
+}
+
+rk_result RK_CALL rk_robot_contact_list_count(rk_robot_contact_list list, uint32_t *out_count) {
+    if (!out_count) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve_contact_list(list);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    *out_count = static_cast<uint32_t>(value->contacts.size());
+    return RK_OK;
+}
+
+rk_result RK_CALL rk_robot_contact_list_get(rk_robot_contact_list list, uint32_t index,
+    rk_robot_contact *out_contact) {
+    if (!out_contact || out_contact->struct_size < offsetof(rk_robot_contact, other_kind))
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve_contact_list(list);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    if (index >= value->contacts.size()) return RK_ERROR_INVALID_ARGUMENT;
+    const auto size = std::min<std::size_t>(out_contact->struct_size, sizeof(*out_contact));
+    std::memcpy(out_contact, &value->contacts[index], size);
+    out_contact->struct_size = static_cast<uint32_t>(size);
+    return RK_OK;
+}
+
+rk_result RK_CALL rk_robot_contact_list_step_index(rk_robot_contact_list list,
+    uint64_t *out_step_index) {
+    if (!out_step_index) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve_contact_list(list);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    *out_step_index = value->step_index;
+    return RK_OK;
+}
+
+void RK_CALL rk_robot_contact_list_destroy(rk_robot_contact_list list) {
+    std::lock_guard lock(contact_lists_mutex);
+    contact_lists.erase(list);
+}
 
 rk_result RK_CALL rk_simulation_create_in_session(nksim_session session,
                                                   rk_simulation *out_simulation) {
@@ -238,6 +306,13 @@ rk_result RK_CALL rk_simulation_get_robot_base_velocity(rk_simulation simulation
                  : RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_apply_robot_force(rk_simulation simulation, uint32_t robot_index,
+                                                  const rk_simulation_wrench *wrench) {
+    if (!wrench) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = resolve(simulation);
+    return value ? value->apply_robot_force(robot_index, *wrench) : RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_get_link_pose(rk_simulation simulation,uint32_t robot_index,
                                                uint32_t link_index,rk_simulation_pose *out_pose) {
     if(!out_pose)return RK_ERROR_INVALID_ARGUMENT;
@@ -249,28 +324,45 @@ rk_result RK_CALL rk_simulation_get_robot_contacts(rk_simulation simulation,
     rk_robot_runtime runtime, rk_robot_contact *out, uint32_t capacity,
     uint32_t *out_count) {
     if (!out_count || (capacity != 0 && !out)) return RK_ERROR_INVALID_ARGUMENT;
-    const auto value = resolve(simulation);
-    if (!value) return RK_ERROR_INVALID_HANDLE;
-    std::vector<rk_robot_contact> contacts;
-    const auto status = value->get_robot_contacts(runtime, contacts);
+    rk_robot_contact_list list = RK_INVALID_ROBOT_CONTACT_LIST;
+    const auto status = rk_simulation_capture_robot_contacts(simulation, runtime, &list);
     if (status != RK_OK) return status;
-    *out_count = static_cast<uint32_t>(contacts.size());
-    for (uint32_t i = 0; i < std::min(capacity, *out_count); ++i)
-        out[i] = contacts[i];
+    const auto value = resolve_contact_list(list);
+    *out_count = static_cast<uint32_t>(value->contacts.size());
+    if (capacity != 0) {
+        const auto stride = out->struct_size == 0 ? sizeof(rk_robot_contact) : out->struct_size;
+        if (stride < offsetof(rk_robot_contact, other_kind)) {
+            rk_robot_contact_list_destroy(list);
+            return RK_ERROR_INVALID_ARGUMENT;
+        }
+        for (uint32_t i = 0; i < std::min(capacity, *out_count); ++i) {
+            auto *target = reinterpret_cast<rk_robot_contact *>(
+                reinterpret_cast<std::uint8_t *>(out) + i * stride);
+            const auto copy_size = std::min<std::size_t>(stride, sizeof(rk_robot_contact));
+            std::memcpy(target, &value->contacts[i], copy_size);
+            target->struct_size = static_cast<uint32_t>(copy_size);
+        }
+    }
+    rk_robot_contact_list_destroy(list);
     return RK_OK;
 }
 
 rk_result RK_CALL rk_simulation_get_robot_contact(rk_simulation simulation,
     rk_robot_runtime runtime, uint32_t index, rk_robot_contact *out_contact) {
-    if (!out_contact || out_contact->struct_size < sizeof(*out_contact))
+    if (!out_contact || out_contact->struct_size < offsetof(rk_robot_contact, other_kind))
         return RK_ERROR_INVALID_ARGUMENT;
-    const auto value = resolve(simulation);
-    if (!value) return RK_ERROR_INVALID_HANDLE;
-    std::vector<rk_robot_contact> contacts;
-    const auto status = value->get_robot_contacts(runtime, contacts);
+    rk_robot_contact_list list = RK_INVALID_ROBOT_CONTACT_LIST;
+    const auto status = rk_simulation_capture_robot_contacts(simulation, runtime, &list);
     if (status != RK_OK) return status;
-    if (index >= contacts.size()) return RK_ERROR_INVALID_ARGUMENT;
-    *out_contact = contacts[index];
+    const auto value = resolve_contact_list(list);
+    if (index >= value->contacts.size()) {
+        rk_robot_contact_list_destroy(list);
+        return RK_ERROR_INVALID_ARGUMENT;
+    }
+    const auto size = std::min<std::size_t>(out_contact->struct_size, sizeof(*out_contact));
+    std::memcpy(out_contact, &value->contacts[index], size);
+    out_contact->struct_size = static_cast<uint32_t>(size);
+    rk_robot_contact_list_destroy(list);
     return RK_OK;
 }
 

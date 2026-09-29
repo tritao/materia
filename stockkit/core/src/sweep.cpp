@@ -45,6 +45,197 @@ void add_range(std::vector<double> &cuts, double lo, double hi) {
     if (hi >= lo) cuts.insert(cuts.end(), {lo, hi});
 }
 
+/** Sorts spans and merges those that overlap or touch. */
+void merge(std::vector<Span> &out) {
+    if (out.size() < 2) return;
+    std::sort(out.begin(), out.end(), [](const Span &a, const Span &b) { return a.lo < b.lo; });
+    size_t kept = 0;
+    for (size_t k = 1; k < out.size(); ++k) {
+        Span &last = out[kept];
+        if (out[k].lo <= last.hi) {
+            if (out[k].hi > last.hi) {
+                last.hi = out[k].hi;
+                std::copy(out[k].hi_normal, out[k].hi_normal + 3, last.hi_normal);
+            }
+        } else {
+            out[++kept] = out[k];
+        }
+    }
+    out.resize(kept + 1);
+}
+
+/** The motion with x and y exchanged, so a Y ray can be treated as an X ray. */
+Motion swapped(const Motion &m) {
+    Motion s = m;
+    std::swap(s.p0[0], s.p0[1]);
+    std::swap(s.p1[0], s.p1[1]);
+    std::swap(s.cx, s.cy);
+    // x = cx + r cos(a) becomes the second coordinate: cos(a) = sin(pi/2 - a).
+    s.start_angle = kPi / 2 - m.start_angle;
+    s.sweep = -m.sweep;
+    return s;
+}
+
+/** Whether an arc's sweep passes through `angle`, modulo full turns. */
+bool within_sweep(const Motion &m, double angle) {
+    if (std::fabs(m.sweep) >= kTwoPi) return true;
+    double lo = std::min(m.start_angle, m.start_angle + m.sweep);
+    double hi = std::max(m.start_angle, m.start_angle + m.sweep);
+    return angle + std::ceil((lo - angle) / kTwoPi) * kTwoPi <= hi;
+}
+
+/** Parameter of a point on the path whose xy position is nearest (x, y). */
+double nearest(const Motion &m, double x, double y) {
+    if (!m.arc) {
+        double dx = m.p1[0] - m.p0[0], dy = m.p1[1] - m.p0[1];
+        double squared = dx * dx + dy * dy;
+        if (!(squared > 0)) return 0;
+        return std::max(0.0, std::min(1.0, ((x - m.p0[0]) * dx + (y - m.p0[1]) * dy) / squared));
+    }
+    if (m.radius == 0 || m.sweep == 0 || (x == m.cx && y == m.cy)) return 0;
+    double phi = std::atan2(y - m.cy, x - m.cx);
+    if (within_sweep(m, phi)) {
+        // The first time the sweep reaches phi.
+        double turns = (m.start_angle - phi) / kTwoPi;
+        double angle = phi + (m.sweep > 0 ? std::ceil(turns) : std::floor(turns)) * kTwoPi;
+        return std::max(0.0, std::min(1.0, (angle - m.start_angle) / m.sweep));
+    }
+    double x0, y0, z0, x1, y1, z1;
+    m.position(0, x0, y0, z0);
+    m.position(1, x1, y1, z1);
+    return std::hypot(x - x0, y - y0) <= std::hypot(x - x1, y - y1) ? 0 : 1;
+}
+
+double path_distance(const Motion &m, double x, double y) {
+    double px, py, pz;
+    m.position(nearest(m, x, y), px, py, pz);
+    return std::hypot(x - px, y - py);
+}
+
+/**
+ * Intervals in x of the line y = c within `reach` of a level path: the
+ * path's 2D offset, a capsule for a line and an annular sector with end
+ * discs for an arc. Its boundary crossings are found in closed form and
+ * each stretch between them is tested at its middle. Pairs go to `out`.
+ */
+void offset_spans(const Motion &m, double reach, double c, std::vector<double> &out) {
+    if (!m.arc) {
+        // A capsule is convex: its end discs and the strip between them meet
+        // the line in overlapping intervals, whose union is one.
+        double lo = kInf, hi = -kInf;
+        double ax, ay, az, bx, by, bz;
+        m.position(0, ax, ay, az);
+        m.position(1, bx, by, bz);
+        for (const double *end : {&ax, &bx}) {
+            double x0 = *end, y0 = end == &ax ? ay : by, dy = c - y0;
+            if (std::fabs(dy) > reach) continue;
+            double w = std::sqrt(reach * reach - dy * dy);
+            lo = std::min(lo, x0 - w);
+            hi = std::max(hi, x0 + w);
+        }
+        double dx = bx - ax, dy = by - ay, length = std::hypot(dx, dy);
+        if (length > 0) {
+            dx /= length;
+            dy /= length;
+            double a = -kInf, b = kInf;
+            // Sides of the strip, where (x - ax) dy - (c - ay) dx = +-reach.
+            if (dy != 0) {
+                double p = ax + (-reach + (c - ay) * dx) / dy, q = ax + (reach + (c - ay) * dx) / dy;
+                a = std::max(a, std::min(p, q));
+                b = std::min(b, std::max(p, q));
+            } else if (std::fabs((c - ay) * dx) > reach) {
+                b = -kInf;
+            }
+            // Ends of the strip, where (x - ax) dx + (c - ay) dy = 0 or length.
+            if (dx != 0) {
+                double p = ax + (0.0 - (c - ay) * dy) / dx, q = ax + (length - (c - ay) * dy) / dx;
+                a = std::max(a, std::min(p, q));
+                b = std::min(b, std::max(p, q));
+            } else if ((c - ay) * dy < 0 || (c - ay) * dy > length) {
+                b = -kInf;
+            }
+            if (a <= b) {
+                lo = std::min(lo, a);
+                hi = std::max(hi, b);
+            }
+        }
+        out.clear();
+        if (lo < hi) out.insert(out.end(), {lo, hi});
+        return;
+    }
+    thread_local std::vector<double> cuts;
+    cuts.clear();
+    auto disc = [&](double x0, double y0, double r) {
+        double dy = c - y0;
+        if (std::fabs(dy) > r) return;
+        double w = std::sqrt(r * r - dy * dy);
+        cuts.insert(cuts.end(), {x0 - w, x0 + w});
+    };
+    double ax, ay, az, bx, by, bz;
+    m.position(0, ax, ay, az);
+    m.position(1, bx, by, bz);
+    disc(ax, ay, reach);
+    disc(bx, by, reach);
+    if (!m.arc) {
+        double dx = bx - ax, dy = by - ay, length = std::hypot(dx, dy);
+        if (length > 0) {
+            dx /= length;
+            dy /= length;
+            // Sides of the strip, where (x - ax) dy - (c - ay) dx = +-reach.
+            if (dy != 0)
+                for (double side : {-reach, reach}) cuts.push_back(ax + (side + (c - ay) * dx) / dy);
+            // Ends of the strip, where (x - ax) dx + (c - ay) dy = 0 or length.
+            if (dx != 0)
+                for (double along : {0.0, length}) cuts.push_back(ax + (along - (c - ay) * dy) / dx);
+        }
+    } else {
+        disc(m.cx, m.cy, m.radius + reach);
+        if (m.radius > reach) disc(m.cx, m.cy, m.radius - reach);
+        cuts.push_back(m.cx);
+        // Where the sector's edges, rays from the centre, cross the line.
+        double dy = c - m.cy;
+        for (double angle : {m.start_angle, m.start_angle + m.sweep}) {
+            double sine = std::sin(angle);
+            if (sine != 0 && dy / sine > 0) cuts.push_back(m.cx + std::cos(angle) * dy / sine);
+        }
+    }
+    std::sort(cuts.begin(), cuts.end());
+    out.clear();
+    for (size_t k = 0; k + 1 < cuts.size(); ++k) {
+        double a = cuts[k], b = cuts[k + 1];
+        if (!(b > a) || path_distance(m, 0.5 * (a + b), c) > reach) continue;
+        if (!out.empty() && out.back() == a) out.back() = b;
+        else out.insert(out.end(), {a, b});
+    }
+}
+
+/** Minimum of f on [a, b]: n samples, then golden section around each sampled local minimum. */
+template <typename F>
+double scan_minimum(F &&f, double a, double b, int n, double &at) {
+    at = a;
+    double best = f(a);
+    if (!(b > a)) return best;
+    thread_local std::vector<double> values;
+    values.resize(n + 1);
+    for (int k = 0; k <= n; ++k) values[k] = f(a + (b - a) * k / n);
+    for (int k = 0; k <= n; ++k) {
+        if (k > 0 && values[k] > values[k - 1]) continue;
+        if (k < n && values[k] > values[k + 1]) continue;
+        double lo = a + (b - a) * std::max(0, k - 1) / n, hi = a + (b - a) * std::min(n, k + 1) / n;
+        double value;
+        double t = golden(f, lo, hi, value);
+        if (values[k] < value) {
+            value = values[k];
+            t = a + (b - a) * k / n;
+        }
+        if (value < best) {
+            best = value;
+            at = t;
+        }
+    }
+    return best;
+}
+
 } // namespace
 
 void Motion::position(double t, double &x, double &y, double &z) const {
@@ -357,21 +548,180 @@ void SweptVolume::intersect_z(double x, double y, std::vector<Span> &out) const 
             if (span.hi > span.lo) out.push_back(span);
         }
     }
-    if (out.size() < 2) return;
-    std::sort(out.begin(), out.end(), [](const Span &a, const Span &b) { return a.lo < b.lo; });
-    size_t kept = 0;
-    for (size_t k = 1; k < out.size(); ++k) {
-        Span &last = out[kept];
-        if (out[k].lo <= last.hi) {
-            if (out[k].hi > last.hi) {
-                last.hi = out[k].hi;
-                std::copy(out[k].hi_normal, out[k].hi_normal + 3, last.hi_normal);
-            }
+    merge(out);
+}
+
+void SweptVolume::intersect(uint32_t axis, double u, double v, std::vector<Span> &out) const {
+    if (axis == 2) intersect_z(u, v, out);
+    else intersect_horizontal(axis, u, v, out);
+}
+
+void SweptVolume::intersect_horizontal(uint32_t axis, double across, double z, std::vector<Span> &out) const {
+    out.clear();
+    const int side = axis == 0 ? 1 : 0; // world axis of `across`
+    if (!(z >= bounds_.min[2] && z <= bounds_.max[2] && across >= bounds_.min[side] && across <= bounds_.max[side]))
+        return;
+    // In this frame the ray runs along +x at y = across.
+    const Motion m = axis == 0 ? motion_ : swapped(motion_);
+    auto normal = [&](double s, double t, double h, double outward, float n[3]) {
+        double px, py, pz;
+        m.position(t, px, py, pz);
+        double ex = s - px, ey = across - py, length = std::hypot(ex, ey);
+        if (length > 0) {
+            ex /= length;
+            ey /= length;
         } else {
-            out[++kept] = out[k];
+            ex = outward;
+            ey = 0;
+        }
+        const Section *section = nullptr;
+        double nr = 1, nz = 0;
+        profile_.section_radius(h, &section);
+        if (section) section->normal(h, nr, nz);
+        // The remaining material's normal points into the tool.
+        n[axis] = static_cast<float>(-nr * ex);
+        n[side] = static_cast<float>(-nr * ey);
+        n[2] = static_cast<float>(-nz);
+    };
+    auto add = [&](double lo, double t_lo, double h_lo, double hi, double t_hi, double h_hi) {
+        if (!(hi > lo)) return;
+        Span span;
+        span.lo = lo;
+        span.hi = hi;
+        normal(lo, t_lo, h_lo, -1, span.lo_normal);
+        normal(hi, t_hi, h_hi, 1, span.hi_normal);
+        out.push_back(span);
+    };
+
+    if (fixed_distance_) {
+        // A plunge sweeps its widest section over the heights it passes.
+        double px, py, pz;
+        m.position(0, px, py, pz);
+        double h0 = z - std::max(m.height(0), m.height(1)), h1 = z - std::min(m.height(0), m.height(1));
+        double at = 0;
+        double r = profile_.largest_radius(h0, h1, at, nullptr);
+        double dy = across - py;
+        if (r < std::fabs(dy)) return;
+        double w = std::sqrt(r * r - dy * dy);
+        add(px - w, 0, at, px + w, 0, at);
+        return;
+    }
+
+    if (level_) {
+        double h = z - m.height(0);
+        double r = profile_.section_radius(h);
+        if (!(r > 0)) return;
+        thread_local std::vector<double> ends;
+        offset_spans(m, r, across, ends);
+        for (size_t k = 0; k < ends.size(); k += 2)
+            add(ends[k], nearest(m, ends[k], across), h, ends[k + 1], nearest(m, ends[k + 1], across), h);
+        return;
+    }
+
+    // Ramps and helices. The pose at t meets the ray where the section at
+    // height h(t) reaches it: margin(t) = R(h(t)) - |across - y(t)| >= 0.
+    const double z0 = m.height(0), rise = m.height(1) - z0;
+    auto height = [&](double t) { return z - (z0 + t * rise); };
+    auto margin = [&](double t) {
+        double px, py, pz;
+        m.position(t, px, py, pz);
+        return profile_.section_radius(height(t)) - std::fabs(across - py);
+    };
+    auto reach = [&](double t, double &px) {
+        double py, pz;
+        m.position(t, px, py, pz);
+        double r = std::max(0.0, profile_.section_radius(height(t))), dy = across - py;
+        return std::sqrt(std::max(0.0, r * r - dy * dy));
+    };
+    auto samples = [&](double a, double b) {
+        double turn = m.arc ? std::fabs(m.sweep) * (b - a) : 0;
+        return std::max(32, static_cast<int>(std::ceil(64 * turn / kPi)));
+    };
+    // Split where the section stops being smooth or the axis crosses the
+    // ray's vertical plane (where |across - y| has its corner).
+    thread_local std::vector<double> breaks;
+    breaks.assign({0.0, 1.0});
+    auto split = [&](double t) {
+        if (t > 0 && t < 1) breaks.push_back(t);
+    };
+    for (double b : profile_.breaks()) split((z - z0 - b) / rise);
+    if (!m.arc) {
+        double dy = m.p1[1] - m.p0[1];
+        if (dy != 0) split((across - m.p0[1]) / dy);
+    } else if (m.radius > 0 && m.sweep != 0) {
+        double sine = (across - m.cy) / m.radius;
+        if (std::fabs(sine) <= 1) {
+            double lo = std::min(m.start_angle, m.start_angle + m.sweep);
+            double hi = std::max(m.start_angle, m.start_angle + m.sweep);
+            for (double angle : {std::asin(sine), kPi - std::asin(sine)})
+                for (double k = std::ceil((lo - angle) / kTwoPi); angle + k * kTwoPi <= hi; k += 1)
+                    split((angle + k * kTwoPi - m.start_angle) / m.sweep);
         }
     }
-    out.resize(kept + 1);
+    std::sort(breaks.begin(), breaks.end());
+    breaks.erase(std::unique(breaks.begin(), breaks.end()), breaks.end());
+
+    // Stretches of t where the pose meets the ray.
+    auto bisect = [&](double in, double out) {
+        for (int i = 0; i < 200; ++i) {
+            double mid = 0.5 * (in + out);
+            if (mid == in || mid == out) break;
+            if (margin(mid) >= 0) in = mid;
+            else out = mid;
+        }
+        return in;
+    };
+    thread_local std::vector<Range> parts;
+    thread_local std::vector<double> ts, fs;
+    parts.clear();
+    for (size_t k = 0; k + 1 < breaks.size(); ++k) {
+        const double a = breaks[k], b = breaks[k + 1];
+        double mid = height(0.5 * (a + b));
+        if (mid < profile_.base() || mid > profile_.height()) continue;
+        const int n = samples(a, b);
+        ts.resize(n + 1);
+        fs.resize(n + 1);
+        for (int i = 0; i <= n; ++i) {
+            ts[i] = i == n ? b : a + (b - a) * i / n;
+            fs[i] = margin(ts[i]);
+        }
+        bool inside = fs[0] >= 0;
+        double start = a;
+        for (int i = 1; i <= n; ++i) {
+            bool now = fs[i] >= 0;
+            if (now == inside) continue;
+            if (now) start = bisect(ts[i], ts[i - 1]);
+            else parts.push_back({start, bisect(ts[i - 1], ts[i])});
+            inside = now;
+        }
+        if (inside) parts.push_back({start, b});
+        // Stretches the samples step over, around local maxima that sampled short.
+        for (int i = 0; i <= n; ++i) {
+            if (fs[i] >= 0 || (i > 0 && fs[i] < fs[i - 1]) || (i < n && fs[i] < fs[i + 1])) continue;
+            double lo = ts[std::max(0, i - 1)], hi = ts[std::min(n, i + 1)];
+            double value;
+            double t = golden([&](double t) { return -margin(t); }, lo, hi, value);
+            if (-value >= 0) parts.push_back({bisect(t, lo), bisect(t, hi)});
+        }
+    }
+
+    // Over each stretch the swept interval runs from the least x - w to the greatest x + w.
+    for (const Range &part : parts) {
+        const int n = samples(part.t0, part.t1);
+        double t_lo, t_hi;
+        double lo = scan_minimum([&](double t) {
+            double px;
+            double w = reach(t, px);
+            return px - w;
+        }, part.t0, part.t1, n, t_lo);
+        double hi = -scan_minimum([&](double t) {
+            double px;
+            double w = reach(t, px);
+            return -(px + w);
+        }, part.t0, part.t1, n, t_hi);
+        add(lo, t_lo, height(t_lo), hi, t_hi, height(t_hi));
+    }
+    merge(out);
 }
 
 } // namespace stockkit

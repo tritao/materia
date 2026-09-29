@@ -5,7 +5,7 @@
 
 namespace stockkit {
 
-Stock::Stock(const Grid &grid) : grid_(grid) {
+DexelGrid::DexelGrid(const Grid &grid) : grid_(grid) {
     if (grid_.tile == 0) grid_.tile = 16;
     tiles_i_ = (grid_.count[0] + grid_.tile - 1) / grid_.tile;
     tiles_j_ = (grid_.count[1] + grid_.tile - 1) / grid_.tile;
@@ -27,7 +27,7 @@ Stock::Stock(const Grid &grid) : grid_(grid) {
         }
 }
 
-uint32_t Stock::tile_index(uint32_t i, uint32_t j, uint32_t &local) const {
+uint32_t DexelGrid::tile_index(uint32_t i, uint32_t j, uint32_t &local) const {
     uint32_t ti = i / grid_.tile, tj = j / grid_.tile;
     uint32_t index = tj * tiles_i_ + ti;
     const Tile &tile = *tiles_[index];
@@ -35,21 +35,21 @@ uint32_t Stock::tile_index(uint32_t i, uint32_t j, uint32_t &local) const {
     return index;
 }
 
-Stock::Tile &Stock::mutable_tile(uint32_t index) {
+DexelGrid::Tile &DexelGrid::mutable_tile(uint32_t index) {
     std::shared_ptr<Tile> &slot = tiles_[index];
     if (slot.use_count() > 1) slot = std::make_shared<Tile>(*slot);
     ++revisions_[index];
     return *slot;
 }
 
-std::unique_ptr<Stock::Snapshot> Stock::snapshot() const {
+std::unique_ptr<DexelGrid::Snapshot> DexelGrid::snapshot() const {
     auto snapshot = std::make_unique<Snapshot>();
     snapshot->grid = grid_;
     snapshot->tiles = tiles_;
     return snapshot;
 }
 
-bool Stock::restore(const Snapshot &snapshot) {
+bool DexelGrid::restore(const Snapshot &snapshot, std::vector<uint8_t> *changed) {
     const Grid &g = snapshot.grid;
     if (g.axis != grid_.axis || g.origin[0] != grid_.origin[0] || g.origin[1] != grid_.origin[1] ||
         g.spacing != grid_.spacing || g.count[0] != grid_.count[0] || g.count[1] != grid_.count[1] ||
@@ -59,11 +59,12 @@ bool Stock::restore(const Snapshot &snapshot) {
         if (tiles_[k] != snapshot.tiles[k]) {
             tiles_[k] = snapshot.tiles[k];
             ++revisions_[k];
+            if (changed) (*changed)[k] = 1;
         }
     return true;
 }
 
-void Stock::Tile::grow(uint32_t slots) {
+void DexelGrid::Tile::grow(uint32_t slots) {
     size_t size = static_cast<size_t>(used) + slots;
     lo.resize(size);
     hi.resize(size);
@@ -74,7 +75,7 @@ void Stock::Tile::grow(uint32_t slots) {
 }
 
 /** Packs every ray's intervals to the front, dropping abandoned slots. */
-void Stock::Tile::compact() {
+void DexelGrid::Tile::compact() {
     Tile packed;
     packed.first.resize(first.size());
     packed.capacity.resize(first.size());
@@ -105,7 +106,7 @@ void Stock::Tile::compact() {
     used = packed.used;
 }
 
-void Stock::Tile::refresh_bounds() {
+void DexelGrid::Tile::refresh_bounds() {
     top = -std::numeric_limits<double>::infinity();
     bottom = std::numeric_limits<double>::infinity();
     for (size_t r = 0; r < count.size(); ++r) {
@@ -115,12 +116,12 @@ void Stock::Tile::refresh_bounds() {
     }
 }
 
-uint32_t Stock::count(uint32_t i, uint32_t j) const {
+uint32_t DexelGrid::count(uint32_t i, uint32_t j) const {
     uint32_t local;
     return tiles_[tile_index(i, j, local)]->count[local];
 }
 
-void Stock::read(uint32_t i, uint32_t j, std::vector<Interval> &out) const {
+void DexelGrid::read(uint32_t i, uint32_t j, std::vector<Interval> &out) const {
     uint32_t local;
     const Tile &tile = *tiles_[tile_index(i, j, local)];
     out.resize(tile.count[local]);
@@ -136,7 +137,23 @@ void Stock::read(uint32_t i, uint32_t j, std::vector<Interval> &out) const {
     }
 }
 
-void Stock::write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n) {
+RayView DexelGrid::view(uint32_t i, uint32_t j) const {
+    uint32_t local;
+    const Tile &tile = *tiles_[tile_index(i, j, local)];
+    RayView view;
+    view.count = tile.count[local];
+    if (view.count == 0) return view;
+    const uint32_t at = tile.first[local];
+    view.lo = &tile.lo[at];
+    view.hi = &tile.hi[at];
+    view.lo_normal = &tile.lo_normal[3 * size_t(at)];
+    view.hi_normal = &tile.hi_normal[3 * size_t(at)];
+    view.lo_source = &tile.lo_source[at];
+    view.hi_source = &tile.hi_source[at];
+    return view;
+}
+
+void DexelGrid::write_local(Tile &tile, uint32_t local, const Interval *intervals, uint32_t n) {
     tile.live -= tile.count[local];
     tile.live += n;
     if (n > tile.capacity[local]) {
@@ -159,13 +176,11 @@ void Stock::write_local(Tile &tile, uint32_t local, const Interval *intervals, u
     tile.count[local] = n;
 }
 
-void Stock::write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals) {
+void DexelGrid::write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals) {
     uint32_t local;
     Tile &tile = mutable_tile(tile_index(i, j, local));
     write_local(tile, local, intervals.data(), static_cast<uint32_t>(intervals.size()));
 }
-
-void Stock::set_threads(uint32_t threads) { threads_ = threads; }
 
 MoveSweep::MoveSweep(const Tool &tool, const Motion &motion, uint32_t source)
     : cutting(tool.cutting, motion), source(source) {
@@ -178,45 +193,10 @@ MoveSweep::MoveSweep(const Tool &tool, const Motion &motion, uint32_t source)
         }
 }
 
-void Stock::cut(const std::vector<MoveSweep> &moves, MoveResult *results) {
-    const uint32_t tiles = tiles_i_ * tiles_j_;
-    uint32_t owners = threads_ == 0 ? Pool::hardware() : threads_;
-    owners = std::max<uint32_t>(1, std::min<uint32_t>({owners, tiles, uint32_t(moves.size())}));
-    // Few moves are not worth waking threads for.
-    if (moves.size() < 4) owners = 1;
-    pool_.resize(std::max(pool_.size(), owners));
-    owners = std::min(owners, pool_.size());
-    workers_.resize(owners);
-    for (Worker &worker : workers_) {
-        worker.stats = CutStats{};
-        worker.records.clear();
-    }
-    pool_.run(owners, [&](unsigned owner) {
-        Worker &worker = workers_[owner];
-        for (size_t k = 0; k < moves.size(); ++k) cut_owned(moves[k], uint32_t(k), owner, owners, worker);
-    });
-    // Per-tile results, summed per move in tile order whatever the thread count.
-    std::vector<Worker::Record> all;
-    for (Worker &worker : workers_) {
-        all.insert(all.end(), worker.records.begin(), worker.records.end());
-        stats_.rays_tested += worker.stats.rays_tested;
-        stats_.rays_changed += worker.stats.rays_changed;
-        stats_.tiles_skipped += worker.stats.tiles_skipped;
-    }
-    std::sort(all.begin(), all.end(), [](const Worker::Record &a, const Worker::Record &b) {
-        return a.move < b.move || (a.move == b.move && a.tile < b.tile);
-    });
-    std::fill(results, results + moves.size(), MoveResult{});
-    for (const Worker::Record &r : all) {
-        results[r.move].removed += r.result.removed;
-        for (uint32_t z = 0; z < kZoneCount; ++z) results[r.move].contact[z] += r.result.contact[z];
-    }
-}
-
-bool Stock::ray_range(const Bounds &b, RayRange &out) const {
+bool DexelGrid::ray_range(const Bounds &b, RayRange &out) const {
     const double s = grid_.spacing;
-    // Rays strictly inside the xy bounds; the bounds are closed but a ray on
-    // them only grazes the tool.
+    // Rays strictly inside the bounds across them; the bounds are closed but a
+    // ray on them only grazes the tool.
     auto first_index = [&](double lo, double origin, uint32_t n) -> int64_t {
         double k = std::ceil((lo - origin) / s);
         return static_cast<int64_t>(std::max(0.0, std::min(k, double(n))));
@@ -225,14 +205,16 @@ bool Stock::ray_range(const Bounds &b, RayRange &out) const {
         double k = std::floor((hi - origin) / s);
         return static_cast<int64_t>(std::max(-1.0, std::min(k, double(n) - 1)));
     };
-    out.i0 = first_index(b.min[0], grid_.origin[0], grid_.count[0]);
-    out.i1 = last_index(b.max[0], grid_.origin[0], grid_.count[0]);
-    out.j0 = first_index(b.min[1], grid_.origin[1], grid_.count[1]);
-    out.j1 = last_index(b.max[1], grid_.origin[1], grid_.count[1]);
+    const uint32_t u = grid_.u_axis(), v = grid_.v_axis();
+    out.i0 = first_index(b.min[u], grid_.origin[0], grid_.count[0]);
+    out.i1 = last_index(b.max[u], grid_.origin[0], grid_.count[0]);
+    out.j0 = first_index(b.min[v], grid_.origin[1], grid_.count[1]);
+    out.j1 = last_index(b.max[v], grid_.origin[1], grid_.count[1]);
     return out.i0 <= out.i1 && out.j0 <= out.j1;
 }
 
-void Stock::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, Worker &worker) {
+void DexelGrid::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, bool measure,
+    CutWorker &worker) {
     if (grid_.count[0] == 0 || grid_.count[1] == 0) return;
     RayRange all;
     if (!ray_range(move.reach, all)) return;
@@ -244,7 +226,8 @@ void Stock::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uin
             if ((ti + tj) % owners != owner) continue;
             const uint32_t tile_index = tj * tiles_i_ + ti;
             const Tile &tile = *tiles_[tile_index];
-            if (!(tile.top > move.reach.min[2]) || !(tile.bottom < move.reach.max[2])) {
+            const uint32_t w = grid_.axis;
+            if (!(tile.top > move.reach.min[w]) || !(tile.bottom < move.reach.max[w])) {
                 ++worker.stats.tiles_skipped;
                 continue;
             }
@@ -254,6 +237,7 @@ void Stock::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uin
                 touched = true;
             // Bands measure the stock this move leaves behind.
             for (const auto &band : move.bands) {
+                if (!measure) break;
                 RayRange range;
                 if (!ray_range(band.second.bounds(), range)) continue;
                 // The cut may have replaced a shared tile with a private copy.
@@ -263,12 +247,12 @@ void Stock::cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uin
                     touched = true;
                 }
             }
-            if (touched) worker.records.push_back({index, tile_index, result});
+            if (touched && measure) worker.records.push_back({index, tile_index, result});
         }
 }
 
-bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
-    Worker &worker, double &removed_volume) {
+bool DexelGrid::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
+    CutWorker &worker, double &removed_volume) {
     // Read through the shared tile; take a private copy only at the first write.
     Tile *writable = nullptr;
     const Tile *view = tiles_[index].get();
@@ -276,8 +260,9 @@ bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &r
     std::vector<Span> &spans = worker.spans;
     std::vector<Interval> &scratch = worker.scratch;
     const double area = grid_.spacing * grid_.spacing;
-    const double sweep_low = sweep.lowest();
-    const double sweep_high = sweep.bounds().max[2];
+    const uint32_t axis = grid_.axis;
+    const double sweep_low = sweep.bounds().min[axis];
+    const double sweep_high = sweep.bounds().max[axis];
     if (!(view->top > sweep_low) || !(view->bottom < sweep_high)) return false;
     uint32_t ia = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.i0, 0)), view->i0);
     uint32_t ja = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.j0, 0)), view->j0);
@@ -285,6 +270,7 @@ bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &r
     uint32_t ib = std::min<uint32_t>(uint32_t(range.i1), view->i0 + view->ni - 1);
     uint32_t jb = std::min<uint32_t>(uint32_t(range.j1), view->j0 + view->nj - 1);
     bool changed = false;
+    double tile_lo = std::numeric_limits<double>::infinity(), tile_hi = -tile_lo;
     for (uint32_t j = ja; j <= jb; ++j)
         for (uint32_t i = ia; i <= ib; ++i) {
             uint32_t local = (j - view->j0) * view->ni + (i - view->i0);
@@ -293,12 +279,12 @@ bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &r
             uint32_t first = view->first[local];
             if (!(view->hi[first + n - 1] > sweep_low) || !(view->lo[first] < sweep_high)) continue;
             ++stats.rays_tested;
-            if (!(view->hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
-            sweep.intersect_z(ray_u(i), ray_v(j), spans);
+            if (axis == 2 && !(view->hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
+            sweep.intersect(axis, ray_u(i), ray_v(j), spans);
             if (spans.empty()) continue;
             // Subtract every span from the ray.
             scratch.clear();
-            double removed = 0;
+            double removed = 0, changed_lo = std::numeric_limits<double>::infinity(), changed_hi = -changed_lo;
             for (uint32_t k = 0; k < n; ++k) {
                 uint32_t at = first + k;
                 Interval piece;
@@ -319,6 +305,8 @@ bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &r
                         scratch.push_back(below);
                     }
                     removed += std::min(span.hi, piece.hi) - std::max(span.lo, piece.lo);
+                    changed_lo = std::min(changed_lo, std::max(span.lo, piece.lo));
+                    changed_hi = std::max(changed_hi, std::min(span.hi, piece.hi));
                     if (span.hi >= piece.hi) {
                         piece.lo = piece.hi; // consumed
                         break;
@@ -336,16 +324,21 @@ bool Stock::cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &r
             }
             write_local(*writable, local, scratch.data(), static_cast<uint32_t>(scratch.size()));
             removed_volume += removed * area;
+            tile_lo = std::min(tile_lo, changed_lo);
+            tile_hi = std::max(tile_hi, changed_hi);
             ++stats.rays_changed;
             changed = true;
         }
     if (changed) writable->refresh_bounds();
+    if (changed && axis != 2 && !worker.marks.dirty.empty()) worker.marks.mark(axis, view->i0, tile_lo, tile_hi);
     return changed;
 }
 
-double Stock::touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, Worker &worker) const {
-    const double sweep_low = sweep.lowest();
-    const double sweep_high = sweep.bounds().max[2];
+double DexelGrid::touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range,
+    CutWorker &worker) const {
+    const uint32_t axis = grid_.axis;
+    const double sweep_low = sweep.bounds().min[axis];
+    const double sweep_high = sweep.bounds().max[axis];
     if (!(tile.top > sweep_low) || !(tile.bottom < sweep_high)) return 0;
     if (range.i1 < int64_t(tile.i0) || range.j1 < int64_t(tile.j0)) return 0;
     uint32_t ia = std::max<uint32_t>(uint32_t(std::max<int64_t>(range.i0, 0)), tile.i0);
@@ -361,8 +354,8 @@ double Stock::touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRa
             if (n == 0) continue;
             uint32_t first = tile.first[local];
             if (!(tile.hi[first + n - 1] > sweep_low) || !(tile.lo[first] < sweep_high)) continue;
-            if (!(tile.hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
-            sweep.intersect_z(ray_u(i), ray_v(j), spans);
+            if (axis == 2 && !(tile.hi[first + n - 1] > sweep.floor_bound(ray_u(i), ray_v(j)))) continue;
+            sweep.intersect(axis, ray_u(i), ray_v(j), spans);
             for (const Span &span : spans)
                 for (uint32_t k = 0; k < n; ++k) {
                     double lo = std::max(span.lo, tile.lo[first + k]);
@@ -399,7 +392,7 @@ RayComparison compare_ray(const std::vector<Interval> &stock, const std::vector<
     return result;
 }
 
-void Stock::pack() {
+void DexelGrid::pack() {
     for (uint32_t k = 0; k < tiles_.size(); ++k) {
         Tile &tile = mutable_tile(k);
         tile.compact();
@@ -407,13 +400,13 @@ void Stock::pack() {
     }
 }
 
-uint64_t Stock::interval_count() const {
+uint64_t DexelGrid::interval_count() const {
     uint64_t total = 0;
     for (const auto &tile : tiles_) total += tile->live;
     return total;
 }
 
-double Stock::volume() const {
+double DexelGrid::volume() const {
     double total = 0;
     for (const auto &slot : tiles_) {
         const Tile &tile = *slot;
@@ -424,7 +417,7 @@ double Stock::volume() const {
     return total * grid_.spacing * grid_.spacing;
 }
 
-uint64_t Stock::bytes() const {
+uint64_t DexelGrid::bytes() const {
     // Tiles shared with snapshots are counted in full here too.
     uint64_t total = sizeof(Stock) + tiles_.capacity() * (sizeof(Tile) + sizeof(std::shared_ptr<Tile>));
     for (const auto &slot : tiles_) {
@@ -434,6 +427,132 @@ uint64_t Stock::bytes() const {
         total += (tile.lo_normal.capacity() + tile.hi_normal.capacity()) * 4;
         total += (tile.lo_source.capacity() + tile.hi_source.capacity()) * 4;
     }
+    return total;
+}
+
+void SurfaceMarks::reset(const Lattice &l) {
+    lattice = l;
+    tiles_x = (l.count[0] + l.tile - 1) / l.tile;
+    tiles_y = (l.count[1] + l.tile - 1) / l.tile;
+    dirty.assign(size_t(tiles_x) * tiles_y, 0);
+}
+
+void SurfaceMarks::mark(uint32_t axis, uint32_t i, double lo, double hi) {
+    const double s = lattice.spacing, origin = lattice.origin[axis];
+    const uint32_t n = lattice.count[axis];
+    // One node of margin each way: a contoured edge looks for its crossing a
+    // little past its ends.
+    double first = std::floor((lo - origin) / s) - 1, last = std::ceil((hi - origin) / s) + 1;
+    first = std::max(0.0, std::min(first, double(n) - 1));
+    last = std::max(0.0, std::min(last, double(n) - 1));
+    const uint32_t t0 = uint32_t(first) / lattice.tile, t1 = uint32_t(last) / lattice.tile;
+    const uint32_t across = i / lattice.tile; // X rays: y index; Y rays: x index
+    for (uint32_t t = t0; t <= t1; ++t)
+        dirty[axis == 0 ? size_t(across) * tiles_x + t : size_t(t) * tiles_x + across] = 1;
+}
+
+Stock::Stock(const Lattice &lattice) : lattice_(lattice) {
+    lattice_.axes |= 1u << 2;
+    if (lattice_.tile == 0) lattice_.tile = 16;
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        if (lattice_.has(axis)) grids_[axis] = std::make_unique<DexelGrid>(lattice_.grid(axis));
+}
+
+void Stock::cut(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary) {
+    uint32_t tiles = 0;
+    for (const auto &grid : grids_)
+        if (grid) tiles += grid->tile_count();
+    uint32_t owners = threads_ == 0 ? Pool::hardware() : threads_;
+    owners = std::max<uint32_t>(1, std::min<uint32_t>({owners, tiles, uint32_t(moves.size())}));
+    // Few moves are not worth waking threads for.
+    if (moves.size() < 4) owners = 1;
+    pool_.resize(std::max(pool_.size(), owners));
+    owners = std::min(owners, pool_.size());
+    workers_.resize(owners);
+    const bool sides = grids_[0] || grids_[1];
+    for (CutWorker &worker : workers_) {
+        worker.stats = CutStats{};
+        worker.records.clear();
+        if (sides) worker.marks.reset(lattice_);
+    }
+    pool_.run(owners, [&](unsigned owner) {
+        CutWorker &worker = workers_[owner];
+        for (size_t k = 0; k < moves.size(); ++k)
+            for (uint32_t axis = 0; axis < 3; ++axis)
+                if (grids_[axis]) grids_[axis]->cut_owned(moves[k], uint32_t(k), owner, owners, axis == 2, worker);
+    });
+    // Per-tile results of the Z grid, summed per move in tile order whatever the thread count.
+    std::vector<CutWorker::Record> all;
+    CutStats totals;
+    for (CutWorker &worker : workers_) {
+        all.insert(all.end(), worker.records.begin(), worker.records.end());
+        totals.add(worker.stats);
+    }
+    stats_.add(totals);
+    if (summary) *summary = totals;
+    if (sides) touch_marked();
+    std::sort(all.begin(), all.end(), [](const CutWorker::Record &a, const CutWorker::Record &b) {
+        return a.move < b.move || (a.move == b.move && a.tile < b.tile);
+    });
+    std::fill(results, results + moves.size(), MoveResult{});
+    for (const CutWorker::Record &r : all) {
+        results[r.move].removed += r.result.removed;
+        for (uint32_t z = 0; z < kZoneCount; ++z) results[r.move].contact[z] += r.result.contact[z];
+    }
+}
+
+std::unique_ptr<Stock::Snapshot> Stock::snapshot() const {
+    auto snapshot = std::make_unique<Snapshot>();
+    snapshot->lattice = lattice_;
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        if (grids_[axis]) snapshot->grids[axis] = grids_[axis]->snapshot();
+    return snapshot;
+}
+
+bool Stock::restore(const Snapshot &snapshot) {
+    if (!(snapshot.lattice == lattice_)) return false;
+    SurfaceMarks marks;
+    marks.reset(lattice_);
+    for (uint32_t axis = 0; axis < 3; ++axis) {
+        if (!grids_[axis]) continue;
+        std::vector<uint8_t> changed(grids_[axis]->tile_count(), 0);
+        if (!grids_[axis]->restore(*snapshot.grids[axis], &changed)) return false;
+        if (axis == 2) continue;
+        // A replaced X or Y tile may differ anywhere along its rays.
+        const uint32_t across = grids_[axis]->tiles_across();
+        for (uint32_t k = 0; k < changed.size(); ++k) {
+            if (!changed[k]) continue;
+            const uint32_t tu = k % across;
+            if (axis == 0)
+                for (uint32_t tx = 0; tx < marks.tiles_x; ++tx) marks.dirty[size_t(tu) * marks.tiles_x + tx] = 1;
+            else
+                for (uint32_t ty = 0; ty < marks.tiles_y; ++ty) marks.dirty[size_t(ty) * marks.tiles_x + tu] = 1;
+        }
+    }
+    for (uint32_t k = 0; k < marks.dirty.size(); ++k)
+        if (marks.dirty[k]) grids_[2]->touch(k);
+    return true;
+}
+
+void Stock::touch_marked() {
+    DexelGrid &z = *grids_[2];
+    for (uint32_t k = 0; k < z.tile_count(); ++k)
+        for (const CutWorker &worker : workers_)
+            if (worker.marks.dirty[k]) {
+                z.touch(k);
+                break;
+            }
+}
+
+void Stock::pack() {
+    for (const auto &grid : grids_)
+        if (grid) grid->pack();
+}
+
+uint64_t Stock::bytes() const {
+    uint64_t total = sizeof(Stock);
+    for (const auto &grid : grids_)
+        if (grid) total += grid->bytes();
     return total;
 }
 

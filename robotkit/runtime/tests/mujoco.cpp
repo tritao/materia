@@ -4,6 +4,8 @@
 #include <cassert>
 #include <cmath>
 #include <cstdio>
+#include <chrono>
+#include <thread>
 
 static rk_robot_state state(rk_robot_runtime robot) {
     rk_robot_state value{};
@@ -169,6 +171,7 @@ static void tool_hulls_collide_only_on_their_pieces() {
     rk_robot_runtime_blueprint model{};
     model.struct_size = sizeof(model);
     model.link_count = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
     model.links[0].mass = 1.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 1.0;
@@ -240,21 +243,172 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     auto object = spawn_object(session, fixed_obstacle ? NKSIM_MOTION_STATIC : NKSIM_MOTION_DYNAMIC,
         position, rotation, half_extents, 1.0);
     assert(step(session, 0) == RK_OK);
+    rk_robot_contact_list list = RK_INVALID_ROBOT_CONTACT_LIST;
+    assert(rk_simulation_capture_robot_contacts(simulation, robot, &list) == RK_OK);
+    uint32_t captured_count = 0;
+    uint64_t captured_step = 0;
+    assert(rk_robot_contact_list_count(list, &captured_count) == RK_OK);
+    assert(rk_robot_contact_list_step_index(list, &captured_step) == RK_OK);
+    assert(captured_step == 1);
     uint32_t count = 0;
     assert(rk_simulation_get_robot_contacts(simulation, robot, nullptr, 0, &count) == RK_OK);
+    assert(captured_count == count);
+    alignas(rk_robot_contact) unsigned char legacy_storage[80]{};
+    auto *legacy = reinterpret_cast<rk_robot_contact *>(legacy_storage);
+    legacy->struct_size = sizeof(legacy_storage);
+    uint32_t legacy_count = 0;
+    assert(rk_simulation_get_robot_contacts(simulation, robot, legacy, 1, &legacy_count) == RK_OK);
+    assert(legacy_count == count && legacy->struct_size == sizeof(legacy_storage));
+    rk_robot_contact zero_initialized{};
+    assert(rk_simulation_get_robot_contacts(simulation, robot, &zero_initialized, 1,
+        &legacy_count) == RK_OK);
+    assert(legacy_count == count && zero_initialized.struct_size == sizeof(zero_initialized));
     bool found = false;
     for (uint32_t i = 0; i < count; ++i) {
         rk_robot_contact contact{};
         contact.struct_size = sizeof(contact);
         assert(rk_simulation_get_robot_contact(simulation, robot, i, &contact) == RK_OK);
+        rk_robot_contact captured{};
+        captured.struct_size = sizeof(captured);
+        assert(rk_robot_contact_list_get(list, i, &captured) == RK_OK);
+        assert(captured.link_index == contact.link_index);
+        assert(captured.tool_piece_index == contact.tool_piece_index);
         if (contact.tool_piece_index == 0) {
             found = true;
             assert((contact.active != 0) == expected_active);
             assert(contact.link_index == 0);
             assert(contact.other_object == object);
+            assert(contact.other_kind == RK_CONTACT_OTHER_OBJECT);
         }
     }
     assert(found);
+    rk_robot_contact_list_destroy(list);
+}
+
+static void captured_contacts_survive_realtime_steps() {
+    SessionFixture fixture(0.001);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    model.links[0].mass = 1.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 1.0;
+    rk_simulation_robot_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.initial_pose.struct_size = sizeof(desc.initial_pose);
+    desc.initial_pose.rotation[3] = 1.0;
+    desc.collision_half_extents[0] = desc.collision_half_extents[1] =
+        desc.collision_half_extents[2] = 0.1;
+    desc.tool_link_index = 0;
+    desc.tool_piece_count = 1;
+    desc.tool_gap = 0.03;
+    desc.tool_piece_vertex_count[0] = 8;
+    for (int vertex = 0; vertex < 8; ++vertex) {
+        auto *point = desc.tool_piece_vertices + vertex * 3;
+        point[0] = (vertex & 1) ? 0.1 : -0.1;
+        point[1] = (vertex & 2) ? 0.1 : -0.1;
+        point[2] = (vertex & 4) ? 0.1 : -0.1;
+    }
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, &desc, &robot) == RK_OK);
+    const double position[3] = {0.0, 0.0, 0.15};
+    const double rotation[4] = {0.0, 0.0, 0.0, 1.0};
+    const double half[3] = {0.1, 0.1, 0.1};
+    const auto object = spawn_object(fixture.session, NKSIM_MOTION_STATIC,
+        position, rotation, half);
+    assert(start(fixture.session) == RK_OK);
+    uint64_t previous_step = 0;
+    bool saw_contact = false;
+    for (int attempt = 0; attempt < 200; ++attempt) {
+        rk_robot_contact_list list = RK_INVALID_ROBOT_CONTACT_LIST;
+        assert(rk_simulation_capture_robot_contacts(fixture.simulation, robot, &list) == RK_OK);
+        uint64_t step_index = 0;
+        uint32_t count = 0;
+        assert(rk_robot_contact_list_step_index(list, &step_index) == RK_OK);
+        assert(rk_robot_contact_list_count(list, &count) == RK_OK);
+        assert(step_index >= previous_step);
+        if (count != 0) saw_contact = true;
+        previous_step = step_index;
+        for (uint32_t index = 0; index < count; ++index) {
+            rk_robot_contact contact{};
+            contact.struct_size = sizeof(contact);
+            assert(rk_robot_contact_list_get(list, index, &contact) == RK_OK);
+            assert(contact.link_index == 0);
+            assert(contact.other_kind == RK_CONTACT_OTHER_OBJECT);
+            assert(contact.other_object == object);
+        }
+        // A capture remains readable after the worker has had time to advance.
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+        uint32_t stable_count = 0;
+        uint64_t stable_step = 0;
+        assert(rk_robot_contact_list_count(list, &stable_count) == RK_OK);
+        assert(rk_robot_contact_list_step_index(list, &stable_step) == RK_OK);
+        assert(stable_count == count && stable_step == step_index);
+        rk_robot_contact_list_destroy(list);
+    }
+    assert(stop(fixture.session) == RK_OK);
+    assert(previous_step > 0);
+    assert(saw_contact);
+}
+
+static void unowned_ground_contact_reports_world() {
+    SessionFixture fixture(0.01);
+    nkscene_transaction transaction = 0;
+    assert(nkscene_transaction_begin(fixture.scene, &transaction) == NKS_OK);
+    nkscene_node_id node{};
+    assert(nkscene_tx_create_node(transaction, &node) == NKS_OK);
+    nkscene_transform transform{};
+    transform.matrix[0] = transform.matrix[5] = transform.matrix[10] =
+        transform.matrix[15] = 1.0f;
+    assert(nkscene_tx_set_transform(transaction, node, &transform) == NKS_OK);
+    nkscene_change_set changes = 0;
+    assert(nkscene_transaction_commit_with_changes(transaction, &changes) == NKS_OK);
+    if (changes != 0) nkscene_change_set_destroy(changes);
+    const double normal[3] = {0.0, 0.0, 1.0};
+    nksim_shape plane = 0;
+    assert(nksim_shape_create_plane(fixture.world, normal, 0.0, &plane) == NKSIM_OK);
+    nksim_body_desc ground_desc{};
+    ground_desc.struct_size = sizeof(ground_desc);
+    ground_desc.node = node;
+    ground_desc.motion_type = NKSIM_MOTION_STATIC;
+    ground_desc.shape = plane;
+    ground_desc.collision_layer = ground_desc.collision_mask = 1;
+    nksim_body ground = 0;
+    assert(nksim_body_create(fixture.world, &ground_desc, &ground) == NKSIM_OK);
+
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.floating_base = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
+    model.links[0].mass = 1.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 1.0;
+    rk_simulation_robot_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.initial_pose.struct_size = sizeof(desc.initial_pose);
+    desc.initial_pose.position[2] = 0.09;
+    desc.initial_pose.rotation[3] = 1.0;
+    desc.collision_half_extents[0] = desc.collision_half_extents[1] =
+        desc.collision_half_extents[2] = 0.1;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, &desc, &robot) == RK_OK);
+    for (int tick = 0; tick < 5; ++tick) assert(fixture.step(tick) == RK_OK);
+    rk_robot_contact_list list = RK_INVALID_ROBOT_CONTACT_LIST;
+    assert(rk_simulation_capture_robot_contacts(fixture.simulation, robot, &list) == RK_OK);
+    uint32_t count = 0;
+    assert(rk_robot_contact_list_count(list, &count) == RK_OK);
+    bool found = false;
+    for (uint32_t index = 0; index < count; ++index) {
+        rk_robot_contact contact{};
+        contact.struct_size = sizeof(contact);
+        assert(rk_robot_contact_list_get(list, index, &contact) == RK_OK);
+        if (contact.other_kind == RK_CONTACT_OTHER_WORLD && contact.other_object == 0)
+            found = true;
+    }
+    assert(found);
+    rk_robot_contact_list_destroy(list);
 }
 
 // Drops a two-box robot onto a floor. A floating base falls and comes to rest
@@ -331,6 +485,60 @@ static void floating_base_falls_and_settles(bool floating) {
     assert(std::abs(pose.position[2] - 0.5) < 1e-9);
     for (int axis = 0; axis < 3; ++axis)
         assert(twist.linear[axis] == 0.0 && twist.angular[axis] == 0.0);
+}
+
+// A push is a force on the base for a tick. Falling free (no floor), a floating
+// two-link robot of 2 kg given 20 N along x for 5 ticks of 5 ms gains
+// 20 * 0.025 / 2 = 0.25 m/s, and a kinematic one ignores the force.
+static void robot_base_can_be_pushed(bool floating) {
+    SessionFixture fixture(0.005, 2);
+    const auto simulation = fixture.simulation;
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 2;
+    model.joint_count = 1;
+    model.floating_base = floating ? 1 : 0;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    for (uint32_t i = 0; i < model.link_count; ++i) {
+        model.links[i].mass = 1.0;
+        model.links[i].inertia_tensor[0] = model.links[i].inertia_tensor[4] =
+            model.links[i].inertia_tensor[8] = 0.02 / 3.0;
+    }
+    model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].parent_frame_position[0] = 0.25;
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[0] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 10.0;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+
+    rk_simulation_wrench push{};
+    push.struct_size = sizeof(push);
+    push.force[0] = 20.0;
+    assert(rk_simulation_apply_robot_force(simulation, 7, &push) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_apply_robot_force(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    rk_simulation_wrench bad = push;
+    bad.force[1] = std::nan("");
+    assert(rk_simulation_apply_robot_force(simulation, 0, &bad) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_apply_robot_force(999, 0, &push) == RK_ERROR_INVALID_HANDLE);
+    for (int tick = 0; tick < 5; ++tick) {
+        assert(rk_simulation_apply_robot_force(simulation, 0, &push) == RK_OK);
+        assert(fixture.step(tick) == RK_OK);
+    }
+    assert(fixture.step(5) == RK_OK); // an unpushed tick adds nothing
+    rk_simulation_twist twist{};
+    twist.struct_size = sizeof(twist);
+    assert(rk_simulation_get_robot_base_velocity(simulation, 0, &twist) == RK_OK);
+    if (floating) {
+        assert(std::abs(twist.linear[0] - 0.25) < 0.01);
+        assert(std::abs(twist.linear[1]) < 1e-6);
+    } else {
+        assert(std::abs(twist.linear[0]) < 1e-9);
+    }
 }
 
 // A floating one-link robot stands on a sphere and a sideways capsule placed
@@ -486,7 +694,9 @@ static void servo_target_runs_through_the_runtime() {
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(fixture.step(0) == RK_ERROR_LIMIT);
+    // The refused command faults its robot, not the shared tick.
+    assert(fixture.step(0) == RK_OK);
+    assert(state(robot).safety == RK_SAFETY_FAULT);
 }
 
 // Joint friction loss compiled into the blueprint holds an unpowered arm,
@@ -553,8 +763,9 @@ static void link_shape_contact_softness_reaches_the_backend() {
 }
 
 // An unpowered arm falls onto its 0.3 rad stop and, since MuJoCo's stops are
-// compliant, rests slightly past it. With exact limits the runtime faults;
-// with an observed-limit tolerance it holds on the stop.
+// compliant, rests slightly past it. With exact limits the runtime faults that
+// robot (the tick itself succeeds); with an observed-limit tolerance it holds
+// on the stop.
 static rk_result arm_on_its_stop(double tolerance, double &position) {
     auto model = gravity_arm(0.0);
     model.joints[0].upper_limit = 0.3;
@@ -565,9 +776,10 @@ static rk_result arm_on_its_stop(double tolerance, double &position) {
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     rk_result result = RK_OK;
-    for (int tick = 0; tick < 200 && result == RK_OK; ++tick)
-        result = fixture.step(static_cast<uint64_t>(tick) * 10'000'000u);
+    for (int tick = 0; tick < 200; ++tick)
+        assert(fixture.step(static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
     position = state(robot).position[0];
+    if (state(robot).safety == RK_SAFETY_FAULT) result = RK_ERROR_LIMIT;
     return result;
 }
 
@@ -688,11 +900,15 @@ int main() {
     link_primitives_collide_in_link_frame();
     floating_base_falls_and_settles(false);
     floating_base_falls_and_settles(true);
+    robot_base_can_be_pushed(false);
+    robot_base_can_be_pushed(true);
     convex_link_and_box_link_build();
     tool_hulls_collide_only_on_their_pieces();
     tool_piece_contact_is_reported(1.07, false);
     tool_piece_contact_is_reported(1.04, true);
     tool_piece_contact_is_reported(1.07, false, true);
+    captured_contacts_survive_realtime_steps();
+    unowned_ground_contact_reports_world();
 
     SessionFixture fixture(0.005, 2);
     auto simulation = fixture.simulation;

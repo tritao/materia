@@ -53,6 +53,24 @@ struct Run {
     double envelope(double d, const Piece **piece = nullptr) const;
 };
 
+/**
+ * One profile segment seen as the tool's radius against height, for
+ * horizontal sections. A horizontal segment has z0 == z1 and stands for its
+ * larger radius.
+ */
+struct Section {
+    bool arc = false;
+    double z0 = 0, z1 = 0;
+    double r0 = 0, r1 = 0;
+    // Arc: r = cr + side * sqrt(radius^2 - (h - cz)^2); turn is +1 when the
+    // profile turns counter-clockwise about the centre (centre inside the tool).
+    double cr = 0, cz = 0, radius = 0, side = 1, turn = 1;
+
+    double radius_at(double h) const;
+    /** The tool's outward normal in the (r, z) half-plane at height h. */
+    void normal(double h, double &nr, double &nz) const;
+};
+
 class Profile {
 public:
     /**
@@ -74,9 +92,23 @@ public:
     /** Tool solid along a vertical line at radial distance d, heights above the tip. */
     void slice(double d, std::vector<double> &intervals) const;
 
+    /**
+     * Radius of the tool's horizontal section (a disc) at height h above the
+     * tip, the larger one at a step; negative outside the tool. `section`
+     * receives the segment giving it, preferring a sloped one on ties.
+     */
+    double section_radius(double h, const Section **section = nullptr) const;
+    /** Largest section radius over heights [h0, h1], negative if the tool misses them. */
+    double largest_radius(double h0, double h1, double &at, const Section **section) const;
+    /** Heights where the section radius stops being smooth: segment ends, sorted. */
+    const std::vector<double> &breaks() const { return breaks_; }
+
 private:
     std::vector<Segment> segments_;
     std::vector<Run> runs_;
+    std::vector<Section> sections_;
+    std::vector<double> breaks_;
+    double tolerance_ = 0;
     double radius_ = 0;
     double base_ = 0;
     double height_ = 0;

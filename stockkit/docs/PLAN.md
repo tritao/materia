@@ -53,8 +53,8 @@ arrive as triangle buffers, so the core never links OCCT.
    target comparison per ray with leftover, gouge and the gouging move.
    CamKit's island-pocket test adopts it. Contact is measured after each
    move's own cut, so a climbing move whose shank meets material its flutes
-   remove later in the same move is missed. Gouges are measured along Z
-   only until phase 6.
+   remove later in the same move is missed. Phase 6 extended gouge
+   measurement to the X and Y grids, so walls gouged sideways are found.
 5. **Preview and editor** (milestone 1): Z-grid mesh, SceneKit colouring by
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
    pick → operation → `Provenance`. The StockKit side is done and headless:
@@ -67,8 +67,25 @@ arrive as triangle buffers, so the core never links OCCT.
    nodes for large stock.
 6. **Tri-dexel and meshing** (milestone 2): X and Y grids updated by every
    move; manifold dual contouring with a QEF over stored normals; STL export.
+   Done so far: the sweep query answers X and Y rays (closed form for level
+   moves and plunges, scan and refine for ramps and helices), and the stock
+   is a lattice with a grid per axis that every move cuts. X and Y rays
+   match the OCCT oracle to 1e-9 m and lie within the sampled reference's
+   bounds. Haxeon's FFI now returns several outputs and queried typed arrays
+   in one call, so ray reads, sweep queries and cuts are single calls. Dual
+   contouring over the three grids gives closed meshes with exact crossings
+   and sharp edges (a box exactly; curved surfaces within their chord
+   error), and the preview and app use it on tri-dexel stock. Not yet
+   manifold: features thinner than a cell can merge at a shared vertex.
+   Target comparison runs along every grid, and contoured meshes are
+   coloured by deviation surface by surface, each by its own ray, so walls
+   gouged sideways show in the viewer and name their move. Still to do:
+   manifold dual contouring and STL export.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
    adapter, holder/spindle against fixtures via RobotKit/SimKit collision.
+
+Follow-ups outside these phases (viewer, diagnostics, CAM integration, FFI
+improvements) are tracked in [`../TODO.md`](../TODO.md).
 
 ## Milestone 1 targets
 
@@ -94,10 +111,19 @@ six levels in 1.5 mm lines joined by half circles).
 | 0.1 mm (2001×2001) | 6 mm flat | 1.6 s | 0.23 s | 244 MB |
 | 0.1 mm (2001×2001) | 6 mm ball | 6.8 s | 0.78 s | 244 MB |
 
+Tri-dexel (the same program on 801×801 Z rays plus X and Y grids through
+30 mm of stock at 0.25 mm, 801×120 rays each): flat mill 1.0 s on one thread
+and 0.13 s on all, ball mill 3.6 s and 0.37 s; 54–74 MB. Most moves are
+level, whose X and Y rays are closed form (a capsule or an annular sector).
+
 Meshing the whole 0.25 mm stock for preview takes 0.04–0.1 s after the flat
 mill (0.22M triangles merged, 1.3M unmerged) and 0.1–0.18 s after the ball
 mill (1.5M merged: its scallops barely merge, 2.6M unmerged). A dirty 4×4-tile
-chunk remeshes in about a millisecond.
+chunk remeshes in about a millisecond. Contouring the tri-dexel stock (a
+closed surface, sides and bottom included) takes 0.7 s after the flat mill
+(3.3M triangles) and 0.9 s after the ball mill (3.7M); a 4×4-tile chunk takes
+2–8 ms. Marking the Z tiles over changed X and Y rays costs no measurable cut
+time.
 
 Creating the stock takes about 0.2 s at either spacing. Memory is 48 bytes
 per interval plus 12 per ray. The ball mill costs more because its scallops

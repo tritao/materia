@@ -1,5 +1,6 @@
 package humanoid;
 
+import RobotKitRuntime;
 import haxe.Int64;
 import robotkit.model.RobotModelCodec;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -14,7 +15,8 @@ import robotkit.runtime.SimulationSpace;
  *
  * Usage: haxeon run --project robotkit/tools/humanoid/haxeon.json -- drop <robot.json> [drop-height]
  * Exits nonzero when the robot passes through the floor or a foot is not
- * among the first links to touch it. A joint-limit fault after touchdown ends
+ * among the first links to touch it. A joint-limit fault after touchdown (the
+ * robot's own fault state; the shared step still succeeds) ends
  * the run early and is reported, not failed: without a balance controller the
  * robot is not expected to stay up (see `stand`).
  */
@@ -45,18 +47,19 @@ class DropCheck {
     var lowest = height;
     var fault:Null<String> = null;
     for (step in 0...1500) {
-      try harness.step(Int64.ofInt(step)) catch (error:Dynamic) {
+      harness.step(Int64.ofInt(step));
+      var snapshot = runtime.snapshot();
+      if (snapshot.safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT) {
         // A hard landing can still press a joint beyond the limit tolerance,
-        // which the runtime latches as a fault. Touchdown has been observed
-        // by then.
-        var snapshot = runtime.snapshot();
+        // which the runtime latches as this robot's fault (the step itself
+        // succeeds). Touchdown has been observed by then.
         var stops = [for (index in 0...model.joints.length) {
           var joint = model.joints[index], position = snapshot.q.get(index);
           if (joint.type == robotkit.model.JointType.Revolute &&
               (position < joint.limits.lower + 0.01 || position > joint.limits.upper - 0.01))
             joint.name;
         }];
-        fault = '${step * TIMESTEP} s: $error; joints at their stops: ${stops.join(", ")}';
+        fault = '${step * TIMESTEP} s: robot fault ${snapshot.faultCode}; joints at their stops: ${stops.join(", ")}';
         break;
       }
       var z = simulation.robotPose(0).position[2];

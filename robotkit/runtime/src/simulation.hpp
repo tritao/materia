@@ -68,10 +68,12 @@ public:
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
     /** Reads one robot base's world-frame twist from the latest physics state. */
     rk_result get_robot_base_velocity(uint32_t robot_index, rk_simulation_twist &out_twist) const;
+    rk_result apply_robot_force(uint32_t robot_index, const rk_simulation_wrench &wrench);
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
     rk_result get_robot_contacts(rk_robot_runtime runtime,
-                                 std::vector<rk_robot_contact> &out) const;
+                                 std::vector<rk_robot_contact> &out,
+                                 uint64_t *step_index = nullptr) const;
     rk_result capture_presentation(rk_simulation_presentation_info &out_info,
         std::vector<rk_simulation_presentation_pose> &out_poses) const;
     /** Robot poses from a frame captured from this session. */

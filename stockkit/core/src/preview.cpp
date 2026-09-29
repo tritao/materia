@@ -20,6 +20,7 @@ struct Builder {
             mesh.normals.insert(mesh.normals.end(), normal, normal + 3);
             mesh.vertex_sources.push_back(source);
             mesh.vertex_rays.push_back(ray);
+            mesh.vertex_axes.push_back(2);
         }
         mesh.indices.insert(mesh.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
         mesh.triangle_sources.insert(mesh.triangle_sources.end(), {source, source});
@@ -94,7 +95,7 @@ struct Open {
 
 } // namespace
 
-void build_preview(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
+void build_preview(const DexelGrid &stock, uint32_t tile_x, uint32_t tile_y, uint32_t tiles_x, uint32_t tiles_y,
     const PreviewOptions &options, PreviewMesh &out) {
     out = PreviewMesh{};
     out.merged = options.merge;
@@ -173,7 +174,10 @@ void build_preview(const Stock &stock, uint32_t tile_x, uint32_t tile_y, uint32_
         }
         for (const Open &face : open) emit(face, y0, y1);
     }
-    if (options.merge) out.vertex_rays.clear();
+    if (options.merge) {
+        out.vertex_rays.clear();
+        out.vertex_axes.clear();
+    }
 }
 
 } // namespace stockkit
