@@ -53,8 +53,8 @@ arrive as triangle buffers, so the core never links OCCT.
    target comparison per ray with leftover, gouge and the gouging move.
    CamKit's island-pocket test adopts it. Contact is measured after each
    move's own cut, so a climbing move whose shank meets material its flutes
-   remove later in the same move is missed. Gouges are measured along Z
-   only until phase 6.
+   remove later in the same move is missed. Phase 6 extended gouge
+   measurement to the X and Y grids, so walls gouged sideways are found.
 5. **Preview and editor** (milestone 1): Z-grid mesh, SceneKit colouring by
    operation/deviation, copy-on-write tile snapshots for scrubbing, surface
    pick → operation → `Provenance`. The StockKit side is done and headless:
@@ -83,6 +83,9 @@ arrive as triangle buffers, so the core never links OCCT.
    manifold dual contouring and STL export.
 7. **Multi-axis** (milestone 3): tilted-tool sweeps, MotionKit + kinematics
    adapter, holder/spindle against fixtures via RobotKit/SimKit collision.
+
+Follow-ups outside these phases (viewer, diagnostics, CAM integration, FFI
+improvements) are tracked in [`../TODO.md`](../TODO.md).
 
 ## Milestone 1 targets
 
