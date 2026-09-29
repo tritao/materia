@@ -15,6 +15,8 @@ import robotkit.world.JointTarget;
 /** Rack-to-table acceptance scene wiring and robot motion. */
 class WorkerDemoJob {
   public static inline var ROBOT_ID = "materia/robot";
+  /** Where the part's centre rests on the assembly table: its 1.06 m top plus half the 8 cm part. */
+  public static final PLACE_POINT = [3.65, 2.5, 1.10];
 
   public static function configure(worker:HumanWorker, objects:Array<{id:String,object:SimObject}>,
       simulation:Simulation, robotIndex:Int, model:RobotModel):Void {
@@ -23,7 +25,7 @@ class WorkerDemoJob {
     if (part == null) throw "Worker demo part is missing from the scene";
     if (robotIndex < 0) throw "Worker demo robot is missing from the scene";
     var job = FacilityJobs.fetch(FacilityRouteDemo.demoFacility(), "shelf", "B3")
-      .deliver("bench", [3.75, 2.7, 1.0]);
+      .deliver("bench", PLACE_POINT);
     for (action in job.orderedActions()) {
       if (Std.isOfType(action, Pick)) {
         var pick:Pick = cast action;

@@ -898,13 +898,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
       {id:"worker-demo-floor",label:"Factory floor",type:"rectangle",x:2.0,y:1.2,z:-0.1,
         width:8.0,height:5.0,depth:0.2,collisionEnabled:true,dynamicBody:false,mass:1.0,
         red:0.38,green:0.42,blue:0.46,visible:true},
-      {id:"worker-demo-rack",label:"Rack B3",type:"rectangle",x:3.65,y:-0.2,z:0.88,
+      {id:"worker-demo-rack",label:"Rack B3",type:"rectangle",x:3.65,y:-0.2,z:0.98,
         width:0.8,height:0.8,depth:0.16,collisionEnabled:true,dynamicBody:false,mass:1.0,
         red:0.55,green:0.38,blue:0.2,visible:true},
-      {id:"worker-demo-table",label:"Assembly table",type:"rectangle",x:3.65,y:2.5,z:0.88,
+      {id:"worker-demo-table",label:"Assembly table",type:"rectangle",x:3.65,y:2.5,z:0.98,
         width:0.8,height:0.8,depth:0.16,collisionEnabled:true,dynamicBody:false,mass:1.0,
         red:0.2,green:0.45,blue:0.65,visible:true},
-      {id:"worker-demo-part",label:"Part",type:"rectangle",x:3.65,y:-0.2,z:1.0,
+      {id:"worker-demo-part",label:"Part",type:"rectangle",x:3.65,y:-0.2,z:1.10,
         width:0.08,height:0.08,depth:0.08,collisionEnabled:true,dynamicBody:true,mass:0.1,
         red:0.95,green:0.65,blue:0.12,visible:true}
     ];

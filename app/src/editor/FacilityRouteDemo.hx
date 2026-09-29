@@ -39,7 +39,9 @@ class FacilityRouteDemo {
 		built.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12.0, 12.0)));
 		var dock = new Station("dock", "Dock", "floor", "map", new Pose2(0.0, 0.0, 0.0));
 		var shelf = new Rack("shelf", "Shelf", "floor", "map", new Pose2(3.0, 0.0, 0.0),
-			[new RackSlot("B3", new RackSlotPose(0.35, -0.2, 1.0))]);
+			// B3's pose is where a hand grasps the part in it: 1 cm above the top of
+			// the 8 cm part resting on the 1.06 m shelf at (3.65, -0.2).
+			[new RackSlot("B3", new RackSlotPose(0.65, -0.2, 1.15))]);
 		var bench = new Station("bench", "Bench", "floor", "map", new Pose2(3.0, 2.5, Math.PI / 2));
 		built.addStation(dock);
 		built.addRack(shelf);

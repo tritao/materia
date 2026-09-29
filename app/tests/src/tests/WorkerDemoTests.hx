@@ -13,6 +13,7 @@ class WorkerDemoTests {
   }
 
   static function run():Void {
+    linkBounds();
     var editor = new ReferenceEditorApp();
     editor.enableWorkerDemo();
     var loaded = new SensorConfiguration(editor.sensors.records());
@@ -56,14 +57,29 @@ class WorkerDemoTests {
       previousPart = current;
       if (worker.currentJobDone() && tick > 900) break;
     }
+    // Let the released part come to rest, as the HumanKit placement test does.
+    var restingSpeed = Math.POSITIVE_INFINITY, settled:Null<Array<Float>> = null;
+    for (settleTick in 0...450) {
+      editor.simulation.step();
+      var now = [for (entry in editor.simulation.environmentVisualState())
+        if (entry.id == "worker-demo-part") entry.position][0];
+      if (settled != null)
+        restingSpeed = Math.sqrt(Math.pow(now[0] - settled[0], 2) + Math.pow(now[1] - settled[1], 2) +
+          Math.pow(now[2] - settled[2], 2)) / editor.simulation.timestep;
+      settled = now;
+      if (settleTick >= 90 && restingSpeed < 0.001) break;
+    }
     var visual = editor.simulation.environmentVisualState();
     var part = [for (entry in visual) if (entry.id == "worker-demo-part") entry];
     if (part.length != 1) throw "Demo part is missing";
     var p = part[0].position;
-    var error = Math.sqrt(Math.pow(p[0] - 3.65, 2) + Math.pow(p[1] - 2.5, 2) +
-      Math.pow(p[2] - 1.0, 2));
-    if (!worker.currentJobDone() || worker.currentJobFailure() != null || error > 0.25)
-      throw 'Worker did not place the part within 25 cm: done=${worker.currentJobDone()} failure=${worker.currentJobFailure()} pose=$p error=$error';
+    var target = app.editor.WorkerDemoJob.PLACE_POINT;
+    var horizontal = Math.sqrt(Math.pow(p[0] - target[0], 2) + Math.pow(p[1] - target[1], 2));
+    var vertical = Math.abs(p[2] - target[2]);
+    if (!worker.currentJobDone() || worker.currentJobFailure() != null ||
+        horizontal > 0.02 || vertical > 0.01 || restingSpeed > 0.001)
+      throw 'Worker missed part target: done=${worker.currentJobDone()} failure=${worker.currentJobFailure()} pose=$p rotation=${part[0].rotation} horizontal=$horizontal vertical=$vertical';
+    Sys.println('worker demo placement: horizontal=$horizontal vertical=$vertical speed=$restingSpeed');
     if (!sawRack || !leftRack || !sawTable || separationCount < 100 || linkTravel < 0.1 ||
         separationMax - separationMin < 0.1)
       throw 'Worker safety stream missed a zone or moving arm: rack=$sawRack left=$leftRack table=$sawTable count=$separationCount linkTravel=$linkTravel range=${separationMax-separationMin}';
@@ -82,5 +98,22 @@ class WorkerDemoTests {
       if (after != nodeCount) throw 'Failed rebuild leaked character nodes: $nodeCount -> $after';
     }
     editor.dispose();
+  }
+
+  /** Link collision shapes become bounding spheres placed through the link's pose. */
+  static function linkBounds():Void {
+    // A quarter turn about +Z takes the 45 cm +X offset onto +Y.
+    var quarter = Math.sqrt(0.5);
+    var center = app.editor.RobotLinkBounds.worldCenter([1.0, 2.0, 1.3], [0.0, 0.0, quarter, quarter],
+      [0.45, 0.0, 0.0]);
+    if (Math.abs(center.x - 1.0) > 1e-9 || Math.abs(center.y - 2.45) > 1e-9 || Math.abs(center.z - 1.3) > 1e-9)
+      throw 'Link bound centre did not follow the link rotation: ${center.x}, ${center.y}, ${center.z}';
+    var box = new robotkit.model.CollisionShape(robotkit.model.CollisionShape.CollisionPrimitive.Box(0.1, 0.2, 0.2),
+      [0.0, 0.0, 0.0]);
+    var capsule = new robotkit.model.CollisionShape(
+      robotkit.model.CollisionShape.CollisionPrimitive.Capsule(0.05, 0.2), [0.0, 0.0, 0.0]);
+    if (Math.abs(app.editor.RobotLinkBounds.radius(box) - 0.3) > 1e-9 ||
+        Math.abs(app.editor.RobotLinkBounds.radius(capsule) - 0.25) > 1e-9)
+      throw "Link bound radii do not enclose their shapes";
   }
 }
