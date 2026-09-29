@@ -82,6 +82,9 @@ class SimSession {
     public function isRunning():Bool
         return status().get_running() != 0;
 
+    public function isSealed():Bool
+        return status().get_sealed() != 0;
+
     public function stepIndex():haxe.Int64
         return status().get_step_index();
 
@@ -102,7 +105,29 @@ class SimSession {
         desc.set_mass(mass);
         var result = NativeKitSim.nksim_session_create_object(owner.borrow(), desc);
         SimWorld.check(result.status, "session.createObject");
-        return new SimObject(this, result.out_object, motion);
+        return new SimObject(this, result.out_object, motion, shape);
+    }
+
+    /** Drive a dynamic object from a carrier body's frame on every tick. */
+    public function holdObject(object:SimObject, carrier:nksim_body, ?offset:SimPose):Void {
+        ensureLive();
+        var local = offset == null ? new SimPose(0, 0, 0) : offset;
+        SimWorld.check(NativeKitSim.nksim_session_hold_object(owner.borrow(), object.handle,
+            carrier, local.toNative()), "session.holdObject");
+    }
+
+    public function releaseObject(object:SimObject):Void {
+        ensureLive();
+        SimWorld.check(NativeKitSim.nksim_session_release_object(owner.borrow(), object.handle),
+            "session.releaseObject");
+    }
+
+    /** Zero means the object is free. */
+    public function objectCarrier(object:SimObject):nksim_body {
+        ensureLive();
+        var result = NativeKitSim.nksim_session_get_object_carrier(owner.borrow(), object.handle);
+        SimWorld.check(result.status, "session.objectCarrier");
+        return result.out_carrier;
     }
 
     /** Adds a group of kinematic parts, each starting at its pose. */

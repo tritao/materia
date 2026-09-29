@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "projectkit-tests" },
+  "entry": "ProjectKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": { "projectkit": { "path": ".." } },
+  "target": "host",
+  "outputDir": "build"
+}

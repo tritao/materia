@@ -307,6 +307,19 @@ artifacts are still written along with `screenshot-error.txt`.
 `frame-timeline.jsonl` records the duration and UI submit/render timing for every
 captured frame.
 
+The built-in worker demo uses one MuJoCo session for a rack, a dynamic part,
+a walking worker, an assembly table, and a cycling robot arm. For a headless
+result after ten simulated seconds, run from the repository root:
+
+```sh
+./app/run-built.sh --snapshot --worker-demo=rack-to-table --worker-demo-step=1000
+```
+
+The output reports the job, part position, current zone, and robot separation.
+Omit `--snapshot` to view it in the editor. The headless capture command is in
+`humankit/sim/tests/README.md`; screenshots are generated under that test's
+ignored build directory.
+
 For a bounded HashLink CPU/allocation/GC capture with process RSS sampled at
 100 ms intervals, run from the repository root:
 

@@ -1,6 +1,6 @@
 # StockKit
 
-StockKit will simulate material removal: it tracks the in-process stock as
+StockKit simulates material removal: it tracks the in-process stock as
 tools move through it, reports collisions and rapid moves through material,
 compares the result with a target part, and meshes the stock for display.
 Coordinates are metres.
@@ -27,8 +27,9 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
 - `stockkit.CutMove` is one tool motion through the stock (tool, motion in the
   workpiece frame, move kind, source operation, tool and provenance).
   `CutMoves.fromProgram(program, ?workOrigin)` builds them from a
-  `ToolpathProgram` with a tool library; CamKit exposes `program.toolpath()`. Toolpath
-  geometry is in work coordinates and includes the active G43 tool length,
+  `ToolpathProgram` with its tool library and active setup position. CamKit
+  returns that program directly. Toolpath geometry is in work coordinates and
+  includes the active G43 tool length,
   which `ToolpathOp.ToolLengthOffset` records for recovering tool-tip positions.
 - The test project holds the exact reference (`tests/src/oracle/ExactOracle.hx`):
   it builds each move's swept solid with OCCT through CadKit, subtracts it from
@@ -200,7 +201,7 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     60-cell-wide lattice and requires the enclosed volume to match the
     OCCT result within 1% of the removed volume.
 
-Build the core and run its checks and benchmark:
+For standalone C++ checks and benchmarks, build the core directly:
 
 ```sh
 cmake -S stockkit/core -B build/stockkit-core -DCMAKE_BUILD_TYPE=Release
@@ -217,10 +218,12 @@ initial capacity so small reads take one call). So `sk_stock_read_rays`
 returns counts and intervals together, `sk_sweep_ray` answers in one call,
 and `sk_stock_cut` returns per-move results and a summary.
 
-Run the Haxe tests with the StockKit core and CadKit native builds on
+Haxeon builds `stockkit_core` automatically from `stockkit/haxeon.json` when
+StockKit, CamKit, or the app needs it. Haxeon also adds the built library to
+the test runtime path. Run the Haxe tests with only the CadKit native build on
 `LD_LIBRARY_PATH`:
 
 ```sh
-LD_LIBRARY_PATH=build/stockkit-core:/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
+LD_LIBRARY_PATH=/path/to/cadkit/build/debug/core:/path/to/cadkit/build/debug/lin64/gcc/libd \
   ./haxeon/scripts/haxeon run --project stockkit/tests/haxeon.json
 ```

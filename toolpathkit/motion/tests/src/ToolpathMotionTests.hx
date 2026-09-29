@@ -7,6 +7,10 @@ import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
+import toolpathkit.path.ToolpathProgram;
+import toolpathkit.setup.Setup;
+import toolpathkit.setup.TravelEnvelope;
+import toolpathkit.tool.ToolLibrary;
 import motionkit.program.MotionOp;
 import motionkit.path.CornerBlender;
 import motionkit.path.GeometricPath;
@@ -18,19 +22,22 @@ import haxe.Int64;
 
 class ToolpathMotionTests {
   static function acceptsBinding(binding:ToolpathMotionBinding):Void {}
+  static function pathProgram(ops:Array<ToolpathOp>):ToolpathProgram
+    return new ToolpathProgram(ops, new ToolLibrary(),
+      [new Setup("1", new Point3(0, 0, 0))]);
 
   static function main():Void {
     acceptsBinding(null);
     var origin = Provenance.cam(7, "face:2");
     var machine = new MachineBinding("work", "x", "y", "z", 0.2);
-    var result = ToolpathMotion.lower([
+    var result = ToolpathMotion.lower(pathProgram([
       ToolpathOp.Spindle(Clockwise, 12000, origin),
       ToolpathOp.Move(Cut,
         PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
         0.01, 0, origin),
       ToolpathOp.Coolant(false, false, origin),
       ToolpathOp.End(origin)
-    ], machine);
+    ]), machine);
     if (result.program == null || result.diagnostics.length != 0)
       throw "lowering failed";
     var pathIndex = -1;
@@ -41,27 +48,47 @@ class ToolpathMotionTests {
     if (pathIndex < 0 || result.sourceMap.provenanceAt(pathIndex, 0.005) != origin ||
         result.sourceMap.entriesFor(origin).length < 3)
       throw "path provenance lost";
-    machine.setTravelEnvelope([-0.01, -0.01, -0.01],
-      [0.005, 0.01, 0.01]);
+    machine.setTravel(new TravelEnvelope(new Point3(-0.01, -0.01, -0.01),
+      new Point3(0.005, 0.01, 0.01)));
     var rejected = false;
-    try ToolpathMotion.lower([
+    try ToolpathMotion.lower(pathProgram([
       ToolpathOp.Move(Cut,
         PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
         0.01, 0, origin)
-    ], machine) catch (error:Dynamic) {
+    ]), machine) catch (error:Dynamic) {
       rejected = Std.string(error).indexOf("X travel") >= 0;
     }
     if (!rejected) throw "machine travel was not checked";
+    machine.setTravel(null);
+    var probeOps = [ToolpathOp.Move(Cut,
+      PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
+      0.01, 0.0, origin)];
+    function endX(workOrigin:Point3):Float {
+      var placed = new ToolpathProgram(probeOps, new ToolLibrary(),
+        [new Setup("1", workOrigin)]);
+      var lowered = ToolpathMotion.lower(placed, machine);
+      var motion:motionkit.program.MotionProgram = cast lowered.program;
+      if (motion == null) throw "probed setup produced no motion";
+      for (op in motion.ops) switch op {
+        case MotionOp.FollowPath(path, _, _, _):
+          return path.poseAt(path.length()).x;
+        case _:
+      }
+      throw "probed setup produced no path";
+    }
+    if (Math.abs(endX(new Point3(0.003, 0, 0)) -
+        endX(new Point3(0, 0, 0)) - 0.003) > 1e-9)
+      throw "probed origin must move the lowered path by the probe difference";
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(
       new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 200), 0.1, 0.4);
     var robotBinding = new ToolpathMotionBinding(
       new MachineBinding("work", "x", "y", "z", 0.08), blueprint);
-    var compiled = robotBinding.compile([
+    var compiled = robotBinding.compile(pathProgram([
       ToolpathOp.Move(Cut,
         PathGeometry.Line(new Point3(0, 0, 0), new Point3(0.01, 0, 0)),
         0.01, 0, Provenance.cam(8))
-    ], [0.0, 0.0, 0.0], Int64.ofInt(1));
+    ]), [0.0, 0.0, 0.0], Int64.ofInt(1));
     if (compiled.blocks.length == 0) throw "robot binding produced no plans";
     compiled.dispose();
     var corners = CornerBlender.blendPerCorner(GeometricPath.lines([
@@ -74,13 +101,13 @@ class ToolpathMotionTests {
     var second:ArcSegment = cast corners.path.primitives[3];
     if (first.radius >= second.radius)
       throw "smaller corner tolerance must create a tighter fillet";
-    var eventResult = ToolpathMotion.lower([
+    var eventResult = ToolpathMotion.lower(pathProgram([
       ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0),
         new Point3(0.01, 0, 0)), 0.01, 0.0002, origin),
       ToolpathOp.Coolant(true, false, origin),
       ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0.01, 0, 0),
         new Point3(0.01, 0.01, 0)), 0.01, 0.0004, origin)
-    ], new MachineBinding("work", "x", "y", "z", 0.2));
+    ]), new MachineBinding("work", "x", "y", "z", 0.2));
     var eventProgram:motionkit.program.MotionProgram = cast eventResult.program;
     if (eventProgram == null || eventProgram.ops.length != 1)
       throw "coolant added a motion stop";
@@ -91,7 +118,7 @@ class ToolpathMotionTests {
           throw "coolant must be a position-tied path event";
       case _: throw "blended path missing";
     }
-    Sys.println("ToolpathKit Motion tests passed (8 assertions)");
+    Sys.println("ToolpathKit Motion tests passed (9 assertions)");
     MachiningRunTests.run();
     ToolpathScenarioTests.main();
   }

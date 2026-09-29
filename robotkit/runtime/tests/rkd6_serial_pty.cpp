@@ -1,3 +1,4 @@
+// This test uses assert for setup calls; keep them active in Release builds.
 #include "robotkit_device_serial_endpoint.hpp"
 #include "rkd6_endpoint.hpp"
 #include <array>

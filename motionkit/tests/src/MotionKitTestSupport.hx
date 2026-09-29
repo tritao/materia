@@ -1,7 +1,5 @@
 import haxe.Int64;
 import haxe.io.Bytes;
-import cnckit.CncMachine;
-import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
 import cadkit.modeling.AssemblyModel;
 import cadbridge.AssemblySimulationBridge;
@@ -28,9 +26,6 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
-import toolpathkit.motion.MachineBinding;
-import toolpathkit.motion.ToolpathMotion;
-import toolpathkit.motion.ToolpathMotionBinding;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;
@@ -117,48 +112,6 @@ import robotkit.world.TrajectorySegment;
 
 
 class MotionKitTestSupport {
-  public static function cncBinding(cnc:CncMachine,
-      blueprint:MotionSystemBlueprint):ToolpathMotionBinding {
-    var machine = new MachineBinding(cnc.frameId, cnc.xAxisId, cnc.yAxisId,
-      cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
-      cnc.positionTolerance, cnc.orientationTolerance,
-      cnc.maxBlendTurnAngleRadians);
-    for (code in 54...60)
-      machine.setSetupOffset(cnc.controller.setupId(code), cnc.controller.workOffset(code));
-    if (cnc.travelLower != null && cnc.travelUpper != null)
-      machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
-    var binding = new ToolpathMotionBinding(machine, blueprint);
-    cnc.setTravelEnvelope(machine.travelLower, machine.travelUpper);
-    return binding;
-  }
-
-  public static function cncProgram(cnc:CncMachine, source:String):MotionProgram {
-    var parsed = new CncCompiler(cnc).compileDetailed(source);
-    for (diagnostic in parsed.diagnostics)
-      if (diagnostic.severity == cnckit.CncDiagnostic.CncSeverity.Error)
-        throw diagnostic.toString();
-    var machine = new MachineBinding(cnc.frameId, cnc.xAxisId, cnc.yAxisId,
-      cnc.zAxisId, cnc.rapidSpeed, cnc.initialPosition,
-      cnc.positionTolerance, cnc.orientationTolerance,
-      cnc.maxBlendTurnAngleRadians);
-    for (code in 54...60)
-      machine.setSetupOffset(cnc.controller.setupId(code), cnc.controller.workOffset(code));
-    if (cnc.travelLower != null && cnc.travelUpper != null)
-      machine.setTravelEnvelope(cnc.travelLower, cnc.travelUpper);
-    var lowered = ToolpathMotion.lower(parsed.ops, machine);
-    if (lowered.program == null) throw "G-code contains no executable motion or barrier";
-    return lowered.program;
-  }
-
-  public static function compileCnc(binding:ToolpathMotionBinding,
-      cnc:CncMachine, source:String, joints:Array<Float>,
-      planId:Int64):motionkit.robot.CompiledProgram {
-    var parsed = new CncCompiler(cnc).compileDetailed(source);
-    for (diagnostic in parsed.diagnostics)
-      if (diagnostic.severity == cnckit.CncDiagnostic.CncSeverity.Error)
-        throw diagnostic.toString();
-    return binding.compile(parsed.ops, joints, planId);
-  }
   public static var assertions:Int = 0;
   public function new() {}
 
@@ -195,121 +148,6 @@ class MotionKitTestSupport {
     if (sinHalf < 1e-12) return [0.0, 0.0, 0.0];
     var angleScale = 2.0 * Math.atan2(sinHalf, w) * scale / sinHalf;
     return [x * angleScale, y * angleScale, z * angleScale];
-  }
-
-  public function cncTrial(virtualDevice:Bool, ?linkLoss:Bool = false):Array<Float> {
-    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
-      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
-      new LinearAxis(23, 10, 200), 0.01, 0.04);
-    for (channel in ["spindle.speed", "spindle.direction"])
-      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
-        ProcessEventValue.Analog(0.0)));
-    var options:Null<VirtualDeviceOptions> = null;
-    if (virtualDevice) {
-      options = new VirtualDeviceOptions();
-      for (index in 0...blueprint.model.actuators.length) {
-        var actuator = blueprint.model.actuators[index];
-        switch actuator.transmission {
-          case SimpleTransmission(_, ratio, offset):
-            options.actuators.push(new VirtualActuatorOptions(actuator.id,
-              index, ratio, offset, 3200.0 / (2.0 * Math.PI),
-              0.01 * Math.abs(ratio), 2));
-        }
-      }
-    }
-    var simulationHarness = new SimulationHarness(0.01);
-    var simulation = simulationHarness.simulation;
-    var runtime = simulation.addRobot(blueprint.runtime, null, options);
-    if (virtualDevice) for (tick in 1...21) simulationHarness.step(Int64.ofInt(tick));
-    var robot = new SimulatedRobot("cnc-gantry", runtime, blueprint.model.name,
-      [for (link in blueprint.model.links) link.name],
-      [for (joint in blueprint.model.joints) joint.name]);
-    var cnc = new CncMachine("work", "x", "y", "z", 0.01,
-      null, 0.001);
-    var binding = cncBinding(cnc, blueprint);
-    var program = cncProgram(cnc,
-      "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G3 X20 Y20 I0 J10\nM5\nM2\n");
-    var motion = new ManipulatorMotion(robot, binding.compiler,
-      function(channel) return channel == "spindle.at_speed" ?
-        EventValue.Digital(true) : null,
-      function() return runtime.pollEvents());
-    motion.run(program);
-    check(motion.running, 'CNC program starts: ${motion.failure}');
-    var trace:Array<Float> = [];
-    var holdIssued = false, holdTicks = 0, linkCut = false;
-    for (tick in 0...3000) {
-      if (!linkCut) motion.update(0.01);
-      simulationHarness.step(Int64.ofInt(virtualDevice ? tick + 21 : tick));
-      var q = robot.snapshot().positions.toArray();
-      trace.push(q[0]); trace.push(q[1]);
-      var projection = Math.max(0.0, Math.min(1.0, (q[0] + q[1]) / 0.02));
-      var lineError = Math.sqrt((q[0] - projection * 0.01) *
-        (q[0] - projection * 0.01) + (q[1] - projection * 0.01) *
-        (q[1] - projection * 0.01));
-      var radius = Math.sqrt((q[0] - 0.01) * (q[0] - 0.01) +
-        (q[1] - 0.02) * (q[1] - 0.02));
-      var arcError = q[0] >= 0.01 && q[1] <= 0.02 ?
-        Math.abs(radius - 0.01) : Math.min(
-          Math.sqrt((q[0] - 0.01) * (q[0] - 0.01) +
-            (q[1] - 0.01) * (q[1] - 0.01)),
-          Math.sqrt((q[0] - 0.02) * (q[0] - 0.02) +
-            (q[1] - 0.02) * (q[1] - 0.02)));
-      check(Math.min(lineError, arcError) <= cnc.positionTolerance + 1e-5,
-        "CNC recorded position stays on the authored rapid or arc");
-      if (!holdIssued && !linkCut && q[0] > 0.0105 && q[1] > 0.0101) {
-        if (linkLoss) {
-          simulation.cutVirtualDeviceLink(0, true);
-          linkCut = true;
-        } else {
-          motion.hold(); holdIssued = true;
-        }
-      }
-      if (holdIssued && holdTicks++ == 35) motion.resume();
-      if ((holdIssued || linkCut) && q[0] > 0.0105 && q[1] > 0.0101) {
-        var radial = Math.sqrt((q[0] - 0.01) * (q[0] - 0.01) +
-          (q[1] - 0.02) * (q[1] - 0.02));
-        check(Math.abs(radial - 0.01) <= 0.001,
-          "CNC feed hold and resume stay on the programmed arc");
-      }
-      if (linkCut && robot.fault() != null) break;
-      if (!motion.running) break;
-    }
-    if (linkLoss) {
-      check(linkCut, "CNC link was cut during the programmed arc");
-      check(robot.fault() != null, "CNC device latches link-loss fault");
-      var previous = robot.snapshot().positions.toArray();
-      var quiet = 0;
-      for (extra in 0...300) {
-        simulationHarness.step(Int64.ofInt(4000 + extra));
-        var current = robot.snapshot().positions.toArray();
-        if (Math.abs(current[0] - previous[0]) < 1e-6 &&
-            Math.abs(current[1] - previous[1]) < 1e-6) quiet++;
-        else quiet = 0;
-        previous = current;
-        if (quiet >= 20) break;
-      }
-      check(quiet >= 20, "CNC link loss reaches a controlled stop");
-      check(previous[0] <= 0.02 + cnc.positionTolerance &&
-        previous[1] <= 0.02 + cnc.positionTolerance,
-        "CNC link-loss stop stays within the programmed axis bounds");
-      simulationHarness.dispose();
-      return trace;
-    }
-    check(motion.completed, 'CNC program completes: ${motion.failure}');
-    check(holdIssued, "CNC feed hold was issued during the arc");
-    near(robot.snapshot().positions.get(0), 0.02, "CNC finishes X", 2e-4);
-    near(robot.snapshot().positions.get(1), 0.02, "CNC finishes Y", 2e-4);
-    if (virtualDevice) for (extra in 0...20)
-      simulationHarness.step(Int64.ofInt(4000 + extra));
-    var events = motion.firedEvents();
-    check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
-      switch event.value { case ProcessEventValue.Analog(value): value == 12000.0;
-        case _: false; }), "CNC spindle start fires");
-    check(Lambda.exists(events, function(event) return event.channel == "spindle.speed" &&
-      switch event.value { case ProcessEventValue.Analog(value): value == 0.0;
-        case _: false; }), "CNC spindle stop fires");
-    simulationHarness.dispose();
-    return trace;
   }
 
   public function runMotion(machine:MotionSystem, harness:SimulationHarness):Void {

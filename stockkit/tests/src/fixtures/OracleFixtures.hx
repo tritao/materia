@@ -127,7 +127,7 @@ class OracleFixtures {
       .pocket(contour, tool, -0.002, 0.01, 0.0015, 0.002)
       .finish();
     // Moves wholly above the stock cannot cut it; skipping them saves booleans.
-    var moves = [for (move in CutMoves.fromProgram(program.toolpath()))
+    var moves = [for (move in CutMoves.fromProgram(program))
       if (switch move.motion { case Path(geometry): lowestPoint(geometry) < 0.0; }) move];
     Assert.check(moves.length > 5, "CAM pocket produces cutting moves");
     var result = removalOf(moves, "CAM pocket");

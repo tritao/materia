@@ -1,6 +1,5 @@
 package toolpathkit.setup;
 
-import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -13,48 +12,22 @@ class Setup {
   public final id:String;
   /** Translation from work coordinates to machine coordinates, in metres. */
   public final workOrigin:Point3;
-  public final stockMinX:Float;
-  public final stockMaxX:Float;
-  public final stockMinY:Float;
-  public final stockMaxY:Float;
-  public final stockTop:Float;
-  public final stockBottom:Float;
-  public final safeZ:Float;
-  public final fixtures:Array<Fixture>;
+  public final stock:Null<SetupStock>;
 
-  public function new(stockMinX:Float, stockMaxX:Float, stockMinY:Float,
-      stockMaxY:Float, stockTop:Float, stockBottom:Float, safeZ:Float,
-      ?fixtures:Array<Fixture>, ?id:String = "1", ?workOrigin:Point3) {
+  public function new(id:String, workOrigin:Point3, ?stock:SetupStock) {
     if (id == null || id.length == 0) throw "setup needs an ID";
-    var origin = workOrigin == null ? new Point3(0, 0, 0) : workOrigin;
-    if (!Math.isFinite(origin.x) || !Math.isFinite(origin.y) ||
-        !Math.isFinite(origin.z)) throw "setup needs a finite work origin";
-    for (value in [stockMinX, stockMaxX, stockMinY, stockMaxY,
-        stockTop, stockBottom, safeZ])
-      if (!Math.isFinite(value)) throw "CAM setup needs finite bounds";
-    if (stockMinX >= stockMaxX || stockMinY >= stockMaxY ||
-        stockBottom >= stockTop || safeZ < stockTop)
-      throw "CAM setup needs ordered stock bounds and safe Z above stock";
-    this.stockMinX = stockMinX; this.stockMaxX = stockMaxX;
-    this.stockMinY = stockMinY; this.stockMaxY = stockMaxY;
-    this.stockTop = stockTop; this.stockBottom = stockBottom;
-    this.safeZ = safeZ;
+    if (workOrigin == null || !Math.isFinite(workOrigin.x) ||
+        !Math.isFinite(workOrigin.y) || !Math.isFinite(workOrigin.z))
+      throw "setup needs a finite work origin";
     this.id = id;
-    this.workOrigin = origin;
-    this.fixtures = fixtures == null ? [] : fixtures.copy();
-    for (fixture in this.fixtures)
-      if (fixture == null || safeZ <= fixture.maxZ)
-        throw "CAM safe Z must clear every fixture";
+    this.workOrigin = workOrigin;
+    this.stock = stock;
   }
 
   /** Rejects a program before export. The cutter tip disk is swept through each path. */
-  public function validate(ops:Array<ToolpathOp>, tools:ToolLibrary,
-      travelLower:Null<Array<Float>>, travelUpper:Null<Array<Float>>):Void {
+  public function validate(ops:Array<ToolpathOp>, tools:ToolLibrary):Void {
     if (ops == null || tools == null) throw "CAM export needs a program and machine";
-    var travel = TravelEnvelope.check(travelLower,
-      travelUpper, ops);
-    if (travel.length > 0)
-      throw 'CAM setup line ${travel[0].provenance.line}: ${travel[0].message()}';
+    if (stock == null) throw "CAM validation needs stock and clearance bounds";
     var radius = 0.0;
     for (op in ops) switch op {
       case ToolChange(number, span):
@@ -71,15 +44,17 @@ class Setup {
 
   function checkPath(geometry:PathGeometry, span:Provenance, radius:Float,
       cutting:Bool):Void {
+    var stock = this.stock;
+    if (stock == null) throw "CAM validation needs stock and clearance bounds";
     var length = GeometryTools.length(geometry);
     var start = GeometryTools.pointAt(geometry, 0.0);
     var end = GeometryTools.pointAt(geometry, length);
-    if (cutting && Math.min(start.z, end.z) < stockBottom - 1e-9)
-      fail(span, 'cut goes below stock bottom $stockBottom');
+    if (cutting && Math.min(start.z, end.z) < stock.bottom - 1e-9)
+      fail(span, 'cut goes below stock bottom ${stock.bottom}');
     if (!cutting && (Math.abs(start.x - end.x) > 1e-9 ||
         Math.abs(start.y - end.y) > 1e-9) &&
-        Math.min(start.z, end.z) < safeZ - 1e-9)
-      fail(span, 'rapid traverse is below safe Z $safeZ');
+        Math.min(start.z, end.z) < stock.safeZ - 1e-9)
+      fail(span, 'rapid traverse is below safe Z ${stock.safeZ}');
     // Short chords plus their maximum arc sagitta conservatively cover a curved path.
     var segments = switch geometry {
       case Line(_, _): 1;
@@ -97,7 +72,7 @@ class Setup {
         case Arc(_, arcRadius, _, sweep), Circular(_, arcRadius, _, sweep, _, _):
           arcRadius * (1.0 - Math.cos(Math.abs(sweep) / segments / 2.0));
       };
-      for (fixture in fixtures)
+      for (fixture in stock.fixtures)
         if (intersectsFixture(previous, current, radius + margin, fixture))
           fail(span, 'cutter intersects fixture "${fixture.name}"');
       previous = current;

@@ -1,3 +1,4 @@
+// This test uses assert for setup calls; keep them active in Release builds.
 #include "robotkit_runtime.hpp"
 
 #include <algorithm>

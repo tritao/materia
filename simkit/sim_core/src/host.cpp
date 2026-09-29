@@ -12,12 +12,14 @@ namespace {
 constexpr std::uint32_t default_command_capacity = 256;
 
 struct Command {
-    enum class Kind { Forces, JointTargets, BodyStates, BodyDrives };
+    enum class Kind { Forces, JointTargets, BodyStates, BodyDrives, BodyMotionType };
 
     Kind kind = Kind::Forces;
     std::vector<nksim_body_force> forces;
     std::vector<nksim_joint_target> joint_targets;
     std::vector<nksim_body_state> body_states;
+    nksim_body body = 0;
+    std::uint32_t motion_type = 0;
 };
 
 struct StepRequest {
@@ -174,6 +176,14 @@ public:
         return enqueue(std::move(command));
     }
 
+    nksim_result submit_body_motion_type(nksim_body body, std::uint32_t motion_type) {
+        Command command;
+        command.kind = Command::Kind::BodyMotionType;
+        command.body = body;
+        command.motion_type = motion_type;
+        return enqueue(std::move(command));
+    }
+
     nksim_result get_snapshot(nksim_snapshot *out_snapshot) {
         if (!out_snapshot)
             return NKSIM_ERROR_INVALID_ARGUMENT;
@@ -229,8 +239,8 @@ public:
 
 private:
     nksim_result enqueue(Command command) {
-        if (command.forces.empty() && command.joint_targets.empty() &&
-            command.body_states.empty())
+        if (command.kind != Command::Kind::BodyMotionType && command.forces.empty() &&
+            command.joint_targets.empty() && command.body_states.empty())
             return NKSIM_OK;
         std::lock_guard lock(mutex);
         if (!started || !running || stop_requested)
@@ -271,6 +281,8 @@ private:
                 result = world->set_joint_targets(
                     command.joint_targets.data(),
                     static_cast<std::uint32_t>(command.joint_targets.size()));
+            } else if (command.kind == Command::Kind::BodyMotionType) {
+                result = world->set_body_motion_type(command.body, command.motion_type);
             } else {
                 const bool drive = command.kind == Command::Kind::BodyDrives;
                 for (const auto &state : command.body_states) {
@@ -401,6 +413,13 @@ std::shared_ptr<Host> resolve_host(nksim_host host) noexcept {
     auto &state = registry();
     std::lock_guard lock(state.mutex);
     return state.hosts.get(host);
+}
+
+nksim_result host_submit_body_motion_type(nksim_host host, nksim_body body,
+                                          std::uint32_t motion_type) {
+    const auto value = resolve_host(host);
+    return value ? value->submit_body_motion_type(body, motion_type)
+                 : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 } // namespace nksim

@@ -31,6 +31,16 @@ class SimActor {
             handle, time, values), "actor.pushKeyframe");
     }
 
+    /** The session body for a capsule or other actor part. */
+    public function partBody(index:Int):nksim_body {
+        if (index < 0 || index >= partCount)
+            throw "Actor part index is out of range";
+        var result = NativeKitSim.nksim_session_get_actor_body(session.nativeHandle(), handle,
+            index);
+        SimWorld.check(result.status, "actor.partBody");
+        return result.out_body;
+    }
+
     /** Removes the actor while stopped. */
     public function dispose():Void
         SimWorld.check(NativeKitSim.nksim_session_destroy_actor(session.nativeHandle(), handle),

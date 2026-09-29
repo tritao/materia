@@ -30,6 +30,9 @@ class HumanActor {
 	public function pushPose(time:Float, pose:HumanPose, root:Array<Float>):Void
 		actor.pushKeyframe(time, simPoses(proxy.place(pose, root)));
 
+	public function dispose():Void
+		actor.dispose();
+
 	static function simPoses(placements:Array<CapsulePlacement>):Array<SimPose>
 		return [
 			for (placement in placements)

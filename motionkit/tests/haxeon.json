@@ -8,12 +8,6 @@
     "src"
   ],
   "dependencies": {
-    "cnckit": {
-      "path": "../../cnckit"
-    },
-    "toolpathkit": {
-      "path": "../../toolpathkit"
-    },
     "cadbridge": {
       "path": "../../robotkit/cadbridge"
     },
@@ -31,9 +25,6 @@
     },
     "robotkit": {
       "path": "../../robotkit"
-    },
-    "toolpathkit-motion": {
-      "path": "../../toolpathkit/motion"
     }
   },
   "native": {

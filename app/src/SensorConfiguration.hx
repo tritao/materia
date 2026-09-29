@@ -43,12 +43,23 @@ class SensorConfiguration {
   final positions:Map<String, Array<Float>> = new Map();
   final rotations:Map<String, Array<Float>> = new Map();
   final readOnlyRobots:Map<String, Bool> = new Map();
+  final configuredHumans:Array<HumanConfiguration> = [];
 
   public function new(?data:Dynamic, ?sharedDocument:EditorDocument, empty:Bool = false) {
     document = sharedDocument == null ? new EditorDocument("sensors") : sharedDocument;
     model=new RobotModel("Materia robot");
     var base=model.addLink(new Link("Base","base"));
     model.addFrame(new Frame("Base sensor mount",base,"base/sensors"));
+    if (data != null && Reflect.hasField(data, "humans")) {
+      var records:Array<Dynamic> = requiredArray(data, "humans");
+      for (entry in records) {
+        var position:Array<Float> = cast requiredArray(entry, "position");
+        var rotation:Array<Float> = cast requiredArray(entry, "rotation");
+        addHuman(new HumanConfiguration(requiredString(entry, "id"),
+          requiredString(entry, "assetPath"), position, rotation,
+          Reflect.hasField(entry, "jobName") ? Reflect.field(entry, "jobName") : null));
+      }
+    }
     if (data == null && empty) {
       this.empty = true;
       selectedIndex = -1;
@@ -152,7 +163,7 @@ class SensorConfiguration {
       var record = live == null ? configurations.get(id) : singleRecordFor(id, live);
       records.push(withoutNames(haxe.Json.parse(haxe.Json.stringify(record))));
     }
-    return haxe.Json.stringify(records);
+    return haxe.Json.stringify({robots:records, humans:[for (human in configuredHumans) human.record()]});
   }
 
   static function withoutNames(value:Dynamic):Dynamic {
@@ -244,8 +255,22 @@ class SensorConfiguration {
 
   public function records():Dynamic {
     var values=robotRecords();
-    return {selectedRobotId:robotId, robots:values};
+    var result:Dynamic = {selectedRobotId:robotId, robots:values};
+    if (configuredHumans.length > 0)
+      Reflect.setField(result, "humans", [for (human in configuredHumans) human.record()]);
+    return result;
   }
+
+  public function addHuman(human:HumanConfiguration):Void {
+    if (human == null) throw "Human configuration is required";
+    for (existing in configuredHumans) if (existing.id == human.id)
+      throw 'Duplicate human "$human.id"';
+    configuredHumans.push(human);
+    configurationRevision++;
+  }
+
+  public function humans():Array<HumanConfiguration>
+    return configuredHumans.copy();
   public function robotRecords():Array<Dynamic> {
     captureCurrent();
     for(id in liveModels.keys())configurations.set(id,singleRecordFor(id,liveModels.get(id)));

@@ -142,7 +142,17 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	extern fn nksim_session_find_object(session: nksim_session, body: nksim_body, out_object: ptr<nksim_object> @out) -> nksim_result;
 	extern fn nksim_session_get_actor_body(session: nksim_session, actor: nksim_actor, part: u32, out_body: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_session_get_object_body(session: nksim_session, object: nksim_object, out_body: ptr<nksim_body> @out) -> nksim_result;
+	/**
+	 * Returns zero in out_carrier when the object is free.
+	 */
+	extern fn nksim_session_get_object_carrier(session: nksim_session, object: nksim_object, out_carrier: ptr<nksim_body> @out) -> nksim_result;
 	extern fn nksim_session_get_status(session: nksim_session, out_status: ptr<nksim_session_status> @inout) -> nksim_result;
+	/**
+	 * Attaches a DYNAMIC object to any session body while stopped or running.
+	 * From the next tick it follows carrier * offset without being displaced by
+	 * contacts. Holding an already-held object replaces its carrier and offset.
+	 */
+	extern fn nksim_session_hold_object(session: nksim_session, object: nksim_object, carrier: nksim_body, offset: ptr<const<nksim_pose>>) -> nksim_result;
 	/**
 	 * Adds a keyframe to an actor's trajectory: the pose of every part at
 	 * simulation time `time`, while stopped or running. Each tick moves every
@@ -161,6 +171,11 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * is nearer.
 	 */
 	extern fn nksim_session_raycast(session: nksim_session, ray: ptr<const<nksim_ray>>, out_distance: ptr<f64> @out) -> nksim_result;
+	/**
+	 * Releases a held object as DYNAMIC from the next tick, retaining the
+	 * carrier point's velocity. Releasing a free object is INVALID_STATE.
+	 */
+	extern fn nksim_session_release_object(session: nksim_session, object: nksim_object) -> nksim_result;
 	/**
 	 * Restores the world, the clock, every object and actor, and every
 	 * participant to their initial state. The session must be stopped.

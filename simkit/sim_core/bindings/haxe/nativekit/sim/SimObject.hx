@@ -7,12 +7,15 @@ class SimObject {
     final session:SimSession;
     public final handle:nksim_object;
     public final motion:MotionType;
+    /** The collision shape the object was created with. */
+    public final shape:SimShape;
 
     @:allow(SimSession)
-    private function new(session:SimSession, handle:nksim_object, motion:MotionType) {
+    private function new(session:SimSession, handle:nksim_object, motion:MotionType, shape:SimShape) {
         this.session = session;
         this.handle = handle;
         this.motion = motion;
+        this.shape = shape;
     }
 
     /** Moves a kinematic object for the next tick, while stopped or running. */

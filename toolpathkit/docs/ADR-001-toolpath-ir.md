@@ -17,3 +17,18 @@ CncKit, CamKit, MotionKit and StockKit need a common representation of machining
 ## Consequences
 
 The G-code interpreter and CAM producers share geometry and provenance without depending on motion execution. Controller mapping remains in CncKit, and execution policy remains in the motion adapter.
+
+## Addendum: setup placement and machine travel
+
+`ToolpathProgram` carries its ordered setups alongside operations and tools. The first
+setup is active until a `SetSetup` operation selects another known setup. A setup's
+required work origin places work coordinates in machine space; its stock, fixtures,
+and safe Z are optional planning data. A measured or probed origin is represented
+by a program setup at that measured position.
+
+`MachineBinding` owns the physical frame, axes, speed, tolerances, and optional
+`TravelEnvelope`. A binding intersects logical axis travel with model joint limits
+and supplies that envelope to compilation and lowering. It never owns setup
+positions. `CncController` owns only G-code dialect, G54–G59 offsets, G28/G30
+homes, H/D mappings, and the controller tool library. The compile call supplies
+the start position.

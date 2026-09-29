@@ -37,6 +37,16 @@ class SimShape {
     public static function capsule(radius:Float, length:Float):SimShape
         return new SimShape(ShapeType.Capsule, radius, length, 0.0);
 
+    /** Radius of the smallest sphere about the shape's origin that encloses it (infinite for a plane). */
+    public function boundingRadius():Float
+        return switch type {
+            case Box: Math.sqrt(a * a + b * b + c * c);
+            case Sphere: a;
+            case Capsule: a + b * 0.5;
+            case Cylinder: Math.sqrt(a * a + b * b * 0.25);
+            default: Math.POSITIVE_INFINITY;
+        };
+
     public function toNative():nksim_shape_desc {
         var value = new nksim_shape_desc();
         value.set_struct_size(nksim_shape_desc.size());

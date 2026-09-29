@@ -18,13 +18,9 @@ class MotionKitBootstrapTests {
       return;
     }
 
-    if (Sys.getEnv("MOTIONKIT_CNC_ONLY") == "1") {
+    if (Sys.getEnv("MOTIONKIT_CIRCULAR_ONLY") == "1") {
       plannerTests.testCircularSegments();
-      Sys.println('CNC focused tests passed (${MotionKitTestSupport.assertions} assertions)');
-      return;
-    }
-    if (Sys.getEnv("MOTIONKIT_C7_ONLY") == "1") {
-      Sys.println('C7 focused tests passed (${MotionKitTestSupport.assertions} assertions)');
+      Sys.println('Circular focused tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
     if (Sys.getEnv("MOTIONKIT_BLEND_ONLY") == "1") {
@@ -65,6 +61,7 @@ class MotionKitBootstrapTests {
     plannerTests.testPlannerIsDeterministicAndBounded();
     plannerTests.testToppraExactStopsAndBindings();
     plannerTests.testToppraCircleAcceleration();
+    plannerTests.testCircularSegments();
     processTests.testLinearAxisCompilesToRobotModel();
     processTests.testLeadScrewActuatorRateLimitsPlans();
     kinematicsTests.testTransmissionDerivedAxisMapping();

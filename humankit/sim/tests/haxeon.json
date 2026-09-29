@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "package": { "name": "humankit-sim-tests" },
+  "entry": "HumanSimTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "humankit-sim": { "path": ".." },
+    "animkit": { "path": "../../../animkit" },
+    "scenekit": { "path": "../../../scenekit" },
+    "nativekit": { "path": "../../../nativekit" }
+  },
+  "native": {
+    "cmake": {
+      "source": "native",
+      "target": "humankit_sim_tests_native",
+      "inputs": ["native/CMakeLists.txt", "../../../simkit/CMakeLists.txt", "../../../animkit/native/CMakeLists.txt"]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

@@ -4,7 +4,7 @@ import toolpathkit.path.MoveKind;
 import cnckit.interp.CncInterpOp;
 import cnckit.CncDiagnostic;
 import cnckit.CncDiagnostic.CncSeverity;
-import cnckit.CncMachine;
+import cnckit.CncController;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.ToolpathOp;
@@ -17,18 +17,20 @@ import cnckit.parse.CncWord;
 
 /** Interprets LinuxCNC blocks into plain metre geometry and ordered CNC ops. */
 class CncInterpreter {
-  public final machine:CncMachine;
+  public final controller:CncController;
+  public final start:Point3;
   public var state(default, null):CncState;
   public var ops(default, null):Array<CncInterpOp> = [];
   public var diagnostics(default, null):Array<CncDiagnostic> = [];
 
-  public function new(machine:CncMachine) {
-    this.machine = machine;
-    state = new CncState(machine);
+  public function new(controller:CncController, start:Point3) {
+    this.controller = controller;
+    this.start = start;
+    state = new CncState(start);
   }
 
   public function interpret(blocks:Array<CncBlock>):Array<CncInterpOp> {
-    state = new CncState(machine);
+    state = new CncState(start);
     ops = [];
     diagnostics = [];
     for (block in blocks) {
@@ -252,7 +254,7 @@ class CncInterpreter {
     if (distanceChange >= 0) state.absolute = distanceChange == 90;
     if (nextWcs >= 0) {
       state.wcs = nextWcs;
-      emit(ToolpathOp.SetSetup(machine.controller.setupId(nextWcs), block.span));
+      emit(ToolpathOp.SetSetup(controller.setupId(nextWcs), block.span));
     }
     if (state.cutterSide != 0 && cutterChange != 40 && planeChange >= 0 &&
         planeChange != state.plane) fail(line, gWords[0].column,
@@ -271,8 +273,8 @@ class CncInterpreter {
       if (number < 0) fail(line, gWords[0].column,
         "G41/G42 requires a loaded tool or D number");
       var tool:Tool = null;
-      try tool = d == null ? machine.toolLibrary.tool(number) :
-        machine.controller.toolForD(number)
+      try tool = d == null ? controller.toolLibrary.tool(number) :
+        controller.toolForD(number)
       catch (error:Dynamic) fail(line, d == null ? gWords[0].column : d.column,
         Std.string(error));
       if (tool.diameter <= 0.0) fail(line, d == null ? gWords[0].column : d.column,
@@ -286,7 +288,7 @@ class CncInterpreter {
     if (setToolOffset) {
       var hWord:CncWord = cast h;
       var number = integer(hWord, line);
-      try state.toolLength = machine.controller.toolLength(number)
+      try state.toolLength = controller.toolLength(number)
       catch (error:Dynamic) fail(line, hWord.column, Std.string(error));
       emit(ToolpathOp.ToolLengthOffset(number, state.toolLength, block.span));
     }
@@ -361,7 +363,7 @@ class CncInterpreter {
       k:Null<CncWord>, r:Null<CncWord>, machineCoordinates:Bool,
       span:Provenance):Void {
     var start = new Point3(state.position[0], state.position[1], state.position[2]);
-    var offset = machine.controller.workOffset(state.wcs);
+    var offset = controller.workOffset(state.wcs);
     var words = [x, y, z];
     var target = state.position.copy();
     for (axis in 0...3) {
@@ -440,7 +442,7 @@ class CncInterpreter {
   function home(code:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, span:Provenance):Void {
     var axes = [x, y, z], intermediate = state.position.copy();
-    var offset = machine.controller.workOffset(state.wcs);
+    var offset = controller.workOffset(state.wcs);
     var anyAxis = false;
     for (axis in 0...3) if (axes[axis] != null) {
       anyAxis = true;
@@ -450,7 +452,7 @@ class CncInterpreter {
         (axis == 2 ? state.toolLength : 0.0) : intermediate[axis] + value;
     }
     if (anyAxis) rapidTo(intermediate, span);
-    var stored = machine.controller.homePosition(code), destination = state.position.copy();
+    var stored = controller.homePosition(code), destination = state.position.copy();
     for (axis in 0...3) if (!anyAxis || axes[axis] != null)
       destination[axis] = stored[axis];
     rapidTo(destination, span, MoveKind.Rapid, true);
@@ -459,7 +461,7 @@ class CncInterpreter {
   function drill(code:Int, x:Null<CncWord>, y:Null<CncWord>,
       z:Null<CncWord>, r:Null<CncWord>, q:Null<CncWord>,
       p:Null<CncWord>, l:Null<CncWord>, span:Provenance, line:Int):Void {
-    var offset = machine.controller.workOffset(state.wcs), scale = unitScale();
+    var offset = controller.workOffset(state.wcs), scale = unitScale();
     if (r != null) state.cycleR = state.absolute ?
       r.value * scale + offset[2] + state.toolLength :
       state.cycleInitialZ + r.value * scale;

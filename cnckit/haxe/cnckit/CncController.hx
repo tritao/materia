@@ -4,15 +4,18 @@ import toolpathkit.tool.Tool;
 import toolpathkit.tool.ToolLibrary;
 
 /** Controller-specific G54–G59, G28/G30, and H/D number mapping. */
-class CncControllerSetup {
+class CncController {
+  public final dialect:CncDialect;
   final offsets:Map<Int, Array<Float>> = new Map();
   final homes:Map<Int, Array<Float>> = new Map();
-  final toolLibrary:ToolLibrary;
+  public final toolLibrary:ToolLibrary;
   final hTools:Map<Int, Int> = new Map();
   final dTools:Map<Int, Int> = new Map();
 
-  public function new(toolLibrary:ToolLibrary) {
-    this.toolLibrary = toolLibrary;
+  public function new(?dialect:CncDialect = LinuxCnc,
+      ?toolLibrary:ToolLibrary) {
+    this.dialect = dialect;
+    this.toolLibrary = toolLibrary == null ? new ToolLibrary() : toolLibrary;
     for (code in 54...60) offsets.set(code, [0.0, 0.0, 0.0]);
     homes.set(28, [0.0, 0.0, 0.0]);
     homes.set(30, [0.0, 0.0, 0.0]);
@@ -23,7 +26,7 @@ class CncControllerSetup {
     return Std.string(code - 53);
   }
 
-  public function gCodeForSetup(id:String, dialect:CncDialect):Int {
+  public function gCodeForSetup(id:String):Int {
     var number = Std.parseInt(id);
     if (number == null || number < 1 || number > 6 ||
         Std.string(number) != id)

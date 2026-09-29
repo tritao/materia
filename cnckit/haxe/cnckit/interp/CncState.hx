@@ -1,11 +1,11 @@
 package cnckit.interp;
 
-import cnckit.CncMachine;
+import toolpathkit.path.Point3;
 import toolpathkit.path.Provenance;
 
 /** Modal state. A block is committed only after its interpretation succeeds. */
 class CncState {
-  public final machine:CncMachine;
+  public final start:Point3;
   public var metric:Bool = true;
   public var absolute:Bool = true;
   public var wcs:Int = 54;
@@ -32,13 +32,13 @@ class CncState {
   public var position:Array<Float>;
   public var ended:Bool = false;
 
-  public function new(machine:CncMachine) {
-    this.machine = machine;
-    position = machine.initialPosition.copy();
+  public function new(start:Point3) {
+    this.start = start;
+    position = [start.x, start.y, start.z];
   }
 
   public function copy():CncState {
-    var result = new CncState(machine);
+    var result = new CncState(start);
     result.metric = metric; result.absolute = absolute; result.wcs = wcs;
     result.toolLength = toolLength; result.feedCommand = feedCommand;
     result.spindleSpeed = spindleSpeed; result.spindleDirection = spindleDirection;

@@ -10,6 +10,7 @@ class BodyState {
     public final x:Float;
     public final y:Float;
     public final z:Float;
+    public final pose:SimPose;
     public final linearVelocityX:Float;
     public final linearVelocityY:Float;
     public final linearVelocityZ:Float;
@@ -21,13 +22,15 @@ class BodyState {
         x = value.get_position(0);
         y = value.get_position(1);
         z = value.get_position(2);
+        pose = new SimPose(x, y, z, value.get_rotation(0), value.get_rotation(1),
+            value.get_rotation(2), value.get_rotation(3));
         linearVelocityX = value.get_linear_velocity(0);
         linearVelocityY = value.get_linear_velocity(1);
         linearVelocityZ = value.get_linear_velocity(2);
         sleeping = value.get_sleeping() != 0;
     }
 
-    @:allow(SimWorld, SimSnapshot)
+    @:allow(SimWorld, SimSnapshot, SimFrame)
     static function fromNative(value:nksim_body_state):BodyState
         return new BodyState(value);
 }

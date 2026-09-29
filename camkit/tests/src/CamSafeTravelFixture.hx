@@ -2,7 +2,6 @@ import camkit.CamContour;
 import cnckit.CncWriter;
 import camkit.CamJob;
 import cnckit.CncCompiler;
-import cnckit.CncMachine;
 import toolpathkit.tool.Tool;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
@@ -75,16 +74,16 @@ class CamSafeTravelFixture {
       profilePlunges >= 3 && drillFeeds == 2,
       "mixed job covers profile passes, two holes and two tool switches");
 
-    var machine = new CncMachine("work", "x", "y", "z", 0.2);
+    var machine = new CamTestRig();
     machine.toolLibrary.set(profileTool); machine.toolLibrary.set(drillTool);
     check(CamTestLowering.lower(program, machine).diagnostics.length == 0,
       "mixed tool job lowers through MotionKit");
-    var imported = new CncCompiler(machine).compileDetailed(
-      CncWriter.write(program.ops, CamTestSetup.standard(), machine));
+    var imported = machine.compileDetailed(
+      machine.export(program, CamTestSetup.standard()));
     check(imported.diagnostics.length == 0 &&
-      imported.ops.length == program.ops.length,
+      imported.program.ops.length == program.ops.length,
       "mixed tool G-code round trip keeps operation order");
-    for (index in 0...program.ops.length) switch [program.ops[index], imported.ops[index]] {
+    for (index in 0...program.ops.length) switch [program.ops[index], imported.program.ops[index]] {
       case [Move(Cut, a, speedA, _, _), Move(Cut, b, speedB, _, _)]:
         check(Math.abs(speedA - speedB) < 1e-8,
           "mixed tool G-code preserves feed selection");

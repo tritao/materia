@@ -1,6 +1,6 @@
 class ToolpathScenarioTests {
   public static function main():Void {
-    var tests = new ProcessTests();
+    var tests = new ToolpathProcessTests();
     tests.testCncProgramBinding();
     tests.testPhysicalAssemblyCncBinding();
     tests.testVirtualCncProgram();

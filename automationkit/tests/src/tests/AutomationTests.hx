@@ -8,6 +8,8 @@ import materia.automation.facility.FacilityRouter;
 import materia.automation.facility.Intersection;
 import materia.automation.facility.Lane;
 import materia.automation.facility.Rack;
+import materia.automation.facility.RackSlot;
+import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
 import materia.automation.facility.Zone;
 import materia.automation.fleet.Dispatcher;
@@ -86,7 +88,9 @@ class AutomationTests {
         Footprint.rectangle(40.0, 20.0)));
       var inbound = new Station("inbound", "Inbound", "main", "map", new Pose2(0.0, 0.0));
       var outbound = new Station("outbound", "Outbound", "main", "map", new Pose2(4.0, 0.0));
-      var rack = new Rack("rack-4", "Rack 4", "main", "map", new Pose2(2.0, 1.0), ["A1", "A2"]);
+      var rack = new Rack("rack-4", "Rack 4", "main", "map", new Pose2(2.0, 1.0, Math.PI / 2),
+        [new RackSlot("A1", new RackSlotPose(0.2, 0.1, 0.8)),
+          new RackSlot("A2", new RackSlotPose(0.2, -0.1, 1.2))]);
       var charger = new Charger("charger-2", "Charger 2", "main", "map",
         new Pose2(-1.0, 0.0), "type-2", 11.0);
       facility.addStation(inbound);
@@ -105,12 +109,17 @@ class AutomationTests {
       var storedRack:Rack = cast facility.rack("rack-4");
       equal(facility.stations().length, 4, "facility indexes stations and specialized locations");
       check(storedRack.hasSlot("A2"), "rack exposes a known slot");
+      var slotPose = storedRack.slotPose("A2");
+      check(Math.abs(slotPose.x - 2.1) < 1e-9 && Math.abs(slotPose.y - 1.2) < 1e-9 &&
+        Math.abs(slotPose.z - 1.2) < 1e-9 && Math.abs(slotPose.yaw - Math.PI / 2) < 1e-9,
+        "rack transforms its relative slot into the facility frame");
       equal(lane.centerline.frameId, "map",
         "lane preserves its facility frame");
       throws(function() facility.addLane(new Lane("bad-frame", inbound.id, outbound.id,
         new Path([inbound.pose, outbound.pose], "odom"), 1.0, 0.5)),
         "facility rejects a lane whose frame differs from its stations");
-      throws(function() new Rack("bad-rack", "Bad", "main", "map", new Pose2(), ["A", "A"]),
+      throws(function() new Rack("bad-rack", "Bad", "main", "map", new Pose2(),
+        [new RackSlot("A", new RackSlotPose(0, 0, 1)), new RackSlot("A", new RackSlotPose(0, 0, 2))]),
         "rack rejects duplicate slot IDs");
       var router = new FacilityRouter(facility);
       var route = router.route(inbound.id, outbound.id);

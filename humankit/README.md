@@ -122,6 +122,14 @@ pushes what they walk into and is never pushed back. A writer that steps the
 session pushes one keyframe per tick; one following a realtime session pushes a
 few ticks ahead, and the session interpolates between keyframes.
 
+`HumanWorker` reports distance from each worker capsule to the supplied robot
+link sphere. Its caller supplies the link pose and an approximate collision
+radius. `ApproachFor` stands on the line from the current root to its target;
+it does not offset the stance for the active arm's shoulder, so a one-arm reach
+can cross the torso slightly.
+Holding an object by a moving robot link uses that link's pose from the last
+session tick, so the object can trail the gripper by one tick.
+
 ## Tests
 
 ```sh

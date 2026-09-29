@@ -81,3 +81,15 @@ install(TARGETS nativekit_sim_core EXPORT NativeKitTargets
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# These tests use assert for setup calls as well as checks. Keep them active in Release.
+get_property(_assert_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(_assert_test_target IN LISTS _assert_test_targets)
+    if(_assert_test_target MATCHES "_tests$")
+        if(MSVC)
+            target_compile_options(${_assert_test_target} PRIVATE /UNDEBUG)
+        else()
+            target_compile_options(${_assert_test_target} PRIVATE -UNDEBUG)
+        endif()
+    endif()
+endforeach()

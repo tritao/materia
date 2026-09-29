@@ -6,6 +6,10 @@
 #include <cstdio>
 #include <chrono>
 #include <thread>
+#include <memory>
+
+// rk_simulation_robot_desc is 1.7 MB. Tests keep it on the heap: with every
+// test inlined into main at -O3, stack copies overflow an 8 MB stack.
 
 static rk_robot_state state(rk_robot_runtime robot) {
     rk_robot_state value{};
@@ -141,7 +145,8 @@ static void convex_link_and_box_link_build() {
     model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[2] = 1.0;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.rotation[3] = 1.0;
@@ -175,7 +180,8 @@ static void tool_hulls_collide_only_on_their_pieces() {
     model.links[0].mass = 1.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 1.0;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.rotation[3] = 1.0;
@@ -221,7 +227,8 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     model.links[0].mass = 1.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 1.0;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.rotation[3] = 1.0;
@@ -294,7 +301,8 @@ static void captured_contacts_survive_realtime_steps() {
     model.links[0].mass = 1.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 1.0;
-    rk_simulation_robot_desc desc{};
+    auto desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &desc = *desc_storage;
     desc.struct_size = sizeof(desc);
     desc.initial_pose.struct_size = sizeof(desc.initial_pose);
     desc.initial_pose.rotation[3] = 1.0;
@@ -385,7 +393,8 @@ static void unowned_ground_contact_reports_world() {
     model.links[0].mass = 1.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 1.0;
-    rk_simulation_robot_desc desc{};
+    auto desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &desc = *desc_storage;
     desc.struct_size = sizeof(desc);
     desc.initial_pose.struct_size = sizeof(desc.initial_pose);
     desc.initial_pose.position[2] = 0.09;
@@ -432,7 +441,8 @@ static void floating_base_falls_and_settles(bool floating) {
     model.joints[0].parent_frame_position[0] = 0.25;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[0] = 1.0;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.position[2] = 0.5;
@@ -508,7 +518,8 @@ static void robot_base_can_be_pushed(bool floating) {
     model.joints[0].parent_frame_position[0] = 0.25;
     model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
     model.joints[0].axis[0] = 1.0;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.position[2] = 10.0;
@@ -556,7 +567,8 @@ static void link_primitives_collide_in_link_frame() {
     model.links[0].mass = 2.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 0.05;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.position[2] = 0.3;
@@ -723,7 +735,8 @@ static double sphere_rest_height(double time_constant, uint32_t contact_filter =
     model.links[0].mass = 10.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 0.01;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.position[2] = 0.06;
@@ -836,7 +849,8 @@ static void link_shape_contact_filters_reach_the_backend() {
     auto simulation = fixture.simulation;
     auto session = fixture.session;
     const auto model = gravity_arm(0.0);
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.link_shape_count = 2;
     for (uint32_t index = 0; index < 2; ++index) {
@@ -872,7 +886,8 @@ static void shapeless_link_without_approximation_collides_with_nothing() {
     model.links[0].mass = 1.0;
     model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
         model.links[0].inertia_tensor[8] = 0.01;
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.position[2] = 0.1;
