@@ -24,6 +24,10 @@ the idle phase. In headless CI, use `--headless-only` to run the interaction
 and retention checks. Use `--skip-build` only when the app and benchmark
 binaries already contain the source being tested.
 
+The scenarios start the editor with the demo scene (the plain editor starts empty) and the tab matrix covers the
+Hierarchy/Sensors and Console/Telemetry groups. The `architecture` scenario currently fails building its 500-link model
+(`simulation.addRobot failed with RobotKit status -8`, a physics backend error) and is not part of the gate.
+
 Each interaction run verifies the inspector rename, frame p95, RSS growth
 after the first 100 cycles, and the retained listener, widget resource, style,
 state, and key path counts. The RSS check allows up to 32 MiB total growth

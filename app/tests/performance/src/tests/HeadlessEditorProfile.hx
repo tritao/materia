@@ -88,7 +88,8 @@ class HeadlessEditorProfile {
     if (!FileSystem.exists(fontPath)) throw "Benchmark font is unavailable: " + fontPath;
     var fonts = FontCollection.create();
     fonts.add(fontPath);
-    var editor = new ReferenceEditorApp(fonts, output + "/workspace.json");
+    // The scenarios drive the starter objects ("box", "tower"); a plain editor starts with an empty scene.
+    var editor = new ReferenceEditorApp(fonts, output + "/workspace.json", null, null, null, null, null, null, true);
     var frame = new LayoutFrame(1320.0, 900.0);
     var frames:Array<String> = [];
     var actions:Array<String> = [];
@@ -402,7 +403,7 @@ class HeadlessEditorProfile {
       editor.sensors.model.addJoint(joint);
     }
     if (!editor.simulation.rebuild(editor.sensors, editor.scene))
-      throw "500-link simulation profile could not build";
+      throw "500-link simulation profile could not build: " + editor.simulation.error;
     for (cycle in 0...cycles) {
       editor.simulation.step();
       editor.simulation.capturePresentationSnapshot();

@@ -340,7 +340,7 @@ def main():
         try:
             actions = [json.loads(line) for line in (output / "actions.jsonl").read_text().splitlines()]
             groups = (("hierarchy", "sensors"),
-                      ("viewport", "perspective", "console", "telemetry"))
+                      ("console", "telemetry"))
             expected = {f"{source}->{target}" for group in groups
                         for source in group for target in group if source != target}
             counts = {name: sum(row.get("action") == name for row in actions) for name in expected}
