@@ -1,12 +1,32 @@
 package humankit;
 
+/** Validated target in a canonical job step. */
+typedef HumanJobTarget = {
+  @:optional var object:String;
+  @:optional var point:Array<Float>;
+  @:optional var anchor:String;
+}
+
+/** Typed canonical step. Action-specific requirements are enforced by parse. */
+typedef HumanJobStep = {
+  var action:String;
+  @:optional var target:HumanJobTarget;
+  @:optional var via:Array<Array<Float>>;
+  @:optional var object:String;
+  @:optional var onto:String;
+  @:optional var offset:Array<Float>;
+  @:optional var hand:String;
+  @:optional var seconds:Float;
+  @:optional var clip:String;
+}
+
 /** Strict, versioned description of an editor-authored human job. */
 class HumanJobSpec {
   public final version:Int = 1;
   public final loop:Bool;
-  public final steps:Array<Dynamic>;
+  public final steps:Array<HumanJobStep>;
 
-  function new(loop:Bool, steps:Array<Dynamic>) {
+  function new(loop:Bool, steps:Array<HumanJobStep>) {
     this.loop = loop;
     this.steps = steps;
   }
@@ -24,13 +44,13 @@ class HumanJobSpec {
     var steps:Dynamic = Reflect.field(raw, "steps");
     if (!Std.isOfType(steps, Array)) throw "job.steps must be an array";
     var held:Map<String, String> = new Map();
-    var normalized:Array<Dynamic> = [];
+    var normalized:Array<HumanJobStep> = [];
     var index = 0;
     for (step in(cast steps:Array<Dynamic>)) {
       var label = 'step $index';
       object(step, label);
       var action = string(step, "action", label);
-      var clean:Dynamic = {action: action};
+      var clean:HumanJobStep = {action: action};
       switch action {
         case "walkTo":
           fields(step, ["action", "target", "via"], label);
@@ -40,11 +60,12 @@ class HumanJobSpec {
           var hasObject = Reflect.hasField(target, "object");
           var hasPoint = Reflect.hasField(target, "point");
           if (hasObject == hasPoint) throw '$label.target needs exactly one of object or point';
-          Reflect.setField(clean, "target", hasObject ? {
+          var walkTarget:HumanJobTarget = hasObject ? {
             object:string(target, "object", '$label.target')
           }
           : {point: point(target, "point", '$label.target')}
-          );
+          ;
+          clean.target = walkTarget;
           if (Reflect.hasField(step, "via")) {
             var via:Dynamic = Reflect.field(step, "via");
             if (!Std.isOfType(via, Array)) throw '$label.via must be an array';
@@ -85,12 +106,12 @@ class HumanJobSpec {
           if (anchor != null && anchor != "top"
             && anchor != "front" && anchor != "center") throw '$label.target.anchor must be top, front, or center';
           if (hasPoint && anchor != null) throw '$label.target.anchor needs an object';
-          var resolved:Dynamic = hasObject ? {
+          var resolved:HumanJobTarget = hasObject ? {
             object:string(target, "object", '$label.target')
           }
-          : {point: point(target, "point", '$label.target')};
-          if (anchor != null) Reflect.setField(resolved, "anchor", anchor);
-          Reflect.setField(clean, "target", resolved);
+          : {point: point3(target, "point", '$label.target')};
+          if (anchor != null) resolved.anchor = anchor;
+          clean.target = resolved;
           Reflect.setField(clean, "hand", hand(step, label));
         case "wait":
           fields(step, ["action", "seconds"], label);
@@ -109,8 +130,39 @@ class HumanJobSpec {
     return new HumanJobSpec(loop, normalized);
   }
 
-  public function toJson():String return haxe.Json.stringify({version: version, loop: loop, steps: steps}
-  );
+  public function toJson():String {
+    var values:Array<Dynamic> = [];
+    for (step in steps) {
+      var value:Dynamic = {action:step.action};
+      switch step.action {
+        case "walkTo", "press":
+          var source:Dynamic = Reflect.field(step,"target");
+          var object:Null<String> = Reflect.field(source,"object");
+          var target:Dynamic = object == null ? {point:Reflect.field(source,"point")} : {object:object};
+          var anchor:Null<String> = Reflect.field(source,"anchor");
+          if (anchor != null) Reflect.setField(target,"anchor",anchor);
+          Reflect.setField(value,"target",target);
+          if (step.action == "walkTo") {
+            var via:Dynamic = Reflect.field(step,"via");
+            if (via != null) Reflect.setField(value,"via",via);
+          } else Reflect.setField(value,"hand",Reflect.field(step,"hand"));
+        case "pick":
+          Reflect.setField(value,"object",Reflect.field(step,"object"));
+          Reflect.setField(value,"hand",Reflect.field(step,"hand"));
+        case "place":
+          Reflect.setField(value,"onto",Reflect.field(step,"onto"));
+          Reflect.setField(value,"hand",Reflect.field(step,"hand"));
+          var offset:Dynamic = Reflect.field(step,"offset");
+          if (offset != null) Reflect.setField(value,"offset",offset);
+        case "wait": Reflect.setField(value,"seconds",Reflect.field(step,"seconds"));
+        case "playClip":
+          Reflect.setField(value,"clip",Reflect.field(step,"clip"));
+          Reflect.setField(value,"seconds",Reflect.field(step,"seconds"));
+      }
+      values.push(value);
+    }
+    return haxe.Json.stringify({version:version,loop:loop,steps:values});
+  }
 
   public static function check(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):Array < String > {
     var warnings:Array<String> = [];
@@ -207,6 +259,14 @@ class HumanJobSpec {
     ),
     '$label.$field'
   );
+
+  static function point3(value:Dynamic, field:String, label:String):Array<Float> {
+    var raw:Dynamic = Reflect.field(value, field);
+    if (!Std.isOfType(raw, Array) || (cast raw:Array<Dynamic>).length != 3)
+      throw '$label.$field needs [x, y, z]';
+    var values:Array<Dynamic> = cast raw;
+    return [for (index in 0...3) number(values[index], '$label.$field[$index]')];
+  }
 
   static function pointValue(value:Dynamic, label:String):Array < Float > {
     if (!Std.isOfType(value, Array) ||(cast value:Array<Dynamic>).length != 2) throw '$label needs [x, y]';

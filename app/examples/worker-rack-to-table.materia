@@ -7,7 +7,7 @@
       "collisionEnabled": true,
       "depth": 0.2,
       "dynamicBody": false,
-      "height": 4,
+      "height": 5.5,
       "id": "worker-demo-floor",
       "label": "Factory floor",
       "mass": 1,
@@ -18,7 +18,7 @@
       "visible": true,
       "width": 6,
       "x": 1.5,
-      "y": 0,
+      "y": 0.8,
       "z": -0.1,
       "materialId": "neutral",
       "visualOverrides": {
@@ -71,8 +71,8 @@
       "type": "rectangle",
       "visible": true,
       "width": 0.8,
-      "x": 1.9,
-      "y": -0.2,
+      "x": 2.4,
+      "y": 1.8,
       "z": 1.01,
       "materialId": "neutral",
       "visualOverrides": {
@@ -113,9 +113,9 @@
     {
       "cadGraph": null,
       "collisionEnabled": false,
-      "depth": 1.8,
+      "depth": 1.834029687801376,
       "dynamicBody": false,
-      "height": 0.7,
+      "height": 0.6067940890789032,
       "id": "worker-demo",
       "label": "Worker",
       "mass": 1,
@@ -124,10 +124,10 @@
       "sketchDraft": null,
       "type": "human-worker",
       "visible": true,
-      "width": 0.7,
+      "width": 0.6379895508289337,
       "worker": {
         "asset": "animkit/assets/quaternius/worker.glb",
-        "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\"},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\"}]}",
+        "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\"},{\"action\":\"walkTo\",\"target\":{\"point\":[1.0,1.1]}},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\"}]}",
         "migrationNote": null,
         "zones": [
           "worker-demo-rack",
@@ -151,7 +151,7 @@
         "pose": {
           "position": [
             3,
-            0,
+            1,
             0
           ],
           "rotation": [

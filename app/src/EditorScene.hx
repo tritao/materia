@@ -89,6 +89,7 @@ class EditorScene {
   var scene(get, never):Scene;
   final model:SceneModel;
   final workerVisuals:Map<String, WorkerVisual> = new Map();
+  final failedWorkerVisualAssets:Map<String, String> = new Map();
   var objects(get, set):Array<EditorSceneObject>;
   function get_objects():Array<EditorSceneObject> return model.objects;
   function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> return model.objects = value;
@@ -1807,6 +1808,8 @@ class EditorScene {
       if (item.kind != "human-worker" || worker == null) continue;
       active.set(item.id, true);
       var existing = workerVisuals.get(item.id);
+      if (failedWorkerVisualAssets.get(item.id) == worker.asset) continue;
+      failedWorkerVisualAssets.remove(item.id);
       if (existing != null && existing.assetPath == worker.asset) {
         for (node in existing.nodes()) bridge.mapNode(node, item.id);
         continue;
@@ -1822,6 +1825,7 @@ class EditorScene {
         for (node in visual.nodes()) bridge.mapNode(node, item.id);
       } catch (error:Dynamic) {
         // A missing asset leaves the authored worker and its selection proxy editable.
+        failedWorkerVisualAssets.set(item.id, worker.asset);
         Sys.println('materia: worker ${item.id} preview failed: $error');
       }
     }
@@ -1832,7 +1836,9 @@ class EditorScene {
         old.dispose(scene, false);
       }
       workerVisuals.remove(id);
+      failedWorkerVisualAssets.remove(id);
     }
+    for (id in failedWorkerVisualAssets.keys()) if (!active.exists(id)) failedWorkerVisualAssets.remove(id);
   }
 
   /** The SceneKit scene, for runtime-only content that is not part of the document. */

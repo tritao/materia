@@ -524,6 +524,12 @@ class CadPlateWorkflowTests {
       near(collision.halfExtents.x, 0.01, "imported collision width follows the source shape");
       near(collision.halfExtents.y, 0.02, "imported collision depth follows the source shape");
       near(collision.halfExtents.z, 0.03, "imported collision height follows the source shape");
+      var workerTarget = new app.editor.WorkerSceneTargets(scene.records(),scene).box(id);
+      if (workerTarget == null) throw "CAD body is unavailable as a worker target";
+      near(workerTarget.center[0], importedObject.x + collision.center.x,
+        "worker target follows the CAD collision centre");
+      near(workerTarget.halfExtents[1], collision.halfExtents.y,
+        "worker target follows the CAD collision box");
       session.save(sceneFile);
       session.open(sceneFile);
       scene = session.scene;

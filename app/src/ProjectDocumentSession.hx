@@ -105,6 +105,13 @@ class ProjectDocumentSession {
     openContent(absolute, text);
   }
 
+  /** Open a bundled example as an untitled document so Save requests a new path. */
+  public function openExample(file:String):Void {
+    var absolute = checkedPath(file);
+    openContent(absolute, File.getContent(absolute));
+    path = null;
+  }
+
   /** Transfer an unsaved document across a development module reload. */
   public function liveState():String {
     var destination = path != null ? path : projectReference != null
@@ -521,11 +528,21 @@ class ProjectDocumentSession {
       var p:Array<Float> = cast position, q:Array<Float> = cast rotation;
       if (p.length != 3 || q.length != 4) throw "Legacy human pose has wrong dimensions";
       for (value in p.concat(q)) if (!Math.isFinite(value)) throw "Legacy human pose must be finite";
-      for (object in data) if (object.id == id) throw 'Duplicate worker ID "$id"';
+      var uniqueId:String = id;
+      var suffix = 2;
+      while (Lambda.exists(data, function(object) return object.id == uniqueId)) {
+        uniqueId = id + "-worker-" + suffix;
+        suffix++;
+      }
       var oldName:Dynamic = Reflect.field(entry, "jobName");
       var note = oldName == null ? null : 'Legacy job "$oldName" requires authoring as document steps';
-      data.push({id:id, label:id, type:"human-worker", x:p[0], y:p[1], z:0.0,
-        width:0.7, height:0.7, depth:1.8, collisionEnabled:false, dynamicBody:false,
+      if (uniqueId != id) note = (note == null ? "" : note + "; ") +
+        'Legacy ID "$id" renamed to "$uniqueId" because a scene object already uses it';
+      var bounds:Array<Float>;
+      try bounds = app.editor.HumanWorkerKind.boundsFor(asset)
+      catch (_:Dynamic) bounds = app.editor.HumanWorkerKind.boundsFor(app.editor.HumanWorkerKind.DEFAULT_ASSET);
+      data.push({id:uniqueId, label:id, type:"human-worker", x:p[0], y:p[1], z:0.0,
+        width:bounds[3]-bounds[0], height:bounds[4]-bounds[1], depth:bounds[5]-bounds[2], collisionEnabled:false, dynamicBody:false,
         mass:1.0, red:0.7, green:0.7, blue:0.7, visible:true, rotation:q.copy(),
         worker:{asset:asset, job:'{"version":1,"loop":false,"steps":[]}', zones:[],
           migrationNote:note}});

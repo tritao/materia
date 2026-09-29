@@ -52,21 +52,24 @@ class HumanWorker {
 	 * at those moments; it would otherwise knock or fling it.
 	 */
 	final stabiliser:SimActor;
+	final twoHandCarrier:SimActor;
 	var pinned:Array<SimObject> = [];
 	/** The Place whose part stays pinned until the action ends. */
-	var placing:Null<{action:Dynamic, object:SimObject, hand:HumanLimb}> = null;
+	var placing:Null<{action:Dynamic, object:SimObject, hand:HumanLimb, both:Bool}> = null;
 	/** Placed parts that stay pinned until no hand or forearm capsule touches them. */
-	var releasing:Array<{object:SimObject, hand:HumanLimb}> = [];
+	var releasing:Array<{object:SimObject, hand:HumanLimb, both:Bool}> = [];
 	/** Parts in a hand, with their offset from the hand capsule. */
-	var held:Array<{object:SimObject, hand:HumanLimb, offset:SimPose}> = [];
+	var held:Array<{object:SimObject, hand:HumanLimb, both:Bool, offset:SimPose}> = [];
 	var job:Null<HumanJob>;
 	var actionSteps:Array<Int> = [];
 	var loopSpec:Null<HumanJobSpec>;
 	var loopTargets:Null<HumanJobTargets>;
 	var loopObjects:Null<Map<String, SimObject>>;
-	var bindings:Array<{action:Dynamic, object:SimObject, hand:HumanLimb, grasp:Array<Float>}> = [];
+	var bindings:Array<{action:Dynamic, object:SimObject, hand:HumanLimb, both:Bool, grasp:Array<Float>}> = [];
+	var lastPick:Null<Pick> = null;
+	var lastPlace:Null<Place> = null;
 	var links:Array<{id:String, pose:Void->SimPose, radius:Float}> = [];
-	var pending:Array<{time:Float, object:SimObject, hand:HumanLimb, kind:Int, carrier:Null<SimPose>,
+	var pending:Array<{time:Float, object:SimObject, hand:HumanLimb, both:Bool, kind:Int, carrier:Null<SimPose>,
 		touch:Null<Array<Float>>}> = [];
 	var lastAction:Dynamic;
 	var lastGrip:Bool = false;
@@ -83,21 +86,33 @@ class HumanWorker {
 		body.advance(0.0);
 		actor = new HumanActor(session, proxy, character.pose, body.rootTransform());
 		stabiliser = session.createActor([SimShape.sphere(0.001)], [STABILISER_POSE]);
+		twoHandCarrier = session.createActor([SimShape.sphere(0.001)], [STABILISER_POSE]);
 		observer = session.addStepObserver(publishSignals);
 	}
 
 	/** Associates a Pick with a dynamic object and its world grasp point. */
 	public function bindPick(action:Pick, object:SimObject, graspPoint:Array<Float>, hand:HumanLimb = ArmR):Void
-		bind(action, object, graspPoint, hand);
+		bind(action, object, graspPoint, hand, false);
+
+	public function bindBothPick(action:Pick, object:SimObject, graspPoint:Array<Float>):Void
+		bind(action, object, graspPoint, ArmL, true);
 
 	/** Associates a Place with the object to release at its world target. */
 	public function bindPlace(action:Place, object:SimObject, graspPoint:Array<Float>, hand:HumanLimb = ArmR):Void
-		bind(action, object, graspPoint, hand);
+		bind(action, object, graspPoint, hand, false);
 
-	function bind(action:Dynamic, object:SimObject, graspPoint:Array<Float>, hand:HumanLimb):Void {
+	public function bindBothPlace(action:Place, object:SimObject, graspPoint:Array<Float>):Void
+		bind(action, object, graspPoint, ArmL, true);
+
+	function bind(action:Dynamic, object:SimObject, graspPoint:Array<Float>, hand:HumanLimb, both:Bool):Void {
 		if (graspPoint.length < 3 || (hand != ArmL && hand != ArmR)) throw "A binding needs a grasp point and hand";
-		bindings.push({action: action, object: object, hand: hand, grasp: graspPoint.copy()});
+		if (Std.isOfType(action, Pick)) lastPick = cast action;
+		if (Std.isOfType(action, Place)) lastPlace = cast action;
+		bindings.push({action: action, object: object, hand: hand, both: both, grasp: graspPoint.copy()});
 	}
+
+	public function pickError():Null<Float> return lastPick == null ? null : lastPick.pickError;
+	public function placementError():Null<Float> return lastPlace == null ? null : lastPlace.placementError;
 
 	public function run(job:HumanJob):Void {
 		if (disposed) throw "Worker is disposed";
@@ -113,6 +128,8 @@ class HumanWorker {
 	public function runSpec(spec:HumanJobSpec, targets:HumanJobTargets, objectsById:Map<String, SimObject>):Void {
 		if (this.job != null && !this.job.isDone()) throw "Worker already has a running job";
 		bindings = [];
+		lastPick = null;
+		lastPlace = null;
 		var built:HumanJobBuildResult;
 		try built = HumanJobBuilder.build(spec, targets, body) catch (error:Dynamic) {
 			var failed = new HumanJob(body).add(new Wait(1.0));
@@ -126,13 +143,20 @@ class HumanWorker {
 		for (hold in built.holds) {
 			if (seen.indexOf(hold.action) >= 0) continue;
 			seen.push(hold.action);
+			var both = false;
+			for (other in built.holds) if (other.action == hold.action && other.hand != hold.hand) both = true;
 			var object = objectsById.get(hold.objectId);
 			if (object == null || object.motion != Dynamic) {
 				failure = 'Job object "${hold.objectId}" is missing or not a dynamic SimObject';
 				break;
 			}
-			if (Std.isOfType(hold.action, Pick)) bindPick(cast hold.action, object, hold.grasp, hold.hand);
-			else bindPlace(cast hold.action, object, hold.grasp, hold.hand);
+			if (Std.isOfType(hold.action, Pick)) {
+				if (both) bindBothPick(cast hold.action, object, hold.grasp);
+				else bindPick(cast hold.action, object, hold.grasp, hold.hand);
+			} else {
+				if (both) bindBothPlace(cast hold.action, object, hold.grasp);
+				else bindPlace(cast hold.action, object, hold.grasp, hold.hand);
+			}
 		}
 		run(built.job);
 		if (failure != null) built.job.abort(failure);
@@ -204,14 +228,20 @@ class HumanWorker {
 			animationTime = target;
 			actor.pushPose(target, body.character.pose, body.rootTransform());
 			var current = job == null ? null : job.currentAction();
+			var carryWithBoth = false;
+			for (entry in held) if (entry.both) carryWithBoth = true;
+			if (Std.isOfType(current, Pick) && (cast current:Pick).hands.length == 2 ||
+				Std.isOfType(current, Place) && (cast current:Place).hands.length == 2)
+				carryWithBoth = true;
+			twoHandCarrier.pushKeyframe(target, [carryWithBoth ? twoHandPose() : STABILISER_POSE]);
 			var placed = placing;
 			if (placed != null && placed.action != current) {
-				releasing.push({object: placed.object, hand: placed.hand});
+				releasing.push({object: placed.object, hand: placed.hand, both: placed.both});
 				placing = null;
 			}
 			for (waiting in releasing.copy())
 				if (handsClear(waiting.object)) {
-					pending.push({time: target, object: waiting.object, hand: waiting.hand, kind: FREE, carrier: null,
+					pending.push({time: target, object: waiting.object, hand: waiting.hand, both: waiting.both, kind: FREE, carrier: null,
 						touch: null});
 					releasing.remove(waiting);
 				}
@@ -222,16 +252,16 @@ class HumanWorker {
 					if (current != lastAction) {
 						lastGrip = Std.isOfType(current, Place);
 						if (Std.isOfType(current, Pick))
-							pending.push({time: target, object: binding.object, hand: binding.hand, kind: PIN,
+							pending.push({time: target, object: binding.object, hand: binding.hand, both: binding.both, kind: PIN,
 								carrier: null, touch: null});
 					}
 					// The session carries a held object on the hand capsule's pose at
 					// the event time, which is the animation pose right now.
 					if (grip != lastGrip) {
-						pending.push({time: target, object: binding.object, hand: binding.hand,
-							kind: grip ? HOLD : PIN, carrier: grip ? handPlacement(binding.hand) : null,
+						pending.push({time: target, object: binding.object, hand: binding.hand, both: binding.both,
+							kind: grip ? HOLD : PIN, carrier: grip ? (binding.both ? twoHandPose() : handPlacement(binding.hand)) : null,
 							touch: grip ? body.gripPoint(binding.hand) : null});
-						if (!grip) placing = {action: current, object: binding.object, hand: binding.hand};
+						if (!grip) placing = {action: current, object: binding.object, hand: binding.hand, both: binding.both};
 					}
 					lastGrip = grip;
 					lastAction = current;
@@ -249,7 +279,7 @@ class HumanWorker {
 	function level(object:SimObject, seconds:Float, time:Float):Void {
 		for (entry in held) {
 			if (entry.object != object) continue;
-			var hand = handPlacement(entry.hand);
+			var hand = entry.both ? twoHandPose() : handPlacement(entry.hand);
 			var carrier = [hand.qx, hand.qy, hand.qz, hand.qw];
 			var offset = [entry.offset.qx, entry.offset.qy, entry.offset.qz, entry.offset.qw];
 			var world = multiply(carrier, offset);
@@ -269,7 +299,7 @@ class HumanWorker {
 				turned[3] * turned[3]);
 			var next = multiply([-carrier[0], -carrier[1], -carrier[2], carrier[3]], [for (value in turned) value / length]);
 			entry.offset = new SimPose(entry.offset.x, entry.offset.y, entry.offset.z, next[0], next[1], next[2], next[3]);
-			pending.push({time: time, object: object, hand: entry.hand, kind: REHOLD, carrier: entry.offset,
+			pending.push({time: time, object: object, hand: entry.hand, both: entry.both, kind: REHOLD, carrier: entry.offset,
 				touch: null});
 			return;
 		}
@@ -296,10 +326,12 @@ class HumanWorker {
 				session.holdObject(event.object, stabiliser.partBody(0), relative(STABILISER_POSE, objectPose));
 				if (pinned.indexOf(event.object) < 0) pinned.push(event.object);
 				body.setHeldPoint(event.hand, null);
+				if (event.both) body.setHeldPoint(ArmR, null);
 				forgetHeld(event.object);
 			} else if (event.kind == REHOLD) {
 				var offset = event.carrier;
-				if (offset != null) session.holdObject(event.object, handBody(event.hand), offset);
+				if (offset != null) session.holdObject(event.object,
+					event.both ? twoHandCarrier.partBody(0) : handBody(event.hand), offset);
 			} else if (event.kind == HOLD) {
 				var index = handIndex(event.hand);
 				var carrierPose = event.carrier;
@@ -318,16 +350,38 @@ class HumanWorker {
 					pending.resize(0);
 					return;
 				}
+				if (event.both) {
+					var right = body.gripPoint(ArmR);
+					var rightReach = Math.sqrt(Math.pow(objectPose.x - right[0], 2) +
+						Math.pow(objectPose.y - right[1], 2) + Math.pow(objectPose.z - right[2], 2));
+					if (rightReach > maxHoldDistance) {
+						if (job != null) job.abort('the object is $rightReach m from the right hand');
+						pending.resize(0);
+						return;
+					}
+				}
 				// Holding again moves the part from the stabiliser to the hand.
-				session.holdObject(event.object, actor.actor.partBody(index), offset);
+				session.holdObject(event.object,
+					event.both ? twoHandCarrier.partBody(0) : actor.actor.partBody(index), offset);
 				pinned.remove(event.object);
 				forgetHeld(event.object);
-				held.push({object: event.object, hand: event.hand, offset: offset});
+				held.push({object: event.object, hand: event.hand, both: event.both, offset: offset});
 				var hand = event.hand;
+				var both = event.both;
 				body.setHeldPoint(hand, function() {
-					var carrier = handPlacement(hand);
+					var carrier = both ? twoHandPose() : handPlacement(hand);
 					var point = rotate(carrier, offset.x, offset.y, offset.z);
-					return [carrier.x + point[0], carrier.y + point[1], carrier.z + point[2]];
+					var root = body.rootTransform();
+					var side = both ? 0.08 : 0.0;
+					return [carrier.x + point[0] + root[4] * side,
+						carrier.y + point[1] + root[5] * side, carrier.z + point[2]];
+				});
+				if (event.both) body.setHeldPoint(ArmR, function() {
+					var carrier = twoHandPose();
+					var point = rotate(carrier, offset.x, offset.y, offset.z);
+					var root = body.rootTransform();
+					return [carrier.x + point[0] - root[4] * 0.08,
+						carrier.y + point[1] - root[5] * 0.08, carrier.z + point[2]];
 				});
 			} else if (pinned.remove(event.object)) {
 				session.releaseObject(event.object);
@@ -336,18 +390,22 @@ class HumanWorker {
 	}
 
 	/**
-	 * True when no hand or forearm capsule, at the current animation pose, comes
+	 * True when no body capsule, at the current animation pose, comes
 	 * within the object's bounding sphere (plus 5 mm).
 	 */
 	function handsClear(object:SimObject):Bool {
 		var frame = session.capture();
 		var pose = frame.objectPose(object);
 		frame.dispose();
+		// Turning into the retreat can sweep an arm across a freshly released part.
+		// Keep it pinned until the whole worker has moved beyond that sweep.
+		var root = body.rootTransform();
+		var rootDistance = Math.sqrt(Math.pow(root[12]-pose.x,2) + Math.pow(root[13]-pose.y,2));
+		if (rootDistance < 1.0) return false;
 		var reach = object.shape.boundingRadius() + 0.005;
 		var placements = actor.proxy.place(body.character.pose, body.rootTransform());
 		for (index in 0...actor.proxy.capsules.length) {
 			var capsule = actor.proxy.capsules[index];
-			if (capsule.name.indexOf("hand") != 0 && capsule.name.indexOf("forearm") != 0) continue;
 			var placement = placements[index];
 			var centre = new SimPose(placement.center[0], placement.center[1], placement.center[2],
 				placement.rotation[0], placement.rotation[1], placement.rotation[2], placement.rotation[3]);
@@ -370,6 +428,15 @@ class HumanWorker {
 		var placement = actor.proxy.place(body.character.pose, body.rootTransform())[handIndex(hand)];
 		return new SimPose(placement.center[0], placement.center[1], placement.center[2], placement.rotation[0],
 			placement.rotation[1], placement.rotation[2], placement.rotation[3]);
+	}
+
+	/** A kinematic midpoint carrier driven by the left and right hand capsules. */
+	function twoHandPose():SimPose {
+		var left = handPlacement(ArmL), right = handPlacement(ArmR);
+		var root = body.rootTransform();
+		var yaw = Math.atan2(root[1], root[0]) * 0.5;
+		return new SimPose((left.x + right.x) * 0.5, (left.y + right.y) * 0.5,
+			(left.z + right.z) * 0.5, 0.0, 0.0, Math.sin(yaw), Math.cos(yaw));
 	}
 
 	function handIndex(hand:HumanLimb):Int {
@@ -420,7 +487,7 @@ class HumanWorker {
 		session.removeStepObserver(observer);
 		// A sealed session owns its actor until the session itself is disposed.
 		if (!session.isSealed()) actor.dispose();
-		if (!session.isSealed()) stabiliser.dispose();
+		if (!session.isSealed()) { stabiliser.dispose(); twoHandCarrier.dispose(); }
 		disposed = true;
 	}
 

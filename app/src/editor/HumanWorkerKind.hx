@@ -35,8 +35,16 @@ class HumanWorkerKind implements ObjectKindProvider {
 
   public static function boundsFor(path:String):Array<Float> {
     var asset = AnimationAsset.load(WorkerAssetPath.resolve(path));
-    var instance = new AnimationInstance(asset);
-    var bounds = instance.bounds();
+    var instance:Null<AnimationInstance> = null;
+    var bounds:Array<Float>;
+    try {
+      instance = new AnimationInstance(asset);
+      bounds = instance.bounds();
+    } catch (error:Dynamic) {
+      if (instance != null) instance.dispose();
+      asset.dispose();
+      throw error;
+    }
     instance.dispose();
     asset.dispose();
     return bounds;
@@ -77,7 +85,30 @@ class HumanWorkerKind implements ObjectKindProvider {
     var steps:Array<Dynamic> = Reflect.field(raw, "steps");
     if (index < 0 || index >= steps.length) throw "Worker step no longer exists";
     if (field == "action") steps[index] = defaultStep(value);
-    else Reflect.setField(steps[index], field, value);
+    else {
+      if (field == "hand") {
+        var action:String = Reflect.field(steps[index], "action");
+        if (action == "pick" || action == "place") {
+          var mate = -1;
+          var oldHand:String = Reflect.field(steps[index], "hand");
+          if (action == "pick") {
+            for (i in index + 1...steps.length) {
+              var other:String = Reflect.field(steps[i], "action");
+              if (other == "place" && Reflect.field(steps[i], "hand") == oldHand) { mate = i; break; }
+            }
+          } else {
+            var i = index - 1;
+            while (i >= 0) {
+              var other:String = Reflect.field(steps[i], "action");
+              if (other == "pick" && Reflect.field(steps[i], "hand") == oldHand) { mate = i; break; }
+              i--;
+            }
+          }
+          if (mate >= 0) Reflect.setField(steps[mate], "hand", value);
+        }
+      }
+      Reflect.setField(steps[index], field, value);
+    }
     var next = HumanJobSpec.parse(haxe.Json.stringify(raw));
     scene.setWorkerData(id, copy(data, next.toJson()));
   }
@@ -116,12 +147,14 @@ class HumanWorkerKind implements ObjectKindProvider {
   static function pointProperty(result:Array<PropertyDescriptor>, scene:EditorScene, id:String,
       prefix:String, index:Int, category:String, field:String, axis:Int):Void {
     var options = settings(category); options.step=0.1; options.unit="m";
-    result.push(new PropertyDescriptor(prefix+'worker-step-$index-$field-$axis', axis == 0 ? "Point X" : "Point Y",
+    result.push(new PropertyDescriptor(prefix+'worker-step-$index-$field-$axis',
+      axis == 0 ? "Point X" : axis == 1 ? "Point Y" : "Point Z",
       PropertyType.Float, function(_) {
         var step = parsed(scene,id).steps[index];
         var point:Array<Float> = field == "target" ? Reflect.field(Reflect.field(step,"target"),"point")
           : Reflect.field(step,field);
-        if (point == null) point = [0.0,0.0];
+        if (point == null) point = field == "target" &&
+          Reflect.field(step,"action") == "press" ? [0.0,0.0,1.0] : [0.0,0.0];
         return PropertyValue.Float(point[axis]);
       }, function(_, value) {
         var number:Float = switch value {
@@ -132,7 +165,8 @@ class HumanWorkerKind implements ObjectKindProvider {
         var step = parsed(scene,id).steps[index];
         var point:Array<Float> = field == "target" ? Reflect.field(Reflect.field(step,"target"),"point")
           : Reflect.field(step,field);
-        if (point == null) point = [0.0,0.0];
+        if (point == null) point = field == "target" &&
+          Reflect.field(step,"action") == "press" ? [0.0,0.0,1.0] : [0.0,0.0];
         var changed = point.copy(); changed[axis] = number;
         if (field == "target") editTarget(scene,id,index,"point",changed);
         else editStep(scene,id,index,field,changed);
@@ -235,15 +269,30 @@ class HumanWorkerKind implements ObjectKindProvider {
           default: throw "Zone selection requires a boolean";
         }, settings("Safety")));
     }
+    for (zoneId in current(scene,id).zones) if (scene.object(zoneId) == null) {
+      var missingId = zoneId;
+      result.push(new PropertyDescriptor(prefix+"worker-missing-zone-"+missingId,
+        "Missing zone: "+missingId, PropertyType.Bool,
+        function(_) return PropertyValue.Bool(true), function(_, value) switch value {
+          case PropertyValue.Bool(false):
+            var zones = current(scene,id).zones.copy();
+            zones.remove(missingId);
+            scene.setWorkerData(id, copy(current(scene,id), null, null, zones));
+          case PropertyValue.Bool(true):
+          default: throw "Zone selection requires a boolean";
+        }, settings("Safety")));
+    }
     var error:Null<String> = null;
     var spec:Null<HumanJobSpec> = null;
     try spec = parsed(scene, id) catch (failure:Dynamic) error = Std.string(failure);
     var note = current(scene,id).migrationNote;
     if (note != null) error = note + (error == null ? "" : "; " + error);
+    for (zoneId in current(scene,id).zones) if (scene.object(zoneId) == null)
+      error = (error == null ? "" : error + "; ") + 'Missing zone "$zoneId"';
     if (spec != null && error == null) {
       var visual = scene.workerVisuals.get(id);
       if (visual != null) {
-        var warnings = HumanJobSpec.check(spec, new WorkerSceneTargets(scene.records()),
+        var warnings = HumanJobSpec.check(spec, new WorkerSceneTargets(scene.records(), scene),
           new HumanBody(visual.character));
         if (warnings.length > 0) error = warnings.join("; ");
       }
@@ -256,7 +305,7 @@ class HumanWorkerKind implements ObjectKindProvider {
           case PropertyValue.Text(text): scene.setWorkerData(id, copy(current(scene,id), text));
           default: throw "Job JSON requires text";
         }, settings("Job")));
-      return ScenePropertyProvider.common(scene, id, prefix, result);
+      return workerProperties(scene, id, prefix, result);
     }
     var loop = settings("Job");
     result.push(new PropertyDescriptor(prefix+"worker-loop", "Loop", PropertyType.Bool,
@@ -276,7 +325,14 @@ class HumanWorkerKind implements ObjectKindProvider {
         default: throw "Step index requires a number";
       }, stepSelect));
     for (index in 0...spec.steps.length) appendStepProperties(result, scene, id, prefix, index, spec.steps[index]);
-    return ScenePropertyProvider.common(scene, id, prefix, result);
+    return workerProperties(scene, id, prefix, result);
+  }
+
+  static function workerProperties(scene:EditorScene, id:String, prefix:String,
+      fields:Array<PropertyDescriptor>):Array<PropertyDescriptor> {
+    var all = ScenePropertyProvider.common(scene, id, prefix, fields);
+    return [for (field in all) if (field.id == prefix + "position-0" || field.id == prefix + "position-1" ||
+      field.id == prefix + "visible" || field.id == prefix + "name" || fields.indexOf(field) >= 0) field];
   }
 
   static function appendStepProperties(result:Array<PropertyDescriptor>, scene:EditorScene,
@@ -304,7 +360,8 @@ class HumanWorkerKind implements ObjectKindProvider {
           case PropertyValue.Enum("object"):
             var records = scene.records();
             editStep(scene,id,index,"target",{object:records.length == 0 ? "object" : records[0].id});
-          case PropertyValue.Enum("point"): editStep(scene,id,index,"target",{point:[0.0,0.0]});
+          case PropertyValue.Enum("point"): editStep(scene,id,index,"target",
+            {point:action == "press" ? [0.0,0.0,1.0] : [0.0,0.0]});
           default: throw "Target type requires object or point";
         }, mode));
       if (objectId != null) {
@@ -327,7 +384,8 @@ class HumanWorkerKind implements ObjectKindProvider {
               default: throw "Anchor requires a choice";
             }, anchor));
         }
-      } else for (axis in 0...2) pointProperty(result,scene,id,prefix,index,category,"target",axis);
+      } else for (axis in 0...(action == "press" ? 3 : 2))
+        pointProperty(result,scene,id,prefix,index,category,"target",axis);
       if (action == "walkTo") {
         result.push(new PropertyDescriptor(prefix+'worker-step-$index-via',"Via points JSON",PropertyType.Text,
           function(_) {

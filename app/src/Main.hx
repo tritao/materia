@@ -896,13 +896,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function enableWorkerDemo(advanceTicks:Int = 0, realtime:Bool = false):Void {
     if (advanceTicks < 0) throw "Worker demo ticks must be non-negative";
     var path = app.editor.WorkerAssetPath.resolve("app/examples/worker-rack-to-table.materia");
-    session.open(path);
+    session.openExample(path);
     documentChanged();
     for (record in scene.records()) if (record.type == "human-worker") {
       scene.select(record.id);
       break;
     }
     simulation.setBackend(ApplicationSimulation.MUJOCO);
+    simulation.demoArmMotion = true;
     if (!simulation.rebuild(sensors, scene, session))
       throw 'Worker demo simulation failed: ${simulation.error}';
     for (_ in 0...advanceTicks) simulation.step();

@@ -36,6 +36,9 @@ class WorkerObjectTests {
       check(created.kind == "human-worker", "worker has the new scene object kind");
       check(created.z == 0.0 && created.depth > 1.5, "worker stands at floor origin with measured height");
       check(app.scene.hasWorkerVisual(workerId), "worker has an idle character preview");
+      for (field in app.scene.properties())
+        if (field.label == "Collision" || field.label == "Mass" || field.label == "Colour")
+          throw 'Worker exposes a physics or box colour field: ${field.label}';
       var job = '{"version":1,"loop":false,"steps":[{"action":"wait","seconds":1.0},{"action":"pick","object":"'+targetId+'"}]}';
       app.scene.setWorkerData(workerId, {asset:createdWorker.asset, job:job, zones:[targetId]});
       var seconds = property(app.scene,"Seconds");
@@ -47,6 +50,19 @@ class WorkerObjectTests {
         "step edit updates worker job");
       check(app.scene.document.undo() && worker(app.scene,workerId).job.indexOf('"seconds":1') >= 0,
         "undo restores the prior step");
+      app.scene.setWorkerData(workerId, {asset:createdWorker.asset,
+        job:'{"version":1,"loop":false,"steps":[{"action":"pick","object":"'+targetId+'","hand":"right"},{"action":"place","onto":"'+targetId+'","hand":"right"}]}',
+        zones:[targetId]});
+      var hand = property(app.scene,"Hand");
+      switch new PropertyBinding(hand, app.scene.context()).apply(PropertyValue.Enum("left")) {
+        case Rejected(message): throw 'Paired hand edit rejected: $message';
+        case Applied, Unchanged:
+      }
+      var paired = humankit.HumanJobSpec.parse(worker(app.scene,workerId).job);
+      check(Reflect.field(paired.steps[0],"hand") == "left" &&
+        Reflect.field(paired.steps[1],"hand") == "left", "hand edit updates pick and place together");
+      check(app.scene.document.undo() && worker(app.scene,workerId).job.indexOf('"hand":"right"') >= 0,
+        "undo restores both paired hands");
       var choice = property(app.scene,"Pick object");
       check(choice.type == PropertyType.Enum && choice.option(targetId) != null,
         "inspector lists scene object IDs in the pick dropdown");

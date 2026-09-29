@@ -14,23 +14,27 @@ class ApproachFor extends HumanActionBase {
 	 */
 	static inline var COMFORT = 0.8;
 
-	public final target:Array<Float>;
+	public var target(default, null):Array<Float>;
 	public final limb:HumanLimb;
 	public final speed:Float;
 	public final bothHands:Bool;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
+	final targetProvider:Null<Void->Array<Float>>;
 
-	public function new(target:Array<Float>, limb:HumanLimb, speed:Float = 1.0, bothHands:Bool = false) {
+	public function new(target:Array<Float>, limb:HumanLimb, speed:Float = 1.0, bothHands:Bool = false,
+		?targetProvider:Void->Array<Float>) {
 		super();
 		this.target = target.copy();
 		this.limb = limb;
 		this.speed = speed;
 		this.bothHands = bothHands;
+		this.targetProvider = targetProvider;
 	}
 
 	override public function start(worker:HumanBody):Void {
 		super.start(worker);
+		if (targetProvider != null) target = targetProvider().copy();
 		if (target.length < 3) { fail("Approach target needs x, y, z"); return; }
 		if (limb != ArmL && limb != ArmR) { fail("Approach requires an arm"); return; }
 		var shoulder = worker.character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);

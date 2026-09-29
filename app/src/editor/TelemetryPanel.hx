@@ -60,9 +60,11 @@ class TelemetryPanel {
       var signals = simulation.humanSignals(id);
       var step = worker == null ? null : worker.currentStep();
       var failure = worker == null ? null : worker.currentJobFailure();
+      var warnings = simulation.humanWarnings(id);
       rows.push(new KeyedView("worker-" + id,
         new Text(id + " · step " + (step == null ? "done" : Std.string(step + 1)) +
-          (failure == null ? "" : " · " + failure))));
+          (failure == null ? "" : " · " + failure) +
+          (warnings.length == 0 ? "" : " · " + warnings.join("; ")))));
       rows.push(new KeyedView("worker-zones-" + id,
         new Text("Zones: " + (signals == null ? "—" : signals.zones.join(", ")))));
       if (signals != null) for (robotId in simulation.simulatedRobotIds()) {

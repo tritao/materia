@@ -38,7 +38,8 @@ separation. The job and zones are saved in the `.materia` document.
 Open [`examples/worker-rack-to-table.materia`](examples/worker-rack-to-table.materia)
 for a complete floor, rack, table, part, robot, and worker. From a built app,
 `./app/run-built.sh --worker-demo=rack-to-table` opens this document and starts
-the simulation. Older documents with sensor `humans` load those people as
+the simulation with the arm joint cycling. The demo opens an untitled copy, so
+Save asks for a new filename. Older documents with sensor `humans` load those people as
 workers with empty jobs; the Inspector shows the former job name so it can be
 authored as steps before saving in the new format.
 

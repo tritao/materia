@@ -129,6 +129,14 @@ class HumanKitTests {
 		if (Math.abs(pick.target[2] - 1.16) > 1e-6) throw "Grasp height is wrong";
 		if (Math.abs(place.target[0] - 1.9) > 1e-6 || Math.abs(place.target[1] - 1.2) > 1e-6
 			|| Math.abs(place.target[2] - 1.1) > 1e-6) throw 'Rotated place point is wrong: ${place.target}';
+		var pressSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"point":[0.8,0.2,1.35]}}]}');
+		var pressJob = HumanJobBuilder.build(pressSpec, targets, body).job;
+		var press:humankit.Press = cast pressJob.orderedActions()[1];
+		if (Math.abs(press.point[2] - 1.35) > 1e-6) throw "Explicit press height was lost";
+		var pointError = "";
+		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"point":[0.8,0.2]}}]}')
+		catch (error:Dynamic) pointError = Std.string(error);
+		if (pointError.indexOf("[x, y, z]") < 0) throw 'Press point error is unclear: $pointError';
 		for (bad in [
 			'{"version":2,"loop":false,"steps":[]}',
 			'{"version":1,"loop":false,"steps":[{"action":"dance"}]}',
@@ -143,8 +151,16 @@ class HumanKitTests {
 			try HumanJobSpec.parse(bad) catch (error:Dynamic) rejected = true;
 			if (!rejected) throw 'Accepted invalid job: $bad';
 		}
+		var missingPickError = "";
+		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick"}]}')
+		catch (error:Dynamic) missingPickError = Std.string(error);
+		if (missingPickError.indexOf("step 0.object") < 0)
+			throw 'Missing pick error lost its field path: $missingPickError';
 		var warningSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"object":"missing"}},{"action":"playClip","clip":"NoSuchClip","seconds":1}]}');
-		if (HumanJobSpec.check(warningSpec, targets, body).length != 2) throw "Missing edit-time warnings";
+		var warnings = HumanJobSpec.check(warningSpec, targets, body);
+		if (warnings.length != 2 || warnings[0].indexOf('step 0: unknown object "missing"') < 0 ||
+			warnings[1].indexOf('step 1: character lacks clip "NoSuchClip"') < 0)
+			throw 'Wrong edit-time warnings: $warnings';
 		targets.boxes.set("high", {center: [0.0, 0.0, 3.0], halfExtents: [0.1, 0.1, 0.1], yaw: 0.0});
 		targets.boxes.set("low", {center: [0.0, 0.0, 0.1], halfExtents: [0.1, 0.1, 0.1], yaw: 0.0});
 		var heights = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"object":"high"}},{"action":"press","target":{"object":"low"}}]}');
@@ -158,6 +174,25 @@ class HumanKitTests {
 		var root = body.rootTransform();
 		if (Math.abs(root[12] - 1.0) > 0.02 || Math.abs(root[13]) > 0.02 || root[0] < 0.99)
 			throw 'Object walk stop/facing wrong: $root';
+		walkTargets.boxes.set("table", {center: [2.0, 2.0, 0.5], halfExtents: [0.5, 0.5, 0.5], yaw: 0.0});
+		body.walker.place(0.0, 0.0, 0.0);
+		body.advance(0.0);
+		var twoStops = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"object":"rack"}},{"action":"walkTo","target":{"object":"table"}}]}');
+		var routed = HumanJobBuilder.build(twoStops, walkTargets, body).job;
+		for (tick in 0...800) if (!routed.isDone()) routed.advance(0.02);
+		root = body.rootTransform();
+		if (!routed.isDone() || routed.failure() != null || Math.abs(root[12]-1.341886) > 0.03 ||
+			Math.abs(root[13]-1.025658) > 0.03)
+			throw 'Second object stop ignored the rack-side approach: $root';
+		body.walker.place(0.0, 0.0, 0.0);
+		body.advance(0.0);
+		walkTargets.boxes.set("button", {center: [2.0, 0.0, 1.5], halfExtents: [0.2, 0.2, 0.2], yaw: 0.0});
+		var frontSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"point":[3,0]}},{"action":"press","target":{"object":"button","anchor":"front"}}]}');
+		var frontJob = HumanJobBuilder.build(frontSpec, walkTargets, body).job;
+		var frontPress:humankit.Press = cast frontJob.orderedActions()[2];
+		for (tick in 0...900) if (!frontJob.isDone()) frontJob.advance(0.02);
+		if (!frontJob.isDone() || frontJob.failure() != null || Math.abs(frontPress.point[0]-2.2) > 0.01)
+			throw 'Front press used the build-time side: ${frontPress.point} root=${body.rootTransform()} failure=${frontJob.failure()}';
 		body.walker.place(0.0, 0.0, 0.0);
 		body.advance(0.0);
 		var animationBuilt = HumanJobBuilder.build(spec, targets, body);

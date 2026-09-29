@@ -128,10 +128,11 @@ saved job can be reopened without Haxe code:
 
 Available actions are `walkTo` (an object or XY point, with optional `via`
 points), `pick`, `place` (optional XY `offset` on the support), `press` (object
-anchor or XY point), `wait` (seconds), and `playClip` (clip and seconds).
+anchor or XYZ point), `wait` (seconds), and `playClip` (clip and seconds).
 Pick and place hands can be `left`, `right`, or `both`. The parser rejects unknown fields,
 invalid pick and place sequences, and unsupported versions. `toJson()` writes
-a normalized spec.
+a normalized spec. Parsed steps use the typed `HumanJobStep` shape; the parser
+enforces action-specific fields before publishing them.
 
 `HumanJobBuilder.build(spec, targets, body)` resolves scene boxes through a
 `HumanJobTargets` adapter and returns a `HumanJob` plus hold bindings. It

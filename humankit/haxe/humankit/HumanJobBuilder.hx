@@ -14,9 +14,15 @@ class HumanJobBuilder {
         case "walkTo":
           var target:Dynamic = Reflect.field(step, "target");
           var id:Null<String> = Reflect.field(target, "object");
-          var point:Array<Float> = id == null ? Reflect.field(target, "point") : stopAt(box(targets, id), body);
+          var point:Array<Float> = id == null ? Reflect.field(target, "point") : null;
           var via:Null<Array < Array < Float>>> = Reflect.field(step, "via");
-          if (via == null || via.length == 0) job.add(new WalkTo(point, 1.0));
+          if (id != null) {
+            var destination = box(targets, id);
+            if (via == null || via.length == 0)
+              job.add(WalkTo.deferred(function() return stopAt(destination, body), 1.0));
+            else job.add(WalkTo.along(via.copy(), 1.0,
+              function() return stopAt(destination, body)));
+          } else if (via == null || via.length == 0) job.add(new WalkTo(point, 1.0));
           else job.add(WalkTo.along(via.concat([point]), 1.0));
         case "pick":
           var id:String = Reflect.field(step, "object");
@@ -49,27 +55,49 @@ class HumanJobBuilder {
           job.add(place);
           for (hand in heldHands) holds.push({action: place, objectId: heldId, grasp: point.copy(), hand: hand}
           );
-          var root = body.rootTransform();
-          var dx = root[12] - point[0], dy = root[13] - point[1];
-          var length = Math.sqrt(dx * dx + dy * dy);
-          if (length < 0.000001) {
-            dx = -root[0];
-            dy = -root[1];
-            length = 1.0;
-          }
-          job.add(new WalkTo([point[0] + dx / length * 0.8, point[1] + dy / length * 0.8], 1.0));
+          job.add(WalkTo.deferred(function() {
+            var root = body.rootTransform();
+            var dx = root[12] - point[0], dy = root[13] - point[1];
+            var length = Math.sqrt(dx * dx + dy * dy);
+            if (length < 0.000001) { dx = -root[0]; dy = -root[1]; length = 1.0; }
+            if (Math.abs(dx) >= Math.abs(dy))
+              return [point[0] + (dx >= 0 ? 0.8 : -0.8), root[13]];
+            return [root[12], point[1] + (dy >= 0 ? 0.8 : -0.8)];
+          }, 1.0));
+          job.add(WalkTo.deferred(function() {
+            var root = body.rootTransform();
+            var dx = root[12] - point[0], dy = root[13] - point[1];
+            var candidates = Math.abs(dx) >= Math.abs(dy)
+              ? [[root[12], root[13] + 0.8], [root[12], root[13] - 0.8]]
+              : [[root[12] + 0.8, root[13]], [root[12] - 0.8, root[13]]];
+            var a = Math.pow(candidates[0][0] - held.center[0], 2) +
+              Math.pow(candidates[0][1] - held.center[1], 2);
+            var b = Math.pow(candidates[1][0] - held.center[0], 2) +
+              Math.pow(candidates[1][1] - held.center[1], 2);
+            return a >= b ? candidates[0] : candidates[1];
+          }, 1.0));
           for (hand in heldHands) heldByHand.remove(hand);
         case "press":
           var target:Dynamic = Reflect.field(step, "target");
           var id:Null<String> = Reflect.field(target, "object");
           var point:Array<Float>;
           if (id == null) {
-            var xy:Array<Float> = Reflect.field(target, "point");
-            point = [xy[0], xy[1], 1.0];
+            point = Reflect.field(target, "point");
           } else point = anchor(box(targets, id), Reflect.field(target, "anchor"), body);
           var hands = limbs(Reflect.field(step, "hand"));
-          job.add(new ApproachFor(point, hands[0], 1.0, hands.length == 2));
-          job.add(new Press(point, hands[0]));
+          if (id != null && Reflect.field(target, "anchor") == "front") {
+            var button = box(targets, id);
+            var resolved:Null<Array<Float>> = null;
+            var resolve = function() {
+              if (resolved == null) resolved = anchor(button, "front", body);
+              return resolved;
+            };
+            job.add(new ApproachFor(point, hands[0], 1.0, hands.length == 2, resolve));
+            job.add(new Press(point, hands[0], 0.2, 0.15, resolve));
+          } else {
+            job.add(new ApproachFor(point, hands[0], 1.0, hands.length == 2));
+            job.add(new Press(point, hands[0]));
+          }
         case "wait":
           job.add(new Wait(Reflect.field(step, "seconds")));
         case "playClip":

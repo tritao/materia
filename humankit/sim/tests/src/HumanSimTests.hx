@@ -129,7 +129,7 @@ class HumanSimTests {
         if (tilt > 0.035) throw 'Placed part rests tilted by $tilt rad';
         if (horizontal > 0.02 || vertical > 0.01 || speed > 0.001)
             throw 'Placed part missed target: horizontal=$horizontal vertical=$vertical speed=$speed pose=${finalPose.x}, ${finalPose.y}, ${finalPose.z}';
-        Sys.println('human sim placement: horizontal=$horizontal vertical=$vertical speed=$speed');
+        Sys.println('human sim placement: pick=${worker.pickError()} horizontal=$horizontal vertical=$vertical speed=$speed residual=${worker.placementError()}');
         var now = session.simulationTime();
         robot.pushKeyframe(now, [new SimPose(3.0, 0.0, 1.5)]);
         robot.pushKeyframe(now + 0.5, [new SimPose(2.0, 0.0, 1.5)]);
@@ -178,19 +178,47 @@ class HumanSimTests {
         objects.set("table", table);
         var spec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"wide-part","hand":"both"},{"action":"place","onto":"table","hand":"both"}]}');
         worker.runSpec(spec, targets, objects);
+        var sawTwoHandHold = false;
+        var settledHoldTicks = 0;
         for (tick in 0...900) {
             worker.advance();
             session.step();
+            if (worker.body.heldPoint(humankit.HumanLimb.ArmL) != null &&
+                worker.body.heldPoint(humankit.HumanLimb.ArmR) != null) {
+                sawTwoHandHold = true;
+                settledHoldTicks++;
+                if (settledHoldTicks > 15) {
+                    var heldFrame = session.capture();
+                    var heldPose = heldFrame.objectPose(part);
+                    heldFrame.dispose();
+                    var palm = worker.body.gripPoint(humankit.HumanLimb.ArmR);
+                    var dx = palm[0]-heldPose.x, dy = palm[1]-heldPose.y;
+                    var sinYaw = 2*(heldPose.qw*heldPose.qz+heldPose.qx*heldPose.qy);
+                    var cosYaw = 1-2*(heldPose.qy*heldPose.qy+heldPose.qz*heldPose.qz);
+                    var lateral = Math.abs(-sinYaw*dx+cosYaw*dy);
+                    if (lateral < 0.04)
+                        throw 'Right palm sank into the carried part: lateral=$lateral at tick $tick';
+                }
+            } else settledHoldTicks = 0;
             if (worker.currentJobDone()) break;
         }
-        if (!worker.currentJobDone() || worker.currentJobFailure() != null)
+        if (!sawTwoHandHold || !worker.currentJobDone() || worker.currentJobFailure() != null)
             throw 'Both-hands job failed: ${worker.currentJobFailure()}';
         for (_ in 0...240) { worker.advance(); session.step(); }
         var frame = session.capture();
         var pose = frame.objectPose(part);
         frame.dispose();
+        worker.advance(); session.step();
+        frame = session.capture();
+        var nextPose = frame.objectPose(part);
+        frame.dispose();
+        var restSpeed = Math.sqrt(Math.pow(nextPose.x-pose.x,2) + Math.pow(nextPose.y-pose.y,2) +
+            Math.pow(nextPose.z-pose.z,2)) / session.fixedTimestep();
+        var tilt = 2 * Math.asin(Math.min(1.0, Math.sqrt(pose.qx*pose.qx+pose.qy*pose.qy)));
         if (Math.abs(pose.x - 1.9) > 0.02 || Math.abs(pose.y) > 0.02 || Math.abs(pose.z - 1.10) > 0.01)
             throw 'Both-hands part missed table: ${pose.x}, ${pose.y}, ${pose.z}';
+        if (tilt > 0.035 || restSpeed > 0.001)
+            throw 'Both-hands part did not settle flat: tilt=$tilt speed=$restSpeed';
         objects.set("wide-part", table);
         worker.runSpec(spec, targets, objects);
         if (worker.currentJobFailure() == null || worker.currentJobFailure().indexOf("dynamic") < 0)
@@ -199,9 +227,9 @@ class HumanSimTests {
         worker.runSpec(missing, targets, objects);
         if (worker.currentJobFailure() == null || worker.currentJobFailure().indexOf("gone") < 0)
             throw "An unresolved job object did not fail";
-        var loop = HumanJobSpec.parse('{"version":1,"loop":true,"steps":[{"action":"wait","seconds":0.5}]}');
+        var loop = HumanJobSpec.parse('{"version":1,"loop":true,"steps":[{"action":"walkTo","target":{"point":[0,0]}},{"action":"walkTo","target":{"point":[1,0]}}]}');
         worker.runSpec(loop, targets, objects);
-        for (tick in 0...100) {
+        for (tick in 0...400) {
             worker.advance();
             session.step();
             if (worker.currentJobDone()) break;

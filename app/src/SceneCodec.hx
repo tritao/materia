@@ -403,8 +403,8 @@ class SceneCodec {
           1000000,
           0.1
         ),
-        collisionEnabled: collisionEnabled,
-        dynamicBody: dynamicBody,
+        collisionEnabled: kind == "human-worker" ? false : collisionEnabled,
+        dynamicBody: kind == "human-worker" ? false : dynamicBody,
         mass: optionalBounded(
           value,
           "mass",
