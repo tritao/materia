@@ -49,7 +49,7 @@ class MachineAssemblyDocuments {
 				propertyText(existing, "cadkit.assembly.id") == description.mechanical.id)
 				removeToolInstances(document, existing);
 		var recipes:Map<String, Definition> = [];
-		var root = AssemblyDocuments.fromDefinition(document, description.mechanical,
+		var root = AssemblyDocuments.fromDefinition(document, machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical),
 			(scope, occurrence, component) -> {
 				if (component == null) return null;
 				var member = sourceFor(description.machine.members, scope, occurrence.id);
@@ -102,7 +102,7 @@ class MachineAssemblyDocuments {
 		}
 		if (side.tools != null) for (tool in side.tools) {
 			var toolEndpoints:Map<String, Element> = [];
-			var flatTool = AssemblyDefinitionFlattener.flatten(tool.mechanical);
+			var flatTool = AssemblyDefinitionFlattener.flatten(machinekit.assembly.FrozenAssemblyDefinitions.thaw(tool.mechanical));
 			for (member in tool.machine.members) {
 				var definition = recipeDefinition(document, member, recipes);
 				if (definition == null) throw 'Tool member "${tool.id}/${member.occurrence}" has no recipe';
@@ -306,7 +306,7 @@ class MachineAssemblyDocuments {
 			rows.sort((a, b) -> Reflect.compare(a.id, b.id));
 			tool.machine.portConnections = rows;
 		}
-		return {schemaVersion: 2, mechanical: AssemblyDocuments.toDefinition(root), machine: side};
+		return {schemaVersion: 2, mechanical: machinekit.assembly.FrozenAssemblyDefinitions.freeze(AssemblyDocuments.toDefinition(root)), machine: side};
 	}
 
 	public static function rebuildAssembly(root:Element):MachineAssembly {

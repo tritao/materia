@@ -58,6 +58,7 @@ private typedef AssemblyMember = {
 	var id:String;
 	var component:MachineComponent;
 }
+private typedef MutableIncludedRecord = {var id:String; var pose:AssemblyFrame; var mechanical:AssemblyDefinition;}
 
 /** Reusable, prefixable assembly made from MachineComponents and named connector references. */
 class MachineAssembly {
@@ -73,7 +74,7 @@ class MachineAssembly {
 	final portConversions:Array<ServiceLinkRecord> = [];
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
-	final nestedEntries:Array<machinekit.assembly.MachineAssemblyDescription.IncludedRecord> = [];
+	final nestedEntries:Array<MutableIncludedRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -144,11 +145,11 @@ class MachineAssembly {
 			fromInstance: connection.fromInstance, fromPort: connection.fromPort,
 			toInstance: connection.toInstance, toPort: connection.toPort}];
 		savedConnections.sort((a, b) -> Reflect.compare(a.id, b.id));
-		return {schemaVersion: 2, mechanical: mechanical, machine: {
+		return {schemaVersion: 2, mechanical: FrozenAssemblyDefinitions.freeze(mechanical), machine: {
 			members: sources,
 			ports: savedPorts,
 			included: [for (entry in nestedEntries) {id: entry.id, pose: copyFrame(entry.pose),
-				mechanical: cloneDefinition(entry.mechanical)}],
+				mechanical: FrozenAssemblyDefinitions.freeze(entry.mechanical)}],
 			portConnections: savedConnections,
 			portExposures: [for (entry in externalPorts) {name: entry.name,
 				instanceId: entry.instanceId, portName: entry.portName}],
@@ -215,8 +216,9 @@ class MachineAssembly {
 	/** Rebuild through registered recipes; no component object is stored in the description. */
 	public static function fromDescription(description:MachineAssemblyDescription):MachineAssembly {
 		if (description == null || description.machine == null) throw "Missing machine assembly description";
-		AssemblyDefinitionCodec.validate(description.mechanical);
-		var mechanical = AssemblyDefinitionFlattener.flatten(description.mechanical);
+		var savedMechanical = FrozenAssemblyDefinitions.thaw(description.mechanical);
+		AssemblyDefinitionCodec.validate(savedMechanical);
+		var mechanical = AssemblyDefinitionFlattener.flatten(savedMechanical);
 		var result = new MachineAssembly();
 		var sources:Map<String, machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
 		for (member in description.machine.members) {
@@ -276,7 +278,7 @@ class MachineAssembly {
 		}
 		if (description.machine.included != null) for (entry in description.machine.included)
 			result.nestedEntries.push({id: entry.id, pose: copyFrame(entry.pose),
-				mechanical: cloneDefinition(entry.mechanical)});
+				mechanical: FrozenAssemblyDefinitions.thaw(entry.mechanical)});
 		for (entry in result.nestedEntries)
 			result.included.push({id: entry.id, assembly: result.rebuildIncluded(entry.id, entry.pose),
 				pose: copyFrame(entry.pose)});
@@ -578,7 +580,7 @@ class MachineAssembly {
 		}
 		included.push({id: id, assembly: assembly.snapshot(), pose: pose == null ? null : copyFrame(pose)});
 		nestedEntries.push({id: id, pose: pose == null ? AssemblyFrames.identity() : copyFrame(pose),
-			mechanical: cloneDefinition(assembly.describe().mechanical)});
+			mechanical: FrozenAssemblyDefinitions.thaw(assembly.describe().mechanical)});
 	}
 
 	public function addMate(id:String, kind:String, parent:String, parentConnector:String,

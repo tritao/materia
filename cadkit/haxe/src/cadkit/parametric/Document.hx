@@ -353,6 +353,30 @@ class Document {
 		var parts = [definition.id.value, Std.string(definition.revision), output];
 		for (input in definition.inputs())
 			parts.push(input.name + "=" + Std.string(instance.resolvedValue(input.name)));
+		if (definition.recipe == AssemblyMemberEvaluator.NESTED_RECIPE) {
+			var scopeProperty = definition.property("cadkit.assembly.subdefinition");
+			var ownerProperty = instance.property("cadkit.assembly.owner");
+			if (scopeProperty == null || ownerProperty == null) return parts.join("|");
+			var scope:String = cast scopeProperty.value;
+			var owner:PersistentReference = cast ownerProperty.value;
+			parts.push(owner.targetId);
+			var children:Array<InstanceElement> = [];
+			for (element in elements) if (element.kind == "instance") {
+				var childScope = element.property("cadkit.assembly.scope");
+				var childOwner = element.property("cadkit.assembly.owner");
+				if (childScope == null || childOwner == null || childScope.value != scope) continue;
+				var reference:PersistentReference = cast childOwner.value;
+				if (reference.documentId == owner.documentId && reference.targetId == owner.targetId)
+					children.push(cast element);
+			}
+			children.sort((a, b) -> Reflect.compare(a.id.value, b.id.value));
+			for (child in children) {
+				var frame = PlacementFrames.toAssemblyFrame(child.localPlacement);
+				parts.push(child.id.value + ":" + frame.x + "," + frame.y + "," + frame.z + "," +
+					frame.qx + "," + frame.qy + "," + frame.qz + "," + frame.qw + ":" +
+					instanceKey(child, this.definition(child.definitionId).primaryGeometryOutput().name));
+			}
+		}
 		return parts.join("|");
 	}
 

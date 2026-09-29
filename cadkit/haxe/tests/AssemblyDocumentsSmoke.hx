@@ -1,5 +1,6 @@
 import cadkit.modeling.AssemblyState;
 import cadkit.parametric.AssemblyDocuments;
+import cadkit.parametric.AssemblyDocuments.AssemblyDocumentDiagnostic;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.QuantityKind;
@@ -42,6 +43,20 @@ class AssemblyDocumentsSmoke {
 		if (!Equality.equals(AssemblyDocuments.toDefinition(root), original))
 			throw "Assembly document changed the mechanical definition";
 		var savedText = DocumentCodec.encode(document);
+		// Keep the joint and its document reference, but remove one endpoint
+		// from the assembly's set of recognized occurrences.
+		var damaged = DocumentCodec.decode(savedText, false, false);
+		for (element in damaged.allElements()) if (element.name == "follower")
+			element.setProperty(TypedProperty.text("cadkit.assembly.kind", "damaged"));
+		var broken = DocumentCodec.decode(DocumentCodec.encode(damaged), false, false);
+		var caught = false;
+		try AssemblyDocuments.toDefinition(broken.element(root.id))
+		catch (problem:AssemblyDocumentDiagnostic) {
+			caught = problem.code == "assembly.missing-joint-endpoint" && problem.subject == "follow";
+		}
+		if (!caught) throw "Damaged owned joint endpoint did not produce its diagnostic";
+		broken.close();
+		damaged.close();
 		var cloned = DocumentCodec.decode(savedText, true, false);
 		if (!Equality.equals(AssemblyDocuments.toDefinition(cloned.element(root.id)), original))
 			throw "Cloning lost assembly ownership references";

@@ -1,11 +1,38 @@
 package machinekit.assembly;
 
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
+import materia.assembly.AssemblyDefinition.KinematicJoint;
+import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
+import materia.assembly.AssemblyDefinition.AssemblyExposedConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import haxe.ds.ReadOnlyArray;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
+
+/** Wire-compatible read-only array view of the mechanical schema. */
+@:wire typedef FrozenAssemblySubdefinition = {
+	@:id(1) var id:String;
+	@:id(2) var definitions:ReadOnlyArray<AssemblyComponentDefinition>;
+	@:id(3) var occurrences:ReadOnlyArray<AssemblyComponentOccurrence>;
+	@:id(4) var joints:ReadOnlyArray<KinematicJoint>;
+	@:id(5) @:optional var couplings:ReadOnlyArray<AssemblyJointCoupling>;
+	@:id(6) @:optional var exposedConnectors:ReadOnlyArray<AssemblyExposedConnector>;
+}
+
+@:wire typedef FrozenAssemblyDefinition = {
+	@:id(1) var schemaVersion:Int;
+	@:id(2) var id:String;
+	@:id(3) @:optional var lengthUnit:String;
+	@:id(4) var definitions:ReadOnlyArray<AssemblyComponentDefinition>;
+	@:id(5) var occurrences:ReadOnlyArray<AssemblyComponentOccurrence>;
+	@:id(6) var joints:ReadOnlyArray<KinematicJoint>;
+	@:id(7) @:optional var couplings:ReadOnlyArray<AssemblyJointCoupling>;
+	@:id(8) @:optional var assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
+	@:id(9) @:optional var exposedConnectors:ReadOnlyArray<AssemblyExposedConnector>;
+}
 
 /** Serializable recipe inputs. The constructor IDs are part of the wire schema. */
 @:wire enum MemberSource {
@@ -100,14 +127,14 @@ import machinekit.component.PortInterface;
 
 @:wire typedef ToolRecord = {
 	@:id(1) var id:String;
-	@:id(2) var mechanical:AssemblyDefinition;
+	@:id(2) var mechanical:FrozenAssemblyDefinition;
 	@:id(3) var machine:ToolSideRecord;
 }
 
 @:wire typedef IncludedRecord = {
 	@:id(1) var id:String;
 	@:id(2) var pose:AssemblyFrame;
-	@:id(3) var mechanical:AssemblyDefinition;
+	@:id(3) var mechanical:FrozenAssemblyDefinition;
 }
 
 /** A tool has its own EOAT data, with no recursive changer table. */
@@ -160,7 +187,7 @@ import machinekit.component.PortInterface;
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
 @:wire typedef MachineAssemblyDescription = {
-	@:id(1) var mechanical:AssemblyDefinition;
+	@:id(1) var mechanical:FrozenAssemblyDefinition;
 	@:id(2) var machine:AssemblySideRecord;
 	@:id(3) @:optional var schemaVersion:Int;
 }

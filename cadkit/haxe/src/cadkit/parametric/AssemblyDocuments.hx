@@ -245,10 +245,13 @@ class AssemblyDocuments {
 				instanceDefinition = fallback.get(occurrence.definition);
 				if (instanceDefinition == null) {
 					instanceDefinition = document.createDefinition(occurrence.definition,
-						AssemblyMemberEvaluator.RECIPE, [], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
+						occurrence.assembly == null ? AssemblyMemberEvaluator.RECIPE : AssemblyMemberEvaluator.NESTED_RECIPE,
+						[], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
 					var noConnectors:Array<materia.assembly.AssemblyRecord.AssemblyConnector> = [];
 					instanceDefinition.setProperty(TypedProperty.text(PREFIX + "connectors",
 						JsonWire.encode(component == null ? noConnectors : component.connectors)));
+					if (occurrence.assembly != null)
+						instanceDefinition.setProperty(TypedProperty.text(PREFIX + "subdefinition", occurrence.assembly));
 					fallback.set(occurrence.definition, instanceDefinition);
 				}
 			}

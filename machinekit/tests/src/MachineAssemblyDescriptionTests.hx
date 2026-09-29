@@ -202,7 +202,7 @@ class MachineAssemblyDescriptionTests {
 			throw "Included assemblies were not preserved as nested definitions";
 		if (description.mechanical.occurrences.length != 2)
 			throw "Included members were not grouped into an assembly occurrence";
-		var flat = AssemblyDefinitionFlattener.flatten(description.mechanical);
+		var flat = AssemblyDefinitionFlattener.flatten(machinekit.assembly.FrozenAssemblyDefinitions.thaw(description.mechanical));
 		if (flat.occurrences.length != outer.components().length || flat.joints.length != 3)
 			throw "Nested assembly did not flatten to the original members and joints";
 		var expected = ["base", "unit/pair/first", "unit/pair/second"];
@@ -223,6 +223,16 @@ class MachineAssemblyDescriptionTests {
 		var restored = MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
 		if (!Equality.equals(outer.describe(), restored.describe()))
 			throw "Nested MachineKit assembly changed after document round trip";
+		var nestedInstance:InstanceElement = null;
+		for (element in reopened.allElements()) if (element.kind == "instance") {
+			var instance:InstanceElement = cast element;
+			if (reopened.definition(instance.definitionId).recipe ==
+				cadkit.parametric.AssemblyMemberEvaluator.NESTED_RECIPE &&
+				instance.name == "unit") nestedInstance = instance;
+		}
+		if (nestedInstance == null) throw "Nested assembly is not a document instance";
+		var nestedShape = reopened.definitionOutput(nestedInstance, "body");
+		if (nestedShape.volume() <= 1) throw "Nested assembly retained placeholder geometry";
 		reopened.close();
 		document.close();
 	}
@@ -410,7 +420,7 @@ class MachineAssemblyDescriptionTests {
 			throw "Builder did not retain authored mechanical records";
 		var model = new AssemblyModel();
 		assembly.addTo(model, "");
-		var modelState = model.initialState(), savedState = new AssemblyState(definition);
+		var modelState = model.initialState(), savedState = new AssemblyState(machinekit.assembly.FrozenAssemblyDefinitions.thaw(definition));
 		modelState.setJoint("first", 5);
 		savedState.setJoint("first", 5);
 		for (id in ["a", "b", "c"])
