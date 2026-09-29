@@ -114,6 +114,7 @@ class HumanJobSpec {
 
   public static function check(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):Array < String > {
     var warnings:Array<String> = [];
+    var heldByHand:Map<String, String> = new Map();
     for (index in 0...spec.steps.length) {
       var step = spec.steps[index];
       var action:String = Reflect.field(step, "action");
@@ -137,6 +138,12 @@ class HumanJobSpec {
         else if (action == "pick" || action == "place" || action == "press") {
           var z = box.center[2] +(action
             == "pick" ? box.halfExtents[2] + 0.01 : action == "place" ? box.halfExtents[2] : 0.0);
+          if (action == "place") {
+            var hand:String = Reflect.field(step, "hand");
+            var heldId = heldByHand.get(hand == "both" ? "left" : hand);
+            var held = heldId == null ? null : targets.box(heldId);
+            if (held != null) z += held.halfExtents[2];
+          }
           var shoulder = body.character.pose.bonePosition(UpperArmR);
           if (shoulder != null) {
             var reach = 0.8 *(body.description.upperArm + body.description.forearm);
@@ -144,6 +151,15 @@ class HumanJobSpec {
             if (shoulder[2] - z >= reach) warnings.push('step $index: target below waist');
           }
         }
+      }
+      if (action == "pick") {
+        var hand:String = Reflect.field(step, "hand");
+        if (hand == "both") { heldByHand.set("left", id); heldByHand.set("right", id); }
+        else heldByHand.set(hand, id);
+      } else if (action == "place") {
+        var hand:String = Reflect.field(step, "hand");
+        if (hand == "both") { heldByHand.remove("left"); heldByHand.remove("right"); }
+        else heldByHand.remove(hand);
       }
     }
     return warnings;

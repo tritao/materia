@@ -183,7 +183,7 @@ class Main {
           worker.currentJobDone(), jobFailure:worker == null ? "missing worker" : worker.currentJobFailure(),
           part:part.length == 0 ? null : part[0].position,
           zones:signals == null ? [] : signals.zones,
-          separation:signals == null ? null : signals.separation.get("demo-arm")}));
+          separation:signals == null ? null : signals.separation.get(editor.sensors.robotId)}));
         editor.dispose();
         return 0;
       }
@@ -897,6 +897,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (advanceTicks < 0) throw "Worker demo ticks must be non-negative";
     var path = app.editor.WorkerAssetPath.resolve("app/examples/worker-rack-to-table.materia");
     session.open(path);
+    documentChanged();
+    for (record in scene.records()) if (record.type == "human-worker") {
+      scene.select(record.id);
+      break;
+    }
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     if (!simulation.rebuild(sensors, scene, session))
       throw 'Worker demo simulation failed: ${simulation.error}';
