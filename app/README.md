@@ -23,6 +23,25 @@ tracks selection. Edit Name, Position X/Y (metres), Width, Height, Colour
 Hidden objects remain selectable in the hierarchy. Click empty viewport space
 or the Scene root to clear object selection.
 
+## Workers in scene documents
+
+Use **Add → People → Worker** to place a worker in the scene. Select it to
+edit its asset, floor position, yaw, job, and safety zones in the Inspector.
+**Add step**, **Remove step**, and **Move step up/down** edit the ordered job;
+each step exposes its action and relevant object, hand, point, or duration
+fields. Object fields list IDs already in the scene. Picked parts need a
+dynamic collision body. Assign scene boxes as zones to show occupancy in
+Telemetry. Press Play to run the worker beside the document's robots;
+Telemetry shows its current step, failure, zones, and minimum robot
+separation. The job and zones are saved in the `.materia` document.
+
+Open [`examples/worker-rack-to-table.materia`](examples/worker-rack-to-table.materia)
+for a complete floor, rack, table, part, robot, and worker. From a built app,
+`./app/run-built.sh --worker-demo=rack-to-table` opens this document and starts
+the simulation. Older documents with sensor `humans` load those people as
+workers with empty jobs; the Inspector shows the former job name so it can be
+authored as steps before saving in the new format.
+
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame
