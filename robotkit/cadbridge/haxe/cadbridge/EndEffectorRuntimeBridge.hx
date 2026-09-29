@@ -155,7 +155,7 @@ class EndEffectorRuntimeBridge {
             configuration.memberConnectorFrame(member.id, connector));
           var mountRelative = AssemblyFrames.compose(
             AssemblyFrames.inverse(solved.mountWorld), mountWorld);
-          var frame = EndEffectorFrames.toRobotFrame(mountRelative);
+          var frame = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(mountRelative));
           var mappedLinkId = blueprint.identity == null ? null :
             blueprint.identity.linkId(flangeLinkIndex);
           if (flangeLinkId != null && mappedLinkId != null && flangeLinkId != mappedLinkId)

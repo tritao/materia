@@ -66,7 +66,16 @@ class MachineAssembly {
 	public function new() {}
 
 	public function addComponent(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
+		InstancePath.segment(id);
+		addComponentPath(id, component, pose);
+	}
+
+	public function addComponentAt(path:InstancePath, component:MachineComponent, ?pose:AssemblyFrame):Void
+		addComponentPath(path, component, pose);
+
+	function addComponentPath(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
 		if (id == null || id.length == 0 || component == null) throw "Assembly component needs an id and component";
+		InstancePath.of(id);
 		for (member in members) if (member.id == id) throw 'Duplicate assembly component "$id"';
 		members.push({id: id, component: component,
 			pose: pose == null ? AssemblyFrames.identity() : copyFrame(pose)});
@@ -76,11 +85,12 @@ class MachineAssembly {
 	public function include(id:String, assembly:MachineAssembly, ?pose:AssemblyFrame):Void {
 		if (id == null || id.length == 0 || assembly == null || assembly == this)
 			throw "Included assembly needs a distinct id and assembly";
+		InstancePath.segment(id);
 		for (entry in included) if (entry.id == id) throw 'Duplicate included assembly "$id"';
 		assembly.validateStructure();
 		for (member in assembly.members) {
 			var localPose = pose == null ? member.pose : AssemblyFrames.compose(pose, member.pose);
-			addComponent(join(id, member.id), member.component, localPose);
+			addComponentPath(join(id, member.id), member.component, localPose);
 		}
 		for (connector in assembly.memberConnectorFrames)
 			addMemberConnector(join(id, connector.instanceId), connector.name, connector.frame);
@@ -508,8 +518,10 @@ class MachineAssembly {
 		throw 'Missing assembly connector "$name"';
 	}
 
-	public static function join(prefix:String, id:String):String
-		return prefix == null || prefix.length == 0 ? id : '$prefix/$id';
+	public static function join(prefix:String, id:String):String {
+		var child = InstancePath.of(id);
+		return prefix == null || prefix.length == 0 ? child : InstancePath.of(prefix + "/" + id);
+	}
 
 	function addOperation(op:MachineAssemblyOperation):Void {
 		var id = operationId(op);

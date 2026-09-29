@@ -50,7 +50,7 @@ class EndEffectorTests {
 		var mass = tool.massPropertiesAtMount();
 		close(mass.mass, 4, "mass");
 		close(mass.centreOfMass.y, 12.5, "centre y");
-		var robot = EndEffectorFrames.toRobotFrame(tcp);
+		var robot = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(tcp));
 		close(robot.position.z, 0.03, "robot metres");
 		var approach = EndEffectorFrames.approachYToZ(tcp);
 		var axis = AssemblyFrames.transformVector(approach, 0, 0, 1);

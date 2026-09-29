@@ -4,6 +4,8 @@ import cadkit.modeling.AssemblyState;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffector.EndEffectorSolvedContext;
 import machinekit.robotics.EndEffectorFrames;
+import machinekit.units.Millimetres;
+import machinekit.units.KgMm2;
 import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import robotkit.spatial.Quat;
@@ -23,7 +25,7 @@ class EndEffectorBridge {
     if (endEffector == null) throw "End effector is required";
     endEffector.validate();
     var solved = endEffector.solve(state);
-    var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state, solved));
+    var converted = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(endEffector.mountTFrame(frameName, state, solved)));
     var transform = new Transform3(new Vec3(converted.position.x,
       converted.position.y, converted.position.z), new Quat(converted.quaternion.x,
       converted.quaternion.y, converted.quaternion.z, converted.quaternion.w));
@@ -35,12 +37,12 @@ class EndEffectorBridge {
     var centre = EndEffectorFrames.pointYToZ(properties.centreOfMass.x,
       properties.centreOfMass.y, properties.centreOfMass.z);
     var tensor = properties.inertia;
-    var inertia = tensor == null ? null : new Inertia3(tensor.xx * 1e-6,
-      tensor.xy * 1e-6, tensor.xz * 1e-6, tensor.yy * 1e-6,
-      tensor.yz * 1e-6, tensor.zz * 1e-6)
+    var inertia = tensor == null ? null : new Inertia3((new KgMm2(tensor.xx)).kgM2(),
+      (new KgMm2(tensor.xy)).kgM2(), (new KgMm2(tensor.xz)).kgM2(), (new KgMm2(tensor.yy)).kgM2(),
+      (new KgMm2(tensor.yz)).kgM2(), (new KgMm2(tensor.zz)).kgM2())
       .rotated(new Quat(Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)));
     var mass = new MassProperties(properties.mass,
-      new Vec3(centre.x * 1e-3, centre.y * 1e-3, centre.z * 1e-3), inertia);
+      new Vec3((new Millimetres(centre.x)).metres(), (new Millimetres(centre.y)).metres(), (new Millimetres(centre.z)).metres()), inertia);
     var collision:ToolCollisionShape;
     if (boxCollision) {
       var bounds = envelopeBox(endEffector, solved);
@@ -87,9 +89,9 @@ class EndEffectorBridge {
     }
     if (!Math.isFinite(minX) || !Math.isFinite(maxX))
       throw "End effector needs envelope geometry for collision";
-    return {centre: new Vec3((minX + maxX) * 0.5e-3,
-      (minY + maxY) * 0.5e-3, (minZ + maxZ) * 0.5e-3),
-      halfExtents: new Vec3((maxX - minX) * 0.5e-3,
-        (maxY - minY) * 0.5e-3, (maxZ - minZ) * 0.5e-3)};
+    return {centre: new Vec3((new Millimetres((minX + maxX) * 0.5)).metres(),
+      (new Millimetres((minY + maxY) * 0.5)).metres(), (new Millimetres((minZ + maxZ) * 0.5)).metres()),
+      halfExtents: new Vec3((new Millimetres((maxX - minX) * 0.5)).metres(),
+        (new Millimetres((maxY - minY) * 0.5)).metres(), (new Millimetres((maxZ - minZ) * 0.5)).metres())};
   }
 }

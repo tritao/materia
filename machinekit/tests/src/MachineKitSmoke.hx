@@ -6,6 +6,10 @@ import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
+import machinekit.assembly.InstancePath;
+import machinekit.component.PortInterfaces;
+import machinekit.units.Millimetres;
+import machinekit.units.KgMm2;
 import machinekit.assembly.MachineAssembly.AssemblyBomMass;
 import machinekit.assembly.FlangeBearingAssembly;
 import machinekit.catalog.Catalog;
@@ -248,6 +252,22 @@ class MachineKitSmoke {
 	}
 
 	static function ports():Void {
+		var path = InstancePath.of("robot/tool/cup");
+		check(path.segments().join(",") == "robot,tool,cup" && path.parent() == "robot/tool",
+			"instance path exposes segments and parent");
+		throws(() -> new InstancePath("bad/name"), "cannot contain");
+		var pathAssembly = new MachineAssembly();
+		throws(() -> pathAssembly.addComponent("bad/name", new MassTestBlock()), "cannot contain");
+		check(PortInterfaces.compatible(PushIn(6), PushIn(6)) &&
+			!PortInterfaces.compatible(PushIn(6), PushIn(8)) &&
+			PortInterfaces.compatible(Plug("M12", 4), Plug("M12", 4)) &&
+			!PortInterfaces.compatible(Plug("M12", 4), Plug("M12", 5)) &&
+			PortInterfaces.compatible(Thread("G1/8-M"), Thread("G1/8-F")),
+			"port interfaces compare by value with thread mating rules");
+		check(Math.abs(((new Millimetres(250)).metres() : Float) - 0.25) < 1e-12 &&
+			Math.abs((new KgMm2(1000000)).kgM2() - 1) < 1e-12,
+			"unit conversions at bridge boundaries");
+
 		var changer = new PortTestComponent("CHANGER");
 		changer.defineConnector("airFace");
 		changer.definePort("robotAir", Pneumatic, Consumer, PushIn(6), false, "airFace");
