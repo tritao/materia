@@ -1135,6 +1135,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     stack.width = LayoutAxis.grow();
     stack.height = LayoutAxis.fixed(TOOLBAR_HEIGHT);
     stack.direction = LayoutDirection.TopToBottom;
+    // The dock workspace is painted after the toolbar; without this its panels would cover the tooltips
+    // that hang below the transport buttons.
+    stack.zIndex = 20;
     var divider = new Spacer("toolbar-tier-divider", LayoutAxis.grow(), LayoutAxis.fixed(1.0));
     divider.style.background = appearance.theme.tokens.border;
     return new Column("editor-toolbar", [
@@ -1221,23 +1224,52 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 4.0;
     var running = simulation.isRunning();
-    var playPause = running
-      ? toolbarAction("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause, true)
-      : toolbarAction("toolbar-sim-play", "sim.play", "Play", IconName.Play, true, true);
-    var items:Array<KeyedView> = [new KeyedView("play-pause", playPause)];
-    items.push(new KeyedView("step", toolbarAction("toolbar-sim-step", "sim.step", "Step",
-      IconName.StepForward, true)));
-    items.push(new KeyedView("reset", toolbarAction("toolbar-sim-reset", "sim.reset", "Reset",
-      IconName.Reset, true)));
-    items.push(new KeyedView("stop", toolbarAction("toolbar-sim-stop", "sim.stop", "Design",
-      IconName.Stop, true)));
-    if (!compact) {
-      var state = running ? "Running" : simulation.isActive() ? "Paused" : "Design";
-      if (simulation.isActive() && simulation.pending(sensors, scene)) state += " · Rebuild pending";
-      items.push(new KeyedView("state", new Text(state, null, appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0))));
-    }
+    // Labels appear when the bar has room; every button always explains itself on hover.
+    var items:Array<KeyedView> = [new KeyedView("play-pause", running
+      ? transportButton("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause,
+        "Pause (F5): freeze time, keeping the simulation", false, compact)
+      : transportButton("toolbar-sim-play", "sim.play", "Play", IconName.Play,
+        "Play (F5): run the simulation", true, compact))];
+    items.push(new KeyedView("step", transportButton("toolbar-sim-step", "sim.step", "Step",
+      IconName.StepForward, "Step (F10): advance the simulation by one step", false, compact)));
+    items.push(new KeyedView("reset", transportButton("toolbar-sim-reset", "sim.reset", "Reset",
+      IconName.Reset, "Reset (Shift+F5): return to the starting state and stay in Simulate", false, compact)));
+    items.push(new KeyedView("stop", transportButton("toolbar-sim-stop", "sim.stop", "Stop",
+      IconName.Stop, "Stop: discard the simulation and return to editing", false, compact)));
+    if (!compact) items.push(new KeyedView("state", simulationStateChip()));
     return new Row("editor-transport", items, style);
+  }
+
+  /** A transport button that shows its label when there is room and always has a hover explanation. */
+  function transportButton(key:String, commandId:String, label:String, icon:IconName, explanation:String,
+      primary:Bool, compact:Bool):View {
+    var action = toolbarAction(key, commandId, label, icon, compact, primary);
+    return new Tooltip(key + "-tooltip", action, new Text(explanation), 0.0, 36.0);
+  }
+
+  /** Current simulation state as a chip that cannot be mistaken for a button label. */
+  function simulationStateChip():View {
+    var tokens = appearance.theme.tokens;
+    var active = simulation.isActive();
+    var text = simulation.isRunning() ? "Running" : active ? "Paused" : "Design";
+    if (active && simulation.pending(sensors, scene)) text += " · rebuild pending";
+    var dotColor = simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
+    var chip = new LayoutStyle();
+    chip.direction = LayoutDirection.LeftToRight;
+    chip.childAlignY = LayoutAlignmentY.Center;
+    chip.childGap = 6.0;
+    chip.padding = new Insets(10.0, 4.0, 10.0, 4.0);
+    chip.background = tokens.surface;
+    chip.radiusTopLeft = chip.radiusTopRight = chip.radiusBottomLeft = chip.radiusBottomRight = 11.0;
+    // Drawn rather than typed: the bullet glyph is not in the UI font and shows as a missing-glyph box.
+    var dot = new Spacer("simulation-state-dot", LayoutAxis.fixed(8.0), LayoutAxis.fixed(8.0));
+    dot.style.background = dotColor;
+    dot.style.radiusTopLeft = dot.style.radiusTopRight = dot.style.radiusBottomLeft =
+      dot.style.radiusBottomRight = 4.0;
+    return new Row("simulation-state", [
+      new KeyedView("dot", dot),
+      new KeyedView("text", new Text(text, null, tokens.text, TextStyleOverride.text(12.0)))
+    ], chip);
   }
 
   function chromeRevisionKey():String {
