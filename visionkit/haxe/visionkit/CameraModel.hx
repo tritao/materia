@@ -20,7 +20,10 @@ class CameraModel {
   public function new(width:Int, height:Int, fx:Float, fy:Float, cx:Float,
       cy:Float, distortionModel:Int = 0, k1:Float = 0, k2:Float = 0,
       p1:Float = 0, p2:Float = 0, k3:Float = 0) {
-    if (width <= 0 || height <= 0 || fx <= 0 || fy <= 0 ||
+    if (width <= 0 || height <= 0 || !Math.isFinite(fx) || !Math.isFinite(fy) ||
+        !Math.isFinite(cx) || !Math.isFinite(cy) || !Math.isFinite(k1) ||
+        !Math.isFinite(k2) || !Math.isFinite(p1) || !Math.isFinite(p2) ||
+        !Math.isFinite(k3) || fx <= 0 || fy <= 0 ||
         (distortionModel != 0 && distortionModel != 1))
       throw "Invalid camera model";
     this.width = width; this.height = height;

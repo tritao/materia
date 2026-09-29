@@ -53,6 +53,44 @@ feeds the existing `FiducialPerception` interface. RobotKit's Haxe dependency
 on VisionKit is always available; its native build enables VisionKit with
 `RK_BUILD_VISIONKIT=ON` when an application uses the adapter.
 
+## Calibration and deployment
+
+`vk_board_detect` finds chessboard inner corners or ChArUco corners in gray8
+or RGB8 images. Chessboard `columns` and `rows` count inner corners; ChArUco
+dimensions count squares. IDs are row major. `vk_calibrate` requires at least
+five detected views with six corners each, one image size, and limits for
+minimum horizontal and vertical image coverage and maximum RMS pixel error.
+Flags can fix the principal point and force tangential distortion to zero.
+It returns the camera model, overall RMS, and each view's RMS and
+`camera_T_board`. The board frame is +X normal into the scene, +Y left, +Z up.
+Its origin is the first inner corner for a chessboard and the upper-left board
+edge for ChArUco, following the board's generated coordinate grid.
+Coverage and RMS failures return `VK_ERROR_CALIBRATION_COVERAGE` and
+`VK_ERROR_CALIBRATION_RMS`; output values remain unchanged on rejection.
+
+The `visionkit_calibrate` executable reads PNG/JPEG files using vendored
+`stb_image` and writes a version 1 `CameraCalibration` JSON file. For example:
+
+```sh
+visionkit_calibrate images/ camera.json charuco 8 6 0.04 0.025
+visionkit_calibrate images/ camera.json chessboard 7 5 0.04
+```
+
+Optional trailing values set minimum coverage (default 0.35 per axis) and
+maximum RMS in pixels (default 1.5). For ChArUco, marker size is required.
+The tool reports detected corners per file and per-view errors.
+
+RobotKit deployment schema version 5 accepts an optional `cameras` array:
+
+```json
+"cameras": [{"sensorId":"sensor/cam", "calibration":"camera.json", "sha256":"<64 lowercase hex digits>"}]
+```
+
+The SHA-256 covers the exact calibration file bytes. Each sensor must exist in
+the robot model with kind `camera`. The current RobotModel sensor schema has no
+image dimensions to compare; calibration dimensions are validated when used
+with a `SensorFrame`. Schemas 3 and 4 remain supported without `cameras`.
+
 The Haxe smoke test can be compiled with
 `./haxeon/scripts/haxeon build --compiler-only --project visionkit/tests/haxeon.json`.
 Run its `main.hl` with the repository's `haxeon/.tools/hashlink/hl`, with the

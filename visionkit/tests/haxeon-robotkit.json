@@ -12,7 +12,8 @@
       "source": "../native",
       "target": "visionkit_core",
       "inputs": ["../native/CMakeLists.txt", "../native/include/visionkit.h",
-        "../native/src/visionkit.cpp", "../native/src/fiducial.cpp"]
+        "../native/src/visionkit.cpp", "../native/src/fiducial.cpp",
+        "../native/src/calibration.cpp"]
     }
   },
   "target": "host",

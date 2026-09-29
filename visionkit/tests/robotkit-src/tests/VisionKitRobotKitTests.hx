@@ -2,6 +2,9 @@ package tests;
 
 import haxe.Int64;
 import haxe.io.Bytes;
+import haxe.Json;
+import haxe.crypto.Sha256;
+import robotkit.deployment.SerialDeployment;
 import robotkit.perception.FiducialPerception;
 import robotkit.perception.FiducialTargetConfig;
 import robotkit.perception.VisionKitFiducialDetector;
@@ -45,6 +48,64 @@ class VisionKitRobotKitTests {
         snapshot.detections()[0].frameId != "cam-frame")
       throw "FiducialPerception did not consume VisionKit marker";
     detector.dispose();
+    testDeployment();
     trace("VisionKit RobotKit integration passed");
+  }
+
+  static function testDeployment():Void {
+    var root = "../../robotkit/tests/fixtures/device-deployment/";
+    var directory = Sys.getCwd() + "build-robotkit/deployment-fixture";
+    if (!sys.FileSystem.exists(directory)) sys.FileSystem.createDirectory(directory);
+    var model:Dynamic = Json.parse(sys.io.File.getContent(root + "robot.json"));
+    var sensors:Array<Dynamic> = cast Reflect.field(model, "sensors");
+    sensors.push({id: "sensor/cam", name: "camera", kind: "camera", updateRate: 30,
+      frame: null, rayCount: 8, maxRange: 10, startAngleRadians: 0,
+      fieldOfViewRadians: 6.283185307179586, noiseStddev: 0, noiseSeed: 1});
+    sys.io.File.saveContent(directory + "/robot.json", Json.stringify(model));
+    sys.io.File.saveBytes(directory + "/layout.json", sys.io.File.getBytes(root + "layout.json"));
+    sys.io.File.saveBytes(directory + "/schema.lock.json", sys.io.File.getBytes("../../robotkit/schema/device_wire6.lock.json"));
+    var deployment:Dynamic = Json.parse(sys.io.File.getContent(root + "deployment.json"));
+    Reflect.setField(deployment, "schemaVersion", 5);
+    Reflect.setField(Reflect.field(deployment, "device"), "schema_lock", "schema.lock.json");
+    var bytes = Bytes.ofString(calibrationJson());
+    sys.io.File.saveBytes(directory + "/camera.json", bytes);
+    var row:Dynamic = {sensorId: "sensor/cam", calibration: "camera.json",
+      sha256: Sha256.encode(bytes.toString())};
+    Reflect.setField(deployment, "cameras", [row]);
+    var path = directory + "/deployment.json";
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    var parsed = new SerialDeployment(path);
+    if (!parsed.cameras.exists("sensor/cam") || parsed.cameras.get("sensor/cam").model.width != 640)
+      throw "Camera deployment was not loaded";
+    Reflect.setField(row, "sha256", "0000000000000000000000000000000000000000000000000000000000000000");
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+    Reflect.setField(row, "sha256", Sha256.encode(bytes.toString()));
+    Reflect.setField(row, "sensorId", "missing");
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+    Reflect.setField(row, "sensorId", "sensor/cam");
+    Reflect.setField(row, "extra", 1);
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+    Reflect.deleteField(row, "extra");
+    Reflect.setField(deployment, "schemaVersion", 4);
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+    Reflect.setField(deployment, "schemaVersion", 5);
+    Reflect.setField(sensors[0], "kind", "lidar");
+    sys.io.File.saveContent(directory + "/robot.json", Json.stringify(model));
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+  }
+
+  static function calibrationJson():String {
+    return new CameraCalibration(new CameraModel(640, 480, 500, 500, 320, 240),
+      0.1, "2026-09-29T00:00:00Z", "test", "fixture").toJson();
+  }
+
+  static function expectInvalid(path:String):Void {
+    try { new SerialDeployment(path); } catch (_:Dynamic) { return; }
+    throw "Invalid camera deployment was accepted";
   }
 }

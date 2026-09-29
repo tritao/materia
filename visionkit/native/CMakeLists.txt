@@ -9,7 +9,7 @@ endif()
 include(cmake/OpenCV.cmake)
 find_package(ZLIB REQUIRED)
 
-add_library(visionkit_core SHARED src/visionkit.cpp src/fiducial.cpp)
+add_library(visionkit_core SHARED src/visionkit.cpp src/fiducial.cpp src/calibration.cpp)
 add_library(VisionKit::core ALIAS visionkit_core)
 target_compile_features(visionkit_core PUBLIC cxx_std_17)
 target_include_directories(visionkit_core PUBLIC
@@ -21,6 +21,16 @@ target_link_libraries(visionkit_core PRIVATE ${VK_OPENCV_LIBRARIES} ZLIB::ZLIB)
 set_target_properties(visionkit_core PROPERTIES
     CXX_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES
     VERSION ${PROJECT_VERSION} SOVERSION 0)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../../animkit/native/vendor/stb/stb_image.h")
+    add_executable(visionkit_calibrate tools/calibrate/main.cpp)
+    target_compile_features(visionkit_calibrate PRIVATE cxx_std_17)
+    target_include_directories(visionkit_calibrate PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/../../animkit/native/vendor/stb")
+    target_link_libraries(visionkit_calibrate PRIVATE VisionKit::core)
+else()
+    message(WARNING "stb_image submodule absent; visionkit_calibrate target unavailable")
+endif()
 
 if(VK_BUILD_TESTS)
     enable_testing()
@@ -34,6 +44,15 @@ if(VK_BUILD_TESTS)
     target_link_libraries(visionkit_fiducial_tests PRIVATE VisionKit::core
         ${VK_OPENCV_LIBRARIES} ZLIB::ZLIB)
     add_test(NAME visionkit_fiducial COMMAND visionkit_fiducial_tests)
+    if(TARGET visionkit_calibrate)
+        add_executable(visionkit_calibration_tests tests/calibration.cpp)
+        target_include_directories(visionkit_calibration_tests PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../animkit/native/vendor/stb")
+        target_link_libraries(visionkit_calibration_tests PRIVATE VisionKit::core
+            ${VK_OPENCV_LIBRARIES} ZLIB::ZLIB)
+        target_compile_options(visionkit_calibration_tests PRIVATE -UNDEBUG)
+        add_test(NAME visionkit_calibration COMMAND visionkit_calibration_tests $<TARGET_FILE:visionkit_calibrate>)
+    endif()
     if(MSVC)
         target_compile_options(visionkit_camera_tests PRIVATE /UNDEBUG)
         target_compile_options(visionkit_fiducial_tests PRIVATE /UNDEBUG)

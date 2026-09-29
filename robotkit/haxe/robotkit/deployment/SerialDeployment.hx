@@ -2,6 +2,8 @@ package robotkit.deployment;
 
 import haxe.Json;
 import haxe.io.Path;
+import haxe.crypto.Sha256;
+import visionkit.CameraCalibration;
 import robotkit.device.DeviceLayout;
 import robotkit.device.DeviceFingerprint;
 import robotkit.model.RobotModel;
@@ -23,14 +25,40 @@ class SerialDeployment {
   public final linkLossTimeoutNs:haxe.Int64;
   public final clockSyncBoundNs:haxe.Int64;
   public final channels:Array<ProcessChannelDeclaration>;
+  public final cameras:Map<String, CameraCalibration>;
 
   public function new(path:String) {
     var directory = Path.directory(path);
     var config:Dynamic = Json.parse(sys.io.File.getContent(path));
     var version:Dynamic = Reflect.field(config, "schemaVersion");
-    if (version != 3 && version != 4) throw "robotd: unsupported deployment schema version";
+    if (version != 3 && version != 4 && version != 5) throw "robotd: unsupported deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
+    cameras = new Map();
+    var cameraRows:Dynamic = Reflect.field(config, "cameras");
+    if (cameraRows != null) {
+      if (version != 5) throw "robotd: deployment cameras require schema version 5";
+      if (!Std.isOfType(cameraRows, Array)) throw "robotd: deployment cameras must be an array";
+      for (entry in (cast cameraRows:Array<Dynamic>)) {
+        if (entry == null) throw "robotd: deployment camera cannot be null";
+        for (field in Reflect.fields(entry))
+          if (["sensorId", "calibration", "sha256"].indexOf(field) < 0)
+            throw 'robotd: unknown camera field $field';
+        var sensorId = requiredString(entry, "sensorId");
+        if (cameras.exists(sensorId)) throw 'robotd: duplicate camera $sensorId';
+        var sensor:Null<robotkit.model.Sensor> = null;
+        for (candidate in robot.sensors) if (candidate.id == sensorId) sensor = candidate;
+        if (sensor == null || sensor.kind != "camera")
+          throw 'robotd: camera $sensorId must name a camera sensor';
+        var hash = requiredString(entry, "sha256");
+        if (!~/^[0-9a-f]{64}$/.match(hash)) throw 'robotd: camera $sensorId requires lowercase SHA-256';
+        var calibrationPath = Path.join([directory, requiredString(entry, "calibration")]);
+        var bytes = sys.io.File.getBytes(calibrationPath);
+        if (sha256Hex(bytes) != hash)
+          throw 'robotd: camera $sensorId calibration SHA-256 mismatch';
+        cameras.set(sensorId, CameraCalibration.fromJson(bytes.toString()));
+      }
+    }
     channels = [];
     var declared:Dynamic = Reflect.field(config, "channels");
     if (declared != null) {
@@ -70,10 +98,10 @@ class SerialDeployment {
     var declaredProtocol:Dynamic = Reflect.field(device, "protocol");
     if (version == 3 && declaredProtocol != "rkd6")
       throw "robotd: v3 deployment requires rkd6; rkd5 is unsupported";
-    if (version == 4 && declaredProtocol != null)
-      throw "robotd: v4 deployment must omit protocol (RKD6 is implied)";
+    if ((version == 4 || version == 5) && declaredProtocol != null)
+      throw "robotd: v4/v5 deployment must omit protocol (RKD6 is implied)";
     protocol = "rkd6";
-    if (version == 3 || version == 4) {
+    if (version == 3 || version == 4 || version == 5) {
       var stepRate:Dynamic = Reflect.field(device, "step_tick_hz");
       if (!Std.isOfType(stepRate, Int) || stepRate <= 0)
         throw "robotd: deployment step_tick_hz must be a positive integer";
@@ -116,6 +144,13 @@ class SerialDeployment {
     if (!Std.isOfType(result, String) || StringTools.trim(result).length == 0)
       throw 'robotd: deployment requires $field';
     return result;
+  }
+
+  static function sha256Hex(bytes:haxe.io.Bytes):String {
+    var digest = Sha256.make(bytes);
+    var result = new StringBuf();
+    for (i in 0...digest.length) result.add(StringTools.hex(digest.get(i), 2).toLowerCase());
+    return result.toString();
   }
 
   static function requiredNanoseconds(value:Dynamic, field:String):haxe.Int64 {

@@ -46,7 +46,9 @@ typedef enum vk_result {
     VK_ERROR_OUT_OF_MEMORY = -3,
     VK_ERROR_BACKEND = -4,
     VK_ERROR_UNSUPPORTED = -5,
-    VK_ERROR_LIMIT = -6
+    VK_ERROR_LIMIT = -6,
+    VK_ERROR_CALIBRATION_COVERAGE = -7,
+    VK_ERROR_CALIBRATION_RMS = -8
 } vk_result;
 
 /** OpenCV plumb-bob uses k1,k2,p1,p2,k3. Fisheye is unsupported. */
@@ -173,6 +175,50 @@ VK_API vk_result vk_marker_detect(vk_marker_detector detector,
     const vk_image_view *image, const vk_camera_model *model, double marker_size_m,
     vk_marker_observation *out_markers VK_OUT_ARRAY(capacity),
     uint32_t capacity, uint32_t *out_count VK_OUT);
+
+typedef enum vk_board_kind { VK_BOARD_CHESSBOARD = 1, VK_BOARD_CHARUCO = 2 } vk_board_kind;
+/** Chessboard dimensions count inner corners; ChArUco dimensions count squares. */
+typedef struct vk_board_spec {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    uint32_t kind, columns, rows;
+    double square_size_m, marker_size_m;
+    uint32_t dictionary;
+} vk_board_spec;
+typedef struct vk_board_corner {
+    uint32_t id;
+    vk_pixel pixel;
+} vk_board_corner;
+/** Returns detected inner corners; ids are row-major board corner indices. */
+VK_API vk_result vk_board_detect(const vk_image_view *image, const vk_board_spec *board,
+    vk_board_corner *out_corners VK_OUT_ARRAY(capacity), uint32_t capacity,
+    uint32_t *out_count VK_OUT);
+
+typedef enum vk_calibration_flags {
+    VK_CALIB_ZERO_TANGENT_DIST = 1,
+    VK_CALIB_FIX_PRINCIPAL_POINT = 2
+} vk_calibration_flags;
+typedef struct vk_calibration_view {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    uint32_t corner_count;
+    const vk_board_corner *corners VK_BORROWED VK_LENGTH_FIELD(corner_count);
+} vk_calibration_view;
+typedef struct vk_calibration_limits {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    double minimum_coverage; /* fraction of image spanned in each axis, 0..1 */
+    double maximum_rms_pixels;
+} vk_calibration_limits;
+typedef struct vk_calibration_view_result {
+    uint32_t struct_size VK_STRUCT_SIZE;
+    double rms_reprojection_error;
+    vk_pose3 camera_T_board;
+} vk_calibration_view_result;
+/** Five or more views are required. flags is a bitwise OR of vk_calibration_flags.
+ * On quality rejection, outputs remain untouched. */
+VK_API vk_result vk_calibrate(const vk_board_spec *board, uint32_t width, uint32_t height,
+    const vk_calibration_view *views VK_IN_ARRAY(view_count), uint32_t view_count,
+    const vk_calibration_limits *limits, uint32_t flags, vk_camera_model *out_model,
+    double *out_rms VK_OUT,
+    vk_calibration_view_result *out_views VK_OUT_ARRAY(view_count));
 
 #ifdef __cplusplus
 }

@@ -14,7 +14,7 @@ class CameraCalibration {
 
   public function new(model:CameraModel, rmsReprojectionError:Float,
       calibrationTime:String, boardDescription:String, source:String) {
-    if (model == null || rmsReprojectionError < 0 ||
+    if (model == null || !Math.isFinite(rmsReprojectionError) || rmsReprojectionError < 0 ||
         calibrationTime == null || calibrationTime == "" ||
         boardDescription == null || boardDescription == "" ||
         source == null || source == "") throw "Invalid camera calibration";
