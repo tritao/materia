@@ -21,6 +21,14 @@ class IconData {
 			case IconName.Terminal: terminal();
 			case IconName.Activity: activity();
 			case IconName.Magnet: magnet();
+			case IconName.Play: new PathBuilder().moveTo(7, 4).lineTo(19, 12).lineTo(7, 20).lineTo(7, 4).build();
+			case IconName.Pause: new PathBuilder().moveTo(8, 5).lineTo(8, 19).moveTo(16, 5).lineTo(16, 19).build();
+			case IconName.StepForward: new PathBuilder().moveTo(6, 4).lineTo(16, 12).lineTo(6, 20).lineTo(6, 4)
+				.moveTo(19, 5).lineTo(19, 19).build();
+			case IconName.Reset: new PathBuilder().moveTo(4, 5).lineTo(4, 10).lineTo(9, 10)
+				.moveTo(4, 10).cubicTo(6, 6, 9, 4, 13, 4).cubicTo(18, 4, 21, 8, 21, 12)
+				.cubicTo(21, 17, 17, 20, 12, 20).cubicTo(9, 20, 6, 18, 5, 15).build();
+			case IconName.Stop: new PathBuilder().moveTo(6, 6).lineTo(18, 6).lineTo(18, 18).lineTo(6, 18).lineTo(6, 6).build();
 			case IconName.ChevronDown: new PathBuilder().moveTo(6, 9).lineTo(12, 15).lineTo(18, 9).build();
 			case IconName.ChevronRight: new PathBuilder().moveTo(9, 6).lineTo(15, 12).lineTo(9, 18).build();
 			case IconName.Plus: new PathBuilder().moveTo(12, 5).lineTo(12, 19)

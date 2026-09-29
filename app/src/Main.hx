@@ -15,6 +15,7 @@ import app.editor.ProjectUiExtension;
 import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
 import app.editor.SceneViewCommands;
+import app.editor.SimulationCommands;
 import app.editor.EditorGrid;
 import Color;
 import LayoutAxis;
@@ -1047,6 +1048,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     }
     items.push(new KeyedView("space", new Spacer("toolbar-space", LayoutAxis.grow(),
       LayoutAxis.fixed(1.0))));
+    items.push(new KeyedView("transport", transportGroup(compact, minimal)));
+    items.push(new KeyedView("space-end", new Spacer("toolbar-space-end", LayoutAxis.grow(),
+      LayoutAxis.fixed(1.0))));
     var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
     items.push(new KeyedView("status", new Text(documentLabel, null, appearance.theme.tokens.textSecondary,
       TextStyleOverride.text(12.0))));
@@ -1060,6 +1064,34 @@ class ReferenceEditorApp implements DesktopUiApplication {
     more.selected = toolbarMenuVisible;
     items.push(new KeyedView("more", more));
     return new Row("editor-toolbar-row", items, barStyle);
+  }
+
+  /** Play/Pause, Step, Reset, and return-to-design controls for the shared simulation. */
+  function transportGroup(compact:Bool, minimal:Bool):View {
+    var style = new LayoutStyle();
+    style.direction = LayoutDirection.LeftToRight;
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 4.0;
+    var running = simulation.isRunning();
+    var playPause = running
+      ? toolbarAction("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause, true)
+      : toolbarAction("toolbar-sim-play", "sim.play", "Play", IconName.Play, true, true);
+    var items:Array<KeyedView> = [new KeyedView("play-pause", playPause)];
+    if (!minimal) {
+      items.push(new KeyedView("step", toolbarAction("toolbar-sim-step", "sim.step", "Step",
+        IconName.StepForward, true)));
+      items.push(new KeyedView("reset", toolbarAction("toolbar-sim-reset", "sim.reset", "Reset",
+        IconName.Reset, true)));
+      items.push(new KeyedView("stop", toolbarAction("toolbar-sim-stop", "sim.stop", "Design",
+        IconName.Stop, true)));
+    }
+    if (!compact) {
+      var state = running ? "Running" : simulation.isActive() ? "Paused" : "Design";
+      if (simulation.isActive() && simulation.pending(sensors, scene)) state += " · Rebuild pending";
+      items.push(new KeyedView("state", new Text(state, null, appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0))));
+    }
+    return new Row("editor-transport", items, style);
   }
 
   function chromeRevisionKey():String {
@@ -1427,6 +1459,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
     commands.register(openPalette);
     SceneViewCommands.install(this);
+    SimulationCommands.install(this);
   }
 
   function documentChanged():Void {
