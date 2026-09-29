@@ -289,6 +289,8 @@ class FrameworkSmoke {
 		var context = new UiContext(session, fonts);
 		if (!retainedStateUsageValid())
 			return 305;
+		if (!themeSwapChangesStyleRevision())
+			return 306;
 		if (!propertyInputContrastValid(fonts))
 			return 301;
 		if (!defaultTextFieldContrastValid(fonts))
@@ -3293,6 +3295,21 @@ class FrameworkSmoke {
 			if (!valid) return false;
 		}
 		return true;
+	}
+
+	/** Retained views compare this fingerprint, so a light-to-dark swap must never reuse one. */
+	static function themeSwapChangesStyleRevision():Bool {
+		var context = new BuildContext(new StateStore(), null, null, null, Theme.light());
+		var light = context.styleRevision;
+		if (context.styleRevision != light)
+			return false;
+		context.setTheme(Theme.dark());
+		var dark = context.styleRevision;
+		context.setTheme(Theme.light());
+		var lightAgain = context.styleRevision;
+		context.setStyleSheet(new StyleSheet("Replacement"));
+		return light != dark && dark != lightAgain && light != lightAgain &&
+			context.styleRevision != lightAgain;
 	}
 
 	static function retainedStateUsageValid():Bool {

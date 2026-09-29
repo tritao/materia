@@ -74,7 +74,9 @@ position; a looping track must end where it starts.
 - Perspective clicks use a camera ray against the boxes' 3D bounds. Left-dragging a
   selected box moves it on its current Z plane with snapping and one undo step.
 - Undo (`Ctrl+Z`) and Redo (`Ctrl+Shift+Z`) are available in the toolbar and palette.
-- The toolbar's transport group drives the shared simulation through `sim.*` commands
+- The toolbar has two tiers: file, history, document name, and More above; the mode switcher,
+  transport, and Frame below. The lower tier is tinted while a simulation is active.
+  The transport group drives the shared simulation through `sim.*` commands
   (`editor/SimulationCommands`): Play/Pause (`F5`), Step (`F10`), Reset (`Shift+F5`), and
   Design, which discards the running simulation and returns to the editor pose. Play and Step
   build or rebuild pending configuration first; the Sensors panel buttons call the same commands.

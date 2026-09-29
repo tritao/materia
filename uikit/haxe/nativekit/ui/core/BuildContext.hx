@@ -39,6 +39,8 @@ class BuildContext {
 	/** A resolved widget can request another native layout pass in this submit. */
 	public var layoutFeedbackRequested(default, null):Bool = false;
 	var styleParent:Null<ComputedStyle>;
+	/** Bumped when the theme or application sheet is replaced, so swaps never reuse a fingerprint. */
+	var styleEpoch:Int = 0;
 	var focusRequester:WidgetId->Bool;
 	final claimed:Map<Int, String>;
 	final idsByPath:Map<String, WidgetId>;
@@ -89,6 +91,7 @@ class BuildContext {
 		if (theme == null)
 			throw "Build context requires a theme";
 		this.theme = theme;
+		styleEpoch++;
 		this.theme.refreshStyles();
 		if (textStyleStack.length <= 1)
 			textStyleStack = [ResolvedTextStyle.fromTheme(theme)];
@@ -99,6 +102,7 @@ class BuildContext {
 		if (styleSheet == null)
 			throw "Build context requires a stylesheet";
 		this.styleSheet = styleSheet;
+		styleEpoch++;
 	}
 
 	/** Updates viewport-derived environment values for conditional style rules. */
@@ -132,8 +136,13 @@ class BuildContext {
 
 	/** Revision fingerprint used to classify style work before the next submission. */
 	public var styleRevision(get, never):Int;
-	function get_styleRevision():Int
-		return theme.styles.revision * 1000003 + styleSheet.revision * 1009 + environment.revision;
+	function get_styleRevision():Int {
+		// Swapping the theme or application sheet bumps the epoch, so the fingerprint changes even when
+		// the replacement has taken the same number of edits (light to dark) as the sheet it replaced.
+		var result = styleEpoch * 1000003 + theme.styles.revision;
+		result = result * 1000003 + styleSheet.revision * 1009 + environment.revision;
+		return result;
+	}
 
 	/** Installs the UiContext focus route used by composite keyboard widgets. */
 	public function setFocusRequester(requester:WidgetId->Bool):Void {
