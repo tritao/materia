@@ -4,6 +4,7 @@ import cadkit.modeling.AssemblyState;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
+import machinekit.assembly.MachineAssemblyDescription;
 import machinekit.assembly.MachineAssembly.MachineAssemblyMassProperties;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -27,6 +28,42 @@ class EndEffector extends MachineAssembly {
 	public var primaryFrame(default, null):Null<String>;
 
 	public function new() super();
+
+	override public function describe():MachineAssemblyDescription {
+		var description = super.describe();
+		description.machine.endEffector = {mount: mountRef == null ? null :
+			{instanceId: mountRef.instanceId, connectorName: mountRef.connectorName},
+			frames: [for (frame in frames) {name: frame.name, instanceId: frame.instanceId,
+				connectorName: frame.connectorName}], primaryFrame: primaryFrame,
+			collisionExclusions: [for (member in components()) if (collisionExclusions.exists(member.id)) member.id]};
+		return description;
+	}
+
+	public static function fromDescription(description:MachineAssemblyDescription):EndEffector {
+		var saved = description.machine.endEffector;
+		if (saved == null) throw "Description has no end-effector data";
+		var base = MachineAssembly.fromDescription(description);
+		var result = new EndEffector();
+		base.copyInto(result);
+		if (saved.mount != null) result.mount(saved.mount.instanceId, saved.mount.connectorName);
+		for (frame in saved.frames) result.workingFrame(frame.name, frame.instanceId,
+			frame.connectorName, frame.name == saved.primaryFrame);
+		for (id in saved.collisionExclusions) result.excludeFromCollision(id);
+		return result;
+	}
+
+	/** Own a stable builder snapshot when a changer accepts this tool. */
+	override public function snapshot():EndEffector {
+		var result = new EndEffector();
+		copyInto(result);
+		if (mountRef != null) result.mountRef = {instanceId: mountRef.instanceId,
+			connectorName: mountRef.connectorName};
+		for (frame in frames) result.frames.push({name: frame.name, instanceId: frame.instanceId,
+			connectorName: frame.connectorName});
+		result.primaryFrame = primaryFrame;
+		for (id in collisionExclusions.keys()) result.collisionExclusions.set(id, true);
+		return result;
+	}
 
 	public function mount(instanceId:String, connector:String):Void {
 		if (mountRef != null) throw "End effector already has a mount";

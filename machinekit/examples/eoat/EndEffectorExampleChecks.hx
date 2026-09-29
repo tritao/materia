@@ -4,6 +4,10 @@ import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
+import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorSet;
+import haxeon.Equality;
+import haxeon.wire.JsonWire;
 
 private class ExampleAirSource extends MachineComponent {
 	public function new() {
@@ -20,6 +24,9 @@ class EndEffectorExampleChecks {
 
 	public static function run():Void {
 		var set = EndEffectorExample.build();
+		var rebuiltSet = EndEffectorSet.fromDescription(JsonWire.decode(set.encode()));
+		check(Equality.equals(set.describe(), rebuiltSet.describe()),
+			"EOAT changer description changed after save and rebuild");
 		var short = set.configuration("short");
 		var long = set.configuration("long");
 		check(short.components().length == 7 && long.components().length == 7,
@@ -38,6 +45,13 @@ class EndEffectorExampleChecks {
 		check(Math.abs(Math.sqrt(dx * dx + dy * dy + dz * dz) - 50) < 1e-6,
 			"Tool contact should move with bar length");
 		for (configuration in [short, long]) {
+			var rebuilt = EndEffector.fromDescription(JsonWire.decode(configuration.encode()));
+			check(Equality.equals(configuration.describe(), rebuilt.describe()),
+				"EOAT configuration description changed after save and rebuild");
+			check(Equality.equals(configuration.billOfMaterials().lines(), rebuilt.billOfMaterials().lines()),
+				"EOAT configuration BOM changed after save and rebuild");
+			check(Equality.equals(configuration.mountTFrame("contact"), rebuilt.mountTFrame("contact")),
+				"EOAT contact frame changed after save and rebuild");
 			var source = configuration.upstream("tool/cup", "vacuum");
 			check(source.port.instanceId == "robot/master" && source.port.portName == "airIn1" && source.external,
 				"Cup vacuum should trace to robot-side air");

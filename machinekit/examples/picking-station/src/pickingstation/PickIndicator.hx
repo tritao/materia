@@ -10,6 +10,8 @@ import machinekit.component.Solids;
 
 /** Simplified pick indicator housing, light, quantity display, and confirmation target. */
 class PickIndicator extends MachineComponent {
+	override public function componentType():machinekit.component.ComponentType return PickingStationRecipes.indicator();
+	override public function values():machinekit.component.ComponentValues return PickingStationRecipes.values(this);
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;

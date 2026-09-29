@@ -162,6 +162,7 @@ class MachineKitSmoke {
 		var assembly = new MachineAssembly();
 		assembly.addComponent("a", block);
 		assembly.addComponent("b", block);
+		throws(() -> assembly.encode(), "Code-only member");
 		assembly.addMate("link", "fixed", "a", "right", "b", "origin");
 		assembly.addBomItem({partNumber: "RAIL-CUT", description: "Unmodelled rail", quantity: 1, material: "steel"});
 		var combined = assembly.massProperties();
@@ -203,6 +204,9 @@ class MachineKitSmoke {
 		var innerInertia:InertiaTensor = cast inner.massProperties().inertia;
 		near(outerInertia.yy, innerInertia.yy,
 			"included assembly inertia");
+		inner.addComponent("late", block);
+		check(outer.subassemblies()[0].assembly.components().length == 2,
+			"include keeps a snapshot of the source builder");
 
 		var moving = new MachineAssembly();
 		moving.addComponent("a", block);
@@ -1384,6 +1388,7 @@ class MachineKitSmoke {
 		throws(() -> pinion.centerDistance(new SpurGear(2.5, 20, 12)), "share a module");
 		throws(() -> GearPair.mesh(pinion, new SpurGear(2, 20, 12, 25 * Math.PI / 180)), "share a pressure angle");
 		var pair = GearPair.mesh(pinion, gear);
+		MachineAssemblyDescriptionTests.roundTrip(pair, "gear pair");
 		near(pair.centerDistance, (pinion.pitchDiameter + gear.pitchDiameter) / 2, "gear pair centre distance");
 		near(pair.operatingPressureAngle, SpurGear.STANDARD_PRESSURE_ANGLE, "gear pair operating pressure angle");
 		near(pair.ratio(), gear.teeth / pinion.teeth, "gear pair ratio");
@@ -1519,6 +1524,7 @@ class MachineKitSmoke {
 	static function flangeBearingAssembly():Void {
 		var bearing = DeepGrooveBearing.metric("6204");
 		var block = new FlangeBearingAssembly(bearing);
+		MachineAssemblyDescriptionTests.roundTrip(block, "flange bearing assembly");
 		check(block.housing.fit == BearingHousingFit.Slip, "flange assembly uses a named housing fit");
 		check(block.housing.mountScrew == "M6", "flange assembly mount screw size");
 		near(block.housing.face, 68.4, "flange housing face leaves 1 mm around the M6 heads");
@@ -1667,6 +1673,7 @@ class MachineKitSmoke {
 
 	static function linearAxis():Void {
 		var axis = new LinearAxis();
+		MachineAssemblyDescriptionTests.roundTrip(axis, "linear axis");
 		check(axis.motor.designation == "23HS22-2804S", "linear axis motor designation");
 		check(axis.bearing.designation == "6000-2Z", "linear axis default bearing matches the 10 mm screw");
 		check(axis.coupling.designation == "COUPLING-6.35x10-18x30", "linear axis coupling joins motor and screw");
@@ -1864,6 +1871,7 @@ class MachineKitSmoke {
 	static function pickingFrames():Void {
 		var config = PickingStationConfig.defaults();
 		var rack = new StorageRack(config), frame = rack.frame;
+		MachineAssemblyDescriptionTests.roundTrip(rack, "storage rack");
 		var clearWidth = config.rackWidth - 2 * frame.profile.size;
 		var clearDepth = config.rackDepth - 2 * frame.profile.size;
 		for (cut in frame.memberCuts()) {
@@ -2406,8 +2414,9 @@ class MachineKitSmoke {
 		outer.include("unit", inner);
 		outer.validate();
 		throws(() -> outer.include("unit", inner), "Duplicate included assembly");
-		check(outer.subassemblies().length == 1 && outer.subassemblies()[0].assembly == inner,
-			"included assembly remains identifiable");
+		check(outer.subassemblies().length == 1 && outer.subassemblies()[0].id == "unit" &&
+			outer.subassemblies()[0].assembly != inner && outer.subassemblies()[0].assembly.components().length == 2,
+			"included assembly keeps an identified snapshot");
 		var model = new AssemblyModel();
 		outer.addTo(model, "");
 		check(model.definition().joints.length == 1, "included joint is prefixed and valid");
@@ -2452,6 +2461,7 @@ class MachineKitSmoke {
 	}
 
 	static function main():Void {
+		MachineAssemblyDescriptionTests.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();
 		EndEffectorComponentTests.run();

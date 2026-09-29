@@ -221,6 +221,7 @@ class LinearAxis extends MachineAssembly {
 		frame.point("railStart", 0, railY, screwStart);
 		frame.point("railEnd", 0, railY, screwStart + length);
 		frame.member("rail", "railStart", "railEnd", rail);
+		addBomItem(railBomItem());
 		configureAssembly();
 	}
 
@@ -331,12 +332,6 @@ class LinearAxis extends MachineAssembly {
 	}
 
 	public function bom():Bom return billOfMaterials();
-
-	override public function billOfMaterials():Bom {
-		var result = super.billOfMaterials();
-		result.add(railBomItem());
-		return result;
-	}
 
 	/** Instance id to component, for geometry generation by a preview or exporter. Excludes the
 	 * frame rail, which is generated through `frame.geometry("rail")` instead.

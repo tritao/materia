@@ -4,6 +4,8 @@ import haxe.Json;
 import cadkit.modeling.Vector;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
+import machinekit.motion.LeadScrewNut;
+import machinekit.assembly.LinearAxis.Carriage;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.RoutedHose;
 import machinekit.pneumatic.SuctionCup;
@@ -110,7 +112,17 @@ class MachineKitAdditionalRecipes {
 		new ComponentType("machinekit.motion.shaft-coupling", [n("boreA", 8), n("boreB", 8),
 			n("outerDiameter", 20), n("length", 30), t("setScrews", '[{"z":7.5,"angle":0},{"z":22.5,"angle":0}]')],
 			v -> new ShaftCoupling(v.number("boreA"), v.number("boreB"), v.number("outerDiameter"),
-				v.number("length"), setScrews(v.token("setScrews"))), true)
+				v.number("length"), setScrews(v.token("setScrews"))), true),
+		new ComponentType("machinekit.assembly.carriage", [n("boreDiameter", 8), n("width", 70),
+			n("length", 50), n("guideSpacing", 25), n("guideSeatDiameter", 12),
+			c("guideSeatFit", ["Slip", "Transition", "Interference"], "Slip"),
+			ComponentRecipeSupport.flag("hasRailMount", false), s("railMountY", 0),
+			i("nutBoltCount", 4)].concat(ComponentRecipeSupport.threadParameters()),
+			v -> new Carriage(v.number("boreDiameter"), v.number("width"), v.number("length"),
+				v.number("guideSpacing"), v.number("guideSeatDiameter"),
+				new LeadScrewNut(ComponentRecipeSupport.thread(v), v.integer("nutBoltCount")),
+				ComponentRecipeSupport.fit(v.token("guideSeatFit")),
+				v.boolean("hasRailMount") ? v.number("railMountY") : null), true)
 	];
 
 	public static function typeFor(component:MachineComponent):Null<ComponentType> {
@@ -133,6 +145,7 @@ class MachineKitAdditionalRecipes {
 		if (Std.isOfType(component, ToolChangerTool)) return all[13];
 		if (Std.isOfType(component, SteppedShaft)) return all[16];
 		if (Std.isOfType(component, ShaftCoupling)) return all[17];
+		if (Std.isOfType(component, Carriage)) return all[18];
 		return null;
 	}
 
@@ -187,6 +200,16 @@ class MachineKitAdditionalRecipes {
 			values.setNumber("boreA", coupling.boreA).setNumber("boreB", coupling.boreB)
 				.setNumber("outerDiameter", coupling.outerDiameter).setNumber("length", coupling.length)
 				.setToken("setScrews", Json.stringify(coupling.setScrews));
+		} else if (Std.isOfType(component, Carriage)) {
+			var carriage:Carriage = cast component;
+			values = ComponentRecipeSupport.threadValues(carriage.nut.thread);
+			values.setNumber("boreDiameter", carriage.boreDiameter).setNumber("width", carriage.width)
+				.setNumber("length", carriage.length).setNumber("guideSpacing", carriage.guideSpacing)
+				.setNumber("guideSeatDiameter", carriage.guideSeatDiameter)
+				.setToken("guideSeatFit", Std.string(carriage.guideSeatFit))
+				.setBoolean("hasRailMount", carriage.hasRailMount)
+				.setNumber("railMountY", carriage.railMountY)
+				.setInteger("nutBoltCount", carriage.nut.boltCount);
 		} else throw 'No recipe values for "${component.designation}"';
 		return values.setToken("material", component.materialSpec());
 	}

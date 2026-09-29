@@ -2,6 +2,7 @@ package machinekit.robotics;
 
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
+import machinekit.assembly.MachineAssemblyDescription;
 
 typedef ChangerPortMap = {robot:String, tool:String};
 
@@ -18,6 +19,57 @@ class EndEffectorSet extends EndEffector {
 	final tools:Map<String, EndEffector> = [];
 
 	public function new() super();
+
+	override public function describe():MachineAssemblyDescription {
+		var description = super.describe();
+		if (changerRef != null) description.machine.changer = {name: changerRef.name,
+			instanceId: changerRef.instanceId, connectorName: changerRef.connectorName,
+			ports: [for (entry in changerRef.ports) {robot: entry.robot, tool: entry.tool}]};
+		var ids = toolIds();
+		ids.sort(Reflect.compare);
+		var toolRecords:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
+		for (id in ids) {
+			var tool = tools.get(id).describe();
+			if (tool.machine.endEffector == null) throw 'Tool "$id" has no end-effector data';
+			toolRecords.push({id: id, mechanical: tool.mechanical, machine: {
+				members: tool.machine.members, ports: tool.machine.ports,
+				portConnections: tool.machine.portConnections,
+				portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
+				connectorExposures: tool.machine.connectorExposures,
+				memberConnectors: tool.machine.memberConnectors,
+				endEffector: tool.machine.endEffector}});
+		}
+		description.machine.tools = toolRecords;
+		return description;
+	}
+
+	public static function fromDescription(description:MachineAssemblyDescription):EndEffectorSet {
+		var changer = description.machine.changer;
+		if (changer == null) throw "Description has no changer data";
+		var base = EndEffector.fromDescription(description);
+		var result = new EndEffectorSet();
+		base.copyInto(result);
+		// Rebuild EOAT metadata through the public API.
+		var eoat = description.machine.endEffector;
+		if (eoat == null) throw "Description has no end-effector data";
+		if (eoat.mount != null) result.mount(eoat.mount.instanceId, eoat.mount.connectorName);
+		for (frame in eoat.frames) result.workingFrame(frame.name, frame.instanceId,
+			frame.connectorName, frame.name == eoat.primaryFrame);
+		for (id in eoat.collisionExclusions) result.excludeFromCollision(id);
+		result.changer(changer.name, changer.instanceId, changer.connectorName, changer.ports.copy());
+		if (description.machine.tools != null) for (entry in description.machine.tools) {
+			var machine:machinekit.assembly.MachineAssemblyDescription.AssemblySideRecord = {
+				members: entry.machine.members, ports: entry.machine.ports,
+				portConnections: entry.machine.portConnections,
+				portExposures: entry.machine.portExposures, bomExtras: entry.machine.bomExtras,
+				connectorExposures: entry.machine.connectorExposures,
+				memberConnectors: entry.machine.memberConnectors};
+			machine.endEffector = entry.machine.endEffector;
+			var tool:MachineAssemblyDescription = {mechanical: entry.mechanical, machine: machine};
+			result.addTool(entry.id, EndEffector.fromDescription(tool));
+		}
+		return result;
+	}
 
 	public function changer(name:String, instanceId:String, connector:String,
 			portMap:Array<ChangerPortMap>):Void {
@@ -74,7 +126,7 @@ class EndEffectorSet extends EndEffector {
 				robotHalf.key != toolHalf.key)
 				throw 'Changer tool "$id" does not fit the master interface';
 		}
-		tools.set(id, tool);
+		tools.set(id, tool.snapshot());
 	}
 
 	function componentAt(assembly:MachineAssembly, instanceId:String):machinekit.component.MachineComponent {

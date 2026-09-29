@@ -11,6 +11,16 @@ import machinekit.component.ComponentPort;
 import machinekit.component.PortInterface;
 import machinekit.component.PortInterfaces;
 import machinekit.component.PortRole;
+import machinekit.component.ComponentValue;
+import machinekit.component.ComponentValues;
+import machinekit.component.MachineKitComponents;
+import machinekit.assembly.MachineAssemblyDescription;
+import machinekit.assembly.MachineAssemblyDescription.MemberSource;
+import machinekit.assembly.MachineAssemblyDescription.SavedValue;
+import haxeon.wire.JsonWire;
+import haxeon.Equality;
+import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
@@ -22,7 +32,7 @@ typedef MachineAssemblyConnector = { var instanceId:String; var connectorName:St
 typedef PortRef = { var instanceId:String; var portName:String; }
 typedef UpstreamResult = { var port:PortRef; var external:Bool; }
 private typedef ServiceTrace = { var port:PortRef; var external:Bool; var supplied:Bool; var chain:Array<String>; }
-typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; }
+typedef MachineSubassembly = { var id:String; var assembly:MachineAssembly; var pose:Null<AssemblyFrame>; }
 /** BOM-only mass is a point-mass estimate, fixed or attached to a member. */
 enum AssemblyBomMass {
 	Unknown;
@@ -62,8 +72,211 @@ class MachineAssembly {
 	final operations:Array<MachineAssemblyOperation> = [];
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
+	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
+
+	/** Capture a portable description. Code-only members remain visible but cannot be saved. */
+	public function describe():MachineAssemblyDescription {
+		var model = new AssemblyModel();
+		addTo(model, "");
+		var mechanical = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(model.definition()));
+		var sources:Array<machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
+		var sourceById:Map<String, machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
+		var connections:Array<machinekit.assembly.MachineAssemblyDescription.PortConnectionRecord> = [];
+		for (op in operations) switch op {
+			case ConnectPorts(id, from, to, _): connections.push({id: id, fromInstance: from.instanceId,
+				fromPort: from.portName, toInstance: to.instanceId, toPort: to.portName});
+			case _:
+		}
+		for (member in members) {
+			var component = member.component;
+			var recipe = component.componentType();
+			var source:MemberSource = if (recipe == null) MemberSource.Code(component.designation)
+			else {
+				var values = component.values();
+				var names = values.names();
+				names.sort(Reflect.compare);
+				MemberSource.Typed(recipe.id, [for (name in names) {name: name, value: switch values.get(name) {
+					case Number(value): SavedValue.Number(value);
+					case Integer(value): SavedValue.Integer(value);
+					case Boolean(value): SavedValue.Boolean(value);
+					case Token(value): SavedValue.Token(value);
+					case null: throw 'Missing value "$name"';
+				}}]);
+			};
+			var record = {occurrence: member.id, source: source, material: component.materialSpec()};
+			sources.push(record);
+			sourceById.set(member.id, record);
+		}
+		// The model initially gives every occurrence its own connector definition.
+		// Intern definitions with the same recipe identity and connector geometry.
+		var shared:Map<String, Array<String>> = [];
+		var kept:Array<materia.assembly.AssemblyDefinition.AssemblyComponentDefinition> = [];
+		for (occurrence in mechanical.occurrences) {
+			var source = sourceById.get(occurrence.id);
+			if (source == null) throw 'Missing source for "${occurrence.id}"';
+			var definition = null;
+			for (candidate in mechanical.definitions) if (candidate.id == occurrence.definition) definition = candidate;
+			if (definition == null) throw 'Missing mechanical definition for "${occurrence.id}"';
+			var key = definitionKey(occurrence.id, requireMember(occurrence.id));
+			var candidates = shared.get(key);
+			var existing:Null<String> = null;
+			if (candidates != null) for (id in candidates) for (item in kept)
+				if (item.id == id && Equality.equals(item.connectors, definition.connectors)) existing = id;
+			if (existing != null) occurrence.definition = existing;
+			else {
+				kept.push(definition);
+				if (candidates == null) {candidates = []; shared.set(key, candidates);}
+				candidates.push(definition.id);
+			}
+		}
+		mechanical.definitions = kept;
+		var emptyTools:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
+		var savedPorts:Array<machinekit.assembly.MachineAssemblyDescription.PortRecord> = [];
+		for (member in members) for (port in member.component.ports())
+			savedPorts.push({occurrence: member.id, name: port.name, kind: port.kind, role: port.role,
+				iface: port.iface, required: port.required, connector: port.connector});
+		return {mechanical: mechanical, machine: {
+			members: sources,
+			ports: savedPorts,
+			portConnections: connections,
+			portExposures: [for (entry in externalPorts) {name: entry.name,
+				instanceId: entry.instanceId, portName: entry.portName}],
+			connectorExposures: [for (entry in externalConnectors) {name: entry.name,
+				instanceId: entry.instanceId, connectorName: entry.connectorName}],
+			memberConnectors: [for (entry in memberConnectorFrames) {instanceId: entry.instanceId,
+				name: entry.name, frame: copyFrame(entry.frame)}],
+			tools: emptyTools,
+			bomExtras: [for (entry in bomItems) {item: copyBomItem(entry.item), quantity: entry.quantity,
+				mass: switch entry.mass {
+					case Unknown: machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown;
+					case Point(kg, centre): machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Point(kg, centre.x, centre.y, centre.z);
+					case Attached(kg, id, centre): machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Attached(kg, id, centre.x, centre.y, centre.z);
+				}}]
+		}};
+	}
+
+	/** Generated wire codec; reject every unbuildable member before emitting a file. */
+	public function encode():String {
+		var description = describe();
+		var problems = new Diagnostics();
+		checkSavableMembers(description.machine.members, "", problems);
+		if (description.machine.tools != null) for (tool in description.machine.tools)
+			checkSavableMembers(tool.machine.members, tool.id + "/", problems);
+		problems.throwIfErrors();
+		return JsonWire.encode(description);
+	}
+
+	static function checkSavableMembers(members:haxe.ds.ReadOnlyArray<machinekit.assembly.MachineAssemblyDescription.MemberRecord>,
+			prefix:String, problems:Diagnostics):Void
+		for (member in members) switch member.source {
+			case Code(designation): problems.error("assembly.code-member", prefix + member.occurrence,
+				'Code-only member "$designation" has no rebuild recipe');
+			case _:
+		}
+
+	public static function decode(text:String):MachineAssembly
+		return fromDescription(JsonWire.decode(text));
+
+	/** Rebuild through registered recipes; no component object is stored in the description. */
+	public static function fromDescription(description:MachineAssemblyDescription):MachineAssembly {
+		if (description == null || description.machine == null) throw "Missing machine assembly description";
+		AssemblyDefinitionCodec.validate(description.mechanical);
+		var mechanical = AssemblyDefinitionFlattener.flatten(description.mechanical);
+		var result = new MachineAssembly();
+		var sources:Map<String, machinekit.assembly.MachineAssemblyDescription.MemberRecord> = [];
+		for (member in description.machine.members) {
+			if (sources.exists(member.occurrence)) throw 'Duplicate member source "${member.occurrence}"';
+			sources.set(member.occurrence, member);
+		}
+		for (occurrence in mechanical.occurrences) {
+			var member = sources.get(occurrence.id);
+			if (member == null) throw 'Missing member source "${occurrence.id}"';
+			var component = switch member.source {
+				case Code(designation): throw 'Code-only member "$designation" has no rebuild recipe';
+				case Typed(typeId, saved):
+					var values = new ComponentValues();
+					for (entry in saved) values.set(entry.name, switch entry.value {
+						case SavedValue.Number(value): ComponentValue.Number(value);
+						case SavedValue.Integer(value): ComponentValue.Integer(value);
+						case SavedValue.Boolean(value): ComponentValue.Boolean(value);
+						case SavedValue.Token(value): ComponentValue.Token(value);
+					});
+					MachineKitComponents.byId(typeId).create(values);
+			};
+			component.setMaterial(member.material);
+			result.addComponentAt(InstancePath.of(occurrence.id), component, occurrence.initialPose);
+		}
+		for (saved in description.machine.ports) {
+			var port = result.requireMember(saved.occurrence).port(saved.name);
+			if (port.kind != saved.kind || port.role != saved.role || port.required != saved.required ||
+				port.connector != saved.connector || !Equality.equals(port.iface, saved.iface))
+				throw 'Saved port "${saved.occurrence}/${saved.name}" differs from its recipe';
+		}
+		for (connector in description.machine.memberConnectors)
+			result.addMemberConnector(connector.instanceId, connector.name, connector.frame);
+		for (joint in mechanical.joints) {
+			if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree)
+				result.addMateOnAxis(joint.id, joint.type, joint.parent, joint.parentConnector,
+					joint.child, joint.childConnector, joint.axis, joint.defaultValue, joint.limits);
+			else result.addConstraintOnAxis(joint.id, joint.type, joint.parent, joint.parentConnector,
+				joint.child, joint.childConnector, joint.axis, null, joint.limits);
+		}
+		if (mechanical.couplings != null) for (coupling in mechanical.couplings)
+			result.addCoupling(coupling.id, coupling.source, coupling.target, coupling.ratio, coupling.offset);
+		for (connection in description.machine.portConnections)
+			result.connectPorts(connection.id, connection.fromInstance, connection.fromPort,
+				connection.toInstance, connection.toPort);
+		for (entry in description.machine.portExposures)
+			result.exposePort(entry.name, entry.instanceId, entry.portName);
+		for (entry in description.machine.connectorExposures)
+			result.exposeConnector(entry.name, entry.instanceId, entry.connectorName);
+		for (entry in description.machine.bomExtras) {
+			var mass:AssemblyBomMass = switch entry.mass {
+				case machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Unknown: AssemblyBomMass.Unknown;
+				case machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Point(kg, x, y, z): AssemblyBomMass.Point(kg, new Vector(x, y, z));
+				case machinekit.assembly.MachineAssemblyDescription.SavedBomMass.Attached(kg, id, x, y, z): AssemblyBomMass.Attached(kg, id, new Vector(x, y, z));
+			};
+			result.addBomItem(entry.item, entry.quantity, mass);
+		}
+		return result;
+	}
+
+	/** Copy builder state for a derived assembly or an owned tool snapshot. */
+	public function copyInto(target:MachineAssembly):Void {
+		for (member in members) target.members.push({id: member.id,
+			component: copyComponent(member.component), pose: copyFrame(member.pose)});
+		for (entry in included) target.included.push({id: entry.id,
+			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
+		for (entry in externalConnectors) target.externalConnectors.push({name: entry.name,
+			instanceId: entry.instanceId, connectorName: entry.connectorName});
+		for (entry in externalPorts) target.externalPorts.push({name: entry.name,
+			instanceId: entry.instanceId, portName: entry.portName});
+		for (entry in operations) target.operations.push(entry);
+		for (entry in bomItems) target.bomItems.push({item: copyBomItem(entry.item), quantity: entry.quantity,
+			mass: entry.mass});
+		for (entry in memberConnectorFrames) target.memberConnectorFrames.push({instanceId: entry.instanceId,
+			name: entry.name, frame: copyFrame(entry.frame)});
+	}
+
+	public function snapshot():MachineAssembly {
+		var result = new MachineAssembly();
+		copyInto(result);
+		return result;
+	}
+
+	static function copyComponent(component:MachineComponent):MachineComponent {
+		var recipe = component.componentType();
+		if (recipe == null) return component;
+		var result = recipe.create(component.values());
+		result.setMaterial(component.materialSpec());
+		return result;
+	}
+
+	static function copyBomItem(item:BomItem):BomItem return {partNumber: item.partNumber,
+		description: item.description, quantity: item.quantity, material: item.material,
+		typeId: item.typeId, valuesKey: item.valuesKey};
 
 	public function addComponent(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
 		InstancePath.segment(id);
@@ -100,18 +313,18 @@ class MachineAssembly {
 		for (operation in assembly.operations) addOperation(prefixed(operation, id));
 		for (entry in assembly.bomItems) {
 			var mass = switch entry.mass {
-				case Unknown: Unknown;
-				case Attached(kg, instanceId, centre): Attached(kg, join(id, instanceId), centre);
-				case Point(kg, centre):
-					if (pose == null) Point(kg, centre);
+				case AssemblyBomMass.Unknown: AssemblyBomMass.Unknown;
+				case AssemblyBomMass.Attached(kg, instanceId, centre): AssemblyBomMass.Attached(kg, join(id, instanceId), centre);
+				case AssemblyBomMass.Point(kg, centre):
+					if (pose == null) AssemblyBomMass.Point(kg, centre);
 					else {
 						var point = AssemblyFrames.transformPoint(pose, centre.x, centre.y, centre.z);
-						Point(kg, new Vector(point.x, point.y, point.z));
+						AssemblyBomMass.Point(kg, new Vector(point.x, point.y, point.z));
 					}
 			};
 			addBomItem(entry.item, entry.quantity, mass);
 		}
-		included.push({id: id, assembly: assembly});
+		included.push({id: id, assembly: assembly.snapshot(), pose: pose == null ? null : copyFrame(pose)});
 	}
 
 	public function addMate(id:String, kind:String, parent:String, parentConnector:String,
@@ -390,7 +603,12 @@ class MachineAssembly {
 		var posed:Array<{id:String, properties:machinekit.component.MassProperties, pose:AssemblyFrame,
 			centre:Vector}> = [];
 		for (member in members) {
-			var properties = member.component.massProperties();
+			var key = definitionKey(member.id, member.component);
+			var properties = massByDefinition.get(key);
+			if (properties == null) {
+				properties = member.component.massProperties();
+				massByDefinition.set(key, properties);
+			}
 			var pose = poses.get(member.id);
 			if (pose == null) throw 'Missing solved pose for "${member.id}"';
 			var centre = properties.centreOfMass;
@@ -448,6 +666,12 @@ class MachineAssembly {
 		return {mass: mass, centreOfMass: combinedCentre,
 			inertia: unaccountedInertia.length == 0 ? inertia : null,
 			unaccounted: unaccounted, unaccountedInertia: unaccountedInertia};
+	}
+
+	static function definitionKey(id:String, component:MachineComponent):String {
+		var recipe = component.componentType();
+		return recipe == null ? "code:" + id + "|" + component.materialSpec() :
+			"typed:" + recipe.id + "|" + recipe.key(component.values()) + "|" + component.materialSpec();
 	}
 
 	public function connectorNames():Array<String>

@@ -30,11 +30,20 @@ import machinekit.transmission.TimingPulley;
  */
 class MachineKitComponents {
 	static var types:Null<Array<ComponentType>>;
+	static final extensions:Array<ComponentType> = [];
 
-	public static function all():Array<ComponentType> return entries().copy();
+	/** Applications register their component recipes before loading saved assemblies. */
+	public static function register(type:ComponentType):Void {
+		for (existing in entries()) if (existing.id == type.id) throw 'Duplicate component type "${type.id}"';
+		for (existing in extensions) if (existing.id == type.id) throw 'Duplicate component type "${type.id}"';
+		extensions.push(type);
+	}
+
+	public static function all():Array<ComponentType> return entries().concat(extensions);
 
 	public static function byId(id:String):ComponentType {
 		for (type in entries()) if (type.id == id) return type;
+		for (type in extensions) if (type.id == id) return type;
 		throw 'Unknown machine component type "$id"';
 	}
 

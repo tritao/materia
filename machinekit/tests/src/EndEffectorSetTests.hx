@@ -11,6 +11,8 @@ import machinekit.robotics.ParallelGripper;
 import machinekit.robotics.schmalz.SchmalzSxtMaster;
 import machinekit.robotics.schmalz.SchmalzSxtTool;
 import materia.assembly.AssemblyFrames;
+import haxeon.Equality;
+import haxeon.wire.JsonWire;
 
 private class TestChangerMaster extends MachineComponent {
 	public function new() {
@@ -149,6 +151,13 @@ class EndEffectorSetTests {
 		sxtTool.mount("half", "master");
 		sxtTool.exposePort("air", "half", "airIn1");
 		sxtSet.addTool("manual", sxtTool);
+		var savedSxt = sxtSet.encode();
+		var rebuiltSxt = EndEffectorSet.fromDescription(JsonWire.decode(savedSxt));
+		if (!Equality.equals(sxtSet.describe(), rebuiltSxt.describe()))
+			throw "SXT changer description changed after wire round trip";
+		sxtTool.addComponent("late", new SchmalzSxtTool("10.07.13.00018"));
+		if (sxtSet.configuration("manual").components().length != 2)
+			throw "Changer retained a mutable tool builder";
 		var coupledSxt = sxtSet.configuration("manual");
 		if (coupledSxt.upstream("tool/half", "airOut1").port.instanceId != "robot/master" ||
 			coupledSxt.billOfMaterials().quantity("10.07.13.00013") != 1 ||
