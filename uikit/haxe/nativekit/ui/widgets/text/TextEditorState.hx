@@ -32,6 +32,9 @@ class TextEditorState {
 	public var lastEditTransaction(default, null):Null<EditTransaction>;
 	/** Vertical scroll offset in the editor's content coordinate space. */
 	public var scrollOffsetY(default, null):Float;
+	/** Read-only logs keep the newest text in view until the user scrolls away from the end. */
+	public var tailFollowing:Bool = false;
+	var tailEnabled:Bool = false;
 	public var focused:Bool;
 	public var draggingSelection:Bool;
 	public final layout:TextEditorLayout;
@@ -541,6 +544,57 @@ class TextEditorState {
 		var target = endOfLine ? trimLineBreak(range.end, range.start) : range.start;
 		resetVerticalNavigation();
 		return placeCaret(target, extend);
+	}
+
+	/** Enables or disables tail following; enabling it starts pinned to the end. */
+	public function configureTail(enabled:Bool):Void {
+		if (enabled == tailEnabled)
+			return;
+		tailEnabled = enabled;
+		tailFollowing = enabled;
+	}
+
+	/** Records the viewport height without moving the scroll position to reveal the caret. */
+	public function setViewportHeight(height:Float):Void {
+		ensureLive();
+		if (!Math.isFinite(height) || height <= 0.0 || viewportHeight == height)
+			return;
+		viewportHeight = height;
+		renderMeasurement.invalidate();
+		clampScrollOffset();
+	}
+
+	/** Scrolls the viewport by a wheel delta, without disturbing the selection. */
+	public function scrollBy(delta:Float):Bool {
+		ensureLive();
+		if (viewportHeight <= 0.0)
+			return false;
+		var maximum = Math.max(0.0, layout.measure().height - viewportHeight);
+		var next = clampFloat(scrollOffsetY + delta, 0.0, maximum);
+		if (next == scrollOffsetY)
+			return false;
+		scrollOffsetY = next;
+		renderMeasurement.invalidate();
+		return true;
+	}
+
+	public function isScrolledToEnd():Bool {
+		ensureLive();
+		if (viewportHeight <= 0.0)
+			return true;
+		return scrollOffsetY >= Math.max(0.0, layout.measure().height - viewportHeight) - 0.5;
+	}
+
+	public function scrollToEnd():Bool {
+		ensureLive();
+		if (viewportHeight <= 0.0)
+			return false;
+		var maximum = Math.max(0.0, layout.measure().height - viewportHeight);
+		if (scrollOffsetY == maximum)
+			return false;
+		scrollOffsetY = maximum;
+		renderMeasurement.invalidate();
+		return true;
 	}
 
 	/** Adjusts internal scrolling so the active caret or selection remains in the viewport. */

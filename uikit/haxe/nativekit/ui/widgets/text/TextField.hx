@@ -52,6 +52,10 @@ class TextField implements View {
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
+	/** Selectable and copyable but not editable; multiline fields also scroll with the wheel. */
+	public var readOnly:Bool;
+	/** With readOnly, keeps the newest text in view until the user scrolls away from the end. */
+	public var followTail:Bool;
 	public var onChange:Null<String->Void>;
 	/** Applied edit notifications for a caller-owned EditorKit document. */
 	public var onEdit:Null<EditTransaction->Void>;
@@ -87,6 +91,8 @@ class TextField implements View {
 		this.textColor = textColor;
 		classes = [];
 		enabled = true;
+		readOnly = false;
+		followTail = false;
 		onDiagnostics = null;
 		semanticRole = AccessibilityRole.TextField;
 		semanticActions = AccessibilityAction.SetValue | AccessibilityAction.SetSelection;
@@ -113,11 +119,15 @@ class TextField implements View {
 			resolved = new ResolvedTextStyle(resolved.textStyle, paragraph, resolved.textColor);
 			var stored:State<TextEditorState> = acquireState(context, id, value, resolved, document);
 			var editor:TextEditorState = stored.value;
+			editor.configureTail(followTail && readOnly);
 			var documentChanged = document != null
 				? editor.syncDocument(document)
 				: editor.syncExternal(value);
-			if (documentChanged)
+			if (documentChanged) {
 				editor.resetCaretBlink(Sys.time());
+				if (editor.tailFollowing)
+					editor.scrollToEnd();
+			}
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
 
 			var flags = context.interactionStates.get(id);
@@ -137,7 +147,9 @@ class TextField implements View {
 			var semantics = new Semantics(semanticRole,
 				label == null ? key : label, null, editor.documentLength());
 			semantics.setValueProvider(function() return editor.text, editor.documentLength());
-			semantics.actions = semanticActions;
+			semantics.actions = readOnly ? semanticActions & ~AccessibilityAction.SetValue : semanticActions;
+			if (readOnly)
+				semantics.states |= AccessibilityState.ReadOnly;
 			semantics.textStart = 0;
 			semantics.selectionStart = editor.selectionStart;
 			semantics.selectionEnd = editor.selectionEnd;
@@ -222,9 +234,9 @@ class TextField implements View {
 					if (!editor.isDisposed()) {
 						var now = Sys.time();
 						var active = context.textInput.isOwner(id);
-						if (active && editor.selectionStart == editor.selectionEnd)
+						if (active && !readOnly && editor.selectionStart == editor.selectionEnd)
 							context.textInput.requestCaretFrameAt(editor.nextCaretBlinkTime(now));
-						paintEditorDecorations(canvas, editor, active, context.theme, now);
+						paintEditorDecorations(canvas, editor, active, context.theme, now, !readOnly);
 					}
 				});
 				editorContent.add(paintNode);
@@ -304,13 +316,18 @@ class TextField implements View {
 			editorContent.onResolved(function(geometry) {
 				if (multiline) {
 					editor.updateLayout(geometry.width);
-					if (editor.ensureCaretVisible(geometry.height))
+					if (readOnly) {
+						// A read-only view keeps what the user scrolled to instead of chasing the caret.
+						editor.setViewportHeight(geometry.height);
+						if (editor.tailFollowing && editor.scrollToEnd())
+							stored.update(editor);
+					} else if (editor.ensureCaretVisible(geometry.height))
 						stored.update(editor);
 				}
 			});
 			textNode.onResolved(function(geometry) {
 				editor.updateLayout(geometry.width);
-				if (multiline && editorContent.resolved != null &&
+				if (multiline && !readOnly && editorContent.resolved != null &&
 					editor.ensureCaretVisible(editorContent.resolved.height))
 					stored.update(editor);
 				syncCursor(geometry);
@@ -415,18 +432,23 @@ class TextField implements View {
 					copySelection(context.clipboard, editor);
 				else if (command && event.key == UiKey.X) {
 					copySelection(context.clipboard, editor);
-					changed = editor.replace(editor.selectionStart, editor.selectionEnd, "");
-					textEdited = true;
+					if (!readOnly) {
+						changed = editor.replace(editor.selectionStart, editor.selectionEnd, "");
+						textEdited = true;
+					}
 				} else if (command && event.key == UiKey.V) {
-					context.clipboard.readText(function(pasted) {
-						if (editor.isDisposed() || !editor.focused)
-							return;
-						var beforePaste = editor.documentRevision();
-						if (editor.insert(pasted)) {
-							editor.resetCaretBlink(Sys.time());
-							publishTextChange(beforePaste);
-						}
-					});
+					if (readOnly)
+						handled = false;
+					else
+						context.clipboard.readText(function(pasted) {
+							if (editor.isDisposed() || !editor.focused)
+								return;
+							var beforePaste = editor.documentRevision();
+							if (editor.insert(pasted)) {
+								editor.resetCaretBlink(Sys.time());
+								publishTextChange(beforePaste);
+							}
+						});
 				} else if (wordNavigation && event.key == UiKey.Left)
 					changed = editor.moveCaretByWord(-1, extend, macWordNavigation);
 				else if (wordNavigation && event.key == UiKey.Right)
@@ -456,15 +478,27 @@ class TextField implements View {
 					changed = multiline && !command ? editor.moveCaretToLineBoundary(true, extend) :
 						editor.placeCaret(editor.documentLength(), extend);
 				else if (event.key == UiKey.Backspace) {
-					changed = editor.deleteBackward();
-					textEdited = true;
+					if (readOnly)
+						handled = false;
+					else {
+						changed = editor.deleteBackward();
+						textEdited = true;
+					}
 				} else if (event.key == UiKey.Delete) {
-					changed = editor.deleteForward();
-					textEdited = true;
+					if (readOnly)
+						handled = false;
+					else {
+						changed = editor.deleteForward();
+						textEdited = true;
+					}
 				} else if (event.key == UiKey.Enter) {
 					if (multiline) {
-						changed = editor.insert("\n");
-						textEdited = true;
+						if (readOnly)
+							handled = false;
+						else {
+							changed = editor.insert("\n");
+							textEdited = true;
+						}
 					} else if (onSubmit != null)
 						onSubmit(editor.layoutText());
 				} else
@@ -483,15 +517,23 @@ class TextField implements View {
 			node.on(UiEventKind.KeyDown, handleKey);
 			node.on(UiEventKind.KeyRepeat, handleKey);
 
+			if (multiline && readOnly)
+				node.on(UiEventKind.Scroll, function(event) {
+					if (scrollReadOnly(editor, event.deltaY)) {
+						stored.update(editor);
+						event.stopPropagation();
+					}
+				});
+
 			node.on(UiEventKind.TextInput, function(event) {
 				var previousRevision = editor.documentRevision();
-				if (enabled && editor.insert(event.text)) {
+				if (enabled && !readOnly && editor.insert(event.text)) {
 					editor.resetCaretBlink(Sys.time());
 					publishTextChange(previousRevision);
 				}
 			});
 			node.on(UiEventKind.TextEdit, function(event) {
-				if (!enabled || event.data == null)
+				if (!enabled || readOnly || event.data == null)
 					return;
 				var edit:NativeKitTextEdit = cast event.data;
 				var previousRevision = editor.documentRevision();
@@ -502,7 +544,7 @@ class TextField implements View {
 			});
 			node.on(UiEventKind.AccessibilitySetValue, function(event) {
 				var previousRevision = editor.documentRevision();
-				if (enabled && editor.replace(0, editor.documentLength(), event.text)) {
+				if (enabled && !readOnly && editor.replace(0, editor.documentLength(), event.text)) {
 					editor.resetCaretBlink(Sys.time());
 					publishTextChange(previousRevision);
 				}
@@ -518,6 +560,14 @@ class TextField implements View {
 			});
 			return node;
 		});
+	}
+
+	/** Applies a wheel delta and re-pins to the tail when the view reaches the end again. */
+	static function scrollReadOnly(editor:TextEditorState, deltaY:Float):Bool {
+		var changed = editor.scrollBy(deltaY);
+		if (changed)
+			editor.tailFollowing = editor.isScrolledToEnd();
+		return changed;
 	}
 
 	static function acquireState(context:BuildContext, id:nativekit.ui.core.WidgetId,
@@ -551,7 +601,8 @@ class TextField implements View {
 	}
 
 	static function paintEditorDecorations(canvas:Canvas, editor:TextEditorState,
-			active:Bool, theme:nativekit.ui.theme.Theme, timeSeconds:Float):Void {
+			active:Bool, theme:nativekit.ui.theme.Theme, timeSeconds:Float,
+			showCaret:Bool = true):Void {
 		if (editor.scrollOffsetY != 0.0)
 			canvas.translate(0.0, -editor.scrollOffsetY);
 		if (active && editor.compositionStart >= 0 && editor.compositionStart != editor.compositionEnd) {
@@ -559,7 +610,7 @@ class TextField implements View {
 				canvas.fillRectIfPositive(new Rect(rect.x, rect.y + rect.height - 1.0, rect.width, 1.0),
 					Color.rgba(0.95, 0.75, 0.24, 1.0));
 		}
-		if (active && editor.selectionStart == editor.selectionEnd &&
+		if (showCaret && active && editor.selectionStart == editor.selectionEnd &&
 				editor.isCaretVisible(timeSeconds)) {
 			var caret = editor.layout.caret(editor.focusPosition());
 			var topX = caret.x + caret.ascender * caret.slope;
