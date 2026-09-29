@@ -163,7 +163,7 @@ class AssemblyDefinitionFlattener {
 	static function exposed(items:Array<AssemblyExposedConnector>, members:Map<String, FlatMember>, path:String):Map<String, FlatEndpoint> {
 		var result = new Map<String, FlatEndpoint>();
 		if (items != null) for (item in items) {
-			if (item == null || !validName(item.name) || result.exists(item.name))
+			if (item == null || !validExposedName(item.name) || result.exists(item.name))
 				throw 'Assembly "$path" has an invalid or duplicate exposed connector';
 			result.set(item.name, endpoint(members, item.occurrence, item.connector, path));
 		}
@@ -182,4 +182,8 @@ class AssemblyDefinitionFlattener {
 
 	static function validName(name:String):Bool
 		return name != null && name.length > 0 && name.indexOf("/") < 0;
+
+	/** Public connector labels may be paths; only occurrence and definition IDs are local segments. */
+	static function validExposedName(name:String):Bool
+		return name != null && StringTools.trim(name).length > 0 && name.indexOf("\x00") < 0;
 }

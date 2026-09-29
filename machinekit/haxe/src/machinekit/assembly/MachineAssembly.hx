@@ -21,6 +21,9 @@ import haxeon.wire.JsonWire;
 import haxeon.Equality;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyDefinitionFlattener;
+import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
+import materia.assembly.AssemblyDefinition.AssemblyExposedConnector;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
@@ -72,6 +75,7 @@ class MachineAssembly {
 	final operations:Array<MachineAssemblyOperation> = [];
 	final bomItems:Array<{item:BomItem, quantity:Int, mass:AssemblyBomMass}> = [];
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
+	final nestedEntries:Array<machinekit.assembly.MachineAssemblyDescription.IncludedRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
 
 	public function new() {}
@@ -132,6 +136,9 @@ class MachineAssembly {
 			}
 		}
 		mechanical.definitions = kept;
+		mechanical.exposedConnectors = [for (entry in externalConnectors) {name: entry.name,
+			occurrence: entry.instanceId, connector: entry.connectorName}];
+		if (nestedEntries.length > 0) mechanical = nestedMechanical(mechanical);
 		var emptyTools:Array<machinekit.assembly.MachineAssemblyDescription.ToolRecord> = [];
 		var savedPorts:Array<machinekit.assembly.MachineAssemblyDescription.PortRecord> = [];
 		for (member in members) for (port in member.component.ports())
@@ -140,6 +147,8 @@ class MachineAssembly {
 		return {mechanical: mechanical, machine: {
 			members: sources,
 			ports: savedPorts,
+			included: [for (entry in nestedEntries) {id: entry.id, pose: copyFrame(entry.pose),
+				mechanical: cloneDefinition(entry.mechanical)}],
 			portConnections: connections,
 			portExposures: [for (entry in externalPorts) {name: entry.name,
 				instanceId: entry.instanceId, portName: entry.portName}],
@@ -240,6 +249,9 @@ class MachineAssembly {
 			};
 			result.addBomItem(entry.item, entry.quantity, mass);
 		}
+		if (description.machine.included != null) for (entry in description.machine.included)
+			result.nestedEntries.push({id: entry.id, pose: copyFrame(entry.pose),
+				mechanical: cloneDefinition(entry.mechanical)});
 		return result;
 	}
 
@@ -249,6 +261,8 @@ class MachineAssembly {
 			component: copyComponent(member.component), pose: copyFrame(member.pose)});
 		for (entry in included) target.included.push({id: entry.id,
 			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
+		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
+			pose: copyFrame(entry.pose), mechanical: cloneDefinition(entry.mechanical)});
 		for (entry in externalConnectors) target.externalConnectors.push({name: entry.name,
 			instanceId: entry.instanceId, connectorName: entry.connectorName});
 		for (entry in externalPorts) target.externalPorts.push({name: entry.name,
@@ -277,6 +291,117 @@ class MachineAssembly {
 	static function copyBomItem(item:BomItem):BomItem return {partNumber: item.partNumber,
 		description: item.description, quantity: item.quantity, material: item.material,
 		typeId: item.typeId, valuesKey: item.valuesKey};
+
+	static function cloneDefinition(value:AssemblyDefinition):AssemblyDefinition
+		return AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(value));
+
+	/** Move included members into reusable subdefinitions while retaining flat side-record IDs. */
+	function nestedMechanical(flat:AssemblyDefinition):AssemblyDefinition {
+		flat.assemblies = [];
+		for (index in 0...nestedEntries.length) {
+			var entry = nestedEntries[index];
+			var child = cloneDefinition(entry.mechanical);
+			var subId = 'machinekit-sub-$index';
+			var imported:Map<String, String> = [];
+			if (child.assemblies != null) for (sub in child.assemblies)
+				imported.set(sub.id, subId + "-" + sub.id);
+			if (child.assemblies != null) for (sub in child.assemblies) {
+				sub.id = imported.get(sub.id);
+				for (occurrence in sub.occurrences) if (occurrence.assembly != null) {
+					occurrence.assembly = imported.get(occurrence.assembly);
+					occurrence.definition = occurrence.assembly;
+				}
+				flat.assemblies.push(sub);
+			}
+			for (occurrence in child.occurrences) if (occurrence.assembly != null) {
+				occurrence.assembly = imported.get(occurrence.assembly);
+				occurrence.definition = occurrence.assembly;
+			}
+			var sub:AssemblySubdefinition = {id: subId, definitions: child.definitions,
+				occurrences: child.occurrences, joints: child.joints,
+				couplings: child.couplings == null ? [] : child.couplings,
+				exposedConnectors: child.exposedConnectors == null ? [] : child.exposedConnectors};
+			flat.assemblies.push(sub);
+			var prefix = entry.id + "/";
+			var childFlat = AssemblyDefinitionFlattener.flatten(entry.mechanical);
+			var internalJoints:Map<String, Bool> = [];
+			for (joint in childFlat.joints) internalJoints.set(prefix + joint.id, true);
+			flat.joints = [for (joint in flat.joints) if (!internalJoints.exists(joint.id)) joint];
+			var internalCouplings:Map<String, Bool> = [];
+			if (childFlat.couplings != null) for (coupling in childFlat.couplings)
+				internalCouplings.set(prefix + coupling.id, true);
+			if (flat.couplings != null)
+				flat.couplings = [for (coupling in flat.couplings) if (!internalCouplings.exists(coupling.id)) coupling];
+			var keptOccurrences:Array<materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence> = [];
+			var insertAt = -1;
+			for (occurrence in flat.occurrences) {
+				if (StringTools.startsWith(occurrence.id, prefix)) {
+					if (insertAt < 0) insertAt = keptOccurrences.length;
+				} else keptOccurrences.push(occurrence);
+			}
+			if (insertAt < 0) throw 'Included assembly "${entry.id}" has no members';
+			keptOccurrences.insert(insertAt, {id: entry.id, definition: subId,
+				assembly: subId, initialPose: copyFrame(entry.pose)});
+			flat.occurrences = keptOccurrences;
+			for (joint in flat.joints) {
+				if (StringTools.startsWith(joint.parent, prefix)) {
+					joint.parentConnector = exposeNested(sub, flat.assemblies,
+						joint.parent.substr(prefix.length), joint.parentConnector);
+					joint.parent = entry.id;
+				}
+				if (StringTools.startsWith(joint.child, prefix)) {
+					joint.childConnector = exposeNested(sub, flat.assemblies,
+						joint.child.substr(prefix.length), joint.childConnector);
+					joint.child = entry.id;
+				}
+			}
+			if (flat.exposedConnectors != null) for (connector in flat.exposedConnectors)
+				if (StringTools.startsWith(connector.occurrence, prefix)) {
+					connector.connector = exposeNested(sub, flat.assemblies,
+						connector.occurrence.substr(prefix.length), connector.connector);
+					connector.occurrence = entry.id;
+				}
+		}
+		var referenced:Map<String, Bool> = [];
+		for (occurrence in flat.occurrences) if (occurrence.assembly == null)
+			referenced.set(occurrence.definition, true);
+		flat.definitions = [for (definition in flat.definitions) if (referenced.exists(definition.id)) definition];
+		AssemblyDefinitionCodec.validate(flat);
+		return flat;
+	}
+
+	static function exposeNested(sub:AssemblySubdefinition, library:Array<AssemblySubdefinition>,
+			path:String, connector:String):String {
+		var direct = false;
+		for (candidate in sub.occurrences) if (candidate.id == path) direct = true;
+		if (!direct) {
+			var slash = path.indexOf("/");
+			if (slash < 0) throw 'Missing nested member "$path"';
+			var head = path.substr(0, slash), tail = path.substr(slash + 1);
+			var found = requireNestedOccurrence(sub, head);
+			if (found.assembly == null) throw 'Missing nested member "$path"';
+			var child = requireSubdefinition(library, found.assembly);
+			connector = exposeNested(child, library, tail, connector);
+			path = head;
+		}
+		if (sub.exposedConnectors == null) sub.exposedConnectors = [];
+		for (exposed in sub.exposedConnectors)
+			if (exposed.occurrence == path && exposed.connector == connector) return exposed.name;
+		var name = '__machinekit_${sub.exposedConnectors.length}';
+		sub.exposedConnectors.push({name: name, occurrence: path, connector: connector});
+		return name;
+	}
+
+	static function requireNestedOccurrence(sub:AssemblySubdefinition, id:String):
+			materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence {
+		for (candidate in sub.occurrences) if (candidate.id == id) return candidate;
+		throw 'Missing nested member "$id"';
+	}
+
+	static function requireSubdefinition(library:Array<AssemblySubdefinition>, id:String):AssemblySubdefinition {
+		for (candidate in library) if (candidate.id == id) return candidate;
+		throw 'Missing nested definition for "$id"';
+	}
 
 	public function addComponent(id:String, component:MachineComponent, ?pose:AssemblyFrame):Void {
 		InstancePath.segment(id);
@@ -325,6 +450,8 @@ class MachineAssembly {
 			addBomItem(entry.item, entry.quantity, mass);
 		}
 		included.push({id: id, assembly: assembly.snapshot(), pose: pose == null ? null : copyFrame(pose)});
+		nestedEntries.push({id: id, pose: pose == null ? AssemblyFrames.identity() : copyFrame(pose),
+			mechanical: cloneDefinition(assembly.describe().mechanical)});
 	}
 
 	public function addMate(id:String, kind:String, parent:String, parentConnector:String,

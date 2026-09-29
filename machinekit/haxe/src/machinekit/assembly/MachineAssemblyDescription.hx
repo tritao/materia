@@ -97,6 +97,12 @@ import machinekit.component.PortInterface;
 	@:id(3) var machine:ToolSideRecord;
 }
 
+@:wire typedef IncludedRecord = {
+	@:id(1) var id:String;
+	@:id(2) var pose:AssemblyFrame;
+	@:id(3) var mechanical:AssemblyDefinition;
+}
+
 /** A tool has its own EOAT data, with no recursive changer table. */
 @:wire typedef ToolSideRecord = {
 	@:id(1) var members:ReadOnlyArray<MemberRecord>;
@@ -107,6 +113,7 @@ import machinekit.component.PortInterface;
 	@:id(6) var memberConnectors:ReadOnlyArray<MemberConnectorRecord>;
 	@:id(7) var endEffector:EndEffectorRecord;
 	@:id(8) var ports:ReadOnlyArray<PortRecord>;
+	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -141,6 +148,7 @@ import machinekit.component.PortInterface;
 	@:id(8) @:optional var changer:ChangerRecord;
 	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
+	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
