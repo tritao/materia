@@ -1857,7 +1857,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function leaveSimulationMode():Void {
     var previous = modeBeforePlay;
     modeBeforePlay = null;
-    if (previous != null && mode == EditorMode.Simulate) switchMode(previous);
+    if (previous == null || mode != EditorMode.Simulate) return;
+    switchMode(previous);
+    // The restored layout keeps whichever tab was in front when the mode was left, which can be the Start
+    // page if simulation began there. After a simulation the model is what should be showing.
+    if (perspectiveViewport != null) workspace.activate("perspective");
   }
 
   // Only the Design layout is written, so a session ending in another mode reopens in Design.
