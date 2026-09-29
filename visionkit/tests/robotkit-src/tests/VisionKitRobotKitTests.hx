@@ -6,6 +6,11 @@ import haxe.Json;
 import haxe.crypto.Sha256;
 import robotkit.deployment.SerialDeployment;
 import robotkit.perception.FiducialPerception;
+import robotkit.perception.ImageDetection;
+import robotkit.perception.ImageDetectionObservation;
+import robotkit.perception.ImageDetectionLifter;
+import robotkit.perception.ObjectDetectorPipeline;
+import robotkit.mobile.Pose3;
 import robotkit.perception.FiducialTargetConfig;
 import robotkit.perception.VisionKitFiducialDetector;
 import robotkit.world.CameraImage;
@@ -61,8 +66,56 @@ class VisionKitRobotKitTests {
       model, 0.24, 1);
     if (crowded.length != 2) throw "Marker detection did not grow its result buffer";
     direct.dispose();
+    testLifting();
     testDeployment();
     trace("VisionKit RobotKit integration passed");
+  }
+
+  static function testLifting():Void {
+    var camera = new CameraModel(16, 12, 8, 8, 8, 6);
+    var rgb = new SensorFrame("rgb", "camera", "cam", Int64.ofInt(7),
+      Int64.ofInt(100), [], Int64.ofInt(110), "", null, null,
+      "source", "host", new CameraImage(16, 12, "rgb8", Bytes.alloc(16 * 12 * 3)));
+    var depthBytes = Bytes.alloc(16 * 12 * 4);
+    for (i in 0...16 * 12) depthBytes.setFloat(i * 4, 2.0);
+    var depth = new SensorFrame("depth", "camera", "cam", Int64.ofInt(7),
+      Int64.ofInt(100), [], Int64.ofInt(110), "", null, null,
+      "source", "host", new CameraImage(16, 12, "depth32f", depthBytes));
+    var digest = "0000000000000000000000000000000000000000000000000000000000000000";
+    var box = new ImageDetection("crate", 0.9, 8, 5, 2, 2);
+    var observation = new ImageDetectionObservation("test", "model", "rgb", "model",
+      digest, "cam", Int64.ofInt(7), Int64.ofInt(100), Int64.ofInt(110),
+      "source", "host", Int64.ofInt(120), "host", [box], 0);
+    var source = function(_:SensorFrame) return observation;
+    var lifter = new ImageDetectionLifter(camera, "rgb", source, "depth");
+    var value = lifter.observe([rgb, depth]).detections()[0];
+    if (Math.abs(value.pose.x - 2) > 1e-5 || Math.abs(value.pose.y + 0.25) > 1e-5 ||
+        value.frameId != "cam" || value.sourceClockId != "source")
+      throw "Depth lifting position or metadata is wrong";
+    var stale = new SensorFrame("depth", "camera", "cam", Int64.ofInt(8),
+      Int64.ofInt(100), [], Int64.ofInt(110), "", null, null,
+      "source", "host", depth.image);
+    try { lifter.observe([rgb, stale]); throw "Stale depth was accepted"; }
+    catch (error:Dynamic) { if (Std.string(error) == "Stale depth was accepted") throw error; }
+    var wrongTime = new SensorFrame("depth", "camera", "cam", Int64.ofInt(7),
+      Int64.ofInt(101), [], Int64.ofInt(110), "", null, null,
+      "source", "host", depth.image);
+    try { lifter.observe([rgb, wrongTime]); throw "Mismatched timestamp was accepted"; }
+    catch (error:Dynamic) { if (Std.string(error) == "Mismatched timestamp was accepted") throw error; }
+    var pitch = Math.PI / 4;
+    var mount = new Pose3(0, 0, 1, 0, Math.sin(pitch / 2), 0, Math.cos(pitch / 2));
+    var groundBox = new ImageDetection("crate", 0.9, 7, 5, 2, 1);
+    var groundObservation = new ImageDetectionObservation("test", "model", "rgb", "model",
+      digest, "cam", Int64.ofInt(7), Int64.ofInt(100), Int64.ofInt(110),
+      "source", "host", Int64.ofInt(120), "host", [groundBox], 0);
+    var ground = new ImageDetectionLifter(camera, "rgb", function(_) return groundObservation,
+      null, "body", mount);
+    var floor = ground.observe([rgb]).detections()[0];
+    if (Math.abs(floor.pose.x - 1) > 1e-5 || Math.abs(floor.pose.y) > 1e-5 ||
+        floor.frameId != "body") throw "Ground lifting position is wrong";
+    var unchanged = ObjectDetectorPipeline.undistortBoxes(camera, [box])[0];
+    if (Math.abs(unchanged.x - box.x) > 1e-5 || Math.abs(unchanged.y - box.y) > 1e-5)
+      throw "Pinhole box undistortion changed pixel coordinates";
   }
 
   static function testDeployment():Void {
