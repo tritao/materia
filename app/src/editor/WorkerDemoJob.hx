@@ -6,8 +6,8 @@ import humankit.facility.FacilityJobs;
 import humankit.sim.HumanWorker;
 import humankit.sim.HumanZone;
 import nativekit.sim.SimObject;
-import nativekit.sim.SimPose;
 import robotkit.runtime.Simulation;
+import robotkit.model.RobotModel;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.JointTarget;
@@ -17,7 +17,7 @@ class WorkerDemoJob {
   public static inline var ROBOT_ID = "materia/robot";
 
   public static function configure(worker:HumanWorker, objects:Array<{id:String,object:SimObject}>,
-      simulation:Simulation, robotIndex:Int):Void {
+      simulation:Simulation, robotIndex:Int, model:RobotModel):Void {
     var part:Null<SimObject> = null;
     for (entry in objects) if (entry.id == "worker-demo-part") part = entry.object;
     if (part == null) throw "Worker demo part is missing from the scene";
@@ -35,16 +35,14 @@ class WorkerDemoJob {
     }
     worker.addZone(new HumanZone("rack", [[2.6, -0.7], [4.0, -0.7], [4.0, 0.5], [2.6, 0.5]]));
     worker.addZone(new HumanZone("table", [[2.6, 1.9], [4.0, 1.9], [4.0, 3.1], [2.6, 3.1]]));
-    // The jointed robot's collision sphere is 45 cm from its link origin.
-    worker.addRobotLinkPose("demo-arm", function() {
-      var link = simulation.linkPose(robotIndex, 1);
-      var q = link.rotation;
-      var x = 0.45 * (1 - 2 * (q[1] * q[1] + q[2] * q[2]));
-      var y = 0.9 * (q[0] * q[1] + q[2] * q[3]);
-      var z = 0.9 * (q[0] * q[2] - q[1] * q[3]);
-      return new SimPose(link.position[0] + x, link.position[1] + y,
-        link.position[2] + z);
-    }, 0.12);
+    for (bound in RobotLinkBounds.shapes(model)) {
+      var linkIndex = bound.link, offset = bound.offset;
+      var id = linkIndex == 1 && bound.shape == 0 ? "demo-arm" : 'demo-link-$linkIndex-${bound.shape}';
+      worker.addRobotLinkPose(id, function() {
+        var link = simulation.linkPose(robotIndex, linkIndex);
+        return RobotLinkBounds.worldCenter(link.position, link.rotation, offset);
+      }, bound.radius);
+    }
     worker.run(job);
   }
 

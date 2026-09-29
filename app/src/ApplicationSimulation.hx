@@ -278,7 +278,8 @@ class ApplicationSimulation {
           var robotIndex = -1;
           for (index in 0...candidateRobots.length)
             if (candidateRobots[index].id() == WorkerDemoJob.ROBOT_ID) robotIndex = index;
-          WorkerDemoJob.configure(worker, candidateObjects, candidate, robotIndex);
+          var robotModel = robotIndex < 0 ? null : models[robotIndex].model;
+          WorkerDemoJob.configure(worker, candidateObjects, candidate, robotIndex, robotModel);
           candidateDemoRobot = true;
         } else if (configured.jobName != null) throw 'Unknown human job "${configured.jobName}"';
         var humanId = configured.id;
