@@ -31,6 +31,17 @@ class RobotRuntime {
   final externalSensorLayout:Array<RobotRuntimeSensorBlueprint>;
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
+
+  /**
+   * Native output buffers reused across calls. `rk_robot_snapshot` is 17 KB and `rk_event_record_batch` 10 KB
+   * because their arrays are sized for the largest robot, and allocating and zeroing them on every simulation
+   * tick was a large share of the tick. The native calls overwrite everything the readers use (`snapshot_full`
+   * the whole struct, `poll_events` resets its count first), and readers copy values out before the lock is
+   * released, so nothing retains a reference to the shared storage.
+   */
+  static final scratchMutex = new Mutex();
+  static final snapshotScratch = new rk_robot_snapshot();
+  static final eventBatchScratch = new rk_event_record_batch();
   var disposed:Bool = false;
   @:allow(robotkit.runtime.Simulation)
   var simulation:Null<Simulation>;
@@ -277,19 +288,27 @@ class RobotRuntime {
   /** Drains output changes produced by the runtime owner clock. */
   public function pollEvents():{events:Array<FiredProcessEvent>, overflow:Bool} {
     ensureLive();
-    var batch = new rk_event_record_batch();
-    batch.set_struct_size(rk_event_record_batch.size());
-    check(RobotKitRuntime.rk_robot_runtime_poll_events(owner.borrow(), batch),
-      "runtime.pollEvents");
     var result:Array<FiredProcessEvent> = [];
-    for (index in 0...batch.get_count()) {
-      var record = batch.get_records(index);
-      result.push(new FiredProcessEvent(record.get_plan_id(),
-        ProcessEventCodec.readChannel(record), ProcessEventCodec.decode(record.get_value()),
-        record.get_scheduled_time_ns(), record.get_applied_owner_time_ns(),
-        record.get_cause()));
+    var overflow = false;
+    scratchMutex.acquire();
+    try {
+      eventBatchScratch.set_struct_size(rk_event_record_batch.size());
+      check(RobotKitRuntime.rk_robot_runtime_poll_events(owner.borrow(), eventBatchScratch),
+        "runtime.pollEvents");
+      for (index in 0...eventBatchScratch.get_count()) {
+        var record = eventBatchScratch.get_records(index);
+        result.push(new FiredProcessEvent(record.get_plan_id(),
+          ProcessEventCodec.readChannel(record), ProcessEventCodec.decode(record.get_value()),
+          record.get_scheduled_time_ns(), record.get_applied_owner_time_ns(),
+          record.get_cause()));
+      }
+      overflow = eventBatchScratch.get_overflow() != 0;
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
     }
-    return {events:result, overflow:batch.get_overflow() != 0};
+    scratchMutex.release();
+    return {events:result, overflow:overflow};
   }
 
   /** Submits all position targets in one native call. */
@@ -372,11 +391,18 @@ class RobotRuntime {
   /** Reads the latest published native state without advancing time. */
   public function snapshot():RobotSnapshot {
     ensureLive();
-    var value = new rk_robot_snapshot();
-    value.set_struct_size(rk_robot_snapshot.size());
-    check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), value).status,
-      "runtime.snapshot");
-    var native = RobotSnapshot.fromNative(value, sensorLayout);
+    var native:RobotSnapshot;
+    scratchMutex.acquire();
+    try {
+      snapshotScratch.set_struct_size(rk_robot_snapshot.size());
+      check(RobotKitRuntime.rk_robot_runtime_snapshot_full(owner.borrow(), snapshotScratch).status,
+        "runtime.snapshot");
+      native = RobotSnapshot.fromNative(snapshotScratch, sensorLayout);
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+    scratchMutex.release();
     if (externalSensorLayout.length == 0) return native;
     var frames = native.sensors.toArray();
     externalMutex.acquire();
