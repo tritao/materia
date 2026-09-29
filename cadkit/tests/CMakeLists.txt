@@ -1,3 +1,10 @@
+# Tests use assert for setup calls as well as checks; keep them active in Release.
+if(MSVC)
+    add_compile_options(/UNDEBUG)
+else()
+    add_compile_options(-UNDEBUG)
+endif()
+
 add_library(cadkit-c-header-compile OBJECT
     c_header_smoke.c
 )
