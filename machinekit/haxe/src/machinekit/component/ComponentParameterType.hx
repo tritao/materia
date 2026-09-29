@@ -9,6 +9,7 @@ enum ComponentParameterType {
 	Angle;
 	Count;
 	Bool;
+	Text;
 	Choice(options:Array<String>);
 	CatalogDesignation(index:CatalogIndex);
 }

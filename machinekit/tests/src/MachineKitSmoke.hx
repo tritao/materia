@@ -564,6 +564,19 @@ class MachineKitSmoke {
 				"MachineKit defines typed tool inputs with defaults");
 		}
 		registryDocument.close();
+		var routeDocument = new Document();
+		var routeType = MachineKitComponents.byId("machinekit.pneumatic.routed-hose");
+		var routeDefinition = MachineKitDocuments.define(routeDocument, routeType,
+			routeType.defaults().setToken("route", '[{"x":0,"y":0,"z":0},{"x":0,"y":0,"z":80},{"x":30,"y":0,"z":80}]'));
+		var routeInstance = routeDocument.createInstance("Hose", routeDefinition);
+		check(MachineKitRecipes.component(routeInstance).connector("end").frame.x == 30,
+			"text route input builds the saved connector frame");
+		var reloadedRoute = DocumentCodec.decode(DocumentCodec.encode(routeDocument));
+		var reloadedInstance:cadkit.parametric.InstanceElement = cast reloadedRoute.element(routeInstance.id);
+		check(MachineKitRecipes.component(reloadedInstance).connector("end").frame.x == 30,
+			"text route input survives document save and reload");
+		reloadedRoute.close();
+		routeDocument.close();
 		var document = new Document();
 		var type = MachineKitComponents.byId("machinekit.standard.deep-groove-bearing");
 		var definition = MachineKitDocuments.define(document, type);

@@ -73,6 +73,9 @@ class ComponentRecipeSupport {
 	public static function count(name:String, value:Int):ComponentParameter
 		return new ComponentParameter(name, Count, Integer(value), null, 0);
 
+	public static function text(name:String, value:String):ComponentParameter
+		return new ComponentParameter(name, Text, Token(value));
+
 	public static function choice(name:String, options:Array<String>, value:String):ComponentParameter
 		return new ComponentParameter(name, Choice(options), Token(value));
 

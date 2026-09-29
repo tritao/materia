@@ -63,7 +63,7 @@ class MachineKitRecipes {
 				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
-				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
+				case Text | Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
 			}
 		}
 		var built = type.create(values);
@@ -92,7 +92,7 @@ class MachineKitRecipes {
 				case Scalar | Length | Angle: values.setNumber(parameter.name, cast raw);
 				case Count: values.setInteger(parameter.name, cast raw);
 				case Bool: values.setBoolean(parameter.name, cast raw);
-				case Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
+				case Text | Choice(_) | CatalogDesignation(_): values.setToken(parameter.name, cast raw);
 			}
 		}
 		return tool.resolve(values);

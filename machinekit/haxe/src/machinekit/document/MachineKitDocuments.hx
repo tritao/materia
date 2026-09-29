@@ -105,6 +105,7 @@ class MachineKitDocuments {
 			case Angle: new DefinitionInput(name, "angle", parameter.unit, number(value));
 			case Count: DefinitionInput.integer(name, integer(value));
 			case Bool: DefinitionInput.boolean(name, boolean(value));
+			case Text: new DefinitionInput(name, "text", "1", token(value));
 			case Choice(options): DefinitionInput.token(name, token(value), options);
 			case CatalogDesignation(index): DefinitionInput.token(name, token(value), index.designations());
 		};

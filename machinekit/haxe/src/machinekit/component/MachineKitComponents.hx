@@ -26,7 +26,7 @@ import machinekit.transmission.Rack;
 import machinekit.transmission.TimingPulley;
 
 /** Registered, editable single-part generators. Parts whose inputs include lists, such as
- * SteppedShaft and ShaftCoupling, remain code-only until a list input type exists.
+ * SteppedShaft and ShaftCoupling, use text inputs for structured feature lists.
  */
 class MachineKitComponents {
 	static var types:Null<Array<ComponentType>>;
@@ -43,7 +43,8 @@ class MachineKitComponents {
 		return types;
 	}
 
-	static function build():Array<ComponentType> return [
+	static function build():Array<ComponentType> {
+		var result:Array<ComponentType> = [
 			DeepGrooveBearing.recipeType(),
 			SocketHeadCapScrew.recipeType(),
 			HexBolt.recipeType(),
@@ -71,5 +72,8 @@ class MachineKitComponents {
 			Rack.recipeType(),
 			TimingPulley.standardRecipeType(),
 			TimingPulley.customRecipeType()
-	];
+		];
+		for (type in MachineKitAdditionalRecipes.all()) result.push(type);
+		return result;
+	}
 }

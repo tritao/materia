@@ -1,4 +1,11 @@
 import cadkit.modeling.Part;
+import haxeon.Equality;
+import cadkit.modeling.Vector;
+import machinekit.motion.ShaftCoupling;
+import machinekit.motion.SteppedShaft;
+import machinekit.pneumatic.RoutedHose;
+import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.standard.ParallelKey;
 import machinekit.component.Bom.BomItem;
 import machinekit.component.ComponentDetail.*;
 import machinekit.component.ComponentParameterType;
@@ -27,6 +34,12 @@ class RecipeContractTests {
 				check(rebuilt.designation == component.designation,
 					'${type.id}: designation changed after rebuild (${component.designation} -> ${rebuilt.designation})');
 				check(sameBom(component.bom, rebuilt.bom), '${type.id}: BOM changed after rebuild');
+				check(Equality.equals(component.connectors(), rebuilt.connectors()),
+					'${type.id}: connectors changed after rebuild');
+				check(Equality.equals(component.ports(), rebuilt.ports()),
+					'${type.id}: ports changed after rebuild');
+				check(Equality.equals(component.capabilities(), rebuilt.capabilities()),
+					'${type.id}: capabilities changed after rebuild');
 
 				var partNumber = component.bom.partNumber;
 				var prior = partNumbers.get(partNumber);
@@ -57,7 +70,30 @@ class RecipeContractTests {
 				check(variant.bom.partNumber != baseline.bom.partNumber,
 					'${type.id}: material variants alias the same part number');
 			}
+		checkRebuild(new RoutedHose("TEST-ROUTE", [new Vector(), new Vector(0, 0, 100),
+			new Vector(100, 0, 100)], 4, 2, 0.011));
+		checkRebuild(new SchmalzVacuumHose("10.07.09.00001", [new Vector(),
+			new Vector(0, 0, 100), new Vector(100, 0, 100)]));
+		checkRebuild(new ShaftCoupling(5, 8, null, null, [{z: 6, angle: 0}]));
+		checkRebuild(new SteppedShaft([{diameter: 8, length: 51.5}, {diameter: 6, length: 8.5}],
+			[{name: "bearing", z: 10}], [{name: "key", z0: 52, key: ParallelKey.forShaft(6, 6)}],
+			[{name: "ring", z0: 50, width: 1.2, diameter: 7.6}]));
+		checkRebuild(new SteppedShaft([{diameter: 12, length: 20}, {diameter: 8, length: 20}],
+			null, null, null, {inputChamfer: 1, outputThread: {diameter: 6, pitch: 1, length: 5}}));
 		}
+	}
+
+	static function checkRebuild(component:MachineComponent):Void {
+		var type:machinekit.component.ComponentType = cast component.type;
+		check(type != null, '${component.designation}: recipe is missing');
+		var rebuilt = type.create(component.values());
+		check(component.designation == rebuilt.designation, '${component.designation}: custom designation changed');
+		check(Equality.equals(component.connectors(), rebuilt.connectors()),
+			'${component.designation}: custom connectors changed');
+		check(Equality.equals(component.ports(), rebuilt.ports()),
+			'${component.designation}: custom ports changed');
+		check(Equality.equals(component.capabilities(), rebuilt.capabilities()),
+			'${component.designation}: custom capabilities changed');
 	}
 
 	static function cases(type:machinekit.component.ComponentType):Array<ComponentValues> {

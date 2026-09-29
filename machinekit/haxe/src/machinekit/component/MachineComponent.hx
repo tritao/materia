@@ -149,12 +149,12 @@ class MachineComponent {
 	function buildTool(name:String, values:ComponentValues):Part
 		throw 'Unknown tool "$name" for "$designation"';
 
-	public function componentType():Null<ComponentType> return null;
+	public function componentType():Null<ComponentType> return MachineKitAdditionalRecipes.typeFor(this);
 
 	function get_type():Null<ComponentType> return componentType();
 
 	public function values():ComponentValues
-		throw 'Component "$designation" is code-only';
+		return MachineKitAdditionalRecipes.valuesFor(this);
 
 	public function connectors():Array<Connector>
 		return connectorList.copy();

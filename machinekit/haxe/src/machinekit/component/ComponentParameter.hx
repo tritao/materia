@@ -42,6 +42,11 @@ class ComponentParameter {
 					case Boolean(_):
 					default: wrongType();
 				}
+			case Text:
+				switch value {
+					case Token(v): if (v == null) wrongType();
+					default: wrongType();
+				}
 			case Choice(options):
 				switch value {
 					case Token(v): if (options.indexOf(v) < 0) throw 'Invalid choice "$v" for component parameter "$name"';
