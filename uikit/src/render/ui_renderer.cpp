@@ -2228,9 +2228,21 @@ bool UiRendererImpl::drawGlyphs(const PreparedGlyphs &glyphs, const float transf
     const float integral_scale = std::round(glyphs.pixel_scale);
     // Preserve crisp texel alignment at integer scales; fractional device scales
     // need coverage interpolation so glyph edges do not lose partial rows/columns.
-    const nkgpu_sampler glyph_sampler = std::abs(glyphs.pixel_scale - integral_scale) < 0.0001f
-                                            ? state_->sampler
-                                            : state_->glyph_sampler;
+    const bool integral_pixel_scale = std::abs(glyphs.pixel_scale - integral_scale) < 0.0001f;
+    const nkgpu_sampler glyph_sampler = integral_pixel_scale ? state_->sampler : state_->glyph_sampler;
+    // Glyph quads are placed relative to the run origin and sampled nearest at integer scales, so each
+    // glyph lands on a whole pixel independently. With a fractional origin (panes sized by ratio give
+    // one that changes with window width) the rounding of every glyph, and so the spacing of the line,
+    // shifted with it. Snapping the run origin to a device pixel makes the result identical at every
+    // layout position. Rotated or skewed transforms keep their exact position.
+    float snap_x = 0.0f;
+    float snap_y = 0.0f;
+    if (integral_pixel_scale && transform[1] == 0.0f && transform[2] == 0.0f) {
+        const float device_x = origin_x * transform[0] + transform[4];
+        const float device_y = origin_y * transform[3] + transform[5];
+        snap_x = std::round(device_x) - device_x;
+        snap_y = std::round(device_y) - device_y;
+    }
     for (const auto &batch : glyphs.batches) {
         const auto atlas = state_->atlases.find(atlas_key(batch.atlas, batch.atlas_generation));
         if (atlas == state_->atlases.end())
@@ -2251,8 +2263,8 @@ bool UiRendererImpl::drawGlyphs(const PreparedGlyphs &glyphs, const float transf
         for (auto &vertex : vertices) {
             const float x = vertex.x + origin_x;
             const float y = vertex.y + origin_y;
-            vertex.x = x * transform[0] + y * transform[2] + transform[4];
-            vertex.y = x * transform[1] + y * transform[3] + transform[5];
+            vertex.x = x * transform[0] + y * transform[2] + transform[4] + snap_x;
+            vertex.y = x * transform[1] + y * transform[3] + transform[5] + snap_y;
             vertex.alpha = static_cast<uint8_t>(vertex.alpha * opacity);
         }
         std::vector<uint32_t> indices;

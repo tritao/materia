@@ -86,7 +86,7 @@ class SensorPanel {
       new KeyedView("pause",new Button("Pause",null,function() commands.execute("sim.pause"),"sensor-pause")),
       new KeyedView("step",new Button("Step",null,function() commands.execute("sim.step"),"sensor-step")),
       new KeyedView("reset",new Button("Reset",null,function() commands.execute("sim.reset"),"sensor-reset")),
-      new KeyedView("design",new Button("Design",null,function() commands.execute("sim.stop"),"sensor-design"))
+      new KeyedView("design",new Button("Stop",null,function() commands.execute("sim.stop"),"sensor-design"))
       ],actionRowStyle()))
     ],actionColumnStyle());
     var backendActions=new Row("sensor-backend-actions",[

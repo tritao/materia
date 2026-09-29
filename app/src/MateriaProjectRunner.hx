@@ -60,7 +60,8 @@ class MateriaProjectRunner {
 
   public static function load(projectPath:String):Array<SceneObjectData> return loadProject(projectPath).objects;
 
-  public static function loadProject(projectPath:String, ?recipeDocument:String):GeneratedAssemblyScene {
+  public static function loadProject(projectPath:String, ?recipeDocument:String,
+      ?control:ProjectLoadControl):GeneratedAssemblyScene {
     var manifestPath = FileSystem.fullPath(projectPath);
     if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
       throw 'Materia project file not found: $manifestPath';
@@ -86,9 +87,12 @@ class MateriaProjectRunner {
     var haxe = ProjectPath.join([home, ".tools", "haxe", "haxe"]);
     if (!FileSystem.exists(haxe)) throw 'Pinned Haxe compiler was not found at $haxe';
     var tools = projectToolsDirectory();
+    if (control != null) control.phase("Checking for a cached build");
     var cache = recipeDocument == null ? cachePath(entry, projectRoot, manifestPath, haxeonManifest,
-      fieldText(entry, "module"), fieldText(entry, "function"), haxe, home, tools) : null;
+      fieldText(entry, "module"), fieldText(entry, "function"), haxe, home, tools, control) : null;
+    if (control != null) control.throwIfCancelled();
     if (cache != null && FileSystem.exists(cache)) {
+      if (control != null) control.phase("Reading the cached build");
       try {
         var metadata = FileSystem.metadata(cache);
         if (metadata == null || metadata.size > MAX_OUTPUT_BYTES) throw "Cached artifact is too large";
@@ -108,18 +112,22 @@ class MateriaProjectRunner {
     var records:GeneratedAssemblyScene;
     try {
       Sys.println("Materia project: compiling its entrypoint");
+      if (control != null) control.phase("Compiling the project");
       var acceptsDocument = Reflect.field(entry, "documentInput") == true;
       if (recipeDocument != null && !acceptsDocument)
         throw "Project entrypoint does not accept an editable document";
       buildModule(haxe, home, tools, haxeonManifest, fieldText(entry, "module"),
-        fieldText(entry, "function"), outputPrefix, acceptsDocument);
+        fieldText(entry, "function"), outputPrefix, acceptsDocument, control);
+      if (control != null) control.throwIfCancelled();
       Sys.println("Materia project: executing its entrypoint");
+      if (control != null) control.phase("Running the project");
       var hashlink = ProjectPath.join([home, ".tools", "hashlink", "hl"]);
       if (!FileSystem.exists(hashlink)) throw 'Pinned HashLink executable was not found at $hashlink';
       if (recipeDocument != null) File.saveContent(outputPrefix + ".document.json", recipeDocument);
       runCommand(hashlink, recipeDocument == null ? [outputPrefix + ".hl", outputPrefix + ".mtrg"]
         : [outputPrefix + ".hl", outputPrefix + ".mtrg", outputPrefix + ".document.json"],
-        "Could not generate Materia project artifact");
+        "Could not generate Materia project artifact", control);
+      if (control != null) control.throwIfCancelled();
       if (!FileSystem.exists(outputPrefix + ".mtrg"))
         throw "Project entrypoint did not write a geometry artifact";
       var metadata = FileSystem.metadata(outputPrefix + ".mtrg");
@@ -128,6 +136,7 @@ class MateriaProjectRunner {
       var result = File.getBytes(outputPrefix + ".mtrg");
       Sys.println('Materia project: received binary geometry artifact (${result.length} bytes)');
       if (result.length > MAX_OUTPUT_BYTES) throw "Project geometry preview exceeds the 150 MB limit";
+      if (control != null) control.phase("Reading the geometry");
       records = previewRecords(result);
       Sys.println('Materia project: decoded ${records.objects.length} component records');
       if (cache != null) try AtomicFile.writeBytes(cache, result)
@@ -142,7 +151,7 @@ class MateriaProjectRunner {
 
   static function cachePath(entry:Dynamic, projectRoot:String, manifestPath:String,
       haxeonManifest:String, module:String, functionName:String, haxe:String,
-      home:String, tools:String):Null<String> {
+      home:String, tools:String, ?control:ProjectLoadControl):Null<String> {
     if (entry == null || !Reflect.hasField(entry, "cache")) return null;
     var declaration = field(entry, "cache");
     var rawInputs = field(declaration, "inputs");
@@ -167,7 +176,7 @@ class MateriaProjectRunner {
     var arguments = ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
       "--run", "MateriaProjectFingerprint", haxeonManifest, module, functionName, tools, home].concat(inputs);
     var fingerprint = StringTools.trim(runCommand(haxe, arguments,
-      "Could not fingerprint Materia project entrypoint"));
+      "Could not fingerprint Materia project entrypoint", control));
     if (!~/^[0-9a-f]{64}$/.match(fingerprint)) throw "Project fingerprint has an invalid result";
     return ProjectPath.join([cacheDirectory, fingerprint + ".mtrg"]);
   }
@@ -189,17 +198,20 @@ class MateriaProjectRunner {
   }
 
   static function buildModule(haxe:String, home:String, tools:String, manifest:String,
-      module:String, functionName:String, outputPrefix:String, documentInput:Bool):Void {
+      module:String, functionName:String, outputPrefix:String, documentInput:Bool,
+      ?control:ProjectLoadControl):Void {
     var arguments = ["--cwd", home, "-cp", ProjectPath.join([home, "src"]), "-cp", tools,
       "--run", "MateriaProjectModuleBuild", manifest, module, functionName, outputPrefix, home,
       documentInput ? "true" : "false"];
-    runCommand(haxe, arguments, "Could not compile Materia project entrypoint");
+    runCommand(haxe, arguments, "Could not compile Materia project entrypoint", control);
   }
 
-  public static function runCommand(command:String, arguments:Array<String>, description:String):String {
+  public static function runCommand(command:String, arguments:Array<String>, description:String,
+      ?control:ProjectLoadControl):String {
     var process:Process;
     try process = Process.run(command, arguments)
     catch (error:Dynamic) throw description + ": " + Std.string(error);
+    if (control != null) control.attach(process);
     var mutex = new Mutex();
     var stdout = "", stderr = "", stdoutDone = false, stderrDone = false, processError:Dynamic = null;
     Thread.create(function() {
@@ -227,6 +239,10 @@ class MateriaProjectRunner {
     }
     var status = process.exitCode();
     process.close();
+    if (control != null) {
+      control.detach();
+      control.throwIfCancelled();
+    }
     if (processError != null)
       throw description + ": " + Std.string(processError);
     if (status != 0) {

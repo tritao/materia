@@ -18,6 +18,7 @@ import app.editor.SceneViewCommands;
 import app.editor.SimulationCommands;
 import app.editor.ExampleCatalog;
 import app.editor.ExampleCatalog.ExampleEntry;
+import app.ProjectLoadJob;
 import app.editor.StartPanel;
 import app.editor.EditorGrid;
 import Color;
@@ -148,7 +149,7 @@ class Main {
           arg.indexOf("--capture-seconds=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
-          arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 &&
+          arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
@@ -164,7 +165,7 @@ class Main {
           "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] " +
           "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] " +
           "[--worker-demo=rack-to-table [--worker-demo-step=N]] " +
-          "[--example=ID[,ID...] [--example-settle=SECONDS]]");
+          "[--example=ID[,ID...] [--example-settle=SECONDS] [--example-play]]");
         return 2;
       }
 
@@ -191,6 +192,11 @@ class Main {
           ExampleCatalog.open(editor, entry);
           Sys.println('Opened example ${entry.id}: document "${editor.session.label()}", ' +
             '${editor.scene.records().length} scene records');
+          if (args.indexOf("--example-play") >= 0) {
+            if (!editor.simulation.rebuild(editor.sensors, editor.scene, editor.session))
+              Sys.println('Play rejected: ${editor.simulation.error}');
+            else editor.simulation.start();
+          }
           // Let a running simulation step, as the interactive editor does between frames.
           var until = Sys.time() + settleSeconds;
           while (Sys.time() < until) {
@@ -235,7 +241,8 @@ class Main {
     var diagnostics = ReferenceEditorLaunchOptions.fromArgs(args);
     if (diagnostics == null) throw "Invalid editor launch options";
     var host = new DesktopUiHostOptions();
-    host.title = "Materia";
+    // Captures screenshot their window by title, so give each capture run a title no other window shares.
+    host.title = diagnostics.captureDirectory == null ? "Materia" : "Materia capture " + Sys.getPid();
     host.icons = MateriaIcon.create();
     host.width = diagnostics.windowWidth;
     host.height = diagnostics.windowHeight;
@@ -531,6 +538,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // Start page example that is queued to open; it runs a few frames later so "Opening..." is visible first.
   var startLoading:Null<ExampleEntry> = null;
   var startLoadDelay:Int = 0;
+  // The worker-thread build behind startLoading, when the example is a project.
+  var startJob:Null<ProjectLoadJob> = null;
   var startFailure:Null<String> = null;
   var lastRecordedPath:Null<String> = null;
   // Each mode keeps the layout it was left in; the mode set itself is never persisted.
@@ -633,7 +642,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
-    if (hostContext != null) hostContext.onCloseRequested = function(close) documents.requestClose(close);
+    documents.busy = function() return startLoading != null;
+    if (hostContext != null) hostContext.onCloseRequested = function(close) {
+      // A running build must not keep the window from closing: cancel it and let the normal prompt run.
+      if (startJob != null) {
+        startJob.control.cancel();
+        startJob = null;
+        startLoading = null;
+      }
+      documents.requestClose(close);
+    };
     treeModel = new EditorSceneTree(scene, session.projectAssembly);
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
@@ -845,15 +863,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function tick():Void {
     var queued = startLoading;
     if (queued != null) {
-      if (startLoadDelay > 0) {
+      var job = startJob;
+      if (job != null) {
+        // A project is building on its worker thread: keep the frame loop going for the spinner and phase.
+        if (!job.isFinished()) {
+          if (hostContext != null) hostContext.requestFrame();
+        } else {
+          startJob = null;
+          startLoading = null;
+          if (job.wasCancelled()) log("Cancelled opening " + queued.title);
+          else try ExampleCatalog.finish(this, queued, job.take()) catch (failure:Dynamic) {
+            startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
+            log(startFailure);
+          }
+          invalidateView();
+        }
+      } else if (startLoadDelay > 0) {
         startLoadDelay--;
         if (hostContext != null) hostContext.requestFrame();
       } else {
-        startLoading = null;
-        try ExampleCatalog.open(this, queued) catch (failure:Dynamic) {
+        try startJob = ExampleCatalog.begin(this, queued) catch (failure:Dynamic) {
           startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
           log(startFailure);
         }
+        // Quick examples opened inside begin(); only a project leaves a job to wait for.
+        if (startJob == null) startLoading = null;
         invalidateView();
       }
     }
@@ -888,6 +922,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       startLoadDelay = 3;
       invalidateView();
     });
+  }
+
+  /** Stops a project build that is running for the Start page. */
+  function cancelExampleLoad():Void {
+    var job = startJob;
+    if (job == null) return;
+    job.control.phase("Cancelling");
+    job.control.cancel();
+    invalidateView();
   }
 
   function requestOpenPath(path:String):Void {
@@ -1092,6 +1135,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
     stack.width = LayoutAxis.grow();
     stack.height = LayoutAxis.fixed(TOOLBAR_HEIGHT);
     stack.direction = LayoutDirection.TopToBottom;
+    // The dock workspace is painted after the toolbar; without this its panels would cover the tooltips
+    // that hang below the transport buttons.
+    stack.zIndex = 20;
     var divider = new Spacer("toolbar-tier-divider", LayoutAxis.grow(), LayoutAxis.fixed(1.0));
     divider.style.background = appearance.theme.tokens.border;
     return new Column("editor-toolbar", [
@@ -1178,23 +1224,52 @@ class ReferenceEditorApp implements DesktopUiApplication {
     style.childAlignY = LayoutAlignmentY.Center;
     style.childGap = 4.0;
     var running = simulation.isRunning();
-    var playPause = running
-      ? toolbarAction("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause, true)
-      : toolbarAction("toolbar-sim-play", "sim.play", "Play", IconName.Play, true, true);
-    var items:Array<KeyedView> = [new KeyedView("play-pause", playPause)];
-    items.push(new KeyedView("step", toolbarAction("toolbar-sim-step", "sim.step", "Step",
-      IconName.StepForward, true)));
-    items.push(new KeyedView("reset", toolbarAction("toolbar-sim-reset", "sim.reset", "Reset",
-      IconName.Reset, true)));
-    items.push(new KeyedView("stop", toolbarAction("toolbar-sim-stop", "sim.stop", "Design",
-      IconName.Stop, true)));
-    if (!compact) {
-      var state = running ? "Running" : simulation.isActive() ? "Paused" : "Design";
-      if (simulation.isActive() && simulation.pending(sensors, scene)) state += " · Rebuild pending";
-      items.push(new KeyedView("state", new Text(state, null, appearance.theme.tokens.textSecondary,
-        TextStyleOverride.text(12.0))));
-    }
+    // Labels appear when the bar has room; every button always explains itself on hover.
+    var items:Array<KeyedView> = [new KeyedView("play-pause", running
+      ? transportButton("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause,
+        "Pause (F5): freeze time, keeping the simulation", false, compact)
+      : transportButton("toolbar-sim-play", "sim.play", "Play", IconName.Play,
+        "Play (F5): run the simulation", true, compact))];
+    items.push(new KeyedView("step", transportButton("toolbar-sim-step", "sim.step", "Step",
+      IconName.StepForward, "Step (F10): advance the simulation by one step", false, compact)));
+    items.push(new KeyedView("reset", transportButton("toolbar-sim-reset", "sim.reset", "Reset",
+      IconName.Reset, "Reset (Shift+F5): return to the starting state and stay in Simulate", false, compact)));
+    items.push(new KeyedView("stop", transportButton("toolbar-sim-stop", "sim.stop", "Stop",
+      IconName.Stop, "Stop: discard the simulation and return to editing", false, compact)));
+    if (!compact) items.push(new KeyedView("state", simulationStateChip()));
     return new Row("editor-transport", items, style);
+  }
+
+  /** A transport button that shows its label when there is room and always has a hover explanation. */
+  function transportButton(key:String, commandId:String, label:String, icon:IconName, explanation:String,
+      primary:Bool, compact:Bool):View {
+    var action = toolbarAction(key, commandId, label, icon, compact, primary);
+    return new Tooltip(key + "-tooltip", action, new Text(explanation), 0.0, 36.0);
+  }
+
+  /** Current simulation state as a chip that cannot be mistaken for a button label. */
+  function simulationStateChip():View {
+    var tokens = appearance.theme.tokens;
+    var active = simulation.isActive();
+    var text = simulation.isRunning() ? "Running" : active ? "Paused" : "Design";
+    if (active && simulation.pending(sensors, scene)) text += " · rebuild pending";
+    var dotColor = simulation.isRunning() ? tokens.success : active ? tokens.warning : tokens.textSecondary;
+    var chip = new LayoutStyle();
+    chip.direction = LayoutDirection.LeftToRight;
+    chip.childAlignY = LayoutAlignmentY.Center;
+    chip.childGap = 6.0;
+    chip.padding = new Insets(10.0, 4.0, 10.0, 4.0);
+    chip.background = tokens.surface;
+    chip.radiusTopLeft = chip.radiusTopRight = chip.radiusBottomLeft = chip.radiusBottomRight = 11.0;
+    // Drawn rather than typed: the bullet glyph is not in the UI font and shows as a missing-glyph box.
+    var dot = new Spacer("simulation-state-dot", LayoutAxis.fixed(8.0), LayoutAxis.fixed(8.0));
+    dot.style.background = dotColor;
+    dot.style.radiusTopLeft = dot.style.radiusTopRight = dot.style.radiusBottomLeft =
+      dot.style.radiusBottomRight = 4.0;
+    return new Row("simulation-state", [
+      new KeyedView("dot", dot),
+      new KeyedView("text", new Text(text, null, tokens.text, TextStyleOverride.text(12.0)))
+    ], chip);
   }
 
   function chromeRevisionKey():String {

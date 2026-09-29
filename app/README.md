@@ -78,12 +78,16 @@ position; a looping track must end where it starts.
   transport, and Frame below. The lower tier is tinted while a simulation is active.
   The transport group drives the shared simulation through `sim.*` commands
   (`editor/SimulationCommands`): Play/Pause (`F5`), Step (`F10`), Reset (`Shift+F5`), and
-  Design, which discards the running simulation and returns to the editor pose. Play and Step
+  Stop, which discards the running simulation and returns to the editor pose. Labels show when the
+  toolbar has room, every button has a hover explanation with its shortcut, and a state chip
+  (Design, Paused, or Running) sits beside them. Play and Step
   build or rebuild pending configuration first; the Sensors panel buttons call the same commands.
 - A Start tab opens beside the 3D view on a plain launch, with new-file shortcuts, recent files,
   and the bundled examples listed in `editor/ExampleCatalog`. `--snapshot --example=ID[,ID...]`
   opens the same examples headlessly, in order, for checks (`--example-settle=SECONDS` lets a
-  running simulation step between them). "Show this page at startup" and the recent-file list are
+  running simulation step between them). Project examples build on a worker thread: the Start page shows a spinner, the current
+  phase and elapsed time with a Cancel button, the rest of the editor stays responsive, and later
+  opens reuse the cached build. "Show this page at startup" and the recent-file list are
   stored in `preferences.json` beside the workspace layout.
 - The Console is a read-only text area over a 1000-line log: select with the mouse, copy with
   `Ctrl+C`, scroll with the wheel, or use **Copy all** (`console.copy-all`). It follows new output

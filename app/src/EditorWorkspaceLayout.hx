@@ -29,7 +29,7 @@ class EditorWorkspaceLayout {
   public static function simulateLayout():DockNode {
     var main = DockNode.Split(DockSplitAxis.Vertical, 0.68,
       DockNode.Panel("perspective"),
-      DockNode.Tabs(["console", "telemetry"], "telemetry"));
+      DockNode.Tabs(["console", "telemetry"], "console"));
     return DockNode.Split(DockSplitAxis.Horizontal, 0.74, main,
       DockNode.Tabs(["sensors", "inspector", "hierarchy"], "sensors"));
   }

@@ -4,6 +4,7 @@ import app.Main.ReferenceEditorApp;
 import app.editor.ExampleCatalog.ExampleEntry;
 import Insets;
 import LayoutAxis;
+import LayoutAlignmentY;
 import LayoutDirection;
 import LayoutStyle;
 import LayoutWrapMode;
@@ -16,6 +17,7 @@ import nativekit.ui.widgets.commands.CommandButton;
 import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.controls.Checkbox;
+import nativekit.ui.widgets.controls.Spinner;
 import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.layout.Row;
 import nativekit.ui.widgets.scroll.ScrollView;
@@ -34,9 +36,7 @@ class StartPanel {
     ];
     var loading = app.startLoading;
     if (loading != null)
-      rows.push(new KeyedView("loading", new Text("Opening " + loading.title +
-        "... building a project can take up to a minute, and the window stays busy until it finishes.",
-        null, tokens.accent, TextStyleOverride.text(13.0))));
+      rows.push(new KeyedView("loading", loadingRow(app, loading)));
     else if (app.startFailure != null)
       rows.push(new KeyedView("failure", new Text(app.startFailure, null, tokens.danger,
         TextStyleOverride.text(13.0))));
@@ -85,6 +85,30 @@ class StartPanel {
     var scrollStyle = ReferenceEditorApp.fillStyle();
     scrollStyle.background = tokens.surface;
     return new ScrollView("start-scroll", content, scrollStyle);
+  }
+
+  /** Spinner, current phase and elapsed time for a running build, with a Cancel button. */
+  static function loadingRow(app:ReferenceEditorApp, entry:ExampleEntry):View {
+    var tokens = app.appearance.theme.tokens;
+    var job = app.startJob;
+    var text = "Opening " + entry.title + "...";
+    if (job != null)
+      text += " " + job.control.currentPhase() + " · " + Std.int(job.elapsedSeconds()) + " s";
+    var rowStyle = new LayoutStyle();
+    rowStyle.width = LayoutAxis.grow();
+    rowStyle.direction = LayoutDirection.LeftToRight;
+    rowStyle.childAlignY = LayoutAlignmentY.Center;
+    rowStyle.childGap = 10.0;
+    var items:Array<KeyedView> = [
+      new KeyedView("spinner", new Spinner("start-loading-spinner", "Opening " + entry.title)),
+      new KeyedView("text", new Text(text, null, tokens.accent, TextStyleOverride.text(13.0)))
+    ];
+    if (job != null) {
+      var cancel = new Button("Cancel", null, function() app.cancelExampleLoad(), "start-cancel-load");
+      cancel.variant = ButtonVariant.Secondary;
+      items.push(new KeyedView("cancel", cancel));
+    }
+    return new Row("start-loading", items, rowStyle);
   }
 
   static function contentStyle(app:ReferenceEditorApp):LayoutStyle {

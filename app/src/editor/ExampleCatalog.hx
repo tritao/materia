@@ -1,6 +1,8 @@
 package app.editor;
 
 import app.MateriaProjectRunner;
+import app.MateriaProjectRunner.GeneratedAssemblyScene;
+import app.ProjectLoadJob;
 import app.Main.ReferenceEditorApp;
 import app.SetupScriptRegistry;
 import sys.FileSystem;
@@ -29,15 +31,15 @@ class ExampleCatalog {
   public static final entries:Array<ExampleEntry> = [
     {id: "picking-station", title: "Picking station",
       description: ["A generated cell with an", "order workflow in the Inspector"],
-      tag: "Project · builds in ~30 s",
+      tag: "Project · first build ~30 s",
       kind: Project("machinekit/examples/picking-station/materia.project.json")},
     {id: "motor-shaft-bearings", title: "Motor, shaft and bearings",
       description: ["Standard parts assembled", "from MachineKit generators"],
-      tag: "Project · builds in ~30 s",
+      tag: "Project · first build ~30 s",
       kind: Project("machinekit/examples/materia.project.json")},
     {id: "cad-modeling", title: "CAD modelling",
       description: ["Parametric sketches, extrusions", "and features in CadKit"],
-      tag: "Project · builds in ~15 s",
+      tag: "Project · first build ~15 s",
       kind: Project("cadkit/examples/modeling/materia.project.json")},
     {id: "two-robot", title: "Two robots with sensors",
       description: ["A script-owned setup: press Play", "to simulate LiDAR and IMUs"],
@@ -72,17 +74,41 @@ class ExampleCatalog {
     }
   }
 
-  /** Replaces the current document with the example. Building a project can take tens of seconds. */
+  /**
+   * Starts opening an example. A project builds on a worker thread, so its job is returned and the caller
+   * applies the result with finish() once the job is done; every other kind opens immediately and returns null.
+   */
+  public static function begin(app:ReferenceEditorApp, entry:ExampleEntry):Null<ProjectLoadJob> {
+    switch (entry.kind) {
+      case Project(path):
+        return new ProjectLoadJob(path);
+      default:
+        open(app, entry);
+        return null;
+    }
+  }
+
+  /** Replaces the current document with a built project example. */
+  public static function finish(app:ReferenceEditorApp, entry:ExampleEntry, generated:GeneratedAssemblyScene):Void {
+    var path = switch (entry.kind) {
+      case Project(projectPath): projectPath;
+      default: throw "Only project examples finish from a build";
+    };
+    app.session.openGeneratedScene(generated.objects, path, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit,
+      generated.physical, generated.recipeDocument);
+    app.documentChanged();
+    showModel(app);
+    app.log("Opened example: " + entry.title);
+  }
+
+  /** Replaces the current document with the example, blocking until it is built (headless use). */
   public static function open(app:ReferenceEditorApp, entry:ExampleEntry):Void {
     switch (entry.kind) {
       case Project(path):
-        var generated = MateriaProjectRunner.loadProject(path);
-        app.session.openGeneratedScene(generated.objects, path, generated.assembly,
-          generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-          generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument);
-        app.documentChanged();
-        showModel(app);
+        finish(app, entry, MateriaProjectRunner.loadProject(path));
+        return;
       case Script(reference):
         var scripted = app.session.openScript(reference);
         app.simulation.setBackend(scripted.backend);

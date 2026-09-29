@@ -64,7 +64,7 @@ class SimulationCommands {
     app.commands.register(new Command("sim.reset", "Simulation: Reset", transport(function() {
       app.log(simulation.reset() ? "Shared simulation reset" : "No simulation to reset");
     }), new Shortcut(UiKey.F5, UiModifier.Shift), function() return available() && simulation.isActive()));
-    app.commands.register(new Command("sim.stop", "Simulation: Stop and return to design",
+    app.commands.register(new Command("sim.stop", "Simulation: Stop and return to Design",
       transport(function() {
         simulation.clear();
         app.log("Returned to design mode");

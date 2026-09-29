@@ -3644,8 +3644,14 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
     std::unique_lock<std::mutex> cpu_lock(renderer_cpu_mutex);
     auto *renderer_slot = resolve(renderer);
     auto *session_state = resolve(session);
-    if (!renderer_slot || !session_state || !session_state->submitted)
+    if (!renderer_slot || !session_state || !session_state->submitted) {
+        // Name the failing check: a bare INVALID_HANDLE from a frame is otherwise impossible to trace.
+        std::fprintf(stderr,
+                     "UIKit render rejected the frame: renderer %s, session %s, submitted tree %s\n",
+                     renderer_slot ? "valid" : "INVALID", session_state ? "valid" : "INVALID",
+                     session_state && session_state->submitted ? "present" : "MISSING");
         return NKUI_ERROR_INVALID_HANDLE;
+    }
     if (!threaded)
         discard_stale_renderer(*renderer_slot, frame_target);
     if (!threaded && !renderer_slot->renderer) {
@@ -3687,8 +3693,15 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
         for (const auto &[node_id, list_handle] : session_state->custom_paints) {
             const auto *item = session_state->snapshot.find(node_id);
             auto *list_slot = resolve(list_handle);
-            if (!item || !list_slot)
+            if (!item || !list_slot) {
+                std::fprintf(stderr,
+                             "UIKit render rejected the frame: custom paint for node %u has %s and %s "
+                             "(display list %u)\n",
+                             node_id, item ? "a layout item" : "NO layout item",
+                             list_slot ? "a live display list" : "a DESTROYED display list",
+                             list_handle.id);
                 return NKUI_ERROR_INVALID_HANDLE;
+            }
             auto cached = session_state->custom_plan_cache.find(node_id);
             const bool cache_hit =
                 cached != session_state->custom_plan_cache.end() &&
@@ -3724,8 +3737,13 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
         }
         for (const auto &[node_id, list_handle] : session_state->custom_paint_composites) {
             auto *list_slot = resolve(list_handle);
-            if (!list_slot || !list_slot->list)
+            if (!list_slot || !list_slot->list) {
+                std::fprintf(stderr,
+                             "UIKit render rejected the frame: custom paint composite for node %u has a "
+                             "DESTROYED display list (%u)\n",
+                             node_id, list_handle.id);
                 return NKUI_ERROR_INVALID_HANDLE;
+            }
             custom_composites.emplace(node_id, list_slot->list.get());
         }
         for (const auto &[node_id, policy] : session_state->cache_policies)
@@ -3769,12 +3787,17 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
     std::vector<std::pair<nkui::TextEngine *, nkui::PreparedGlyphs *>> prepared_texts;
     uint32_t prepared_slot = 1;
     bool valid = true;
+    const char *invalid_reason = "a frame resource could not be prepared";
+    // The last resource step attempted, reported with the reason so a failure can be traced to one step.
+    const char *frame_stage = "start";
     for (auto &pass : plan.passes) {
         if (pass.kind == nkui::RenderPassKind::Mask && pass.mask.kind == nkui::MaskKind::Image) {
+            frame_stage = "mask image";
             auto *image =
                 resolve_retained(nkui_resource{pass.mask.image.value}, nkui::ResourceKind::Image);
             if (!image) {
                 valid = false;
+                invalid_reason = "a mask image resource was destroyed";
                 break;
             }
             auto prepared = std::make_shared<nkui::PreparedTexture>();
@@ -3810,11 +3833,14 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                                             static_cast<uint64_t>(pass.mask.image.value)))
                 sealable = false;
         }
+        // Commands whose path has nothing to draw are removed from the pass once it has been walked.
+        std::vector<size_t> dropped_commands;
         for (auto &command : pass.commands) {
             if (!command.custom_payload)
                 continue;
             if (command.kind == nkui::RenderCommandKind::Path ||
                 command.kind == nkui::RenderCommandKind::StrokePath) {
+                frame_stage = "custom path: resolve resources";
                 auto *path = resolve_retained(nkui_resource{command.resource.value},
                                               nkui::ResourceKind::Path);
                 auto *paint = command.paint.value
@@ -3824,26 +3850,51 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                 if (!path || (command.paint.value && !paint) ||
                     prepared_slot > std::numeric_limits<uint16_t>::max()) {
                     valid = false;
+                    invalid_reason = !path ? "a custom-paint path resource was destroyed"
+                                     : (command.paint.value && !paint)
+                                         ? "a custom-paint paint resource was destroyed"
+                                         : "too many prepared resources in one frame";
                     break;
                 }
                 const auto transform = command.transform;
                 const auto tessellation = tessellation_transform(transform);
                 const nkui_resource path_handle{command.resource.value};
+                frame_stage = "custom path: prepare cached geometry";
                 const auto cached =
                     prepare_cached_path(*renderer_slot, path_handle, *path, tessellation,
                                         frame_info->pixel_scale, command);
-                if (!cached) {
-                    valid = false;
-                    break;
-                }
                 auto prepared = std::make_shared<nkui::PreparedPath>();
                 const auto kind = command.kind == nkui::RenderCommandKind::StrokePath
                                       ? nkui::PreparedPathKind::Stroke
                                       : nkui::PreparedPathKind::Fill;
-                if (!prepared ||
-                    !prepared->set_view(kind, cached->geometry, paint_color(paint, tessellation))) {
+                if (!prepared) {
                     valid = false;
+                    invalid_reason = "out of memory preparing a custom-paint path";
                     break;
+                }
+                // A path that tessellates to nothing (empty, degenerate, or collapsed by its transform)
+                // has nothing to draw. Skip it: failing here would reject the whole frame and end the app.
+                if (!cached ||
+                    !prepared->set_view(kind, cached->geometry, paint_color(paint, tessellation))) {
+                    static uint32_t skipped_reports = 0;
+                    if (skipped_reports < 8) {
+                        ++skipped_reports;
+                        std::fprintf(stderr,
+                                     "UIKit render skipped a custom %s path with no drawable geometry "
+                                     "(width %g, device scale %g, transform %g %g %g %g %g %g)\n",
+                                     command.kind == nkui::RenderCommandKind::StrokePath ? "stroke"
+                                                                                         : "fill",
+                                     static_cast<double>(command.stroke_width),
+                                     static_cast<double>(frame_info->pixel_scale),
+                                     static_cast<double>(tessellation[0]),
+                                     static_cast<double>(tessellation[1]),
+                                     static_cast<double>(tessellation[2]),
+                                     static_cast<double>(tessellation[3]),
+                                     static_cast<double>(tessellation[4]),
+                                     static_cast<double>(tessellation[5]));
+                    }
+                    dropped_commands.push_back(static_cast<size_t>(&command - pass.commands.data()));
+                    continue;
                 }
                 auto *prepared_path = prepared.get();
                 custom_paths.push_back(std::move(prepared));
@@ -3851,6 +3902,7 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     nkui::ResourceKind::Path, 0x0FFD, static_cast<uint16_t>(prepared_slot++));
                 command.resource = prepared_id;
                 command.transform = placement_transform(transform);
+                frame_stage = "custom path: bind";
                 valid = frame_resources.bind_path(prepared_id, *prepared_path, 0,
                                                   static_cast<uint64_t>(path_handle.id));
                 if (valid && !owned_resources.bind_path(prepared_id, custom_paths.back(), 0,
@@ -3858,10 +3910,13 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     sealable = false;
             } else if (command.kind == nkui::RenderCommandKind::Image) {
                 const uint32_t source_resource = command.resource.value;
+                frame_stage = "custom image: resolve resource";
                 auto *image = resolve_retained(nkui_resource{command.resource.value},
                                                nkui::ResourceKind::Image);
                 if (!image || prepared_slot > std::numeric_limits<uint16_t>::max()) {
                     valid = false;
+                    invalid_reason = !image ? "a custom-paint image resource was destroyed"
+                                            : "too many prepared resources in one frame";
                     break;
                 }
                 auto prepared = std::make_shared<nkui::PreparedTexture>();
@@ -3886,6 +3941,7 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                 const auto prepared_id = nkui::make_resource_id(
                     nkui::ResourceKind::Image, 0x0FFD, static_cast<uint16_t>(prepared_slot++));
                 command.resource = prepared_id;
+                frame_stage = "custom image: bind";
                 valid = frame_resources.bind_image(prepared_id, *prepared_image,
                                                    static_cast<uint64_t>(source_resource));
                 if (valid && !owned_resources.bind_image(prepared_id, custom_images.back(),
@@ -3893,11 +3949,15 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     sealable = false;
             } else if (command.kind == nkui::RenderCommandKind::GlyphBatch) {
                 const uint32_t source_resource = command.resource.value;
+                frame_stage = "custom glyph batch: resolve text layout";
                 auto *layout = resolve_retained(nkui_resource{command.resource.value},
                                                 nkui::ResourceKind::TextLayout);
                 if (!layout || !layout->text ||
                     prepared_slot > std::numeric_limits<uint16_t>::max()) {
                     valid = false;
+                    invalid_reason = !layout ? "a custom-paint text layout resource was destroyed"
+                                     : !layout->text ? "a custom-paint text layout has no text engine"
+                                                     : "too many prepared resources in one frame";
                     break;
                 }
                 float requested_scale = 1.0f;
@@ -3944,6 +4004,7 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                 prepared_texts.push_back({layout->text.get(), glyphs});
                 const auto prepared_id = nkui::make_resource_id(
                     nkui::ResourceKind::TextLayout, 0x0FFD, static_cast<uint16_t>(prepared_slot++));
+                frame_stage = "custom glyph batch: bind glyphs";
                 valid = frame_resources.bind_text(prepared_id, *glyphs,
                                                   (static_cast<uint64_t>(source_resource) << 32) ^
                                                       layout->text->layout_generation() ^
@@ -3962,20 +4023,25 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                 command.resource = prepared_id;
                 retain_text_engine(layout->text, text_engines, text_engine_owners);
             } else if (command.kind == nkui::RenderCommandKind::CompositeTarget) {
+                frame_stage = "composite target: check resource id";
                 if (!nkui::is_resource_id(command.resource, nkui::ResourceKind::RenderTarget)) {
                     valid = false;
+                    invalid_reason = "a composite target is not a render target resource";
                     break;
                 }
                 const uint16_t target_slot = static_cast<uint16_t>(command.resource.value);
                 if (target_slot < nkui::kFirstTransientRenderTargetSlot &&
                     command.resource.value != compile_target.value) {
+                    frame_stage = "composite target: resolve retained render target";
                     auto *surface_slot = resolve_retained(nkui_resource{command.resource.value},
                                                           nkui::ResourceKind::RenderTarget);
                     if (!surface_slot) {
                         valid = false;
+                        invalid_reason = "a composited render target was destroyed";
                         break;
                     }
                     if (surface_slot->graphics_image.id) {
+                        frame_stage = "composite target: bind graphics image";
                         valid = frame_resources.bind_graphics_image(command.resource,
                                                                     surface_slot->graphics_image);
                         if (valid && !owned_resources.bind_graphics_image(
@@ -3986,12 +4052,14 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                         if (published.id) {
                             const auto generation =
                                 static_cast<uint64_t>(surface_slot->surface->generation());
+                            frame_stage = "composite target: bind published surface image";
                             valid = frame_resources.bind_graphics_image(command.resource, published,
                                                                         generation);
                             if (valid && !owned_resources.bind_graphics_image(
                                              command.resource, published, generation))
                                 sealable = false;
                         } else {
+                            frame_stage = "composite target: bind live surface";
                             valid = frame_resources.bind_surface(command.resource,
                                                                  *surface_slot->surface);
                             /* A live result producer is a callback and cannot be sealed. */
@@ -4003,11 +4071,16 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
             if (!valid)
                 break;
         }
+        for (auto dropped = dropped_commands.rbegin(); dropped != dropped_commands.rend(); ++dropped)
+            pass.commands.erase(pass.commands.begin() + static_cast<std::ptrdiff_t>(*dropped));
         if (!valid)
             break;
     }
-    if (!valid)
+    if (!valid) {
+        std::fprintf(stderr, "UIKit render rejected the frame: %s (last step: %s)\n", invalid_reason,
+                     frame_stage);
         return NKUI_ERROR_INVALID_HANDLE;
+    }
     for (auto &[engine, glyphs] : prepared_texts)
         if (!engine->prepared_glyphs_current(*glyphs) &&
             !engine->prepare_glyphs(glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale,
