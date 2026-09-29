@@ -15,6 +15,7 @@ typedef HumanJobStep = {
   @:optional var object:String;
   @:optional var onto:String;
   @:optional var offset:Array<Float>;
+  @:optional var retreat:String;
   @:optional var hand:String;
   @:optional var seconds:Float;
   @:optional var clip:String;
@@ -80,7 +81,7 @@ class HumanJobSpec {
           Reflect.setField(clean, "object", id);
           Reflect.setField(clean, "hand", hand);
         case "place":
-          fields(step, ["action", "onto", "offset", "hand"], label);
+          fields(step, ["action", "onto", "offset", "hand", "retreat"], label);
           var onto = string(step, "onto", label);
           var hand = hand(step, label);
           var part:Null<String> = null;
@@ -94,6 +95,12 @@ class HumanJobSpec {
           Reflect.setField(clean, "onto", onto);
           Reflect.setField(clean, "hand", hand);
           if (Reflect.hasField(step, "offset")) Reflect.setField(clean, "offset", point(step, "offset", label));
+          if (Reflect.hasField(step, "retreat")) {
+            var retreat = string(step, "retreat", label);
+            if (retreat != "backward" && retreat != "turn")
+              throw '$label.retreat must be "backward" or "turn"';
+            Reflect.setField(clean, "retreat", retreat);
+          }
         case "press":
           fields(step, ["action", "target", "hand"], label);
           var target = Reflect.field(step, "target");
@@ -154,6 +161,8 @@ class HumanJobSpec {
           Reflect.setField(value,"hand",Reflect.field(step,"hand"));
           var offset:Dynamic = Reflect.field(step,"offset");
           if (offset != null) Reflect.setField(value,"offset",offset);
+          var retreat:Dynamic = Reflect.field(step,"retreat");
+          if (retreat != null) Reflect.setField(value,"retreat",retreat);
         case "wait": Reflect.setField(value,"seconds",Reflect.field(step,"seconds"));
         case "playClip":
           Reflect.setField(value,"clip",Reflect.field(step,"clip"));
@@ -200,7 +209,7 @@ class HumanJobSpec {
           if (shoulder != null) {
             var reach = 0.8 *(body.description.upperArm + body.description.forearm);
             if (z - shoulder[2] >= reach) warnings.push('step $index: target above reach');
-            if (shoulder[2] - z >= reach) warnings.push('step $index: target below waist');
+            if (shoulder[2] - z >= reach) warnings.push('step $index: target below standing arm reach');
           }
         }
       }

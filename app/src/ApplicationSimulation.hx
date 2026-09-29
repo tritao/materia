@@ -70,13 +70,13 @@ class ApplicationSimulation {
   var simulatedIds:Array<String> = [];
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
+  var robotMotions:Array<RobotMotionTrack> = [];
   var humanWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter,asset:AnimationAsset}> = [];
   var humanSignalsById:Map<String, HumanWorkerSignals> = new Map();
   var workerWarningsById:Map<String, Array<String>> = new Map();
   var humanScene:Null<EditorScene> = null;
   var assemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
   var running:Bool = false;
-  public var demoArmMotion:Bool = false;
   var presentAssemblyPhysics:Bool = false;
   var presentationEpoch:Int = 0;
   final participants:Array<SessionParticipant> = [];
@@ -158,6 +158,7 @@ class ApplicationSimulation {
         candidateLinks.push([for (link in editable.model.links) link.id]);
         candidateRobotModels.push(editable.model);
       }
+      var candidateMotions = session == null ? [] : session.robotMotions;
       if (assembly != null) {
         var physical = session == null ? null : session.projectPhysical;
         if (physical == null) throw "Assembly physical properties are unavailable";
@@ -252,6 +253,19 @@ class ApplicationSimulation {
             linkIndex: linkIndex, center: [for (coordinate in center) coordinate *
               physical.metresPerUnit]});
         }
+      }
+      for (track in candidateMotions) {
+        var index = -1;
+        for (i in 0...candidateRobots.length)
+          if (candidateRobots[i].id() == track.robotId) { index = i; break; }
+        if (index < 0) throw 'Robot motion names unknown robot "${track.robotId}"';
+        var joints = candidateRobotModels[index].joints;
+        if (track.joint >= joints.length)
+          throw 'Robot motion joint ${track.joint} is missing from "${track.robotId}"';
+        var limits = joints[track.joint].limits;
+        if (limits.lower < limits.upper) for (key in track.keys)
+          if (key.position < limits.lower || key.position > limits.upper)
+            throw 'Robot motion exceeds joint ${track.joint} limits';
       }
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
@@ -364,10 +378,9 @@ class ApplicationSimulation {
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
+      robotMotions = candidateMotions.copy();
       humanWorkers = candidateWorkers;
       workerWarningsById = candidateWorkerWarnings;
-      if (demoArmMotion && !Lambda.exists(workerRecords, function(record) return record.id == "worker-demo"))
-        demoArmMotion = false;
       humanSignalsById.clear();
       humanScene = scene;
       assemblyParts = candidateAssemblyParts;
@@ -468,13 +481,21 @@ class ApplicationSimulation {
   /** Feed worker keyframes from simulation time, also during realtime sessions. */
   public function advanceWorkers():Void {
     var scene = humanScene;
-    if (scene == null) return;
-    var activeSpace = space;
-    if (demoArmMotion && activeSpace != null) {
-      var robot = world.robot("materia/robot");
-      if (robot != null) robot.submit(RobotCommand.JointTargets(
-        [JointTarget.position(0, 0.6 * Math.sin(activeSpace.session.simulationTime() * 2.0))], null));
+    var active = space;
+    if (active != null) {
+      var commands = new Map<String, Array<JointTarget>>();
+      for (track in robotMotions) {
+        var targets = commands.get(track.robotId);
+        if (targets == null) { targets = []; commands.set(track.robotId, targets); }
+        targets.push(JointTarget.position(track.joint,
+          track.sample(active.session.simulationTime())));
+      }
+      for (id in commands.keys()) {
+        var robot = world.robot(id);
+        if (robot != null) robot.submit(RobotCommand.JointTargets(commands.get(id), null));
+      }
     }
+    if (scene == null) return;
     for (entry in humanWorkers) {
       entry.worker.advance();
       var matrix = entry.worker.body.rootTransform();
@@ -490,6 +511,10 @@ class ApplicationSimulation {
   public function isActive():Bool return simulation!=null;
   /** The live session, for people and other participants that join it. */
   public function activeSession():Null<SimSession> { var active = space; return active == null ? null : active.session; }
+  public function environmentObject(id:String):Null<SimObject> {
+    for (item in simulatedObjects) if (item.id == id) return item.object;
+    return null;
+  }
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   /** Captures physics poses once, then combines the matching frame's world publications. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
@@ -569,6 +594,7 @@ class ApplicationSimulation {
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
+    robotMotions = [];
     assemblyParts.resize(0);
     collisionWarnings = [];
     presentAssemblyPhysics = false;

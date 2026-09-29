@@ -6,22 +6,25 @@ class WalkTo extends HumanActionBase {
 	final point:Null<Array<Float>>;
 	final path:Null<Array<Array<Float>>>;
 	final pointProvider:Null<Void->Array<Float>>;
+	final preserveFacing:Bool;
 
 	/** Resolve a destination from the worker's pose when this action starts. */
-	public static function deferred(pointProvider:Void->Array<Float>, speed:Float):WalkTo
-		return new WalkTo(null, speed, null, pointProvider);
+	public static function deferred(pointProvider:Void->Array<Float>, speed:Float,
+		preserveFacing:Bool = false):WalkTo
+		return new WalkTo(null, speed, null, pointProvider, preserveFacing);
 
 	public static function along(path:Array<Array<Float>>, speed:Float,
 		?destination:Void->Array<Float>):WalkTo
 		return new WalkTo(null, speed, path, destination);
 
 	public function new(point:Null<Array<Float>>, speed:Float, ?path:Array<Array<Float>>,
-		?pointProvider:Void->Array<Float>) {
+		?pointProvider:Void->Array<Float>, preserveFacing:Bool = false) {
 		super();
 		this.point = point == null ? null : point.copy();
 		this.path = path == null ? null : [for (p in path) p.copy()];
 		this.speed = speed;
 		this.pointProvider = pointProvider;
+		this.preserveFacing = preserveFacing;
 	}
 
 	override public function start(worker:HumanBody):Void {
@@ -60,7 +63,8 @@ class WalkTo extends HumanActionBase {
 			done = true;
 			return;
 		}
-		worker.walker.continueAlong(route, speed);
+		if (preserveFacing) worker.walker.retreatAlong(route, speed);
+		else worker.walker.continueAlong(route, speed);
 	}
 
 	override public function isDone():Bool

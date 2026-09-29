@@ -1,6 +1,6 @@
 # Rack-to-table worker demo
 
-The app and the headless app acceptance test run the same MuJoCo session: a worker fetches the part from rack slot B3, carries it through a waypoint and a turn for more than 2.5 m to the assembly table, and releases it directly from the hand while the demo drives a jointed robot arm nearby. `app/tests/src/tests/WorkerDemoTests.hx` asserts that the part settles within 2 cm of its table target, checks for jumps during delivery near the table and confirms that this check ran, verifies the worker finishes outside the rack, and checks that robot link pose and separation vary during the cycle. There is no target correction after release.
+The app and the headless app acceptance test run the same MuJoCo session: a worker fetches the part from rack slot B3, carries it through a waypoint and a turn for more than 2.5 m to the assembly table, and releases it directly from the hand while the example document's robot motion track cycles a jointed arm nearby. `app/tests/src/tests/WorkerDemoTests.hx` asserts that the part settles within 2 cm of its table target, checks for jumps during delivery near the table and confirms that this check ran, verifies the worker finishes outside the rack, and checks that robot link pose and separation vary during the cycle. There is no target correction after release.
 
 Run the command-line scenario from the worktree root after building the app:
 

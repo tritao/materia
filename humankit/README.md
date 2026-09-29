@@ -127,7 +127,8 @@ saved job can be reopened without Haxe code:
 ```
 
 Available actions are `walkTo` (an object or XY point, with optional `via`
-points), `pick`, `place` (optional XY `offset` on the support), `press` (object
+points), `pick`, `place` (optional XY `offset` on the support and
+`retreat: "backward"` to keep facing the part for the first step away), `press` (object
 anchor or XYZ point), `wait` (seconds), and `playClip` (clip and seconds).
 Pick and place hands can be `left`, `right`, or `both`. The parser rejects unknown fields,
 invalid pick and place sequences, and unsupported versions. `toJson()` writes

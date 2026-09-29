@@ -63,7 +63,8 @@ class HumanJobBuilder {
             if (Math.abs(dx) >= Math.abs(dy))
               return [point[0] + (dx >= 0 ? 0.8 : -0.8), root[13]];
             return [root[12], point[1] + (dy >= 0 ? 0.8 : -0.8)];
-          }, 1.0));
+          }, 1.0, Reflect.field(step, "retreat") == "backward"));
+          for (hand in heldHands) job.add(new ReleaseLimb(hand, 0.2));
           job.add(WalkTo.deferred(function() {
             var root = body.rootTransform();
             var dx = root[12] - point[0], dy = root[13] - point[1];

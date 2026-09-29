@@ -62,6 +62,7 @@ class ProjectDocumentSession {
     return value == null ? null : value.copy();
   }
   public var customMaterials(default, null):Array<MaterialDef> = [];
+  public var robotMotions(default, null):Array<RobotMotionTrack> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
@@ -122,7 +123,7 @@ class ProjectDocumentSession {
         scriptOwnership == null ? null : scriptOwnership.record(), bim,
         project == null ? null : project.record,
         project == null ? null : project.authored, customMaterials,
-        recipeDocument == null ? null : DocumentCodec.encode(recipeDocument)),
+        recipeDocument == null ? null : DocumentCodec.encode(recipeDocument), robotMotions),
       dirty: isDirty()});
   }
 
@@ -138,11 +139,13 @@ class ProjectDocumentSession {
 
   function openContent(absolute:String, text:String):Void {
     var root = SceneCodec.parse(text);
+    var loadedMotions = RobotMotionTrack.decode(Reflect.field(root, "robotMotions"));
     var loadedMaterials = SceneCodec.decodeCustomMaterialsRoot(root);
     var project = SceneCodec.decodeProjectRoot(root);
     if (project != null) {
       openProjectDocument(absolute, root, project, loadedMaterials);
       customMaterials = loadedMaterials;
+      robotMotions = loadedMotions;
       return;
     }
     var script=SceneCodec.decodeScriptRoot(root);
@@ -161,6 +164,7 @@ class ProjectDocumentSession {
       }
       replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);
       customMaterials = loadedMaterials;
+      robotMotions = loadedMotions;
       return;
     }
     var data = SceneCodec.decodeRoot(root);
@@ -176,6 +180,7 @@ class ProjectDocumentSession {
     catch (error:Dynamic) { next.dispose(); if (nextSensors != null) nextSensors.dispose(); throw error; }
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
     customMaterials = loadedMaterials;
+    robotMotions = loadedMotions;
   }
 
   public function openScript(reference:String):ScriptMaterialization {
@@ -541,9 +546,12 @@ class ProjectDocumentSession {
       var bounds:Array<Float>;
       try bounds = app.editor.HumanWorkerKind.boundsFor(asset)
       catch (_:Dynamic) bounds = app.editor.HumanWorkerKind.boundsFor(app.editor.HumanWorkerKind.DEFAULT_ASSET);
+      var yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]),
+        1 - 2 * (q[1] * q[1] + q[2] * q[2]));
       data.push({id:uniqueId, label:id, type:"human-worker", x:p[0], y:p[1], z:0.0,
         width:bounds[3]-bounds[0], height:bounds[4]-bounds[1], depth:bounds[5]-bounds[2], collisionEnabled:false, dynamicBody:false,
-        mass:1.0, red:0.7, green:0.7, blue:0.7, visible:true, rotation:q.copy(),
+        mass:1.0, red:0.7, green:0.7, blue:0.7, visible:true,
+        rotation:[0.0, 0.0, Math.sin(yaw / 2), Math.cos(yaw / 2)],
         worker:{asset:asset, job:'{"version":1,"loop":false,"steps":[]}', zones:[],
           migrationNote:note}});
     }
@@ -558,7 +566,7 @@ class ProjectDocumentSession {
       scriptOwnership==null?null:scriptOwnership.record(), bim,
       project == null ? null : project.record,
       project == null ? null : project.authored, customMaterials,
-      recipeDocument == null ? null : DocumentCodec.encode(recipeDocument)));
+      recipeDocument == null ? null : DocumentCodec.encode(recipeDocument), robotMotions));
     // Do not move the savepoint or change the document path until publication succeeds.
     path = absolute;
     document.markSaved();
@@ -609,6 +617,7 @@ class ProjectDocumentSession {
     projectAssemblyState = null;
     projectPhysical = null;
     customMaterials = [];
+    robotMotions = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

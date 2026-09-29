@@ -84,7 +84,19 @@ class HumanWorkerKind implements ObjectKindProvider {
     var raw:Dynamic = haxe.Json.parse(data.job);
     var steps:Array<Dynamic> = Reflect.field(raw, "steps");
     if (index < 0 || index >= steps.length) throw "Worker step no longer exists";
-    if (field == "action") steps[index] = defaultStep(value);
+    if (field == "action") {
+      var hand = "right";
+      if (value == "place") {
+        var held:Array<String> = [];
+        for (i in 0...index) {
+          var prior = steps[i], action:String = Reflect.field(prior, "action");
+          if (action == "pick") held.push(Reflect.field(prior, "hand"));
+          if (action == "place") held.remove(Reflect.field(prior, "hand"));
+        }
+        if (held.length > 0) hand = held[held.length - 1];
+      }
+      steps[index] = defaultStep(value, hand);
+    }
     else {
       if (field == "hand") {
         var action:String = Reflect.field(steps[index], "action");
@@ -173,10 +185,10 @@ class HumanWorkerKind implements ObjectKindProvider {
       }, options));
   }
 
-  static function defaultStep(action:String):Dynamic return switch action {
+  static function defaultStep(action:String, hand:String = "right"):Dynamic return switch action {
     case "walkTo": {action:"walkTo", target:{point:[0.0, 0.0]}};
     case "pick": {action:"pick", object:"part", hand:"right"};
-    case "place": {action:"place", onto:"table", hand:"right"};
+    case "place": {action:"place", onto:"table", hand:hand};
     case "press": {action:"press", target:{object:"button", anchor:"top"}, hand:"right"};
     case "wait": {action:"wait", seconds:1.0};
     case "playClip": {action:"playClip", clip:"Wave", seconds:1.0};

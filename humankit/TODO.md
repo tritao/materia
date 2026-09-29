@@ -24,7 +24,11 @@ as scene objects, jobs as versioned JSON). These come after it.
 - Path planning and obstacle avoidance around machines and racks; yielding to
   other workers and AGVs at lanes and intersections. Routes are followed
   blindly.
-- Crouching and kneeling. `ApproachFor` fails for targets below the waist.
+- The automatic step-back after placement does not avoid support or zone boxes;
+  author a clear retreat route until obstacle-aware planning is available.
+- A dedicated backward gait for short retreats; the current backward retreat
+  keeps the heading and idle pose while translating away from the part.
+- Crouching and kneeling. `ApproachFor` fails below standing arm reach.
 - A carry clip and gait for two-handed carrying of larger parts.
 - Look-at for head and eyes (needs aim IK from AnimKit, see its TODO).
 - Hand orientation. IK sets the wrist position only, so a part keeps the

@@ -390,22 +390,18 @@ class HumanWorker {
 	}
 
 	/**
-	 * True when no body capsule, at the current animation pose, comes
+	 * True when no hand or forearm capsule, at the current animation pose, comes
 	 * within the object's bounding sphere (plus 5 mm).
 	 */
 	function handsClear(object:SimObject):Bool {
 		var frame = session.capture();
 		var pose = frame.objectPose(object);
 		frame.dispose();
-		// Turning into the retreat can sweep an arm across a freshly released part.
-		// Keep it pinned until the whole worker has moved beyond that sweep.
-		var root = body.rootTransform();
-		var rootDistance = Math.sqrt(Math.pow(root[12]-pose.x,2) + Math.pow(root[13]-pose.y,2));
-		if (rootDistance < 1.0) return false;
 		var reach = object.shape.boundingRadius() + 0.005;
 		var placements = actor.proxy.place(body.character.pose, body.rootTransform());
 		for (index in 0...actor.proxy.capsules.length) {
 			var capsule = actor.proxy.capsules[index];
+			if (capsule.name.indexOf("hand") < 0 && capsule.name.indexOf("forearm") < 0) continue;
 			var placement = placements[index];
 			var centre = new SimPose(placement.center[0], placement.center[1], placement.center[2],
 				placement.rotation[0], placement.rotation[1], placement.rotation[2], placement.rotation[3]);

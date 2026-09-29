@@ -145,6 +145,7 @@ class HumanKitTests {
 			'{"version":1,"loop":false,"steps":[{"action":"pick","object":"part","hand":"foot"}]}',
 			'{"version":1,"loop":false,"steps":[{"action":"place","onto":"table"}]}',
 			'{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"},{"action":"pick","object":"part"}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"wait","seconds":1,"unexpected":true}]}',
 			'{"version":1,"loop":false,"steps":[],"future":3}'
 		]) {
 			var rejected = false;
@@ -156,6 +157,11 @@ class HumanKitTests {
 		catch (error:Dynamic) missingPickError = Std.string(error);
 		if (missingPickError.indexOf("step 0.object") < 0)
 			throw 'Missing pick error lost its field path: $missingPickError';
+		var unknownStepError = "";
+		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"wait","seconds":1,"unexpected":true}]}')
+		catch (error:Dynamic) unknownStepError = Std.string(error);
+		if (unknownStepError.indexOf('step 0 has unknown field "unexpected"') < 0)
+			throw 'Unknown step field error lost its field path: $unknownStepError';
 		var warningSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"object":"missing"}},{"action":"playClip","clip":"NoSuchClip","seconds":1}]}');
 		var warnings = HumanJobSpec.check(warningSpec, targets, body);
 		if (warnings.length != 2 || warnings[0].indexOf('step 0: unknown object "missing"') < 0 ||
@@ -198,12 +204,14 @@ class HumanKitTests {
 		var animationBuilt = HumanJobBuilder.build(spec, targets, body);
 		var animation = animationBuilt.job;
 		var animationPick:Pick = cast animationBuilt.holds[0].action;
+		var animationPlace:Place = cast animationBuilt.holds[1].action;
 		for (tick in 0...3000) {
 			if (animation.isDone()) break;
 			animation.advance(0.02);
 		}
-		if (!animation.isDone() || animation.failure() != null || !animationPick.grip || animationPick.pickError > 0.02)
-			throw 'Built animation failed: ${animation.failure()}, pick miss ${animationPick.pickError}';
+		if (!animation.isDone() || animation.failure() != null || !animationPick.grip ||
+			animationPick.pickError > 0.02 || animationPlace.grip || animationPlace.placementError > 0.02)
+			throw 'Built animation failed: ${animation.failure()}, pick miss ${animationPick.pickError}, place miss ${animationPlace.placementError}';
 		human.dispose();
 	}
 
@@ -688,7 +696,7 @@ class HumanKitTests {
 		var tooLow = new HumanJob(unreachableBody).add(new ApproachFor([0.5, 0.0, 0.1], ArmR));
 		tooLow.advance(step);
 		var lowReason = tooLow.failure();
-		if (lowReason == null || lowReason.indexOf("below waist") < 0)
+		if (lowReason == null || lowReason.indexOf("below standing arm reach") < 0)
 			throw 'A low target did not explain its failure: $lowReason';
 		var cancel = new HumanJob(unreachableBody).add(new Reach(ArmR, [0.4, -0.2, 1.3], 0.1))
 			.add(new Wait(1.0)).add(new ReleaseLimb(ArmR, 0.1));

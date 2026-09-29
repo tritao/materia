@@ -903,7 +903,6 @@ class ReferenceEditorApp implements DesktopUiApplication {
       break;
     }
     simulation.setBackend(ApplicationSimulation.MUJOCO);
-    simulation.demoArmMotion = true;
     if (!simulation.rebuild(sensors, scene, session))
       throw 'Worker demo simulation failed: ${simulation.error}';
     for (_ in 0...advanceTicks) simulation.step();

@@ -63,6 +63,21 @@ class WorkerObjectTests {
         Reflect.field(paired.steps[1],"hand") == "left", "hand edit updates pick and place together");
       check(app.scene.document.undo() && worker(app.scene,workerId).job.indexOf('"hand":"right"') >= 0,
         "undo restores both paired hands");
+      app.scene.setWorkerData(workerId, {asset:createdWorker.asset,
+        job:'{"version":1,"loop":false,"steps":[{"action":"pick","object":"'+targetId+'","hand":"left"},{"action":"wait","seconds":1}]}',
+        zones:[targetId]});
+      app.editor.HumanWorkerKind.selectStep(workerId, 1);
+      var action:Null<nativekit.ui.properties.PropertyDescriptor> = null;
+      for (field in app.scene.properties())
+        if (StringTools.endsWith(field.id, "worker-step-1-action")) action = field;
+      if (action == null) throw "Missing second worker step action";
+      switch new PropertyBinding(action, app.scene.context()).apply(PropertyValue.Enum("place")) {
+        case Rejected(message): throw 'Changing wait to place rejected: $message';
+        case Applied, Unchanged:
+      }
+      var defaulted = humankit.HumanJobSpec.parse(worker(app.scene,workerId).job);
+      check(Reflect.field(defaulted.steps[1], "hand") == "left",
+        "new place defaults to the preceding pick hand");
       var choice = property(app.scene,"Pick object");
       check(choice.type == PropertyType.Enum && choice.option(targetId) != null,
         "inspector lists scene object IDs in the pick dropdown");

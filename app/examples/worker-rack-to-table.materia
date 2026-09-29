@@ -127,7 +127,7 @@
       "width": 0.6379895508289337,
       "worker": {
         "asset": "animkit/assets/quaternius/worker.glb",
-        "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\"},{\"action\":\"walkTo\",\"target\":{\"point\":[1.0,1.1]}},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\"}]}",
+        "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\"},{\"action\":\"walkTo\",\"target\":{\"point\":[1.0,1.1]}},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\",\"offset\":[0.1,-0.05],\"retreat\":\"backward\"}]}",
         "migrationNote": null,
         "zones": [
           "worker-demo-rack",
@@ -689,5 +689,35 @@
     "relationships": [],
     "output": null
   },
-  "recipeDocument": null
+  "recipeDocument": null,
+  "robotMotions": [
+    {
+      "version": 1,
+      "robotId": "materia/robot",
+      "joint": 0,
+      "loop": true,
+      "keys": [
+        {
+          "time": 0,
+          "position": 0
+        },
+        {
+          "time": 1.5,
+          "position": 0.6
+        },
+        {
+          "time": 3,
+          "position": 0
+        },
+        {
+          "time": 4.5,
+          "position": -0.6
+        },
+        {
+          "time": 6,
+          "position": 0
+        }
+      ]
+    }
+  ]
 }

@@ -12,6 +12,7 @@ class WorkerDemoTests {
 
   static function run():Void {
     linkBounds();
+    motionCodec();
     migration();
     var editor = new ReferenceEditorApp();
     editor.enableWorkerDemo();
@@ -24,11 +25,24 @@ class WorkerDemoTests {
       "app/examples/worker-rack-to-table.materia"));
     if (saved.indexOf('"human-worker"') < 0 || saved.indexOf('"humans"') >= 0)
       throw "Example does not use document workers exclusively";
+    var example:Dynamic = haxe.Json.parse(saved);
+    var motion:Array<Dynamic> = Reflect.field(example, "robotMotions");
+    if (motion == null || motion.length != 1)
+      throw "Example has no document-owned robot motion";
+    var authored = [for (record in editor.scene.records()) if (record.id == "worker-demo") record][0];
+    if (authored.worker == null || authored.worker.job.indexOf('"offset":[0.1,-0.05]') < 0)
+      throw "Acceptance example does not exercise a placement offset";
     var sawRack = false, sawTable = false, leftRack = false, separationCount = 0;
     var inRackAtEnd = false, checkedJump = false;
     var minSeparation = Math.POSITIVE_INFINITY, maxSeparation = 0.0;
     var firstLink:Null<Array<Float>> = null, linkTravel = 0.0;
     var previousPart:Null<Array<Float>> = null;
+    var sawHeld = false, sawRelease = false, releaseDistance = Math.POSITIVE_INFINITY;
+    var partObject = editor.simulation.environmentObject("worker-demo-part");
+    if (partObject == null) throw "Part has no simulation body";
+    if (partObject.motion != nativekit.sim.MotionType.Dynamic)
+      throw "Placed part is not dynamic";
+    var noCarrier = editor.simulation.activeSession().objectCarrier(partObject);
     worker.onTick = function(_, signals:HumanWorkerSignals) {
       if (signals.zones.indexOf("worker-demo-rack") >= 0) sawRack = true;
       if (sawRack && signals.zones.indexOf("worker-demo-rack") < 0) leftRack = true;
@@ -42,6 +56,16 @@ class WorkerDemoTests {
     };
     for (tick in 0...1800) {
       editor.simulation.step();
+      var carrier = editor.simulation.activeSession().objectCarrier(partObject);
+      if (carrier != noCarrier) sawHeld = true;
+      if (sawHeld && carrier == noCarrier && !sawRelease) {
+        sawRelease = true;
+        var root = worker.body.rootTransform();
+        var partAtRelease = [for (item in editor.simulation.environmentVisualState())
+          if (item.id == "worker-demo-part") item.position][0];
+        releaseDistance = Math.sqrt(Math.pow(root[12] - partAtRelease[0], 2) +
+          Math.pow(root[13] - partAtRelease[1], 2));
+      }
       var link = editor.simulation.visualState()[0].links[1].rotation;
       if (firstLink == null) firstLink = link.copy();
       linkTravel = Math.max(linkTravel, Math.sqrt(Math.pow(link[0]-firstLink[0],2) +
@@ -72,17 +96,24 @@ class WorkerDemoTests {
       if (item.id == "worker-demo-part") item][0];
     var table = [for (item in editor.scene.records()) if (item.id == "worker-demo-table") item][0];
     var part = [for (item in editor.scene.records()) if (item.id == "worker-demo-part") item][0];
-    var horizontal = Math.sqrt(Math.pow(pose.position[0] - table.x, 2) +
-      Math.pow(pose.position[1] - table.y, 2));
+    var horizontal = Math.sqrt(Math.pow(pose.position[0] - (table.x + 0.1), 2) +
+      Math.pow(pose.position[1] - (table.y - 0.05), 2));
     var vertical = Math.abs(pose.position[2] - (table.z + table.depth / 2 + part.depth / 2));
     var tilt = Math.sqrt(pose.rotation[0] * pose.rotation[0] + pose.rotation[1] * pose.rotation[1]);
-    if (!worker.currentJobDone() || worker.currentJobFailure() != null ||
+    if (!sawRelease || releaseDistance >= 1.0 || !worker.currentJobDone() ||
+        worker.currentJobFailure() != null ||
         horizontal > 0.02 || vertical > 0.01 || restingSpeed > 0.001 || tilt > 0.02)
       throw 'Worker missed target: failure=${worker.currentJobFailure()} pose=${pose.position} rotation=${pose.rotation} horizontal=$horizontal vertical=$vertical speed=$restingSpeed tilt=$tilt';
     if (!sawRack || !leftRack || inRackAtEnd || !sawTable || !checkedJump || separationCount < 100 ||
         !Math.isFinite(minSeparation) || linkTravel < 0.1 || maxSeparation-minSeparation < 0.1)
       throw 'Worker safety stream is incomplete: rack=$sawRack left=$leftRack table=$sawTable count=$separationCount linkTravel=$linkTravel range=${maxSeparation-minSeparation}';
     Sys.println('worker document placement: horizontal=$horizontal vertical=$vertical speed=$restingSpeed');
+    var roundTrip = "build/worker-demo-motion-roundtrip.materia";
+    editor.session.save(roundTrip);
+    var savedMotion:Array<Dynamic> = Reflect.field(haxe.Json.parse(sys.io.File.getContent(roundTrip)),
+      "robotMotions");
+    if (savedMotion == null || savedMotion.length != 1)
+      throw "Saving the document lost its robot motion";
     var scene = editor.scene.runtimeContentScene();
     var snapshot = scene.snapshot();
     var nodeCount = snapshot.nodeCount();
@@ -166,6 +197,11 @@ class WorkerDemoTests {
       throw "Migrated document saved in the old format";
     editor.dispose();
     var source:Dynamic = haxe.Json.parse(sys.io.File.getContent("fixtures/worker-legacy.materia"));
+    var legacy:Array<Dynamic> = Reflect.field(Reflect.field(source, "sensors"), "humans");
+    var halfRoll = 0.1, halfYaw = 0.2;
+    Reflect.setField(legacy[0], "rotation", [Math.sin(halfRoll) * Math.cos(halfYaw),
+      Math.sin(halfRoll) * Math.sin(halfYaw), Math.cos(halfRoll) * Math.sin(halfYaw),
+      Math.cos(halfRoll) * Math.cos(halfYaw)]);
     var objects:Array<Dynamic> = Reflect.field(source,"objects");
     var collision:Dynamic = haxe.Json.parse(haxe.Json.stringify(objects[0]));
     Reflect.setField(collision,"id","legacy-worker");
@@ -179,11 +215,29 @@ class WorkerDemoTests {
     if (migrated.length != 1 || migrated[0].id == "legacy-worker" ||
         migratedData == null || migratedData.migrationNote == null)
       throw "Legacy human ID clash did not migrate with a note";
+    var rotation = migrated[0].rotation;
+    if (rotation == null || Math.abs(rotation[0]) > 1e-9 || Math.abs(rotation[1]) > 1e-9 ||
+        Math.abs(2 * Math.atan2(rotation[2], rotation[3]) - 0.4) > 1e-6)
+      throw "Migrated worker retained legacy roll or lost yaw";
     clash.dispose();
   }
 
   static function distance(a:Array<Float>, b:Array<Float>):Float
     return Math.sqrt(Math.pow(a[0]-b[0],2)+Math.pow(a[1]-b[1],2)+Math.pow(a[2]-b[2],2));
+
+  static function motionCodec():Void {
+    var tracks = app.RobotMotionTrack.decode([{version:1, robotId:"arm", joint:0, loop:true,
+      keys:[{time:0.0, position:0.0}, {time:1.0, position:0.6}, {time:2.0, position:0.0}]}]);
+    if (tracks.length != 1 || Math.abs(tracks[0].sample(0.5) - 0.3) > 1e-9 ||
+        Math.abs(tracks[0].sample(2.5) - 0.3) > 1e-9 ||
+        app.RobotMotionTrack.decode([tracks[0].record()]).length != 1)
+      throw "Robot motion interpolation or codec failed";
+    var rejected = false;
+    try app.RobotMotionTrack.decode([{version:1, robotId:"arm", joint:0, loop:true,
+      keys:[{time:0.0, position:0.0}, {time:0.0, position:1.0}]}])
+    catch (_:Dynamic) rejected = true;
+    if (!rejected) throw "Robot motion accepted non-increasing key times";
+  }
 
   static function linkBounds():Void {
     var quarter = Math.sqrt(0.5);

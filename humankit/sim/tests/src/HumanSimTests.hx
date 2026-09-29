@@ -11,6 +11,17 @@ import humankit.Place;
 import humankit.ApproachFor;
 import humankit.WalkTo;
 import humankit.Wait;
+import humankit.facility.FacilityJobs;
+import materia.automation.facility.Facility;
+import materia.automation.facility.Lane;
+import materia.automation.facility.Rack;
+import materia.automation.facility.RackSlot;
+import materia.automation.facility.RackSlotPose;
+import materia.automation.facility.Station;
+import materia.automation.facility.Zone;
+import robotkit.mobile.Footprint;
+import robotkit.mobile.Pose2;
+import robotkit.navigation.Path;
 import humankit.sim.HumanWorker;
 import humankit.sim.HumanZone;
 import nativekit.scene.Scene;
@@ -153,6 +164,7 @@ class HumanSimTests {
         scene.dispose();
         releaseMidWalk(asset, rig);
         bothHands(asset, rig);
+        facilityShortRetreat(asset, rig);
     }
 
     static function bothHands(asset:AnimationAsset, rig:HumanoidRig):Void {
@@ -179,10 +191,14 @@ class HumanSimTests {
         var spec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"wide-part","hand":"both"},{"action":"place","onto":"table","hand":"both"}]}');
         worker.runSpec(spec, targets, objects);
         var sawTwoHandHold = false;
+        var sawRelease = false;
+        var noCarrier = session.objectCarrier(part);
         var settledHoldTicks = 0;
         for (tick in 0...900) {
             worker.advance();
             session.step();
+            if (sawTwoHandHold && session.objectCarrier(part) == noCarrier)
+                sawRelease = true;
             if (worker.body.heldPoint(humankit.HumanLimb.ArmL) != null &&
                 worker.body.heldPoint(humankit.HumanLimb.ArmR) != null) {
                 sawTwoHandHold = true;
@@ -202,7 +218,8 @@ class HumanSimTests {
             } else settledHoldTicks = 0;
             if (worker.currentJobDone()) break;
         }
-        if (!sawTwoHandHold || !worker.currentJobDone() || worker.currentJobFailure() != null)
+        if (part.motion != MotionType.Dynamic || !sawTwoHandHold || !sawRelease ||
+            !worker.currentJobDone() || worker.currentJobFailure() != null)
             throw 'Both-hands job failed: ${worker.currentJobFailure()}';
         for (_ in 0...240) { worker.advance(); session.step(); }
         var frame = session.capture();
@@ -238,6 +255,22 @@ class HumanSimTests {
         worker.advance();
         session.step();
         if (worker.currentJobDone()) throw "Loop did not start its second pass";
+        for (_ in 0...400) {
+            worker.advance(); session.step();
+            if (worker.currentJobDone()) break;
+        }
+        if (!worker.currentJobDone()) throw "Loop's second pass did not finish";
+        var badLoop = HumanJobSpec.parse('{"version":1,"loop":true,"steps":[{"action":"press","target":{"point":[0.8,0,5]}}]}');
+        worker.runSpec(badLoop, targets, objects);
+        for (_ in 0...20) {
+            worker.advance(); session.step();
+            if (worker.currentJobDone()) break;
+        }
+        var firstFailure = worker.currentJobFailure();
+        if (firstFailure == null) throw "Failing loop had no first failure";
+        for (_ in 0...20) { worker.advance(); session.step(); }
+        if (worker.currentJobFailure() != firstFailure || !worker.currentJobDone())
+            throw "Loop restarted after its first failure";
         worker.dispose();
         session.dispose();
         world.dispose();
@@ -264,6 +297,62 @@ class HumanSimTests {
                 capsule.radius - radius));
         }
         return minimum;
+    }
+
+    static function facilityShortRetreat(asset:AnimationAsset, rig:HumanoidRig):Void {
+        var scene = Scene.create();
+        var world = MujocoSimWorld.create(scene, {timestep: 1.0 / 60.0, physicsSubsteps: 4,
+            gravity: [0.0, 0.0, -9.81]});
+        var session = new SimSession(scene, world.nativeHandle());
+        var human = new HumanCharacter(scene, asset, rig, null, "facility worker");
+        human.advance(0.0);
+        var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
+        var worker = new HumanWorker(session, human, proxy, new SimPose(0, 0, 0));
+        var facility = new Facility("short-retreat", "Short retreat");
+        facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(8, 8)));
+        var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(0.9, -0.2),
+            [new RackSlot("part", new RackSlotPose(0, 0, 1.15))]);
+        var table = new Station("table", "Table", "floor", "map", new Pose2(1.9, -0.2));
+        facility.addRack(rack);
+        facility.addStation(table);
+        facility.addLane(new Lane("carry", "rack", "table",
+            new Path([rack.pose, table.pose], "map"), 1, 1));
+        var part = session.createObject(MotionType.Dynamic, SimShape.box(0.04, 0.04, 0.04),
+            new SimPose(0.9, -0.2, 1.10), 0.1);
+        session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05),
+            new SimPose(0.9, -0.2, 1.01));
+        session.createObject(MotionType.Static, SimShape.box(0.25, 0.25, 0.05),
+            new SimPose(2.55, -0.2, 1.01));
+        session.createObject(MotionType.Static, SimShape.box(4, 4, 0.1), new SimPose(0, 0, -0.05));
+        var job = FacilityJobs.fetch(facility, "rack", "part").deliver("table", [2.55, -0.2, 1.15]);
+        var actions = job.orderedActions();
+        worker.bindPick(cast actions[1], part, [0.9, -0.2, 1.15]);
+        worker.bindPlace(cast actions[4], part, [0.9, -0.2, 1.15]);
+        worker.run(job);
+        var noCarrier = session.objectCarrier(part), sawHold = false, sawRelease = false;
+        var releaseDistance = Math.POSITIVE_INFINITY;
+        for (_ in 0...1000) {
+            worker.advance(); session.step();
+            var carrier = session.objectCarrier(part);
+            if (carrier != noCarrier) sawHold = true;
+            if (sawHold && carrier == noCarrier && !sawRelease) {
+                sawRelease = true;
+                var frame = session.capture(), pose = frame.objectPose(part);
+                frame.dispose();
+                var root = worker.body.rootTransform();
+                releaseDistance = Math.sqrt(Math.pow(root[12] - pose.x, 2) +
+                    Math.pow(root[13] - pose.y, 2));
+            }
+            if (worker.currentJobDone()) break;
+        }
+        if (part.motion != MotionType.Dynamic || !sawHold || !sawRelease ||
+            releaseDistance >= 1.0 || !worker.currentJobDone() || worker.currentJobFailure() != null)
+            throw 'Facility delivery did not release after 0.65 m retreat: ${worker.currentJobFailure()}';
+        var root = worker.body.rootTransform();
+        var retreat = Math.sqrt(Math.pow(root[12] - 2.55, 2) + Math.pow(root[13] + 0.2, 2));
+        if (Math.abs(retreat - 0.65) > 0.08)
+            throw 'Facility retreat was not 0.65 m: $retreat';
+        worker.dispose(); session.dispose(); world.dispose(); human.dispose(); scene.dispose();
     }
 
     static function releaseMidWalk(asset:AnimationAsset, rig:HumanoidRig):Void {

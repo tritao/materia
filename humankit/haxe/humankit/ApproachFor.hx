@@ -47,7 +47,7 @@ class ApproachFor extends HumanActionBase {
 			return;
 		}
 		if (-rise >= comfortable) {
-			fail("Target is below waist height; crouching is unsupported");
+			fail("Target is below standing arm reach; crouching is unsupported");
 			return;
 		}
 		var ahead = Math.sqrt(comfortable * comfortable - rise * rise);

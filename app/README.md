@@ -43,6 +43,11 @@ Save asks for a new filename. Older documents with sensor `humans` load those pe
 workers with empty jobs; the Inspector shows the former job name so it can be
 authored as steps before saving in the new format.
 
+The example's arm cycle is a document `robotMotions` track. Version 1 tracks
+name a robot and joint, use increasing `{time, position}` keys starting at zero,
+and interpolate linearly in simulation time. A non-looping track holds its last
+position; a looping track must end where it starts.
+
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame

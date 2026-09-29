@@ -1,7 +1,7 @@
 package humankit;
 
 /**
- * Places what the hands hold at target, then opens them and eases the IK out.
+ * Places what the hands hold at target, then opens and withdraws the hands.
  * With a held-point provider (HumanBody.setHeldPoint, set by the simulation
  * layer while a hand holds an object), target is where the object's reference
  * point goes and the wrists are solved to put it there; without one, target is
@@ -65,14 +65,18 @@ class Place extends HumanActionBase {
 
 	override public function advance(seconds:Float):Void {
 		if (stage == 2) {
+			// Keep the withdrawn reach until the caller has stepped clear. Releasing
+			// IK here lets the idle or walking arm swing into the free part.
 			elapsed += seconds;
-			var weight = ramp == 0.0 ? 0.0 : Math.max(0.0, 1.0 - elapsed / ramp);
-			for (index in 0...hands.length)
-				worker.setReachWorld(hands[index], goals[index], weight);
-			if (weight <= 0.0) {
-				for (hand in hands) worker.clearReach(hand);
-				done = true;
+			var fraction = ramp == 0.0 ? 1.0 : Math.min(1.0, elapsed / ramp);
+			var root = worker.rootTransform();
+			for (index in 0...hands.length) {
+				var goal = goals[index];
+				worker.setReachWorld(hands[index],
+					[goal[0] - root[0] * 0.25 * fraction,
+					 goal[1] - root[1] * 0.25 * fraction, goal[2] + 0.03 * fraction], 1.0);
 			}
+			if (fraction >= 1.0) done = true;
 			return;
 		}
 		elapsed += seconds;
