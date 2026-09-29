@@ -19,14 +19,10 @@ import nativekit.ui.core.TextStyleOverride;
 /** Builds the telemetry dock panel around its retained plot model. */
 class TelemetryPanel {
   final model:PlotModel;
-  final surface:Color;
-  final textSecondary:Color;
   final demo:Bool;
 
-  public function new(surface:Color, textSecondary:Color, demo:Bool = false) {
+  public function new(demo:Bool = false) {
     this.demo = demo;
-    this.surface = surface;
-    this.textSecondary = textSecondary;
     model = new PlotModel();
     var frameTime = new PlotSeries("frame-time", "Frame time", Color.rgba(0.28, 0.75, 0.98, 1.0), 2.0);
     var gpuTime = new PlotSeries("gpu-time", "GPU submission", Color.rgba(0.78, 0.45, 0.98, 1.0), 2.0);
@@ -38,7 +34,8 @@ class TelemetryPanel {
     model.addSeries(gpuTime);
   }
 
-  public function build(frame:Null<ApplicationPresentationSnapshot>,
+  /** Colours come from the caller on every build so a theme switch reaches this panel. */
+  public function build(frame:Null<ApplicationPresentationSnapshot>, surface:Color, textSecondary:Color,
       ?simulation:ApplicationSimulation):View {
     var style = fillStyle();
     style.padding = new Insets(12.0, 12.0, 12.0, 12.0);

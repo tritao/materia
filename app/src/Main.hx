@@ -639,8 +639,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
     }
-    telemetry = new TelemetryPanel(appearance.theme.tokens.surface,
-      appearance.theme.tokens.textSecondary, demo);
+    telemetry = new TelemetryPanel(demo);
     logLines = [];
     for (line in demo ? ["Demo scene ready", "Select a box; edit position or visibility",
         "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"])
@@ -1294,7 +1293,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
       new DockPanelContent("console", function(_) return consolePanel()),
-      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, simulation))
+      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
+        appearance.theme.tokens.textSecondary, simulation))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());
