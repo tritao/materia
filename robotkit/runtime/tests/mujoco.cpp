@@ -333,6 +333,60 @@ static void floating_base_falls_and_settles(bool floating) {
         assert(twist.linear[axis] == 0.0 && twist.angular[axis] == 0.0);
 }
 
+// A push is a force on the base for a tick. Falling free (no floor), a floating
+// two-link robot of 2 kg given 20 N along x for 5 ticks of 5 ms gains
+// 20 * 0.025 / 2 = 0.25 m/s, and a kinematic one ignores the force.
+static void robot_base_can_be_pushed(bool floating) {
+    SessionFixture fixture(0.005, 2);
+    const auto simulation = fixture.simulation;
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 2;
+    model.joint_count = 1;
+    model.floating_base = floating ? 1 : 0;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    for (uint32_t i = 0; i < model.link_count; ++i) {
+        model.links[i].mass = 1.0;
+        model.links[i].inertia_tensor[0] = model.links[i].inertia_tensor[4] =
+            model.links[i].inertia_tensor[8] = 0.02 / 3.0;
+    }
+    model.joints[0] = {0, RK_RUNTIME_JOINT_REVOLUTE, 0, 1, -3.14, 3.14, 100.0};
+    model.joints[0].parent_frame_position[0] = 0.25;
+    model.joints[0].parent_frame_rotation[3] = model.joints[0].child_frame_rotation[3] = 1.0;
+    model.joints[0].axis[0] = 1.0;
+    rk_simulation_robot_desc robot_desc{};
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 10.0;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, &robot_desc, &robot) == RK_OK);
+
+    rk_simulation_wrench push{};
+    push.struct_size = sizeof(push);
+    push.force[0] = 20.0;
+    assert(rk_simulation_apply_robot_force(simulation, 7, &push) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_apply_robot_force(simulation, 0, nullptr) == RK_ERROR_INVALID_ARGUMENT);
+    rk_simulation_wrench bad = push;
+    bad.force[1] = std::nan("");
+    assert(rk_simulation_apply_robot_force(simulation, 0, &bad) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_simulation_apply_robot_force(999, 0, &push) == RK_ERROR_INVALID_HANDLE);
+    for (int tick = 0; tick < 5; ++tick) {
+        assert(rk_simulation_apply_robot_force(simulation, 0, &push) == RK_OK);
+        assert(fixture.step(tick) == RK_OK);
+    }
+    assert(fixture.step(5) == RK_OK); // an unpushed tick adds nothing
+    rk_simulation_twist twist{};
+    twist.struct_size = sizeof(twist);
+    assert(rk_simulation_get_robot_base_velocity(simulation, 0, &twist) == RK_OK);
+    if (floating) {
+        assert(std::abs(twist.linear[0] - 0.25) < 0.01);
+        assert(std::abs(twist.linear[1]) < 1e-6);
+    } else {
+        assert(std::abs(twist.linear[0]) < 1e-9);
+    }
+}
+
 // A floating one-link robot stands on a sphere and a sideways capsule placed
 // under opposite ends; it rests level on them at their radius, not on the
 // link's default bounds box.
@@ -486,7 +540,9 @@ static void servo_target_runs_through_the_runtime() {
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
-    assert(fixture.step(0) == RK_ERROR_LIMIT);
+    // The refused command faults its robot, not the shared tick.
+    assert(fixture.step(0) == RK_OK);
+    assert(state(robot).safety == RK_SAFETY_FAULT);
 }
 
 // Joint friction loss compiled into the blueprint holds an unpowered arm,
@@ -553,8 +609,9 @@ static void link_shape_contact_softness_reaches_the_backend() {
 }
 
 // An unpowered arm falls onto its 0.3 rad stop and, since MuJoCo's stops are
-// compliant, rests slightly past it. With exact limits the runtime faults;
-// with an observed-limit tolerance it holds on the stop.
+// compliant, rests slightly past it. With exact limits the runtime faults that
+// robot (the tick itself succeeds); with an observed-limit tolerance it holds
+// on the stop.
 static rk_result arm_on_its_stop(double tolerance, double &position) {
     auto model = gravity_arm(0.0);
     model.joints[0].upper_limit = 0.3;
@@ -565,9 +622,10 @@ static rk_result arm_on_its_stop(double tolerance, double &position) {
     rk_robot_runtime robot = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
     rk_result result = RK_OK;
-    for (int tick = 0; tick < 200 && result == RK_OK; ++tick)
-        result = fixture.step(static_cast<uint64_t>(tick) * 10'000'000u);
+    for (int tick = 0; tick < 200; ++tick)
+        assert(fixture.step(static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
     position = state(robot).position[0];
+    if (state(robot).safety == RK_SAFETY_FAULT) result = RK_ERROR_LIMIT;
     return result;
 }
 
@@ -688,6 +746,8 @@ int main() {
     link_primitives_collide_in_link_frame();
     floating_base_falls_and_settles(false);
     floating_base_falls_and_settles(true);
+    robot_base_can_be_pushed(false);
+    robot_base_can_be_pushed(true);
     convex_link_and_box_link_build();
     tool_hulls_collide_only_on_their_pieces();
     tool_piece_contact_is_reported(1.07, false);

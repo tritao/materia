@@ -1127,6 +1127,21 @@ rk_result Simulation::get_robot_base_velocity(uint32_t robot_index,
     return RK_OK;
 }
 
+rk_result Simulation::apply_robot_force(uint32_t robot_index, const rk_simulation_wrench &wrench) {
+    Lock lock(session_);
+    if (wrench.struct_size < sizeof(wrench) || robot_index >= robot_base_bodies_.size())
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (int axis = 0; axis < 3; ++axis)
+        if (!std::isfinite(wrench.force[axis]) || !std::isfinite(wrench.torque[axis]))
+            return RK_ERROR_INVALID_ARGUMENT;
+    nksim_body_force push{};
+    push.struct_size = sizeof(push);
+    push.body = robot_base_bodies_[robot_index];
+    std::copy_n(wrench.force, 3, push.force);
+    std::copy_n(wrench.torque, 3, push.torque);
+    return nksim_session_submit_forces(session_, &push, 1) == NKSIM_OK ? RK_OK : RK_ERROR_BACKEND;
+}
+
 rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
                                      rk_simulation_pose &out_pose) const {
     Lock lock(session_);
@@ -1273,12 +1288,16 @@ rk_result Simulation::cut_virtual_device_link(uint32_t robot_index, bool cut) {
 rk_result Simulation::prepare(const nksim_tick &tick) {
     // Realtime ticks apply every mailbox at the owner's monotonic time; manual
     // ticks give virtual devices the fixed simulation time they run on.
+    // A robot whose commands cannot be applied faults alone: the others still
+    // apply theirs and the tick goes ahead. Rejecting the whole tick would let
+    // one robot, for instance a fallen humanoid whose policy keeps commanding
+    // it, stop every machine that shares the session.
     const auto simulation_ns = tick.step_index * static_cast<std::uint64_t>(period_.count());
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
         const auto time = !tick.realtime && virtual_devices_[index] ? simulation_ns
                                                                     : tick.owner_time_ns;
-        const auto result = runtimes_[index]->apply_pending_commands(time);
-        if (result != RK_OK) return result;
+        if (runtimes_[index]->apply_pending_commands(time) != RK_OK)
+            runtimes_[index]->fail_tick();
     }
     return RK_OK;
 }
@@ -1334,13 +1353,16 @@ rk_result Simulation::submit(const nksim_tick &tick) {
 rk_result Simulation::publish(const nksim_tick &tick) {
     robot_tick_poses_ = robot_base_poses_;
     const auto simulation_ns = tick.step_index * static_cast<std::uint64_t>(period_.count());
+    // Every robot publishes from the one snapshot. One that cannot, for
+    // instance because a joint is beyond its limit, faults on its own; the
+    // robots after it in the list are neither skipped nor failed.
     for (std::size_t index = 0; index < runtimes_.size(); ++index) {
         const auto sample_result = virtual_devices_[index]
             ? runtimes_[index]->publish_presampled(simulation_ns, virtual_samples_[index],
                                                   virtual_sample_results_[index])
             : runtimes_[index]->publish_sample(tick.owner_time_ns);
         if (sample_result != RK_OK)
-            return sample_result;
+            runtimes_[index]->fail_tick();
     }
     return RK_OK;
 }

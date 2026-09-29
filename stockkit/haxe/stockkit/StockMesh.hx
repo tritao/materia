@@ -5,8 +5,8 @@ import haxe.io.Bytes;
 /**
   A display mesh of part of a stock, as byte streams ready for a renderer:
   float xyz positions and normals per vertex, uint32 triangle indices, RGBA8
-  colours per vertex, and the source move of each triangle for picking. Each
-  ray is drawn as a square column spacing wide with exact depths.
+  colours per vertex, and the source move of each triangle for picking: a
+  column mesh (`Stock.mesh`) or a contoured surface (`Stock.contour`).
 **/
 class StockMesh {
   public final vertexCount:Int;

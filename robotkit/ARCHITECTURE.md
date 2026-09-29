@@ -248,8 +248,8 @@ command mailbox → validation → arbitration/intent → controllers
 The runtime rejects stale command sequences, validates compiled joint and
 actuator limits before endpoint application, latches endpoint/sample failures
 as faults, and exposes explicit stop/reset-safety commands. `RobotEndpoint`
-only has `apply()` and `sample()` plus the rollback hook needed by a shared
-transactional simulation tick. Backends do not receive runtime ownership.
+only has `apply()` and `sample()` plus the rollback hook a shared simulation
+tick uses to undo one robot's half-applied commands. Backends do not receive runtime ownership.
 
 Position targets are retained as runtime intent and emitted on every owner
 tick. When a command supplies `max_rate`, the runtime advances a deterministic
@@ -428,6 +428,16 @@ in-memory runtimes own a worker lifecycle through `start()` and `stop()`;
 runtimes attached to a shared `Simulation` are externally driven and cannot be
 started independently. This keeps the clock owner explicit and prevents a
 robot from accidentally advancing only part of a multi-robot world.
+
+A robot's failure is that robot's fault, not the tick's. If a runtime rejects
+its commands in step 2, or cannot publish in step 6 (for instance a joint is
+observed past its limit), `RobotRuntime::fail_tick` rolls that runtime back and
+leaves it faulted; every other robot still applies its commands, the host still
+advances, and every other robot still publishes. `Simulation.step` returns OK,
+a realtime session keeps ticking, and the fault shows in that robot's own
+state (`safety`, `mode`, `fault_code`). Timestep, integrator, friction cone and
+solver iteration limits, and the MuJoCo constraint solver, remain shared by
+every robot in the world (see `plans/MIXED_SCENE.md`).
 
 While stopped, the simulation owner can reset the whole world, reset one robot,
 teleport a robot, and spawn/remove/teleport environment objects. The editable
@@ -672,6 +682,28 @@ with lever-arm scale under active load; this test's anchors are a few
 centimeters, not the meters a real link might use, specifically to keep
 that expected, undiagnosed-bug error under the 1e-3 tolerance — a future
 multi-DOF controller improvement should re-check this at larger scales.
+
+## Learned policies (H4)
+
+`robotkit/policy` is an optional native library (`RK_BUILD_POLICY`) that runs
+an ONNX model on the CPU with ONNX Runtime (MIT, a pinned prebuilt release). It
+is a pure function on flat float tensors; recurrent state is an ordinary input
+the caller feeds back. Above it, `robotkit.policy` (Haxe) has:
+
+- `PolicySpec`: the `policy.json` beside a model: observation terms and scales,
+  default pose, kp/kd, action scale, control period, recurrent pairs, IMU mount.
+- `PolicyController`: encoders and the base IMU in, `JointTarget.servo` out.
+  It never reads simulator truth; gravity comes from `GravityEstimator`, which
+  must be fed at the IMU's rate. Policy targets are clamped into joint travel,
+  because the runtime rejects a servo target outside it.
+- `VelocityReference`: the velocity command as a cyclic reference with a
+  sequence, a deadline, limits and braking to zero.
+- `PolicySession`: the loop over any `Robot`, reading it every tick and running
+  the policy every control period, so a `RecordingRobot` records it and a
+  physics step (2 ms) can be shorter than the control period (20 ms).
+
+`Simulation.applyRobotForce` pushes a robot's base for one tick. The G1 policy,
+its licence and the acceptance tests are under `tools/humanoid`.
 
 ## Deployment boundary
 

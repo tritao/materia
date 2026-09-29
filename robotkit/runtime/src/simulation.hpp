@@ -68,6 +68,7 @@ public:
     rk_result get_robot_pose(uint32_t robot_index, rk_simulation_pose &out_pose) const;
     /** Reads one robot base's world-frame twist from the latest physics state. */
     rk_result get_robot_base_velocity(uint32_t robot_index, rk_simulation_twist &out_twist) const;
+    rk_result apply_robot_force(uint32_t robot_index, const rk_simulation_wrench &wrench);
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
     rk_result get_robot_contacts(rk_robot_runtime runtime,

@@ -1167,20 +1167,8 @@ private:
     // and exactly the same collision_layer/collision_mask semantics, as
     // before this whole fix.
     nksim_result add_self_collision_excludes() {
-        auto is_same_articulation = [&](std::uint64_t first, std::uint64_t second) {
-            std::vector<std::uint64_t> visited{first};
-            for (std::size_t index = 0; index < visited.size(); ++index) {
-                const auto current = visited[index];
-                for (const auto joint_id : joint_order) {
-                    const auto &joint = joints.at(joint_id);
-                    const auto next = joint.desc.body_a == current ? joint.desc.body_b :
-                        joint.desc.body_b == current ? joint.desc.body_a : 0;
-                    if (next == second) return true;
-                    if (next != 0 && std::find(visited.begin(), visited.end(), next) == visited.end())
-                        visited.push_back(next);
-                }
-            }
-            return false;
+        const auto is_same_articulation = [&](std::uint64_t first, std::uint64_t second) {
+            return same_articulation(first, second);
         };
         auto is_parent_child = [&](std::uint64_t first, std::uint64_t second) {
             for (const auto joint_id : joint_order) {
@@ -1212,8 +1200,25 @@ private:
         return NKSIM_OK;
     }
 
+    // Whether joints connect two bodies, directly or through others.
+    bool same_articulation(std::uint64_t first, std::uint64_t second) const {
+        std::vector<std::uint64_t> visited{first};
+        for (std::size_t index = 0; index < visited.size(); ++index) {
+            const auto current = visited[index];
+            for (const auto joint_id : joint_order) {
+                const auto &joint = joints.at(joint_id);
+                const auto next = joint.desc.body_a == current ? joint.desc.body_b :
+                    joint.desc.body_b == current ? joint.desc.body_a : 0;
+                if (next == second) return true;
+                if (next != 0 && std::find(visited.begin(), visited.end(), next) == visited.end())
+                    visited.push_back(next);
+            }
+        }
+        return false;
+    }
+
     // Explicit pairs, and for each part that also meets the environment, one
-    // pair with every part of every environment body (one no joint connects).
+    // pair with every layered part of every body outside its articulation.
     nksim_result add_contact_pairs() {
         const auto geom_name = [&](std::uint64_t body, std::size_t part) {
             return bodies.at(body).name + "_part_" + std::to_string(part);
@@ -1242,21 +1247,37 @@ private:
             const auto result = add_pair(pair.body_a, pair.part_a, pair.body_b, pair.part_b, pair.surface);
             if (result != NKSIM_OK) return result;
         }
-        const auto jointed = [&](std::uint64_t body) {
-            for (const auto joint_id : joint_order) {
-                const auto &joint = joints.at(joint_id);
-                if (joint.desc.body_a == body || joint.desc.body_b == body) return true;
-            }
-            return false;
+        // A part that meets the environment collides, as by layers, with every
+        // layered part outside its own articulation: environment objects and
+        // other robots' links alike, so a humanoid's foot meets a machine bed
+        // as it meets the floor. A body on no layer (a link with no shape
+        // under the "none" approximation) collides with nothing, and a part
+        // that collides only through pairs is not part of the environment.
+        std::unordered_map<std::uint64_t, std::uint64_t> group;
+        const auto find = [&](std::uint64_t body) {
+            while (group.count(body) != 0 && group[body] != body) body = group[body];
+            return body;
         };
+        for (const auto body_id : body_order) group[body_id] = body_id;
+        for (const auto joint_id : joint_order) {
+            const auto &joint = joints.at(joint_id);
+            group[find(joint.desc.body_a)] = find(joint.desc.body_b);
+        }
         for (const auto body_id : body_order) {
-            const auto &parts = bodies.at(body_id).desc.shape_parts;
+            const auto &body = bodies.at(body_id).desc;
+            const auto &parts = body.shape_parts;
             for (std::size_t part = 0; part < parts.size(); ++part) {
                 if (parts[part].contact_filter != NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT) continue;
                 for (const auto other : body_order) {
-                    if (other == body_id || jointed(other)) continue;
+                    if (find(other) == find(body_id)) continue;
+                    const auto &other_body = bodies.at(other).desc;
+                    if ((body.collision_layer & other_body.collision_mask) == 0 &&
+                        (other_body.collision_layer & body.collision_mask) == 0)
+                        continue;
                     for (std::size_t other_part = 0;
-                         other_part < bodies.at(other).desc.shape_parts.size(); ++other_part) {
+                         other_part < other_body.shape_parts.size(); ++other_part) {
+                        if (other_body.shape_parts[other_part].contact_filter != NKSIM_CONTACT_LAYERS)
+                            continue;
                         const auto result = add_pair(body_id, part, other, other_part, parts[part]);
                         if (result != NKSIM_OK) return result;
                     }

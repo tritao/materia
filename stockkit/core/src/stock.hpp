@@ -5,6 +5,7 @@
 #include "tool.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -14,12 +15,51 @@ namespace stockkit {
 
 constexpr uint32_t kSourceStock = 0xFFFFFFFFu;
 
+/**
+ * One grid of rays along `axis`. Ray (i, j) passes through (u, v) =
+ * (origin[0] + i * spacing, origin[1] + j * spacing), where u and v are the
+ * other two world axes in increasing order: (x, y) for Z rays, (y, z) for X
+ * rays and (x, z) for Y rays.
+ */
 struct Grid {
     uint32_t axis = 2;
     double origin[2] = {0, 0};
     double spacing = 0;
     uint32_t count[2] = {0, 0};
     uint32_t tile = 16;
+
+    uint32_t u_axis() const { return axis == 0 ? 1 : 0; }
+    uint32_t v_axis() const { return axis == 2 ? 1 : 2; }
+};
+
+/**
+ * A cell-centred lattice: node (i, j, k) sits at origin + (i, j, k) *
+ * spacing, and each axis in `axes` (bit 1 << axis) has a grid of rays
+ * through the nodes. The Z grid is always present.
+ */
+struct Lattice {
+    uint32_t axes = 4;
+    double origin[3] = {0, 0, 0};
+    double spacing = 0;
+    uint32_t count[3] = {0, 0, 0};
+    uint32_t tile = 16;
+
+    bool has(uint32_t axis) const { return (axes >> axis) & 1; }
+    Grid grid(uint32_t axis) const {
+        Grid g;
+        g.axis = axis;
+        g.origin[0] = origin[g.u_axis()];
+        g.origin[1] = origin[g.v_axis()];
+        g.spacing = spacing;
+        g.count[0] = count[g.u_axis()];
+        g.count[1] = count[g.v_axis()];
+        g.tile = tile;
+        return g;
+    }
+    bool operator==(const Lattice &o) const {
+        return axes == o.axes && spacing == o.spacing && tile == o.tile && std::equal(origin, origin + 3, o.origin) &&
+            std::equal(count, count + 3, o.count);
+    }
 };
 
 /** One material interval with its end data, used when reading or rewriting a ray. */
@@ -91,24 +131,71 @@ struct CutStats {
     uint64_t rays_changed = 0;
     uint64_t rays_tested = 0;
     uint64_t tiles_skipped = 0;
+
+    void add(const CutStats &o) {
+        rays_changed += o.rays_changed;
+        rays_tested += o.rays_tested;
+        tiles_skipped += o.tiles_skipped;
+    }
 };
 
 /**
- * Tiled dexel grid. Each tile stores its intervals field by field (depths,
- * normals and sources in separate arrays); each ray owns a slot range in its
- * tile and is moved to the end of the tile's arrays when it outgrows it. A
- * tile keeps the highest material top and lowest material bottom of its rays,
- * so a move whose sweep lies wholly above or below skips the tile.
+ * Z-grid tiles whose footprint (in x and y) holds X or Y rays that changed.
+ * A contoured mesh reads all three grids, so these tiles take a new revision
+ * too: a finishing pass that moves a wall less than a spacing may change no
+ * Z ray at all.
  */
-class Stock {
+struct SurfaceMarks {
+    Lattice lattice;
+    uint32_t tiles_x = 0, tiles_y = 0;
+    std::vector<uint8_t> dirty; // one flag per Z tile, row by row
+
+    void reset(const Lattice &l);
+    /**
+     * Rays of the grid along `axis` (0 or 1) with first index `i` changed
+     * between `lo` and `hi` along them: flags the Z tiles holding the nodes
+     * of the lattice edges that stretch touches, with a node to spare each
+     * way. One call covers a whole X or Y tile, whose rays lie in one row
+     * (or column) of Z tiles.
+     */
+    void mark(uint32_t axis, uint32_t i, double lo, double hi);
+};
+
+/** Per-thread scratch and results for one cut. */
+struct CutWorker {
+    std::vector<Span> spans;
+    std::vector<Interval> scratch;
+    CutStats stats;
+    struct Record { uint32_t move, tile; MoveResult result; };
+    std::vector<Record> records;
+    SurfaceMarks marks;
+};
+
+/** One ray's intervals where the grid stores them; valid until the grid changes. */
+struct RayView {
+    const double *lo = nullptr, *hi = nullptr;
+    const float *lo_normal = nullptr, *hi_normal = nullptr; // xyz per interval
+    const uint32_t *lo_source = nullptr, *hi_source = nullptr;
+    uint32_t count = 0;
+};
+
+/**
+ * One tiled grid of dexels (see Grid). Each tile stores its intervals field
+ * by field (depths, normals and sources in separate arrays); each ray owns a
+ * slot range in its tile and is moved to the end of the tile's arrays when it
+ * outgrows it. A tile keeps the furthest and nearest material along its rays,
+ * so a move whose sweep lies wholly beyond either skips the tile.
+ */
+class DexelGrid {
 public:
-    explicit Stock(const Grid &grid);
+    explicit DexelGrid(const Grid &grid);
 
     const Grid &grid() const { return grid_; }
     double ray_u(uint32_t i) const { return grid_.origin[0] + grid_.spacing * i; }
     double ray_v(uint32_t j) const { return grid_.origin[1] + grid_.spacing * j; }
 
     void read(uint32_t i, uint32_t j, std::vector<Interval> &out) const;
+    RayView view(uint32_t i, uint32_t j) const;
     uint32_t count(uint32_t i, uint32_t j) const;
     /** Replaces a ray's intervals; call `pack` after a series of writes. */
     void write(uint32_t i, uint32_t j, const std::vector<Interval> &intervals);
@@ -116,43 +203,39 @@ public:
     void pack();
 
     /**
-     * Removes each move's cutting sweep in order, giving the endpoints it
-     * creates the move's source, and measures how much of the stock left
-     * after each cut its shank and holder bands overlap.
-     *
-     * Tiles are split among threads by a fixed ownership pattern; each thread
-     * walks every move in order over the tiles it owns, so a ray only ever
-     * sees its moves in program order. Results are summed per tile, then over
-     * tiles in tile order, so they are bit-identical for any thread count.
-     *
-     * Contact is measured after the move's own cut. A band that reaches stock
-     * which the flutes remove later in the same move (only possible while the
-     * tool climbs) is not seen.
+     * Cuts one move from the tiles `owner` owns among `owners`: tile (ti,
+     * tj) belongs to owner (ti + tj) % owners. With `measure`, records per
+     * tile the volume removed and the stock the move's shank and holder
+     * bands overlap after its cut, for the Z grid's accounting.
      */
-    void cut(const std::vector<MoveSweep> &moves, MoveResult *results);
-    const CutStats &stats() const { return stats_; }
-
-    /** Threads used by `cut`; 0 means one per hardware thread. */
-    void set_threads(uint32_t threads);
-    uint32_t threads() const { return threads_; }
+    void cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, bool measure,
+        CutWorker &worker);
+    uint32_t tile_count() const { return tiles_i_ * tiles_j_; }
 
     /**
      * Tiles, row by row, and their revisions: a tile's revision changes
      * whenever its rays change (a cut or a restore), so a preview remeshes
-     * only tiles whose revision it has not seen.
+     * only tiles whose revision it has not seen. The stock also renews a Z
+     * tile's revision when X or Y rays in its footprint change.
      */
     uint32_t tiles_across() const { return tiles_i_; }
     uint32_t tiles_down() const { return tiles_j_; }
     const std::vector<uint64_t> &revisions() const { return revisions_; }
+    /** Gives a tile a new revision without changing it. */
+    void touch(uint32_t index) { ++revisions_[index]; }
 
     /** An immutable copy of the stock that shares tiles until either side changes them. */
     struct Snapshot;
     std::unique_ptr<Snapshot> snapshot() const;
-    /** Returns the stock to `snapshot`, which must come from a stock with the same grid. */
-    bool restore(const Snapshot &snapshot);
+    /**
+     * Returns the stock to `snapshot`, which must come from a stock with the
+     * same grid. With `changed`, flags each tile that took the snapshot's.
+     */
+    bool restore(const Snapshot &snapshot, std::vector<uint8_t> *changed = nullptr);
 
-    uint64_t interval_count() const;
+    /** Material length along every ray, times spacing^2: the stock's volume as this grid sees it. */
     double volume() const;
+    uint64_t interval_count() const;
     uint64_t bytes() const;
 
 private:
@@ -172,22 +255,12 @@ private:
         void refresh_bounds();
     };
 
-    /** Per-thread scratch and results for one `cut` call. */
-    struct Worker {
-        std::vector<Span> spans;
-        std::vector<Interval> scratch;
-        CutStats stats;
-        struct Record { uint32_t move, tile; MoveResult result; };
-        std::vector<Record> records;
-    };
     struct RayRange { int64_t i0, i1, j0, j1; };
 
     bool ray_range(const Bounds &bounds, RayRange &out) const;
-    /** Cuts one move from the tiles `owner` owns among `owners`. */
-    void cut_owned(const MoveSweep &move, uint32_t index, uint32_t owner, uint32_t owners, Worker &worker);
-    bool cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source, Worker &worker,
-        double &removed_volume);
-    double touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, Worker &worker) const;
+    bool cut_tile(uint32_t index, const SweptVolume &sweep, const RayRange &range, uint32_t source,
+        CutWorker &worker, double &removed_volume);
+    double touch_tile(const Tile &tile, const SweptVolume &sweep, const RayRange &range, CutWorker &worker) const;
     /** The tile for writing: a private copy if a snapshot still shares it; bumps its revision. */
     Tile &mutable_tile(uint32_t index);
     uint32_t tile_index(uint32_t i, uint32_t j, uint32_t &local) const;
@@ -203,12 +276,68 @@ public:
         Grid grid;
         std::vector<std::shared_ptr<Tile>> tiles;
     };
+};
+
+/**
+ * The stock: a lattice and a dexel grid per axis in it. Every move cuts
+ * every grid; the Z grid accounts for the volume each move removes and the
+ * contact of its shank and holder.
+ */
+class Stock {
+public:
+    explicit Stock(const Lattice &lattice);
+
+    const Lattice &lattice() const { return lattice_; }
+    DexelGrid *grid(uint32_t axis) { return axis < 3 ? grids_[axis].get() : nullptr; }
+    const DexelGrid *grid(uint32_t axis) const { return axis < 3 ? grids_[axis].get() : nullptr; }
+    DexelGrid &z() { return *grids_[2]; }
+    const DexelGrid &z() const { return *grids_[2]; }
+
+    /**
+     * Removes each move's cutting sweep in order from every grid, giving the
+     * endpoints it creates the move's source, and measures on the Z grid the
+     * volume each removes and how much of the stock left after its cut its
+     * shank and holder bands overlap.
+     *
+     * Tiles of all grids are split among threads by a fixed ownership
+     * pattern; each thread walks every move in order over the tiles it owns,
+     * so a ray only ever sees its moves in program order. Results are summed
+     * per tile, then over tiles in tile order, so they are bit-identical for
+     * any thread count.
+     *
+     * Contact is measured after the move's own cut. A band that reaches stock
+     * which the flutes remove later in the same move (only possible while the
+     * tool climbs) is not seen.
+     */
+    void cut(const std::vector<MoveSweep> &moves, MoveResult *results, CutStats *summary = nullptr);
+    /** Totals over every cut so far, over all grids. */
+    const CutStats &stats() const { return stats_; }
+
+    /** Threads used by `cut`; 0 means one per hardware thread. */
+    void set_threads(uint32_t threads) { threads_ = threads; }
+    uint32_t threads() const { return threads_; }
+
+    struct Snapshot {
+        Lattice lattice;
+        std::array<std::unique_ptr<DexelGrid::Snapshot>, 3> grids;
+    };
+    std::unique_ptr<Snapshot> snapshot() const;
+    /** Returns the stock to `snapshot`, which must come from a stock with the same lattice. */
+    bool restore(const Snapshot &snapshot);
+
+    void pack();
+    uint64_t bytes() const;
 
 private:
+    /** Renews the revision of every Z tile a worker marked during the last cut. */
+    void touch_marked();
+
+    Lattice lattice_;
+    std::array<std::unique_ptr<DexelGrid>, 3> grids_;
     CutStats stats_;
     uint32_t threads_ = 0;
     Pool pool_;
-    std::vector<Worker> workers_;
+    std::vector<CutWorker> workers_;
 };
 
 } // namespace stockkit

@@ -21,4 +21,8 @@ project(materia_robotd_native_mujoco NONE)
 
 set(NKSIM_BUILD_MUJOCO ON CACHE BOOL "Build the optional MuJoCo simulation backend" FORCE)
 
+# The humanoid tools also run learned policies, so they carry the optional ONNX
+# Runtime library, the same way they carry MuJoCo.
+set(RK_BUILD_POLICY ON CACHE BOOL "Build the ONNX Runtime policy library" FORCE)
+
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../native" native)

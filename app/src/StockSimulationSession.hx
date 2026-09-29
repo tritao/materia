@@ -20,7 +20,8 @@ import stockkit.CutMove;
 import stockkit.CutMoves;
 import stockkit.MoveOutcome;
 import stockkit.Stock;
-import stockkit.StockGrid;
+import stockkit.StockColoring;
+import stockkit.StockLattice;
 import stockkit.StockTimeline;
 
 /**
@@ -88,13 +89,13 @@ class StockSimulationSession {
       new Point3(width / 2, height / 2, -depth / 2));
     // Rays at cell centres, so none lies exactly on the program's millimetre-round walls,
     // where cut stock and the finished part's mesh could disagree about which side it is on.
-    var grid = new StockGrid(-width / 2 + SPACING / 2, -height / 2 + SPACING / 2, SPACING,
-      Std.int(Math.max(1, Math.round(width / SPACING))), Std.int(Math.max(1, Math.round(height / SPACING))));
-    timeline = new StockTimeline(Stock.box(grid, -width / 2, -height / 2, -depth / 2, width / 2,
+    var lattice = StockLattice.covering(-width / 2, -height / 2, -depth / 2, width / 2, height / 2, depth / 2,
+      SPACING);
+    timeline = new StockTimeline(Stock.box(lattice, -width / 2, -height / 2, -depth / 2, width / 2,
       height / 2, depth / 2), moves, 250);
     var part = finishedPart(program);
     try {
-      target = Stock.fromMesh(grid, part.shape.tessellate(1e-6, 0.1));
+      target = Stock.fromMesh(lattice, part.shape.tessellate(1e-6, 0.1));
     } catch (error:Dynamic) {
       part.close();
       timeline.stock.dispose();
@@ -120,16 +121,9 @@ class StockSimulationSession {
   /** The stock as it is now, in the object's frame, coloured by the current mode. */
   public function geometry():GeometryData {
     var stock = timeline.stock;
-    var mesh = if (colorBy == "operation") {
-      var palette = [for (move in stock.history) operationColour(move)];
-      stock.mesh(0, 0, stock.tilesX(), stock.tilesY(), true, true, palette, UNTOUCHED);
-    } else {
-      var comparison = stock.compare(target);
-      var colours = [for (k in 0...comparison.gouge.length)
-        comparison.largestGouge[k] > TOLERANCE ? GOUGE
-        : comparison.largestLeftover[k] > TOLERANCE ? LEFTOVER : ON_TARGET];
-      stock.mesh(0, 0, stock.tilesX(), stock.tilesY(), false, true, null, UNTOUCHED, colours);
-    }
+    var mesh = colorBy == "operation"
+      ? stock.contour(0, 0, stock.tilesX(), stock.tilesY(), BySource(operationColour, UNTOUCHED))
+      : stock.contour(0, 0, stock.tilesX(), stock.tilesY(), ByDeviation(target, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
     var geometry = new GeometryData();
     geometry.addStream(1, 2, mesh.positions, mesh.vertexCount, 12);
     geometry.addStream(2, 2, mesh.normals, mesh.vertexCount, 12);
@@ -177,7 +171,11 @@ class StockSimulationSession {
   }
 
   /** Deepest gouge into the finished part at the current position, in metres. */
-  public function deepestGouge():Float return timeline.stock.compare(target).deepestGouge();
+  public function deepestGouge():Float {
+    var deepest = 0.0;
+    for (comparison in timeline.stock.compareAll(target)) deepest = Math.max(deepest, comparison.deepestGouge());
+    return deepest;
+  }
 
   public function dispose():Void {
     if (disposed) return;

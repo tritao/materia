@@ -475,6 +475,19 @@ typedef struct rk_simulation_twist {
 RK_API rk_result RK_CALL rk_simulation_get_robot_base_velocity(
     rk_simulation simulation, uint32_t robot_index,
     rk_simulation_twist *out_twist RK_INOUT);
+/** A force (N) and torque (N m), world frame, at a body's centre of mass. */
+typedef struct rk_simulation_wrench {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    double force[3];
+    double torque[3];
+} rk_simulation_wrench;
+/**
+ * Pushes one robot's base for the next tick, on top of any already applied for
+ * that tick. Repeat every tick to push for longer. A kinematic base ignores
+ * it, as it ignores every force.
+ */
+RK_API rk_result RK_CALL rk_simulation_apply_robot_force(
+    rk_simulation simulation, uint32_t robot_index, const rk_simulation_wrench *wrench);
 /** Reads one robot link pose from the latest physics state. */
 RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,

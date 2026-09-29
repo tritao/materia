@@ -1679,6 +1679,16 @@ void RobotRuntime::discard_pending_commands() noexcept {
     }
 }
 
+void RobotRuntime::fail_tick() noexcept {
+    discard_pending_commands();
+    std::lock_guard owner_lock(owner_mutex_);
+    {
+        std::lock_guard state_lock(state_mutex_);
+        if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP) return;
+    }
+    latch_fault();
+}
+
 void RobotRuntime::reset_state() noexcept {
     std::lock_guard owner_lock(owner_mutex_);
     {

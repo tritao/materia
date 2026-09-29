@@ -104,6 +104,35 @@ and Warren (2007), manifold dual contouring.
   checked against closed forms or bounds. A wrong reference must only ever
   cause a false alarm, never a false pass.
 
+## Cutter geometry shared with CAM
+
+StockKit and a future 3D CamKit need the same maths from opposite sides.
+StockKit asks what a moving tool removes (depth along a ray through a
+sweep); CAM toolpath generation asks how low a tool may go without gouging
+the target (OpenCAMLib-style drop-cutter and push-cutter against a mesh). For
+a straight move these are the same minimisation mirrored in height, so the
+per-cutter contact solutions are shared.
+
+- **Keep the cutter maths a standalone layer.** Decomposing a profile into
+  rings, cones, spheres and tori, and the contact solutions against points,
+  edges and paths, must not depend on rays, tiles or stock. It gets its own
+  C interface and its own closed-form fixtures.
+- **Today** it lives inside `stockkit-core`'s sweep code (`profile.cpp`
+  decomposes profiles, `sweep.cpp` solves contact along rays), not yet
+  behind an interface of its own. Split it out before a second user
+  arrives.
+- **When CamKit adds 3D toolpaths:** move it into a small shared native
+  library that CamKit links too, and add what only CAM needs: drop and push
+  against mesh vertices, faces and edges; a spatial index over triangles;
+  adaptive path sampling.
+- **Build it rather than depend on OpenCAMLib:** OpenCAMLib is in
+  maintenance mode, has known cone bugs and absolute tolerances, pulls in
+  Boost, and has no tests; one implementation used by both kits cannot
+  disagree with itself.
+- **CAM will also read StockKit's stock:** rest machining (re-cut only what
+  earlier tools left), engagement-controlled clearing, and skipping passes
+  through air all need the in-process stock, not the raw block.
+
 ## Ideas kept for later
 
 - **Target comparison as a first-class output:** leftover material (stock

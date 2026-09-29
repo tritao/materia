@@ -7,14 +7,14 @@ import StockKitNative;
   Restoring it also restores the move history it had.
 **/
 class StockSnapshot {
-  public final grid:StockGrid;
+  public final lattice:StockLattice;
   public final history:Array<CutMove>;
   final owner:Ownedsk_snapshot_handle;
   var disposed = false;
 
   /** Made by `Stock.snapshot`. */
-  public function new(grid:StockGrid, history:Array<CutMove>, owner:Ownedsk_snapshot_handle) {
-    this.grid = grid;
+  public function new(lattice:StockLattice, history:Array<CutMove>, owner:Ownedsk_snapshot_handle) {
+    this.lattice = lattice;
     this.history = history;
     this.owner = owner;
   }

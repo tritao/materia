@@ -1,0 +1,11 @@
+The files in this directory come from Unitree Robotics' unitree_rl_gym
+(https://github.com/unitreerobotics/unitree_rl_gym), commit 276801e:
+
+- policy.onnx is an ONNX export of deploy/pre_train/g1/motion.pt, the
+  pretrained G1 locomotion policy (trained in Isaac Gym; PPO with an LSTM actor).
+- policy.json and policy-menagerie.json are this repository's policy specs for it.
+
+unitree_rl_gym is released under the BSD 3-Clause licence (see LICENSE). The
+repository does not say outright that the trained weights are covered by that
+licence, so they are treated as part of it. Check with Unitree before
+redistributing them outside this repository.

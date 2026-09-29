@@ -15,7 +15,7 @@ with CAMotics and FreeCAD, the OpenVDB decision, libraries surveyed, ideas
 kept for later) is in [`docs/DESIGN.md`](docs/DESIGN.md); notes on the
 open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
 
-## Current state (phases 0–5)
+## Current state (phases 0–5, phase 6 under way)
 
 - Tool shapes live in ToolpathKit so any `Tool` can carry one:
   `toolpathkit.tool.CutterProfile` describes a tool as a surface of revolution from
@@ -59,10 +59,16 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
 - **StockKit core** (`core/`, phase 3) is a C++17 library with a C ABI and
   no dependencies, following CadKit's layering: opaque generation-checked
   handles, bulk arrays, no exceptions across the boundary.
-  - The stock is a Z grid of rays in 16×16-ray tiles. Each tile stores its
-    intervals field by field (depths, normals and sources in separate arrays)
-    and keeps the highest and lowest material in it, so a move whose sweep
-    lies wholly above or below skips the tile. A per-ray floor bound rejects
+  - The stock lives on a lattice (`sk_lattice`: origin, spacing, node
+    counts in x, y and z, and which axes have rays). Each axis in it has a
+    grid of rays through the nodes: Z rays through (x, y), X rays through
+    (y, z), Y rays through (x, z). The Z grid is always there; with X and Y
+    (tri-dexel) every move cuts all three. The Z grid measures each move's
+    removed volume and contact; per-grid volumes are reported too.
+  - Each grid is tiled 16×16 rays. Each tile stores its intervals field by
+    field (depths, normals and sources in separate arrays) and keeps its
+    furthest and nearest material along its rays, so a move whose sweep lies
+    wholly beyond skips the tile. On Z rays a per-ray floor bound rejects
     rays whose material is already below the sweep before the exact query.
   - `SweptVolume` gives a move's bounds and the exact material it sweeps
     along a ray, for any surface-of-revolution profile. The profile is split
@@ -71,6 +77,13 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     closed form; ramps minimise a convex function (golden section, to
     floating-point resolution); helices and non-convex profiles scan and then
     refine each local minimum.
+  - `SweptVolume` also answers X and Y rays (`sk_sweep_ray` with
+    `SK_AXIS_X`, through (y, z), or `SK_AXIS_Y`, through (x, z)). At each height the tool is a disc, so a level move
+    sweeps its path's 2D offset: a capsule for a line, an annular sector with
+    end discs for an arc, whose crossings with the ray are found in closed
+    form. A plunge sweeps its widest section over the heights it passes;
+    ramps and helices scan and refine. Endpoint normals come from the profile
+    at the endpoint's height.
   - Stock comes from a box or from a closed triangle mesh. Mesh casting uses
     exact orientation predicates and a tie rule, so a ray through a shared
     edge or vertex is counted exactly once; open meshes are refused.
@@ -84,25 +97,30 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
   - `sk_stock_compare` compares the stock with a target part cast on the same
     grid, ray by ray: leftover (stock outside the target), gouge (target
     missing from the stock), the largest stretch of each, and the move whose
-    surface bounds the largest gouge. Z rays see floors and ceilings; a wall
-    gouged sideways shows only where a ray falls inside the gouge, until the
-    X and Y grids exist.
+    surface bounds the largest gouge, along any of the stock's grids. Z rays
+    see floors and ceilings; X and Y rays see walls.
   - Cuts run on a pool of threads owned by the core (one per hardware thread
     by default; `sk_stock_set_threads` changes it). Each tile belongs to one
-    thread, which applies every move of the batch to its tiles in order, and
+    thread (across all three grids), which applies every move of the batch
+    to its tiles in order, and
     removed volumes are summed per tile in tile order. So the stock and the
     volumes are bit-identical for any thread count, which a native test
     checks. The core does not use NativeKit's task system, since it has no
     NativeKit dependency. An app can still run a long simulation as an
     `nk_task` that cuts a slice of moves per step.
-- `stockkit.Stock` is the Haxe wrapper. It builds stock from a box, from
-  triangles or from a CadKit mesh, and cuts `CutMove`s, one native call per
+- `stockkit.Stock` is the Haxe wrapper. It builds stock on a `StockLattice`
+  (tri-dexel by default; `StockLattice.covering` puts nodes at cell centres
+  with a cell to spare around the stock, so no ray lies in its faces) from a
+  box, from triangles or from a CadKit mesh, reads rays of any grid
+  (`StockGrid`, per `StockAxis`), and cuts `CutMove`s, one native call per
   run of moves with the same tool. It keeps the move history, so an
   interval end's source leads back to its `CutMove`, and from there to the
   op and `Provenance`. `cut` returns a `CutReport` with each move's
   `MoveOutcome`, rapid contacts, collisions and totals per operation.
-  `compare` returns a `StockComparison` with leftover and gouge volumes,
-  the deepest gouge and the moves that gouged.
+  `compare` returns a `StockComparison` along one grid with leftover and
+  gouge volumes, the deepest gouge and the moves that gouged;
+  `compareAll` returns one per grid, so a wall gouged sideways (seen only
+  by X or Y rays) is not missed.
 - Preview and scrubbing (phase 5, headless):
   - `sk_stock_mesh` meshes a range of tiles. Each ray is a square column
     spacing wide with exact depths: top faces carry the stored normal and
@@ -112,6 +130,30 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     positions and normals, uint32 indices, RGBA8 colours) plus each
     triangle's source move for picking. Colouring is by source through a
     palette (so by operation) or per ray (so by deviation from a target).
+  - On a tri-dexel stock `SK_MESH_CONTOUR` (`Stock.contour` in Haxe)
+    dual-contours the lattice instead, into a closed surface. Nodes are
+    inside or outside by their Z rays; each edge between nodes of opposite
+    sign lies on a ray of the grid along it, whose interval end gives the
+    crossing's exact point, normal and source. Each cell gets the
+    least-squares meeting point of its crossings' planes, clamped to the
+    cell, so floors and walls stay flat and edges and corners stay sharp;
+    each crossing edge becomes a quad with its crossing's normal and source.
+    Curved surfaces are cut by chords (the ball slot in the core tests comes
+    out 0.16% of its removed volume off at a sixth of the tool radius), and
+    features thinner than a cell can be lost. Chunks own disjoint edges and
+    join exactly. A Z tile's revision also changes when X or Y rays in its
+    footprint do, so a finishing pass that moves a wall by less than a
+    spacing still remeshes its chunk. `StockPreview` and the app use
+    contoured meshes on tri-dexel stock.
+  - `sk_mesh_color_by_deviation` colours a contoured mesh against a target
+    surface by surface: each quad's surface is an exact interval end on its
+    ray, and the ray's comparison with the target gives the gouge starting
+    there on its empty side and the leftover ending there on its material
+    side. A wall cut too deep shows on the X or Y rays crossing it, while
+    the stock's other faces on those rays keep their own colour.
+    `StockColoring.ByDeviation` uses it for contoured meshes.
+    `sk_mesh_color_by_ray` takes a grid axis and colours the quads made from
+    that grid's rays, for any other per-ray map.
   - Tiles are copy-on-write and carry revisions. `sk_stock_snapshot` and
     `sk_stock_restore` share tiles, so a snapshot costs a pointer per tile
     plus whatever later cuts replace.
@@ -146,7 +188,17 @@ open-source code this draws on are in [`docs/REFERENCES.md`](docs/REFERENCES.md)
     tie rules, provenance, handle validation, shank and holder contact,
     target comparison, snapshots and revisions, closed preview meshes whose
     volume equals the stock's (also when built in chunks), colouring, and
-    bit-identical results with 1, 2, 3, 8 and all threads.
+    bit-identical results with 1, 2, 3, 8 and all threads. Contoured meshes
+    must be closed and oriented; a box comes out exactly (every vertex on
+    it, face normals only, volume to float precision, the same in chunks),
+    flat and ball slots within their chord error, and a 0.1 mm wall shave
+    that no Z ray sees moves the wall and renews the Z tiles along it.
+    A slot too wide and too shallow colours its walls as gouged (seen only
+    by Y rays), its floor as leftover and the box's sides on the same rays
+    as on target, and a groove's gouge ends where the stock resumes.
+  - Every oracle and chain fixture also contours the core stock on a
+    60-cell-wide lattice and requires the enclosed volume to match the
+    OCCT result within 1% of the removed volume.
 
 Build the core and run its checks and benchmark:
 
@@ -154,13 +206,16 @@ Build the core and run its checks and benchmark:
 cmake -S stockkit/core -B build/stockkit-core -DCMAKE_BUILD_TYPE=Release
 cmake --build build/stockkit-core
 build/stockkit-core/stockkit_core_tests
-build/stockkit-core/stockkit_core_bench        # optional ray spacing in mm
+build/stockkit-core/stockkit_core_bench        # optional ray spacing in mm, then "tri"
 ```
 
 After changing `core/include/stockkit.h`, regenerate the Haxe binding with
-`stockkit/core/tools/check-hxi.sh`. Haxeon's FFI allows one output array per
-function and no other outputs beside it, which is why counts and contents
-are read with separate calls.
+`stockkit/core/tools/check-hxi.sh`. Variable-length results come back in one
+call: the caller's capacity goes in through an in/out count, and a count too
+small comes back as the size needed (haxeon's queried outputs, with an
+initial capacity so small reads take one call). So `sk_stock_read_rays`
+returns counts and intervals together, `sk_sweep_ray` answers in one call,
+and `sk_stock_cut` returns per-move results and a summary.
 
 Run the Haxe tests with the StockKit core and CadKit native builds on
 `LD_LIBRARY_PATH`:

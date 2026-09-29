@@ -137,6 +137,36 @@ void Piece::normal(double d, double sigma, double &nr, double &nz) const {
     nz = z / length;
 }
 
+double Section::radius_at(double h) const {
+    if (!arc) {
+        if (z1 == z0) return std::max(r0, r1);
+        double f = std::max(0.0, std::min(1.0, (h - z0) / (z1 - z0)));
+        return r0 + f * (r1 - r0);
+    }
+    double dz = std::max(-radius, std::min(radius, h - cz));
+    return cr + side * std::sqrt(std::max(0.0, radius * radius - dz * dz));
+}
+
+void Section::normal(double h, double &nr, double &nz) const {
+    if (!arc) {
+        // Right of the direction of travel up the profile.
+        double dr = r1 - r0, dz = z1 - z0;
+        double length = std::hypot(dr, dz);
+        if (!(length > 0)) {
+            nr = 1;
+            nz = 0;
+            return;
+        }
+        nr = dz / length;
+        nz = -dr / length;
+        return;
+    }
+    double r = radius_at(h);
+    double dz = std::max(-radius, std::min(radius, h - cz));
+    nr = turn * (r - cr) / radius;
+    nz = turn * dz / radius;
+}
+
 double Run::envelope(double d, const Piece **piece) const {
     double best = std::numeric_limits<double>::infinity();
     for (const Piece &p : pieces) {
@@ -212,6 +242,31 @@ bool Profile::build(const std::vector<Segment> &segments, Profile &out, std::str
     profile.base_ = base;
     profile.height_ = z;
 
+    profile.tolerance_ = 1e-12 * std::max(1.0, scale);
+    for (const Segment &s : segments) {
+        Section section;
+        section.arc = s.arc;
+        section.z0 = s.z0;
+        section.z1 = std::max(s.z0, s.z1);
+        section.r0 = s.r0;
+        section.r1 = s.r1;
+        if (s.arc) {
+            double start, sweep;
+            arc_angles(s, start, sweep);
+            section.cr = s.cr;
+            section.cz = s.cz;
+            section.radius = arc_radius(s);
+            // Heights never turn back inside an arc, so it keeps to one side of its centre.
+            section.side = std::cos(start + sweep / 2) >= 0 ? 1.0 : -1.0;
+            section.turn = sweep >= 0 ? 1.0 : -1.0;
+        }
+        profile.sections_.push_back(section);
+        profile.breaks_.push_back(section.z0);
+        profile.breaks_.push_back(section.z1);
+    }
+    std::sort(profile.breaks_.begin(), profile.breaks_.end());
+    profile.breaks_.erase(std::unique(profile.breaks_.begin(), profile.breaks_.end()), profile.breaks_.end());
+
     std::vector<Monotone> monotone;
     split_monotone(segments, scale, monotone);
     // Vertical pieces take the direction of the piece before them (or, at
@@ -256,6 +311,44 @@ bool Profile::build(const std::vector<Segment> &segments, Profile &out, std::str
     }
     out = std::move(profile);
     return true;
+}
+
+double Profile::section_radius(double h, const Section **section) const {
+    double best = -1;
+    bool sloped = false;
+    for (const Section &s : sections_) {
+        if (h < s.z0 - tolerance_ || h > s.z1 + tolerance_) continue;
+        double r = s.radius_at(h);
+        bool flat = s.z1 == s.z0;
+        if (r > best + tolerance_ || (r >= best - tolerance_ && !flat && !sloped)) {
+            best = std::max(r, best);
+            sloped = !flat;
+            if (section) *section = &s;
+        }
+    }
+    return best;
+}
+
+double Profile::largest_radius(double h0, double h1, double &at, const Section **section) const {
+    double best = -1;
+    h0 = std::max(h0, base_);
+    h1 = std::min(h1, height_);
+    for (const Section &s : sections_) {
+        double lo = std::max(h0, s.z0 - tolerance_), hi = std::min(h1, s.z1 + tolerance_);
+        if (lo > hi) continue;
+        auto consider = [&](double h) {
+            double r = s.radius_at(h);
+            if (r > best) {
+                best = r;
+                at = h;
+                if (section) *section = &s;
+            }
+        };
+        consider(lo);
+        consider(hi);
+        if (s.arc && s.side > 0 && s.cz > lo && s.cz < hi) consider(s.cz);
+    }
+    return best;
 }
 
 void Profile::slice(double d, std::vector<double> &intervals) const {

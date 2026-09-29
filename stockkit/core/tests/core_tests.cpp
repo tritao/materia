@@ -4,10 +4,12 @@
 #include "stockkit.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -88,26 +90,43 @@ sk_move arc_move(double cx, double cy, double z, double radius, double start, do
     return m;
 }
 
-std::vector<sk_interval> sweep(sk_tool_handle t, const sk_move &m, double x, double y) {
+/** One sweep query: a capacity too small reports what it needs, then the call succeeds. */
+std::vector<sk_interval> sweep_axis(sk_tool_handle t, const sk_move &m, uint32_t axis, double u, double v) {
     uint32_t count = 0;
-    check(sk_sweep_count_ray(t, &m, SK_AXIS_Z, x, y, &count) == SK_OK, "sweep count");
+    sk_result first = sk_sweep_ray(t, &m, axis, u, v, nullptr, &count);
+    check(first == SK_OK || first == SK_ERROR_LIMIT, "sweep size query");
     std::vector<sk_interval> out(count);
-    check(sk_sweep_read_ray(t, &m, SK_AXIS_Z, x, y, out.data(), count) == SK_OK, "sweep read");
+    check(sk_sweep_ray(t, &m, axis, u, v, out.data(), &count) == SK_OK && count == out.size(), "sweep read");
     return out;
 }
 
-sk_grid grid(double x0, double y0, double spacing, uint32_t ni, uint32_t nj, uint32_t tile = 8) {
-    sk_grid g{};
+std::vector<sk_interval> sweep(sk_tool_handle t, const sk_move &m, double x, double y) {
+    return sweep_axis(t, m, SK_AXIS_Z, x, y);
+}
+
+/** A Z-only lattice: rays through (x0 + i * spacing, y0 + j * spacing). */
+sk_lattice grid(double x0, double y0, double spacing, uint32_t ni, uint32_t nj, uint32_t tile = 8) {
+    sk_lattice g{};
     g.struct_size = sizeof g;
-    g.axis = SK_AXIS_Z;
+    g.axes = SK_AXES_Z;
     g.origin[0] = x0, g.origin[1] = y0;
     g.spacing = spacing;
-    g.count[0] = ni, g.count[1] = nj;
+    g.count[0] = ni, g.count[1] = nj, g.count[2] = 1;
     g.tile_size = tile;
     return g;
 }
 
-sk_stock_handle box_stock(const sk_grid &g, double x0, double y0, double z0, double x1, double y1, double z1) {
+/** A lattice with all three grids, nodes from (x0, y0, z0). */
+sk_lattice lattice(double x0, double y0, double z0, double spacing, uint32_t ni, uint32_t nj, uint32_t nk,
+    uint32_t tile = 8) {
+    sk_lattice g = grid(x0, y0, spacing, ni, nj, tile);
+    g.axes = SK_AXES_ALL;
+    g.origin[2] = z0;
+    g.count[2] = nk;
+    return g;
+}
+
+sk_stock_handle box_stock(const sk_lattice &g, double x0, double y0, double z0, double x1, double y1, double z1) {
     sk_box b{};
     b.struct_size = sizeof b;
     b.min[0] = x0, b.min[1] = y0, b.min[2] = z0;
@@ -120,8 +139,11 @@ sk_stock_handle box_stock(const sk_grid &g, double x0, double y0, double z0, dou
 std::vector<sk_move_result> cut_results(sk_stock_handle s, sk_tool_handle t, const std::vector<sk_move> &moves,
     const std::string &what) {
     std::vector<sk_move_result> results(moves.size());
-    check(sk_stock_cut(s, t, moves.data(), uint32_t(moves.size()), results.data(), uint32_t(results.size())) == SK_OK,
-        what);
+    sk_cut_summary summary{};
+    check(sk_stock_cut(s, t, moves.data(), uint32_t(moves.size()), results.data(), &summary) == SK_OK, what);
+    double removed = 0;
+    for (const sk_move_result &r : results) removed += r.removed;
+    check(summary.moves == moves.size() && summary.removed == removed, what + ": summary adds up the moves");
     return results;
 }
 
@@ -151,22 +173,25 @@ struct Rays {
     }
 };
 
-Rays read_all(sk_stock_handle s) {
+Rays read_all(sk_stock_handle s, uint32_t axis = SK_AXIS_Z) {
     sk_stock_info info{};
     info.struct_size = sizeof info;
     sk_stock_get_info(s, &info);
     Rays rays;
-    rays.ni = info.grid.count[0];
-    uint32_t ni = info.grid.count[0], nj = info.grid.count[1], total = 0;
+    const sk_grid_info &grid = info.grids[axis];
+    rays.ni = grid.count[0];
+    uint32_t ni = grid.count[0], nj = grid.count[1];
     rays.counts.resize(size_t(ni) * nj);
-    check(sk_stock_read_counts(s, 0, 0, ni, nj, rays.counts.data(), uint32_t(rays.counts.size())) == SK_OK,
-        "read counts");
-    check(sk_stock_count_intervals(s, 0, 0, ni, nj, &total) == SK_OK, "interval total");
-    check(total == info.interval_count, "interval total matches info");
-    check(total == 0 || sk_stock_read_intervals(s, 0, 0, ni, nj, nullptr, total - 1) == SK_ERROR_LIMIT,
+    // Too small a capacity reports the total and writes no intervals.
+    uint32_t total = 0;
+    check(sk_stock_read_rays(s, axis, 0, 0, ni, nj, rays.counts.data(), uint32_t(rays.counts.size()), nullptr,
+              &total) == (grid.interval_count == 0 ? SK_OK : SK_ERROR_LIMIT),
         "short read refused");
+    check(total == grid.interval_count, "interval total matches info");
     rays.intervals.resize(total);
-    check(sk_stock_read_intervals(s, 0, 0, ni, nj, rays.intervals.data(), total) == SK_OK, "read rays");
+    check(sk_stock_read_rays(s, axis, 0, 0, ni, nj, rays.counts.data(), uint32_t(rays.counts.size()),
+              rays.intervals.data(), &total) == SK_OK && total == rays.intervals.size(),
+        "read rays");
     uint32_t offset = 0;
     for (uint32_t c : rays.counts) {
         rays.offsets.push_back(offset);
@@ -190,7 +215,7 @@ double sampled_floor(const std::function<void(double, double &, double &, double
 
 void flat_slot() {
     sk_tool_handle t = flat(6, 20);
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
     double before = info_of(s).volume;
     auto removed = cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 7)}, "flat slot cut");
@@ -268,7 +293,7 @@ void bull_arc() {
 
 void plunge() {
     sk_tool_handle t = flat(6, 20);
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
     cut(s, t, {line_move(25, 15, 25, 25, 15, 5)}, "plunge cut");
     Rays rays = read_all(s);
@@ -388,7 +413,7 @@ void necked_tool() {
 }
 
 void box_mesh() {
-    auto mesh_stock = [](const sk_grid &g, const std::vector<double> &p, const std::vector<uint32_t> &idx,
+    auto mesh_stock = [](const sk_lattice &g, const std::vector<double> &p, const std::vector<uint32_t> &idx,
                           sk_result &result) {
         sk_stock_handle s{};
         result = sk_stock_create_mesh(&g, p.data(), uint32_t(p.size()), idx.data(), uint32_t(idx.size()), &s);
@@ -401,7 +426,7 @@ void box_mesh() {
         idx = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 1, 2, 6, 1, 6, 5, 2, 3, 7, 2, 7, 6, 3, 0, 4, 3,
             4, 7};
     };
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     std::vector<double> p;
     std::vector<uint32_t> idx;
     box(0.25, 0.25, 0, 49.75, 29.75, 20, p, idx);
@@ -413,7 +438,7 @@ void box_mesh() {
     a.struct_size = c.struct_size = sizeof a;
     sk_stock_get_info(s, &a);
     sk_stock_get_info(b, &c);
-    check(a.interval_count == c.interval_count && a.volume == c.volume, "box mesh matches box stock");
+    check(a.grids[SK_AXIS_Z].interval_count == c.grids[SK_AXIS_Z].interval_count && a.volume == c.volume, "box mesh matches box stock");
     Rays rays = read_all(s);
     uint32_t n;
     const sk_interval *v = rays.at(10, 10, n);
@@ -461,7 +486,7 @@ void box_mesh() {
 
 void provenance_and_rapids() {
     sk_tool_handle t = flat(6, 20);
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
     std::vector<sk_move> moves = {line_move(10, 15, 15, 40, 15, 15, 1), line_move(10, 15, 30, 40, 15, 30, 2),
         line_move(25, 5, 18, 25, 25, 18, 3)};
@@ -469,7 +494,7 @@ void provenance_and_rapids() {
     auto removed = cut(s, t, moves, "three moves");
     check(removed[0] > 0 && removed[1] == 0 && removed[2] > 0, "per-move removal shows the rapid through stock");
     std::vector<sk_move_result> short_output(2);
-    check(sk_stock_cut(s, t, moves.data(), 3, short_output.data(), 2) == SK_ERROR_INVALID_ARGUMENT,
+    check(sk_stock_cut(s, t, moves.data(), 3, short_output.data(), nullptr) == SK_ERROR_INVALID_ARGUMENT,
         "cut output shorter than the moves is refused");
     Rays rays = read_all(s);
     uint32_t n;
@@ -498,13 +523,15 @@ void handles() {
     sk_profile_segment gap[] = {line(0, 0, 3, 0), line(3, 1, 3, 20)};
     sk_tool_handle bad{};
     check(sk_tool_create(gap, 2, &bad) == SK_ERROR_INVALID_ARGUMENT && bad.id == 0, "discontinuous profile refused");
-    sk_grid x = grid(0, 0, 1, 10, 10);
-    x.axis = SK_AXIS_X;
+    sk_lattice x = grid(0, 0, 1, 10, 10);
+    x.axes = SK_AXES_X | SK_AXES_Y;
     sk_box b{};
     b.struct_size = sizeof b;
     b.max[0] = b.max[1] = b.max[2] = 1;
     sk_stock_handle s{};
-    check(sk_stock_create_box(&x, &b, &s) == SK_ERROR_UNSUPPORTED, "X grids are not implemented yet");
+    check(sk_stock_create_box(&x, &b, &s) == SK_ERROR_INVALID_ARGUMENT, "a lattice needs its Z grid");
+    x.axes = 8 | SK_AXES_Z;
+    check(sk_stock_create_box(&x, &b, &s) == SK_ERROR_INVALID_ARGUMENT, "unknown axes are refused");
 }
 
 sk_profile_segment zoned(sk_profile_segment segment, uint32_t zone) {
@@ -524,7 +551,7 @@ void shank_and_holder_contact() {
     check(sk_tool_get_info(t, &info) == SK_OK && info.cutting_radius == 3 && info.cutting_height == 5 &&
             info.radius == 10 && info.height == 45,
         "tool info separates flutes from the whole tool");
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     // Sum of `height` over rays within `reach` of the segment (10, 15)-(40, 15): an exact ray-sampled volume.
     auto footprint = [&](double reach, double height) {
         double total = 0;
@@ -585,14 +612,14 @@ void shank_and_holder_contact() {
 
 void target_comparison() {
     sk_tool_handle t = flat(6, 20);
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     // The target is a block 15 high; the stock is 20. One pass clears to 15,
     // then a second slot dips to 14.9.
     sk_stock_handle target = box_stock(g, 0, 0, 0, 50, 30, 15);
     sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
     cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 4), line_move(25, 5, 14.9, 25, 25, 14.9, 9)}, "cut for comparison");
     std::vector<sk_ray_comparison> rays(101 * 61);
-    check(sk_stock_compare(s, target, 0, 0, 101, 61, rays.data(), uint32_t(rays.size())) == SK_OK, "compare");
+    check(sk_stock_compare(s, target, SK_AXIS_Z, 0, 0, 101, 61, rays.data(), uint32_t(rays.size())) == SK_OK, "compare");
     const sk_ray_comparison &cleared = rays[30 * 101 + 30];  // (15, 15): the first pass only
     check(cleared.leftover == 0 && cleared.gouge == 0 && cleared.gouge_source == SK_SOURCE_NONE, "cleared to the target");
     const sk_ray_comparison &uncut = rays[2 * 101 + 2];     // (1, 1)
@@ -601,9 +628,9 @@ void target_comparison() {
     near(dipped.gouge, 0.1, 1e-12, "the dip is a gouge");
     check(dipped.gouge_source == 9 && dipped.leftover == 0, "the gouge names the move that dipped");
     // Grids must match.
-    sk_grid other = grid(0, 0, 0.25, 201, 121);
+    sk_lattice other = grid(0, 0, 0.25, 201, 121);
     sk_stock_handle fine = box_stock(other, 0, 0, 0, 50, 30, 15);
-    check(sk_stock_compare(s, fine, 0, 0, 1, 1, rays.data(), 1) == SK_ERROR_INVALID_ARGUMENT, "grids must match");
+    check(sk_stock_compare(s, fine, SK_AXIS_Z, 0, 0, 1, 1, rays.data(), 1) == SK_ERROR_INVALID_ARGUMENT, "grids must match");
     sk_stock_destroy(fine);
     sk_stock_destroy(s);
     sk_stock_destroy(target);
@@ -612,8 +639,8 @@ void target_comparison() {
 
 std::vector<uint64_t> revisions_of(sk_stock_handle s) {
     sk_stock_info info = info_of(s);
-    std::vector<uint64_t> revisions(size_t(info.tiles[0]) * info.tiles[1]);
-    check(sk_stock_read_revisions(s, revisions.data(), uint32_t(revisions.size())) == SK_OK, "read revisions");
+    std::vector<uint64_t> revisions(size_t(info.grids[SK_AXIS_Z].tiles[0]) * info.grids[SK_AXIS_Z].tiles[1]);
+    check(sk_stock_read_revisions(s, SK_AXIS_Z, revisions.data(), uint32_t(revisions.size())) == SK_OK, "read revisions");
     return revisions;
 }
 
@@ -625,7 +652,7 @@ bool same_rays(sk_stock_handle a, sk_stock_handle b) {
 
 void snapshots() {
     sk_tool_handle t = flat(6, 20);
-    sk_grid g = grid(0, 0, 0.5, 101, 61);
+    sk_lattice g = grid(0, 0, 0.5, 101, 61);
     sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
     sk_stock_handle copy = box_stock(g, 0, 0, 0, 50, 30, 20);
     cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 0)}, "before snapshot");
@@ -651,7 +678,7 @@ void snapshots() {
     cut(s, t, {line_move(2, 2, 5, 48, 28, 5, 2)}, "diverge again");
     sk_stock_handle other = box_stock(g, 0, 0, 0, 50, 30, 20);
     check(sk_stock_restore(other, shot) == SK_OK && same_rays(other, copy), "the snapshot survives later cuts");
-    sk_grid wrong = grid(0, 0, 0.25, 201, 121);
+    sk_lattice wrong = grid(0, 0, 0.25, 201, 121);
     sk_stock_handle mismatched = box_stock(wrong, 0, 0, 0, 50, 30, 20);
     check(sk_stock_restore(mismatched, shot) == SK_ERROR_INVALID_ARGUMENT, "snapshots need the same grid");
     sk_snapshot_destroy(shot);
@@ -661,7 +688,7 @@ void snapshots() {
 }
 
 struct MeshData {
-    std::vector<float> positions;
+    std::vector<float> positions, normals;
     std::vector<uint32_t> indices, sources, colors;
 };
 
@@ -704,22 +731,22 @@ double enclosed(const MeshData &d) {
 
 void preview_mesh() {
     sk_tool_handle t = ball(6, 20);
-    sk_grid g = grid(0.1, 0.2, 0.5, 90, 50, 8);
+    sk_lattice g = grid(0.1, 0.2, 0.5, 90, 50, 8);
     sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
     cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 0), arc_move(25, 15, 12, 6, 0, 3, 0, 1),
         line_move(5, 5, 21, 30, 25, 14, 2)}, "cut for preview");
     sk_stock_info info = info_of(s);
-    MeshData closed = mesh_of(s, 0, 0, info.tiles[0], info.tiles[1], SK_MESH_BOTTOMS);
+    MeshData closed = mesh_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], SK_MESH_BOTTOMS);
     near(enclosed(closed), info.volume, 1e-5 * info.volume, "closed preview mesh encloses the stock's volume");
-    MeshData merged = mesh_of(s, 0, 0, info.tiles[0], info.tiles[1], SK_MESH_BOTTOMS | SK_MESH_MERGE);
+    MeshData merged = mesh_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], SK_MESH_BOTTOMS | SK_MESH_MERGE);
     near(enclosed(merged), info.volume, 1e-5 * info.volume, "merged preview mesh encloses the same volume");
     check(merged.indices.size() < closed.indices.size() / 2, "merging joins the flat faces");
     // Chunks: the walls between them are emitted once, so the pieces add up to the whole.
     double pieces = 0;
     size_t triangles = 0;
-    for (uint32_t ty = 0; ty < info.tiles[1]; ty += 3)
-        for (uint32_t tx = 0; tx < info.tiles[0]; tx += 4) {
-            MeshData piece = mesh_of(s, tx, ty, std::min(4u, info.tiles[0] - tx), std::min(3u, info.tiles[1] - ty),
+    for (uint32_t ty = 0; ty < info.grids[SK_AXIS_Z].tiles[1]; ty += 3)
+        for (uint32_t tx = 0; tx < info.grids[SK_AXIS_Z].tiles[0]; tx += 4) {
+            MeshData piece = mesh_of(s, tx, ty, std::min(4u, info.grids[SK_AXIS_Z].tiles[0] - tx), std::min(3u, info.grids[SK_AXIS_Z].tiles[1] - ty),
                 SK_MESH_BOTTOMS);
             pieces += enclosed(piece);
             triangles += piece.indices.size();
@@ -731,7 +758,7 @@ void preview_mesh() {
     for (uint32_t source : closed.sources) named = named || source == 1;
     check(named, "the arc's surfaces carry its source");
     sk_mesh_handle m{};
-    mesh_of(s, 0, 0, info.tiles[0], info.tiles[1], 0, &m);
+    mesh_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], 0, &m);
     uint32_t palette[3] = {0xFF0000FFu, 0x00FF00FFu, 0x0000FFFFu};
     check(sk_mesh_color_by_source(m, palette, 3, 0x808080FFu, 0) == SK_OK, "colour by source");
     auto colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
@@ -746,15 +773,284 @@ void preview_mesh() {
     }
     check(matches, "each triangle is coloured by its source");
     std::vector<uint32_t> rays(size_t(90) * 50, 0x123456FFu);
-    check(sk_mesh_color_by_ray(m, rays.data(), uint32_t(rays.size())) == SK_OK, "colour by ray");
+    check(sk_mesh_color_by_ray(m, SK_AXIS_Z, rays.data(), uint32_t(rays.size())) == SK_OK, "colour by ray");
     sk_mesh_destroy(m);
     mesh_of(s, 0, 0, 1, 1, SK_MESH_MERGE, &m);
-    check(sk_mesh_color_by_ray(m, rays.data(), uint32_t(rays.size())) == SK_ERROR_UNSUPPORTED,
+    check(sk_mesh_color_by_ray(m, SK_AXIS_Z, rays.data(), uint32_t(rays.size())) == SK_ERROR_UNSUPPORTED,
         "merged meshes cannot be coloured per ray");
     sk_mesh_destroy(m);
-    check(sk_stock_mesh(s, 0, 0, info.tiles[0] + 1, 1, 0, &m) == SK_ERROR_INVALID_ARGUMENT, "tile range is checked");
+    check(sk_stock_mesh(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0] + 1, 1, 0, &m) == SK_ERROR_INVALID_ARGUMENT, "tile range is checked");
     sk_stock_destroy(s);
     sk_tool_destroy(t);
+}
+
+/** A contoured mesh of tiles and the edges it drew without a matching ray surface. */
+MeshData contour_of(sk_stock_handle s, uint32_t tx, uint32_t ty, uint32_t nx, uint32_t ny, uint32_t *unmatched) {
+    sk_mesh_handle m{};
+    MeshData d = mesh_of(s, tx, ty, nx, ny, SK_MESH_CONTOUR, &m);
+    sk_mesh_info info{};
+    info.struct_size = sizeof info;
+    check(sk_mesh_get_info(m, &info) == SK_OK, "contour mesh info");
+    *unmatched = info.unmatched_edges;
+    d.normals = mesh_stream<float>(m, sk_mesh_copy_normals);
+    sk_mesh_destroy(m);
+    return d;
+}
+
+/**
+ * Closed and consistently oriented: after welding equal positions, every
+ * directed edge of a non-degenerate triangle is matched by as many edges
+ * the other way.
+ */
+bool closed_surface(const std::vector<const MeshData *> &parts) {
+    std::map<std::array<float, 3>, uint32_t> welded;
+    std::map<std::pair<uint32_t, uint32_t>, int> edges;
+    for (const MeshData *d : parts)
+        for (size_t k = 0; k < d->indices.size(); k += 3) {
+            uint32_t id[3];
+            for (int c = 0; c < 3; ++c) {
+                const float *p = &d->positions[3 * d->indices[k + c]];
+                id[c] = welded.emplace(std::array<float, 3>{p[0], p[1], p[2]}, uint32_t(welded.size())).first->second;
+            }
+            if (id[0] == id[1] || id[1] == id[2] || id[2] == id[0]) continue;
+            for (int c = 0; c < 3; ++c) {
+                uint32_t a = id[c], b = id[(c + 1) % 3];
+                if (a < b) ++edges[{a, b}];
+                else --edges[{b, a}];
+            }
+        }
+    for (const auto &e : edges)
+        if (e.second != 0) return false;
+    return true;
+}
+
+void contour_mesh() {
+    // A box between the nodes of its lattice: exact faces, edges and corners.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        const double lo[3] = {1.1, 2.2, 0.7}, hi[3] = {48.3, 27.9, 18.35};
+        sk_stock_handle s = box_stock(g, lo[0], lo[1], lo[2], hi[0], hi[1], hi[2]);
+        sk_stock_info info = info_of(s);
+        uint32_t unmatched = 0;
+        MeshData d = contour_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], &unmatched);
+        check(unmatched == 0, "box: every crossing is on a ray surface");
+        check(closed_surface({&d}), "box: the contoured mesh is closed");
+        near(enclosed(d), (hi[0] - lo[0]) * (hi[1] - lo[1]) * (hi[2] - lo[2]), 1e-3, "box: contoured volume");
+        double off = 0;
+        bool axial = true;
+        for (size_t v = 0; v < d.positions.size() / 3; ++v) {
+            double gap = 1e9;
+            for (int c = 0; c < 3; ++c) {
+                double p = d.positions[3 * v + c];
+                off = std::max(off, std::max(lo[c] - p, p - hi[c]));
+                gap = std::min({gap, std::fabs(p - lo[c]), std::fabs(p - hi[c])});
+            }
+            off = std::max(off, gap);
+            int ones = 0;
+            for (int c = 0; c < 3; ++c) ones += std::fabs(d.normals[3 * v + c]) == 1;
+            axial = axial && ones == 1;
+        }
+        check(off < 1e-5, "box: every vertex lies on the box (" + std::to_string(off) + " off)");
+        check(axial, "box: normals are the faces' normals");
+        // Chunks of 3 x 2 tiles own disjoint edges and join exactly.
+        std::vector<MeshData> pieces;
+        size_t triangles = 0;
+        for (uint32_t ty = 0; ty < info.grids[SK_AXIS_Z].tiles[1]; ty += 2)
+            for (uint32_t tx = 0; tx < info.grids[SK_AXIS_Z].tiles[0]; tx += 3) {
+                pieces.push_back(contour_of(s, tx, ty, std::min(3u, info.grids[SK_AXIS_Z].tiles[0] - tx),
+                    std::min(2u, info.grids[SK_AXIS_Z].tiles[1] - ty), &unmatched));
+                triangles += pieces.back().indices.size();
+            }
+        std::vector<const MeshData *> parts;
+        for (const MeshData &p : pieces) parts.push_back(&p);
+        check(triangles == d.indices.size(), "box: chunks hold the same triangles as one mesh");
+        check(closed_surface(parts), "box: chunks join into a closed surface");
+        // Stock past the lattice is closed off half a cell outside the last nodes.
+        sk_stock_destroy(s);
+        s = box_stock(g, -5, -5, -5, 60, 40, 30);
+        d = contour_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], &unmatched);
+        check(unmatched > 0 && closed_surface({&d}), "box past the lattice: closed at the lattice's edge");
+        near(enclosed(d), 50.0 * 30 * 20, 1e-3, "box past the lattice: the lattice's cells");
+        sk_stock_destroy(s);
+    }
+    // Slots: the flat mill's walls and rounded ends, and the ball mill's floor.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        const double pi = 3.14159265358979323846;
+        struct Case { const char *name; sk_tool_handle tool; double removed, tolerance; };
+        Case cases[] = {
+            {"flat slot", flat(6, 20), (30 * 6 + pi * 9) * 5, 1e-3},
+            {"ball slot", ball(6, 20), 30 * (pi * 9 / 2 + 12) + (2 * pi * 27 / 3 + pi * 9 * 2), 2e-3},
+        };
+        for (Case &c : cases) {
+            sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+            cut(s, c.tool, {line_move(10, 15, 15, 40, 15, 15, 7)}, c.name);
+            sk_stock_info info = info_of(s);
+            uint32_t unmatched = 0;
+            MeshData d = contour_of(s, 0, 0, info.grids[SK_AXIS_Z].tiles[0], info.grids[SK_AXIS_Z].tiles[1], &unmatched);
+            std::string name = c.name;
+            check(unmatched == 0, name + ": every crossing is on a ray surface");
+            check(closed_surface({&d}), name + ": closed");
+            double volume = enclosed(d);
+            near(volume, 30000 - c.removed, c.tolerance * c.removed,
+                name + ": contoured volume (" + std::to_string(30000 - volume) + " removed)");
+            bool cut_faces = false, walls = false;
+            for (size_t k = 0; k < d.sources.size(); ++k) {
+                if (d.sources[k] != 7) continue;
+                cut_faces = true;
+                const float *n = &d.normals[3 * d.indices[3 * k]];
+                walls = walls || (std::fabs(n[2]) < 1e-6 && std::fabs(n[1]) > 0.99);
+            }
+            check(cut_faces && walls, name + ": its walls carry the move's source and wall normals");
+            sk_stock_destroy(s);
+            sk_tool_destroy(c.tool);
+        }
+    }
+    // A finishing pass shaving 0.1 mm off a wall changes no Z ray, yet renews
+    // the Z tiles it passes over and moves the contoured wall.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+        sk_tool_handle t = flat(6, 30);
+        sk_stock_info info = info_of(s);
+        uint32_t unmatched = 0;
+        const uint32_t tiles_x = info.grids[SK_AXIS_Z].tiles[0], tiles_y = info.grids[SK_AXIS_Z].tiles[1];
+        MeshData before = contour_of(s, 0, 0, tiles_x, tiles_y, &unmatched);
+        std::vector<uint64_t> z_before = revisions_of(s);
+        sk_snapshot_handle shot{};
+        check(sk_stock_snapshot(s, &shot) == SK_OK, "shave snapshot");
+        cut(s, t, {line_move(-2.9, -5, -1, -2.9, 35, -1, 3)}, "shave the -x wall");
+        info = info_of(s);
+        near(info.grids[SK_AXIS_Z].volume, 30000, 1e-9, "shave: the Z grid sees nothing");
+        near(info.grids[SK_AXIS_X].volume, 30000 - 0.1 * 30 * 20, 1e-6, "shave: the X grid sees it");
+        std::vector<uint64_t> z_after = revisions_of(s);
+        bool renewed = z_after[0] != z_before[0] && z_after[(tiles_y - 1) * tiles_x] != z_before[(tiles_y - 1) * tiles_x];
+        bool spared = z_after[tiles_x - 1] == z_before[tiles_x - 1] && z_after[tiles_y * tiles_x - 1] == z_before[tiles_y * tiles_x - 1];
+        check(renewed && spared, "shave: renews the revisions of the Z tiles along the wall only");
+        MeshData after = contour_of(s, 0, 0, tiles_x, tiles_y, &unmatched);
+        near(enclosed(before) - enclosed(after), 0.1 * 30 * 20, 1e-3, "shave: the contoured wall moves");
+        z_before = z_after;
+        check(sk_stock_restore(s, shot) == SK_OK, "shave restore");
+        z_after = revisions_of(s);
+        check(z_after[0] != z_before[0] && z_after[(tiles_y - 1) * tiles_x] != z_before[(tiles_y - 1) * tiles_x],
+            "shave: restoring X and Y tiles renews the Z tiles over them");
+        sk_snapshot_destroy(shot);
+        sk_stock_destroy(s);
+        sk_tool_destroy(t);
+    }
+    // A through-slot 0.4 mm too wide and 0.2 mm too shallow: its walls are
+    // gouged by 0.2 mm between Z rays, which only Y rays see, and its floor
+    // keeps 0.2 mm of leftover. Colouring by deviation marks each surface by
+    // what its own ray finds there.
+    {
+        sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+        sk_stock_handle target = box_stock(g, 0, 0, 0, 50, 30, 20), s = box_stock(g, 0, 0, 0, 50, 30, 20);
+        sk_tool_handle right = flat(6, 20), wide = flat(6.4, 20);
+        cut(target, right, {line_move(-10, 15, 14.8, 60, 15, 14.8, 0)}, "target slot");
+        cut(s, wide, {line_move(-10, 1, 30, 60, 1, 30, 0), line_move(-10, 15, 15, 60, 15, 15, 1)}, "wide slot");
+        sk_stock_info info = info_of(s);
+        double deepest[3] = {0, 0, 0}, thickest[3] = {0, 0, 0};
+        bool named = true;
+        for (uint32_t axis = 0; axis < 3; ++axis) {
+            const sk_grid_info &grid = info.grids[axis];
+            uint32_t n = grid.count[0] * grid.count[1];
+            std::vector<sk_ray_comparison> rays(n);
+            check(sk_stock_compare(s, target, axis, 0, 0, grid.count[0], grid.count[1], rays.data(), n) == SK_OK,
+                "slot comparison");
+            for (const sk_ray_comparison &r : rays) {
+                deepest[axis] = std::max(deepest[axis], r.largest_gouge);
+                thickest[axis] = std::max(thickest[axis], r.largest_leftover);
+                if (r.largest_gouge > 0.1) named = named && r.gouge_source == 1;
+            }
+        }
+        check(deepest[SK_AXIS_Z] == 0 && deepest[SK_AXIS_X] == 0, "wall gouge: no Z or X ray sees it");
+        near(deepest[SK_AXIS_Y], 0.2, 1e-9, "wall gouge: Y rays see 0.2 mm");
+        near(thickest[SK_AXIS_Z], 0.2, 1e-9, "floor leftover: Z rays see 0.2 mm");
+        check(named, "wall gouge: the wide slot's move made it");
+        sk_mesh_handle m{};
+        const uint32_t tiles_x = info.grids[SK_AXIS_Z].tiles[0], tiles_y = info.grids[SK_AXIS_Z].tiles[1];
+        check(sk_stock_mesh(s, 0, 0, tiles_x, tiles_y, SK_MESH_CONTOUR, &m) == SK_OK, "slot mesh");
+        const uint32_t green = 0x00FF00FFu, yellow = 0xFFFF00FFu, red = 0xFF0000FFu;
+        check(sk_mesh_color_by_deviation(m, target, 0.1, green, yellow, red) == SK_OK, "colour by deviation");
+        auto mesh_colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+        auto normals = mesh_stream<float>(m, sk_mesh_copy_normals);
+        auto positions = mesh_stream<float>(m, sk_mesh_copy_positions);
+        int walls = 0, floors = 0, faces = 0, wrong = 0;
+        for (size_t v = 0; v < mesh_colors.size(); ++v) {
+            const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&mesh_colors[v]);
+            uint32_t color = uint32_t(rgba[0]) << 24 | uint32_t(rgba[1]) << 16 | uint32_t(rgba[2]) << 8 | rgba[3];
+            const float *p = &positions[3 * v], *n = &normals[3 * v];
+            bool inner = p[0] > 1 && p[0] < 49;
+            if (inner && std::fabs(n[1]) > 0.99 && p[2] > 15.5 && std::fabs(std::fabs(p[1] - 15) - 3.2) < 0.01) {
+                ++walls; // the slot's walls
+                wrong += color != red;
+            } else if (inner && n[2] > 0.99 && std::fabs(p[2] - 15) < 1e-4 && std::fabs(p[1] - 15) < 2.5) {
+                ++floors; // the slot's floor, away from its walls
+                wrong += color != yellow;
+            } else if (inner && std::fabs(n[1]) > 0.99 && (p[1] < 0.01 || p[1] > 29.99)) {
+                ++faces; // the box's sides, on the same Y rays as the walls
+                wrong += color != green;
+            }
+        }
+        check(walls > 0 && floors > 0 && faces > 0 && wrong == 0, "deviation colours: walls gouged, floor leftover, "
+            "sides on target (" + std::to_string(wrong) + " of " + std::to_string(walls + floors + faces) + " wrong)");
+        // Colouring by ray takes each grid's colours for the quads made from its rays.
+        std::vector<uint32_t> ys(size_t(info.grids[SK_AXIS_Y].count[0]) * info.grids[SK_AXIS_Y].count[1], red);
+        check(sk_mesh_color_by_ray(m, SK_AXIS_Y, ys.data(), uint32_t(ys.size())) == SK_OK, "colour by Y ray");
+        check(sk_mesh_color_by_ray(m, 3, ys.data(), uint32_t(ys.size())) == SK_ERROR_INVALID_ARGUMENT,
+            "colour by ray checks the axis");
+        check(sk_mesh_color_by_ray(m, SK_AXIS_Y, ys.data(), uint32_t(ys.size() - 1)) == SK_ERROR_INVALID_ARGUMENT,
+            "colour by ray needs every ray of the grid");
+        mesh_colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+        bool only_y = true;
+        for (size_t v = 0; v < mesh_colors.size(); ++v) {
+            const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&mesh_colors[v]);
+            bool is_red = rgba[0] == 0xFF && rgba[1] == 0 && rgba[2] == 0;
+            if (std::fabs(normals[3 * v + 2]) > 0.99 && is_red) only_y = false; // Z quads keep their colour
+        }
+        check(only_y, "colour by Y ray leaves Z quads alone");
+        sk_mesh_destroy(m);
+        // A 1.2 mm groove in the top: along the Y rays through it the gouge
+        // ends where the stock resumes across the groove, not where the part does.
+        sk_tool_handle narrow = flat(1.2, 20);
+        cut(s, narrow, {line_move(-10, 5, 19.7, 60, 5, 19.7, 2)}, "groove");
+        check(sk_stock_mesh(s, 0, 0, tiles_x, tiles_y, SK_MESH_CONTOUR, &m) == SK_OK, "groove mesh");
+        check(sk_mesh_color_by_deviation(m, target, 2, green, yellow, red) == SK_OK, "colour the groove");
+        mesh_colors = mesh_stream<uint32_t>(m, sk_mesh_copy_colors);
+        normals = mesh_stream<float>(m, sk_mesh_copy_normals);
+        positions = mesh_stream<float>(m, sk_mesh_copy_positions);
+        int groove = 0, gouged = 0;
+        for (size_t v = 0; v < mesh_colors.size(); ++v) {
+            const float *p = &positions[3 * v];
+            if (std::fabs(normals[3 * v + 1]) < 0.99 || p[2] < 19.7 || std::fabs(std::fabs(p[1] - 5) - 0.6) > 0.01) continue;
+            ++groove;
+            const uint8_t *rgba = reinterpret_cast<const uint8_t *>(&mesh_colors[v]);
+            gouged += rgba[1] == 0;
+        }
+        check(groove > 0 && gouged == 0, "groove walls gouge only the groove's width (" + std::to_string(gouged) +
+            " of " + std::to_string(groove) + " marked)");
+        sk_mesh_destroy(m);
+        sk_tool_destroy(narrow);
+        check(sk_stock_mesh(s, 0, 0, 1, 1, 0, &m) == SK_OK &&
+                sk_mesh_color_by_deviation(m, target, 0.1, green, yellow, red) == SK_ERROR_UNSUPPORTED,
+            "colour by deviation needs a contoured mesh");
+        sk_mesh_destroy(m);
+        sk_stock_destroy(s);
+        sk_stock_destroy(target);
+        sk_tool_destroy(right);
+        sk_tool_destroy(wide);
+    }
+    // Contouring needs all three grids and takes no other flags.
+    {
+        sk_stock_handle s = box_stock(grid(0, 0, 0.5, 20, 20), 0, 0, 0, 5, 5, 5);
+        sk_mesh_handle m{};
+        check(sk_stock_mesh(s, 0, 0, 1, 1, SK_MESH_CONTOUR, &m) == SK_ERROR_UNSUPPORTED, "contour needs X and Y grids");
+        sk_stock_destroy(s);
+        s = box_stock(lattice(0, 0, 0, 0.5, 20, 20, 20), 0, 0, 0, 5, 5, 5);
+        check(sk_stock_mesh(s, 0, 0, 1, 1, SK_MESH_CONTOUR | SK_MESH_BOTTOMS, &m) == SK_ERROR_INVALID_ARGUMENT,
+            "contour takes no column flags");
+        sk_stock_destroy(s);
+    }
 }
 
 /** A zig-zag of short lines, arcs, ramps and a helix over several levels, cut at each thread count. */
@@ -771,31 +1067,389 @@ void thread_determinism() {
         }
         moves.push_back(line_move(5, 5, z + 1, 45, 25, z - 0.5, source++));
     }
-    sk_grid g = grid(0, 0, 0.23, 218, 131, 8);
-    std::vector<sk_interval> reference;
-    std::vector<double> reference_removed;
-    for (uint32_t threads : {1u, 2u, 3u, 8u, 0u}) {
-        sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
-        check(sk_stock_set_threads(s, threads) == SK_OK, "set threads");
-        auto removed = cut(s, t, moves, "threaded cut");
-        Rays rays = read_all(s);
-        if (threads == 1) {
-            reference = rays.intervals;
-            reference_removed = removed;
-        } else {
-            bool same = rays.intervals.size() == reference.size() &&
-                std::memcmp(rays.intervals.data(), reference.data(), reference.size() * sizeof(sk_interval)) == 0;
-            check(same, "stock with " + std::to_string(threads) + " threads is bit-identical to one thread");
-            check(std::memcmp(removed.data(), reference_removed.data(), removed.size() * sizeof(double)) == 0,
-                "removed volumes with " + std::to_string(threads) + " threads are bit-identical");
+    // A Z grid, then all three grids of a cell-centred lattice.
+    for (const sk_lattice &g : {grid(0, 0, 0.23, 218, 131, 8), lattice(0.115, 0.115, 0.115, 0.23, 218, 131, 87, 8)}) {
+        const uint32_t axes = g.axes;
+        std::vector<sk_interval> reference[3];
+        std::vector<double> reference_removed;
+        for (uint32_t threads : {1u, 2u, 3u, 8u, 0u}) {
+            sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+            check(sk_stock_set_threads(s, threads) == SK_OK, "set threads");
+            auto removed = cut(s, t, moves, "threaded cut");
+            for (uint32_t axis = 0; axis < 3; ++axis) {
+                if (!((axes >> axis) & 1)) continue;
+                Rays rays = read_all(s, axis);
+                if (threads == 1) {
+                    reference[axis] = rays.intervals;
+                    continue;
+                }
+                bool same = rays.intervals.size() == reference[axis].size() &&
+                    std::memcmp(rays.intervals.data(), reference[axis].data(),
+                        reference[axis].size() * sizeof(sk_interval)) == 0;
+                check(same, "grid " + std::to_string(axis) + " with " + std::to_string(threads) +
+                        " threads is bit-identical to one thread");
+            }
+            if (threads == 1) reference_removed = removed;
+            else
+                check(std::memcmp(removed.data(), reference_removed.data(), removed.size() * sizeof(double)) == 0,
+                    "removed volumes with " + std::to_string(threads) + " threads are bit-identical");
+            sk_stock_destroy(s);
         }
-        sk_stock_destroy(s);
+        for (uint32_t axis = 0; axis < 3; ++axis)
+            if ((axes >> axis) & 1) check(reference[axis].size() > 1000, "determinism program cuts many rays");
     }
-    check(reference.size() > 1000, "determinism program cuts many rays");
+    sk_tool_destroy(t);
+}
+
+/** Box stock, a slot and mesh casting on all three grids of a cell-centred lattice. */
+void tri_dexel() {
+    // Nodes at cell centres of [0, 50] x [0, 30] x [0, 20], so no ray lies in a face.
+    sk_lattice g = lattice(0.25, 0.25, 0.25, 0.5, 100, 60, 40);
+    sk_stock_handle s = box_stock(g, 0, 0, 0, 50, 30, 20);
+    sk_stock_info info = info_of(s);
+    const uint32_t counts[3][2] = {{60, 40}, {100, 40}, {100, 60}};
+    for (uint32_t axis = 0; axis < 3; ++axis) {
+        const sk_grid_info &grid = info.grids[axis];
+        check(grid.present && grid.count[0] == counts[axis][0] && grid.count[1] == counts[axis][1],
+            "grid " + std::to_string(axis) + " rays");
+        near(grid.volume, 30000, 1e-9, "grid " + std::to_string(axis) + " sees the box's volume");
+    }
+    Rays along_x = read_all(s, SK_AXIS_X);
+    uint32_t n;
+    const sk_interval *r = along_x.at(3, 5, n);
+    check(n == 1 && r[0].lo == 0 && r[0].hi == 50 && r[0].lo_normal[0] == -1 && r[0].hi_normal[0] == 1,
+        "X rays cross the box with its end faces' normals");
+    sk_snapshot_handle shot{};
+    check(sk_stock_snapshot(s, &shot) == SK_OK, "tri-dexel snapshot");
+
+    // A flat slot (radius 3) along X at y = 15 with its tip at z = 15, from x = 10 to 40.
+    sk_tool_handle t = flat(6, 20);
+    cut(s, t, {line_move(10, 15, 15, 40, 15, 15, 7)}, "tri-dexel slot");
+    along_x = read_all(s, SK_AXIS_X);
+    Rays along_y = read_all(s, SK_AXIS_Y);
+    int wrong = 0, tested = 0;
+    for (uint32_t k = 0; k < 40; ++k) {
+        double z = 0.25 + 0.5 * k;
+        for (uint32_t j = 0; j < 60; ++j) {
+            double dy = 0.25 + 0.5 * j - 15;
+            r = along_x.at(j, k, n);
+            bool ok;
+            if (z > 15 && std::fabs(dy) < 3) {
+                ++tested;
+                // The slot's rounded ends, as seen from the side.
+                double w = std::sqrt(9 - dy * dy);
+                ok = n == 2 && r[0].lo == 0 && std::fabs(r[0].hi - (10 - w)) < 1e-12 &&
+                    std::fabs(r[1].lo - (40 + w)) < 1e-12 && r[1].hi == 50 && r[0].hi_source == 7 &&
+                    r[1].lo_source == 7 && r[0].hi_normal[0] > 0 && r[1].lo_normal[0] < 0;
+            } else {
+                ok = n == 1 && r[0].lo == 0 && r[0].hi == 50 && r[0].hi_source == SK_SOURCE_STOCK;
+            }
+            if (!ok) ++wrong;
+        }
+        for (uint32_t i = 0; i < 100; ++i) {
+            double x = 0.25 + 0.5 * i;
+            double end = std::fabs(x - std::max(10.0, std::min(40.0, x)));
+            r = along_y.at(i, k, n);
+            bool ok;
+            if (z > 15 && end < 3) {
+                ++tested;
+                double half = std::sqrt(9 - end * end);
+                ok = n == 2 && r[0].lo == 0 && std::fabs(r[0].hi - (15 - half)) < 1e-12 &&
+                    std::fabs(r[1].lo - (15 + half)) < 1e-12 && r[1].hi == 30 && r[0].hi_source == 7 &&
+                    r[0].hi_normal[1] > 0 && r[1].lo_normal[1] < 0 && r[0].hi_normal[2] == 0;
+            } else {
+                ok = n == 1 && r[0].lo == 0 && r[0].hi == 30;
+            }
+            if (!ok) ++wrong;
+        }
+    }
+    check(wrong == 0 && tested > 300, "slot seen along X and Y (" + std::to_string(wrong) + " wrong of " +
+            std::to_string(tested) + ")");
+    // Each grid measures the slot's volume to within its rays' resolution.
+    sk_stock_info after = info_of(s);
+    const double slot = (30 * 6 + kPi * 9) * 5;
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        near(30000 - after.grids[axis].volume, slot, 0.03 * slot, "grid " + std::to_string(axis) + " slot volume");
+    check(sk_stock_restore(s, shot) == SK_OK, "tri-dexel restore");
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        check(info_of(s).grids[axis].volume == 30000, "restore returns grid " + std::to_string(axis));
+    sk_snapshot_destroy(shot);
+    sk_stock_destroy(s);
+
+    // The octahedron |x - 25| + |y - 15| + |z - 10| <= 6 cast along each axis; Y rays cast a reflected copy.
+    std::vector<double> o = {31, 15, 10, 19, 15, 10, 25, 21, 10, 25, 9, 10, 25, 15, 16, 25, 15, 4};
+    std::vector<uint32_t> oi = {0, 2, 4, 2, 1, 4, 1, 3, 4, 3, 0, 4, 2, 0, 5, 1, 2, 5, 3, 1, 5, 0, 3, 5};
+    sk_stock_handle m{};
+    check(sk_stock_create_mesh(&g, o.data(), uint32_t(o.size()), oi.data(), uint32_t(oi.size()), &m) == SK_OK,
+        "octahedron on all grids");
+    const double centre[3] = {25, 15, 10};
+    wrong = 0;
+    tested = 0;
+    for (uint32_t axis = 0; axis < 2; ++axis) {
+        Rays rays = read_all(m, axis);
+        const uint32_t ua = axis == 0 ? 1 : 0, va = 2;
+        for (uint32_t b = 0; b < 40; ++b)
+            for (uint32_t a = 0; a < counts[axis][0]; ++a) {
+                double du = 0.25 + 0.5 * a - centre[ua], dv = 0.25 + 0.5 * b - centre[va];
+                double half = 6 - std::fabs(du) - std::fabs(dv);
+                r = rays.at(a, b, n);
+                if (half <= 0) {
+                    if (n != 0) ++wrong;
+                    continue;
+                }
+                ++tested;
+                // Outward normals (±1, ±1, ±1) / sqrt(3), signed by the octant.
+                const float third = float(1 / std::sqrt(3.0));
+                bool ok = n == 1 && std::fabs(r[0].lo - (centre[axis] - half)) < 1e-12 &&
+                    std::fabs(r[0].hi - (centre[axis] + half)) < 1e-12 &&
+                    std::fabs(r[0].lo_normal[axis] + third) < 1e-6 && std::fabs(r[0].hi_normal[axis] - third) < 1e-6 &&
+                    std::fabs(r[0].lo_normal[ua] - (du > 0 ? third : -third)) < 1e-6 &&
+                    std::fabs(r[0].lo_normal[va] - (dv > 0 ? third : -third)) < 1e-6;
+                if (!ok) ++wrong;
+            }
+    }
+    check(wrong == 0 && tested > 200, "octahedron along X and Y (" + std::to_string(wrong) + " wrong of " +
+            std::to_string(tested) + ")");
+    sk_stock_destroy(m);
+
+    // Stock far along +x: an X tile's material bounds are x values, which must not be compared with z.
+    sk_lattice far = lattice(100.25, 0.25, 0.25, 0.5, 100, 60, 40);
+    s = box_stock(far, 100, 0, 0, 150, 30, 20);
+    cut(s, t, {line_move(110, 15, 15, 140, 15, 15, 1)}, "slot in stock far along x");
+    info = info_of(s);
+    for (uint32_t axis = 0; axis < 3; ++axis)
+        near(30000 - info.grids[axis].volume, slot, 0.03 * slot, "grid " + std::to_string(axis) + " cuts stock far along x");
+    sk_stock_destroy(s);
     sk_tool_destroy(t);
 }
 
 } // namespace
+
+/** Checks a horizontal ray's intervals and their ends' normals, when given. */
+void expect_spans(sk_tool_handle t, const sk_move &m, uint32_t axis, double u, double v,
+    const std::vector<std::pair<double, double>> &expected, const std::string &what,
+    const std::vector<float> &lo_normal = {}, const std::vector<float> &hi_normal = {}) {
+    auto spans = sweep_axis(t, m, axis, u, v);
+    check(spans.size() == expected.size(),
+        what + ": " + std::to_string(spans.size()) + " spans, expected " + std::to_string(expected.size()));
+    if (spans.size() != expected.size()) return;
+    for (size_t k = 0; k < spans.size(); ++k) {
+        near(spans[k].lo, expected[k].first, 1e-12, what + " lo");
+        near(spans[k].hi, expected[k].second, 1e-12, what + " hi");
+    }
+    for (int c = 0; c < 3 && !lo_normal.empty(); ++c) near(spans[0].lo_normal[c], lo_normal[c], 1e-6, what + " lo normal");
+    for (int c = 0; c < 3 && !hi_normal.empty(); ++c)
+        near(spans.back().hi_normal[c], hi_normal[c], 1e-6, what + " hi normal");
+}
+
+void horizontal_level() {
+    sk_tool_handle f = flat(6, 20);
+    const double s8 = std::sqrt(8.0);
+    // A slot along X at y = 20, tip at z = 5.
+    sk_move along_x = line_move(10, 20, 5, 40, 20, 5);
+    expect_spans(f, along_x, SK_AXIS_Y, 25, 8, {{17, 23}}, "Y ray across an X slot", {0, 1, 0}, {0, -1, 0});
+    expect_spans(f, along_x, SK_AXIS_X, 21, 8, {{10 - s8, 40 + s8}}, "X ray along an X slot",
+        {float(s8 / 3), -1.0f / 3, 0}, {float(-s8 / 3), -1.0f / 3, 0});
+    expect_spans(f, along_x, SK_AXIS_X, 20, 4.9, {}, "X ray below the tip");
+    expect_spans(f, along_x, SK_AXIS_X, 20, 25.1, {}, "X ray above the tool");
+    expect_spans(f, along_x, SK_AXIS_X, 23.5, 8, {}, "X ray beside the slot");
+    // The same slot along Y.
+    sk_move along_y = line_move(20, 10, 5, 20, 40, 5);
+    expect_spans(f, along_y, SK_AXIS_Y, 21, 8, {{10 - s8, 40 + s8}}, "Y ray along a Y slot",
+        {-1.0f / 3, float(s8 / 3), 0});
+    expect_spans(f, along_y, SK_AXIS_X, 25, 8, {{17, 23}}, "X ray across a Y slot", {1, 0, 0}, {-1, 0, 0});
+    // A diagonal slot: the capsule's sides.
+    sk_move diagonal = line_move(10, 10, 5, 30, 30, 5);
+    expect_spans(f, diagonal, SK_AXIS_X, 20, 8, {{20 - 3 * std::sqrt(2.0), 20 + 3 * std::sqrt(2.0)}},
+        "X ray across a diagonal slot");
+
+    // A ball mill below its centre: the section at height 1 has radius sqrt(5).
+    sk_tool_handle b = ball(6, 20);
+    const double s5 = std::sqrt(5.0);
+    expect_spans(b, along_x, SK_AXIS_X, 20, 6, {{10 - s5, 40 + s5}}, "ball section below its centre",
+        {float(s5 / 3), 0, 2.0f / 3}, {float(-s5 / 3), 0, 2.0f / 3});
+
+    // Arcs of radius 10 about (50, 50) with the flat mill (radius 3).
+    sk_move circle = arc_move(50, 50, 5, 10, 0, 2 * kPi, 0);
+    expect_spans(f, circle, SK_AXIS_X, 50, 8, {{37, 43}, {57, 63}}, "X ray through a circle's centre",
+        {1, 0, 0}, {-1, 0, 0});
+    expect_spans(f, circle, SK_AXIS_Y, 50, 8, {{37, 43}, {57, 63}}, "Y ray through a circle's centre",
+        {0, 1, 0}, {0, -1, 0});
+    const double s168 = std::sqrt(168.0), s48 = std::sqrt(48.0);
+    for (double sweep : {kPi, -kPi}) {
+        sk_move upper = arc_move(50, 50, 5, 10, sweep > 0 ? 0 : kPi, sweep, 0);
+        std::string dir = sweep > 0 ? " (counter-clockwise)" : " (clockwise)";
+        expect_spans(f, upper, SK_AXIS_X, 51, 8, {{50 - s168, 50 - s48}, {50 + s48, 50 + s168}},
+            "X ray through an upper half circle" + dir);
+        expect_spans(f, upper, SK_AXIS_X, 49, 8, {{40 - s8, 40 + s8}, {60 - s8, 60 + s8}},
+            "X ray under an upper half circle meets its end discs" + dir);
+        expect_spans(f, upper, SK_AXIS_Y, 50, 8, {{57, 63}}, "Y ray through an upper half circle" + dir);
+    }
+    // The left half circle, from (50, 60) to (50, 40), seen by Y rays.
+    sk_move left = arc_move(50, 50, 5, 10, kPi / 2, kPi, 0);
+    expect_spans(f, left, SK_AXIS_Y, 49, 8, {{50 - s168, 50 - s48}, {50 + s48, 50 + s168}},
+        "Y ray through a left half circle");
+    expect_spans(f, left, SK_AXIS_Y, 51, 8, {{40 - s8, 40 + s8}, {60 - s8, 60 + s8}},
+        "Y ray beside a left half circle meets its end discs");
+    // A quarter arc from (60, 50) to (50, 60): the sector's edge bounds the ray.
+    sk_move quarter = arc_move(50, 50, 5, 10, 0, kPi / 2, 0);
+    expect_spans(f, quarter, SK_AXIS_X, 55, 8, {{50 + std::sqrt(24.0), 62}}, "X ray through a quarter arc");
+    // An arc tighter than the tool sweeps a full disc.
+    sk_move tight = arc_move(50, 50, 5, 2, 0, 2 * kPi, 0);
+    expect_spans(f, tight, SK_AXIS_X, 50, 8, {{45, 55}}, "X ray through a tight circle");
+
+    // Necked tool: flutes of radius 3 to height 5, a neck of radius 2 to 15.
+    sk_tool_handle n = tool({line(0, 0, 3, 0), line(3, 0, 3, 5), line(3, 5, 2, 5), line(2, 5, 2, 15),
+        line(2, 15, 3, 15), line(3, 15, 3, 25)});
+    sk_move neck = line_move(10, 15, 10, 40, 15, 10);
+    const double w = std::sqrt(9 - 6.25);
+    expect_spans(n, neck, SK_AXIS_X, 17.5, 12, {{10 - w, 40 + w}}, "X ray beside the flutes");
+    expect_spans(n, neck, SK_AXIS_X, 17.5, 18, {}, "X ray beside the neck misses it");
+    expect_spans(n, neck, SK_AXIS_Y, 25, 18, {{13, 17}}, "Y ray through the neck", {0, 1, 0}, {0, -1, 0});
+    sk_tool_destroy(f);
+    sk_tool_destroy(b);
+    sk_tool_destroy(n);
+}
+
+void horizontal_plunge_ramp_helix() {
+    // A 90-degree V-bit, radius 5 from height 5 up.
+    sk_tool_handle v = tool({line(0, 0, 5, 5), line(5, 5, 5, 20)});
+    sk_move plunge = line_move(20, 20, 10, 20, 20, 4);
+    const float h = float(std::sqrt(0.5));
+    expect_spans(v, plunge, SK_AXIS_Y, 20, 7, {{17, 23}}, "V-bit plunge sweeps its widest section", {0, h, h},
+        {0, -h, h});
+    expect_spans(v, plunge, SK_AXIS_X, 21, 7, {{20 - std::sqrt(8.0), 20 + std::sqrt(8.0)}}, "V-bit plunge off-axis");
+    expect_spans(v, plunge, SK_AXIS_X, 20, 3.9, {}, "below a plunge");
+    sk_move rising = line_move(20, 20, 4, 20, 20, 10);
+    expect_spans(v, rising, SK_AXIS_Y, 20, 7, {{17, 23}}, "rising plunge");
+
+    // A flat mill (radius 3) ramping down along X from (0, 0, 0) to (10, 0, -2).
+    sk_tool_handle f = flat(6, 20);
+    sk_move ramp = line_move(0, 0, 0, 10, 0, -2);
+    expect_spans(f, ramp, SK_AXIS_X, 0, -1, {{2, 13}}, "X ray along a ramp", {1, 0, 0}, {-1, 0, 0});
+    expect_spans(f, ramp, SK_AXIS_Y, 5, -1, {{-3, 3}}, "Y ray across a ramp", {0, 1, 0}, {0, -1, 0});
+    expect_spans(f, ramp, SK_AXIS_X, 0, -2.5, {}, "X ray under a ramp");
+
+    // A flat mill (radius 2) on a descending turn of radius 5 about the origin.
+    sk_tool_handle g = flat(4, 10);
+    sk_move helix = arc_move(0, 0, 0, 5, 0, 2 * kPi, -2);
+    expect_spans(g, helix, SK_AXIS_X, 0, -1, {{-7, -3}, {3, 7}}, "X ray through the lower half of a helix");
+    expect_spans(g, helix, SK_AXIS_X, 0, -1.5, {{3, 7}}, "X ray through the last quarter of a helix");
+    expect_spans(g, helix, SK_AXIS_Y, 0, -1, {{-7, -3}}, "Y ray through the lower half of a helix");
+    sk_tool_destroy(v);
+    sk_tool_destroy(f);
+    sk_tool_destroy(g);
+}
+
+/**
+ * Horizontal rays against the union of densely sampled poses, each cut by
+ * the ray exactly: the sampled union must lie inside the swept intervals,
+ * and the swept intervals within a sampling step of it.
+ */
+void horizontal_sampled() {
+    struct Shape {
+        const char *name;
+        sk_tool_handle handle;
+        std::function<double(double)> radius; // section radius at height h, negative outside
+    };
+    std::vector<Shape> shapes = {
+        {"flat", flat(6, 20), [](double h) { return h >= 0 && h <= 20 ? 3.0 : -1.0; }},
+        {"ball", ball(6, 20),
+            [](double h) { return h < 0 || h > 20 ? -1.0 : h < 3 ? std::sqrt(9 - (3 - h) * (3 - h)) : 3.0; }},
+        {"bull", bull(10, 2, 20),
+            [](double h) { return h < 0 || h > 20 ? -1.0 : h < 2 ? 3 + std::sqrt(4 - (2 - h) * (2 - h)) : 5.0; }},
+        {"V-bit", tool({line(0, 0, 5, 5), line(5, 5, 5, 20)}),
+            [](double h) { return h < 0 || h > 20 ? -1.0 : std::min(h, 5.0); }},
+        {"necked", tool({line(0, 0, 3, 0), line(3, 0, 3, 5), line(3, 5, 2, 5), line(2, 5, 2, 15),
+                           line(2, 15, 3, 15), line(3, 15, 3, 25)}),
+            [](double h) { return h < 0 || h > 25 ? -1.0 : h <= 5 || h >= 15 ? 3.0 : 2.0; }},
+    };
+    struct Case {
+        const char *name;
+        sk_move move;
+    };
+    const std::vector<Case> cases = {
+        {"level line", line_move(10, 12, 10, 38, 25, 10)},
+        {"plunge", line_move(24, 18, 16, 24, 18, 6)},
+        {"ramp", line_move(10, 15, 15, 40, 20, 9)},
+        {"climb", line_move(12, 24, 6, 36, 12, 14)},
+        {"level arc", arc_move(25, 18, 10, 8, 0.4, 3.9, 0)},
+        {"helix", arc_move(25, 18, 14, 4, 0.3, 4 * kPi, -5)},
+        {"rising helix", arc_move(25, 18, 8, 7, 2.0, -5.0, 3)},
+    };
+    const int samples = 100000;
+    const double tolerance = 2e-3;
+    for (const Shape &shape : shapes)
+        for (const Case &c : cases) {
+            int wrong = 0, tested = 0;
+            unsigned seed = 12345;
+            auto next = [&]() {
+                seed = seed * 1664525u + 1013904223u;
+                return (seed >> 8) / double(1u << 24);
+            };
+            for (int r = 0; r < 60; ++r) {
+                uint32_t axis = r % 2 == 0 ? SK_AXIS_X : SK_AXIS_Y;
+                double u = axis == SK_AXIS_X ? 8 + 22 * next() : 6 + 36 * next();
+                double v = 4 + 20 * next();
+                auto spans = sweep_axis(shape.handle, c.move, axis, u, v);
+                // The sampled union, merging stretches closer than the tolerance.
+                std::vector<std::pair<double, double>> sampled;
+                for (int k = 0; k <= samples; ++k) {
+                    double t = double(k) / samples, x, y, z;
+                    if (c.move.kind == SK_MOVE_LINE) {
+                        x = c.move.start[0] + t * (c.move.end[0] - c.move.start[0]);
+                        y = c.move.start[1] + t * (c.move.end[1] - c.move.start[1]);
+                        z = c.move.start[2] + t * (c.move.end[2] - c.move.start[2]);
+                    } else {
+                        double a = c.move.start_angle + t * c.move.sweep;
+                        x = c.move.center[0] + c.move.radius * std::cos(a);
+                        y = c.move.center[1] + c.move.radius * std::sin(a);
+                        z = c.move.center[2] + t * c.move.rise;
+                    }
+                    double along = axis == SK_AXIS_X ? x : y, off = u - (axis == SK_AXIS_X ? y : x);
+                    double rr = shape.radius(v - z);
+                    if (rr < std::fabs(off)) continue;
+                    double w = std::sqrt(rr * rr - off * off);
+                    sampled.push_back({along - w, along + w});
+                }
+                std::sort(sampled.begin(), sampled.end());
+                std::vector<std::pair<double, double>> merged;
+                for (auto &p : sampled) {
+                    if (!merged.empty() && p.first <= merged.back().second + 2 * tolerance)
+                        merged.back().second = std::max(merged.back().second, p.second);
+                    else merged.push_back(p);
+                }
+                if (merged.empty() && spans.empty()) continue;
+                ++tested;
+                bool ok = true;
+                // Sampled poses are inside the swept set.
+                for (auto &p : sampled) {
+                    bool inside = false;
+                    for (auto &s : spans) inside |= s.lo <= p.first + 1e-9 && s.hi >= p.second - 1e-9;
+                    if (!inside && p.second - p.first > 1e-9) ok = false;
+                }
+                // The swept set is within the tolerance of them.
+                for (auto &s : spans) {
+                    bool close = false;
+                    for (auto &p : merged) close |= s.lo >= p.first - tolerance && s.hi <= p.second + tolerance;
+                    if (!close) ok = false;
+                }
+                if (!ok) {
+                    ++wrong;
+                    if (wrong <= 3) {
+                        std::printf("  %s %s axis %u (%.6f, %.6f):", shape.name, c.name, axis, u, v);
+                        for (auto &s : spans) std::printf(" [%.6f, %.6f]", s.lo, s.hi);
+                        std::printf(" sampled");
+                        for (auto &p : merged) std::printf(" [%.6f, %.6f]", p.first, p.second);
+                        std::printf("\n");
+                    }
+                }
+            }
+            check(wrong == 0 && tested > 10, std::string(shape.name) + " " + c.name + " horizontal rays vs sampling (" +
+                std::to_string(wrong) + " wrong of " + std::to_string(tested) + ")");
+        }
+    for (const Shape &shape : shapes) sk_tool_destroy(shape.handle);
+}
 
 int main() {
     flat_slot();
@@ -805,14 +1459,19 @@ int main() {
     ball_ramp();
     bull_ramp_and_helix();
     necked_tool();
+    horizontal_level();
+    horizontal_plunge_ramp_helix();
+    horizontal_sampled();
     box_mesh();
     provenance_and_rapids();
     handles();
     thread_determinism();
+    tri_dexel();
     shank_and_holder_contact();
     target_comparison();
     snapshots();
     preview_mesh();
+    contour_mesh();
     std::printf("%d of %d checks passed\n", checks - failures, checks);
     return failures == 0 ? 0 : 1;
 }

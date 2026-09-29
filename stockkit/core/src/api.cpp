@@ -1,6 +1,7 @@
 #include "stockkit.h"
 
 #include "mesh.hpp"
+#include "contour.hpp"
 #include "preview.hpp"
 #include "profile.hpp"
 #include "stock.hpp"
@@ -99,7 +100,9 @@ Table<Stock::Snapshot, kKindSnapshot> &snapshots() {
 /** A preview mesh and the grid size its ray indices refer to. */
 struct MeshEntry {
     PreviewMesh mesh;
-    uint64_t rays = 0;
+    uint64_t rays[3] = {0, 0, 0}; // per grid, for colouring by ray
+    uint32_t stock = 0;           // the stock it was built from, for colouring by deviation
+    uint64_t unmatched = 0;
 };
 
 Table<MeshEntry, kKindMesh> &meshes() {
@@ -136,23 +139,38 @@ bool finite(const double *values, int n) {
     return true;
 }
 
-sk_result to_grid(const sk_grid *in, Grid &out) {
-    if (!in || in->struct_size < sizeof(sk_grid)) return SK_ERROR_INVALID_ARGUMENT;
-    if (in->axis > SK_AXIS_Z) return SK_ERROR_INVALID_ARGUMENT;
-    if (in->axis != SK_AXIS_Z) return SK_ERROR_UNSUPPORTED;
-    if (!finite(in->origin, 2) || !std::isfinite(in->spacing) || !(in->spacing > 0))
+sk_result to_lattice(const sk_lattice *in, Lattice &out) {
+    if (!in || in->struct_size < sizeof(sk_lattice)) return SK_ERROR_INVALID_ARGUMENT;
+    if ((in->axes & ~uint32_t(SK_AXES_ALL)) || !(in->axes & SK_AXES_Z)) return SK_ERROR_INVALID_ARGUMENT;
+    if (!finite(in->origin, 3) || !std::isfinite(in->spacing) || !(in->spacing > 0))
         return SK_ERROR_INVALID_ARGUMENT;
-    if (in->count[0] == 0 || in->count[1] == 0) return SK_ERROR_INVALID_ARGUMENT;
-    if (uint64_t(in->count[0]) * in->count[1] > (uint64_t(1) << 32)) return SK_ERROR_LIMIT;
+    if (in->count[0] == 0 || in->count[1] == 0 || in->count[2] == 0) return SK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t axis = 0; axis < 3; ++axis) {
+        if (!((in->axes >> axis) & 1)) continue;
+        Grid g = Lattice{in->axes, {}, 1, {in->count[0], in->count[1], in->count[2]}, 16}.grid(axis);
+        if (uint64_t(g.count[0]) * g.count[1] > (uint64_t(1) << 32)) return SK_ERROR_LIMIT;
+    }
     if (in->tile_size > 1024) return SK_ERROR_INVALID_ARGUMENT;
-    out.axis = in->axis;
-    out.origin[0] = in->origin[0];
-    out.origin[1] = in->origin[1];
+    out.axes = in->axes;
+    for (int k = 0; k < 3; ++k) {
+        out.origin[k] = in->origin[k];
+        out.count[k] = in->count[k];
+    }
     out.spacing = in->spacing;
-    out.count[0] = in->count[0];
-    out.count[1] = in->count[1];
     out.tile = in->tile_size == 0 ? 16 : in->tile_size;
     return SK_OK;
+}
+
+void from_lattice(const Lattice &in, sk_lattice &out) {
+    out = sk_lattice{};
+    out.struct_size = sizeof(sk_lattice);
+    out.axes = in.axes;
+    for (int k = 0; k < 3; ++k) {
+        out.origin[k] = in.origin[k];
+        out.count[k] = in.count[k];
+    }
+    out.spacing = in.spacing;
+    out.tile_size = in.tile;
 }
 
 sk_result to_motion(const sk_move *in, Motion &out) {
@@ -262,33 +280,22 @@ sk_result sweep_ray(sk_tool_handle tool, const sk_move *move, uint32_t axis, dou
     sk_result result = to_motion(move, motion);
     if (result != SK_OK) return result;
     if (axis > SK_AXIS_Z || !std::isfinite(u) || !std::isfinite(v)) return SK_ERROR_INVALID_ARGUMENT;
-    if (axis != SK_AXIS_Z) return SK_ERROR_UNSUPPORTED;
-    SweptVolume(t->cutting, motion).intersect_z(u, v, spans);
+    SweptVolume(t->cutting, motion).intersect(axis, u, v, spans);
     return SK_OK;
 }
 
 } // namespace
 
-SK_API sk_result SK_CALL sk_sweep_count_ray(sk_tool_handle tool, const sk_move *move, uint32_t axis, double u,
-    double v, uint32_t *out_count) {
+SK_API sk_result SK_CALL sk_sweep_ray(sk_tool_handle tool, const sk_move *move, uint32_t axis, double u, double v,
+    sk_interval *out_intervals, uint32_t *interval_count) {
     return guarded([&]() -> sk_result {
-        if (!out_count) return SK_ERROR_INVALID_ARGUMENT;
-        *out_count = 0;
-        std::vector<Span> spans;
-        sk_result result = sweep_ray(tool, move, axis, u, v, spans);
-        if (result == SK_OK) *out_count = static_cast<uint32_t>(spans.size());
-        return result;
-    });
-}
-
-SK_API sk_result SK_CALL sk_sweep_read_ray(sk_tool_handle tool, const sk_move *move, uint32_t axis, double u,
-    double v, sk_interval *out_intervals, uint32_t capacity) {
-    return guarded([&]() -> sk_result {
-        if (capacity > 0 && !out_intervals) return SK_ERROR_INVALID_ARGUMENT;
+        if (!interval_count) return SK_ERROR_INVALID_ARGUMENT;
+        uint32_t capacity = *interval_count;
         std::vector<Span> spans;
         sk_result result = sweep_ray(tool, move, axis, u, v, spans);
         if (result != SK_OK) return result;
-        if (spans.size() > capacity) return SK_ERROR_LIMIT;
+        *interval_count = uint32_t(spans.size());
+        if (spans.size() > capacity || (!spans.empty() && !out_intervals)) return SK_ERROR_LIMIT;
         for (size_t k = 0; k < spans.size(); ++k) {
             Interval interval;
             interval.lo = spans[k].lo;
@@ -304,33 +311,40 @@ SK_API sk_result SK_CALL sk_sweep_read_ray(sk_tool_handle tool, const sk_move *m
     });
 }
 
-SK_API sk_result SK_CALL sk_stock_create_box(const sk_grid *grid, const sk_box *box, sk_stock_handle *out_stock) {
+SK_API sk_result SK_CALL sk_stock_create_box(const sk_lattice *lattice, const sk_box *box,
+    sk_stock_handle *out_stock) {
     return guarded([&]() -> sk_result {
         if (!out_stock) return SK_ERROR_INVALID_ARGUMENT;
         out_stock->id = 0;
-        Grid g;
-        sk_result result = to_grid(grid, g);
+        Lattice l;
+        sk_result result = to_lattice(lattice, l);
         if (result != SK_OK) return result;
         if (!box || box->struct_size < sizeof(sk_box) || !finite(box->min, 3) || !finite(box->max, 3))
             return SK_ERROR_INVALID_ARGUMENT;
         for (int k = 0; k < 3; ++k)
             if (!(box->max[k] > box->min[k])) return SK_ERROR_INVALID_ARGUMENT;
-        auto stock = std::make_unique<Stock>(g);
-        std::vector<Interval> ray(1);
-        ray[0].lo = box->min[2];
-        ray[0].hi = box->max[2];
-        const float down[3] = {0, 0, -1}, up[3] = {0, 0, 1};
-        std::copy_n(down, 3, ray[0].lo_normal);
-        std::copy_n(up, 3, ray[0].hi_normal);
-        ray[0].lo_source = ray[0].hi_source = kSourceStock;
-        const std::vector<Interval> empty;
-        // Rays on the box's sides are inside it: the box is closed.
-        for (uint32_t j = 0; j < g.count[1]; ++j)
-            for (uint32_t i = 0; i < g.count[0]; ++i) {
-                double x = stock->ray_u(i), y = stock->ray_v(j);
-                bool inside = x >= box->min[0] && x <= box->max[0] && y >= box->min[1] && y <= box->max[1];
-                if (inside) stock->write(i, j, ray);
-            }
+        auto stock = std::make_unique<Stock>(l);
+        for (uint32_t axis = 0; axis < 3; ++axis) {
+            DexelGrid *grid = stock->grid(axis);
+            if (!grid) continue;
+            const uint32_t u = grid->grid().u_axis(), v = grid->grid().v_axis();
+            std::vector<Interval> ray(1);
+            ray[0].lo = box->min[axis];
+            ray[0].hi = box->max[axis];
+            float down[3] = {0, 0, 0}, up[3] = {0, 0, 0};
+            down[axis] = -1;
+            up[axis] = 1;
+            std::copy_n(down, 3, ray[0].lo_normal);
+            std::copy_n(up, 3, ray[0].hi_normal);
+            ray[0].lo_source = ray[0].hi_source = kSourceStock;
+            // Rays on the box's sides are inside it: the box is closed.
+            for (uint32_t j = 0; j < grid->grid().count[1]; ++j)
+                for (uint32_t i = 0; i < grid->grid().count[0]; ++i) {
+                    double a = grid->ray_u(i), b = grid->ray_v(j);
+                    if (a >= box->min[u] && a <= box->max[u] && b >= box->min[v] && b <= box->max[v])
+                        grid->write(i, j, ray);
+                }
+        }
         stock->pack();
         uint32_t id = stocks().add(std::move(stock));
         if (id == 0) return SK_ERROR_LIMIT;
@@ -339,19 +353,22 @@ SK_API sk_result SK_CALL sk_stock_create_box(const sk_grid *grid, const sk_box *
     });
 }
 
-SK_API sk_result SK_CALL sk_stock_create_mesh(const sk_grid *grid, const double *positions,
+SK_API sk_result SK_CALL sk_stock_create_mesh(const sk_lattice *lattice, const double *positions,
     uint32_t position_count, const uint32_t *indices, uint32_t index_count, sk_stock_handle *out_stock) {
     return guarded([&]() -> sk_result {
         if (!out_stock) return SK_ERROR_INVALID_ARGUMENT;
         out_stock->id = 0;
-        Grid g;
-        sk_result result = to_grid(grid, g);
+        Lattice l;
+        sk_result result = to_lattice(lattice, l);
         if (result != SK_OK) return result;
         if ((position_count > 0 && !positions) || (index_count > 0 && !indices)) return SK_ERROR_INVALID_ARGUMENT;
-        auto stock = std::make_unique<Stock>(g);
+        auto stock = std::make_unique<Stock>(l);
         std::string error;
-        if (!cast_mesh_z(*stock, positions, position_count, indices, index_count, error))
-            return SK_ERROR_INVALID_ARGUMENT;
+        for (uint32_t axis = 0; axis < 3; ++axis) {
+            DexelGrid *grid = stock->grid(axis);
+            if (grid && !cast_mesh(*grid, positions, position_count, indices, index_count, error))
+                return SK_ERROR_INVALID_ARGUMENT;
+        }
         stock->pack();
         uint32_t id = stocks().add(std::move(stock));
         if (id == 0) return SK_ERROR_LIMIT;
@@ -372,36 +389,41 @@ SK_API sk_result SK_CALL sk_stock_get_info(sk_stock_handle stock, sk_stock_info 
         if (!out_info) return SK_ERROR_INVALID_ARGUMENT;
         Stock *s = stocks().get(stock.id);
         if (!s) return SK_ERROR_INVALID_HANDLE;
-        const Grid &g = s->grid();
+        *out_info = sk_stock_info{};
         out_info->struct_size = sizeof(sk_stock_info);
-        out_info->grid.struct_size = sizeof(sk_grid);
-        out_info->grid.axis = g.axis;
-        out_info->grid.origin[0] = g.origin[0];
-        out_info->grid.origin[1] = g.origin[1];
-        out_info->grid.spacing = g.spacing;
-        out_info->grid.count[0] = g.count[0];
-        out_info->grid.count[1] = g.count[1];
-        out_info->grid.tile_size = g.tile;
-        out_info->interval_count = s->interval_count();
-        out_info->volume = s->volume();
+        from_lattice(s->lattice(), out_info->lattice);
+        out_info->volume = s->z().volume();
         out_info->bytes = s->bytes();
         const CutStats &stats = s->stats();
         out_info->rays_tested = stats.rays_tested;
         out_info->rays_changed = stats.rays_changed;
         out_info->tiles_skipped = stats.tiles_skipped;
         out_info->threads = s->threads();
-        out_info->tiles[0] = s->tiles_across();
-        out_info->tiles[1] = s->tiles_down();
+        for (uint32_t axis = 0; axis < 3; ++axis) {
+            sk_grid_info &info = out_info->grids[axis];
+            info.struct_size = sizeof(sk_grid_info);
+            const DexelGrid *grid = s->grid(axis);
+            if (!grid) continue;
+            info.present = 1;
+            info.count[0] = grid->grid().count[0];
+            info.count[1] = grid->grid().count[1];
+            info.tiles[0] = grid->tiles_across();
+            info.tiles[1] = grid->tiles_down();
+            info.interval_count = grid->interval_count();
+            info.volume = grid->volume();
+        }
         return SK_OK;
     });
 }
 
-SK_API sk_result SK_CALL sk_stock_read_revisions(sk_stock_handle stock, uint64_t *out_revisions,
+SK_API sk_result SK_CALL sk_stock_read_revisions(sk_stock_handle stock, uint32_t axis, uint64_t *out_revisions,
     uint32_t revision_capacity) {
     return guarded([&]() -> sk_result {
         Stock *s = stocks().get(stock.id);
         if (!s) return SK_ERROR_INVALID_HANDLE;
-        const std::vector<uint64_t> &revisions = s->revisions();
+        const DexelGrid *grid = s->grid(axis);
+        if (!grid) return SK_ERROR_INVALID_ARGUMENT;
+        const std::vector<uint64_t> &revisions = grid->revisions();
         if (revision_capacity < revisions.size() || (revision_capacity > 0 && !out_revisions))
             return SK_ERROR_INVALID_ARGUMENT;
         std::copy(revisions.begin(), revisions.end(), out_revisions);
@@ -449,10 +471,11 @@ SK_API sk_result SK_CALL sk_stock_set_threads(sk_stock_handle stock, uint32_t th
 }
 
 SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool, const sk_move *moves,
-    uint32_t move_count, sk_move_result *out_results, uint32_t result_capacity) {
+    uint32_t move_count, sk_move_result *out_results, sk_cut_summary *out_summary) {
     return guarded([&]() -> sk_result {
-        if ((move_count > 0 && (!moves || !out_results)) || result_capacity < move_count)
-            return SK_ERROR_INVALID_ARGUMENT;
+        if ((move_count > 0 && (!moves || !out_results)) || !out_summary) return SK_ERROR_INVALID_ARGUMENT;
+        *out_summary = sk_cut_summary{};
+        out_summary->struct_size = sizeof(sk_cut_summary);
         Stock *s = stocks().get(stock.id);
         Tool *t = tools().get(tool.id);
         if (!s || !t) return SK_ERROR_INVALID_HANDLE;
@@ -466,12 +489,21 @@ SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool
         sweeps.reserve(move_count);
         for (uint32_t k = 0; k < move_count; ++k) sweeps.emplace_back(*t, motions[k], moves[k].source);
         std::vector<MoveResult> results(move_count);
-        s->cut(sweeps, results.data());
+        CutStats stats;
+        s->cut(sweeps, results.data(), &stats);
+        out_summary->moves = move_count;
+        out_summary->rays_tested = stats.rays_tested;
+        out_summary->rays_changed = stats.rays_changed;
+        out_summary->tiles_skipped = stats.tiles_skipped;
         for (uint32_t k = 0; k < move_count; ++k) {
             out_results[k] = sk_move_result{};
             out_results[k].struct_size = sizeof(sk_move_result);
             out_results[k].removed = results[k].removed;
-            for (uint32_t z = 0; z < SK_ZONE_COUNT; ++z) out_results[k].contact[z] = results[k].contact[z];
+            out_summary->removed += results[k].removed;
+            for (uint32_t z = 0; z < SK_ZONE_COUNT; ++z) {
+                out_results[k].contact[z] = results[k].contact[z];
+                out_summary->contact[z] += results[k].contact[z];
+            }
         }
         return SK_OK;
     });
@@ -479,93 +511,72 @@ SK_API sk_result SK_CALL sk_stock_cut(sk_stock_handle stock, sk_tool_handle tool
 
 namespace {
 
-sk_result check_block(Stock *s, uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj) {
+/** The grid along `axis`, if the block lies in it. */
+sk_result block_grid(Stock *s, uint32_t axis, uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj,
+    const DexelGrid *&out) {
     if (!s) return SK_ERROR_INVALID_HANDLE;
-    const Grid &g = s->grid();
+    out = s->grid(axis);
+    if (!out) return SK_ERROR_INVALID_ARGUMENT;
+    const Grid &g = out->grid();
     if (uint64_t(i0) + ni > g.count[0] || uint64_t(j0) + nj > g.count[1]) return SK_ERROR_INVALID_ARGUMENT;
     return SK_OK;
 }
 
 } // namespace
 
-SK_API sk_result SK_CALL sk_stock_read_counts(sk_stock_handle stock, uint32_t i0, uint32_t j0, uint32_t ni,
-    uint32_t nj, uint32_t *out_counts, uint32_t count_capacity) {
+SK_API sk_result SK_CALL sk_stock_read_rays(sk_stock_handle stock, uint32_t axis, uint32_t i0, uint32_t j0,
+    uint32_t ni, uint32_t nj, uint32_t *out_counts, uint32_t count_capacity, sk_interval *out_intervals,
+    uint32_t *interval_count) {
     return guarded([&]() -> sk_result {
-        Stock *s = stocks().get(stock.id);
-        sk_result result = check_block(s, i0, j0, ni, nj);
+        if (!interval_count) return SK_ERROR_INVALID_ARGUMENT;
+        const uint32_t capacity = *interval_count;
+        *interval_count = 0;
+        const DexelGrid *grid = nullptr;
+        sk_result result = block_grid(stocks().get(stock.id), axis, i0, j0, ni, nj, grid);
         if (result != SK_OK) return result;
         if (count_capacity < uint64_t(ni) * nj || (count_capacity > 0 && !out_counts)) return SK_ERROR_INVALID_ARGUMENT;
+        uint64_t total = 0;
         for (uint32_t j = 0; j < nj; ++j)
-            for (uint32_t i = 0; i < ni; ++i) out_counts[size_t(j) * ni + i] = s->count(i0 + i, j0 + j);
-        return SK_OK;
-    });
-}
-
-namespace {
-
-uint64_t block_total(Stock *s, uint32_t i0, uint32_t j0, uint32_t ni, uint32_t nj) {
-    uint64_t total = 0;
-    for (uint32_t j = 0; j < nj; ++j)
-        for (uint32_t i = 0; i < ni; ++i) total += s->count(i0 + i, j0 + j);
-    return total;
-}
-
-} // namespace
-
-SK_API sk_result SK_CALL sk_stock_count_intervals(sk_stock_handle stock, uint32_t i0, uint32_t j0, uint32_t ni,
-    uint32_t nj, uint32_t *out_total) {
-    return guarded([&]() -> sk_result {
-        if (!out_total) return SK_ERROR_INVALID_ARGUMENT;
-        *out_total = 0;
-        Stock *s = stocks().get(stock.id);
-        sk_result result = check_block(s, i0, j0, ni, nj);
-        if (result != SK_OK) return result;
-        uint64_t total = block_total(s, i0, j0, ni, nj);
+            for (uint32_t i = 0; i < ni; ++i) {
+                uint32_t n = grid->count(i0 + i, j0 + j);
+                out_counts[size_t(j) * ni + i] = n;
+                total += n;
+            }
         if (total > 0xFFFFFFFFu) return SK_ERROR_LIMIT;
-        *out_total = static_cast<uint32_t>(total);
-        return SK_OK;
-    });
-}
-
-SK_API sk_result SK_CALL sk_stock_read_intervals(sk_stock_handle stock, uint32_t i0, uint32_t j0, uint32_t ni,
-    uint32_t nj, sk_interval *out_intervals, uint32_t interval_capacity) {
-    return guarded([&]() -> sk_result {
-        Stock *s = stocks().get(stock.id);
-        sk_result result = check_block(s, i0, j0, ni, nj);
-        if (result != SK_OK) return result;
-        uint64_t total = block_total(s, i0, j0, ni, nj);
-        if (total > interval_capacity) return SK_ERROR_LIMIT;
-        if (total > 0 && !out_intervals) return SK_ERROR_INVALID_ARGUMENT;
+        *interval_count = uint32_t(total);
+        if (total > capacity || (total > 0 && !out_intervals)) return SK_ERROR_LIMIT;
         std::vector<Interval> ray;
         size_t at = 0;
         for (uint32_t j = 0; j < nj; ++j)
             for (uint32_t i = 0; i < ni; ++i) {
-                s->read(i0 + i, j0 + j, ray);
+                grid->read(i0 + i, j0 + j, ray);
                 for (const Interval &interval : ray) to_interval(interval, out_intervals[at++]);
             }
         return SK_OK;
     });
 }
 
-SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle target, uint32_t i0, uint32_t j0,
-    uint32_t ni, uint32_t nj, sk_ray_comparison *out_comparisons, uint32_t comparison_capacity) {
+SK_API sk_result SK_CALL sk_stock_compare(sk_stock_handle stock, sk_stock_handle target, uint32_t axis, uint32_t i0,
+    uint32_t j0, uint32_t ni, uint32_t nj, sk_ray_comparison *out_comparisons, uint32_t comparison_capacity) {
     return guarded([&]() -> sk_result {
         Stock *s = stocks().get(stock.id);
         Stock *t = stocks().get(target.id);
         if (!t) return SK_ERROR_INVALID_HANDLE;
-        sk_result result = check_block(s, i0, j0, ni, nj);
+        const DexelGrid *grid = nullptr;
+        sk_result result = block_grid(s, axis, i0, j0, ni, nj, grid);
         if (result != SK_OK) return result;
-        const Grid &a = s->grid(), &b = t->grid();
-        if (a.axis != b.axis || a.origin[0] != b.origin[0] || a.origin[1] != b.origin[1] || a.spacing != b.spacing ||
-            a.count[0] != b.count[0] || a.count[1] != b.count[1])
+        const Lattice &a = s->lattice(), &b = t->lattice();
+        if (!t->grid(axis) || a.spacing != b.spacing || !std::equal(a.origin, a.origin + 3, b.origin) ||
+            !std::equal(a.count, a.count + 3, b.count))
             return SK_ERROR_INVALID_ARGUMENT;
+        const DexelGrid &target_grid = *t->grid(axis);
         if (comparison_capacity < uint64_t(ni) * nj || (comparison_capacity > 0 && !out_comparisons))
             return SK_ERROR_INVALID_ARGUMENT;
         std::vector<Interval> x, y;
         for (uint32_t j = 0; j < nj; ++j)
             for (uint32_t i = 0; i < ni; ++i) {
-                s->read(i0 + i, j0 + j, x);
-                t->read(i0 + i, j0 + j, y);
+                grid->read(i0 + i, j0 + j, x);
+                target_grid.read(i0 + i, j0 + j, y);
                 RayComparison c = compare_ray(x, y);
                 sk_ray_comparison &out = out_comparisons[size_t(j) * ni + i];
                 out = sk_ray_comparison{};
@@ -587,16 +598,27 @@ SK_API sk_result SK_CALL sk_stock_mesh(sk_stock_handle stock, uint32_t tile_x, u
         out_mesh->id = 0;
         Stock *s = stocks().get(stock.id);
         if (!s) return SK_ERROR_INVALID_HANDLE;
-        if (flags & ~uint32_t(SK_MESH_BOTTOMS | SK_MESH_MERGE)) return SK_ERROR_INVALID_ARGUMENT;
-        if (uint64_t(tile_x) + tiles_x > s->tiles_across() || uint64_t(tile_y) + tiles_y > s->tiles_down())
+        if (flags & ~uint32_t(SK_MESH_BOTTOMS | SK_MESH_MERGE | SK_MESH_CONTOUR)) return SK_ERROR_INVALID_ARGUMENT;
+        if ((flags & SK_MESH_CONTOUR) && flags != SK_MESH_CONTOUR) return SK_ERROR_INVALID_ARGUMENT;
+        const DexelGrid &z = s->z();
+        if (uint64_t(tile_x) + tiles_x > z.tiles_across() || uint64_t(tile_y) + tiles_y > z.tiles_down())
             return SK_ERROR_INVALID_ARGUMENT;
         auto entry = std::make_unique<MeshEntry>();
-        PreviewOptions options;
-        options.bottoms = flags & SK_MESH_BOTTOMS;
-        options.merge = flags & SK_MESH_MERGE;
-        build_preview(*s, tile_x, tile_y, tiles_x, tiles_y, options, entry->mesh);
+        if (flags & SK_MESH_CONTOUR) {
+            if (!s->grid(0) || !s->grid(1)) return SK_ERROR_UNSUPPORTED;
+            ContourStats stats;
+            build_contour(*s, tile_x, tile_y, tiles_x, tiles_y, entry->mesh, &stats);
+            entry->unmatched = stats.unmatched;
+        } else {
+            PreviewOptions options;
+            options.bottoms = flags & SK_MESH_BOTTOMS;
+            options.merge = flags & SK_MESH_MERGE;
+            build_preview(z, tile_x, tile_y, tiles_x, tiles_y, options, entry->mesh);
+        }
         entry->mesh.colors.assign(entry->mesh.vertex_count(), 0xFFFFFFFFu);
-        entry->rays = uint64_t(s->grid().count[0]) * s->grid().count[1];
+        entry->stock = stock.id;
+        for (uint32_t axis = 0; axis < 3; ++axis)
+            if (const DexelGrid *g = s->grid(axis)) entry->rays[axis] = uint64_t(g->grid().count[0]) * g->grid().count[1];
         uint32_t id = meshes().add(std::move(entry));
         if (id == 0) return SK_ERROR_LIMIT;
         out_mesh->id = id;
@@ -621,6 +643,7 @@ SK_API sk_result SK_CALL sk_mesh_get_info(sk_mesh_handle mesh, sk_mesh_info *out
         out_info->vertex_count = m->mesh.vertex_count();
         out_info->triangle_count = m->mesh.triangle_count();
         out_info->merged = m->mesh.merged ? 1 : 0;
+        out_info->unmatched_edges = uint32_t(std::min<uint64_t>(m->unmatched, 0xFFFFFFFFu));
         return SK_OK;
     });
 }
@@ -669,14 +692,31 @@ SK_API sk_result SK_CALL sk_mesh_color_by_source(sk_mesh_handle mesh, const uint
     });
 }
 
-SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, const uint32_t *ray_colors, uint32_t ray_count) {
+SK_API sk_result SK_CALL sk_mesh_color_by_ray(sk_mesh_handle mesh, uint32_t axis, const uint32_t *ray_colors,
+    uint32_t ray_count) {
     return guarded([&]() -> sk_result {
         MeshEntry *m = meshes().get(mesh.id);
         if (!m) return SK_ERROR_INVALID_HANDLE;
         if (m->mesh.merged) return SK_ERROR_UNSUPPORTED;
-        if (ray_count < m->rays || (ray_count > 0 && !ray_colors)) return SK_ERROR_INVALID_ARGUMENT;
+        if (axis > 2 || ray_count < m->rays[axis] || (ray_count > 0 && !ray_colors)) return SK_ERROR_INVALID_ARGUMENT;
         PreviewMesh &p = m->mesh;
-        for (size_t k = 0; k < p.vertex_rays.size(); ++k) p.colors[k] = rgba_bytes(ray_colors[p.vertex_rays[k]]);
+        for (size_t k = 0; k < p.vertex_rays.size(); ++k)
+            if (p.vertex_axes[k] == axis) p.colors[k] = rgba_bytes(ray_colors[p.vertex_rays[k]]);
+        return SK_OK;
+    });
+}
+
+SK_API sk_result SK_CALL sk_mesh_color_by_deviation(sk_mesh_handle mesh, sk_stock_handle target, double tolerance,
+    uint32_t on_target, uint32_t leftover, uint32_t gouge) {
+    return guarded([&]() -> sk_result {
+        MeshEntry *m = meshes().get(mesh.id);
+        if (!m) return SK_ERROR_INVALID_HANDLE;
+        Stock *s = stocks().get(m->stock), *t = stocks().get(target.id);
+        if (!s || !t) return SK_ERROR_INVALID_HANDLE;
+        if (m->mesh.quad_depths.size() * 4 != m->mesh.vertex_count()) return SK_ERROR_UNSUPPORTED;
+        if (!std::isfinite(tolerance) || tolerance < 0) return SK_ERROR_INVALID_ARGUMENT;
+        const uint32_t colors[3] = {rgba_bytes(on_target), rgba_bytes(leftover), rgba_bytes(gouge)};
+        if (!color_by_deviation(m->mesh, *s, *t, tolerance, colors)) return SK_ERROR_INVALID_ARGUMENT;
         return SK_OK;
     });
 }
