@@ -490,22 +490,31 @@ class ProgramCompiler {
       var timeSteps = Std.int(Math.max(1,
         Math.ceil(timed.trajectory.durationSeconds() / 0.001)));
       var taskSampleDistances:Array<Float> = [];
-      var interval = 0;
-      for (sample in 0...(timeSteps + 1)) {
-        var time = timed.trajectory.durationSeconds() * sample / timeSteps;
-        while (interval + 1 < timeMap.length - 1 && timeMap[interval + 1] < time)
-          interval++;
-        var lower = distances[interval];
-        var upper = distances[interval + 1];
-        if (sample == 0) taskSampleDistances.push(0.0);
-        else if (sample == timeSteps) taskSampleDistances.push(path.length());
-        else {
-          for (_ in 0...24) {
-            var middle = (lower + upper) * 0.5;
-            if (timed.distanceToTime(middle) < time) lower = middle;
-            else upper = middle;
+      if (timed.hasDirectInverse()) {
+        // The time law inverts in closed form: one native call covers every 1 ms sample, where a bisection
+        // per sample cost 24 round trips each.
+        var duration = timed.trajectory.durationSeconds();
+        taskSampleDistances = timed.timesToDistances([for (sample in 0...(timeSteps + 1)) duration * sample / timeSteps]);
+        taskSampleDistances[0] = 0.0;
+        taskSampleDistances[timeSteps] = path.length();
+      } else {
+        var interval = 0;
+        for (sample in 0...(timeSteps + 1)) {
+          var time = timed.trajectory.durationSeconds() * sample / timeSteps;
+          while (interval + 1 < timeMap.length - 1 && timeMap[interval + 1] < time)
+            interval++;
+          var lower = distances[interval];
+          var upper = distances[interval + 1];
+          if (sample == 0) taskSampleDistances.push(0.0);
+          else if (sample == timeSteps) taskSampleDistances.push(path.length());
+          else {
+            for (_ in 0...24) {
+              var middle = (lower + upper) * 0.5;
+              if (timed.distanceToTime(middle) < time) lower = middle;
+              else upper = middle;
+            }
+            taskSampleDistances.push((lower + upper) * 0.5);
           }
-          taskSampleDistances.push((lower + upper) * 0.5);
         }
       }
       timed.releaseDistanceMap();

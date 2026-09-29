@@ -372,6 +372,15 @@ MK_API void MK_CALL mk_time_law_destroy(mk_time_law_handle law);
 /** Returns seconds from the time-law epoch; exact at stage boundaries. */
 MK_API mk_result MK_CALL mk_path_distance_to_time(mk_time_law_handle law,
     double s, double *out_seconds MK_OUT);
+/**
+ * Returns the path distance reached at each of `count` times, in seconds from the time-law
+ * epoch: the inverse of mk_path_distance_to_time, evaluated in closed form per stage. Times
+ * outside the law clamp to its first and last distance. Non-finite times are rejected.
+ * One call replaces a bisection of mk_path_distance_to_time per sample.
+ */
+MK_API mk_result MK_CALL mk_path_times_to_distances(mk_time_law_handle law,
+    const double *seconds MK_IN_ARRAY(count), uint32_t count,
+    double *out_distances MK_OUT_ARRAY(count));
 /** Quintic Hermite lowering, with adaptive knots and exact polynomial-deviation extrema. */
 MK_API mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
     double tolerance, mk_trajectory_handle *out_trajectory MK_OUT MK_OWNED);

@@ -25,7 +25,8 @@ class ToppraPathTiming implements PathTimingBackend {
       try {
         var bindings = law.bindingConstraints();
         var result = new TimedPath(timed.trajectory, function(distance:Float):Float
-          return law.distanceToTime(distance), bindings, function():Void law.dispose());
+          return law.distanceToTime(distance), bindings, function():Void law.dispose(),
+          function(seconds:Array<Float>):Array<Float> return law.timesToDistances(seconds));
         nativePath.dispose();
         return result;
       } catch (error:Dynamic) {

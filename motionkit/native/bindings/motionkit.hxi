@@ -66,6 +66,13 @@ interface MotionKitNative @target("portable-abi64") @library("motionkit_core") {
 	 */
 	extern fn mk_path_lower(path: mk_path_handle, law: mk_time_law_handle, tolerance: f64, out_trajectory: ptr<mk_trajectory_handle> @out @owned) -> mk_result;
 	/**
+	 * Returns the path distance reached at each of `count` times, in seconds from the time-law
+	 * epoch: the inverse of mk_path_distance_to_time, evaluated in closed form per stage. Times
+	 * outside the law clamp to its first and last distance. Non-finite times are rejected.
+	 * One call replaces a bisection of mk_path_distance_to_time per sample.
+	 */
+	extern fn mk_path_times_to_distances(law: mk_time_law_handle, seconds: ptr<const<f64>> @in_array("count"), count: u32, out_distances: ptr<f64> @out_array("count")) -> mk_result;
+	/**
 	 * Deep-copies the trajectory and refuses any failed validation check.
 	 */
 	extern fn mk_plan_create(trajectory: mk_trajectory_handle, spec: ptr<const<mk_plan_spec>>, limits: ptr<const<mk_limits>>, out_plan: ptr<mk_plan_handle> @out @owned, out_report: ptr<mk_validation_report>) -> mk_result;

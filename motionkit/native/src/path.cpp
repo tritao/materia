@@ -120,6 +120,23 @@ bool inverse_time(const std::vector<mk_time_stage> &stages, double s, double &se
     return false;
 }
 
+/** Distance reached `seconds` after the epoch; clamped to the law's first and last distance. */
+double distance_at(const std::vector<mk_time_stage> &stages, double seconds) {
+    const auto &first = stages.front();
+    const auto &last = stages.back();
+    if (seconds <= static_cast<double>(first.start_ns) * 1e-9) return first.start_s;
+    if (seconds >= static_cast<double>(last.start_ns + last.duration_ns) * 1e-9)
+        return end_s(last);
+    // The first stage that ends after `seconds`; stages are contiguous and ordered.
+    auto stage = std::partition_point(stages.begin(), stages.end(),
+        [seconds](const mk_time_stage &candidate) {
+            return static_cast<double>(candidate.start_ns + candidate.duration_ns) * 1e-9 <= seconds;
+        });
+    if (stage == stages.end()) stage = std::prev(stages.end());
+    const double tau = seconds - static_cast<double>(stage->start_ns) * 1e-9;
+    return stage->start_s + stage->speed * tau + 0.5 * stage->acceleration * tau * tau;
+}
+
 Poly add(const Poly &a, const Poly &b) {
     Poly out(std::max(a.size(), b.size()), 0.0);
     for (size_t i = 0; i < a.size(); ++i) out[i] += a[i];
@@ -472,6 +489,19 @@ mk_result MK_CALL mk_path_distance_to_time(mk_time_law_handle law, double s,
     const auto found = laws.find(law.id);
     if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
     return inverse_time(found->second.stages, s, *out_seconds) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
+}
+
+mk_result MK_CALL mk_path_times_to_distances(mk_time_law_handle law, const double *seconds,
+                                              uint32_t count, double *out_distances) {
+    if ((count && (!seconds || !out_distances))) return MK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t i = 0; i < count; ++i)
+        if (!std::isfinite(seconds[i])) return MK_ERROR_INVALID_ARGUMENT;
+    std::lock_guard lock(mutex);
+    const auto found = laws.find(law.id);
+    if (found == laws.end()) return MK_ERROR_INVALID_HANDLE;
+    for (uint32_t i = 0; i < count; ++i)
+        out_distances[i] = distance_at(found->second.stages, seconds[i]);
+    return MK_OK;
 }
 
 mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
