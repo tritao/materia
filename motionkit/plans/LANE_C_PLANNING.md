@@ -272,9 +272,8 @@ Tests:
 
 ## C6 — CncKit v1: declared G-code subset → `MotionProgram`
 
-Do: a new haxeon project `cnckit/` (package `cnckit`) depending on
-`motionkit` only. The CNC-to-robot binding lives in `motionkit.robot` or a
-small `cnckit-robot` adapter if it needs RobotKit.
+Do: a separate haxeon project for CNC interpretation. The CNC-to-robot
+binding belongs in an adapter above the motion packages.
 - **Declared subset.** Anything outside it is **rejected** with a line and
   column diagnostic, never approximated:
   - `G0`, `G1`, `G2`, `G3` (XY plane, `G17` only; `I`/`J` centre form; `R`
@@ -333,7 +332,7 @@ Do:
   gap that prevents it (for example missing actuator attachment) in the log
   instead of working around it.
 
-Tests (a scenario test in `motionkit/tests` or a new `cnckit/tests`):
+Tests (a scenario test in the motion or CNC test project):
 - the executed path stays within the declared tolerance of the programmed
   geometry at every recorded sample;
 - the spindle events fire at the programmed positions;
@@ -356,7 +355,7 @@ These are follow-on plans.
 
 ### C6 — CNC G-code to MotionProgram
 
-Added a strict G17 XY I/J CNC parser in the independent `cnckit` project.
+Added a strict G17 XY I/J CNC parser in the independent CNC project.
 It tracks units, absolute or incremental coordinates, work and tool offsets,
 feeds, spindle and coolant state, exact stops, and G64 P corner blending.
 Unsupported words report line and column. The robot binding compiles the

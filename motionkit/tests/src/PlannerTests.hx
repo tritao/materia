@@ -1,6 +1,5 @@
 import haxe.Int64;
 import haxe.io.Bytes;
-import cnckit.CncCompiler;
 import machinekit.assembly.LinearAxis;
 import cadkit.modeling.AssemblyModel;
 import cadbridge.AssemblySimulationBridge;
@@ -669,11 +668,28 @@ class PlannerTests extends MotionKitTestSupport {
       var blueprint = MachineKitRobotCompiler.compileXYZGantry(
         new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 200), 0.1, 0.4);
-      var binding = MotionKitTestSupport.cncBinding(
-        new MotionCncRig("work", "x", "y", "z", 0.08), blueprint);
-      var primitive = new toolpathkit.motion.ToolpathPosePrimitive(circular, 0.05, 0.0005, 0.02);
+      var solver = new AxisKinematics(blueprint, "x", "y", "z");
+      var count = solver.jointCount();
+      var limits = new ValidationLimits(count,
+        Int64.ofInt(blueprint.runtime.revision),
+        Int64.ofInt(blueprint.runtime.calibrationRevision));
+      var velocity = [for (_ in 0...count) 0.1];
+      var acceleration = [for (_ in 0...count) 0.4];
+      var jerk = [for (_ in 0...count) 10.0];
+      for (joint in 0...count) {
+        var bounds = blueprint.model.joints[joint].limits;
+        if (bounds.lower < bounds.upper)
+          limits.position(joint, bounds.lower, bounds.upper);
+        limits.velocity(joint, velocity[joint]);
+        limits.acceleration(joint, acceleration[joint]);
+        limits.jerk(joint, jerk[joint]);
+      }
+      var compiler = new ProgramCompiler(solver, limits, "work", velocity,
+        acceleration, jerk, StartTolerances.uniform(count,
+          0.0005, 0.004, 0.01));
+      var primitive = new TestCircularPosePrimitive(circular, 0.05);
       var path = new PosePath("work", [primitive]).withAuthoredGeometry(authored, 0.001);
-      var compiled = binding.compiler.compile(new MotionProgram([
+      var compiled = compiler.compile(new MotionProgram([
         MotionOp.FollowPath(path, "work", 0.05, [])]),
         [for (_ in blueprint.model.joints) 0.0], Int64.ofInt(901));
       check(compiled.blocks.length == 1, 'helical $plane compiles through TOPP-RA');
