@@ -9,4 +9,5 @@ enum RobotRecordingEvent {
   World(value:WorldSnapshot);
   WorldEvent(value:RobotWorldEvent);
   ProcessEvent(value:FiredProcessEvent);
+  Channel(robotId:RobotId, channelName:String, payload:Dynamic);
 }

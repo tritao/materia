@@ -751,18 +751,22 @@ or recorded state without backend conditionals. `worldd` is only a headless
 composition of `RobotWorld` plus `Simulation`; it does not create a parallel
 domain model.
 
-Persistent recording is an adapter below the world boundary. Haxe owns the
-versioned RobotKit payload contract; a small C ABI owns a bounded queue and the
-MCAP reader/writer. Neither MCAP headers nor MCAP concepts appear in `Robot`,
-`RobotWorld`, behavior contexts, or runtime observation contracts. The writer
-uses one channel/schema per event kind and no compression. File order and the
-recording ordinal—not unrelated source clocks—define deterministic replay.
+Persistent recording is an adapter below the world boundary. Haxe registers
+typed `RecordingChannel<T>` codecs backed by RKF1-locked `@:wire` classes. The
+MCAP schema for each channel embeds its field IDs, names, and types. Messages
+are MessagePack, including raw camera bytes; the native C ABI treats payloads
+as opaque bytes and handles the bounded queue and MCAP I/O. New channels use
+the same registration path as the seven core channels. Neither MCAP headers
+nor MCAP concepts appear in `Robot`, `RobotWorld`, or behavior contracts.
 
-The current format uses MCAP log time for the independent wall-clock recording
-timestamp and publish time for the full-width event ordinal. Reader cursors are
-incremental and schema-validating. Writer queues are bounded by payload bytes,
-in-memory retention is optional, and a companion terminal-status record keeps
-write failures and drop counts visible across process restarts.
+Recording format v6 defaults to LZ4 chunk compression and also supports no
+compression. MCAP log time stores the independent wall-clock recording time;
+publish time stores the full-width arrival ordinal used for deterministic
+replay. The incremental reader rejects older versions and can skip unknown
+channels or reject them in strict mode. In-memory retention is optional, and
+a companion terminal-status record keeps write failures and drop counts visible
+across process restarts. `robotkit/tools/recording/dump` uses embedded schemas
+to print a recording as JSON lines for inspection.
 
 World-level behaviors leave command deadlines unset. Nonzero world-command
 deadlines are currently rejected rather than ignored or translated without a

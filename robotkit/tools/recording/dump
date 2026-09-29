@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Print RobotKit v6 MCAP messages as JSON lines using embedded RKF1 schemas.
+
+Dependencies: mcap and msgpack (for example: uv run --with mcap --with msgpack).
+"""
+import argparse
+import base64
+import json
+from pathlib import Path
+
+import msgpack
+from mcap.reader import make_reader
+
+
+def decode(value, type_name, declarations):
+    if value is None:
+        return None
+    if type_name.startswith("Null<"):
+        return decode(value, type_name[5:-1], declarations)
+    if type_name.startswith("Array<"):
+        return [decode(item, type_name[6:-1], declarations) for item in value]
+    if type_name == "haxe.io.Bytes":
+        return {"base64": base64.b64encode(value).decode("ascii"), "size": len(value)}
+    if type_name in declarations:
+        if not isinstance(value, dict):
+            raise ValueError(f"Expected map for {type_name}")
+        fields = {field["id"]: field for field in declarations[type_name]["fields"]}
+        if any(key not in fields for key in value):
+            raise ValueError(f"Unknown field ID in {type_name}")
+        return {fields[key]["name"]: decode(item, fields[key]["type"], declarations)
+                for key, item in value.items()}
+    return value
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("recording", type=Path)
+    args = parser.parse_args()
+    with args.recording.open("rb") as stream:
+        for schema, channel, message in make_reader(stream).iter_messages():
+            if channel.metadata.get("robotkit.schema_version") != "6":
+                parser.error("Recording schema version is not 6")
+            if schema is None or schema.encoding != "robotkit-wire" or channel.message_encoding != "msgpack":
+                parser.error(f"Unsupported encoding on {channel.topic}")
+            spec = json.loads(schema.data)
+            payload = msgpack.unpackb(message.data, raw=False, strict_map_key=False)
+            record = {"topic": channel.topic, "ordinal": message.publish_time,
+                      "recordingTimestampNs": message.log_time,
+                      "payload": decode(payload, spec["root"], spec["declarations"])}
+            print(json.dumps(record, separators=(",", ":")))
+
+
+if __name__ == "__main__":
+    main()

@@ -2,6 +2,7 @@ package robotkit.world;
 
 import RobotKitRuntime;
 import haxe.Int64;
+import robotkit.world.RecordingChannels.RegisteredChannel;
 
 /** File-backed recording facade. MCAP types and threading stay below this boundary. */
 class McapRobotRecording implements RobotRecordingSink {
@@ -10,17 +11,33 @@ class McapRobotRecording implements RobotRecordingSink {
   final staging:RobotRecording;
   final retainInMemory:Bool;
   final owner:Ownedrk_recording_writer_handle;
+  public final channels:RecordingChannels;
+  final channelIds:Map<String, Int> = new Map<String, Int>();
   var closed:Bool = false;
 
   public function new(path:String, ?queueCapacityBytes:Int = 16 * 1024 * 1024,
-      ?retainInMemory:Bool = true) {
+      ?retainInMemory:Bool = true, ?compression:String = "lz4",
+      ?channels:RecordingChannels) {
     if (queueCapacityBytes <= 0) throw "Recording queue byte capacity must be positive";
-    var result = RobotKitRuntime.rk_recording_writer_create(path, Int64.ofInt(queueCapacityBytes));
+    var compressionValue = switch compression {
+      case "none": RobotKitRuntimeConstants.RK_RECORDING_COMPRESSION_NONE;
+      case "lz4": RobotKitRuntimeConstants.RK_RECORDING_COMPRESSION_LZ4;
+      case _: throw "Recording compression must be none or lz4";
+    };
+    var result = RobotKitRuntime.rk_recording_writer_create(path,
+      Int64.ofInt(queueCapacityBytes), compressionValue);
     check(result.status, "open recording");
     owner = result.out_writer;
+    this.channels = channels == null ? new RecordingChannels() : channels;
     this.retainInMemory = retainInMemory;
     staging = new RobotRecording();
     memory = retainInMemory ? staging : null;
+    try {
+      for (channel in this.channels.channels()) registerChannel(channel);
+    } catch (error:Dynamic) {
+      owner.close();
+      throw error;
+    }
   }
 
   public function recordCommand(command:RobotCommand, ?robotId:RobotId = ""):Void {
@@ -33,6 +50,10 @@ class McapRobotRecording implements RobotRecordingSink {
   public function recordEvent(value:RobotWorldEvent):Void { staging.recordEvent(value); flushLast(); }
   public function recordProcessEvent(robotId:RobotId, value:FiredProcessEvent):Void {
     staging.recordProcessEvent(robotId, value); flushLast();
+  }
+  public function recordChannel(robotId:RobotId, name:String, payload:Dynamic):Void {
+    if (channels.get(name) == null) throw 'Unregistered recording channel $name';
+    staging.recordChannel(robotId, name, payload); flushLast();
   }
   public function attach(world:RobotWorld):RobotWorldSubscription return world.subscribe(recordEvent);
 
@@ -57,12 +78,25 @@ class McapRobotRecording implements RobotRecordingSink {
 
   function flushLast():Void {
     if (closed) throw "Recording is closed";
-    var entry=staging.entries[staging.entries.length-1], bytes=RobotRecordingCodec.encode(entry);
-    var kind = switch entry.event {case Command(_):1;case RobotSnapshot(_):2;case Sensor(_,_):3;case Fault(_):4;case World(_):5;case WorldEvent(_):6;case ProcessEvent(_):7;};
-    check(RobotKitRuntime.rk_recording_writer_enqueue(owner.borrow(),kind,
-      RobotRecordingEntry.VERSION,entry.ordinal,entry.recordingTimestampNs,bytes),
+    var entry=staging.entries[staging.entries.length-1];
+    var name = RecordingChannels.nameOf(entry.event);
+    var channel = channels.get(name);
+    if (channel == null) throw 'Unregistered recording channel $name';
+    if (!channelIds.exists(name)) registerChannel(channel);
+    var channelId = channelIds.get(name);
+    if (channelId == null) throw 'Recording channel $name has no native ID';
+    var bytes = channel.encode(entry);
+    check(RobotKitRuntime.rk_recording_writer_enqueue(owner.borrow(),channelId,
+      entry.ordinal,entry.recordingTimestampNs,bytes),
       "enqueue recording event");
     if (!retainInMemory) clearStaging();
+  }
+  function registerChannel(channel:RegisteredChannel):Void {
+    var result = RobotKitRuntime.rk_recording_writer_register_channel(owner.borrow(),
+      "robotkit/" + channel.name, channel.wireClass, "robotkit-wire",
+      haxe.io.Bytes.ofString(channel.schemaData), "msgpack");
+    check(result.status, "register recording channel");
+    channelIds.set(channel.name, result.out_channel_id);
   }
   function clearStaging():Void {
     staging.commands.splice(0, staging.commands.length);

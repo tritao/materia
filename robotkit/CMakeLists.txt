@@ -22,6 +22,33 @@ add_library(robotkit_mcap_headers INTERFACE)
 target_include_directories(robotkit_mcap_headers INTERFACE
     "${mcap_SOURCE_DIR}/cpp/mcap/include")
 
+# MCAP's LZ4 support needs only four small C sources. A system installation can
+# be selected explicitly for distribution builds; source builds stay pinned.
+option(RK_USE_SYSTEM_LZ4 "Use a system LZ4 library" OFF)
+if(RK_USE_SYSTEM_LZ4)
+    find_path(RK_LZ4_INCLUDE_DIR lz4frame.h REQUIRED)
+    find_library(RK_LZ4_LIBRARY NAMES lz4 REQUIRED)
+    add_library(robotkit_lz4 INTERFACE)
+    target_include_directories(robotkit_lz4 INTERFACE "${RK_LZ4_INCLUDE_DIR}")
+    target_link_libraries(robotkit_lz4 INTERFACE "${RK_LZ4_LIBRARY}")
+else()
+    FetchContent_Declare(robotkit_lz4_source
+        GIT_REPOSITORY https://github.com/lz4/lz4.git
+        GIT_TAG ebb370ca83af193212df4dcbadcc5d87bc0de2f0
+        GIT_SHALLOW FALSE)
+    FetchContent_GetProperties(robotkit_lz4_source)
+    if(NOT robotkit_lz4_source_POPULATED)
+        FetchContent_Populate(robotkit_lz4_source)
+    endif()
+    add_library(robotkit_lz4 STATIC
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4.c"
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4frame.c"
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4hc.c"
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/xxhash.c")
+    target_include_directories(robotkit_lz4 PUBLIC "${robotkit_lz4_source_SOURCE_DIR}/lib")
+    set_target_properties(robotkit_lz4 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif()
+
 option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})
 option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)

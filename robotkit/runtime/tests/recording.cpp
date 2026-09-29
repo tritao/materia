@@ -2,26 +2,49 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <string>
-int main(){
-  const std::string path="robotkit-recording-test.mcap"; rk_recording_writer_handle w{};
-  assert(rk_recording_writer_create(path.c_str(),1024,&w)==RK_OK);
-  const char data[]="{\"version\":5,\"ordinal\":\"18446744073709551614\",\"type\":\"processEvent\"}";
-  assert(rk_recording_writer_enqueue(w,RK_RECORDING_PROCESS_EVENT,5,UINT64_MAX-1,123456789,
-    reinterpret_cast<const uint8_t*>(data),sizeof(data)-1)==RK_OK);
-  assert(rk_recording_writer_finish(w)==RK_OK); rk_recording_writer_destroy(w);
-  rk_recording_reader_handle r{}; assert(rk_recording_reader_open(path.c_str(),&r)==RK_OK);
-  rk_recording_message m{};m.struct_size=sizeof(m);uint8_t output[256];uint32_t size=sizeof(output);
-  assert(rk_recording_reader_next(r,&m,output,&size)==RK_OK);assert(m.ordinal==UINT64_MAX-1);
-  assert(m.recording_timestamp_ns==123456789);assert(m.kind==RK_RECORDING_PROCESS_EVENT);
-  assert(size==sizeof(data)-1);assert(std::memcmp(output,data,size)==0);
-  assert(rk_recording_reader_next(r,&m,output,&size)==RK_ERROR_STALE_STATE);rk_recording_reader_destroy(r);std::remove(path.c_str());
-  const std::string truncated="robotkit-recording-truncated.mcap";
-  {std::ofstream file(truncated,std::ios::binary);file.write("\x89MCAP0\r\n",8);}
-  assert(rk_recording_reader_open(truncated.c_str(),&r)==RK_ERROR_BACKEND);std::remove(truncated.c_str());
-  const std::string incomplete="robotkit-recording-incomplete.mcap";
-  assert(rk_recording_writer_create(incomplete.c_str(),1024,&w)==RK_OK);rk_recording_writer_destroy(w);
-  assert(rk_recording_reader_open(incomplete.c_str(),&r)==RK_ERROR_INVALID_STATE);
-  std::remove(incomplete.c_str());std::remove((incomplete+".incomplete").c_str());
+
+static void roundTrip(rk_recording_compression compression, const char* suffix) {
+  const std::string path = std::string("robotkit-recording-") + suffix + ".mcap";
+  rk_recording_writer_handle writer{};
+  assert(rk_recording_writer_create(path.c_str(), 1024 * 1024, compression, &writer) == RK_OK);
+  const char schema[] = "{\"name\":\"TestMsg\",\"fields\":[{\"id\":1,\"name\":\"pixels\",\"type\":\"Bytes\"}]}";
+  uint32_t channel = 0;
+  assert(rk_recording_writer_register_channel(writer, "robotkit/test", "TestMsg",
+      "robotkit-wire", reinterpret_cast<const uint8_t*>(schema), sizeof(schema) - 1,
+      "msgpack", &channel) == RK_OK);
+  assert(channel == 1);
+  uint32_t duplicate = 0;
+  assert(rk_recording_writer_register_channel(writer, "robotkit/test", "TestMsg",
+      "robotkit-wire", reinterpret_cast<const uint8_t*>(schema), sizeof(schema) - 1,
+      "msgpack", &duplicate) == RK_OK && duplicate == channel);
+  assert(rk_recording_writer_register_channel(writer, "robotkit/test", "OtherMsg",
+      "robotkit-wire", reinterpret_cast<const uint8_t*>(schema), sizeof(schema) - 1,
+      "msgpack", &duplicate) == RK_ERROR_INVALID_ARGUMENT);
+  const uint8_t payload[] = {0x81, 0x01, 0xc4, 0x02, 0x00, 0xff};
+  assert(rk_recording_writer_enqueue(writer, channel, 9, 123456789, payload, sizeof(payload)) == RK_OK);
+  uint8_t oversized[1024 * 1024 + 1]{};
+  assert(rk_recording_writer_enqueue(writer, channel, 10, 123456790,
+      oversized, sizeof(oversized)) == RK_ERROR_QUEUE_FULL);
+  rk_recording_writer_status status{}; status.struct_size = sizeof(status);
+  assert(rk_recording_writer_get_status(writer, &status) == RK_OK && status.dropped == 1);
+  assert(rk_recording_writer_finish(writer) == RK_OK);
+  rk_recording_writer_destroy(writer);
+
+  rk_recording_reader_handle reader{};
+  assert(rk_recording_reader_open(path.c_str(), &reader) == RK_OK);
+  rk_recording_message message{}; message.struct_size = sizeof(message);
+  uint8_t output[256]{}; uint32_t size = sizeof(output);
+  assert(rk_recording_reader_next(reader, &message, output, &size) == RK_OK);
+  assert(message.schema_version == 6 && message.ordinal == 9 &&
+      message.recording_timestamp_ns == 123456789 &&
+      std::strcmp(message.topic, "robotkit/test") == 0 &&
+      size == sizeof(payload) && std::memcmp(output, payload, size) == 0);
+  assert(rk_recording_reader_next(reader, &message, output, &size) == RK_ERROR_STALE_STATE);
+  rk_recording_reader_destroy(reader);
+  std::remove(path.c_str());
+}
+int main() {
+  roundTrip(RK_RECORDING_COMPRESSION_NONE, "none");
+  roundTrip(RK_RECORDING_COMPRESSION_LZ4, "lz4");
 }

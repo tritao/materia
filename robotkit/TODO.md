@@ -2,6 +2,7 @@
 
 ## Perception foundations (robotkit/plans/PERCEPTION.md)
 
+- Add `robotkit/tools/recording/foxglove-export` when Foxglove export is needed; Phase 3 proceeded without it at the user's request.
 - Consider a second TCP connection for bulk data; UDP, QUIC, and HTTP model distribution, health, and recording download remain outside RKF1.
 - Estimate cross-process clock offsets when a bounded mapping can be measured.
 - Add world fusion, tracking, and shared maps after observations are available.
