@@ -8,8 +8,10 @@ class StyleTarget {
 	public final classes:Array<String>;
 	public final tags:Array<String>;
 	public final states:Int;
-	/** Stable value fingerprint for selector inputs other than pseudo-state. */
-	public final selectorFingerprint:String;
+	/** Hash of the selector inputs other than pseudo-state, computed without allocating. */
+	public final selectorHash:Int;
+	/** Shared by every target without classes or tags; never mutated. */
+	static final NoStrings:Array<String> = [];
 
 	public function new(widgetType:String, ?key:String, ?id:String,
 			?classes:Array<String>, ?tags:Array<String>, states:Int = 0) {
@@ -18,12 +20,53 @@ class StyleTarget {
 		this.widgetType = widgetType;
 		this.key = key;
 		this.id = id;
-		this.classes = classes == null ? [] : classes.copy();
-		this.tags = tags == null ? [] : tags.copy();
+		this.classes = classes == null || classes.length == 0 ? NoStrings : classes.copy();
+		this.tags = tags == null || tags.length == 0 ? NoStrings : tags.copy();
 		this.states = states;
-		selectorFingerprint = stringKey(widgetType) + "|key=" + stringKey(key) +
-			"|id=" + stringKey(id) + "|classes=" + valuesKey(this.classes) +
-			"|tags=" + valuesKey(this.tags);
+		var hash = hashString(widgetType, -2128831035);
+		hash = hashString(key, hash * 31 + 1);
+		hash = hashString(id, hash * 31 + 2);
+		hash = hashValues(this.classes, hash * 31 + 3);
+		selectorHash = hashValues(this.tags, hash * 31 + 4);
+	}
+
+	/** Whether both targets select on identical type, key, id, classes and tags (pseudo-state excluded). */
+	public function sameSelector(other:StyleTarget):Bool
+		return this == other || (widgetType == other.widgetType && key == other.key && id == other.id &&
+			sameValues(classes, other.classes) && sameValues(tags, other.tags));
+
+	/** Stable text form of the selector inputs, for diagnostics; the style cache compares structurally instead. */
+	public var selectorFingerprint(get, never):String;
+
+	function get_selectorFingerprint():String
+		return stringKey(widgetType) + "|key=" + stringKey(key) + "|id=" + stringKey(id) +
+			"|classes=" + valuesKey(classes) + "|tags=" + valuesKey(tags);
+
+	static function hashString(value:Null<String>, seed:Int):Int {
+		if (value == null)
+			return seed * 16777619 + 0x9e3779b;
+		var hash = seed;
+		for (index in 0...value.length)
+			hash = (hash ^ value.charCodeAt(index)) * 16777619;
+		return hash ^ value.length;
+	}
+
+	static function hashValues(values:Array<String>, seed:Int):Int {
+		var hash = seed * 16777619 + values.length;
+		for (value in values)
+			hash = hashString(value, hash);
+		return hash;
+	}
+
+	static function sameValues(left:Array<String>, right:Array<String>):Bool {
+		if (left == right)
+			return true;
+		if (left.length != right.length)
+			return false;
+		for (index in 0...left.length)
+			if (left[index] != right[index])
+				return false;
+		return true;
 	}
 
 	static function valuesKey(values:Array<String>):String {

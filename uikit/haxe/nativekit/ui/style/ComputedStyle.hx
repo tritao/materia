@@ -203,7 +203,7 @@ class ComputedStyle {
 		shared = false;
 	}
 
-	/** Copies the mutable value objects that can be exposed through a computed style. */
+	/** Copies the mutable value objects that can be exposed through a computed style; Insets and Transform2D are immutable. */
 	static function copyValue(property:StyleProperty<Dynamic>, value:Dynamic):Dynamic {
 		if (value == null)
 			return null;
@@ -211,13 +211,6 @@ class ComputedStyle {
 			case "width" | "height":
 				var axis:LayoutAxis = cast value;
 				new LayoutAxis(axis.sizing, axis.value, axis.min, axis.max, axis.growWeight);
-			case "padding":
-				var insets:Insets = cast value;
-				new Insets(insets.left, insets.top, insets.right, insets.bottom);
-			case "transform":
-				var transform:Transform2D = cast value;
-				new Transform2D(transform.a, transform.b, transform.c, transform.d,
-					transform.tx, transform.ty);
 			case "effects" | "backdropEffects":
 				var effects:EffectChain = cast value;
 				effects == null ? null : effects.copy();

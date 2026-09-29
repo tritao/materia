@@ -117,3 +117,13 @@ On the tab-matrix workload, median allocation per interaction went from 1264 KiB
 2.96 ms to 1.69 ms: `StyleDiff` compared every property of every node through copying accessors (464 KiB, now 23 KiB),
 `RenderNode` no longer allocates handler, paint and decoration containers it never uses, and string building moved to
 the compiler's one-allocation concatenation.
+
+## Per-node allocation costs
+
+`python3 app/tools/profile-editor.py --scenario primitives` prints the bytes and time each building block of a rendered
+node costs in isolation (`new RenderNode`, `new StyleTarget`, a style-cache hit, `toLayoutStyle`, a scope and widget id,
+and whole `Text` and `Button` builds). It is single-threaded, so unlike the phase counters it is not mixed with
+allocation from the workspace save worker. On 2026-09-30 a `Text` build cost 3.3 KB and a `Button` 5.5 KB; a
+`RenderNode` is 0.9 KB, a scope and id 0.5 KB. A tab switch rebuilds about 320 nodes, so the fixed per-node cost, not
+any one widget, sets the tree-build total (about 530 KiB); shrinking it much further means reusing unchanged subtrees
+instead of rebuilding them.

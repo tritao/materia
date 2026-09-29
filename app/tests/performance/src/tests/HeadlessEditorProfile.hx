@@ -6,6 +6,9 @@ import app.ProjectDocumentSession;
 import app.SceneObjectData;
 import haxe.Json;
 import LayoutFrame;
+import LayoutStyle;
+import LayoutVisualKind;
+import TextWrap;
 import FontCollection;
 import nativekit.scene.SpatialIndex;
 import nativekit.scene.SceneView;
@@ -61,14 +64,14 @@ class HeadlessEditorProfile {
   static function main():Int {
     try {
       if (Sys.args().length < 2 || Sys.args().length > 4)
-        throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|inspector-edits|selection-stress|tab-matrix] [HEAP_DUMP_PATH]";
+        throw "Usage: headless-profile OUTPUT_DIR CYCLES [tab-inspector|inspector-edits|selection-stress|tab-matrix|primitives] [HEAP_DUMP_PATH]";
       var output = Sys.args()[0];
       var cycles = Std.parseInt(Sys.args()[1]);
       if (cycles == null || cycles < 1) throw "CYCLES must be positive";
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
         Sys.args()[2] == "inspector-edits" ||
         Sys.args()[2] == "selection-stress" ||
-        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -96,7 +99,9 @@ class HeadlessEditorProfile {
     var retained:Array<String> = [];
     try {
       submit(editor, frame, frames, "initial");
-      if (scenario == "tab-matrix") {
+      if (scenario == "primitives") {
+        runPrimitives(editor);
+      } else if (scenario == "tab-matrix") {
         var groups = [["hierarchy", "sensors"],
           ["console", "telemetry"]];
         for (cycle in 0...cycles) {
@@ -462,6 +467,37 @@ class HeadlessEditorProfile {
       state: editor.ui.stateStore.diagnosticCounts(),
       styles: editor.ui.buildContext.styleResolver.diagnosticCounts(),
       keys: editor.ui.buildContext.diagnosticKeyCounts()});
+  }
+
+  static function measurePrimitive(name:String, n:Int, body:Int->Void):Void {
+    for (i in 0...200) body(i);
+    var before = hl.Gc.totalAllocated();
+    var started = Sys.time();
+    for (i in 0...n) body(i);
+    var elapsed = Sys.time() - started;
+    var bytes = (hl.Gc.totalAllocated() - before) / n;
+    Sys.println(StringTools.rpad(name, " ", 34) + " " + StringTools.lpad(Std.string(Math.round(bytes)), " ", 7) + " B/op  "
+      + StringTools.lpad(Std.string(Math.round(elapsed * 1000000000.0 / n)), " ", 8) + " ns/op");
+  }
+
+  static function runPrimitives(editor:ReferenceEditorApp):Void {
+    var ctx = editor.ui.buildContext;
+    var n = 5000;
+    measurePrimitive("beginFrame", n, function(i) ctx.beginFrame());
+    measurePrimitive("withScope(Key) empty", n, function(i) { ctx.beginFrame(); ctx.withScope(new nativekit.ui.core.Key("a"), function() return 1); });
+    measurePrimitive("scope + id", n, function(i) { ctx.beginFrame(); ctx.withScope(new nativekit.ui.core.Key("a"), function() return ctx.id("x")); });
+    measurePrimitive("new WidgetId", n, function(i) new nativekit.ui.core.WidgetId(i + 1));
+    measurePrimitive("new RenderNode", n, function(i) new RenderNode(new nativekit.ui.core.WidgetId(i + 1), LayoutVisualKind.Box, null));
+    measurePrimitive("new StyleTarget", n, function(i) new nativekit.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0));
+    var target = new nativekit.ui.style.StyleTarget("button", "k", "k", ["a"], ["button"], 0);
+    measurePrimitive("resolve (cache hit)", n, function(i) ctx.styleResolver.resolve(target, ctx.inheritedStyle, ctx.theme.styles, ctx.styleSheet, null, ctx.environment));
+    var computed = ctx.styleResolver.resolve(target, ctx.inheritedStyle, ctx.theme.styles, ctx.styleSheet, null, ctx.environment);
+    measurePrimitive("computed.toLayoutStyle", n, function(i) computed.toLayoutStyle());
+    measurePrimitive("new LayoutStyle", n, function(i) new LayoutStyle());
+    measurePrimitive("new Semantics", n, function(i) new nativekit.ui.semantics.Semantics(nativekit.ui.semantics.AccessibilityRole.Button, "x"));
+    measurePrimitive("Text widget build", n, function(i) { ctx.beginFrame(); new nativekit.ui.widgets.text.Text("hello").build(ctx); });
+    measurePrimitive("Button widget build", n, function(i) { ctx.beginFrame(); new nativekit.ui.widgets.controls.Button("Label", null, null, "b").build(ctx); });
+    measurePrimitive("resolveTextRole", n, function(i) ctx.resolveTextRole(nativekit.ui.theme.TextRole.Button, nativekit.ui.core.TextStyleOverride.paragraph(TextWrap.None)));
   }
 
   static function submit(editor:ReferenceEditorApp, frame:LayoutFrame,

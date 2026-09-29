@@ -38,6 +38,13 @@ class LayoutStyle {
 	/** Normalized vertical pivot used after layout resolves the node height. */
 	public var transformOriginY:Float;
 
+	/** Insets, Color and Transform2D are immutable, so every style can start from the same default values. */
+	static final DefaultPadding:Insets = new Insets(0.0, 0.0, 0.0, 0.0);
+
+	static final DefaultBackground:Color = Color.rgba(0.0, 0.0, 0.0, 0.0);
+
+	static final DefaultTransform:Transform2D = Transform2D.identity();
+
 	public function new() {
 		width = LayoutAxis.fit();
 		height = LayoutAxis.fit();
@@ -55,9 +62,9 @@ class LayoutStyle {
 		positionY = 0.0;
 		zIndex = 0;
 		clipToParent = true;
-		padding = new Insets(0.0, 0.0, 0.0, 0.0);
+		padding = DefaultPadding;
 		childGap = 0.0;
-		background = Color.rgba(0.0, 0.0, 0.0, 0.0);
+		background = DefaultBackground;
 		radiusTopLeft = 0.0;
 		radiusTopRight = 0.0;
 		radiusBottomLeft = 0.0;
@@ -65,7 +72,7 @@ class LayoutStyle {
 		clipHorizontal = false;
 		clipVertical = false;
 		visible = true;
-		transform = Transform2D.identity();
+		transform = DefaultTransform;
 		transformOriginX = 0.5;
 		transformOriginY = 0.5;
 	}
@@ -89,7 +96,7 @@ class LayoutStyle {
 		result.positionY = positionY;
 		result.zIndex = zIndex;
 		result.clipToParent = clipToParent;
-		result.padding = new Insets(padding.left, padding.top, padding.right, padding.bottom);
+		result.padding = padding;
 		result.childGap = childGap;
 		result.background = background;
 		result.radiusTopLeft = radiusTopLeft;
@@ -99,8 +106,7 @@ class LayoutStyle {
 		result.clipHorizontal = clipHorizontal;
 		result.clipVertical = clipVertical;
 		result.visible = visible;
-		result.transform = new Transform2D(transform.a, transform.b, transform.c,
-			transform.d, transform.tx, transform.ty);
+		result.transform = transform;
 		result.transformOriginX = transformOriginX;
 		result.transformOriginY = transformOriginY;
 		return result;

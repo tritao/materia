@@ -112,7 +112,7 @@ class StyleResolver {
 		if (cacheable) {
 			parentInheritedKey = parentKey(parent);
 			localStyleKey = localKey(local);
-			cacheFingerprint = cacheHash(target.selectorFingerprint, target.states,
+			cacheFingerprint = cacheHash(target.selectorHash, target.states,
 				parentInheritedKey, themeIdentity, themeRevision, applicationIdentity,
 				applicationRevision, localStyleKey, environmentIdentity, environmentRevision);
 		}
@@ -120,7 +120,7 @@ class StyleResolver {
 			var bucket = cache.get(cacheFingerprint);
 			if (bucket != null)
 				for (entry in bucket)
-					if (entry.matches(target.selectorFingerprint, target.states, parentInheritedKey,
+					if (entry.matches(target, target.states, parentInheritedKey,
 						themeIdentity, themeRevision, applicationIdentity, applicationRevision,
 						localStyleKey, environmentIdentity, environmentRevision)) {
 						cacheHitCount++;
@@ -154,7 +154,7 @@ class StyleResolver {
 				bucket = [];
 				cache.set(cacheFingerprint, bucket);
 			}
-			bucket.push(new StyleResolverCacheEntry(target.selectorFingerprint, target.states,
+			bucket.push(new StyleResolverCacheEntry(target, target.states,
 				parentInheritedKey, themeIdentity, themeRevision, applicationIdentity,
 				applicationRevision, localStyleKey, environmentIdentity, environmentRevision,
 				result.fork()));
@@ -167,11 +167,11 @@ class StyleResolver {
 		return (theme != null && theme.transitions.length > 0) ||
 			(application != null && application.transitions.length > 0);
 
-	function cacheHash(targetFingerprint:String, states:Int, parentKey:String,
+	function cacheHash(targetHash:Int, states:Int, parentKey:String,
 			themeIdentity:Int, themeRevision:Int, applicationIdentity:Int,
 			applicationRevision:Int, localKey:String, environmentIdentity:Int,
 			environmentRevision:Int):Int {
-		var result = keyHash(targetFingerprint);
+		var result = targetHash;
 		result = mix(result, states);
 		result = mix(result, keyHash(parentKey));
 		result = mix(result, themeIdentity);
@@ -551,7 +551,7 @@ class StyleResolverLocalFingerprint {
 
 /** Collision-checked structural key for a cached computed style. */
 class StyleResolverCacheEntry {
-	final targetFingerprint:String;
+	final target:StyleTarget;
 	final states:Int;
 	final parentKey:String;
 	final themeIdentity:Int;
@@ -563,11 +563,11 @@ class StyleResolverCacheEntry {
 	final environmentRevision:Int;
 	public final style:ComputedStyle;
 
-	public function new(targetFingerprint:String, states:Int, parentKey:String,
+	public function new(target:StyleTarget, states:Int, parentKey:String,
 			themeIdentity:Int, themeRevision:Int, applicationIdentity:Int,
 			applicationRevision:Int, localKey:String, environmentIdentity:Int,
 			environmentRevision:Int, style:ComputedStyle) {
-		this.targetFingerprint = targetFingerprint;
+		this.target = target;
 		this.states = states;
 		this.parentKey = parentKey;
 		this.themeIdentity = themeIdentity;
@@ -580,11 +580,11 @@ class StyleResolverCacheEntry {
 		this.style = style;
 	}
 
-	public function matches(targetFingerprint:String, states:Int, parentKey:String,
+	public function matches(target:StyleTarget, states:Int, parentKey:String,
 			themeIdentity:Int, themeRevision:Int, applicationIdentity:Int,
 			applicationRevision:Int, localKey:String, environmentIdentity:Int,
 			environmentRevision:Int):Bool
-		return this.targetFingerprint == targetFingerprint && this.states == states &&
+		return this.target.sameSelector(target) && this.states == states &&
 			this.parentKey == parentKey && this.themeIdentity == themeIdentity &&
 			this.themeRevision == themeRevision &&
 			this.applicationIdentity == applicationIdentity &&
