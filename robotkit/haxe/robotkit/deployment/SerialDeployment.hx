@@ -8,6 +8,8 @@ import robotkit.model.RobotModel;
 import robotkit.model.RobotModelCodec;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventValue;
+import robotkit.inference.InferenceSession;
+import robotkit.perception.PerceptionPipelineRegistry;
 
 /** A canonical semantic robot model plus its physical device configuration. */
 class SerialDeployment {
@@ -23,14 +25,64 @@ class SerialDeployment {
   public final linkLossTimeoutNs:haxe.Int64;
   public final clockSyncBoundNs:haxe.Int64;
   public final channels:Array<ProcessChannelDeclaration>;
+  public final perception:Array<PerceptionPipelineConfig>;
 
   public function new(path:String) {
     var directory = Path.directory(path);
     var config:Dynamic = Json.parse(sys.io.File.getContent(path));
     var version:Dynamic = Reflect.field(config, "schemaVersion");
-    if (version != 3 && version != 4) throw "robotd: unsupported deployment schema version";
+    if (version != 3 && version != 4 && version != 5) throw "robotd: unsupported deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
+    perception = [];
+    var configured:Dynamic = Reflect.field(config, "perception");
+    if (configured != null) {
+      if (version != 5) throw "robotd: perception requires deployment schema version 5";
+      if (!Std.isOfType(configured, Array)) throw "robotd: perception must be an array";
+      var rows:Array<Dynamic> = cast configured;
+      for (entry in rows) {
+        if (entry == null) throw "robotd: perception entry cannot be null";
+        exactKeys(entry, ["id", "input", "pipeline", "model", "modelSha256", "host", "consumers", "options"], "perception");
+        var id = requiredString(entry, "id");
+        for (existing in perception) if (existing.id == id) throw 'robotd: duplicate perception id $id';
+        var input = requiredString(entry, "input");
+        var sensor:Null<robotkit.model.Sensor> = null;
+        for (candidate in robot.sensors) if (candidate.id == input) sensor = candidate;
+        if (sensor == null || sensor.kind != "camera" || sensor.frame == null)
+          throw 'robotd: perception input $input must name a camera with an existing frame';
+        var pipeline = requiredString(entry, "pipeline");
+        if (!PerceptionPipelineRegistry.supports(pipeline))
+          throw 'robotd: unknown perception pipeline $pipeline';
+        var modelFile = Path.join([directory, requiredString(entry, "model")]);
+        var digest = requiredString(entry, "modelSha256").toLowerCase();
+        if (!~/^[0-9a-f]{64}$/.match(digest) || InferenceSession.modelDigest(modelFile) != digest)
+          throw 'robotd: perception model SHA-256 mismatch for $id';
+        var host = requiredString(entry, "host");
+        if (host != "robotd" && host != "worldd") throw 'robotd: unsupported perception host $host';
+        var consumersValue:Dynamic = Reflect.field(entry, "consumers");
+        if (!Std.isOfType(consumersValue, Array)) throw 'robotd: perception consumers for $id must be an array';
+        var consumerRows:Array<Dynamic> = cast consumersValue;
+        if (consumerRows.length == 0) throw 'robotd: perception $id needs consumers';
+        var consumers:Array<String> = [];
+        for (consumer in consumerRows) {
+          if (consumer != "local" && consumer != "worldd") throw 'robotd: unsupported perception consumer $consumer';
+          if (consumers.indexOf(consumer) >= 0) throw 'robotd: duplicate perception consumer $consumer';
+          consumers.push(consumer);
+        }
+        if (host == "worldd" && consumers.indexOf("local") >= 0)
+          throw 'robotd: worldd perception cannot serve a local consumer without a network round trip';
+        var options:Dynamic = Reflect.field(entry, "options");
+        if (options == null) options = {};
+        exactKeys(options, ["scoreThreshold", "maxRateHz", "iouThreshold"], "perception options");
+        var score = optionalNumber(options, "scoreThreshold", 0.4);
+        var rate = optionalNumber(options, "maxRateHz", 0.0);
+        var iou = optionalNumber(options, "iouThreshold", 0.5);
+        if (score < 0 || score > 1 || iou < 0 || iou > 1 || rate < 0)
+          throw 'robotd: perception options for $id are out of range';
+        perception.push(new PerceptionPipelineConfig(id, input, pipeline, modelFile,
+          digest, host, consumers, score, rate, iou));
+      }
+    }
     channels = [];
     var declared:Dynamic = Reflect.field(config, "channels");
     if (declared != null) {
@@ -70,10 +122,10 @@ class SerialDeployment {
     var declaredProtocol:Dynamic = Reflect.field(device, "protocol");
     if (version == 3 && declaredProtocol != "rkd6")
       throw "robotd: v3 deployment requires rkd6; rkd5 is unsupported";
-    if (version == 4 && declaredProtocol != null)
-      throw "robotd: v4 deployment must omit protocol (RKD6 is implied)";
+    if ((version == 4 || version == 5) && declaredProtocol != null)
+      throw "robotd: v4/v5 deployment must omit protocol (RKD6 is implied)";
     protocol = "rkd6";
-    if (version == 3 || version == 4) {
+    if (version == 3 || version == 4 || version == 5) {
       var stepRate:Dynamic = Reflect.field(device, "step_tick_hz");
       if (!Std.isOfType(stepRate, Int) || stepRate <= 0)
         throw "robotd: deployment step_tick_hz must be a positive integer";
@@ -123,5 +175,18 @@ class SerialDeployment {
     if (!Std.isOfType(source, Int) || source <= 0)
       throw 'robotd: deployment $field must be a positive integer nanosecond count';
     return haxe.Int64.ofInt(source);
+  }
+
+  static function exactKeys(value:Dynamic, allowed:Array<String>, section:String):Void {
+    for (key in Reflect.fields(value))
+      if (allowed.indexOf(key) < 0) throw 'robotd: unknown $section key $key';
+  }
+
+  static function optionalNumber(value:Dynamic, field:String, fallback:Float):Float {
+    var source:Dynamic = Reflect.field(value, field);
+    if (source == null) return fallback;
+    if ((!Std.isOfType(source, Int) && !Std.isOfType(source, Float)) || !Math.isFinite(source))
+      throw 'robotd: perception $field must be a finite number';
+    return source;
   }
 }

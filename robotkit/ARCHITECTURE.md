@@ -773,6 +773,30 @@ deadlines are currently rejected rather than ignored or translated without a
 clock mapping. Local runtime behaviors may use bounded `IntentBuffer` expiry;
 source timestamps are never silently reused as receive or command time.
 
+## Perception
+
+`SerialDeployment` schema v5 may declare perception pipelines separately from
+the device layout. Each entry names a camera sensor, a model path and SHA-256,
+a pipeline implementation, an execution `host`, and its `consumers`.
+The section is strict and remains outside the RKD6 device fingerprint. Older
+v3/v4 deployments remain valid without it. A `worldd` host cannot serve a
+`local` consumer without a network round trip.
+
+`PerceptionHost` routes camera `SensorFrame`s by sensor ID to code-defined
+`PerceptionPipeline`s. `ObjectDetectorPipeline` accepts raw `rgb8` and enqueues
+it to `RobotKit::inference`; one native worker keeps the newest pending frame,
+performs bilinear letterboxing and normalization, then runs the pinned CPU
+ONNX Runtime. Haxe polls completed tensors, maps pixel boxes back through the
+reported letterbox transform, thresholds them and applies per-class NMS.
+The submitter never waits for inference. The humanoid policy has its separate
+small-tensor API but links the same ONNX Runtime shared library.
+
+`ImageDetectionObservation` is independent of `RobotSnapshot` and planar
+`Detection`. It retains the source image's sequence, frame and source/receive
+clocks, plus a completion timestamp on `robotkit.monotonic`, model identity
+and digest, and dropped-frame count. Phase 5 will deliver these observations
+through the robot event stream and over RKF1.
+
 ## 3D spatial types
 
 `robotkit.spatial` is the one place full rigid-body geometry lives above

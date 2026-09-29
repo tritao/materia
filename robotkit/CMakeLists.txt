@@ -53,6 +53,7 @@ option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})
 option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)
 option(RK_BUILD_POLICY "Build the ONNX Runtime policy library (fetches a pinned prebuilt release)" OFF)
+option(RK_BUILD_INFERENCE "Build the ONNX Runtime image inference library" OFF)
 
 set(RK_LIBRARY_TYPE STATIC)
 if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
@@ -68,6 +69,9 @@ add_subdirectory(runtime)
 
 if(RK_BUILD_POLICY)
     add_subdirectory(policy)
+endif()
+if(RK_BUILD_INFERENCE)
+    add_subdirectory(inference)
 endif()
 
 if(RK_BUILD_SIMKIT)

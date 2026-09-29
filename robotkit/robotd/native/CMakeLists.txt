@@ -16,6 +16,8 @@ set(RK_BUILD_TESTS ${ROBOTD_BUILD_TESTS} CACHE BOOL
     "Build RobotKit tests in robotd" FORCE)
 set(RK_BUILD_SIMKIT ON CACHE BOOL
     "Build the SimKit-backed RobotKit simulation" FORCE)
+set(RK_BUILD_INFERENCE ON CACHE BOOL
+    "Build the image inference module used by robotd" FORCE)
 set(NK_BUILD_SHARED ON CACHE BOOL "Build SimKit dependencies as shared libraries" FORCE)
 set(NK_BUILD_TESTS OFF CACHE BOOL "Disable SimKit tests in robotd" FORCE)
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "Disable SimKit examples in robotd" FORCE)
@@ -28,7 +30,7 @@ add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../.." robotkit)
 
 foreach(target_name
         nativekit nativekit_scene nativekit_scene_render nativekit_scene_interaction
-        nativekit_sim_core nativekit_sim_mujoco motionkit_core robotkit_runtime robotkit_policy)
+        nativekit_sim_core nativekit_sim_mujoco motionkit_core robotkit_runtime robotkit_policy robotkit_inference)
     if(TARGET "${target_name}")
         set_target_properties("${target_name}" PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
@@ -40,9 +42,12 @@ endforeach()
 if(TARGET robotkit_policy)
     set(ROBOTD_POLICY_TARGET robotkit_policy)
 endif()
+if(TARGET robotkit_inference)
+    set(ROBOTD_INFERENCE_TARGET robotkit_inference)
+endif()
 
 add_custom_target(robotd_native
-    DEPENDS motionkit_core robotkit_runtime ${ROBOTD_POLICY_TARGET}
+    DEPENDS motionkit_core robotkit_runtime ${ROBOTD_POLICY_TARGET} ${ROBOTD_INFERENCE_TARGET}
     COMMAND "${CMAKE_COMMAND}" -E touch "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
     BYPRODUCTS "${HAXEON_NATIVE_OUTPUT_DIR}/robotd.hdll"
     COMMENT "Building RobotKit native dependencies for robotd")
