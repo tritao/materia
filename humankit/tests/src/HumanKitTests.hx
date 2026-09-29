@@ -28,9 +28,14 @@ import humankit.HumanoidRig;
 import humankit.Mat4;
 import humankit.RigMapping;
 import humankit.facility.FacilityWalk;
+import humankit.facility.FacilityTargets;
+import humankit.facility.FacilityJobs;
 import materia.automation.facility.Facility;
 import materia.automation.facility.FacilityRouter;
 import materia.automation.facility.Lane;
+import materia.automation.facility.Rack;
+import materia.automation.facility.RackSlot;
+import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
 import materia.automation.facility.Zone;
 import nativekit.scene.Scene;
@@ -96,6 +101,7 @@ class HumanKitTests {
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
+		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		jobs(scene, worker, rig);
 		scene.dispose();
@@ -333,6 +339,52 @@ class HumanKitTests {
 		// straight line from start to destination.
 		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
 			throw "The facility walk does not face along the last lane";
+		human.dispose();
+	}
+
+	/** Rack-relative slots resolve in facility space and jobs use routed lanes. */
+	static function facilityTargets(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var facility = new Facility("fetch", "Fetch facility");
+		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
+		var dock = new Station("dock", "Dock", "floor", "map", new Pose2(0, 0));
+		var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(2, 1, Math.PI / 2),
+			[new RackSlot("B3", new RackSlotPose(0.25, 0, 1.2))]);
+		var table = new Station("table", "Table", "floor", "map", new Pose2(4, 1));
+		facility.addStation(dock);
+		facility.addRack(rack);
+		facility.addStation(table);
+		facility.addLane(new Lane("dock-rack", "dock", "rack",
+			new Path([dock.pose, new Pose2(2, 0), rack.pose], "map"), 1, 1));
+		facility.addLane(new Lane("rack-table", "rack", "table",
+			new Path([rack.pose, new Pose2(3, 1), table.pose], "map"), 1, 1));
+		var targets = new FacilityTargets(facility);
+		var slot = targets.rackSlotPoint("rack", "B3");
+		if (distance(slot, [2, 1.25, 1.2]) > 1e-9)
+			throw 'Rack slot did not resolve through yaw: $slot';
+		var route = targets.route("rack", "table");
+		var points = FacilityWalk.routeFromFacilityRoute(route);
+		if (points.length != 3 || distance([points[1][0], points[1][1], 0], [3, 1, 0]) > 1e-9)
+			throw 'Fetch route did not follow facility lane: $points';
+		var human = new HumanCharacter(scene, asset, rig, null, "Fetcher");
+		var body = new HumanBody(human);
+		var job = FacilityJobs.fetch(facility, "rack", "B3").deliver("table", [4.25, 1, 1.2]);
+		job.bind(body);
+		var checkedSlot = false;
+		for (_ in 0...1200) {
+			job.advance(1.0 / 60.0);
+			if (!checkedSlot && job.currentIndex() >= 1) {
+				checkedSlot = true;
+				var shoulder = body.toWorld(human.pose.bonePosition(HumanBone.UpperArmR));
+				if (distance(shoulder, slot) > body.description.upperArm + body.description.forearm + 0.02)
+					throw 'Fetch approach stopped outside slot reach: $shoulder to $slot';
+			}
+			if (job.isDone()) break;
+		}
+		if (!checkedSlot || !job.isDone() || job.failure() != null)
+			throw 'Facility fetch did not finish: ${job.failure()}';
+		var root = body.rootTransform();
+		if (Math.abs(root[12] - table.pose.x) > 1e-3 || Math.abs(root[13] - table.pose.y) > 1e-3)
+			throw 'Facility fetch did not end at table: ${root[12]}, ${root[13]}';
 		human.dispose();
 	}
 

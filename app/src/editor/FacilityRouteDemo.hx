@@ -4,6 +4,9 @@ import humankit.facility.FacilityWalk;
 import materia.automation.facility.Facility;
 import materia.automation.facility.FacilityRouter;
 import materia.automation.facility.Lane;
+import materia.automation.facility.Rack;
+import materia.automation.facility.RackSlot;
+import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
 import materia.automation.facility.Zone;
 import robotkit.mobile.Footprint;
@@ -35,10 +38,11 @@ class FacilityRouteDemo {
 		var built = new Facility("preview", "Preview facility");
 		built.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12.0, 12.0)));
 		var dock = new Station("dock", "Dock", "floor", "map", new Pose2(0.0, 0.0, 0.0));
-		var shelf = new Station("shelf", "Shelf", "floor", "map", new Pose2(3.0, 0.0, 0.0));
+		var shelf = new Rack("shelf", "Shelf", "floor", "map", new Pose2(3.0, 0.0, 0.0),
+			[new RackSlot("B3", new RackSlotPose(0.35, -0.2, 1.0))]);
 		var bench = new Station("bench", "Bench", "floor", "map", new Pose2(3.0, 2.5, Math.PI / 2));
 		built.addStation(dock);
-		built.addStation(shelf);
+		built.addRack(shelf);
 		built.addStation(bench);
 		built.addLane(new Lane("dock-shelf", dock.id, shelf.id, new Path([dock.pose, shelf.pose], "map"), 1.0, 1.4));
 		built.addLane(new Lane("shelf-bench", shelf.id, bench.id, new Path([shelf.pose, bench.pose], "map"), 1.0,
