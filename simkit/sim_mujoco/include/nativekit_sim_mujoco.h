@@ -24,6 +24,8 @@ extern "C" {
 /** Creates a Sim world whose internal backend is MuJoCo. */
 NKSIMMUJOCO_API nksim_result NKSIMMUJOCO_CALL nksim_mujoco_world_create(
     const nksim_world_desc *desc, nksim_world *out_world NK_OUT NK_OWNED);
+/** Diagnostic count of fallback geom-distance calls since process start. */
+NKSIMMUJOCO_API uint64_t NKSIMMUJOCO_CALL nksim_mujoco_distance_call_count(void);
 
 #ifdef __cplusplus
 }
