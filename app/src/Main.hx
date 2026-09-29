@@ -15,6 +15,7 @@ import app.editor.ProjectUiExtension;
 import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
 import app.editor.SceneViewCommands;
+import app.editor.SimulationCommands;
 import app.editor.EditorGrid;
 import Color;
 import LayoutAxis;
@@ -36,6 +37,7 @@ import nativekit.ui.core.CommandResult;
 import nativekit.ui.docking.DockPanelDescriptor;
 import nativekit.ui.docking.DockWorkspaceCommands;
 import nativekit.ui.docking.DockWorkspaceModel;
+import nativekit.ui.docking.DockWorkspaceSnapshot;
 import nativekit.ui.docking.DockWorkspacePersistence;
 import nativekit.ui.docking.DockWorkspaceStorage;
 import nativekit.ui.properties.PropertyDescriptor;
@@ -484,6 +486,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var viewportWidth:Float = Main.DEFAULT_WINDOW_WIDTH;
   var viewportHeight:Float = Main.DEFAULT_WINDOW_HEIGHT;
   var toolbarDensity:EditorToolbarDensity = Full;
+  public var mode(default, null):EditorMode = EditorMode.Design;
+  // Each mode keeps the layout it was left in; the mode set itself is never persisted.
+  final modeSnapshots:Map<String, DockWorkspaceSnapshot> = new Map();
+  // Mode to return to when the simulation stops after Play switched into Simulate.
+  var modeBeforePlay:Null<EditorMode> = null;
   var contextMenuVisible:Bool;
   var hierarchyAddVisible:Bool = false;
   var hierarchySearch:String = "";
@@ -974,6 +981,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   };
 
   public function resetWorkspace():Void {
+    modeSnapshots.remove(mode.id);
     workspace.reset();
     log("Workspace reset");
     invalidateView();
@@ -1028,7 +1036,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     barStyle.childAlignY = LayoutAlignmentY.Center;
     barStyle.childGap = 6.0;
     barStyle.padding = new Insets(10.0, 5.0, 10.0, 5.0);
-    barStyle.background = appearance.toolbar;
+    barStyle.background = simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar;
 
     var titleStyle = new LayoutStyle();
     titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
@@ -1040,12 +1048,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
     ];
     if (!minimal) {
+      items.push(new KeyedView("modes", modeSwitcher(compact)));
       items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
       items.push(new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact)));
       items.push(new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
         "Frame", IconName.Inspect, compact)));
     }
     items.push(new KeyedView("space", new Spacer("toolbar-space", LayoutAxis.grow(),
+      LayoutAxis.fixed(1.0))));
+    items.push(new KeyedView("transport", transportGroup(compact, minimal)));
+    items.push(new KeyedView("space-end", new Spacer("toolbar-space-end", LayoutAxis.grow(),
       LayoutAxis.fixed(1.0))));
     var documentLabel = shortenLabel(session.label(), compact ? 18 : 30);
     items.push(new KeyedView("status", new Text(documentLabel, null, appearance.theme.tokens.textSecondary,
@@ -1062,6 +1074,47 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return new Row("editor-toolbar-row", items, barStyle);
   }
 
+  /** Segmented mode buttons; the active mode reads as selected through its command's checked state. */
+  function modeSwitcher(compact:Bool):View {
+    var style = new LayoutStyle();
+    style.direction = LayoutDirection.LeftToRight;
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 2.0;
+    var buttons:Array<KeyedView> = [];
+    for (candidate in EditorMode.all())
+      buttons.push(new KeyedView(candidate.id, toolbarAction("toolbar-mode-" + candidate.id,
+        "editor.mode." + candidate.id, candidate.label, candidate.icon, compact)));
+    return new Row("editor-mode-switcher", buttons, style);
+  }
+
+  /** Play/Pause, Step, Reset, and return-to-design controls for the shared simulation. */
+  function transportGroup(compact:Bool, minimal:Bool):View {
+    var style = new LayoutStyle();
+    style.direction = LayoutDirection.LeftToRight;
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 4.0;
+    var running = simulation.isRunning();
+    var playPause = running
+      ? toolbarAction("toolbar-sim-pause", "sim.pause", "Pause", IconName.Pause, true)
+      : toolbarAction("toolbar-sim-play", "sim.play", "Play", IconName.Play, true, true);
+    var items:Array<KeyedView> = [new KeyedView("play-pause", playPause)];
+    if (!minimal) {
+      items.push(new KeyedView("step", toolbarAction("toolbar-sim-step", "sim.step", "Step",
+        IconName.StepForward, true)));
+      items.push(new KeyedView("reset", toolbarAction("toolbar-sim-reset", "sim.reset", "Reset",
+        IconName.Reset, true)));
+      items.push(new KeyedView("stop", toolbarAction("toolbar-sim-stop", "sim.stop", "Design",
+        IconName.Stop, true)));
+    }
+    if (!compact) {
+      var state = running ? "Running" : simulation.isActive() ? "Paused" : "Design";
+      if (simulation.isActive() && simulation.pending(sensors, scene)) state += " · Rebuild pending";
+      items.push(new KeyedView("state", new Text(state, null, appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0))));
+    }
+    return new Row("editor-transport", items, style);
+  }
+
   function chromeRevisionKey():String {
     var presentationRevision = framePresentation == null ? -1 : framePresentation.revision;
     return "generation=" + sceneGeneration + ":scene=" + scene.revision +
@@ -1070,7 +1123,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ":error=" + (simulation.error == null ? "" : simulation.error) +
       ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
       ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
-      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
+      ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
       ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision;
   }
 
@@ -1141,7 +1194,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePanelContents = [
       new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
-          ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision),
+          ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision +
+          ":simulating=" + simulation.isActive()),
       new DockPanelContent("bim", function(_) return bimEditor),
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
         function(_, width) return perspectivePanel(width)),
@@ -1427,6 +1481,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
     openPalette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
     commands.register(openPalette);
     SceneViewCommands.install(this);
+    SimulationCommands.install(this);
+    for (candidate in EditorMode.all()) {
+      var target = candidate;
+      commands.register(new Command("editor.mode." + target.id, target.label + " mode",
+        function() switchMode(target),
+        new Shortcut(target == EditorMode.Design ? 49 : 50, UiModifier.Control),
+        function() return !documents.blocked(), function() return mode == target));
+    }
   }
 
   function documentChanged():Void {
@@ -1607,16 +1669,49 @@ class ReferenceEditorApp implements DesktopUiApplication {
     catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
   }
 
+  /** Switches dock layout and toolbar emphasis; the document, selection, and history are untouched. */
+  public function switchMode(next:EditorMode):Void {
+    if (next == mode) return;
+    modeSnapshots.set(mode.id, workspace.snapshot());
+    mode = next;
+    // The mode's default layout backs "Reset workspace" while it is active.
+    workspace.setDefaultLayout(next.layout());
+    var saved = modeSnapshots.get(next.id);
+    if (saved != null) workspace.restorePersisted(saved);
+    log(next.label + " mode");
+    commands.refresh();
+    invalidateView();
+    queueWorkspaceSave();
+  }
+
+  /** Play enters Simulate and remembers where to return; Stop and Design restore it. */
+  public function enterSimulationMode():Void {
+    if (mode == EditorMode.Simulate) return;
+    modeBeforePlay = mode;
+    switchMode(EditorMode.Simulate);
+  }
+
+  public function leaveSimulationMode():Void {
+    var previous = modeBeforePlay;
+    modeBeforePlay = null;
+    if (previous != null && mode == EditorMode.Simulate) switchMode(previous);
+  }
+
+  // Only the Design layout is written, so a session ending in another mode reopens in Design.
+  function persistedWorkspace():DockWorkspaceSnapshot
+    return mode == EditorMode.Design || !modeSnapshots.exists(EditorMode.Design.id)
+      ? workspace.snapshot() : modeSnapshots.get(EditorMode.Design.id);
+
   function saveWorkspace():Void {
     try {
-      var error = workspaceSaves.saveNow(workspace.snapshot());
+      var error = workspaceSaves.saveNow(persistedWorkspace());
       if (error != null) log("Workspace save failed: " + error);
     }
     catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
   }
 
   function queueWorkspaceSave():Void {
-    try workspaceSaves.schedule(workspace.snapshot());
+    try workspaceSaves.schedule(persistedWorkspace());
     catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
   }
 

@@ -2,6 +2,7 @@ package app.editor;
 
 import app.Main.ReferenceEditorApp;
 import Insets;
+import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.core.View;
 import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.KeyedView;
@@ -57,10 +58,11 @@ class InspectorPanel {
     inspector.enabled = ownership==null&&!simulation.isActive() &&
       (perspectiveViewport == null || !perspectiveViewport.dragging());
     var rows:Array<KeyedView> = [new KeyedView("heading",sectionHeading(selected.label))];
+    if (simulation.isActive()) rows.push(new KeyedView("simulation-hint",
+      new Text(HierarchyPanel.SIMULATION_LOCK_HINT, null, appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0))));
     var assembly = session.projectAssembly;
     if (assembly != null && StringTools.startsWith(selected.id, "project:")) {
-      if (simulation.isActive()) rows.push(new KeyedView("assembly-simulation-hint",
-        new Text("Stop the simulation to edit assembly joints.")));
       var instanceId = selected.id.substr(8);
       var jointLines:Array<String> = [];
       for (joint in assembly.joints) if (joint.parent == instanceId || joint.child == instanceId)
