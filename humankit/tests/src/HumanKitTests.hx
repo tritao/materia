@@ -103,9 +103,54 @@ class HumanKitTests {
 		facilityRoute(scene, worker, rig);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
+		placeReferencePoint(scene, worker, rig);
 		jobs(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
+	}
+
+	static function placeReferencePoint(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		for (withObject in [false, true]) {
+			var human = new HumanCharacter(scene, asset, rig, null, "Place reference test");
+			var body = new HumanBody(human);
+			body.advance(0.0);
+			// Without a held object Place puts the palm on target.
+			var hand = withObject ? body.toWorld(human.pose.bonePosition(HumanBone.HandR)) : body.gripPoint(ArmR);
+			var target = [hand[0] + (withObject ? 0.08 : 0.02), hand[1], hand[2]];
+			if (withObject) body.setHeldPoint(ArmR, function() {
+				var current = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
+				return [current[0] + 0.07, current[1], current[2]];
+			});
+			var place = new Place(target, [ArmR], withObject ? 0.0 : 0.1);
+			var job = new HumanJob(body).add(place);
+			job.advance(1.0 / 60.0);
+			if (withObject && distance(body.heldPoint(ArmR), target) >= 0.005)
+				throw 'Place did not solve the held-point offset in one advance: ${body.heldPoint(ArmR)}';
+			for (_ in 0...99) {
+				job.advance(1.0 / 60.0);
+				if (!place.grip) break;
+			}
+			var actual = withObject ? body.heldPoint(ArmR) : body.gripPoint(ArmR);
+			var error = distance(actual, target);
+			if (place.grip || error >= 0.005 || withObject && place.placementError >= 0.005)
+				throw 'Place reference point error: held=$withObject actual=$actual target=$target error=$error residual=${place.placementError}';
+			human.dispose();
+		}
+		var human = new HumanCharacter(scene, asset, rig, null, "Unreachable place test");
+		var body = new HumanBody(human);
+		body.advance(0.0);
+		var hand = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
+		var unreachable = new Place([hand[0] + 2.0, hand[1], hand[2]], [ArmR], 0.1);
+		var job = new HumanJob(body).add(unreachable);
+		for (_ in 0...5) {
+			var before = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
+			job.advance(1.0 / 60.0);
+			var after = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
+			if (distance(before, after) > 0.05) throw 'Unreachable Place moved the hand: $before to $after';
+		}
+		if (job.failure() == null || job.failure().indexOf("Place target out of reach") < 0)
+			throw 'Unreachable Place did not fail clearly: ${job.failure()}';
+		human.dispose();
 	}
 
 	/** Measurements and capsule placement at the worker's rest pose. */
@@ -367,9 +412,10 @@ class HumanKitTests {
 			throw 'Fetch route did not follow facility lane: $points';
 		var human = new HumanCharacter(scene, asset, rig, null, "Fetcher");
 		var body = new HumanBody(human);
-		var job = FacilityJobs.fetch(facility, "rack", "B3").deliver("table", [4.25, 1, 1.2]);
+		var placePoint = [4.25, 1.0, 1.2];
+		var job = FacilityJobs.fetch(facility, "rack", "B3").deliver("table", placePoint);
 		job.bind(body);
-		var checkedSlot = false;
+		var checkedSlot = false, checkedPlace = false;
 		for (_ in 0...1200) {
 			job.advance(1.0 / 60.0);
 			if (!checkedSlot && job.currentIndex() >= 1) {
@@ -378,13 +424,17 @@ class HumanKitTests {
 				if (distance(shoulder, slot) > body.description.upperArm + body.description.forearm + 0.02)
 					throw 'Fetch approach stopped outside slot reach: $shoulder to $slot';
 			}
+			if (!checkedPlace && job.currentIndex() >= 4) {
+				checkedPlace = true;
+				var hand = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
+				var reach = body.description.upperArm + body.description.forearm;
+				if (distance(hand, placePoint) >= 0.9 * reach)
+					throw 'Delivery did not approach the place point: hand=$hand target=$placePoint';
+			}
 			if (job.isDone()) break;
 		}
-		if (!checkedSlot || !job.isDone() || job.failure() != null)
+		if (!checkedSlot || !checkedPlace || !job.isDone() || job.failure() != null)
 			throw 'Facility fetch did not finish: ${job.failure()}';
-		var root = body.rootTransform();
-		if (Math.abs(root[12] - table.pose.x) > 1e-3 || Math.abs(root[13] - table.pose.y) > 1e-3)
-			throw 'Facility fetch did not end at table: ${root[12]}, ${root[13]}';
 		human.dispose();
 	}
 
@@ -458,6 +508,7 @@ class HumanKitTests {
 			.add(pick)
 			.add(new Carry(HumanCarryPosture.RightHand))
 			.add(new WalkTo([1.2, 0.0], 1.0))
+			.add(new ApproachFor(placePoint, ArmR))
 			.add(new Place(placePoint, [ArmR], 0.2))
 			.add(new Press(placePoint, ArmR, 0.1, 0.1))
 			.add(new Wait(0.05))
@@ -466,23 +517,30 @@ class HumanKitTests {
 		var step = 1.0 / 60.0;
 		for (_ in 0...900) {
 			var before = body.rootTransform()[12];
+			var headingBefore = Math.atan2(body.rootTransform()[1], body.rootTransform()[0]);
 			job.advance(step);
+			// Walks continue from the current heading: the body never turns faster than its turn rate.
+			var turned = Math.atan2(body.rootTransform()[1], body.rootTransform()[0]) - headingBefore;
+			turned = Math.abs(Math.atan2(Math.sin(turned), Math.cos(turned)));
+			if (turned > body.walker.turnRate * step + 1e-6)
+				throw 'The body snapped its heading by $turned rad in one step';
 			if (!approached && job.currentIndex() > 0) {
 				approached = true;
+				// The target lies straight ahead of the reaching shoulder, within reach.
 				var root = body.rootTransform();
-				var dx = pickPoint[0] - root[12], dy = pickPoint[1] - root[13];
-				var range = Math.sqrt(dx * dx + dy * dy);
 				var shoulderNow = body.toWorld(human.pose.bonePosition(HumanBone.UpperArmR));
+				var dx = pickPoint[0] - shoulderNow[0], dy = pickPoint[1] - shoulderNow[1];
+				var range = Math.sqrt(dx * dx + dy * dy);
 				var reachLength = body.description.upperArm + body.description.forearm;
-				if (distance(shoulderNow, pickPoint) > reachLength + 0.02 ||
+				if (distance(shoulderNow, pickPoint) > reachLength ||
 					(root[0] * dx + root[1] * dy) / range < 0.99)
 					throw 'Approach did not stand within reach facing the target: $root';
 			}
 			if (pick.grip && !picked && !body.isCarrying(ArmR)) {
 				picked = true;
-				var hand = body.toWorld(human.pose.bonePosition(HumanBone.HandR));
-				if (distance(hand, pickPoint) > 0.02)
-					throw 'The pick hand missed its world target: $hand vs $pickPoint';
+				var palm = body.gripPoint(ArmR);
+				if (distance(palm, pickPoint) > 0.02 || pick.pickError > 0.02)
+					throw 'The pick palm missed its world target: $palm vs $pickPoint (${pick.pickError})';
 			}
 			if (body.isCarrying(ArmR) && body.walker.isWalking()) {
 				carried = true;

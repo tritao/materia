@@ -1,7 +1,19 @@
 package humankit;
 
-/** Stands at arm's reach of a point and faces it before the reach begins. */
+/**
+ * Walks to where the limb's shoulder has a comfortable reach to a point and
+ * faces so the point lies straight ahead of that shoulder, before a reach.
+ * The stand-off accounts for the height between shoulder and point: a low
+ * point is approached closer than one at shoulder height.
+ */
 class ApproachFor extends HumanActionBase {
+	/**
+	 * Fraction of the arm (shoulder to wrist) a standing reach uses. The palm
+	 * adds no reliable length: IK sets only the wrist, so the hand may hang
+	 * across the reach direction.
+	 */
+	static inline var COMFORT = 0.8;
+
 	public final target:Array<Float>;
 	public final limb:HumanLimb;
 	public final speed:Float;
@@ -20,29 +32,30 @@ class ApproachFor extends HumanActionBase {
 		if (target.length < 3) { fail("Approach target needs x, y, z"); return; }
 		if (limb != ArmL && limb != ArmR) { fail("Approach requires an arm"); return; }
 		var shoulder = worker.character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
-		var pelvis = worker.character.pose.bonePosition(Pelvis);
-		if (shoulder == null || pelvis == null) { fail("The rig lacks an arm or pelvis"); return; }
-		var reach = worker.description.upperArm + worker.description.forearm;
-		var localTarget = worker.toModel(target);
-		if (localTarget[2] > shoulder[2] + reach * 0.9) {
+		if (shoulder == null) { fail("The rig lacks an arm"); return; }
+		var root = worker.rootTransform();
+		var comfortable = COMFORT * (worker.description.upperArm + worker.description.forearm);
+		var rise = target[2] - (root[14] + shoulder[2]);
+		if (rise >= comfortable) {
 			fail("Target is above reachable height");
 			return;
 		}
-		if (localTarget[2] < pelvis[2] - 0.05) {
+		if (-rise >= comfortable) {
 			fail("Target is below waist height; crouching is unsupported");
 			return;
 		}
-		var root = worker.rootTransform();
+		var ahead = Math.sqrt(comfortable * comfortable - rise * rise);
 		var dx = target[0] - root[12], dy = target[1] - root[13];
 		var distance = Math.sqrt(dx * dx + dy * dy);
 		var ux = distance > 1e-8 ? dx / distance : root[0];
 		var uy = distance > 1e-8 ? dy / distance : root[1];
-		var standOff = Math.max(0.2, reach * 0.72);
-		var standX = target[0] - ux * standOff;
-		var standY = target[1] - uy * standOff;
-		faceAngle = Math.atan2(target[1] - standY, target[0] - standX);
+		// Stand so the shoulder (model +X forward, +Y left of the root) sits
+		// `ahead` metres behind the target along the facing direction.
+		var standX = target[0] - ux * (ahead + shoulder[0]) + uy * shoulder[1];
+		var standY = target[1] - uy * (ahead + shoulder[0]) - ux * shoulder[1];
+		faceAngle = Math.atan2(uy, ux);
 		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005)
-			worker.walker.follow([[root[12], root[13]], [standX, standY]], speed);
+			worker.walker.continueAlong([[root[12], root[13]], [standX, standY]], speed);
 		else {
 			worker.walker.face(faceAngle);
 			turnIssued = true;

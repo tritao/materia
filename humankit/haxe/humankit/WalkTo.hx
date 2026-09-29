@@ -44,7 +44,7 @@ class WalkTo extends HumanActionBase {
 			done = true;
 			return;
 		}
-		worker.walker.follow(route, speed);
+		worker.walker.continueAlong(route, speed);
 	}
 
 	override public function isDone():Bool

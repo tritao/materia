@@ -70,6 +70,17 @@ class HumanWalker {
 		character.player.play(gait.clip, FADE_SECONDS);
 	}
 
+	/**
+	 * Walks along route from where the character stands (the route's first
+	 * point), keeping its heading and turning onto the route at turnRate rather
+	 * than snapping to it, so what it carries does not swing.
+	 */
+	public function continueAlong(route:Array<Array<Float>>, metresPerSecond:Float):Void {
+		var current = heading;
+		follow(route, metresPerSecond);
+		heading = current;
+	}
+
 	/** Sets the starting floor pose before a job begins. */
 	public function place(x:Float, y:Float, heading:Float):Void {
 		stop();

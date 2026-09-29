@@ -40,6 +40,13 @@ class HumanJob {
 	public function failure():Null<String>
 		return error;
 
+	/** Stops the job with a failure found outside its actions, such as by a simulation layer. */
+	public function abort(reason:String):Void {
+		if (isDone()) return;
+		error = 'Action $index: $reason';
+		if (worker != null) worker.cancel();
+	}
+
 	public function cancel():Void {
 		cancelled = true;
 		if (worker != null) worker.cancel();
