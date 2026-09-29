@@ -8,6 +8,9 @@ import cadkit.parametric.TypedProperty;
 import machinekit.document.MachineAssemblyDocuments;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.VacuumGenerator;
+import machinekit.pneumatic.SuctionCup;
+import machinekit.component.PortInterface;
+import materia.assembly.AssemblyFrames;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.schmalz.SchmalzSxtMaster;
@@ -101,6 +104,8 @@ class MachineAssemblyDescriptionTests {
 		if (rebuilt.billOfMaterials().quantity(flangePart) != beforeEdit + 1)
 			throw "Editing a rebuilt assembly did not update its evaluated BOM";
 		nestedRoundTrip();
+		includedConnectorRuntime();
+		suctionInterfaceRoundTrip();
 		documentRoundTrip();
 		changerDocumentRoundTrip();
 		mechanicalRecords();
@@ -108,6 +113,31 @@ class MachineAssemblyDescriptionTests {
 		EndEffectorSetTests.run();
 		MachineKitSmoke.massProperties();
 		MachineKitSmoke.ports();
+	}
+
+	static function includedConnectorRuntime():Void {
+		var inner = new MachineAssembly();
+		inner.addComponent("part", new RobotFlange(50));
+		var outer = new MachineAssembly();
+		outer.addComponent("base", new RobotFlange(50));
+		outer.include("unit", inner);
+		outer.addMemberConnector("unit/part", "outerMount", AssemblyFrames.identity());
+		outer.addMate("attach", "fixed", "base", "face", "unit/part", "outerMount");
+		if (outer.solvedPoses().get("unit/part") == null) throw "Outer connector was lost during pose solve";
+		if (outer.massProperties().mass <= 0) throw "Outer connector was lost during mass solve";
+	}
+
+	static function suctionInterfaceRoundTrip():Void {
+		var assembly = new MachineAssembly();
+		assembly.addComponent("cup", new SuctionCup(20, 10, null, null, null, PushIn(4)));
+		var oldDescription = assembly.describe();
+		oldDescription.machine.portBridges = [{occurrence: "cup", fromPort: "old", toPort: "vacuum"}];
+		MachineAssembly.fromDescription(oldDescription);
+		var rebuilt = MachineAssembly.decode(assembly.encode());
+		switch rebuilt.components()[0].component.port("vacuum").iface {
+			case PushIn(size): if (size != 4) throw "Suction cup port diameter changed";
+			case _: throw "Suction cup port interface changed";
+		}
 	}
 
 	static function nestedRoundTrip():Void {
@@ -251,6 +281,24 @@ class MachineAssemblyDescriptionTests {
 			throw "Document lost closure tolerance";
 		reopened.close();
 		document.close();
+		var defaultClosure = new MachineAssembly();
+		defaultClosure.addComponent("a", new RobotFlange(50));
+		defaultClosure.addComponent("b", new RobotFlange(50), AssemblyFrames.translation(0.002, 0, 0));
+		defaultClosure.addConstraint("default", "fixed", "a", "face", "b", "face");
+		if (defaultClosure.describe().mechanical.joints[0].closureTolerance != null ||
+			!rejectsClosure(defaultClosure))
+			throw "Default closure tolerance was stored or not checked";
+		var metreModel = new AssemblyModel("m");
+		metreModel.add("a"); metreModel.add("b", AssemblyFrames.translation(0.000002, 0, 0));
+		metreModel.connector("a", "point", AssemblyFrames.identity());
+		metreModel.connector("b", "point", AssemblyFrames.identity());
+		metreModel.constrain("default", "fixed", "a", "point", "b", "point");
+		if (metreModel.definition().joints[0].closureTolerance != null)
+			throw "AssemblyModel stored its default closure tolerance";
+		var metreRejected = false;
+		try metreModel.solve() catch (error:String)
+			metreRejected = error.indexOf("separated connectors") >= 0;
+		if (!metreRejected) throw "Metre closure did not use the length-unit default";
 	}
 
 	static function rejectsClosure(assembly:MachineAssembly):Bool {

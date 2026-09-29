@@ -15,6 +15,7 @@ import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.units.LengthUnit;
 import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveOptions;
 import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveResult;
 
@@ -155,6 +156,24 @@ class AssemblyState {
 			result.push({joint: joint.id, position: position, axis: 1 - axisDot, rotation: rotation});
 		}
 		return result;
+	}
+
+	/** Check closures using a one-micrometre default in the definition's length unit. */
+	public function checkClosures():Void {
+		for (residual in closureResiduals()) {
+			var joint = joints.get(residual.joint);
+			if (joint == null) throw 'Missing assembly joint "${residual.joint}"';
+			var tolerance = joint.closureTolerance;
+			if (tolerance == null)
+				tolerance = 1e-6 / LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
+			if (residual.position > tolerance)
+				throw 'Assembly joint "${residual.joint}" has separated connectors';
+			if (joint.type == AssemblyJointType.Fixed) {
+				if (residual.rotation > 1e-5)
+					throw 'Assembly fixed joint "${residual.joint}" has misaligned frames';
+			} else if (residual.axis > 1e-5)
+				throw 'Assembly joint "${residual.joint}" has misaligned axes';
+		}
 	}
 
 	/** Adjusts selected tree-joint coordinates until the assembly closures are satisfied. */

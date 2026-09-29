@@ -3,7 +3,6 @@ package machinekit.robotics;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
 import machinekit.assembly.MachineAssemblyDescription;
-import machinekit.assembly.MachineAssemblyDescription.MemberSource;
 
 typedef ChangerPortMap = {robot:String, tool:String};
 
@@ -158,8 +157,6 @@ class EndEffectorSet extends EndEffector {
 
 	/** Build one coupled configuration, with no ports to other tools. */
 	public function configuration(toolId:String):EndEffector {
-		var description = describe();
-		if (savable(description)) return configurationFromDescription(description, toolId);
 		return buildConfiguration(toolId);
 	}
 
@@ -167,19 +164,6 @@ class EndEffectorSet extends EndEffector {
 	public static function configurationFromDescription(description:MachineAssemblyDescription,
 			toolId:String):EndEffector
 		return EndEffectorSet.fromDescription(description).buildConfiguration(toolId);
-
-	static function savable(description:MachineAssemblyDescription):Bool {
-		for (member in description.machine.members) switch member.source {
-			case Code(_): return false;
-			case Typed(_, _):
-		}
-		if (description.machine.tools != null) for (tool in description.machine.tools)
-			for (member in tool.machine.members) switch member.source {
-				case Code(_): return false;
-				case Typed(_, _):
-			}
-		return true;
-	}
 
 	function buildConfiguration(toolId:String):EndEffector {
 		if (changerRef == null) throw "End effector set needs a changer";

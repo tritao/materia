@@ -112,15 +112,16 @@ class AssemblyModel {
 		if (!validJointKind(kind))
 			throw 'Unsupported assembly joint "$kind"';
 		validateAxis(axis);
-		var resolvedTolerance = tolerance == null ? 1e-6 / metresPerUnit : tolerance;
-		if (!Math.isFinite(resolvedTolerance) || resolvedTolerance < 0) throw "Assembly tolerance must be finite and nonnegative";
+		if (tolerance != null && (!Math.isFinite(tolerance) || tolerance < 0)) throw "Assembly tolerance must be finite and nonnegative";
 		validateLimits(limits, 0);
 		requireConnector(parent, parentConnector);
 		requireConnector(child, childConnector);
-		data.joints.push({id: id, type: cast kind, role: AssemblyJointRole.Closure,
+		var joint:materia.assembly.AssemblyDefinition.KinematicJoint = {id: id, type: cast kind, role: AssemblyJointRole.Closure,
 			parent: parent, parentConnector: parentConnector, child: child,
 			childConnector: childConnector, defaultValue: 0, axis: axis,
-			limits: limits == null ? noLimits() : limits, closureTolerance: resolvedTolerance});
+			limits: limits == null ? noLimits() : limits};
+		if (tolerance != null) joint.closureTolerance = tolerance;
+		data.joints.push(joint);
 		solved = null;
 	}
 
@@ -160,30 +161,9 @@ class AssemblyModel {
 	function solvedState():AssemblyState {
 		if (solved != null) return solved;
 		var state = initialState();
-		state.forwardKinematics();
-		for (residual in state.closureResiduals()) {
-			var tolerance = jointClosureTolerance(residual.joint);
-			if (tolerance != null && residual.position > tolerance)
-				throw 'Assembly joint "${residual.joint}" has separated connectors';
-			var kind = jointKind(residual.joint);
-			if (kind == "fixed") {
-				if (residual.rotation > 1e-5)
-					throw 'Assembly fixed joint "${residual.joint}" has misaligned frames';
-			} else if (residual.axis > 1e-5)
-				throw 'Assembly joint "${residual.joint}" has misaligned axes';
-		}
+		state.checkClosures();
 		solved = state;
 		return state;
-	}
-
-	function jointKind(id:String):String {
-		for (joint in data.joints) if (joint.id == id) return cast joint.type;
-		throw 'Missing assembly joint "$id"';
-	}
-
-	function jointClosureTolerance(id:String):Null<Float> {
-		for (joint in data.joints) if (joint.id == id) return joint.closureTolerance;
-		throw 'Missing assembly joint "$id"';
 	}
 
 	function require(id:String):AssemblyComponentOccurrence {

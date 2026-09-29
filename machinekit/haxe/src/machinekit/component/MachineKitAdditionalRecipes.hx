@@ -59,10 +59,19 @@ class MachineKitAdditionalRecipes {
 		new ComponentType("machinekit.pneumatic.manifold", [i("outlets", 2)],
 			v -> new PneumaticManifold(v.integer("outlets")), true),
 		new ComponentType("machinekit.pneumatic.suction-cup", [n("diameter", 40), n("height", 18),
-			s("effectiveAreaMm2", 0), s("ratedMomentNm", 0)],
+			s("effectiveAreaMm2", 0), s("ratedMomentNm", 0),
+			c("vacuumInterfaceKind", ["PushIn", "Thread", "Plug", "Coupling", "Unspecified"], "PushIn"),
+			n("vacuumInterfaceSize", 6), t("vacuumInterfaceName", ""), i("vacuumInterfaceChannel", 0)],
 			v -> new SuctionCup(v.number("diameter"), v.number("height"),
 				v.number("effectiveAreaMm2") == 0 ? null : v.number("effectiveAreaMm2"),
-				v.number("ratedMomentNm") == 0 ? null : v.number("ratedMomentNm")), true),
+				v.number("ratedMomentNm") == 0 ? null : v.number("ratedMomentNm"), null,
+				switch v.token("vacuumInterfaceKind") {
+					case "PushIn": PortInterface.PushIn(v.number("vacuumInterfaceSize"));
+					case "Thread": PortInterface.Thread(v.token("vacuumInterfaceName"));
+					case "Plug": PortInterface.Plug(v.token("vacuumInterfaceName"), v.integer("vacuumInterfaceChannel"));
+					case "Coupling": PortInterface.Coupling(v.token("vacuumInterfaceName"), v.integer("vacuumInterfaceChannel"));
+					case _: PortInterface.Unspecified;
+				}), true),
 		new ComponentType("machinekit.pneumatic.vacuum-generator", [s("ratedVacuumKpa", 0)],
 			v -> new VacuumGenerator(v.number("ratedVacuumKpa") == 0 ? null : v.number("ratedVacuumKpa")), true),
 		new ComponentType("machinekit.pneumatic.vacuum-control-valve", [n("tubeOdMm", 4)],
@@ -165,6 +174,13 @@ class MachineKitAdditionalRecipes {
 			values.setNumber("diameter", cup.diameter).setNumber("height", cup.height)
 				.setNumber("effectiveAreaMm2", cup.effectiveAreaMm2 == null ? 0 : cup.effectiveAreaMm2)
 				.setNumber("ratedMomentNm", cup.ratedMomentNm == null ? 0 : cup.ratedMomentNm);
+			switch cup.port("vacuum").iface {
+				case PushIn(size): values.setToken("vacuumInterfaceKind", "PushIn").setNumber("vacuumInterfaceSize", size);
+				case Thread(name): values.setToken("vacuumInterfaceKind", "Thread").setToken("vacuumInterfaceName", name);
+				case Plug(name, pins): values.setToken("vacuumInterfaceKind", "Plug").setToken("vacuumInterfaceName", name).setInteger("vacuumInterfaceChannel", pins);
+				case Coupling(key, channel): values.setToken("vacuumInterfaceKind", "Coupling").setToken("vacuumInterfaceName", key).setInteger("vacuumInterfaceChannel", channel);
+				case Unspecified: values.setToken("vacuumInterfaceKind", "Unspecified");
+			}
 		} else if (Std.isOfType(component, VacuumGenerator)) {
 			var generator:VacuumGenerator = cast component;
 			values.setNumber("ratedVacuumKpa", generator.ratedVacuumKpa == null ? 0 : generator.ratedVacuumKpa);
