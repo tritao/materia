@@ -19,7 +19,6 @@ class AssemblyModel {
 	final byId:Map<String, AssemblyComponentOccurrence> = [];
 	final components:Map<String, AssemblyComponentDefinition> = [];
 	final attached:Map<String, Bool> = [];
-	final closureTolerances:Map<String, Float> = [];
 	var solved:Null<AssemblyState> = null;
 	public final lengthUnit:String;
 	public final metresPerUnit:Float;
@@ -121,8 +120,7 @@ class AssemblyModel {
 		data.joints.push({id: id, type: cast kind, role: AssemblyJointRole.Closure,
 			parent: parent, parentConnector: parentConnector, child: child,
 			childConnector: childConnector, defaultValue: 0, axis: axis,
-			limits: limits == null ? noLimits() : limits});
-		closureTolerances.set(id, resolvedTolerance);
+			limits: limits == null ? noLimits() : limits, closureTolerance: resolvedTolerance});
 		solved = null;
 	}
 
@@ -164,7 +162,7 @@ class AssemblyModel {
 		var state = initialState();
 		state.forwardKinematics();
 		for (residual in state.closureResiduals()) {
-			var tolerance = closureTolerances.get(residual.joint);
+			var tolerance = jointClosureTolerance(residual.joint);
 			if (tolerance != null && residual.position > tolerance)
 				throw 'Assembly joint "${residual.joint}" has separated connectors';
 			var kind = jointKind(residual.joint);
@@ -180,6 +178,11 @@ class AssemblyModel {
 
 	function jointKind(id:String):String {
 		for (joint in data.joints) if (joint.id == id) return cast joint.type;
+		throw 'Missing assembly joint "$id"';
+	}
+
+	function jointClosureTolerance(id:String):Null<Float> {
+		for (joint in data.joints) if (joint.id == id) return joint.closureTolerance;
 		throw 'Missing assembly joint "$id"';
 	}
 

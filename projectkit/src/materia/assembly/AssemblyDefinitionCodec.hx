@@ -162,6 +162,8 @@ class AssemblyDefinitionCodec {
 				joint.role != AssemblyJointRole.Closure) || joint.parent == joint.child ||
 				!Math.isFinite(joint.defaultValue) || !validAxis(joint.axis) ||
 				(joint.type == AssemblyJointType.Fixed && joint.defaultValue != 0) ||
+				(joint.closureTolerance != null && (joint.role != AssemblyJointRole.Closure ||
+					!Math.isFinite(joint.closureTolerance) || joint.closureTolerance < 0)) ||
 				!validLimits(joint.limits, joint.defaultValue))
 				throw "Assembly definition has an invalid joint";
 			joints.set(joint.id, true);

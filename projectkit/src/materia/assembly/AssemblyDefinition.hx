@@ -56,6 +56,8 @@ enum abstract AssemblyJointRole(String) from String to String {
 	@:id(8) var axis:AssemblyVector;
 	@:id(9) var limits:AssemblyJointLimits;
 	@:id(10) var defaultValue:Float;
+	/** Maximum closure position residual in the assembly length unit. */
+	@:id(11) @:optional var closureTolerance:Float;
 }
 
 /** Target coordinate = source coordinate × ratio + offset. */

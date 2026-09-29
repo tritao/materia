@@ -49,6 +49,12 @@ import machinekit.component.PortInterface;
 	@:id(7) @:optional var connector:String;
 }
 
+@:wire typedef ServiceLinkRecord = {
+	@:id(1) var occurrence:String;
+	@:id(2) var fromPort:String;
+	@:id(3) var toPort:String;
+}
+
 @:wire typedef PortExposureRecord = {
 	@:id(1) var name:String;
 	@:id(2) var instanceId:String;
@@ -114,6 +120,8 @@ import machinekit.component.PortInterface;
 	@:id(7) var endEffector:EndEffectorRecord;
 	@:id(8) var ports:ReadOnlyArray<PortRecord>;
 	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(10) @:optional var portBridges:ReadOnlyArray<ServiceLinkRecord>;
+	@:id(11) @:optional var portConversions:ReadOnlyArray<ServiceLinkRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -149,6 +157,8 @@ import machinekit.component.PortInterface;
 	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
+	@:id(12) @:optional var portBridges:ReadOnlyArray<ServiceLinkRecord>;
+	@:id(13) @:optional var portConversions:ReadOnlyArray<ServiceLinkRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */

@@ -140,7 +140,7 @@ private class PortTestComponent extends MachineComponent {
 }
 
 class MachineKitSmoke {
-	static function massProperties():Void {
+	public static function massProperties():Void {
 		var tube = new MassTestTube();
 		var expected = (40 * 20 - 36 * 16) * 100 * 1e-9 * 2700;
 		near(tube.massProperties().mass, expected, "rectangular tube analytic mass", 1e-9);
@@ -255,7 +255,7 @@ class MachineKitSmoke {
 		near(rotatedInertia.yy, 2, "declared tensor y moment rotates into assembly frame");
 	}
 
-	static function ports():Void {
+	public static function ports():Void {
 		var path = InstancePath.of("robot/tool/cup");
 		check(path.segments().join(",") == "robot,tool,cup" && path.parent() == "robot/tool",
 			"instance path exposes segments and parent");
@@ -1871,7 +1871,7 @@ class MachineKitSmoke {
 	static function pickingFrames():Void {
 		var config = PickingStationConfig.defaults();
 		var rack = new StorageRack(config), frame = rack.frame;
-		MachineAssemblyDescriptionTests.roundTrip(rack, "storage rack");
+		MachineAssemblyDescriptionTests.roundTrip(rack, "storage rack", false);
 		var clearWidth = config.rackWidth - 2 * frame.profile.size;
 		var clearDepth = config.rackDepth - 2 * frame.profile.size;
 		for (cut in frame.memberCuts()) {

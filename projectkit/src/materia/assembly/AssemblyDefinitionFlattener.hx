@@ -149,10 +149,12 @@ class AssemblyDefinitionFlattener {
 		for (joint in joints) {
 			var parent = endpoint(members, joint.parent, joint.parentConnector, prefix);
 			var child = endpoint(members, joint.child, joint.childConnector, prefix);
-			flat.joints.push({id: scoped(prefix, joint.id), type: joint.type, role: joint.role,
+			var expanded:KinematicJoint = {id: scoped(prefix, joint.id), type: joint.type, role: joint.role,
 				parent: parent.occurrence, parentConnector: parent.connector, child: child.occurrence,
 				childConnector: child.connector, axis: joint.axis, limits: joint.limits,
-				defaultValue: joint.defaultValue});
+				defaultValue: joint.defaultValue};
+			if (joint.closureTolerance != null) expanded.closureTolerance = joint.closureTolerance;
+			flat.joints.push(expanded);
 		}
 		if (couplings != null) for (coupling in couplings)
 			flat.couplings.push({id: scoped(prefix, coupling.id), source: scoped(prefix, coupling.source),

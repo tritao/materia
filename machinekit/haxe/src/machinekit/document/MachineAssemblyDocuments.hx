@@ -26,6 +26,7 @@ class MachineAssemblyDocuments {
 		var noConnections:Array<PortConnectionRecord> = [];
 		var saved:AssemblySideRecord = {
 			members: side.members, ports: side.ports, included: side.included,
+			portBridges: side.portBridges, portConversions: side.portConversions,
 			portConnections: noConnections, portExposures: side.portExposures,
 			bomExtras: side.bomExtras, connectorExposures: side.connectorExposures,
 			memberConnectors: side.memberConnectors, endEffector: side.endEffector,

@@ -3,6 +3,7 @@ package machinekit.robotics;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.Diagnostics;
 import machinekit.assembly.MachineAssemblyDescription;
+import machinekit.assembly.MachineAssemblyDescription.MemberSource;
 
 typedef ChangerPortMap = {robot:String, tool:String};
 
@@ -33,6 +34,7 @@ class EndEffectorSet extends EndEffector {
 			if (tool.machine.endEffector == null) throw 'Tool "$id" has no end-effector data';
 			toolRecords.push({id: id, mechanical: tool.mechanical, machine: {
 				members: tool.machine.members, ports: tool.machine.ports,
+				portBridges: tool.machine.portBridges, portConversions: tool.machine.portConversions,
 				included: tool.machine.included,
 				portConnections: tool.machine.portConnections,
 				portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
@@ -61,6 +63,7 @@ class EndEffectorSet extends EndEffector {
 		if (description.machine.tools != null) for (entry in description.machine.tools) {
 			var machine:machinekit.assembly.MachineAssemblyDescription.AssemblySideRecord = {
 				members: entry.machine.members, ports: entry.machine.ports,
+				portBridges: entry.machine.portBridges, portConversions: entry.machine.portConversions,
 				included: entry.machine.included,
 				portConnections: entry.machine.portConnections,
 				portExposures: entry.machine.portExposures, bomExtras: entry.machine.bomExtras,
@@ -155,6 +158,30 @@ class EndEffectorSet extends EndEffector {
 
 	/** Build one coupled configuration, with no ports to other tools. */
 	public function configuration(toolId:String):EndEffector {
+		var description = describe();
+		if (savable(description)) return configurationFromDescription(description, toolId);
+		return buildConfiguration(toolId);
+	}
+
+	/** Evaluate a configuration from portable data without modifying the source description. */
+	public static function configurationFromDescription(description:MachineAssemblyDescription,
+			toolId:String):EndEffector
+		return EndEffectorSet.fromDescription(description).buildConfiguration(toolId);
+
+	static function savable(description:MachineAssemblyDescription):Bool {
+		for (member in description.machine.members) switch member.source {
+			case Code(_): return false;
+			case Typed(_, _):
+		}
+		if (description.machine.tools != null) for (tool in description.machine.tools)
+			for (member in tool.machine.members) switch member.source {
+				case Code(_): return false;
+				case Typed(_, _):
+			}
+		return true;
+	}
+
+	function buildConfiguration(toolId:String):EndEffector {
 		if (changerRef == null) throw "End effector set needs a changer";
 		var changer = changerRef;
 		var tool = tools.get(toolId);

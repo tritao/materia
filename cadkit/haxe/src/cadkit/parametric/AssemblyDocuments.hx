@@ -108,6 +108,8 @@ class AssemblyDocuments {
 				role: cast readRelationship(relationship, "role"), parent: parent.id, parentConnector: readRelationship(relationship, "parentConnector"),
 				child: child.id, childConnector: readRelationship(relationship, "childConnector"), axis: axis, limits: limits,
 				defaultValue: number(relationship, "defaultValue")};
+			var tolerance = relationship.property(PREFIX + "closureTolerance");
+			if (tolerance != null) joint.closureTolerance = cast tolerance.value;
 			scope.joints.push(joint);
 		}
 		for (relationship in document.allRelationships()) if (relationship.typeName == COUPLING) {
@@ -166,6 +168,9 @@ class AssemblyDocuments {
 			putRelationship(relationship, "parentConnector", joint.parentConnector); putRelationship(relationship, "childConnector", joint.childConnector);
 			putRelationship(relationship, "axis", JsonWire.encode(joint.axis)); putRelationship(relationship, "limits", JsonWire.encode(joint.limits));
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "defaultValue", QuantityKind.Scalar, joint.defaultValue, "1"));
+			if (joint.closureTolerance != null)
+				relationship.setProperty(TypedProperty.quantity(PREFIX + "closureTolerance",
+					QuantityKind.Scalar, joint.closureTolerance, "1"));
 			children.set(joint.id, members.get(joint.child));
 		}
 		if (couplings != null) for (coupling in couplings) {
