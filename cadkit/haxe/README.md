@@ -146,6 +146,15 @@ and typed properties, and are serialized with the rest of the document. Layers
 can register multiple before and after recompute hooks; the former callback
 fields remain as compatibility adapters.
 
+`AssemblyDocuments.fromDefinition(document, definition)` stores an
+`AssemblyDefinition` as assembly, component, and occurrence objects. Nested
+assembly occurrences retain their referenced definition IDs. Mechanical joints
+and couplings are `cadkit.joint` and `cadkit.coupling` relationships between
+occurrence objects; their connector names and joint parameters are typed
+properties. `AssemblyDocuments.toDefinition(root)` reconstructs the mechanical
+definition after document loading or edits. Changing a joint's
+`cadkit.assembly.defaultValue` scalar property changes the rebuilt solve.
+
 ## Constrained sketches
 
 `cadkit.sketch` provides an OCCT-independent two-dimensional constraint model
