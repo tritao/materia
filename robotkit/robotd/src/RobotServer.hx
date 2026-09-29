@@ -67,6 +67,9 @@ class RobotServer {
   final observerStreams:Map<Int, RobotFrameStream> = new Map<Int, RobotFrameStream>();
   final observerSessions:Map<Int, haxe.Int64> = new Map<Int, haxe.Int64>();
   final observerHello:Map<Int, Bool> = new Map<Int, Bool>();
+  final outbound:Map<Int, OutboundScheduler> = new Map<Int, OutboundScheduler>();
+  final bulkBudgetBytes:Int;
+  final fixtureTick:Null<Void->Void>;
   var stream:RobotFrameStream;
   final snapshots = new RobotSnapshotMailbox();
   var sessionId:haxe.Int64 = haxe.Int64.ofInt(0);
@@ -87,7 +90,8 @@ class RobotServer {
 
   public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
       simulation:Null<SimulationHarness>, port:Int, robotId:Int, ?behavior:RobotBehavior,
-      ?listenAddress:String = "127.0.0.1") {
+      ?listenAddress:String = "127.0.0.1", ?bulkBudgetBytes:Int = 0,
+      ?fixtureTick:Void->Void) {
     this.robot = robot;
     this.blueprint = blueprint;
     this.runtime = runtime;
@@ -95,6 +99,8 @@ class RobotServer {
     this.port = port;
     this.listenAddress = listenAddress;
     this.robotId = robotId;
+    this.bulkBudgetBytes = bulkBudgetBytes;
+    this.fixtureTick = fixtureTick;
     behaviorRunner = behavior == null ? null : new RobotBehaviorRunner(behavior);
     if (behaviorRunner != null) controlOwner = LocalBehavior;
     nativeRuntime = NativeKitRuntime.start();
@@ -120,11 +126,13 @@ class RobotServer {
     try {
       var stopped = false;
       while (!stopped) {
+        if (fixtureTick != null) fixtureTick();
         publishSnapshot(false);
         var hadEvent = false;
         while (nativeRuntime.events.poll())
           hadEvent = true;
         checkControlLeaseTimeout();
+        flushBulk();
         if (!hadEvent) {
           nativeRuntime.events.wait(0.01);
           checkControlLeaseTimeout();
@@ -141,12 +149,20 @@ class RobotServer {
 
   /** Runs one event-pump iteration; useful to tests and embedded hosts. */
   public function poll():Bool {
+    if (fixtureTick != null) fixtureTick();
     publishSnapshot(false);
     var hadEvent = false;
     while (nativeRuntime.events.poll())
       hadEvent = true;
     checkControlLeaseTimeout();
+    flushBulk();
     return hadEvent;
+  }
+
+  /** Current-session drop count for test and host diagnostics. */
+  public function outboundDropCount(connectionId:Int, family:OutboundFamily):Int {
+    var scheduler = outbound.get(connectionId);
+    return scheduler == null ? 0 : scheduler.dropCount(family);
   }
 
   public function dispose():Void {
@@ -168,6 +184,7 @@ class RobotServer {
     observerStreams.clear();
     observerSessions.clear();
     observerHello.clear();
+    outbound.clear();
     listener.close();
     if (simulation != null) simulation.stop();
     else runtime.stop();
@@ -207,6 +224,7 @@ class RobotServer {
       return;
     if (client == null) {
       client = accepted;
+      outbound.set(accepted.rawValue(), new OutboundScheduler(accepted, bulkBudgetBytes));
       stream = new RobotFrameStream();
       servedState = false;
       helloComplete = false;
@@ -217,6 +235,7 @@ class RobotServer {
       lastSentSnapshotSequence = haxe.Int64.ofInt(-1);
     } else {
       observers.push(accepted);
+      outbound.set(accepted.rawValue(), new OutboundScheduler(accepted, bulkBudgetBytes));
       observerStreams.set(accepted.rawValue(), new RobotFrameStream());
       observerSessions.set(accepted.rawValue(), nextSessionId);
       observerHello.set(accepted.rawValue(), false);
@@ -573,7 +592,7 @@ class RobotServer {
       lastSentSnapshotSequence = latest.sequence;
       sendState(latest);
     }
-    for (observer in observers) {
+    for (observer in observers.copy()) {
       var key = observer.rawValue();
       var observerSession = observerSessions.get(key);
       if (observerHello.get(key) == true && observerSession != null)
@@ -634,7 +653,11 @@ class RobotServer {
       snapshot.committedUntilNs, snapshot.queueEndTimeNs);
     sendTo(target, targetSession, RobotProtocol.state(message, targetSession, snapshot.sequence,
       snapshot.sourceTimestampNs));
+    var scheduler = outbound.get(target.rawValue());
+    if (scheduler == null) return;
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot)) {
+      var family = sensor.image == null ? OutboundFamily.Sensor : OutboundFamily.Camera;
+      if (!scheduler.accepts(sensor.sensorId, sensor.sequence)) continue;
       if (sensor.image != null) {
         var image = sensor.image;
         var format = switch image.encoding {
@@ -648,10 +671,12 @@ class RobotServer {
           sensor.receivedTimestampNs, image.width, image.height, format, null,
           sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray(),
           sensor.sourceClockId, sensor.receivedClockId);
-        sendTo(target, targetSession, RobotProtocol.cameraFrame(camera,
-          image.bytes(), targetSession, sensor.sequence, sensor.sourceTimestampNs));
+        scheduler.offer(OutboundFamily.Camera, sensor.sensorId, sensor.sequence,
+          RobotProtocol.cameraFrame(camera, image.bytes(), targetSession,
+            sensor.sequence, sensor.sourceTimestampNs));
       } else {
-        sendTo(target, targetSession, RobotProtocol.sensorFrame(new SensorFrameMsg(
+        scheduler.offer(OutboundFamily.Sensor, sensor.sensorId, sensor.sequence,
+          RobotProtocol.sensorFrame(new SensorFrameMsg(
           snapshot.robotId, sensor.sensorId, sensor.kind, sensor.frameId, sensor.sequence,
           sensor.sourceTimestampNs, sensor.receivedTimestampNs, sensor.values.toArray(),
           sensor.linkId, sensor.mountPosition.toArray(), sensor.mountRotation.toArray()),
@@ -676,11 +701,41 @@ class RobotServer {
   function sendTo(target:Null<TransportHandle>, targetSession:haxe.Int64,
       frame:RobotFrame):Void {
     if (target == null) return;
+    if (OutboundPolicy.family(frame.messageType) != OutboundFamily.Essential)
+      throw "bulk RKF1 frames must use the outbound scheduler";
     try {
       NativeTransport.send(target, frame.encode());
     } catch (_:Dynamic) {
       if (client != null && client.rawValue() == target.rawValue())
         closeClient(target);
+      else closeObserver(target);
+    }
+  }
+
+  function flushBulk():Void {
+    var currentClient = client;
+    if (currentClient != null && helloComplete)
+      flushTo(currentClient, sessionId);
+    for (observer in observers.copy()) {
+      var key = observer.rawValue();
+      var observerSession = observerSessions.get(key);
+      if (observerHello.get(key) == true && observerSession != null)
+        flushTo(observer, observerSession);
+    }
+  }
+
+  function flushTo(target:TransportHandle, targetSession:Int64):Void {
+    var scheduler = outbound.get(target.rawValue());
+    if (scheduler == null) return;
+    try {
+      if (!scheduler.flush()) {
+        if (client != null && client.rawValue() == target.rawValue()) closeClient(target);
+        else closeObserver(target);
+        return;
+      }
+      scheduler.logDrops(NativeKit.nk_time_now_ns(), targetSession);
+    } catch (_:Dynamic) {
+      if (client != null && client.rawValue() == target.rawValue()) closeClient(target);
       else closeObserver(target);
     }
   }
@@ -693,6 +748,7 @@ class RobotServer {
       controllerGranted = false;
       lastLeaseRenewalNs = Int64.ofInt(0);
     }
+    outbound.remove(currentClient.rawValue());
     try { NativeTransport.close(currentClient); } catch (_:Dynamic) {}
   }
 
@@ -713,6 +769,7 @@ class RobotServer {
     observerStreams.remove(value.rawValue());
     observerSessions.remove(value.rawValue());
     observerHello.remove(value.rawValue());
+    outbound.remove(value.rawValue());
     try { NativeTransport.close(value); } catch (_:Dynamic) {}
   }
 }

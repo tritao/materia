@@ -29,7 +29,9 @@ class NativeTransport {
   }
 
   public static function listen(port:Int, ?host:String = "127.0.0.1"):OwnedListenerHandle {
-    var result = NativeKit.nk_transport_listen(options(port, host));
+    var value = options(port, host);
+    value.set_flags(TransportFlags.ReuseAddress);
+    var result = NativeKit.nk_transport_listen(value);
     if (result.status != Result.Ok)
       throw 'RobotKit TCP listen failed: ${NativeKit.nk_last_error()}';
     return result.out_listener;
@@ -50,6 +52,18 @@ class NativeTransport {
     NativeKit.nk_transport_send_checked(transport, bytes, bytes.length);
   }
 
+  public static function sendStatus(transport:TransportHandle, bytes:Bytes):Int {
+    if (bytes == null) throw "RobotKit TCP cannot send null bytes";
+    return NativeKit.nk_transport_send(transport, bytes, bytes.length);
+  }
+
+  public static function sendQueue(transport:TransportHandle):TransportSendQueue {
+    var result = NativeKit.nk_transport_get_send_queue(transport);
+    if (result.status != Result.Ok)
+      throw 'RobotKit TCP send queue query failed: ${NativeKit.nk_last_error()}';
+    return new TransportSendQueue(result.out_queued_bytes, result.out_capacity);
+  }
+
   public static function receive(transport:TransportHandle,
       ?capacity:Int = 64 * 1024):Bytes {
     if (capacity <= 0)
@@ -66,4 +80,14 @@ class NativeTransport {
 
   public static function close(transport:TransportHandle):Void
     NativeKit.nk_transport_close_checked(transport);
+}
+
+class TransportSendQueue {
+  public final queuedBytes:Int64;
+  public final capacity:Int64;
+
+  public function new(queuedBytes:Int64, capacity:Int64) {
+    this.queuedBytes = queuedBytes;
+    this.capacity = capacity;
+  }
 }

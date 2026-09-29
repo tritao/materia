@@ -718,6 +718,21 @@ the owner, and closes that connection. A replacement controller receives a
 new session and must explicitly reset safety before motion can resume. World
 composition and multi-robot discovery remain in `RobotWorld`.
 
+outbound RKF1 traffic is classified centrally as essential, numeric sensor, or
+camera. Essential messages enter NativeKit's writer queue immediately. Sensor
+and camera frames occupy one latest-wins slot per connection and sensor ID;
+each sensor sequence is offered once per session. The main loop flushes slots
+round-robin only while the transport's queued bytes, including the next frame,
+remain below half its configured capacity. `--bulk-budget-bytes` can lower or
+raise that threshold below capacity. Replaced frames count as drops and are
+logged at most once per second per connection. A full bulk queue leaves its
+slot pending; an essential send failure still closes the connection.
+The transport writer thread performs socket I/O, so this scheduler only
+enqueues from the robotd loop. TCP still delivers bytes in order: an essential
+frame can follow a bulk frame already handed to the socket. The budget reserves
+NativeKit queue capacity and prevents bulk queue exhaustion from closing a
+control lease; it does not remove TCP serialization latency.
+
 Recording stores commands, snapshots, sensor-bearing world snapshots, faults,
 and world events. `ReplayRobot` and `WorldBehaviorRunner` consume the same
 public boundary, so behavior code can be exercised against simulated, remote,

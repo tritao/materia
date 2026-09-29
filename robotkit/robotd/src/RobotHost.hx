@@ -25,12 +25,14 @@ class RobotHost {
     if (args.indexOf("--help") >= 0) {
       Sys.println("Usage: robotd [--server [--once]] [--port=N] [--listen=IPv4] "
         + "[--robot-id=N] [--multi-joint] [--behavior=oscillate] [--in-memory] "
-        + "[--deployment=FILE] [--camera-fixture] [--help]");
+        + "[--deployment=FILE] [--camera-fixture] [--camera-fixture-stream] "
+        + "[--bulk-budget-bytes=N] [--help]");
       return;
     }
     var port = parsePort();
     var listenAddress = parseListenAddress();
     var robotId = parseRobotId();
+    var bulkBudgetBytes = parseBulkBudget();
     var deploymentPath = optionValue("--deployment=");
     var deployment = deploymentPath == null ? null : new RobotDeployment(deploymentPath);
     var serialPath = deployment == null ? null : deployment.serialPath;
@@ -51,7 +53,8 @@ class RobotHost {
       throw "robotd: --deployment cannot be combined with --in-memory";
     var behavior = parseBehavior();
     var multiJoint = args.indexOf("--multi-joint") >= 0;
-    var cameraFixture = args.indexOf("--camera-fixture") >= 0;
+    var cameraFixtureStream = args.indexOf("--camera-fixture-stream") >= 0;
+    var cameraFixture = args.indexOf("--camera-fixture") >= 0 || cameraFixtureStream;
     if (cameraFixture && deployment != null)
       throw "robotd: --camera-fixture requires the demo robot";
     var robot = deployment == null ? new RobotModel(multiJoint ? "demo-forklift" : "demo-arm") : deployment.robot;
@@ -102,6 +105,11 @@ class RobotHost {
       var camera = robot.addSensor(new robotkit.model.Sensor("camera", "camera", 0,
         "demo/camera"));
       camera.frame = mount;
+      if (cameraFixtureStream) {
+        var secondCamera = robot.addSensor(new robotkit.model.Sensor("camera-right", "camera", 0,
+          "demo/camera-right"));
+        secondCamera.frame = mount;
+      }
     }
     }
     var blueprint = RobotRuntimeCompiler.compile(robot);
@@ -125,7 +133,24 @@ class RobotHost {
         }
         if (serverRuntime == null) throw "robotd: failed to create runtime";
         var hostedRuntime:RobotRuntime = serverRuntime;
-        if (cameraFixture) {
+        var fixtureTick:Null<Void->Void> = null;
+        if (cameraFixtureStream) {
+          var pixels = haxe.io.Bytes.alloc(640 * 480 * 3);
+          for (index in 0...pixels.length) pixels.set(index, index % 251);
+          var image = new robotkit.world.CameraImage(640, 480, "rgb8", pixels);
+          var fixtureSequence = haxe.Int64.ofInt(0);
+          var nextFixtureNs = haxe.Int64.ofInt(0);
+          fixtureTick = function() {
+            var now = nativekit.ffi.NativeKit.nk_time_now_ns();
+            if (haxe.Int64.compare(now, nextFixtureNs) < 0) return;
+            fixtureSequence = haxe.Int64.add(fixtureSequence, haxe.Int64.ofInt(1));
+            hostedRuntime.publishCameraFrame("demo/camera", image, fixtureSequence,
+              now, "camera.fixture");
+            hostedRuntime.publishCameraFrame("demo/camera-right", image, fixtureSequence,
+              now, "camera.fixture");
+            nextFixtureNs = haxe.Int64.add(now, haxe.Int64.ofInt(20000000));
+          };
+        } else if (cameraFixture) {
           var pixels = haxe.io.Bytes.alloc(6);
           for (index in 0...6) pixels.set(index, index + 1);
           hostedRuntime.publishCameraFrame("demo/camera",
@@ -133,7 +158,7 @@ class RobotHost {
             haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
         }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
-          port, robotId, behavior, listenAddress);
+          port, robotId, behavior, listenAddress, bulkBudgetBytes, fixtureTick);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
         if (serverSimulation != null) serverSimulation.dispose();
@@ -184,6 +209,15 @@ class RobotHost {
       }
     }
     return 17890;
+  }
+
+  function parseBulkBudget():Int {
+    var raw = optionValue("--bulk-budget-bytes=");
+    if (raw == null) return 0;
+    var value = Std.parseInt(raw);
+    if (value == null || value <= 0 || value >= 4 * 1024 * 1024)
+      throw "robotd: --bulk-budget-bytes must be positive and below 4194304";
+    return value;
   }
 
   function parseListenAddress():String {

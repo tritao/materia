@@ -1,5 +1,17 @@
 # RobotKit follow-ups
 
+## Perception foundations (robotkit/plans/PERCEPTION.md)
+
+- Consider a second TCP connection for bulk data; UDP, QUIC, and HTTP model distribution, health, and recording download remain outside RKF1.
+- Estimate cross-process clock offsets when a bounded mapping can be measured.
+- Add world fusion, tracking, and shared maps after observations are available.
+- Consider `perceptiond` as a separate execution host.
+- Evaluate GPU execution providers and inference backends beyond the pinned CPU ONNX Runtime.
+- Reconsider OpenCV only for camera capture, calibration, undistortion, or heavier image processing; use vendored `stb_image` for JPEG decode.
+- Add `jpeg` and `depth32f` detector inputs and depth/intrinsics lifting into planar `Detection`.
+- Add segmentation, pose, and occupancy observations and fault/world-event robot stream cases.
+- Decide on production sensorkit camera integration after the Phase 7 spike.
+
 ## Humanoid (robotkit/plans/HUMANOID.md)
 
 - H3 sensing the policy run does not use yet: encoder quantization, IMU noise,

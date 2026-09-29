@@ -4,7 +4,7 @@ set -euo pipefail
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 robotkit_dir="$repo_dir/robotkit"
 haxeon="$repo_dir/haxeon/scripts/haxeon"
-cadkit_build="$repo_dir/cadkit/build/debug"
+cadkit_build="${CADKIT_BUILD_ROOT:-$repo_dir/cadkit/build/debug}"
 cadkit_library="$cadkit_build/core/libcadkit-core.so"
 mujoco_source="$repo_dir/simkit/vendor/mujoco"
 
@@ -79,8 +79,10 @@ else
 fi
 
 say "World TCP integration"
+run "$haxeon" run --project "$robotkit_dir/tests/integration/haxeon.json" -- --outbound-scheduler
 run "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_SESSIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_LEASE_TIMEOUT=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_BULK=1 "$robotkit_dir/tests/world-tcp.sh"
 
 printf '\nAll available RobotKit suites passed.\n'
