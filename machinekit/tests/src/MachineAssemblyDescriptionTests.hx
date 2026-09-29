@@ -95,6 +95,11 @@ class MachineAssemblyDescriptionTests {
 			throw "Machine assembly lost a member";
 		if (rebuilt.connectorNames()[0] != "mount" || rebuilt.billOfMaterials().lines().length != 2)
 			throw "Machine assembly lost its exposure or BOM extra";
+		var flangePart = new RobotFlange(50).bom.partNumber;
+		var beforeEdit = rebuilt.billOfMaterials().quantity(flangePart);
+		rebuilt.addComponent("third", new RobotFlange(50));
+		if (rebuilt.billOfMaterials().quantity(flangePart) != beforeEdit + 1)
+			throw "Editing a rebuilt assembly did not update its evaluated BOM";
 		nestedRoundTrip();
 		documentRoundTrip();
 		changerDocumentRoundTrip();

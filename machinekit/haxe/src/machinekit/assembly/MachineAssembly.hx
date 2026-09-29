@@ -75,6 +75,7 @@ class MachineAssembly {
 	final memberConnectorFrames:Array<{instanceId:String, name:String, frame:AssemblyFrame}> = [];
 	final nestedEntries:Array<machinekit.assembly.MachineAssemblyDescription.IncludedRecord> = [];
 	final massByDefinition:Map<String, machinekit.component.MassProperties> = [];
+	var frozenEvaluation:Bool = false;
 
 	public function new() {}
 
@@ -255,6 +256,7 @@ class MachineAssembly {
 		if (description.machine.included != null) for (entry in description.machine.included)
 			result.nestedEntries.push({id: entry.id, pose: copyFrame(entry.pose),
 				mechanical: cloneDefinition(entry.mechanical)});
+		result.frozenEvaluation = true;
 		return result;
 	}
 
@@ -267,6 +269,7 @@ class MachineAssembly {
 		target.mechanical.occurrences = copy.occurrences;
 		target.mechanical.joints = copy.joints;
 		target.mechanical.couplings = copy.couplings;
+		target.frozenEvaluation = frozenEvaluation;
 		for (entry in included) target.included.push({id: entry.id,
 			assembly: entry.assembly.snapshot(), pose: entry.pose == null ? null : copyFrame(entry.pose)});
 		for (entry in nestedEntries) target.nestedEntries.push({id: entry.id,
@@ -444,6 +447,7 @@ class MachineAssembly {
 			fromPort: link.from, toPort: link.to});
 		for (link in component.conversions()) portConversions.push({occurrence: id,
 			fromPort: link.from, toPort: link.to});
+		frozenEvaluation = false;
 	}
 
 	/** Include another assembly below a local namespace, optionally moving all of its parts. */
@@ -521,6 +525,7 @@ class MachineAssembly {
 		if (source == null || source.length == 0 || target == null || target.length == 0)
 			throw 'Assembly coupling "$id" needs source and target';
 		mechanical.couplings.push({id: id, source: source, target: target, ratio: ratio, offset: offset});
+		frozenEvaluation = false;
 	}
 
 	public function connectPorts(id:String, fromInstance:String, fromPort:String,
@@ -539,6 +544,7 @@ class MachineAssembly {
 		requireOperationId(id);
 		portConnections.push({id: id, fromInstance: from.instanceId, fromPort: from.portName,
 			toInstance: to.instanceId, toPort: to.portName});
+		frozenEvaluation = false;
 		if (line != null) addBomItem(line, 1, lineMass);
 	}
 
@@ -551,6 +557,7 @@ class MachineAssembly {
 			throw 'Duplicate assembly connector "$instanceId/$name"';
 		memberConnectorFrames.push({instanceId: instanceId, name: name, frame: copyFrame(frame)});
 		definition.connectors.push({name: name, frame: copyFrame(frame)});
+		frozenEvaluation = false;
 	}
 
 	/** Publish a stable assembly-level name that resolves to one member connector. */
@@ -560,6 +567,7 @@ class MachineAssembly {
 		for (existing in externalConnectors) if (existing.name == name)
 			throw 'Duplicate external assembly connector "$name"';
 		externalConnectors.push({name: name, instanceId: instanceId, connectorName: connectorName});
+		frozenEvaluation = false;
 	}
 
 	public function exposePort(name:String, instanceId:String, portName:String):Void {
@@ -569,6 +577,7 @@ class MachineAssembly {
 			throw 'Duplicate external assembly port "$name"';
 		}
 		externalPorts.push({name: name, instanceId: instanceId, portName: portName});
+		frozenEvaluation = false;
 	}
 
 	public function addBomItem(item:BomItem, quantity:Int = 1,
@@ -586,10 +595,13 @@ class MachineAssembly {
 			case _:
 		}
 		bomItems.push({item: item, quantity: quantity, mass: mass});
+		frozenEvaluation = false;
 	}
 
 	/** Collect structural and service faults without stopping at the first one. */
 	public function check():Diagnostics {
+		var view = evaluationView();
+		if (view != this) return view.check();
 		var result = new Diagnostics();
 		checkStructure(result);
 		checkServices(result);
@@ -738,6 +750,8 @@ class MachineAssembly {
 	public function subassemblies():Array<MachineSubassembly> return included.copy();
 
 	public function billOfMaterials():Bom {
+		var view = evaluationView();
+		if (view != this) return view.billOfMaterials();
 		var result = new Bom();
 		for (member in members) result.addComponent(member.component);
 		for (entry in bomItems) result.add(entry.item, entry.quantity);
@@ -746,6 +760,8 @@ class MachineAssembly {
 
 	/** Sum posed component masses; separately report BOM extras with no mass model. */
 	public function massProperties(?state:AssemblyState):MachineAssemblyMassProperties {
+		var view = evaluationView();
+		if (view != this) return view.massProperties(state);
 		return massPropertiesFromPoses(solvedPoses(state));
 	}
 
@@ -774,6 +790,8 @@ class MachineAssembly {
 
 	/** Mass using poses already solved for this assembly. */
 	public function massPropertiesFromPoses(poses:Map<String, AssemblyFrame>):MachineAssemblyMassProperties {
+		var view = evaluationView();
+		if (view != this) return view.massPropertiesFromPoses(poses);
 		var mass = 0.0, weightedX = 0.0, weightedY = 0.0, weightedZ = 0.0;
 		var posed:Array<{id:String, properties:machinekit.component.MassProperties, pose:AssemblyFrame,
 			centre:Vector}> = [];
@@ -862,6 +880,8 @@ class MachineAssembly {
 
 	/** Trace a service through connections, bridges, and a single-input converter. */
 	public function upstream(instanceId:String, portName:String):UpstreamResult {
+		var view = evaluationView();
+		if (view != this) return view.upstream(instanceId, portName);
 		checkConnections();
 		var trace = traceUpstream(portRef(instanceId, portName));
 		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
@@ -870,6 +890,8 @@ class MachineAssembly {
 
 	/** Ordered member/port path from a consumer to its supplied boundary. */
 	public function upstreamChain(instanceId:String, portName:String):Array<String> {
+		var view = evaluationView();
+		if (view != this) return view.upstreamChain(instanceId, portName);
 		checkConnections();
 		var trace = traceUpstream(portRef(instanceId, portName));
 		if (!trace.supplied) throw unsuppliedMessage(trace.chain);
@@ -939,6 +961,7 @@ class MachineAssembly {
 		if (joint.role == AssemblyJointRole.Closure)
 			saved.closureTolerance = tolerance == null ? 1e-3 : tolerance;
 		mechanical.joints.push(saved);
+		frozenEvaluation = false;
 	}
 
 	function requireOperationId(id:String):Void {
@@ -954,6 +977,16 @@ class MachineAssembly {
 	function occurrencePose(id:String):AssemblyFrame {
 		for (occurrence in mechanical.occurrences) if (occurrence.id == id) return occurrence.initialPose;
 		throw 'Missing mechanical occurrence "$id"';
+	}
+
+	/** Savable assemblies evaluate through the same recipe rebuild as persisted documents. */
+	function evaluationView():MachineAssembly {
+		if (frozenEvaluation || members.length == 0) return this;
+		for (member in members) if (member.component.componentType() == null) return this;
+		var structure = new Diagnostics();
+		checkStructure(structure);
+		if (structure.hasErrors()) return this;
+		return fromDescription(describe());
 	}
 
 	function mechanicalDefinition(id:String):materia.assembly.AssemblyDefinition.AssemblyComponentDefinition {
