@@ -351,7 +351,10 @@ private class DockPanelView implements View {
 			context.reportBuild("panel:" + descriptor.id, buildStarted - preparationStarted,
 				Sys.time() - buildStarted, root);
 		if (cacheKey != null)
-			panelCache.put(descriptor.id, cacheKey, root, context.stateIdsUsedSince(stateMarker));
+			{
+				var usedStates = context.stateIdsUsedSince(stateMarker);
+				panelCache.put(descriptor.id, cacheKey, root, usedStates, context.stateRevisions(usedStates));
+			}
 		return root;
 	}
 }
@@ -365,11 +368,12 @@ private class DockPanelCache {
 	public function entry(panelId:String):Null<DockPanelCacheEntry>
 		return entries.get(panelId);
 
-	public function put(panelId:String, key:String, root:RenderNode, stateIds:Array<Int>):Void {
+	public function put(panelId:String, key:String, root:RenderNode, stateIds:Array<Int>,
+			stateRevisions:Array<Int>):Void {
 		var previous = entries.get(panelId);
 		if (previous != null && previous.root != root)
 			previous.root.detach();
-		entries.set(panelId, new DockPanelCacheEntry(key, root, stateIds));
+		entries.set(panelId, new DockPanelCacheEntry(key, root, stateIds, stateRevisions));
 	}
 
 	public function retain(context:BuildContext):Void {
@@ -382,14 +386,22 @@ private class DockPanelCacheEntry {
 	public final key:String;
 	public final root:RenderNode;
 	public final stateIds:Array<Int>;
+	final stateRevisions:Array<Int>;
 
-	public function new(key:String, root:RenderNode, stateIds:Array<Int>) {
+	public function new(key:String, root:RenderNode, stateIds:Array<Int>, stateRevisions:Array<Int>) {
 		this.key = key;
 		this.root = root;
 		this.stateIds = stateIds == null ? [] : stateIds.copy();
+		this.stateRevisions = stateRevisions == null ? [] : stateRevisions.copy();
 	}
 
 	public function statesMatch(context:BuildContext):Bool {
+		// A widget inside the panel changed its own state (a select opening, a section toggling). The
+		// panel's cache key knows nothing about that, so the built tree is stale and must be rebuilt.
+		var current = context.stateRevisions(stateIds);
+		for (index in 0...current.length)
+			if (current[index] != stateRevisions[index])
+				return false;
 		var mask = StyleState.Hovered | StyleState.Pressed | StyleState.Focused;
 		var result = true;
 		root.walk(function(node) {

@@ -290,6 +290,10 @@ class BuildContext {
 	public function stateIdsUsedSince(marker:Int):Array<Int>
 		return stateStore.usedIdsSince(marker);
 
+	/** Current change revisions of the given widget states, for detecting changes inside a retained subtree. */
+	public function stateRevisions(ids:Array<Int>):Array<Int>
+		return [for (id in ids) stateStore.valueRevision(id)];
+
 	/** Keeps state-backed resources alive for a retained subtree this frame. */
 	public function retainStateIds(ids:Array<Int>):Void
 		stateStore.retain(ids);

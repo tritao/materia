@@ -3,6 +3,8 @@ package nativekit.ui.core;
 /** Haxe-owned per-widget state retained while views are rebuilt. */
 class StateStore {
 	final values:Map<Int, Dynamic>;
+	// Store revision at each state's last update, so retained subtrees can tell which of their own states changed.
+	final valueRevisions:Map<Int, Int> = new Map();
 	final disposers:Map<Int, Void->Void>;
 	final paths:Map<Int, String>;
 	final managed:Map<Int, Bool>;
@@ -103,6 +105,7 @@ class StateStore {
 			disposers.remove(id);
 			managed.remove(id);
 			values.remove(id);
+			valueRevisions.remove(id);
 		}
 		frameUsed.clear();
 		frameUseOrder.resize(0);
@@ -126,6 +129,13 @@ class StateStore {
 			throw "State requires a widget ID";
 		values.set(id.value, value);
 		revision++;
+		valueRevisions.set(id.value, revision);
+	}
+
+	/** Revision at which this state last changed; zero if it never has been set since creation. */
+	public function valueRevision(id:Int):Int {
+		var result = valueRevisions.get(id);
+		return result == null ? 0 : result;
 	}
 
 	public function contains(id:WidgetId):Bool
@@ -179,6 +189,7 @@ class StateStore {
 		frameUsed.clear();
 		frameActive = false;
 		values.clear();
+		valueRevisions.clear();
 		paths.clear();
 		revision++;
 		if (failure != null)

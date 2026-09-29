@@ -41,7 +41,8 @@ class RetainedView implements View {
 		if (view == null)
 			throw 'Retained view "$key" returned no view';
 		var root = view.build(context);
-		cache.replace(cacheKey, root, context.stateIdsUsedSince(marker));
+		var usedStates = context.stateIdsUsedSince(marker);
+		cache.replace(cacheKey, root, usedStates, context.stateRevisions(usedStates));
 		return root;
 	}
 }
@@ -52,10 +53,10 @@ private class RetainedViewCache {
 	public function new()
 		entry = null;
 
-	public function replace(key:String, root:RenderNode, stateIds:Array<Int>):Void {
+	public function replace(key:String, root:RenderNode, stateIds:Array<Int>, stateRevisions:Array<Int>):Void {
 		if (entry != null && entry.root != root)
 			entry.root.detach();
-		entry = new RetainedViewEntry(key, root, stateIds);
+		entry = new RetainedViewEntry(key, root, stateIds, stateRevisions);
 	}
 
 	public function dispose():Void {
@@ -69,14 +70,21 @@ private class RetainedViewEntry {
 	public final key:String;
 	public final root:RenderNode;
 	public final stateIds:Array<Int>;
+	final stateRevisions:Array<Int>;
 
-	public function new(key:String, root:RenderNode, stateIds:Array<Int>) {
+	public function new(key:String, root:RenderNode, stateIds:Array<Int>, stateRevisions:Array<Int>) {
 		this.key = key;
 		this.root = root;
 		this.stateIds = stateIds == null ? [] : stateIds.copy();
+		this.stateRevisions = stateRevisions == null ? [] : stateRevisions.copy();
 	}
 
 	public function statesMatch(context:BuildContext):Bool {
+		// See DockPanelCacheEntry: a widget inside changed its own state, so the built tree is stale.
+		var current = context.stateRevisions(stateIds);
+		for (index in 0...current.length)
+			if (current[index] != stateRevisions[index])
+				return false;
 		var mask = StyleState.Hovered | StyleState.Pressed | StyleState.Focused;
 		var result = true;
 		root.walk(function(node) {

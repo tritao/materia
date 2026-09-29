@@ -291,6 +291,8 @@ class FrameworkSmoke {
 			return 305;
 		if (!themeSwapChangesStyleRevision())
 			return 306;
+		if (!stateRevisionsTrackOwnUpdates())
+			return 307;
 		if (!propertyInputContrastValid(fonts))
 			return 301;
 		if (!defaultTextFieldContrastValid(fonts))
@@ -3295,6 +3297,26 @@ class FrameworkSmoke {
 			if (!valid) return false;
 		}
 		return true;
+	}
+
+	/** A retained panel must be able to tell which of its own widget states changed (a select opening). */
+	static function stateRevisionsTrackOwnUpdates():Bool {
+		var store = new StateStore();
+		var context = new BuildContext(store, null, null, null, Theme.light());
+		store.beginFrame();
+		var open:State<Bool> = context.state(context.id("open"), false);
+		var other:State<Int> = context.state(context.id("other"), 0);
+		var ids = [open.id.value, other.id.value];
+		var before = context.stateRevisions(ids);
+		if (context.stateRevisions(ids)[0] != before[0])
+			return false;
+		open.update(true);
+		var after = context.stateRevisions(ids);
+		var ok = after[0] != before[0] && after[1] == before[1];
+		other.update(3);
+		var last = context.stateRevisions(ids);
+		store.endFrame();
+		return ok && last[1] != after[1] && last[0] == after[0];
 	}
 
 	/** Retained views compare this fingerprint, so a light-to-dark swap must never reuse one. */
