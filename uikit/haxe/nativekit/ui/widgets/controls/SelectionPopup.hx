@@ -218,7 +218,9 @@ class SelectionPopup {
 			var optionStyle = new LayoutStyle();
 			optionStyle.width = LayoutAxis.grow();
 			optionStyle.height = LayoutAxis.fixed(rowHeight);
-			optionStyle.padding = new Insets(9.0, 5.0, 9.0, 5.0);
+			// The selection check is painted in the first 20 px of the row; the label starts after it
+			// on every row, so the text lines up whether or not that row is the selected one.
+			optionStyle.padding = new Insets(26.0, 5.0, 9.0, 5.0);
 			var optionButton = new Button(option.label, optionStyle,
 				function() { onSelect(originalIndex); }, option.key);
 			optionButton.classes = ["selection-option"];
