@@ -114,6 +114,28 @@ the local clock and leaves aggregate source time zero: unrelated robot clocks
 cannot be meaningfully combined using a maximum. Per-robot source times remain
 available without reinterpretation.
 
+`robotkit.time.ClockMapping` is the sanctioned representation for comparing
+timestamps from different clocks. It names a directed nanosecond-to-nanosecond
+relationship, provenance, offset, skew in parts per billion, an error bound,
+and `validFromNs` in the target clock. The offset is defined at that target
+clock anchor: if `sourceAnchor = validFromNs - offsetNs`, then
+`target = source + offsetNs + round((source - sourceAnchor) * skewPpb / 1e9)`.
+`ClockMappings` follows only registered directed edges, sums their bounds,
+and chooses the valid path with the lowest bound. Equal-bound paths that
+disagree return no mapping. Identity has zero error. A mapping outside its
+validity or representable nanosecond range also returns no result. This model
+does not estimate a relationship or enable absolute command deadlines.
+
+RKD6's `ClockEstimator6` currently maps host monotonic nanoseconds to **device
+ticks**, fitting rate and offset from low-RTT samples. Its reported
+`uncertainty_ns` is a measured bound; deployment's `clock_sync_bound_ns` is
+the maximum accepted uncertainty, not that measurement. RKD6 rejects late
+or inconsistent samples, faults after lost sync, and reserves link latency
+plus twice the current uncertainty for its committed horizon. Since the
+estimator exposes neither a nanosecond-valued device epoch nor a mapping
+snapshot, it cannot yet register a valid `ClockMapping`. No clock edge is
+inferred from the configured bound.
+
 ### Ownership
 
 The existing ownership matrix below is normative: `RobotWorld` owns attached

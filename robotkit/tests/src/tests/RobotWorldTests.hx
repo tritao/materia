@@ -226,6 +226,7 @@ class RobotWorldTests {
     assertions += PerceptionTests.run();
     assertions += PerceptionInferenceTests.run();
     assertions += RobotEventTests.run();
+    assertions += ClockMappingTests.run();
     assertions += PlacementTests.run();
     assertions += WallFinishingScenarioTests.run();
     assertions += ConstructionSkillTests.run();
