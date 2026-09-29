@@ -46,6 +46,7 @@ class DesktopUiHost {
 		var eventCounts:Map<String, Int> = new Map();
 		var frameRequestCounts:Map<String, Int> = new Map();
 		var captureState = {startedAt: -1.0};
+		var frameGc = FrameGcScheduler.fromEnvironment();
 		var result = 0;
 		var step:Void->Bool = function() return false;
 		var failureRecorded = false;
@@ -216,7 +217,9 @@ class DesktopUiHost {
 									frameRequested = false;
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
+									frameGc.beginFrame();
 									var rendered = runtime.render(Sys.time());
+									frameGc.endFrame();
 									if (!rendered) return;
 									var renderedApp = runtime.app();
 									nextCaretFrameAt = renderedApp != null
@@ -268,6 +271,7 @@ class DesktopUiHost {
 											scheduleFrameWithReason("continuous");
 									}
 								} catch (error:Dynamic) {
+									frameGc.endFrame();
 									recordFailure("frame-callback", error);
 									runtime.fail("frame-callback", error);
 									active = false;
@@ -308,6 +312,7 @@ class DesktopUiHost {
 						throw "Surface frame request failed";
 					framePending = true;
 				}
+				if (active && !hadEvent && !frameRequested && !framePending) frameGc.idle();
 				if (active && !hadEvent) pump.wait(1.0 / options.targetFps);
 					if (session.state == UiHostLifecycle.Failed) throw session.error;
 				} catch (error:Dynamic) {

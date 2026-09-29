@@ -11,6 +11,7 @@ import nativekit.scene.SpatialIndex;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.host.FrameGcScheduler;
 import nativekit.ui.editing.EditOperation;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
@@ -54,6 +55,9 @@ private typedef InputProbe = {
 @:access(app.EditorScene)
 class HeadlessEditorProfile {
   static var profileSpans = false;
+  static var frameGc = FrameGcScheduler.fromEnvironment();
+  static var idleSeconds = 0.0;
+  static var idleMarkMicros = 0.0;
   static function main():Int {
     try {
       if (Sys.args().length < 2 || Sys.args().length > 4)
@@ -144,6 +148,10 @@ class HeadlessEditorProfile {
       File.saveContent(output + "/actions.jsonl", actions.join("\n") + "\n");
       File.saveContent(output + "/retained.jsonl", retained.join("\n") + "\n");
       File.saveContent(output + "/app-state.json", Json.stringify(editor.diagnosticState()));
+      File.saveContent(output + "/frame-gc.json", Json.stringify({enabled: frameGc.enabled,
+        idleCollections: frameGc.idleCollections, forcedCollections: frameGc.forcedCollections,
+        idleSeconds: idleSeconds, idleMarkMicros: idleMarkMicros, totalCollections: hl.Gc.collections(),
+        totalMarkMicros: hl.Gc.markMicros(), maxPauseMicros: hl.Gc.maxPauseMicros()}));
       if (heapDumpPath != null) {
         frames.resize(0);
         actions.resize(0);
@@ -464,7 +472,9 @@ class HeadlessEditorProfile {
     };
     if (profileSpans && input != null) haxeon.ProfileSpan.begin("tab/" + actionName + "/frame");
     var started = Sys.time();
+    frameGc.beginFrame();
     editor.submit(frame);
+    frameGc.endFrame();
     editor.ui.buildContext.buildProbe = null;
     var elapsed = Sys.time() - started;
     if (profileSpans && input != null) haxeon.ProfileSpan.end("tab/" + actionName + "/frame");
@@ -506,6 +516,7 @@ class HeadlessEditorProfile {
       submitGcCollections: submitGcCollections,
       submitGcMarkMicros: submitGcMarkMicros,
       startedAtSeconds: started,
+      frameGcEnabled: frameGc.enabled,
       frameSeconds: elapsed, submitSeconds: metrics.submitSeconds,
       viewSeconds: metrics.viewSeconds,
       treeAndStyleSeconds: metrics.treeAndStyleSeconds,
@@ -518,6 +529,14 @@ class HeadlessEditorProfile {
       styleChangedNodes: metrics.styleChangedNodes,
       subtrees: subtrees
     }));
+    // The interaction is over; a real host would now be idle.
+    if (input != null) {
+      var idleStarted = Sys.time();
+      var idleMarkBefore = hl.Gc.markMicros();
+      frameGc.idle();
+      idleSeconds += Sys.time() - idleStarted;
+      idleMarkMicros += hl.Gc.markMicros() - idleMarkBefore;
+    }
   }
 
   static function measuredClick(editor:ReferenceEditorApp, key:String, actionName:String):InputProbe {

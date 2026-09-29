@@ -85,3 +85,18 @@ The tab matrix uses 50 Hz CPU sampling with allocation sampling disabled. The
 The capture command builds the Release HashLink runtime before each run, even
 with `--skip-build`, so timing comparisons use the same optimized VM. Haxeon's
 Debug CMake preset writes its VM to its own build tree.
+
+## Frame-boundary collection
+
+`DesktopUiHost` turns automatic garbage collection off while a frame renders and
+collects afterwards instead: when the host goes idle, or right after a frame
+once allocation since the last collection is three times the collector's own
+trigger. The tab-matrix workload models this by wrapping each submit and
+collecting after each interaction. Set `MATERIA_FRAME_GC=0` to switch it off and
+compare; `frame-gc.json` in a capture records the idle and forced collections.
+
+On 100 tab-matrix cycles without the profiler (2026-09-29), interaction latency
+(input plus frame) went from 3.32 ms median, 4.60 ms p95 and 7.61 ms max to
+2.68 ms, 3.72 ms and 5.57 ms, and no interaction contained a collection (280 of
+396 did before). Total mark time was unchanged at about 290 ms; it moved into
+200 idle collections averaging 0.7 ms.
