@@ -31,7 +31,7 @@ class FacilityRouteDemo {
 	public static function stationIds():Array<String>
 		return [for (station in demoFacility().stations()) station.id];
 
-	static function demoFacility():Facility {
+	public static function demoFacility():Facility {
 		var existing = facility;
 		if (existing != null)
 			return existing;

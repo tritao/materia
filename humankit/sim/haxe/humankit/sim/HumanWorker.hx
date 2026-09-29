@@ -78,6 +78,12 @@ class HumanWorker {
 		lastAligned = false;
 	}
 
+	public function currentJobDone():Bool
+		return job != null && job.isDone();
+
+	public function currentJobFailure():Null<String>
+		return job == null ? null : job.failure();
+
 	public function addZone(zone:HumanZone):Void
 		zones.push(zone);
 

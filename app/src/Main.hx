@@ -145,7 +145,8 @@ class Main {
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
           arg.indexOf("--character-route=") != 0 && arg.indexOf("--character-facility-route=") != 0 &&
-          arg.indexOf("--character-reach=") != 0 && arg.indexOf("--character-reach-clip=") != 0) {
+          arg.indexOf("--character-reach=") != 0 && arg.indexOf("--character-reach-clip=") != 0 &&
+          arg != "--worker-demo=rack-to-table" && arg.indexOf("--worker-demo-step=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
@@ -153,7 +154,8 @@ class Main {
           "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] " +
           "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
           "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] " +
-          "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]]");
+          "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] " +
+          "[--worker-demo=rack-to-table [--worker-demo-step=N]]");
         return 2;
       }
 
@@ -171,6 +173,20 @@ class Main {
           generated.physical, generated.recipeDocument);
       }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
+      if (args.indexOf("--worker-demo=rack-to-table") >= 0) {
+        editor.enableWorkerDemo(workerDemoSteps(args), false);
+        var worker = editor.simulation.humanWorker("worker-demo");
+        var signals = editor.simulation.humanSignals("worker-demo");
+        var environment = editor.simulation.environmentVisualState();
+        var part = [for (entry in environment) if (entry.id == "worker-demo-part") entry];
+        Sys.println(haxe.Json.stringify({workerDemo:"rack-to-table", jobDone:worker != null &&
+          worker.currentJobDone(), jobFailure:worker == null ? "missing worker" : worker.currentJobFailure(),
+          part:part.length == 0 ? null : part[0].position,
+          zones:signals == null ? [] : signals.zones,
+          separation:signals == null ? null : signals.separation.get("demo-arm")}));
+        editor.dispose();
+        return 0;
+      }
       if (args.indexOf("--simulate") >= 0) {
         if (!editor.simulation.rebuild(editor.sensors, editor.scene, editor.session))
           throw "Snapshot simulation rebuild failed: " + editor.simulation.error;
@@ -266,6 +282,8 @@ class Main {
         editor.enableCharacterPreview(arg.substr(12), clip, hold, display, route, reachTarget, reachClip);
       }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
+      if (args.indexOf("--worker-demo=rack-to-table") >= 0)
+        editor.enableWorkerDemo(workerDemoSteps(args), true);
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
       return editor;
     });
@@ -274,6 +292,15 @@ class Main {
       if (activeEditor != null) activeEditor.tick();
       return active;
     }, function() return hosted.close());
+  }
+
+  static function workerDemoSteps(args:Array<String>):Int {
+    for (arg in args) if (arg.indexOf("--worker-demo-step=") == 0) {
+      var value = Std.parseInt(arg.substr(19));
+      if (value == null || value < 0 || value > 3600) throw "--worker-demo-step needs 0 to 3600 ticks";
+      return value;
+    }
+    return 0;
   }
 }
 
@@ -760,6 +787,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
   public function tick():Void {
+    if (simulation.isActive() && simulation.isRunning()) {
+      simulation.advanceWorkers();
+      if (hostContext != null) hostContext.requestFrame();
+    }
     if (characterPreview != null) {
       characterPreview.advance(scene);
       if (hostContext != null) hostContext.requestFrame();
@@ -858,6 +889,47 @@ class ReferenceEditorApp implements DesktopUiApplication {
     // A humanoid preview walks through the shared simulation as a person.
     simulation.addParticipant(preview);
     if (hostContext != null) hostContext.requestFrame();
+  }
+
+  /** Built-in rack, part, table, and cycling arm for the worker acceptance demo. */
+  public function enableWorkerDemo(advanceTicks:Int = 0, realtime:Bool = false):Void {
+    if (advanceTicks < 0) throw "Worker demo ticks must be non-negative";
+    var objects:Array<SceneObjectData> = [
+      {id:"worker-demo-floor",label:"Factory floor",type:"rectangle",x:2.0,y:1.2,z:-0.1,
+        width:8.0,height:5.0,depth:0.2,collisionEnabled:true,dynamicBody:false,mass:1.0,
+        red:0.38,green:0.42,blue:0.46,visible:true},
+      {id:"worker-demo-rack",label:"Rack B3",type:"rectangle",x:3.65,y:-0.2,z:0.88,
+        width:0.8,height:0.8,depth:0.16,collisionEnabled:true,dynamicBody:false,mass:1.0,
+        red:0.55,green:0.38,blue:0.2,visible:true},
+      {id:"worker-demo-table",label:"Assembly table",type:"rectangle",x:3.65,y:2.5,z:0.88,
+        width:0.8,height:0.8,depth:0.16,collisionEnabled:true,dynamicBody:false,mass:1.0,
+        red:0.2,green:0.45,blue:0.65,visible:true},
+      {id:"worker-demo-part",label:"Part",type:"rectangle",x:3.65,y:-0.2,z:1.0,
+        width:0.08,height:0.08,depth:0.08,collisionEnabled:true,dynamicBody:true,mass:0.1,
+        red:0.95,green:0.65,blue:0.12,visible:true}
+    ];
+    scene.reconcileRecords(objects);
+    var base = sensors.model.links[0];
+    var arm = sensors.model.addLink(new robotkit.model.Link("Demo arm", "worker-demo-arm"));
+    var joint = new robotkit.model.Joint("Arm pivot", robotkit.model.JointType.Revolute,
+      base, arm, "worker-demo-pivot");
+    joint.limits.lower = -0.8; joint.limits.upper = 0.8;
+    joint.limits.velocity = 2.0; joint.limits.effort = 5.0;
+    sensors.model.addJoint(joint);
+    sensors.setRobotPose(sensors.robotId, [3.8, 1.2, 0.0], [0.0, 0.0, 0.0, 1.0]);
+    var workerAsset = "animkit/assets/quaternius/worker.glb";
+    for (prefix in ["", "../", "../../"])
+      if (sys.FileSystem.exists(prefix + "animkit/assets/quaternius/worker.glb")) {
+        workerAsset = prefix + "animkit/assets/quaternius/worker.glb";
+        break;
+      }
+    sensors.addHuman(new HumanConfiguration("worker-demo", workerAsset,
+      [0, 0, 0], [0, 0, 0, 1], "rack-to-table"));
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    if (!simulation.rebuild(sensors, scene, session))
+      throw 'Worker demo simulation failed: ${simulation.error}';
+    for (_ in 0...advanceTicks) simulation.step();
+    if (realtime) simulation.start();
   }
 
   public function hasCharacterPreview():Bool return characterPreview != null;

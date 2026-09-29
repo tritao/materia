@@ -27,6 +27,10 @@ class HumanJob {
 	public function currentIndex():Int
 		return index;
 
+	/** Read-only copy of the ordered actions, for physics bindings. */
+	public function orderedActions():Array<HumanAction>
+		return actions.copy();
+
 	public function currentAction():Null<HumanAction>
 		return index < actions.length ? actions[index] : null;
 
