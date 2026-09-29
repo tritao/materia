@@ -305,7 +305,7 @@ class RobotModelCodec {
     return model;
   }
 
-  static function encodeCollisionShape(shape:CollisionShape):Dynamic {
+  public static function encodeCollisionShape(shape:CollisionShape):Dynamic {
     var kind:String, size:Array<Float>;
     switch shape.primitive {
       case Box(x, y, z): kind = "box"; size = [x, y, z];
@@ -335,7 +335,7 @@ class RobotModelCodec {
       number(record, "contactDampingRatio"));
   }
 
-  static function readCollisionShape(record:Dynamic):CollisionShape {
+  public static function readCollisionShape(record:Dynamic):CollisionShape {
     var primitive = switch text(record, "kind") {
       case "box":
         var size = vectorField(record, "size", 3);

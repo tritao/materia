@@ -1791,6 +1791,14 @@ class EditorScene {
 
   public function hasWorkerVisual(id:String):Bool return workerVisuals.exists(id);
 
+  public function setWorkerVisualsVisible(visible:Bool):Void {
+    if (workerVisuals.iterator().hasNext() == false) return;
+    var transaction = scene.beginTransaction();
+    for (visual in workerVisuals) transaction.setVisibility(visual.character.root, visible);
+    transaction.commit();
+    publishRuntimeNodes([]);
+  }
+
   /** Keeps each worker's idle mesh attached to its authored scene node. */
   public function syncWorkerVisuals():Void {
     var active:Map<String, Bool> = new Map();

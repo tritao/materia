@@ -157,6 +157,7 @@ class ProjectDocumentSession {
       return;
     }
     var data = SceneCodec.decodeRoot(root);
+    migrateLegacyHumans(data, SceneCodec.decodeSensorsRoot(root));
     var nextDocument = createDocument();
     var next = new EditorScene(data, nextDocument);
     var nextSensors:SensorConfiguration = null;
@@ -255,6 +256,7 @@ class ProjectDocumentSession {
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
     var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics, materials);
+    migrateLegacyHumans(data, SceneCodec.decodeSensorsRoot(root));
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
@@ -501,6 +503,33 @@ class ProjectDocumentSession {
     previousSensors.dispose();
     return {scene: scene, sensors: sensors, backend: materialized.backend,
       timestep: materialized.timestep};
+  }
+
+  /** Convert M4 sensor humans on load; the sensor writer emits only robot data. */
+  static function migrateLegacyHumans(data:Array<SceneObjectData>, sensors:Dynamic):Void {
+    if (sensors == null || !Reflect.hasField(sensors, "humans")) return;
+    var raw:Dynamic = Reflect.field(sensors, "humans");
+    if (!Std.isOfType(raw, Array)) throw "Legacy humans must be an array";
+    for (entry in (cast raw:Array<Dynamic>)) {
+      var id:Dynamic = Reflect.field(entry, "id");
+      var asset:Dynamic = Reflect.field(entry, "assetPath");
+      var position:Dynamic = Reflect.field(entry, "position");
+      var rotation:Dynamic = Reflect.field(entry, "rotation");
+      if (!Std.isOfType(id, String) || id == "" || !Std.isOfType(asset, String) || asset == "" ||
+          !Std.isOfType(position, Array) || !Std.isOfType(rotation, Array))
+        throw "Legacy human needs an ID, asset, and pose";
+      var p:Array<Float> = cast position, q:Array<Float> = cast rotation;
+      if (p.length != 3 || q.length != 4) throw "Legacy human pose has wrong dimensions";
+      for (value in p.concat(q)) if (!Math.isFinite(value)) throw "Legacy human pose must be finite";
+      for (object in data) if (object.id == id) throw 'Duplicate worker ID "$id"';
+      var oldName:Dynamic = Reflect.field(entry, "jobName");
+      var note = oldName == null ? null : 'Legacy job "$oldName" requires authoring as document steps';
+      data.push({id:id, label:id, type:"human-worker", x:p[0], y:p[1], z:0.0,
+        width:0.7, height:0.7, depth:1.8, collisionEnabled:false, dynamicBody:false,
+        mass:1.0, red:0.7, green:0.7, blue:0.7, visible:true, rotation:q.copy(),
+        worker:{asset:asset, job:'{"version":1,"loop":false,"steps":[]}', zones:[],
+          migrationNote:note}});
+    }
   }
 
   public function save(?file:String):Void {

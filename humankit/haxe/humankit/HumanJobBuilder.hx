@@ -6,7 +6,9 @@ class HumanJobBuilder {
     var job = new HumanJob(body);
     var holds:Array<HumanJobHold> = [];
     var heldByHand:Map<Int, String> = new Map();
-    for (step in spec.steps) {
+    var actionSteps:Array<Int> = [];
+    for (stepIndex in 0...spec.steps.length) {
+      var step = spec.steps[stepIndex];
       var action:String = Reflect.field(step, "action");
       switch action {
         case "walkTo":
@@ -73,8 +75,9 @@ class HumanJobBuilder {
         case "playClip":
           job.add(new PlayClip(Reflect.field(step, "clip"), Reflect.field(step, "seconds")));
       }
+      while (actionSteps.length < job.orderedActions().length) actionSteps.push(stepIndex);
     }
-    return {job: job, holds: holds};
+    return {job: job, holds: holds, actionSteps: actionSteps};
   }
 
   static function box(targets:HumanJobTargets, id:String):HumanTargetBox {

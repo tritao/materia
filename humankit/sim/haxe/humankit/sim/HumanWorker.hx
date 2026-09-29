@@ -60,6 +60,7 @@ class HumanWorker {
 	/** Parts in a hand, with their offset from the hand capsule. */
 	var held:Array<{object:SimObject, hand:HumanLimb, offset:SimPose}> = [];
 	var job:Null<HumanJob>;
+	var actionSteps:Array<Int> = [];
 	var loopSpec:Null<HumanJobSpec>;
 	var loopTargets:Null<HumanJobTargets>;
 	var loopObjects:Null<Map<String, SimObject>>;
@@ -120,6 +121,7 @@ class HumanWorker {
 			return;
 		}
 		var seen:Array<HumanAction> = [];
+		actionSteps = built.actionSteps;
 		var failure:Null<String> = null;
 		for (hold in built.holds) {
 			if (seen.indexOf(hold.action) >= 0) continue;
@@ -144,6 +146,13 @@ class HumanWorker {
 
 	public function currentJobFailure():Null<String>
 		return job == null ? null : job.failure();
+
+	/** Zero-based document step currently running, or null for an empty or finished job. */
+	public function currentStep():Null<Int> {
+		if (job == null || job.isDone()) return null;
+		var index = job.currentIndex();
+		return index < actionSteps.length ? actionSteps[index] : null;
+	}
 
 	public function addZone(zone:HumanZone):Void
 		zones.push(zone);
