@@ -1,0 +1,432 @@
+import animkit.AnimationAsset;
+import humankit.CapsulePlacement;
+import humankit.HumanBodyProxy;
+import humankit.HumanBodyView;
+import humankit.HumanBone;
+import humankit.HumanCapsule;
+import humankit.HumanDescription;
+import humankit.HumanDisplay;
+import humankit.HumanLimb;
+import humankit.HumanReachTask;
+import humankit.HumanWalker;
+import humankit.HumanPose;
+import humankit.HumanCharacter;
+import humankit.HumanoidRig;
+import humankit.Mat4;
+import humankit.RigMapping;
+import humankit.facility.FacilityWalk;
+import materia.automation.facility.Facility;
+import materia.automation.facility.FacilityRouter;
+import materia.automation.facility.Lane;
+import materia.automation.facility.Station;
+import materia.automation.facility.Zone;
+import nativekit.scene.Scene;
+import nativekit.scene.SceneRenderer;
+import nativekit.scene.SceneView;
+import robotkit.mobile.Footprint;
+import robotkit.mobile.Pose2;
+import robotkit.navigation.Path;
+import sys.FileSystem;
+
+class HumanKitTests {
+	static function main():Void {
+		var assets = assetDir();
+		var worker = AnimationAsset.load(assets + "/quaternius/worker.glb");
+		var rig = HumanoidRig.detect(worker);
+		if (rig.mapping.name != "quaternius")
+			throw 'Expected the Quaternius preset, got ${rig.mapping.name}';
+		if (!rig.has(HumanBone.MiddleR) || rig.joint(HumanBone.HandR) != worker.jointIndex("Wrist.R"))
+			throw "Worker hand bones did not map";
+		if (RigMapping.localName("mixamorig:LeftHand") != "LeftHand")
+			throw "Namespace prefixes are not stripped";
+		var soldier = AnimationAsset.load(assets + "/kenney/character-soldier.glb");
+		var rejected = false;
+		try HumanoidRig.detect(soldier) catch (error:String) rejected = true;
+		if (!rejected)
+			throw "A non-humanoid rig was accepted";
+
+		var scene = Scene.create();
+		var human = new HumanCharacter(scene, worker, rig, null, "Worker");
+		var height = human.height();
+		if (height < 1.7 || height > 1.95)
+			throw 'Unexpected worker height $height';
+		var head = human.pose.bonePosition(HumanBone.Head);
+		var left = human.pose.bonePosition(HumanBone.HandL);
+		var right = human.pose.bonePosition(HumanBone.HandR);
+		var foot = human.pose.bonePosition(HumanBone.FootL);
+		// Characters face +X with +Z up, so their left side is +Y.
+		if (head[2] < 1.3 || foot[2] > 0.3 || left[1] <= right[1])
+			throw 'Landmarks are not anatomical: head $head left $left right $right foot $foot';
+		checkRigid(human.pose.boneFrame(HumanBone.HandR), "right hand frame");
+		bodyProxy(human.pose, height);
+
+		var before = drawCalls(scene);
+		var wrench = AnimationAsset.load(assets + "/props/wrench.glb");
+		var held = human.attach(wrench, HumanBone.HandR, null, "Wrench");
+		human.player.playNamed("walk", 0.0);
+		for (step in 0...5)
+			human.advance(0.1);
+		var snapshot = scene.snapshot();
+		var world = snapshot.findNode(held.node).worldTransform();
+		var palm = Mat4.position(human.pose.boneFrame(HumanBone.HandR));
+		for (axis in 0...3)
+			if (Math.abs(world.element(12 + axis) - palm[axis]) > 1e-4)
+				throw 'Attachment does not follow the hand: palm $palm';
+		if (human.changedNodes().indexOf(held.node) < 0)
+			throw "Attachment node is not reported as changed";
+		snapshot.dispose();
+		var after = drawCalls(scene);
+		if (after != before + 1)
+			throw 'Attaching a one-mesh prop changed draw calls from $before to $after';
+		bodyView(scene, human);
+		human.dispose();
+		walking(scene, worker, rig);
+		reaching(scene, worker, rig);
+		facilityRoute(scene, worker, rig);
+		reachTask(scene, worker, rig);
+		scene.dispose();
+		Sys.println("humankit tests: ok");
+	}
+
+	/** Measurements and capsule placement at the worker's rest pose. */
+	static function bodyProxy(rest:HumanPose, height:Float):Void {
+		var description = HumanDescription.measure(rest, height);
+		if (description.stature != height || description.scale != 1.0)
+			throw "A measured description keeps the rig's height and scale";
+		inRange(description.shoulderWidth, 0.2, 0.5, "shoulder width");
+		inRange(description.hipWidth, 0.1, 0.4, "hip width");
+		inRange(description.upperArm, 0.15, 0.4, "upper arm");
+		inRange(description.thigh, 0.3, 0.6, "thigh");
+		inRange(description.torso, 0.3, 0.8, "torso");
+
+		var proxy = HumanBodyProxy.standard(rest, description);
+		if (proxy.capsules.length != 15)
+			throw 'Expected 15 capsules, got ${proxy.capsules.length}';
+		var placements = proxy.place(rest);
+		var arm = capsuleIndex(proxy, "upper_arm.L");
+		var shoulder = rest.bonePosition(HumanBone.UpperArmL), elbow = rest.bonePosition(HumanBone.ForearmL);
+		for (axis in 0...3)
+			if (Math.abs(placements[arm].center[axis] - (shoulder[axis] + elbow[axis]) * 0.5) > 1e-6)
+				throw "The upper arm capsule is not centred between shoulder and elbow";
+		var along = Mat4.normalize(Mat4.subtract(elbow, shoulder)), axisOfArm = capsuleAxis(placements[arm]);
+		if (Mat4.dot(along, axisOfArm) < 1 - 1e-9)
+			throw "The upper arm capsule does not lie along the arm";
+		var head = capsuleIndex(proxy, "head");
+		var crown = capsuleEnd(proxy.capsules[head], placements[head], 1.0)[2] + proxy.capsules[head].radius;
+		if (Math.abs(crown - height) > 0.01)
+			throw 'The head capsule reaches $crown, not the crown at $height';
+		// Feet rest on the floor; nothing sinks more than a few centimetres below it.
+		for (name in ["foot.L", "foot.R", "shin.L", "shin.R"]) {
+			var index = capsuleIndex(proxy, name);
+			var capsule = proxy.capsules[index];
+			var lowest = Math.min(capsuleEnd(capsule, placements[index], -1.0)[2], capsuleEnd(capsule, placements[index], 1.0)[2])
+				- capsule.radius;
+			if (StringTools.startsWith(name, "foot") && lowest > 0.06 || lowest < -0.03)
+				throw '$name sits at $lowest, not on the floor';
+		}
+
+		// Placing through a root: turned a quarter about +Z and moved 5 m along +X.
+		var root = [0.0, 1.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 5.0, 0.0, 0.0, 1.0];
+		var moved = proxy.place(rest, root)[arm];
+		var expected = [5.0 - placements[arm].center[1], placements[arm].center[0], placements[arm].center[2]];
+		for (axis in 0...3)
+			if (Math.abs(moved.center[axis] - expected[axis]) > 1e-6)
+				throw "The root transform does not carry the capsules";
+
+		// The same body twice as tall: every capsule doubles, and so does the root's scale.
+		var giant = HumanDescription.measure(rest, height).scaledTo(height * 2.0);
+		if (Math.abs(giant.scale - 2.0) > 1e-12 || Math.abs(giant.upperArm - description.upperArm * 2.0) > 1e-9)
+			throw "Scaling a description does not scale its lengths";
+		var tall = HumanBodyProxy.standard(rest, giant);
+		for (index in 0...proxy.capsules.length)
+			if (Math.abs(tall.capsules[index].length - proxy.capsules[index].length * 2.0) > 1e-6
+				|| Math.abs(tall.capsules[index].radius - proxy.capsules[index].radius * 2.0) > 1e-9)
+				throw '${proxy.capsules[index].name} does not scale with the body';
+		var scaled = tall.place(rest, [2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0, 1.0]);
+		var tallCrown = capsuleEnd(tall.capsules[head], scaled[head], 1.0)[2] + tall.capsules[head].radius;
+		if (Math.abs(tallCrown - height * 2.0) > 0.02)
+			throw 'The scaled head reaches $tallCrown, not ${height * 2.0}';
+	}
+
+	/** The capsule and skeleton views draw only when shown and follow the pose. */
+	static function bodyView(scene:Scene, human:HumanCharacter):Void {
+		var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
+		var base = drawCalls(scene);
+		var view = new HumanBodyView(scene, human.root, proxy, human.pose);
+		if (drawCalls(scene) != base)
+			throw "A new body view draws before it is shown";
+		view.show(Capsules);
+		if (drawCalls(scene) != base + proxy.capsules.length)
+			throw 'The capsule view draws ${drawCalls(scene) - base} parts, not ${proxy.capsules.length}';
+		view.show(Skeleton);
+		var bones = drawCalls(scene) - base;
+		if (bones < 15 || bones + proxy.capsules.length != view.nodes().length)
+			throw 'The skeleton view draws $bones bones';
+		view.show(Mesh);
+		if (drawCalls(scene) != base)
+			throw "Returning to the mesh still draws the body view";
+
+		human.advance(0.1);
+		view.update(human.pose);
+		var placement = proxy.place(human.pose)[0];
+		var snapshot = scene.snapshot();
+		// The character root sits at the origin, so model space is world space.
+		var world = snapshot.findNode(view.nodes()[0]).worldTransform();
+		for (axis in 0...3)
+			if (Math.abs(world.element(12 + axis) - placement.center[axis]) > 1e-4)
+				throw "The first capsule node is not where the proxy places it";
+		snapshot.dispose();
+	}
+
+	/** Walking a route with the clip matched to the speed keeps planted feet still. */
+	static function walking(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Walker");
+		var walker = new HumanWalker(human);
+		inRange(walker.gait.naturalSpeed, 0.5, 2.5, "natural walking speed");
+		if (walker.isWalking())
+			throw "A new walker is already walking";
+
+		// Along +X, then a left turn towards +Y.
+		var speed = 1.4;
+		walker.follow([[0.0, 0.0], [3.0, 0.0], [3.0, 2.0]], speed);
+		var step = 1.0 / 60.0;
+		var drift = 0.0, travel = 0.0, previous:Null<Array<Float>> = null, lowest = Math.POSITIVE_INFINITY;
+		var heights:Array<Float> = [], worldFeet:Array<Array<Float>> = [];
+		for (_ in 0...90) {
+			walker.advance(step);
+			var root = walker.rootTransform();
+			var foot = human.pose.bonePosition(HumanBone.FootL);
+			var world = [
+				root[0] * foot[0] + root[4] * foot[1] + root[12],
+				root[1] * foot[0] + root[5] * foot[1] + root[13]
+			];
+			heights.push(foot[2]);
+			worldFeet.push(world);
+			lowest = Math.min(lowest, foot[2]);
+		}
+		// After the 0.3 s start: the body is at full speed and the walk fully faded in.
+		for (index in 24...worldFeet.length)
+			if (heights[index] <= lowest + 0.01 && heights[index - 1] <= lowest + 0.01) {
+				drift += Math.abs(worldFeet[index][0] - worldFeet[index - 1][0]);
+				travel += speed * step;
+			}
+		if (travel == 0.0)
+			throw "The left foot never planted during the walk";
+		if (drift > 0.25 * travel)
+			throw 'A planted foot slid ${drift} m while the body walked ${travel} m';
+		// Ramping up from rest over 0.3 s costs half of that at full speed; per-frame
+		// integration may add up to one frame's travel.
+		if (Math.abs(walker.distance() - speed * (90 * step - 0.15)) > speed * step)
+			throw 'The walker covered ${walker.distance()} m, not a ramped ${speed * (90 * step - 0.15)} m';
+		if (Math.abs(human.player.speed - speed / walker.gait.naturalSpeed) > 1e-9)
+			throw "The walk clip does not play at the gait-matched rate";
+
+		for (_ in 0...600)
+			walker.advance(step);
+		var root = walker.rootTransform();
+		if (walker.isWalking() || Math.abs(root[12] - 3.0) > 1e-6 || Math.abs(root[13] - 2.0) > 1e-6)
+			throw 'The walker did not stop at the end of its route: ${root[12]}, ${root[13]}';
+		// Facing +Y after the turn.
+		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
+			throw "The walker does not face along the last leg";
+		if (human.player.currentClip() != asset.clipIndex("idle") || human.player.speed != 1.0)
+			throw "The walker does not idle at normal speed after arriving";
+		human.dispose();
+	}
+
+	/** Two-bone IK puts a wrist on a target, bends the elbow downwards, and lets go cleanly. */
+	static function reaching(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Reacher");
+		human.advance(0.0);
+		var shoulder = human.pose.bonePosition(HumanBone.UpperArmR);
+		var restHand = human.pose.bonePosition(HumanBone.HandR);
+		var description = HumanDescription.measure(human.pose, human.height());
+		var reachLength = description.upperArm + description.forearm;
+		// Ahead of the right shoulder and a little down: well within reach.
+		var direction = Mat4.normalize([1.0, -0.2, -0.3]);
+		var target = [for (axis in 0...3) shoulder[axis] + direction[axis] * reachLength * 0.8];
+		human.reach(ArmR, target);
+		human.advance(0.0);
+		var hand = human.pose.bonePosition(HumanBone.HandR);
+		if (distance(hand, target) > 0.01)
+			throw 'The wrist reached ${hand}, not ${target}';
+		var elbow = human.pose.bonePosition(HumanBone.ForearmR);
+		if (elbow[2] >= (shoulder[2] + hand[2]) * 0.5)
+			throw "The elbow does not bend downwards";
+
+		// Out of reach: the arm straightens towards the target.
+		var far = [for (axis in 0...3) shoulder[axis] + direction[axis] * reachLength * 3.0];
+		human.reach(ArmR, far);
+		human.advance(0.0);
+		hand = human.pose.bonePosition(HumanBone.HandR);
+		var towards = Mat4.normalize(Mat4.subtract(hand, shoulder));
+		if (Mat4.dot(towards, direction) < 0.99 || Math.abs(distance(hand, shoulder) - reachLength) > 0.02)
+			throw "An unreachable target does not straighten the arm towards it";
+
+		// Half weight lands between the animation and the full reach.
+		human.reach(ArmR, target, 0.5);
+		human.advance(0.0);
+		var half = human.pose.bonePosition(HumanBone.HandR);
+		if (distance(half, target) < 0.01 || distance(half, restHand) < 0.01)
+			throw "Half-weight IK does not blend";
+
+		human.release(ArmR);
+		human.advance(0.0);
+		if (distance(human.pose.bonePosition(HumanBone.HandR), restHand) > 1e-4)
+			throw "Releasing the arm does not restore its animated pose";
+		var rejected = false;
+		try human.reach(LegL, [0.3, 0.1, 0.1]) catch (_:Dynamic) rejected = true;
+		if (!rejected)
+			throw "A Quaternius leg, whose foot is not below its shin, was accepted as a chain";
+		human.dispose();
+	}
+
+	/**
+	 * A real FacilityRouter route through two lanes, adapted with FacilityWalk:
+	 * the person ends at the destination station and faces along the last lane,
+	 * not the straight line from the start.
+	 */
+	static function facilityRoute(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var facility = new Facility("warehouse", "Warehouse A");
+		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(10.0, 10.0)));
+		var start = new Station("start", "Start", "floor", "map", new Pose2(0.0, 0.0, 0.0));
+		var corner = new Station("corner", "Corner", "floor", "map", new Pose2(4.0, 0.0, 0.0));
+		var dest = new Station("dest", "Dest", "floor", "map", new Pose2(4.0, 3.0, Math.PI / 2));
+		facility.addStation(start);
+		facility.addStation(corner);
+		facility.addStation(dest);
+		facility.addLane(new Lane("start-corner", start.id, corner.id,
+			new Path([start.pose, corner.pose], "map"), 1.0, 1.4));
+		facility.addLane(new Lane("corner-dest", corner.id, dest.id,
+			new Path([corner.pose, dest.pose], "map"), 1.0, 1.4));
+		var route = new FacilityRouter(facility).route(start.id, dest.id);
+		var points = FacilityWalk.routeFromFacilityRoute(route);
+		if (points.length != 3)
+			throw 'Expected 3 route points, got ${points.length}';
+
+		var human = new HumanCharacter(scene, asset, rig, null, "FacilityWalker");
+		var walker = new HumanWalker(human);
+		walker.follow(points, route.maximumSpeedMetersPerSecond);
+		var step = 1.0 / 60.0;
+		for (_ in 0...600)
+			walker.advance(step);
+		var root = walker.rootTransform();
+		if (walker.isWalking())
+			throw "The facility walk did not stop at its destination";
+		if (Math.abs(root[12] - dest.pose.x) > 1e-3 || Math.abs(root[13] - dest.pose.y) > 1e-3)
+			throw 'The facility walk ended at ${root[12]}, ${root[13]}, not the destination station';
+		// The last lane runs along +Y; the walker must face along it, not the
+		// straight line from start to destination.
+		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
+			throw "The facility walk does not face along the last lane";
+		human.dispose();
+	}
+
+	/**
+	 * A HumanReachTask walks to a spot, stops, reaches for a target with the IK
+	 * weight ramped in and out (playing "interact" while holding), and releases
+	 * cleanly.
+	 */
+	static function reachTask(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "ReachTasker");
+		var walker = new HumanWalker(human);
+		human.advance(0.0);
+		var shoulder = human.pose.bonePosition(HumanBone.UpperArmR);
+		var description = HumanDescription.measure(human.pose, human.height());
+		var reachLength = description.upperArm + description.forearm;
+		var direction = Mat4.normalize([1.0, -0.2, -0.3]);
+		var target = [for (axis in 0...3) shoulder[axis] + direction[axis] * reachLength * 0.8];
+		var task = new HumanReachTask(walker, [[0.0, 0.0], [1.5, 0.0]], 1.2, ArmR, target, 0.3, 0.4, null,
+			"interact", 0.2);
+		var step = 1.0 / 60.0;
+		var checkedHold = false;
+		for (_ in 0...400) {
+			task.advance(step);
+			if (task.phase == Holding && !checkedHold) {
+				checkedHold = true;
+				if (walker.isWalking())
+					throw "The reach task is still walking while holding";
+				var root = walker.rootTransform();
+				if (Math.abs(root[12] - 1.5) > 1e-3 || Math.abs(root[13]) > 1e-3)
+					throw 'The body did not stop at the spot: ${root[12]}, ${root[13]}';
+				var hand = human.pose.bonePosition(HumanBone.HandR);
+				if (distance(hand, target) > 0.01)
+					throw 'The wrist did not reach the target: $hand vs $target';
+				if (human.player.currentClip() != asset.clipIndex("interact"))
+					throw "The interact clip is not playing while holding";
+			}
+			if (task.isDone())
+				break;
+		}
+		if (!checkedHold)
+			throw "The reach task never held its target";
+		if (!task.isDone())
+			throw "The reach task never finished";
+		// A clean release: the IK no longer pins the wrist to the target.
+		for (_ in 0...12)
+			task.advance(step);
+		var released = human.pose.bonePosition(HumanBone.HandR);
+		if (distance(released, target) < 0.02)
+			throw "The reach did not release cleanly; the wrist is still pinned to the target";
+		human.dispose();
+	}
+
+	static function distance(a:Array<Float>, b:Array<Float>):Float {
+		var delta = Mat4.subtract(a, b);
+		return Math.sqrt(Mat4.dot(delta, delta));
+	}
+
+	static function inRange(value:Float, low:Float, high:Float, label:String):Void
+		if (!(value >= low && value <= high))
+			throw 'Implausible $label $value';
+
+	static function capsuleIndex(proxy:HumanBodyProxy, name:String):Int {
+		for (index in 0...proxy.capsules.length)
+			if (proxy.capsules[index].name == name)
+				return index;
+		throw 'No $name capsule';
+	}
+
+	/** The capsule's local +Z axis in the placed frame. */
+	static function capsuleAxis(placement:CapsulePlacement):Array<Float> {
+		var q = placement.rotation;
+		return [
+			2.0 * (q[0] * q[2] + q[3] * q[1]),
+			2.0 * (q[1] * q[2] - q[3] * q[0]),
+			1.0 - 2.0 * (q[0] * q[0] + q[1] * q[1])
+		];
+	}
+
+	/** A hemisphere centre: the capsule's +Z end for sign 1, its -Z end for -1. */
+	static function capsuleEnd(capsule:HumanCapsule, placement:CapsulePlacement, sign:Float):Array<Float> {
+		var axis = capsuleAxis(placement), half = capsule.length * 0.5 * sign;
+		return [
+			placement.center[0] + axis[0] * half,
+			placement.center[1] + axis[1] * half,
+			placement.center[2] + axis[2] * half
+		];
+	}
+
+	static function drawCalls(scene:Scene):Int {
+		var snapshot = scene.snapshot();
+		var renderer = SceneRenderer.createHeadless();
+		var stats = renderer.render(snapshot, new SceneView());
+		snapshot.dispose();
+		return haxe.Int64.toInt(stats.get_draw_calls());
+	}
+
+	static function checkRigid(m:Array<Float>, label:String):Void {
+		var x = [m[0], m[1], m[2]], y = [m[4], m[5], m[6]], z = [m[8], m[9], m[10]];
+		if (Math.abs(Mat4.dot(x, x) - 1) > 1e-4 || Math.abs(Mat4.dot(y, y) - 1) > 1e-4 || Math.abs(Mat4.dot(x, y)) > 1e-4
+			|| Mat4.dot(Mat4.cross(x, y), z) < 0.999)
+			throw '$label is not a rigid right-handed frame';
+	}
+
+	static function assetDir():String {
+		var configured = Sys.getEnv("ANIMKIT_ASSET_DIR");
+		for (root in configured != null ? [configured] : ["animkit/assets", "../../animkit/assets", "../animkit/assets"])
+			if (FileSystem.exists(root + "/quaternius/worker.glb"))
+				return root;
+		throw "Cannot find animkit/assets; set ANIMKIT_ASSET_DIR";
+	}
+}

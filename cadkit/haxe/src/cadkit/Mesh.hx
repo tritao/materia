@@ -12,6 +12,8 @@ class Mesh {
 	public final edgeSegments:Bytes;
 	public final edgeIds:Bytes;
 	public final vertexCount:Int;
+	/** Maximum linear tessellation deflection, in the mesh's length units. */
+	public final linearDeflection:Float;
 	public final indexCount:Int;
 	public final faceRanges:Array<cadkit.MeshFaceRange>;
 
@@ -23,20 +25,21 @@ class Mesh {
 		edgeIds:Bytes,
 		vertexCount:Int,
 		indexCount:Int,
-		faceRanges:Array<cadkit.MeshFaceRange>) {
+		faceRanges:Array<cadkit.MeshFaceRange>, linearDeflection:Float) {
 		this.vertices = vertices;
 		this.normals = normals;
 		this.indices = indices;
 		this.edgeSegments = edgeSegments;
 		this.edgeIds = edgeIds;
 		this.vertexCount = vertexCount;
+		this.linearDeflection = linearDeflection;
 		this.indexCount = indexCount;
 		this.faceRanges = faceRanges;
 	}
 
 	public static function fromShape(
 		shape:CadKit.ShapeHandle,
-		options:CadKit.MeshOptions):Mesh {
+		options:CadKit.MeshOptions, linearDeflection:Float):Mesh {
 		var native = CadKit.shapeTessellateChecked(shape, options);
 		try {
 			var vertices = CadKit.meshCopyVerticesBytesChecked(native.borrow());
@@ -63,7 +66,7 @@ class Mesh {
 				edgeIds,
 				vertexCount,
 				indexCount,
-				faceRanges);
+				faceRanges, linearDeflection);
 			native.close();
 			return result;
 		} catch (error:Dynamic) {

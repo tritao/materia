@@ -42,3 +42,12 @@
 [submodule "motionkit/native/vendor/descartes_light"]
 	path = motionkit/native/vendor/descartes_light
 	url = https://github.com/swri-robotics/descartes_light.git
+[submodule "animkit/native/vendor/cgltf"]
+	path = animkit/native/vendor/cgltf
+	url = https://github.com/jkuhlmann/cgltf.git
+[submodule "animkit/native/vendor/ozz-animation"]
+	path = animkit/native/vendor/ozz-animation
+	url = https://github.com/guillaumeblanc/ozz-animation.git
+[submodule "animkit/native/vendor/stb"]
+	path = animkit/native/vendor/stb
+	url = https://github.com/nothings/stb.git

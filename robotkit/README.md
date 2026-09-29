@@ -53,19 +53,32 @@ graph consumed by the Haxeon host. The Haxe façade and wire protocol are under
 its bindings deliberately submit one command batch and retrieve one snapshot
 per tick.
 
-Multi-robot simulation is coordinated by `rk_simulation`. One simulation owns
-the SceneKit scene, SimKit world, host, and clock. Robot runtimes remain the
-command/snapshot boundary, but they do not advance physics independently:
-`Simulation` drains every robot's commands, advances the shared world once,
-and publishes every robot state from the resulting snapshot. The Haxe
+Multi-robot simulation is coordinated by `rk_simulation`, the set of robots
+taking part in one SimKit session (`simkit/sim_core`, `nativekit_sim_session.h`).
+The session owns the SceneKit scene's physics world, host, clock, and the
+environment: props and people are session objects and actors, not robots. On
+every session tick the robots' participant drains every robot's commands (all
+or none), submits their targets and base drives, and publishes every robot
+state from the resulting snapshot. Robot runtimes remain the command/snapshot
+boundary, but they do not advance physics independently. The Haxe
 `robotkit.runtime.Simulation` façade exposes the same lifecycle while behavior
 code continues to depend on robot-scoped submit/snapshot APIs.
-Participating runtimes cannot be stepped individually; applications must call
-`Simulation.step()` so the shared-world boundary remains explicit.
 
-`Simulation` also owns explicit runtime-scene operations: reset, per-robot
-reset, robot teleport, environment-object spawn/remove/teleport, and one
-shared simulation clock. These edits are accepted while stopped. Once running,
+`Simulation.inSession(session)` (`rk_simulation_create_in_session`) is the only
+way to construct a `Simulation`: it joins a session the caller owns, steps,
+starts, stops, and resets, and whose environment (session objects and actors)
+the caller edits directly through the session API; `presentFrame` presents the
+robots from the same `SimFrame` the caller reads its props and people from.
+`Simulation` itself has no clock or environment calls of its own. Callers that
+just want one thing to construct, step, and dispose end to end — mainly
+tests, and robotd's standalone/in-memory server mode — can use
+`robotkit.runtime.SimulationHarness` instead, which owns a
+`robotkit.runtime.SimulationSpace` (scene, world, and session) and the
+`Simulation` joined to it, and offers the same `step`/`start`/`stop`/`reset`
+and box-object convenience the old self-owned mode had.
+
+`Simulation` also owns robot runtime-scene operations: per-robot reset and
+robot teleport. These edits are accepted while the session is stopped. Once running,
 physics is authoritative and editable-scene changes must go through the
 simulation owner.
 Kinematic robot bases are the exception: `Simulation.driveRobotBase` moves a
@@ -117,7 +130,9 @@ cmake --build /tmp/materia-mujoco -j 6
 ctest --test-dir /tmp/materia-mujoco --output-on-failure
 ```
 
-Select it with `new Simulation(0.01, 2, 1)`; backend `0` remains the test backend.
+Select it with `SimulationSpace.create(SimulationSpace.MUJOCO, 0.01, 2)` (or
+`new SimulationHarness(0.01, 2, SimulationSpace.MUJOCO)` in tests); the
+deterministic backend remains the default.
 MuJoCo self-collision excludes direct parent/child pairs and links that
 already overlap in their authored rest pose, while other link pairs can make
 contact. Set `blueprint.selfCollision = false` for a model whose simple box
@@ -153,7 +168,8 @@ The ownership rule is intentionally simple:
 
 ```text
 RobotWorld owns attached adapters
-Simulation owns simulated runtimes and physics
+A SimKit session owns physics and the simulation clock
+Simulation owns simulated runtimes, as a session participant
 robotd owns the deployed runtime and endpoint
 ```
 

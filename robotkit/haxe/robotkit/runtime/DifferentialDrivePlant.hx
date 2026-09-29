@@ -19,6 +19,7 @@ import robotkit.world.RobotSnapshot;
  * simulation, and the IMU measures the chassis motion.
  */
 class DifferentialDrivePlant {
+  final harness:SimulationHarness;
   public final simulation:Simulation;
   public final robotIndex:Int;
   public final base:MobileBase;
@@ -30,14 +31,15 @@ class DifferentialDrivePlant {
   /** Base height, preserved while the plant drives the planar pose. */
   public var baseHeight(get, never):Float;
 
-  public function new(simulation:Simulation, robotIndex:Int, base:MobileBase,
+  public function new(harness:SimulationHarness, robotIndex:Int, base:MobileBase,
       ?initialPose:Pose2) {
-    if (simulation == null || robotIndex < 0 || base == null)
+    if (harness == null || robotIndex < 0 || base == null)
       throw "Differential-drive plant requires a simulation, robot index, and mobile base";
     var odometry = base.driveModel.createOdometry();
     if (odometry == null)
       throw "Differential-drive plant requires a differential drive model";
-    this.simulation = simulation;
+    this.harness = harness;
+    this.simulation = harness.simulation;
     this.robotIndex = robotIndex;
     this.base = base;
     simulation.setDifferentialDrive(robotIndex, odometry.leftWheelJoint,
@@ -58,7 +60,7 @@ class DifferentialDrivePlant {
 
   /** Advances one fixed simulation step and returns the robot's snapshot. */
   public function step(timestampNs:Int64):RobotSnapshot {
-    simulation.step(timestampNs);
+    harness.step(timestampNs);
     return base.robot.snapshot();
   }
 

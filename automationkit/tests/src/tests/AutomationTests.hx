@@ -49,6 +49,7 @@ import robotkit.navigation.Path;
 import robotkit.skill.FollowPath;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.world.Robot;
 import robotkit.world.RobotCapabilities;
 import robotkit.world.RobotCommand;
@@ -362,7 +363,9 @@ class AutomationTests {
   }
 
   static function testSimulatedMissionReplay(model:RobotModel):Void {
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+
+    var simulation = simulationHarness.simulation;
     var world = new RobotWorld();
     var replayWorld:Null<RobotWorld> = null;
     var recordingPath = '/tmp/materia-automation-${Sys.getPid()}-mission.mcap';
@@ -432,7 +435,7 @@ class AutomationTests {
           ticks < 300) {
         executionStatus = executor.update(0.01);
         if (switch executionStatus { case MissionExecutionStatus.Running: true; case _: false; })
-          simulation.step(Int64.ofInt((ticks + 1) * 10000000));
+          simulationHarness.step(Int64.ofInt((ticks + 1) * 10000000));
         ticks++;
       }
       check(switch executionStatus { case MissionExecutionStatus.Succeeded: true; case _: false; } &&
@@ -537,13 +540,13 @@ class AutomationTests {
       replayWorld.close();
       replayWorld = null;
       world.close();
-      simulation.dispose();
+      simulationHarness.dispose();
       cleanupRecording(recordingPath);
       closed = true;
     } catch (error:Dynamic) {
       if (replayWorld != null) replayWorld.close();
       world.close();
-      if (!closed) simulation.dispose();
+      if (!closed) simulationHarness.dispose();
       if (writer != null) try cast(writer, McapRobotRecording).close() catch (_:Dynamic) {}
       cleanupRecording(recordingPath);
       throw error;

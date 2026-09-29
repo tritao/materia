@@ -8,6 +8,84 @@ typedef CollisionHullResult = {vertices:Array<Float>, warning:Null<String>, erro
 class ConvexHullVertices {
   public static inline final MAX_VERTICES:Int = 64;
 
+  /** An enclosing 26-DOP built from exact mesh support in fixed directions. */
+  public static function enclosingFromMesh(vertices:Bytes, count:Int,
+      minimumThickness:Float, ?offset:Float):CollisionHullResult {
+    if (vertices == null || count < 1 || vertices.length < count * 24 ||
+        !Math.isFinite(minimumThickness) || minimumThickness <= 0 ||
+        (offset != null && (!Math.isFinite(offset) || offset < 0)))
+      throw "Collision mesh data or minimum thickness is invalid";
+    var directions:Array<Array<Float>> = [];
+    var supports:Array<Float> = [];
+    var minimum = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+    var maximum = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+    for (index in 0...count) for (axis in 0...3) {
+      var value = vertices.getDouble(index * 24 + axis * 8);
+      if (!Math.isFinite(value)) throw "Convex hull mesh has a non-finite vertex";
+      minimum[axis] = Math.min(minimum[axis], value);
+      maximum[axis] = Math.max(maximum[axis], value);
+    }
+    var diagonal = Math.sqrt(Math.pow(maximum[0] - minimum[0], 2) +
+      Math.pow(maximum[1] - minimum[1], 2) + Math.pow(maximum[2] - minimum[2], 2));
+    var flat = false;
+    for (axis in 0...3) if (maximum[axis] - minimum[axis] < minimumThickness) flat = true;
+    for (xi in 0...3) for (yi in 0...3) for (zi in 0...3) {
+      var x = xi - 1, y = yi - 1, z = zi - 1;
+      if (x == 0 && y == 0 && z == 0) continue;
+      var length = Math.sqrt(x * x + y * y + z * z);
+      var direction = [x / length, y / length, z / length];
+      var support = Math.NEGATIVE_INFINITY;
+      for (index in 0...count) {
+        var at = index * 24;
+        support = Math.max(support, direction[0] * vertices.getDouble(at) +
+          direction[1] * vertices.getDouble(at + 8) + direction[2] * vertices.getDouble(at + 16));
+      }
+      directions.push(direction);
+      // A small outward offset also gives oblique planar meshes full volume.
+      supports.push(support + (offset == null ? minimumThickness * 0.5 : offset));
+    }
+    var result:Array<Float> = [];
+    var scale = Math.max(1.0, Math.max(diagonal, minimumThickness));
+    for (i in 0...directions.length) for (j in i + 1...directions.length)
+      for (k in j + 1...directions.length) {
+        var a = directions[i], b = directions[j], c = directions[k];
+        var bc = cross(b, c), ca = cross(c, a), ab = cross(a, b);
+        var determinant = dot(a, bc);
+        if (Math.abs(determinant) < 1e-10) continue;
+        var point = [for (axis in 0...3)
+          (supports[i] * bc[axis] + supports[j] * ca[axis] + supports[k] * ab[axis]) / determinant];
+        var inside = true;
+        for (plane in 0...directions.length)
+          if (dot(directions[plane], point) > supports[plane] + scale * 1e-8) {
+            inside = false;
+            break;
+          }
+        if (!inside) continue;
+        var duplicate = false;
+        for (index in 0...Std.int(result.length / 3)) {
+          var at = index * 3;
+          if (Math.abs(result[at] - point[0]) <= scale * 1e-8 &&
+              Math.abs(result[at + 1] - point[1]) <= scale * 1e-8 &&
+              Math.abs(result[at + 2] - point[2]) <= scale * 1e-8) {
+            duplicate = true;
+            break;
+          }
+        }
+        if (!duplicate) for (axis in 0...3) result.push(point[axis]);
+      }
+    if (result.length < 12 || result.length > MAX_VERTICES * 3)
+      throw 'Enclosing k-DOP has ${Std.int(result.length / 3)} vertices';
+    return {vertices: result, warning: flat ? "Thin collision mesh was thickened" : null,
+      errorRatio: supportErrorRatio(vertices, count, result, diagonal)};
+  }
+
+  static function dot(a:Array<Float>, b:Array<Float>):Float
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  static function cross(a:Array<Float>, b:Array<Float>):Array<Float>
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
+      a[0] * b[1] - a[1] * b[0]];
+
   /** Keeps a thin or degenerate part loadable with a minimum-thickness box. */
   public static function safeFromMesh(vertices:Bytes, count:Int,
       minimumThickness:Float):CollisionHullResult {

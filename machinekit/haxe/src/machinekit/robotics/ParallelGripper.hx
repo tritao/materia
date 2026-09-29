@@ -8,9 +8,12 @@ import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.Solids;
+import machinekit.component.RuntimePortIntent;
 
 /** Generic two-jaw pneumatic gripper envelope; stroke is the total jaw travel. */
 class ParallelGripper extends MachineComponent {
+	override public function runtimePortIntents():Array<RuntimePortIntent>
+		return [Gripper("open", "close")];
 	public final width:Float;
 	public final depth:Float;
 	public final length:Float;
@@ -33,5 +36,5 @@ class ParallelGripper extends MachineComponent {
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.box(width, depth, length);
+		return Part.box(detail == Envelope ? width + stroke : width, depth, length);
 }

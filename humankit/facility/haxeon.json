@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "humankit-facility" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "humankit": { "path": ".." },
+    "materia-automation": { "path": "../../automationkit" }
+  },
+  "target": "host"
+}

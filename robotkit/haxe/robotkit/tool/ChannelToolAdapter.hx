@@ -27,6 +27,15 @@ class ChannelToolAdapter {
     });
   }
 
+  /** A true output holds the changer locked; false requests release. */
+  public function bindChangerLock(channel:String, changerLock:ChangerLock):Void {
+    if (changerLock == null) throw "Changer lock channel binding requires a lock";
+    bind(channel, function(event) {
+      if (digital(event.value, "Changer lock")) changerLock.lock(event.scheduledTimeNs);
+      else changerLock.unlock(event.scheduledTimeNs);
+    });
+  }
+
   public function bindSprayerFlow(channel:String, sprayer:Sprayer, onFlow:Float):Void {
     if (sprayer == null || !Math.isFinite(onFlow) || onFlow < 0.0)
       throw "Invalid sprayer channel binding";

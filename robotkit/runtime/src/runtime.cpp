@@ -181,7 +181,7 @@ rk_result InMemoryRobot::apply(const rk_robot_command &command) {
     for (uint32_t index = 0; index < command.target_count; ++index) {
         const auto &target = command.targets[index];
         if (target.joint >= joint_count_ || target.mode < RK_TARGET_POSITION ||
-            target.mode > RK_TARGET_EFFORT)
+            target.mode > RK_TARGET_SERVO)
             return RK_ERROR_UNSUPPORTED;
     }
     for (uint32_t index = 0; index < command.target_count; ++index) {
@@ -207,7 +207,7 @@ rk_result InMemoryRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
         state.effort[index] = 0.0;
         if (!stopped_ && has_target_[index]) {
             const auto &target = targets_[index];
-            if (target.mode == RK_TARGET_POSITION) {
+            if (target.mode == RK_TARGET_POSITION || target.mode == RK_TARGET_SERVO) {
                 state.position[index] = target.target;
                 state.velocity[index] = elapsed_seconds > 0.0
                     ? (state.position[index] - old_position) / elapsed_seconds
@@ -379,7 +379,8 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             // setpoint. Endpoint samples are observations, not plan anchors.
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
                 if (control_.active[joint] &&
-                    control_.targets[joint].mode != RK_TARGET_POSITION)
+                    control_.targets[joint].mode != RK_TARGET_POSITION &&
+                    control_.targets[joint].mode != RK_TARGET_SERVO)
                     return RK_ERROR_INVALID_STATE;
                 const double bound = blueprint_.following_error_bound[joint];
                 if (bound > 0.0 &&
@@ -1179,13 +1180,15 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 for (uint32_t target_index = 0; target_index < value.target_count; ++target_index) {
                     const auto &target = value.targets[target_index];
                     const auto &joint = blueprint_.joints[target.joint];
-                    if (target.mode == RK_TARGET_POSITION &&
+                    if ((target.mode == RK_TARGET_POSITION || target.mode == RK_TARGET_SERVO) &&
                         (target.target < joint.lower_limit || target.target > joint.upper_limit)) {
                         latch_fault();
                         return RK_ERROR_LIMIT;
                     }
-                    if (target.mode == RK_TARGET_EFFORT && joint.max_effort > 0.0 &&
-                        std::abs(target.target) > joint.max_effort) {
+                    const double effort = target.mode == RK_TARGET_EFFORT ? target.target
+                        : target.mode == RK_TARGET_SERVO ? value.servos[target_index].feedforward
+                        : 0.0;
+                    if (joint.max_effort > 0.0 && std::abs(effort) > joint.max_effort) {
                         latch_fault();
                         return RK_ERROR_LIMIT;
                     }
@@ -1199,6 +1202,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         control_.reference_initialized[joint] = true;
                     }
                     control_.targets[joint] = target;
+                    // Validation keeps servo targets below RK_MAX_SERVO_JOINTS.
+                    if (joint < RK_MAX_SERVO_JOINTS)
+                        control_.servos[joint] = target.mode == RK_TARGET_SERVO
+                            ? value.servos[target_index] : rk_joint_servo{};
                     velocity_anchor_pending_[joint] = target.mode == RK_TARGET_VELOCITY;
                     if (target.mode == RK_TARGET_EFFORT && target.max_effort > 0.0 &&
                         std::abs(control_.targets[joint].target) > target.max_effort)
@@ -1449,6 +1456,10 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 }
                 target.target = control_.position_reference[joint];
             }
+            // Targets go out in joint order, so a servo joint (below
+            // RK_MAX_SERVO_JOINTS) always lands at an index with servo terms.
+            if (joint < RK_MAX_SERVO_JOINTS)
+                output.servos[active_count] = control_.servos[joint];
             output.targets[active_count++] = target;
         }
         output.target_count = active_count;
@@ -1478,7 +1489,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     }
     if (output.kind == RK_COMMAND_JOINT_TARGETS)
         for (uint32_t index = 0; index < output.target_count; ++index)
-            if (output.targets[index].mode == RK_TARGET_POSITION)
+            if (output.targets[index].mode == RK_TARGET_POSITION ||
+                output.targets[index].mode == RK_TARGET_SERVO)
                 commanded_position_[output.targets[index].joint] = output.targets[index].target;
     if (stop_ramp_finished && control_.stop_ramp_hits_limit) {
         // The commanded setpoint is clamped to the travel limit; distinguish
@@ -1607,10 +1619,14 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         latch_fault();
         return result != RK_OK ? result : RK_ERROR_BACKEND;
     }
+    const double tolerance = blueprint_.struct_size >=
+        offsetof(rk_robot_runtime_blueprint, observed_limit_tolerance) +
+            sizeof(blueprint_.observed_limit_tolerance)
+        ? blueprint_.observed_limit_tolerance : 0.0;
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
-        if (next.position[joint] < limits.lower_limit ||
-            next.position[joint] > limits.upper_limit) {
+        if (next.position[joint] < limits.lower_limit - tolerance ||
+            next.position[joint] > limits.upper_limit + tolerance) {
             latch_fault();
             return RK_ERROR_LIMIT;
         }
@@ -1661,6 +1677,16 @@ void RobotRuntime::discard_pending_commands() noexcept {
             velocity_anchor_pending_);
         state_backup_valid_ = false;
     }
+}
+
+void RobotRuntime::fail_tick() noexcept {
+    discard_pending_commands();
+    std::lock_guard owner_lock(owner_mutex_);
+    {
+        std::lock_guard state_lock(state_mutex_);
+        if (state_.safety == RK_SAFETY_FAULT || state_.safety == RK_SAFETY_EMERGENCY_STOP) return;
+    }
+    latch_fault();
 }
 
 void RobotRuntime::reset_state() noexcept {

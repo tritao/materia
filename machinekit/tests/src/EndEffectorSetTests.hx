@@ -7,6 +7,9 @@ import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorSet;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
+import machinekit.robotics.ParallelGripper;
+import machinekit.robotics.schmalz.SchmalzSxtMaster;
+import machinekit.robotics.schmalz.SchmalzSxtTool;
 import materia.assembly.AssemblyFrames;
 
 private class TestChangerMaster extends MachineComponent {
@@ -21,6 +24,31 @@ private class TestChangerMaster extends MachineComponent {
 		declareMass(5, new Vector(), InertiaTensor.zero());
 	}
 
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+}
+
+private class CoupledMaster extends MachineComponent {
+	public function new() {
+		super("COUPLED-MASTER", "Coupled master", "steel", true);
+		addConnector("mount", Mount, AssemblyFrames.identity());
+		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
+		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+		declareMass(5, new Vector(), InertiaTensor.zero());
+	}
+	override public function couplingKey():String return "test:master";
+	override public function couplingConnector():String return "couple";
+	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
+}
+
+private class CoupledPlate extends MachineComponent {
+	public function new() {
+		super("COUPLED-PLATE", "Coupled plate", "steel", true);
+		addConnector("mount", Mount, AssemblyFrames.identity());
+		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
+		declareMass(1, new Vector(), InertiaTensor.zero());
+	}
+	override public function couplingKey():String return "test:tool";
+	override public function couplingConnector():String return "mount";
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
 }
 
@@ -85,7 +113,40 @@ class EndEffectorSetTests {
 		return result;
 	}
 
+	static function coupledTool():EndEffector {
+		var result = new EndEffector();
+		result.addComponent("plate", new CoupledPlate());
+		result.mount("plate", "mount");
+		result.exposePort("air", "plate", "airIn");
+		return result;
+	}
+
 	public static function run():Void {
+		var sxtSet = new EndEffectorSet();
+		sxtSet.addComponent("master", new SchmalzSxtMaster("10.07.13.00013"));
+		sxtSet.mount("master", "robot");
+		sxtSet.exposePort("robotAir", "master", "airIn1");
+		sxtSet.exposePort("coupledAir", "master", "airOut1");
+		sxtSet.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
+		var sxtTool = new EndEffector();
+		sxtTool.addComponent("half", new SchmalzSxtTool("10.07.13.00018"));
+		sxtTool.mount("half", "master");
+		sxtTool.exposePort("air", "half", "airIn1");
+		sxtSet.addTool("manual", sxtTool);
+		var coupledSxt = sxtSet.configuration("manual");
+		if (coupledSxt.upstream("tool/half", "airOut1").port.instanceId != "robot/master" ||
+			coupledSxt.billOfMaterials().quantity("10.07.13.00013") != 1 ||
+			coupledSxt.billOfMaterials().quantity("10.07.13.00018") != 1)
+			throw "SXT catalog halves must couple and bridge the keyed air passage";
+		var gripper = new ParallelGripper(40, 20, 60, 30);
+		var preview = gripper.geometry(Preview), envelope = gripper.geometry(Envelope);
+		var previewBox = preview.shape.bounds(), envelopeBox = envelope.shape.bounds();
+		close(previewBox.get_max().get_x() - previewBox.get_min().get_x(), 40,
+			"gripper preview width");
+		close(envelopeBox.get_max().get_x() - envelopeBox.get_min().get_x(), 70,
+			"gripper full-open envelope width");
+		preview.close();
+		envelope.close();
 		var set = new EndEffectorSet();
 		set.addComponent("master", new TestChangerMaster());
 		set.mount("master", "mount");
@@ -128,6 +189,17 @@ class EndEffectorSetTests {
 		if (generic.toolIds().indexOf("matching") < 0) throw "Matching generic changer was rejected";
 		fails(() -> generic.addTool("wrong-diameter", genericTool(1, 55)), "does not fit");
 		fails(() -> generic.addTool("wrong-channels", genericTool(2, 60)), "does not fit");
-		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching ToolChangerTool");
+		fails(() -> generic.addTool("wrong-half", tool(1, 20)), "matching coupling interface");
+		var wrongConnector = new EndEffectorSet();
+		wrongConnector.addComponent("master", new ToolChangerMaster(1, 60));
+		fails(() -> wrongConnector.changer("coupling", "master", "robot", []), "coupling connector");
+
+		var custom = new EndEffectorSet();
+		custom.addComponent("master", new CoupledMaster());
+		custom.mount("master", "mount");
+		custom.exposePort("coupledAir", "master", "airOut");
+		custom.changer("coupling", "master", "couple", [{robot: "coupledAir", tool: "air"}]);
+		fails(() -> custom.addTool("wrong-key", coupledTool()), "does not fit");
+		fails(() -> custom.addTool("mixed", tool(1, 20)), "matching coupling interface");
 	}
 }

@@ -9,12 +9,37 @@
 
 namespace nksim {
 
+struct BackendShapePart {
+    std::uint32_t type = 0;
+    std::array<double, 4> parameters{};
+    std::vector<float> vertices;
+    std::array<double, 3> position{};
+    std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
+    double margin = 0.0;
+    double gap = 0.0;
+    /** Contact surface; zero fields keep the backend default (see nksim_surface). */
+    std::uint32_t friction_dimensions = 0;
+    std::array<double, 3> friction{};
+    double contact_time_constant = 0.0;
+    double contact_damping_ratio = 0.0;
+    std::uint32_t contact_filter = NKSIM_CONTACT_LAYERS;
+};
+
+struct BackendContactPair {
+    std::uint64_t body_a = 0;
+    std::uint32_t part_a = 0;
+    std::uint64_t body_b = 0;
+    std::uint32_t part_b = 0;
+    BackendShapePart surface; /**< Only its surface fields are read. */
+};
+
 struct BackendBodyDesc {
     std::uint32_t motion_type = NKSIM_MOTION_STATIC;
     double mass = 0.0;
     std::uint32_t shape_type = 0;
     std::array<double, 4> shape_parameters{};
     std::vector<float> shape_vertices;
+    std::vector<BackendShapePart> shape_parts;
     std::array<double, 3> position{};
     std::array<double, 4> rotation{0.0, 0.0, 0.0, 1.0};
     std::uint32_t collision_layer = 0;
@@ -52,6 +77,12 @@ struct BackendJointDesc {
     /** Joint-frame orientation relative to body_a/body_b; identity when the caller's ABI struct predates these fields. */
     std::array<double, 4> rotation_a{0.0, 0.0, 0.0, 1.0};
     std::array<double, 4> rotation_b{0.0, 0.0, 0.0, 1.0};
+    double armature = 0.0;
+    double damping = 0.0;
+    double friction_loss = 0.0;
+    double limit_time_constant = 0.0;
+    double limit_damping_ratio = 0.0;
+    std::array<double, 5> limit_impedance{};
 };
 
 struct BackendJointState {
@@ -66,6 +97,11 @@ struct BackendJointTarget {
     std::uint32_t mode = 0;
     double target = 0.0;
     double max_force = 0.0;
+    /* NKSIM_JOINT_TARGET_SERVO terms. */
+    double velocity = 0.0;
+    double stiffness = 0.0;
+    double damping = 0.0;
+    double feedforward = 0.0;
 };
 
 struct BackendJointCoupling {
@@ -81,6 +117,17 @@ struct BackendClosure {
     std::uint64_t body_b = 0;
     std::array<double, 3> anchor_a{};
     std::array<double, 3> axis_a{};
+};
+
+struct BackendContact {
+    std::uint64_t body_a = 0;
+    std::uint64_t body_b = 0;
+    std::int32_t part_a = -1;
+    std::int32_t part_b = -1;
+    std::array<double, 3> position{};
+    std::array<double, 3> normal{};
+    double distance = 0.0;
+    bool active = false;
 };
 
 /** Internal backend contract. It is intentionally not part of the C ABI. */
@@ -103,6 +150,8 @@ public:
     virtual nksim_result joint_destroy(std::uint64_t joint) = 0;
     virtual nksim_result joint_couple(const BackendJointCoupling &coupling) = 0;
     virtual nksim_result closure_create(const BackendClosure &closure) = 0;
+    /** Backends without explicit pairs keep their own contact rules. */
+    virtual nksim_result contact_pair_create(const BackendContactPair &) { return NKSIM_OK; }
     virtual nksim_result set_joint_targets(const BackendJointTarget *targets,
                                            std::uint32_t count) = 0;
 
@@ -116,6 +165,13 @@ public:
                                           std::uint32_t count) = 0;
     virtual nksim_result read_joint_states(BackendJointState *states,
                                            std::uint32_t count) = 0;
+    virtual nksim_result joint_set_state(std::uint64_t, double, double) {
+        return NKSIM_ERROR_UNSUPPORTED;
+    }
+    virtual nksim_result read_contacts(std::vector<BackendContact> &out) {
+        out.clear();
+        return NKSIM_OK;
+    }
 };
 
 std::unique_ptr<PhysicsBackend> make_test_physics_backend();

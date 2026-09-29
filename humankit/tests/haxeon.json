@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "package": { "name": "humankit-tests" },
+  "entry": "HumanKitTests",
+  "sourceRoots": ["src"],
+  "dependencies": {
+    "humankit": { "path": ".." },
+    "humankit-facility": { "path": "../facility" },
+    "materia-automation": { "path": "../../automationkit" },
+    "animkit": { "path": "../../animkit" },
+    "scenekit": { "path": "../../scenekit" },
+    "nativekit": { "path": "../../nativekit" }
+  },
+  "native": {
+    "cmake": {
+      "source": "../../animkit/tests/native",
+      "target": "animkit_tests_native",
+      "inputs": [
+        "../../animkit/tests/native/CMakeLists.txt",
+        "../../animkit/native/CMakeLists.txt",
+        "../../animkit/native/include/animkit.h",
+        "../../animkit/native/src/api.cpp",
+        "../../animkit/native/src/import.cpp",
+        "../../animkit/native/src/runtime.cpp",
+        "../../animkit/native/src/vendor.cpp",
+        "../../scenekit/scene/CMakeLists.txt",
+        "../../nativekit/CMakeLists.txt"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

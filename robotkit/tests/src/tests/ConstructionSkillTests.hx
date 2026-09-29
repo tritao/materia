@@ -16,7 +16,10 @@ import robotkit.spatial.Transform3;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.ToolBoxObstacle;
+import robotkit.manipulation.ToolPlanningContext;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.HolonomicDrivePlant;
 import robotkit.mobile.MobileBase;
@@ -42,6 +45,8 @@ import robotkit.skill.Paint;
 import robotkit.skill.Sand;
 import robotkit.tool.SimulatedSprayer;
 import robotkit.tool.SimulatedSander;
+import robotkit.tool.Tool;
+import robotkit.tool.ToolCollisionShape;
 import robotkit.work.WorkSurface;
 import robotkit.work.Polygon2;
 import robotkit.work.Point2;
@@ -85,7 +90,10 @@ class ConstructionSkillTests {
     blueprint.channels.push(new ProcessChannelDeclaration("surface.process",
       ProcessEventValue.Digital(false)));
 
-    var simulation = new Simulation(0.02);
+    var simulationHarness = new SimulationHarness(0.02);
+
+
+    var simulation = simulationHarness.simulation;
     var recordingPath = '/tmp/robotkit-${Sys.getPid()}-construction-skills.mcap';
     var writer = new McapRobotRecording(recordingPath, 4 * 1024 * 1024);
     var runtime = simulation.addRobot(blueprint);
@@ -94,7 +102,7 @@ class ConstructionSkillTests {
     var robot = new RecordingRobot(sourceRobot, writer);
 
     var base = MobileBase.fromBlueprint(robot, blueprint);
-    var plant = new HolonomicDrivePlant(simulation, 0, base);
+    var plant = new HolonomicDrivePlant(simulationHarness, 0, base);
     var localization = new HolonomicOdometryLocalization([0, 1, 2], fixture.wheelRadius, fixture.baseRadius);
     var navigation = new Navigation(base, localization, 0.2, 0.3, 1.0);
     var grid = new OccupancyGrid2(0.1, new Pose2(-2.0, -2.0), 40, 40, "odom", OccupancyCell.Free);
@@ -189,9 +197,35 @@ class ConstructionSkillTests {
     for (event in sander.history) if (event.contactForce > 0.0) sandedOn = true;
     check(sandedOn, "Sand commands a contact-force setpoint on the simulated sander");
 
+    // A skill must pass its mounted tool and cell obstacles to the planner,
+    // then stop before navigation or process output when the tool is blocked.
+    var mounted = new Tool("paint-head", "paint head", Transform3.identity(),
+      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+    var cell = new ToolPlanningContext(mounted, [new ToolBoxObstacle(
+      Transform3.identity(), new Vec3(10.0, 10.0, 10.0))]);
+    var blockedPaint = new Paint(navigator, manipulator, robot,
+      registered.frame_T_surface, registered, spec, observe, new SimulatedSprayer(),
+      0.3, 2.0, seed, paintMotion, null, cell);
+    var blockedStatus = runToCompletion(blockedPaint);
+    check(switch blockedStatus { case Failed(_): true; case _: false; },
+      "Paint rejects a path blocked by a 3D obstacle at planning time");
+    check(blockedPaint.coverage() == null,
+      "Blocked Paint does not start coverage or process execution");
+
+    var wrongTcp = new Tool("wrong-tcp", "wrong TCP",
+      new Transform3(new Vec3(0.01, 0.0, 0.0), Quat.identity()),
+      ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
+    var rejected = false;
+    try {
+      new Paint(navigator, manipulator, robot, registered.frame_T_surface, registered,
+        spec, observe, new SimulatedSprayer(), 0.3, 2.0, seed, paintMotion, null,
+        new ToolPlanningContext(wrongTcp, cell.obstacles));
+    } catch (_:Dynamic) rejected = true;
+    check(rejected, "Paint rejects a tool whose TCP differs from the manipulator TCP");
+
     writer.close();
     robot.close();
-    simulation.dispose();
+    simulationHarness.dispose();
     var recording = McapRecordingReader.load(recordingPath);
     check(recording.commands.length > 10 && recording.snapshots.length > 10,
       "construction skill run is recorded to MCAP");

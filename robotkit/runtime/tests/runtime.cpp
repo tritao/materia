@@ -1057,11 +1057,14 @@ void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &bl
 
 void idle_plan_uses_commanded_anchor_and_following_error(
     const rk_robot_runtime_blueprint &source) {
+    // Four runtimes and two plans exceed a comfortable stack; keep the
+    // runtimes on the heap, as the C API does.
     auto blueprint = source;
     blueprint.following_error_bound[0] = 0.0002;
     auto accepted_endpoint = std::make_shared<OffsetEndpoint>(0.0001);
-    robotkit::RobotRuntime accepted(blueprint, accepted_endpoint,
+    auto accepted_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, accepted_endpoint,
         std::chrono::milliseconds(10));
+    auto &accepted = *accepted_owner;
     assert(accepted.publish_sample(1) == RK_OK);
     rk_plan_submission plan{};
     plan.struct_size = sizeof(plan);
@@ -1074,7 +1077,8 @@ void idle_plan_uses_commanded_anchor_and_following_error(
     assert(accepted.submit_plan(plan) == RK_OK);
 
     auto held_endpoint = std::make_shared<OffsetEndpoint>(0.0001);
-    robotkit::RobotRuntime held(blueprint, held_endpoint, std::chrono::milliseconds(10));
+    auto held_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, held_endpoint, std::chrono::milliseconds(10));
+    auto &held = *held_owner;
     uint64_t timestamp = 0;
     assert(held.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 90)) == RK_OK);
@@ -1095,8 +1099,9 @@ void idle_plan_uses_commanded_anchor_and_following_error(
     assert(held.submit_plan(plan) == RK_OK);
 
     auto rejected_endpoint = std::make_shared<OffsetEndpoint>(0.0003);
-    robotkit::RobotRuntime rejected(blueprint, rejected_endpoint,
+    auto rejected_owner = std::make_unique<robotkit::RobotRuntime>(blueprint, rejected_endpoint,
         std::chrono::milliseconds(10));
+    auto &rejected = *rejected_owner;
     assert(rejected.publish_sample(1) == RK_OK);
     assert(rejected.submit_plan(plan) == RK_ERROR_FOLLOWING_ERROR);
     rk_robot_snapshot snapshot{};
@@ -1105,8 +1110,9 @@ void idle_plan_uses_commanded_anchor_and_following_error(
 
     auto unchecked_blueprint = source;
     auto unchecked_endpoint = std::make_shared<OffsetEndpoint>(0.0003);
-    robotkit::RobotRuntime unchecked(unchecked_blueprint, unchecked_endpoint,
+    auto unchecked_owner = std::make_unique<robotkit::RobotRuntime>(unchecked_blueprint, unchecked_endpoint,
         std::chrono::milliseconds(10));
+    auto &unchecked = *unchecked_owner;
     assert(unchecked.publish_sample(1) == RK_OK);
     assert(unchecked.submit_plan(initial_plan) == RK_OK);
 }

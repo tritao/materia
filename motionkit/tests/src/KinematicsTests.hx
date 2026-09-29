@@ -86,6 +86,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
@@ -431,7 +432,8 @@ class KinematicsTests extends MotionKitTestSupport {
     var blueprint = MotionSystemBlueprint.fromRobotModel(model, [
       new MotionAxisBlueprint("x", ["x.left", "x.right"], 0.0, 0.08, 0.08, 0.4)
     ]);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("dual-motor-x", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -442,13 +444,13 @@ class KinematicsTests extends MotionKitTestSupport {
       "one logical axis exposes both dual-motor joints");
 
     machine.home();
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     machine.moveAxes([new AxisTarget("x", 0.035)], new MotionOptions(0.08, 0.4));
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     var snapshot = robot.snapshot();
     near(snapshot.positions.get(0), 0.035, "dual-motor axis reaches its logical target on motor one", 1e-5);
     near(snapshot.positions.get(1), 0.035, "dual-motor axis reaches its logical target on motor two", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
 }

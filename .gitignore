@@ -6,16 +6,21 @@
 /robotkit/tests/build/
 /robotkit/tests/tool-capabilities/build/
 /robotkit/tests/mujoco/build/
+/robotkit/tools/humanoid/build/
 /robotkit/tests/excavator/build/
 /robotkit/build/
 /robotkit/device_protocol/target/
 /robotkit/device_virtual/target/
 /robotkit/cadbridge/tests/build/
+/robotkit/cadbridge/tests/mujoco/build/
 /robotkit/worldd/build/
 /automationkit/tests/build/
 /motionkit/tests/build/
 /cnckit/tests/build/
 /processkit/tests/build/
+/animkit/native/build/
+/animkit/tests/build/
+/humankit/tests/build/
 
 /cadkit/examples/modeling/build/
 /simkit/.cache/
@@ -23,3 +28,4 @@
 /app/tests/build/
 /build/
 /uikit/build-web/
+/robotkit/tools/humanoid/tests/build/

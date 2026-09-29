@@ -36,4 +36,10 @@ nksim_result NKSIM_CALL nksim_joint_get_state(nksim_world world, nksim_joint joi
     return value ? value->get_joint_state(joint, out_state) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_joint_set_state(nksim_world world, nksim_joint joint,
+                                              double position, double velocity) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_joint_state(joint, position, velocity) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 } // extern "C"

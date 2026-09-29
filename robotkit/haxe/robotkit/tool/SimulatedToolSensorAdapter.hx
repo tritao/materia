@@ -45,8 +45,8 @@ class SimulatedToolSensorAdapter {
     if (binding == null || selection.active() != binding.runtime) return false;
     if (frame.kind != binding.kind || frame.image != null || frame.values.length != 1)
       throw 'Tool sensor "${frame.sensorId}" has the wrong payload';
-    if (frame.sourceClockId != "robotkit.monotonic")
-      throw 'Tool sensor "${frame.sensorId}" needs the robotkit.monotonic source clock';
+    if (frame.sourceClockId != selection.selectedClockId())
+      throw 'Tool sensor "${frame.sensorId}" uses a different source clock from tool selection';
     if (Int64.compare(frame.sourceTimestampNs, selection.selectedAtNs()) < 0 ||
         (binding.lastSequence != null && Int64.compare(frame.sequence, binding.lastSequence) <= 0))
       return false;

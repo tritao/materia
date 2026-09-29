@@ -13,17 +13,39 @@ import machinekit.component.Solids;
 class SuctionCup extends MachineComponent {
 	public final diameter:Float;
 	public final height:Float;
+	/** Measured or vendor-rated sealed area in mm²; null until specified. */
+	public final effectiveAreaMm2:Null<Float>;
+	/** Rated overturning moment at the chosen vacuum, in N m; null if unknown. */
+	public final ratedMomentNm:Null<Float>;
 
-	public function new(diameter:Float, height:Float) {
+	public function new(diameter:Float, height:Float,
+			?effectiveAreaMm2:Float, ?ratedMomentNm:Float,
+			?catalogDesignation:String, ?vacuumInterface:PortInterface,
+			?catalogDescription:String) {
 		if (!Math.isFinite(diameter) || diameter <= 0 || !Math.isFinite(height) || height <= 0)
 			throw "Suction cup needs positive dimensions";
-		super('SUCTION-CUP-${Dimension.format(diameter)}-${Dimension.format(height)}',
-			"Generic suction cup", "rubber", true);
+		var nominalArea = Math.PI * diameter * diameter / 4;
+		if (effectiveAreaMm2 != null && (!Math.isFinite(effectiveAreaMm2) ||
+				effectiveAreaMm2 <= 0 || effectiveAreaMm2 > nominalArea + 1e-9))
+			throw "Suction cup effective area must fit within its nominal diameter";
+		if (ratedMomentNm != null && (!Math.isFinite(ratedMomentNm) || ratedMomentNm <= 0))
+			throw "Suction cup moment rating must be positive and finite";
+		var ratingId = effectiveAreaMm2 == null ? "" : '-A${Dimension.format(effectiveAreaMm2)}';
+		if (ratedMomentNm != null) ratingId += '-M${Dimension.format(ratedMomentNm)}';
+		super(catalogDesignation == null
+			? 'SUCTION-CUP-${Dimension.format(diameter)}-${Dimension.format(height)}$ratingId'
+			: catalogDesignation,
+			catalogDesignation == null ? "Generic suction cup" :
+				(catalogDescription == null ? 'Catalog suction cup $catalogDesignation' : catalogDescription),
+			"rubber", catalogDesignation == null);
 		this.diameter = diameter;
 		this.height = height;
+		this.effectiveAreaMm2 = effectiveAreaMm2;
+		this.ratedMomentNm = ratedMomentNm;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addConnector("contact", Face, Solids.axial(0, 0, height));
-		addPort({name: "vacuum", kind: Vacuum, role: Consumer, iface: PushIn(6), required: true});
+		addPort({name: "vacuum", kind: Vacuum, role: Consumer,
+			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: true});
 	}
 
 	override public function geometry(detail:ComponentDetail = Preview):Part

@@ -15,6 +15,7 @@ class AppTests {
     if (SceneEditingTests.main() != 0) return 1;
     if (StockSimulationTests.main() != 0) return 1;
     ScriptedSetupTests.run();
+    if (HumanSimulationTests.main() != 0) return 1;
     SceneDocumentTests.run();
     return CadPlateWorkflowTests.main();
   }

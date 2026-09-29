@@ -10,6 +10,7 @@ import robotkit.model.RobotMobileConfiguration;
 import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.behavior.RobotBehavior;
 import robotd.behaviors.OscillateBehavior;
 
@@ -110,7 +111,7 @@ class RobotHost {
       for (channel in deployment.channels) blueprint.channels.push(channel);
     }
     if (args.indexOf("--server") >= 0) {
-      var serverSimulation:Null<Simulation> = null;
+      var serverSimulation:Null<SimulationHarness> = null;
       var serverRuntime:Null<RobotRuntime> = null;
       try {
         if (serialPath != null)
@@ -118,8 +119,9 @@ class RobotHost {
             fingerprint, targetError, baud, stepTickHz,
             linkLossTimeoutNs, clockSyncBoundNs);
         else {
-          serverSimulation = new Simulation();
-          serverRuntime = serverSimulation.addRobot(blueprint);
+          var newServerSimulation = new SimulationHarness();
+          serverSimulation = newServerSimulation;
+          serverRuntime = newServerSimulation.simulation.addRobot(blueprint);
         }
         if (serverRuntime == null) throw "robotd: failed to create runtime";
         var hostedRuntime:RobotRuntime = serverRuntime;
@@ -143,13 +145,18 @@ class RobotHost {
       return;
     }
     var inMemory = args.indexOf("--in-memory") >= 0;
-    var simulation:Null<Simulation> = inMemory || serialPath != null ? null : new Simulation();
-    var runtime = serialPath != null
-      ? RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud,
-          stepTickHz, linkLossTimeoutNs, clockSyncBoundNs)
-      : inMemory
-        ? RobotRuntime.create(blueprint)
-        : simulation.addRobot(blueprint);
+    var simulation:Null<SimulationHarness> = null;
+    var runtime:RobotRuntime;
+    if (serialPath != null)
+      runtime = RobotRuntime.createSerial(blueprint, serialPath, fingerprint, targetError, baud,
+        stepTickHz, linkLossTimeoutNs, clockSyncBoundNs);
+    else if (inMemory)
+      runtime = RobotRuntime.create(blueprint);
+    else {
+      var newSimulation = new SimulationHarness();
+      simulation = newSimulation;
+      runtime = newSimulation.simulation.addRobot(blueprint);
+    }
     runtime.submitPositions([0.5], 1);
     if (simulation == null) {
       runtime.start();

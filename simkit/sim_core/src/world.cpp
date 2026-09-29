@@ -50,6 +50,7 @@ bool valid_shape_desc(const nksim_shape_desc &desc) noexcept {
     case NKSIM_SHAPE_SPHERE:
         return std::isfinite(desc.parameters[0]) && desc.parameters[0] > 0.0;
     case NKSIM_SHAPE_CAPSULE:
+    case NKSIM_SHAPE_CYLINDER:
         return std::isfinite(desc.parameters[0]) && std::isfinite(desc.parameters[1]) &&
             desc.parameters[0] > 0.0 && desc.parameters[1] > 0.0;
     case NKSIM_SHAPE_PLANE: {
@@ -149,6 +150,14 @@ std::shared_ptr<Snapshot> resolve_snapshot(nksim_snapshot snapshot) noexcept {
 
 bool valid_struct_size(std::uint32_t provided, std::size_t required) noexcept {
     return provided >= required;
+}
+
+void copy_surface(const nksim_surface &surface, BackendShapePart &part) noexcept {
+    part.contact_filter = surface.contact_filter;
+    part.friction_dimensions = surface.friction_dimensions;
+    std::copy(std::begin(surface.friction), std::end(surface.friction), part.friction.begin());
+    part.contact_time_constant = surface.contact_time_constant;
+    part.contact_damping_ratio = surface.contact_damping_ratio;
 }
 
 bool finite_positive(double value) noexcept {
@@ -412,10 +421,10 @@ nksim_result World::pull_backend_state() {
     return result;
 }
 
-// Backends pin a kinematic root without degrees of freedom, so the bodies
-// articulated beneath it report only their motion relative to it. Their world
-// twist adds the root's: v = v_root + w_root x (p - p_root) + v_rel and
-// w = w_root + w_rel.
+// Backends pin a kinematic root that carries other bodies without degrees of
+// freedom, so the bodies articulated beneath it report only their motion
+// relative to it. Their world twist adds the root's: v = v_root + w_root x
+// (p - p_root) + v_rel and w = w_root + w_rel.
 void World::carry_kinematic_root_twists() noexcept {
     if (joints.empty())
         return;
@@ -522,10 +531,18 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
     std::vector<BackendJointTarget> backend_targets;
     backend_targets.reserve(count);
     for (std::uint32_t index = 0; index < count; ++index) {
-        if (!valid_struct_size(targets[index].struct_size, sizeof(targets[index])))
+        // The servo terms are an optional tail; older callers stop before it.
+        const auto &source = targets[index];
+        const bool has_servo = source.struct_size >= sizeof(source);
+        if (!valid_struct_size(source.struct_size, offsetof(nksim_joint_target, velocity)))
             return NKSIM_ERROR_INVALID_ARGUMENT;
-        if (targets[index].mode < NKSIM_JOINT_TARGET_POSITION ||
-            targets[index].mode > NKSIM_JOINT_TARGET_EFFORT)
+        if (source.mode < NKSIM_JOINT_TARGET_POSITION || source.mode > NKSIM_JOINT_TARGET_SERVO ||
+            (source.mode == NKSIM_JOINT_TARGET_SERVO && !has_servo))
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (source.mode == NKSIM_JOINT_TARGET_SERVO &&
+            (!std::isfinite(source.velocity) || !std::isfinite(source.stiffness) ||
+             !std::isfinite(source.damping) || !std::isfinite(source.feedforward) ||
+             source.stiffness < 0.0 || source.damping < 0.0))
             return NKSIM_ERROR_INVALID_ARGUMENT;
         const auto *joint = joints.get(targets[index].joint);
         if (!joint)
@@ -535,6 +552,12 @@ nksim_result World::set_joint_targets(const nksim_joint_target *targets, std::ui
         target.mode = targets[index].mode;
         target.target = targets[index].target;
         target.max_force = targets[index].max_force;
+        if (source.mode == NKSIM_JOINT_TARGET_SERVO) {
+            target.velocity = source.velocity;
+            target.stiffness = source.stiffness;
+            target.damping = source.damping;
+            target.feedforward = source.feedforward;
+        }
         backend_targets.push_back(target);
     }
     const auto result = backend->set_joint_targets(
@@ -555,7 +578,40 @@ nksim_result World::snapshot(std::shared_ptr<Snapshot> &out_snapshot) const {
     result->clock = clock;
     bodies.for_each([&](nksim_body, const Body &body) { result->bodies.push_back(body.state); });
     joints.for_each([&](nksim_joint, const Joint &joint) { result->joints.push_back(joint.state); });
+    std::uint32_t count = 0;
+    auto status = contacts(nullptr, 0, &count);
+    if (status != NKSIM_OK) return status;
+    result->contacts.resize(count);
+    status = contacts(result->contacts.data(), count, &count);
+    if (status != NKSIM_OK) return status;
     out_snapshot = std::move(result);
+    return NKSIM_OK;
+}
+
+nksim_result World::contacts(nksim_contact *out, std::uint32_t capacity,
+                             std::uint32_t *out_count) const {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!out_count || (capacity != 0 && !out)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::vector<BackendContact> values;
+    const auto result = backend->read_contacts(values);
+    if (result != NKSIM_OK) return result;
+    *out_count = static_cast<std::uint32_t>(values.size());
+    for (std::uint32_t i = 0; i < std::min(capacity, *out_count); ++i) {
+        const auto &value = values[i];
+        nksim_contact contact{};
+        contact.struct_size = sizeof(contact);
+        bodies.for_each([&](nksim_body handle, const Body &body) {
+            if (body.backend_body == value.body_a) contact.body_a = handle;
+            if (body.backend_body == value.body_b) contact.body_b = handle;
+        });
+        contact.part_a = value.part_a;
+        contact.part_b = value.part_b;
+        std::copy(value.position.begin(), value.position.end(), contact.position);
+        std::copy(value.normal.begin(), value.normal.end(), contact.normal);
+        contact.distance = value.distance;
+        contact.active = value.active ? 1u : 0u;
+        out[i] = contact;
+    }
     return NKSIM_OK;
 }
 
@@ -602,6 +658,136 @@ nksim_result World::create_convex_shape(const double *vertices, std::uint32_t co
         stored->convex_vertices.push_back(static_cast<float>(vertices[i]));
     *out_shape = shape;
     return NKSIM_OK;
+}
+
+nksim_result World::create_compound_shape(const nksim_shape *children,
+        const nksim_shape_pose *poses, std::uint32_t count, nksim_shape *out_shape) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!children || !poses || !out_shape || count == 0 || count > 64)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    std::vector<BackendShapePart> parts;
+    parts.reserve(count);
+    std::array<double, 3> half{};
+    for (std::uint32_t index = 0; index < count; ++index) {
+        const auto *child = shapes.get(children[index]);
+        if (!child) return NKSIM_ERROR_INVALID_HANDLE;
+        if (child->desc.type == NKSIM_SHAPE_COMPOUND || child->desc.type == NKSIM_SHAPE_PLANE)
+            return NKSIM_ERROR_UNSUPPORTED;
+        BackendShapePart part{};
+        part.type = child->desc.type;
+        std::copy(std::begin(child->desc.parameters), std::end(child->desc.parameters),
+                  part.parameters.begin());
+        part.vertices = child->convex_vertices;
+        part.margin = child->margin;
+        part.gap = child->gap;
+        copy_surface(child->surface, part);
+        double quaternion_length = 0.0;
+        for (int axis = 0; axis < 3; ++axis) {
+            if (!std::isfinite(poses[index].position[axis])) return NKSIM_ERROR_INVALID_ARGUMENT;
+            part.position[axis] = poses[index].position[axis];
+        }
+        for (int axis = 0; axis < 4; ++axis) {
+            if (!std::isfinite(poses[index].rotation[axis])) return NKSIM_ERROR_INVALID_ARGUMENT;
+            part.rotation[axis] = poses[index].rotation[axis];
+            quaternion_length += part.rotation[axis] * part.rotation[axis];
+        }
+        if (quaternion_length < 1e-20) return NKSIM_ERROR_INVALID_ARGUMENT;
+        normalize_quaternion(part.rotation);
+        double radius = 0.0;
+        switch (part.type) {
+        case NKSIM_SHAPE_BOX:
+            radius = std::sqrt(part.parameters[0] * part.parameters[0] +
+                               part.parameters[1] * part.parameters[1] +
+                               part.parameters[2] * part.parameters[2]);
+            break;
+        case NKSIM_SHAPE_SPHERE: radius = part.parameters[0]; break;
+        case NKSIM_SHAPE_CAPSULE: radius = part.parameters[0] + part.parameters[1] * 0.5; break;
+        case NKSIM_SHAPE_CYLINDER:
+            radius = std::sqrt(part.parameters[0] * part.parameters[0] +
+                               0.25 * part.parameters[1] * part.parameters[1]);
+            break;
+        case NKSIM_SHAPE_CONVEX:
+            for (std::size_t vertex = 0; vertex < part.vertices.size(); vertex += 3) {
+                const double x = part.vertices[vertex], y = part.vertices[vertex + 1],
+                             z = part.vertices[vertex + 2];
+                radius = std::max(radius, std::sqrt(x*x + y*y + z*z));
+            }
+            break;
+        default: return NKSIM_ERROR_UNSUPPORTED;
+        }
+        for (int axis = 0; axis < 3; ++axis)
+            half[axis] = std::max(half[axis], std::abs(part.position[axis]) + radius);
+        parts.push_back(std::move(part));
+    }
+    auto [handle, shape] = shapes.create();
+    if (!shape) return NKSIM_ERROR_OUT_OF_MEMORY;
+    shape->handle = handle;
+    shape->desc.struct_size = sizeof(shape->desc);
+    shape->desc.type = NKSIM_SHAPE_COMPOUND;
+    for (int axis = 0; axis < 3; ++axis) shape->desc.parameters[axis] = half[axis];
+    shape->parts = std::move(parts);
+    *out_shape = handle;
+    return NKSIM_OK;
+}
+
+nksim_result World::set_shape_contact(nksim_shape shape_handle, double margin, double gap) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!std::isfinite(margin) || !std::isfinite(gap) || margin < 0.0 || gap < 0.0)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    auto *shape = shapes.get(shape_handle);
+    if (!shape) return NKSIM_ERROR_INVALID_HANDLE;
+    bool in_use = false;
+    bodies.for_each([&](nksim_body, const Body &body) { in_use |= body.desc.shape == shape_handle; });
+    if (in_use) return NKSIM_ERROR_INVALID_STATE;
+    shape->margin = margin;
+    shape->gap = gap;
+    for (auto &part : shape->parts) { part.margin = margin; part.gap = gap; }
+    return NKSIM_OK;
+}
+
+nksim_result World::set_shape_surface(nksim_shape shape_handle, const nksim_surface &surface) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!valid_struct_size(surface.struct_size, sizeof(surface)) ||
+        (surface.friction_dimensions != 0 && surface.friction_dimensions != 1 &&
+         surface.friction_dimensions != 3 && surface.friction_dimensions != 4 &&
+         surface.friction_dimensions != 6) ||
+        !std::isfinite(surface.contact_time_constant) || surface.contact_time_constant < 0.0 ||
+        !std::isfinite(surface.contact_damping_ratio) || surface.contact_damping_ratio < 0.0 ||
+        surface.contact_filter > NKSIM_CONTACT_PAIRS_AND_ENVIRONMENT)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    for (const double value : surface.friction)
+        if (!std::isfinite(value) || value < 0.0) return NKSIM_ERROR_INVALID_ARGUMENT;
+    auto *shape = shapes.get(shape_handle);
+    if (!shape) return NKSIM_ERROR_INVALID_HANDLE;
+    bool in_use = false;
+    bodies.for_each([&](nksim_body, const Body &body) { in_use |= body.desc.shape == shape_handle; });
+    if (in_use) return NKSIM_ERROR_INVALID_STATE;
+    shape->surface = surface;
+    for (auto &part : shape->parts) copy_surface(surface, part);
+    return NKSIM_OK;
+}
+
+nksim_result World::create_contact_pair(const nksim_contact_pair_desc &desc) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!valid_struct_size(desc.struct_size, sizeof(desc)) || desc.body_a == desc.body_b)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto *body_a = bodies.get(desc.body_a);
+    const auto *body_b = bodies.get(desc.body_b);
+    if (!body_a || !body_b) return NKSIM_ERROR_INVALID_HANDLE;
+    const auto part_count = [&](const Body &body) -> std::size_t {
+        const auto *shape = shapes.get(body.desc.shape);
+        if (!shape) return 0;
+        return shape->desc.type == NKSIM_SHAPE_COMPOUND ? shape->parts.size() : 1;
+    };
+    if (desc.part_a >= part_count(*body_a) || desc.part_b >= part_count(*body_b))
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    BackendContactPair pair{};
+    pair.body_a = body_a->backend_body;
+    pair.part_a = desc.part_a;
+    pair.body_b = body_b->backend_body;
+    pair.part_b = desc.part_b;
+    copy_surface(desc.surface, pair.surface);
+    return backend->contact_pair_create(pair);
 }
 
 nksim_result World::destroy_shape(nksim_shape shape) {
@@ -654,10 +840,22 @@ nksim_result World::create_body(const nksim_body_desc &desc, nksim_body *out_bod
     std::copy_n(desc.center_of_mass, 3, backend_desc.center_of_mass.begin());
     std::copy_n(desc.inertia_tensor, 9, backend_desc.inertia_tensor.begin());
     if (shape) {
-        backend_desc.shape_type = shape->desc.type;
+        backend_desc.shape_type = shape->desc.type == NKSIM_SHAPE_COMPOUND
+            ? NKSIM_SHAPE_BOX : shape->desc.type;
         backend_desc.shape_vertices = shape->convex_vertices;
         std::copy(std::begin(shape->desc.parameters), std::end(shape->desc.parameters),
                   backend_desc.shape_parameters.begin());
+        if (shape->desc.type == NKSIM_SHAPE_COMPOUND) backend_desc.shape_parts = shape->parts;
+        else {
+            BackendShapePart part{};
+            part.type = shape->desc.type;
+            part.parameters = backend_desc.shape_parameters;
+            part.vertices = shape->convex_vertices;
+            part.margin = shape->margin;
+            part.gap = shape->gap;
+            copy_surface(shape->surface, part);
+            backend_desc.shape_parts.push_back(std::move(part));
+        }
     }
     std::uint64_t backend_body = 0;
     result = backend->body_create(backend_desc, &backend_body);
@@ -721,6 +919,19 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     // bodies kinematically in the backend; pull every body/joint's resulting
     // state back so an immediate get_body_state/get_joint_state observes it,
     // not just the next step().
+    return pull_backend_state();
+}
+
+nksim_result World::set_joint_state(nksim_joint joint, double position, double velocity) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    if (!std::isfinite(position) || !std::isfinite(velocity)) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto *value = joints.get(joint);
+    if (!value) return NKSIM_ERROR_INVALID_HANDLE;
+    if (value->desc.type == NKSIM_JOINT_FIXED) return NKSIM_ERROR_UNSUPPORTED;
+    const auto result = backend->joint_set_state(value->backend_joint, position, velocity);
+    if (result != NKSIM_OK) return result;
+    // Pull every body the joint carries, as set_body_state does, so reads
+    // before the next step observe the new pose.
     return pull_backend_state();
 }
 
@@ -828,7 +1039,7 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     joint->desc.max_force = desc.max_force;
     joint->desc.rotation_a[3] = 1.0; // identity default for legacy-sized callers
     joint->desc.rotation_b[3] = 1.0;
-    if (desc.struct_size >= sizeof(nksim_joint_desc)) {
+    if (desc.struct_size >= offsetof(nksim_joint_desc, rotation_b) + sizeof(desc.rotation_b)) {
         std::copy(std::begin(desc.rotation_a), std::end(desc.rotation_a), std::begin(joint->desc.rotation_a));
         std::copy(std::begin(desc.rotation_b), std::end(desc.rotation_b), std::begin(joint->desc.rotation_b));
     }
@@ -862,6 +1073,32 @@ nksim_result World::create_joint(const nksim_joint_desc &desc, nksim_joint *out_
     backend_desc.max_force = joint->desc.max_force;
     std::copy(std::begin(joint->desc.rotation_a), std::end(joint->desc.rotation_a), backend_desc.rotation_a.begin());
     std::copy(std::begin(joint->desc.rotation_b), std::end(joint->desc.rotation_b), backend_desc.rotation_b.begin());
+    if (desc.struct_size >= offsetof(nksim_joint_desc, friction_loss) + sizeof(desc.friction_loss)) {
+        if (!std::isfinite(desc.armature) || !std::isfinite(desc.damping) ||
+            !std::isfinite(desc.friction_loss) || desc.armature < 0.0 || desc.damping < 0.0 ||
+            desc.friction_loss < 0.0) {
+            joints.remove(handle);
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        }
+        joint->desc.armature = backend_desc.armature = desc.armature;
+        joint->desc.damping = backend_desc.damping = desc.damping;
+        joint->desc.friction_loss = backend_desc.friction_loss = desc.friction_loss;
+    }
+    if (desc.struct_size >= offsetof(nksim_joint_desc, limit_impedance) + sizeof(desc.limit_impedance)) {
+        bool valid = std::isfinite(desc.limit_time_constant) && desc.limit_time_constant >= 0.0 &&
+            std::isfinite(desc.limit_damping_ratio) && desc.limit_damping_ratio >= 0.0;
+        for (const double value : desc.limit_impedance) valid = valid && std::isfinite(value);
+        if (!valid) {
+            joints.remove(handle);
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        }
+        joint->desc.limit_time_constant = backend_desc.limit_time_constant = desc.limit_time_constant;
+        joint->desc.limit_damping_ratio = backend_desc.limit_damping_ratio = desc.limit_damping_ratio;
+        std::copy(std::begin(desc.limit_impedance), std::end(desc.limit_impedance),
+                  std::begin(joint->desc.limit_impedance));
+        std::copy(std::begin(desc.limit_impedance), std::end(desc.limit_impedance),
+                  backend_desc.limit_impedance.begin());
+    }
     std::uint64_t backend_joint = 0;
     const auto result = backend->joint_create(backend_desc, &backend_joint);
     if (result != NKSIM_OK) {
@@ -941,10 +1178,19 @@ nksim_result World::get_joint_state(nksim_joint joint, nksim_joint_state *out_st
 
 namespace nksim {
 
-nksim_result create_world_with_backend(const nksim_world_desc &desc,
+nksim_result create_world_with_backend(const nksim_world_desc &provided,
                                        std::unique_ptr<PhysicsBackend> backend,
                                        nksim_world *out_world) {
-    if (!out_world || !valid_struct_size(desc.struct_size, sizeof(desc)) ||
+    // The integrator and friction cone are an optional tail: copy only the
+    // caller's prefix so older callers get zero, the backend default.
+    if (!valid_struct_size(provided.struct_size, offsetof(nksim_world_desc, integrator)))
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    nksim_world_desc desc{};
+    std::memcpy(&desc, &provided, std::min<std::size_t>(provided.struct_size, sizeof(desc)));
+    desc.struct_size = sizeof(desc);
+    if (desc.integrator > NKSIM_INTEGRATOR_RK4 || desc.friction_cone > NKSIM_FRICTION_CONE_ELLIPTIC)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    if (!out_world ||
         !finite_positive(desc.fixed_timestep) || desc.physics_substeps == 0 ||
         !std::isfinite(desc.gravity[0]) || !std::isfinite(desc.gravity[1]) ||
         !std::isfinite(desc.gravity[2]))
@@ -973,7 +1219,7 @@ nksim_result NKSIM_CALL nksim_world_create(const nksim_world_desc *desc,
                                            nksim_world *out_world) {
     if (!desc || !out_world)
         return NKSIM_ERROR_INVALID_ARGUMENT;
-    if (!nksim::valid_struct_size(desc->struct_size, sizeof(*desc)) ||
+    if (!nksim::valid_struct_size(desc->struct_size, offsetof(nksim_world_desc, integrator)) ||
         !nksim::finite_positive(desc->fixed_timestep) || desc->physics_substeps == 0 ||
         !std::isfinite(desc->gravity[0]) || !std::isfinite(desc->gravity[1]) ||
         !std::isfinite(desc->gravity[2]))
@@ -1034,6 +1280,12 @@ nksim_result NKSIM_CALL nksim_world_snapshot(nksim_world world, nksim_snapshot *
         return NKSIM_ERROR_OUT_OF_MEMORY;
     *out_snapshot = handle;
     return NKSIM_OK;
+}
+
+nksim_result NKSIM_CALL nksim_world_get_contacts(nksim_world world,
+    nksim_contact *out, uint32_t capacity, uint32_t *out_count) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->contacts(out, capacity, out_count) : NKSIM_ERROR_INVALID_HANDLE;
 }
 
 } // extern "C"

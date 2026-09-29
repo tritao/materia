@@ -47,16 +47,17 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         // an active buffered trajectory into a short position-target ramp;
         // this branch handles direct velocity/effort targets that have no
         // runtime trajectory to ramp.
-        // Position-held joints keep their current, already rate-limited
-        // reference, which is where they stop; never-commanded joints stay
-        // passive.
+        // Position- and servo-held joints keep their current, already
+        // rate-limited reference, which is where they stop; never-commanded
+        // joints stay passive.
         stopped_ = false;
         pending_targets_.clear();
         const auto staged = staged_commands();
         for (std::size_t index = 0; index < joints_.size(); ++index) {
             if (index >= actuated_joints_.size() || !actuated_joints_[index] ||
                 staged[index].mode == 0 ||
-                staged[index].mode == NKSIM_JOINT_TARGET_POSITION)
+                staged[index].mode == NKSIM_JOINT_TARGET_POSITION ||
+                staged[index].mode == NKSIM_JOINT_TARGET_SERVO)
                 continue;
             queue_velocity_hold(index);
         }
@@ -85,6 +86,13 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
         target.mode = source.mode;
         target.target = source.target;
         target.max_force = source.max_effort;
+        if (source.mode == RK_TARGET_SERVO) {
+            const auto &servo = command.servos[index];
+            target.velocity = servo.velocity;
+            target.stiffness = servo.stiffness;
+            target.damping = servo.damping;
+            target.feedforward = servo.feedforward;
+        }
         pending_targets_.push_back(target);
         staged[source.joint] = {source.mode, source.target};
     }
@@ -102,21 +110,23 @@ std::vector<nksim_joint_target> SimulationRobot::take_pending_targets() {
 }
 
 rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) {
-    if (simulation_.snapshot_ == 0)
+    const auto snapshot = nksim_session_latest_snapshot(simulation_.session_);
+    nksim_session_status status{};
+    status.struct_size = sizeof(status);
+    if (snapshot == 0 || nksim_session_get_status(simulation_.session_, &status) != NKSIM_OK)
         return RK_ERROR_INVALID_STATE;
     state.struct_size = sizeof(state);
-    state.source_timestamp_ns = static_cast<uint64_t>(
-        simulation_.simulation_time_ * 1'000'000'000.0);
+    state.source_timestamp_ns = static_cast<uint64_t>(status.simulation_time * 1'000'000'000.0);
     state.joint_count = static_cast<uint32_t>(joints_.size());
     for (uint32_t index = 0; index < state.joint_count; ++index)
         state.position[index] = state.velocity[index] = state.effort[index] = 0.0;
     uint64_t count = 0;
-    if (nksim_snapshot_get_joint_count(simulation_.snapshot_, &count) != NKSIM_OK)
+    if (nksim_snapshot_get_joint_count(snapshot, &count) != NKSIM_OK)
         return RK_ERROR_BACKEND;
     for (uint64_t index = 0; index < count; ++index) {
         nksim_joint_state source{};
         source.struct_size = sizeof(source);
-        if (nksim_snapshot_get_joint(simulation_.snapshot_, index, &source) != NKSIM_OK)
+        if (nksim_snapshot_get_joint(snapshot, index, &source) != NKSIM_OK)
             return RK_ERROR_BACKEND;
         for (uint32_t target = 0; target < state.joint_count; ++target) {
             if (source.joint == joints_[target]) {
@@ -129,15 +139,15 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
     }
     // All measurements use the same immutable physics snapshot as encoders.
     uint64_t body_count = 0;
-    if (nksim_snapshot_get_body_count(simulation_.snapshot_, &body_count) != NKSIM_OK)
+    if (nksim_snapshot_get_body_count(snapshot, &body_count) != NKSIM_OK)
         return RK_ERROR_BACKEND;
     std::vector<nksim_body_state> bodies(body_count);
     for (uint64_t index = 0; index < body_count; ++index) {
         bodies[index].struct_size = sizeof(nksim_body_state);
-        if (nksim_snapshot_get_body(simulation_.snapshot_, index, &bodies[index]) != NKSIM_OK)
+        if (nksim_snapshot_get_body(snapshot, index, &bodies[index]) != NKSIM_OK)
             return RK_ERROR_BACKEND;
     }
-    const double now = simulation_.simulation_time_;
+    const double now = status.simulation_time;
     state.sensor_count = static_cast<uint32_t>(sensors_.size());
     for (uint32_t slot = 0; slot < sensors_.size(); ++slot) {
         auto &sensor = sensors_[slot];
@@ -185,14 +195,24 @@ rk_result SimulationRobot::sample(uint64_t timestamp_ns, rk_robot_state &state) 
                     const double local[3] = {std::cos(angle), std::sin(angle), 0.0};
                     double direction[3];
                     sensors::rotate(rotation, local, direction);
+                    // Session objects and actors (props, people) by their own
+                    // shapes; other robots' links as their 10 cm boxes.
+                    nksim_ray cast{};
+                    cast.struct_size = sizeof(cast);
+                    std::copy_n(origin, 3, cast.origin);
+                    std::copy_n(direction, 3, cast.direction);
+                    cast.max_distance = config.max_range;
                     double range = config.max_range;
+                    if (nksim_session_raycast(simulation_.session_, &cast, &range) != NKSIM_OK)
+                        return RK_ERROR_BACKEND;
+                    const double robot_extents[3] = {0.05, 0.05, 0.05};
                     for (const auto &body : bodies) {
-                        if (std::find(bodies_.begin(), bodies_.end(), body.body) != bodies_.end()) continue;
-                        const double robot_extents[3] = {0.05, 0.05, 0.05};
-                        const double *extents = robot_extents;
-                        for (const auto &object : simulation_.objects_)
-                            if (object.active && object.body == body.body) { extents = object.half_extents; break; }
-                        range = sensors::ray_box(origin, direction, body.position, body.rotation, extents, range);
+                        if (std::find(bodies_.begin(), bodies_.end(), body.body) != bodies_.end() ||
+                            std::find(simulation_.bodies_.begin(), simulation_.bodies_.end(),
+                                      body.body) == simulation_.bodies_.end())
+                            continue;
+                        range = sensors::ray_box(origin, direction, body.position, body.rotation,
+                                                 robot_extents, range);
                     }
                     sample.values[ray] = range;
                 }

@@ -1,0 +1,51 @@
+<!-- Sim-to-sim conformance fixture (robotkit/plans/HUMANOID.md, HU-D5): a
+     floating torso on two two-joint legs that falls onto a floor box while
+     every joint is driven by a known torque sequence. It uses joint armature,
+     damping and friction loss, sphere, capsule, cylinder and box geometry,
+     the implicit-fast integrator and a 2 ms physics step. Geoms keep MuJoCo's
+     default surface, which the RobotKit ground plane also has. Geoms that are not
+     parent and child do not overlap at rest, so no collision exclusions
+     beyond MuJoCo's parent-child rule apply. -->
+<mujoco model="conformance-biped">
+  <option timestep="0.002" integrator="implicitfast"/>
+  <default>
+    <joint damping="0.2" armature="0.005" frictionloss="0.05" range="-2 2"/>
+    <motor gear="1"/>
+  </default>
+  <worldbody>
+    <geom name="floor" type="plane" size="0 0 1"/>
+    <body name="torso" pos="0 0 0.8">
+      <freejoint name="root"/>
+      <inertial pos="0 0 0.05" mass="8" diaginertia="0.12 0.1 0.06"/>
+      <geom type="box" size="0.12 0.16 0.12"/>
+      <body name="left_thigh" pos="0 0.1 -0.15">
+        <inertial pos="0 0 -0.14" mass="2" diaginertia="0.02 0.02 0.004"/>
+        <joint name="left_hip" axis="0 1 0"/>
+        <geom type="capsule" size="0.04" fromto="0 0.02 -0.05 0 0.02 -0.26"/>
+        <body name="left_shin" pos="0 0 -0.3">
+          <inertial pos="0 0 -0.13" mass="1.2" diaginertia="0.012 0.012 0.002"/>
+          <joint name="left_knee" axis="0 1 0" range="0 2.4"/>
+          <geom type="cylinder" size="0.035 0.1" pos="0 0.02 -0.14"/>
+          <geom type="sphere" size="0.04" pos="0.02 0.02 -0.26"/>
+        </body>
+      </body>
+      <body name="right_thigh" pos="0 -0.1 -0.15">
+        <inertial pos="0 0 -0.14" mass="2" diaginertia="0.02 0.02 0.004"/>
+        <joint name="right_hip" axis="0 1 0"/>
+        <geom type="capsule" size="0.04" fromto="0 -0.02 -0.05 0 -0.02 -0.26"/>
+        <body name="right_shin" pos="0 0 -0.3">
+          <inertial pos="0 0 -0.13" mass="1.2" diaginertia="0.012 0.012 0.002"/>
+          <joint name="right_knee" axis="0 1 0" range="0 2.4"/>
+          <geom type="cylinder" size="0.035 0.1" pos="0 -0.02 -0.14"/>
+          <geom type="sphere" size="0.04" pos="0.02 -0.02 -0.26"/>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <motor name="left_hip" joint="left_hip"/>
+    <motor name="left_knee" joint="left_knee"/>
+    <motor name="right_hip" joint="right_hip"/>
+    <motor name="right_knee" joint="right_knee"/>
+  </actuator>
+</mujoco>

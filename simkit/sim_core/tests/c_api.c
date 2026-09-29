@@ -20,6 +20,9 @@ int main(void) {
     clock.struct_size = sizeof(clock);
     assert(nksim_world_get_clock(world, &clock) == NKSIM_OK);
     assert(clock.step_index == 0);
+    uint32_t contact_count = 99;
+    assert(nksim_world_get_contacts(world, 0, 0, &contact_count) == NKSIM_OK);
+    assert(contact_count == 0);
 
     nksim_step_result step = {0};
     step.struct_size = sizeof(step);
@@ -35,6 +38,7 @@ int main(void) {
     assert(nksim_host_create(&host_desc, &host) == NKSIM_OK);
     assert(nksim_host_start(host) == NKSIM_OK);
     assert(nksim_world_get_clock(world, &clock) == NKSIM_ERROR_WRONG_THREAD);
+    assert(nksim_world_get_contacts(world, 0, 0, &contact_count) == NKSIM_ERROR_WRONG_THREAD);
     assert(nksim_host_get_clock(host, &clock) == NKSIM_OK);
     assert(clock.step_index == 1);
     step = (nksim_step_result){0};

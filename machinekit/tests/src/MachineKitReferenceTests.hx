@@ -4,6 +4,9 @@ import machinekit.motion.LinearBearing;
 import machinekit.motion.LinearRailSystem;
 import machinekit.motion.NemaStepper;
 import machinekit.motion.PillowBlock;
+import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
+import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
+import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
 import machinekit.robotics.RobotFlange;
 import machinekit.standard.DeepGrooveBearing;
 import machinekit.standard.FlatWasher;
@@ -23,6 +26,22 @@ class MachineKitReferenceTests {
 	}
 
 	public static function run():Void {
+		var cup = SchmalzSuctionCup.catalog().get("10.01.01.11401");
+		equal(cup.envelopeDiameterMm, 46, "Schmalz SAF 40 outside diameter");
+		equal(cup.heightMm, 22, "Schmalz SAF 40 height");
+		equal(cup.massKg, 0.0136, "Schmalz SAF 40 mass");
+		equal(cup.theoreticalForceAt60KpaN, 69, "Schmalz SAF 40 theoretical force");
+		var ejector = SchmalzVacuumGenerator.catalog().get("10.02.01.00563");
+		equal(ejector.degreeOfEvacuationPercent, 85, "Schmalz SBP evacuation");
+		equal(ejector.massKg, 0.0075, "Schmalz SBP mass");
+		equal(ejector.airConsumptionLMin, 13.5, "Schmalz SBP air use");
+		var fitting = SchmalzPushInFitting.catalog().get("10.08.02.00203");
+		equal(fitting.tubeOdMm, 4, "Schmalz fitting hose diameter");
+		equal(fitting.massKg, 0.015, "Schmalz fitting mass");
+		if (SchmalzSuctionCup.catalog().metadata(cup.designation).source.indexOf("schmalz") < 0 ||
+			SchmalzVacuumGenerator.catalog().metadata(ejector.designation).source.indexOf("schmalz") < 0 ||
+			SchmalzPushInFitting.catalog().metadata(fitting.designation).source.indexOf("schmalz") < 0)
+			throw "Schmalz catalog rows need manufacturer provenance";
 		// The 608 preview is an approximation of a catalog bearing (about 12 g).
 		near(DeepGrooveBearing.metric("608").massProperties().mass, 0.012, 0.0018,
 			"608 preview mass");

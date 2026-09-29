@@ -5,12 +5,6 @@ import NativeKitSim;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 
-typedef SimWorldOptions = {
-    ?timestep:Float,
-    ?physicsSubsteps:Int,
-    ?gravity:Array<Float>
-};
-
 /** Thin typed Haxeon façade over an explicitly stepped simulation world. */
 class SimWorld {
     final scene:Scene;
@@ -45,6 +39,13 @@ class SimWorld {
             throw "Simulation gravity must contain three values";
         for (index in 0...3)
             desc.set_gravity(index, gravity[index]);
+        if (options != null) {
+            if (options.integrator != null) desc.set_integrator(options.integrator);
+            if (options.frictionCone != null) desc.set_friction_cone(options.frictionCone);
+            if (options.solverIterations != null) desc.set_solver_iterations(options.solverIterations);
+            if (options.lineSearchIterations != null)
+                desc.set_line_search_iterations(options.lineSearchIterations);
+        }
         return desc;
     }
 
@@ -52,7 +53,7 @@ class SimWorld {
     static function fromNativeOwner(scene:Scene, owner:Ownednksim_world):SimWorld
         return new SimWorld(scene, null, owner);
 
-    @:allow(MujocoSimWorld)
+    @:allow(MujocoSimWorld, SimSession, SimObject, SimActor, SimFrame)
     static function check(status:Int, operation:String):Void {
         if (status != NativeKitSimConstants.NKSIM_OK)
             throw '$operation failed with NativeKit simulation status $status';

@@ -22,6 +22,7 @@ import sys.thread.Mutex;
  * simulation so all robots observe one physics tick.
  */
 class RobotRuntime {
+  @:allow(robotkit.runtime.Simulation)
   final owner:Ownedrk_robot_runtime;
   final defaultMaxRates:Array<Float>;
   final defaultMaxEfforts:Array<Float>;
@@ -31,6 +32,8 @@ class RobotRuntime {
   final externalMutex = new Mutex();
   final externalFrames:Map<String, SensorFrame> = new Map();
   var disposed:Bool = false;
+  @:allow(robotkit.runtime.Simulation)
+  var simulation:Null<Simulation>;
 
   @:allow(robotkit.runtime.Simulation)
   private function new(owner:Ownedrk_robot_runtime, blueprint:RobotRuntimeBlueprint) {
@@ -40,6 +43,22 @@ class RobotRuntime {
     sensorLayout = blueprint.nativeSensorLayout();
     channels = blueprint.channels.copy();
     externalSensorLayout = blueprint.externalSensorLayout();
+  }
+
+  /** Contacts from the latest simulation tick. Standalone runtimes have none. */
+  public function contacts():Array<RobotContact> {
+    if (simulation == null) return [];
+    return simulation.robotContacts(this);
+  }
+
+  /** Inactive proximity contacts on attached tool pieces. */
+  public function toolProximity():Array<RobotContact>
+    return contacts().filter(contact -> contact.toolPieceIndex >= 0 && !contact.active);
+
+  public function hasExternalSensor(id:String, kind:String):Bool {
+    for (sensor in externalSensorLayout)
+      if (sensor.id == id && sensor.kind == kind) return true;
+    return false;
   }
 
   /** Creates a standalone in-memory runtime with its own worker lifecycle. */
@@ -127,7 +146,16 @@ class RobotRuntime {
         case robotkit.world.JointTargetMode.Position: RobotKitRuntimeConstants.RK_TARGET_POSITION;
         case robotkit.world.JointTargetMode.Velocity: RobotKitRuntimeConstants.RK_TARGET_VELOCITY;
         case robotkit.world.JointTargetMode.Effort: RobotKitRuntimeConstants.RK_TARGET_EFFORT;
+        case robotkit.world.JointTargetMode.Servo: RobotKitRuntimeConstants.RK_TARGET_SERVO;
       });
+      if (targetValue.mode == robotkit.world.JointTargetMode.Servo) {
+        var servo = new rk_joint_servo();
+        servo.set_velocity(targetValue.servoVelocity);
+        servo.set_stiffness(targetValue.stiffness);
+        servo.set_damping(targetValue.damping);
+        servo.set_feedforward(targetValue.feedforward);
+        command.set_servos(index, servo);
+      }
       target.set_target(targetValue.target);
       target.set_max_rate(targetValue.joint < defaultMaxRates.length
         ? defaultMaxRates[targetValue.joint] : 0.0);
@@ -379,6 +407,13 @@ class RobotRuntime {
    */
   public function publishSensorFrame(sensorId:String, values:Array<Float>, sequence:Int64,
       sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):Void {
+    publishSensorFrameAndGet(sensorId, values, sequence, sourceTimestampNs,
+      sourceClockId, image);
+  }
+
+  /** Publish and return the exact frame retained by the runtime snapshot. */
+  public function publishSensorFrameAndGet(sensorId:String, values:Array<Float>, sequence:Int64,
+      sourceTimestampNs:Int64, sourceClockId:String, ?image:CameraImage):SensorFrame {
     ensureLive();
     if (sensorId == null || sensorId.length == 0 || values == null || sequence == null ||
         Int64.compare(sequence, Int64.ofInt(0)) <= 0 || sourceTimestampNs == null ||
@@ -420,12 +455,14 @@ class RobotRuntime {
     }
     externalFrames.set(sensorId, frame);
     externalMutex.release();
+    return frame;
   }
 
   /** Publishes one camera image; see `publishSensorFrame`. */
   public function publishCameraFrame(sensorId:String, image:CameraImage, sequence:Int64,
-      sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified"):Void
+      sourceTimestampNs:Int64, ?sourceClockId:String = "unspecified"):Void {
     publishSensorFrame(sensorId, [], sequence, sourceTimestampNs, sourceClockId, image);
+  }
 
   public function dispose():Void {
     if (disposed)

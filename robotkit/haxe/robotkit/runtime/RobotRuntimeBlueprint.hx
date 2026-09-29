@@ -26,6 +26,18 @@ class RobotRuntimeBlueprint {
   public var collisionApproximation:Int = RobotKitRuntimeConstants.RK_COLLISION_APPROXIMATION_BOUNDS_BOX;
   /** MuJoCo self-collision is enabled unless this opt-out is set false. */
   public var selfCollision:Bool = true;
+  /** Primitive link collision shapes, in link order; Simulation collides through them. */
+  public final linkCollisionShapes:Array<RobotRuntimeLinkShape> = [];
+  /** Explicit contacts between linkCollisionShapes entries, by index. */
+  public final contactPairs:Array<RobotRuntimeContactPair> = [];
+  /**
+   * How far an observed position may pass a joint limit before the runtime
+   * faults; zero keeps limits exact. Legged robots resting on compliant stops
+   * need a small tolerance.
+   */
+  public var observedLimitTolerance:Float = 0.0;
+  /** True makes the root link a free six-DOF body in Simulation. */
+  public var floatingBase:Bool = false;
   /** Zero uses two owner periods. */
   public var commitLeadNs:haxe.Int64 = haxe.Int64.ofInt(0);
   /** Zero uses the runtime's 10 ms owner period. */
@@ -145,15 +157,53 @@ class RobotRuntimeBlueprint {
     value.set_frame_count(frameCount);
     value.set_collision_approximation(collisionApproximation);
     value.set_self_collision(selfCollision ? 1 : 2);
+    value.set_floating_base(floatingBase ? 1 : 0);
+    if (!Math.isFinite(observedLimitTolerance) || observedLimitTolerance < 0.0)
+      throw "Observed limit tolerance must be finite and non-negative";
+    value.set_observed_limit_tolerance(observedLimitTolerance);
     var layout = nativeSensorLayout();
     if (layout.length > RobotKitRuntimeConstants.RK_MAX_SENSORS) throw "Too many sensors";
     value.set_sensor_count(layout.length);
     for (i in 0...layout.length) value.set_sensors(i, layout[i].nativeValue());
-    for (index in 0...joints.length)
-      value.set_joints(index, joints[index].nativeValue());
+    for (index in 0...joints.length) {
+      var joint = joints[index];
+      value.set_joints(index, joint.nativeValue());
+      var dynamics = new rk_robot_joint_dynamics();
+      dynamics.set_armature(joint.armature);
+      dynamics.set_damping(joint.damping);
+      dynamics.set_friction_loss(joint.frictionLoss);
+      dynamics.set_limit_time_constant(joint.limitTimeConstant);
+      dynamics.set_limit_damping_ratio(joint.limitDampingRatio);
+      for (term in 0...5) dynamics.set_limit_impedance(term, joint.limitImpedance[term]);
+      value.set_joint_dynamics(index, dynamics);
+    }
     if (links.length != linkCount) throw "RobotKit runtime blueprint is missing link physical properties";
     for (index in 0...links.length) value.set_links(index, links[index].nativeValue());
     return value;
   }
 
+}
+
+/** One primitive collision shape on the link at a runtime link index. */
+class RobotRuntimeLinkShape {
+  public final link:Int;
+  public final shape:robotkit.model.CollisionShape;
+
+  public function new(link:Int, shape:robotkit.model.CollisionShape) {
+    this.link = link;
+    this.shape = shape;
+  }
+}
+
+/** An explicit contact between two entries of linkCollisionShapes. */
+class RobotRuntimeContactPair {
+  public final shapeA:Int;
+  public final shapeB:Int;
+  public final surface:robotkit.model.CollisionShape.ContactSurface;
+
+  public function new(shapeA:Int, shapeB:Int, surface:robotkit.model.CollisionShape.ContactSurface) {
+    this.shapeA = shapeA;
+    this.shapeB = shapeB;
+    this.surface = surface;
+  }
 }

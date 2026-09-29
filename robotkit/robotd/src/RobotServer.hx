@@ -14,7 +14,7 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotSnapshot;
 import robotkit.runtime.RobotSnapshotMailbox;
 import robotkit.runtime.RobotRuntime;
-import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.behavior.RobotBehavior;
 import robotkit.behavior.RobotBehaviorRunner;
 import robotkit.protocol.ControlHeartbeat;
@@ -54,7 +54,7 @@ class RobotServer {
   final robot:RobotModel;
   final blueprint:RobotRuntimeBlueprint;
   final runtime:RobotRuntime;
-  final simulation:Null<Simulation>;
+  final simulation:Null<SimulationHarness>;
   final nativeRuntime:NativeKitRuntime;
   final listener:OwnedListenerHandle;
   final port:Int;
@@ -86,7 +86,7 @@ class RobotServer {
   var disposed:Bool = false;
 
   public function new(robot:RobotModel, blueprint:RobotRuntimeBlueprint, runtime:RobotRuntime,
-      simulation:Null<Simulation>, port:Int, robotId:Int, ?behavior:RobotBehavior,
+      simulation:Null<SimulationHarness>, port:Int, robotId:Int, ?behavior:RobotBehavior,
       ?listenAddress:String = "127.0.0.1") {
     this.robot = robot;
     this.blueprint = blueprint;

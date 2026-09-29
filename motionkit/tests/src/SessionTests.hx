@@ -86,6 +86,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
@@ -123,7 +124,8 @@ class SessionTests extends MotionKitTestSupport {
   public function testNormalAbortWaitsForRest():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.05, 0.2);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("abort-replacement", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -137,7 +139,7 @@ class SessionTests extends MotionKitTestSupport {
     var tick = 0;
     for (_ in 0...5) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
     }
     check(runtime.snapshot().trajectoryActive,
       "abort replacement test starts with a running native trajectory");
@@ -158,7 +160,7 @@ class SessionTests extends MotionKitTestSupport {
     while (runtime.snapshot().trajectoryActive ||
         runtime.snapshot().sessionState == RobotKitRuntimeConstants.RK_SESSION_STOPPING) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       stopTicks++;
       if (stopTicks > 500) throw "normal abort did not settle";
     }
@@ -180,10 +182,10 @@ class SessionTests extends MotionKitTestSupport {
     near(cast(replacement, Trajectory).evaluate(
       cast(replacement, Trajectory).durationSeconds()).positions[0], 0.01,
       "deferred replacement uses targets captured before caller mutation", 1e-5);
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.025,
       "queued move uses targets captured before the caller mutates its array", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   /** Exercise the MotionSession transition table through a virtual runtime. */
@@ -308,7 +310,8 @@ class SessionTests extends MotionKitTestSupport {
   public function testRuntimeSynchronizedHolding():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.2);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("runtime-synchronized-hold", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
@@ -321,7 +324,7 @@ class SessionTests extends MotionKitTestSupport {
     var previousProgress = machine.progress();
     for (_ in 0...8) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       var progress = machine.progress();
       check(progress + 1e-9 >= previousProgress,
         "runtime-synchronized progress never moves backwards");
@@ -340,7 +343,7 @@ class SessionTests extends MotionKitTestSupport {
       var stopTicks = 0;
       while (runtime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
         check(!machine.update(), "held motion does not submit host-clock samples");
-        simulation.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
         stopTicks += 1;
         if (stopTicks > 200) throw "runtime stop did not settle";
       }
@@ -348,7 +351,7 @@ class SessionTests extends MotionKitTestSupport {
       machine.resume();
       while (machine.isHolding()) {
         machine.update();
-        simulation.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
         stopTicks += 1;
         if (stopTicks > 400) throw "held motion did not resume";
       }
@@ -359,7 +362,7 @@ class SessionTests extends MotionKitTestSupport {
       previousProgress = machine.progress();
       for (_ in 0...4) {
         machine.update();
-        simulation.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
         var progress = machine.progress();
         check(progress + 1e-9 >= previousProgress,
           "progress remains monotonic after resuming");
@@ -368,17 +371,18 @@ class SessionTests extends MotionKitTestSupport {
     }
     while (machine.isMoving()) {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (tick > 2000) throw "held trajectory did not complete";
     }
     check(!machine.isHolding() && machine.queueDepth() == 0,
       "repeated hold/resume leaves no buffered motion");
     near(robot.snapshot().positions.get(0), 0.06,
       "repeated hold/resume reaches the planned endpoint", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
 
     var queuedBlueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.2);
-    var queuedSimulation = new Simulation(0.01);
+    var queuedSimulationHarness = new SimulationHarness(0.01);
+    var queuedSimulation = queuedSimulationHarness.simulation;
     var queuedRuntime = queuedSimulation.addRobot(queuedBlueprint.runtime);
     var queuedRobot = new SimulatedRobot("queued-hold", queuedRuntime,
       queuedBlueprint.model.name, [for (link in queuedBlueprint.model.links) link.name],
@@ -396,32 +400,33 @@ class SessionTests extends MotionKitTestSupport {
     while (Int64.compare(queuedRuntime.snapshot().trajectoryTag, firstTag) == 0 ||
         Int64.compare(queuedRuntime.snapshot().trajectoryTag, Int64.ofInt(0)) == 0) {
       queuedMachine.update();
-      queuedSimulation.step(Int64.ofInt(tick++));
+      queuedSimulationHarness.step(Int64.ofInt(tick++));
       if (tick > 2000) throw "queued trajectory did not reach its second move";
     }
     queuedMachine.hold();
     while (queuedRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       queuedMachine.update();
-      queuedSimulation.step(Int64.ofInt(tick++));
+      queuedSimulationHarness.step(Int64.ofInt(tick++));
       if (tick > 2200) throw "second queued trajectory did not stop";
     }
     var queuedHoldPosition = queuedRobot.snapshot().positions.get(0);
     queuedMachine.resume();
     while (queuedMachine.isMoving()) {
       queuedMachine.update();
-      queuedSimulation.step(Int64.ofInt(tick++));
+      queuedSimulationHarness.step(Int64.ofInt(tick++));
       if (tick > 3000) throw "second queued trajectory did not resume";
     }
     check(queuedRobot.snapshot().positions.get(0) >= queuedHoldPosition - 1e-4,
       "second queued trajectory resumes from its stop path");
     near(queuedRobot.snapshot().positions.get(0), 0.05,
       "hold during a queued trajectory preserves later motion", 1e-5);
-    queuedSimulation.dispose();
+    queuedSimulationHarness.dispose();
 
     var squareBlueprint = MachineKitRobotCompiler.compileXYZGantry(
       new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
       new LinearAxis(23, 10, 80), 0.08, 0.2);
-    var squareSimulation = new Simulation(0.01);
+    var squareSimulationHarness = new SimulationHarness(0.01);
+    var squareSimulation = squareSimulationHarness.simulation;
     var squareRuntime = squareSimulation.addRobot(squareBlueprint.runtime);
     var squareRobot = new SimulatedRobot("square-hold", squareRuntime,
       squareBlueprint.model.name, [for (link in squareBlueprint.model.links) link.name],
@@ -462,7 +467,7 @@ class SessionTests extends MotionKitTestSupport {
     var reachedThirdLeg = false;
     while (squareMachine.isMoving()) {
       squareMachine.update();
-      squareSimulation.step(Int64.ofInt(tick++));
+      squareSimulationHarness.step(Int64.ofInt(tick++));
       var position = squareRobot.snapshot().positions;
       if (position.get(1) > 0.019 && position.get(0) < 0.019) {
         reachedThirdLeg = true;
@@ -474,7 +479,7 @@ class SessionTests extends MotionKitTestSupport {
     squareMachine.hold();
     while (squareRuntime.snapshot().sessionState != RobotKitRuntimeConstants.RK_SESSION_HELD) {
       squareMachine.update();
-      squareSimulation.step(Int64.ofInt(tick++));
+      squareSimulationHarness.step(Int64.ofInt(tick++));
       if (tick > 3400) throw "square third-leg stop did not settle";
     }
     var stopped = squareRobot.snapshot().positions;
@@ -482,7 +487,7 @@ class SessionTests extends MotionKitTestSupport {
     var previousX = stopped.get(0);
     while (squareMachine.isMoving()) {
       squareMachine.update();
-      squareSimulation.step(Int64.ofInt(tick++));
+      squareSimulationHarness.step(Int64.ofInt(tick++));
       var position = squareRobot.snapshot().positions;
       if (previousX > 0.0001 && position.get(0) > 0.0001) {
         check(Math.abs(position.get(1) - 0.02) < 0.001,
@@ -497,7 +502,7 @@ class SessionTests extends MotionKitTestSupport {
       "square path resumes to its final X endpoint", 1e-5);
     near(squareRobot.snapshot().positions.get(1), 0.0,
       "square path resumes to its final Y endpoint", 1e-5);
-    squareSimulation.dispose();
+    squareSimulationHarness.dispose();
   }
 
   /**
@@ -517,7 +522,8 @@ class SessionTests extends MotionKitTestSupport {
     while (moveTicks == 0 || holdTick < moveTicks) {
       var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
         new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, limit);
-      var simulation = new Simulation(0.01);
+      var simulationHarness = new SimulationHarness(0.01);
+      var simulation = simulationHarness.simulation;
       var runtime = simulation.addRobot(blueprint.runtime);
       var robot = new SimulatedRobot("hold-sweep", runtime, blueprint.model.name,
         [for (link in blueprint.model.links) link.name],
@@ -530,13 +536,13 @@ class SessionTests extends MotionKitTestSupport {
       var positions:Array<Float> = [];
       for (_ in 0...holdTick) {
         machine.update();
-        simulation.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
         positions.push(robot.snapshot().positions.get(0));
       }
       machine.hold();
       for (_ in 0...40) {
         machine.update();
-        simulation.step(Int64.ofInt(tick++));
+        simulationHarness.step(Int64.ofInt(tick++));
         positions.push(robot.snapshot().positions.get(0));
       }
       var peak = 0.0;
@@ -560,7 +566,7 @@ class SessionTests extends MotionKitTestSupport {
         (session == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
           Math.abs(last - target) < 1e-5),
         'hold at tick $holdTick pauses or completes its path');
-      simulation.dispose();
+      simulationHarness.dispose();
       holdTick += 2;
     }
     check(worstAcceleration <= limit * 1.05,
@@ -570,7 +576,8 @@ class SessionTests extends MotionKitTestSupport {
   public function testImmediateMotionReplacesNativeQueue():Void {
     var axis = new LinearAxis(23, 10, 80);
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(axis, "x", 0.08, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("replace-queue", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -594,16 +601,17 @@ class SessionTests extends MotionKitTestSupport {
       case Hold | Resume | Abort:
         throw "immediate replacement unexpectedly submitted a lifecycle command";
     }
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(robot.snapshot().positions.get(0), 0.01,
       "immediate motion replaces stale native trajectory motion", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testSmoothReplacementRetriesLateSubmission():Void {
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80),
       "x", 0.08, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var base = new SimulatedRobot("retry-replacement", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -614,7 +622,7 @@ class SessionTests extends MotionKitTestSupport {
     machine.moveAxes([new AxisTarget("x", 0.06)], options);
     for (tick in 0...5) {
       machine.update();
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
     }
     robot.lateRejections = 1;
     var replacement = machine.moveAxes([new AxisTarget("x", 0.04)], options);
@@ -623,36 +631,37 @@ class SessionTests extends MotionKitTestSupport {
       "late replacement submits exactly one retry");
     check(Int64.compare(robot.lastReplacementLeadNs, Int64.ofInt(20000000)) >= 0,
       "smooth replacement anchors at least two owner periods ahead");
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(base.snapshot().positions.get(0), 0.04, "retried replacement reaches target", 1e-5);
     robot.lateRejections = 2;
     machine.moveAxes([new AxisTarget("x", 0.06)], options);
     for (tick in 0...5) {
       machine.update();
-      simulation.step(Int64.ofInt(tick + 500));
+      simulationHarness.step(Int64.ofInt(tick + 500));
     }
     var fallback = machine.moveAxes([new AxisTarget("x", 0.02)], options);
     check(fallback == null && machine.isMoving(),
       "two late rejections defer the target behind a stop");
     check(robot.lateRejections == 0,
       "stop-first fallback follows exactly two rejected attempts");
-    runMotion(machine, simulation);
+    runMotion(machine, simulationHarness);
     near(base.snapshot().positions.get(0), 0.02,
       "stop-first fallback reaches target", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testFreeRunningSmoothReplacement():Void {
     var blueprint = MachineKitRobotCompiler.compileLinearAxis(new LinearAxis(23, 10, 80),
       "x", 0.08, 0.4);
     blueprint.replacementOwnerPeriodSeconds = 0.001;
-    var simulation = new Simulation(0.001);
+    var simulationHarness = new SimulationHarness(0.001);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("free-running-replacement", runtime,
       blueprint.model.name, [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);
     var machine = MotionSystem.fromBlueprint(robot, blueprint);
-    simulation.start();
+    simulationHarness.start();
     machine.jog("x", 0.03, 1.0, 0.2);
     for (index in 0...12) {
       Sys.sleep(0.004);
@@ -667,8 +676,8 @@ class SessionTests extends MotionKitTestSupport {
         observation.positions.get(0) <= 0.08 + 1e-6,
         "free-running replacement stays within travel limits");
     }
-    simulation.stop();
-    simulation.dispose();
+    simulationHarness.stop();
+    simulationHarness.dispose();
   }
 
   /**
@@ -770,7 +779,8 @@ class SessionTests extends MotionKitTestSupport {
   public function testLateJogReplacementRejectsLateArrival():Void {
     var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 200),
       new LinearAxis(23, 10, 60), new LinearAxis(23, 10, 40), 0.1, 0.4);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new LaggingRobot(new SimulatedRobot("late-splice", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -781,7 +791,7 @@ class SessionTests extends MotionKitTestSupport {
     var tick = 0;
     function step():Void {
       machine.update();
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       positions.push(robot.snapshot().positions.get(0));
       if (tick > 2000) throw "late jog splice did not settle";
     }
@@ -791,14 +801,14 @@ class SessionTests extends MotionKitTestSupport {
     for (_ in 0...8) step();
     throws(() -> robot.release(), "late native replacement is rejected explicitly");
     for (_ in 0...250) {
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       positions.push(robot.snapshot().positions.get(0));
     }
     check(peakSecondDifference(positions) <= 0.4 * 1.05,
       'original jog stays within the limit (peak ${peakSecondDifference(positions)})');
     near(positions[positions.length - 1], 0.1,
       "rejected replacement leaves the original jog to complete", 1e-5);
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   /**

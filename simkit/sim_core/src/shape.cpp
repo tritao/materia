@@ -49,6 +49,34 @@ nksim_result NKSIM_CALL nksim_shape_create_convex(nksim_world world,
                  : NKSIM_ERROR_INVALID_HANDLE;
 }
 
+nksim_result NKSIM_CALL nksim_shape_create_compound(nksim_world world,
+        const nksim_shape *children, const nksim_shape_pose *poses,
+        uint32_t count, nksim_shape *out_shape) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->create_compound_shape(children, poses, count, out_shape)
+                 : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_shape_set_contact(nksim_world world, nksim_shape shape,
+        double margin, double gap) {
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_shape_contact(shape, margin, gap) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_shape_set_surface(nksim_world world, nksim_shape shape,
+        const nksim_surface *surface) {
+    if (!surface) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->set_shape_surface(shape, *surface) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
+nksim_result NKSIM_CALL nksim_contact_pair_create(nksim_world world,
+        const nksim_contact_pair_desc *desc) {
+    if (!desc) return NKSIM_ERROR_INVALID_ARGUMENT;
+    const auto value = nksim::resolve_world(world);
+    return value ? value->create_contact_pair(*desc) : NKSIM_ERROR_INVALID_HANDLE;
+}
+
 nksim_result NKSIM_CALL nksim_shape_create_sphere(nksim_world world, double radius,
                                                   nksim_shape *out_shape) {
     if (!out_shape || !std::isfinite(radius) || radius <= 0.0)
@@ -68,6 +96,19 @@ nksim_result NKSIM_CALL nksim_shape_create_capsule(nksim_world world, double rad
     nksim_shape_desc desc{};
     desc.struct_size = sizeof(desc);
     desc.type = NKSIM_SHAPE_CAPSULE;
+    desc.parameters[0] = radius;
+    desc.parameters[1] = height;
+    return create_shape(world, desc, out_shape);
+}
+
+nksim_result NKSIM_CALL nksim_shape_create_cylinder(nksim_world world, double radius,
+                                                    double height, nksim_shape *out_shape) {
+    if (!out_shape || !std::isfinite(radius) || !std::isfinite(height) || radius <= 0.0 ||
+        height <= 0.0)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    nksim_shape_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.type = NKSIM_SHAPE_CYLINDER;
     desc.parameters[0] = radius;
     desc.parameters[1] = height;
     return create_shape(world, desc, out_shape);

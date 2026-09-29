@@ -379,14 +379,19 @@ class MachineKitSmoke {
 		throws(() -> doubleConsumer.validate(), "incompatible roles");
 		var threaded = new PortTestComponent("THREADED");
 		threaded.definePort("air", Pneumatic, Consumer, Thread("G1/8"));
-		var warning = new MachineAssembly();
-		warning.addComponent("a", supplier);
-		warning.addComponent("b", threaded);
-		warning.connectPorts("adapter-needed", "a", "air", "b", "air");
-		check(warning.validate().length == 1, "interface mismatch is a warning");
-		warning.addComponent("c", threaded);
-		warning.connectPorts("branch", "a", "air", "c", "air");
-		throws(() -> warning.validate(), "more than once");
+		var mismatch = new MachineAssembly();
+		mismatch.addComponent("a", supplier);
+		mismatch.addComponent("b", threaded);
+		mismatch.connectPorts("adapter-needed", "a", "air", "b", "air");
+		mismatch.validateStructure();
+		throws(() -> mismatch.validate(), "mismatched interfaces");
+		var branch = new MachineAssembly();
+		branch.addComponent("a", supplier);
+		branch.addComponent("b", consumer);
+		branch.addComponent("c", consumer);
+		branch.connectPorts("first", "a", "air", "b", "air");
+		branch.connectPorts("second", "a", "air", "c", "air");
+		throws(() -> branch.validate(), "more than once");
 	}
 
 	static function componentRecipes():Void {

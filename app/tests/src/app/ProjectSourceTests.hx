@@ -13,6 +13,7 @@ import nativekit.ui.properties.PropertyEditResult;
 import haxe.Json;
 import haxe.Int64;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
@@ -40,30 +41,34 @@ class ProjectSourceTests {
     source.limits = new JointLimits(-2, 2);
     target.limits = new JointLimits(-2, 2);
     model.addCoupling(new JointCoupling("gears", source.id, target.id, -2.0, 0.0));
-    var simulation = new Simulation(0.01, 1, backend);
+    var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
     runtime.submitPosition(0, 0.3, 1);
-    for (index in 0...200) simulation.step(Int64.ofInt(index));
+    for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
     check(Math.abs(q.get(0)) > 0.1 &&
       Math.abs(q.get(1) + 2.0 * q.get(0)) < (backend == 0 ? 1e-9 : 0.02),
       'joint coupling tracks on backend $backend: ${q.get(0)}, ${q.get(1)}');
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function checkLinkCollision(backend:Int, enabled:Bool):Void {
     var model = new RobotModel("generated part collision probe");
     model.addLink(new Link("part"));
     model.collisionApproximation = robotkit.model.CollisionApproximation.None;
-    var simulation = new Simulation(0.01, 1, backend);
+    var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+    var simulation = simulationHarness.simulation;
     simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, [enabled ? [0.5, 0.5, 0.5] : null]);
-    var box = simulation.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
-    for (index in 0...200) simulation.step(Int64.ofInt(index));
-    var height = simulation.objectPose(box).position[2];
+    var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
+    for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
+    var height = simulationHarness.objectPose(box).position[2];
     check(enabled ? height > 0.5 : (backend == 1 ? height < 0.25 : height < -1.0),
       'link collision ${enabled ? "on" : "off"} on backend $backend: $height');
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function checkHullCollision(backend:Int, enabled:Bool):Void {
@@ -76,15 +81,17 @@ class ProjectSourceTests {
       vertices.push((index & 2) == 0 ? -0.5 : 0.5);
       vertices.push((index & 4) == 0 ? -0.5 : 0.5);
     }
-    var simulation = new Simulation(0.01, 1, backend);
+    var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+    var simulation = simulationHarness.simulation;
     simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? vertices : null]);
-    var box = simulation.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
-    for (index in 0...200) simulation.step(Int64.ofInt(index));
-    var height = simulation.objectPose(box).position[2];
+    var box = simulationHarness.spawnBox([0.0, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
+    for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
+    var height = simulationHarness.objectPose(box).position[2];
     check(enabled ? height > 0.5 : (backend == 1 ? height < 0.25 : height < -1.0),
       'hull link collision ${enabled ? "on" : "off"} on backend $backend: $height');
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function checkWedgeContact():Void {
@@ -95,15 +102,17 @@ class ProjectSourceTests {
       -0.5, -0.5, 0.5, -0.5, 0.5, -0.5,
       0.5, 0.5, -0.5, -0.5, 0.5, 0.5];
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
-      var simulation = new Simulation(0.01, 1, backend);
+      var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+      var simulation = simulationHarness.simulation;
       simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
         [0.0, 0.0, 0.0, 1.0], null, null, [wedge]);
-      var box = simulation.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
-      for (index in 0...200) simulation.step(Int64.ofInt(index));
-      var height = simulation.objectPose(box).position[2];
+      var box = simulationHarness.spawnBox([0.35, 0.0, 1.25], [0.1, 0.1, 0.1], true, 1.0);
+      for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
+      var height = simulationHarness.objectPose(box).position[2];
       check(backend == ApplicationSimulation.DETERMINISTIC ? height > 0.5 : height < 0.5,
         'wedge contact differs from its bounding box on backend $backend: $height');
-      simulation.dispose();
+      simulationHarness.dispose();
     }
   }
 
@@ -133,15 +142,17 @@ class ProjectSourceTests {
     model.collisionApproximation = robotkit.model.CollisionApproximation.None;
     for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO])
       for (enabled in [true, false]) {
-        var simulation = new Simulation(0.01, 1, backend);
+        var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+        var simulation = simulationHarness.simulation;
         simulation.addRobotAtPose(RobotRuntimeCompiler.compile(model), [0.0, 0.0, 0.0],
           [0.0, 0.0, 0.0, 1.0], null, null, [enabled ? hull : null]);
-        var box = simulation.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
-        for (index in 0...200) simulation.step(Int64.ofInt(index));
-        var height = simulation.objectPose(box).position[2];
+        var box = simulationHarness.spawnBox([0.0, 0.0, top + 0.5], [0.05, 0.05, 0.05], true, 1.0);
+        for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
+        var height = simulationHarness.objectPose(box).position[2];
         check(enabled ? height > 0.8 : (backend == ApplicationSimulation.MUJOCO ? height < 0.25 : height < 0.0),
           'MachineKit part collision ${enabled ? "on" : "off"} on backend $backend: $height');
-        simulation.dispose();
+        simulationHarness.dispose();
       }
   }
 

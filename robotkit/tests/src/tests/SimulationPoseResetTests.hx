@@ -2,6 +2,7 @@ package tests;
 
 import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
@@ -10,21 +11,63 @@ import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
 import haxe.Int64;
+import robotkit.tool.ToolCollisionShape;
+import robotkit.spatial.Vec3;
 
 class SimulationPoseResetTests {
   public static function run(backend:Int):Void {
     var position = [1.25, -2.5, 0.75];
     var rotation = [Math.sin(0.3), 0.0, 0.0, Math.cos(0.3)];
-    var simulation = new Simulation(0.01, 1, backend);
-    simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), position, rotation);
-    simulation.teleportRobot(0, [4.0, 5.0, 6.0]);
-    simulation.resetRobot(0);
+    var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+    var simulation = simulationHarness.simulation;
+    var piece:Array<Float> = [];
+    for (index in 0...8) {
+      piece.push((index & 1) == 0 ? -0.01 : 0.01);
+      piece.push((index & 2) == 0 ? -0.01 : 0.01);
+      piece.push((index & 4) == 0 ? 0.0 : 0.02);
+    }
+    simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1), position, rotation,
+      null, null, null, null, ToolCollisionShape.Hulls([piece], 0.005), 0);
+    simulationHarness.teleportRobot(0, [4.0, 5.0, 6.0]);
+    simulationHarness.resetRobot(0);
     checkPose(simulation, position, rotation, 'resetRobot on backend $backend');
-    simulation.teleportRobot(0, [7.0, 8.0, 9.0]);
-    simulation.reset();
+    simulationHarness.teleportRobot(0, [7.0, 8.0, 9.0]);
+    simulationHarness.reset();
     checkPose(simulation, position, rotation, 'reset on backend $backend');
-    simulation.dispose();
+    simulationHarness.dispose();
+    var boxSimulationHarness = new SimulationHarness(0.01, 1, backend);
+
+    var boxSimulation = boxSimulationHarness.simulation;
+    boxSimulation.addRobotAtPose(new RobotRuntimeBlueprint(2, 0, 1), [0, 0, 0],
+      [0, 0, 0, 1], null, null, null, null,
+      ToolCollisionShape.Box(new Vec3(0.01, 0.01, 0.02), new Vec3(0, 0, 0.02)), 0);
+    boxSimulationHarness.step(Int64.ofInt(0));
+    boxSimulationHarness.dispose();
+    if (backend == 1) toolProximity();
     coupling(backend);
+  }
+
+  static function toolProximity():Void {
+    var simulationHarness = new SimulationHarness(0.01, 2, 1);
+
+    var simulation = simulationHarness.simulation;
+    var cup:Array<Float> = [];
+    for (index in 0...8) {
+      cup.push((index & 1) == 0 ? -0.01 : 0.01);
+      cup.push((index & 2) == 0 ? -0.01 : 0.01);
+      cup.push((index & 4) == 0 ? 0.0 : 0.02);
+    }
+    var runtime = simulation.addRobotAtPose(new RobotRuntimeBlueprint(1, 0, 1),
+      [0, 0, 0], [0, 0, 0, 1], null, null, null, null,
+      ToolCollisionShape.Hulls([cup], 0.03), 0);
+    var obstacle = simulationHarness.spawnBox([0, 0, 0.05], [0.01, 0.01, 0.01]);
+    simulationHarness.step(Int64.ofInt(0));
+    var contacts = runtime.toolProximity();
+    if (contacts.length == 0 || contacts[0].toolPieceIndex != 0 || contacts[0].active ||
+        contacts[0].otherObject != obstacle.handle.rawValue())
+      throw "Tool cup proximity was not reported";
+    simulationHarness.dispose();
   }
 
   static function coupling(backend:Int):Void {
@@ -37,15 +80,17 @@ class SimulationPoseResetTests {
     source.limits = new JointLimits(-2, 2);
     follower.limits = new JointLimits(-2, 2);
     model.addCoupling(new JointCoupling("gears", source.id, follower.id, -2.0, 0.0));
-    var simulation = new Simulation(0.01, 1, backend);
+    var simulationHarness = new SimulationHarness(0.01, 1, backend);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(model));
     runtime.submitPosition(0, 0.3, 1);
-    for (index in 0...200) simulation.step(Int64.ofInt(index));
+    for (index in 0...200) simulationHarness.step(Int64.ofInt(index));
     var q = runtime.snapshot().q;
     var tolerance = backend == 0 ? 1e-9 : 0.02;
     if (!(Math.abs(q.get(0)) > 0.1 && Math.abs(q.get(1) + 2.0 * q.get(0)) < tolerance))
       throw 'coupling did not follow source on backend $backend: ${q.get(0)}, ${q.get(1)}';
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   static function checkPose(simulation:Simulation, position:Array<Float>, rotation:Array<Float>,

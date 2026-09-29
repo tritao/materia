@@ -156,7 +156,7 @@ hashes ordered actuator transmissions and process-channel declarations.
 
 ### Transmissions (model contract and RKD6 implementation)
 
-RobotModel v5 owns actuators independently of joints. Each actuator has a
+RobotModel v6 owns actuators independently of joints. Each actuator has a
 stable ID, effort/rate limits in actuator units, and a `SimpleTransmission`
 with `jointId`, `ratio`, and `offset`. Coordinates are SI and obey
 `joint = offset + actuator / ratio`: for a motor driving a linear joint,
@@ -166,9 +166,29 @@ logical coordinate and derives the other joint scales and offsets by equating
 actuator coordinates, using the first actuator authored for each joint as its
 mapping reference. Additional actuators on that joint do not change the
 logical-axis mapping. Explicit authored axis maps remain a deprecated override.
-`RobotModelCodec` accepts v5 only; older schemas are rejected, not migrated.
+`RobotModelCodec` accepts v6 only; older schemas are rejected, not migrated.
 
-RobotModel v5 also owns `JointCoupling{id, leader, follower, ratio, offset}`.
+RobotModel v6 adds `floatingBase`. When true, the root link is a free six-DOF
+body, as for a legged or humanoid robot, instead of a base fixed to or driven
+over the world. It is a model property rather than a joint, so runtime joints
+stay one-DOF and joint indices, targets, and plans are unchanged;
+`JointType.Floating` remains rejected by the compiler. The blueprint carries it
+as `floating_base`. `Simulation` then creates the root as a dynamic body
+(a MuJoCo free joint), reports its twist through
+`rk_simulation_get_robot_base_velocity()`, and refuses kinematic base drives
+and wheel couplings for it. A floating base cannot also have a `mobileBase`.
+See `robotkit/plans/HUMANOID.md`.
+
+RobotModel v6 links also carry `collisionShapes`: boxes, spheres, capsules and
+cylinders, each posed in the link frame, with capsule and cylinder lengths
+given as half-lengths along local Z (MuJoCo's convention). The compiler copies
+them onto the blueprint, and `Simulation` sends them in the robot
+description's `link_shapes` tail. A link with shapes collides through one
+compound of them together with its explicit hull or box and any tool pieces;
+a link without shapes keeps the model's `collisionApproximation`.
+`robotkit_mjcf_import` produces these from MJCF (`robotkit/tools/mjcf_import`).
+
+RobotModel v5 added `JointCoupling{id, leader, follower, ratio, offset}`.
 This is a joint-to-joint relation, `follower = ratio * leader + offset`,
 separate from the actuator-to-joint `SimpleTransmission`. The runtime blueprint
 carries these couplings. MotionKit derives logical-axis scales and offsets from
@@ -228,8 +248,8 @@ command mailbox → validation → arbitration/intent → controllers
 The runtime rejects stale command sequences, validates compiled joint and
 actuator limits before endpoint application, latches endpoint/sample failures
 as faults, and exposes explicit stop/reset-safety commands. `RobotEndpoint`
-only has `apply()` and `sample()` plus the rollback hook needed by a shared
-transactional simulation tick. Backends do not receive runtime ownership.
+only has `apply()` and `sample()` plus the rollback hook a shared simulation
+tick uses to undo one robot's half-applied commands. Backends do not receive runtime ownership.
 
 Position targets are retained as runtime intent and emitted on every owner
 tick. When a command supplies `max_rate`, the runtime advances a deterministic
@@ -409,6 +429,16 @@ runtimes attached to a shared `Simulation` are externally driven and cannot be
 started independently. This keeps the clock owner explicit and prevents a
 robot from accidentally advancing only part of a multi-robot world.
 
+A robot's failure is that robot's fault, not the tick's. If a runtime rejects
+its commands in step 2, or cannot publish in step 6 (for instance a joint is
+observed past its limit), `RobotRuntime::fail_tick` rolls that runtime back and
+leaves it faulted; every other robot still applies its commands, the host still
+advances, and every other robot still publishes. `Simulation.step` returns OK,
+a realtime session keeps ticking, and the fault shows in that robot's own
+state (`safety`, `mode`, `fault_code`). Timestep, integrator, friction cone and
+solver iteration limits, and the MuJoCo constraint solver, remain shared by
+every robot in the world (see `plans/MIXED_SCENE.md`).
+
 While stopped, the simulation owner can reset the whole world, reset one robot,
 teleport a robot, and spawn/remove/teleport environment objects. The editable
 scene is therefore the source of initial/configuration state. After a running
@@ -440,9 +470,9 @@ same immutable sensor frames; endpoints without those measurements do not
 invent them. Rebuild native consumers for the extended structs.
 
 The default backend is still the deterministic SimKit test backend. Build with
-`-DNKSIM_BUILD_MUJOCO=ON` and select `rk_simulation_desc.backend = 1` (Haxe
-`new Simulation(dt, substeps, 1)`) for MuJoCo; requesting it in an unconfigured
-build returns `RK_ERROR_UNSUPPORTED`, never a silent fallback. MuJoCo tests
+`-DNKSIM_BUILD_MUJOCO=ON` and create the session's world with
+`nksim_mujoco_world_create` (Haxe `SimulationSpace.create(SimulationSpace.MUJOCO,
+dt, substeps)`) for MuJoCo; there is no silent fallback. MuJoCo tests
 exercise articulated IMU/offset acceleration, moving-object LiDAR occlusion,
 collision response, angular limits in radians, world-oriented body velocities,
 and deterministic replay. Rebuilds preserve articulated rest transforms;
@@ -518,6 +548,15 @@ reproduction is independent of the actuator's own mass-matrix addressing —
 see below) and confirms the fix; `robotkit_mujoco_tests`'
 IMU-vs-joint-velocity assertion now passes along with the rest of that
 regression suite (12/12).
+
+Later, kinematic actors (walking humans, moving platforms) needed contacts to
+see their motion, which a zero-dof body cannot give (MuJoCo reports no
+velocity for it). A `KINEMATIC` root that carries no other bodies therefore
+gets a free joint again, with gravity compensation, re-placed on its scripted
+trajectory before every substep. A `KINEMATIC` root with bodies beneath it,
+such as a robot base, stays welded as above: a free joint under articulated
+children, even one stiffened with a large armature, still leaked into their
+joint friction and limits.
 
 A second, previously undocumented native bug surfaced while writing this
 fix's test with a position-mode target instead of effort mode: `data->M`
@@ -643,6 +682,28 @@ with lever-arm scale under active load; this test's anchors are a few
 centimeters, not the meters a real link might use, specifically to keep
 that expected, undiagnosed-bug error under the 1e-3 tolerance — a future
 multi-DOF controller improvement should re-check this at larger scales.
+
+## Learned policies (H4)
+
+`robotkit/policy` is an optional native library (`RK_BUILD_POLICY`) that runs
+an ONNX model on the CPU with ONNX Runtime (MIT, a pinned prebuilt release). It
+is a pure function on flat float tensors; recurrent state is an ordinary input
+the caller feeds back. Above it, `robotkit.policy` (Haxe) has:
+
+- `PolicySpec`: the `policy.json` beside a model: observation terms and scales,
+  default pose, kp/kd, action scale, control period, recurrent pairs, IMU mount.
+- `PolicyController`: encoders and the base IMU in, `JointTarget.servo` out.
+  It never reads simulator truth; gravity comes from `GravityEstimator`, which
+  must be fed at the IMU's rate. Policy targets are clamped into joint travel,
+  because the runtime rejects a servo target outside it.
+- `VelocityReference`: the velocity command as a cyclic reference with a
+  sequence, a deadline, limits and braking to zero.
+- `PolicySession`: the loop over any `Robot`, reading it every tick and running
+  the policy every control period, so a `RecordingRobot` records it and a
+  physics step (2 ms) can be shorter than the control period (20 ms).
+
+`Simulation.applyRobotForce` pushes a robot's base for one tick. The G1 policy,
+its licence and the acceptance tests are under `tools/humanoid`.
 
 ## Deployment boundary
 
@@ -804,9 +865,36 @@ freedom — the existing typed joint-command boundary, unchanged.
 `Robot`, `RobotRuntime`, or the native runtime. A `Tool` is a mounted end
 effector: `id`, `flangeTTcp` (the tool center point's pose in the flange
 frame, per the `a_T_b` convention — `flange_T_tcp` maps tool-tip coordinates
-into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`, or
-`Cylinder`, since `model.CollisionApproximation` is a link-geometry
+into the flange frame), a `ToolCollisionShape` (`NoCollision`, `Box`,
+`Cylinder`, or per-member `Hulls`, since `model.CollisionApproximation` is a link-geometry
 derivation policy, not a shape), and `mass`.
+The CadBridge also carries `MassProperties` in the flange frame: mass in kg,
+centre of mass in metres, and centroidal `Inertia3` in kg m² when known.
+Legacy tools that declare only scalar mass retain that API, but a load check
+requires a known centre of mass. `WorkpieceLoad` supplies a part's mass
+properties and its pose at one pick; the tool and part are combined with the
+parallel-axis theorem.
+
+`PayloadChecker.checkPath` samples the manipulator's joint path and checks
+carried mass and gravity moment about the flange against a `RobotLoadChart`
+at every sample. `ReachLoadChart` is a simple piecewise chart by flange
+distance from the base; robot-specific charts can implement the interface
+with joint-dependent limits. A pose outside the chart fails. This is a static
+gravity check with configurable joint sampling, so acceleration loads and
+unsampled motion between points need separate analysis.
+
+Suction capacity is checked separately from runtime vacuum actuation.
+`cadbridge.SuctionCapacityBridge.toGrip` converts one connected MachineKit
+`SuctionCup` to a flange-frame `SuctionGrip`. The cup needs an effective sealed
+area; the caller supplies a minimum vacuum guaranteed at that cup, friction
+coefficient for the actual cup and workpiece surface, and safety factor. A
+generator's catalog rating only bounds the requested vacuum and does not
+establish delivered pressure. `SuctionCapacityChecker.checkPath` samples
+workpiece COM acceleration and flange pose, checks normal and tangential
+holding margins, and requires a cup moment rating for nonzero overturning
+moment. It models one sealed cup; it does not predict leakage, deformation,
+or load sharing across cups. The motion samples must include acceleration from
+flange rotation. This is a design check, not a live hold sensor.
 
 Capability control surfaces are typed interfaces, not
 `Map<String, Dynamic>` commands, per haxeon's structural-typing rules:
@@ -832,11 +920,29 @@ clears the observed pickup.
 `SimulatedToolSensorAdapter` routes `tool_contact` (0/1) and
 `tool_vacuum_kpa` (non-negative vacuum magnitude) `SensorFrame` values from a
 robot snapshot to the selected tool. Bindings use configuration-specific sensor
-IDs. Frames require the `robotkit.monotonic` source clock so observations older
-than the tool selection can be ignored; repeated sequences are ignored too.
+IDs. A frame must use the same source clock as the tool selection, such as
+`robotkit.monotonic` or the logical `robotkit.simulation` clock, so older
+observations can be ignored; repeated sequences are ignored too.
 The runtime accepts both kinds as externally published sensors at authored
 mounts, allowing a simulation sensor producer to publish them without a native
 physics sensor.
+
+`cadbridge.EndEffectorVacuumFeedback` is a deterministic simulation producer
+for one suction cup with a dedicated collision piece. After each physics step,
+it reads that piece's contact distances and feeds the selected tool's pressure
+sensor adapter. `EndEffectorRuntimeBridge.addVacuumSensorToBlueprint` authors its
+sensor mount on the robot flange before runtime creation. Attaching the producer
+to `Simulation` publishes one `tool_vacuum_kpa` frame per explicit step of its
+private clock or the owning `SimSession` clock, so
+runtime snapshots, RobotWorld recordings, and replay see the same observations.
+These frames use the logical `robotkit.simulation` source clock, which must also
+be used when selecting the tool. An enabled vacuum command and geometric cup
+touch produce a caller-specified sealed pressure; proximity alone, contact loss, or a disabled
+command produce zero. Contact is only a seal proxy: this model does not predict
+leakage, evacuation time, or seal quality. Designs with multiple cups or a cup
+merged into another collision piece need a richer model and are rejected.
+The test uses distance rather than the contact's `active` force flag because
+MuJoCo cannot apply force between a fixed obstacle and a kinematic flange.
 
 `cadbridge.EndEffectorRuntimeBridge` builds a `ToolRuntime` from a selected
 `EndEffectorSet` configuration and working frame. Each explicit control binding
@@ -1105,6 +1211,20 @@ false if any patch's best candidate fell short of full reachability. Base
 motion between patches is left entirely to the existing `Navigator`/`GoTo`
 against each patch's `basePose`.
 
+When a tool collision shape and map-frame `ToolBoxObstacle`s are supplied,
+the planner transforms the obstacles into each candidate's base frame and
+checks every solved flange pose. `ToolClearanceChecker` uses separating axes
+for each convex tool piece against each oriented box, preserving the empty
+space between pieces. It also samples the joint-space segment between
+successive solved poses (default maximum step 0.02 radians or metres per
+joint). Hull padding and requested planning clearance are added to the
+separation test. This is a sampled path check; callers needing a tighter
+path guarantee must use a smaller joint step or continuous collision check.
+`FinishSurface`, `Paint`, and `Sand` accept an optional `ToolPlanningContext`
+with the mounted `Tool`, map-frame obstacle boxes, clearance, and sampling
+step. The skill checks that the tool and manipulator agree on the flange-to-TCP
+transform, then rejects a blocked patch before navigation or process output.
+
 ## Simulated wall-finishing robot (M9)
 
 `robotkit/tests/src/tests/WallFinishingScenarioTests.hx` is the first
@@ -1168,7 +1288,7 @@ scan/register/plan/navigate/execute/coverage/replay logic runs against
 either backend; `testSimulatedWallFinishingScenario` calls it with
 `backend = 0` (default, `strictFkCrossCheck = true`, `minCoverage = 0.99`),
 and `testSimulatedWallFinishingScenarioMuJoCo` with the plan's own
-`new Simulation(0.01, 2, 1)` (`strictFkCrossCheck = false`,
+`new SimulationHarness(0.01, 2, SimulationSpace.MUJOCO)` (`strictFkCrossCheck = false`,
 `minCoverage = 0.97`). A fixed navigation tick budget is scaled by the
 timestep (`40.0 / timestep`) so both backends get the same *simulated-time*
 budget to converge, not the same tick count. MuJoCo's per-joint
@@ -1203,9 +1323,9 @@ for any other consumer). `robotkit/tests/mujoco/haxeon.json` points its
 `tests.WallFinishingMuJoCoRunner`, which calls only
 `WallFinishingScenarioTests.runMuJoCo()` — not `RobotWorldTests.main()`,
 which is still the entry for the standard `robotkit/tests` project and must
-never reach a `new Simulation(dt, substeps, 1)` call on a build where MuJoCo
-support is compiled out (`RK_ERROR_UNSUPPORTED`, not a silent fallback, per
-the "One simulation tick" section above).
+never reach a MuJoCo `SimulationHarness` on a build where MuJoCo support is
+compiled out (there is no silent fallback, per the "One simulation tick"
+section above).
 
 ## Construction skills (M10)
 

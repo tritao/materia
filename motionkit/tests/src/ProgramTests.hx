@@ -86,6 +86,7 @@ import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.VirtualDeviceOptions;
 import robotkit.runtime.VirtualActuatorOptions;
 import robotkit.runtime.RobotRuntimeError;
@@ -167,7 +168,8 @@ class ProgramTests extends MotionKitTestSupport {
     var plan = compiled.blocks[0].plans[0];
     near(plan.copyPositionTolerances()[0], 0.00001,
       "program compiler preserves tight start position tolerance", 1e-12);
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var segments = [for (segment in plan.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
@@ -189,7 +191,7 @@ class ProgramTests extends MotionKitTestSupport {
     }
     check(rejectedAtRuntime,
       "runtime rejects compiled program whose start exceeds tight tolerance");
-    simulation.dispose();
+    simulationHarness.dispose();
     compiled.dispose();
   }
 
@@ -377,7 +379,8 @@ class ProgramTests extends MotionKitTestSupport {
   public function testManipulatorMotion():Void {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var blueprint = RobotRuntimeCompiler.compile(fixture.model);
     blueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
       ProcessEventValue.Digital(false)));
@@ -420,7 +423,7 @@ class ProgramTests extends MotionKitTestSupport {
     for (tick in 0...400) {
       if (tick == 100) ready = true;
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick));
+      simulationHarness.step(Int64.ofInt(tick));
       if (!motion.running) break;
     }
     check(motion.completed && motion.failure == null,
@@ -437,21 +440,22 @@ class ProgramTests extends MotionKitTestSupport {
     ]));
     for (tick in 0...400) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(500 + tick));
+      simulationHarness.step(Int64.ofInt(500 + tick));
       if (!motion.running) break;
     }
     check(!motion.completed && motion.failure != null &&
       motion.failure.indexOf("timed out") >= 0,
       "barrier timeout fails the manipulator program with a diagnostic");
-    simulation.step(Int64.ofInt(1000));
+    simulationHarness.step(Int64.ofInt(1000));
     check(Lambda.exists(motion.firedEvents(), function(event) return switch event.value {
       case ProcessEventValue.Digital(enabled): !enabled;
       case _: false;
     }),
       "timeout abort produces a safe output transition");
-    simulation.dispose();
+    simulationHarness.dispose();
 
-    var pathSimulation = new Simulation(0.01);
+    var pathSimulationHarness = new SimulationHarness(0.01);
+    var pathSimulation = pathSimulationHarness.simulation;
     var pathBlueprint = RobotRuntimeCompiler.compile(fixture.model);
     pathBlueprint.channels.push(new ProcessChannelDeclaration("sprayer.enabled",
       ProcessEventValue.Digital(false)));
@@ -469,7 +473,7 @@ class ProgramTests extends MotionKitTestSupport {
       MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)]));
     for (_ in 0...500) {
       pathMotion.update(0.01);
-      pathSimulation.step(Int64.ofInt(pathTick++));
+      pathSimulationHarness.step(Int64.ofInt(pathTick++));
       if (!pathMotion.running) break;
     }
     check(pathMotion.completed, 'arm reaches FollowPath start: ${pathMotion.failure}');
@@ -484,12 +488,12 @@ class ProgramTests extends MotionKitTestSupport {
       'FollowPath starts: ${pathMotion.failure}');
     for (_ in 0...10) {
       pathMotion.update(0.01);
-      pathSimulation.step(Int64.ofInt(pathTick++));
+      pathSimulationHarness.step(Int64.ofInt(pathTick++));
     }
     pathMotion.hold();
     for (_ in 10...50) {
       pathMotion.update(0.01);
-      pathSimulation.step(Int64.ofInt(pathTick++));
+      pathSimulationHarness.step(Int64.ofInt(pathTick++));
     }
     var heldDistance = pathMotion.progress().pathDistance;
     var heldPose = solver.forward(pathRobot.snapshot().positions.toArray());
@@ -501,7 +505,7 @@ class ProgramTests extends MotionKitTestSupport {
     pathMotion.resume();
     for (_ in 50...500) {
       pathMotion.update(0.01);
-      pathSimulation.step(Int64.ofInt(pathTick++));
+      pathSimulationHarness.step(Int64.ofInt(pathTick++));
       if (!pathMotion.running) break;
     }
     check(pathMotion.completed && pathMotion.firedEvents().length > 0,
@@ -510,21 +514,22 @@ class ProgramTests extends MotionKitTestSupport {
       MoveTarget.JointTarget(origin), new MotionOptions(), Blend.ExactStop)]));
     for (_ in 0...5) {
       pathMotion.update(0.01);
-      pathSimulation.step(Int64.ofInt(pathTick++));
+      pathSimulationHarness.step(Int64.ofInt(pathTick++));
     }
     pathMotion.abort();
-    pathSimulation.step(Int64.ofInt(pathTick++));
+    pathSimulationHarness.step(Int64.ofInt(pathTick++));
     check(Lambda.exists(pathMotion.firedEvents(), function(event) return switch event.value {
       case ProcessEventValue.Digital(enabled): !enabled;
       case _: false;
     }), "manipulator abort restores the safe process value");
-    pathSimulation.dispose();
+    pathSimulationHarness.dispose();
   }
 
   public function testProcessRunVirtualArmRecovery():Void {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var blueprint = RobotRuntimeCompiler.compile(fixture.model);
     blueprint.channels.push(new ProcessChannelDeclaration("paint.flow",
       ProcessEventValue.Analog(0.0)));
@@ -561,7 +566,7 @@ class ProgramTests extends MotionKitTestSupport {
     motion.run(new MotionProgram([MotionOp.MoveJ(
       MoveTarget.JointTarget(approach), new MotionOptions(), Blend.ExactStop)]));
     for (_ in 0...600) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
       if (!motion.running) break;
     }
     check(motion.completed, 'arm reaches process start: ${motion.failure}');
@@ -572,7 +577,7 @@ class ProgramTests extends MotionKitTestSupport {
     var applied = 0;
     var distance = 0.0;
     for (_ in 0...1200) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
       var records = motion.firedEvents();
       run.applyRecords([for (i in applied...records.length) records[i]]);
       applied = records.length;
@@ -599,7 +604,7 @@ class ProgramTests extends MotionKitTestSupport {
       "process recovery waits while the arm session is faulted");
     var settled = false;
     for (_ in 0...500) {
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = runtime.snapshot();
       if (snapshot.sessionState == RobotKitRuntimeConstants.RK_SESSION_IDLE &&
           !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0) {
@@ -611,7 +616,7 @@ class ProgramTests extends MotionKitTestSupport {
     robot.faultOverride = 0;
     motion.reset();
     check(motion.sessionState() == Idle, "explicit arm reset permits recovery");
-    simulation.step(Int64.ofInt(tick++));
+    simulationHarness.step(Int64.ofInt(tick++));
     run.update(distance);
     check(run.state == Recovery, "process run enters recovery after arm reset");
     var continuation = run.takeProgram();
@@ -633,7 +638,7 @@ class ProgramTests extends MotionKitTestSupport {
     var flowRestored = false;
     var finalOffEvent = false;
     for (_ in 0...1200) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
       var records = motion.firedEvents();
       for (i in applied...records.length) {
         var record = records[i];
@@ -655,13 +660,14 @@ class ProgramTests extends MotionKitTestSupport {
       "runtime fires the final safe output event");
     run.update(path.length());
     check(run.state == Completion, "process run completes after resumed pass");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testManipulatorSessionTransitions():Void {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) joint.limits.maxAcceleration = 4.0;
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(RobotRuntimeCompiler.compile(fixture.model));
     var robot = new FaultingArmRobot("session-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name],
@@ -684,7 +690,7 @@ class ProgramTests extends MotionKitTestSupport {
     var tick = 0;
     motion.run(longMove);
     for (_ in 0...5) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
     }
     motion.abort();
     check(motion.sessionState() == Stopping(Discard) && motion.running &&
@@ -700,7 +706,7 @@ class ProgramTests extends MotionKitTestSupport {
       robot.commands.length == commandsAtStop,
       "arm hold and resume during Stopping do not change state");
     for (_ in 0...800) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
       if (!motion.running) break;
     }
     check(motion.completed && motion.failure == null,
@@ -710,7 +716,7 @@ class ProgramTests extends MotionKitTestSupport {
 
     motion.run(longMove);
     for (_ in 0...5) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
     }
     motion.hold();
     check(motion.sessionState() == Holding && robot.commandCount("hold") == 1,
@@ -721,7 +727,7 @@ class ProgramTests extends MotionKitTestSupport {
       robot.commandCount("resume") == resumesBefore,
       "arm resume during Holding waits for rest");
     for (_ in 0...800) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
       if (!motion.running) break;
     }
     check(motion.completed && robot.commandCount("resume") == resumesBefore + 1,
@@ -729,7 +735,7 @@ class ProgramTests extends MotionKitTestSupport {
 
     motion.run(homeMove);
     for (_ in 0...5) {
-      motion.update(0.01); simulation.step(Int64.ofInt(tick++));
+      motion.update(0.01); simulationHarness.step(Int64.ofInt(tick++));
     }
     motion.abort();
     var commandsBeforeFault = robot.commands.length;
@@ -744,7 +750,7 @@ class ProgramTests extends MotionKitTestSupport {
     motion.reset();
     check(motion.sessionState() == Idle,
       "arm explicit reset returns Faulted to Idle");
-    simulation.dispose();
+    simulationHarness.dispose();
   }
 
   public function testMotionProgramContracts():Void {

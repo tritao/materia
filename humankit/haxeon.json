@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "package": { "name": "humankit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {
+    "animkit": { "path": "../animkit" },
+    "scenekit": { "path": "../scenekit" }
+  },
+  "target": "host"
+}

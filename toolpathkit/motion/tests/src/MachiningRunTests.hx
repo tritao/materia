@@ -9,6 +9,7 @@ import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.SessionState;
 import robotkit.runtime.Simulation;
+import robotkit.runtime.SimulationHarness;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventValue;
 import robotkit.world.SimulatedRobot;
@@ -35,7 +36,9 @@ class MachiningRunTests {
     for (channel in ["coolant.mist", "coolant.flood"])
       blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
         ProcessEventValue.Digital(false)));
-    var simulation = new Simulation(0.01);
+    var simulationHarness = new SimulationHarness(0.01);
+
+    var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobot(blueprint.runtime);
     var robot = new SimulatedRobot("cam-pocket", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
@@ -96,7 +99,7 @@ class MachiningRunTests {
     var tick = 0, heldAt = -1.0;
     for (_ in 0...5000) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       var progress = motion.progress();
       if (progress.op == target && progress.pathDistance > targetLength * 0.25) {
         heldAt = progress.pathDistance;
@@ -108,7 +111,7 @@ class MachiningRunTests {
     if (heldAt < 0.0) throw 'CAM pocket never reached restart path: ${motion.failure}';
     for (_ in 0...1000) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (motion.sessionState() == SessionState.Held) break;
     }
     if (motion.sessionState() != SessionState.Held)
@@ -125,7 +128,7 @@ class MachiningRunTests {
     var settled = false;
     for (_ in 0...1000) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
       if (motion.sessionState() == SessionState.Idle &&
           !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 &&
@@ -138,7 +141,7 @@ class MachiningRunTests {
     run.resumePrepared(continuation);
     for (_ in 0...10000) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (!motion.running) break;
     }
     if (!motion.completed || motion.failure != null)
@@ -158,7 +161,7 @@ class MachiningRunTests {
     var active = false;
     for (_ in 0...500) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       if (motion.progress().pathDistance > 0.002) {
         active = true;
         break;
@@ -172,7 +175,7 @@ class MachiningRunTests {
     settled = false;
     for (_ in 0...1000) {
       motion.update(0.01);
-      simulation.step(Int64.ofInt(tick++));
+      simulationHarness.step(Int64.ofInt(tick++));
       var snapshot = robot.snapshot();
       if (motion.sessionState() == SessionState.Idle &&
           !snapshot.trajectoryActive && snapshot.trajectoryQueueDepth == 0 &&
@@ -185,7 +188,7 @@ class MachiningRunTests {
     var shutdown = faultRun.safeShutdown();
     if (shutdown.ops.length != 4)
       throw "spindle fault shutdown needs spindle and coolant off";
-    simulation.dispose();
+    simulationHarness.dispose();
     Sys.println("Machining run tests passed (10 assertions)");
   }
 }
