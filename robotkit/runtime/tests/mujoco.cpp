@@ -337,13 +337,8 @@ static void floating_base_falls_and_settles(bool floating) {
 // two-link robot of 2 kg given 20 N along x for 5 ticks of 5 ms gains
 // 20 * 0.025 / 2 = 0.25 m/s, and a kinematic one ignores the force.
 static void robot_base_can_be_pushed(bool floating) {
-    rk_simulation_desc desc{};
-    desc.struct_size = sizeof(desc);
-    desc.fixed_timestep = 0.005;
-    desc.physics_substeps = 2;
-    desc.backend = 1;
-    rk_simulation simulation = 0;
-    assert(rk_simulation_create(&desc, &simulation) == RK_OK);
+    SessionFixture fixture(0.005, 2);
+    const auto simulation = fixture.simulation;
     rk_robot_runtime_blueprint model{};
     model.struct_size = sizeof(model);
     model.link_count = 2;
@@ -378,9 +373,9 @@ static void robot_base_can_be_pushed(bool floating) {
     assert(rk_simulation_apply_robot_force(999, 0, &push) == RK_ERROR_INVALID_HANDLE);
     for (int tick = 0; tick < 5; ++tick) {
         assert(rk_simulation_apply_robot_force(simulation, 0, &push) == RK_OK);
-        assert(rk_simulation_step(simulation, tick) == RK_OK);
+        assert(fixture.step(tick) == RK_OK);
     }
-    assert(rk_simulation_step(simulation, 5) == RK_OK); // an unpushed tick adds nothing
+    assert(fixture.step(5) == RK_OK); // an unpushed tick adds nothing
     rk_simulation_twist twist{};
     twist.struct_size = sizeof(twist);
     assert(rk_simulation_get_robot_base_velocity(simulation, 0, &twist) == RK_OK);
@@ -390,7 +385,6 @@ static void robot_base_can_be_pushed(bool floating) {
     } else {
         assert(std::abs(twist.linear[0]) < 1e-9);
     }
-    rk_simulation_destroy(simulation);
 }
 
 // A floating one-link robot stands on a sphere and a sideways capsule placed
