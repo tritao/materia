@@ -4,6 +4,7 @@
 #include <opencv2/objdetect/charuco_detector.hpp>
 #include <opencv2/objdetect/aruco_board.hpp>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <climits>
 #include <vector>
@@ -11,7 +12,8 @@
 namespace {
 bool valid_board(const vk_board_spec *b) {
     return b && b->struct_size >= sizeof(*b) && b->columns >= 3 && b->rows >= 3 &&
-        b->columns <= 100 && b->rows <= 100 && std::isfinite(b->square_size_m) &&
+        b->columns <= 100 && b->rows <= 100 && b->legacy_pattern <= 1 &&
+        std::isfinite(b->square_size_m) &&
         b->square_size_m > 0 && (b->kind == VK_BOARD_CHESSBOARD ||
         (b->kind == VK_BOARD_CHARUCO && std::isfinite(b->marker_size_m) &&
         b->marker_size_m > 0 && b->marker_size_m < b->square_size_m &&
@@ -24,8 +26,10 @@ cv::aruco::PredefinedDictionaryType dictionary(uint32_t d) {
     return cv::aruco::DICT_4X4_50;
 }
 cv::aruco::CharucoBoard make_board(const vk_board_spec &b) {
-    return cv::aruco::CharucoBoard(cv::Size(b.columns,b.rows), float(b.square_size_m),
+    cv::aruco::CharucoBoard board(cv::Size(b.columns,b.rows), float(b.square_size_m),
         float(b.marker_size_m), cv::aruco::getPredefinedDictionary(dictionary(b.dictionary)));
+    board.setLegacyPattern(b.legacy_pattern != 0);
+    return board;
 }
 uint32_t corner_count(const vk_board_spec &b) {
     return b.kind == VK_BOARD_CHESSBOARD ? b.columns*b.rows : (b.columns-1)*(b.rows-1);
@@ -56,7 +60,7 @@ extern "C" VK_API vk_result vk_board_detect(const vk_image_view *image,const vk_
     vk_board_corner *out_corners,uint32_t capacity,uint32_t *out_count) {
     if (!valid_image(image)||!valid_board(board)||!out_count||(capacity&&!out_corners)) return VK_ERROR_INVALID_ARGUMENT;
     try {
-        vk_version();
+        if (vk_version() != 1) return VK_ERROR_BACKEND;
         cv::Mat raw(image->height,image->width,image->pixel_format==VK_PIXEL_RGB8?CV_8UC3:CV_8UC1,image->data,image->stride_bytes),gray;
         if(image->pixel_format==VK_PIXEL_RGB8) cv::cvtColor(raw,gray,cv::COLOR_RGB2GRAY); else gray=raw;
         std::vector<cv::Point2f> points;std::vector<int> ids;
@@ -77,7 +81,7 @@ extern "C" VK_API vk_result vk_board_detect(const vk_image_view *image,const vk_
         if(points.size()>capacity) return VK_ERROR_LIMIT;
         for(size_t i=0;i<points.size();++i) out_corners[i]={uint32_t(ids[i]),{points[i].x,points[i].y}};
         return VK_OK;
-    } catch(const std::bad_alloc&){return VK_ERROR_OUT_OF_MEMORY;} catch(const cv::Exception&){return VK_ERROR_BACKEND;}
+    } catch(const std::bad_alloc&){return VK_ERROR_OUT_OF_MEMORY;} catch(const cv::Exception&){return VK_ERROR_BACKEND;} catch(...){return VK_ERROR_BACKEND;}
 }
 extern "C" VK_API vk_result vk_calibrate(const vk_board_spec *board,uint32_t width,uint32_t height,
     const vk_calibration_view *views,uint32_t view_count,const vk_calibration_limits *limits,
@@ -88,7 +92,7 @@ extern "C" VK_API vk_result vk_calibrate(const vk_board_spec *board,uint32_t wid
        !std::isfinite(limits->maximum_rms_pixels)||limits->maximum_rms_pixels<=0||
        !out_model||out_model->struct_size<sizeof(*out_model)||!out_rms||!out_views) return VK_ERROR_INVALID_ARGUMENT;
     try {
-        vk_version();
+        if (vk_version() != 1) return VK_ERROR_BACKEND;
         std::vector<cv::Point3f> board_points;
         if(board->kind==VK_BOARD_CHESSBOARD) {
             board_points.reserve(corner_count(*board));
@@ -102,11 +106,13 @@ extern "C" VK_API vk_result vk_calibrate(const vk_board_spec *board,uint32_t wid
         std::vector<std::vector<cv::Point3f>> objects(view_count);
         std::vector<std::vector<cv::Point2f>> pixels(view_count);
         double minx=width,miny=height,maxx=0,maxy=0;
+        std::array<uint32_t,16> cell_views{};
         for(uint32_t i=0;i<view_count;++i){
             const auto &v=views[i];
             if(v.struct_size<sizeof(v)||!v.corners||v.corner_count<6||v.corner_count>corner_count(*board)||
                out_views[i].struct_size<sizeof(vk_calibration_view_result)) return VK_ERROR_INVALID_ARGUMENT;
             std::vector<bool> seen(corner_count(*board),false);
+            std::array<bool,16> view_cells{};
             for(uint32_t j=0;j<v.corner_count;++j){
                 const auto &c=v.corners[j];
                 if(c.id>=seen.size()||seen[c.id]||!std::isfinite(c.pixel.x)||!std::isfinite(c.pixel.y)||
@@ -115,9 +121,16 @@ extern "C" VK_API vk_result vk_calibrate(const vk_board_spec *board,uint32_t wid
                 pixels[i].emplace_back(float(c.pixel.x),float(c.pixel.y));
                 minx=std::min(minx,c.pixel.x);miny=std::min(miny,c.pixel.y);
                 maxx=std::max(maxx,c.pixel.x);maxy=std::max(maxy,c.pixel.y);
+                const uint32_t cell_x=std::min(3u,uint32_t(c.pixel.x*4/width));
+                const uint32_t cell_y=std::min(3u,uint32_t(c.pixel.y*4/height));
+                view_cells[cell_y*4+cell_x]=true;
             }
+            for(size_t cell=0;cell<16;++cell) if(view_cells[cell]) ++cell_views[cell];
         }
-        if((maxx-minx)/width<limits->minimum_coverage||(maxy-miny)/height<limits->minimum_coverage)
+        const uint32_t repeated_cells=std::count_if(cell_views.begin(),cell_views.end(),
+            [](uint32_t visits){return visits>=2;});
+        if((maxx-minx)/width<limits->minimum_coverage||(maxy-miny)/height<limits->minimum_coverage||
+           double(repeated_cells)/16<limits->minimum_coverage)
             return VK_ERROR_CALIBRATION_COVERAGE;
         cv::Mat k=cv::Mat::eye(3,3,CV_64F),d,r,t;
         std::vector<cv::Mat> rvecs,tvecs;
@@ -127,20 +140,30 @@ extern "C" VK_API vk_result vk_calibrate(const vk_board_spec *board,uint32_t wid
         if(flags & VK_CALIB_FIX_PRINCIPAL_POINT) cvflags|=cv::CALIB_FIX_PRINCIPAL_POINT;
         double rms=cv::calibrateCamera(objects,pixels,cv::Size(width,height),k,d,rvecs,tvecs,cvflags);
         if(!std::isfinite(rms)) return VK_ERROR_BACKEND;
-        if(rms>limits->maximum_rms_pixels) return VK_ERROR_CALIBRATION_RMS;
+        if(rms>limits->maximum_rms_pixels) {
+            *out_rms=rms;
+            return VK_ERROR_CALIBRATION_RMS;
+        }
         vk_camera_model model{sizeof(vk_camera_model),width,height,k.at<double>(0,0),k.at<double>(1,1),
             k.at<double>(0,2),k.at<double>(1,2),VK_DISTORTION_PLUMB_BOB,
             d.at<double>(0),d.at<double>(1),d.at<double>(2),d.at<double>(3),d.at<double>(4)};
-        if(!std::isfinite(model.fx)||!std::isfinite(model.fy)||model.fx<=0||model.fy<=0) return VK_ERROR_BACKEND;
+        for(double value:{model.fx,model.fy,model.cx,model.cy,model.k1,
+            model.k2,model.p1,model.p2,model.k3})
+            if(!std::isfinite(value)) return VK_ERROR_BACKEND;
+        if(model.fx<=0||model.fy<=0) return VK_ERROR_BACKEND;
         std::vector<vk_calibration_view_result> results(view_count);
         for(uint32_t i=0;i<view_count;++i){
             std::vector<cv::Point2f> projected;
             cv::projectPoints(objects[i],rvecs[i],tvecs[i],k,d,projected);
             double sq=0;for(size_t j=0;j<projected.size();++j){auto q=projected[j]-pixels[i][j];sq+=q.dot(q);}
             results[i]={sizeof(vk_calibration_view_result),sqrt(sq/projected.size()),pose(rvecs[i],tvecs[i])};
+            const auto &p=results[i].camera_T_board;
+            for(double value:{results[i].rms_reprojection_error,p.x,p.y,p.z,
+                p.qx,p.qy,p.qz,p.qw})
+                if(!std::isfinite(value)) return VK_ERROR_BACKEND;
         }
         *out_model=model;*out_rms=rms;
         for(uint32_t i=0;i<view_count;++i)out_views[i]=results[i];
         return VK_OK;
-    } catch(const std::bad_alloc&){return VK_ERROR_OUT_OF_MEMORY;} catch(const cv::Exception&){return VK_ERROR_BACKEND;}
+    } catch(const std::bad_alloc&){return VK_ERROR_OUT_OF_MEMORY;} catch(const cv::Exception&){return VK_ERROR_BACKEND;} catch(...){return VK_ERROR_BACKEND;}
 }

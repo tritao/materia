@@ -50,7 +50,8 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 	extern fn vk_board_detect(image: ptr<const<vk_image_view>>, board: ptr<const<vk_board_spec>>, out_corners: ptr<vk_board_corner> @out_array("capacity"), capacity: u32, out_count: ptr<u32> @out) -> vk_result;
 	/**
 	 * Five or more views are required. flags is a bitwise OR of vk_calibration_flags.
-	 * On quality rejection, outputs remain untouched.
+	 * On RMS rejection, out_rms reports the measured value; model and view results
+	 * remain untouched. On coverage rejection, all outputs remain untouched.
 	 */
 	extern fn vk_calibrate(board: ptr<const<vk_board_spec>>, width: u32, height: u32, views: ptr<const<vk_calibration_view>> @in_array("view_count"), view_count: u32, limits: ptr<const<vk_calibration_limits>>, flags: u32, out_model: ptr<vk_camera_model>, out_rms: ptr<f64> @out, out_views: ptr<vk_calibration_view_result> @out_array("view_count")) -> vk_result;
 	/**
@@ -60,12 +61,16 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 	extern fn vk_marker_detector_create(dictionary: u32, params: ptr<const<vk_marker_detector_params>>, out_detector: ptr<vk_marker_detector> @out @owned) -> vk_result;
 	extern fn vk_marker_detector_destroy(detector: vk_marker_detector) -> void;
 	/**
+	 * Current OpenCV worker cap in this VisionKit library instance.
+	 */
+	extern fn vk_opencv_threads() -> u32;
+	/**
 	 * Projects Materia camera-frame metre points. Points behind the camera are invalid.
 	 */
 	extern fn vk_project_points(model: ptr<const<vk_camera_model>>, points: ptr<const<vk_point3>> @in_array("count"), count: u32, out_pixels: ptr<vk_pixel> @out_array("count")) -> vk_result;
 	/**
 	 * For IPPE-square, object points are marker top-left, top-right,
-	 * bottom-right, bottom-left in its Materia YZ plane (+X out of the marker).
+	 * bottom-right, bottom-left in its Materia YZ plane (+X into the scene).
 	 */
 	extern fn vk_solve_pnp(model: ptr<const<vk_camera_model>>, object_points: ptr<const<vk_point3>> @in_array("count"), image_points: ptr<const<vk_pixel>> @in_array("count"), count: u32, method: u32, out_camera_T_object: ptr<vk_pose3>, out_reprojection_errors: ptr<f64> @out_array("count")) -> vk_result;
 	/**
@@ -100,6 +105,7 @@ interface VisionKitNative @target("portable-abi64") @library("visionkit_core") {
 		square_size_m: f64 @offset(16);
 		marker_size_m: f64 @offset(24);
 		dictionary: u32 @offset(32);
+		legacy_pattern: u32 @offset(36);
 	}
 	struct vk_calibration_limits @layout(24, 8) {
 		struct_size: u32 @offset(0) @struct_size;

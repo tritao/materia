@@ -15,6 +15,27 @@ std::mutex maps_mutex;
 std::unordered_map<uint32_t, std::shared_ptr<Map>> maps;
 uint32_t next_map = 1;
 bool vk_finite(double x) { return std::isfinite(x); }
+bool monotonic_distortion(const vk_camera_model &m, double x, double y) {
+    if (m.distortion_model == VK_DISTORTION_NONE) return true;
+    // Reject a ray if the distortion map folds anywhere between the optical
+    // axis and that ray. A folded ray has more than one inverse solution.
+    for (int i = 1; i <= 64; ++i) {
+        const double scale = double(i) / 64;
+        const double u = x*scale, v = y*scale;
+        const double r2 = u*u+v*v, r4 = r2*r2, r6 = r4*r2;
+        const double radial = 1+m.k1*r2+m.k2*r4+m.k3*r6;
+        const double radial_slope = 2*(m.k1+2*m.k2*r2+3*m.k3*r4);
+        const double jxx = radial+u*u*radial_slope+2*m.p1*v+6*m.p2*u;
+        const double jxy = u*v*radial_slope+2*m.p1*u+2*m.p2*v;
+        const double jyx = jxy;
+        const double jyy = radial+v*v*radial_slope+6*m.p1*v+2*m.p2*u;
+        if (!vk_finite(jxx) || !vk_finite(jyy) ||
+            jxx*jyy-jxy*jyx <= 0 ||
+            ((x != 0 || y != 0) &&
+             (x*jxx+y*jyx)*x+(x*jxy+y*jyy)*y <= 0)) return false;
+    }
+    return true;
+}
 bool valid_model(const vk_camera_model *m) {
     if (!m || m->struct_size < sizeof(vk_camera_model) || !m->width || !m->height ||
         m->width >= 32767 || m->height >= 32767 || !vk_finite(m->fx) ||
@@ -59,13 +80,19 @@ bool valid_image(const vk_image_view *v, uint32_t width, uint32_t height) {
     if (type < 0) return false;
     const uint64_t row = uint64_t(width) * CV_ELEM_SIZE(type);
     return v->stride_bytes >= row &&
+        (v->pixel_format != VK_PIXEL_DEPTH32F || v->stride_bytes % 4 == 0) &&
         uint64_t(v->stride_bytes) * (height - 1) + row <= v->buffer_bytes;
 }
 }
 
 extern "C" VK_API uint32_t vk_version(void) {
-    configure_threads();
-    return 1;
+    try { configure_threads(); return 1; }
+    catch (...) { return 0; }
+}
+
+extern "C" VK_API uint32_t vk_opencv_threads(void) {
+    try { return uint32_t(cv::getNumThreads()); }
+    catch (...) { return 0; }
 }
 
 extern "C" VK_API vk_result vk_project_points(const vk_camera_model *model,
@@ -81,6 +108,8 @@ extern "C" VK_API vk_result vk_project_points(const vk_camera_model *model,
             if (!vk_finite(p.x) || !vk_finite(p.y) || !vk_finite(p.z) || p.x <= 0)
                 return VK_ERROR_INVALID_ARGUMENT;
             // Materia (forward, left, up) -> OpenCV (right, down, forward).
+            const double u = -p.y/p.x, v = -p.z/p.x;
+            if (!monotonic_distortion(*model, u, v)) return VK_ERROR_INVALID_ARGUMENT;
             input.emplace_back(-p.y, -p.z, p.x);
         }
         std::vector<cv::Point2d> pixels;
@@ -92,7 +121,8 @@ extern "C" VK_API vk_result vk_project_points(const vk_camera_model *model,
         }
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }
 
 extern "C" VK_API vk_result vk_unproject_points(const vk_camera_model *model,
@@ -108,16 +138,20 @@ extern "C" VK_API vk_result vk_unproject_points(const vk_camera_model *model,
             input.emplace_back(pixels[i].x, pixels[i].y);
         }
         std::vector<cv::Point2d> normalized;
-        cv::undistortPoints(input, normalized, intrinsics(*model), distortion(*model));
+        cv::undistortPoints(input, normalized, intrinsics(*model), distortion(*model),
+            cv::noArray(), cv::noArray(),
+            cv::TermCriteria(cv::TermCriteria::COUNT | cv::TermCriteria::EPS, 100, 1e-12));
         for (uint32_t i = 0; i < count; ++i) {
             const double x = normalized[i].x, y = normalized[i].y;
+            if (!monotonic_distortion(*model, x, y)) return VK_ERROR_INVALID_ARGUMENT;
             const double length = std::sqrt(1 + x*x + y*y);
             if (!vk_finite(length) || length == 0) return VK_ERROR_BACKEND;
             out_rays[i] = {1/length, -x/length, -y/length};
         }
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }
 
 extern "C" VK_API vk_result vk_undistort_map_create(const vk_camera_model *model,
@@ -155,23 +189,26 @@ extern "C" VK_API vk_result vk_undistort_map_create(const vk_camera_model *model
         *out_map = id;
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }
 
 extern "C" VK_API void vk_undistort_map_destroy(vk_undistort_map map) {
-    std::lock_guard<std::mutex> lock(maps_mutex);
-    maps.erase(map);
+    try {
+        std::lock_guard<std::mutex> lock(maps_mutex);
+        maps.erase(map);
+    } catch (...) {}
 }
 
 extern "C" VK_API vk_result vk_undistort_image(vk_undistort_map map,
         const vk_image_view *src, const vk_image_view *dst) {
     std::shared_ptr<Map> mapping;
-    {
+    try {
         std::lock_guard<std::mutex> lock(maps_mutex);
         const auto it = maps.find(map);
         if (it == maps.end()) return VK_ERROR_INVALID_HANDLE;
         mapping = it->second;
-    }
+    } catch (...) { return VK_ERROR_BACKEND; }
     if (!valid_image(src, mapping->width, mapping->height) ||
         !valid_image(dst, mapping->width, mapping->height) ||
         src->pixel_format != dst->pixel_format) return VK_ERROR_INVALID_ARGUMENT;
@@ -190,5 +227,6 @@ extern "C" VK_API vk_result vk_undistort_image(vk_undistort_map map,
                   cv::BORDER_CONSTANT, cv::Scalar(0));
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }

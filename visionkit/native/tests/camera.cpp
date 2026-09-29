@@ -53,6 +53,37 @@ static void geometry(bool distorted) {
     }
 }
 
+static void absolute_conventions_and_edges() {
+    auto m = camera(false);
+    const vk_point3 points[] = {{2, 0.5, 0}, {2, -0.5, 0},
+        {2, 0, 0.5}, {2, 0, -0.5}};
+    vk_pixel pixels[4]{};
+    assert(vk_project_points(&m, points, 4, pixels) == VK_OK);
+    near(pixels[0].x, 100); near(pixels[1].x, 220);
+    near(pixels[2].y, 58.75); near(pixels[3].y, 181.25);
+    const vk_pixel left_top{40, 30};
+    vk_ray3 ray{};
+    assert(vk_unproject_points(&m, &left_top, 1, &ray) == VK_OK);
+    const double length = std::sqrt(1+0.5*0.5+(90.0/245)*(90.0/245));
+    near(ray.x, 1/length); near(ray.y, 0.5/length);
+    near(ray.z, (90.0/245)/length);
+
+    // A wide image exercises the inverse distortion near an actual corner.
+    m.width=1920; m.height=1080; m.fx=650; m.fy=640; m.cx=960; m.cy=540;
+    m.distortion_model=VK_DISTORTION_PLUMB_BOB;
+    m.k1=-0.23; m.k2=0.07; m.k3=-0.01; m.p1=0.001; m.p2=-0.002;
+    const vk_point3 edge{1, 1.2, 0.65};
+    vk_pixel distorted{};
+    assert(vk_project_points(&m, &edge, 1, &distorted)==VK_OK);
+    assert(vk_unproject_points(&m, &distorted, 1, &ray)==VK_OK);
+    const double norm=std::sqrt(1+1.2*1.2+0.65*0.65);
+    near(ray.y, 1.2/norm, 1e-7); near(ray.z, 0.65/norm, 1e-7);
+
+    m.k1=-0.5; m.k2=m.k3=m.p1=m.p2=0;
+    const vk_point3 folded{1, -std::sqrt(2.0), 0};
+    assert(vk_project_points(&m, &folded, 1, &distorted)==VK_ERROR_INVALID_ARGUMENT);
+}
+
 static void remap_and_stride() {
     auto m = camera(false);
     vk_undistort_map handle = 0;
@@ -112,6 +143,9 @@ static void distorted_maps() {
                         VK_PIXEL_DEPTH32F, uint32_t(src.size()), src.data()};
         vk_image_view b{sizeof(vk_image_view), m.width, m.height, stride,
                         VK_PIXEL_DEPTH32F, uint32_t(dst.size()), dst.data()};
+        b.stride_bytes = stride+1;
+        assert(vk_undistort_image(handle, &a, &b) == VK_ERROR_INVALID_ARGUMENT);
+        b.stride_bytes = stride;
         assert(vk_undistort_image(handle, &a, &b) == VK_OK);
         for (uint32_t y = 0; y < m.height; ++y)
             for (uint32_t x = 0; x < m.width; ++x) {
@@ -152,6 +186,10 @@ static void undistort_grid() {
             const int x = int(std::round(pixel.x)), y = int(std::round(pixel.y));
             assert(x >= 0 && y >= 0 && x < int(m.width) && y < int(m.height));
             assert(dst[y*m.width+x] > 100);
+            if (row == 0 && y >= 6 && y+6 < int(m.height)) {
+                assert(dst[(y-6)*m.width+x] < 100);
+                assert(dst[(y+6)*m.width+x] < 100);
+            }
         }
     vk_undistort_map_destroy(handle);
 }
@@ -174,6 +212,7 @@ static void invalid_arguments() {
 int main() {
     geometry(false);
     geometry(true);
+    absolute_conventions_and_edges();
     remap_and_stride();
     distorted_maps();
     undistort_grid();

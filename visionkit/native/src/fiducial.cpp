@@ -112,7 +112,7 @@ extern "C" VK_API vk_result vk_solve_pnp(const vk_camera_model *model,
         (method == VK_PNP_IPPE_SQUARE && (count != 4 || !valid_square(object_points))))
         return VK_ERROR_INVALID_ARGUMENT;
     try {
-        vk_version();
+        if (vk_version() != 1) return VK_ERROR_BACKEND;
         std::vector<cv::Point3d> object;
         std::vector<cv::Point2d> image;
         object.reserve(count); image.reserve(count);
@@ -126,18 +126,21 @@ extern "C" VK_API vk_result vk_solve_pnp(const vk_camera_model *model,
             image.emplace_back(q.x, q.y);
         }
         cv::Mat rvec, tvec;
-        const bool solved = cv::solvePnP(object, image, intrinsics(*model),
+        bool solved = cv::solvePnP(object, image, intrinsics(*model),
             distortion(*model), rvec, tvec, false,
             method == VK_PNP_IPPE_SQUARE ? cv::SOLVEPNP_IPPE_SQUARE : cv::SOLVEPNP_ITERATIVE);
+        if (!solved && method == VK_PNP_IPPE_SQUARE)
+            solved = cv::solvePnP(object, image, intrinsics(*model),
+                distortion(*model), rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
         if (!solved) return VK_ERROR_BACKEND;
         std::vector<cv::Point2d> projected;
         cv::projectPoints(object, rvec, tvec, intrinsics(*model), distortion(*model), projected);
         double sum_squared = 0;
         for (uint32_t i = 0; i < count; ++i)
             sum_squared += cv::normL2Sqr<double>(projected[i] - image[i]);
-        if (method == VK_PNP_IPPE_SQUARE && std::sqrt(sum_squared/count) > 2.0) {
-            // IPPE can return the reflected solution for a front-facing square.
-            // Refine independently and keep it only if reprojection improves.
+        if (method == VK_PNP_IPPE_SQUARE) {
+            // Near a front-facing square, IPPE's two planar solutions can have
+            // nearly equal error. The iterative solution is more stable there.
             cv::Mat refined_r, refined_t;
             if (cv::solvePnP(object, image, intrinsics(*model), distortion(*model),
                              refined_r, refined_t, false, cv::SOLVEPNP_ITERATIVE)) {
@@ -147,7 +150,8 @@ extern "C" VK_API vk_result vk_solve_pnp(const vk_camera_model *model,
                 double refined_squared = 0;
                 for (uint32_t i = 0; i < count; ++i)
                     refined_squared += cv::normL2Sqr<double>(refined_pixels[i] - image[i]);
-                if (refined_squared < sum_squared) {
+                if (std::isfinite(refined_squared) &&
+                    (!std::isfinite(sum_squared) || refined_squared <= sum_squared + 1e-6)) {
                     rvec = refined_r; tvec = refined_t;
                     projected = std::move(refined_pixels);
                 }
@@ -160,7 +164,8 @@ extern "C" VK_API vk_result vk_solve_pnp(const vk_camera_model *model,
         *out_camera_T_object = pose;
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }
 
 extern "C" VK_API vk_result vk_marker_detector_create(uint32_t dictionary,
@@ -168,6 +173,7 @@ extern "C" VK_API vk_result vk_marker_detector_create(uint32_t dictionary,
     if (!out_detector || (params && (params->struct_size < sizeof(*params) ||
         !std::isfinite(params->min_marker_perimeter_rate) ||
         params->min_marker_perimeter_rate <= 0 ||
+        params->min_marker_perimeter_rate > 1 ||
         params->corner_refinement > 1))) return VK_ERROR_INVALID_ARGUMENT;
     *out_detector = VK_INVALID_MARKER_DETECTOR;
     cv::aruco::PredefinedDictionaryType code;
@@ -178,7 +184,7 @@ extern "C" VK_API vk_result vk_marker_detector_create(uint32_t dictionary,
     default: return VK_ERROR_UNSUPPORTED;
     }
     try {
-        vk_version();
+        if (vk_version() != 1) return VK_ERROR_BACKEND;
         cv::aruco::DetectorParameters native_params;
         if (params) {
             native_params.minMarkerPerimeterRate = params->min_marker_perimeter_rate;
@@ -194,24 +200,27 @@ extern "C" VK_API vk_result vk_marker_detector_create(uint32_t dictionary,
         *out_detector = id;
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }
 
 extern "C" VK_API void vk_marker_detector_destroy(vk_marker_detector detector) {
-    std::lock_guard<std::mutex> lock(detector_mutex);
-    detectors.erase(detector);
+    try {
+        std::lock_guard<std::mutex> lock(detector_mutex);
+        detectors.erase(detector);
+    } catch (...) {}
 }
 
 extern "C" VK_API vk_result vk_marker_detect(vk_marker_detector detector,
     const vk_image_view *image, const vk_camera_model *model, double marker_size_m,
     vk_marker_observation *out_markers, uint32_t capacity, uint32_t *out_count) {
     std::shared_ptr<Detector> native;
-    {
+    try {
         std::lock_guard<std::mutex> lock(detector_mutex);
         const auto it = detectors.find(detector);
         if (it == detectors.end()) return VK_ERROR_INVALID_HANDLE;
         native = it->second;
-    }
+    } catch (...) { return VK_ERROR_BACKEND; }
     if (!valid_model(model) || !image || image->struct_size < sizeof(*image) ||
         !image->data || image->width != model->width || image->height != model->height ||
         (image->pixel_format != VK_PIXEL_GRAY8 && image->pixel_format != VK_PIXEL_RGB8) ||
@@ -261,5 +270,6 @@ extern "C" VK_API vk_result vk_marker_detect(vk_marker_detector detector,
             out_markers[i] = observations[i];
         return VK_OK;
     } catch (const std::bad_alloc &) { return VK_ERROR_OUT_OF_MEMORY;
-    } catch (const cv::Exception &) { return VK_ERROR_BACKEND; }
+    } catch (const cv::Exception &) { return VK_ERROR_BACKEND;
+    } catch (...) { return VK_ERROR_BACKEND; }
 }

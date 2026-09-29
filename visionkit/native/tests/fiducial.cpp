@@ -34,6 +34,23 @@ static void pnp() {
     near(pose.x, 1, 1e-5); near(pose.y, 0, 1e-5); near(pose.z, 0, 1e-5);
     near(std::abs(pose.qw), 1, 1e-5);
     for (double error : errors) near(error, 0, 1e-5);
+    // Front-facing, laterally offset markers are a planar PnP ambiguity case.
+    for (int i = 0; i < 4; ++i)
+        in_camera[i] = {1, object[i].y+0.25, object[i].z-0.12};
+    assert(vk_project_points(&m, in_camera, 4, pixels) == VK_OK);
+    assert(vk_solve_pnp(&m, object, pixels, 4, VK_PNP_IPPE_SQUARE,
+                        &pose, errors) == VK_OK);
+    near(pose.x, 1, 1e-4); near(pose.y, 0.25, 1e-4); near(pose.z, -0.12, 1e-4);
+    near(std::abs(pose.qw), 1, 1e-4);
+    near(pose.qx, 0, 1e-4); near(pose.qy, 0, 1e-4); near(pose.qz, 0, 1e-4);
+    // A 90 degree in-plane roll has an absolute orientation expectation.
+    for (int i = 0; i < 4; ++i)
+        in_camera[i] = {1, -object[i].z, object[i].y};
+    assert(vk_project_points(&m, in_camera, 4, pixels) == VK_OK);
+    assert(vk_solve_pnp(&m, object, pixels, 4, VK_PNP_IPPE_SQUARE,
+                        &pose, errors) == VK_OK);
+    near(std::abs(pose.qx), std::sqrt(0.5), 1e-4);
+    near(std::abs(pose.qw), std::sqrt(0.5), 1e-4);
     assert(vk_solve_pnp(&m, object, pixels, 3, VK_PNP_IPPE_SQUARE,
                         &pose, errors) == VK_ERROR_INVALID_ARGUMENT);
     const vk_point3 arbitrary[6] = {{0,0,0},{0,0.2,0},{0,0,0.2},
@@ -86,6 +103,7 @@ static void detection() {
     auto image = view(frame);
     vk_marker_detector detector = 0;
     assert(vk_marker_detector_create(VK_ARUCO_4X4_50, nullptr, &detector) == VK_OK);
+    assert(vk_opencv_threads() == VK_OPENCV_THREADS);
     vk_marker_observation found[4]{};
     uint32_t count = 0;
     assert(vk_marker_detect(detector, &image, &m, 0.18, found, 4, &count) == VK_OK);

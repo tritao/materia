@@ -26,8 +26,12 @@ class MarkerDetector {
   public function detect(image:ImageView, model:CameraModel,
       markerSizeMetres:Float, capacity:Int = 64):Array<MarkerObservation> {
     if (disposed) throw "Marker detector has been disposed";
+    if (capacity <= 0) throw "Marker capacity must be positive";
     var result = VisionKitNative.vk_marker_detect(owner.borrow(), image.native(),
       model.native(), markerSizeMetres, capacity);
+    if (result.status == -6)
+      result = VisionKitNative.vk_marker_detect(owner.borrow(), image.native(),
+        model.native(), markerSizeMetres, result.out_count);
     if (result.status != 0)
       throw 'Marker detection failed with VisionKit error ${result.status}';
     var output:Array<MarkerObservation> = [];

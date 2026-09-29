@@ -60,11 +60,18 @@ or RGB8 images. Chessboard `columns` and `rows` count inner corners; ChArUco
 dimensions count squares. IDs are row major. `vk_calibrate` requires at least
 five detected views with six corners each, one image size, and limits for
 minimum horizontal and vertical image coverage and maximum RMS pixel error.
+The coverage limit also requires that fraction of a 4×4 image grid to contain
+corners in at least two views, so one unusually wide view cannot compensate
+for otherwise clustered images.
 Flags can fix the principal point and force tangential distortion to zero.
 It returns the camera model, overall RMS, and each view's RMS and
 `camera_T_board`. The board frame is +X normal into the scene, +Y left, +Z up.
 Its origin is the first inner corner for a chessboard and the upper-left board
 edge for ChArUco, following the board's generated coordinate grid.
+An ordinary symmetric chessboard cannot distinguish a 180° rotation from its
+image alone, so per-view board yaw may flip. Use ChArUco when stable board
+orientation matters. The CLI accepts `--dictionary=...` and
+`--legacy-pattern` for boards printed with OpenCV's pre-4.6 layout.
 Coverage and RMS failures return `VK_ERROR_CALIBRATION_COVERAGE` and
 `VK_ERROR_CALIBRATION_RMS`; output values remain unchanged on rejection.
 
@@ -76,7 +83,8 @@ visionkit_calibrate images/ camera.json charuco 8 6 0.04 0.025
 visionkit_calibrate images/ camera.json chessboard 7 5 0.04
 ```
 
-Optional trailing values set minimum coverage (default 0.35 per axis) and
+Optional trailing values set minimum coverage (default 0.35 for each axis and
+the repeated grid-cell fraction) and
 maximum RMS in pixels (default 1.5). For ChArUco, marker size is required.
 The tool reports detected corners per file and per-view errors.
 
@@ -90,8 +98,13 @@ The SHA-256 covers the exact calibration file bytes. Each sensor must exist in
 the robot model with kind `camera`. The current RobotModel sensor schema has no
 image dimensions to compare; calibration dimensions are validated when used
 with a `SensorFrame`. Schemas 3 and 4 remain supported without `cameras`.
+Calibration references stay within the deployment directory. A camera frame
+is optional for intrinsic calibration; a world pose pipeline must require a
+mounted frame separately.
 
 The Haxe smoke test can be compiled with
 `./haxeon/scripts/haxeon build --compiler-only --project visionkit/tests/haxeon.json`.
 Run its `main.hl` with the repository's `haxeon/.tools/hashlink/hl`, with the
 native build directory and `haxeon/out` on `LD_LIBRARY_PATH`.
+Run native, Haxe smoke, and RobotKit adapter checks together with
+`VISIONKIT_OPENCV_DIR=<prefix> visionkit/tests/run-all.sh`.

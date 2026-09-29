@@ -32,6 +32,19 @@ class VisionKitSmokeTests {
         try CameraCalibration.fromJson('{"version":2,"cameraModel":{}}')
           catch (_:Dynamic) rejected = true;
         if (!rejected) throw "unsupported calibration version accepted";
+        for (bad in [
+          StringTools.replace(calibration.toJson(), '"width":64', '"width":"64"'),
+          StringTools.replace(calibration.toJson(), '"fx":40', '"fx":"40"'),
+          StringTools.replace(calibration.toJson(), '"source":"test fixture"', '"source":5')
+        ]) {
+          rejected = false;
+          try CameraCalibration.fromJson(bad) catch (_:Dynamic) rejected = true;
+          if (!rejected) throw "malformed calibration field accepted";
+        }
+        rejected = false;
+        try new CameraModel(64, 48, Math.NaN, 40, 32, 24)
+          catch (_:Dynamic) rejected = true;
+        if (!rejected) throw "NaN camera model accepted";
         var map = new UndistortMap(new CameraModel(64, 48, 40, 40, 32, 24));
         var input = Bytes.alloc(64 * 48); input.set(24 * 64 + 32, 173);
         var output = Bytes.alloc(64 * 48);

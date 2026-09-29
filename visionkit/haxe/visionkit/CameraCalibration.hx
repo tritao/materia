@@ -41,25 +41,38 @@ class CameraCalibration {
     });
   }
 
+  static function number(value:Dynamic, field:String):Float {
+    var fieldValue:Dynamic = Reflect.field(value, field);
+    if ((!Std.isOfType(fieldValue, Int) && !Std.isOfType(fieldValue, Float)) ||
+        !Math.isFinite(fieldValue)) throw 'Invalid numeric calibration field $field';
+    return fieldValue;
+  }
+
+  static function integer(value:Dynamic, field:String):Int {
+    var fieldValue:Dynamic = Reflect.field(value, field);
+    if (!Std.isOfType(fieldValue, Int)) throw 'Invalid integer calibration field $field';
+    return fieldValue;
+  }
+
+  static function string(value:Dynamic, field:String):String {
+    var fieldValue:Dynamic = Reflect.field(value, field);
+    if (!Std.isOfType(fieldValue, String) || fieldValue == "")
+      throw 'Invalid text calibration field $field';
+    return fieldValue;
+  }
+
   public static function fromJson(text:String):CameraCalibration {
     var root:Dynamic = Json.parse(text);
-    if (root == null || Reflect.field(root, "version") != VERSION)
+    if (root == null || Std.isOfType(root, Array) || Reflect.field(root, "version") != VERSION)
       throw "Unsupported camera calibration version";
     var m:Dynamic = Reflect.field(root, "cameraModel");
-    if (m == null) throw "Missing camera model";
-    for (field in ["width", "height", "fx", "fy", "cx", "cy",
-        "distortionModel", "k1", "k2", "p1", "p2", "k3"])
-      if (!Reflect.hasField(m, field)) throw 'Missing camera model field $field';
-    for (field in ["rmsReprojectionError", "calibrationTime",
-        "boardDescription", "source"])
-      if (!Reflect.hasField(root, field)) throw 'Missing calibration field $field';
-    var model = new CameraModel(Reflect.field(m, "width"), Reflect.field(m, "height"),
-      Reflect.field(m, "fx"), Reflect.field(m, "fy"), Reflect.field(m, "cx"),
-      Reflect.field(m, "cy"), Reflect.field(m, "distortionModel"),
-      Reflect.field(m, "k1"), Reflect.field(m, "k2"), Reflect.field(m, "p1"),
-      Reflect.field(m, "p2"), Reflect.field(m, "k3"));
-    return new CameraCalibration(model, Reflect.field(root, "rmsReprojectionError"),
-      Reflect.field(root, "calibrationTime"), Reflect.field(root, "boardDescription"),
-      Reflect.field(root, "source"));
+    if (m == null || Std.isOfType(m, Array)) throw "Missing camera model";
+    var model = new CameraModel(integer(m, "width"), integer(m, "height"),
+      number(m, "fx"), number(m, "fy"), number(m, "cx"), number(m, "cy"),
+      integer(m, "distortionModel"), number(m, "k1"), number(m, "k2"),
+      number(m, "p1"), number(m, "p2"), number(m, "k3"));
+    return new CameraCalibration(model, number(root, "rmsReprojectionError"),
+      string(root, "calibrationTime"), string(root, "boardDescription"),
+      string(root, "source"));
   }
 }

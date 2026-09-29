@@ -12,6 +12,7 @@ import robotkit.world.CameraImage;
 import robotkit.world.SensorFrame;
 import visionkit.CameraCalibration;
 import visionkit.CameraModel;
+import visionkit.ImageView;
 import visionkit.MarkerDetector;
 
 class VisionKitRobotKitTests {
@@ -48,6 +49,18 @@ class VisionKitRobotKitTests {
         snapshot.detections()[0].frameId != "cam-frame")
       throw "FiducialPerception did not consume VisionKit marker";
     detector.dispose();
+    for (y in 0...120) for (x in 0...120) {
+      var row = rows[Std.int(y/20)];
+      if (row.charAt(Std.int(x/20)) == "0") {
+        var offset = ((180+y)*width + 80+x)*3;
+        pixels.set(offset, 0); pixels.set(offset+1, 0); pixels.set(offset+2, 0);
+      }
+    }
+    var direct = new MarkerDetector(MarkerDetector.ARUCO_4X4_50);
+    var crowded = direct.detect(new ImageView(width, height, width*3, 1, pixels),
+      model, 0.24, 1);
+    if (crowded.length != 2) throw "Marker detection did not grow its result buffer";
+    direct.dispose();
     testDeployment();
     trace("VisionKit RobotKit integration passed");
   }
@@ -81,10 +94,21 @@ class VisionKitRobotKitTests {
     sys.io.File.saveContent(path, Json.stringify(deployment));
     expectInvalid(path);
     Reflect.setField(row, "sha256", Sha256.encode(bytes.toString()));
+    var invalidBytes = Bytes.ofString("{}");
+    sys.io.File.saveBytes(directory + "/camera.json", invalidBytes);
+    Reflect.setField(row, "sha256", Sha256.encode(invalidBytes.toString()));
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+    sys.io.File.saveBytes(directory + "/camera.json", bytes);
+    Reflect.setField(row, "sha256", Sha256.encode(bytes.toString()));
     Reflect.setField(row, "sensorId", "missing");
     sys.io.File.saveContent(path, Json.stringify(deployment));
     expectInvalid(path);
     Reflect.setField(row, "sensorId", "sensor/cam");
+    Reflect.setField(row, "calibration", "../camera.json");
+    sys.io.File.saveContent(path, Json.stringify(deployment));
+    expectInvalid(path);
+    Reflect.setField(row, "calibration", "camera.json");
     Reflect.setField(row, "extra", 1);
     sys.io.File.saveContent(path, Json.stringify(deployment));
     expectInvalid(path);

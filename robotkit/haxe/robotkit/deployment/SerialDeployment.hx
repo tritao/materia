@@ -52,11 +52,28 @@ class SerialDeployment {
           throw 'robotd: camera $sensorId must name a camera sensor';
         var hash = requiredString(entry, "sha256");
         if (!~/^[0-9a-f]{64}$/.match(hash)) throw 'robotd: camera $sensorId requires lowercase SHA-256';
-        var calibrationPath = Path.join([directory, requiredString(entry, "calibration")]);
-        var bytes = sys.io.File.getBytes(calibrationPath);
+        var calibrationName = requiredString(entry, "calibration");
+        var normalizedName = StringTools.replace(calibrationName, "\\", "/");
+        if (StringTools.startsWith(normalizedName, "/") ||
+            ~/^[A-Za-z]:/.match(normalizedName) ||
+            normalizedName.split("/").indexOf("..") >= 0)
+          throw 'robotd: camera $sensorId calibration must stay within the deployment directory';
+        var calibrationPath = Path.join([directory, calibrationName]);
+        var deploymentDirectory = sys.FileSystem.fullPath(directory);
+        var resolvedCalibration = sys.FileSystem.fullPath(calibrationPath);
+        var directoryPrefix = StringTools.endsWith(deploymentDirectory, "/") ?
+          deploymentDirectory : deploymentDirectory + "/";
+        if (!StringTools.startsWith(resolvedCalibration, directoryPrefix))
+          throw 'robotd: camera $sensorId calibration resolves outside the deployment directory';
+        var bytes:haxe.io.Bytes;
+        try bytes = sys.io.File.getBytes(calibrationPath)
+        catch (_:Dynamic) throw 'robotd: camera $sensorId calibration file cannot be read';
         if (sha256Hex(bytes) != hash)
           throw 'robotd: camera $sensorId calibration SHA-256 mismatch';
-        cameras.set(sensorId, CameraCalibration.fromJson(bytes.toString()));
+        var parsedCalibration:CameraCalibration;
+        try parsedCalibration = CameraCalibration.fromJson(bytes.toString())
+        catch (_:Dynamic) throw 'robotd: camera $sensorId calibration JSON is invalid';
+        cameras.set(sensorId, parsedCalibration);
       }
     }
     channels = [];

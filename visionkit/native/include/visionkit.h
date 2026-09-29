@@ -101,6 +101,8 @@ typedef uint32_t vk_undistort_map VK_HANDLE VK_HANDLE_DESTROY(vk_undistort_map_d
 
 /** Version of the VisionKit C ABI. */
 VK_API uint32_t vk_version(void);
+/** Current OpenCV worker cap in this VisionKit library instance. */
+VK_API uint32_t vk_opencv_threads(void);
 
 /** Projects Materia camera-frame metre points. Points behind the camera are invalid. */
 VK_API vk_result vk_project_points(const vk_camera_model *model,
@@ -134,7 +136,7 @@ typedef struct vk_pose3 {
 } vk_pose3;
 
 /** For IPPE-square, object points are marker top-left, top-right,
- * bottom-right, bottom-left in its Materia YZ plane (+X out of the marker). */
+ * bottom-right, bottom-left in its Materia YZ plane (+X into the scene). */
 VK_API vk_result vk_solve_pnp(const vk_camera_model *model,
     const vk_point3 *object_points VK_IN_ARRAY(count),
     const vk_pixel *image_points VK_IN_ARRAY(count), uint32_t count,
@@ -183,6 +185,7 @@ typedef struct vk_board_spec {
     uint32_t kind, columns, rows;
     double square_size_m, marker_size_m;
     uint32_t dictionary;
+    uint32_t legacy_pattern; /* ChArUco pre-4.6 pattern when nonzero */
 } vk_board_spec;
 typedef struct vk_board_corner {
     uint32_t id;
@@ -204,7 +207,7 @@ typedef struct vk_calibration_view {
 } vk_calibration_view;
 typedef struct vk_calibration_limits {
     uint32_t struct_size VK_STRUCT_SIZE;
-    double minimum_coverage; /* fraction of image spanned in each axis, 0..1 */
+    double minimum_coverage; /* axis span and repeat-observed 4x4 cell fraction, 0..1 */
     double maximum_rms_pixels;
 } vk_calibration_limits;
 typedef struct vk_calibration_view_result {
@@ -213,7 +216,8 @@ typedef struct vk_calibration_view_result {
     vk_pose3 camera_T_board;
 } vk_calibration_view_result;
 /** Five or more views are required. flags is a bitwise OR of vk_calibration_flags.
- * On quality rejection, outputs remain untouched. */
+ * On RMS rejection, out_rms reports the measured value; model and view results
+ * remain untouched. On coverage rejection, all outputs remain untouched. */
 VK_API vk_result vk_calibrate(const vk_board_spec *board, uint32_t width, uint32_t height,
     const vk_calibration_view *views VK_IN_ARRAY(view_count), uint32_t view_count,
     const vk_calibration_limits *limits, uint32_t flags, vk_camera_model *out_model,
