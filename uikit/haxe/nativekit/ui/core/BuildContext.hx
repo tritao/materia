@@ -132,8 +132,13 @@ class BuildContext {
 
 	/** Revision fingerprint used to classify style work before the next submission. */
 	public var styleRevision(get, never):Int;
-	function get_styleRevision():Int
-		return theme.styles.revision * 1000003 + styleSheet.revision * 1009 + environment.revision;
+	function get_styleRevision():Int {
+		// Sheet identities matter: replacing the theme with another that has taken the same number
+		// of edits (light to dark) must still change the fingerprint that retained views compare.
+		var result = theme.styles.identity * 1000003 + theme.styles.revision;
+		result = result * 1000003 + styleSheet.identity * 1009 + styleSheet.revision;
+		return result * 1000003 + environment.identity * 1009 + environment.revision;
+	}
 
 	/** Installs the UiContext focus route used by composite keyboard widgets. */
 	public function setFocusRequester(requester:WidgetId->Bool):Void {
