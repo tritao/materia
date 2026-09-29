@@ -13,7 +13,7 @@ first, then builds perception on top, then connects the two end to end.
 |---|---|---|
 | 1 | Outbound traffic control in `robotd` (priority, drop policy) | none |
 | 2 | Subscriptions, capabilities, RKF1 schema lock | 1 |
-| 3 | Registered recording channels | none |
+| 3 | Recording v6: MessagePack channels, no built-in kinds, LZ4 | 2 |
 | 4 | In-process perception: inference module, types, detector, config | none |
 | 5 | Robot event stream, then observations end to end (wire, events, recording, replay) | 1–4 |
 | 6 | Clock mapping data model (no estimation) | none |
@@ -21,8 +21,9 @@ first, then builds perception on top, then connects the two end to end.
 
 Each phase is committed separately, with tests passing at every commit. Stop
 after each phase and summarize what changed, what was decided and any deviation
-from this plan, so it can be reviewed before the next phase starts. Phases 3, 4
-and 6 don't depend on 1–2 and may be done in any order relative to them.
+from this plan, so it can be reviewed before the next phase starts. Phase 3
+builds on phase 2's RKF1 lock. Phases 4 and 6 don't depend on 1–3 and may be
+done in any order relative to them.
 
 ## Decisions already made (do not re-litigate)
 
@@ -48,8 +49,14 @@ and 6 don't depend on 1–2 and may be done in any order relative to them.
   - Priority comes from a scheduler in `robotd` (phase 1), not from a new
     protocol.
   - A second bulk connection, UDP, QUIC and HTTP are all out of scope.
-- **Recording format.** Recordings stay MCAP with JSON payloads. Replay order
-  stays file order plus ordinal, never source clocks.
+- **Recording format.**
+  - Recordings stay MCAP.
+  - Payloads become MessagePack using the same haxeon `@:wire` classes as RKF1.
+    JSON payloads and base64 images go away.
+  - Every recorded type is a registered channel. There are no built-in kinds.
+  - There is no backward compatibility with v5 recordings: drop the v5 reader
+    and writer paths.
+  - Replay order stays file order plus ordinal, never source clocks.
 - **Clocks are never synchronized.** Source and received times stay separate,
   and a cross-clock mapping always carries an error bound.
 - **Minimal protocol.** RKF1 stays point-to-point. Subscriptions are a filter,
@@ -228,40 +235,99 @@ offers, and published RKF1 message shapes can't change silently.
    - Capabilities are reported.
    - Changing a field id fails the lock check.
 
-## Phase 3: registered recording channels
+## Phase 3: recording v6 (MessagePack channels, no built-in kinds, LZ4)
 
-Goal: a new recorded type is added by registering a channel, not by editing the
-C ABI, the enum and five switches. Existing recordings still read.
+Goal: every recorded type is an ordinary registered channel whose payload is
+the MessagePack encoding of a `@:wire` class.
+- The wire and the recording share one schema definition, protected by the
+  RKF1 lock from phase 2.
+- Blobs are raw bytes.
+- Chunks can be compressed.
+- There is no v5 compatibility.
 
-1. **Native registry.** Add to the native writer:
-   `rk_recording_writer_register_channel(writer, name, schema_name,
-   schema_json, &channel_id)` and `rk_recording_writer_enqueue_channel(writer,
-   channel_id, entry...)`.
-   - Encoding stays JSON. Channel topics are `robotkit/<name>`, with
-     `robotkit.schema_version` metadata kept.
-   - The existing 7 kinds become built-in registrations with their current
-     names and schemas, so files written by v5 writers are unchanged.
-   - Keep the old `enqueue` by kind as a thin wrapper.
-   - Keep the bounded queue and drop accounting.
-2. **Haxe side.**
-   - A `RecordingChannel` interface: name, schema name and version, and JSON
-     `encode`/`decode` for one payload type.
-   - A registry used by `McapRobotRecording` and `McapRecordingReader`.
-   - Add a generic `RobotRecordingEvent.Channel(robotId, channelName, payload)`
-     case. The reader decodes it with the registered channel. It skips and
-     counts unknown channels instead of throwing, unless the reader runs in a
-     strict mode.
-3. **Versioning.** Bump the entry/codec version to 6. A v6 reader accepts v5
-   files and a v5 file stays byte-identical when re-recorded.
-4. **Replay order is unchanged:** file order plus ordinal.
-5. **Tests.**
-   - Round-trip a test channel.
-   - Read an existing v5 fixture.
-   - Unknown-channel skipping.
-   - Queue-full drops are counted.
-   - `tests/mcap-independent.sh` still validates files with the Python `mcap`
-     reader.
-   - Regenerate the `.hxi`.
+1. **Recorded types become `@:wire` classes.** Each of today's seven kinds
+   (command, snapshot, sensor, fault, world, world_event, process_event) gets a
+   `@:wire` class.
+   - Reuse existing RKF1 classes where one already matches (for example
+     `RobotStateMsg`, `SensorFrameMsg`, `CameraFrame`).
+   - Add recording-specific classes only where none exists.
+   - Camera pixels are a `Bytes` field, not base64, not an attachment reference.
+   - Add every new class to the RKF1 lock (phase 2), so wire and recording
+     compatibility are checked by the same tool.
+2. **Native writer (`runtime/src/recording.cpp`, `robotkit_runtime.h`).**
+   - Remove the kind enum (`RK_RECORDING_*` kinds), `Names[]`, `SchemaV1-5`,
+     `validKind`, the per-kind loops and the version-5 checks.
+   - Add
+     `rk_recording_writer_register_channel(writer, topic, schema_name,
+     schema_encoding, schema_data, schema_data_len, message_encoding,
+     &channel_id)`.
+   - Add `rk_recording_writer_enqueue(writer, channel_id, ordinal,
+     recording_timestamp_ns, payload, payload_len)`. The writer treats the
+     payload as opaque bytes.
+   - Channel conventions:
+     - topic `robotkit/<name>`;
+     - message encoding `msgpack`;
+     - schema encoding `robotkit-wire`;
+     - schema data is that class's entry from the RKF1 lock (name, field ids,
+       names and types), so a recording describes its own payloads.
+   - Keep the file-level `robotkit.schema_version` metadata, bumped to 6.
+   - Before relying on custom encoding strings, confirm in the pinned MCAP
+     source that MCAP accepts them.
+   - Keep log time as the wall-clock recording timestamp and publish time as
+     the ordinal, as today.
+   - Keep the bounded byte queue, the drop accounting and the terminal-status
+     record.
+   - Regenerate `runtime/bindings/robotkit-runtime.hxi`.
+3. **Compression.**
+   - `recording.cpp` currently compiles compression out
+     (`MCAP_COMPRESSION_NO_LZ4`, `MCAP_COMPRESSION_NO_ZSTD`).
+   - Add LZ4 as a pinned dependency, following the style of the MCAP
+     `FetchContent` in `robotkit/CMakeLists.txt`: prefer a small source build
+     of lz4, with an override for a system copy.
+   - Expose the chunk compression choice (`none`, `lz4`) in the writer options,
+     with `lz4` as the default. zstd is out of scope.
+   - Measure write CPU and file size on a camera-heavy recording and report the
+     numbers in the phase summary.
+4. **Haxe side.**
+   - A `RecordingChannel<T>` interface: channel name, the `@:wire` class, and
+     encode/decode through haxeon's MessagePack.
+   - A `RecordingChannels` registry that registers the seven core channels at
+     startup the same way any other channel registers. No special cases.
+   - `RobotRecordingEvent` becomes a generic `(robotId, channel, payload)`
+     record, or keeps typed cases built on the registry. Choose one and record
+     the reason; the goal is that adding a channel touches only the new channel
+     and its registration.
+   - Update `McapRobotRecording`, `McapRecordingReader`, `RobotRecording`,
+     `RecordingRobot` and `ReplayRobot`.
+   - The reader rejects files whose schema version isn't 6, with a clear
+     message.
+   - Unknown channels are skipped and counted, or cause an error in strict mode.
+5. **Remove v5.**
+   - Delete the JSON codec paths (`RobotRecordingCodec` JSON encoding,
+     base64 image handling) and any v5 fixtures.
+   - Update docs and tests that reference v5.
+   - Keep ordinal-based replay order unchanged.
+6. **Tools** (put them under `robotkit/tools/`, and check whether a recording
+   tools location already exists first):
+   - `dump`: prints any v6 recording as JSON lines, using the embedded schemas.
+     This is the debugging path, replacing human-readable payloads.
+   - `foxglove-export`: writes a copy of a recording that Foxglove Studio can
+     open. Camera frames go to Foxglove's well-known raw image schema, and
+     other channels become JSON. It can be Python using the `mcap` package that
+     `tests/mcap-independent.sh` already uses. Detections are added in phase 5.
+7. **Tests.**
+   - A round trip for every core channel, including a camera frame with a large
+     image, both uncompressed and with LZ4.
+   - Registering and round-tripping a test channel without touching any core
+     file.
+   - Skipping unknown channels, and rejecting non-v6 files.
+   - Counting queue-full drops.
+   - `tests/mcap-independent.sh` updated to decode MessagePack payloads with
+     Python and check them against the embedded schemas.
+   - `dump` output on a fixture recording.
+8. **Docs.** Rewrite the recording part of ARCHITECTURE.md (around the
+   "Persistent recording is an adapter below the world boundary" paragraphs)
+   for v6.
 
 ## Phase 4: in-process perception
 
@@ -290,6 +356,16 @@ C ABI (`robotkit_inference.h`), with an opaque `rk_inference_session` and
   slot, modelled on `rk_recording_writer_*`. `submit` never waits, and
   `poll_result` returns the newest result and the number of inputs dropped since
   the last poll.
+- **Native image pre-processing.** An async submit variant takes a raw `rgb8`
+  image (width, height, stride, bytes) plus pre-processing options: target
+  size, letterbox padding value, scale/mean/std normalization, and NCHW or NHWC
+  layout.
+  - The worker does letterbox-resize (bilinear), normalization and layout
+    conversion before running the model. None of this per-pixel work happens in
+    Haxe or on the `robotd` main loop.
+  - The result carries the letterbox transform (scale and padding) so boxes can
+    be mapped back to source pixels.
+  - Don't add OpenCV. This is a small, self-contained C++ routine.
 
 Before relying on ORT behavior (thread safety of `Run`, dynamic shapes, uint8),
 read the pinned release's headers under `ROBOTKIT_ONNXRUNTIME_DIR`.
@@ -298,7 +374,10 @@ Tests:
 - shapes and a known output;
 - the error paths;
 - `submit` returns promptly during a slow run;
-- drop counting.
+- drop counting;
+- pre-processing: letterbox geometry for wide, tall and exact-fit images;
+  normalization values; NCHW and NHWC layout; a stride larger than the row
+  width.
 
 Generate a tiny YOLO-style fixture model, with a known box and score for a known
 input, using a script next to
@@ -333,10 +412,11 @@ Validate constructor arguments like the existing perception types do.
 ### 4c. Detector pipeline (`ObjectDetectorPipeline`)
 
 - Accept `rgb8` only, and reject other encodings clearly.
-- Letterbox and normalize the image (the fixture is NCHW float32), then submit
-  it to the async session.
+- Submit the raw `rgb8` image to the async session with pre-processing options
+  (the fixture is NCHW float32). Letterboxing and normalization happen natively
+  (4a).
 - Decode boxes, apply the threshold and NMS in Haxe, and map boxes back to
-  source pixels.
+  source pixels using the letterbox transform returned with the result.
 - Tests: letterbox round-trip, NMS, threshold, an empty result, and rejection of
   non-`rgb8` input.
 
@@ -417,9 +497,10 @@ Goal: an observation produced in `robotd` reaches local behaviors, a remote
    - Pipelines with `host: worldd` run in a `PerceptionHost` inside
      `WorldHost`, fed from `RemoteRobot` camera frames. The world side must
      subscribe to those frames.
-4. **Recording.** Register a `perception.image_detections` recording channel
-   (phase 3). `RecordingRobot` records events, and `ReplayRobot` replays them
-   with their original ordinals.
+4. **Recording.** Register a `perception.image_detections` channel (phase 3),
+   reusing `ImageDetectionObservationMsg`. `RecordingRobot` records events, and
+   `ReplayRobot` replays them with their original ordinals. Extend
+   `foxglove-export` to write detections as Foxglove image annotations.
 5. **Tests.**
    - End to end over TCP: a camera fixture, then `robotd` perception with the
      fixture model, then a `RemoteRobot` in a `WorldHost`, then a behavior that
@@ -481,6 +562,9 @@ production path.
 - World fusion, tracking and shared maps.
 - `perceptiond` as a separate process.
 - GPU execution providers and other inference backends.
+- OpenCV. Reconsider it when a real need appears: camera capture (V4L2),
+  calibration and undistortion, or heavier image processing. Use the
+  already-vendored `stb_image` for JPEG decode.
 - `jpeg` and `depth32f` inference inputs.
 - Lifting `ImageDetection` into planar `Detection` (depth or intrinsics) through
   a `Perception` adapter for `FrameAwarePerception`.
@@ -529,8 +613,13 @@ production path.
   counted. The nativekit queue query is tested.
 - **Phase 2.** Legacy and subscribing clients both work. Rate limits and
   capabilities are tested. The RKF1 lock check runs in the test suite.
-- **Phase 3.** v5 recordings still read. A registered channel round-trips.
-  Unknown channels are skipped and counted. The independent MCAP check passes.
+- **Phase 3.**
+  - Every recorded type is a MessagePack channel, with no kind enum or v5 code
+    left.
+  - A new channel needs no core edits.
+  - LZ4 round-trips, with size and CPU numbers reported.
+  - `dump` and `foxglove-export` work on a fixture.
+  - The independent Python check decodes the payloads.
 - **Phase 4.** `RK_BUILD_INFERENCE=ON` builds on linux-x64, and ctest and the
   `.hxi` check pass. The detector, host, deployment and replay parity tests
   pass.
