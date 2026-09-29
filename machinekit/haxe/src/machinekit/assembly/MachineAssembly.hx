@@ -713,11 +713,7 @@ class MachineAssembly {
 
 	/** Solve every member pose from one AssemblyState, or read them from a supplied state. */
 	public function solvedPoses(?state:AssemblyState):Map<String, AssemblyFrame> {
-		if (state == null) {
-			var model = new AssemblyModel();
-			addTo(model, "");
-			state = model.solve();
-		}
+		if (state == null) state = new AssemblyState(describe().mechanical);
 		var result:Map<String, AssemblyFrame> = [];
 		for (member in members)
 			result.set(member.id, state.worldPose(member.id));
