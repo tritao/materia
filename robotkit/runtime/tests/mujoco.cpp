@@ -259,6 +259,10 @@ static void tool_piece_contact_is_reported(double obstacle_z, bool expected_acti
     uint32_t legacy_count = 0;
     assert(rk_simulation_get_robot_contacts(simulation, robot, legacy, 1, &legacy_count) == RK_OK);
     assert(legacy_count == count && legacy->struct_size == sizeof(legacy_storage));
+    rk_robot_contact zero_initialized{};
+    assert(rk_simulation_get_robot_contacts(simulation, robot, &zero_initialized, 1,
+        &legacy_count) == RK_OK);
+    assert(legacy_count == count && zero_initialized.struct_size == sizeof(zero_initialized));
     bool found = false;
     for (uint32_t i = 0; i < count; ++i) {
         rk_robot_contact contact{};

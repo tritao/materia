@@ -1142,7 +1142,6 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
                                          std::vector<rk_robot_contact> &out,
                                          uint64_t *step_index) const {
     Lock lock(session_);
-    if (step_index) *step_index = this->step_index();
     out.clear();
     const auto handle = std::find(handles_.begin(), handles_.end(), runtime);
     if (handle == handles_.end()) return RK_ERROR_INVALID_HANDLE;
@@ -1157,6 +1156,15 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
         if (world == 0 || nksim_world_snapshot(world, &owned) != NKSIM_OK)
             return RK_ERROR_INVALID_STATE;
         snapshot = owned;
+    }
+    if (step_index) {
+        nksim_clock clock{};
+        clock.struct_size = sizeof(clock);
+        if (nksim_snapshot_get_clock(snapshot, &clock) != NKSIM_OK) {
+            if (owned) nksim_snapshot_destroy(owned);
+            return RK_ERROR_BACKEND;
+        }
+        *step_index = clock.step_index;
     }
     rk_result result_code = RK_OK;
     uint64_t count = 0;

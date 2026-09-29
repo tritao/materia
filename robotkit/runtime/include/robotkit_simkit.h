@@ -517,6 +517,8 @@ RK_API rk_result RK_CALL rk_robot_contact_list_step_index(
     rk_robot_contact_list list, uint64_t *out_step_index RK_OUT);
 RK_API void RK_CALL rk_robot_contact_list_destroy(rk_robot_contact_list list);
 RK_API rk_result RK_CALL rk_simulation_get_robot_contacts(
+    /* A zero out[0].struct_size uses sizeof(rk_robot_contact). Otherwise it
+       supplies the stride and copied prefix size for each output entry. */
     rk_simulation simulation, rk_robot_runtime runtime, rk_robot_contact *out,
     uint32_t capacity, uint32_t *out_count RK_OUT);
 RK_API rk_result RK_CALL rk_simulation_get_robot_contact(

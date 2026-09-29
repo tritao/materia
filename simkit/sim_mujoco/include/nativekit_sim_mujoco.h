@@ -25,6 +25,7 @@ extern "C" {
 NKSIMMUJOCO_API nksim_result NKSIMMUJOCO_CALL nksim_mujoco_world_create(
     const nksim_world_desc *desc, nksim_world *out_world NK_OUT NK_OWNED);
 /** Diagnostic count of fallback geom-distance calls since process start. */
+/** Diagnostic count of fallback mj_geomDistance calls, useful in tests. */
 NKSIMMUJOCO_API uint64_t NKSIMMUJOCO_CALL nksim_mujoco_distance_call_count(void);
 
 #ifdef __cplusplus

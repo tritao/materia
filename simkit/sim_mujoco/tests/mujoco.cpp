@@ -1451,6 +1451,49 @@ void kinematic_parent_child_gap_is_filtered() {
     nkscene_scene_destroy(scene);
 }
 
+// A kinematic root with a child is jointless in MuJoCo and shares the world's
+// weld id. Its gap to an unrelated static obstacle must still be reported.
+void world_welded_kinematic_root_reports_static_proximity() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double half[] = {0.1, 0.1, 0.1};
+    nksim_shape shape = 0;
+    assert(nksim_shape_create_box(world, half, &shape) == NKSIM_OK);
+    assert(nksim_shape_set_contact(world, shape, 0.0, 0.03) == NKSIM_OK);
+    const auto root = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
+        NKSIM_MOTION_KINEMATIC, 1.0, shape);
+    const auto child = make_body(world, make_node_xyz(scene, 1.0, 0.0, 0.0),
+        NKSIM_MOTION_KINEMATIC, 1.0, shape);
+    const auto obstacle = make_body(world, make_node_xyz(scene, 0.21, 0.0, 0.0),
+        NKSIM_MOTION_STATIC, 0.0, shape);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_FIXED;
+    joint_desc.body_a = root;
+    joint_desc.body_b = child;
+    joint_desc.anchor_b[0] = -1.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    step_world(world, 1);
+    nksim_contact contacts[16]{};
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, contacts, 16, &count) == NKSIM_OK);
+    bool found = false;
+    for (uint32_t i = 0; i < count; ++i)
+        if ((contacts[i].body_a == root && contacts[i].body_b == obstacle) ||
+            (contacts[i].body_b == root && contacts[i].body_a == obstacle)) found = true;
+    assert(found);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 void kinematic_chain_self_collision_mask_blocks_proximity() {
     nkscene_scene scene = 0;
     assert(nkscene_scene_create(&scene) == NKS_OK);
@@ -2172,6 +2215,7 @@ int main() {
     kinematic_bodies_never_contact_static_or_each_other();
     distant_kinematic_pairs_skip_distance_calls();
     kinematic_parent_child_gap_is_filtered();
+    world_welded_kinematic_root_reports_static_proximity();
     kinematic_chain_self_collision_mask_blocks_proximity();
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();

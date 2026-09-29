@@ -1119,14 +1119,6 @@ private:
                 const auto low = std::min(first_owner->second.first, second_owner->second.first);
                 const auto high = std::max(first_owner->second.first, second_owner->second.first);
                 if (real_excludes.count({low, high}) != 0) continue;
-                const int body_a = model->geom_bodyid[first], body_b = model->geom_bodyid[second];
-                const int weld_a = model->body_weldid[body_a], weld_b = model->body_weldid[body_b];
-                const int parent_a = model->body_weldid[model->body_parentid[weld_a]];
-                const int parent_b = model->body_weldid[model->body_parentid[weld_b]];
-                if (!(model->opt.disableflags & mjDSBL_FILTERPARENT) &&
-                    (weld_a == weld_b ||
-                     (parent_a == weld_b && parent_a != 0) ||
-                     (parent_b == weld_a && parent_b != 0))) continue;
                 const double detection = model->geom_margin[first] + model->geom_margin[second] +
                     model->geom_gap[first] + model->geom_gap[second];
                 if (detection > 0.0) proximity_candidates.push_back({first, second, detection});

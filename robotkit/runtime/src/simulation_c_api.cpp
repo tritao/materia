@@ -323,7 +323,7 @@ rk_result RK_CALL rk_simulation_get_robot_contacts(rk_simulation simulation,
     const auto value = resolve_contact_list(list);
     *out_count = static_cast<uint32_t>(value->contacts.size());
     if (capacity != 0) {
-        const auto stride = out->struct_size;
+        const auto stride = out->struct_size == 0 ? sizeof(rk_robot_contact) : out->struct_size;
         if (stride < offsetof(rk_robot_contact, other_kind)) {
             rk_robot_contact_list_destroy(list);
             return RK_ERROR_INVALID_ARGUMENT;
