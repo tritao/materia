@@ -123,7 +123,8 @@ class MachineAssemblyDescriptionTests {
 		if (assembly.describe().mechanical.definitions.length != 1)
 			throw "Identical recipe parts should share a mechanical definition";
 		var detached = assembly.describe();
-		detached.mechanical.occurrences[0].initialPose.x = 42;
+		var editableCopy = machinekit.assembly.FrozenAssemblyDefinitions.thaw(detached.mechanical);
+		editableCopy.occurrences[0].initialPose.x = 42;
 		if (assembly.describe().mechanical.occurrences[0].initialPose.x == 42)
 			throw "Description retained a mutable connector or pose from the builder";
 		var encoded = assembly.encode();

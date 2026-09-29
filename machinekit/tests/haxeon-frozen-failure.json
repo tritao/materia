@@ -1,0 +1,32 @@
+{
+	"version": 1,
+	"package": {
+		"name": "machinekit-tests"
+	},
+	"entry": "FrozenMutationProbe",
+	"sourceRoots": [
+		"compile_fail"
+	],
+	"dependencies": {
+		"projectkit": {
+			"path": "../../projectkit"
+		},
+		"manufacturingkit": {
+			"path": "../../manufacturingkit"
+		},
+		"cadkit": {
+			"path": "../../cadkit"
+		},
+		"machinekit": {
+			"path": ".."
+		},
+		"cadbridge": {
+			"path": "../../robotkit/cadbridge"
+		},
+		"machinekit-picking-station-example": {
+			"path": "../examples/picking-station"
+		}
+	},
+	"target": "host",
+	"outputDir": "build/frozen-failure"
+}

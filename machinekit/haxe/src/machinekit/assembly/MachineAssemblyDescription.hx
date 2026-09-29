@@ -1,37 +1,99 @@
 package machinekit.assembly;
 
-import materia.assembly.AssemblyDefinition;
-import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
-import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
-import materia.assembly.AssemblyDefinition.KinematicJoint;
-import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
-import materia.assembly.AssemblyDefinition.AssemblyExposedConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import haxe.ds.ReadOnlyArray;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
 import machinekit.component.PortInterface;
 
-/** Wire-compatible read-only array view of the mechanical schema. */
+/** Wire-compatible read-only view of the mechanical schema. */
+@:wire typedef FrozenFrame = {
+	@:id(1) final x:Float;
+	@:id(2) final y:Float;
+	@:id(3) final z:Float;
+	@:id(4) final qx:Float;
+	@:id(5) final qy:Float;
+	@:id(6) final qz:Float;
+	@:id(7) final qw:Float;
+}
+
+@:wire typedef FrozenConnector = {
+	@:id(1) final name:String;
+	@:id(2) final frame:FrozenFrame;
+}
+
+@:wire typedef FrozenComponentDefinition = {
+	@:id(1) final id:String;
+	@:id(2) final connectors:ReadOnlyArray<FrozenConnector>;
+}
+
+@:wire typedef FrozenOccurrence = {
+	@:id(1) final id:String;
+	@:id(2) final definition:String;
+	@:id(3) final initialPose:FrozenFrame;
+	@:id(4) @:optional final assembly:String;
+}
+
+@:wire typedef FrozenVector = {
+	@:id(1) final x:Float;
+	@:id(2) final y:Float;
+	@:id(3) final z:Float;
+}
+
+@:wire typedef FrozenJointLimits = {
+	@:id(1) final lower:Null<Float>;
+	@:id(2) final upper:Null<Float>;
+	@:id(3) final velocity:Null<Float>;
+	@:id(4) final effort:Null<Float>;
+}
+
+@:wire typedef FrozenJoint = {
+	@:id(1) final id:String;
+	@:id(2) final type:materia.assembly.AssemblyDefinition.AssemblyJointType;
+	@:id(3) final role:materia.assembly.AssemblyDefinition.AssemblyJointRole;
+	@:id(4) final parent:String;
+	@:id(5) final parentConnector:String;
+	@:id(6) final child:String;
+	@:id(7) final childConnector:String;
+	@:id(8) final axis:FrozenVector;
+	@:id(9) final limits:FrozenJointLimits;
+	@:id(10) final defaultValue:Float;
+	@:id(11) @:optional final closureTolerance:Float;
+}
+
+@:wire typedef FrozenCoupling = {
+	@:id(1) final id:String;
+	@:id(2) final source:String;
+	@:id(3) final target:String;
+	@:id(4) final ratio:Float;
+	@:id(5) final offset:Float;
+}
+
+@:wire typedef FrozenExposedConnector = {
+	@:id(1) final name:String;
+	@:id(2) final occurrence:String;
+	@:id(3) final connector:String;
+}
+
 @:wire typedef FrozenAssemblySubdefinition = {
-	@:id(1) var id:String;
-	@:id(2) var definitions:ReadOnlyArray<AssemblyComponentDefinition>;
-	@:id(3) var occurrences:ReadOnlyArray<AssemblyComponentOccurrence>;
-	@:id(4) var joints:ReadOnlyArray<KinematicJoint>;
-	@:id(5) @:optional var couplings:ReadOnlyArray<AssemblyJointCoupling>;
-	@:id(6) @:optional var exposedConnectors:ReadOnlyArray<AssemblyExposedConnector>;
+	@:id(1) final id:String;
+	@:id(2) final definitions:ReadOnlyArray<FrozenComponentDefinition>;
+	@:id(3) final occurrences:ReadOnlyArray<FrozenOccurrence>;
+	@:id(4) final joints:ReadOnlyArray<FrozenJoint>;
+	@:id(5) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
+	@:id(6) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
 }
 
 @:wire typedef FrozenAssemblyDefinition = {
-	@:id(1) var schemaVersion:Int;
-	@:id(2) var id:String;
-	@:id(3) @:optional var lengthUnit:String;
-	@:id(4) var definitions:ReadOnlyArray<AssemblyComponentDefinition>;
-	@:id(5) var occurrences:ReadOnlyArray<AssemblyComponentOccurrence>;
-	@:id(6) var joints:ReadOnlyArray<KinematicJoint>;
-	@:id(7) @:optional var couplings:ReadOnlyArray<AssemblyJointCoupling>;
-	@:id(8) @:optional var assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
-	@:id(9) @:optional var exposedConnectors:ReadOnlyArray<AssemblyExposedConnector>;
+	@:id(1) final schemaVersion:Int;
+	@:id(2) final id:String;
+	@:id(3) @:optional final lengthUnit:String;
+	@:id(4) final definitions:ReadOnlyArray<FrozenComponentDefinition>;
+	@:id(5) final occurrences:ReadOnlyArray<FrozenOccurrence>;
+	@:id(6) final joints:ReadOnlyArray<FrozenJoint>;
+	@:id(7) @:optional final couplings:ReadOnlyArray<FrozenCoupling>;
+	@:id(8) @:optional final assemblies:ReadOnlyArray<FrozenAssemblySubdefinition>;
+	@:id(9) @:optional final exposedConnectors:ReadOnlyArray<FrozenExposedConnector>;
 }
 
 /** Serializable recipe inputs. The constructor IDs are part of the wire schema. */
