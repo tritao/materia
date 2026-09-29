@@ -158,6 +158,15 @@ class MachineKitSmoke {
 		near(combined.mass, 0.0054, "two block mass", 1e-9);
 		near(combined.centreOfMass.x, 10, "solved assembly centre of mass x");
 		near(combined.centreOfMass.z, 5, "solved assembly centre of mass z");
+		var childFirst = new MachineAssembly();
+		for (id in ["a", "b", "c"]) childFirst.addComponent(id, block);
+		childFirst.addMate("second", "fixed", "b", "right", "c", "origin");
+		childFirst.addMate("first", "fixed", "a", "right", "b", "origin");
+		var childFirstPoses = childFirst.solvedPoses();
+		var middlePose = childFirstPoses.get("b"), leafPose = childFirstPoses.get("c");
+		if (middlePose == null || leafPose == null) throw "Child-first MachineAssembly poses are missing";
+		near(middlePose.x, 20, "child-first MachineAssembly middle pose");
+		near(leafPose.x, 40, "child-first MachineAssembly leaf pose");
 		var combinedInertia:InertiaTensor = cast combined.inertia;
 		near(combinedInertia.xx, 0.09, "two block axial inertia", 1e-8);
 		near(combinedInertia.yy, 0.63, "parallel axis inertia", 1e-8);
