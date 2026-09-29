@@ -24,7 +24,7 @@ class EndEffectorFrames {
 		var x:Metres = (new Millimetres(frame.x)).metres();
 		var y:Metres = (new Millimetres(frame.y)).metres();
 		var z:Metres = (new Millimetres(frame.z)).metres();
-		return {position: {x: x, y: y, z: z},
+		return {position: {x: x.raw(), y: y.raw(), z: z.raw()},
 			quaternion: {x: frame.qx, y: frame.qy, z: frame.qz, w: frame.qw}};
 	}
 

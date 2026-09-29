@@ -12,4 +12,5 @@ enum ComponentParameterType {
 	Text;
 	Choice(options:Array<String>);
 	CatalogDesignation(index:CatalogIndex);
+	Optional(inner:ComponentParameterType);
 }

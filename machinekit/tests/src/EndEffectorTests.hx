@@ -46,13 +46,13 @@ class EndEffectorTests {
 		tool.workingFrame("contact", "cup", "contact", true);
 		tool.validate();
 		var tcp = tool.mountTFrame("contact");
-		close(tcp.y, 30, "contact y");
+		close(tcp.raw().y, 30, "contact y");
 		var mass = tool.massPropertiesAtMount();
 		close(mass.mass, 4, "mass");
 		close(mass.centreOfMass.y, 12.5, "centre y");
-		var robot = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(tcp));
+		var robot = EndEffectorFrames.toRobotFrame(tcp);
 		close(robot.position.z, 0.03, "robot metres");
-		var approach = EndEffectorFrames.approachYToZ(tcp);
+		var approach = EndEffectorFrames.approachYToZ(tcp.raw());
 		var axis = AssemblyFrames.transformVector(approach, 0, 0, 1);
 		close(axis.z, 1, "robot approach rotation");
 
@@ -64,8 +64,8 @@ class EndEffectorTests {
 		rotated.workingFrame("tip", "plate", "tip", true);
 		rotated.validate();
 		var rotatedFrame = rotated.mountTFrame("tip");
-		close(rotatedFrame.x, 20, "rotated TCP x");
-		close(rotatedFrame.y, 10, "rotated TCP y");
+		close(rotatedFrame.raw().x, 20, "rotated TCP x");
+		close(rotatedFrame.raw().y, 10, "rotated TCP y");
 		var rotatedMass = rotated.massPropertiesAtMount();
 		close(rotatedMass.centreOfMass.x, 0, "rotated mass x");
 		close(rotatedMass.centreOfMass.y, 10, "rotated mass y");

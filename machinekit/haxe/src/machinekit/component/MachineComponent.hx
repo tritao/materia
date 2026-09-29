@@ -96,7 +96,7 @@ class MachineComponent {
 	function get_bom():BomItem {
 		if (cachedBom != null) return cachedBom;
 		var recipe = type;
-		var valuesKey = recipe == null ? null : recipe.key(values());
+		var valuesKey = recipe == null ? null : recipe.bomKey(values());
 		cachedBom = {partNumber: recipe == null ? designation : recipe.partNumber(this),
 			description: description, quantity: 1,
 			material: MaterialLibrary.require(materialId).physical.spec,
@@ -104,17 +104,24 @@ class MachineComponent {
 		return cachedBom;
 	}
 
-	public function hasGeometry():Bool return false;
+	public function hasGeometry():Bool {
+		try {
+			var part = geometry(Preview);
+			part.close();
+			return true;
+		} catch (_:NoGeometry) return false;
+	}
 
 	public function geometry(detail:ComponentDetail = Preview):Part
-		throw 'Component "$designation" does not generate geometry';
+		throw new NoGeometry(designation);
 
 	/** The preview shape supplies volume and centroid; its density is kg/m³. */
 	public function massProperties():MassProperties {
 		if (declaredMass != null) return declaredMass;
 		if (cachedMass != null && cachedMassMaterialId == materialId) return cachedMass;
-		if (!hasGeometry()) throw 'Component "$designation" has no geometry or declared mass';
-		var part = geometry(Preview);
+		var part:Part;
+		try part = geometry(Preview) catch (_:NoGeometry)
+			throw 'Component "$designation" has no geometry or declared mass';
 		try {
 			var physical = part.massProperties();
 			var density = MaterialLibrary.require(materialId).physical.density;
@@ -149,12 +156,12 @@ class MachineComponent {
 	function buildTool(name:String, values:ComponentValues):Part
 		throw 'Unknown tool "$name" for "$designation"';
 
-	public function componentType():Null<ComponentType> return MachineKitAdditionalRecipes.typeFor(this);
+	public function componentType():Null<ComponentType> return null;
 
 	function get_type():Null<ComponentType> return componentType();
 
 	public function values():ComponentValues
-		return MachineKitAdditionalRecipes.valuesFor(this);
+		throw 'Component "$designation" has no recipe values';
 
 	public function connectors():Array<Connector>
 		return connectorList.copy();

@@ -33,6 +33,15 @@ class ParallelGripper extends MachineComponent {
 		addCapability(Grip(stroke, null, "open", "close"));
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.parallel-gripper");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, ParallelGripper) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setNumber("width", width).setNumber("depth", depth).setNumber("length", length).setNumber("stroke", stroke).setToken("material", materialSpec());
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part

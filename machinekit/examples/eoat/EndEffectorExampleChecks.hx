@@ -40,8 +40,8 @@ class EndEffectorExampleChecks {
 			long.massPropertiesAtMount().mass > short.massPropertiesAtMount().mass,
 			"Longer EOAT should have greater mass");
 		var shortContact = short.mountTFrame("contact"), longContact = long.mountTFrame("contact");
-		var dx = longContact.x - shortContact.x, dy = longContact.y - shortContact.y,
-			dz = longContact.z - shortContact.z;
+		var dx = longContact.raw().x - shortContact.raw().x, dy = longContact.raw().y - shortContact.raw().y,
+			dz = longContact.raw().z - shortContact.raw().z;
 		check(Math.abs(Math.sqrt(dx * dx + dy * dy + dz * dz) - 50) < 1e-6,
 			"Tool contact should move with bar length");
 		for (configuration in [short, long]) {

@@ -141,7 +141,7 @@ class EndEffector extends MachineAssembly {
 
 	/** MachineKit frame in mm, relative to the robot-facing mount connector. */
 	public function mountTFrame(name:String, ?state:AssemblyState,
-			?solved:EndEffectorSolvedContext):AssemblyFrame {
+			?solved:EndEffectorSolvedContext):ConnectorFrame {
 		if (mountRef == null) throw "End effector needs a mount";
 		var frame:Null<WorkingFrame> = null;
 		for (entry in frames) if (entry.name == name) frame = entry;
@@ -151,7 +151,7 @@ class EndEffector extends MachineAssembly {
 		if (pose == null) throw 'Missing solved pose for "${frame.instanceId}"';
 		var frameWorld = AssemblyFrames.compose(pose,
 			memberConnectorFrame(frame.instanceId, frame.connectorName));
-		return AssemblyFrames.compose(AssemblyFrames.inverse(context.mountWorld), frameWorld);
+		return new ConnectorFrame(AssemblyFrames.compose(AssemblyFrames.inverse(context.mountWorld), frameWorld));
 	}
 
 	/** Centre in mm and centroidal inertia in kg mm², both in the mount frame. */

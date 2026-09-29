@@ -351,6 +351,15 @@ class SteppedShaft extends MachineComponent {
 		return new SteppedShaft(sections, faces, rebuilt, grooves, detail);
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.motion.stepped-shaft");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, SteppedShaft) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return recipeValues().setToken("material", materialSpec());
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {

@@ -105,7 +105,6 @@ private class MassTestBlock extends MachineComponent {
 
 private class MassTestTube extends MachineComponent {
 	public function new() super("TEST-TUBE", "Rectangular test tube", "aluminium 6061", true);
-	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part
 		return new RectTube(40, 20, 2).geometry(100);
@@ -145,6 +144,8 @@ class MachineKitSmoke {
 		var expected = (40 * 20 - 36 * 16) * 100 * 1e-9 * 2700;
 		near(tube.massProperties().mass, expected, "rectangular tube analytic mass", 1e-9);
 		near(tube.massProperties().centreOfMass.z, 50, "tube centre of mass");
+		check(new MassTestTube().massProperties().mass > 0,
+			"Geometry-only override must provide computed mass");
 		check(tube.massProperties() == tube.massProperties(), "component mass estimate is cached");
 		check(switch tube.massProperties().source { case Computed(Preview): true; default: false; },
 			"preview mass source");
@@ -268,7 +269,7 @@ class MachineKitSmoke {
 			!PortInterfaces.compatible(Plug("M12", 4), Plug("M12", 5)) &&
 			PortInterfaces.compatible(Thread("G1/8-M"), Thread("G1/8-F")),
 			"port interfaces compare by value with thread mating rules");
-		check(Math.abs(((new Millimetres(250)).metres() : Float) - 0.25) < 1e-12 &&
+		check(Math.abs((new Millimetres(250)).metres().raw() - 0.25) < 1e-12 &&
 			Math.abs((new KgMm2(1000000)).kgM2() - 1) < 1e-12,
 			"unit conversions at bridge boundaries");
 

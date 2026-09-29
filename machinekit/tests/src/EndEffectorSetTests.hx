@@ -184,8 +184,8 @@ class EndEffectorSetTests {
 		var short = set.configuration("short"), long = set.configuration("long");
 		close(short.massPropertiesAtMount().mass, 6.5, "short mass");
 		close(long.massPropertiesAtMount().mass, 7.5, "long mass");
-		close(short.mountTFrame("contact").y, 35, "short contact");
-		close(long.mountTFrame("contact").y, 55, "long contact");
+		close(short.mountTFrame("contact").raw().y, 35, "short contact");
+		close(long.mountTFrame("contact").raw().y, 55, "long contact");
 		if (short.primaryFrame != "contact" || short.billOfMaterials().quantity("TEST-CUP") != 1 ||
 			short.billOfMaterials().quantity("TEST-MASTER") != 1)
 			throw "Configuration did not preserve selected frame and BOM";

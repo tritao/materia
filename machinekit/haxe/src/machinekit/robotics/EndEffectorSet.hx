@@ -33,7 +33,6 @@ class EndEffectorSet extends EndEffector {
 			if (tool.machine.endEffector == null) throw 'Tool "$id" has no end-effector data';
 			toolRecords.push({id: id, mechanical: tool.mechanical, machine: {
 				members: tool.machine.members, ports: tool.machine.ports,
-				portBridges: tool.machine.portBridges, portConversions: tool.machine.portConversions,
 				included: tool.machine.included,
 				portConnections: tool.machine.portConnections,
 				portExposures: tool.machine.portExposures, bomExtras: tool.machine.bomExtras,
@@ -62,7 +61,6 @@ class EndEffectorSet extends EndEffector {
 		if (description.machine.tools != null) for (entry in description.machine.tools) {
 			var machine:machinekit.assembly.MachineAssemblyDescription.AssemblySideRecord = {
 				members: entry.machine.members, ports: entry.machine.ports,
-				portBridges: entry.machine.portBridges, portConversions: entry.machine.portConversions,
 				included: entry.machine.included,
 				portConnections: entry.machine.portConnections,
 				portExposures: entry.machine.portExposures, bomExtras: entry.machine.bomExtras,

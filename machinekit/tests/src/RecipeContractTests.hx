@@ -4,6 +4,10 @@ import cadkit.modeling.Vector;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.pneumatic.RoutedHose;
+import machinekit.pneumatic.SuctionCup;
+import machinekit.pneumatic.VacuumGenerator;
+import machinekit.component.PortInterface;
+import machinekit.component.Bom;
 import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
 import machinekit.standard.ParallelKey;
 import machinekit.component.Bom.BomItem;
@@ -16,8 +20,26 @@ import machinekit.component.MachineKitComponents;
 import materia.project.MaterialLibrary;
 
 /** Cross-recipe checks for identity, generated solids, tools, and BOM part numbers. */
+private class UnregisteredCup extends SuctionCup {
+	public function new() super(20, 10);
+}
+
 class RecipeContractTests {
 	public static function run():Void {
+		check(new UnregisteredCup().componentType() == null,
+			"Unregistered cup subclass must remain code-only");
+		var hoseBom = new Bom();
+		hoseBom.addComponent(new RoutedHose("STOCK-L100", [new Vector(), new Vector(0, 0, 100)], 4, 2, 0.011));
+		hoseBom.addComponent(new RoutedHose("STOCK-L100", [new Vector(), new Vector(50, 0, 0),
+			new Vector(50, 50, 0)], 4, 2, 0.011));
+		check(hoseBom.lines().length == 1 && hoseBom.lines()[0].quantity == 2,
+			"Equal-length hose routes must share one BOM line");
+		var cupBom = new Bom();
+		cupBom.addComponent(new SuctionCup(40, 18));
+		cupBom.addComponent(new SuctionCup(40, 18, null, null, null, PushIn(4)));
+		check(cupBom.lines().length == 2, "Different cup fittings must have different BOM identities");
+		checkRebuild(new SuctionCup(40, 18, 900, 0.2, "CUP-CUSTOM", Thread("G1/8"), "Custom cup"));
+		checkRebuild(new VacuumGenerator(80, "GEN-CUSTOM", PushIn(4), Thread("G1/4"), "Custom generator"));
 		for (type in MachineKitComponents.all()) {
 			var seenValues:Map<String, Bool> = [];
 			var partNumbers:Map<String, String> = [];

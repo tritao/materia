@@ -105,8 +105,8 @@ class CadBridgeTests {
     var solved = effector.solve();
     var pose = effector.mountTFrame("tip");
     var reused = effector.mountTFrame("tip", null, solved);
-    check(approx(pose.x, reused.x, 1e-9) && approx(pose.y, reused.y, 1e-9) &&
-      approx(pose.z, reused.z, 1e-9), "shared solve preserves TCP pose");
+    check(approx(pose.raw().x, reused.raw().x, 1e-9) && approx(pose.raw().y, reused.raw().y, 1e-9) &&
+      approx(pose.raw().z, reused.raw().z, 1e-9), "shared solve preserves TCP pose");
     check(approx(effector.massPropertiesAtMount().mass,
       effector.massPropertiesAtMount(null, solved).mass, 1e-9),
       "shared solve preserves mount mass");

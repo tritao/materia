@@ -59,6 +59,15 @@ class SchmalzVacuumGenerator extends VacuumGenerator {
 				m * (x * x + z * z) / 12, 0, m * (x * x + y * y) / 12));
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.schmalz-vacuum-generator");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, SchmalzVacuumGenerator) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setToken("designation", spec.designation).setToken("material", materialSpec());
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part

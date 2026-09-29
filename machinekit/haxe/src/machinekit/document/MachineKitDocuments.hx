@@ -100,6 +100,12 @@ class MachineKitDocuments {
 
 	static function definitionInput(name:String, parameter:ComponentParameter, value:ComponentValue):DefinitionInput
 		return switch parameter.type {
+			case Optional(_): new DefinitionInput(name, "text", "1", switch value {
+				case Unset: "null";
+				case Number(number): haxe.Json.stringify(number);
+				case Token(text): haxe.Json.stringify(text);
+				case _: throw 'Unsupported optional input "$name"';
+			});
 			case Scalar: new DefinitionInput(name, "scalar", "1", number(value));
 			case Length: new DefinitionInput(name, "length", parameter.unit, number(value));
 			case Angle: new DefinitionInput(name, "angle", parameter.unit, number(value));

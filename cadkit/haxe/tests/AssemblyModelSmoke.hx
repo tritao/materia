@@ -10,18 +10,37 @@ class AssemblyModelSmoke {
 		near(reversed.pose("middle").x, ordered.pose("middle").x, "child-first middle pose");
 		near(reversed.pose("leaf").x, ordered.pose("leaf").x, "child-first leaf pose");
 		near(reversed.worldPoint("leaf", "base").x, 115, "world connector uses solved pose");
-		if (reversed.definition() != reversed.definition()) throw "Definition is not the recorded object";
+		if (reversed.definition() == reversed.definition()) throw "Definition exposes mutable model data";
+		var namedA = reversed.definition("a"), namedB = reversed.definition("b");
+		if (namedA.id != "a" || namedB.id != "b" || reversed.definition().id != "assembly")
+			throw "Definition export changed the model id";
 		near(reversed.definition().occurrences[2].initialPose.x, 0, "definition retains recorded placement");
 		near(reversed.record().instances[2].pose.x, 115, "legacy record retains solved pose");
 		throws(() -> reversed.place("leaf", AssemblyFrames.identity()), "cannot be placed independently");
 		reversed.place("root", at(200));
 		near(reversed.pose("leaf").x, 215, "root placement invalidates cached solve");
+		var earlier = reversed.initialState();
+		reversed.place("root", at(300));
+		near(earlier.worldPose("root").x, 200, "initial state retains its original placement");
+		near(reversed.pose("root").x, 300, "model placement changes independently");
+		var returned = reversed.solve();
+		returned.setRootPose("root", at(400));
+		near(reversed.pose("root").x, 300, "returned state cannot mutate model pose");
+		reversed.place("root", at(200));
 		reversed.constrain("closed", "fixed", "root", "tip", "middle", "base");
 		near(reversed.pose("leaf").x, 215, "closure checks solved frames");
 
 		var open = chain(true);
 		open.constrain("separated", "fixed", "root", "tip", "leaf", "base");
 		throws(() -> open.pose("leaf"), "separated connectors");
+		var moving = new AssemblyModel();
+		moving.add("base"); moving.add("slide");
+		moving.connector("base", "axis", AssemblyFrames.identity());
+		moving.connector("slide", "axis", AssemblyFrames.identity());
+		moving.mate("travel", "prismatic", "base", "axis", "slide", "axis");
+		var detached = moving.solve();
+		detached.setJoint("travel", 12);
+		near(moving.pose("slide").y, 0, "returned joint state cannot mutate model pose");
 	}
 
 	static function chain(childFirst:Bool):AssemblyModel {

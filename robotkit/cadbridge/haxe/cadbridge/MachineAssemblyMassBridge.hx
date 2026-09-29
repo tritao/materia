@@ -44,9 +44,9 @@ class MachineAssemblyMassBridge {
     if (link == null) throw "Robot link is required";
     var properties = complete(assembly, state, true);
     var tensor:InertiaTensor = cast properties.inertia;
-    link.mass = new Kilograms(properties.mass);
-    link.centerOfMass = [(new Millimetres(properties.centreOfMass.x)).metres(),
-      (new Millimetres(properties.centreOfMass.y)).metres(), (new Millimetres(properties.centreOfMass.z)).metres()];
+    link.mass = (new Kilograms(properties.mass)).raw();
+    link.centerOfMass = [(new Millimetres(properties.centreOfMass.x)).metres().raw(),
+      (new Millimetres(properties.centreOfMass.y)).metres().raw(), (new Millimetres(properties.centreOfMass.z)).metres().raw()];
     link.inertiaTensor = [for (value in [tensor.xx, tensor.xy, tensor.xz,
       tensor.xy, tensor.yy, tensor.yz, tensor.xz, tensor.yz, tensor.zz]) (new KgMm2(value)).kgM2()];
   }
@@ -59,7 +59,7 @@ class MachineAssemblyMassBridge {
     var properties = complete(assembly, state, false);
     var centre = properties.centreOfMass;
     var payload = new Payload(properties.mass, lengthMeters, widthMeters, heightMeters,
-      (new Millimetres(centre.x)).metres(), (new Millimetres(centre.y)).metres(), (new Millimetres(centre.z)).metres());
+      (new Millimetres(centre.x)).metres().raw(), (new Millimetres(centre.y)).metres().raw(), (new Millimetres(centre.z)).metres().raw());
     return limits.violation(payload, liftHeightMeters);
   }
 }

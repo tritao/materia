@@ -21,14 +21,51 @@ private class AssemblyDocumentScope {
 	public var hasCouplings:Bool = false;
 }
 
+typedef AssemblyDefinitionResolver = (String, AssemblyComponentOccurrence,
+	Null<AssemblyComponentDefinition>)->Null<Definition>;
+
+/** An owned relationship whose document endpoint has been removed. */
+class AssemblyDocumentDiagnostic {
+	public final severity:String = "error";
+	public final code:String;
+	public final subject:String;
+	public final message:String;
+
+	public function new(code:String, subject:String, message:String) {
+		this.code = code;
+		this.subject = subject;
+		this.message = message;
+	}
+
+	public function toString():String return '$code: $subject: $message';
+}
+
 /** Maps mechanical definitions to persistent CadKit document objects and relationships. */
 class AssemblyDocuments {
 	public static inline var JOINT:String = "cadkit.joint";
 	public static inline var COUPLING:String = "cadkit.coupling";
 	static inline var PREFIX:String = "cadkit.assembly.";
 
-	public static function fromDefinition(document:Document, definition:AssemblyDefinition):Element {
+	public static function fromDefinition(document:Document, definition:AssemblyDefinition,
+			?resolve:AssemblyDefinitionResolver):Element {
 		AssemblyDefinitionCodec.validate(definition);
+		var ownTransaction = !document.hasActiveTransaction();
+		var transaction = ownTransaction ? document.beginTransaction() : null;
+		try {
+			var result = writeDefinition(document, definition, resolve);
+			if (transaction != null) transaction.commit();
+			return result;
+		} catch (error:Dynamic) {
+			if (transaction != null) transaction.cancel();
+			throw error;
+		}
+	}
+
+	static function writeDefinition(document:Document, definition:AssemblyDefinition,
+			resolve:Null<AssemblyDefinitionResolver>):Element {
+		AssemblyMemberEvaluator.register();
+		for (existing in document.allElements()) if (readOrNull(existing, "kind") == "root" &&
+			readOrNull(existing, "id") == definition.id) removeAssembly(document, existing);
 		var root = document.createObject(definition.id);
 		put(root, "kind", "root");
 		put(root, "id", definition.id);
@@ -37,22 +74,51 @@ class AssemblyDocuments {
 		if (definition.lengthUnit != null) put(root, "lengthUnit", definition.lengthUnit);
 		if (definition.exposedConnectors != null)
 			put(root, "exposed", JsonWire.encode(definition.exposedConnectors));
-		var scopes = new Map<String, Map<String, Element>>();
 		var rootMembers = writeScope(document, root, "", root, definition.definitions, definition.occurrences,
-			definition.couplings, definition.exposedConnectors);
+			definition.couplings, definition.exposedConnectors, resolve, "");
+		var scopes = new Map<String, Map<String, Element>>();
 		scopes.set("", rootMembers);
+		var scopePaths = new Map<String, String>();
+		if (definition.assemblies != null) {
+			var byId = new Map<String, AssemblySubdefinition>();
+			for (nested in definition.assemblies) byId.set(nested.id, nested);
+			collectScopePaths(definition.occurrences, byId, "", scopePaths);
+		}
 		if (definition.assemblies != null) for (nested in definition.assemblies) {
 			var holder = document.createObject(nested.id);
 			put(holder, "kind", "subdefinition");
 			putOwner(holder, root);
 			put(holder, "scope", nested.id);
 			scopes.set(nested.id, writeScope(document, root, nested.id, holder, nested.definitions,
-				nested.occurrences, nested.couplings, nested.exposedConnectors));
+				nested.occurrences, nested.couplings, nested.exposedConnectors, resolve, scopePaths.get(nested.id)));
 		}
-		writeJoints(document, "", definition.joints, definition.couplings, rootMembers);
+		writeJoints(document, root, "", definition.joints, definition.couplings, rootMembers);
 		if (definition.assemblies != null) for (nested in definition.assemblies)
-			writeJoints(document, nested.id, nested.joints, nested.couplings, scopes.get(nested.id));
+			writeJoints(document, root, nested.id, nested.joints, nested.couplings, scopes.get(nested.id));
 		return root;
+	}
+
+	static function collectScopePaths(occurrences:Array<AssemblyComponentOccurrence>,
+			byId:Map<String, AssemblySubdefinition>, prefix:String, paths:Map<String, String>):Void {
+		for (occurrence in occurrences) if (occurrence.assembly != null) {
+			var nested = byId.get(occurrence.assembly);
+			if (nested == null) throw 'Unknown nested assembly "${occurrence.assembly}"';
+			var path = prefix + occurrence.id + "/";
+			if (!paths.exists(nested.id)) paths.set(nested.id, path);
+			collectScopePaths(nested.occurrences, byId, path, paths);
+		}
+	}
+
+	static function removeAssembly(document:Document, root:Element):Void {
+		var owned = [for (element in document.allElements()) if (belongsTo(element, root)) element];
+		var ownedIds:Map<String, Bool> = [];
+		ownedIds.set(root.id.value, true);
+		for (element in owned) ownedIds.set(element.id.value, true);
+		for (relationship in document.allRelationships()) if (
+			ownedIds.exists(relationship.source.elementId.value) ||
+			ownedIds.exists(relationship.target.elementId.value)) document.removeRelationship(relationship.id);
+		for (element in owned) document.removeElement(element.id);
+		document.removeElement(root.id);
 	}
 
 	public static function toDefinition(root:Element):AssemblyDefinition {
@@ -77,6 +143,7 @@ class AssemblyDocuments {
 			subdefinitions.push(nested);
 		}
 		var byElement = new Map<String, {scope:String, id:String}>();
+		var seenDefinitions:Map<String, Bool> = [];
 		for (element in document.allElements()) if (belongsTo(element, root)) {
 			var kind = read(element, "kind");
 			if (kind != "component" && kind != "occurrence") continue;
@@ -86,8 +153,19 @@ class AssemblyDocuments {
 				var record:AssemblyComponentDefinition = JsonWire.decode(read(element, "record"));
 				scope.definitions.push(record);
 			} else {
+				var recordText = readOrNull(element, "record");
+				if (recordText != null) {
+					var record:AssemblyComponentDefinition = JsonWire.decode(recordText);
+					var key = scopeName + "/" + record.id;
+					if (!seenDefinitions.exists(key)) {
+						scope.definitions.push(record);
+						seenDefinitions.set(key, true);
+					}
+				}
 				var occurrence:AssemblyComponentOccurrence = {id: read(element, "id"),
-					definition: read(element, "definition"), initialPose: decodeFrame(read(element, "initialPose"))};
+					definition: read(element, "definition"),
+					initialPose: element.kind == "instance" ? PlacementFrames.toAssemblyFrame(element.localPlacement) :
+						decodeFrame(read(element, "initialPose"))};
 				var assembly = readOrNull(element, "assembly");
 				if (assembly != null) occurrence.assembly = assembly;
 				scope.occurrences.push(occurrence);
@@ -97,13 +175,18 @@ class AssemblyDocuments {
 		for (relationship in document.allRelationships()) if (relationship.typeName == JOINT) {
 			var parent = byElement.get(relationship.source.elementId.value);
 			var child = byElement.get(relationship.target.elementId.value);
-			if (parent == null || child == null) continue;
+			if (parent == null || child == null) {
+				if (readRelationshipOrNull(relationship, "owner") == root.id.value)
+					throw new AssemblyDocumentDiagnostic("assembly.missing-joint-endpoint",
+						readRelationship(relationship, "id"), "Joint endpoint is missing");
+				continue;
+			}
 			var scopeName = readRelationship(relationship, "scope");
 			if (parent.scope != scopeName || child.scope != scopeName) throw "Joint crosses assembly scopes";
 			var scope = scopes.get(scopeName);
 			if (scope == null) throw 'Unknown joint scope "$scopeName"';
-			var axis:AssemblyVector = JsonWire.decode(readRelationship(relationship, "axis"));
-			var limits:AssemblyJointLimits = JsonWire.decode(readRelationship(relationship, "limits"));
+			var axis:AssemblyVector = readAxis(relationship);
+			var limits:AssemblyJointLimits = readLimits(relationship);
 			var joint:KinematicJoint = {id: readRelationship(relationship, "id"), type: cast readRelationship(relationship, "type"),
 				role: cast readRelationship(relationship, "role"), parent: parent.id, parentConnector: readRelationship(relationship, "parentConnector"),
 				child: child.id, childConnector: readRelationship(relationship, "childConnector"), axis: axis, limits: limits,
@@ -115,7 +198,12 @@ class AssemblyDocuments {
 		for (relationship in document.allRelationships()) if (relationship.typeName == COUPLING) {
 			var source = byElement.get(relationship.source.elementId.value);
 			var target = byElement.get(relationship.target.elementId.value);
-			if (source == null || target == null) continue;
+			if (source == null || target == null) {
+				if (readRelationshipOrNull(relationship, "owner") == root.id.value)
+					throw new AssemblyDocumentDiagnostic("assembly.missing-coupling-endpoint",
+						readRelationship(relationship, "id"), "Coupling endpoint is missing");
+				continue;
+			}
 			var scopeName = readRelationship(relationship, "scope"), scope = scopes.get(scopeName);
 			if (scope == null) throw 'Unknown coupling scope "$scopeName"';
 			if (source.scope != scopeName || target.scope != scopeName) throw "Coupling crosses assembly scopes";
@@ -131,42 +219,68 @@ class AssemblyDocuments {
 		if (unit != null) definition.lengthUnit = unit;
 		var exposed = readOrNull(root, "exposed");
 		if (exposed != null) definition.exposedConnectors = decodeExposed(exposed);
+		sortScope(rootScope);
+		for (scope in scopes) if (scope != rootScope) sortScope(scope);
+		subdefinitions.sort((a, b) -> Reflect.compare(a.id, b.id));
 		AssemblyDefinitionCodec.validate(definition);
 		return definition;
 	}
 
 	static function writeScope(document:Document, root:Element, scope:String, holder:Element,
 			definitions:Array<AssemblyComponentDefinition>, occurrences:Array<AssemblyComponentOccurrence>,
-			couplings:Array<AssemblyJointCoupling>, exposed:Array<AssemblyExposedConnector>):Map<String, Element> {
+			couplings:Array<AssemblyJointCoupling>, exposed:Array<AssemblyExposedConnector>,
+			resolve:Null<AssemblyDefinitionResolver>, path:Null<String>):Map<String, Element> {
 		holder.setProperty(TypedProperty.boolean(PREFIX + "hasCouplings", couplings != null));
 		if (scope != "" && exposed != null) put(holder, "exposed", JsonWire.encode(exposed));
+		var definitionsById = new Map<String, AssemblyComponentDefinition>();
+		var fallback = new Map<String, Definition>();
 		for (definition in definitions) {
-			var element = document.createObject(definition.id);
-			put(element, "kind", "component"); putOwner(element, root); put(element, "scope", scope);
-			put(element, "record", JsonWire.encode(definition));
+			definitionsById.set(definition.id, definition);
 		}
 		var members = new Map<String, Element>();
 		for (occurrence in occurrences) {
-			var element = document.createObject(occurrence.id);
+			var component = occurrence.assembly == null ? definitionsById.get(occurrence.definition) : null;
+			var instanceDefinition = resolve == null ? null : resolve(path == null ? "" : path, occurrence, component);
+			if (instanceDefinition == null) {
+				instanceDefinition = fallback.get(occurrence.definition);
+				if (instanceDefinition == null) {
+					instanceDefinition = document.createDefinition(occurrence.definition,
+						AssemblyMemberEvaluator.RECIPE, [], [new DefinitionOutput("body", DefinitionOutput.Geometry)]);
+					var noConnectors:Array<materia.assembly.AssemblyRecord.AssemblyConnector> = [];
+					instanceDefinition.setProperty(TypedProperty.text(PREFIX + "connectors",
+						JsonWire.encode(component == null ? noConnectors : component.connectors)));
+					fallback.set(occurrence.definition, instanceDefinition);
+				}
+			}
+			var element = document.createInstance(occurrence.id, instanceDefinition);
+			element.setPlacement(PlacementFrames.fromAssemblyFrame(occurrence.initialPose));
 			put(element, "kind", "occurrence"); putOwner(element, root); put(element, "scope", scope);
+			if (path != null) put(element, "path", path + occurrence.id);
 			put(element, "id", occurrence.id); put(element, "definition", occurrence.definition);
-			put(element, "initialPose", JsonWire.encode(occurrence.initialPose));
+			if (component != null) put(element, "record", JsonWire.encode(component));
 			if (occurrence.assembly != null) put(element, "assembly", occurrence.assembly);
 			members.set(occurrence.id, element);
 		}
 		return members;
 	}
 
-	static function writeJoints(document:Document, scope:String, joints:Array<KinematicJoint>,
+	static function writeJoints(document:Document, root:Element, scope:String, joints:Array<KinematicJoint>,
 			couplings:Array<AssemblyJointCoupling>, members:Map<String, Element>):Void {
 		var children = new Map<String, Element>();
 		for (joint in joints) {
 			var relationship = document.createRelationship(JOINT, reference(document, members.get(joint.parent)),
 				reference(document, members.get(joint.child)));
+			putRelationship(relationship, "owner", root.id.value);
 			putRelationship(relationship, "scope", scope); putRelationship(relationship, "id", joint.id);
 			putRelationship(relationship, "type", joint.type); putRelationship(relationship, "role", joint.role);
 			putRelationship(relationship, "parentConnector", joint.parentConnector); putRelationship(relationship, "childConnector", joint.childConnector);
-			putRelationship(relationship, "axis", JsonWire.encode(joint.axis)); putRelationship(relationship, "limits", JsonWire.encode(joint.limits));
+			quantity(relationship, "axisX", joint.axis.x);
+			quantity(relationship, "axisY", joint.axis.y);
+			quantity(relationship, "axisZ", joint.axis.z);
+			if (joint.limits.lower != null) quantity(relationship, "limitLower", joint.limits.lower);
+			if (joint.limits.upper != null) quantity(relationship, "limitUpper", joint.limits.upper);
+			if (joint.limits.velocity != null) quantity(relationship, "limitVelocity", joint.limits.velocity);
+			if (joint.limits.effort != null) quantity(relationship, "limitEffort", joint.limits.effort);
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "defaultValue", QuantityKind.Scalar, joint.defaultValue, "1"));
 			if (joint.closureTolerance != null)
 				relationship.setProperty(TypedProperty.quantity(PREFIX + "closureTolerance",
@@ -176,6 +290,7 @@ class AssemblyDocuments {
 		if (couplings != null) for (coupling in couplings) {
 			var relationship = document.createRelationship(COUPLING, reference(document, children.get(coupling.source)),
 				reference(document, children.get(coupling.target)));
+			putRelationship(relationship, "owner", root.id.value);
 			putRelationship(relationship, "scope", scope); putRelationship(relationship, "id", coupling.id);
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "ratio", QuantityKind.Scalar, coupling.ratio, "1"));
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "offset", QuantityKind.Scalar, coupling.offset, "1"));
@@ -198,6 +313,37 @@ class AssemblyDocuments {
 
 	static function decodeFrame(value:String):AssemblyFrame
 		return JsonWire.decode(value);
+
+	static function quantity(relationship:Relationship, name:String, value:Float):Void
+		relationship.setProperty(TypedProperty.quantity(PREFIX + name, QuantityKind.Scalar, value, "1"));
+
+	static function optionalNumber(relationship:Relationship, name:String):Null<Float> {
+		var property = relationship.property(PREFIX + name);
+		return property == null ? null : cast property.value;
+	}
+
+	static function readAxis(relationship:Relationship):AssemblyVector {
+		if (relationship.property(PREFIX + "axisX") == null)
+			return JsonWire.decode(readRelationship(relationship, "axis"));
+		return {x: number(relationship, "axisX"), y: number(relationship, "axisY"),
+			z: number(relationship, "axisZ")};
+	}
+
+	static function readLimits(relationship:Relationship):AssemblyJointLimits {
+		if (relationship.property(PREFIX + "axisX") == null)
+			return JsonWire.decode(readRelationship(relationship, "limits"));
+		return {lower: optionalNumber(relationship, "limitLower"),
+			upper: optionalNumber(relationship, "limitUpper"),
+			velocity: optionalNumber(relationship, "limitVelocity"),
+			effort: optionalNumber(relationship, "limitEffort")};
+	}
+
+	static function sortScope(scope:AssemblyDocumentScope):Void {
+		scope.definitions.sort((a, b) -> Reflect.compare(a.id, b.id));
+		scope.occurrences.sort((a, b) -> Reflect.compare(a.id, b.id));
+		scope.joints.sort((a, b) -> Reflect.compare(a.id, b.id));
+		scope.couplings.sort((a, b) -> Reflect.compare(a.id, b.id));
+	}
 
 	static function put(element:Element, name:String, value:String):Void
 		element.setProperty(TypedProperty.text(PREFIX + name, value));
@@ -225,6 +371,11 @@ class AssemblyDocuments {
 		var property = relationship.property(PREFIX + name);
 		if (property == null) throw 'Missing assembly relationship property "$name"';
 		return cast property.value;
+	}
+
+	static function readRelationshipOrNull(relationship:Relationship, name:String):Null<String> {
+		var property = relationship.property(PREFIX + name);
+		return property == null ? null : cast property.value;
 	}
 
 	static function readOrNull(element:Element, name:String):Null<String> {

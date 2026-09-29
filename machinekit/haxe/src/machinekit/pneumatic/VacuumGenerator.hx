@@ -36,6 +36,23 @@ class VacuumGenerator extends MachineComponent {
 		addCapability(VacuumSource(ratedVacuumKpa, "vacuum"));
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.pneumatic.vacuum-generator");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, VacuumGenerator) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues {
+		var values = new machinekit.component.ComponentValues()
+			.set("ratedVacuumKpa", ratedVacuumKpa == null ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Number(ratedVacuumKpa))
+			.set("catalogDesignation", codeOnly ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Token(designation))
+			.set("catalogDescription", codeOnly ? machinekit.component.ComponentValue.Unset : machinekit.component.ComponentValue.Token(description));
+		machinekit.component.MachineKitAdditionalRecipes.interfaceValues(values, "airInterface", port("air").iface);
+		machinekit.component.MachineKitAdditionalRecipes.interfaceValues(values, "vacuumInterface", port("vacuum").iface);
+		return values.setToken("material", materialSpec());
+	}
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part

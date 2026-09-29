@@ -40,6 +40,15 @@ class ToolChangerMaster extends MachineComponent {
 		addCapability(Coupling('generic:$airChannels:${Dimension.format(diameter)}', "tool"));
 	}
 
+	public static function recipeType():machinekit.component.ComponentType
+		return machinekit.component.MachineKitAdditionalRecipes.byId("machinekit.robotics.tool-changer-master");
+
+	/** Subclasses must declare their own recipe and saved values. */
+	override public function componentType():Null<machinekit.component.ComponentType>
+		return Std.isExactType(this, ToolChangerMaster) ? recipeType() : null;
+
+	override public function values():machinekit.component.ComponentValues return new machinekit.component.ComponentValues().setInteger("airChannels", airChannels).setNumber("diameter", diameter).setNumber("thickness", thickness).setToken("material", materialSpec());
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part

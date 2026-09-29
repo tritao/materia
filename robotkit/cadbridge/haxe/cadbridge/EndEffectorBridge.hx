@@ -25,7 +25,7 @@ class EndEffectorBridge {
     if (endEffector == null) throw "End effector is required";
     endEffector.validate();
     var solved = endEffector.solve(state);
-    var converted = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(endEffector.mountTFrame(frameName, state, solved)));
+    var converted = EndEffectorFrames.toRobotFrame(endEffector.mountTFrame(frameName, state, solved));
     var transform = new Transform3(new Vec3(converted.position.x,
       converted.position.y, converted.position.z), new Quat(converted.quaternion.x,
       converted.quaternion.y, converted.quaternion.z, converted.quaternion.w));
@@ -42,7 +42,7 @@ class EndEffectorBridge {
       (new KgMm2(tensor.yz)).kgM2(), (new KgMm2(tensor.zz)).kgM2())
       .rotated(new Quat(Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)));
     var mass = new MassProperties(properties.mass,
-      new Vec3((new Millimetres(centre.x)).metres(), (new Millimetres(centre.y)).metres(), (new Millimetres(centre.z)).metres()), inertia);
+      new Vec3((new Millimetres(centre.x)).metres().raw(), (new Millimetres(centre.y)).metres().raw(), (new Millimetres(centre.z)).metres().raw()), inertia);
     var collision:ToolCollisionShape;
     if (boxCollision) {
       var bounds = envelopeBox(endEffector, solved);
@@ -89,9 +89,9 @@ class EndEffectorBridge {
     }
     if (!Math.isFinite(minX) || !Math.isFinite(maxX))
       throw "End effector needs envelope geometry for collision";
-    return {centre: new Vec3((new Millimetres((minX + maxX) * 0.5)).metres(),
-      (new Millimetres((minY + maxY) * 0.5)).metres(), (new Millimetres((minZ + maxZ) * 0.5)).metres()),
-      halfExtents: new Vec3((new Millimetres((maxX - minX) * 0.5)).metres(),
-        (new Millimetres((maxY - minY) * 0.5)).metres(), (new Millimetres((maxZ - minZ) * 0.5)).metres())};
+    return {centre: new Vec3((new Millimetres((minX + maxX) * 0.5)).metres().raw(),
+      (new Millimetres((minY + maxY) * 0.5)).metres().raw(), (new Millimetres((minZ + maxZ) * 0.5)).metres().raw()),
+      halfExtents: new Vec3((new Millimetres((maxX - minX) * 0.5)).metres().raw(),
+        (new Millimetres((maxY - minY) * 0.5)).metres().raw(), (new Millimetres((maxZ - minZ) * 0.5)).metres().raw())};
   }
 }

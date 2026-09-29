@@ -173,7 +173,7 @@ class SpurGear extends MachineComponent {
 		return recipeTypeCache;
 	}
 
-	override public function componentType():Null<ComponentType> return recipeType();
+	override public function componentType():Null<ComponentType> return Std.isExactType(this, SpurGear) ? recipeType() : null;
 
 	override public function values():ComponentValues return new ComponentValues()
 		.setNumber("moduleSize", moduleSize).setInteger("teeth", teeth).setNumber("faceWidth", faceWidth)

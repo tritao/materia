@@ -12,6 +12,7 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.units.LengthUnit;
+import haxeon.wire.JsonWire;
 
 /** Records an assembly definition and solves its poses lazily through AssemblyState. */
 class AssemblyModel {
@@ -147,16 +148,20 @@ class AssemblyModel {
 
 	/** Exports reusable definitions and explicit tree/closure semantics. */
 	public function definition(id:String = "assembly"):AssemblyDefinition {
-		data.id = id;
-		AssemblyDefinitionCodec.validate(data);
-		return data;
+		var copy:AssemblyDefinition = JsonWire.decode(JsonWire.encode(data));
+		copy.id = id;
+		AssemblyDefinitionCodec.validate(copy);
+		return copy;
 	}
 
 	public function initialState(?definitionId:String):AssemblyState
 		return new AssemblyState(definition(definitionId == null ? data.id : definitionId));
 
-	/** Returns the cached default solve after checking closure tolerances. */
-	public function solve():AssemblyState return solvedState();
+	/** Returns an independent default solve after checking closure tolerances. */
+	public function solve():AssemblyState {
+		var state = solvedState();
+		return new AssemblyState(state.definition, state.record());
+	}
 
 	function solvedState():AssemblyState {
 		if (solved != null) return solved;

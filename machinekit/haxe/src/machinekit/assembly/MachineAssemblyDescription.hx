@@ -18,6 +18,7 @@ import machinekit.component.PortInterface;
 	@:id(2) Integer(value:Int);
 	@:id(3) Boolean(value:Bool);
 	@:id(4) Token(value:String);
+	@:id(5) Unset;
 }
 
 @:wire typedef NamedValue = {
@@ -120,8 +121,6 @@ import machinekit.component.PortInterface;
 	@:id(7) var endEffector:EndEffectorRecord;
 	@:id(8) var ports:ReadOnlyArray<PortRecord>;
 	@:id(9) var included:ReadOnlyArray<IncludedRecord>;
-	@:id(10) @:optional var portBridges:ReadOnlyArray<ServiceLinkRecord>;
-	@:id(11) @:optional var portConversions:ReadOnlyArray<ServiceLinkRecord>;
 }
 
 @:wire typedef BomExtraRecord = {
@@ -157,12 +156,11 @@ import machinekit.component.PortInterface;
 	@:id(9) @:optional var tools:ReadOnlyArray<ToolRecord>;
 	@:id(10) var ports:ReadOnlyArray<PortRecord>;
 	@:id(11) var included:ReadOnlyArray<IncludedRecord>;
-	@:id(12) @:optional var portBridges:ReadOnlyArray<ServiceLinkRecord>;
-	@:id(13) @:optional var portConversions:ReadOnlyArray<ServiceLinkRecord>;
 }
 
 /** Mechanical definition plus the MachineKit facts keyed by occurrence ID. */
 @:wire typedef MachineAssemblyDescription = {
 	@:id(1) var mechanical:AssemblyDefinition;
 	@:id(2) var machine:AssemblySideRecord;
+	@:id(3) @:optional var schemaVersion:Int;
 }

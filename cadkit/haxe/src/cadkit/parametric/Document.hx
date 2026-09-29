@@ -1636,6 +1636,8 @@ class Document {
 		return activeTransaction;
 	}
 
+	public function hasActiveTransaction():Bool return activeTransaction != null;
+
 	public function undo():Bool {
 		if (activeTransaction != null)
 			throw new ParametricError("finish the active transaction first");

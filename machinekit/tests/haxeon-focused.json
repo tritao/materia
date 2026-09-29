@@ -21,6 +21,9 @@
 		"machinekit": {
 			"path": ".."
 		},
+		"cadbridge": {
+			"path": "../../robotkit/cadbridge"
+		},
 		"machinekit-picking-station-example": {
 			"path": "../examples/picking-station"
 		}

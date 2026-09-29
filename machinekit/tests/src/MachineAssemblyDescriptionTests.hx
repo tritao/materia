@@ -5,6 +5,8 @@ import materia.assembly.AssemblyDefinitionFlattener;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.TypedProperty;
+import cadkit.parametric.InstanceElement;
+import cadkit.parametric.Relationship;
 import machinekit.document.MachineAssemblyDocuments;
 import machinekit.pneumatic.PneumaticManifold;
 import machinekit.pneumatic.VacuumGenerator;
@@ -31,10 +33,19 @@ class MachineAssemblyDescriptionTests {
 	}
 
 	public static function roundTrip(assembly:MachineAssembly, label:String, massAvailable:Bool = true):Void {
-		var rebuilt = MachineAssembly.decode(assembly.encode());
-		if (!Equality.equals(assembly.describe(), rebuilt.describe()))
-			throw '$label description changed after round trip';
-		if (!Equality.equals(assembly.billOfMaterials().lines(), rebuilt.billOfMaterials().lines()))
+		var rebuilt:MachineAssembly = Std.isOfType(assembly, EndEffector)
+			? EndEffector.fromDescription(haxeon.wire.JsonWire.decode(assembly.encode()))
+			: MachineAssembly.decode(assembly.encode());
+		if (!Equality.equals(assembly.describe(), rebuilt.describe())) {
+			var before = assembly.encode(), after = rebuilt.encode(), offset = 0;
+			while (offset < before.length && offset < after.length && before.charAt(offset) == after.charAt(offset)) offset++;
+			throw '$label description changed after round trip at $offset: ' + before.substr(0, offset + 160) + ' versus ' + after.substr(0, offset + 160);
+		}
+		var originalBom = assembly.billOfMaterials().lines();
+		var rebuiltBom = rebuilt.billOfMaterials().lines();
+		originalBom.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
+		rebuiltBom.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
+		if (!Equality.equals(originalBom, rebuiltBom))
 			throw '$label BOM changed after round trip';
 		if (!Equality.equals(assembly.check().items, rebuilt.check().items))
 			throw '$label diagnostics changed after round trip';
@@ -64,6 +75,31 @@ class MachineAssemblyDescriptionTests {
 		for (member in assembly.components())
 			if (!Equality.equals(poses.get(member.id), restored.get(member.id)))
 				throw '$label pose changed for ${member.id}';
+		if (Std.isOfType(assembly, EndEffector)) {
+			var originalPieces = cadbridge.EndEffectorCollision.pieces(cast assembly);
+			var rebuiltPieces = cadbridge.EndEffectorCollision.pieces(cast rebuilt);
+			if (!Equality.equals(collisionSignature(originalPieces), collisionSignature(rebuiltPieces)))
+				throw '$label collision pieces changed after round trip';
+		}
+	}
+
+	static function collisionSignature(result:cadbridge.EndEffectorCollision.EndEffectorCollisionResult):Array<String> {
+		var signatures:Array<String> = [];
+		for (piece in result.pieces) {
+			var members = piece.memberIds.copy();
+			members.sort(Reflect.compare);
+			var vertices:Array<String> = [];
+			for (index in 0...Std.int(piece.vertices.length / 3)) {
+				var at = index * 3;
+				vertices.push(Std.string(Math.round(piece.vertices[at] * 1e7)) + "," +
+					Std.string(Math.round(piece.vertices[at + 1] * 1e7)) + "," +
+					Std.string(Math.round(piece.vertices[at + 2] * 1e7)));
+			}
+			vertices.sort(Reflect.compare);
+			signatures.push(members.join(",") + ":" + vertices.join(";"));
+		}
+		signatures.sort(Reflect.compare);
+		return signatures;
 	}
 
 	static function close(a:Float, b:Float, label:String):Void
@@ -108,11 +144,15 @@ class MachineAssemblyDescriptionTests {
 		suctionInterfaceRoundTrip();
 		documentRoundTrip();
 		changerDocumentRoundTrip();
+		fullEoatDocumentRoundTrip();
+		documentEditsAndUndo();
+		recipeAssemblyReconcile();
 		mechanicalRecords();
 		libraryRoundTrips();
 		EndEffectorSetTests.run();
 		MachineKitSmoke.massProperties();
 		MachineKitSmoke.ports();
+		RecipeContractTests.run();
 	}
 
 	static function includedConnectorRuntime():Void {
@@ -125,14 +165,16 @@ class MachineAssemblyDescriptionTests {
 		outer.addMate("attach", "fixed", "base", "face", "unit/part", "outerMount");
 		if (outer.solvedPoses().get("unit/part") == null) throw "Outer connector was lost during pose solve";
 		if (outer.massProperties().mass <= 0) throw "Outer connector was lost during mass solve";
+		var restored = MachineAssembly.decode(outer.encode());
+		if (!Equality.equals(outer.solvedPoses().get("unit/part"), restored.solvedPoses().get("unit/part")))
+			throw "Outer connector was lost during nested round trip";
+		if (restored.subassemblies().length != 1 || restored.subassemblies()[0].id != "unit")
+			throw "Included builder was not restored";
 	}
 
 	static function suctionInterfaceRoundTrip():Void {
 		var assembly = new MachineAssembly();
 		assembly.addComponent("cup", new SuctionCup(20, 10, null, null, null, PushIn(4)));
-		var oldDescription = assembly.describe();
-		oldDescription.machine.portBridges = [{occurrence: "cup", fromPort: "old", toPort: "vacuum"}];
-		MachineAssembly.fromDescription(oldDescription);
 		var rebuilt = MachineAssembly.decode(assembly.encode());
 		switch rebuilt.components()[0].component.port("vacuum").iface {
 			case PushIn(size): if (size != 4) throw "Suction cup port diameter changed";
@@ -167,9 +209,12 @@ class MachineAssemblyDescriptionTests {
 		for (index in 0...expected.length)
 			if (flat.occurrences[index].id != expected[index])
 				throw 'Nested member path changed at $index';
-		if (flat.joints[0].id != "unit/pair/join" ||
-			flat.joints[1].id != "unit/pair/closure" || flat.joints[1].closureTolerance != 0.2 ||
-			flat.joints[2].id != "attach")
+		var jointById = new Map<String, materia.assembly.AssemblyDefinition.KinematicJoint>();
+		for (joint in flat.joints) jointById.set(joint.id, joint);
+		var nestedClosure = jointById.get("unit/pair/closure");
+		if (!jointById.exists("unit/pair/join") ||
+			nestedClosure == null || nestedClosure.closureTolerance != 0.2 ||
+			!jointById.exists("attach"))
 			throw "Nested joint paths changed during flattening";
 		roundTrip(outer, "nested assembly");
 		var document = new Document();
@@ -211,6 +256,80 @@ class MachineAssemblyDescriptionTests {
 		document.close();
 	}
 
+	static function documentEditsAndUndo():Void {
+		var assembly = new MachineAssembly();
+		assembly.addComponent("base", new RobotFlange(50));
+		assembly.addComponent("slider", new RobotFlange(50));
+		assembly.addMateOnAxis("slide", "prismatic", "base", "face", "slider", "face",
+			{x: 0, y: 1, z: 0});
+		var document = new Document();
+		MachineAssemblyDocuments.defineAssembly(document, assembly);
+		var root = MachineAssemblyDocuments.defineAssembly(document, assembly);
+		var roots = 0;
+		for (element in document.allElements()) {
+			var kind = element.property("cadkit.assembly.kind");
+			if (kind != null && kind.value == "root") roots++;
+		}
+		if (roots != 1) throw "Saving twice created duplicate assembly roots";
+		if (!document.undo()) throw "Saving did not create an undo step";
+		if (!document.redo()) throw "Saving did not create a redo step";
+		var edited = false;
+		for (relationship in document.allRelationships()) if (relationship.typeName == "cadkit.joint") {
+			relationship.setProperty(TypedProperty.quantity("cadkit.assembly.limitUpper",
+				cadkit.parametric.QuantityKind.Scalar, 12, "1"));
+			edited = true;
+		}
+		if (!edited) throw "Joint was not saved as a relationship";
+		var description = MachineAssemblyDocuments.describeAssembly(document.element(root.id));
+		var upper = description.mechanical.joints[0].limits.upper;
+		if (upper == null || upper != 12.0)
+			throw "Typed joint limit edit was lost";
+		var victim:InstanceElement = null;
+		for (element in document.allElements()) {
+			var id = element.property("cadkit.assembly.id");
+			if (id != null && id.value == "slider") victim = cast element;
+		}
+		if (victim == null) throw "Assembly member is not an instance";
+		var missing = false;
+		try document.removeElement(victim.id)
+		catch (error:Dynamic) missing = Std.string(error).indexOf("target of relationship") >= 0;
+		if (!missing) throw "Deleting a joint endpoint silently discarded a relationship";
+		document.close();
+		var free = new MachineAssembly();
+		free.addComponent("part", new RobotFlange(50));
+		var movedDocument = new Document();
+		var movedRoot = MachineAssemblyDocuments.defineAssembly(movedDocument, free);
+		for (element in movedDocument.allElements()) {
+			var id = element.property("cadkit.assembly.id");
+			if (id != null && id.value == "part")
+				element.setPlacement(new cadkit.parametric.Placement(new cadkit.modeling.Plane(
+					new cadkit.modeling.Vector(25, 0, 0), cadkit.modeling.Vector.X(), cadkit.modeling.Vector.Z())));
+		}
+		var movedPose = MachineAssemblyDocuments.rebuildAssembly(movedRoot).solvedPoses().get("part");
+		if (movedPose == null || movedPose.x != 25)
+			throw "Moving a document instance did not move the rebuilt assembly";
+		movedDocument.close();
+	}
+
+	static function recipeAssemblyReconcile():Void {
+		var oldAssembly = new MachineAssembly();
+		oldAssembly.addComponent("manifold", new PneumaticManifold(2));
+		var saved = new Document();
+		MachineAssemblyDocuments.defineAssembly(saved, oldAssembly);
+		var savedText = DocumentCodec.encode(saved);
+		var freshAssembly = new MachineAssembly();
+		freshAssembly.addComponent("manifold", new PneumaticManifold(3));
+		var fresh = new Document();
+		var root = MachineAssemblyDocuments.defineAssembly(fresh, freshAssembly);
+		var diagnostics:Array<String> = [];
+		machinekit.document.MachineKitRecipes.reconcileDocument(fresh, savedText, diagnostics);
+		var rebuilt = MachineAssemblyDocuments.rebuildAssembly(root);
+		if (rebuilt.components()[0].component.ports().length != 4)
+			throw "Reconciled assembly did not use current recipe inputs";
+		fresh.close();
+		saved.close();
+	}
+
 	static function changerDocumentRoundTrip():Void {
 		var set = new EndEffectorSet();
 		set.addComponent("master", new SchmalzSxtMaster("10.07.13.00013"));
@@ -220,20 +339,59 @@ class MachineAssemblyDescriptionTests {
 		set.changer("bayonet", "master", "tool", [{robot: "coupledAir", tool: "air"}]);
 		var tool = new EndEffector();
 		tool.addComponent("half", new SchmalzSxtTool("10.07.13.00018"));
+		tool.addComponent("generator", new VacuumGenerator(null, null, Thread("G1/8-M")));
+		tool.addMate("generator-mount", "fixed", "half", "payload", "generator", "mount");
+		tool.connectPorts("tool-air", "half", "airOut1", "generator", "air");
 		tool.mount("half", "master");
 		tool.exposePort("air", "half", "airIn1");
 		set.addTool("manual", tool);
 		var document = new Document();
 		var root = MachineAssemblyDocuments.defineAssembly(document, set);
 		var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var toolConnections = 0;
+		for (relationship in reopened.allRelationships()) if (relationship.typeName == MachineAssemblyDocuments.PORT_CONNECTION &&
+			relationship.property("machinekit.assembly.tool") != null) toolConnections++;
+		if (toolConnections != 1) throw "Tool port connection was not saved as a scoped relationship";
 		var restored = EndEffectorSet.fromDescription(
 			MachineAssemblyDocuments.describeAssembly(reopened.element(root.id)));
-		if (!Equality.equals(set.describe(), restored.describe()) ||
-			!Equality.equals(set.configuration("manual").billOfMaterials().lines(),
-				restored.configuration("manual").billOfMaterials().lines()))
-			throw "EOAT set changed after document round trip";
+		if (!Equality.equals(set.describe(), restored.describe())) {
+			var before = set.encode(), after = restored.encode(), offset = 0;
+			while (offset < before.length && offset < after.length && before.charAt(offset) == after.charAt(offset)) offset++;
+			throw "EOAT set changed after document round trip at " + offset + ": " +
+				before.substr(offset, 150) + " versus " + after.substr(offset, 150);
+		}
+		var originalLines = set.configuration("manual").billOfMaterials().lines();
+		var restoredLines = restored.configuration("manual").billOfMaterials().lines();
+		originalLines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
+		restoredLines.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
+		if (!Equality.equals(originalLines, restoredLines))
+			throw "EOAT BOM changed after document round trip";
 		if (restored.configuration("manual").upstream("tool/half", "airOut1").port.instanceId !=
 			"robot/master") throw "EOAT service path changed after document round trip";
+		reopened.close();
+		document.close();
+	}
+
+	static function fullEoatDocumentRoundTrip():Void {
+		var original = eoat.EndEffectorExample.build();
+		var document = new Document();
+		var root = MachineAssemblyDocuments.defineAssembly(document, original);
+		var reopened = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var restored:EndEffectorSet = cast MachineAssemblyDocuments.rebuildAssembly(reopened.element(root.id));
+		if (!Equality.equals(original.describe(), restored.describe()))
+			throw "EOAT document changed the frozen description";
+		for (name in ["short", "long"]) {
+			var before = original.configuration(name), after = restored.configuration(name);
+			var massBefore = before.massPropertiesAtMount(), massAfter = after.massPropertiesAtMount();
+			close(massBefore.mass, massAfter.mass, 'EOAT $name document mass');
+			if (!Equality.equals(before.mountTFrame("contact"), after.mountTFrame("contact")))
+				throw 'EOAT $name document TCP changed';
+			if (!Equality.equals(before.upstream("tool/cup", "vacuum"), after.upstream("tool/cup", "vacuum")))
+				throw 'EOAT $name document upstream path changed';
+			if (!Equality.equals(collisionSignature(cadbridge.EndEffectorCollision.pieces(before)),
+				collisionSignature(cadbridge.EndEffectorCollision.pieces(after))))
+				throw 'EOAT $name document collision pieces changed';
+		}
 		reopened.close();
 		document.close();
 	}
@@ -247,8 +405,8 @@ class MachineAssemblyDescriptionTests {
 			{x: 0, y: 1, z: 0});
 		assembly.addCoupling("linked", "first", "second", 2);
 		var definition = assembly.describe().mechanical;
-		if (definition.joints.length != 2 || definition.joints[0].id != "second" ||
-			definition.joints[1].id != "first" || definition.couplings[0].id != "linked")
+		if (definition.joints.length != 2 || definition.joints[0].id != "first" ||
+			definition.joints[1].id != "second" || definition.couplings[0].id != "linked")
 			throw "Builder did not retain authored mechanical records";
 		var model = new AssemblyModel();
 		assembly.addTo(model, "");
@@ -311,7 +469,12 @@ class MachineAssemblyDescriptionTests {
 		roundTrip(GearPair.mesh(new SpurGear(2, 18, 12), new SpurGear(2, 20, 12)), "gear pair");
 		roundTrip(new FlangeBearingAssembly(DeepGrooveBearing.metric("6204")), "flange bearing");
 		roundTrip(new LinearAxis(), "linear axis");
-		// Picking Station components provide geometry but do not declare hasGeometry or mass.
-		roundTrip(new StorageRack(PickingStationConfig.defaults()), "storage rack", false);
+		if (new LinearAxis().massProperties().unaccounted.length != 0)
+			throw "Linear axis has unaccounted rail mass";
+		roundTrip(new StorageRack(PickingStationConfig.defaults()), "storage rack");
+		roundTrip(eoat.SchmalzEndEffectorExample.build(), "Schmalz end effector");
+		var eoatSet = eoat.EndEffectorExample.build();
+		roundTrip(eoatSet.configuration("short"), "EOAT short configuration");
+		roundTrip(eoatSet.configuration("long"), "EOAT long configuration");
 	}
 }

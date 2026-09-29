@@ -34,6 +34,9 @@ class AssemblyDocumentsSmoke {
 				occurrences: [{id: "body", definition: "body-part", initialPose: frame}], joints: [],
 				exposedConnectors: [{name: "base", occurrence: "body", connector: "base"},
 					{name: "tip", occurrence: "body", connector: "tip"}]}]};
+		original.definitions.sort((a, b) -> Reflect.compare(a.id, b.id));
+		original.occurrences.sort((a, b) -> Reflect.compare(a.id, b.id));
+		original.joints.sort((a, b) -> Reflect.compare(a.id, b.id));
 		var document = new Document();
 		var root = AssemblyDocuments.fromDefinition(document, original);
 		if (!Equality.equals(AssemblyDocuments.toDefinition(root), original))

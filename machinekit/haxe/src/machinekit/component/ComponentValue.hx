@@ -6,4 +6,5 @@ enum ComponentValue {
 	Integer(value:Int);
 	Boolean(value:Bool);
 	Token(value:String);
+	Unset;
 }

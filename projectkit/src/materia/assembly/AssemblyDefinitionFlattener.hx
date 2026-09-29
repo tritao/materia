@@ -10,6 +10,7 @@ import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinition.AssemblyRootPose;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import haxeon.wire.JsonWire;
 
 private typedef FlatEndpoint = {var occurrence:String; var connector:String;}
 private typedef FlatMember = {var connectors:Map<String, FlatEndpoint>;}
@@ -67,7 +68,8 @@ class AssemblyDefinitionFlattener {
 
 	public static function flatten(source:AssemblyDefinition):AssemblyDefinition {
 		if (source == null) throw "Assembly definition is null";
-		if (source.assemblies == null || source.assemblies.length == 0) return source;
+		if (source.assemblies == null || source.assemblies.length == 0)
+			return JsonWire.decode(JsonWire.encode(source));
 		var library = new Map<String, AssemblySubdefinition>();
 		for (assembly in source.assemblies) {
 			if (assembly == null || !validName(assembly.id) || library.exists(assembly.id))
@@ -92,7 +94,7 @@ class AssemblyDefinitionFlattener {
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
 		}
-		return flat;
+		return JsonWire.decode(JsonWire.encode(flat));
 	}
 
 	static function expand(prefix:String, pose:AssemblyFrame, definitions:Array<AssemblyComponentDefinition>,
