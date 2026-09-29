@@ -30,6 +30,7 @@ class SimulationCommands {
       try {
         simulation.start();
         app.log("Simulation running");
+        app.enterSimulationMode();
       } catch (error:Dynamic) {
         app.log("Run rejected: " + Std.string(error));
       }
@@ -55,6 +56,7 @@ class SimulationCommands {
       if (!ensureBuilt()) return;
       try {
         simulation.step();
+        app.enterSimulationMode();
       } catch (error:Dynamic) {
         app.log("Step rejected: " + Std.string(error));
       }
@@ -66,6 +68,7 @@ class SimulationCommands {
       transport(function() {
         simulation.clear();
         app.log("Returned to design mode");
+        app.leaveSimulationMode();
       }), null, function() return available() && simulation.isActive()));
     app.commands.register(new Command("sim.rebuild", "Simulation: Apply / Rebuild",
       transport(function() rebuild()), null, available));

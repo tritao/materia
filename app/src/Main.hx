@@ -37,6 +37,7 @@ import nativekit.ui.core.CommandResult;
 import nativekit.ui.docking.DockPanelDescriptor;
 import nativekit.ui.docking.DockWorkspaceCommands;
 import nativekit.ui.docking.DockWorkspaceModel;
+import nativekit.ui.docking.DockWorkspaceSnapshot;
 import nativekit.ui.docking.DockWorkspacePersistence;
 import nativekit.ui.docking.DockWorkspaceStorage;
 import nativekit.ui.properties.PropertyDescriptor;
@@ -485,6 +486,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var viewportWidth:Float = Main.DEFAULT_WINDOW_WIDTH;
   var viewportHeight:Float = Main.DEFAULT_WINDOW_HEIGHT;
   var toolbarDensity:EditorToolbarDensity = Full;
+  public var mode(default, null):EditorMode = EditorMode.Design;
+  // Each mode keeps the layout it was left in; the mode set itself is never persisted.
+  final modeSnapshots:Map<String, DockWorkspaceSnapshot> = new Map();
+  // Mode to return to when the simulation stops after Play switched into Simulate.
+  var modeBeforePlay:Null<EditorMode> = null;
   var contextMenuVisible:Bool;
   var hierarchyAddVisible:Bool = false;
   var hierarchySearch:String = "";
@@ -975,6 +981,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   };
 
   public function resetWorkspace():Void {
+    modeSnapshots.remove(mode.id);
     workspace.reset();
     log("Workspace reset");
     invalidateView();
@@ -1041,6 +1048,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       new KeyedView("save", toolbarAction("toolbar-save", "editor.save", "Save", IconName.Save, compact, true))
     ];
     if (!minimal) {
+      items.push(new KeyedView("modes", modeSwitcher(compact)));
       items.push(new KeyedView("undo", toolbarAction("toolbar-undo", "editor.undo", "Undo", IconName.Undo, compact)));
       items.push(new KeyedView("redo", toolbarAction("toolbar-redo", "editor.redo", "Redo", IconName.Redo, compact)));
       items.push(new KeyedView("frame", toolbarAction("toolbar-frame", "scene.frame-selected",
@@ -1064,6 +1072,19 @@ class ReferenceEditorApp implements DesktopUiApplication {
     more.selected = toolbarMenuVisible;
     items.push(new KeyedView("more", more));
     return new Row("editor-toolbar-row", items, barStyle);
+  }
+
+  /** Segmented mode buttons; the active mode reads as selected through its command's checked state. */
+  function modeSwitcher(compact:Bool):View {
+    var style = new LayoutStyle();
+    style.direction = LayoutDirection.LeftToRight;
+    style.childAlignY = LayoutAlignmentY.Center;
+    style.childGap = 2.0;
+    var buttons:Array<KeyedView> = [];
+    for (candidate in EditorMode.all())
+      buttons.push(new KeyedView(candidate.id, toolbarAction("toolbar-mode-" + candidate.id,
+        "editor.mode." + candidate.id, candidate.label, candidate.icon, compact)));
+    return new Row("editor-mode-switcher", buttons, style);
   }
 
   /** Play/Pause, Step, Reset, and return-to-design controls for the shared simulation. */
@@ -1102,7 +1123,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ":error=" + (simulation.error == null ? "" : simulation.error) +
       ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
       ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
-      ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
+      ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
       ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision;
   }
 
@@ -1460,6 +1481,13 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(openPalette);
     SceneViewCommands.install(this);
     SimulationCommands.install(this);
+    for (candidate in EditorMode.all()) {
+      var target = candidate;
+      commands.register(new Command("editor.mode." + target.id, target.label + " mode",
+        function() switchMode(target),
+        new Shortcut(target == EditorMode.Design ? 49 : 50, UiModifier.Control),
+        function() return !documents.blocked(), function() return mode == target));
+    }
   }
 
   function documentChanged():Void {
@@ -1640,16 +1668,49 @@ class ReferenceEditorApp implements DesktopUiApplication {
     catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
   }
 
+  /** Switches dock layout and toolbar emphasis; the document, selection, and history are untouched. */
+  public function switchMode(next:EditorMode):Void {
+    if (next == mode) return;
+    modeSnapshots.set(mode.id, workspace.snapshot());
+    mode = next;
+    // The mode's default layout backs "Reset workspace" while it is active.
+    workspace.setDefaultLayout(next.layout());
+    var saved = modeSnapshots.get(next.id);
+    if (saved != null) workspace.restorePersisted(saved);
+    log(next.label + " mode");
+    commands.refresh();
+    invalidateView();
+    queueWorkspaceSave();
+  }
+
+  /** Play enters Simulate and remembers where to return; Stop and Design restore it. */
+  public function enterSimulationMode():Void {
+    if (mode == EditorMode.Simulate) return;
+    modeBeforePlay = mode;
+    switchMode(EditorMode.Simulate);
+  }
+
+  public function leaveSimulationMode():Void {
+    var previous = modeBeforePlay;
+    modeBeforePlay = null;
+    if (previous != null && mode == EditorMode.Simulate) switchMode(previous);
+  }
+
+  // Only the Design layout is written, so a session ending in another mode reopens in Design.
+  function persistedWorkspace():DockWorkspaceSnapshot
+    return mode == EditorMode.Design || !modeSnapshots.exists(EditorMode.Design.id)
+      ? workspace.snapshot() : modeSnapshots.get(EditorMode.Design.id);
+
   function saveWorkspace():Void {
     try {
-      var error = workspaceSaves.saveNow(workspace.snapshot());
+      var error = workspaceSaves.saveNow(persistedWorkspace());
       if (error != null) log("Workspace save failed: " + error);
     }
     catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
   }
 
   function queueWorkspaceSave():Void {
-    try workspaceSaves.schedule(workspace.snapshot());
+    try workspaceSaves.schedule(persistedWorkspace());
     catch (error:Dynamic) log("Workspace save failed: " + Std.string(error));
   }
 
