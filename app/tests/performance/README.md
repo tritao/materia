@@ -100,3 +100,16 @@ On 100 tab-matrix cycles without the profiler (2026-09-29), interaction latency
 2.68 ms, 3.72 ms and 5.57 ms, and no interaction contained a collection (280 of
 396 did before). Total mark time was unchanged at about 290 ms; it moved into
 200 idle collections averaging 0.7 ms.
+
+## Where a frame's allocation goes
+
+`UiFrameMetrics` records the bytes allocated by each submit phase (`viewAllocatedBytes`, `treeBuildAllocatedBytes`,
+`treeCompareAllocatedBytes`, `nativeLayoutAllocatedBytes`, `reconcileAllocatedBytes`, and the render phases), and the
+headless profile writes them into `frame-timeline.jsonl`. They read `hl.Gc.totalAllocated`, so they are 0 on Wasm.
+The sampling profiler only attributes allocations to the native allocator, so these counters are the way to find which
+phase to look at first.
+
+On the tab-matrix workload, median allocation per interaction went from 1264 KiB to 587 KiB and median latency from
+2.96 ms to 1.69 ms: `StyleDiff` compared every property of every node through copying accessors (464 KiB, now 23 KiB),
+`RenderNode` no longer allocates handler, paint and decoration containers it never uses, and string building moved to
+the compiler's one-allocation concatenation.

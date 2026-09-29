@@ -15,7 +15,7 @@ class StyleDiff {
 	 * when the resulting value is unchanged.
 	 */
 	public static function compare(previous:Null<ComputedStyle>, current:Null<ComputedStyle>):StyleDiff {
-		if (previous == current)
+		if (previous == current || previous != null && previous.sharesValuesWith(current))
 			return new StyleDiff(false, StyleImpact.None);
 
 		var changed = false;
@@ -24,7 +24,7 @@ class StyleDiff {
 			var previousHas = previous != null && previous.has(property);
 			var currentHas = current != null && current.has(property);
 			if (previousHas == currentHas && (!previousHas ||
-				property.isEqual(previous.get(property), current.get(property))))
+				property.isEqual(previous.peek(property), current.peek(property))))
 				continue;
 			changed = true;
 			impact |= property.impact;

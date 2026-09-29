@@ -68,6 +68,14 @@ class ComputedStyle {
 			? cast copyValue(cast property, value) : cast value;
 	}
 
+	/** True when both styles read the same value storage (cache forks do until one mutates), so no value can differ. */
+	public function sharesValuesWith(other:Null<ComputedStyle>):Bool
+		return other != null && values == other.values;
+
+	/** Reads a value without the defensive copy `get` makes; the caller must not mutate it. */
+	public function peek<T>(property:StyleProperty<T>):T
+		return cast values.get(property.name);
+
 	public function property<T>(property:StyleProperty<T>):ComputedProperty<T>
 		return new ComputedProperty(get(property), sources.get(property.name));
 

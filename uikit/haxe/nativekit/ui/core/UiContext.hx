@@ -28,6 +28,7 @@ import nativekit.ui.gestures.GestureArena;
 import nativekit.ui.animation.AnimationScheduler;
 import nativekit.ui.debug.AccessibilityAudit;
 import nativekit.ui.debug.AccessibilityIssue;
+import nativekit.ui.debug.AllocationProbe;
 import nativekit.ui.debug.UiFrameMetrics;
 import nativekit.ui.debug.UiInspector;
 import nativekit.ui.debug.UiNodeSnapshot;
@@ -264,18 +265,23 @@ class UiContext {
 		buildContext.beginFrame();
 		diagnosticStage = 4;
 		var viewStartedAt = Sys.time();
+		var viewAllocatedAt = AllocationProbe.now();
 		var view = build();
 		var viewBuiltAt = Sys.time();
+		var viewBuiltAllocatedAt = AllocationProbe.now();
 		var next = buildContext.withScope(new nativekit.ui.core.Key("root"), function() return view == null ? null : view.build(buildContext));
 		if (next == null || next.parent != null)
 			throw "A view must produce one unparented render tree root";
 		diagnosticStage = 5;
+		var treeBuiltAllocatedAt = AllocationProbe.now();
 		var styleInvalidation = UiStyleInvalidationMetrics.compare(root, next,
 			previousNodesById, currentNodesById);
+		var compareAllocatedAt = AllocationProbe.now();
 		next.walk(function(node) {
 			node.syncHitTestPolicy();
 			node.syncSceneRevisions();
 		});
+		var syncAllocatedAt = AllocationProbe.now();
 		var previousById = previousNodesById;
 		var nodesById = currentNodesById;
 		var nativeLayoutReused = !styleInvalidation.nativeLayoutRequired &&
@@ -289,6 +295,7 @@ class UiContext {
 			});
 		var resolved:Array<ResolvedLayoutItem> = [];
 		var nativeLayoutStartedAt = Sys.time();
+		var nativeLayoutStartAllocatedAt = AllocationProbe.now();
 		if (nativeLayoutReused) {
 			next.walk(function(node) {
 				var previous = previousById.get(node.id.value);
@@ -354,6 +361,7 @@ class UiContext {
 			layoutPass++;
 		}
 		var nativeLayoutEndedAt = Sys.time();
+		var nativeLayoutEndAllocatedAt = AllocationProbe.now();
 		if (layoutPass > 0)
 			styleInvalidation = UiStyleInvalidationMetrics.compare(root, next,
 				previousNodesById, currentNodesById);
@@ -409,6 +417,7 @@ class UiContext {
 			return submitInternal(frame, cacheKey, function() return view, false);
 		frameNumber++;
 		var submitEndedAt = Sys.time();
+		var submitEndAllocatedAt = AllocationProbe.now();
 		lastFrameMetrics = new UiFrameMetrics(frameNumber, nodeCount,
 			buildContext.styleResolver.resolutions - styleResolutionsBefore,
 			buildContext.styleResolver.cacheHits - styleCacheHitsBefore,
@@ -424,6 +433,10 @@ class UiContext {
 		lastFrameMetrics.setSubmitPhases(viewBuiltAt - viewStartedAt,
 			nativeLayoutStartedAt - viewBuiltAt, nativeLayoutEndedAt - nativeLayoutStartedAt,
 			submitEndedAt - nativeLayoutEndedAt);
+		lastFrameMetrics.setTreeAllocations(treeBuiltAllocatedAt - viewBuiltAllocatedAt, compareAllocatedAt - treeBuiltAllocatedAt,
+			syncAllocatedAt - compareAllocatedAt, nativeLayoutStartAllocatedAt - syncAllocatedAt);
+		lastFrameMetrics.setSubmitAllocations(viewBuiltAllocatedAt - viewAllocatedAt, nativeLayoutStartAllocatedAt - viewBuiltAllocatedAt,
+			nativeLayoutEndAllocatedAt - nativeLayoutStartAllocatedAt, submitEndAllocatedAt - nativeLayoutEndAllocatedAt);
 		diagnosticStage = 0;
 		return next;
 	}
@@ -447,6 +460,7 @@ class UiContext {
 
 	public function render(renderer:Renderer, surface:Surface, frame:FrameInfo):Void {
 		var renderStartedAt = Sys.time();
+		var renderStartAllocatedAt = AllocationProbe.now();
 		diagnosticStage = 20;
 		ensureLive();
 		if (root == null)
@@ -600,6 +614,7 @@ class UiContext {
 		}
 		diagnosticStage = 24;
 		var nativeRenderStartedAt = Sys.time();
+		var nativeRenderStartAllocatedAt = AllocationProbe.now();
 		session.render(renderer, surface, frame);
 		if (lastFrameMetrics != null) {
 			var renderEndedAt = Sys.time();
@@ -607,6 +622,9 @@ class UiContext {
 				paintSkippedNodes, emptyPaintNodes);
 			lastFrameMetrics.setRenderPhases(nativeRenderStartedAt - renderStartedAt,
 				renderEndedAt - nativeRenderStartedAt);
+			var renderEndAllocatedAt = AllocationProbe.now();
+			lastFrameMetrics.setRenderAllocations(nativeRenderStartAllocatedAt - renderStartAllocatedAt,
+				renderEndAllocatedAt - nativeRenderStartAllocatedAt);
 		}
 		diagnosticStage = 0;
 	}

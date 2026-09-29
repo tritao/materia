@@ -59,13 +59,16 @@ class RenderNode {
 	public var compositeRevision(default, null):Int;
 	/** Categories raised while this node was compared with its prior frame. */
 	public var invalidationFlags(default, null):Int;
-	final handlers:Map<String, Array<UiEvent->Void>>;
-	final outsidePointerDownHandlers:Array<UiEvent->Void>;
-	final resolvedHandlers:Array<ResolvedLayoutItem->Void>;
-	final paintHandlers:Array<Canvas->ResolvedLayoutItem->Void>;
-	final paintCacheKeys:Array<Null<String>>;
-	final decorations:Array<Decoration>;
-	final decorationCacheKeys:Array<Null<String>>;
+	/** Most nodes never take handlers, custom paint or decorations, so these are allocated on first use. */
+	var handlers:Null<Map<String, Array<UiEvent->Void>>>;
+	var outsidePointerDownHandlers:Null<Array<UiEvent->Void>>;
+	var resolvedHandlers:Null<Array<ResolvedLayoutItem->Void>>;
+	var paintHandlers:Null<Array<Canvas->ResolvedLayoutItem->Void>>;
+	var paintCacheKeys:Null<Array<Null<String>>>;
+	var decorations:Null<Array<Decoration>>;
+	var decorationCacheKeys:Null<Array<Null<String>>>;
+	/** Shared by every node without classes or tags; never mutated. */
+	static final NoStrings:Array<String> = [];
 
 	public function new(id:WidgetId, kind:LayoutVisualKind = LayoutVisualKind.Box, ?style:LayoutStyle) {
 		if (id == null)
@@ -85,8 +88,8 @@ class RenderNode {
 		styleType = null;
 		styleKey = null;
 		styleId = null;
-		styleClasses = [];
-		styleTags = [];
+		styleClasses = NoStrings;
+		styleTags = NoStrings;
 		commandScope = null;
 		computedStyle = null;
 		tabIndex = 0;
@@ -100,13 +103,13 @@ class RenderNode {
 		invalidationFlags = UiDirtyFlag.NeedsBuild | UiDirtyFlag.NeedsStyle |
 			UiDirtyFlag.NeedsTextLayout | UiDirtyFlag.NeedsLayout | UiDirtyFlag.NeedsPaint |
 			UiDirtyFlag.NeedsComposite | UiDirtyFlag.NeedsSemantics | UiDirtyFlag.NeedsHitGeometry;
-		handlers = new Map();
-		outsidePointerDownHandlers = [];
-		resolvedHandlers = [];
-		paintHandlers = [];
-		paintCacheKeys = [];
-		decorations = [];
-		decorationCacheKeys = [];
+		handlers = null;
+		outsidePointerDownHandlers = null;
+		resolvedHandlers = null;
+		paintHandlers = null;
+		paintCacheKeys = null;
+		decorations = null;
+		decorationCacheKeys = null;
 	}
 
 	/** Publishes the typed selector identity associated with this render node. */
@@ -117,8 +120,8 @@ class RenderNode {
 		styleType = type;
 		styleKey = key;
 		styleId = id;
-		styleClasses = classes == null ? [] : classes.copy();
-		styleTags = tags == null ? [] : tags.copy();
+		styleClasses = classes == null || classes.length == 0 ? NoStrings : classes.copy();
+		styleTags = tags == null || tags.length == 0 ? NoStrings : tags.copy();
 		return this;
 	}
 
@@ -192,6 +195,8 @@ class RenderNode {
 			(phase != "capture" && phase != "target" && phase != "bubble"))
 			throw "Event handlers require a kind and callback";
 		var key = handlerKey(kind, phase);
+		if (handlers == null)
+			handlers = new Map();
 		var values = handlers.get(key);
 		if (values == null) {
 			values = [];
@@ -205,6 +210,8 @@ class RenderNode {
 	public function onPointerDownOutside(handler:UiEvent->Void):RenderNode {
 		if (handler == null)
 			throw "Outside pointer handlers require a callback";
+		if (outsidePointerDownHandlers == null)
+			outsidePointerDownHandlers = [];
 		outsidePointerDownHandlers.push(handler);
 		return this;
 	}
@@ -212,6 +219,8 @@ class RenderNode {
 	public function onResolved(handler:ResolvedLayoutItem->Void):RenderNode {
 		if (handler == null)
 			throw "Resolved geometry handlers cannot be null";
+		if (resolvedHandlers == null)
+			resolvedHandlers = [];
 		resolvedHandlers.push(handler);
 		return this;
 	}
@@ -263,6 +272,10 @@ class RenderNode {
 			throw "Render paint handlers cannot be null";
 		if (cacheKey != null && cacheKey.length == 0)
 			throw "Render paint cache keys cannot be empty";
+		if (paintHandlers == null) {
+			paintHandlers = [];
+			paintCacheKeys = [];
+		}
 		paintHandlers.push(handler);
 		paintCacheKeys.push(cacheKey);
 		return this;
@@ -280,6 +293,10 @@ class RenderNode {
 			throw "Render decorations cannot be null";
 		if (cacheKey != null && cacheKey.length == 0)
 			throw "Render decoration cache keys cannot be empty";
+		if (decorations == null) {
+			decorations = [];
+			decorationCacheKeys = [];
+		}
 		decorations.push(decoration);
 		decorationCacheKeys.push(cacheKey);
 		return this;
@@ -287,7 +304,7 @@ class RenderNode {
 
 	@:allow(nativekit.ui.core.UiContext)
 	function hasPaintHandler():Bool
-		return paintHandlers.length > 0 || decorations.length > 0 || hasStyleDecorations();
+		return paintHandlers != null || decorations != null || hasStyleDecorations();
 
 	/** Copies the framework hit policy into the native transaction payload. */
 	@:allow(nativekit.ui.core.UiContext)
@@ -325,18 +342,20 @@ class RenderNode {
 		var style = computedStyle == null ? null : computedStyle.get(StyleProperty.Decorations);
 		if (style != null && style.decorations.length > 0)
 			result += "|style-decorations:" + style.key();
-		for (index in 0...paintHandlers.length) {
-			var key = paintCacheKeys[index];
-			if (key == null)
-				return null;
-			result += "|handler:" + key;
-		}
-		for (index in 0...decorations.length) {
-			var key = decorationCacheKeys[index];
-			if (key == null)
-				return null;
-			result += "|decoration:" + key;
-		}
+		if (paintHandlers != null)
+			for (index in 0...paintHandlers.length) {
+				var key = paintCacheKeys[index];
+				if (key == null)
+					return null;
+				result += "|handler:" + key;
+			}
+		if (decorations != null)
+			for (index in 0...decorations.length) {
+				var key = decorationCacheKeys[index];
+				if (key == null)
+					return null;
+				result += "|decoration:" + key;
+			}
 		return result;
 	}
 
@@ -361,7 +380,7 @@ class RenderNode {
 	@:allow(nativekit.ui.core.UiContext)
 	function setResolved(item:Null<ResolvedLayoutItem>):Void {
 		resolved = item;
-		if (item != null)
+		if (item != null && resolvedHandlers != null)
 			for (handler in resolvedHandlers)
 				handler(item);
 	}
@@ -375,10 +394,12 @@ class RenderNode {
 		if (styleDecorations != null)
 			for (decoration in styleDecorations.decorations)
 				decoration.paint(canvas, resolved, style);
-		for (decoration in decorations)
-			decoration.paint(canvas, resolved, style);
-		for (handler in paintHandlers)
-			handler(canvas, resolved);
+		if (decorations != null)
+			for (decoration in decorations)
+				decoration.paint(canvas, resolved, style);
+		if (paintHandlers != null)
+			for (handler in paintHandlers)
+				handler(canvas, resolved);
 		return true;
 	}
 
@@ -619,6 +640,8 @@ class RenderNode {
 
 	@:allow(nativekit.ui.core.EventDispatcher)
 	function invokePointerDownOutside(event:UiEvent):Void {
+		if (outsidePointerDownHandlers == null)
+			return;
 		for (handler in outsidePointerDownHandlers) {
 			event.currentTarget = id;
 			event.phase = "outside";
@@ -629,6 +652,8 @@ class RenderNode {
 	}
 
 	function invokePhase(event:UiEvent, phase:String):Void {
+		if (handlers == null)
+			return;
 		var values = handlers.get(handlerKey(event.kind, phase));
 		if (values == null)
 			return;

@@ -32,6 +32,18 @@ class UiFrameMetrics {
 	public var reconcileSeconds(default, null):Float = 0.0;
 	public var customPaintSeconds(default, null):Float = 0.0;
 	public var nativeRenderSeconds(default, null):Float = 0.0;
+	/** Bytes allocated by each submit and render phase; 0 where the runtime has no allocation counter. */
+	public var viewAllocatedBytes(default, null):Float = 0.0;
+	public var treeAndStyleAllocatedBytes(default, null):Float = 0.0;
+	public var nativeLayoutAllocatedBytes(default, null):Float = 0.0;
+	public var reconcileAllocatedBytes(default, null):Float = 0.0;
+	public var customPaintAllocatedBytes(default, null):Float = 0.0;
+	/** Split of the tree-and-style phase: building the tree, comparing it with the last one, syncing node state, and the layout-reuse check. */
+	public var treeBuildAllocatedBytes(default, null):Float = 0.0;
+	public var treeCompareAllocatedBytes(default, null):Float = 0.0;
+	public var treeSyncAllocatedBytes(default, null):Float = 0.0;
+	public var layoutReuseAllocatedBytes(default, null):Float = 0.0;
+	public var nativeRenderAllocatedBytes(default, null):Float = 0.0;
 	public var paintedNodes(default, null):Int;
 	public var paintSkippedNodes(default, null):Int;
 	/** Paint-capable visible nodes skipped because either resolved axis was empty. */
@@ -95,6 +107,25 @@ class UiFrameMetrics {
 		treeAndStyleSeconds = treeAndStyle;
 		nativeLayoutSeconds = nativeLayout;
 		reconcileSeconds = reconcile;
+	}
+
+	public function setSubmitAllocations(view:Float, treeAndStyle:Float, nativeLayout:Float, reconcile:Float):Void {
+		viewAllocatedBytes = view;
+		treeAndStyleAllocatedBytes = treeAndStyle;
+		nativeLayoutAllocatedBytes = nativeLayout;
+		reconcileAllocatedBytes = reconcile;
+	}
+
+	public function setTreeAllocations(build:Float, compare:Float, sync:Float, layoutReuse:Float):Void {
+		treeBuildAllocatedBytes = build;
+		treeCompareAllocatedBytes = compare;
+		treeSyncAllocatedBytes = sync;
+		layoutReuseAllocatedBytes = layoutReuse;
+	}
+
+	public function setRenderAllocations(customPaint:Float, nativeRender:Float):Void {
+		customPaintAllocatedBytes = customPaint;
+		nativeRenderAllocatedBytes = nativeRender;
 	}
 
 	public function setRenderPhases(customPaint:Float, nativeRender:Float):Void {
