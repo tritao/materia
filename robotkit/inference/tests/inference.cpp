@@ -1,5 +1,5 @@
 #include "robotkit_inference.h"
-
+#undef NDEBUG
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -74,10 +74,16 @@ static void basic() {
   char digest[65]{}; size = sizeof(digest);
   assert(rk_inference_model_sha256(RK_INFERENCE_FIXTURE, digest, &size) == RK_OK);
   assert(size == 65 && std::strlen(digest) == 64);
+  rk_inference_options options{}; options.struct_size = sizeof(options);
+  rk_inference_session checked = 0;
+  assert(rk_inference_create_checked(RK_INFERENCE_FIXTURE, digest, &options, &checked) == RK_OK);
+  rk_inference_destroy(checked);
+  digest[0] = digest[0] == 'a' ? 'b' : 'a';
+  assert(rk_inference_create_checked(RK_INFERENCE_FIXTURE, digest, &options, &checked) ==
+      RK_ERROR_MODEL_MISMATCH);
   rk_inference_destroy(session);
   assert(rk_inference_get_info(session, &info) == RK_ERROR_INVALID_HANDLE);
   rk_inference_destroy(session);
-  rk_inference_options options{}; options.struct_size = sizeof(options);
   assert(rk_inference_create("/missing.onnx", &options, &session) == RK_ERROR_BACKEND);
 }
 static void images(const char* model, uint32_t layout) {
@@ -149,6 +155,12 @@ static void dynamicShapes() {
   rk_inference_tensor tensor{}; tensor.struct_size = sizeof(tensor);
   assert(rk_inference_get_tensor(session, RK_INFERENCE_INPUT, 0, &tensor) == RK_OK);
   assert(tensor.shape[0] == 1 && tensor.shape[2] == 4 && tensor.shape[3] == 4);
+  float pixels[48]{};
+  uint8_t output[48]{};
+  uint32_t size = sizeof(output);
+  assert(rk_inference_run(session, reinterpret_cast<uint8_t*>(pixels), sizeof(pixels),
+      output, &size) == RK_OK);
+  assert(size == sizeof(output) && std::fabs(value(std::vector<uint8_t>(output, output + size), 4) - .9f) < 1e-5);
   rk_inference_destroy(session);
 }
 int main() {

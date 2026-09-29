@@ -12,10 +12,10 @@ from stalled_controller import read_frame, send_frame
 def main(port):
     with socket.create_connection(("127.0.0.1", port), timeout=5) as observer:
         observer.settimeout(5)
-        # The observer requests detections, then deliberately stops reading.
+        # The observer requests large camera frames and detections, then stops reading.
         send_frame(observer, threading.Lock(), 1, {
             1: 1, 2: "stalled-observer", 3: "", 4: "observer",
-            5: [{1: "observation", 2: 0.0}],
+            5: [{1: "camera", 2: 0.0}, {1: "observation", 2: 0.0}],
         })
         with socket.create_connection(("127.0.0.1", port), timeout=5) as controller:
             controller.settimeout(5)

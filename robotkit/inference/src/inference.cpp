@@ -46,18 +46,26 @@ struct Session {
   uint64_t dropped = 0;
   bool stopping = false;
   std::thread worker;
+  ~Session() {
+    { std::lock_guard lock(mutex); stopping = true; pending.reset(); }
+    cv.notify_all();
+    if (worker.joinable()) worker.join();
+  }
 };
 Ort::Env& environment() {
-  static Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "robotkit_inference");
-  return env;
+  static auto* env = new Ort::Env(ORT_LOGGING_LEVEL_WARNING, "robotkit_inference");
+  return *env;
 }
 std::mutex registryMutex;
-std::unordered_map<rk_inference_session, std::shared_ptr<Session>> sessions;
+auto& sessions() {
+  static auto* registry = new std::unordered_map<rk_inference_session, std::shared_ptr<Session>>();
+  return *registry;
+}
 rk_inference_session nextSession = 1;
 std::shared_ptr<Session> lookup(rk_inference_session id) {
   std::lock_guard lock(registryMutex);
-  auto found = sessions.find(id);
-  return found == sessions.end() ? nullptr : found->second;
+  auto found = sessions().find(id);
+  return found == sessions().end() ? nullptr : found->second;
 }
 uint32_t elementBytes(uint32_t type) { return type == RK_INFERENCE_FLOAT32 ? 4 : 1; }
 
@@ -120,6 +128,7 @@ rk_result run(const std::shared_ptr<Session>& session, const uint8_t* input,
     return RK_OK;
   } catch (const Ort::Exception&) { return RK_ERROR_BACKEND; }
     catch (const std::bad_alloc&) { return RK_ERROR_OUT_OF_MEMORY; }
+    catch (...) { return RK_ERROR_BACKEND; }
 }
 
 rk_result preprocess(const Work& work, const Tensor& input, std::vector<uint8_t>& output,
@@ -181,9 +190,11 @@ void workerMain(const std::shared_ptr<Session>& session) {
     result.meta.sequence = work.sequence;
     std::vector<uint8_t> prepared;
     rk_result status = RK_OK;
-    if (work.width) status = preprocess(work, session->inputs.front(), prepared, result.meta);
-    else prepared = std::move(work.data);
-    if (status == RK_OK) status = run(session, prepared.data(), prepared.size(), result.data);
+    try {
+      if (work.width) status = preprocess(work, session->inputs.front(), prepared, result.meta);
+      else prepared = std::move(work.data);
+      if (status == RK_OK) status = run(session, prepared.data(), prepared.size(), result.data);
+    } catch (...) { status = RK_ERROR_BACKEND; }
     result.meta.status = status;
     result.meta.output_bytes = result.data.size();
     result.meta.completed_timestamp_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -198,18 +209,44 @@ void workerMain(const std::shared_ptr<Session>& session) {
 }
 
 extern "C" {
-rk_result rk_inference_create(const char* path, const rk_inference_options* options,
+rk_result rk_inference_create_checked(const char* path, const char* expectedDigest,
+    const rk_inference_options* options,
     rk_inference_session* out) {
   if (!path || !*path || !options || options->struct_size < sizeof(*options) || !out)
     return RK_ERROR_INVALID_ARGUMENT;
   *out = 0;
   try {
+    std::vector<uint8_t> modelBytes;
+    if (expectedDigest) {
+      if (std::strlen(expectedDigest) != 64) return RK_ERROR_INVALID_ARGUMENT;
+      std::ifstream file(path, std::ios::binary | std::ios::ate);
+      if (!file) return RK_ERROR_BACKEND;
+      const auto length = file.tellg();
+      if (length <= 0 || static_cast<uint64_t>(length) > UINT32_MAX) return RK_ERROR_UNSUPPORTED;
+      modelBytes.resize(static_cast<size_t>(length));
+      file.seekg(0);
+      if (!file.read(reinterpret_cast<char*>(modelBytes.data()),
+          static_cast<std::streamsize>(modelBytes.size()))) return RK_ERROR_BACKEND;
+      unsigned char digest[32]{};
+      unsigned int digestLength = 0;
+      if (EVP_Digest(modelBytes.data(), modelBytes.size(), digest, &digestLength,
+          EVP_sha256(), nullptr) != 1 || digestLength != 32) return RK_ERROR_BACKEND;
+      constexpr char hex[] = "0123456789abcdef";
+      char actual[65]{};
+      for (size_t i = 0; i < 32; ++i) {
+        actual[2*i] = hex[digest[i] >> 4];
+        actual[2*i+1] = hex[digest[i] & 15];
+      }
+      if (std::strcmp(actual, expectedDigest) != 0) return RK_ERROR_MODEL_MISMATCH;
+    }
     Ort::SessionOptions ortOptions;
     ortOptions.SetIntraOpNumThreads(options->intra_op_threads ? options->intra_op_threads : 1);
     ortOptions.SetInterOpNumThreads(1);
     ortOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
     auto session = std::make_shared<Session>();
-    session->ort = Ort::Session(environment(), path, ortOptions);
+    session->ort = expectedDigest
+      ? Ort::Session(environment(), modelBytes.data(), modelBytes.size(), ortOptions)
+      : Ort::Session(environment(), path, ortOptions);
     Ort::AllocatorWithDefaultOptions allocator;
     const auto collect = [&](bool output) -> rk_result {
       auto& tensors = output ? session->outputs : session->inputs;
@@ -237,12 +274,12 @@ rk_result rk_inference_create(const char* path, const rk_inference_options* opti
     {
       std::lock_guard lock(registryMutex);
       handle = nextSession++;
-      sessions.emplace(handle, session);
+      sessions().emplace(handle, session);
     }
     try { session->worker = std::thread(workerMain, session); }
     catch (...) {
       std::lock_guard lock(registryMutex);
-      sessions.erase(handle);
+      sessions().erase(handle);
       throw;
     }
     *out = handle;
@@ -251,14 +288,18 @@ rk_result rk_inference_create(const char* path, const rk_inference_options* opti
     catch (const std::bad_alloc&) { return RK_ERROR_OUT_OF_MEMORY; }
     catch (...) { return RK_ERROR_BACKEND; }
 }
+rk_result rk_inference_create(const char* path, const rk_inference_options* options,
+    rk_inference_session* out) {
+  return rk_inference_create_checked(path, nullptr, options, out);
+}
 void rk_inference_destroy(rk_inference_session id) {
   std::shared_ptr<Session> session;
   {
     std::lock_guard lock(registryMutex);
-    auto found = sessions.find(id);
-    if (found == sessions.end()) return;
+    auto found = sessions().find(id);
+    if (found == sessions().end()) return;
     session = std::move(found->second);
-    sessions.erase(found);
+    sessions().erase(found);
   }
   { std::lock_guard lock(session->mutex); session->stopping = true; session->pending.reset(); }
   session->cv.notify_one();

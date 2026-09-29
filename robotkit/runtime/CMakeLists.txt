@@ -133,7 +133,7 @@ if(RK_BUILD_TESTS)
 
     add_executable(robotkit_recording_tests tests/recording.cpp)
     target_compile_features(robotkit_recording_tests PRIVATE cxx_std_20)
-    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime)
+    target_link_libraries(robotkit_recording_tests PRIVATE RobotKit::runtime robotkit_mcap_headers)
     add_test(NAME robotkit_recording COMMAND robotkit_recording_tests)
     set_tests_properties(robotkit_recording PROPERTIES LABELS "robot;recording;mcap" TIMEOUT 30)
 

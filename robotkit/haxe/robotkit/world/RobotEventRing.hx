@@ -20,6 +20,15 @@ class RobotEventRing {
     return event;
   }
 
+  /** Reserve ordinals for observations lost before this boundary. */
+  public function skip(count:Int):Void {
+    if (count < 0) throw "Robot event gap cannot be negative";
+    var next = robotkit.time.ClockMapping.checkedAdd(nextOrdinal, Int64.ofInt(count));
+    if (next == null) throw "Robot event ordinal overflow";
+    nextOrdinal = next;
+  }
+
+
   /** Used by replay; stored ordinals must remain strictly increasing. */
   public function restore(event:RobotEvent):Void {
     var ordinal = ordinalOf(event);
@@ -44,9 +53,18 @@ class RobotEventRing {
       var lost = Int64.sub(first, expected);
       result.push(RobotEvent.Overflow(Int64.sub(first, Int64.ofInt(1)), Int64.toInt(lost)));
     }
+    var previous = Int64.sub(first, Int64.ofInt(1));
     for (event in values) {
       if (result.length >= max) break;
-      if (Int64.compare(ordinalOf(event), afterOrdinal) > 0) result.push(event);
+      var ordinal = ordinalOf(event);
+      var missing = Int64.sub(ordinal, Int64.add(previous, Int64.ofInt(1)));
+      if (Int64.compare(missing, Int64.ofInt(0)) > 0 &&
+          switch event { case Overflow(_, _): false; case _: true; } &&
+          Int64.compare(ordinal, afterOrdinal) > 0) {
+        result.push(RobotEvent.Overflow(Int64.sub(ordinal, Int64.ofInt(1)), Int64.toInt(missing)));
+      }
+      if (result.length < max && Int64.compare(ordinal, afterOrdinal) > 0) result.push(event);
+      previous = ordinal;
     }
     return result;
   }

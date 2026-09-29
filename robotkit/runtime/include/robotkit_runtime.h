@@ -171,6 +171,10 @@ RK_API rk_result RK_CALL rk_recording_reader_open(const char *path RK_UTF8,
 RK_API rk_result RK_CALL rk_recording_reader_next(rk_recording_reader_handle reader,
     rk_recording_message *message, uint8_t *payload RK_OUT_BUFFER(inout_payload_size),
     uint32_t *inout_payload_size RK_INOUT);
+/** UTF-8 schema name, newline, then exact schema data for the last message. */
+RK_API rk_result RK_CALL rk_recording_reader_schema(rk_recording_reader_handle reader,
+    uint8_t *schema RK_OUT_BUFFER(inout_schema_size),
+    uint32_t *inout_schema_size RK_INOUT);
 RK_API void RK_CALL rk_recording_reader_destroy(rk_recording_reader_handle reader);
 
 /* ------------------------------------------------------------------------- */

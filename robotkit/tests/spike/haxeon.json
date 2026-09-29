@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "package": {
+    "name": "robotkit-sensorkit-camera-spike"
+  },
+  "entry": "tests.spike.Main",
+  "sourceRoots": [
+    "src",
+    "../../../sensorkit/sensor_io/haxe"
+  ],
+  "dependencies": {
+    "nativekit": {
+      "path": "../../../nativekit"
+    },
+    "robotkit": {
+      "path": "../.."
+    }
+  },
+  "native": {
+    "cmake": {
+      "source": "../../robotd/native",
+      "target": "robotd_native",
+      "inputs": [
+        "../../robotd/native/CMakeLists.txt",
+        "../../CMakeLists.txt",
+        "../../runtime/CMakeLists.txt",
+        "../../inference/CMakeLists.txt",
+        "../../inference/src/inference.cpp",
+        "../../inference/include/robotkit_inference.h",
+        "../../../nativekit/CMakeLists.txt",
+        "../../policy/CMakeLists.txt",
+        "../../policy/src/policy.cpp",
+        "../../policy/include/robotkit_policy.h"
+      ]
+    }
+  },
+  "target": "host",
+  "outputDir": "build"
+}

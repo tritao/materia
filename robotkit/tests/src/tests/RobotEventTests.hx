@@ -26,6 +26,16 @@ private class EventBehavior implements WorldBehavior {
   public function update(context:WorldBehaviorContext):Void seen += context.events.length;
 }
 
+private class LocalEventBehavior implements robotkit.behavior.RobotBehavior {
+  public var observations:Int = 0;
+  public function new() {}
+  public function update(context:robotkit.behavior.RobotContext):Void
+    for (event in context.events) switch event {
+      case Observation(_, _): observations++;
+      case Overflow(_, _):
+    }
+}
+
 class RobotEventTests {
   static var assertions = 0;
   static function check(value:Bool, message:String):Void {
@@ -61,6 +71,20 @@ class RobotEventTests {
       "wire round trip keeps ordinal and pixel box");
 
     var remote = new RemoteRobot("robot-events");
+    var wireRemote = new RemoteRobot("wire-events");
+    wireRemote.onImageDetection(ImageDetectionObservationMsg.fromObservation(Int64.ofInt(42),
+      Int64.ofInt(1), observation(1)));
+    wireRemote.onImageDetection(ImageDetectionObservationMsg.fromObservation(Int64.ofInt(42),
+      Int64.ofInt(3), observation(3)));
+    var wireGap = wireRemote.events(Int64.ofInt(1), 10);
+    check(wireGap.length == 2 && switch wireGap[0] {
+      case Overflow(ordinal, count): Int64.compare(ordinal, Int64.ofInt(2)) == 0 && count == 1;
+      case _: false;
+    } && switch wireGap[1] {
+      case Observation(ordinal, _): Int64.compare(ordinal, Int64.ofInt(3)) == 0;
+      case _: false;
+    }, "wire observation gaps become overflow events");
+    wireRemote.close();
     var memory = new RobotRecording();
     memory.recordSnapshot(remote.snapshot());
     var recording = new RecordingRobot(remote, memory);
@@ -103,6 +127,29 @@ class RobotEventTests {
     check(replayed.length == 1 && Int64.compare(RobotEventRing.ordinalOf(replayed[0]),
       Int64.ofInt(1)) == 0, "replay restores original event ordinal");
     replay.close(); recording.close();
+    var gapRecording = new RobotRecording();
+    gapRecording.recordRobotEvent("robot-events", RobotEvent.Observation(Int64.ofInt(1), observation(1)));
+    gapRecording.recordRobotEvent("robot-events", RobotEvent.Observation(Int64.ofInt(3), observation(3)));
+    var gapReplay = new ReplayRobot("robot-events", gapRecording);
+    check(gapReplay.advance(), "replay advances over the ordinal gap");
+    var gapEvents = gapReplay.events(Int64.ofInt(1), 10);
+    check(gapEvents.length == 2 && switch gapEvents[0] {
+      case Overflow(ordinal, count): Int64.compare(ordinal, Int64.ofInt(2)) == 0 && count == 1;
+      case _: false;
+    } && switch gapEvents[1] {
+      case Observation(ordinal, _): Int64.compare(ordinal, Int64.ofInt(3)) == 0;
+      case _: false;
+    }, "replay emits the same overflow gap as the live ring");
+    gapReplay.close();
+    var localBehavior = new LocalEventBehavior();
+    var localRunner = new robotkit.behavior.RobotBehaviorRunner(localBehavior);
+    var runtimeSnapshot = new robotkit.runtime.RobotSnapshot(Int64.ofInt(1),
+      Int64.ofInt(1), Int64.ofInt(10), 1, 0, 0, 0, [], [], [], Int64.ofInt(20));
+    localRunner.update(runtimeSnapshot, Int64.ofInt(20));
+    localRunner.offerEvent(RobotEvent.Observation(Int64.ofInt(1), observation(1)));
+    localRunner.update(runtimeSnapshot, Int64.ofInt(21));
+    check(localBehavior.observations == 1,
+      "local robotd behavior receives observation without a new snapshot");
     Sys.println('RobotKit robot event tests passed ($assertions assertions)');
     return assertions;
   }

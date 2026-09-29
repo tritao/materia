@@ -29,7 +29,7 @@ from mcap.reader import make_reader
 from mcap.writer import Writer, CompressionType
 
 with open(sys.argv[1], "rb") as stream:
-    messages = list(make_reader(stream).iter_messages())
+    messages = list(make_reader(stream).iter_messages(log_time_order=False))
 
 expected = ["command", "snapshot", "sensor", "fault", "world", "world_event", "process_event"]
 assert [channel.topic for _, channel, _ in messages] == ["robotkit/" + name for name in expected]
@@ -42,6 +42,9 @@ for ordinal, (schema, channel, message) in enumerate(messages):
     payload = msgpack.unpackb(message.data, raw=False, strict_map_key=False)
     assert isinstance(payload, dict)
     assert set(payload) == {field["id"] for field in spec["declarations"][spec["root"]]["fields"]}
+    import runpy
+    decode = runpy.run_path(sys.argv[2])["decode"]
+    decode(payload, spec["root"], spec["declarations"])
     assert message.publish_time == ordinal
     assert message.log_time > 0
 camera = msgpack.unpackb(messages[1][2].data, raw=False, strict_map_key=False)[10][1][13][4]

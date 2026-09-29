@@ -55,6 +55,17 @@ class OutboundSchedulerIntegration {
       if (!scheduler.shouldOffer(OutboundFamily.Camera, "legacy", Int64.ofInt(1),
           Int64.ofInt(0))) throw "legacy client lost camera family";
       scheduler.configure([new StreamSubscription("sensor", 2.0)]);
+      scheduler.configure([new StreamSubscription("future_family", 1.0),
+        new StreamSubscription("sensor", 2.0)]);
+      if (!scheduler.subscribed(OutboundFamily.Sensor) ||
+          scheduler.subscribed(OutboundFamily.Camera))
+        throw "unknown future subscription family changed known subscriptions";
+      var invalidRate = false;
+      try scheduler.configure([new StreamSubscription("camera", 1.0),
+        new StreamSubscription("sensor", -1.0)]) catch (_:Dynamic) invalidRate = true;
+      if (!invalidRate || !scheduler.subscribed(OutboundFamily.Sensor) ||
+          scheduler.subscribed(OutboundFamily.Camera))
+        throw "invalid subscription partially replaced active configuration";
       if (scheduler.shouldOffer(OutboundFamily.Camera, "filtered", Int64.ofInt(1),
           Int64.ofInt(0)) || !scheduler.subscribed(OutboundFamily.Essential))
         throw "subscription filtering failed";
@@ -65,6 +76,13 @@ class OutboundSchedulerIntegration {
           Int64.ofInt(500000000))) throw "per-key subscription rate limiting failed";
       if (!scheduler.shouldOffer(OutboundFamily.Sensor, "other", Int64.ofInt(1),
           Int64.ofInt(250000000))) throw "rate limit was shared across sensor keys";
+      scheduler.configure([new StreamSubscription("sensor", 15.0)]);
+      var delivered = 0;
+      for (index in 0...100) if (scheduler.shouldOffer(OutboundFamily.Sensor, "jitter",
+          Int64.ofInt(index + 1), Int64.fromFloat(index * 10000000.0 + (index % 3) * 1000000.0)))
+        delivered++;
+      if (delivered < 14 || delivered > 16)
+        throw '15 Hz pacing drifted under jitter: delivered=$delivered';
       scheduler.configure([new StreamSubscription("camera", 1.0)]);
       if (!scheduler.shouldOffer(OutboundFamily.Camera, "paced", Int64.ofInt(1),
           Int64.ofInt(0))) throw "initial paced frame was rejected";
@@ -119,12 +137,17 @@ class OutboundSchedulerIntegration {
       if (scheduler.dropCount(OutboundFamily.Observation) != 1 || !scheduler.flush(1) ||
           receiveOne(client.borrow(), stream, runtime) != "detection")
         throw "per-producer observation latest-wins delivery failed";
-      var oversized = new RobotFrame(RobotMessageType.CameraFrame, Bytes.alloc(300));
+      var oversized = new RobotFrame(RobotMessageType.CameraFrame, Bytes.alloc(4 * 1024 * 1024));
       scheduler.offer(OutboundFamily.Camera, "blocked", Int64.ofInt(1), oversized);
       if (!scheduler.flush(1)) throw "over-budget bulk frame failed the connection";
-      scheduler.offer(OutboundFamily.Camera, "blocked", Int64.ofInt(2), oversized);
       if (scheduler.dropCount(OutboundFamily.Camera) != 2)
-        throw "over-budget slot replacement did not count a drop";
+        throw "oversized bulk frame was not dropped and counted";
+      scheduler.offer(OutboundFamily.Camera, "blocked", Int64.ofInt(2), oversized);
+      if (!scheduler.flush(1) || scheduler.dropCount(OutboundFamily.Camera) != 3)
+        throw "second oversized bulk frame was not dropped and counted";
+      scheduler.offer(OutboundFamily.Sensor, "imu", Int64.ofInt(0), numeric);
+      if (!scheduler.flush(1) || receiveOne(client.borrow(), stream, runtime) != "imu1")
+        throw "sensor sequence reset did not resume delivery";
       NativeTransport.send(server,
         new RobotFrame(RobotMessageType.RobotState, Bytes.ofString("essential")).encode());
       if (receiveOne(client.borrow(), stream, runtime) != "essential")

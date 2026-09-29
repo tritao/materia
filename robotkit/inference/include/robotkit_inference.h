@@ -64,6 +64,10 @@ typedef struct rk_inference_result {
 
 RK_API rk_result RK_CALL rk_inference_create(const char *path RK_UTF8,
     const rk_inference_options *options, rk_inference_session *out_session RK_OUT RK_OWNED);
+/** Hashes the exact model bytes loaded by ONNX Runtime and checks expected_sha256. */
+RK_API rk_result RK_CALL rk_inference_create_checked(const char *path RK_UTF8,
+    const char *expected_sha256 RK_UTF8, const rk_inference_options *options,
+    rk_inference_session *out_session RK_OUT RK_OWNED);
 RK_API void RK_CALL rk_inference_destroy(rk_inference_session session);
 RK_API rk_result RK_CALL rk_inference_get_info(rk_inference_session session,
     rk_inference_info *out_info RK_INOUT);

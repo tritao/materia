@@ -33,7 +33,7 @@ class ClockMappings {
   }
 
   /** Chooses the valid path with the lowest sum of error bounds.
-   * Equal-bound paths that disagree on the result are ambiguous and return null. */
+   * Equal-bound paths differing by more than one nanosecond are ambiguous. */
   public function map(timestampNs:Int64, fromClockId:String,
       toClockId:String):Null<MappedTimestamp> {
     if (fromClockId == null || fromClockId.length == 0 ||
@@ -60,7 +60,11 @@ class ClockMappings {
           if (best == null || Int64.compare(bound, best.errorBoundNs) < 0) {
             best = new MappedTimestamp(mapped.valueNs, bound);
             ambiguous = false;
-          } else if (Int64.compare(mapped.valueNs, best.valueNs) != 0) ambiguous = true;
+          } else {
+            var difference = ClockMapping.checkedSubtract(mapped.valueNs, best.valueNs);
+            if (difference == null || Int64.compare(difference, Int64.ofInt(1)) > 0 ||
+                Int64.compare(difference, Int64.ofInt(-1)) < 0) ambiguous = true;
+          }
         } else {
           var visited = route.visited.copy(); visited.push(mapping.toClockId);
           pending.push(new ClockRoute(mapping.toClockId, mapped.valueNs, bound, visited));

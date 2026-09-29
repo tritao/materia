@@ -107,7 +107,13 @@ class RobotRecordingCodec {
     msg.replaceAfterTimeNs = value.replaceAfterTimeNs;
     return msg;
   }
-  static function readPlan(msg:RecordingPlanMsg):ExecutionPlanSubmission
+  static function readPlan(msg:RecordingPlanMsg):ExecutionPlanSubmission {
+    finiteArray(msg.startPosition, "plan start position");
+    finiteArray(msg.startVelocity, "plan start velocity");
+    finiteArray(msg.startAcceleration, "plan start acceleration");
+    finiteArray(msg.positionTolerances, "plan position tolerances");
+    finiteArray(msg.velocityTolerances, "plan velocity tolerances");
+    finiteArray(msg.accelerationTolerances, "plan acceleration tolerances");
     return new ExecutionPlanSubmission(msg.planId, msg.modelRevision,
       msg.calibrationRevision, msg.requiredCapabilities, msg.startPosition,
       msg.startVelocity, msg.startAcceleration,
@@ -115,6 +121,7 @@ class RobotRecordingCodec {
       msg.replaceAfterTimeNs, msg.positionTolerances, msg.velocityTolerances,
       msg.accelerationTolerances, msg.endsAtRest,
       [for (event in msg.events) readTimedEvent(event)], msg.jerkUnchecked);
+  }
   static function timedEvent(value:ProcessTimedEvent):RecordingTimedEventMsg {
     var msg = new RecordingTimedEventMsg();
     msg.timeNs = value.timeNs;
@@ -175,12 +182,23 @@ class RobotRecordingCodec {
     }
     return msg;
   }
-  public static function readSensor(msg:RecordingSensorMsg):SensorFrame
+  public static function readSensor(msg:RecordingSensorMsg):SensorFrame {
+    finiteArray(msg.values, "sensor values");
+    if (msg.mountPosition == null || msg.mountPosition.length != 3 ||
+        msg.mountRotation == null || msg.mountRotation.length != 4)
+      throw "Recorded sensor mount dimensions are invalid";
+    finiteArray(msg.mountPosition, "sensor mount position");
+    finiteArray(msg.mountRotation, "sensor mount rotation");
+    var norm = 0.0;
+    for (value in msg.mountRotation) norm += value * value;
+    if (Math.abs(norm - 1.0) > 0.000001)
+      throw "Recorded sensor mount rotation is not a unit quaternion";
     return new SensorFrame(msg.sensorId, msg.kind, msg.frameId, msg.sequence,
       msg.sourceTimestampNs, msg.values, msg.receivedTimestampNs, msg.linkId,
       msg.mountPosition, msg.mountRotation, msg.sourceClockId, msg.receivedClockId,
       msg.image == null ? null : new CameraImage(msg.image.width, msg.image.height,
         msg.image.encoding, msg.image.pixels));
+  }
 
   public static function snapshot(value:RobotSnapshot):RecordingSnapshotMsg {
     var msg = new RecordingSnapshotMsg();
@@ -209,7 +227,10 @@ class RobotRecordingCodec {
     msg.queueEndTimeNs = value.queueEndTimeNs;
     return msg;
   }
-  public static function readSnapshot(msg:RecordingSnapshotMsg):RobotSnapshot
+  public static function readSnapshot(msg:RecordingSnapshotMsg):RobotSnapshot {
+    finiteArray(msg.positions, "snapshot positions");
+    finiteArray(msg.velocities, "snapshot velocities");
+    finiteArray(msg.efforts, "snapshot efforts");
     return new RobotSnapshot(msg.id, msg.sourceSequence, msg.sourceTimestampNs,
       msg.positions, msg.velocities, msg.efforts, msg.mode, msg.faultCode,
       msg.receivedTimestampNs, [for (sensor in msg.sensors) readSensor(sensor)],
@@ -217,6 +238,12 @@ class RobotRecordingCodec {
       msg.trajectoryActive, msg.trajectoryTimeNs, msg.trajectoryDurationNs,
       msg.trajectoryTag, msg.trajectoryTagTimeNs, msg.sessionState, msg.activePlanId,
       msg.committedUntilNs, msg.queueEndTimeNs);
+  }
+
+  static function finiteArray(values:Array<Float>, label:String):Void {
+    if (values == null) throw 'Recorded $label is missing';
+    for (value in values) if (!Math.isFinite(value)) throw 'Recorded $label is not finite';
+  }
 
   public static function fault(value:RobotFault):RecordingFaultMsg {
     var msg = new RecordingFaultMsg();

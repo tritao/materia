@@ -73,14 +73,23 @@ class SerialDeployment {
           throw 'robotd: worldd perception cannot serve a local consumer without a network round trip';
         var options:Dynamic = Reflect.field(entry, "options");
         if (options == null) options = {};
-        exactKeys(options, ["scoreThreshold", "maxRateHz", "iouThreshold"], "perception options");
+        exactKeys(options, ["scoreThreshold", "maxRateHz", "iouThreshold", "threads",
+          "dynamicWidth", "dynamicHeight"], "perception options");
         var score = optionalNumber(options, "scoreThreshold", 0.4);
         var rate = optionalNumber(options, "maxRateHz", 0.0);
         var iou = optionalNumber(options, "iouThreshold", 0.5);
+        var threads = optionalNumber(options, "threads", 1);
+        var dynamicWidth = optionalNumber(options, "dynamicWidth", 0);
+        var dynamicHeight = optionalNumber(options, "dynamicHeight", 0);
         if (score < 0 || score > 1 || iou < 0 || iou > 1 || rate < 0)
           throw 'robotd: perception options for $id are out of range';
+        if (threads < 1 || threads > 64 || threads != Math.floor(threads) ||
+            dynamicWidth < 0 || dynamicWidth > 8192 || dynamicWidth != Math.floor(dynamicWidth) ||
+            dynamicHeight < 0 || dynamicHeight > 8192 || dynamicHeight != Math.floor(dynamicHeight))
+          throw 'robotd: inference dimensions or threads for $id are invalid';
         perception.push(new PerceptionPipelineConfig(id, input, pipeline, modelFile,
-          digest, host, consumers, score, rate, iou));
+          digest, host, consumers, score, rate, iou,
+          Std.int(threads), Std.int(dynamicWidth), Std.int(dynamicHeight)));
       }
     }
     channels = [];

@@ -413,6 +413,8 @@ class SessionTransitionRobot implements Robot {
       value.queueEndTimeNs);
   }
   public function sensors():Array<SensorFrame> return inner.sensors();
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent>
+    return inner.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
     if (rejectNext) {
@@ -521,6 +523,8 @@ class LaggingRobot implements Robot {
   public function capabilities():RobotCapabilities return inner.capabilities();
   public function snapshot():RobotSnapshot return inner.snapshot();
   public function sensors():Array<SensorFrame> return inner.sensors();
+  public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent>
+    return inner.events(afterOrdinal, max);
   public function fault():Null<RobotFault> return inner.fault();
   public function submit(command:RobotCommand):Void {
     switch command {

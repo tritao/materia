@@ -51,6 +51,7 @@ struct Reader {
   std::optional<mcap::LinearMessageView::Iterator> iterator;
   std::optional<Item> current;
   std::string topic;
+  std::string schema;
 };
 std::mutex RegistryMutex;
 uint32_t NextHandle = 1;
@@ -122,17 +123,19 @@ rk_result validateAndCache(const std::shared_ptr<Reader>& reader) {
   if (reader->damaged) return RK_ERROR_BACKEND;
   if (!reader->iterator || *reader->iterator == reader->messages->end()) return RK_ERROR_STALE_STATE;
   const auto& view = **reader->iterator;
-  auto version = view.channel->metadata.find("robotkit.schema_version");
-  if (!view.schema || view.schema->encoding != "robotkit-wire" ||
-      view.channel->messageEncoding != "msgpack" ||
-      version == view.channel->metadata.end() || version->second != "6" ||
-      view.channel->topic.size() >= 128) return RK_ERROR_UNSUPPORTED;
+  const bool robotkit = view.channel->topic.rfind("robotkit/", 0) == 0;
+  if (robotkit && (!view.schema || view.schema->encoding != "robotkit-wire" ||
+      view.channel->messageEncoding != "msgpack")) return RK_ERROR_UNSUPPORTED;
+  if (view.channel->topic.size() >= 128) return RK_ERROR_UNSUPPORTED;
   Item item;
   item.channelId = 0;
   item.ordinal = view.message.publishTime;
   item.timestamp = view.message.logTime;
   item.data.assign(view.message.data, view.message.data + view.message.dataSize);
   reader->topic = view.channel->topic;
+  reader->schema = view.schema ? view.schema->name + "\n" +
+      std::string(reinterpret_cast<const char*>(view.schema->data.data()), view.schema->data.size())
+      : std::string();
   reader->current = std::move(item);
   ++(*reader->iterator);
   return reader->damaged ? RK_ERROR_BACKEND : RK_OK;
@@ -158,8 +161,8 @@ rk_result rk_recording_writer_create(const char* path, uint64_t capacity,
     metadata.metadata["robotkit.schema_version"] = "6";
     result = writer->output.write(metadata);
     if (!result.ok()) { writer->output.close(); std::filesystem::remove(marker); return RK_ERROR_BACKEND; }
-    { std::lock_guard lock(RegistryMutex); out->id = NextHandle++; Writers[out->id] = writer; }
     writer->thread = std::thread(writerMain, writer);
+    { std::lock_guard lock(RegistryMutex); out->id = NextHandle++; Writers[out->id] = writer; }
     return RK_OK;
   } catch (...) { return RK_ERROR_OUT_OF_MEMORY; }
 }
@@ -243,10 +246,19 @@ rk_result rk_recording_reader_open(const char* path,rk_recording_reader_handle* 
     if(std::filesystem::exists(std::string(path)+".incomplete"))return RK_ERROR_INVALID_STATE;
     auto reader=std::make_shared<Reader>();auto status=reader->mcap.open(path);if(!status.ok())return RK_ERROR_BACKEND;
     status=reader->mcap.readSummary(mcap::ReadSummaryMethod::NoFallbackScan);if(!status.ok())return RK_ERROR_BACKEND;
-    for (const auto& [_, channel] : reader->mcap.channels()) {
-      auto version = channel->metadata.find("robotkit.schema_version");
-      if (version == channel->metadata.end() || version->second != "6") return RK_ERROR_UNSUPPORTED;
+    bool version6 = false;
+    const auto indexes = reader->mcap.metadataIndexes().equal_range("robotkit");
+    for (auto it = indexes.first; it != indexes.second; ++it) {
+      mcap::Record record;
+      auto* source = reader->mcap.dataSource();
+      if (!source || !mcap::McapReader::ReadRecord(*source, it->second.offset, &record).ok())
+        return RK_ERROR_BACKEND;
+      mcap::Metadata metadata;
+      if (!mcap::McapReader::ParseMetadata(record, &metadata).ok()) return RK_ERROR_BACKEND;
+      auto version = metadata.metadata.find("robotkit.schema_version");
+      if (version != metadata.metadata.end() && version->second == "6") version6 = true;
     }
+    if (!version6) return RK_ERROR_UNSUPPORTED;
     reader->messages.emplace(reader->mcap.readMessages([raw=reader.get()](const mcap::Status&){raw->damaged=true;}));
     reader->iterator.emplace(reader->messages->begin());
     {std::lock_guard lock(RegistryMutex);out->id=NextHandle++;Readers[out->id]=reader;}return RK_OK;
@@ -262,6 +274,15 @@ rk_result rk_recording_reader_next(rk_recording_reader_handle handle,rk_recordin
   std::memcpy(message->topic,reader->topic.data(),reader->topic.size());
   if(!payload||*size<item.data.size()){*size=item.data.size();return RK_ERROR_LIMIT;}
   std::memcpy(payload,item.data.data(),item.data.size());*size=item.data.size();reader->current.reset();return RK_OK;
+}
+rk_result rk_recording_reader_schema(rk_recording_reader_handle handle,uint8_t* schema,uint32_t* size) {
+  auto reader=lookup(Readers,handle.id);if(!reader)return RK_ERROR_INVALID_HANDLE;
+  if(!size)return RK_ERROR_INVALID_ARGUMENT;
+  if(!schema||*size<reader->schema.size()){
+    *size=reader->schema.size();return RK_ERROR_LIMIT;
+  }
+  if(!reader->schema.empty())std::memcpy(schema,reader->schema.data(),reader->schema.size());
+  *size=reader->schema.size();return RK_OK;
 }
 void rk_recording_reader_destroy(rk_recording_reader_handle handle){std::lock_guard lock(RegistryMutex);Readers.erase(handle.id);}
 }

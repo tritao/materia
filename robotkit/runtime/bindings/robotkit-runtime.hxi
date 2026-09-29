@@ -263,6 +263,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_recording_reader_next(reader: rk_recording_reader_handle, message: ptr<rk_recording_message>, payload: nullable<ptr<u8>> @out_buffer("inout_payload_size"), inout_payload_size: ptr<u32> @inout) -> rk_result;
 	extern fn rk_recording_reader_open(path: utf8, out_reader: ptr<rk_recording_reader_handle> @out @owned) -> rk_result;
+	/**
+	 * UTF-8 schema name, newline, then exact schema data for the last message.
+	 */
+	extern fn rk_recording_reader_schema(reader: rk_recording_reader_handle, schema: nullable<ptr<u8>> @out_buffer("inout_schema_size"), inout_schema_size: ptr<u32> @inout) -> rk_result;
 	extern fn rk_recording_writer_create(path: utf8, queue_capacity_bytes: u64, compression: rk_recording_compression, out_writer: ptr<rk_recording_writer_handle> @out @owned) -> rk_result;
 	extern fn rk_recording_writer_destroy(writer: rk_recording_writer_handle) -> void;
 	extern fn rk_recording_writer_enqueue(writer: rk_recording_writer_handle, channel_id: u32, ordinal: u64, recording_timestamp_ns: u64, payload: ptr<const<u8>> @in_array("payload_size"), payload_size: u32) -> rk_result;

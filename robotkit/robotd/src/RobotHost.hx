@@ -112,6 +112,11 @@ class RobotHost {
         var secondCamera = robot.addSensor(new robotkit.model.Sensor("camera-right", "camera", 0,
           "demo/camera-right"));
         secondCamera.frame = mount;
+        if (perceptionFixtureModel == null) {
+          var oversizeCamera = robot.addSensor(new robotkit.model.Sensor("camera-oversize", "camera", 0,
+            "demo/camera-oversize"));
+          oversizeCamera.frame = mount;
+        }
       }
     }
     }
@@ -138,18 +143,26 @@ class RobotHost {
         var hostedRuntime:RobotRuntime = serverRuntime;
         var fixtureTick:Null<Void->Void> = null;
         if (cameraFixtureStream) {
-          var fixtureWidth = perceptionFixtureModel == null ? 640 : 8;
-          var fixtureHeight = perceptionFixtureModel == null ? 480 : 4;
+          var largeFixture = perceptionFixtureModel == null ||
+            args.indexOf("--perception-stall-large") >= 0;
+          var fixtureWidth = largeFixture ? 640 : 8;
+          var fixtureHeight = largeFixture ? 480 : 4;
           var pixels = haxe.io.Bytes.alloc(fixtureWidth * fixtureHeight * 3);
           for (index in 0...pixels.length) pixels.set(index,
             perceptionFixtureModel == null ? index % 251 : 51);
           var image = new robotkit.world.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
+          var oversizeImage = perceptionFixtureModel == null
+            ? new robotkit.world.CameraImage(1920, 1080, "rgb8", haxe.io.Bytes.alloc(1920 * 1080 * 3))
+            : null;
           var fixtureSequence = haxe.Int64.ofInt(0);
           var nextFixtureNs = haxe.Int64.ofInt(0);
           fixtureTick = function() {
             var now = nativekit.ffi.NativeKit.nk_time_now_ns();
             if (haxe.Int64.compare(now, nextFixtureNs) < 0) return;
             fixtureSequence = haxe.Int64.add(fixtureSequence, haxe.Int64.ofInt(1));
+            if (oversizeImage != null && haxe.Int64.compare(fixtureSequence, haxe.Int64.ofInt(1)) == 0)
+              hostedRuntime.publishCameraFrame("demo/camera-oversize", oversizeImage,
+                fixtureSequence, now, "camera.fixture");
             hostedRuntime.publishCameraFrame("demo/camera", image, fixtureSequence,
               now, "camera.fixture");
             hostedRuntime.publishCameraFrame("demo/camera-right", image, fixtureSequence,
@@ -226,8 +239,8 @@ class RobotHost {
     var raw = optionValue("--bulk-budget-bytes=");
     if (raw == null) return 0;
     var value = Std.parseInt(raw);
-    if (value == null || value <= 0 || value >= 4 * 1024 * 1024)
-      throw "robotd: --bulk-budget-bytes must be positive and below 4194304";
+    if (value == null || value <= 0 || value > 4 * 1024 * 1024 - OutboundScheduler.MIN_ESSENTIAL_RESERVE)
+      throw "robotd: --bulk-budget-bytes must leave at least 65536 bytes for essential traffic";
     return value;
   }
 

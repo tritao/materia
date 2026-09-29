@@ -63,10 +63,53 @@ class ClockMappingTests {
     check(selected != null, "valid alternate path is considered");
     if (selected != null) equal(selected.errorBoundNs, Int64.ofInt(27),
       "least-error explicit path wins");
-    registry.add(new ClockMapping("camera", "world", Int64.ofInt(901), 0,
-      Int64.ofInt(27), Int64.add(epoch, Int64.ofInt(901)), "replacement"));
+    registry.add(new ClockMapping("camera", "world", Int64.ofInt(951), 0,
+      Int64.ofInt(27), Int64.add(epoch, Int64.ofInt(951)), "replacement"));
+    check(registry.map(epoch, "camera", "world") != null,
+      "one-nanosecond rounding difference is tolerated");
+    registry.add(new ClockMapping("camera", "world", Int64.ofInt(952), 0,
+      Int64.ofInt(27), Int64.add(epoch, Int64.ofInt(952)), "replacement"));
     check(registry.map(epoch, "camera", "world") == null,
-      "equal-bound disagreeing paths are ambiguous");
+      "larger equal-bound disagreement is ambiguous");
+    var staged = new ClockMappings();
+    staged.add(new ClockMapping("a", "b", Int64.ofInt(5), 0,
+      Int64.ofInt(2), Int64.ofInt(5), "first"));
+    staged.add(new ClockMapping("b", "c", Int64.ofInt(7), 0,
+      Int64.ofInt(3), Int64.ofInt(20), "second"));
+    check(staged.map(Int64.ofInt(7), "a", "c") == null &&
+      staged.map(Int64.ofInt(8), "a", "c") != null,
+      "validFrom on the second edge is enforced midway through a chain");
+
+    var longMapping = new ClockMapping("sim", "host", Int64.ofInt(0), 100000.0,
+      Int64.ofInt(1), Int64.ofInt(0), "long run", 10.0,
+      Int64.parseString("30003000000000"));
+    var longResult = longMapping.map(Int64.parseString("30000000000000"));
+    check(longResult != null, "eight-hour correction is representable");
+    if (longResult != null) {
+      equal(longResult.valueNs, Int64.parseString("30003000000000"),
+        "100 ppm over 8.3 h corrects three seconds without Int32 wrap");
+      equal(longResult.errorBoundNs, Int64.ofInt(300001),
+        "skew uncertainty grows with anchor distance");
+    }
+    check(longMapping.map(Int64.parseString("30000000000001")) == null,
+      "validity window expires");
+    var zeroSkew = new ClockMapping("a", "b", Int64.ofInt(0), 0,
+      Int64.ofInt(0), Int64.ofInt(0), "test");
+    check(zeroSkew.map(Int64.parseString("9007199254740992")) != null,
+      "zero skew accepts deltas beyond floating-point exact range");
+    var negative = new ClockMapping("a", "b", Int64.ofInt(0), -100000.0,
+      Int64.ofInt(0), Int64.ofInt(0), "test");
+    var negativeResult = negative.map(Int64.parseString("30000000000000"));
+    check(negativeResult != null, "negative skew maps long intervals");
+    if (negativeResult != null)
+      equal(negativeResult.valueNs, Int64.parseString("29997000000000"),
+        "negative skew correction is not truncated");
+    var nearMax = new ClockMapping("a", "b", Int64.ofInt(0), 1000000000.0,
+      Int64.ofInt(0), Int64.parseString("9223372036854775800"), "test");
+    check(nearMax.map(Int64.parseString("9223372036854775807")) == null,
+      "positive overflow is rejected");
+    check(ClockMapping.checkedAdd(Int64.parseString("-9223372036854775808"),
+      Int64.ofInt(-1)) == null, "negative overflow is rejected");
 
     var boundOnly = new ClockMappings();
     boundOnly.add(new ClockMapping("a", "b", Int64.ofInt(0), 0,

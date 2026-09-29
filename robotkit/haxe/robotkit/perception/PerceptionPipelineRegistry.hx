@@ -10,7 +10,8 @@ class PerceptionPipelineRegistry {
     return switch config.pipeline {
       case "object_detector": new ObjectDetectorPipeline(producerId, config.id, config.input,
         config.id, config.modelPath, config.modelSha256, config.scoreThreshold,
-        config.iouThreshold, config.maxRateHz);
+        config.iouThreshold, config.maxRateHz, config.threads,
+        config.dynamicWidth, config.dynamicHeight);
       case _: throw 'Unknown perception pipeline ${config.pipeline}';
     };
   }

@@ -52,7 +52,7 @@ class RobotClient {
   public var subscribeObservations:Bool = false;
   public var statusListener:Null<Void->Void> = null;
   /** Add camera before connect when full images are needed. */
-  public var subscribeCamera:Bool = false;
+  public var subscribeCamera:Null<Bool> = null;
   public var sensorMaxRateHz:Float = 0.0;
   public var cameraMaxRateHz:Float = 0.0;
 
@@ -76,6 +76,9 @@ class RobotClient {
     this.clientName = clientName;
     this.requestedRole = requestedRole;
   }
+
+  public function subscriptionLocked():Bool
+    return subscription != null || nativeRuntime != null || owned != null;
 
   /** Connects to robotd and starts the NativeKit event subscription. */
   public function connect(host:String, port:Int):Void {
@@ -313,7 +316,7 @@ class RobotClient {
               statusChanged();
             var requested = [new StreamSubscription("essential"),
               new StreamSubscription("sensor", sensorMaxRateHz)];
-            if (subscribeCamera)
+            if (subscribeCamera == true || (subscribeCamera == null && cameraListener != null))
               requested.push(new StreamSubscription("camera", cameraMaxRateHz));
             if (subscribeObservations)
               requested.push(new StreamSubscription("observation"));

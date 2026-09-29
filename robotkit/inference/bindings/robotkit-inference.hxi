@@ -7,6 +7,10 @@ interface RobotKitInference @target("portable-abi64") @library("robotkit_inferen
 	const RK_INFERENCE_OUTPUT = 1;
 	const RK_INFERENCE_UINT8 = 2;
 	extern fn rk_inference_create(path: utf8, options: ptr<const<rk_inference_options>>, out_session: ptr<rk_inference_session> @out @owned) -> rk_result;
+	/**
+	 * Hashes the exact model bytes loaded by ONNX Runtime and checks expected_sha256.
+	 */
+	extern fn rk_inference_create_checked(path: utf8, expected_sha256: utf8, options: ptr<const<rk_inference_options>>, out_session: ptr<rk_inference_session> @out @owned) -> rk_result;
 	extern fn rk_inference_destroy(session: rk_inference_session) -> void;
 	extern fn rk_inference_get_info(session: rk_inference_session, out_info: ptr<rk_inference_info> @inout) -> rk_result;
 	extern fn rk_inference_get_tensor(session: rk_inference_session, direction: u32, index: u32, out_tensor: ptr<rk_inference_tensor> @inout) -> rk_result;

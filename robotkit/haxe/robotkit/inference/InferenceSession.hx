@@ -14,6 +14,7 @@ typedef InferenceTensor = {
 };
 
 class InferenceResult {
+  public final status:Int;
   public final sequence:Int64;
   public final dropped:Int64;
   public final completedTimestampNs:Int64;
@@ -23,8 +24,9 @@ class InferenceResult {
   public final imageScale:Float;
   public final padX:Float;
   public final padY:Float;
-  public function new(sequence:Int64, dropped:Int64, completedTimestampNs:Int64, output:Bytes,
+  public function new(status:Int, sequence:Int64, dropped:Int64, completedTimestampNs:Int64, output:Bytes,
       sourceWidth:Int, sourceHeight:Int, imageScale:Float, padX:Float, padY:Float) {
+    this.status = status;
     this.sequence = sequence; this.dropped = dropped;
     this.completedTimestampNs = completedTimestampNs; this.output = output;
     this.sourceWidth = sourceWidth; this.sourceHeight = sourceHeight;
@@ -41,15 +43,25 @@ class InferenceSession {
   public final outputs:Array<InferenceTensor> = [];
   var closed = false;
 
-  public function new(path:String, ?threads:Int = 1, ?dynamicWidth:Int = 0, ?dynamicHeight:Int = 0) {
+  public function new(path:String, ?threads:Int = 1, ?dynamicWidth:Int = 0,
+      ?dynamicHeight:Int = 0, ?expectedDigest:String) {
     var options = new rk_inference_options();
     options.set_struct_size(rk_inference_options.size());
     options.set_intra_op_threads(threads);
     options.set_dynamic_width(dynamicWidth);
     options.set_dynamic_height(dynamicHeight);
-    var opened = RobotKitInference.rk_inference_create(path, options);
-    check(opened.status, 'inference.open($path)');
-    owner = opened.out_session;
+    if (expectedDigest == null) {
+      var opened = RobotKitInference.rk_inference_create(path, options);
+      check(opened.status, 'inference.open($path)');
+      owner = opened.out_session;
+    } else {
+      var opened = RobotKitInference.rk_inference_create_checked(path,
+        expectedDigest.toLowerCase(), options);
+      if (opened.status == RobotKitRuntimeConstants.RK_ERROR_MODEL_MISMATCH)
+        throw 'Inference model SHA-256 mismatch for $path';
+      check(opened.status, 'inference.open($path)');
+      owner = opened.out_session;
+    }
     var info = new rk_inference_info(); info.set_struct_size(rk_inference_info.size());
     check(RobotKitInference.rk_inference_get_info(owner.borrow(), info).status, "inference.info");
     inputBytes = Int64.toInt(info.get_input_bytes());
@@ -88,7 +100,8 @@ class InferenceSession {
 
   public function submitRgb8(sequence:Int64, width:Int, height:Int, pixels:Bytes,
       targetWidth:Int, targetHeight:Int, ?layout:Int = 1, ?padding:Float = 0.0,
-      ?scale:Float = 1.0 / 255.0, ?mean:Array<Float>, ?std:Array<Float>):Void {
+      ?scale:Float = 1.0 / 255.0, ?mean:Array<Float>, ?std:Array<Float>,
+      ?stride:Int = 0):Void {
     ensureOpen();
     var options = new rk_inference_image_options();
     options.set_struct_size(rk_inference_image_options.size());
@@ -99,7 +112,7 @@ class InferenceSession {
     if (m.length != 3 || s.length != 3) throw "Inference mean/std need three channels";
     for (i in 0...3) { options.set_mean(i, m[i]); options.set_std(i, s[i]); }
     check(RobotKitInference.rk_inference_submit_rgb8(owner.borrow(), sequence,
-      width, height, width * 3, pixels, options), "inference.submitRgb8");
+      width, height, stride == 0 ? width * 3 : stride, pixels, options), "inference.submitRgb8");
   }
 
   public function poll():Null<InferenceResult> {
@@ -108,8 +121,7 @@ class InferenceSession {
     var found = RobotKitInference.rk_inference_poll_result(owner.borrow(), meta);
     if (found.status == RobotKitRuntimeConstants.RK_ERROR_STALE_STATE) return null;
     check(found.status, "inference.poll");
-    check(meta.get_status(), "inference.worker");
-    return new InferenceResult(meta.get_sequence(), meta.get_dropped(),
+    return new InferenceResult(meta.get_status(), meta.get_sequence(), meta.get_dropped(),
       meta.get_completed_timestamp_ns(), found.output, meta.get_source_width(),
       meta.get_source_height(), meta.get_image_scale(), meta.get_pad_x(), meta.get_pad_y());
   }

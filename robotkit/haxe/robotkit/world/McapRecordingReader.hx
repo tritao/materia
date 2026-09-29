@@ -46,6 +46,17 @@ class McapRecordingReader {
         skippedUnknown++;
         continue;
       }
+      var schema = RobotKitRuntime.rk_recording_reader_schema(owner.borrow());
+      if (schema.status != RobotKitRuntimeConstants.RK_OK)
+        throw 'Read recording schema failed with RobotKit status ${schema.status}';
+      var encoded = schema.schema.toString();
+      var separator = encoded.indexOf("\n");
+      if (separator < 0 || encoded.substr(0, separator) != channel.wireClass ||
+          encoded.substr(separator + 1) != channel.schemaData) {
+        if (strict) throw 'Recording schema mismatch for channel $name';
+        skippedUnknown++;
+        continue;
+      }
       var decoded = channel.decode(result.payload);
       var sourceSequence = Int64.ofInt(0);
       var sourceTimestampNs = Int64.ofInt(0);
@@ -71,13 +82,15 @@ class McapRecordingReader {
   }
 
   static function topicName(message:rk_recording_message):String {
-    var value = new StringBuf();
+    var length = 0;
     for (index in 0...128) {
       var code = message.get_topic(index);
       if (code == 0) break;
-      value.addChar(code);
+      length++;
     }
-    var topic = value.toString();
+    var bytes = haxe.io.Bytes.alloc(length);
+    for (index in 0...length) bytes.set(index, message.get_topic(index));
+    var topic = bytes.toString();
     if (topic.indexOf("robotkit/") != 0 || topic.length <= 9)
       return topic;
     return topic.substr(9);

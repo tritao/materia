@@ -18,7 +18,13 @@
         "../../../runtime/include/robotkit_runtime.h",
         "../../../runtime/include/robotkit_simkit.h",
         "../../../../simkit/CMakeLists.txt",
-        "../../../../cadkit/CMakeLists.txt"
+        "../../../../cadkit/CMakeLists.txt",
+        "../../../inference/CMakeLists.txt",
+        "../../../inference/src/inference.cpp",
+        "../../../inference/include/robotkit_inference.h",
+        "../../../policy/CMakeLists.txt",
+        "../../../policy/src/policy.cpp",
+        "../../../policy/include/robotkit_policy.h"
       ]
     }
   },

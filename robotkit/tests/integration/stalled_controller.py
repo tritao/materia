@@ -145,11 +145,12 @@ def main(port):
             # No recv calls while two 640x480 RGB camera sources publish at 50 Hz.
             time.sleep(2.0)
             send_frame(sock, lock, 7, {}, session)  # unsupported command -> Fault 404
-            seen_state = seen_fault = seen_camera = False
+            seen_state = seen_fault = False
             cameras = set()
+            camera_ids = set()
             kinds = {}
             deadline = time.monotonic() + 6
-            while time.monotonic() < deadline and not (seen_state and seen_fault and seen_camera):
+            while time.monotonic() < deadline and not (seen_state and seen_fault and len(camera_ids) >= 2):
                 kind, frame_session, sequence, value, attachments = read_frame(sock)
                 kinds[kind] = kinds.get(kind, 0) + 1
                 assert frame_session == session
@@ -162,10 +163,11 @@ def main(port):
                     key = (value[2], value[5])
                     assert key not in cameras, f"camera sequence repeated: {key}"
                     cameras.add(key)
-                    seen_camera |= attachments == [640 * 480 * 3]
+                    if attachments == [640 * 480 * 3]:
+                        camera_ids.add(value[2])
             assert not heartbeat_error, f"heartbeat failed: {heartbeat_error}"
-            assert seen_state and seen_fault and seen_camera, (
-                f"recovery missing state={seen_state} fault={seen_fault} camera={seen_camera} kinds={kinds}"
+            assert seen_state and seen_fault and len(camera_ids) >= 2, (
+                f"recovery missing state={seen_state} fault={seen_fault} cameras={camera_ids} kinds={kinds}"
             )
             print(f"robotd stalled controller retained control; {len(cameras)} unique large camera frames received")
         finally:

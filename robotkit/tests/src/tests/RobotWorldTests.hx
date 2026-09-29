@@ -225,7 +225,6 @@ class RobotWorldTests {
     assertions += WorkTests.run();
     assertions += PerceptionTests.run();
     assertions += PerceptionInferenceTests.run();
-    assertions += tests.spike.SensorkitCameraSpikeTests.run();
     assertions += RobotEventTests.run();
     assertions += ClockMappingTests.run();
     assertions += PlacementTests.run();
@@ -243,6 +242,7 @@ class RobotWorldTests {
     if (channel == null) throw 'Missing recording channel $name';
     var decoded = channel.decode(channel.encode(entry));
     return new RobotRecordingEntry(entry.ordinal, decoded.robotId, decoded.event,
+      entry.sourceSequence, entry.sourceTimestampNs, entry.sourceClockId,
       entry.recordingTimestampNs);
   }
 
@@ -3620,10 +3620,31 @@ class RobotWorldTests {
       Int64.ofInt(9), Int64.ofInt(150), [], Int64.ofInt(160), "link/base",
       [0.2, 0.0, 0.8], [0.0, 0.0, 0.0, 1.0], "robot-a.reset-2",
       "host.monotonic", new CameraImage(2, 1, "rgb8", cameraBytes));
+    var corruptSensor = robotkit.world.RobotRecordingCodec.sensor(camera, "robot-a");
+    corruptSensor.mountPosition = [0.0, 0.0];
+    var decodeError = "";
+    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    catch (error:Dynamic) decodeError = Std.string(error);
+    check(decodeError.indexOf("mount dimensions") >= 0,
+      "recorded sensor mount position requires three finite values");
+    corruptSensor.mountPosition = [0.0, 0.0, 0.0];
+    corruptSensor.mountRotation = [0.0, 0.0, 0.0, 2.0];
+    decodeError = "";
+    try robotkit.world.RobotRecordingCodec.readSensor(corruptSensor)
+    catch (error:Dynamic) decodeError = Std.string(error);
+    check(decodeError.indexOf("unit quaternion") >= 0,
+      "recorded sensor mount rotation requires unit length");
     var first = new RobotSnapshot("robot-a", Int64.parseString("9007199254740995"),
       Int64.parseString("9223372036854775000"), [0.5], [0.25], [0.125], 1, 0,
       Int64.parseString("9223372036854775002"), [sensor, camera], "robot-a.reset-2", "host.monotonic",
       RobotKitRuntimeConstants.RK_SAFETY_EMERGENCY_STOP);
+    var corruptSnapshot = robotkit.world.RobotRecordingCodec.snapshot(first);
+    corruptSnapshot.positions = [Math.sqrt(-1.0)];
+    decodeError = "";
+    try robotkit.world.RobotRecordingCodec.readSnapshot(corruptSnapshot)
+    catch (error:Dynamic) decodeError = Std.string(error);
+    check(decodeError.indexOf("not finite") >= 0,
+      "recorded snapshot rejects non-finite joint values");
     var second = new RobotSnapshot("robot-b", Int64.ofInt(3), Int64.ofInt(10),
       [0.75], [], [], 1, 0, Int64.ofInt(20), [], "robot-b.boot-1", "host.monotonic");
     writer.recordCommand(RobotCommand.JointTargets([
@@ -3643,6 +3664,30 @@ class RobotWorldTests {
     writer.close();
 
     var loaded = McapRecordingReader.load(path);
+    var v5Path = Sys.getCwd() + "/robotkit/tests/fixtures/recording-v5.mcap";
+    if (!sys.FileSystem.exists(v5Path))
+      v5Path = Sys.getCwd() + "/fixtures/recording-v5.mcap";
+    var v5Error = "";
+    try McapRecordingReader.load(v5Path) catch (error:Dynamic) v5Error = Std.string(error);
+    check(v5Error.indexOf("schema version is not 6") >= 0,
+      "Haxe reader rejects a pre-v6 MCAP file");
+    var fixtureRoot = v5Path.substr(0, v5Path.lastIndexOf("/") + 1);
+    var mismatchPath = fixtureRoot + "recording-schema-mismatch.mcap";
+    var mismatch = new McapRecordingReader(mismatchPath, null, true);
+    var schemaError = "";
+    try mismatch.next() catch (error:Dynamic) schemaError = Std.string(error);
+    mismatch.close();
+    check(schemaError.indexOf("schema mismatch") >= 0,
+      "strict Haxe reader rejects an embedded schema mismatch");
+    mismatch = new McapRecordingReader(mismatchPath);
+    check(mismatch.next() == null && mismatch.skippedUnknown == 1,
+      "non-strict Haxe reader counts an embedded schema mismatch");
+    mismatch.close();
+    var foreignPath = fixtureRoot + "recording-foreign.mcap";
+    var foreign = new McapRecordingReader(foreignPath);
+    check(foreign.next() == null && foreign.skippedUnknown == 1,
+      "file-level v6 metadata permits a foreign MCAP channel");
+    foreign.close();
     equal(loaded.entries.length, 7, "MCAP reload preserves every event type");
     equal(loaded.processEvents.length, 1, "MCAP reload preserves process records");
     equal(loaded.processEvents[0].scheduledTimeNs, Int64.ofInt(300),
@@ -4410,25 +4455,24 @@ class RobotWorldTests {
     var snapshot = host.step(Int64.ofInt(3000));
     check(snapshot.robot(robot.id()) != null,
       "worldd composes one world and one shared simulation");
-    var remote = host.addRemoteRobot("worldd-camera");
-    var modelPath = Sys.getCwd() + "/robotkit/inference/tests/fixtures/detector.onnx";
-    if (!sys.FileSystem.exists(modelPath))
-      modelPath = Sys.getCwd() + "/../inference/tests/fixtures/detector.onnx";
-    host.configurePerception(remote, [new robotkit.deployment.PerceptionPipelineConfig(
-      "world_objects", "front_camera", "object_detector", modelPath,
-      robotkit.inference.InferenceSession.modelDigest(modelPath), "worldd", ["worldd"],
-      0.4, 0.0, 0.5)]);
+    var deploymentPath = Sys.getCwd() +
+      "/robotkit/tests/fixtures/device-deployment/perception-worldd.json";
+    if (!sys.FileSystem.exists(deploymentPath))
+      deploymentPath = Sys.getCwd() + "/fixtures/device-deployment/perception-worldd.json";
+    var remote = host.addRemoteRobot("worldd-camera", false,
+      new SerialDeployment(deploymentPath));
     var pixels = haxe.io.Bytes.alloc(8 * 4 * 3);
     for (index in 0...pixels.length) pixels.set(index, 51);
     remote.onCamera(new robotkit.protocol.CameraFrameData(new CameraFrame(
       Int64.ofInt(42), "front_camera", "camera", "frame/front", Int64.ofInt(1),
       Int64.ofInt(10), Int64.ofInt(20), 8, 4, PixelFormat.RGB8), pixels));
     var worldObservation = false;
-    for (index in 0...200) {
+    for (index in 0...500) {
       host.step(Int64.ofInt(4000 + index));
       for (event in remote.events(Int64.ofInt(0), 8)) switch event {
         case robotkit.world.RobotEvent.Observation(_, value):
-          if (value.detections.length == 1) worldObservation = true;
+          if (value.sensorId == "front_camera" && value.sourceFrameId == "frame/front")
+            worldObservation = true;
         case _:
       }
       if (worldObservation) break;

@@ -21,7 +21,13 @@ class PerceptionHost {
   }
   public function poll():Array<ImageDetectionObservation> {
     var output:Array<ImageDetectionObservation> = [];
-    for (pipeline in pipelines) for (value in pipeline.poll()) output.push(value);
+    for (pipeline in pipelines) {
+      try {
+        for (value in pipeline.poll()) output.push(value);
+      } catch (error:Dynamic) {
+        Sys.println('perception pipeline ${pipeline.id()} poll failed: $error');
+      }
+    }
     return output;
   }
   public function dispose():Void for (pipeline in pipelines) pipeline.dispose();

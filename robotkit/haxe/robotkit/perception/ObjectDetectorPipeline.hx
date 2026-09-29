@@ -8,7 +8,11 @@ import robotkit.world.SensorFrame;
 
 private class FrameMeta {
   public final frame:SensorFrame;
-  public function new(frame:SensorFrame) this.frame = frame;
+  public final nativeSequence:Int64;
+  public function new(frame:SensorFrame, nativeSequence:Int64) {
+    this.frame = frame;
+    this.nativeSequence = nativeSequence;
+  }
 }
 
 /** YOLO-style [cx,cy,w,h,score,class] detector over one rgb8 camera. */
@@ -28,12 +32,15 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
   var lastSubmittedTimeNs:Int64 = Int64.ofInt(0);
   var lastSubmittedClockId:String = "";
   var filtered:Int = 0;
+  var carriedDrops:Int = 0;
+  var nextNativeSequence:Int64 = Int64.ofInt(1);
   var closed:Bool = false;
 
   public function new(producerId:String, pipelineId:String, sensorId:String,
       modelId:String, modelPath:String, expectedDigest:String,
       ?scoreThreshold:Float = 0.4, ?iouThreshold:Float = 0.5,
-      ?maxRateHz:Float = 0.0) {
+      ?maxRateHz:Float = 0.0, ?threads:Int = 1,
+      ?dynamicWidth:Int = 0, ?dynamicHeight:Int = 0) {
     if (producerId == null || producerId.length == 0 || pipelineId == null || pipelineId.length == 0 ||
         sensorId == null || sensorId.length == 0 || modelId == null || modelId.length == 0 ||
         modelPath == null || modelPath.length == 0 ||
@@ -43,10 +50,10 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       throw "Object detector needs IDs, a model, and valid thresholds";
     this.producerId = producerId; this.pipelineId = pipelineId;
     this.inputSensorId = sensorId; this.modelId = modelId;
-    modelDigest = InferenceSession.modelDigest(modelPath);
-    if (expectedDigest == null || modelDigest != expectedDigest.toLowerCase())
-      throw 'Object detector model SHA-256 mismatch for $modelPath';
-    session = new InferenceSession(modelPath);
+    if (expectedDigest == null || !~/^[0-9a-fA-F]{64}$/.match(expectedDigest))
+      throw "Object detector needs a SHA-256 model digest";
+    modelDigest = expectedDigest.toLowerCase();
+    session = new InferenceSession(modelPath, threads, dynamicWidth, dynamicHeight, modelDigest);
     if (session.inputs.length != 1 || session.outputs.length != 1 ||
         session.inputs[0].elementType != 1 || session.inputs[0].shape.length != 4 ||
         Int64.toInt(session.inputs[0].shape[1]) != 3 ||
@@ -67,7 +74,8 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
   public function submit(frame:SensorFrame):Void {
     if (closed) throw "Object detector is closed";
     if (frame == null || frame.sensorId != inputSensorId) throw "Object detector received the wrong sensor";
-    if (frame.image == null || frame.image.encoding != "rgb8")
+    var image = frame.image;
+    if (image == null || image.encoding != "rgb8")
       throw "Object detector accepts rgb8 camera frames only";
     if (maxRateHz > 0 && frame.receivedClockId == lastSubmittedClockId &&
         Int64.compare(lastSubmittedTimeNs, Int64.ofInt(0)) > 0 &&
@@ -75,9 +83,11 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       var elapsed = Int64.toFloat(Int64.sub(frame.receivedTimestampNs, lastSubmittedTimeNs));
       if (elapsed < 1000000000.0 / maxRateHz) { filtered++; return; }
     }
-    session.submitRgb8(frame.sequence, frame.image.width, frame.image.height,
-      frame.image.bytes(), targetWidth, targetHeight);
-    submitted.push(new FrameMeta(frame));
+    var nativeSequence = nextNativeSequence;
+    nextNativeSequence = Int64.add(nextNativeSequence, Int64.ofInt(1));
+    session.submitRgb8(nativeSequence, image.width, image.height,
+      image.bytes(), targetWidth, targetHeight);
+    submitted.push(new FrameMeta(frame, nativeSequence));
     if (submitted.length > 1024) submitted.shift();
     lastSubmittedTimeNs = frame.receivedTimestampNs;
     lastSubmittedClockId = frame.receivedClockId;
@@ -89,13 +99,18 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
     if (ready == null) return [];
     var index = -1;
     for (i in 0...submitted.length)
-      if (Int64.compare(submitted[i].frame.sequence, ready.sequence) == 0) { index = i; break; }
-    if (index < 0) return [];
+      if (Int64.compare(submitted[i].nativeSequence, ready.sequence) == 0) { index = i; break; }
+    if (index < 0) { carriedDrops += Int64.toInt(ready.dropped); return []; }
     var frame = submitted[index].frame;
     submitted.splice(0, index + 1);
+    if (ready.status != 0) {
+      carriedDrops += Int64.toInt(ready.dropped) + 1;
+      Sys.println('perception pipeline $pipelineId: inference worker status ${ready.status}');
+      return [];
+    }
     var detections = decode(ready.output, ready, threshold, iouThreshold);
-    var dropped = Int64.toInt(ready.dropped) + filtered;
-    filtered = 0;
+    var dropped = Int64.toInt(ready.dropped) + filtered + carriedDrops;
+    filtered = 0; carriedDrops = 0;
     return [new ImageDetectionObservation(producerId, pipelineId, inputSensorId,
       modelId, modelDigest, frame.frameId, frame.sequence,
       frame.sourceTimestampNs, frame.receivedTimestampNs,
@@ -117,8 +132,10 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       if (!Math.isFinite(score) || score < scoreThreshold || score > 1) continue;
       var cx = output.getFloat(base), cy = output.getFloat(base + 4);
       var w = output.getFloat(base + 8), h = output.getFloat(base + 12);
-      var classId = Std.int(output.getFloat(base + 20));
+      var classValue = output.getFloat(base + 20);
+      var classId = Math.round(classValue);
       if (!Math.isFinite(cx) || !Math.isFinite(cy) || !Math.isFinite(w) || !Math.isFinite(h) ||
+          !Math.isFinite(classValue) || Math.abs(classValue - classId) > 0.001 ||
           w <= 0 || h <= 0 || classId < 0) continue;
       var left = Math.max(0, Math.min(transform.sourceWidth,
         (cx - w / 2 - transform.padX) / transform.imageScale));

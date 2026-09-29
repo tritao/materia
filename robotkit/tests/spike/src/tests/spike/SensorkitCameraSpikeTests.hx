@@ -22,8 +22,9 @@ class SensorkitCameraSpikeTests {
   }
   public static function run():Int {
     var root = Sys.getCwd();
-    var prefix = sys.FileSystem.exists(root + "/robotkit/tests/fixtures/sensorkit-camera.hmpk")
-      ? root + "/robotkit" : root + "/..";
+    var prefix = root + "/robotkit";
+    if (!sys.FileSystem.exists(prefix + "/tests/fixtures/sensorkit-camera.hmpk"))
+      prefix = root + "/../..";
     var wire = File.getBytes(prefix + "/tests/fixtures/sensorkit-camera.hmpk");
     var model = new RobotModel("spike");
     var link = model.addLink(new Link("base", "link/base"));
@@ -67,8 +68,36 @@ class SensorkitCameraSpikeTests {
       }
       Sys.sleep(0.005);
     }
+    var sourcePixels = SensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(wire)).data;
+    var widePixels = Bytes.alloc(640 * 480 * 4);
+    for (y in 0...480) for (x in 0...640) {
+      var source = ((Std.int(y * 16 / 480) * 16) + Std.int(x * 16 / 640)) * 4;
+      var target = (y * 640 + x) * 4;
+      for (channel in 0...4) widePixels.set(target + channel, sourcePixels.get(source + channel));
+    }
+    packed = SensorWireCodec.decodePackedFrameMessage(MessagePackFrame.unpack(wire));
+    packed.width = Int64.ofInt(640);
+    packed.height = Int64.ofInt(480);
+    packed.stride = Int64.ofInt(640 * 4);
+    packed.sequence = Int64.ofInt(2);
+    packed.data = widePixels;
+    var wideWire = MessagePackFrame.pack(SensorWireCodec.encodePackedFrameMessage(packed));
+    var begin = Sys.time();
+    var largeFrame = SensorkitCameraAdapter.decode(wideWire, model, ids);
+    for (_ in 0...9) SensorkitCameraAdapter.decode(wideWire, model, ids);
+    Sys.println('sensorkit_camera_haxe_decode_640x480_mean_ms=' + (Sys.time() - begin) * 100.0);
+    check(largeFrame.image != null && largeFrame.image.width == 640 &&
+      largeFrame.image.height == 480, "wide frame conversion failed");
+    host.submit(largeFrame);
+    var wideFound = false;
+    for (_ in 0...500) {
+      var observations = host.poll();
+      if (observations.length > 0) { wideFound = true; break; }
+      Sys.sleep(0.005);
+    }
     host.dispose();
     check(found, "detector did not finish on rendered camera frame");
+    check(wideFound, "detector did not finish on 640x480 camera frame");
     Sys.println("Sensorkit camera spike passed");
     return 1;
   }

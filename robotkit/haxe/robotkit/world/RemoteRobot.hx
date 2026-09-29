@@ -18,6 +18,7 @@ class RemoteRobot implements Robot {
   var currentFault:Null<RobotFault> = null;
   var currentSensors:Array<SensorFrame> = [];
   final eventRing = new RobotEventRing();
+  var lastWireObservationOrdinal:Int64 = Int64.ofInt(0);
   final sensorSourceReceipts:Map<String, Int64> = [];
   var changeListener:Null < RobotId -> Void > = null;
 
@@ -31,14 +32,22 @@ class RemoteRobot implements Robot {
     client.statusListener = onStatus;
     client.sensorListener = onSensor;
     client.cameraListener = onCamera;
+    client.subscribeCamera = false;
     client.imageDetectionListener = onImageDetection;
-    client.subscribeObservations = true;
+    client.subscribeObservations = false;
   }
 
   /** Request image frames before connecting. */
   public function enableCamera(?maxRateHz:Float = 0.0):Void {
+    if (client.subscriptionLocked()) throw "Camera subscription must be set before connect";
     client.subscribeCamera = true;
     client.cameraMaxRateHz = maxRateHz;
+  }
+
+  /** Request robotd-produced observations before connecting. */
+  public function enableObservations():Void {
+    if (client.subscriptionLocked()) throw "Observation subscription must be set before connect";
+    client.subscribeObservations = true;
   }
 
   public function streamCapabilities():Array<String> {
@@ -131,10 +140,26 @@ class RemoteRobot implements Robot {
     return event;
   }
 
+  @:allow(tests.RobotEventTests)
   function onImageDetection(value:robotkit.protocol.ImageDetectionObservationMsg):Void {
     var welcome = client.welcome;
     if (welcome != null && Int64.compare(value.robotId, welcome.robotId) != 0) return;
-    publishObservation(value.toObservation());
+    try {
+      var observation = value.toObservation();
+      if (Int64.compare(value.ordinal, lastWireObservationOrdinal) > 0) {
+        var gap = Int64.sub(value.ordinal, lastWireObservationOrdinal);
+        if (Int64.compare(gap, Int64.ofInt(1)) > 0) {
+          var missing = Int64.sub(gap, Int64.ofInt(1));
+          if (Int64.compare(missing, Int64.ofInt(2147483647)) > 0)
+            throw "Observation gap exceeds supported range";
+          eventRing.skip(Int64.toInt(missing));
+        }
+      }
+      lastWireObservationOrdinal = value.ordinal;
+      publishObservation(observation);
+    } catch (error:Dynamic) {
+      Sys.println('RemoteRobot ${logicalId}: discarded malformed image detection: $error');
+    }
   }
 
   public function submit(command:RobotCommand):Void switch command {

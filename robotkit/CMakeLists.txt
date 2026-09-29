@@ -20,7 +20,8 @@ if(NOT mcap_POPULATED)
 endif()
 add_library(robotkit_mcap_headers INTERFACE)
 target_include_directories(robotkit_mcap_headers INTERFACE
-    "${mcap_SOURCE_DIR}/cpp/mcap/include")
+    $<BUILD_INTERFACE:${mcap_SOURCE_DIR}/cpp/mcap/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 
 # MCAP's LZ4 support needs only four small C sources. A system installation can
 # be selected explicitly for distribution builds; source builds stay pinned.
@@ -29,8 +30,12 @@ if(RK_USE_SYSTEM_LZ4)
     find_path(RK_LZ4_INCLUDE_DIR lz4frame.h REQUIRED)
     find_library(RK_LZ4_LIBRARY NAMES lz4 REQUIRED)
     add_library(robotkit_lz4 INTERFACE)
-    target_include_directories(robotkit_lz4 INTERFACE "${RK_LZ4_INCLUDE_DIR}")
-    target_link_libraries(robotkit_lz4 INTERFACE "${RK_LZ4_LIBRARY}")
+    target_include_directories(robotkit_lz4 INTERFACE
+        $<BUILD_INTERFACE:${RK_LZ4_INCLUDE_DIR}>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+    target_link_libraries(robotkit_lz4 INTERFACE
+        $<BUILD_INTERFACE:${RK_LZ4_LIBRARY}>
+        $<INSTALL_INTERFACE:lz4>)
 else()
     FetchContent_Declare(robotkit_lz4_source
         GIT_REPOSITORY https://github.com/lz4/lz4.git
@@ -45,15 +50,34 @@ else()
         "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4frame.c"
         "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4hc.c"
         "${robotkit_lz4_source_SOURCE_DIR}/lib/xxhash.c")
-    target_include_directories(robotkit_lz4 PUBLIC "${robotkit_lz4_source_SOURCE_DIR}/lib")
+    target_include_directories(robotkit_lz4 PUBLIC
+        $<BUILD_INTERFACE:${robotkit_lz4_source_SOURCE_DIR}/lib>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
     set_target_properties(robotkit_lz4 PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    install(FILES "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4.h"
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4frame.h"
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/lz4hc.h"
+        "${robotkit_lz4_source_SOURCE_DIR}/lib/xxhash.h"
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 endif()
+install(TARGETS robotkit_mcap_headers robotkit_lz4 EXPORT RobotKitTargets)
+install(DIRECTORY "${mcap_SOURCE_DIR}/cpp/mcap/include/" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})
 option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)
 option(RK_BUILD_POLICY "Build the ONNX Runtime policy library (fetches a pinned prebuilt release)" OFF)
 option(RK_BUILD_INFERENCE "Build the ONNX Runtime image inference library" OFF)
+
+if(RK_BUILD_TESTS)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME robotkit_rkf1_lock
+        COMMAND ${Python3_EXECUTABLE} -m tools.wire.rkf1 check
+            --source ${CMAKE_CURRENT_SOURCE_DIR}/haxe/robotkit/protocol
+            --lock ${CMAKE_CURRENT_SOURCE_DIR}/schema/rkf1.lock.json)
+    set_tests_properties(robotkit_rkf1_lock PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/.. LABELS "robot;wire")
+endif()
 
 set(RK_LIBRARY_TYPE STATIC)
 if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)

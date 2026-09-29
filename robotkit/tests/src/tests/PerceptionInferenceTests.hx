@@ -35,7 +35,7 @@ class PerceptionInferenceTests {
     var pixels = Bytes.alloc(8 * 4 * 3);
     for (i in 0...pixels.length) pixels.set(i, 51);
     return new SensorFrame("front_camera", "camera", "frame/front-camera", Int64.ofInt(sequence),
-      Int64.ofInt(100 + sequence), [], Int64.ofInt(200 + sequence), "link/base",
+      Int64.ofInt(100 + sequence), [], Int64.fromFloat(200 + sequence * 100000000.0), "link/base",
       null, null, "camera.clock", "host.monotonic", new CameraImage(8, 4, "rgb8", pixels));
   }
   static function wait(host:PerceptionHost):ImageDetectionObservation {
@@ -52,13 +52,14 @@ class PerceptionInferenceTests {
     check(deployment.perception[0].host == "robotd" &&
       deployment.perception[0].consumers.length == 2, "host and consumers stay independent");
     for (name in ["unknown-key", "unknown-option", "bad-digest", "bad-input",
+        "non-camera", "null-frame",
         "round-trip", "duplicate-id", "unknown-pipeline", "bad-consumer"])
       throws(function() new SerialDeployment(fixture('perception-$name.json')),
         switch name {
           case "unknown-key": "unknown perception key";
           case "unknown-option": "unknown perception options key";
           case "bad-digest": "SHA-256 mismatch";
-          case "bad-input": "camera with an existing frame";
+          case "bad-input", "non-camera", "null-frame": "camera with an existing frame";
           case "round-trip": "network round trip";
           case "duplicate-id": "duplicate perception id";
           case "unknown-pipeline": "unknown perception pipeline";
@@ -68,6 +69,17 @@ class PerceptionInferenceTests {
     check(older.perception.length == 0, "v4 remains accepted without perception");
     check(older.fingerprint == deployment.fingerprint,
       "perception section stays outside the RKD6 device fingerprint");
+    var dynamicDeployment = new SerialDeployment(fixture("perception-dynamic.json"));
+    var dynamicConfig = dynamicDeployment.perception[0];
+    check(dynamicConfig.threads == 2 && dynamicConfig.dynamicWidth == 4 &&
+      dynamicConfig.dynamicHeight == 4,
+      "deployment carries worker thread count and dynamic input dimensions");
+    var dynamicHost = new PerceptionHost([PerceptionPipelineRegistry.create(dynamicConfig,
+      "robotd/dynamic")]);
+    dynamicHost.submit(frame(6));
+    check(wait(dynamicHost).detections.length == 1,
+      "dynamic-height and dynamic-width ONNX model runs through deployment");
+    dynamicHost.dispose();
     var config = deployment.perception[0];
     var direct = new PerceptionHost([PerceptionPipelineRegistry.create(config, "robotd/front_objects")]);
     var source = frame(7);
@@ -88,6 +100,26 @@ class PerceptionInferenceTests {
       "observation retains provenance and separate clocks");
     check(observation.modelDigest == InferenceSession.modelDigest(config.modelPath),
       "model digest is actual file digest");
+    var nhwcPath = config.modelPath.substr(0, config.modelPath.lastIndexOf("/") + 1)
+      + "detector_nhwc.onnx";
+    var nhwc = new InferenceSession(nhwcPath);
+    var stride = 8 * 3 + 5;
+    var padded = Bytes.alloc(stride * 4);
+    for (row in 0...4) for (column in 0...24) padded.set(row * stride + column, 51);
+    nhwc.submitRgb8(Int64.ofInt(1), 8, 4, padded, 4, 4, 2, 0.0, 1.0 / 255.0,
+      null, null, stride);
+    var nhwcResult:Null<robotkit.inference.InferenceSession.InferenceResult> = null;
+    for (_ in 0...500) {
+      nhwcResult = nhwc.poll();
+      if (nhwcResult != null) break;
+      Sys.sleep(0.005);
+    }
+    check(nhwcResult != null && nhwcResult.status == 0 &&
+      nhwcResult.sourceWidth == 8 && nhwcResult.sourceHeight == 4 &&
+      Math.abs(nhwcResult.imageScale - 0.5) < 1e-6 &&
+      Math.abs(nhwcResult.padY - 1) < 1e-6,
+      "NHWC Haxe submission keeps padded stride and non-square letterbox geometry");
+    nhwc.dispose();
     var copy = observation.detections;
     copy.pop();
     check(observation.detections.length == 1, "observation owns its detection list");
@@ -109,21 +141,43 @@ class PerceptionInferenceTests {
     bad.dispose();
 
     var recording = new RobotRecording();
-    var snapshot = new RobotSnapshot("robot-a", Int64.ofInt(7), Int64.ofInt(100),
-      [], [], [], 1, 0, Int64.ofInt(200), [source], "robot.clock", "host.monotonic");
-    recording.recordSnapshot(snapshot);
+    for (sequence in 7...10) {
+      var recordedFrame = frame(sequence);
+      recording.recordSnapshot(new RobotSnapshot("robot-a", Int64.ofInt(sequence),
+        Int64.ofInt(100 + sequence), [], [], [], 1, 0,
+        Int64.ofInt(200 + sequence), [recordedFrame], "robot.clock", "host.monotonic"));
+    }
     var replay = new ReplayRobot("robot-a", recording);
     var replayHost = new PerceptionHost([PerceptionPipelineRegistry.create(config, "robotd/front_objects")]);
-    replayHost.submit(replay.sensors()[0]);
-    var replayed = wait(replayHost);
-    check(replayed.producerId == observation.producerId &&
-      replayed.modelDigest == observation.modelDigest &&
-      replayed.sequence == observation.sequence &&
-      replayed.sourceTimestampNs == observation.sourceTimestampNs &&
-      replayed.receivedTimestampNs == observation.receivedTimestampNs &&
-      replayed.detections.length == observation.detections.length &&
-      Math.abs(replayed.detections[0].x - observation.detections[0].x) < 1e-6,
-      "replay and direct frames produce the same observation except completion time");
+    var directReplay = new PerceptionHost([PerceptionPipelineRegistry.create(config, "robotd/front_objects")]);
+    for (sequence in 7...10) {
+      if (sequence > 7) check(replay.advance(), "replay advances to the next recorded frame");
+      var replayFrame = replay.sensors()[0];
+      replayHost.submit(replayFrame);
+      directReplay.submit(frame(sequence));
+      var replayed = wait(replayHost);
+      var expected = wait(directReplay);
+      check(replayed.producerId == expected.producerId &&
+        replayed.pipelineId == expected.pipelineId && replayed.sensorId == expected.sensorId &&
+        replayed.modelId == expected.modelId && replayed.modelDigest == expected.modelDigest &&
+        replayed.sourceFrameId == expected.sourceFrameId &&
+        replayed.sequence == expected.sequence &&
+        replayed.sourceTimestampNs == expected.sourceTimestampNs &&
+        replayed.receivedTimestampNs == expected.receivedTimestampNs &&
+        replayed.sourceClockId == expected.sourceClockId &&
+        replayed.receivedClockId == expected.receivedClockId &&
+        replayed.completedClockId == expected.completedClockId &&
+        replayed.droppedFrames == expected.droppedFrames &&
+        replayed.detections.length == expected.detections.length &&
+        Math.abs(replayed.detections[0].x - expected.detections[0].x) < 1e-6 &&
+        Math.abs(replayed.detections[0].y - expected.detections[0].y) < 1e-6 &&
+        Math.abs(replayed.detections[0].width - expected.detections[0].width) < 1e-6 &&
+        Math.abs(replayed.detections[0].height - expected.detections[0].height) < 1e-6 &&
+        replayed.detections[0].label == expected.detections[0].label &&
+        replayed.detections[0].score == expected.detections[0].score,
+        "recorded multi-frame replay reproduces every observation field except completion time");
+    }
+    directReplay.dispose();
     replayHost.dispose(); replay.close();
     Sys.println('RobotKit perception inference tests passed ($assertions assertions)');
     return assertions;
