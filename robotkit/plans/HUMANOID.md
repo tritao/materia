@@ -69,6 +69,30 @@ joints makes it fall.
   MuJoCo Playground won't transfer.
 - **HU-D6 — Learned first, model-based second.** A policy gets the robot
   walking soonest. The whole-body controller (H7) reuses H0–H3 and Lane D.
+- **HU-D7 — Stand-up goes through a simulated support harness.** The G1 cannot
+  hold its default pose on servos, and the pretrained policy was trained to start
+  near it. The stand-up state is: supported, Ruckig to the default pose, the
+  harness ramps its support down, the policy takes over. The harness is a SimKit
+  environment feature built on the force API from H4, not a property of the
+  robot model, and it mirrors the gantry that H8's first hardware runs use, so
+  simulation and hardware share one state machine.
+- **HU-D8 — The runtime keeps rejecting servo targets outside joint travel;
+  MotionGuard clamps.** The controller emits raw targets. MotionGuard checks
+  every servo batch, clamps with a configured margin, records each clamp and
+  puts the count on an MCAP channel. It replaces the controller's own clamping.
+  `observed_limit_tolerance` is a separate question, about compliant stops going
+  slightly past a limit: derive it per robot from the model's limit softness,
+  set by the importer or a humanoid profile, and never as a global default. A
+  compiled model keeps 0 unless configured, so arms and CNCs are unaffected.
+- **HU-D9 — A faulted robot keeps publishing its true state.** A fault means
+  the robot rejects commands and goes to damping, not that it stops reporting.
+  The state carries `safety = FAULT` and the fault code, so the editor and MCAP
+  show the fall. The change needs a test that arm and CNC results are unchanged.
+- **HU-D10 — The pretrained G1 policy and the imported 12-joint model are
+  checked in.** `unitree_rl_gym` is BSD-3-Clause, but its repository does not say
+  outright that the trained weights are covered. Keep a `NOTICE` beside the
+  files naming the source repository, the pinned commit, the licence and that
+  ambiguity.
 
 ---
 
@@ -518,3 +542,23 @@ Found, in the order it was found:
    affected.
 
 Not done, and where it goes: `robotkit/TODO.md`.
+
+### Plan for H3–H5
+
+Decisions HU-D7 to HU-D10 (above) settle the open questions from H4. Order:
+0. Verify `main` after the H0–H4 and mixed-scene merges: the Haxe suites, the walk
+   gate, the three `world-tcp.sh` modes, and the cnckit, toolpathkit, motionkit and
+   app tests.
+1. H3: encoder quantization, IMU noise, bias and latency, per-foot contact force,
+   and an observation assembler that only reads sensors. Sensor frames refresh
+   every tick. Re-tune `GravityEstimator` against a biased, noisy gyro, and run
+   the walk gate at a mild noise level to see how much slack the policy has.
+2. H5: the support harness (HU-D7), the state machine (passive/damping, stand-up,
+   policy, sit-down, fault), HOLD as a zero-velocity command, fall detection,
+   MotionGuard on every servo batch (HU-D8), and faulted robots that keep
+   publishing (HU-D9).
+3. Mixed-scene follow-ups inside H5: collision shapes for the pelvis, torso and
+   hands so a fall lands on the torso and arms cannot pass through it, and the
+   humanoid at 2 ms beside the CAM pocket scenario.
+4. H4 leftovers: the truncated MJX solver, and MCAP channels for the command
+   reference, gait phase, estimate and clamped-target count.
