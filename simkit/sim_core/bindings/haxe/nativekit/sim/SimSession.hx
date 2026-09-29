@@ -105,7 +105,7 @@ class SimSession {
         desc.set_mass(mass);
         var result = NativeKitSim.nksim_session_create_object(owner.borrow(), desc);
         SimWorld.check(result.status, "session.createObject");
-        return new SimObject(this, result.out_object, motion);
+        return new SimObject(this, result.out_object, motion, shape);
     }
 
     /** Drive a dynamic object from a carrier body's frame on every tick. */
