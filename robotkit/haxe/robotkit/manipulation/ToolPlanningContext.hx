@@ -7,12 +7,15 @@ class ToolPlanningContext {
   public final tool:Tool;
   public final obstacles:Array<ToolBoxObstacle>;
   public final clearance:Float;
-  public final maxJointStep:Float;
+  public final maxToolStep:Float;
+  public final maxJointStep:Null<Float>;
+  public final preparedShape:ToolClearanceShape;
 
   public function new(tool:Tool, obstacles:Array<ToolBoxObstacle>,
-      ?clearance:Float = 0.0, ?maxJointStep:Float = 0.02) {
+      ?clearance:Float = 0.0, ?maxJointStep:Null<Float>, ?maxToolStep:Float = 0.005) {
     if (tool == null || obstacles == null || !Math.isFinite(clearance) || clearance < 0.0 ||
-        !Math.isFinite(maxJointStep) || maxJointStep <= 0.0)
+        !Math.isFinite(maxToolStep) || maxToolStep <= 0.0 ||
+        (maxJointStep != null && (!Math.isFinite(maxJointStep) || maxJointStep <= 0.0)))
       throw "Tool planning requires a mounted tool, obstacles, and valid clearance settings";
     if (obstacles.length > 0) switch (tool.collision) {
       case NoCollision: throw "Tool planning requires collision geometry for a mounted tool";
@@ -24,5 +27,7 @@ class ToolPlanningContext {
     this.obstacles = obstacles.copy();
     this.clearance = clearance;
     this.maxJointStep = maxJointStep;
+    this.maxToolStep = maxToolStep;
+    this.preparedShape = ToolClearanceShape.prepare(tool.collision);
   }
 }

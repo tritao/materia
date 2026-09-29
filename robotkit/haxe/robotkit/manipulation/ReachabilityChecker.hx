@@ -35,7 +35,8 @@ class ReachabilityChecker {
   public static function check(manipulator:Manipulator, toolpath:Toolpath, base_T_work:Transform3,
       seed:Array<Float>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
       ?maxIterations:Int = 100, ?damping:Float = 0.02,
-      ?toolClearance:ToolClearanceChecker, ?toolJointStep:Float = 0.02):ReachabilityResult {
+      ?toolClearance:ToolClearanceChecker, ?toolJointStep:Null<Float>,
+      ?maxToolStep:Float = 0.005, ?checkApproach:Bool = false):ReachabilityResult {
     if (manipulator == null || toolpath == null || base_T_work == null)
       throw "Reachability check requires a manipulator, toolpath, and base_T_work transform";
     if (seed == null) throw "Reachability check requires a seed joint configuration";
@@ -54,8 +55,11 @@ class ReachabilityChecker {
       var ik = manipulator.solveIkForTcp(target, seedQ, positionTolerance, orientationTolerance,
         maxIterations, damping);
       lastQ = ik.q;
-      if (ik.converged && (toolClearance == null ||
-          toolClearance.clearJointSegment(manipulator, seedQ, ik.q, toolJointStep))) {
+      var clear = ik.converged && (toolClearance == null || (reachableCount == 0 && !checkApproach
+        ? toolClearance.isClear(manipulator.forwardKinematics(ik.q))
+        : toolClearance.clearJointSegment(manipulator, seedQ, ik.q,
+            toolJointStep, maxToolStep)));
+      if (clear) {
         reachableCount++;
         seedQ = ik.q;
       } else if (firstFailure < 0) firstFailure = index;

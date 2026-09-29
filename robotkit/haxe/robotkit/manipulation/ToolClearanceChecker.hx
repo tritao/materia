@@ -11,17 +11,23 @@ private typedef ClearancePiece = {
 };
 
 /** Conservative convex-tool clearance against oriented boxes. Tool poses and
- * obstacles use the manipulator base frame. Joint motion is sampled; callers
- * choose a joint step small enough for their required path resolution. */
+ * obstacles use the manipulator base frame. Joint motion is sampled using a
+ * five millimetre tool-motion target unless a joint step is supplied. */
 class ToolClearanceChecker {
   final pieces:Array<ClearancePiece> = [];
   final obstacles:Array<ToolBoxObstacle>;
   final clearance:Float;
 
-  public function new(shape:ToolCollisionShape, obstacles:Array<ToolBoxObstacle>, ?clearance:Float = 0.0) {
+  public function new(shape:ToolCollisionShape, obstacles:Array<ToolBoxObstacle>,
+      ?clearance:Float = 0.0, ?preparedShape:ToolClearanceShape) {
     if (shape == null || obstacles == null || !Math.isFinite(clearance) || clearance < 0)
       throw "Tool clearance requires a shape, obstacles, and non-negative clearance";
     this.obstacles = obstacles.copy();
+    if (preparedShape != null) {
+      for (piece in preparedShape.checker.pieces) pieces.push(piece);
+      this.clearance = clearance + preparedShape.checker.clearance;
+      return;
+    }
     var padding = 0.0;
     switch (shape) {
       case NoCollision:
@@ -64,14 +70,19 @@ class ToolClearanceChecker {
   }
 
   public function clearJointSegment(manipulator:Manipulator, from:Array<Float>, to:Array<Float>,
-      ?maxJointStep:Float = 0.02):Bool {
+      ?maxJointStep:Null<Float>, ?maxToolStep:Float = 0.005):Bool {
     if (manipulator == null || from == null || to == null || from.length != to.length ||
-        !Math.isFinite(maxJointStep) || maxJointStep <= 0)
+        !Math.isFinite(maxToolStep) || maxToolStep <= 0 ||
+        (maxJointStep != null && (!Math.isFinite(maxJointStep) || maxJointStep <= 0)))
       throw "Tool segment requires matching joints and a positive sampling step";
+    for (i in 0...from.length)
+      if (!Math.isFinite(from[i]) || !Math.isFinite(to[i]))
+        throw "Tool segment joints must be finite";
+    var stepLimit:Float = maxJointStep == null ? jointStepForToolDistance(manipulator, from, to,
+      maxToolStep) : maxJointStep;
     var steps = 1;
     for (i in 0...from.length) {
-      if (!Math.isFinite(from[i]) || !Math.isFinite(to[i])) throw "Tool segment joints must be finite";
-      steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[i] - from[i]) / maxJointStep)));
+      steps = Std.int(Math.max(steps, Math.ceil(Math.abs(to[i] - from[i]) / stepLimit)));
     }
     for (step in 0...(steps + 1)) {
       var t = step / steps;
@@ -79,6 +90,26 @@ class ToolClearanceChecker {
       if (!isClear(manipulator.forwardKinematics(q))) return false;
     }
     return true;
+  }
+
+  function jointStepForToolDistance(manipulator:Manipulator, from:Array<Float>, to:Array<Float>,
+      maxToolStep:Float):Float {
+    if (pieces.length == 0) return maxToolStep;
+    var sensitivity = 0.0;
+    for (joint in 0...from.length) {
+      var worst = 0.0;
+      for (fraction in [0.0, 0.5, 1.0]) {
+        var q = [for (i in 0...from.length) from[i] + (to[i] - from[i]) * fraction];
+        var pose = manipulator.forwardKinematics(q);
+        q[joint] += 0.001;
+        var moved = manipulator.forwardKinematics(q);
+        for (piece in pieces) for (vertex in piece.vertices)
+          worst = Math.max(worst, moved.transformPoint(vertex)
+            .sub(pose.transformPoint(vertex)).norm() / 0.001);
+      }
+      sensitivity += worst;
+    }
+    return maxToolStep / Math.max(1.0, sensitivity);
   }
 
   static function prepare(vertices:Array<Vec3>):ClearancePiece {
