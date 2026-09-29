@@ -113,9 +113,9 @@ lives in ToolpathKit and CamKit's existing 12,223 assertions still pass.
 The requested single-worktree workflow uses clean generated test builds on
 `feat/toolpath-cleanup`, with MotionKit vendor links and CadKit's native
 directories on `LD_LIBRARY_PATH`. Haxeon builds StockKit core automatically;
-no manual StockKit CMake step or StockKit runtime path is used. A literal
-fresh-main worktree gate follows integration into main. The assertion counts
-below record the clean-build gate on this branch.
+no manual StockKit CMake step or StockKit runtime path is used. The assertion
+counts below record that clean-build gate and were checked again after merging
+current main into the branch. The app gained a worker demo test group from main.
 
 | Suite | Final result |
 | --- | ---: |
@@ -126,4 +126,4 @@ below record the clean-build gate on this branch.
 | CamKit | 12,223 |
 | StockKit, core rays | 100,667 + 17,494 rays |
 | MotionKit full | 6,723 |
-| App | 5 test groups passed; runner does not report an assertion total |
+| App | 6 test groups passed; runner does not report an assertion total |
