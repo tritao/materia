@@ -37,6 +37,24 @@ class SceneObjectCommands {
     app.commands.register(new Command("scene.create-stock-simulation", "Add stock simulation", function() {
       app.runSceneEdit("Could not add stock simulation", function() app.scene.createStockSimulation());
     }, null, function() return app.canEditObjects() && app.scene.canCreate()));
+    app.commands.register(new Command("scene.create-worker", "Add worker", function() {
+      app.runSceneEdit("Could not add worker", function() app.scene.createWorker());
+    }, null, function() return app.canEditObjects() && app.scene.canCreate()));
+    for (command in ["scene.worker-add-step","scene.worker-remove-step",
+        "scene.worker-step-up","scene.worker-step-down"]) {
+      var selected = command;
+      app.commands.register(new Command(selected, switch selected {
+        case "scene.worker-add-step": "Add job step";
+        case "scene.worker-remove-step": "Remove job step";
+        case "scene.worker-step-up": "Move job step up";
+        default: "Move job step down";
+      }, function() app.runSceneEdit("Could not edit worker job", function()
+        return HumanWorkerKind.command(app.scene, selected)), null,
+        function() {
+          var selectedObject = app.scene.object(app.scene.selectedId);
+          return app.canEditObjects() && selectedObject != null && selectedObject.kind == HumanWorkerKind.KIND;
+        }));
+    }
     app.commands.register(new Command("scene.create-bracket", "Add L bracket", function() {
       app.runSceneEdit("Could not add L bracket", function() app.scene.createBracket());
     }, null, function() return app.canEditObjects() && app.scene.canCreate()));

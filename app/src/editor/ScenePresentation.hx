@@ -156,7 +156,11 @@ class ScenePresentation {
     view.setViewProjection(viewProjection);
     var selected = owner.object(owner.selectedId);
     var selection = new SelectionSet();
-    if (selected != null) selection.add(owner.runtimeFor(selected.id).node);
+    if (selected != null) {
+      var workerVisual = owner.workerVisuals.get(selected.id);
+      if (workerVisual == null) selection.add(owner.runtimeFor(selected.id).node);
+      else for (node in workerVisual.character.model.primitiveNodes) selection.add(node);
+    }
     view.applySelection(selection, selectionMaterial);
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
@@ -184,9 +188,12 @@ class ScenePresentation {
     return view;
   }
 
-  public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>):MaterialData {
+  public static function materialFor(red:Float, green:Float, blue:Float, appearance:Null<Appearance>,
+      kind:String = ""):MaterialData {
     var finish = appearance == null ? Appearances.neutral() : appearance;
-    return MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
+    var result = MaterialData.opaque(red, green, blue).setMetallic(finish.metallic).setRoughness(finish.roughness);
+    if (kind == "human-worker") result.setOpacity(0.0).setOpaque(false);
+    return result;
   }
 
 }

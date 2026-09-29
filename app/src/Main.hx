@@ -693,6 +693,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       addSection("Primitive", ObjectKindRegistry.addMenuCommands("Primitive"));
       addSection("CAD", ObjectKindRegistry.addMenuCommands("CAD"));
       addSection("Machining", ObjectKindRegistry.addMenuCommands("Machining"));
+      addSection("People", ObjectKindRegistry.addMenuCommands("People"));
       addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
         "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
         "scene.create-vertical-fillet"]);

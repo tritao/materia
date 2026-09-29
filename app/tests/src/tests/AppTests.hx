@@ -14,6 +14,7 @@ class AppTests {
     if (WorkspaceSaveWorkerTests.main() != 0) return 1;
     if (SceneEditingTests.main() != 0) return 1;
     if (StockSimulationTests.main() != 0) return 1;
+    if (WorkerObjectTests.main() != 0) return 1;
     ScriptedSetupTests.run();
     if (HumanSimulationTests.main() != 0) return 1;
     if (WorkerDemoTests.main() != 0) return 1;

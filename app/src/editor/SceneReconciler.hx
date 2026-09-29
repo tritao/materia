@@ -15,6 +15,14 @@ import app.CadDocumentSession;
 /** Stages record reconciliation and commits scene, CAD, and selection changes atomically. */
 @:access(app.EditorScene)
 class SceneReconciler {
+  static function sameWorker(a:Null<app.WorkerObjectData>, b:Null<app.WorkerObjectData>):Bool {
+    if (a == null || b == null) return a == null && b == null;
+    if (a.asset != b.asset || a.job != b.job || a.migrationNote != b.migrationNote ||
+        a.zones.length != b.zones.length) return false;
+    for (index in 0...a.zones.length) if (a.zones[index] != b.zones[index]) return false;
+    return true;
+  }
+
   public static function replace(owner:EditorScene, data:Array<SceneObjectData>, selection:String):Void {
     owner.fullReconciliationCount = owner.fullReconciliationCount + 1;
     var physicsChanged = owner.model.physicsRecordsChanged(data);
@@ -88,7 +96,7 @@ class SceneReconciler {
           if (geometry == null) throw 'No geometry resource was prepared for "${record.id}"';
           var material = owner.scene.createMaterial();
           prepared.createdMaterials.push(material);
-          owner.scene.setMaterialData(material, ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance));
+          owner.scene.setMaterialData(material, ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance, record.type));
           owner.failIfInjected("prepare.new-material");
           var node = prepared.transaction.createNode();
           prepared.transaction.setName(node, record.label);
@@ -104,6 +112,7 @@ class SceneReconciler {
             record.dynamicBody, record.mass, record.red, record.green, record.blue,
             storedGraph,
             record.x, record.y, record.z, record.visible, record.meshSnapshot, record.rotation, record.appearance, record.materialId);
+          item.worker = record.worker;
           prepared.objects.push(item);
           owner.failIfInjected("prepare.new-object");
           prepared.changed = true;
@@ -118,7 +127,8 @@ class SceneReconciler {
             item.meshSnapshot != record.meshSnapshot || !EditorScene.sameRotation(item.rotation, record.rotation) ||
             item.collisionEnabled != record.collisionEnabled || item.dynamicBody != record.dynamicBody ||
             item.mass != record.mass || item.materialId != record.materialId || item.red != record.red || item.green != record.green ||
-            item.blue != record.blue || !EditorScene.sameFinish(item.appearance, record.appearance);
+            item.blue != record.blue || !EditorScene.sameFinish(item.appearance, record.appearance) ||
+            !sameWorker(item.worker, record.worker);
           if (objectChanged) candidate = SceneModel.copyEditorSceneObject(item);
           if (item.label != record.label) prepared.transaction.setName(runtime.node, record.label);
           if (item.visible != record.visible) prepared.transaction.setVisibility(runtime.node, record.visible);
@@ -158,7 +168,7 @@ class SceneReconciler {
               !EditorScene.sameFinish(item.appearance, record.appearance)) {
             var material = owner.scene.createMaterial();
             prepared.createdMaterials.push(material);
-            owner.scene.setMaterialData(material, ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance));
+            owner.scene.setMaterialData(material, ScenePresentation.materialFor(record.red, record.green, record.blue, record.appearance, record.type));
             prepared.transaction.setMaterial(runtime.node, material);
             prepared.retiredMaterials.push(runtime.material);
             runtime = new EditorSceneRuntimeObject(runtime.node, runtime.geometry, material);
@@ -175,6 +185,7 @@ class SceneReconciler {
           candidate.cadGraph = storedGraph; candidate.x = record.x; candidate.y = record.y; candidate.z = record.z;
           candidate.meshSnapshot = record.meshSnapshot;
           candidate.rotation = record.rotation;
+          candidate.worker = record.worker;
           candidate.visible = record.visible;
           if (objectChanged) prepared.changed = true;
           prepared.objects.push(candidate);
@@ -215,6 +226,7 @@ class SceneReconciler {
     owner.cadSessions = prepared.cadSessions;
     owner.pruneStockSimulations();
     owner.bridge.replaceEntries(prepared.bridgeEntries, prepared.nodeEntries);
+    owner.syncWorkerVisuals();
     owner.selection.selectedId = selection;
     owner.selection.selectedFeatureKey=null;
     if (prepared.changed) owner.publish(prepared.changedBounds, physicsChanged, committedChanges);
@@ -234,7 +246,9 @@ class SceneReconciler {
     prepared.retire();
     var nextSelected = owner.object(selection);
     var propertySchemaChanged = previousSelectedId != selection || previousSelectedFeatureKey != null ||
-      previousSelectedKind != (nextSelected == null ? null : nextSelected.kind);
+      previousSelectedKind != (nextSelected == null ? null : nextSelected.kind) ||
+      (previousSelected != null && nextSelected != null && nextSelected.kind == "human-worker" &&
+        !sameWorker(previousSelected.worker, nextSelected.worker));
     if (propertySchemaChanged)
       owner.selection.changed(owner);
   }

@@ -120,6 +120,14 @@ class InspectorPanel {
           sceneAction("create-pocket", commandId, "Pocket", IconName.Plus)));
         case "scene.create-vertical-fillet": rows.push(new KeyedView("create-vertical-fillet",
           sceneAction("create-vertical-fillet", commandId, "Fillet vertical edges", IconName.Plus)));
+        case "scene.worker-add-step": rows.push(new KeyedView("worker-add-step",
+          sceneAction("worker-add-step", commandId, "Add step", IconName.Plus)));
+        case "scene.worker-remove-step": rows.push(new KeyedView("worker-remove-step",
+          sceneAction("worker-remove-step", commandId, "Remove step", IconName.Close)));
+        case "scene.worker-step-up": rows.push(new KeyedView("worker-step-up",
+          sceneAction("worker-step-up", commandId, "Move step up", IconName.Plus)));
+        case "scene.worker-step-down": rows.push(new KeyedView("worker-step-down",
+          sceneAction("worker-step-down", commandId, "Move step down", IconName.Plus)));
         default:
       }
     }

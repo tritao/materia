@@ -59,7 +59,8 @@ class SceneModel {
       width: source.width, height: source.height, red: source.red, green: source.green,
       blue: source.blue, appearance: source.appearance, visible: source.visible,depth:source.depth,
       collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation});
+      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation,
+      worker:source.worker});
     return changeObjects(owner, "Duplicate object", data, id);
   }
 
@@ -139,9 +140,11 @@ class SceneModel {
   }
 
   public static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
-    return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
+    var copy = new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
       item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
       item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId);
+    copy.worker = item.worker;
+    return copy;
   }
 
   public function records():Array<SceneObjectData> {
@@ -153,7 +156,7 @@ class SceneModel {
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
         appearance:item.appearance,materialId:item.materialId,
         visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
-        rotation:item.rotation});
+        rotation:item.rotation, worker:item.worker});
     }
     return result;
   }
@@ -211,7 +214,7 @@ class SceneModel {
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
       red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
       visible: item.visible, cadGraph: item.cadGraph,
-      meshSnapshot: item.meshSnapshot, rotation: item.rotation};
+      meshSnapshot: item.meshSnapshot, rotation: item.rotation, worker: item.worker};
   }
 
   public static function estimateSceneChanges(changes:Array<SceneRecordChange>):Int {
@@ -227,7 +230,9 @@ class SceneModel {
     if (record == null) return 0;
     return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) +
       estimatedStringBytes(record.type) + estimatedStringBytes(record.cadGraph) +
-      estimatedStringBytes(record.sketchDraft);
+      estimatedStringBytes(record.sketchDraft) +
+      (record.worker == null ? 0 : estimatedStringBytes(record.worker.asset) +
+      estimatedStringBytes(record.worker.job) + record.worker.zones.length * 32);
   }
 
   static function estimatedStringBytes(value:Null<String>):Int
