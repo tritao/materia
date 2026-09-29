@@ -2,6 +2,7 @@
 // and a floating-base legged robot share one Simulation on the MuJoCo backend
 // without disturbing each other. Every check names the property it protects.
 #include "robotkit_simkit.h"
+#include "nativekit_sim_mujoco.h"
 #include <cassert>
 #include <cmath>
 #include <cstdio>
@@ -238,11 +239,14 @@ struct Trace {
 };
 
 struct Scene {
+    nkscene_scene scene = 0;
+    nksim_world world = 0;
+    nksim_session session = 0;
     rk_simulation simulation = 0;
     rk_robot_runtime arm = 0, gantry = 0, humanoid = 0;
     int arm_index = -1, gantry_index = -1, humanoid_index = -1;
     uint32_t arm_links = 4, gantry_links = 4, arm_joints = 3;
-    rk_simulation_object floor = 0, box = 0;
+    nksim_object floor = 0, box = 0;
     std::vector<rk_result> results;
     Trace arm_trace, gantry_trace;
     uint64_t sequence = 0;
@@ -251,8 +255,33 @@ struct Scene {
     uint32_t stride = 1; // Record every stride-th tick.
     double arm_error = 0.0, gantry_error = 0.0; // Worst distance from the commanded position.
     uint32_t arm_contacts = 0, gantry_contacts = 0; // Most active contacts either had in one tick.
-    ~Scene() { if (simulation) rk_simulation_destroy(simulation); }
+    Scene() = default;
+    Scene(const Scene &) = delete;
+    Scene &operator=(const Scene &) = delete;
+    ~Scene() {
+        if (simulation) rk_simulation_destroy(simulation);
+        if (session) nksim_session_destroy(session);
+        if (world) nksim_world_destroy(world);
+        if (scene) nkscene_scene_destroy(scene);
+    }
 };
+
+rk_result from_sim(nksim_result result) {
+    switch (result) {
+    case NKSIM_OK: return RK_OK;
+    case NKSIM_ERROR_INVALID_ARGUMENT: return RK_ERROR_INVALID_ARGUMENT;
+    case NKSIM_ERROR_INVALID_HANDLE: return RK_ERROR_INVALID_HANDLE;
+    case NKSIM_ERROR_INVALID_STATE: return RK_ERROR_INVALID_STATE;
+    case NKSIM_ERROR_OUT_OF_MEMORY: return RK_ERROR_OUT_OF_MEMORY;
+    default: return RK_ERROR_BACKEND;
+    }
+}
+
+// The session steps the world; a robot's failure is that robot's fault, so a
+// tick reports OK unless the session itself failed.
+rk_result step(Scene &scene, uint64_t timestamp_ns) {
+    return from_sim(nksim_session_step(scene.session, timestamp_ns, nullptr));
+}
 
 void record(Scene &scene, Trace &trace, rk_robot_runtime runtime, int index, uint32_t links) {
     rk_robot_state state{};
@@ -276,15 +305,23 @@ void record(Scene &scene, Trace &trace, rk_robot_runtime runtime, int index, uin
 }
 
 void build(Scene &scene, const Options &options) {
-    rk_simulation_desc desc{};
+    assert(nkscene_scene_create(&scene.scene) == NKS_OK);
+    nksim_world_desc desc{};
     desc.struct_size = sizeof(desc);
+    desc.scene = scene.scene;
     desc.fixed_timestep = options.timestep;
     desc.physics_substeps = options.substeps;
-    desc.backend = 1;
+    desc.gravity[2] = -9.81;
     desc.integrator = options.integrator;
     desc.solver_iterations = options.solver_iterations;
     desc.line_search_iterations = options.line_search_iterations;
-    assert(rk_simulation_create(&desc, &scene.simulation) == RK_OK);
+    assert(nksim_mujoco_world_create(&desc, &scene.world) == NKSIM_OK);
+    nksim_session_desc session_desc{};
+    session_desc.struct_size = sizeof(session_desc);
+    session_desc.scene = scene.scene;
+    session_desc.world = scene.world;
+    assert(nksim_session_create(&session_desc, &scene.session) == NKSIM_OK);
+    assert(rk_simulation_create_in_session(scene.session, &scene.simulation) == RK_OK);
     scene.timestep = options.timestep;
     int next = 0;
     const auto add_humanoid = [&] {
@@ -318,30 +355,32 @@ void build(Scene &scene, const Options &options) {
                                        &scene.gantry) == RK_OK);
     }
     if (options.humanoid && !options.humanoid_first) add_humanoid();
+    const auto spawn = [&](uint32_t motion, uint32_t shape, const double *at, double half, double half_z,
+                           double mass) {
+        nksim_object_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.motion_type = motion;
+        desc.shape.struct_size = sizeof(desc.shape);
+        desc.shape.type = shape;
+        desc.shape.parameters[0] = desc.shape.parameters[1] = half;
+        desc.shape.parameters[2] = half_z;
+        desc.pose.struct_size = sizeof(desc.pose);
+        desc.pose.rotation[3] = 1.0;
+        std::copy(at, at + 3, desc.pose.position);
+        desc.mass = mass;
+        nksim_object object = 0;
+        assert(nksim_session_create_object(scene.session, &desc, &object) == NKSIM_OK);
+        return object;
+    };
     if (options.floor_box) {
-        rk_simulation_object_desc floor{};
-        floor.struct_size = sizeof(floor);
-        floor.rotation[3] = 1.0;
-        floor.position[0] = options.humanoid_x;
-        floor.position[2] = -0.5;
-        floor.half_extents[0] = floor.half_extents[1] = 2.0;
-        floor.half_extents[2] = 0.5;
-        assert(rk_simulation_spawn_object(scene.simulation, &floor, &scene.floor) == RK_OK);
+        const double at[3] = {options.humanoid_x, 0.0, -0.5};
+        scene.floor = spawn(NKSIM_MOTION_STATIC, NKSIM_SHAPE_BOX, at, 2.0, 0.5, 0.0);
     }
     const auto spawn_box = [&](const double *at, uint32_t motion) {
-        rk_simulation_object_desc box{};
-        box.struct_size = sizeof(box);
-        box.motion_type = motion;
-        box.mass = motion == 2 ? 1.0 : 0.0;
-        box.rotation[3] = 1.0;
-        std::copy(at, at + 3, box.position);
-        box.half_extents[0] = box.half_extents[1] = box.half_extents[2] = 0.05;
-        rk_simulation_object object = 0;
-        assert(rk_simulation_spawn_object(scene.simulation, &box, &object) == RK_OK);
-        scene.box = object;
+        scene.box = spawn(motion, NKSIM_SHAPE_BOX, at, 0.05, 0.05, motion == NKSIM_MOTION_DYNAMIC ? 1.0 : 0.0);
     };
-    if (options.static_box) spawn_box(options.static_box, 0);
-    if (options.dynamic_box) spawn_box(options.dynamic_box, 2);
+    if (options.static_box) spawn_box(options.static_box, NKSIM_MOTION_STATIC);
+    if (options.dynamic_box) spawn_box(options.dynamic_box, NKSIM_MOTION_DYNAMIC);
     if (options.shapeless_robot) {
         // One link, no joints, no collision shape, and the "none" approximation:
         // a robot that is not meant to touch anything.
@@ -352,11 +391,8 @@ void build(Scene &scene, const Options &options) {
         assert(rk_simulation_add_robot(scene.simulation, model.get(), robot_desc.get(), &ghost) == RK_OK);
     }
     if (options.plane) {
-        rk_simulation_object_desc plane{};
-        plane.struct_size = sizeof(plane);
-        plane.rotation[3] = 1.0;
-        plane.shape = 1;
-        assert(rk_simulation_spawn_object(scene.simulation, &plane, &scene.floor) == RK_OK);
+        const double at[3] = {0.0, 0.0, 0.0};
+        scene.floor = spawn(NKSIM_MOTION_STATIC, NKSIM_SHAPE_PLANE, at, 0.0, 0.0, 0.0);
     }
     if (scene.humanoid) {
         const auto hold = servo_hold(1, 4, 8.0, 0.5);
@@ -395,8 +431,7 @@ void run(Scene &scene, uint32_t ticks, uint32_t first_tick = 0) {
             const auto command = servo_hold(++scene.sequence, 4, 8.0, 0.5);
             (void)rk_robot_runtime_submit(scene.humanoid, &command);
         }
-        scene.results.push_back(rk_simulation_step(scene.simulation,
-                                                   static_cast<uint64_t>(tick) * 10'000'000u));
+        scene.results.push_back(step(scene, static_cast<uint64_t>(tick) * 10'000'000u));
         if (scene.arm) {
             const auto state = snapshot(scene.arm);
             for (int joint = 0; joint < 3; ++joint)
@@ -615,7 +650,7 @@ Touch leg_touch(Target target, uint32_t filter, const Touch *reference) {
     build(scene, options);
     Touch touch;
     for (uint32_t tick = 0; tick < 100; ++tick) {
-        assert(rk_simulation_step(scene.simulation, tick * 10'000'000ull) == RK_OK);
+        assert(step(scene, tick * 10'000'000ull) == RK_OK);
         rk_robot_contact contacts[256]{};
         uint32_t count = 0;
         assert(rk_simulation_get_robot_contacts(scene.simulation, scene.humanoid, contacts, 256, &count) == RK_OK);
@@ -685,7 +720,7 @@ static void humanoid_stands_on_a_machine_bed(uint32_t filter) {
     Scene scene;
     build(scene, options);
     for (uint32_t tick = 0; tick < 150; ++tick)
-        assert(rk_simulation_step(scene.simulation, tick * 10'000'000ull) == RK_OK);
+        assert(step(scene, tick * 10'000'000ull) == RK_OK);
     const auto height = height_of(scene, scene.humanoid_index);
     std::printf("filter %u humanoid dropped on a machine bed: torso height %.3f (bed top 0.55, floor 0)\n",
                 filter, height);
@@ -741,7 +776,7 @@ static void realtime_session_survives_a_humanoid_fault() {
     const double targets[3] = {0.5, -0.4, 0.3};
     const auto command = position_command(1, 3, targets);
     assert(rk_robot_runtime_submit(scene.arm, &command) == RK_OK);
-    assert(rk_simulation_start(scene.simulation) == RK_OK);
+    assert(from_sim(nksim_session_start(scene.session)) == RK_OK);
     std::this_thread::sleep_for(std::chrono::milliseconds(1500));
     rk_simulation_clock clock{};
     clock.struct_size = sizeof(clock);
@@ -757,7 +792,7 @@ static void realtime_session_survives_a_humanoid_fault() {
     EXPECT(clock.step_index >= before + 30, "the session stopped ticking after the fault: %llu -> %llu",
            static_cast<unsigned long long>(before), static_cast<unsigned long long>(clock.step_index));
     EXPECT(std::fabs(arm.position[0] - 0.5) < 0.05, "the arm is at %.3f", arm.position[0]);
-    assert(rk_simulation_stop(scene.simulation) == RK_OK);
+    assert(from_sim(nksim_session_stop(scene.session)) == RK_OK);
 }
 
 int main() {
