@@ -1,8 +1,7 @@
 package cadbridge;
 
 import cadkit.modeling.AssemblyState;
-import machinekit.pneumatic.SuctionCup;
-import machinekit.pneumatic.VacuumGenerator;
+import machinekit.component.ComponentCapability;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorFrames;
 import materia.assembly.AssemblyFrames;
@@ -19,35 +18,48 @@ class SuctionCapacityBridge {
     if (effector == null || cupInstanceId == null || cupInstanceId.length == 0)
       throw "Suction bridge requires an end effector and cup instance";
     effector.validate();
-    var cup:Null<SuctionCup> = null;
+    var found = false;
+    var suction = false;
+    var effectiveArea:Null<Float> = null;
+    var ratedMoment:Null<Float> = null;
+    var vacuumPort = "vacuum";
+    var contactConnector = "contact";
     for (member in effector.components()) if (member.id == cupInstanceId) {
-      if (!Std.isOfType(member.component, SuctionCup))
-        throw 'Member "$cupInstanceId" is not a suction cup';
-      cup = cast member.component;
+      found = true;
+      for (capability in member.component.capabilities()) switch capability {
+        case Suction(area, moment, port, contact):
+          suction = true;
+          effectiveArea = area;
+          ratedMoment = moment;
+          vacuumPort = port;
+          contactConnector = contact;
+        case _:
+      }
     }
-    if (cup == null) throw 'Unknown suction cup "$cupInstanceId"';
-    if (cup.effectiveAreaMm2 == null)
-      throw 'Suction cup "$cupInstanceId" has no effective sealed area';
-    var chain = effector.upstreamChain(cupInstanceId, "vacuum");
-    for (member in effector.components()) if (Std.isOfType(member.component, VacuumGenerator) &&
-        chain.indexOf('${member.id}/vacuum') >= 0) {
-      var generator:VacuumGenerator = cast member.component;
-      if (generator.ratedVacuumKpa == null)
-        throw 'Vacuum generator "${member.id}" has no pressure rating';
-      if (minimumCupVacuumKpa > generator.ratedVacuumKpa + 1e-9)
-        throw 'Cup vacuum exceeds generator "${member.id}" rating';
-    }
+    if (!found) throw 'Unknown suction cup "$cupInstanceId"';
+    if (!suction) throw 'Member "$cupInstanceId" is not a suction cup';
+    if (effectiveArea == null) throw 'Suction cup "$cupInstanceId" has no effective sealed area';
+    var chain = effector.upstreamChain(cupInstanceId, vacuumPort);
+    for (member in effector.components()) for (capability in member.component.capabilities())
+      switch capability {
+        case VacuumSource(rating, outputPort):
+          if (chain.indexOf('${member.id}/$outputPort') >= 0) {
+            if (rating == null) throw 'Vacuum generator "${member.id}" has no pressure rating';
+            if (minimumCupVacuumKpa > rating + 1e-9)
+              throw 'Cup vacuum exceeds generator "${member.id}" rating';
+          }
+        case _:
+      }
     var solved = effector.solve(state);
     var memberPose = solved.poses.get(cupInstanceId);
     if (memberPose == null) throw 'Missing solved pose for "$cupInstanceId"';
     var mountTContact = AssemblyFrames.compose(AssemblyFrames.inverse(solved.mountWorld),
-      AssemblyFrames.compose(memberPose, effector.memberConnectorFrame(cupInstanceId, "contact")));
+      AssemblyFrames.compose(memberPose, effector.memberConnectorFrame(cupInstanceId, contactConnector)));
     var converted = EndEffectorFrames.toRobotFrame(new machinekit.robotics.ConnectorFrame(mountTContact));
     var flangeTCup = new Transform3(new Vec3(converted.position.x,
       converted.position.y, converted.position.z), new Quat(converted.quaternion.x,
       converted.quaternion.y, converted.quaternion.z, converted.quaternion.w));
-    var effectiveArea:Float = cast cup.effectiveAreaMm2;
-    return new SuctionGrip(flangeTCup, effectiveArea * 1e-6,
-      minimumCupVacuumKpa, frictionCoefficient, safetyFactor, cup.ratedMomentNm);
+    return new SuctionGrip(flangeTCup, (cast effectiveArea : Float) * 1e-6,
+      minimumCupVacuumKpa, frictionCoefficient, safetyFactor, ratedMoment);
   }
 }

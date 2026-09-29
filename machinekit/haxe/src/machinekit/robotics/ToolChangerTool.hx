@@ -15,9 +15,6 @@ class ToolChangerTool extends MachineComponent {
 	public final diameter:Float;
 	public final thickness:Float;
 
-	/** Generic coupling dimensions shared with the matching robot-side half. */
-	override public function couplingKey():String return 'generic:$airChannels:${Dimension.format(diameter)}';
-	override public function couplingConnector():String return "master";
 
 	public function new(airChannels:Int, diameter:Float = 60, thickness:Float = 12) {
 		if (airChannels < 1 || !Math.isFinite(diameter) || diameter <= 0 ||
@@ -38,6 +35,7 @@ class ToolChangerTool extends MachineComponent {
 		addPort({name: "signalIn", kind: Signal, role: Consumer, iface: Plug("generic", 4), required: true});
 		addPort({name: "signalOut", kind: Signal, role: Supply, iface: Plug("generic", 4), required: false});
 		addBridge("signalIn", "signalOut");
+		addCapability(Coupling('generic:$airChannels:${Dimension.format(diameter)}', "master"));
 	}
 
 	override public function hasGeometry():Bool return true;

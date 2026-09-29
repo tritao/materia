@@ -6,13 +6,10 @@ import machinekit.component.MachineComponent;
 import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
-import machinekit.component.RuntimePortIntent;
 import machinekit.component.Solids;
 
 /** Generic inline vacuum sensor with a pressure feedback signal. */
 class VacuumPressureSensor extends MachineComponent {
-	override public function runtimePortIntents():Array<RuntimePortIntent>
-		return [RuntimePortIntent.VacuumPressureSensor("vacuumIn", "pressureSignal")];
 
 	public function new(tubeOdMm:Float = 4) {
 		if (!Math.isFinite(tubeOdMm) || tubeOdMm <= 0)
@@ -27,6 +24,7 @@ class VacuumPressureSensor extends MachineComponent {
 		addBridge("vacuumIn", "vacuumOut");
 		addPort({name: "pressureSignal", kind: Signal, role: Supply,
 			iface: Plug("analog-vacuum-kpa", 3), required: false});
+		addCapability(VacuumPressureSensor("vacuumIn", "pressureSignal"));
 	}
 
 	override public function hasGeometry():Bool return true;

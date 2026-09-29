@@ -26,7 +26,8 @@ class EndEffectorSet extends EndEffector {
 			throw "Changer needs a name and port map";
 		memberConnectorFrame(instanceId, connector);
 		var master = componentAt(this, instanceId);
-		if (master.couplingKey() != null && connector != master.couplingConnector())
+		var coupling = master.coupling();
+		if (coupling != null && connector != coupling.connector)
 			throw 'Changer connector "$connector" does not match master coupling connector';
 		var robotPorts:Map<String, Bool> = [], toolPorts:Map<String, Bool> = [];
 		var copied:Array<ChangerPortMap> = [];
@@ -59,14 +60,18 @@ class EndEffectorSet extends EndEffector {
 		var master = componentAt(this, changer.instanceId);
 		var mount = tool.mountReference();
 		var half = componentAt(tool, mount.instanceId);
-		var masterCoupled = master.couplingKey() != null;
-		var toolCoupled = half.couplingKey() != null;
+		var masterCoupling = master.coupling();
+		var toolCoupling = half.coupling();
+		var masterCoupled = masterCoupling != null;
+		var toolCoupled = toolCoupling != null;
 		if (masterCoupled != toolCoupled)
 			throw 'Changer tool "$id" needs a matching coupling interface';
 		if (masterCoupled) {
-			if (changer.connectorName != master.couplingConnector() ||
-				mount.connectorName != half.couplingConnector() ||
-				master.couplingKey() != half.couplingKey())
+			var robotHalf:{key:String, connector:String} = cast masterCoupling;
+			var toolHalf:{key:String, connector:String} = cast toolCoupling;
+			if (changer.connectorName != robotHalf.connector ||
+				mount.connectorName != toolHalf.connector ||
+				robotHalf.key != toolHalf.key)
 				throw 'Changer tool "$id" does not fit the master interface';
 		}
 		tools.set(id, tool);

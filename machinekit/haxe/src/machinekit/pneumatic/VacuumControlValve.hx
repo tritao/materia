@@ -6,13 +6,10 @@ import machinekit.component.MachineComponent;
 import machinekit.component.PortInterface;
 import machinekit.component.PortKind;
 import machinekit.component.PortRole;
-import machinekit.component.RuntimePortIntent;
 import machinekit.component.Solids;
 
 /** Generic normally closed valve in a vacuum line, commanded by a signal. */
 class VacuumControlValve extends MachineComponent {
-	override public function runtimePortIntents():Array<RuntimePortIntent>
-		return [RuntimePortIntent.VacuumValve("control")];
 
 	public function new(tubeOdMm:Float = 4) {
 		if (!Math.isFinite(tubeOdMm) || tubeOdMm <= 0)
@@ -27,6 +24,7 @@ class VacuumControlValve extends MachineComponent {
 		addBridge("vacuumIn", "vacuumOut");
 		addPort({name: "control", kind: Signal, role: Consumer,
 			iface: Plug("digital-valve", 2), required: true});
+		addCapability(VacuumValve("control"));
 	}
 
 	override public function hasGeometry():Bool return true;

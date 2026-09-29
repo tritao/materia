@@ -30,15 +30,15 @@ private class TestChangerMaster extends MachineComponent {
 }
 
 private class CoupledMaster extends MachineComponent {
-	public function new() {
+	public function new(duplicate:Bool = false) {
 		super("COUPLED-MASTER", "Coupled master", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());
 		addConnector("couple", Mount, AssemblyFrames.translation(0, 10, 0));
 		addPort({name: "airOut", kind: Pneumatic, role: Supply, iface: Unspecified, required: false});
+		addCapability(Coupling("test:master", "couple"));
+		if (duplicate) addCapability(Coupling("test:master", "couple"));
 		declareMass(5, new Vector(), InertiaTensor.zero());
 	}
-	override public function couplingKey():String return "test:master";
-	override public function couplingConnector():String return "couple";
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
@@ -49,10 +49,9 @@ private class CoupledPlate extends MachineComponent {
 		super("COUPLED-PLATE", "Coupled plate", "steel", true);
 		addConnector("mount", Mount, AssemblyFrames.identity());
 		addPort({name: "airIn", kind: Pneumatic, role: Consumer, iface: Unspecified, required: false});
+		addCapability(Coupling("test:tool", "mount"));
 		declareMass(1, new Vector(), InertiaTensor.zero());
 	}
-	override public function couplingKey():String return "test:tool";
-	override public function couplingConnector():String return "mount";
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part return Part.box(2, 2, 2);
@@ -132,6 +131,7 @@ class EndEffectorSetTests {
 	}
 
 	public static function run():Void {
+		fails(() -> new CoupledMaster(true), "Duplicate coupling capability");
 		var emptySet = new EndEffectorSet();
 		var emptyFindings = emptySet.check().items;
 		if (emptyFindings.length != 2 || emptyFindings[0].code != "eoat.missing-mount" ||

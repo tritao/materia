@@ -45,8 +45,6 @@ class SchmalzSxtTool extends MachineComponent {
 		return table;
 	}
 
-	override public function couplingKey():String return 'schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}';
-	override public function couplingConnector():String return "master";
 
 	public function new(designation:String) {
 		var row = catalog().get(designation);
@@ -56,11 +54,12 @@ class SchmalzSxtTool extends MachineComponent {
 		addConnector("payload", Mount, Solids.axial(0, 0, row.lengthMm));
 		for (i in 1...row.channels + 1) {
 			addPort({name: 'airIn$i', kind: Pneumatic, role: Consumer,
-				iface: Coupling(couplingKey(), i), required: false});
+				iface: Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', i), required: false});
 			addPort({name: 'airOut$i', kind: Pneumatic, role: Supply,
 				iface: Thread(row.outsideThread), required: false});
 			addBridge('airIn$i', 'airOut$i');
 		}
+		addCapability(Coupling('schmalz:sxt:${spec.nominalPipeDiameterMm}:${spec.channels}', "master"));
 		var r = row.envelopeDiameterMm / 2, z = row.lengthMm, m = row.massKg;
 		var transverse = m * (3 * r * r + z * z) / 12;
 		declareMass(m, new Vector(0, 0, z / 2),

@@ -34,7 +34,8 @@ class EndEffectorComponentTests {
 			throw "Catalog cup sizes must have distinct mass and rated area";
 		var sxtMaster = new SchmalzSxtMaster("10.07.13.00013");
 		var sxtTool = new SchmalzSxtTool("10.07.13.00018");
-		if (sxtMaster.couplingKey() != sxtTool.couplingKey() ||
+		if ((cast sxtMaster.coupling() : {key:String, connector:String}).key !=
+			(cast sxtTool.coupling() : {key:String, connector:String}).key ||
 			!PortInterfaces.compatible(sxtMaster.port("airOut2").iface,
 				sxtTool.port("airIn2").iface) ||
 			PortInterfaces.compatible(sxtMaster.port("airOut2").iface,

@@ -46,6 +46,7 @@ class SuctionCup extends MachineComponent {
 		addConnector("contact", Face, Solids.axial(0, 0, height));
 		addPort({name: "vacuum", kind: Vacuum, role: Consumer,
 			iface: vacuumInterface == null ? PushIn(6) : vacuumInterface, required: true});
+		addCapability(Suction(effectiveAreaMm2, ratedMomentNm, "vacuum", "contact"));
 	}
 
 	override public function hasGeometry():Bool return true;
