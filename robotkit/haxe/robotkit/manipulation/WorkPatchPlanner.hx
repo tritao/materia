@@ -31,7 +31,9 @@ class WorkPatchPlanner {
       ?standoffSteps:Int = 3, ?lateralSteps:Int = 5, ?clearance:Float = 0.4,
       ?obstacles:Array<BaseObstacle>, ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3,
       ?toolCollision:ToolCollisionShape, ?toolObstacles:Array<ToolBoxObstacle>,
-      ?toolClearance:Float = 0.0, ?toolJointStep:Float = 0.02):WorkPatchPlanResult {
+      ?toolClearance:Float = 0.0, ?toolJointStep:Null<Float>,
+      ?maxToolStep:Float = 0.005, ?preparedToolShape:ToolClearanceShape,
+      ?checkApproach:Bool = false):WorkPatchPlanResult {
     if (design == null) throw "Work patch planning requires a design work surface";
     if (map_T_surface == null) throw "Work patch planning requires a map_T_surface transform";
     if (manipulator == null) throw "Work patch planning requires a manipulator";
@@ -42,6 +44,10 @@ class WorkPatchPlanner {
     var toolObstacleList = toolObstacles == null ? [] : toolObstacles;
     if (toolObstacleList.length > 0 && toolCollision == null)
       throw "Tool obstacles require a tool collision shape";
+    if (preparedToolShape != null && toolCollision != preparedToolShape.shape)
+      throw "Prepared tool shape must use the same collision shape instance";
+    var prepared = toolCollision == null || toolObstacleList.length == 0 ? null :
+      preparedToolShape == null ? ToolClearanceShape.prepare(toolCollision) : preparedToolShape;
 
     var bounds = design.boundary.bounds();
     var width = bounds.maxX - bounds.minX;
@@ -106,9 +112,10 @@ class WorkPatchPlanner {
           var base_T_work = candidateTransform.inverse().compose(map_T_surface);
           var collisionChecker = toolCollision == null || toolObstacleList.length == 0 ? null : new ToolClearanceChecker(toolCollision,
             [for (obstacle in toolObstacleList) new ToolBoxObstacle(
-              candidateTransform.inverse().compose(obstacle.pose), obstacle.halfExtents)], toolClearance);
+              candidateTransform.inverse().compose(obstacle.pose), obstacle.halfExtents)], toolClearance, prepared);
           var result = ReachabilityChecker.check(manipulator, patchToolpath, base_T_work, seed,
-            positionTolerance, orientationTolerance, 100, 0.02, collisionChecker, toolJointStep);
+            positionTolerance, orientationTolerance, 100, 0.02, collisionChecker, toolJointStep,
+            maxToolStep, checkApproach);
 
           if (best == null || result.reachableFraction > best.reachableFraction) {
             best = result;
