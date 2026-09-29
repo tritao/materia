@@ -337,9 +337,18 @@ class RobotServer {
     }
     var value = RobotProtocol.decodeHello(frame);
     if (value.protocolVersion != 1) return;
+    try {
+      outbound.get(transport.rawValue()).configure(value.subscriptions);
+    } catch (_:Dynamic) {
+      sendTo(transport, observerSession, new RobotFrame(RobotMessageType.Fault,
+        MessagePack.encode(new Fault(Int64.ofInt(robotId), 422,
+          "invalid stream subscriptions", false)), 0, null, observerSession));
+      return;
+    }
     sendTo(transport, observerSession, RobotProtocol.welcome(
       new robotkit.protocol.Welcome(1, "robotd", observerSession,
-        Int64.ofInt(robotId), false, Int64.ofInt(0), 0), observerSession));
+        Int64.ofInt(robotId), false, Int64.ofInt(0), 0,
+        OutboundPolicy.capabilities()), observerSession));
     sendTo(transport, observerSession, RobotProtocol.description(new RobotDescription(
       Int64.ofInt(robotId), robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), observerSession));
@@ -360,6 +369,13 @@ class RobotServer {
       sendFault(426, "unsupported RobotKit protocol version", true);
       return;
     }
+    var scheduler = client == null ? null : outbound.get(client.rawValue());
+    try {
+      if (scheduler != null) scheduler.configure(value.subscriptions);
+    } catch (_:Dynamic) {
+      sendFault(422, "invalid stream subscriptions", false);
+      return;
+    }
     controllerGranted = value.requestedRole == "controller" &&
       switch controlOwner { case None: true; case _: false; };
     if (controllerGranted) {
@@ -369,7 +385,8 @@ class RobotServer {
     send(RobotProtocol.welcome(new robotkit.protocol.Welcome(1, "robotd",
       sessionId, Int64.ofInt(robotId), controllerGranted,
       controllerGranted ? sessionId : Int64.ofInt(0),
-      controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0), sessionId));
+      controllerGranted ? CONTROL_LEASE_TIMEOUT_MS : 0,
+      OutboundPolicy.capabilities()), sessionId));
     send(RobotProtocol.description(new RobotDescription(Int64.ofInt(robotId),
       robot.name, [for (link in robot.links) link.name],
       [for (joint in robot.joints) joint.name]), sessionId));
@@ -657,7 +674,8 @@ class RobotServer {
     if (scheduler == null) return;
     for (sensor in RobotSensorFrames.fromRuntimeSnapshot(snapshot)) {
       var family = sensor.image == null ? OutboundFamily.Sensor : OutboundFamily.Camera;
-      if (!scheduler.accepts(sensor.sensorId, sensor.sequence)) continue;
+      if (!scheduler.shouldOffer(family, sensor.sensorId, sensor.sequence,
+          NativeKit.nk_time_now_ns())) continue;
       if (sensor.image != null) {
         var image = sensor.image;
         var format = switch image.encoding {

@@ -11,6 +11,10 @@ import robotd.OutboundFamily;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotFrame.RobotFrameStream;
 import robotkit.protocol.RobotMessageType;
+import robotkit.protocol.Hello;
+import robotkit.protocol.RobotProtocol;
+import robotkit.protocol.StreamSubscription;
+import haxeon.wire.MessagePackWriter;
 import robotkit.transport.NativeTransport;
 
 /** Exercises real NativeKit queue/transport behavior with a bounded dispatch step. */
@@ -38,6 +42,51 @@ class OutboundSchedulerIntegration {
       var server = accepted;
       if (server == null) throw "scheduler test TCP accept timed out";
       var scheduler = new OutboundScheduler(server, 256);
+      var legacyWriter = new MessagePackWriter();
+      legacyWriter.writeMapHeader(4);
+      legacyWriter.writeInt(1); legacyWriter.writeInt(1);
+      legacyWriter.writeInt(2); legacyWriter.writeString("legacy");
+      legacyWriter.writeInt(3); legacyWriter.writeString("robotkit-v1");
+      legacyWriter.writeInt(4); legacyWriter.writeString("observer");
+      var legacy = RobotProtocol.decodeHello(new RobotFrame(RobotMessageType.Hello,
+        legacyWriter.getBytes()));
+      if (legacy.subscriptions.length != 0) throw "missing Hello subscriptions did not decode empty";
+      scheduler.configure(legacy.subscriptions);
+      if (!scheduler.shouldOffer(OutboundFamily.Camera, "legacy", Int64.ofInt(1),
+          Int64.ofInt(0))) throw "legacy client lost camera family";
+      scheduler.configure([new StreamSubscription("sensor", 2.0)]);
+      if (scheduler.shouldOffer(OutboundFamily.Camera, "filtered", Int64.ofInt(1),
+          Int64.ofInt(0)) || !scheduler.subscribed(OutboundFamily.Essential))
+        throw "subscription filtering failed";
+      if (!scheduler.shouldOffer(OutboundFamily.Sensor, "rate", Int64.ofInt(1),
+          Int64.ofInt(0)) || scheduler.shouldOffer(OutboundFamily.Sensor, "rate",
+          Int64.ofInt(2), Int64.ofInt(250000000)) ||
+          !scheduler.shouldOffer(OutboundFamily.Sensor, "rate", Int64.ofInt(3),
+          Int64.ofInt(500000000))) throw "per-key subscription rate limiting failed";
+      if (!scheduler.shouldOffer(OutboundFamily.Sensor, "other", Int64.ofInt(1),
+          Int64.ofInt(250000000))) throw "rate limit was shared across sensor keys";
+      scheduler.configure([new StreamSubscription("camera", 1.0)]);
+      if (!scheduler.shouldOffer(OutboundFamily.Camera, "paced", Int64.ofInt(1),
+          Int64.ofInt(0))) throw "initial paced frame was rejected";
+      scheduler.offer(OutboundFamily.Camera, "paced", Int64.ofInt(1), frame("paced1"));
+      if (!scheduler.flush(1) || receiveOne(client.borrow(), new RobotFrameStream(), runtime) !=
+          "paced1") throw "initial paced frame was not delivered";
+      if (!scheduler.shouldOffer(OutboundFamily.Camera, "paced", Int64.ofInt(2),
+          Int64.ofInt(1000000000))) throw "next paced frame was rejected";
+      scheduler.offer(OutboundFamily.Camera, "paced", Int64.ofInt(2), frame("paced2"));
+      if (!scheduler.flush(1)) throw "rate-limited flush failed";
+      var quietUntil = Sys.time() + 0.1;
+      while (Sys.time() < quietUntil) {
+        if (NativeTransport.receive(client.borrow()).length > 0)
+          throw "per-key rate limit delivered frames too quickly";
+        runtime.events.wait(0.01);
+      }
+      scheduler.configure([new StreamSubscription("sensor")]);
+      scheduler.configure([]);
+      var capabilities = robotd.OutboundScheduler.OutboundPolicy.capabilities();
+      if (capabilities.indexOf("essential") < 0 || capabilities.indexOf("sensor") < 0 ||
+          capabilities.indexOf("camera") < 0)
+        throw "server capabilities omit an emitted family";
       var stream = new RobotFrameStream();
       scheduler.offer(OutboundFamily.Camera, "a", Int64.ofInt(1), frame("a1"));
       scheduler.offer(OutboundFamily.Camera, "b", Int64.ofInt(1), frame("b1"));

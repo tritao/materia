@@ -24,6 +24,7 @@ import robotkit.protocol.RobotStateMsg;
 import robotkit.protocol.SafetyReset;
 import robotkit.protocol.SensorFrameMsg;
 import robotkit.protocol.Stop;
+import robotkit.protocol.StreamSubscription;
 import robotkit.protocol.PlanSubmission;
 import robotkit.protocol.PathControl;
 import robotkit.transport.NativeTransport;
@@ -47,6 +48,10 @@ class RobotClient {
   public var sensorListener:Null<SensorFrameMsg->Void> = null;
   public var cameraListener:Null<CameraFrameData->Void> = null;
   public var statusListener:Null<Void->Void> = null;
+  /** Add camera before connect when full images are needed. */
+  public var subscribeCamera:Bool = false;
+  public var sensorMaxRateHz:Float = 0.0;
+  public var cameraMaxRateHz:Float = 0.0;
 
   var nativeRuntime:Null<NativeKitRuntime> = null;
   var eventPump:Null<NativeKitEvents> = null;
@@ -303,7 +308,12 @@ class RobotClient {
             var statusChanged = statusListener;
             if (statusChanged != null)
               statusChanged();
-            send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1", requestedRole)));
+            var requested = [new StreamSubscription("essential"),
+              new StreamSubscription("sensor", sensorMaxRateHz)];
+            if (subscribeCamera)
+              requested.push(new StreamSubscription("camera", cameraMaxRateHz));
+            send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1",
+              requestedRole, requested)));
           } else if (kind == EventKind.TransportData) {
             receive(currentTransport);
           } else if (kind == EventKind.TransportClosed || kind == EventKind.TransportFailed) {

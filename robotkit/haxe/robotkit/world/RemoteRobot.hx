@@ -32,6 +32,17 @@ class RemoteRobot implements Robot {
     client.cameraListener = onCamera;
   }
 
+  /** Request image frames before connecting. */
+  public function enableCamera(?maxRateHz:Float = 0.0):Void {
+    client.subscribeCamera = true;
+    client.cameraMaxRateHz = maxRateHz;
+  }
+
+  public function streamCapabilities():Array<String> {
+    var value = client.welcome;
+    return value == null ? [] : value.capabilities.copy();
+  }
+
   public function id():RobotId return logicalId;
 
   /** Negotiated wire identity, exposed for transport diagnostics only. */

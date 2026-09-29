@@ -733,6 +733,17 @@ frame can follow a bulk frame already handed to the socket. The budget reserves
 NativeKit queue capacity and prevents bulk queue exhaustion from closing a
 control lease; it does not remove TCP serialization latency.
 
+`Hello` may request `essential`, `sensor`, and `camera` families with a maximum
+rate per family (Hz; zero is unlimited). Missing or empty subscriptions retain
+legacy delivery of every family. Essential traffic is always delivered. Numeric
+and camera rate limits apply independently to each sensor ID using robotd's
+monotonic clock; filtered sequences are not retried on later snapshots.
+`RobotClient` requests essential and numeric sensor traffic by default; callers
+opt in to camera frames before connecting. `Welcome.capabilities` lists the
+families robotd can emit. The published RKF1 `@:wire` field IDs and types and
+`RobotMessageType` values are checked against `schema/rkf1.lock.json` in the
+test suite; new fields use fresh IDs.
+
 Recording stores commands, snapshots, sensor-bearing world snapshots, faults,
 and world events. `ReplayRobot` and `WorldBehaviorRunner` consume the same
 public boundary, so behavior code can be exercised against simulated, remote,

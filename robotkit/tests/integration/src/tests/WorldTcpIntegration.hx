@@ -88,6 +88,7 @@ class WorldTcpIntegration {
     var runtime = NativeKitRuntime.start();
     var world = new RobotWorld();
     var remote = new RemoteRobot(LOGICAL_ID);
+    if (cameraFixture) remote.enableCamera();
     world.attach(remote);
     var simulationHarness = new robotkit.runtime.SimulationHarness();
     var simulation = simulationHarness.simulation;
@@ -146,6 +147,10 @@ class WorldTcpIntegration {
       simulationHarness.step(Int64.ofInt(2));
       remote.connect(host, port, runtime.events);
       waitUntil(runtime, function() return remote.status() == RobotStatus.Ready, "RemoteRobot did not become ready");
+      var families = remote.streamCapabilities();
+      if (families.indexOf("essential") < 0 || families.indexOf("sensor") < 0 ||
+          families.indexOf("camera") < 0)
+        throw "robotd Welcome did not report stream capabilities";
       if (remote.id() != LOGICAL_ID) throw "world changed the logical robot ID";
       var protocolId = remote.protocolRobotId();
       if (protocolId == null || Int64.compare(protocolId,

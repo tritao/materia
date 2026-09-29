@@ -28,6 +28,10 @@ fi
 if [[ "${ROBOTKIT_TEST_BULK:-0}" == "1" ]]; then
   server_mode="--server --camera-fixture-stream"
 fi
+if [[ "${ROBOTKIT_TEST_SUBSCRIPTIONS:-0}" == "1" ]]; then
+  server_mode="--server --camera-fixture"
+  client_mode="--subscriptions"
+fi
 setsid "$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
   $server_mode --multi-joint --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
@@ -79,7 +83,8 @@ else
     --port="$port" $client_mode
 fi
 if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" \
-    && "${ROBOTKIT_TEST_LEASE_TIMEOUT:-0}" != "1" && "${ROBOTKIT_TEST_BULK:-0}" != "1" ]]; then
+    && "${ROBOTKIT_TEST_LEASE_TIMEOUT:-0}" != "1" && "${ROBOTKIT_TEST_BULK:-0}" != "1" \
+    && "${ROBOTKIT_TEST_SUBSCRIPTIONS:-0}" != "1" ]]; then
   wait "$server_pid"
   trap - EXIT
 fi

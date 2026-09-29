@@ -1,0 +1,842 @@
+{
+  "declarations": {
+    "BaseTwist": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "vx",
+          "type": "Float"
+        },
+        {
+          "id": 3,
+          "name": "vy",
+          "type": "Float"
+        },
+        {
+          "id": 4,
+          "name": "wz",
+          "type": "Float"
+        },
+        {
+          "id": 5,
+          "name": "expiryNs",
+          "type": "haxe.Int64"
+        }
+      ],
+      "kind": "class"
+    },
+    "BufferRef": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "attachment",
+          "type": "Int"
+        },
+        {
+          "id": 2,
+          "name": "offset",
+          "type": "Int"
+        },
+        {
+          "id": 3,
+          "name": "length",
+          "type": "Int"
+        }
+      ],
+      "kind": "class"
+    },
+    "CameraFrame": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "sensorId",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "kind",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "frameId",
+          "type": "String"
+        },
+        {
+          "id": 5,
+          "name": "sequence",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 6,
+          "name": "sourceTimestampNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 7,
+          "name": "receivedTimestampNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 8,
+          "name": "width",
+          "type": "Int"
+        },
+        {
+          "id": 9,
+          "name": "height",
+          "type": "Int"
+        },
+        {
+          "id": 10,
+          "name": "format",
+          "type": "PixelFormat"
+        },
+        {
+          "id": 11,
+          "name": "pixels",
+          "type": "BufferRef"
+        },
+        {
+          "id": 12,
+          "name": "linkId",
+          "type": "String"
+        },
+        {
+          "id": 13,
+          "name": "mountPosition",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 14,
+          "name": "mountRotation",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 15,
+          "name": "sourceClockId",
+          "type": "String"
+        },
+        {
+          "id": 16,
+          "name": "receivedClockId",
+          "type": "String"
+        }
+      ],
+      "kind": "class"
+    },
+    "ControlHeartbeat": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "leaseId",
+          "type": "haxe.Int64"
+        }
+      ],
+      "kind": "class"
+    },
+    "ControllerStatus": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "controller",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "state",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "active",
+          "type": "Bool"
+        }
+      ],
+      "kind": "class"
+    },
+    "Fault": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "code",
+          "type": "Int"
+        },
+        {
+          "id": 3,
+          "name": "message",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "fatal",
+          "type": "Bool"
+        }
+      ],
+      "kind": "class"
+    },
+    "FrameTarget": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "frame",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "position",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 4,
+          "name": "rotation",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 5,
+          "name": "expiryNs",
+          "type": "haxe.Int64"
+        }
+      ],
+      "kind": "class"
+    },
+    "Hello": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "protocolVersion",
+          "type": "Int"
+        },
+        {
+          "id": 2,
+          "name": "clientName",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "schemaFingerprint",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "requestedRole",
+          "type": "String"
+        },
+        {
+          "id": 5,
+          "name": "subscriptions",
+          "type": "Array<StreamSubscription>"
+        }
+      ],
+      "kind": "class"
+    },
+    "JointTarget": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "joint",
+          "type": "Int"
+        },
+        {
+          "id": 3,
+          "name": "mode",
+          "type": "Int"
+        },
+        {
+          "id": 4,
+          "name": "target",
+          "type": "Float"
+        },
+        {
+          "id": 5,
+          "name": "sequence",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 6,
+          "name": "expiryNs",
+          "type": "haxe.Int64"
+        }
+      ],
+      "kind": "class"
+    },
+    "JointTargetValue": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "joint",
+          "type": "Int"
+        },
+        {
+          "id": 2,
+          "name": "mode",
+          "type": "Int"
+        },
+        {
+          "id": 3,
+          "name": "target",
+          "type": "Float"
+        }
+      ],
+      "kind": "class"
+    },
+    "JointTargets": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "Int64"
+        },
+        {
+          "id": 2,
+          "name": "targets",
+          "type": "Array<JointTargetValue>"
+        },
+        {
+          "id": 3,
+          "name": "sequence",
+          "type": "Int64"
+        },
+        {
+          "id": 4,
+          "name": "expiryNs",
+          "type": "Int64"
+        }
+      ],
+      "kind": "class"
+    },
+    "PathControl": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "action",
+          "type": "Int"
+        }
+      ],
+      "kind": "class"
+    },
+    "PixelFormat": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "RGB8"
+        },
+        {
+          "id": 2,
+          "name": "Depth32F"
+        },
+        {
+          "id": 3,
+          "name": "JPEG"
+        }
+      ],
+      "kind": "enum"
+    },
+    "PlanSegment": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "timeFromStartNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "durationNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 3,
+          "name": "jointCount",
+          "type": "Int"
+        },
+        {
+          "id": 4,
+          "name": "degree",
+          "type": "Int"
+        },
+        {
+          "id": 5,
+          "name": "coefficients",
+          "type": "Array<Float>"
+        }
+      ],
+      "kind": "class"
+    },
+    "PlanSubmission": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "Int64"
+        },
+        {
+          "id": 2,
+          "name": "planId",
+          "type": "Int64"
+        },
+        {
+          "id": 3,
+          "name": "modelRevision",
+          "type": "Int64"
+        },
+        {
+          "id": 4,
+          "name": "calibrationRevision",
+          "type": "Int64"
+        },
+        {
+          "id": 5,
+          "name": "requiredCapabilities",
+          "type": "Int"
+        },
+        {
+          "id": 6,
+          "name": "startPosition",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 7,
+          "name": "startVelocity",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 8,
+          "name": "startAcceleration",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 9,
+          "name": "positionTolerances",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 10,
+          "name": "velocityTolerances",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 11,
+          "name": "accelerationTolerances",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 12,
+          "name": "endsAtRest",
+          "type": "Bool"
+        },
+        {
+          "id": 13,
+          "name": "segments",
+          "type": "Array<PlanSegment>"
+        },
+        {
+          "id": 14,
+          "name": "replaceAfterPlanId",
+          "type": "Int64"
+        },
+        {
+          "id": 15,
+          "name": "replaceAfterTimeNs",
+          "type": "Int64"
+        },
+        {
+          "id": 16,
+          "name": "jerkUnchecked",
+          "type": "Bool"
+        }
+      ],
+      "kind": "class"
+    },
+    "RobotCapabilities": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "jointCount",
+          "type": "Int"
+        },
+        {
+          "id": 3,
+          "name": "supportsPosition",
+          "type": "Bool"
+        },
+        {
+          "id": 4,
+          "name": "supportsVelocity",
+          "type": "Bool"
+        },
+        {
+          "id": 5,
+          "name": "supportsEffort",
+          "type": "Bool"
+        },
+        {
+          "id": 6,
+          "name": "supportsPrediction",
+          "type": "Bool"
+        },
+        {
+          "id": 7,
+          "name": "supportsTrajectoryQueue",
+          "type": "Bool"
+        },
+        {
+          "id": 8,
+          "name": "supportsExecutionPlans",
+          "type": "Bool"
+        }
+      ],
+      "kind": "class"
+    },
+    "RobotDescription": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "links",
+          "type": "Array<String>"
+        },
+        {
+          "id": 4,
+          "name": "joints",
+          "type": "Array<String>"
+        }
+      ],
+      "kind": "class"
+    },
+    "RobotStateMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "sequence",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 3,
+          "name": "sourceTimestampNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 4,
+          "name": "q",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 5,
+          "name": "dq",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 6,
+          "name": "effort",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 7,
+          "name": "mode",
+          "type": "Int"
+        },
+        {
+          "id": 8,
+          "name": "fault",
+          "type": "Int"
+        },
+        {
+          "id": 9,
+          "name": "receivedTimestampNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 10,
+          "name": "safety",
+          "type": "Int"
+        },
+        {
+          "id": 11,
+          "name": "trajectoryQueueDepth",
+          "type": "Int"
+        },
+        {
+          "id": 12,
+          "name": "trajectoryActive",
+          "type": "Bool"
+        },
+        {
+          "id": 13,
+          "name": "trajectoryTimeNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 14,
+          "name": "trajectoryDurationNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 15,
+          "name": "trajectoryTag",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 16,
+          "name": "trajectoryTagTimeNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 17,
+          "name": "sessionState",
+          "type": "Int"
+        },
+        {
+          "id": 18,
+          "name": "activePlanId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 19,
+          "name": "committedUntilNs",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 20,
+          "name": "queueEndTimeNs",
+          "type": "haxe.Int64"
+        }
+      ],
+      "kind": "class"
+    },
+    "SafetyReset": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "reason",
+          "type": "String"
+        }
+      ],
+      "kind": "class"
+    },
+    "SensorFrameMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "Int64"
+        },
+        {
+          "id": 2,
+          "name": "sensorId",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "kind",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "frameId",
+          "type": "String"
+        },
+        {
+          "id": 5,
+          "name": "sequence",
+          "type": "Int64"
+        },
+        {
+          "id": 6,
+          "name": "sourceTimestampNs",
+          "type": "Int64"
+        },
+        {
+          "id": 7,
+          "name": "receivedTimestampNs",
+          "type": "Int64"
+        },
+        {
+          "id": 8,
+          "name": "values",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 9,
+          "name": "linkId",
+          "type": "String"
+        },
+        {
+          "id": 10,
+          "name": "mountPosition",
+          "type": "Array<Float>"
+        },
+        {
+          "id": 11,
+          "name": "mountRotation",
+          "type": "Array<Float>"
+        }
+      ],
+      "kind": "class"
+    },
+    "Stop": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 2,
+          "name": "reason",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "emergency",
+          "type": "Bool"
+        }
+      ],
+      "kind": "class"
+    },
+    "StreamSubscription": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "family",
+          "type": "String"
+        },
+        {
+          "id": 2,
+          "name": "maxRateHz",
+          "type": "Float"
+        }
+      ],
+      "kind": "class"
+    },
+    "Welcome": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "protocolVersion",
+          "type": "Int"
+        },
+        {
+          "id": 2,
+          "name": "serverName",
+          "type": "String"
+        },
+        {
+          "id": 3,
+          "name": "sessionId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 4,
+          "name": "robotId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 5,
+          "name": "controlGranted",
+          "type": "Bool"
+        },
+        {
+          "id": 6,
+          "name": "leaseId",
+          "type": "haxe.Int64"
+        },
+        {
+          "id": 7,
+          "name": "leaseTimeoutMs",
+          "type": "Int"
+        },
+        {
+          "id": 8,
+          "name": "capabilities",
+          "type": "Array<String>"
+        }
+      ],
+      "kind": "class"
+    }
+  },
+  "messageTypes": {
+    "BaseTwist": 8,
+    "CameraFrame": 17,
+    "ControlHeartbeat": 16,
+    "ControllerStatus": 10,
+    "Fault": 11,
+    "FrameTarget": 7,
+    "Hello": 1,
+    "JointTarget": 6,
+    "JointTargets": 14,
+    "PathControl": 18,
+    "PlanSubmission": 9,
+    "RobotCapabilities": 4,
+    "RobotDescription": 3,
+    "RobotState": 5,
+    "SafetyReset": 15,
+    "SensorFrame": 13,
+    "Stop": 12,
+    "Welcome": 2
+  },
+  "version": 1
+}

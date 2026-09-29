@@ -2,13 +2,19 @@ package robotd;
 
 import haxe.Int64;
 import haxe.io.Bytes;
+import nativekit.ffi.NativeKit;
 import nativekit.ffi.NativeKitTypes;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotMessageType;
+import robotkit.protocol.StreamSubscription;
 import robotkit.transport.NativeTransport;
 
 /** The sole outbound RKF1 family classification. New families register here. */
 class OutboundPolicy {
+  public static function capabilities():Array<String> {
+    return [OutboundFamily.Essential, OutboundFamily.Sensor, OutboundFamily.Camera];
+  }
+
   public static function family(messageType:Int):OutboundFamily {
     if (messageType == RobotMessageType.SensorFrame) return OutboundFamily.Sensor;
     if (messageType == RobotMessageType.CameraFrame) return OutboundFamily.Camera;
@@ -36,6 +42,10 @@ class OutboundScheduler {
   final keys:Array<String> = [];
   final lastSequence:Map<String, Int64> = new Map<String, Int64>();
   final drops:Map<String, Int> = new Map<String, Int>();
+  final rates:Map<String, Float> = new Map<String, Float>();
+  final lastOfferNs:Map<String, Int64> = new Map<String, Int64>();
+  final lastSentNs:Map<String, Int64> = new Map<String, Int64>();
+  var legacy:Bool = true;
   var nextKey:Int = 0;
   var lastLogNs:Int64 = Int64.ofInt(0);
 
@@ -50,6 +60,56 @@ class OutboundScheduler {
   public function dropCount(family:OutboundFamily):Int {
     var value = drops.get(family);
     return value == null ? 0 : value;
+  }
+
+  public function configure(subscriptions:Array<StreamSubscription>):Void {
+    rates.clear();
+    lastOfferNs.clear();
+    lastSentNs.clear();
+    legacy = subscriptions == null || subscriptions.length == 0;
+    if (legacy) return;
+    for (item in subscriptions) {
+      if (item == null || (item.family != OutboundFamily.Essential &&
+          item.family != OutboundFamily.Sensor && item.family != OutboundFamily.Camera) ||
+          item.maxRateHz < 0 || !Math.isFinite(item.maxRateHz))
+        throw "invalid RKF1 stream subscription";
+      rates.set(item.family, item.maxRateHz);
+    }
+    // A repeated Hello cannot leave unsubscribed bulk data queued.
+    for (key in keys.copy()) {
+      var slot = slots.get(key);
+      if (slot != null && !subscribed(slot.family)) {
+        slots.remove(key);
+        keys.remove(key);
+      }
+    }
+    nextKey = 0;
+  }
+
+  public function subscribed(family:OutboundFamily):Bool {
+    return family == OutboundFamily.Essential || legacy || rates.exists(family);
+  }
+
+  /** Records each sensor sequence even when filtered, so old frames are not retried. */
+  public function shouldOffer(family:OutboundFamily, sensorId:String, sequence:Int64,
+      nowNs:Int64):Bool {
+    if (!accepts(sensorId, sequence)) return false;
+    if (!subscribed(family)) {
+      lastSequence.set(sensorId, sequence);
+      return false;
+    }
+    var rate = rates.get(family);
+    if (rate != null && rate > 0) {
+      var key = family + ":" + sensorId;
+      var previous = lastOfferNs.get(key);
+      if (!slots.exists(key) && previous != null &&
+          Int64.toFloat(Int64.sub(nowNs, previous)) < 1000000000.0 / rate) {
+        lastSequence.set(sensorId, sequence);
+        return false;
+      }
+      if (previous == null || !slots.exists(key)) lastOfferNs.set(key, nowNs);
+    }
+    return true;
   }
 
   public function accepts(sensorId:String, sequence:Int64):Bool {
@@ -99,6 +159,14 @@ class OutboundScheduler {
       var key = keys[nextKey];
       var slot = slots.get(key);
       if (slot == null) throw "outbound slot index is inconsistent";
+      var rate = rates.get(slot.family);
+      var lastSent = lastSentNs.get(key);
+      var nowNs = NativeKit.nk_time_now_ns();
+      if (rate != null && rate > 0 && lastSent != null &&
+          Int64.toFloat(Int64.sub(nowNs, lastSent)) < 1000000000.0 / rate) {
+        nextKey++;
+        continue;
+      }
       var queue = NativeTransport.sendQueue(transport);
       if (Int64.compare(Int64.add(queue.queuedBytes, Int64.ofInt(slot.bytes.length)),
           Int64.ofInt(budgetBytes)) > 0) {
@@ -111,6 +179,7 @@ class OutboundScheduler {
         continue;
       }
       if (result != Result.Ok) return false;
+      if (rate != null && rate > 0) lastSentNs.set(key, nowNs);
       sent++;
       slots.remove(key);
       keys.splice(nextKey, 1);
