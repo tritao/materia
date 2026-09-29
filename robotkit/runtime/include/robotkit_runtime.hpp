@@ -178,6 +178,13 @@ public:
     rk_result publish_presampled(uint64_t timestamp_ns, const rk_robot_state &sample,
                                 rk_result sample_result = RK_OK);
     void discard_pending_commands() noexcept;
+    /**
+     * Confines a failed tick to this robot: rolls back what the tick had
+     * applied and leaves the robot faulted, which its own state reports. The
+     * shared Simulation calls it so one robot's rejected command or
+     * out-of-limit reading does not fail the tick of every other robot.
+     */
+    void fail_tick() noexcept;
     void reset_state() noexcept;
     void set_externally_driven(bool value) noexcept;
 
