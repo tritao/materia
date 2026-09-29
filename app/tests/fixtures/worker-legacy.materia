@@ -1,0 +1,211 @@
+{
+  "format": "materia.scene",
+  "version": 1,
+  "objects": [
+    {
+      "id": "legacy-rack",
+      "label": "Legacy rack",
+      "type": "rectangle",
+      "x": 0.9,
+      "y": -0.2,
+      "z": 1.01,
+      "width": 0.8,
+      "height": 0.8,
+      "depth": 0.1,
+      "visible": true,
+      "collisionEnabled": true,
+      "dynamicBody": false,
+      "mass": 1.0,
+      "materialId": "neutral"
+    }
+  ],
+  "sensors": {
+    "selectedRobotId": "materia/robot",
+    "robots": [
+      {
+        "robotId": "materia/robot",
+        "name": "Materia robot",
+        "modelVersion": 6,
+        "collisionApproximation": "bounds-box",
+        "pose": {
+          "position": [
+            3,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        "links": [
+          {
+            "centerOfMass": [
+              0,
+              0,
+              0
+            ],
+            "collisionGeometry": null,
+            "collisionShapes": [],
+            "id": "base",
+            "inertiaTensor": [
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "mass": 1,
+            "name": "Base",
+            "visualGeometry": null
+          },
+          {
+            "centerOfMass": [
+              0,
+              0,
+              0
+            ],
+            "collisionGeometry": null,
+            "collisionShapes": [
+              {
+                "kind": "sphere",
+                "size": [
+                  0.12
+                ],
+                "position": [
+                  0.45,
+                  0,
+                  0
+                ],
+                "rotation": [
+                  0,
+                  0,
+                  0,
+                  1
+                ],
+                "surface": null,
+                "contact": "layers"
+              }
+            ],
+            "id": "worker-demo-arm",
+            "inertiaTensor": [
+              1,
+              0,
+              0,
+              0,
+              1,
+              0,
+              0,
+              0,
+              1
+            ],
+            "mass": 1,
+            "name": "Demo arm",
+            "visualGeometry": null
+          }
+        ],
+        "joints": [
+          {
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "childFramePosition": [
+              0,
+              0,
+              0
+            ],
+            "childFrameRotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "childId": "worker-demo-arm",
+            "id": "worker-demo-pivot",
+            "limits": {
+              "effort": 5,
+              "lower": -0.8,
+              "upper": 0.8,
+              "velocity": 2
+            },
+            "name": "Arm pivot",
+            "parentFramePosition": [
+              0,
+              0,
+              1.3
+            ],
+            "parentFrameRotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "parentId": "base",
+            "type": "revolute"
+          }
+        ],
+        "frames": [
+          {
+            "id": "base/sensors",
+            "linkId": "base",
+            "name": "Base sensor mount",
+            "position": [
+              0,
+              0,
+              0
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ]
+          }
+        ],
+        "mobileBase": null,
+        "forkMechanism": null,
+        "sensors": [
+          {
+            "fieldOfViewRadians": 6.283185307179586,
+            "frameId": "base/sensors",
+            "id": "sensor/1",
+            "kind": "lidar",
+            "maxRange": 10,
+            "name": "lidar 1",
+            "noiseSeed": 1,
+            "noiseStddev": 0,
+            "rayCount": 8,
+            "startAngleRadians": 0,
+            "updateRate": 0
+          }
+        ]
+      }
+    ],
+    "humans": [
+      {
+        "id": "legacy-worker",
+        "assetPath": "animkit/assets/quaternius/worker.glb",
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "jobName": "rack-to-table"
+      }
+    ]
+  }
+}

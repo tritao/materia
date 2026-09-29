@@ -30,6 +30,8 @@ class HumanWalker {
 	var y:Float = 0.0;
 	var heading:Float = 0.0;
 	var facing:Null<Float> = null;
+	var preserveHeading:Bool = false;
+	var retreating:Bool = false;
 
 	/** Measures the walk clip's gait and starts the character idling at the origin. */
 	public function new(character:HumanCharacter, walkClip:String = "walk", idleClip:String = "idle") {
@@ -67,6 +69,8 @@ class HumanWalker {
 		heading = tangentAt(0.0);
 		walking = true;
 		facing = null;
+		preserveHeading = false;
+		retreating = false;
 		character.player.play(gait.clip, FADE_SECONDS);
 	}
 
@@ -79,6 +83,14 @@ class HumanWalker {
 		var current = heading;
 		follow(route, metresPerSecond);
 		heading = current;
+	}
+
+	/** Moves along a retreat route without turning toward it. */
+	public function retreatAlong(route:Array<Array<Float>>, metresPerSecond:Float):Void {
+		continueAlong(route, metresPerSecond);
+		preserveHeading = true;
+		retreating = true;
+		character.player.play(idleClip, FADE_SECONDS);
 	}
 
 	/** Sets the starting floor pose before a job begins. */
@@ -134,10 +146,12 @@ class HumanWalker {
 			var point = pointAt(travelled);
 			x = point[0];
 			y = point[1];
-			var target = tangentAt(travelled);
-			var turn = wrap(target - heading);
-			var limit = turnRate * seconds;
-			heading = wrap(heading + Math.max(-limit, Math.min(limit, turn)));
+			if (!preserveHeading) {
+				var target = tangentAt(travelled);
+				var turn = wrap(target - heading);
+				var limit = turnRate * seconds;
+				heading = wrap(heading + Math.max(-limit, Math.min(limit, turn)));
+			}
 		} else if (facing != null) {
 			var target = facing;
 			var turn = wrap(target - heading);
@@ -148,7 +162,7 @@ class HumanWalker {
 			} else
 				heading = wrap(heading + (turn > 0.0 ? limit : -limit));
 		}
-		character.player.speed = walking ? velocity / gait.naturalSpeed : 1.0;
+		character.player.speed = walking && !retreating ? velocity / gait.naturalSpeed : 1.0;
 		character.advance(seconds);
 	}
 

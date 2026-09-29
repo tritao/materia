@@ -62,6 +62,8 @@ import app.editor.SceneReconciler;
 import app.editor.SketchEditController;
 import app.editor.SceneModel.SceneRecordChange;
 import app.editor.ObjectKindRegistry;
+import app.editor.WorkerVisual;
+import app.editor.HumanWorkerKind;
 import haxe.io.Path as FilePath;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
@@ -86,6 +88,8 @@ class EditorScene {
   function set_bridge(value:SceneBridge):SceneBridge return presentation.bridge = value;
   var scene(get, never):Scene;
   final model:SceneModel;
+  final workerVisuals:Map<String, WorkerVisual> = new Map();
+  final failedWorkerVisualAssets:Map<String, String> = new Map();
   var objects(get, set):Array<EditorSceneObject>;
   function get_objects():Array<EditorSceneObject> return model.objects;
   function set_objects(value:Array<EditorSceneObject>):Array<EditorSceneObject> return model.objects = value;
@@ -226,6 +230,7 @@ class EditorScene {
         addObject("tower", "Orange tower", 1.1, 0.0, 0.1, 1.2, 1.8, 0.2, 0.92, 0.48, 0.22);
       } else {
         addObjects(data);
+        syncWorkerVisuals();
         selection.selectedId = data.length == 0 ? "scene" : data[0].id;
         var savedDraft:Null<SceneObjectData> = null;
         for (item in data) if (item.sketchDraft != null) {
@@ -374,11 +379,12 @@ class EditorScene {
       }
       if (geometryIndex == null) throw 'No geometry resource was prepared for "${item.id}"';
       geometryIndexes.push(geometryIndex);
-      materialData.push(ScenePresentation.materialFor(item.red, item.green, item.blue, item.appearance));
+      materialData.push(ScenePresentation.materialFor(item.red, item.green, item.blue, item.appearance, item.type));
       candidates.push(new EditorSceneObject(item.id, item.label, item.type,
         item.width, item.height, item.depth, item.collisionEnabled, item.dynamicBody,
         item.mass, item.red, item.green, item.blue, storedCadGraph,
         item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId));
+      candidates[candidates.length - 1].worker = item.worker;
     }
     profileLoadEnd("geometryData", preparationStarted);
 
@@ -436,6 +442,44 @@ class EditorScene {
 
   public function createStockSimulation():Bool
     return model.createDefault(this, StockSimulationSession.KIND, "stock", "Create stock simulation");
+
+  public function createWorker():Bool
+    return model.createDefault(this, "human-worker", "worker", "Create worker");
+
+  /** Replaces the authored worker payload in one undoable scene edit. */
+  public function setWorkerData(id:String, worker:WorkerObjectData):Bool {
+    var item = requiredObject(id);
+    if (item.kind != "human-worker") throw 'Scene object "$id" is not a worker';
+    var before = records();
+    var after = records();
+    var previousWorker = item.worker;
+    var bounds:Null<Array<Float>> = previousWorker == null || previousWorker.asset != worker.asset
+      ? HumanWorkerKind.boundsFor(worker.asset) : null;
+    for (record in after) if (record.id == id) {
+      record.worker = worker;
+      if (bounds != null) {
+        record.width = bounds[3] - bounds[0];
+        record.height = bounds[4] - bounds[1];
+        record.depth = bounds[5] - bounds[2];
+      }
+    }
+    return document.apply(new EditOperation("Edit worker", function() replaceObjects(after, id),
+      function() replaceObjects(before, id), null, null, null,
+      384 + worker.job.length * 2 + worker.asset.length * 2));
+  }
+
+  /** Sets an authored worker's only editable rotation, about the floor normal. */
+  public function setWorkerYaw(id:String, yaw:Float):Bool {
+    if (!Math.isFinite(yaw)) throw "Worker yaw must be finite";
+    var item = requiredObject(id);
+    if (item.kind != "human-worker") throw 'Scene object "$id" is not a worker';
+    var before = records();
+    var after = records();
+    var rotation = [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)];
+    for (record in after) if (record.id == id) { record.rotation = rotation; record.z = 0.0; }
+    return document.apply(new EditOperation("Rotate worker", function() replaceObjects(after, id),
+      function() replaceObjects(before, id), null, null, null, 256));
+  }
 
   public function createCadPart():Bool
     return model.createDefault(this, "cad-part", "part", "Create CAD part");
@@ -1718,7 +1762,7 @@ class EditorScene {
     var changes:Null<ChangeSet> = null;
     try {
       material = scene.createMaterial();
-      scene.setMaterialData(material, ScenePresentation.materialFor(red, green, blue, finish));
+      scene.setMaterialData(material, ScenePresentation.materialFor(red, green, blue, finish, item.kind));
       transaction.setMaterial(runtime.node, material);
       failIfInjected("prepare.existing-material");
       changes = transaction.commitWithChanges();
@@ -1744,6 +1788,57 @@ class EditorScene {
       environmentRevision = nextEnvironmentRevision;
     }
     rebuildPresentation(updatedNodes);
+  }
+
+  public function hasWorkerVisual(id:String):Bool return workerVisuals.exists(id);
+
+  public function setWorkerVisualsVisible(visible:Bool):Void {
+    if (workerVisuals.iterator().hasNext() == false) return;
+    var transaction = scene.beginTransaction();
+    for (visual in workerVisuals) transaction.setVisibility(visual.character.root, visible);
+    transaction.commit();
+    publishRuntimeNodes([]);
+  }
+
+  /** Keeps each worker's idle mesh attached to its authored scene node. */
+  public function syncWorkerVisuals():Void {
+    var active:Map<String, Bool> = new Map();
+    for (item in objects) {
+      var worker = item.worker;
+      if (item.kind != "human-worker" || worker == null) continue;
+      active.set(item.id, true);
+      var existing = workerVisuals.get(item.id);
+      if (failedWorkerVisualAssets.get(item.id) == worker.asset) continue;
+      failedWorkerVisualAssets.remove(item.id);
+      if (existing != null && existing.assetPath == worker.asset) {
+        for (node in existing.nodes()) bridge.mapNode(node, item.id);
+        continue;
+      }
+      if (existing != null) {
+        for (node in existing.nodes()) bridge.unmapNode(node);
+        existing.dispose(scene, true);
+        workerVisuals.remove(item.id);
+      }
+      try {
+        var visual = new WorkerVisual(scene, runtimeFor(item.id).node, worker.asset);
+        workerVisuals.set(item.id, visual);
+        for (node in visual.nodes()) bridge.mapNode(node, item.id);
+      } catch (error:Dynamic) {
+        // A missing asset leaves the authored worker and its selection proxy editable.
+        failedWorkerVisualAssets.set(item.id, worker.asset);
+        Sys.println('materia: worker ${item.id} preview failed: $error');
+      }
+    }
+    for (id in workerVisuals.keys()) if (!active.exists(id)) {
+      var old = workerVisuals.get(id);
+      if (old != null) {
+        for (node in old.nodes()) bridge.unmapNode(node);
+        old.dispose(scene, false);
+      }
+      workerVisuals.remove(id);
+      failedWorkerVisualAssets.remove(id);
+    }
+    for (id in failedWorkerVisualAssets.keys()) if (!active.exists(id)) failedWorkerVisualAssets.remove(id);
   }
 
   /** The SceneKit scene, for runtime-only content that is not part of the document. */
@@ -2203,6 +2298,8 @@ class EditorScene {
   public function dispose():Void {
     if (disposed) return;
     disposed = true;
+    for (visual in workerVisuals) visual.dispose(scene, false);
+    workerVisuals.clear();
     for (session in stockSimulations) session.dispose();
     stockSimulations.clear();
     if (pendingRenderChanges != null) pendingRenderChanges.dispose();
@@ -2274,6 +2371,7 @@ class EditorSceneObject {
   public var materialId:Null<String>;
   public var cadGraph:Null<String>;
   public var meshSnapshot:Null<String>;
+  public var worker:Null<WorkerObjectData>;
   public var rotation:Null<Array<Float>>;
   public var x:Float;
   public var y:Float;
@@ -2302,6 +2400,9 @@ class SceneBridge {
   var nodeEntries:Map<String, String> = new Map();
 
   public function new() scene = Scene.create();
+
+  public function mapNode(node:NodeId, id:String):Void nodeEntries.set(nodeKey(node), id);
+  public function unmapNode(node:NodeId):Void nodeEntries.remove(nodeKey(node));
 
   public function attach(id:String,node:NodeId,geometry:Geometry,material:Material):Void {
     objects.set(id,new EditorSceneRuntimeObject(node,geometry,material));

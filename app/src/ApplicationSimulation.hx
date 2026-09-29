@@ -2,12 +2,18 @@ package app;
 
 import haxe.Int64;
 import animkit.AnimationAsset;
-import app.editor.WorkerDemoJob;
+import app.editor.WorkerSceneTargets;
+import app.editor.WorkerAssetPath;
+import app.editor.RobotLinkBounds;
 import humankit.HumanBodyProxy;
+import humankit.HumanJob;
+import humankit.HumanJobSpec;
+import humankit.Wait;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanoidRig;
 import humankit.sim.HumanWorker;
+import humankit.sim.HumanZone;
 import humankit.sim.HumanWorkerSignals;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
@@ -17,6 +23,8 @@ import RobotKitRuntime;
 import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.world.Robot;
 import robotkit.world.RobotWorld;
+import robotkit.world.RobotCommand;
+import robotkit.world.JointTarget;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.WorldSnapshot;
 import robotkit.world.SensorFrame;
@@ -62,10 +70,11 @@ class ApplicationSimulation {
   var simulatedIds:Array<String> = [];
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
-  var humanWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter}> = [];
+  var robotMotions:Array<RobotMotionTrack> = [];
+  var humanWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter,asset:AnimationAsset}> = [];
   var humanSignalsById:Map<String, HumanWorkerSignals> = new Map();
+  var workerWarningsById:Map<String, Array<String>> = new Map();
   var humanScene:Null<EditorScene> = null;
-  var demoRobot:Bool = false;
   var assemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
   var running:Bool = false;
   var presentAssemblyPhysics:Bool = false;
@@ -118,16 +127,18 @@ class ApplicationSimulation {
     var candidate:Null<Simulation> = null;
     var candidateRobots:Array<SimulatedRobot> = [];
     var candidateLinks:Array<Array<String>> = [];
+    var candidateRobotModels:Array<robotkit.model.RobotModel> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
-    var candidateWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter}> = [];
-    var candidateDemoRobot:Bool = false;
+    var candidateWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter,asset:AnimationAsset}> = [];
     var candidateAssemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
     var candidateWarnings:Array<String> = [];
+    var candidateWorkerWarnings:Map<String, Array<String>> = new Map();
     try {
       var models = configuration.robotModels();
+      var workerRecords = [for (record in scene.records()) if (record.type == "human-worker") record];
       var assembly = session == null ? null : session.projectAssemblyDefinition;
       if (models.length == 0 && assembly == null && participants.length == 0 &&
-          configuration.humans().length == 0) throw "Nothing to simulate";
+          workerRecords.length == 0) throw "Nothing to simulate";
       for (configured in models) {
         var id=configured.id;
         var existing = world.robot(id);
@@ -145,7 +156,9 @@ class ApplicationSimulation {
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
         candidateLinks.push([for (link in editable.model.links) link.id]);
+        candidateRobotModels.push(editable.model);
       }
+      var candidateMotions = session == null ? [] : session.robotMotions;
       if (assembly != null) {
         var physical = session == null ? null : session.projectPhysical;
         if (physical == null) throw "Assembly physical properties are unavailable";
@@ -227,6 +240,7 @@ class ApplicationSimulation {
           [for (link in converted.model.links) link.id],
           [for (joint in converted.model.joints) joint.id]));
         candidateLinks.push([for (link in converted.model.links) link.id]);
+        candidateRobotModels.push(converted.model);
         var robotIndex = candidateRobots.length - 1;
         for (occurrence in assembly.occurrences) {
           var center = session == null ? null : session.assemblyPreviewCenter(occurrence.definition);
@@ -239,6 +253,19 @@ class ApplicationSimulation {
             linkIndex: linkIndex, center: [for (coordinate in center) coordinate *
               physical.metresPerUnit]});
         }
+      }
+      for (track in candidateMotions) {
+        var index = -1;
+        for (i in 0...candidateRobots.length)
+          if (candidateRobots[i].id() == track.robotId) { index = i; break; }
+        if (index < 0) throw 'Robot motion names unknown robot "${track.robotId}"';
+        var joints = candidateRobotModels[index].joints;
+        if (track.joint >= joints.length)
+          throw 'Robot motion joint ${track.joint} is missing from "${track.robotId}"';
+        var limits = joints[track.joint].limits;
+        if (limits.lower < limits.upper) for (key in track.keys)
+          if (key.position < limits.lower || key.position > limits.upper)
+            throw 'Robot motion exceeds joint ${track.joint} limits';
       }
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
@@ -263,26 +290,64 @@ class ApplicationSimulation {
         candidateObjects.push({id:object.id,object:created});
       }
 
-      for (configured in configuration.humans()) {
-        var asset = AnimationAsset.load(configured.assetPath);
-        var rig = HumanoidRig.detect(asset);
-        var character = new HumanCharacter(scene.runtimeContentScene(), asset, rig, null, configured.id);
-        // Register immediately: a missing clip can throw during worker construction.
-        candidateWorkers.push({id:configured.id,worker:null,character:character});
+      var objectsById:Map<String, SimObject> = new Map();
+      for (entry in candidateObjects) objectsById.set(entry.id, entry.object);
+      var targets = new WorkerSceneTargets(environmentRecords, scene);
+      for (record in workerRecords) {
+        var data = record.worker;
+        if (data == null) throw 'Worker "${record.id}" has no worker data';
+        var asset = AnimationAsset.load(WorkerAssetPath.resolve(data.asset));
+        var character:HumanCharacter;
+        try {
+          var rig = HumanoidRig.detect(asset);
+          character = new HumanCharacter(scene.runtimeContentScene(), asset, rig, null, record.id);
+        } catch (error:Dynamic) {
+          asset.dispose();
+          throw error;
+        }
+        // Register before construction so a failure removes this candidate's scene nodes.
+        candidateWorkers.push({id:record.id,worker:null,character:character,asset:asset});
         character.advance(0.0);
         var proxy = HumanBodyProxy.standard(character.pose,
           HumanDescription.measure(character.pose, character.height()));
-        var worker = new HumanWorker(createdSpace.session, character, proxy, configured.startPose());
+        var rotation = record.rotation == null ? [0.0,0.0,0.0,1.0] : record.rotation;
+        var worker = new HumanWorker(createdSpace.session, character, proxy,
+          new SimPose(record.x,record.y,0.0,rotation[0],rotation[1],rotation[2],rotation[3]));
         candidateWorkers[candidateWorkers.length - 1].worker = worker;
-        if (configured.jobName == "rack-to-table") {
-          var robotIndex = -1;
-          for (index in 0...candidateRobots.length)
-            if (candidateRobots[index].id() == WorkerDemoJob.ROBOT_ID) robotIndex = index;
-          var robotModel = robotIndex < 0 ? null : models[robotIndex].model;
-          WorkerDemoJob.configure(worker, candidateObjects, candidate, robotIndex, robotModel);
-          candidateDemoRobot = true;
-        } else if (configured.jobName != null) throw 'Unknown human job "${configured.jobName}"';
-        var humanId = configured.id;
+        for (zoneId in data.zones) {
+          var box = targets.box(zoneId);
+          if (box == null) {
+            var warning = 'Missing zone "$zoneId"';
+            candidateWarnings.push('Worker "${record.id}": $warning');
+            var perWorker = candidateWorkerWarnings.get(record.id);
+            if (perWorker == null) { perWorker = []; candidateWorkerWarnings.set(record.id, perWorker); }
+            perWorker.push(warning);
+            continue;
+          }
+          var c=Math.cos(box.yaw), t=Math.sin(box.yaw);
+          var polygon:Array<Array<Float>> = [];
+          for (corner in [[-1.0,-1.0],[1.0,-1.0],[1.0,1.0],[-1.0,1.0]]) {
+            var x=corner[0]*box.halfExtents[0], y=corner[1]*box.halfExtents[1];
+            polygon.push([box.center[0]+c*x-t*y,box.center[1]+t*x+c*y]);
+          }
+          worker.addZone(new HumanZone(zoneId,polygon));
+        }
+        for (robotIndex in 0...candidateRobotModels.length)
+          for (bound in RobotLinkBounds.shapes(candidateRobotModels[robotIndex])) {
+            var linkIndex=bound.link, offset=bound.offset, radius=bound.radius;
+            var robotId=candidateRobots[robotIndex].id();
+            worker.addRobotLinkPose(robotId,function() {
+              var link=candidate.linkPose(robotIndex,linkIndex);
+              return RobotLinkBounds.worldCenter(link.position,link.rotation,offset);
+            },radius);
+          }
+        try worker.runSpec(HumanJobSpec.parse(data.job),targets,objectsById)
+        catch (failure:Dynamic) {
+          var failed = new HumanJob().add(new Wait(1.0));
+          worker.run(failed);
+          failed.abort('Invalid worker job: $failure');
+        }
+        var humanId = record.id;
         worker.onTick = function(_, signals) humanSignalsById.set(humanId, signals);
       }
 
@@ -313,10 +378,11 @@ class ApplicationSimulation {
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
+      robotMotions = candidateMotions.copy();
       humanWorkers = candidateWorkers;
+      workerWarningsById = candidateWorkerWarnings;
       humanSignalsById.clear();
       humanScene = scene;
-      demoRobot = candidateDemoRobot;
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
@@ -328,6 +394,7 @@ class ApplicationSimulation {
       collisionWarnings = candidateWarnings;
       presentAssemblyPhysics = running;
       presentationEpoch++;
+      scene.setWorkerVisualsVisible(false);
       disposeHumanWorkers(previousWorkers, previousHumanScene);
       releaseSpace(previousSpace, previousSimulation);
       for (robot in previousRobots) robot.close();
@@ -349,7 +416,7 @@ class ApplicationSimulation {
   }
 
   static function disposeHumanWorkers(entries:Array<{id:String,worker:HumanWorker,
-      character:HumanCharacter}>, scene:Null<EditorScene>):Void {
+      character:HumanCharacter,asset:AnimationAsset}>, scene:Null<EditorScene>):Void {
     if (entries.length == 0) return;
     for (entry in entries) if (entry.worker != null) entry.worker.dispose();
     if (scene != null) {
@@ -362,7 +429,7 @@ class ApplicationSimulation {
       transaction.commit();
       scene.publishRuntimeNodes([]);
     }
-    for (entry in entries) entry.character.dispose();
+    for (entry in entries) { entry.character.dispose(); entry.asset.dispose(); }
   }
 
   static function rotateOffset(x:Float, y:Float, z:Float, rotation:Null<Array<Float>>):Array<Float> {
@@ -405,16 +472,30 @@ class ApplicationSimulation {
   }
   public function humanSignals(id:String):Null<HumanWorkerSignals>
     return humanSignalsById.get(id);
+  public function humanWarnings(id:String):Array<String> {
+    var warnings = workerWarningsById.get(id);
+    return warnings == null ? [] : warnings.copy();
+  }
+  public function humanWorkerIds():Array<String> return [for (entry in humanWorkers) entry.id];
 
   /** Feed worker keyframes from simulation time, also during realtime sessions. */
   public function advanceWorkers():Void {
     var scene = humanScene;
-    var activeSpace = space;
-    if (scene == null) return;
-    if (demoRobot && activeSpace != null) {
-      var robot = world.robot(WorkerDemoJob.ROBOT_ID);
-      if (robot != null) WorkerDemoJob.cycle(robot, activeSpace.session.simulationTime());
+    var active = space;
+    if (active != null) {
+      var commands = new Map<String, Array<JointTarget>>();
+      for (track in robotMotions) {
+        var targets = commands.get(track.robotId);
+        if (targets == null) { targets = []; commands.set(track.robotId, targets); }
+        targets.push(JointTarget.position(track.joint,
+          track.sample(active.session.simulationTime())));
+      }
+      for (id in commands.keys()) {
+        var robot = world.robot(id);
+        if (robot != null) robot.submit(RobotCommand.JointTargets(commands.get(id), null));
+      }
     }
+    if (scene == null) return;
     for (entry in humanWorkers) {
       entry.worker.advance();
       var matrix = entry.worker.body.rootTransform();
@@ -430,6 +511,10 @@ class ApplicationSimulation {
   public function isActive():Bool return simulation!=null;
   /** The live session, for people and other participants that join it. */
   public function activeSession():Null<SimSession> { var active = space; return active == null ? null : active.session; }
+  public function environmentObject(id:String):Null<SimObject> {
+    for (item in simulatedObjects) if (item.id == id) return item.object;
+    return null;
+  }
   public function simulatedRobotIds():Array<String> return simulatedIds.copy();
   /** Captures physics poses once, then combines the matching frame's world publications. */
   public function capturePresentationSnapshot():ApplicationPresentationSnapshot {
@@ -504,10 +589,12 @@ class ApplicationSimulation {
     stop();
     for (participant in participants) participant.leave();
     disposeHumanWorkers(humanWorkers, humanScene);
-    humanWorkers.resize(0); humanSignalsById.clear(); humanScene = null; demoRobot = false;
+    if (humanScene != null) humanScene.setWorkerVisualsVisible(true);
+    humanWorkers.resize(0); humanSignalsById.clear(); workerWarningsById.clear(); humanScene = null;
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
+    robotMotions = [];
     assemblyParts.resize(0);
     collisionWarnings = [];
     presentAssemblyPhysics = false;

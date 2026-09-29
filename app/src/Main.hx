@@ -185,7 +185,7 @@ class Main {
           worker.currentJobDone(), jobFailure:worker == null ? "missing worker" : worker.currentJobFailure(),
           part:part.length == 0 ? null : part[0].position,
           zones:signals == null ? [] : signals.zones,
-          separation:signals == null ? null : signals.separation.get("demo-arm")}));
+          separation:signals == null ? null : signals.separation.get(editor.sensors.robotId)}));
         editor.dispose();
         return 0;
       }
@@ -700,6 +700,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       addSection("Primitive", ObjectKindRegistry.addMenuCommands("Primitive"));
       addSection("CAD", ObjectKindRegistry.addMenuCommands("CAD"));
       addSection("Machining", ObjectKindRegistry.addMenuCommands("Machining"));
+      addSection("People", ObjectKindRegistry.addMenuCommands("People"));
       addSection("Feature", ["scene.create-sketch", "scene.create-face-sketch",
         "scene.create-extrusion", "scene.add-face-hole", "scene.create-pocket",
         "scene.create-vertical-fillet"]);
@@ -898,43 +899,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (hostContext != null) hostContext.requestFrame();
   }
 
-  /** Built-in rack, part, table, and cycling arm for the worker acceptance demo. */
+  /** Opens the saved rack-to-table worker example and starts its simulation. */
   public function enableWorkerDemo(advanceTicks:Int = 0, realtime:Bool = false):Void {
     if (advanceTicks < 0) throw "Worker demo ticks must be non-negative";
-    var objects:Array<SceneObjectData> = [
-      {id:"worker-demo-floor",label:"Factory floor",type:"rectangle",x:2.0,y:1.2,z:-0.1,
-        width:8.0,height:5.0,depth:0.2,collisionEnabled:true,dynamicBody:false,mass:1.0,
-        red:0.38,green:0.42,blue:0.46,visible:true},
-      {id:"worker-demo-rack",label:"Rack B3",type:"rectangle",x:3.65,y:-0.2,z:0.98,
-        width:0.8,height:0.8,depth:0.16,collisionEnabled:true,dynamicBody:false,mass:1.0,
-        red:0.55,green:0.38,blue:0.2,visible:true},
-      {id:"worker-demo-table",label:"Assembly table",type:"rectangle",x:3.65,y:2.5,z:0.98,
-        width:0.8,height:0.8,depth:0.16,collisionEnabled:true,dynamicBody:false,mass:1.0,
-        red:0.2,green:0.45,blue:0.65,visible:true},
-      {id:"worker-demo-part",label:"Part",type:"rectangle",x:3.65,y:-0.2,z:1.10,
-        width:0.08,height:0.08,depth:0.08,collisionEnabled:true,dynamicBody:true,mass:0.1,
-        red:0.95,green:0.65,blue:0.12,visible:true}
-    ];
-    scene.reconcileRecords(objects);
-    var base = sensors.model.links[0];
-    var arm = sensors.model.addLink(new robotkit.model.Link("Demo arm", "worker-demo-arm"));
-    arm.collisionShapes.push(new robotkit.model.CollisionShape(
-      robotkit.model.CollisionShape.CollisionPrimitive.Sphere(0.12), [0.45, 0.0, 0.0]));
-    var joint = new robotkit.model.Joint("Arm pivot", robotkit.model.JointType.Revolute,
-      base, arm, "worker-demo-pivot");
-    joint.parentFramePosition = [0.0, 0.0, 1.3];
-    joint.limits.lower = -0.8; joint.limits.upper = 0.8;
-    joint.limits.velocity = 2.0; joint.limits.effort = 5.0;
-    sensors.model.addJoint(joint);
-    sensors.setRobotPose(sensors.robotId, [3.8, 1.2, 0.0], [0.0, 0.0, 0.0, 1.0]);
-    var workerAsset = "animkit/assets/quaternius/worker.glb";
-    for (prefix in ["", "../", "../../"])
-      if (sys.FileSystem.exists(prefix + "animkit/assets/quaternius/worker.glb")) {
-        workerAsset = prefix + "animkit/assets/quaternius/worker.glb";
-        break;
-      }
-    sensors.addHuman(new HumanConfiguration("worker-demo", workerAsset,
-      [0, 0, 0], [0, 0, 0, 1], "rack-to-table"));
+    var path = app.editor.WorkerAssetPath.resolve("app/examples/worker-rack-to-table.materia");
+    session.openExample(path);
+    documentChanged();
+    for (record in scene.records()) if (record.type == "human-worker") {
+      scene.select(record.id);
+      break;
+    }
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     if (!simulation.rebuild(sensors, scene, session))
       throw 'Worker demo simulation failed: ${simulation.error}';
@@ -1209,7 +1183,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
       new DockPanelContent("console", function(_) return consolePanel()),
-      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation))
+      new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, simulation))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());

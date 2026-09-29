@@ -62,6 +62,7 @@ class ProjectDocumentSession {
     return value == null ? null : value.copy();
   }
   public var customMaterials(default, null):Array<MaterialDef> = [];
+  public var robotMotions(default, null):Array<RobotMotionTrack> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
@@ -105,6 +106,13 @@ class ProjectDocumentSession {
     openContent(absolute, text);
   }
 
+  /** Open a bundled example as an untitled document so Save requests a new path. */
+  public function openExample(file:String):Void {
+    var absolute = checkedPath(file);
+    openContent(absolute, File.getContent(absolute));
+    path = null;
+  }
+
   /** Transfer an unsaved document across a development module reload. */
   public function liveState():String {
     var destination = path != null ? path : projectReference != null
@@ -115,7 +123,7 @@ class ProjectDocumentSession {
         scriptOwnership == null ? null : scriptOwnership.record(), bim,
         project == null ? null : project.record,
         project == null ? null : project.authored, customMaterials,
-        recipeDocument == null ? null : DocumentCodec.encode(recipeDocument)),
+        recipeDocument == null ? null : DocumentCodec.encode(recipeDocument), robotMotions),
       dirty: isDirty()});
   }
 
@@ -131,11 +139,13 @@ class ProjectDocumentSession {
 
   function openContent(absolute:String, text:String):Void {
     var root = SceneCodec.parse(text);
+    var loadedMotions = RobotMotionTrack.decode(Reflect.field(root, "robotMotions"));
     var loadedMaterials = SceneCodec.decodeCustomMaterialsRoot(root);
     var project = SceneCodec.decodeProjectRoot(root);
     if (project != null) {
       openProjectDocument(absolute, root, project, loadedMaterials);
       customMaterials = loadedMaterials;
+      robotMotions = loadedMotions;
       return;
     }
     var script=SceneCodec.decodeScriptRoot(root);
@@ -154,9 +164,11 @@ class ProjectDocumentSession {
       }
       replace(materialized.scene,materialized.sensors,absolute,ownership,nextBim,nextDocument);
       customMaterials = loadedMaterials;
+      robotMotions = loadedMotions;
       return;
     }
     var data = SceneCodec.decodeRoot(root);
+    migrateLegacyHumans(data, SceneCodec.decodeSensorsRoot(root));
     var nextDocument = createDocument();
     var next = new EditorScene(data, nextDocument);
     var nextSensors:SensorConfiguration = null;
@@ -168,6 +180,7 @@ class ProjectDocumentSession {
     catch (error:Dynamic) { next.dispose(); if (nextSensors != null) nextSensors.dispose(); throw error; }
     replace(next, nextSensors, absolute, null, nextBim, nextDocument);
     customMaterials = loadedMaterials;
+    robotMotions = loadedMotions;
   }
 
   public function openScript(reference:String):ScriptMaterialization {
@@ -255,6 +268,7 @@ class ProjectDocumentSession {
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
     var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics, materials);
+    migrateLegacyHumans(data, SceneCodec.decodeSensorsRoot(root));
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
@@ -503,6 +517,46 @@ class ProjectDocumentSession {
       timestep: materialized.timestep};
   }
 
+  /** Convert M4 sensor humans on load; the sensor writer emits only robot data. */
+  static function migrateLegacyHumans(data:Array<SceneObjectData>, sensors:Dynamic):Void {
+    if (sensors == null || !Reflect.hasField(sensors, "humans")) return;
+    var raw:Dynamic = Reflect.field(sensors, "humans");
+    if (!Std.isOfType(raw, Array)) throw "Legacy humans must be an array";
+    for (entry in (cast raw:Array<Dynamic>)) {
+      var id:Dynamic = Reflect.field(entry, "id");
+      var asset:Dynamic = Reflect.field(entry, "assetPath");
+      var position:Dynamic = Reflect.field(entry, "position");
+      var rotation:Dynamic = Reflect.field(entry, "rotation");
+      if (!Std.isOfType(id, String) || id == "" || !Std.isOfType(asset, String) || asset == "" ||
+          !Std.isOfType(position, Array) || !Std.isOfType(rotation, Array))
+        throw "Legacy human needs an ID, asset, and pose";
+      var p:Array<Float> = cast position, q:Array<Float> = cast rotation;
+      if (p.length != 3 || q.length != 4) throw "Legacy human pose has wrong dimensions";
+      for (value in p.concat(q)) if (!Math.isFinite(value)) throw "Legacy human pose must be finite";
+      var uniqueId:String = id;
+      var suffix = 2;
+      while (Lambda.exists(data, function(object) return object.id == uniqueId)) {
+        uniqueId = id + "-worker-" + suffix;
+        suffix++;
+      }
+      var oldName:Dynamic = Reflect.field(entry, "jobName");
+      var note = oldName == null ? null : 'Legacy job "$oldName" requires authoring as document steps';
+      if (uniqueId != id) note = (note == null ? "" : note + "; ") +
+        'Legacy ID "$id" renamed to "$uniqueId" because a scene object already uses it';
+      var bounds:Array<Float>;
+      try bounds = app.editor.HumanWorkerKind.boundsFor(asset)
+      catch (_:Dynamic) bounds = app.editor.HumanWorkerKind.boundsFor(app.editor.HumanWorkerKind.DEFAULT_ASSET);
+      var yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]),
+        1 - 2 * (q[1] * q[1] + q[2] * q[2]));
+      data.push({id:uniqueId, label:id, type:"human-worker", x:p[0], y:p[1], z:0.0,
+        width:bounds[3]-bounds[0], height:bounds[4]-bounds[1], depth:bounds[5]-bounds[2], collisionEnabled:false, dynamicBody:false,
+        mass:1.0, red:0.7, green:0.7, blue:0.7, visible:true,
+        rotation:[0.0, 0.0, Math.sin(yaw / 2), Math.cos(yaw / 2)],
+        worker:{asset:asset, job:'{"version":1,"loop":false,"steps":[]}', zones:[],
+          migrationNote:note}});
+    }
+  }
+
   public function save(?file:String):Void {
     var destination = file == null ? path : file;
     if (destination == null) throw "Choose a filename for this scene";
@@ -512,7 +566,7 @@ class ProjectDocumentSession {
       scriptOwnership==null?null:scriptOwnership.record(), bim,
       project == null ? null : project.record,
       project == null ? null : project.authored, customMaterials,
-      recipeDocument == null ? null : DocumentCodec.encode(recipeDocument)));
+      recipeDocument == null ? null : DocumentCodec.encode(recipeDocument), robotMotions));
     // Do not move the savepoint or change the document path until publication succeeds.
     path = absolute;
     document.markSaved();
@@ -563,6 +617,7 @@ class ProjectDocumentSession {
     projectAssemblyState = null;
     projectPhysical = null;
     customMaterials = [];
+    robotMotions = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

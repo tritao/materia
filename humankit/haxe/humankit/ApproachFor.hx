@@ -14,21 +14,27 @@ class ApproachFor extends HumanActionBase {
 	 */
 	static inline var COMFORT = 0.8;
 
-	public final target:Array<Float>;
+	public var target(default, null):Array<Float>;
 	public final limb:HumanLimb;
 	public final speed:Float;
+	public final bothHands:Bool;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
+	final targetProvider:Null<Void->Array<Float>>;
 
-	public function new(target:Array<Float>, limb:HumanLimb, speed:Float = 1.0) {
+	public function new(target:Array<Float>, limb:HumanLimb, speed:Float = 1.0, bothHands:Bool = false,
+		?targetProvider:Void->Array<Float>) {
 		super();
 		this.target = target.copy();
 		this.limb = limb;
 		this.speed = speed;
+		this.bothHands = bothHands;
+		this.targetProvider = targetProvider;
 	}
 
 	override public function start(worker:HumanBody):Void {
 		super.start(worker);
+		if (targetProvider != null) target = targetProvider().copy();
 		if (target.length < 3) { fail("Approach target needs x, y, z"); return; }
 		if (limb != ArmL && limb != ArmR) { fail("Approach requires an arm"); return; }
 		var shoulder = worker.character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
@@ -41,7 +47,7 @@ class ApproachFor extends HumanActionBase {
 			return;
 		}
 		if (-rise >= comfortable) {
-			fail("Target is below waist height; crouching is unsupported");
+			fail("Target is below standing arm reach; crouching is unsupported");
 			return;
 		}
 		var ahead = Math.sqrt(comfortable * comfortable - rise * rise);
@@ -51,8 +57,9 @@ class ApproachFor extends HumanActionBase {
 		var uy = distance > 1e-8 ? dy / distance : root[1];
 		// Stand so the shoulder (model +X forward, +Y left of the root) sits
 		// `ahead` metres behind the target along the facing direction.
-		var standX = target[0] - ux * (ahead + shoulder[0]) + uy * shoulder[1];
-		var standY = target[1] - uy * (ahead + shoulder[0]) - ux * shoulder[1];
+		var lateral = bothHands ? 0.0 : shoulder[1];
+		var standX = target[0] - ux * (ahead + shoulder[0]) + uy * lateral;
+		var standY = target[1] - uy * (ahead + shoulder[0]) - ux * lateral;
 		faceAngle = Math.atan2(uy, ux);
 		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005)
 			worker.walker.continueAlong([[root[12], root[13]], [standX, standY]], speed);

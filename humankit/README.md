@@ -113,6 +113,34 @@ capsule's local +Z along its bones) through the character's root transform.
 character root, as a `HumanDisplay` of `Mesh`, `Capsules`, or `Skeleton`, to
 check the proxy against the mesh.
 
+## Document jobs
+
+`HumanJobSpec.parse` accepts strict, versioned JSON. Version 1 has `version`,
+`loop`, and an ordered `steps` array. Steps refer to scene object IDs, so a
+saved job can be reopened without Haxe code:
+
+```json
+{"version":1,"loop":false,"steps":[
+  {"action":"pick","object":"part","hand":"right"},
+  {"action":"place","onto":"table","hand":"right"}
+]}
+```
+
+Available actions are `walkTo` (an object or XY point, with optional `via`
+points), `pick`, `place` (optional XY `offset` on the support and
+`retreat: "backward"` to keep facing the part for the first step away), `press` (object
+anchor or XYZ point), `wait` (seconds), and `playClip` (clip and seconds).
+Pick and place hands can be `left`, `right`, or `both`. The parser rejects unknown fields,
+invalid pick and place sequences, and unsupported versions. `toJson()` writes
+a normalized spec. Parsed steps use the typed `HumanJobStep` shape; the parser
+enforces action-specific fields before publishing them.
+
+`HumanJobBuilder.build(spec, targets, body)` resolves scene boxes through a
+`HumanJobTargets` adapter and returns a `HumanJob` plus hold bindings. It
+places walk stops outside object footprints and computes pick and place
+points from box tops. The simulation layer binds those holds to dynamic
+objects; see [the simulation README](sim/README.md).
+
 ## Simulation
 
 The `humankit/sim` package (`humankit-sim`) puts a person in a SimKit session:

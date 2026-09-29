@@ -3,6 +3,8 @@ import humankit.CapsulePlacement;
 import humankit.HumanBodyProxy;
 import humankit.HumanBody;
 import humankit.HumanJob;
+import humankit.HumanJobSpec;
+import humankit.HumanJobBuilder;
 import humankit.HumanCarryPosture;
 import humankit.ApproachFor;
 import humankit.WalkTo;
@@ -105,8 +107,112 @@ class HumanKitTests {
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
 		jobs(scene, worker, rig);
+		jobSpecs(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
+	}
+
+	static function jobSpecs(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Spec worker");
+		var body = new HumanBody(human);
+		body.walker.place(0.0, 0.0, 0.0);
+		body.advance(0.0);
+		var targets = new JobTargets();
+		targets.boxes.set("part", {center: [0.8, 0.0, 1.1], halfExtents: [0.1, 0.1, 0.05], yaw: 0.0});
+		targets.boxes.set("table", {center: [2.0, 1.0, 0.65], halfExtents: [0.5, 0.4, 0.4], yaw: Math.PI / 2});
+		var spec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"},{"action":"place","onto":"table","offset":[0.2,0.1]}]}');
+		if (HumanJobSpec.parse(spec.toJson()).steps.length != 2) throw "Job JSON round trip failed";
+		var built = HumanJobBuilder.build(spec, targets, body);
+		if (built.holds.length != 2) throw "Pick/place bindings missing";
+		var pick:Pick = cast built.holds[0].action;
+		var place:Place = cast built.holds[1].action;
+		if (Math.abs(pick.target[2] - 1.16) > 1e-6) throw "Grasp height is wrong";
+		if (Math.abs(place.target[0] - 1.9) > 1e-6 || Math.abs(place.target[1] - 1.2) > 1e-6
+			|| Math.abs(place.target[2] - 1.1) > 1e-6) throw 'Rotated place point is wrong: ${place.target}';
+		var pressSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"point":[0.8,0.2,1.35]}}]}');
+		var pressJob = HumanJobBuilder.build(pressSpec, targets, body).job;
+		var press:humankit.Press = cast pressJob.orderedActions()[1];
+		if (Math.abs(press.point[2] - 1.35) > 1e-6) throw "Explicit press height was lost";
+		var pointError = "";
+		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"point":[0.8,0.2]}}]}')
+		catch (error:Dynamic) pointError = Std.string(error);
+		if (pointError.indexOf("[x, y, z]") < 0) throw 'Press point error is unclear: $pointError';
+		for (bad in [
+			'{"version":2,"loop":false,"steps":[]}',
+			'{"version":1,"loop":false,"steps":[{"action":"dance"}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"pick"}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"wait","seconds":1e400}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"pick","object":"part","hand":"foot"}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"place","onto":"table"}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"},{"action":"pick","object":"part"}]}',
+			'{"version":1,"loop":false,"steps":[{"action":"wait","seconds":1,"unexpected":true}]}',
+			'{"version":1,"loop":false,"steps":[],"future":3}'
+		]) {
+			var rejected = false;
+			try HumanJobSpec.parse(bad) catch (error:Dynamic) rejected = true;
+			if (!rejected) throw 'Accepted invalid job: $bad';
+		}
+		var missingPickError = "";
+		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick"}]}')
+		catch (error:Dynamic) missingPickError = Std.string(error);
+		if (missingPickError.indexOf("step 0.object") < 0)
+			throw 'Missing pick error lost its field path: $missingPickError';
+		var unknownStepError = "";
+		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"wait","seconds":1,"unexpected":true}]}')
+		catch (error:Dynamic) unknownStepError = Std.string(error);
+		if (unknownStepError.indexOf('step 0 has unknown field "unexpected"') < 0)
+			throw 'Unknown step field error lost its field path: $unknownStepError';
+		var warningSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"object":"missing"}},{"action":"playClip","clip":"NoSuchClip","seconds":1}]}');
+		var warnings = HumanJobSpec.check(warningSpec, targets, body);
+		if (warnings.length != 2 || warnings[0].indexOf('step 0: unknown object "missing"') < 0 ||
+			warnings[1].indexOf('step 1: character lacks clip "NoSuchClip"') < 0)
+			throw 'Wrong edit-time warnings: $warnings';
+		targets.boxes.set("high", {center: [0.0, 0.0, 3.0], halfExtents: [0.1, 0.1, 0.1], yaw: 0.0});
+		targets.boxes.set("low", {center: [0.0, 0.0, 0.1], halfExtents: [0.1, 0.1, 0.1], yaw: 0.0});
+		var heights = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"object":"high"}},{"action":"press","target":{"object":"low"}}]}');
+		if (HumanJobSpec.check(heights, targets, body).length != 2) throw "Missing reach warnings";
+		var walkTargets = new JobTargets();
+		walkTargets.boxes.set("rack", {center: [2.0, 0.0, 0.5], halfExtents: [0.5, 0.5, 0.5], yaw: 0.0});
+		var walkSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"object":"rack"}}]}');
+		var walk = HumanJobBuilder.build(walkSpec, walkTargets, body).job;
+		for (tick in 0...500) if (!walk.isDone()) walk.advance(0.02);
+		if (!walk.isDone() || walk.failure() != null) throw 'Object walk failed: ${walk.failure()}';
+		var root = body.rootTransform();
+		if (Math.abs(root[12] - 1.0) > 0.02 || Math.abs(root[13]) > 0.02 || root[0] < 0.99)
+			throw 'Object walk stop/facing wrong: $root';
+		walkTargets.boxes.set("table", {center: [2.0, 2.0, 0.5], halfExtents: [0.5, 0.5, 0.5], yaw: 0.0});
+		body.walker.place(0.0, 0.0, 0.0);
+		body.advance(0.0);
+		var twoStops = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"object":"rack"}},{"action":"walkTo","target":{"object":"table"}}]}');
+		var routed = HumanJobBuilder.build(twoStops, walkTargets, body).job;
+		for (tick in 0...800) if (!routed.isDone()) routed.advance(0.02);
+		root = body.rootTransform();
+		if (!routed.isDone() || routed.failure() != null || Math.abs(root[12]-1.341886) > 0.03 ||
+			Math.abs(root[13]-1.025658) > 0.03)
+			throw 'Second object stop ignored the rack-side approach: $root';
+		body.walker.place(0.0, 0.0, 0.0);
+		body.advance(0.0);
+		walkTargets.boxes.set("button", {center: [2.0, 0.0, 1.5], halfExtents: [0.2, 0.2, 0.2], yaw: 0.0});
+		var frontSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"point":[3,0]}},{"action":"press","target":{"object":"button","anchor":"front"}}]}');
+		var frontJob = HumanJobBuilder.build(frontSpec, walkTargets, body).job;
+		var frontPress:humankit.Press = cast frontJob.orderedActions()[2];
+		for (tick in 0...900) if (!frontJob.isDone()) frontJob.advance(0.02);
+		if (!frontJob.isDone() || frontJob.failure() != null || Math.abs(frontPress.point[0]-2.2) > 0.01)
+			throw 'Front press used the build-time side: ${frontPress.point} root=${body.rootTransform()} failure=${frontJob.failure()}';
+		body.walker.place(0.0, 0.0, 0.0);
+		body.advance(0.0);
+		var animationBuilt = HumanJobBuilder.build(spec, targets, body);
+		var animation = animationBuilt.job;
+		var animationPick:Pick = cast animationBuilt.holds[0].action;
+		var animationPlace:Place = cast animationBuilt.holds[1].action;
+		for (tick in 0...3000) {
+			if (animation.isDone()) break;
+			animation.advance(0.02);
+		}
+		if (!animation.isDone() || animation.failure() != null || !animationPick.grip ||
+			animationPick.pickError > 0.02 || animationPlace.grip || animationPlace.placementError > 0.02)
+			throw 'Built animation failed: ${animation.failure()}, pick miss ${animationPick.pickError}, place miss ${animationPlace.placementError}';
+		human.dispose();
 	}
 
 	static function placeReferencePoint(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
@@ -590,7 +696,7 @@ class HumanKitTests {
 		var tooLow = new HumanJob(unreachableBody).add(new ApproachFor([0.5, 0.0, 0.1], ArmR));
 		tooLow.advance(step);
 		var lowReason = tooLow.failure();
-		if (lowReason == null || lowReason.indexOf("below waist") < 0)
+		if (lowReason == null || lowReason.indexOf("below standing arm reach") < 0)
 			throw 'A low target did not explain its failure: $lowReason';
 		var cancel = new HumanJob(unreachableBody).add(new Reach(ArmR, [0.4, -0.2, 1.3], 0.1))
 			.add(new Wait(1.0)).add(new ReleaseLimb(ArmR, 0.1));

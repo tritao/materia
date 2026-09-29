@@ -2,7 +2,8 @@ package humankit;
 
 /** Reaches a button, holds contact briefly, and releases the arm. */
 class Press extends HumanActionBase {
-	public final point:Array<Float>;
+	public var point(default, null):Array<Float>;
+	final pointProvider:Null<Void->Array<Float>>;
 	public final limb:HumanLimb;
 	public final ramp:Float;
 	public final hold:Float;
@@ -10,16 +11,18 @@ class Press extends HumanActionBase {
 	var elapsed:Float = 0.0;
 
 	public function new(point:Array<Float>, limb:HumanLimb = ArmR, ramp:Float = 0.2,
-			hold:Float = 0.15) {
+			hold:Float = 0.15, ?pointProvider:Void->Array<Float>) {
 		super();
 		this.point = point.copy();
 		this.limb = limb;
 		this.ramp = ramp;
 		this.hold = hold;
+		this.pointProvider = pointProvider;
 	}
 
 	override public function start(worker:HumanBody):Void {
 		super.start(worker);
+		if (pointProvider != null) point = pointProvider().copy();
 		if (point.length < 3 || ramp < 0.0 || hold < 0.0) {
 			fail("Press needs a point and non-negative timing");
 			return;

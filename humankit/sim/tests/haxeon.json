@@ -5,6 +5,7 @@
   "sourceRoots": ["src"],
   "dependencies": {
     "humankit-sim": { "path": ".." },
+    "humankit-facility": { "path": "../../facility" },
     "animkit": { "path": "../../../animkit" },
     "scenekit": { "path": "../../../scenekit" },
     "nativekit": { "path": "../../../nativekit" }

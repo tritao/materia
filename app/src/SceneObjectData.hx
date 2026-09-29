@@ -26,4 +26,5 @@ typedef SceneObjectData = {
   @:optional var cadGraph:String;
   @:optional var meshSnapshot:String;
   @:optional var sketchDraft:String;
+  @:optional var worker:WorkerObjectData;
 }

@@ -59,7 +59,8 @@ class SceneModel {
       width: source.width, height: source.height, red: source.red, green: source.green,
       blue: source.blue, appearance: source.appearance, visible: source.visible,depth:source.depth,
       collisionEnabled:source.collisionEnabled,dynamicBody:source.dynamicBody,mass:source.mass,
-      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation});
+      cadGraph:cadGraph,meshSnapshot:source.meshSnapshot,rotation:source.rotation,
+      worker:source.worker});
     return changeObjects(owner, "Duplicate object", data, id);
   }
 
@@ -118,30 +119,55 @@ class SceneModel {
   public function physicsRecordsChanged(data:Array<SceneObjectData>):Bool {
     var previous:Map<String, EditorSceneObject> = new Map();
     var nextIds:Map<String, Bool> = new Map();
-    for (item in objects) previous.set(item.id, item);
+    var hasWorker = false;
+    for (item in objects) {
+      previous.set(item.id, item);
+      if (item.kind == "human-worker") hasWorker = true;
+    }
+    for (record in data) if (record.type == "human-worker") hasWorker = true;
     for (record in data) {
       nextIds.set(record.id, true);
       var old = previous.get(record.id);
       if (old == null) {
-        if (record.collisionEnabled) return true;
+        if (record.collisionEnabled || hasWorker) return true;
         continue;
       }
       if (old.collisionEnabled != record.collisionEnabled) return true;
-      if (!record.collisionEnabled) continue;
+      if (old.kind == "human-worker" || record.type == "human-worker") {
+        if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
+            !EditorScene.sameRotation(old.rotation, record.rotation) ||
+            !sameWorkerData(old.worker, record.worker)) return true;
+        continue;
+      }
+      if (!record.collisionEnabled) {
+        if (hasWorker && (old.x != record.x || old.y != record.y || old.z != record.z ||
+            old.width != record.width || old.height != record.height || old.depth != record.depth ||
+            !EditorScene.sameRotation(old.rotation, record.rotation))) return true;
+        continue;
+      }
       if (old.kind != record.type || old.x != record.x || old.y != record.y || old.z != record.z ||
           old.width != record.width || old.height != record.height || old.depth != record.depth ||
           !EditorScene.sameRotation(old.rotation, record.rotation) || old.cadGraph != record.cadGraph ||
           old.meshSnapshot != record.meshSnapshot || old.dynamicBody != record.dynamicBody ||
           old.mass != record.mass || old.materialId != record.materialId) return true;
     }
-    for (item in objects) if (item.collisionEnabled && !nextIds.exists(item.id)) return true;
+    for (item in objects) if ((item.collisionEnabled || hasWorker) && !nextIds.exists(item.id)) return true;
     return false;
   }
 
+  static function sameWorkerData(a:Null<app.WorkerObjectData>, b:Null<app.WorkerObjectData>):Bool {
+    if (a == null || b == null) return a == null && b == null;
+    if (a.asset != b.asset || a.job != b.job || a.zones.length != b.zones.length) return false;
+    for (index in 0...a.zones.length) if (a.zones[index] != b.zones[index]) return false;
+    return true;
+  }
+
   public static function copyEditorSceneObject(item:EditorSceneObject):EditorSceneObject {
-    return new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
+    var copy = new EditorSceneObject(item.id, item.label, item.kind, item.width, item.height,
       item.depth, item.collisionEnabled, item.dynamicBody, item.mass, item.red, item.green,
       item.blue, item.cadGraph, item.x, item.y, item.z, item.visible, item.meshSnapshot, item.rotation, item.appearance, item.materialId);
+    copy.worker = item.worker;
+    return copy;
   }
 
   public function records():Array<SceneObjectData> {
@@ -153,7 +179,7 @@ class SceneModel {
         dynamicBody:item.dynamicBody,mass:item.mass,red:item.red,green:item.green,blue:item.blue,
         appearance:item.appearance,materialId:item.materialId,
         visible: item.visible,cadGraph:item.cadGraph,meshSnapshot:item.meshSnapshot,
-        rotation:item.rotation});
+        rotation:item.rotation, worker:item.worker});
     }
     return result;
   }
@@ -211,7 +237,7 @@ class SceneModel {
       collisionEnabled: item.collisionEnabled, dynamicBody: item.dynamicBody, mass: item.mass,
       red: item.red, green: item.green, blue: item.blue, appearance: item.appearance,
       visible: item.visible, cadGraph: item.cadGraph,
-      meshSnapshot: item.meshSnapshot, rotation: item.rotation};
+      meshSnapshot: item.meshSnapshot, rotation: item.rotation, worker: item.worker};
   }
 
   public static function estimateSceneChanges(changes:Array<SceneRecordChange>):Int {
@@ -227,7 +253,9 @@ class SceneModel {
     if (record == null) return 0;
     return 384 + estimatedStringBytes(record.id) + estimatedStringBytes(record.label) +
       estimatedStringBytes(record.type) + estimatedStringBytes(record.cadGraph) +
-      estimatedStringBytes(record.sketchDraft);
+      estimatedStringBytes(record.sketchDraft) +
+      (record.worker == null ? 0 : estimatedStringBytes(record.worker.asset) +
+      estimatedStringBytes(record.worker.job) + record.worker.zones.length * 32);
   }
 
   static function estimatedStringBytes(value:Null<String>):Int

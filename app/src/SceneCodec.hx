@@ -1,6 +1,7 @@
 package app;
 
 import haxe.Json;
+import humankit.HumanJobSpec;
 import bimkit.BimCodec;
 import bimkit.BimDocument;
 import materia.project.Appearance;
@@ -15,7 +16,8 @@ class SceneCodec {
   public static function encode(scene:EditorScene,
     ? sensors:SensorConfiguration, ? script:ScriptOwnershipRecord, ? bim:BimDocument,
     ?project:ProjectSceneRecord, ?authoredObjects:Array<SceneObjectData>,
-    ?customMaterials:Array<MaterialDef>, ?recipeDocument:String):String {
+    ?customMaterials:Array<MaterialDef>, ?recipeDocument:String,
+    ?robotMotions:Array<RobotMotionTrack>):String {
     var custom = customMaterials == null ? [] : customMaterials;
     MaterialLibrary.validateCustom(custom);
     var objects = script == null ? (authoredObjects == null ? scene.recordsForSave() : authoredObjects) : [];
@@ -25,7 +27,9 @@ class SceneCodec {
       sensors: script == null && sensors != null ? sensors.records() : null,
       script: script, project: project, materials: MaterialLibrary.all().concat(custom),
       bim: bim == null ? null : Json.parse(BimCodec.encode(bim)),
-      recipeDocument: recipeDocument}, null, "  ") + "\n";
+      recipeDocument: recipeDocument,
+      robotMotions: robotMotions == null || robotMotions.length == 0 ? null :
+        [for (track in robotMotions) track.record()]}, null, "  ") + "\n";
   }
 
   /** Serialize editor color fields as sparse material visuals. */
@@ -36,7 +40,8 @@ class SceneCodec {
       (hasMaterial(finish, custom) ? finish : "neutral") : object.materialId;
     var material = resolveMaterial(id, custom);
     var result:Dynamic = {};
-    for (name in Reflect.fields(object)) if (["red", "green", "blue", "appearance", "materialId"].indexOf(name) < 0)
+    for (name in Reflect.fields(object)) if (["red", "green", "blue", "appearance", "materialId"].indexOf(name) < 0 &&
+        (name != "worker" || object.worker != null))
       Reflect.setField(result, name, Reflect.field(object, name));
     Reflect.setField(result, "materialId", id);
     var visual:Dynamic = {};
@@ -305,7 +310,8 @@ class SceneCodec {
       ids.set(id, true);
       var kind = stringField(value, "type");
       if (kind != "rectangle" && kind != "cad-plate" && kind != "cad-bracket" && kind != "cad-step" &&
-          kind != "cad-part" && kind != "cad-preview" && kind != StockSimulationSession.KIND)
+          kind != "cad-part" && kind != "cad-preview" && kind != StockSimulationSession.KIND &&
+          kind != "human-worker")
         throw "Unsupported scene object type: " + kind;
       var materialId = stringField(value, "materialId");
       var material = resolveMaterial(materialId, custom);
@@ -331,6 +337,23 @@ class SceneCodec {
       var cadGraph = optionalText(value, "cadGraph");
       var meshSnapshot = optionalText(value, "meshSnapshot");
       var sketchDraft = optionalText(value, "sketchDraft");
+      var worker:Null<WorkerObjectData> = null;
+      if (kind == "human-worker") {
+        var source:Dynamic = field(value, "worker");
+        if (source == null || Std.isOfType(source, Array)) throw "Worker data must be an object";
+        var zonesRaw:Dynamic = field(source, "zones");
+        if (!Std.isOfType(zonesRaw, Array)) throw "Worker zones must be an array";
+        var zones:Array<String> = [];
+        for (zone in (cast zonesRaw:Array<Dynamic>)) {
+          if (!Std.isOfType(zone, String) || zone == "") throw "Worker zone needs an object ID";
+          zones.push(zone);
+        }
+        worker = {asset: stringField(source, "asset"), job: stringField(source, "job"), zones: zones};
+        if (Reflect.hasField(source, "migrationNote")) worker.migrationNote = optionalText(source, "migrationNote");
+        // A malformed job remains editable and is reported by the worker inspector.
+        try HumanJobSpec.parse(worker.job) catch (_:Dynamic) {}
+      } else if (Reflect.hasField(value, "worker") && Reflect.field(value, "worker") != null)
+        throw "Worker data belongs only to human-worker objects";
       if ((kind == "cad-plate" || kind == "cad-bracket" || kind == "cad-step" || kind == "cad-part")
           && cadGraph != null && cadGraph.length > 10000000) throw "CAD feature graph is too large";
       if (kind == "cad-preview" && (meshSnapshot == null || meshSnapshot.length > 50000000))
@@ -358,7 +381,7 @@ class SceneCodec {
           -1000000,
           1000000
         ),
-        z: bounded(
+        z: kind == "human-worker" ? 0.0 : bounded(
           value,
           "z",
           -1000000,
@@ -383,8 +406,8 @@ class SceneCodec {
           1000000,
           0.1
         ),
-        collisionEnabled: collisionEnabled,
-        dynamicBody: dynamicBody,
+        collisionEnabled: kind == "human-worker" ? false : collisionEnabled,
+        dynamicBody: kind == "human-worker" ? false : dynamicBody,
         mass: optionalBounded(
           value,
           "mass",
@@ -398,14 +421,22 @@ class SceneCodec {
         appearance: appearance,
         materialId: materialId,
         visible: visibleValue,
-        rotation: optionalRotation(value),
+        rotation: kind == "human-worker" ? workerYawRotation(optionalRotation(value)) : optionalRotation(value),
         cadGraph: cadGraph,
         meshSnapshot: meshSnapshot,
-        sketchDraft: sketchDraft
+        sketchDraft: sketchDraft,
+        worker: worker
       }
       );
     }
     return result;
+  }
+
+  static function workerYawRotation(rotation:Null<Array<Float>>):Null<Array<Float>> {
+    if (rotation == null) return null;
+    var yaw = Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+      1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    return [0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5)];
   }
 
   static function field(value:Dynamic, name:String):Dynamic {
