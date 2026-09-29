@@ -24,8 +24,8 @@ class ToolClearanceChecker {
       throw "Tool clearance requires a shape, obstacles, and non-negative clearance";
     this.obstacles = obstacles.copy();
     if (preparedShape != null) {
-      if (!Type.enumEq(shape, preparedShape.shape))
-        throw "Prepared tool shape does not match the collision shape";
+      if (shape != preparedShape.shape)
+        throw "Prepared tool shape must use the same collision shape instance";
       for (piece in preparedShape.checker.pieces) pieces.push(piece);
       this.clearance = clearance + preparedShape.checker.clearance;
       return;

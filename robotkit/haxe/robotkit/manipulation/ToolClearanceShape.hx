@@ -2,7 +2,8 @@ package robotkit.manipulation;
 
 import robotkit.tool.ToolCollisionShape;
 
-/** Collision axes and vertices prepared once in the tool frame. */
+/** Collision axes and vertices prepared once in the tool frame. Reuse with the
+ * same ToolCollisionShape instance passed to prepare. */
 class ToolClearanceShape {
   public final checker:ToolClearanceChecker;
   public final shape:ToolCollisionShape;

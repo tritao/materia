@@ -44,9 +44,8 @@ class WorkPatchPlanner {
     var toolObstacleList = toolObstacles == null ? [] : toolObstacles;
     if (toolObstacleList.length > 0 && toolCollision == null)
       throw "Tool obstacles require a tool collision shape";
-    if (preparedToolShape != null && (toolCollision == null ||
-        !Type.enumEq(toolCollision, preparedToolShape.shape)))
-      throw "Prepared tool shape does not match the collision shape";
+    if (preparedToolShape != null && toolCollision != preparedToolShape.shape)
+      throw "Prepared tool shape must use the same collision shape instance";
     var prepared = toolCollision == null || toolObstacleList.length == 0 ? null :
       preparedToolShape == null ? ToolClearanceShape.prepare(toolCollision) : preparedToolShape;
 
