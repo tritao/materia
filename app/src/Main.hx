@@ -18,6 +18,7 @@ import app.editor.SceneViewCommands;
 import app.editor.SimulationCommands;
 import app.editor.ExampleCatalog;
 import app.editor.ExampleCatalog.ExampleEntry;
+import app.ProjectLoadJob;
 import app.editor.StartPanel;
 import app.editor.EditorGrid;
 import Color;
@@ -537,6 +538,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // Start page example that is queued to open; it runs a few frames later so "Opening..." is visible first.
   var startLoading:Null<ExampleEntry> = null;
   var startLoadDelay:Int = 0;
+  // The worker-thread build behind startLoading, when the example is a project.
+  var startJob:Null<ProjectLoadJob> = null;
   var startFailure:Null<String> = null;
   var lastRecordedPath:Null<String> = null;
   // Each mode keeps the layout it was left in; the mode set itself is never persisted.
@@ -639,7 +642,16 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (chooser == null) complete(null, "File dialogs require the desktop host");
       else chooser.choose(save, path, complete);
     }, documentChanged, commitActiveDrag, cancelActiveDrag);
-    if (hostContext != null) hostContext.onCloseRequested = function(close) documents.requestClose(close);
+    documents.busy = function() return startLoading != null;
+    if (hostContext != null) hostContext.onCloseRequested = function(close) {
+      // A running build must not keep the window from closing: cancel it and let the normal prompt run.
+      if (startJob != null) {
+        startJob.control.cancel();
+        startJob = null;
+        startLoading = null;
+      }
+      documents.requestClose(close);
+    };
     treeModel = new EditorSceneTree(scene, session.projectAssembly);
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
@@ -851,15 +863,31 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public function tick():Void {
     var queued = startLoading;
     if (queued != null) {
-      if (startLoadDelay > 0) {
+      var job = startJob;
+      if (job != null) {
+        // A project is building on its worker thread: keep the frame loop going for the spinner and phase.
+        if (!job.isFinished()) {
+          if (hostContext != null) hostContext.requestFrame();
+        } else {
+          startJob = null;
+          startLoading = null;
+          if (job.wasCancelled()) log("Cancelled opening " + queued.title);
+          else try ExampleCatalog.finish(this, queued, job.take()) catch (failure:Dynamic) {
+            startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
+            log(startFailure);
+          }
+          invalidateView();
+        }
+      } else if (startLoadDelay > 0) {
         startLoadDelay--;
         if (hostContext != null) hostContext.requestFrame();
       } else {
-        startLoading = null;
-        try ExampleCatalog.open(this, queued) catch (failure:Dynamic) {
+        try startJob = ExampleCatalog.begin(this, queued) catch (failure:Dynamic) {
           startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
           log(startFailure);
         }
+        // Quick examples opened inside begin(); only a project leaves a job to wait for.
+        if (startJob == null) startLoading = null;
         invalidateView();
       }
     }
@@ -894,6 +922,15 @@ class ReferenceEditorApp implements DesktopUiApplication {
       startLoadDelay = 3;
       invalidateView();
     });
+  }
+
+  /** Stops a project build that is running for the Start page. */
+  function cancelExampleLoad():Void {
+    var job = startJob;
+    if (job == null) return;
+    job.control.phase("Cancelling");
+    job.control.cancel();
+    invalidateView();
   }
 
   function requestOpenPath(path:String):Void {

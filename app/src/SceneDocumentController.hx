@@ -15,6 +15,8 @@ class SceneDocumentController {
   public var trustReference(default, null):Null<String> = null;
   public var choosing(default, null):Bool = false;
   public var error(default, null):Null<String> = null;
+  /** Set by the host while something outside the controller, such as a background project load, owns the document. */
+  public var busy:Null<Void->Bool> = null;
 
   public function new(session:ProjectDocumentSession,
       choosePath:Bool->Null<String>->(Null<String>->Null<String>->Void)->Void, changed:Void->Void,
@@ -28,7 +30,8 @@ class SceneDocumentController {
 
   public function needsConfirmation():Bool return pending != null;
   public function needsTrustConfirmation():Bool return trustedOpen != null;
-  public function blocked():Bool return choosing || pending != null || trustedOpen != null || error != null;
+  public function blocked():Bool return choosing || pending != null || trustedOpen != null || error != null ||
+    (busy != null && busy());
 
   public function requestNew():Void interrupt(function() {
     try session.newDocument() catch (failure:Dynamic) { fail(failure); return; }
