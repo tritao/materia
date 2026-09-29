@@ -163,6 +163,16 @@ public:
         return recompute_articulated_poses(0.0);
     }
 
+    nksim_result body_set_motion_type(std::uint64_t id, std::uint32_t motion_type,
+                                      double) override {
+        auto *body = find_body(id);
+        if (!body) return NKSIM_ERROR_INVALID_HANDLE;
+        if (motion_type != NKSIM_MOTION_DYNAMIC && motion_type != NKSIM_MOTION_KINEMATIC)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        body->desc.motion_type = motion_type;
+        return NKSIM_OK;
+    }
+
     nksim_result apply_forces(const BackendBodyForce *forces,
                               std::uint32_t count) override {
         if (count != 0 && !forces)

@@ -294,6 +294,7 @@ public:
     nksim_result get_body_state(nksim_body body, nksim_body_state *out_state) const;
     nksim_result set_body_state(nksim_body body, const nksim_body_state &state);
     nksim_result drive_body(nksim_body body, const nksim_body_state &state);
+    nksim_result set_body_motion_type(nksim_body body, std::uint32_t motion_type);
     nksim_result reset_body(nksim_body body);
     nksim_result reset();
     nksim_result create_joint(const nksim_joint_desc &desc, nksim_joint *out_joint);
@@ -340,6 +341,9 @@ struct RuntimeRegistry {
 
 RuntimeRegistry &registry() noexcept;
 std::shared_ptr<World> resolve_world(nksim_world world) noexcept;
+/** Queue a motion switch on a host's owner thread before its next step. */
+nksim_result host_submit_body_motion_type(nksim_host host, nksim_body body,
+                                          std::uint32_t motion_type);
 std::shared_ptr<Snapshot> resolve_snapshot(nksim_snapshot snapshot) noexcept;
 std::shared_ptr<Host> resolve_host(nksim_host host) noexcept;
 

@@ -26,6 +26,9 @@ struct BodyRecord {
     nksim::BackendBodyDesc desc{};
     nksim::BackendBodyState state{};
     std::string name;
+    double free_mass = 0.0;
+    std::array<double, 3> free_inertia{};
+    bool free_inertia_saved = false;
 };
 
 struct RestBox {
@@ -482,6 +485,47 @@ public:
         found->second.state = state;
         found->second.state.backend_body = id;
         mj_forward(model, data);
+        return NKSIM_OK;
+    }
+
+    nksim_result body_set_motion_type(std::uint64_t id, std::uint32_t motion_type,
+                                      double) override {
+        auto found = bodies.find(id);
+        if (found == bodies.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (motion_type != NKSIM_MOTION_DYNAMIC && motion_type != NKSIM_MOTION_KINEMATIC)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (found->second.desc.motion_type == motion_type) return NKSIM_OK;
+        // Only a childless root has the free joint used by both motion types.
+        // A jointed body would need a different compiled topology.
+        if (parent_joint_id(id) != 0 || has_children(id)) return NKSIM_ERROR_UNSUPPORTED;
+        const int model_id = model_body_id(id);
+        if (model_id < 0) return NKSIM_ERROR_INVALID_HANDLE;
+        const int joint_id = model->body_jntadr[model_id];
+        if (joint_id < 0 || model->jnt_type[joint_id] != mjJNT_FREE)
+            return NKSIM_ERROR_UNSUPPORTED;
+        auto &record = found->second;
+        if (!record.free_inertia_saved) {
+            record.free_mass = model->body_mass[model_id];
+            std::copy_n(model->body_inertia + 3 * model_id, 3, record.free_inertia.begin());
+            record.free_inertia_saved = true;
+        }
+        const bool held = motion_type == NKSIM_MOTION_KINEMATIC;
+        model->body_mass[model_id] = held ? kKinematicBodyMass : record.free_mass;
+        for (int axis = 0; axis < 3; ++axis)
+            model->body_inertia[3 * model_id + axis] =
+                held ? kKinematicBodyMass : record.free_inertia[axis];
+        model->body_gravcomp[model_id] = held ? 1.0 : 0.0;
+        // mj_setConst recomputes body_invweight0 and dof_invweight0 from the
+        // edited inertial properties (engine_setconst.c). The held object
+        // keeps its original collision pairs, including STATIC/KINEMATIC
+        // pairs; only contacts against DYNAMIC bodies can move another body.
+        const std::vector<mjtNum> qpos(data->qpos, data->qpos + model->nq);
+        const std::vector<mjtNum> qvel(data->qvel, data->qvel + model->nv);
+        mj_setConst(model, data);
+        std::copy(qpos.begin(), qpos.end(), data->qpos);
+        std::copy(qvel.begin(), qvel.end(), data->qvel);
+        mj_forward(model, data);
+        record.desc.motion_type = motion_type;
         return NKSIM_OK;
     }
 

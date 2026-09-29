@@ -25,12 +25,20 @@ ticks use the compiled model/data pair.
 The current adapter supports free bodies plus fixed, revolute, and prismatic
 NativeKit joints.
 
-A kinematic body is pinned like static geometry, without mass or degrees of
-freedom, and SimKit places it at its prescribed pose before each step; SimKit
-adds its twist to the velocities reported for the links articulated beneath
-it. Contacts see no velocity for it, so a moving kinematic platform does not
-drag resting bodies along by friction. A body without explicit inertial
-properties has its centre of mass at its origin.
+A childless kinematic root has a free joint with nominal mass and gravity
+compensation. It is placed along its prescribed trajectory before every
+MuJoCo substep, so contacts see its actual velocity while its own motion
+remains pinned. Kinematic roots carrying articulated links stay welded; SimKit
+adds the root twist to the reported link velocities. A body without explicit
+inertial properties has its centre of mass at its origin.
+
+A held session object switches its childless free body between dynamic and
+kinematic motion in the live model. The switch updates mass, inertia, and
+gravity compensation, then calls `mj_setConst` to recompute mass dependent
+solver constants. The live joint state is restored afterwards. The object's
+original collision pairs remain active while held, including contacts with
+static and kinematic bodies; those contacts cannot move the held object, while
+contacts with dynamic bodies can push them.
 
 Position, velocity, and effort targets are batched through
 the internal backend seam and applied through private MuJoCo actuators and

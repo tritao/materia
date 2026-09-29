@@ -105,6 +105,28 @@ class SimSession {
         return new SimObject(this, result.out_object, motion);
     }
 
+    /** Drive a dynamic object from a carrier body's frame on every tick. */
+    public function holdObject(object:SimObject, carrier:nksim_body, ?offset:SimPose):Void {
+        ensureLive();
+        var local = offset == null ? new SimPose(0, 0, 0) : offset;
+        SimWorld.check(NativeKitSim.nksim_session_hold_object(owner.borrow(), object.handle,
+            carrier, local.toNative()), "session.holdObject");
+    }
+
+    public function releaseObject(object:SimObject):Void {
+        ensureLive();
+        SimWorld.check(NativeKitSim.nksim_session_release_object(owner.borrow(), object.handle),
+            "session.releaseObject");
+    }
+
+    /** Zero means the object is free. */
+    public function objectCarrier(object:SimObject):nksim_body {
+        ensureLive();
+        var result = NativeKitSim.nksim_session_get_object_carrier(owner.borrow(), object.handle);
+        SimWorld.check(result.status, "session.objectCarrier");
+        return result.out_carrier;
+    }
+
     /** Adds a group of kinematic parts, each starting at its pose. */
     public function createActor(shapes:Array<SimShape>, poses:Array<SimPose>):SimActor {
         ensureLive();

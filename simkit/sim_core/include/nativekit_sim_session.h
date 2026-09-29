@@ -126,6 +126,23 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_teleport_object(
  */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_drive_object(
     nksim_session session, nksim_object object, const nksim_pose *pose);
+/**
+ * Attaches a DYNAMIC object to any session body while stopped or running.
+ * From the next tick it follows carrier * offset without being displaced by
+ * contacts. Holding an already-held object replaces its carrier and offset.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_hold_object(
+    nksim_session session, nksim_object object, nksim_body carrier,
+    const nksim_pose *offset);
+/**
+ * Releases a held object as DYNAMIC from the next tick, retaining the
+ * carrier point's velocity. Releasing a free object is INVALID_STATE.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_release_object(
+    nksim_session session, nksim_object object);
+/** Returns zero in out_carrier when the object is free. */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_get_object_carrier(
+    nksim_session session, nksim_object object, nksim_body *out_carrier NK_OUT);
 NKSIM_API nksim_result NKSIM_CALL nksim_session_get_object_body(
     nksim_session session, nksim_object object, nksim_body *out_body NK_OUT);
 /**

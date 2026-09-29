@@ -314,6 +314,111 @@ void planes_and_cylinders_are_objects() {
 }
 
 int main() {
+    {
+        Space space;
+        nksim_object_desc desc{};
+        desc.struct_size = sizeof(desc);
+        desc.motion_type = NKSIM_MOTION_DYNAMIC;
+        desc.mass = 1.0;
+        desc.shape.type = NKSIM_SHAPE_BOX;
+        desc.shape.parameters[0] = desc.shape.parameters[1] = desc.shape.parameters[2] = 0.1;
+        desc.pose = pose_at(0.0, 0.0, 2.0);
+        nksim_object payload = 0;
+        assert(nksim_session_create_object(space.session, &desc, &payload) == NKSIM_OK);
+        desc.motion_type = NKSIM_MOTION_STATIC;
+        desc.mass = 0.0;
+        desc.pose = pose_at(5.0, 0.0, 0.0);
+        nksim_object fixed = 0;
+        assert(nksim_session_create_object(space.session, &desc, &fixed) == NKSIM_OK);
+        desc.shape.parameters[0] = desc.shape.parameters[1] = 10.0;
+        desc.shape.parameters[2] = 0.5;
+        desc.pose = pose_at(0.0, 0.0, -0.5);
+        nksim_object floor = 0;
+        assert(nksim_session_create_object(space.session, &desc, &floor) == NKSIM_OK);
+        nksim_actor_part part{};
+        part.struct_size = sizeof(part);
+        part.shape.type = NKSIM_SHAPE_BOX;
+        part.shape.parameters[0] = part.shape.parameters[1] = part.shape.parameters[2] = 0.1;
+        part.pose = pose_at(0.0, 0.0, 2.0);
+        nksim_actor actor = 0;
+        assert(nksim_session_create_actor(space.session, &part, 1, &actor) == NKSIM_OK);
+        nksim_body carrier = 0, body = 0, reported = 0;
+        assert(nksim_session_get_actor_body(space.session, actor, 0, &carrier) == NKSIM_OK);
+        assert(nksim_session_get_object_body(space.session, payload, &body) == NKSIM_OK);
+        const auto offset = pose_at(0.0, 0.0, 0.3);
+        assert(nksim_session_hold_object(space.session, fixed, carrier, &offset) ==
+               NKSIM_ERROR_INVALID_STATE);
+        assert(nksim_session_hold_object(space.session, payload, 0, &offset) ==
+               NKSIM_ERROR_INVALID_ARGUMENT);
+        nksim_body fixed_body = 0;
+        assert(nksim_session_get_object_body(space.session, fixed, &fixed_body) == NKSIM_OK);
+        assert(nksim_session_hold_object(space.session, payload, fixed_body, &offset) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, payload, &reported) == NKSIM_OK &&
+               reported == fixed_body);
+        assert(nksim_session_hold_object(space.session, payload, carrier, &offset) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, payload, &reported) == NKSIM_OK &&
+               reported == carrier);
+        assert(nksim_session_hold_object(space.session, payload, body, &offset) ==
+               NKSIM_ERROR_INVALID_ARGUMENT);
+        const auto start = pose_at(0.0, 0.0, 2.0);
+        const auto end = pose_at(1.0, 0.0, 2.0);
+        assert(nksim_session_push_actor_keyframe(space.session, actor, 0.0, &start, 1) == NKSIM_OK);
+        assert(nksim_session_push_actor_keyframe(space.session, actor, 1.0, &end, 1) == NKSIM_OK);
+        for (int tick = 1; tick <= 20; ++tick) {
+            assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+            nksim_body_state state{};
+            state.struct_size = sizeof(state);
+            assert(nksim_session_get_body_state(space.session, body, &state) == NKSIM_OK);
+            assert(near(state.position[0], tick * 0.01, 1e-9));
+            assert(near(state.position[2], 2.3, 1e-9));
+            assert(near(state.linear_velocity[0], 1.0, 1e-9));
+        }
+        assert(nksim_session_release_object(space.session, payload) == NKSIM_OK);
+        assert(nksim_session_release_object(space.session, payload) == NKSIM_ERROR_INVALID_STATE);
+        assert(nksim_session_stop(space.session) == NKSIM_OK);
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+        nksim_body_state released{};
+        released.struct_size = sizeof(released);
+        assert(nksim_session_get_body_state(space.session, body, &released) == NKSIM_OK);
+        assert(released.linear_velocity[0] > 0.9 && released.position[2] < 2.3);
+        for (int tick = 0; tick < 300; ++tick)
+            assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+        assert(nksim_session_get_body_state(space.session, body, &released) == NKSIM_OK);
+        assert(near(released.position[2], 0.1, 1e-4));
+        assert(nksim_session_stop(space.session) == NKSIM_OK);
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+        assert(nksim_session_hold_object(space.session, payload, carrier, &offset) == NKSIM_OK);
+        assert(nksim_session_stop(space.session) == NKSIM_OK);
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
+        nksim_body_state held_again{};
+        held_again.struct_size = sizeof(held_again);
+        assert(nksim_session_get_body_state(space.session, body, &held_again) == NKSIM_OK);
+        assert(near(held_again.position[0], 1.0, 1e-9));
+        assert(near(held_again.position[2], 2.3, 1e-9));
+        assert(nksim_session_stop(space.session) == NKSIM_OK);
+        assert(nksim_session_reset(space.session) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, payload, &reported) == NKSIM_OK &&
+               reported == 0);
+        nksim_body_state reset{};
+        reset.struct_size = sizeof(reset);
+        assert(nksim_session_get_body_state(space.session, body, &reset) == NKSIM_OK);
+        assert(near(reset.position[0], 0.0) && near(reset.position[2], 2.0));
+        assert(near(reset.linear_velocity[0], 0.0) &&
+               near(reset.linear_velocity[1], 0.0) &&
+               near(reset.linear_velocity[2], 0.0));
+        assert(nksim_session_hold_object(space.session, payload, carrier, &offset) == NKSIM_OK);
+        assert(nksim_session_reset(space.session) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, payload, &reported) == NKSIM_OK &&
+               reported == 0);
+        assert(nksim_session_hold_object(space.session, payload, carrier, &offset) == NKSIM_OK);
+        assert(nksim_session_destroy_actor(space.session, actor) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, payload, &reported) == NKSIM_OK &&
+               reported == 0);
+        assert(nksim_session_hold_object(space.session, payload, fixed_body, &offset) == NKSIM_OK);
+        assert(nksim_session_destroy_object(space.session, payload) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, payload, &reported) ==
+               NKSIM_ERROR_INVALID_HANDLE);
+    }
     planes_and_cylinders_are_objects();
     objects_follow_their_motion_type();
     actors_follow_timed_keyframes();

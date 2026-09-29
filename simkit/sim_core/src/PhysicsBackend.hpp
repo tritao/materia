@@ -142,6 +142,10 @@ public:
     virtual nksim_result body_destroy(std::uint64_t body) = 0;
     virtual nksim_result body_set_state(std::uint64_t body,
                                         const BackendBodyState &state) = 0;
+    /** Switch a free body's dynamics without changing the compiled topology. */
+    virtual nksim_result body_set_motion_type(std::uint64_t, std::uint32_t, double) {
+        return NKSIM_ERROR_UNSUPPORTED;
+    }
     virtual nksim_result apply_forces(const BackendBodyForce *forces,
                                       std::uint32_t count) = 0;
 
