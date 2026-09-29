@@ -79,6 +79,11 @@ column-major storage and multiply column vectors, matching SceneKit. Adapters
 for external conventions, including ROS, convert at their boundary and leave
 the internal model unchanged.
 
+VisionKit converts OpenCV's camera axes (`+Z` forward, `+X` right, `+Y` down)
+at its native boundary. Camera points and poses exposed to RobotKit use
+Materia's `+X` forward, `+Y` left, `+Z` up frame. Image pixels retain an origin
+at the upper left, with `x` increasing right and `y` increasing down.
+
 ### Time and command provenance
 
 Keep source and receive clocks distinct. The API names below describe the

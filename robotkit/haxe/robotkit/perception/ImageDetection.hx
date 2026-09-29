@@ -1,6 +1,6 @@
 package robotkit.perception;
 
-/** One immutable axis-aligned box in source-image pixels. */
+/** One immutable axis-aligned pixel box. Detector calibration yields ideal pinhole pixels. */
 class ImageDetection {
   public final label:String;
   public final score:Float;

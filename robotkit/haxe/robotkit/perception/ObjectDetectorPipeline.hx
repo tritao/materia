@@ -5,6 +5,9 @@ import haxe.io.Bytes;
 import robotkit.inference.InferenceSession;
 import robotkit.inference.InferenceSession.InferenceResult;
 import robotkit.world.SensorFrame;
+import visionkit.CameraModel;
+import visionkit.ImageView;
+import visionkit.UndistortMap;
 
 private class FrameMeta {
   public final frame:SensorFrame;
@@ -15,7 +18,10 @@ private class FrameMeta {
   }
 }
 
-/** YOLO-style [cx,cy,w,h,score,class] detector over one rgb8 camera. */
+/** YOLO-style [cx,cy,w,h,score,class] detector over one rgb8 camera.
+ * With calibration, output boxes use ideal pinhole pixels. A rectified-input model
+ * uses UndistortMap.rectified intrinsics; otherwise the original K is retained.
+ */
 class ObjectDetectorPipeline implements PerceptionPipeline {
   final pipelineId:String;
   final inputSensorId:String;
@@ -23,6 +29,8 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
   final modelId:String;
   final modelDigest:String;
   final session:InferenceSession;
+  final calibration:Null<CameraModel>;
+  final rectification:Null<UndistortMap>;
   final threshold:Float;
   final iouThreshold:Float;
   final targetWidth:Int;
@@ -40,7 +48,8 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       modelId:String, modelPath:String, expectedDigest:String,
       ?scoreThreshold:Float = 0.4, ?iouThreshold:Float = 0.5,
       ?maxRateHz:Float = 0.0, ?threads:Int = 1,
-      ?dynamicWidth:Int = 0, ?dynamicHeight:Int = 0) {
+      ?dynamicWidth:Int = 0, ?dynamicHeight:Int = 0,
+      ?calibration:CameraModel, ?rectifyInput:Bool = false) {
     if (producerId == null || producerId.length == 0 || pipelineId == null || pipelineId.length == 0 ||
         sensorId == null || sensorId.length == 0 || modelId == null || modelId.length == 0 ||
         modelPath == null || modelPath.length == 0 ||
@@ -48,6 +57,10 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
         !Math.isFinite(iouThreshold) || iouThreshold < 0 || iouThreshold > 1 ||
         !Math.isFinite(maxRateHz) || maxRateHz < 0)
       throw "Object detector needs IDs, a model, and valid thresholds";
+    if (rectifyInput && calibration == null)
+      throw "Rectified detector input requires calibration";
+    this.calibration = calibration;
+    this.rectification = rectifyInput ? new UndistortMap(calibration) : null;
     this.producerId = producerId; this.pipelineId = pipelineId;
     this.inputSensorId = sensorId; this.modelId = modelId;
     if (expectedDigest == null || !~/^[0-9a-fA-F]{64}$/.match(expectedDigest))
@@ -85,8 +98,17 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
     }
     var nativeSequence = nextNativeSequence;
     nextNativeSequence = Int64.add(nextNativeSequence, Int64.ofInt(1));
+    if (calibration != null && (image.width != calibration.width || image.height != calibration.height))
+      throw "Detector image does not match calibration dimensions";
+    var pixels = image.bytes();
+    if (rectification != null) {
+      var rectified = Bytes.alloc(pixels.length);
+      rectification.remap(new ImageView(image.width, image.height, image.width * 3, 1, pixels),
+        new ImageView(image.width, image.height, image.width * 3, 1, rectified));
+      pixels = rectified;
+    }
     session.submitRgb8(nativeSequence, image.width, image.height,
-      image.bytes(), targetWidth, targetHeight);
+      pixels, targetWidth, targetHeight);
     submitted.push(new FrameMeta(frame, nativeSequence));
     if (submitted.length > 1024) submitted.shift();
     lastSubmittedTimeNs = frame.receivedTimestampNs;
@@ -109,6 +131,8 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       return [];
     }
     var detections = decode(ready.output, ready, threshold, iouThreshold);
+    if (calibration != null && rectification == null)
+      detections = undistortBoxes(calibration, detections);
     var dropped = Int64.toInt(ready.dropped) + filtered + carriedDrops;
     filtered = 0; carriedDrops = 0;
     return [new ImageDetectionObservation(producerId, pipelineId, inputSensorId,
@@ -118,7 +142,37 @@ class ObjectDetectorPipeline implements PerceptionPipeline {
       ready.completedTimestampNs, "robotkit.monotonic", detections, dropped)];
   }
 
-  public function dispose():Void { if (!closed) { closed = true; session.dispose(); } }
+  public function dispose():Void { if (!closed) {
+    closed = true; session.dispose();
+    if (rectification != null) rectification.dispose();
+  } }
+
+  /** Enclosing boxes in ideal pinhole pixels, using the four source corners. */
+  public static function undistortBoxes(camera:CameraModel, boxes:Array<ImageDetection>):Array<ImageDetection> {
+    if (camera == null || boxes == null) throw "Undistortion needs a camera and boxes";
+    var result:Array<ImageDetection> = [];
+    for (box in boxes) {
+      var rays = camera.unproject([
+        {x: box.x, y: box.y}, {x: box.x + box.width, y: box.y},
+        {x: box.x, y: box.y + box.height},
+        {x: box.x + box.width, y: box.y + box.height}]);
+      var left = Math.POSITIVE_INFINITY, top = Math.POSITIVE_INFINITY;
+      var right = Math.NEGATIVE_INFINITY, bottom = Math.NEGATIVE_INFINITY;
+      for (ray in rays) {
+        var x = camera.cx - camera.fx * ray.y / ray.x;
+        var y = camera.cy - camera.fy * ray.z / ray.x;
+        left = Math.min(left, x); top = Math.min(top, y);
+        right = Math.max(right, x); bottom = Math.max(bottom, y);
+      }
+      left = Math.max(0, Math.min(camera.width, left));
+      right = Math.max(0, Math.min(camera.width, right));
+      top = Math.max(0, Math.min(camera.height, top));
+      bottom = Math.max(0, Math.min(camera.height, bottom));
+      if (right > left && bottom > top)
+        result.push(new ImageDetection(box.label, box.score, left, top, right - left, bottom - top));
+    }
+    return result;
+  }
 
   /** Decode and map fixture-style boxes; suppression is per class label. */
   public static function decode(output:Bytes, transform:InferenceResult,

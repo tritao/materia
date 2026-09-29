@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "package": { "name": "visionkit" },
+  "sourceRoots": ["haxe"],
+  "scopeSourceRoots": false,
+  "dependencies": {},
+  "ffi": { "interfaces": ["native/bindings/visionkit.hxi"] },
+  "target": "host"
+}

@@ -2,6 +2,8 @@ package robotkit.deployment;
 
 import haxe.Json;
 import haxe.io.Path;
+import haxe.crypto.Sha256;
+import visionkit.CameraCalibration;
 import robotkit.device.DeviceLayout;
 import robotkit.device.DeviceFingerprint;
 import robotkit.model.RobotModel;
@@ -25,6 +27,7 @@ class SerialDeployment {
   public final linkLossTimeoutNs:haxe.Int64;
   public final clockSyncBoundNs:haxe.Int64;
   public final channels:Array<ProcessChannelDeclaration>;
+  public final cameras:Map<String, CameraCalibration>;
   public final perception:Array<PerceptionPipelineConfig>;
 
   public function new(path:String) {
@@ -34,6 +37,46 @@ class SerialDeployment {
     if (version != 3 && version != 4 && version != 5) throw "robotd: unsupported deployment schema version";
     var modelPath = Path.join([directory, requiredString(config, "model")]);
     robot = RobotModelCodec.decode(sys.io.File.getBytes(modelPath));
+    cameras = new Map();
+    var cameraRows:Dynamic = Reflect.field(config, "cameras");
+    if (cameraRows != null) {
+      if (version != 5) throw "robotd: deployment cameras require schema version 5";
+      if (!Std.isOfType(cameraRows, Array)) throw "robotd: deployment cameras must be an array";
+      for (entry in (cast cameraRows:Array<Dynamic>)) {
+        if (entry == null) throw "robotd: deployment camera cannot be null";
+        exactKeys(entry, ["sensorId", "calibration", "sha256"], "camera");
+        var sensorId = requiredString(entry, "sensorId");
+        if (cameras.exists(sensorId)) throw 'robotd: duplicate camera $sensorId';
+        var sensor:Null<robotkit.model.Sensor> = null;
+        for (candidate in robot.sensors) if (candidate.id == sensorId) sensor = candidate;
+        if (sensor == null || sensor.kind != "camera")
+          throw 'robotd: camera $sensorId must name a camera sensor';
+        var hash = requiredString(entry, "sha256");
+        if (!~/^[0-9a-f]{64}$/.match(hash)) throw 'robotd: camera $sensorId requires lowercase SHA-256';
+        var calibrationName = requiredString(entry, "calibration");
+        var normalizedName = StringTools.replace(calibrationName, "\\", "/");
+        if (StringTools.startsWith(normalizedName, "/") ||
+            ~/^[A-Za-z]:/.match(normalizedName) ||
+            normalizedName.split("/").indexOf("..") >= 0)
+          throw 'robotd: camera $sensorId calibration must stay within the deployment directory';
+        var calibrationPath = Path.join([directory, calibrationName]);
+        var deploymentDirectory = sys.FileSystem.fullPath(directory);
+        var resolvedCalibration = sys.FileSystem.fullPath(calibrationPath);
+        var directoryPrefix = StringTools.endsWith(deploymentDirectory, "/") ?
+          deploymentDirectory : deploymentDirectory + "/";
+        if (!StringTools.startsWith(resolvedCalibration, directoryPrefix))
+          throw 'robotd: camera $sensorId calibration resolves outside the deployment directory';
+        var bytes:haxe.io.Bytes;
+        try bytes = sys.io.File.getBytes(calibrationPath)
+        catch (_:Dynamic) throw 'robotd: camera $sensorId calibration file cannot be read';
+        if (sha256Hex(bytes) != hash)
+          throw 'robotd: camera $sensorId calibration SHA-256 mismatch';
+        var parsedCalibration:CameraCalibration;
+        try parsedCalibration = CameraCalibration.fromJson(bytes.toString())
+        catch (_:Dynamic) throw 'robotd: camera $sensorId calibration JSON is invalid';
+        cameras.set(sensorId, parsedCalibration);
+      }
+    }
     perception = [];
     var configured:Dynamic = Reflect.field(config, "perception");
     if (configured != null) {
@@ -177,6 +220,13 @@ class SerialDeployment {
     if (!Std.isOfType(result, String) || StringTools.trim(result).length == 0)
       throw 'robotd: deployment requires $field';
     return result;
+  }
+
+  static function sha256Hex(bytes:haxe.io.Bytes):String {
+    var digest = Sha256.make(bytes);
+    var result = new StringBuf();
+    for (i in 0...digest.length) result.add(StringTools.hex(digest.get(i), 2).toLowerCase());
+    return result.toString();
   }
 
   static function requiredNanoseconds(value:Dynamic, field:String):haxe.Int64 {

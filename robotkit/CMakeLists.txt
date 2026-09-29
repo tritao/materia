@@ -67,6 +67,7 @@ option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})
 option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)
 option(RK_BUILD_POLICY "Build the ONNX Runtime policy library (fetches a pinned prebuilt release)" OFF)
+option(RK_BUILD_VISIONKIT "Build the optional VisionKit camera geometry library" OFF)
 option(RK_BUILD_INFERENCE "Build the ONNX Runtime image inference library" OFF)
 
 if(RK_BUILD_TESTS)
@@ -87,6 +88,10 @@ endif()
 if(NOT TARGET motionkit_core)
     set(MK_BUILD_SHARED ${RK_BUILD_SHARED} CACHE BOOL "Build MotionKit with RobotKit" FORCE)
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../motionkit/native" motionkit)
+endif()
+
+if(RK_BUILD_VISIONKIT AND NOT TARGET visionkit_core)
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../visionkit/native" visionkit)
 endif()
 
 add_subdirectory(runtime)
