@@ -39,6 +39,15 @@ class SceneDocumentController {
     choose(false, openAccepted);
   });
 
+  /** Opens a known path (for example a recent file) with the same prompts as File > Open. */
+  public function requestOpenPath(path:String):Void interrupt(function() openAccepted(path));
+
+  /** Runs a document-replacing action after the unsaved-change prompt, reporting failures as errors. */
+  public function requestRun(action:Void->Void):Void interrupt(function() {
+    try action() catch (failure:Dynamic) { fail(failure); return; }
+    changed();
+  });
+
   function openAccepted(path:String):Void {
     try {
       var root:Dynamic = Json.parse(File.getContent(path));

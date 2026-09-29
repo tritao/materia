@@ -16,6 +16,9 @@ import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
 import app.editor.SceneViewCommands;
 import app.editor.SimulationCommands;
+import app.editor.ExampleCatalog;
+import app.editor.ExampleCatalog.ExampleEntry;
+import app.editor.StartPanel;
 import app.editor.EditorGrid;
 import Color;
 import LayoutAxis;
@@ -287,6 +290,14 @@ class Main {
       if (args.indexOf("--worker-demo=rack-to-table") >= 0)
         editor.enableWorkerDemo(workerDemoSteps(args), true);
       if (args.indexOf("--perspective") >= 0) editor.workspace.activate("perspective");
+      // Start shows for a plain launch; explicit documents, demos, and previews go straight to the model.
+      var explicitContent = diagnostics.projectPath != null || diagnostics.setupScript != null ||
+        diagnostics.demo || diagnostics.componentLab || args.indexOf("--perspective") >= 0 ||
+        args.indexOf("--worker-demo=rack-to-table") >= 0 ||
+        Lambda.exists(args, function(arg) return arg.indexOf("--character=") == 0);
+      if (!explicitContent && editor.preferences.showStartPage) editor.showStartPage();
+      else if (!editor.preferences.showStartPage && editor.workspace.isOpen("start"))
+        editor.workspace.close("start");
       return editor;
     });
     return new DesktopUiHostSession(function() {
@@ -490,6 +501,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var viewportHeight:Float = Main.DEFAULT_WINDOW_HEIGHT;
   var toolbarDensity:EditorToolbarDensity = Full;
   public var mode(default, null):EditorMode = EditorMode.Design;
+  public var preferences(default, null):AppPreferences;
+  // Start page example that is queued to open; it runs a few frames later so "Opening..." is visible first.
+  var startLoading:Null<ExampleEntry> = null;
+  var startLoadDelay:Int = 0;
+  var startFailure:Null<String> = null;
+  var lastRecordedPath:Null<String> = null;
   // Each mode keeps the layout it was left in; the mode set itself is never persisted.
   final modeSnapshots:Map<String, DockWorkspaceSnapshot> = new Map();
   // Mode to return to when the simulation stops after Play switched into Simulate.
@@ -572,6 +589,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     attachSceneRecorder();
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
+    preferences = AppPreferences.besideWorkspace(workspacePath);
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
@@ -680,7 +698,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "editor.save-as", "scene.export-step", "editor.undo", "editor.redo",
         "scene.frame-selected", "scene.reset-perspective",
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast",
-        "scene.toggle-grid", "editor.toggle-dark-theme", "editor.command-palette", "workspace.reset"
+        "scene.toggle-grid", "editor.toggle-dark-theme", "start.show", "editor.command-palette", "workspace.reset"
       ], Math.max(8.0, viewportWidth - 228.0), FILE_BAR_HEIGHT, commands, ui.commandContext,
         function() { toolbarMenuVisible = false; invalidateView(); },
         function(_) { toolbarMenuVisible = false; invalidateView(); });
@@ -798,6 +816,20 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   /** Advance the character preview, then CAD preview refinement after a rendered frame. */
   public function tick():Void {
+    var queued = startLoading;
+    if (queued != null) {
+      if (startLoadDelay > 0) {
+        startLoadDelay--;
+        if (hostContext != null) hostContext.requestFrame();
+      } else {
+        startLoading = null;
+        try ExampleCatalog.open(this, queued) catch (failure:Dynamic) {
+          startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
+          log(startFailure);
+        }
+        invalidateView();
+      }
+    }
     if (simulation.isActive() && simulation.isRunning()) {
       simulation.advanceWorkers();
       if (hostContext != null) hostContext.requestFrame();
@@ -812,6 +844,28 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var needsFrame = scene.advanceCadMeshRefinement();
     if ((needsFrame || scene.visualRevision != before) && hostContext != null)
       hostContext.requestFrame();
+  }
+
+  /** Opens the Start page beside the 3D view. */
+  public function showStartPage():Void {
+    if (workspace.get("start") == null) return;
+    workspace.open("start", "perspective");
+    invalidateView();
+  }
+
+  /** Queues a bundled example; the unsaved-change prompt runs first. */
+  function requestExample(entry:ExampleEntry):Void {
+    startFailure = null;
+    documents.requestRun(function() {
+      startLoading = entry;
+      startLoadDelay = 3;
+      invalidateView();
+    });
+  }
+
+  function requestOpenPath(path:String):Void {
+    startFailure = null;
+    documents.requestOpenPath(path);
   }
 
   function invalidateView():Void {
@@ -1182,6 +1236,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
 
   function makeWorkspace():DockWorkspaceModel {
     var result = new DockWorkspaceModel();
+    result.register(new DockPanelDescriptor("start", "Start", true, true, IconName.Grid));
     result.register(new DockPanelDescriptor("hierarchy", "Hierarchy", false, true, IconName.Hierarchy));
     result.register(new DockPanelDescriptor("bim", "BIM", false, true, IconName.Building));
     // Recognize legacy saved layouts; this panel is removed before the UI builds.
@@ -1193,6 +1248,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
 
     workspacePanelContents = [
+      new DockPanelContent("start", function(_) return StartPanel.build(this)),
       new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision +
@@ -1483,6 +1539,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(openPalette);
     SceneViewCommands.install(this);
     SimulationCommands.install(this);
+    commands.register(new Command("start.show", "Show Start page", showStartPage));
     for (candidate in EditorMode.all()) {
       var target = candidate;
       commands.register(new Command("editor.mode." + target.id, target.label + " mode",
@@ -1493,6 +1550,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
   }
 
   function documentChanged():Void {
+    if (preferences != null && session.path != null && session.path != lastRecordedPath) {
+      lastRecordedPath = session.path;
+      preferences.addRecent(session.path);
+    }
     attachSceneRecorder();
     if (bimEditor.model != session.bim) bimEditor = makeBimEditor();
     cancelActiveDrag();

@@ -682,6 +682,63 @@ int main(int argc, char **argv) {
         std::abs(wrapped_column_third_item->bounds.y) > 0.01f)
         return 44;
 
+    // A wrapping row's minimum width is its widest child, so a grow chain shrinks to the viewport
+    // and wraps instead of staying as wide as all children side by side.
+    LayoutNode wrapped_shrink_root = box(750, -1);
+    wrapped_shrink_root.style.width = {LayoutSizing::Fixed, 200.0f};
+    wrapped_shrink_root.style.height = {LayoutSizing::Fit, 0.0f};
+    wrapped_shrink_root.style.direction = LayoutDirection::TopToBottom;
+    LayoutNode wrapped_shrink_column = box(751, 0);
+    wrapped_shrink_column.style.direction = LayoutDirection::TopToBottom;
+    LayoutNode wrapped_shrink_row = box(752, 1);
+    wrapped_shrink_row.style.direction = LayoutDirection::LeftToRight;
+    wrapped_shrink_row.style.wrap_mode = LayoutWrapMode::Wrap;
+    wrapped_shrink_row.style.child_gap = 6.0f;
+    std::vector<LayoutNode> wrapped_shrink_nodes{wrapped_shrink_root, wrapped_shrink_column,
+                                                 wrapped_shrink_row};
+    for (uint32_t index = 0; index < 5; ++index) {
+        LayoutNode card = box(753 + index, 2);
+        card.style.width = {LayoutSizing::Fixed, 60.0f};
+        card.style.height = {LayoutSizing::Fixed, 20.0f};
+        wrapped_shrink_nodes.push_back(card);
+    }
+    if (!engine.layout(wrapped_shrink_nodes, 200.0f, 200.0f, 1.0f / 60.0f, snapshot, &error))
+        return 62;
+    const auto *wrapped_shrink_row_item = snapshot.find(752);
+    const auto *wrapped_shrink_third_item = snapshot.find(755);
+    const auto *wrapped_shrink_fourth_item = snapshot.find(756);
+    // Three 60 px cards and two 6 px gaps fit in 200 px; the fourth starts a second line.
+    if (!wrapped_shrink_row_item || !wrapped_shrink_third_item || !wrapped_shrink_fourth_item ||
+        std::abs(wrapped_shrink_row_item->bounds.width - 200.0f) > 0.01f ||
+        std::abs(wrapped_shrink_third_item->bounds.x - 132.0f) > 0.01f ||
+        std::abs(wrapped_shrink_third_item->bounds.y) > 0.01f ||
+        std::abs(wrapped_shrink_fourth_item->bounds.x) > 0.01f ||
+        std::abs(wrapped_shrink_fourth_item->bounds.y - 26.0f) > 0.01f)
+        return 63;
+
+    // Setting only row_gap must not zero the column gap: each axis falls back to child_gap.
+    LayoutNode gap_fallback_root = box(760, -1);
+    gap_fallback_root.style.width = {LayoutSizing::Fixed, 200.0f};
+    gap_fallback_root.style.height = {LayoutSizing::Fit, 0.0f};
+    gap_fallback_root.style.direction = LayoutDirection::LeftToRight;
+    gap_fallback_root.style.wrap_mode = LayoutWrapMode::Wrap;
+    gap_fallback_root.style.child_gap = 6.0f;
+    gap_fallback_root.style.row_gap = 10.0f;
+    LayoutNode gap_fallback_first = box(761, 0);
+    gap_fallback_first.style.width = {LayoutSizing::Fixed, 60.0f};
+    gap_fallback_first.style.height = {LayoutSizing::Fixed, 20.0f};
+    LayoutNode gap_fallback_second = box(762, 0);
+    gap_fallback_second.style.width = {LayoutSizing::Fixed, 60.0f};
+    gap_fallback_second.style.height = {LayoutSizing::Fixed, 20.0f};
+    std::vector<LayoutNode> gap_fallback_nodes{gap_fallback_root, gap_fallback_first,
+                                               gap_fallback_second};
+    if (!engine.layout(gap_fallback_nodes, 200.0f, 100.0f, 1.0f / 60.0f, snapshot, &error))
+        return 64;
+    const auto *gap_fallback_second_item = snapshot.find(762);
+    if (!gap_fallback_second_item ||
+        std::abs(gap_fallback_second_item->bounds.x - 66.0f) > 0.01f)
+        return 65;
+
     LayoutNode align_self_row_root = box(745, -1);
     align_self_row_root.style.width = {LayoutSizing::Fixed, 100.0f};
     align_self_row_root.style.height = {LayoutSizing::Fixed, 40.0f};
