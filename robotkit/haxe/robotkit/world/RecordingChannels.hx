@@ -49,6 +49,7 @@ class RecordingChannels {
     register(new CoreWorldChannel());
     register(new CoreWorldEventChannel());
     register(new CoreProcessEventChannel());
+    register(new PerceptionRecordingChannel());
   }
 
   public function register<T>(channel:RecordingChannel<T>):Void {

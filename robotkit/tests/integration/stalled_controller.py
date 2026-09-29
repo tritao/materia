@@ -15,9 +15,14 @@ def pack(value):
         if 0 <= value < 128:
             return bytes((value,))
         return b"\xcf" + struct.pack(">Q", value)
+    if isinstance(value, float):
+        return b"\xcb" + struct.pack(">d", value)
     if isinstance(value, str):
         data = value.encode()
         return (bytes((0xA0 | len(data),)) if len(data) < 32 else b"\xd9" + bytes((len(data),))) + data
+    if isinstance(value, list):
+        assert len(value) < 16
+        return bytes((0x90 | len(value),)) + b"".join(pack(item) for item in value)
     if isinstance(value, dict):
         assert len(value) < 16
         return bytes((0x80 | len(value),)) + b"".join(pack(k) + pack(v) for k, v in value.items())

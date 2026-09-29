@@ -14,6 +14,7 @@ ROOTS = {
     "world": "RecordingWorldMsg",
     "world_event": "RecordingWorldEventMsg",
     "process_event": "RecordingProcessEventMsg",
+    "perception.image_detections": "ImageDetectionObservationMsg",
 }
 
 
@@ -26,7 +27,7 @@ def schema(root: str, declarations: dict) -> str:
         entry = declarations[name]
         found[name] = entry
         for field in entry["fields"]:
-            for dependency in re.findall(r"Recording\w+Msg", field.get("type", "")):
+            for dependency in re.findall(r"[A-Z]\w+Msg", field.get("type", "")):
                 visit(dependency)
 
     visit(root)

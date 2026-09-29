@@ -363,7 +363,10 @@ rk_result rk_inference_poll_result(rk_inference_session id, rk_inference_result*
   if (!result || result->struct_size < sizeof(*result) || !size) return RK_ERROR_INVALID_ARGUMENT;
   auto session = lookup(id); if (!session) return RK_ERROR_INVALID_HANDLE;
   std::lock_guard lock(session->mutex);
-  if (!session->result) return RK_ERROR_STALE_STATE;
+  // The HXI two-call wrapper may query while the worker is still running.
+  // Report the fixed output capacity even on STALE_STATE so a result arriving
+  // between query and read cannot exceed the allocated buffer.
+  if (!session->result) { *size = session->outputBytes; return RK_ERROR_STALE_STATE; }
   const auto& ready = *session->result;
   if (ready.data.size() && (!output || *size < ready.data.size())) {
     *size = ready.data.size(); return RK_ERROR_LIMIT;

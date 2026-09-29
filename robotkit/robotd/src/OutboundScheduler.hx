@@ -12,12 +12,14 @@ import robotkit.transport.NativeTransport;
 /** The sole outbound RKF1 family classification. New families register here. */
 class OutboundPolicy {
   public static function capabilities():Array<String> {
-    return [OutboundFamily.Essential, OutboundFamily.Sensor, OutboundFamily.Camera];
+    return [OutboundFamily.Essential, OutboundFamily.Sensor, OutboundFamily.Camera,
+      OutboundFamily.Observation];
   }
 
   public static function family(messageType:Int):OutboundFamily {
     if (messageType == RobotMessageType.SensorFrame) return OutboundFamily.Sensor;
     if (messageType == RobotMessageType.CameraFrame) return OutboundFamily.Camera;
+    if (messageType == RobotMessageType.ImageDetectionObservation) return OutboundFamily.Observation;
     return OutboundFamily.Essential;
   }
 }
@@ -70,7 +72,8 @@ class OutboundScheduler {
     if (legacy) return;
     for (item in subscriptions) {
       if (item == null || (item.family != OutboundFamily.Essential &&
-          item.family != OutboundFamily.Sensor && item.family != OutboundFamily.Camera) ||
+          item.family != OutboundFamily.Sensor && item.family != OutboundFamily.Camera &&
+          item.family != OutboundFamily.Observation) ||
           item.maxRateHz < 0 || !Math.isFinite(item.maxRateHz))
         throw "invalid RKF1 stream subscription";
       rates.set(item.family, item.maxRateHz);
@@ -126,7 +129,7 @@ class OutboundScheduler {
     if (!accepts(sensorId, sequence)) return;
     var oldKey = (family == OutboundFamily.Camera ? OutboundFamily.Sensor : OutboundFamily.Camera)
       + ":" + sensorId;
-    var old = slots.get(oldKey);
+    var old = family == OutboundFamily.Observation ? null : slots.get(oldKey);
     if (old != null) {
       slots.remove(oldKey);
       var oldIndex = keys.indexOf(oldKey);
@@ -192,8 +195,9 @@ class OutboundScheduler {
     if (Int64.compare(Int64.sub(nowNs, lastLogNs), Int64.ofInt(1000000000)) < 0)
       return;
     lastLogNs = nowNs;
-    if (dropCount(OutboundFamily.Sensor) + dropCount(OutboundFamily.Camera) > 0)
-      Sys.println('robotd: session $sessionId outbound drops sensor=${dropCount(OutboundFamily.Sensor)} camera=${dropCount(OutboundFamily.Camera)}');
+    if (dropCount(OutboundFamily.Sensor) + dropCount(OutboundFamily.Camera) +
+        dropCount(OutboundFamily.Observation) > 0)
+      Sys.println('robotd: session $sessionId outbound drops sensor=${dropCount(OutboundFamily.Sensor)} camera=${dropCount(OutboundFamily.Camera)} observation=${dropCount(OutboundFamily.Observation)}');
   }
 
   function countDrop(family:OutboundFamily):Void {

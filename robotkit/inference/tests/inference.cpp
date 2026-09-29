@@ -47,6 +47,10 @@ static rk_inference_image_options imageOptions(uint32_t layout) {
 }
 static void basic() {
   auto session = open(RK_INFERENCE_FIXTURE);
+  rk_inference_result pending{}; pending.struct_size = sizeof(pending);
+  uint32_t pendingSize = 0;
+  assert(rk_inference_poll_result(session, &pending, nullptr, &pendingSize) == RK_ERROR_STALE_STATE);
+  assert(pendingSize == 48);
   rk_inference_info info{}; info.struct_size = sizeof(info);
   assert(rk_inference_get_info(session, &info) == RK_OK);
   assert(info.input_count == 1 && info.output_count == 1);

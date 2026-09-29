@@ -5,4 +5,5 @@ enum abstract OutboundFamily(String) from String to String {
   var Essential = "essential";
   var Sensor = "sensor";
   var Camera = "camera";
+  var Observation = "observation";
 }

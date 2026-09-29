@@ -15,6 +15,7 @@ import robotkit.protocol.JointTargetValue;
 import robotkit.protocol.JointTargets;
 import robotkit.protocol.RobotCapabilities;
 import robotkit.protocol.CameraFrameData;
+import robotkit.protocol.ImageDetectionObservationMsg;
 import robotkit.protocol.RobotDescription;
 import robotkit.protocol.RobotFrame;
 import robotkit.protocol.RobotFrame.RobotFrameStream;
@@ -47,6 +48,8 @@ class RobotClient {
   public var faultListener:Null<Fault->Void> = null;
   public var sensorListener:Null<SensorFrameMsg->Void> = null;
   public var cameraListener:Null<CameraFrameData->Void> = null;
+  public var imageDetectionListener:Null<ImageDetectionObservationMsg->Void> = null;
+  public var subscribeObservations:Bool = false;
   public var statusListener:Null<Void->Void> = null;
   /** Add camera before connect when full images are needed. */
   public var subscribeCamera:Bool = false;
@@ -312,6 +315,8 @@ class RobotClient {
               new StreamSubscription("sensor", sensorMaxRateHz)];
             if (subscribeCamera)
               requested.push(new StreamSubscription("camera", cameraMaxRateHz));
+            if (subscribeObservations)
+              requested.push(new StreamSubscription("observation"));
             send(RobotProtocol.hello(new Hello(1, clientName, "robotkit-v1",
               requestedRole, requested)));
           } else if (kind == EventKind.TransportData) {
@@ -422,6 +427,11 @@ class RobotClient {
       var listener = cameraListener;
       if (listener != null)
         listener(camera);
+    case RobotMessageType.ImageDetectionObservation:
+      if (!validSession(frame)) return;
+      var observation = RobotProtocol.decodeImageDetectionObservation(frame);
+      var listener = imageDetectionListener;
+      if (listener != null) listener(observation);
     case _:
   }
 

@@ -14,6 +14,7 @@ interface Robot {
   function capabilities():RobotCapabilities;
   function snapshot():RobotSnapshot;
   function sensors():Array<SensorFrame>;
+  function events(afterOrdinal:haxe.Int64, max:Int):Array<RobotEvent>;
   function fault():Null<RobotFault>;
   function submit(command:RobotCommand):Void;
   function stop(mode:StopMode):Void;

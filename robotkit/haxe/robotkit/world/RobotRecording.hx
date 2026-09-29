@@ -81,6 +81,14 @@ class RobotRecording implements RobotRecordingSink {
     append(RobotRecordingEvent.ProcessEvent(value), robotId);
   }
 
+  public function recordRobotEvent(robotId:RobotId, value:RobotEvent):Void {
+    if (value == null) throw "Robot event is required";
+    switch value {
+      case Observation(_, _): recordChannel(robotId, "perception.image_detections", value);
+      case Overflow(_, _): // The next observation's ordinal preserves this gap.
+    }
+  }
+
   public function recordChannel(robotId:RobotId, name:String, payload:Dynamic):Void {
     if (name == null || name.length == 0 || payload == null)
       throw "Recording channel requires a name and payload";

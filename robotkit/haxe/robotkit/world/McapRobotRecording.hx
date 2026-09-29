@@ -51,6 +51,10 @@ class McapRobotRecording implements RobotRecordingSink {
   public function recordProcessEvent(robotId:RobotId, value:FiredProcessEvent):Void {
     staging.recordProcessEvent(robotId, value); flushLast();
   }
+  public function recordRobotEvent(robotId:RobotId, value:RobotEvent):Void {
+    staging.recordRobotEvent(robotId, value);
+    switch value { case Observation(_, _): flushLast(); case Overflow(_, _): }
+  }
   public function recordChannel(robotId:RobotId, name:String, payload:Dynamic):Void {
     if (channels.get(name) == null) throw 'Unregistered recording channel $name';
     staging.recordChannel(robotId, name, payload); flushLast();

@@ -34,6 +34,7 @@ class RobotHost {
     var robotId = parseRobotId();
     var bulkBudgetBytes = parseBulkBudget();
     var deploymentPath = optionValue("--deployment=");
+    var perceptionFixtureModel = optionValue("--perception-fixture-model=");
     var deployment = deploymentPath == null ? null : new RobotDeployment(deploymentPath);
     var serialPath = deployment == null ? null : deployment.serialPath;
     var baud = deployment == null ? 115200 : deployment.baud;
@@ -51,9 +52,11 @@ class RobotHost {
       throw "robotd: --deployment requires --server";
     if (deployment != null && args.indexOf("--in-memory") >= 0)
       throw "robotd: --deployment cannot be combined with --in-memory";
+    if (perceptionFixtureModel != null && deployment != null)
+      throw "robotd: perception fixture requires the demo robot";
     var behavior = parseBehavior();
     var multiJoint = args.indexOf("--multi-joint") >= 0;
-    var cameraFixtureStream = args.indexOf("--camera-fixture-stream") >= 0;
+    var cameraFixtureStream = args.indexOf("--camera-fixture-stream") >= 0 || perceptionFixtureModel != null;
     var cameraFixture = args.indexOf("--camera-fixture") >= 0 || cameraFixtureStream;
     if (cameraFixture && deployment != null)
       throw "robotd: --camera-fixture requires the demo robot";
@@ -135,9 +138,12 @@ class RobotHost {
         var hostedRuntime:RobotRuntime = serverRuntime;
         var fixtureTick:Null<Void->Void> = null;
         if (cameraFixtureStream) {
-          var pixels = haxe.io.Bytes.alloc(640 * 480 * 3);
-          for (index in 0...pixels.length) pixels.set(index, index % 251);
-          var image = new robotkit.world.CameraImage(640, 480, "rgb8", pixels);
+          var fixtureWidth = perceptionFixtureModel == null ? 640 : 8;
+          var fixtureHeight = perceptionFixtureModel == null ? 480 : 4;
+          var pixels = haxe.io.Bytes.alloc(fixtureWidth * fixtureHeight * 3);
+          for (index in 0...pixels.length) pixels.set(index,
+            perceptionFixtureModel == null ? index % 251 : 51);
+          var image = new robotkit.world.CameraImage(fixtureWidth, fixtureHeight, "rgb8", pixels);
           var fixtureSequence = haxe.Int64.ofInt(0);
           var nextFixtureNs = haxe.Int64.ofInt(0);
           fixtureTick = function() {
@@ -158,7 +164,12 @@ class RobotHost {
             haxe.Int64.ofInt(1), haxe.Int64.ofInt(1), "camera.fixture");
         }
         var server = new RobotServer(robot, blueprint, hostedRuntime, serverSimulation,
-          port, robotId, behavior, listenAddress, bulkBudgetBytes, fixtureTick);
+          port, robotId, behavior, listenAddress, bulkBudgetBytes, fixtureTick,
+          deployment != null ? deployment.perception : perceptionFixtureModel == null ? [] :
+            [new robotkit.deployment.PerceptionPipelineConfig("front_objects", "demo/camera",
+              "object_detector", perceptionFixtureModel,
+              robotkit.inference.InferenceSession.modelDigest(perceptionFixtureModel),
+              "robotd", ["local", "worldd"], 0.4, 0.0, 0.5)]);
         server.run(args.indexOf("--once") >= 0);
       } catch (error:Dynamic) {
         if (serverSimulation != null) serverSimulation.dispose();

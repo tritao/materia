@@ -32,6 +32,14 @@ if [[ "${ROBOTKIT_TEST_SUBSCRIPTIONS:-0}" == "1" ]]; then
   server_mode="--server --camera-fixture"
   client_mode="--subscriptions"
 fi
+if [[ "${ROBOTKIT_TEST_PERCEPTION:-0}" == "1" ]]; then
+  server_mode="--server --perception-fixture-model=$repo_dir/robotkit/inference/tests/fixtures/detector.onnx"
+  client_mode="--perception"
+fi
+if [[ "${ROBOTKIT_TEST_PERCEPTION_STALL:-0}" == "1" ]]; then
+  server_mode="--server --perception-fixture-model=$repo_dir/robotkit/inference/tests/fixtures/detector.onnx"
+  client_mode="--perception-stall"
+fi
 setsid "$repo_dir/haxeon/scripts/haxeon" run --project "$server_project" -- \
   $server_mode --multi-joint --robot-id=42 --port="$port" >"$server_log" 2>&1 &
 server_pid=$!
@@ -76,7 +84,9 @@ if [[ "$ready" != "1" ]]; then
 fi
 # Let robotd process the probe disconnect before the real controller connects.
 sleep 0.1
-if [[ "${ROBOTKIT_TEST_BULK:-0}" == "1" ]]; then
+if [[ "${ROBOTKIT_TEST_PERCEPTION_STALL:-0}" == "1" ]]; then
+  python3 "$repo_dir/robotkit/tests/integration/stalled_observer.py" "$port"
+elif [[ "${ROBOTKIT_TEST_BULK:-0}" == "1" ]]; then
   python3 "$repo_dir/robotkit/tests/integration/stalled_controller.py" "$port"
 else
   "$repo_dir/haxeon/scripts/haxeon" run --project "$client_project" -- \
@@ -84,7 +94,9 @@ else
 fi
 if [[ "${ROBOTKIT_TEST_SESSIONS:-0}" != "1" && "${ROBOTKIT_TEST_LOCAL_OWNER:-0}" != "1" \
     && "${ROBOTKIT_TEST_LEASE_TIMEOUT:-0}" != "1" && "${ROBOTKIT_TEST_BULK:-0}" != "1" \
-    && "${ROBOTKIT_TEST_SUBSCRIPTIONS:-0}" != "1" ]]; then
+    && "${ROBOTKIT_TEST_SUBSCRIPTIONS:-0}" != "1" \
+    && "${ROBOTKIT_TEST_PERCEPTION:-0}" != "1" \
+    && "${ROBOTKIT_TEST_PERCEPTION_STALL:-0}" != "1" ]]; then
   wait "$server_pid"
   trap - EXIT
 fi

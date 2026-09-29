@@ -794,8 +794,23 @@ small-tensor API but links the same ONNX Runtime shared library.
 `ImageDetectionObservation` is independent of `RobotSnapshot` and planar
 `Detection`. It retains the source image's sequence, frame and source/receive
 clocks, plus a completion timestamp on `robotkit.monotonic`, model identity
-and digest, and dropped-frame count. Phase 5 will deliver these observations
-through the robot event stream and over RKF1.
+and digest, and dropped-frame count. The `Robot.events(afterOrdinal, max)`
+boundary exposes them in a bounded per-robot ring. Its ordinal is assigned
+when an observation enters the boundary; a late reader receives an `Overflow`
+marker before retained events. `WorldBehaviorContext` receives new events
+alongside each snapshot, and a new event can trigger an update even if the
+snapshot itself has not changed.
+
+`robotd` submits each new camera sequence to its configured pipelines and
+polls completed observations without waiting for inference. The observation
+family uses RKF1 message type 19 and a latest-wins slot per producer. Clients
+must subscribe to `observation`; `Welcome` advertises it. `RemoteRobot`
+assigns a new ordinal as each delivered observation enters its own robot
+boundary; the wire also carries the producing boundary's ordinal.
+`WorldHost` can run pipelines placed at `worldd` over subscribed remote camera
+frames. `RecordingRobot` stores observations on the registered
+`perception.image_detections` MessagePack channel, and `ReplayRobot` restores
+their original ordinals in recording order.
 
 ## 3D spatial types
 

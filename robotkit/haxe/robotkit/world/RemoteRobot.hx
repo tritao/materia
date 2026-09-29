@@ -17,6 +17,7 @@ class RemoteRobot implements Robot {
   var currentSnapshot:RobotSnapshot;
   var currentFault:Null<RobotFault> = null;
   var currentSensors:Array<SensorFrame> = [];
+  final eventRing = new RobotEventRing();
   final sensorSourceReceipts:Map<String, Int64> = [];
   var changeListener:Null < RobotId -> Void > = null;
 
@@ -30,6 +31,8 @@ class RemoteRobot implements Robot {
     client.statusListener = onStatus;
     client.sensorListener = onSensor;
     client.cameraListener = onCamera;
+    client.imageDetectionListener = onImageDetection;
+    client.subscribeObservations = true;
   }
 
   /** Request image frames before connecting. */
@@ -118,6 +121,21 @@ class RemoteRobot implements Robot {
   }
 
   public function fault():Null < RobotFault > return currentFault;
+
+  public function events(afterOrdinal:Int64, max:Int):Array<RobotEvent>
+    return eventRing.events(afterOrdinal, max);
+
+  public function publishObservation(value:robotkit.perception.ImageDetectionObservation):RobotEvent {
+    var event = eventRing.publish(value);
+    notifyChanged();
+    return event;
+  }
+
+  function onImageDetection(value:robotkit.protocol.ImageDetectionObservationMsg):Void {
+    var welcome = client.welcome;
+    if (welcome != null && Int64.compare(value.robotId, welcome.robotId) != 0) return;
+    publishObservation(value.toObservation());
+  }
 
   public function submit(command:RobotCommand):Void switch command {
     case JointTargets(targets, expiryNs):

@@ -4,17 +4,20 @@ import haxe.Int64;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.SensorFrame;
+import robotkit.world.RobotEvent;
 
 /** Read-only application input plus bounded command output for one robot. */
 class WorldBehaviorContext {
   public final snapshot:RobotSnapshot;
   public final sensors:Array<SensorFrame>;
+  public final events:Array<RobotEvent>;
   final commands:Array<RobotCommand>;
 
   @:allow(robotkit.behavior.WorldBehaviorRunner)
-  function new(snapshot:RobotSnapshot, commands:Array<RobotCommand>) {
+  function new(snapshot:RobotSnapshot, events:Array<RobotEvent>, commands:Array<RobotCommand>) {
     this.snapshot = snapshot;
     this.sensors = snapshot.sensors.toArray();
+    this.events = events.copy();
     this.commands = commands;
   }
 

@@ -87,5 +87,7 @@ run env ROBOTKIT_TEST_SUBSCRIPTIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_SESSIONS=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_LEASE_TIMEOUT=1 "$robotkit_dir/tests/world-tcp.sh"
 run env ROBOTKIT_TEST_BULK=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_PERCEPTION=1 "$robotkit_dir/tests/world-tcp.sh"
+run env ROBOTKIT_TEST_PERCEPTION_STALL=1 "$robotkit_dir/tests/world-tcp.sh"
 
 printf '\nAll available RobotKit suites passed.\n'

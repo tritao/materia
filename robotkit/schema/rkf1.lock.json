@@ -260,6 +260,136 @@
       ],
       "kind": "class"
     },
+    "ImageDetectionMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "label",
+          "type": "String"
+        },
+        {
+          "id": 2,
+          "name": "score",
+          "type": "Float"
+        },
+        {
+          "id": 3,
+          "name": "x",
+          "type": "Float"
+        },
+        {
+          "id": 4,
+          "name": "y",
+          "type": "Float"
+        },
+        {
+          "id": 5,
+          "name": "width",
+          "type": "Float"
+        },
+        {
+          "id": 6,
+          "name": "height",
+          "type": "Float"
+        }
+      ],
+      "kind": "class"
+    },
+    "ImageDetectionObservationMsg": {
+      "fields": [
+        {
+          "id": 1,
+          "name": "robotId",
+          "type": "Int64"
+        },
+        {
+          "id": 2,
+          "name": "ordinal",
+          "type": "Int64"
+        },
+        {
+          "id": 3,
+          "name": "producerId",
+          "type": "String"
+        },
+        {
+          "id": 4,
+          "name": "pipelineId",
+          "type": "String"
+        },
+        {
+          "id": 5,
+          "name": "sensorId",
+          "type": "String"
+        },
+        {
+          "id": 6,
+          "name": "modelId",
+          "type": "String"
+        },
+        {
+          "id": 7,
+          "name": "modelDigest",
+          "type": "String"
+        },
+        {
+          "id": 8,
+          "name": "sourceFrameId",
+          "type": "String"
+        },
+        {
+          "id": 9,
+          "name": "sequence",
+          "type": "Int64"
+        },
+        {
+          "id": 10,
+          "name": "sourceTimestampNs",
+          "type": "Int64"
+        },
+        {
+          "id": 11,
+          "name": "receivedTimestampNs",
+          "type": "Int64"
+        },
+        {
+          "id": 12,
+          "name": "sourceClockId",
+          "type": "String"
+        },
+        {
+          "id": 13,
+          "name": "receivedClockId",
+          "type": "String"
+        },
+        {
+          "id": 14,
+          "name": "completedTimestampNs",
+          "type": "Int64"
+        },
+        {
+          "id": 15,
+          "name": "completedClockId",
+          "type": "String"
+        },
+        {
+          "id": 16,
+          "name": "detections",
+          "type": "Array<ImageDetectionMsg>"
+        },
+        {
+          "id": 17,
+          "name": "droppedFrames",
+          "type": "Int"
+        },
+        {
+          "id": 18,
+          "name": "logicalRobotId",
+          "type": "String"
+        }
+      ],
+      "kind": "class"
+    },
     "JointTarget": {
       "fields": [
         {
@@ -1396,6 +1526,7 @@
     "Fault": 11,
     "FrameTarget": 7,
     "Hello": 1,
+    "ImageDetectionObservation": 19,
     "JointTarget": 6,
     "JointTargets": 14,
     "PathControl": 18,

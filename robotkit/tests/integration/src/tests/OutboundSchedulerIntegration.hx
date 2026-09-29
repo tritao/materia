@@ -85,7 +85,7 @@ class OutboundSchedulerIntegration {
       scheduler.configure([]);
       var capabilities = robotd.OutboundScheduler.OutboundPolicy.capabilities();
       if (capabilities.indexOf("essential") < 0 || capabilities.indexOf("sensor") < 0 ||
-          capabilities.indexOf("camera") < 0)
+          capabilities.indexOf("camera") < 0 || capabilities.indexOf("observation") < 0)
         throw "server capabilities omit an emitted family";
       var stream = new RobotFrameStream();
       scheduler.offer(OutboundFamily.Camera, "a", Int64.ofInt(1), frame("a1"));
@@ -111,6 +111,14 @@ class OutboundSchedulerIntegration {
         throw "numeric sensor sequence was not sent exactly once";
       if (scheduler.dropCount(OutboundFamily.Sensor) != 0)
         throw "camera drop affected numeric sensor counter";
+      scheduler.configure([new StreamSubscription("observation")]);
+      var observationFrame = new RobotFrame(RobotMessageType.ImageDetectionObservation,
+        Bytes.ofString("detection"));
+      scheduler.offer(OutboundFamily.Observation, "front", Int64.ofInt(1), observationFrame);
+      scheduler.offer(OutboundFamily.Observation, "front", Int64.ofInt(2), observationFrame);
+      if (scheduler.dropCount(OutboundFamily.Observation) != 1 || !scheduler.flush(1) ||
+          receiveOne(client.borrow(), stream, runtime) != "detection")
+        throw "per-producer observation latest-wins delivery failed";
       var oversized = new RobotFrame(RobotMessageType.CameraFrame, Bytes.alloc(300));
       scheduler.offer(OutboundFamily.Camera, "blocked", Int64.ofInt(1), oversized);
       if (!scheduler.flush(1)) throw "over-budget bulk frame failed the connection";

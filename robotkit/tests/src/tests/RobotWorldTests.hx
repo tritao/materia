@@ -225,6 +225,7 @@ class RobotWorldTests {
     assertions += WorkTests.run();
     assertions += PerceptionTests.run();
     assertions += PerceptionInferenceTests.run();
+    assertions += RobotEventTests.run();
     assertions += PlacementTests.run();
     assertions += WallFinishingScenarioTests.run();
     assertions += ConstructionSkillTests.run();
@@ -4407,6 +4408,31 @@ class RobotWorldTests {
     var snapshot = host.step(Int64.ofInt(3000));
     check(snapshot.robot(robot.id()) != null,
       "worldd composes one world and one shared simulation");
+    var remote = host.addRemoteRobot("worldd-camera");
+    var modelPath = Sys.getCwd() + "/robotkit/inference/tests/fixtures/detector.onnx";
+    if (!sys.FileSystem.exists(modelPath))
+      modelPath = Sys.getCwd() + "/../inference/tests/fixtures/detector.onnx";
+    host.configurePerception(remote, [new robotkit.deployment.PerceptionPipelineConfig(
+      "world_objects", "front_camera", "object_detector", modelPath,
+      robotkit.inference.InferenceSession.modelDigest(modelPath), "worldd", ["worldd"],
+      0.4, 0.0, 0.5)]);
+    var pixels = haxe.io.Bytes.alloc(8 * 4 * 3);
+    for (index in 0...pixels.length) pixels.set(index, 51);
+    remote.onCamera(new robotkit.protocol.CameraFrameData(new CameraFrame(
+      Int64.ofInt(42), "front_camera", "camera", "frame/front", Int64.ofInt(1),
+      Int64.ofInt(10), Int64.ofInt(20), 8, 4, PixelFormat.RGB8), pixels));
+    var worldObservation = false;
+    for (index in 0...200) {
+      host.step(Int64.ofInt(4000 + index));
+      for (event in remote.events(Int64.ofInt(0), 8)) switch event {
+        case robotkit.world.RobotEvent.Observation(_, value):
+          if (value.detections.length == 1) worldObservation = true;
+        case _:
+      }
+      if (worldObservation) break;
+      Sys.sleep(0.005);
+    }
+    check(worldObservation, "worldd-hosted perception consumes subscribed remote camera frames");
     host.close();
   }
 
@@ -4893,6 +4919,7 @@ private class FakeRobot implements Robot {
     0
   );
   public function sensors():Array<SensorFrame> return [];
+  public function events(afterOrdinal:haxe.Int64, max:Int):Array<robotkit.world.RobotEvent> return [];
   public function fault():Null < RobotFault > return null;
   public function submit(command:RobotCommand):Void lastCommand = command;
   public function stop(mode:StopMode):Void lastStop = mode;

@@ -8,6 +8,7 @@ class WorldBehaviorRunner {
   public final behavior:WorldBehavior;
   var hasObservation:Bool = false;
   var lastObservationKey:String = "";
+  var lastEventOrdinal:Int64 = Int64.ofInt(0);
 
   public function new(behavior:WorldBehavior) {
     if (behavior == null) throw "WorldBehaviorRunner requires a behavior";
@@ -17,16 +18,18 @@ class WorldBehaviorRunner {
   public function update(robot:Robot):Int {
     var snapshot = robot.snapshot();
     var key = observationKey(snapshot);
-    if (hasObservation && key == lastObservationKey) return 0;
+    var events = robot.events(lastEventOrdinal, 256);
+    if (hasObservation && key == lastObservationKey && events.length == 0) return 0;
+    if (events.length > 0) lastEventOrdinal = robotkit.world.RobotEventRing.ordinalOf(events[events.length - 1]);
     hasObservation = true;
     lastObservationKey = key;
     var commands:Array<robotkit.world.RobotCommand> = [];
-    behavior.update(new WorldBehaviorContext(snapshot, commands));
+    behavior.update(new WorldBehaviorContext(snapshot, events, commands));
     for (command in commands) robot.submit(command);
     return commands.length;
   }
 
-  public function reset():Void { hasObservation = false; lastObservationKey = ""; }
+  public function reset():Void { hasObservation = false; lastObservationKey = ""; lastEventOrdinal = Int64.ofInt(0); }
 
   static function observationKey(snapshot:robotkit.world.RobotSnapshot):String {
     var key = '${snapshot.sourceClockId}:${Int64.toStr(snapshot.sourceSequence)}:'
