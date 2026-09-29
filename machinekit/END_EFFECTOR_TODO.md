@@ -6,11 +6,11 @@ project of its own.
 
 ## Real parts
 
-- [ ] **Vendor catalogs (M per vendor).** Eins, Schunk, Zimmer, SMC or Piab via
-  `Catalog<T>`: coupling key, ports, declared mass and centre, envelope
-  geometry and provenance, using the same API as the generic parts. A Schmalz
-  cup, ejector and fitting now provide the first pneumatic slice; changer
-  halves and broader vendor coverage remain.
+- [x] **First vendor catalog slice.** Schmalz cups, ejector, fitting, hose and
+  changer pair now provide sourced envelopes, masses, ports and coupling keys.
+- [ ] **Vendor catalogs (M per vendor).** Extend the Schmalz slice and add
+  Eins, Schunk, Zimmer, SMC or Piab via `Catalog<T>`, with broader verified
+  options and the same API as generic parts.
 - [ ] **Vendor STEP files as envelopes (M).** Load a vendor model for
   collision and appearance, then declare connectors and ports by hand. Vendor
   files usually allow internal use but not redistribution, so keep them outside
@@ -52,7 +52,8 @@ project of its own.
   by the runtime gripper state, instead of one full-stroke envelope.
 - [ ] **Contact-based grasping (M–L).** Hold parts through suction or friction
   contacts rather than attachment, so parts can slip or drop under
-  acceleration; feeds the suction capacity check.
+  acceleration; feeds the suction capacity check. Simulated cup contact now
+  drives vacuum pressure feedback, but attachment still holds the part.
 - [ ] **Hose and cable dress packs (M).** A swept volume or simple cable model
   for hose loops, a common real-world collision.
 
@@ -65,9 +66,10 @@ project of its own.
 - [ ] **Tool-aware task skills (M).** Choose a tool configuration and working
   frame per part in AutomationKit `Pick`/`Place` tasks, and schedule tool
   changes.
-- [ ] **Runtime bindings from the design (S–M).** Generate valve channels,
+- [x] **Runtime bindings from the design (S–M).** Generate valve channels,
   vacuum sensors and changer-lock bindings from the design's ports instead of
-  hand-written control bindings.
+  hand-written control bindings. `EndEffectorRuntimeBridge.deriveBindings`
+  supplies these bindings from component port intents.
 
 ## Beyond end effectors
 
@@ -83,6 +85,7 @@ project of its own.
 
 1. Design report: show the configuration BOM, service chains, payload and
    suction margins in one reviewable artifact.
-2. Extend the vendor catalog to a matching changer pair and more cup sizes.
-3. Document and editor persistence: needed once someone must author tools
+2. Document and editor persistence: needed once someone must author tools
    interactively.
+3. Contact-based grasping: make the simulated part slip or drop when holding
+   forces fail, using the existing cup pressure feedback.
