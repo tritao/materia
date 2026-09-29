@@ -18,6 +18,7 @@ import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolPlanningContext;
+import robotkit.manipulation.ToolClearanceShape;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -203,10 +204,13 @@ class ConstructionSkillTests {
       ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05)));
     var cell = new ToolPlanningContext(mounted, [new ToolBoxObstacle(
       Transform3.identity(), new Vec3(10.0, 10.0, 10.0))]);
+    var preparedBeforeSkill = ToolClearanceShape.preparationCount;
     var blockedPaint = new Paint(navigator, manipulator, robot,
       registered.frame_T_surface, registered, spec, observe, new SimulatedSprayer(),
       0.3, 2.0, seed, paintMotion, null, cell);
     var blockedStatus = runToCompletion(blockedPaint);
+    check(ToolClearanceShape.preparationCount == preparedBeforeSkill,
+      "FinishSurface reuses the planning context's prepared tool shape");
     check(switch blockedStatus { case Failed(_): true; case _: false; },
       "Paint rejects a path blocked by a 3D obstacle at planning time");
     check(blockedPaint.coverage() == null,
