@@ -171,3 +171,15 @@ install(TARGETS robotkit_runtime EXPORT RobotKitTargets
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(FILES generated/device_wire6.hpp generated/device_frame6.hpp
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+# These tests use assert for setup calls as well as checks. Keep them active in Release.
+get_property(_assert_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(_assert_test_target IN LISTS _assert_test_targets)
+    if(_assert_test_target MATCHES "_tests$")
+        if(MSVC)
+            target_compile_options(${_assert_test_target} PRIVATE /UNDEBUG)
+        else()
+            target_compile_options(${_assert_test_target} PRIVATE -UNDEBUG)
+        endif()
+    endif()
+endforeach()

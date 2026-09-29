@@ -386,6 +386,11 @@ public:
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         const auto found = objects_.find(id);
         if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        for (auto &[other_id, object] : objects_)
+            if (other_id != id && object.carrier == found->second.part.body) {
+                const auto result = release_object(other_id);
+                if (result != NKSIM_OK) return result;
+            }
         destroy_part(found->second.part);
         objects_.erase(found);
         return NKSIM_OK;

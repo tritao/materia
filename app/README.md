@@ -316,9 +316,9 @@ result after ten simulated seconds, run from the repository root:
 ```
 
 The output reports the job, part position, current zone, and robot separation.
-Omit `--snapshot` to view it in the editor. Headless screenshots and their
-capture commands are in `humankit/sim/tests/screenshots` and
-`humankit/sim/tests/README.md`.
+Omit `--snapshot` to view it in the editor. The headless capture command is in
+`humankit/sim/tests/README.md`; screenshots are generated under that test's
+ignored build directory.
 
 For a bounded HashLink CPU/allocation/GC capture with process RSS sampled at
 100 ms intervals, run from the repository root:

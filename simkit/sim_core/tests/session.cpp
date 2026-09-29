@@ -1,4 +1,3 @@
-#undef NDEBUG
 #include "nativekit_scene.h"
 #include "nativekit_sim.h"
 #include "nativekit_sim_session.h"
@@ -418,6 +417,22 @@ int main() {
         assert(nksim_session_destroy_object(space.session, payload) == NKSIM_OK);
         assert(nksim_session_get_object_carrier(space.session, payload, &reported) ==
                NKSIM_ERROR_INVALID_HANDLE);
+        // An object body is also a valid carrier. Destroying it must clear
+        // dependent holds before removing the body handle.
+        desc.motion_type = NKSIM_MOTION_DYNAMIC;
+        desc.mass = 1.0;
+        desc.pose = pose_at(0.0, 0.0, 2.0);
+        nksim_object parent = 0, child = 0;
+        assert(nksim_session_create_object(space.session, &desc, &parent) == NKSIM_OK);
+        desc.pose = pose_at(0.0, 0.0, 2.3);
+        assert(nksim_session_create_object(space.session, &desc, &child) == NKSIM_OK);
+        nksim_body parent_body = 0;
+        assert(nksim_session_get_object_body(space.session, parent, &parent_body) == NKSIM_OK);
+        assert(nksim_session_hold_object(space.session, child, parent_body, &offset) == NKSIM_OK);
+        assert(nksim_session_destroy_object(space.session, parent) == NKSIM_OK);
+        assert(nksim_session_get_object_carrier(space.session, child, &reported) == NKSIM_OK &&
+               reported == 0);
+        assert(nksim_session_step(space.session, 0, nullptr) == NKSIM_OK);
     }
     planes_and_cylinders_are_objects();
     objects_follow_their_motion_type();

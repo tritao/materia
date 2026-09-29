@@ -36,7 +36,8 @@ A held session object switches its childless free body between dynamic and
 kinematic motion in the live model. The switch updates mass, inertia, and
 gravity compensation, then calls `mj_setConst` to recompute mass dependent
 solver constants. The live joint state is restored afterwards. The object's
-original collision pairs remain active while held, including contacts with
+original collision pairs remain active while held, including across a model
+rebuild, and contacts with
 static and kinematic bodies; those contacts cannot move the held object, while
 contacts with dynamic bodies can push them.
 

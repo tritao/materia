@@ -434,6 +434,12 @@ class HumanKitTests {
 		var released = human.pose.bonePosition(HumanBone.HandR);
 		if (distance(released, target) < 0.02)
 			throw "The reach did not release cleanly; the wrist is still pinned to the target";
+		var resetRoute = new HumanReachTask(walker, [[2.0, 1.0], [2.5, 1.0]], 1.0,
+			ArmR, target, 0.2, 0.1);
+		var resetRoot = walker.rootTransform();
+		if (Math.abs(resetRoot[12] - 2.0) > 1e-5 || Math.abs(resetRoot[13] - 1.0) > 1e-5)
+			throw "Reach task did not start at the first route point";
+		resetRoute.advance(step);
 		human.dispose();
 	}
 
@@ -499,6 +505,20 @@ class HumanKitTests {
 			if (distance(human.pose.bonePosition(bone), body.carryTargetModel(hand)) > 0.03)
 				throw 'Two-hand carry missed the $hand hand target';
 		}
+		body.setCarry([ArmL]);
+		body.advance(0.0);
+		if (body.isCarrying(ArmR) || body.reachTargetWorld(ArmR) != null ||
+			distance(human.pose.bonePosition(HumanBone.HandR), body.carryTargetModel(ArmR)) < 0.04)
+			throw "Dropped right hand remained locked in its carry pose";
+		body.setCarry([]);
+		body.advance(0.0);
+		if (body.isCarrying(ArmL) || body.reachTargetWorld(ArmL) != null ||
+			distance(human.pose.bonePosition(HumanBone.HandL), body.carryTargetModel(ArmL)) < 0.04)
+			throw "Dropped left hand remained locked in its carry pose";
+		var malformed = new HumanJob(body).add(WalkTo.along([[0.0, 0.0], [1.0]], 1.0));
+		malformed.advance(step);
+		if (malformed.failure() == null || malformed.failure().indexOf("finite x and y") < 0)
+			throw "Malformed route point was accepted";
 		human.dispose();
 
 		var unreachableHuman = new HumanCharacter(scene, asset, rig, null, "UnreachableWorker");

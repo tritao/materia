@@ -11,6 +11,7 @@ class Place extends HumanActionBase {
 	public var atTarget(default, null):Bool = false;
 	var stage:Int = 0;
 	var elapsed:Float = 0.0;
+	var from:Array<Array<Float>> = [];
 
 	public function new(target:Array<Float>, hands:Array<HumanLimb>, ramp:Float = 0.35) {
 		super();
@@ -25,15 +26,22 @@ class Place extends HumanActionBase {
 			fail("Place needs a point, hands, and a non-negative ramp");
 			return;
 		}
+		from = [];
+		for (hand in hands) {
+			var bone = hand == ArmL ? HandL : HandR;
+			var point = worker.character.pose.bonePosition(bone);
+			if (point == null) { fail("Place needs a hand bone"); return; }
+			from.push(worker.toWorld(point));
+		}
 		worker.setCarry([]);
-		setWeight(0.0);
+		setWeight(0.0, true);
 	}
 
 	override public function advance(seconds:Float):Void {
 		if (stage == 0) {
 			elapsed += seconds;
 			var weight = ramp == 0.0 ? 1.0 : Math.min(1.0, elapsed / ramp);
-			setWeight(weight);
+			setWeight(weight, true);
 			if (weight >= 1.0) {
 				atTarget = true;
 				stage = 1;
@@ -58,13 +66,19 @@ class Place extends HumanActionBase {
 		}
 	}
 
-	function setWeight(weight:Float):Void {
+	function setWeight(weight:Float, entering:Bool = false):Void {
 		var root = worker.rootTransform();
-		for (hand in hands) {
+		for (index in 0...hands.length) {
+			var hand = hands[index];
 			var side = hand == ArmL ? 1.0 : -1.0;
 			var spread = hands.length == 2 ? 0.08 : 0.0;
-			worker.setReachWorld(hand, [target[0] + root[4] * side * spread,
-				target[1] + root[5] * side * spread, target[2]], weight);
+			var goal = [target[0] + root[4] * side * spread,
+				target[1] + root[5] * side * spread, target[2]];
+			if (entering) {
+				var start = from[index];
+				for (axis in 0...3) goal[axis] = start[axis] + (goal[axis] - start[axis]) * weight;
+			}
+			worker.setReachWorld(hand, goal, entering ? 1.0 : weight);
 		}
 	}
 }

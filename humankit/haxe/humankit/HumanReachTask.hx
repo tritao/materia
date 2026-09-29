@@ -39,6 +39,13 @@ class HumanReachTask {
 		this.holdSeconds = holdSeconds;
 		if (clip != null && walker.character.asset.clipIndex(clip) < 0)
 			throw 'The character needs a "$clip" clip';
+		if (route.length == 0) throw "Reach route needs a start point";
+		for (point in route)
+			if (point == null || point.length < 2 || !Math.isFinite(point[0]) || !Math.isFinite(point[1]))
+				throw "Reach route points need finite x and y";
+		var direction = route.length > 1 ? Math.atan2(route[1][1] - route[0][1],
+			route[1][0] - route[0][0]) : 0.0;
+		walker.place(route[0][0], route[0][1], direction);
 		job = new HumanJob(new HumanBody(walker.character, walker));
 		job.add(WalkTo.along(route, metresPerSecond));
 		if (clip != null) job.add(new PlayClip(clip, 0.0, fadeSeconds));

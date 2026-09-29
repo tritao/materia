@@ -83,6 +83,7 @@ class HumanBody {
 	}
 
 	public function setCarry(hands:Array<HumanLimb>):Void {
+		for (hand in carrying) if (hands.indexOf(hand) < 0) clearReach(hand);
 		carrying = hands.copy();
 		for (hand in hands) clearReach(hand);
 	}

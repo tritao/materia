@@ -1239,8 +1239,13 @@ private:
             for (std::size_t j = i + 1; j < body_order.size(); ++j) {
                 const auto first = body_order[i], second = body_order[j];
                 const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
-                const bool neither_dynamic = body_a.desc.motion_type != NKSIM_MOTION_DYNAMIC &&
-                    body_b.desc.motion_type != NKSIM_MOTION_DYNAMIC;
+                // A held free body may become dynamic again without another
+                // rebuild. Keep its static contacts in the compiled model.
+                const auto can_be_dynamic = [](const BodyRecord &body) {
+                    return body.desc.motion_type == NKSIM_MOTION_DYNAMIC ||
+                        (body.desc.motion_type == NKSIM_MOTION_KINEMATIC && body.free_inertia_saved);
+                };
+                const bool neither_dynamic = !can_be_dynamic(body_a) && !can_be_dynamic(body_b);
                 bool needs_exclude = neither_dynamic;
                 if (!needs_exclude && is_same_articulation(first, second)) {
                     needs_exclude = is_parent_child(first, second) ||

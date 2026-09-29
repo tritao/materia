@@ -911,8 +911,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     scene.reconcileRecords(objects);
     var base = sensors.model.links[0];
     var arm = sensors.model.addLink(new robotkit.model.Link("Demo arm", "worker-demo-arm"));
+    arm.collisionShapes.push(new robotkit.model.CollisionShape(
+      robotkit.model.CollisionShape.CollisionPrimitive.Sphere(0.12), [0.45, 0.0, 0.0]));
     var joint = new robotkit.model.Joint("Arm pivot", robotkit.model.JointType.Revolute,
       base, arm, "worker-demo-pivot");
+    joint.parentFramePosition = [0.0, 0.0, 1.3];
     joint.limits.lower = -0.8; joint.limits.upper = 0.8;
     joint.limits.velocity = 2.0; joint.limits.effort = 5.0;
     sensors.model.addJoint(joint);

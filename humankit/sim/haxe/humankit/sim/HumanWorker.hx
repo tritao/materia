@@ -8,11 +8,9 @@ import humankit.HumanLimb;
 import humankit.Pick;
 import humankit.Place;
 import nativekit.sim.SimFrame;
-import nativekit.sim.SimActor;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
 import nativekit.sim.SimSession;
-import nativekit.sim.SimShape;
 import NativeKitSim;
 
 /** A job-driven animated worker and its physical capsule actor. */
@@ -21,17 +19,14 @@ class HumanWorker {
 	public final session:SimSession;
 	public final body:HumanBody;
 	public final actor:HumanActor;
-	final placeAnchor:SimActor;
 	public final zones:Array<HumanZone> = [];
 	public var onTick:Null<HumanWorker->HumanWorkerSignals->Void>;
 	var job:Null<HumanJob>;
 	var bindings:Array<{action:Dynamic, object:SimObject, hand:HumanLimb, grasp:Array<Float>}> = [];
-	var grasps:Array<{object:SimObject, offset:Array<Float>, initial:SimPose}> = [];
-	var links:Array<{id:String, body:nksim_body, radius:Float}> = [];
-	var pending:Array<{time:Float, object:SimObject, hand:HumanLimb, kind:Int, goal:Null<SimPose>}> = [];
+	var links:Array<{id:String, pose:Void->SimPose, radius:Float}> = [];
+	var pending:Array<{time:Float, object:SimObject, hand:HumanLimb, kind:Int}> = [];
 	var lastAction:Dynamic;
 	var lastGrip:Bool = false;
-	var lastAligned:Bool = false;
 	var animationTime:Float = 0.0;
 	var observer:Int;
 	var disposed:Bool = false;
@@ -44,7 +39,6 @@ class HumanWorker {
 				1 - 2 * (startPose.qy * startPose.qy + startPose.qz * startPose.qz)));
 		body.advance(0.0);
 		actor = new HumanActor(session, proxy, character.pose, body.rootTransform());
-		placeAnchor = session.createActor([SimShape.sphere(0.001)], [new SimPose(0, 0, -10)]);
 		observer = session.addStepObserver(publishSignals);
 	}
 
@@ -58,13 +52,6 @@ class HumanWorker {
 
 	function bind(action:Dynamic, object:SimObject, graspPoint:Array<Float>, hand:HumanLimb):Void {
 		if (graspPoint.length < 3 || (hand != ArmL && hand != ArmR)) throw "A binding needs a grasp point and hand";
-		if (Std.isOfType(action, Pick)) {
-			var frame = session.capture();
-			var pose = frame.objectPose(object);
-			frame.dispose();
-			grasps.push({object: object, offset: [pose.x - graspPoint[0], pose.y - graspPoint[1],
-				pose.z - graspPoint[2]], initial: pose});
-		}
 		bindings.push({action: action, object: object, hand: hand, grasp: graspPoint.copy()});
 	}
 
@@ -75,7 +62,6 @@ class HumanWorker {
 		this.job = job;
 		lastAction = null;
 		lastGrip = false;
-		lastAligned = false;
 	}
 
 	public function currentJobDone():Bool
@@ -89,8 +75,18 @@ class HumanWorker {
 
 	/** A robot link's collision bound is approximated by a sphere around its body origin. */
 	public function addRobotLink(id:String, link:nksim_body, radius:Float):Void {
+		addRobotLinkPose(id, function() {
+			var frame = session.capture();
+			var pose = frame.bodyState(link).pose;
+			frame.dispose();
+			return pose;
+		}, radius);
+	}
+
+	/** Samples a robot runtime link's collision center after each physics tick. */
+	public function addRobotLinkPose(id:String, pose:Void->SimPose, radius:Float):Void {
 		if (radius < 0.0) throw "Robot link radius must be non-negative";
-		links.push({id: id, body: link, radius: radius});
+		links.push({id: id, pose: pose, radius: radius});
 	}
 
 	/** Call before stepping the session. Jobs and actor poses run three ticks ahead. */
@@ -116,23 +112,9 @@ class HumanWorker {
 						Std.isOfType(current, Place) ? (cast current:Place).grip : false;
 					if (current != lastAction) {
 						lastGrip = Std.isOfType(current, Place);
-						lastAligned = false;
-					}
-					if (Std.isOfType(current, Place)) {
-						var place:Place = cast current;
-						if (place.atTarget && !lastAligned) {
-							var grasp:Null<{object:SimObject, offset:Array<Float>, initial:SimPose}> = null;
-							for (entry in grasps) if (entry.object == binding.object) grasp = entry;
-							if (grasp == null) throw "Place needs a bound Pick for its object";
-							pending.push({time: target, object: binding.object, hand: binding.hand, kind: 2,
-								goal: new SimPose(place.target[0] + grasp.offset[0], place.target[1] + grasp.offset[1],
-									place.target[2] + grasp.offset[2], grasp.initial.qx, grasp.initial.qy,
-									grasp.initial.qz, grasp.initial.qw)});
-							lastAligned = true;
-						}
 					}
 					if (grip != lastGrip) pending.push({time: target, object: binding.object, hand: binding.hand,
-						kind: grip ? 1 : 3, goal: null});
+						kind: grip ? 1 : 3});
 					lastGrip = grip;
 					lastAction = current;
 				}
@@ -143,17 +125,11 @@ class HumanWorker {
 	function flushPending(until:Float):Void {
 		while (pending.length > 0 && pending[0].time <= until + 1e-9) {
 			var event = pending.shift();
-			if (event.kind == 2) {
-				var goal = event.goal;
-				if (goal == null) throw "Place anchor requires a goal pose";
-				placeAnchor.pushKeyframe(event.time, [new SimPose(goal.x, goal.y, -10)]);
-				session.holdObject(event.object, placeAnchor.partBody(0),
-					new SimPose(0, 0, goal.z + 10, goal.qx, goal.qy, goal.qz, goal.qw));
-			} else if (event.kind == 1) {
+			if (event.kind == 1) {
 				var frame = session.capture();
 				var index = handIndex(event.hand);
 				var carrierPose = frame.actorPose(actor.actor, index);
-				var objectPose = event.goal == null ? frame.objectPose(event.object) : event.goal;
+				var objectPose = frame.objectPose(event.object);
 				frame.dispose();
 				session.holdObject(event.object, actor.actor.partBody(index), relative(carrierPose, objectPose));
 			} else session.releaseObject(event.object);
@@ -186,7 +162,7 @@ class HumanWorker {
 					zone.contains(pose.x - axis[0] * half, pose.y - axis[1] * half)) occupied.push(zone.id);
 			}
 			for (link in links) {
-				var other = frame.bodyState(link.body).pose;
+				var other = link.pose();
 				var along = (other.x - pose.x) * axis[0] + (other.y - pose.y) * axis[1] +
 					(other.z - pose.z) * axis[2];
 				along = Math.max(-half, Math.min(half, along));
@@ -208,7 +184,6 @@ class HumanWorker {
 		session.removeStepObserver(observer);
 		// A sealed session owns its actor until the session itself is disposed.
 		if (!session.isSealed()) actor.dispose();
-		if (!session.isSealed()) placeAnchor.dispose();
 		disposed = true;
 	}
 

@@ -1,5 +1,4 @@
 // This test uses assert for setup calls; keep them active in Release builds.
-#undef NDEBUG
 #include "robotkit_runtime.hpp"
 
 #include <algorithm>

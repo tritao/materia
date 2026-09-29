@@ -26,13 +26,18 @@ class WalkTo extends HumanActionBase {
 		if (pathValue != null) {
 			if (pathValue.length == 0) { fail("Walking route is empty"); return; }
 			route = [start];
-			for (p in pathValue)
-				if (p.length < 2 || Math.sqrt(Math.pow(p[0] - route[route.length - 1][0], 2)
+			for (p in pathValue) {
+				if (p == null || p.length < 2 || !Math.isFinite(p[0]) || !Math.isFinite(p[1])) {
+					fail("Walking point needs finite x and y"); return;
+				}
+				if (Math.sqrt(Math.pow(p[0] - route[route.length - 1][0], 2)
 					+ Math.pow(p[1] - route[route.length - 1][1], 2)) > 1e-5)
 					route.push([p[0], p[1]]);
+			}
 		} else {
 			var goal = point;
-			if (goal == null || goal.length < 2) { fail("Walking point needs x and y"); return; }
+			if (goal == null || goal.length < 2 || !Math.isFinite(goal[0]) ||
+				!Math.isFinite(goal[1])) { fail("Walking point needs finite x and y"); return; }
 			route = [start, [goal[0], goal[1]]];
 		}
 		if (route.length < 2) {

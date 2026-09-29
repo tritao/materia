@@ -1,4 +1,3 @@
-#undef NDEBUG
 #include "nativekit_scene.h"
 #include "nativekit_sim.h"
 #include "nativekit_sim_mujoco.h"
@@ -188,6 +187,31 @@ void held_object_tracks_pushes_and_releases() {
     assert(nksim_session_destroy_actor(session, actor) == NKSIM_OK);
     assert(nksim_session_get_object_carrier(session, payload, &reported) == NKSIM_OK &&
            reported == 0);
+    // Rebuilding while held must retain the cargo's future floor contacts.
+    nksim_actor_part rebuild_carrier_part{};
+    rebuild_carrier_part.struct_size = sizeof(rebuild_carrier_part);
+    rebuild_carrier_part.shape.type = NKSIM_SHAPE_SPHERE;
+    rebuild_carrier_part.shape.parameters[0] = 0.02;
+    rebuild_carrier_part.pose = pose_at(3.0, 0, 1.0);
+    nksim_actor rebuild_carrier = 0;
+    assert(nksim_session_create_actor(session, &rebuild_carrier_part, 1, &rebuild_carrier) == NKSIM_OK);
+    nksim_body rebuild_body = 0;
+    assert(nksim_session_get_actor_body(session, rebuild_carrier, 0, &rebuild_body) == NKSIM_OK);
+    const auto rebuilt_payload = make_box(session, NKSIM_MOTION_DYNAMIC, 1.0,
+                                          pose_at(3.4, 0, 1.0), 0.1, 0.1, 0.1);
+    const auto rebuild_offset = pose_at(0.4, 0, 0);
+    assert(nksim_session_hold_object(session, rebuilt_payload, rebuild_body,
+                                     &rebuild_offset) == NKSIM_OK);
+    assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_session_stop(session) == NKSIM_OK);
+    make_box(session, NKSIM_MOTION_STATIC, 0.0, pose_at(-3.0, 0, 0.5), 0.2, 0.2, 0.5);
+    assert(nksim_session_release_object(session, rebuilt_payload) == NKSIM_OK);
+    for (int tick = 0; tick < 500; ++tick)
+        assert(nksim_session_step(session, 0, nullptr) == NKSIM_OK);
+    assert(nksim_session_capture(session, &frame) == NKSIM_OK);
+    const auto rebuilt_rest = object_pose(frame, rebuilt_payload);
+    assert(std::abs(rebuilt_rest.position[2] - 0.1) < 0.03);
+    nksim_frame_destroy(frame);
     nksim_session_destroy(session);
     nksim_world_destroy(world);
     nkscene_scene_destroy(scene);
