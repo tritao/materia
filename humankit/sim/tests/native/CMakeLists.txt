@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.24)
+project(humankit_sim_tests_native LANGUAGES C CXX)
+if(NOT DEFINED HAXEON_NATIVE_OUTPUT_DIR OR HAXEON_NATIVE_OUTPUT_DIR STREQUAL "")
+    set(HAXEON_NATIVE_OUTPUT_DIR "${CMAKE_BINARY_DIR}/native")
+endif()
+file(MAKE_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
+get_filename_component(MATERIA_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(NK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(NK_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(NKSIM_BUILD_MUJOCO ON CACHE BOOL "" FORCE)
+set(MUJOCO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/simkit" simkit)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/animkit/native" animkit)
+set(HUMANKIT_SIM_RUNTIME_TARGETS nativekit nativekit_gpu nativekit_scene nativekit_scene_render
+    nativekit_sim_core nativekit_sim_mujoco animkit_core)
+foreach(target_name IN LISTS HUMANKIT_SIM_RUNTIME_TARGETS)
+    set_target_properties("${target_name}" PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${HAXEON_NATIVE_OUTPUT_DIR}")
+endforeach()
+add_custom_target(humankit_sim_tests_native DEPENDS ${HUMANKIT_SIM_RUNTIME_TARGETS})

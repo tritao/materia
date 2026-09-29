@@ -239,6 +239,8 @@ struct Part {
 
 struct Object {
     uint32_t motion_type = 0;
+    nksim_body carrier = 0;
+    nksim_pose offset{};
     Part part;
 };
 
@@ -333,6 +335,13 @@ public:
         if (running_) return NKSIM_ERROR_INVALID_STATE;
         auto result = release_host();
         if (result != NKSIM_OK) return result;
+        for (auto &[id, object] : objects_) {
+            if (object.carrier == 0) continue;
+            result = nksim::resolve_world(world_)->set_body_motion_type(
+                object.part.body, NKSIM_MOTION_DYNAMIC);
+            if (result != NKSIM_OK) return result;
+            object.carrier = 0;
+        }
         if ((result = nksim_world_reset(world_)) != NKSIM_OK) return result;
         step_index_ = 0;
         simulation_time_ = 0.0;
@@ -377,6 +386,11 @@ public:
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         const auto found = objects_.find(id);
         if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        for (auto &[other_id, object] : objects_)
+            if (other_id != id && object.carrier == found->second.part.body) {
+                const auto result = release_object(other_id);
+                if (result != NKSIM_OK) return result;
+            }
         destroy_part(found->second.part);
         objects_.erase(found);
         return NKSIM_OK;
@@ -389,6 +403,10 @@ public:
         if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
         if (pose.struct_size < sizeof(pose) || !valid_pose(pose))
             return NKSIM_ERROR_INVALID_ARGUMENT;
+        if (found->second.carrier != 0) {
+            const auto released = release_object(id);
+            if (released != NKSIM_OK) return released;
+        }
         const auto result = place(found->second.part, pose, found->second.motion_type);
         if (result == NKSIM_OK) found->second.part.initial = pose;
         return result;
@@ -404,6 +422,61 @@ public:
             return NKSIM_ERROR_INVALID_ARGUMENT;
         Part *parts[] = {&found->second.part};
         return drive_parts(parts, &pose, 1);
+    }
+
+    nksim_result hold_object(nksim_object id, nksim_body carrier, const nksim_pose &offset) {
+        std::lock_guard lock(mutex);
+        auto found = objects_.find(id);
+        if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        if (found->second.motion_type != NKSIM_MOTION_DYNAMIC)
+            return NKSIM_ERROR_INVALID_STATE;
+        if (offset.struct_size < sizeof(offset) || !valid_pose(offset) || carrier == 0 ||
+            carrier == found->second.part.body)
+            return NKSIM_ERROR_INVALID_ARGUMENT;
+        nksim_body_state carrier_state{};
+        carrier_state.struct_size = sizeof(carrier_state);
+        if (const auto result = body_state(carrier, carrier_state); result != NKSIM_OK)
+            return result;
+        auto &object = found->second;
+        if (object.carrier == 0) {
+            nksim_body_state object_state{};
+            object_state.struct_size = sizeof(object_state);
+            if (const auto result = body_state(object.part.body, object_state); result != NKSIM_OK)
+                return result;
+            object.part.pose = object.part.tick_pose =
+                make_pose(object_state.position, object_state.rotation);
+            const auto result = host_ != 0
+                ? host_submit_body_motion_type(host_, object.part.body, NKSIM_MOTION_KINEMATIC)
+                : nksim::resolve_world(world_)->set_body_motion_type(
+                      object.part.body, NKSIM_MOTION_KINEMATIC);
+            if (result != NKSIM_OK) return result;
+        }
+        object.carrier = carrier;
+        object.offset = offset;
+        return NKSIM_OK;
+    }
+
+    nksim_result release_object(nksim_object id) {
+        std::lock_guard lock(mutex);
+        auto found = objects_.find(id);
+        if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        auto &object = found->second;
+        if (object.carrier == 0) return NKSIM_ERROR_INVALID_STATE;
+        const auto result = host_ != 0
+            ? host_submit_body_motion_type(host_, object.part.body, NKSIM_MOTION_DYNAMIC)
+            : nksim::resolve_world(world_)->set_body_motion_type(
+                  object.part.body, NKSIM_MOTION_DYNAMIC);
+        if (result != NKSIM_OK) return result;
+        object.carrier = 0;
+        return NKSIM_OK;
+    }
+
+    nksim_result object_carrier(nksim_object id, nksim_body &out) {
+        std::lock_guard lock(mutex);
+        const auto found = objects_.find(id);
+        if (found == objects_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        out = found->second.carrier;
+        return NKSIM_OK;
     }
 
     nksim_result object_body(nksim_object id, nksim_body &out) {
@@ -457,6 +530,12 @@ public:
         if (host_ != 0) return NKSIM_ERROR_INVALID_STATE;
         const auto found = actors_.find(id);
         if (found == actors_.end()) return NKSIM_ERROR_INVALID_HANDLE;
+        for (const auto &part : found->second.parts)
+            for (auto &[object_id, object] : objects_)
+                if (object.carrier == part.body) {
+                    const auto result = release_object(object_id);
+                    if (result != NKSIM_OK) return result;
+                }
         for (auto &part : found->second.parts) destroy_part(part);
         actors_.erase(found);
         return NKSIM_OK;
@@ -636,6 +715,7 @@ private:
                     return result;
         auto result = advance_actors(info.simulation_time);
         if (result != NKSIM_OK) return result;
+        if ((result = advance_held_objects()) != NKSIM_OK) return result;
         nksim_step_result stepped{};
         stepped.struct_size = sizeof(stepped);
         if ((result = nksim_host_step(host_, &stepped)) != NKSIM_OK) return result;
@@ -687,6 +767,37 @@ private:
             for (auto &part : actor.parts) parts.push_back(&part);
             const auto result = drive_parts(parts.data(), poses.data(),
                                             static_cast<uint32_t>(parts.size()));
+            if (result != NKSIM_OK) return result;
+        }
+        return NKSIM_OK;
+    }
+
+    nksim_result advance_held_objects() {
+        for (auto &[id, object] : objects_) {
+            if (object.carrier == 0) continue;
+            nksim_pose carrier_pose{};
+            bool actor_part = false;
+            for (const auto &[actor_id, actor] : actors_)
+                for (const auto &part : actor.parts)
+                    if (part.body == object.carrier) {
+                        carrier_pose = part.pose;
+                        actor_part = true;
+                    }
+            if (!actor_part) {
+                nksim_body_state state{};
+                state.struct_size = sizeof(state);
+                const auto result = body_state(object.carrier, state);
+                if (result != NKSIM_OK) return result;
+                carrier_pose = make_pose(state.position, state.rotation);
+            }
+            nksim_pose target = carrier_pose;
+            double displacement[3]{};
+            rotate(carrier_pose.rotation, object.offset.position, displacement);
+            for (int axis = 0; axis < 3; ++axis)
+                target.position[axis] += displacement[axis];
+            multiply(carrier_pose.rotation, object.offset.rotation, target.rotation);
+            Part *part = &object.part;
+            const auto result = drive_parts(&part, &target, 1);
             if (result != NKSIM_OK) return result;
         }
         return NKSIM_OK;
@@ -868,7 +979,19 @@ private:
         const auto result = nksim_host_stop(host_);
         nksim_host_destroy(host_);
         host_ = 0;
-        return result;
+        if (result != NKSIM_OK) return result;
+        // A stop may discard a motion switch queued after the last tick.
+        // Reconcile the world's live type with session bookkeeping before
+        // another hosted run or an unhosted reset begins.
+        const auto world = nksim::resolve_world(world_);
+        for (const auto &[id, object] : objects_) {
+            if (object.motion_type != NKSIM_MOTION_DYNAMIC) continue;
+            const auto motion = object.carrier == 0 ? NKSIM_MOTION_DYNAMIC
+                                                    : NKSIM_MOTION_KINEMATIC;
+            const auto switched = world->set_body_motion_type(object.part.body, motion);
+            if (switched != NKSIM_OK) return switched;
+        }
+        return NKSIM_OK;
     }
 
     void destroy() {
@@ -1034,6 +1157,27 @@ nksim_result NKSIM_CALL nksim_session_drive_object(nksim_session session, nksim_
     if (!pose) return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->drive_object(object, *pose);
+}
+
+nksim_result NKSIM_CALL nksim_session_hold_object(nksim_session session, nksim_object object,
+                                                  nksim_body carrier, const nksim_pose *offset) {
+    if (!offset) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->hold_object(object, carrier, *offset);
+}
+
+nksim_result NKSIM_CALL nksim_session_release_object(nksim_session session,
+                                                     nksim_object object) {
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->release_object(object);
+}
+
+nksim_result NKSIM_CALL nksim_session_get_object_carrier(nksim_session session,
+                                                         nksim_object object,
+                                                         nksim_body *out_carrier) {
+    if (!out_carrier) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->object_carrier(object, *out_carrier);
 }
 
 nksim_result NKSIM_CALL nksim_session_get_object_body(nksim_session session, nksim_object object,

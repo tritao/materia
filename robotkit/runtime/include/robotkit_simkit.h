@@ -494,9 +494,14 @@ RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation_pose *out_pose RK_INOUT);
 /**
  * Contact involving one robot link. tool_piece_index is -1 for link geometry.
- * other_object is the session object (nksim_object) the caller created that
- * the link touches, or zero for another robot link or an unowned body.
+ * other_object is nonzero only for Object contacts. RobotLink contacts carry
+ * zero-based other_robot/other_link; World covers unowned geometry.
  */
+typedef enum rk_contact_other_kind {
+    RK_CONTACT_OTHER_WORLD = 0,
+    RK_CONTACT_OTHER_OBJECT = 1,
+    RK_CONTACT_OTHER_ROBOT_LINK = 2
+} rk_contact_other_kind;
 typedef struct rk_robot_contact {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t link_index;
@@ -507,7 +512,25 @@ typedef struct rk_robot_contact {
     double normal[3];
     uint32_t active;
     uint32_t reserved;
+    rk_contact_other_kind other_kind;
+    uint32_t other_robot;
+    uint32_t other_link;
+    uint32_t reserved2;
 } rk_robot_contact;
+typedef uint32_t rk_robot_contact_list RK_HANDLE RK_HANDLE_DESTROY(rk_robot_contact_list_destroy);
+#define RK_INVALID_ROBOT_CONTACT_LIST ((rk_robot_contact_list)0)
+RK_API rk_result RK_CALL rk_simulation_capture_robot_contacts(
+    rk_simulation simulation, rk_robot_runtime runtime,
+    rk_robot_contact_list *out_list RK_OUT RK_OWNED);
+RK_API rk_result RK_CALL rk_robot_contact_list_count(
+    rk_robot_contact_list list, uint32_t *out_count RK_OUT);
+RK_API rk_result RK_CALL rk_robot_contact_list_get(
+    rk_robot_contact_list list, uint32_t index, rk_robot_contact *out_contact RK_INOUT);
+RK_API rk_result RK_CALL rk_robot_contact_list_step_index(
+    rk_robot_contact_list list, uint64_t *out_step_index RK_OUT);
+RK_API void RK_CALL rk_robot_contact_list_destroy(rk_robot_contact_list list);
+/** A zero out[0].struct_size uses sizeof(rk_robot_contact). Otherwise it
+ * supplies the stride and copied prefix size for each output entry. */
 RK_API rk_result RK_CALL rk_simulation_get_robot_contacts(
     rk_simulation simulation, rk_robot_runtime runtime, rk_robot_contact *out,
     uint32_t capacity, uint32_t *out_count RK_OUT);

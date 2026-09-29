@@ -1,6 +1,14 @@
 package app;
 
 import haxe.Int64;
+import animkit.AnimationAsset;
+import app.editor.WorkerDemoJob;
+import humankit.HumanBodyProxy;
+import humankit.HumanCharacter;
+import humankit.HumanDescription;
+import humankit.HumanoidRig;
+import humankit.sim.HumanWorker;
+import humankit.sim.HumanWorkerSignals;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
@@ -20,6 +28,7 @@ import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
 import nativekit.sim.SimSession;
 import nativekit.sim.SimShape;
+import nativekit.scene.Transform;
 
 typedef SimulationRobotVisual={
   var id:String;
@@ -53,6 +62,10 @@ class ApplicationSimulation {
   var simulatedIds:Array<String> = [];
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
+  var humanWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter}> = [];
+  var humanSignalsById:Map<String, HumanWorkerSignals> = new Map();
+  var humanScene:Null<EditorScene> = null;
+  var demoRobot:Bool = false;
   var assemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
   var running:Bool = false;
   var presentAssemblyPhysics:Bool = false;
@@ -106,12 +119,15 @@ class ApplicationSimulation {
     var candidateRobots:Array<SimulatedRobot> = [];
     var candidateLinks:Array<Array<String>> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
+    var candidateWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter}> = [];
+    var candidateDemoRobot:Bool = false;
     var candidateAssemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
     var candidateWarnings:Array<String> = [];
     try {
       var models = configuration.robotModels();
       var assembly = session == null ? null : session.projectAssemblyDefinition;
-      if (models.length == 0 && assembly == null && participants.length == 0) throw "Nothing to simulate";
+      if (models.length == 0 && assembly == null && participants.length == 0 &&
+          configuration.humans().length == 0) throw "Nothing to simulate";
       for (configured in models) {
         var id=configured.id;
         var existing = world.robot(id);
@@ -247,8 +263,33 @@ class ApplicationSimulation {
         candidateObjects.push({id:object.id,object:created});
       }
 
+      for (configured in configuration.humans()) {
+        var asset = AnimationAsset.load(configured.assetPath);
+        var rig = HumanoidRig.detect(asset);
+        var character = new HumanCharacter(scene.runtimeContentScene(), asset, rig, null, configured.id);
+        // Register immediately: a missing clip can throw during worker construction.
+        candidateWorkers.push({id:configured.id,worker:null,character:character});
+        character.advance(0.0);
+        var proxy = HumanBodyProxy.standard(character.pose,
+          HumanDescription.measure(character.pose, character.height()));
+        var worker = new HumanWorker(createdSpace.session, character, proxy, configured.startPose());
+        candidateWorkers[candidateWorkers.length - 1].worker = worker;
+        if (configured.jobName == "rack-to-table") {
+          var robotIndex = -1;
+          for (index in 0...candidateRobots.length)
+            if (candidateRobots[index].id() == WorkerDemoJob.ROBOT_ID) robotIndex = index;
+          var robotModel = robotIndex < 0 ? null : models[robotIndex].model;
+          WorkerDemoJob.configure(worker, candidateObjects, candidate, robotIndex, robotModel);
+          candidateDemoRobot = true;
+        } else if (configured.jobName != null) throw 'Unknown human job "${configured.jobName}"';
+        var humanId = configured.id;
+        worker.onTick = function(_, signals) humanSignalsById.set(humanId, signals);
+      }
+
       var previousSimulation = simulation;
       var previousSpace = space;
+      var previousWorkers = humanWorkers;
+      var previousHumanScene = humanScene;
       var previousIds = simulatedIds.copy();
       var previousRobots:Array<Robot> = [];
       for (id in previousIds) {
@@ -272,6 +313,10 @@ class ApplicationSimulation {
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
+      humanWorkers = candidateWorkers;
+      humanSignalsById.clear();
+      humanScene = scene;
+      demoRobot = candidateDemoRobot;
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
       appliedDocumentRevision = configuration.revision();
@@ -283,11 +328,13 @@ class ApplicationSimulation {
       collisionWarnings = candidateWarnings;
       presentAssemblyPhysics = running;
       presentationEpoch++;
+      disposeHumanWorkers(previousWorkers, previousHumanScene);
       releaseSpace(previousSpace, previousSimulation);
       for (robot in previousRobots) robot.close();
       return true;
     } catch (failure:Dynamic) {
       error = Std.string(failure);
+      disposeHumanWorkers(candidateWorkers, scene);
       if (candidateSpace != null && candidateSpace != space)
         releaseSpace(candidateSpace, candidate);
       return false;
@@ -299,6 +346,23 @@ class ApplicationSimulation {
     if (released != null) released.session.stop();
     if (robots != null) robots.dispose();
     if (released != null) released.dispose();
+  }
+
+  static function disposeHumanWorkers(entries:Array<{id:String,worker:HumanWorker,
+      character:HumanCharacter}>, scene:Null<EditorScene>):Void {
+    if (entries.length == 0) return;
+    for (entry in entries) if (entry.worker != null) entry.worker.dispose();
+    if (scene != null) {
+      var transaction = scene.runtimeContentScene().beginTransaction();
+      for (entry in entries) {
+        var nodes = entry.character.changedNodes();
+        nodes.reverse();
+        for (node in nodes) transaction.destroyNode(node);
+      }
+      transaction.commit();
+      scene.publishRuntimeNodes([]);
+    }
+    for (entry in entries) entry.character.dispose();
   }
 
   static function rotateOffset(x:Float, y:Float, z:Float, rotation:Null<Array<Float>>):Array<Float> {
@@ -314,6 +378,7 @@ class ApplicationSimulation {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";
     if (running) throw "Stop realtime simulation before deterministic stepping";
+    advanceWorkers();
     active.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
     presentAssemblyPhysics = true;
     return world.snapshot();
@@ -334,6 +399,33 @@ class ApplicationSimulation {
     presentationEpoch++; return true;
   }
   public function isRunning():Bool return running;
+  public function humanWorker(id:String):Null<HumanWorker> {
+    for (entry in humanWorkers) if (entry.id == id) return entry.worker;
+    return null;
+  }
+  public function humanSignals(id:String):Null<HumanWorkerSignals>
+    return humanSignalsById.get(id);
+
+  /** Feed worker keyframes from simulation time, also during realtime sessions. */
+  public function advanceWorkers():Void {
+    var scene = humanScene;
+    var activeSpace = space;
+    if (scene == null) return;
+    if (demoRobot && activeSpace != null) {
+      var robot = world.robot(WorkerDemoJob.ROBOT_ID);
+      if (robot != null) WorkerDemoJob.cycle(robot, activeSpace.session.simulationTime());
+    }
+    for (entry in humanWorkers) {
+      entry.worker.advance();
+      var matrix = entry.worker.body.rootTransform();
+      var transform = Transform.identity();
+      for (index in 0...16) transform.set(index, matrix[index]);
+      var transaction = scene.runtimeContentScene().beginTransaction();
+      transaction.setTransform(entry.character.root, transform);
+      transaction.commit();
+      scene.publishRuntimeNodes(entry.character.changedNodes());
+    }
+  }
   /** True in both running and paused simulation modes. */
   public function isActive():Bool return simulation!=null;
   /** The live session, for people and other participants that join it. */
@@ -411,6 +503,8 @@ class ApplicationSimulation {
   public function clear():Void {
     stop();
     for (participant in participants) participant.leave();
+    disposeHumanWorkers(humanWorkers, humanScene);
+    humanWorkers.resize(0); humanSignalsById.clear(); humanScene = null; demoRobot = false;
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

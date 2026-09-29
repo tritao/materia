@@ -125,7 +125,9 @@ class FinishSurface implements Skill {
         toolPlanning == null ? null : toolPlanning.tool.collision,
         toolPlanning == null ? null : toolPlanning.obstacles,
         toolPlanning == null ? 0.0 : toolPlanning.clearance,
-        toolPlanning == null ? 0.02 : toolPlanning.maxJointStep);
+        toolPlanning == null ? null : toolPlanning.maxJointStep,
+        toolPlanning == null ? 0.005 : toolPlanning.maxToolStep,
+        toolPlanning == null ? null : toolPlanning.preparedShape);
       if (result.patches.length == 0) {
         lifecycle.fail("work patch planner produced no patches");
         return;

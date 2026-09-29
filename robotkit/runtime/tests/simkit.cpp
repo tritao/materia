@@ -6,6 +6,10 @@
 #include <cmath>
 #include <chrono>
 #include <thread>
+#include <memory>
+
+// rk_simulation_robot_desc is 1.7 MB. Tests keep it on the heap: with every
+// test inlined into main at -O3, stack copies overflow an 8 MB stack.
 
 namespace {
 
@@ -152,7 +156,8 @@ void convex_link_and_box_link_build() {
     auto simulation = fixture.simulation;
     auto session = fixture.session;
     auto model = blueprint(101);
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
     robot_desc.initial_pose.rotation[3] = 1.0;
@@ -1181,7 +1186,8 @@ void shape_descriptor_without_pose_keeps_default_placement() {
     const auto model = blueprint(7);
     rk_robot_runtime first = 0, second = 0;
     assert(rk_simulation_add_robot(simulation, &model, nullptr, &first) == RK_OK);
-    rk_simulation_robot_desc robot_desc{};
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
     robot_desc.struct_size = sizeof(robot_desc);
     robot_desc.link_shape_count = 2;
     robot_desc.link_shapes[0] = {1, RK_LINK_SHAPE_CYLINDER, {0.05, 0.2, 0.0}, {0.0, 0.0, 0.1},

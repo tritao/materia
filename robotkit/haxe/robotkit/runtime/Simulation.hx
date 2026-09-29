@@ -336,25 +336,39 @@ class Simulation {
     ensureLive();
     if (runtime == null || runtime.simulation != this)
       throw "Runtime does not belong to this simulation";
-    var countResult = RobotKitSimKit.rk_simulation_get_robot_contacts(
-      owner.borrow(), runtime.owner.borrow(), null, 0);
-    check(countResult.status, "simulation.robotContacts");
+    var capture = RobotKitSimKit.rk_simulation_capture_robot_contacts(
+      owner.borrow(), runtime.owner.borrow());
+    check(capture.status, "simulation.robotContacts");
     var contacts:Array<RobotContact> = [];
-    for (index in 0...countResult.out_count) {
-      var value = new rk_robot_contact();
-      value.set_struct_size(rk_robot_contact.size());
-      var result = RobotKitSimKit.rk_simulation_get_robot_contact(owner.borrow(),
-        runtime.owner.borrow(), index, value);
-      check(result.status, "simulation.robotContact");
-      value = result.out_contact;
-      contacts.push({linkIndex: value.get_link_index(),
-        toolPieceIndex: value.get_tool_piece_index(),
-        otherObject: value.get_other_object().rawValue(),
-        distance: value.get_distance(),
-        position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
-        normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
-        active: value.get_active() != 0});
+    var list = capture.out_list;
+    try {
+      var countResult = RobotKitSimKit.rk_robot_contact_list_count(list.borrow());
+      check(countResult.status, "simulation.robotContacts.count");
+      var stepResult = RobotKitSimKit.rk_robot_contact_list_step_index(list.borrow());
+      check(stepResult.status, "simulation.robotContacts.stepIndex");
+      for (index in 0...countResult.out_count) {
+        var value = new rk_robot_contact();
+        value.set_struct_size(rk_robot_contact.size());
+        var result = RobotKitSimKit.rk_robot_contact_list_get(list.borrow(), index, value);
+        check(result.status, "simulation.robotContact");
+        value = result.out_contact;
+        contacts.push({linkIndex: value.get_link_index(),
+          toolPieceIndex: value.get_tool_piece_index(),
+          otherObject: value.get_other_object().rawValue(),
+          distance: value.get_distance(),
+          position: new Vec3(value.get_position(0), value.get_position(1), value.get_position(2)),
+          normal: new Vec3(value.get_normal(0), value.get_normal(1), value.get_normal(2)),
+          active: value.get_active() != 0,
+          stepIndex: stepResult.out_step_index,
+          otherKind: cast value.get_other_kind(),
+          otherRobot: value.get_other_robot(),
+          otherLink: value.get_other_link()});
+      }
+    } catch (error:Dynamic) {
+      list.close();
+      throw error;
     }
+    list.close();
     return contacts;
   }
 

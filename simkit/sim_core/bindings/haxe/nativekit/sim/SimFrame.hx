@@ -41,6 +41,15 @@ class SimFrame {
         return SimPose.fromNative(pose);
     }
 
+    public function bodyState(body:nksim_body):BodyState {
+        ensureLive();
+        var value = new nksim_body_state();
+        value.set_struct_size(nksim_body_state.size());
+        SimWorld.check(NativeKitSim.nksim_frame_get_body_state(owner.borrow(), body,
+            value).status, "frame.bodyState");
+        return BodyState.fromNative(value);
+    }
+
     public function dispose():Void {
         if (disposed)
             return;

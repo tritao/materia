@@ -1216,8 +1216,10 @@ the planner transforms the obstacles into each candidate's base frame and
 checks every solved flange pose. `ToolClearanceChecker` uses separating axes
 for each convex tool piece against each oriented box, preserving the empty
 space between pieces. It also samples the joint-space segment between
-successive solved poses (default maximum step 0.02 radians or metres per
-joint). Hull padding and requested planning clearance are added to the
+successive reachable process poses. By default, it converts a 5 mm maximum
+tool motion into a joint sampling step; an explicit joint step takes priority.
+The approach from the seed is checked only when `checkApproach` is enabled.
+Hull padding and requested planning clearance are added to the
 separation test. This is a sampled path check; callers needing a tighter
 path guarantee must use a smaller joint step or continuous collision check.
 `FinishSurface`, `Paint`, and `Sand` accept an optional `ToolPlanningContext`

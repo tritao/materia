@@ -922,6 +922,25 @@ nksim_result World::set_body_state(nksim_body body, const nksim_body_state &stat
     return pull_backend_state();
 }
 
+nksim_result World::set_body_motion_type(nksim_body body, std::uint32_t motion_type) {
+    if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
+    auto *value = bodies.get(body);
+    if (!value) return NKSIM_ERROR_INVALID_HANDLE;
+    if (motion_type != NKSIM_MOTION_DYNAMIC && motion_type != NKSIM_MOTION_KINEMATIC)
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    if (value->desc.motion_type == motion_type) return NKSIM_OK;
+    if (value->desc.motion_type != NKSIM_MOTION_DYNAMIC &&
+        value->desc.motion_type != NKSIM_MOTION_KINEMATIC)
+        return NKSIM_ERROR_INVALID_STATE;
+    const auto result = backend->body_set_motion_type(value->backend_body, motion_type,
+                                                       value->desc.mass);
+    if (result != NKSIM_OK) return result;
+    value->desc.motion_type = motion_type;
+    value->kinematic_continuous = false;
+    value->kinematic_drive_pending = false;
+    return NKSIM_OK;
+}
+
 nksim_result World::set_joint_state(nksim_joint joint, double position, double velocity) {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
     if (!std::isfinite(position) || !std::isfinite(velocity)) return NKSIM_ERROR_INVALID_ARGUMENT;

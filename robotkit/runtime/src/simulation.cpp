@@ -1154,7 +1154,8 @@ rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
 }
 
 rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
-                                         std::vector<rk_robot_contact> &out) const {
+                                         std::vector<rk_robot_contact> &out,
+                                         uint64_t *step_index) const {
     Lock lock(session_);
     out.clear();
     const auto handle = std::find(handles_.begin(), handles_.end(), runtime);
@@ -1170,6 +1171,15 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
         if (world == 0 || nksim_world_snapshot(world, &owned) != NKSIM_OK)
             return RK_ERROR_INVALID_STATE;
         snapshot = owned;
+    }
+    if (step_index) {
+        nksim_clock clock{};
+        clock.struct_size = sizeof(clock);
+        if (nksim_snapshot_get_clock(snapshot, &clock) != NKSIM_OK) {
+            if (owned) nksim_snapshot_destroy(owned);
+            return RK_ERROR_BACKEND;
+        }
+        *step_index = clock.step_index;
     }
     rk_result result_code = RK_OK;
     uint64_t count = 0;
@@ -1188,12 +1198,29 @@ rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
             const auto part = source.body_a == body ? source.part_a : source.part_b;
             rk_robot_contact result{};
             result.struct_size = sizeof(result);
+            result.other_robot = UINT32_MAX;
+            result.other_link = UINT32_MAX;
             result.link_index = link;
             result.tool_piece_index = part - 1;
             const auto other_body = source.body_a == body ? source.body_b : source.body_a;
             nksim_object other_object = 0;
-            if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK)
+            if (nksim_session_find_object(session_, other_body, &other_object) == NKSIM_OK) {
                 result.other_object = other_object;
+                result.other_kind = RK_CONTACT_OTHER_OBJECT;
+            } else {
+                result.other_kind = RK_CONTACT_OTHER_WORLD;
+                for (uint32_t other_robot = 0; other_robot < bindings_.size(); ++other_robot) {
+                    const auto other_binding = bindings_[other_robot].lock();
+                    if (!other_binding) continue;
+                    const auto &bodies = other_binding->bodies_;
+                    const auto found = std::find(bodies.begin(), bodies.end(), other_body);
+                    if (found == bodies.end()) continue;
+                    result.other_kind = RK_CONTACT_OTHER_ROBOT_LINK;
+                    result.other_robot = other_robot;
+                    result.other_link = static_cast<uint32_t>(found - bodies.begin());
+                    break;
+                }
+            }
             result.distance = source.distance;
             std::copy_n(source.position, 3, result.position);
             std::copy_n(source.normal, 3, result.normal);

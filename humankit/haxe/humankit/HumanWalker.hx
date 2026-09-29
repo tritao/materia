@@ -29,6 +29,7 @@ class HumanWalker {
 	var x:Float = 0.0;
 	var y:Float = 0.0;
 	var heading:Float = 0.0;
+	var facing:Null<Float> = null;
 
 	/** Measures the walk clip's gait and starts the character idling at the origin. */
 	public function new(character:HumanCharacter, walkClip:String = "walk", idleClip:String = "idle") {
@@ -65,11 +66,40 @@ class HumanWalker {
 		y = points[0][1];
 		heading = tangentAt(0.0);
 		walking = true;
+		facing = null;
 		character.player.play(gait.clip, FADE_SECONDS);
 	}
 
+	/**
+	 * Walks along route from where the character stands (the route's first
+	 * point), keeping its heading and turning onto the route at turnRate rather
+	 * than snapping to it, so what it carries does not swing.
+	 */
+	public function continueAlong(route:Array<Array<Float>>, metresPerSecond:Float):Void {
+		var current = heading;
+		follow(route, metresPerSecond);
+		heading = current;
+	}
+
+	/** Sets the starting floor pose before a job begins. */
+	public function place(x:Float, y:Float, heading:Float):Void {
+		stop();
+		this.x = x;
+		this.y = y;
+		this.heading = wrap(heading);
+		facing = null;
+	}
+
+	/** Turns in place at turnRate, including after a route has ended. */
+	public function face(angle:Float):Void
+		facing = wrap(angle);
+
+	public function isTurning():Bool
+		return facing != null;
+
 	/** Stops where the character stands and idles. */
 	public function stop():Void {
+		facing = null;
 		if (!walking)
 			return;
 		walking = false;
@@ -108,6 +138,15 @@ class HumanWalker {
 			var turn = wrap(target - heading);
 			var limit = turnRate * seconds;
 			heading = wrap(heading + Math.max(-limit, Math.min(limit, turn)));
+		} else if (facing != null) {
+			var target = facing;
+			var turn = wrap(target - heading);
+			var limit = turnRate * seconds;
+			if (Math.abs(turn) <= limit) {
+				heading = target;
+				facing = null;
+			} else
+				heading = wrap(heading + (turn > 0.0 ? limit : -limit));
 		}
 		character.player.speed = walking ? velocity / gait.naturalSpeed : 1.0;
 		character.advance(seconds);

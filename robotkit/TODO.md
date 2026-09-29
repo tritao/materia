@@ -23,3 +23,11 @@
   unverified; add CI or a machine that builds them.
 - `RuntimeRobotAdapter.sensors()` returns the frames of the last `snapshot()`.
   Either document it on `Robot.sensors()` or refresh it.
+
+## Grippers
+
+- `SimulatedGripper` only reports a grasp state; the object never moves with
+  the tool. Closing on a detected object should hold it with
+  `nksim_session_hold_object` on the tool-flange link body, and opening should
+  release it, as HumanKit workers already do (see also `simkit/TODO.md` on the
+  one-tick lag of link carriers).

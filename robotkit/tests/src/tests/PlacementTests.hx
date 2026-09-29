@@ -16,6 +16,7 @@ import robotkit.manipulation.WorkPatchPlanner;
 import robotkit.manipulation.BaseObstacle;
 import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolClearanceChecker;
+import robotkit.manipulation.ToolClearanceShape;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.process.ToolpathPoint;
 import robotkit.process.Toolpath;
@@ -34,6 +35,8 @@ class PlacementTests {
     testObstacleForcesADifferentBasePose();
     testConvexToolClearancePreservesEmptyCorner();
     testToolClearanceChecksJointMotion();
+    testFirstPointDoesNotCheckSeedApproach();
+    testFiveMillimetreObstacleBetweenPoints();
     testWorkPatchPlannerUsesToolObstacles();
     Sys.println('RobotKit placement tests passed ($assertions assertions)');
     return assertions;
@@ -130,10 +133,55 @@ class PlacementTests {
     ]));
     var shape = ToolCollisionShape.Box(new Vec3(0.05, 0.05, 0.05));
     var obstacle = new ToolBoxObstacle(Transform3.identity(), new Vec3(10.0, 10.0, 10.0));
+    var preparedBefore = ToolClearanceShape.preparationCount;
     var plan = WorkPatchPlanner.plan(small, scenario.map_T_surface, scenario.manipulator,
       0.2, 0.08, 0.0, 0.02, 0.05, 0.0, 0.46, 0.5, scenario.seed,
       1, 1, 0.02, null, 1e-4, 1e-3, shape, [obstacle]);
     check(!plan.fullyPlanned, "Work patch planner rejects a path blocked by a 3D tool obstacle");
+    check(ToolClearanceShape.preparationCount == preparedBefore + 1,
+      "Work patch planner prepares the tool shape once per plan");
+  }
+
+  static function testFirstPointDoesNotCheckSeedApproach():Void {
+    var manipulator = slidingManipulator();
+    var checker = new ToolClearanceChecker(ToolCollisionShape.Box(new Vec3(0.001, 0.001, 0.001)),
+      [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.01, 0.01, 0.01))]);
+    var path = new Toolpath("base", [
+      new ToolpathPoint(manipulator.tcpPose([0.1]), 0.05, true),
+      new ToolpathPoint(manipulator.tcpPose([0.2]), 0.05, true)
+    ]);
+    var result = ReachabilityChecker.check(manipulator, path, Transform3.identity(), [-0.1],
+      1e-4, 1e-3, 100, 0.02, checker);
+    check(result.fullyReachable(), "Seed approach does not count against the first process point");
+    var approach = ReachabilityChecker.check(manipulator, path, Transform3.identity(), [-0.1],
+      1e-4, 1e-3, 100, 0.02, checker, null, 0.005, true);
+    check(approach.firstFailureIndex == 0, "Explicit approach checking catches the seed obstacle");
+  }
+
+  static function testFiveMillimetreObstacleBetweenPoints():Void {
+    var manipulator = slidingManipulator();
+    var checker = new ToolClearanceChecker(ToolCollisionShape.Box(new Vec3(0.001, 0.001, 0.001)),
+      [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.0025, 0.0025, 0.0025))]);
+    var path = new Toolpath("base", [
+      new ToolpathPoint(manipulator.tcpPose([-0.01]), 0.05, true),
+      new ToolpathPoint(manipulator.tcpPose([0.01]), 0.05, true)
+    ]);
+    var result = ReachabilityChecker.check(manipulator, path, Transform3.identity(), [-0.01],
+      1e-4, 1e-3, 100, 0.02, checker);
+    check(result.firstFailureIndex == 1,
+      "Five millimetre obstacle between process points is detected");
+  }
+
+  static function slidingManipulator():Manipulator {
+    var model = new RobotModel("tool-step");
+    var base = model.addLink(new Link("base"));
+    var moving = model.addLink(new Link("moving"));
+    var joint = model.addJoint(new Joint("slide", JointType.Prismatic, base, moving));
+    joint.axis = [1.0, 0.0, 0.0];
+    joint.limits.lower = -1.0;
+    joint.limits.upper = 1.0;
+    var flange = model.addFrame(new Frame("flange", moving));
+    return new Manipulator(model, new KinematicChain(model, base.id, ChainTip.Frame(flange.id)));
   }
 
   static function boxVertices(centre:Vec3, half:Vec3):Array<Float> {

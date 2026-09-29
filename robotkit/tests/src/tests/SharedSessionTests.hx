@@ -33,6 +33,11 @@ class SharedSessionTests {
     var crate = session.createObject(MotionType.Dynamic, SimShape.box(0.2, 0.2, 0.2),
       new SimPose(3.0, 0.0, 2.0), 1.0);
     var person = session.createActor([SimShape.capsule(0.2, 1.2)], [new SimPose(-2.0, 0.0, 0.8)]);
+    var held = session.createObject(MotionType.Dynamic, SimShape.box(0.1, 0.1, 0.1),
+      new SimPose(-1.5, 0.0, 1.0), 1.0);
+    session.holdObject(held, person.partBody(0), new SimPose(0.5, 0.0, 0.2));
+    if (session.objectCarrier(held) != person.partBody(0))
+      throw "Held object did not report its actor carrier";
     person.pushKeyframe(0.0, [new SimPose(-2.0, 0.0, 0.8)]);
     person.pushKeyframe(1.0, [new SimPose(-1.0, 0.0, 0.8)]);
 
@@ -57,10 +62,15 @@ class SharedSessionTests {
       throw "person did not follow its keyframes on the shared clock";
     if (frame.objectPose(crate).z >= 2.0)
       throw "the shared session's crate did not fall";
+    if (Math.abs(frame.objectPose(held).x + 1.0) > 1e-6)
+      throw "held object did not follow its carrier";
     presentation.dispose();
     frame.dispose();
 
     session.stop();
+    session.releaseObject(held);
+    if (session.objectCarrier(held) == person.partBody(0))
+      throw "Released object still reports a carrier";
     simulation.dispose();
     session.step();
     if (ticks.times.length != 50)
