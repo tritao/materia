@@ -1036,7 +1036,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     barStyle.childAlignY = LayoutAlignmentY.Center;
     barStyle.childGap = 6.0;
     barStyle.padding = new Insets(10.0, 5.0, 10.0, 5.0);
-    barStyle.background = appearance.toolbar;
+    barStyle.background = simulation.isActive() ? appearance.toolbarSimulating : appearance.toolbar;
 
     var titleStyle = new LayoutStyle();
     titleStyle.width = LayoutAxis.fixed(compact ? 72.0 : 84.0);
@@ -1194,7 +1194,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePanelContents = [
       new DockPanelContent("hierarchy", function(_) return hierarchyPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
-          ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision),
+          ":filter=" + hierarchySearch + ":expansion=" + hierarchyExpansionRevision +
+          ":simulating=" + simulation.isActive()),
       new DockPanelContent("bim", function(_) return bimEditor),
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
         function(_, width) return perspectivePanel(width)),

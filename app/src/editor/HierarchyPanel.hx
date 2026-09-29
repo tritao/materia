@@ -3,6 +3,7 @@ package app.editor;
 import app.Main.ReferenceEditorApp;
 import Insets;
 import LayoutStyle;
+import nativekit.ui.core.TextStyleOverride;
 import nativekit.ui.core.View;
 import nativekit.ui.icons.IconName;
 import nativekit.ui.widgets.KeyedView;
@@ -12,10 +13,13 @@ import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.controls.SearchField;
 import nativekit.ui.widgets.layout.Column;
 import nativekit.ui.widgets.layout.Row;
+import nativekit.ui.widgets.text.Text;
 
 /** Hierarchy dock panel. */
 @:access(app.Main.ReferenceEditorApp)
 class HierarchyPanel {
+  public static inline var SIMULATION_LOCK_HINT:String = "Simulation active. Press Design to edit.";
+
   public static function build(app:ReferenceEditorApp):View {
     var addStyle = new LayoutStyle();
     addStyle.padding = new Insets(6.0, 8.0, 6.0, 8.0);
@@ -58,10 +62,13 @@ class HierarchyPanel {
       app.invalidateView();
     };
     tree.onItemRename = app.startRename;
+    var rows:Array<KeyedView> = [new KeyedView("heading", app.sectionHeading("SCENE"))];
+    if (app.simulation.isActive()) rows.push(new KeyedView("simulation-hint",
+      new Text(SIMULATION_LOCK_HINT, null, app.appearance.theme.tokens.textSecondary,
+        TextStyleOverride.text(12.0))));
     return new Column(
       "hierarchy-panel",
-      [
-        new KeyedView("heading", app.sectionHeading("SCENE")),
+      rows.concat([
         new KeyedView("actions", new Row("scene-object-actions", [
           new KeyedView("add", addButton),
           new KeyedView("duplicate", app.sceneAction("scene-duplicate", "scene.duplicate", "", IconName.Copy)),
@@ -76,7 +83,7 @@ class HierarchyPanel {
           "tree",
           tree
         )
-      ],
+      ]),
       treeStyle
     );
   }
