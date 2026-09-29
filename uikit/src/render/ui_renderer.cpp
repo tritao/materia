@@ -2230,14 +2230,19 @@ bool UiRendererImpl::drawGlyphs(const PreparedGlyphs &glyphs, const float transf
     // need coverage interpolation so glyph edges do not lose partial rows/columns.
     const bool integral_pixel_scale = std::abs(glyphs.pixel_scale - integral_scale) < 0.0001f;
     const nkgpu_sampler glyph_sampler = integral_pixel_scale ? state_->sampler : state_->glyph_sampler;
-    // Glyph quads are placed relative to the run origin and sampled nearest at integer scales, so each
-    // glyph lands on a whole pixel independently. With a fractional origin (panes sized by ratio give
-    // one that changes with window width) the rounding of every glyph, and so the spacing of the line,
-    // shifted with it. Snapping the run origin to a device pixel makes the result identical at every
-    // layout position. Rotated or skewed transforms keep their exact position.
+    // Integer-scale glyphs are drawn 1:1 from the atlas with a nearest sampler, so their placement must be
+    // exact in two steps. First the run origin snaps to a whole device pixel: panes sized by ratio give
+    // fractional origins that change with the window width, and without this every glyph would round
+    // differently as the window resizes, changing the spacing of a line. Then each quad's top-left snaps
+    // to a whole pixel too, so no glyph edge sits on a texel boundary, where which column the sampler
+    // picks depends on the GPU's rounding (a glyph can come out heavier or lose a column). With both,
+    // texels and pixels line up exactly and the result is the same on any hardware and at any width.
+    // Rotated, skewed, or mirrored transforms keep their exact positions.
+    const bool snap_quads = integral_pixel_scale && transform[1] == 0.0f && transform[2] == 0.0f &&
+                            transform[0] > 0.0f && transform[3] > 0.0f;
     float snap_x = 0.0f;
     float snap_y = 0.0f;
-    if (integral_pixel_scale && transform[1] == 0.0f && transform[2] == 0.0f) {
+    if (snap_quads) {
         const float device_x = origin_x * transform[0] + transform[4];
         const float device_y = origin_y * transform[3] + transform[5];
         snap_x = std::round(device_x) - device_x;
@@ -2266,6 +2271,17 @@ bool UiRendererImpl::drawGlyphs(const PreparedGlyphs &glyphs, const float transf
             vertex.x = x * transform[0] + y * transform[2] + transform[4] + snap_x;
             vertex.y = x * transform[1] + y * transform[3] + transform[5] + snap_y;
             vertex.alpha = static_cast<uint8_t>(vertex.alpha * opacity);
+        }
+        if (snap_quads && batch.mode == GlyphMode::Alpha) {
+            // Each glyph is four vertices, top-left first.
+            for (size_t quad = 0; quad + 3 < vertices.size(); quad += 4) {
+                const float shift_x = std::round(vertices[quad].x) - vertices[quad].x;
+                const float shift_y = std::round(vertices[quad].y) - vertices[quad].y;
+                for (size_t corner = 0; corner < 4; ++corner) {
+                    vertices[quad + corner].x += shift_x;
+                    vertices[quad + corner].y += shift_y;
+                }
+            }
         }
         std::vector<uint32_t> indices;
         indices.reserve(batch.index_count);
