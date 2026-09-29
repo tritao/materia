@@ -1382,6 +1382,67 @@ void kinematic_bodies_never_contact_static_or_each_other() {
     nkscene_scene_destroy(scene);
 }
 
+void distant_kinematic_pairs_skip_distance_calls() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double half[] = {0.05, 0.05, 0.05};
+    nksim_shape shape = 0;
+    assert(nksim_shape_create_box(world, half, &shape) == NKSIM_OK);
+    assert(nksim_shape_set_contact(world, shape, 0.0, 0.03) == NKSIM_OK);
+    for (int index = 0; index < 16; ++index)
+        make_body(world, make_node_xyz(scene, 100.0 + index * 10.0, 0.0, 0.0),
+            NKSIM_MOTION_KINEMATIC, 1.0, shape);
+    for (int index = 0; index < 50; ++index)
+        make_body(world, make_node_xyz(scene, 1000.0 + index * 10.0, 0.0, 0.0),
+            NKSIM_MOTION_STATIC, 0.0, shape);
+    const auto before = nksim_mujoco_distance_call_count();
+    step_world(world, 1);
+    assert(nksim_mujoco_distance_call_count() == before);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
+void kinematic_parent_child_gap_is_filtered() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 1;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    const double half[] = {0.1, 0.1, 0.1};
+    nksim_shape shape = 0;
+    assert(nksim_shape_create_box(world, half, &shape) == NKSIM_OK);
+    assert(nksim_shape_set_contact(world, shape, 0.0, 0.03) == NKSIM_OK);
+    const auto parent = make_body(world, make_node_xyz(scene, 0.0, 0.0, 0.0),
+        NKSIM_MOTION_KINEMATIC, 1.0, shape);
+    const auto child = make_body(world, make_node_xyz(scene, 0.21, 0.0, 0.0),
+        NKSIM_MOTION_KINEMATIC, 1.0, shape);
+    nksim_joint_desc joint_desc{};
+    joint_desc.struct_size = sizeof(joint_desc);
+    joint_desc.type = NKSIM_JOINT_FIXED;
+    joint_desc.body_a = parent;
+    joint_desc.body_b = child;
+    joint_desc.anchor_b[0] = -0.21;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &joint_desc, &joint) == NKSIM_OK);
+    step_world(world, 1);
+    uint32_t count = 0;
+    assert(nksim_world_get_contacts(world, nullptr, 0, &count) == NKSIM_OK);
+    assert(count == 0);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 // A body without explicit inertial properties has its centre of mass at its
 // origin. Left undefined, MuJoCo copied the body's parent-relative position
 // into its inertial frame, displacing the centre of mass by that offset: an
@@ -2051,6 +2112,8 @@ int main() {
     kinematic_base_is_not_moved_by_child_reaction();
     kinematic_platform_carries_resting_box();
     kinematic_bodies_never_contact_static_or_each_other();
+    distant_kinematic_pairs_skip_distance_calls();
+    kinematic_parent_child_gap_is_filtered();
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();

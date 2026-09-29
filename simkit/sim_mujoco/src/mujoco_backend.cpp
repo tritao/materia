@@ -6,10 +6,12 @@
 #include <mujoco/mujoco.h>
 
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -18,6 +20,8 @@
 
 namespace nksim_mujoco {
 namespace {
+
+std::atomic<std::uint64_t> distance_call_count{0};
 
 using Vec3 = std::array<double, 3>;
 using Quat = std::array<double, 4>;
@@ -820,51 +824,35 @@ public:
         // MuJoCo does not create contacts between two bodies with no dynamic
         // degrees of freedom. A tool on a kinematic flange still needs to
         // report its proximity to a fixed cell obstacle.
-        for (int first = 0; first < model->ngeom; ++first) {
-            const auto first_owner = geom_owner.find(first);
-            if (first_owner == geom_owner.end() ||
-                bodies.at(first_owner->second.first).desc.motion_type == NKSIM_MOTION_DYNAMIC)
-                continue;
-            for (int second = first + 1; second < model->ngeom; ++second) {
-                const auto second_owner = geom_owner.find(second);
-                if (second_owner == geom_owner.end() ||
-                    first_owner->second.first == second_owner->second.first ||
-                    bodies.at(second_owner->second.first).desc.motion_type == NKSIM_MOTION_DYNAMIC ||
-                    reported_pairs.count(pair_key(first, second)) != 0)
-                    continue;
-                if ((model->geom_contype[first] & model->geom_conaffinity[second]) == 0 &&
-                    (model->geom_contype[second] & model->geom_conaffinity[first]) == 0)
-                    continue;
-                // Every pair this loop reaches already has neither body
-                // DYNAMIC (checked above), which is now also exactly
-                // add_self_collision_excludes()'s "neither is DYNAMIC"
-                // condition for excluding a pair from MuJoCo's own
-                // collision detection (see that function's comment): MuJoCo
-                // itself will therefore never generate a native contact for
-                // this pair, so there is nothing in model->exclude_signature
-                // to defer to here — reported_pairs (checked above, from
-                // data->ncon) is the only de-duplication this loop needs.
-                const double detection = model->geom_margin[first] + model->geom_margin[second] +
-                    model->geom_gap[first] + model->geom_gap[second];
-                if (detection <= 0.0) continue;
-                mjtNum fromto[6]{};
-                const double distance = mj_geomDistance(model, data, first, second, detection, fromto);
-                if (!std::isfinite(distance) || distance >= detection) continue;
-                nksim::BackendContact contact{};
-                contact.body_a = first_owner->second.first;
-                contact.part_a = first_owner->second.second;
-                contact.body_b = second_owner->second.first;
-                contact.part_b = second_owner->second.second;
-                contact.distance = distance;
-                for (int axis = 0; axis < 3; ++axis)
-                    contact.position[axis] = (fromto[axis] + fromto[axis + 3]) * 0.5;
-                const Vec3 delta{fromto[3] - fromto[0], fromto[4] - fromto[1],
-                                 fromto[5] - fromto[2]};
-                contact.normal = normalize(delta);
-                // Neither body can receive a MuJoCo contact force.
-                contact.active = false;
-                out.push_back(contact);
-            }
+        for (const auto &candidate : proximity_candidates) {
+            const int first = candidate.first, second = candidate.second;
+            if (reported_pairs.count(pair_key(first, second)) != 0) continue;
+            const double detection = candidate.detection;
+            const double dx = data->geom_xpos[3 * first] - data->geom_xpos[3 * second];
+            const double dy = data->geom_xpos[3 * first + 1] - data->geom_xpos[3 * second + 1];
+            const double dz = data->geom_xpos[3 * first + 2] - data->geom_xpos[3 * second + 2];
+            const double reach = model->geom_rbound[first] + model->geom_rbound[second] + detection;
+            if (model->geom_type[first] != mjGEOM_PLANE &&
+                model->geom_type[second] != mjGEOM_PLANE &&
+                dx * dx + dy * dy + dz * dz > reach * reach) continue;
+            mjtNum fromto[6]{};
+            distance_call_count.fetch_add(1, std::memory_order_relaxed);
+            const double distance = mj_geomDistance(model, data, first, second, detection, fromto);
+            if (!std::isfinite(distance) || distance >= detection) continue;
+            nksim::BackendContact contact{};
+            contact.body_a = geom_owner.at(first).first;
+            contact.part_a = geom_owner.at(first).second;
+            contact.body_b = geom_owner.at(second).first;
+            contact.part_b = geom_owner.at(second).second;
+            contact.distance = distance;
+            for (int axis = 0; axis < 3; ++axis)
+                contact.position[axis] = (fromto[axis] + fromto[axis + 3]) * 0.5;
+            const Vec3 delta{fromto[3] - fromto[0], fromto[4] - fromto[1],
+                             fromto[5] - fromto[2]};
+            contact.normal = normalize(delta);
+            // Neither body can receive a MuJoCo contact force.
+            contact.active = false;
+            out.push_back(contact);
         }
         return NKSIM_OK;
     }
@@ -1113,6 +1101,37 @@ private:
                     std::make_pair(body_id, static_cast<std::int32_t>(part)));
             }
         }
+        proximity_candidates.clear();
+        for (int first = 0; first < model->ngeom; ++first) {
+            const auto first_owner = geom_owner.find(first);
+            if (first_owner == geom_owner.end() ||
+                bodies.at(first_owner->second.first).desc.motion_type == NKSIM_MOTION_DYNAMIC)
+                continue;
+            for (int second = first + 1; second < model->ngeom; ++second) {
+                const auto second_owner = geom_owner.find(second);
+                if (second_owner == geom_owner.end() ||
+                    first_owner->second.first == second_owner->second.first ||
+                    bodies.at(second_owner->second.first).desc.motion_type == NKSIM_MOTION_DYNAMIC)
+                    continue;
+                if ((model->geom_contype[first] & model->geom_conaffinity[second]) == 0 &&
+                    (model->geom_contype[second] & model->geom_conaffinity[first]) == 0)
+                    continue;
+                const auto low = std::min(first_owner->second.first, second_owner->second.first);
+                const auto high = std::max(first_owner->second.first, second_owner->second.first);
+                if (real_excludes.count({low, high}) != 0) continue;
+                const int body_a = model->geom_bodyid[first], body_b = model->geom_bodyid[second];
+                const int weld_a = model->body_weldid[body_a], weld_b = model->body_weldid[body_b];
+                const int parent_a = model->body_weldid[model->body_parentid[weld_a]];
+                const int parent_b = model->body_weldid[model->body_parentid[weld_b]];
+                if (!(model->opt.disableflags & mjDSBL_FILTERPARENT) &&
+                    (weld_a == weld_b ||
+                     (parent_a == weld_b && parent_a != 0) ||
+                     (parent_b == weld_a && parent_b != 0))) continue;
+                const double detection = model->geom_margin[first] + model->geom_margin[second] +
+                    model->geom_gap[first] + model->geom_gap[second];
+                if (detection > 0.0) proximity_candidates.push_back({first, second, detection});
+            }
+        }
         apply_joint_targets();
         mj_forward(model, data);
         return NKSIM_OK;
@@ -1167,6 +1186,7 @@ private:
     // and exactly the same collision_layer/collision_mask semantics, as
     // before this whole fix.
     nksim_result add_self_collision_excludes() {
+        real_excludes.clear();
         auto is_same_articulation = [&](std::uint64_t first, std::uint64_t second) {
             std::vector<std::uint64_t> visited{first};
             for (std::size_t index = 0; index < visited.size(); ++index) {
@@ -1197,11 +1217,10 @@ private:
                 const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
                 const bool neither_dynamic = body_a.desc.motion_type != NKSIM_MOTION_DYNAMIC &&
                     body_b.desc.motion_type != NKSIM_MOTION_DYNAMIC;
-                bool needs_exclude = neither_dynamic;
-                if (!needs_exclude && is_same_articulation(first, second)) {
-                    needs_exclude = is_parent_child(first, second) ||
-                        geometries_overlap_at_rest(body_a, body_b);
-                }
+                const bool real_exclude = is_same_articulation(first, second) &&
+                    (is_parent_child(first, second) || geometries_overlap_at_rest(body_a, body_b));
+                if (real_exclude) real_excludes.emplace(std::min(first, second), std::max(first, second));
+                const bool needs_exclude = neither_dynamic || real_exclude;
                 if (!needs_exclude) continue;
                 auto *exclude = mjs_addExclude(spec);
                 if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
@@ -1766,6 +1785,9 @@ private:
     mjData *data = nullptr;
     std::unordered_map<std::uint64_t, BodyRecord> bodies;
     std::unordered_map<int, std::pair<std::uint64_t, std::int32_t>> geom_owner;
+    struct ProximityCandidate { int first; int second; double detection; };
+    std::vector<ProximityCandidate> proximity_candidates;
+    std::set<std::pair<std::uint64_t, std::uint64_t>> real_excludes;
     std::vector<std::uint64_t> body_order;
     std::unordered_map<std::uint64_t, JointRecord> joints;
     std::vector<std::uint64_t> joint_order;
@@ -1795,6 +1817,10 @@ std::unique_ptr<nksim::PhysicsBackend> make_backend() {
 } // namespace nksim_mujoco
 
 extern "C" {
+
+uint64_t NKSIMMUJOCO_CALL nksim_mujoco_distance_call_count(void) {
+    return nksim_mujoco::distance_call_count.load(std::memory_order_relaxed);
+}
 
 nksim_result NKSIMMUJOCO_CALL nksim_mujoco_world_create(
     const nksim_world_desc *desc, nksim_world *out_world) {
