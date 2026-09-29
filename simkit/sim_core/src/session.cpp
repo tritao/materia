@@ -577,6 +577,13 @@ public:
                           : nksim_world_set_joint_targets(world_, targets, count);
     }
 
+    nksim_result submit_forces(const nksim_body_force *forces, uint32_t count) {
+        std::lock_guard lock(mutex);
+        if (count == 0) return NKSIM_OK;
+        return host_ != 0 ? nksim_host_submit_forces(host_, forces, count)
+                          : nksim_world_apply_forces(world_, forces, count);
+    }
+
     nksim_result drive_bodies(const nksim_body_state *states, uint32_t count) {
         std::lock_guard lock(mutex);
         if (count == 0) return NKSIM_OK;
@@ -1213,6 +1220,13 @@ nksim_result NKSIM_CALL nksim_session_submit_joint_targets(nksim_session session
     if (count != 0 && !targets) return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->submit_joint_targets(targets, count);
+}
+
+nksim_result NKSIM_CALL nksim_session_submit_forces(nksim_session session,
+                                                    const nksim_body_force *forces, uint32_t count) {
+    if (count != 0 && !forces) return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->submit_forces(forces, count);
 }
 
 nksim_result NKSIM_CALL nksim_session_drive_bodies(nksim_session session,

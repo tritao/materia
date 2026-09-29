@@ -363,3 +363,158 @@ Still approximated: a pair with any world geom becomes contact with every
 environment object, using that pair's surface. Pairs between two world
 geoms, geom `solmix` and `solimp` on surfaces, and tendon or site actuators
 are not imported.
+
+### H4 — Policy runtime (first walk)
+
+Result: Unitree's pretrained G1 walking policy, run through the ordinary
+RobotKit runtime in MuJoCo on IMU and encoder observations only, stands,
+walks at 1 m/s for 30 s, turns, survives pushes, and its run records to MCAP
+and replays bit for bit. `tools/humanoid/check-walk.sh` is the gate;
+`tools/humanoid/tests` holds the tests (`haxeon run --project
+robotkit/tools/humanoid/tests/haxeon.json`, about 40 s).
+
+Baseline verification, run first in the new worktree at ffcec085:
+- The app tests did not compile: `EditorToolbarLayoutTests` imports both a
+  module and one of its enums, which made every constructor of that enum
+  ambiguous, so a bare `Full` did not resolve (haxeon 92396dba exposed it).
+  Fixed in haxeon with a compiler test. All app tests pass after that.
+- `robotkit/tests/world-tcp.sh` passes in all three modes (plain,
+  `ROBOTKIT_TEST_SESSIONS=1`, `ROBOTKIT_TEST_LEASE_TIMEOUT=1`), and again after
+  this branch's `robotkit/haxeon.json` gained an interface.
+- The mixed-scene safety check (step 2 of the brief) is owned by another agent
+  on `mixed-scene-safety`; nothing of it is here.
+
+The policy:
+- **Source.** `unitree_rl_gym` commit 276801e, `deploy/pre_train/g1/motion.pt`,
+  trained in Isaac Gym with PPO and an LSTM actor (47 observations, 12 leg
+  joint actions, 20 ms control period, 2 ms physics in Unitree's own
+  sim-to-sim `deploy_mujoco`). No pretrained MuJoCo Playground G1 policy is
+  published, and there is no GPU here to train one.
+- **Licence.** BSD-3-Clause, Copyright Unitree Robotics. It permits
+  redistribution in binary form with the notice, so the ONNX export
+  (127 KB) and the imported 12-joint G1 model (19 KB, no meshes) are checked in
+  with the licence text (`tools/humanoid/policies/unitree-g1/LICENSE`,
+  `tests/fixtures/humanoid/README.md`). The repository does not say in so
+  many words that the weights are covered; we treat them as part of it. STL
+  meshes and the original TorchScript are not vendored:
+  `tools/humanoid/fetch-unitree-g1.sh` fetches the model at the pinned commit.
+- **ONNX export.** `policies/export_unitree_g1.py` makes the LSTM's state an
+  explicit input and output (`obs, h_in, c_in` to `action, h_out, c_out`),
+  because ONNX Runtime sessions are stateless. It checks the export against the
+  TorchScript module over 200 random steps (1e-5 max difference).
+- Kept out of the build: the export, `make_test_fixtures.py` and
+  `reference_unitree_g1.py`, which runs the policy in plain MuJoCo as
+  `deploy_mujoco.py` does and is the yardstick below.
+
+Built:
+- **ONNX Runtime binding** (`robotkit/policy`, library `robotkit_policy`,
+  option `RK_BUILD_POLICY`, on in the MuJoCo/humanoid native build only). ONNX
+  Runtime 1.30.0 (MIT) comes from its pinned prebuilt release, SHA-256 checked
+  by CMake, or from `ROBOTKIT_ONNXRUNTIME_DIR` when offline; it is not built
+  from source. Only linux-x64 has been built and run; the aarch64, macOS arm64
+  and Windows x64 pins are the release's published digests, untested.
+  Tensors cross the C ABI as flat `double` arrays in the model's own order, so
+  the ABI knows nothing about the model; `OnnxPolicy` (Haxe) addresses them by
+  name. Native and Haxe tests match Python's ONNX Runtime on the G1 model over
+  a 100-step recurrent sequence.
+- **Policy spec** (`policy.json`, `PolicySpec`): observation terms and scales
+  in order, history length, joints, default pose, kp/kd, action scale, control
+  period, recurrent state pairs, IMU mount, command limits, hold gains for
+  joints the policy does not drive, and provenance. The controller checks it
+  against the model and the network at construction.
+- **Sensing (the H3 the policy needs).** `PolicyController` reads encoders and
+  the base IMU and nothing else (HU-D4); `debugTruth` is the explicit debug
+  switch, used only by tools comparing the estimate. Gravity comes from
+  `GravityEstimator`, a complementary filter on gyro and accelerometer.
+  Deliberately not done here, still H3: encoder quantization, IMU noise, bias
+  and latency, foot contact forces.
+- **Command reference and session.** `VelocityReference` is LD-D3's cyclic
+  reference: sequence, deadline, limits, acceleration-limited ramp, brake to
+  zero when the deadline lapses, stale/non-finite/expired commands rejected.
+  `PolicySession` closes the loop over the `Robot` boundary (so a
+  `RecordingRobot` records it) and submits `JointTarget.servo` batches.
+  Zero velocity is "hold": the policy keeps balancing.
+- **Force push.** SimKit could not disturb a running robot, so
+  `nksim_session_submit_forces`, `rk_simulation_apply_robot_force` and
+  `Simulation.applyRobotForce` apply a force at a robot's base for one tick.
+
+Acceptance (`WalkTests`, on the checked-in fixture; 2 ms physics, Euler, 100
+solver iterations, as Unitree's scene):
+- stand 10 s: ends 0.14 m from the start, worst tilt 0.087 rad;
+- walk 1 m/s for 30 s: mean forward speed 0.925 m/s over 5-30 s, 25.7 m
+  forward, worst tilt 0.097 rad;
+- turn: 0.5 rad/s walking and in place, both signs: heading changes 1.45-1.94 rad
+  in 10 s, upright;
+- push: 100 N for 0.2 s (about 0.6 m/s on 33 kg) forward, back, left and right,
+  standing and walking: upright at the end every time;
+- MCAP: a 6 s walk records 3000 snapshots (one per 2 ms tick) and 301 servo
+  batches with their gains and targets, the recorded commands fed into a fresh
+  simulation reproduce every joint position exactly (0 rad, same timestamps),
+  and `ReplayRobot` preserves the command stream.
+
+Sim-to-sim gap, measured (10 s, SimKit against `reference_unitree_g1.py`, same
+model, same command; SimKit ramps a command at 1 m/s^2, the reference steps it):
+
+| command (vx, vy, wz) | SimKit x, y, yaw | plain MuJoCo x, y, yaw |
+| --- | --- | --- |
+| 0, 0, 0 | 0.14, -0.04, -0.09 | 0.13, -0.18, -0.09 |
+| 0.5, 0, 0 | 4.57, -0.30, -0.15 | 4.59, -0.39, -0.17 |
+| 1.0, 0, 0 | 8.45, -0.53, -0.21 | 8.69, -1.04, -0.26 |
+| 0, 0, 0.5 | -0.08, -0.04, 1.451 | -0.12, -0.06, 1.450 |
+| 0.5, 0, 0.5 | -1.14, -1.21, 1.63 | -1.18, -1.18, 1.60 |
+
+Standing pushes of 200 N for 0.2 s topple it in both simulators, forward and
+sideways, and neither topples backwards; the end positions of the survivors
+agree to a few centimetres. So SimKit adds no measurable gap on this policy
+beyond chaotic divergence of a walking gait. The remaining distance to Isaac
+Gym, where the policy was trained, cannot be measured here (no Isaac); Unitree
+deploys the same policy from the same MuJoCo scene, and what we observe is what
+that gives. Also run, not in the tests: the same policy on the 29-joint
+Menagerie G1 (`policy-menagerie.json`, waist and arms held at zero, its own
+IMU): it stands, walks 6.2 m in 10 s at 0.5 m/s and 30 s at 1 m/s without
+falling, so it tolerates other inertias. Those runs use 2 ms Euler with 100
+iterations, not MJX's truncated 5/8: the truncated solver was not tried.
+
+Found, in the order it was found:
+1. **The runtime rejects servo targets outside joint travel** and latches a
+   fault (`RK_ERROR_LIMIT`), which failed `Simulation.step`. A policy's
+   `default + 0.25 * action` goes past travel now and then, so the controller
+   clamps its targets (95 of 18000 in a 30 s walk). In Isaac and plain MuJoCo
+   the target is unclamped and the joint just meets its stop, so this is a
+   small deliberate difference. Not a bug in the runtime: it owns position
+   bounds.
+2. **Sensor frames only refresh when `snapshot()` is called**
+   (`RuntimeRobotAdapter.sensors()` returns the last ones), so a session must
+   call it every tick. Reading the IMU once per control period aliased the
+   gait's impacts into a 0.05 to 0.1 rad tilt bias and made the robot walk 25
+   percent too fast. At tick rate (2 ms) the estimate stays within 0.002 rad.
+3. **An accelerometer cannot be trusted while walking**: averaged over a gait
+   it reads a gravity tilted 0.05 to 0.1 rad, and the more it corrects the
+   worse the estimate. The filter therefore corrects only while the robot is
+   still (|f| within 10 percent of g and under 0.1 rad/s) and otherwise
+   integrates the gyro exactly.
+4. **G1 cannot hold its default pose on servos, so there is no warm-up**: the
+   policy must run from the first control tick, as in Unitree's own script
+   (H2 already found G1 falls on servos alone). `PolicySession.start` has a
+   warm-up argument for a robot that can hold still (a gantry); H5's stand-up
+   state should replace it.
+5. **The policy turns clockwise for a positive yaw command**, in plain MuJoCo
+   too, at about a third of the commanded rate. The spec negates the yaw scale
+   so RobotKit commands are counter-clockwise positive (REP-103).
+6. The imported model keeps only primitive collision shapes: the pelvis and
+   leg meshes that collide in Unitree's MJCF (contype 1) are skipped by the
+   importer, so only the foot spheres touch the floor. This did not show up
+   in walking, standing, pushes or the toppling comparison; a fall onto the
+   torso will behave differently.
+7. `Math.round` returns a 32-bit Int, so `Int64.fromFloat(Math.round(s * 1e9))`
+   overflows after 2.1 s. Two tests caught it; the code uses
+   `Int64.fromFloat(s * 1e9 + 0.5)`.
+8. Two haxeon bugs, fixed there with tests: an enum imported by module and by
+   name lost its constructors, and FFI interfaces were registered in path order
+   so `robotkit/policy/...` (depends on RobotKitRuntime) came before
+   `robotkit/runtime/...`; the session now registers dependencies first.
+9. The disk filled during the work (other checkouts' builds) and truncated
+   two files being written; they were rewritten, and nothing committed is
+   affected.
+
+Not done, and where it goes: `robotkit/TODO.md`.

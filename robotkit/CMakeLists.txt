@@ -25,6 +25,7 @@ target_include_directories(robotkit_mcap_headers INTERFACE
 option(RK_BUILD_SHARED "Build RobotKit libraries as shared libraries" ON)
 option(RK_BUILD_TESTS "Build RobotKit tests" ${BUILD_TESTING})
 option(RK_BUILD_SIMKIT "Build the SimKit-backed RobotKit simulation" OFF)
+option(RK_BUILD_POLICY "Build the ONNX Runtime policy library (fetches a pinned prebuilt release)" OFF)
 
 set(RK_LIBRARY_TYPE STATIC)
 if(RK_BUILD_SHARED AND NOT EMSCRIPTEN)
@@ -37,6 +38,10 @@ if(NOT TARGET motionkit_core)
 endif()
 
 add_subdirectory(runtime)
+
+if(RK_BUILD_POLICY)
+    add_subdirectory(policy)
+endif()
 
 if(RK_BUILD_SIMKIT)
     if(NOT TARGET NativeKit::sim_core)

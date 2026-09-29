@@ -10,11 +10,13 @@
 	"ffi": {
 		"interfaces": [
 			"runtime/bindings/robotkit-runtime.hxi",
-			"runtime/bindings/robotkit-simkit.hxi"
+			"runtime/bindings/robotkit-simkit.hxi",
+			"policy/bindings/robotkit-policy.hxi"
 		],
 		"projections": [
 			"runtime/bindings/robotkit-runtime.hxmap",
-			"runtime/bindings/robotkit-simkit.hxmap"
+			"runtime/bindings/robotkit-simkit.hxmap",
+			"policy/bindings/robotkit-policy.hxmap"
 		]
 	},
 	"target": "host"
