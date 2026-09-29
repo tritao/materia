@@ -235,7 +235,8 @@ class Main {
     var diagnostics = ReferenceEditorLaunchOptions.fromArgs(args);
     if (diagnostics == null) throw "Invalid editor launch options";
     var host = new DesktopUiHostOptions();
-    host.title = "Materia";
+    // Captures screenshot their window by title, so give each capture run a title no other window shares.
+    host.title = diagnostics.captureDirectory == null ? "Materia" : "Materia capture " + Sys.getPid();
     host.icons = MateriaIcon.create();
     host.width = diagnostics.windowWidth;
     host.height = diagnostics.windowHeight;
