@@ -347,6 +347,13 @@ capture the visual, structural, application, event, and performance state:
   --capture-dir=build/captures/default --frames=3
 ```
 
+The 3D viewport smooths geometry edges with multisampling, four samples per
+pixel by default or as many as the GPU supports. Choose Off, 2x or 4x in the
+viewport options menu; the choice is saved in `preferences.json`. For a run that
+should not touch the saved choice, such as a capture, pass `--msaa=SAMPLES`
+(`--msaa=1` turns it off). The `sampleCount` in `app-state.json` is the count the
+last render used.
+
 The capture directory contains `frame.png`, `ui-tree.txt`, `layout.json`,
 `app-state.json`, `frame-metrics.json`, and `events.jsonl`. Paths are resolved
 from the app project directory. Native PNG capture currently uses ImageMagick's

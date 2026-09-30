@@ -616,6 +616,18 @@ class NKSRENDER_API NativeKitGpuExecutor {
 
     void set_renderer(nkgpu_renderer renderer) noexcept;
     nkgpu_renderer renderer() const noexcept;
+    /**
+     * Sets how many samples offscreen captures render with, clamped to what the
+     * GPU can render and resolve for the capture formats, and returns the count
+     * that will be used: a power of two, or 1 when multisampling is unavailable.
+     * Captures stay single-sample until this is called. Pixel picking and the
+     * swapchain path are always single-sample.
+     */
+    std::uint32_t set_sample_count(std::uint32_t requested);
+    /** The sample count captures use now. */
+    std::uint32_t sample_count();
+    /** The largest sample count this GPU can render and resolve for captures. */
+    std::uint32_t max_sample_count();
     nkgpu_result last_result() const noexcept;
 
     GpuExecutionStats execute(const RenderPlan &, const SceneSnapshot &);
