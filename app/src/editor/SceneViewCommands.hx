@@ -1,12 +1,17 @@
 package app.editor;
 
+import app.AppSettings;
 import app.Main.ReferenceEditorApp;
+import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.core.Command;
 import nativekit.ui.core.Shortcut;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
 
-/** Viewport, lighting, grid, and nudge command registrations. */
+/**
+ * Viewport, lighting, grid, and nudge command registrations. Grid and lighting
+ * commands change the saved settings; the editor applies them from there.
+ */
 @:access(app.Main.ReferenceEditorApp)
 class SceneViewCommands {
   public static function install(app:ReferenceEditorApp):Void {
@@ -25,11 +30,11 @@ class SceneViewCommands {
     registerAntialiasing(app, "scene.antialiasing-2x", "Anti-aliasing: 2x", 2);
     registerAntialiasing(app, "scene.antialiasing-4x", "Anti-aliasing: 4x", 4);
     app.commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
-      app.gridVisible = !app.gridVisible;
+      app.preferences.store.set(AppSettings.GRID_VISIBLE, PropertyValue.Bool(!app.gridVisible));
       app.log(app.gridVisible ? "Grid enabled" : "Grid disabled");
     }, null, null, function() return app.gridVisible));
     app.commands.register(new Command("scene.toggle-grid-snap", "Toggle grid snapping", function() {
-      app.gridSnapEnabled = !app.gridSnapEnabled;
+      app.preferences.store.set(AppSettings.GRID_SNAP, PropertyValue.Bool(!app.gridSnapEnabled));
       app.log(app.gridSnapEnabled ? "Grid snapping enabled" : "Grid snapping disabled");
     }, null, null, function() return app.gridSnapEnabled));
     registerGridSpacing(app, "scene.grid-spacing-0.1", "Grid spacing: 0.1 m", 0.1);
@@ -56,20 +61,17 @@ class SceneViewCommands {
 
   static function registerGridSpacing(app:ReferenceEditorApp, id:String, label:String, spacing:Float):Void {
     app.commands.register(new Command(id, label, function() {
-      app.gridSpacing = spacing;
+      app.preferences.store.set(AppSettings.GRID_SPACING, PropertyValue.Float(spacing));
       app.log("Grid spacing set to " + spacing + " m");
-      app.commands.refresh();
     }, null, null, function() return app.gridSpacing == spacing));
   }
 
   static function registerLightingPreset(app:ReferenceEditorApp, id:String, label:String, preset:Int):Void {
     app.commands.register(new Command(id, label, function() {
-      if (app.perspectiveViewport != null) app.perspectiveViewport.setLightingPreset(preset);
+      app.preferences.store.set(AppSettings.LIGHTING, PropertyValue.Enum(AppSettings.LIGHTING_PRESETS[preset]));
       app.log(label);
-      app.commands.refresh();
     }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null,
-      function() return app.perspectiveViewport != null &&
-        app.perspectiveViewport.lightingPresetId() == preset));
+      function() return app.lightingPreset == preset));
   }
 
   static function registerAntialiasing(app:ReferenceEditorApp, id:String, label:String, samples:Int):Void {

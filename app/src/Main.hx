@@ -266,8 +266,8 @@ class Main {
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null ||
         activeEditor.hasCharacterPreview());
     var hosted = DesktopUiHost.open(host, function(context) {
-      var activeTheme = Theme.light();
-      if (diagnostics.darkTheme) activeTheme = Theme.dark();
+      // --dark overrides the saved color scheme for this run only.
+      var activeTheme:Null<Theme> = diagnostics.darkTheme ? Theme.dark() : null;
       var world:Null<RobotWorld> = null;
       var robotHost = diagnostics.robotHost;
       if (robotHost != null) {
@@ -541,6 +541,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var gridVisible:Bool;
   var gridSnapEnabled:Bool;
   var gridSpacing:Float;
+  /** The viewport's lighting preset number, from the saved setting. */
+  var lightingPreset:Int = 0;
   var paletteVisible:Bool;
   var toolbarMenuVisible:Bool;
   var viewportWidth:Float = Main.DEFAULT_WINDOW_WIDTH;
@@ -633,7 +635,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ?recordPath:String, demo:Bool = false) {
     this.hostContext = hostContext;
     semanticRecordPath = recordPath;
-    appearance = new EditorAppearance(theme);
+    workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
+    preferences = AppPreferences.besideWorkspace(workspacePath);
+    appearance = new EditorAppearance(theme != null ? theme : savedTheme());
     ui = new UiContext(null, fonts, appearance.theme);
     commands = ui.commands;
     if (semanticRecordPath != null) commands.onInvoked = function(id, result) {
@@ -646,14 +650,17 @@ class ReferenceEditorApp implements DesktopUiApplication {
     simulation = new ApplicationSimulation(this.world,ApplicationSimulation.MUJOCO);
     session = new ProjectDocumentSession(demo ? BimEditorDemo.create() : null, demo);
     attachSceneRecorder();
-    workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
-    preferences = AppPreferences.besideWorkspace(workspacePath);
     antialiasing = preferences.antialiasing;
     // The settings dialog edits the store directly; apply what it changes.
     preferences.store.onChanged(AppSettings.ANTIALIASING, function(_) {
       if (preferences.antialiasing != antialiasing) setAntialiasing(preferences.antialiasing, false);
     });
+    preferences.store.onChanged(AppSettings.COLOR_SCHEME, function(_) {
+      var dark = preferences.store.getString(AppSettings.COLOR_SCHEME) == "dark";
+      if (dark != appearance.dark) applyTheme(dark ? Theme.dark() : Theme.light());
+    });
+    preferences.store.onChanged("editors/3d", function(_) readViewSettings());
     preferences.store.onChanged("", function(_) { if (settingsPanel != null) invalidateView(); });
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
@@ -693,15 +700,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
       perspectiveViewport.setSampleCount(antialiasing);
+      perspectiveViewport.setLightingPreset(lightingPreset);
     }
     telemetry = new TelemetryPanel(demo);
     logLines = [];
     for (line in demo ? ["Demo scene ready", "Select a box; edit position or visibility",
         "Middle-drag to pan; scroll to zoom"] : ["Scene ready", "Use Add to create an object"])
       log(line);
-    gridVisible = true;
-    gridSnapEnabled = false;
-    gridSpacing = EditorGrid.STEP;
+    readViewSettings();
     paletteVisible = false;
     toolbarMenuVisible = false;
     contextMenuVisible = false;
@@ -1485,6 +1491,29 @@ class ReferenceEditorApp implements DesktopUiApplication {
     } catch (error:Dynamic) log("Rename failed: " + Std.string(error));
   }
 
+  function savedTheme():Theme
+    return preferences.store.getString(AppSettings.COLOR_SCHEME) == "dark" ? Theme.dark() : Theme.light();
+
+  function applyTheme(theme:Theme):Void {
+    appearance = new EditorAppearance(theme);
+    ui.setTheme(appearance.theme);
+    commands.refresh();
+    invalidateView();
+    if (hostContext != null) hostContext.requestFrame();
+  }
+
+  /** Copies the saved grid and lighting settings into the fields the viewport and toolbar read. */
+  function readViewSettings():Void {
+    var store = preferences.store;
+    gridVisible = store.getBool(AppSettings.GRID_VISIBLE);
+    gridSnapEnabled = store.getBool(AppSettings.GRID_SNAP);
+    gridSpacing = store.getFloat(AppSettings.GRID_SPACING);
+    lightingPreset = Std.int(Math.max(0, AppSettings.LIGHTING_PRESETS.indexOf(store.getString(AppSettings.LIGHTING))));
+    if (perspectiveViewport != null) perspectiveViewport.setLightingPreset(lightingPreset);
+    if (commands != null) commands.refresh();
+    invalidateView();
+  }
+
   /** Opens the Editor Settings dialog on its first category. */
   public function openSettings():Void {
     if (settingsPanel == null) settingsPanel = new SettingsPanel("editor-settings", preferences.store, invalidateView);
@@ -1738,10 +1767,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       log("Workspace saved");
     }));
     commands.register(new Command("editor.toggle-dark-theme", "Toggle dark theme", function() {
-      appearance = new EditorAppearance(appearance.dark ? Theme.light() : Theme.dark());
-      ui.setTheme(appearance.theme);
-      commands.refresh();
-      if (hostContext != null) hostContext.requestFrame();
+      var dark = !appearance.dark;
+      preferences.store.set(AppSettings.COLOR_SCHEME, PropertyValue.Enum(dark ? "dark" : "light"));
+      // Also apply directly: a --dark launch can differ from the saved scheme, so the set may not change it.
+      applyTheme(dark ? Theme.dark() : Theme.light());
     }, null, null, function() return appearance.dark));
     var openPalette = new Command("editor.command-palette", "Open command palette", function() {
       paletteVisible = true;
@@ -1790,7 +1819,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
-      if (perspectiveViewport != null) perspectiveViewport.setSampleCount(antialiasing);
+      if (perspectiveViewport != null) {
+        perspectiveViewport.setSampleCount(antialiasing);
+        perspectiveViewport.setLightingPreset(lightingPreset);
+      }
       sceneInspector = null;
     }
     scene.onSelectionChanged = updateCommandContext;

@@ -7,6 +7,7 @@ import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
 import nativekit.ui.properties.PropertyValue;
+import nativekit.ui.theme.Theme;
 import FontCollection;
 import LayoutFrame;
 import nativekit.ui.widgets.settings.SettingsPanel;
@@ -14,6 +15,7 @@ import nativekit.ui.widgets.settings.ShortcutsPanel;
 import sys.FileSystem;
 
 /** The Editor Settings dialog: opening, editing, resetting and closing it in a laid-out editor. */
+@:access(app.Main.ReferenceEditorApp)
 class EditorSettingsDialogTests {
   static final DIRECTORY = "build/editor-settings-dialog-test";
 
@@ -117,6 +119,8 @@ class EditorSettingsDialogTests {
     editor.closeSettings();
     editor.dispose();
 
+    viewSettings(fonts);
+
     // A restarted editor keeps the new binding.
     var restarted = new ReferenceEditorApp(fonts, DIRECTORY + "/workspace.json");
     check(!restarted.commands.dispatch(UiKey.Comma, UiModifier.Control)
@@ -167,4 +171,49 @@ class EditorSettingsDialogTests {
     return open;
   }
 
+
+  /** The grid, lighting and theme: menu commands save them, the dialog changes them, a restart keeps them. */
+  static function viewSettings(fonts:FontCollection):Void {
+    var editor = new ReferenceEditorApp(fonts, DIRECTORY + "/workspace.json");
+    var store = editor.preferences.store;
+    check(editor.gridVisible && !editor.gridSnapEnabled && editor.gridSpacing == 0.2 && editor.lightingPreset == 0
+      && !editor.appearance.dark, "view settings start at their defaults");
+
+    check(editor.commands.execute("scene.toggle-grid") && !editor.gridVisible && !store.getBool(AppSettings.GRID_VISIBLE),
+      "Toggle grid saves the choice");
+    check(editor.commands.get("scene.toggle-grid").isChecked() == false, "and the menu shows it");
+    editor.commands.execute("scene.toggle-grid-snap");
+    editor.commands.execute("scene.grid-spacing-0.5");
+    check(editor.gridSnapEnabled && editor.gridSpacing == 0.5 && store.getFloat(AppSettings.GRID_SPACING) == 0.5,
+      "snapping and spacing commands save their choices");
+    check(editor.commands.get("scene.grid-spacing-0.5").isChecked(), "the spacing menu item is checked");
+
+    store.set(AppSettings.GRID_SPACING, PropertyValue.Float(0.25));
+    check(editor.gridSpacing == 0.25 && !editor.commands.get("scene.grid-spacing-0.5").isChecked(),
+      "a spacing typed in the dialog reaches the editor");
+    store.set(AppSettings.LIGHTING, PropertyValue.Enum("contrast"));
+    check(editor.lightingPreset == 2 && editor.commands.get("scene.lighting-contrast").isChecked(),
+      "lighting chosen in the dialog reaches the editor and its menu");
+
+    check(editor.commands.execute("editor.toggle-dark-theme") && editor.appearance.dark
+      && store.getString(AppSettings.COLOR_SCHEME) == "dark", "Toggle dark theme saves the color scheme");
+    store.set(AppSettings.COLOR_SCHEME, PropertyValue.Enum("light"));
+    check(!editor.appearance.dark, "the color scheme chosen in the dialog applies at once");
+    store.set(AppSettings.COLOR_SCHEME, PropertyValue.Enum("dark"));
+    editor.dispose();
+
+    var restarted = new ReferenceEditorApp(fonts, DIRECTORY + "/workspace.json");
+    check(restarted.appearance.dark && !restarted.gridVisible && restarted.gridSnapEnabled && restarted.gridSpacing == 0.25
+      && restarted.lightingPreset == 2, "a restarted editor starts with the saved view settings");
+    var launchedLight = new ReferenceEditorApp(fonts, DIRECTORY + "/workspace.json", Theme.light());
+    check(!launchedLight.appearance.dark && launchedLight.preferences.store.getString(AppSettings.COLOR_SCHEME) == "dark",
+      "a theme given at launch wins for that run without changing the saved one");
+    launchedLight.commands.execute("editor.toggle-dark-theme");
+    check(launchedLight.appearance.dark, "toggling from a launch theme still switches");
+    launchedLight.dispose();
+    for (path in [AppSettings.GRID_VISIBLE, AppSettings.GRID_SNAP, AppSettings.GRID_SPACING, AppSettings.LIGHTING,
+      AppSettings.COLOR_SCHEME])
+      restarted.preferences.store.reset(path);
+    restarted.dispose();
+  }
 }
