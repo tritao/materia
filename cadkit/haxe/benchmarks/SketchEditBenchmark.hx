@@ -6,6 +6,8 @@ import cadkit.parametric.features.ConstrainedSketchSupportFaceChange;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.ProfileError;
 import cadkit.sketch.SketchConstraint;
+import cadkit.sketch.SketchEntity;
+import cadkit.sketch.SketchPoint;
 import cadkit.sketch.SketchSession;
 
 /** Repeatable timing probe for sketch solve, document evaluation, and viewport tessellation. */
@@ -105,5 +107,53 @@ class SketchEditBenchmark {
 		Sys.println("solver_cancelled=" + cancelled + " callback_checks=" + cancellationChecks
 			+ " cancel_ms=" + milliseconds(Sys.time() - cancellationStarted));
 		model.close();
+		scaling();
+	}
+
+	/**
+		Solve cost against sketch size: rectangles of 4 points each, either
+		independent (each with its own fixed corner: many parts) or chained
+		(each shares a corner with the last: one part). Cold is a solve from
+		the authored pose; edit changes one width and re-solves from the
+		previous solution.
+	*/
+	static function scaling():Void {
+		for (points in [48, 200, 1000])
+			for (chained in [false, true]) {
+				var sketch = rectangles(Std.int(points / 4), chained, 10);
+				var started = Sys.time();
+				var solved = sketch.solve();
+				var cold = Sys.time() - started;
+				setDimension(sketch, "r0.width", 10.5);
+				started = Sys.time();
+				var edited = sketch.solve(solved);
+				var edit = Sys.time() - started;
+				Sys.println("scaling " + (chained ? "chained" : "independent") + " points=" + points
+					+ " cold_ms=" + milliseconds(cold) + " edit_ms=" + milliseconds(edit)
+					+ " iterations=" + edited.diagnostic.iterations + " diagnostic=" + edited.diagnostic.status
+					+ " subsystems=" + (edited.diagnostic.report == null ? 0 : edited.diagnostic.report.subsystems.length));
+			}
+	}
+
+	static function rectangles(count:Int, chained:Bool, width:Float):ConstrainedSketch {
+		var sketch = new ConstrainedSketch();
+		for (r in 0...count) {
+			var p = [for (i in 0...4) 'r$r.p$i'], x = r * (width + (chained ? 0 : 5)), y = 0.0;
+			sketch.addPoint(new SketchPoint(p[0], x + 0.1, y - 0.1)).addPoint(new SketchPoint(p[1], x + width - 0.2, y + 0.2))
+				.addPoint(new SketchPoint(p[2], x + width + 0.3, y + 5.1)).addPoint(new SketchPoint(p[3], x - 0.2, y + 4.9));
+			sketch.addEntity(SketchEntity.line('r$r.bottom', p[0], p[1])).addEntity(SketchEntity.line('r$r.right', p[1], p[2]))
+				.addEntity(SketchEntity.line('r$r.top', p[2], p[3])).addEntity(SketchEntity.line('r$r.left', p[3], p[0]));
+			if (chained && r > 0)
+				sketch.addConstraint(SketchConstraint.coincident('r$r.joint', p[0], 'r${r - 1}.p1'));
+			else
+				sketch.addConstraint(SketchConstraint.fixed('r$r.origin', p[0]));
+			sketch.addConstraint(SketchConstraint.horizontal('r$r.h0', 'r$r.bottom'))
+				.addConstraint(SketchConstraint.horizontal('r$r.h1', 'r$r.top'))
+				.addConstraint(SketchConstraint.vertical('r$r.v0', 'r$r.right'))
+				.addConstraint(SketchConstraint.vertical('r$r.v1', 'r$r.left'))
+				.addConstraint(SketchConstraint.distance('r$r.width', p[0], p[1], width))
+				.addConstraint(SketchConstraint.distance('r$r.height', p[1], p[2], 5));
+		}
+		return sketch;
 	}
 }

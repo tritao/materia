@@ -1,4 +1,7 @@
 import cadkit.modeling.AssemblyState;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
@@ -89,6 +92,7 @@ class DiagnosisInvarianceSmoke {
 			{name: "rotate", apply: s -> transformSketch(s, 1, 0, 0, 0.7, false, 0)},
 			{name: "reorder", apply: s -> transformSketch(s, 1, 0, 0, 0, true, 0)},
 			{name: "perturb", apply: s -> transformSketch(s, 1, 0, 0, 0, false, 0.02)},
+			{name: "codec", apply: throughDocument},
 		];
 		for (transform in transforms) {
 			var summary = sketchSummary(transform.apply(fixture.build()));
@@ -100,6 +104,18 @@ class DiagnosisInvarianceSmoke {
 		var again = sketchSummary(sketch);
 		if (again != base)
 			failures.push('${fixture.name}/repeat: $again, first $base');
+	}
+
+	/** Saves the sketch in a document and loads it back, without evaluating the document. */
+	static function throughDocument(source:ConstrainedSketch):ConstrainedSketch {
+		var document = new Document();
+		document.add(new ConstrainedSketchFeature(source));
+		var reloaded = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var feature:ConstrainedSketchFeature = cast reloaded.featureAt(0);
+		var result = feature.sketch();
+		reloaded.close();
+		document.close();
+		return result;
 	}
 
 	/** Degeneracy belongs to a pose, so it is checked directly rather than through the invariant summary. */

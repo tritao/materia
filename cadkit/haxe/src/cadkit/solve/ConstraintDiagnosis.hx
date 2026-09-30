@@ -144,6 +144,128 @@ class ConstraintDiagnosis {
 			suggestRemovals(input.owners, groups, protectedOwners));
 	}
 
+	/**
+		`diagnose` for sparse rows (`index`/`value` pairs, each variable once
+		per row). When there are no more rows than variables it first factors
+		JJᵀ (rows equilibrated) by `EnvelopeCholesky`: if every pivot is at
+		least `FULL_RANK_PIVOT`, the rows are independent and the report
+		follows without a QR. Otherwise it falls back to the dense diagnosis,
+		which is needed only when there is a dependency to explain.
+	*/
+	public static function diagnoseSparse(rows:Array<{index:Array<Int>, value:Array<Float>}>, variables:Int, owners:Array<String>,
+			residuals:Array<Float>, ?rankTolerance:Float, ?protectedOwners:Array<String>):DiagnosisReport {
+		if (rows.length != owners.length || rows.length != residuals.length)
+			throw 'Diagnosis has ${rows.length} rows, ${owners.length} owners and ${residuals.length} residuals';
+		if (rows.length <= variables && independentRows(rows)) {
+			var unsatisfied = uniqueOwners(owners, [for (row in 0...rows.length) if (!(Math.abs(residuals[row]) <= 1)) row]);
+			return new DiagnosisReport(variables, rows.length, sparseSubsystems(rows, owners, variables), [], unsatisfied, false, []);
+		}
+		var dense = [for (_ in 0...rows.length * variables) 0.0];
+		for (row in 0...rows.length)
+			for (e in 0...rows[row].index.length)
+				dense[row * variables + rows[row].index[e]] += rows[row].value[e];
+		return diagnose({jacobian: dense, variables: variables, owners: owners, residuals: residuals,
+			rankTolerance: rankTolerance, protectedOwners: protectedOwners});
+	}
+
+	/** Smallest JJᵀ pivot (rows at unit norm) that proves independence; anything closer goes to the QR. */
+	static inline var FULL_RANK_PIVOT:Float = 1e-8;
+
+	static function independentRows(rows:Array<{index:Array<Int>, value:Array<Float>}>):Bool {
+		var m = rows.length;
+		var scale = [for (row in rows) {
+			var sum = 0.0;
+			for (value in row.value) sum += value * value;
+			Math.sqrt(sum);
+		}];
+		for (value in scale) if (!(value > 0)) return false;
+		// Rows are adjacent when they share a variable.
+		var rowsOf = new Map<Int, Array<Int>>();
+		for (row in 0...m)
+			for (variable in rows[row].index) {
+				var list = rowsOf.get(variable);
+				if (list == null) { list = []; rowsOf.set(variable, list); }
+				list.push(row);
+			}
+		var neighbours:Array<Array<Int>> = [for (_ in 0...m) []];
+		for (list in rowsOf)
+			for (a in list) for (b in list)
+				if (a != b && neighbours[a].indexOf(b) < 0) neighbours[a].push(b);
+		var ordering = EnvelopeCholesky.order(neighbours);
+		var envelope = EnvelopeCholesky.zero(ordering.first);
+		for (a in 0...m) {
+			var pa = ordering.position[a];
+			envelope[pa][pa - ordering.first[pa]] = 1;
+			for (b in neighbours[a]) {
+				var pb = ordering.position[b];
+				if (pb < pa) envelope[pa][pb - ordering.first[pa]] = dot(rows[a], rows[b]) / (scale[a] * scale[b]);
+			}
+		}
+		var pivots:Array<Float> = [];
+		if (!EnvelopeCholesky.factor(envelope, ordering.first, pivots)) return false;
+		for (pivot in pivots) if (pivot < FULL_RANK_PIVOT) return false;
+		return true;
+	}
+
+	static function dot(a:{index:Array<Int>, value:Array<Float>}, b:{index:Array<Int>, value:Array<Float>}):Float {
+		var sum = 0.0;
+		for (i in 0...a.index.length)
+			for (j in 0...b.index.length)
+				if (a.index[i] == b.index[j]) sum += a.value[i] * b.value[j];
+		return sum;
+	}
+
+	/** Subsystems as `components` finds them (shared nonzero variable or owner), from sparse rows. */
+	static function sparseSubsystems(rows:Array<{index:Array<Int>, value:Array<Float>}>, owners:Array<String>, variables:Int):Array<DiagnosisSubsystem> {
+		var m = rows.length, parent = [for (i in 0...m) i];
+		var firstRowOfColumn = [for (_ in 0...variables) -1], firstRowOfOwner = new Map<String, Int>();
+		for (row in 0...m) {
+			var seen = firstRowOfOwner.get(owners[row]);
+			if (seen == null) firstRowOfOwner.set(owners[row], row); else join(parent, row, seen);
+			for (e in 0...rows[row].index.length)
+				if (rows[row].value[e] != 0) {
+					var column = rows[row].index[e];
+					if (firstRowOfColumn[column] < 0) firstRowOfColumn[column] = row; else join(parent, row, firstRowOfColumn[column]);
+				}
+		}
+		var slot = [for (_ in 0...m) -1];
+		var members:Array<Array<Int>> = [], columnCounts:Array<Int> = [];
+		for (row in 0...m) {
+			var root = find(parent, row);
+			if (slot[root] < 0) { slot[root] = members.length; members.push([]); columnCounts.push(0); }
+			members[slot[root]].push(row);
+		}
+		for (column in 0...variables)
+			if (firstRowOfColumn[column] >= 0) columnCounts[slot[find(parent, firstRowOfColumn[column])]]++;
+		var result = [for (i in 0...members.length) new DiagnosisSubsystem(uniqueOwners(owners, members[i]), columnCounts[i], members[i].length)];
+		result.sort((a, b) -> Reflect.compare(a.owners.join(","), b.owners.join(",")));
+		return result;
+	}
+
+	/**
+		Combines reports of disjoint parts of one system with `variables` in
+		all: ranks add, lists concatenate (sorted), and variables no part
+		touches count as free.
+	*/
+	public static function merge(reports:Array<DiagnosisReport>, variables:Int):DiagnosisReport {
+		var rank = 0, nearDegenerate = false;
+		var subsystems:Array<DiagnosisSubsystem> = [], groups:Array<DependencyGroup> = [];
+		var unsatisfied:Array<String> = [], suggestions:Array<String> = [];
+		for (report in reports) {
+			rank += report.rank;
+			nearDegenerate = nearDegenerate || report.nearDegenerate;
+			for (subsystem in report.subsystems) subsystems.push(subsystem);
+			for (group in report.dependencyGroups) groups.push(group);
+			for (owner in report.unsatisfied) if (unsatisfied.indexOf(owner) < 0) unsatisfied.push(owner);
+			for (owner in report.suggestedRemovals) if (suggestions.indexOf(owner) < 0) suggestions.push(owner);
+		}
+		subsystems.sort((a, b) -> Reflect.compare(a.owners.join(","), b.owners.join(",")));
+		groups.sort((a, b) -> Reflect.compare(a.owners.join(","), b.owners.join(",")));
+		unsatisfied.sort(Reflect.compare);
+		suggestions.sort(Reflect.compare);
+		return new DiagnosisReport(variables, rank, subsystems, groups, unsatisfied, nearDegenerate, suggestions);
+	}
+
 	/** Rows joined through shared variables and shared owners; columns no row touches are left out (free). */
 	static function components(input:DiagnosisInput, rows:Int, columns:Int):Array<{rows:Array<Int>, columns:Array<Int>}> {
 		var parent = [for (i in 0...rows) i];

@@ -399,3 +399,35 @@ branch `loop-flow-stores`), which had broken toolpathkit's
   both cos and sin rows, so it is already oriented.
 - Step 4 (large-sketch benchmark, sparse solves) not started: the dense
   normal-equation solve is now the only O(n³) part; measure before changing.
+
+### C2.4 — Sketch scaling: parts, sparse Cholesky, sparse diagnosis; codec check (2026-09-30)
+
+Measured first (`SketchEditBenchmark` scaling section: rectangles of 4
+points, independent or chained into one part). With C2.2's dense solve,
+chained 200 points took 12.8 s, 97% of it in the dense normal-equation LU.
+
+- **Parts:** constraints are grouped by the variables they reference (not by
+  Jacobian nonzeros, which vanish by accident at special poses); each part
+  runs its own LM, polish, diagnosis and witness pose, and
+  `ConstraintDiagnosis.merge` combines the reports (untouched variables are
+  free). The Jacobian is kept as sparse rows.
+- **Sparse LM step:** `cadkit.solve.EnvelopeCholesky` — reverse
+  Cuthill-McKee ordering per part (from the reference graph, computed once),
+  JᵀJ + λI accumulated in its envelope, Cholesky there.
+- **Sparse diagnosis fast path:** `ConstraintDiagnosis.diagnoseSparse`
+  factors JJᵀ (rows at unit norm) the same way; all pivots ≥ 1e-8 proves
+  independent rows, so the report needs no QR. Otherwise (a dependency to
+  explain, or anything near) it falls back to the dense diagnosis. Redundant
+  constraints are exact in practice, so they show as zero pivots. The
+  diagnosis smoke checks sparse and dense agree on every hand-built case.
+- Numbers (load average 13–20, so noisy): chained 200 points 12.8 s →
+  14–18 ms; chained 1000 points (2000 variables, one part) 30.5 s →
+  0.11–0.15 s; independent 1000 points (250 parts) 60–200 ms; the bracket
+  1–2 ms (80–95 ms on main before C2).
+- Known limit: a large connected part *with* a dependency still takes the
+  dense QR (≈30 s at 1000 points). A sparse rank-revealing path (e.g. QR
+  restricted to the rows the failed pivots touch) would fix it if it matters.
+- **Codec check:** the invariance suite now also saves each sketch fixture
+  in a document (`DocumentCodec`, `ConstrainedSketchFeature`), reloads it
+  without evaluating, and solves again; all pass. This closes the C0 gap.
+- C2 is closed: step 3 was moot (see C2.2), steps 1, 2 and 4 are done.

@@ -51,10 +51,23 @@ class ConstraintDiagnosisSmoke {
 		check(threw, "a Jacobian of the wrong size is refused");
 	}
 
+	/** The dense diagnosis, checked against the sparse entry point, which must agree whichever path it takes. */
 	static function diagnose(jacobian:Array<Float>, variables:Int, owners:Array<String>, residuals:Array<Float>,
-			?protectedOwners:Array<String>):DiagnosisReport
-		return ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variables, owners: owners, residuals: residuals,
+			?protectedOwners:Array<String>):DiagnosisReport {
+		var dense = ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variables, owners: owners, residuals: residuals,
 			protectedOwners: protectedOwners});
+		var rows = [for (row in 0...owners.length) {
+			var index:Array<Int> = [], value:Array<Float> = [];
+			for (column in 0...variables)
+				if (jacobian[row * variables + column] != 0) { index.push(column); value.push(jacobian[row * variables + column]); }
+			{index: index, value: value};
+		}];
+		var sparse = ConstraintDiagnosis.diagnoseSparse(rows, variables, owners, residuals, null, protectedOwners);
+		check(sparse.rank == dense.rank && groups(sparse) == groups(dense) && sparse.unsatisfied.join(",") == dense.unsatisfied.join(",")
+			&& sparse.subsystems.length == dense.subsystems.length,
+			'sparse and dense diagnoses agree: rank ${sparse.rank}/${dense.rank}, ${groups(sparse)} / ${groups(dense)}');
+		return dense;
+	}
 
 	static function groups(report:DiagnosisReport):String
 		return [for (group in report.dependencyGroups) group.toString()].join(" ");
