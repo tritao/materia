@@ -62,6 +62,40 @@ class MateriaProjectRunner {
 
   public static function loadProject(projectPath:String, ?recipeDocument:String,
       ?control:ProjectLoadControl):GeneratedAssemblyScene {
+    var scene = loadGeneratedProject(projectPath, recipeDocument, control);
+    scene.robotMotions = projectMotions(FileSystem.fullPath(projectPath), scene);
+    return scene;
+  }
+
+  /**
+   * Joint motion the project ships with. The manifest's optional `robotMotions` names a JSON file
+   * `{"version": 1, "tracks": [{"joint": "<assembly joint id>", "loop": true, "keys": [...]}]}`
+   * beside it. Positions are joint coordinates relative to the generated initial pose, like every
+   * motion track, and the tracks drive the project's own assembly in a simulation.
+   */
+  static function projectMotions(manifestPath:String, scene:GeneratedAssemblyScene):Array<RobotMotionTrack> {
+    var root:Dynamic = Json.parse(File.getContent(manifestPath));
+    var reference:Dynamic = Reflect.field(root, "robotMotions");
+    if (reference == null) return [];
+    if (!Std.isOfType(reference, String) || StringTools.trim(reference).length == 0)
+      throw 'Project field "robotMotions" must name a file';
+    var definition = scene.assemblyDefinition;
+    if (definition == null) throw "Project robot motions need a kinematic assembly";
+    var file = resolveProjectPath(directory(manifestPath), reference);
+    if (!FileSystem.exists(file) || FileSystem.isDirectory(file))
+      throw 'Project robot motion file not found: $file';
+    var document:Dynamic = Json.parse(File.getContent(file));
+    if (Reflect.field(document, "version") != 1 || !Std.isOfType(Reflect.field(document, "tracks"), Array))
+      throw "Unsupported project robot motion file";
+    var raw:Array<Dynamic> = [for (track in (cast Reflect.field(document, "tracks"):Array<Dynamic>)) {
+      version: 1, robotId: "assembly:" + definition.id, jointId: Reflect.field(track, "joint"),
+      loop: Reflect.field(track, "loop"), keys: Reflect.field(track, "keys")
+    }];
+    return RobotMotionTrack.decode(raw);
+  }
+
+  static function loadGeneratedProject(projectPath:String, ?recipeDocument:String,
+      ?control:ProjectLoadControl):GeneratedAssemblyScene {
     var manifestPath = FileSystem.fullPath(projectPath);
     if (!FileSystem.exists(manifestPath) || FileSystem.isDirectory(manifestPath))
       throw 'Materia project file not found: $manifestPath';
@@ -380,7 +414,8 @@ class MateriaProjectRunner {
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       metresPerUnit: generated.metresPerUnit, physical: generated.physical,
-      recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics};
+      recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
+      robotMotions: generated.robotMotions};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -521,4 +556,6 @@ typedef GeneratedAssemblyScene = {
   var physical:AssemblyPhysicalData;
   var recipeDocument:Null<String>;
   @:optional var recipeDiagnostics:Array<String>;
+  /** Joint motion the project ships with, applied to its own assembly in simulation. */
+  @:optional var robotMotions:Array<RobotMotionTrack>;
 }

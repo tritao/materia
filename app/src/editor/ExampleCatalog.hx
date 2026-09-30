@@ -37,6 +37,10 @@ class ExampleCatalog {
       description: ["Standard parts assembled", "from MachineKit generators"],
       tag: "Project · first build ~30 s",
       kind: Project("machinekit/examples/materia.project.json")},
+    {id: "robot-arm", title: "Six-axis robot arm",
+      description: ["A generated arm on a pedestal:", "press Play to run its pick motion"],
+      tag: "Simulation · first build ~30 s",
+      kind: Project("machinekit/examples/robot-arm/materia.project.json")},
     {id: "cad-modeling", title: "CAD modelling",
       description: ["Parametric sketches, extrusions", "and features in CadKit"],
       tag: "Project · first build ~15 s",
@@ -97,7 +101,7 @@ class ExampleCatalog {
     app.session.openGeneratedScene(generated.objects, path, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument);
+      generated.physical, generated.recipeDocument, generated.robotMotions);
     app.documentChanged();
     showModel(app);
     app.log("Opened example: " + entry.title);

@@ -3,14 +3,18 @@ package app;
 /** A document-owned, time-based position track for one simulated robot joint. */
 class RobotMotionTrack {
   public final robotId:String;
+  /** Joint index in the robot model; resolved from `jointId` when the track names its joint. */
   public final joint:Int;
+  /** Joint name, for tracks authored against a generated model whose joint order is not fixed. */
+  public final jointId:Null<String>;
   public final loop:Bool;
   public final keys:Array<{time:Float, position:Float}>;
 
   public function new(robotId:String, joint:Int, loop:Bool,
-      keys:Array<{time:Float, position:Float}>) {
+      keys:Array<{time:Float, position:Float}>, ?jointId:String) {
     this.robotId = robotId;
     this.joint = joint;
+    this.jointId = jointId;
     this.loop = loop;
     this.keys = keys;
   }
@@ -27,8 +31,12 @@ class RobotMotionTrack {
     return keys[keys.length - 1].position;
   }
 
-  public function record():Dynamic return {version:1, robotId:robotId, joint:joint,
-    loop:loop, keys:[for (key in keys) {time:key.time, position:key.position}]};
+  public function record():Dynamic {
+    var result:Dynamic = {version:1, robotId:robotId, joint:joint,
+      loop:loop, keys:[for (key in keys) {time:key.time, position:key.position}]};
+    if (jointId != null) Reflect.setField(result, "jointId", jointId);
+    return result;
+  }
 
   public static function decode(raw:Dynamic):Array<RobotMotionTrack> {
     if (raw == null) return [];
@@ -36,16 +44,20 @@ class RobotMotionTrack {
     var result:Array<RobotMotionTrack> = [];
     var seen = new Map<String, Bool>();
     for (item in (cast raw:Array<Dynamic>)) {
-      fields(item, ["version", "robotId", "joint", "loop", "keys"]);
+      fields(item, ["version", "robotId", "joint", "jointId", "loop", "keys"]);
       if (Reflect.field(item, "version") != 1) throw "Unsupported robot motion version";
       var robotId:Dynamic = Reflect.field(item, "robotId");
+      var jointId:Dynamic = Reflect.field(item, "jointId");
       var joint:Dynamic = Reflect.field(item, "joint");
+      if (joint == null && jointId != null) joint = 0;
       var loop:Dynamic = Reflect.field(item, "loop");
       var rawKeys:Dynamic = Reflect.field(item, "keys");
       if (!Std.isOfType(robotId, String) || robotId == "" || !Std.isOfType(joint, Int) ||
           joint < 0 || joint >= 64 || !Std.isOfType(loop, Bool) ||
-          !Std.isOfType(rawKeys, Array)) throw "Invalid robot motion header";
-      var identity = robotId + ":" + joint;
+          !Std.isOfType(rawKeys, Array) ||
+          (jointId != null && (!Std.isOfType(jointId, String) || jointId == "")))
+        throw "Invalid robot motion header";
+      var identity = robotId + ":" + (jointId != null ? jointId : Std.string(joint));
       if (seen.exists(identity)) throw 'Duplicate robot motion "$identity"';
       seen.set(identity, true);
       var keys:Array<{time:Float, position:Float}> = [];
@@ -68,7 +80,7 @@ class RobotMotionTrack {
         throw "Robot motion needs 2..10000 keys and positive duration";
       if (loop && Math.abs(keys[0].position - keys[keys.length - 1].position) > 1e-9)
         throw "Looping robot motion must end at its starting position";
-      result.push(new RobotMotionTrack(robotId, joint, loop, keys));
+      result.push(new RobotMotionTrack(robotId, joint, loop, keys, jointId));
     }
     return result;
   }

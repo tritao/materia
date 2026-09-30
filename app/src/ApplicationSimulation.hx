@@ -254,18 +254,28 @@ class ApplicationSimulation {
               physical.metresPerUnit]});
         }
       }
+      var resolvedMotions:Array<RobotMotionTrack> = [];
       for (track in candidateMotions) {
         var index = -1;
         for (i in 0...candidateRobots.length)
           if (candidateRobots[i].id() == track.robotId) { index = i; break; }
         if (index < 0) throw 'Robot motion names unknown robot "${track.robotId}"';
         var joints = candidateRobotModels[index].joints;
-        if (track.joint >= joints.length)
-          throw 'Robot motion joint ${track.joint} is missing from "${track.robotId}"';
-        var limits = joints[track.joint].limits;
+        var jointIndex = track.joint;
+        if (track.jointId != null) {
+          jointIndex = -1;
+          for (i in 0...joints.length) if (joints[i].id == track.jointId) { jointIndex = i; break; }
+          if (jointIndex < 0)
+            throw 'Robot motion names unknown joint "${track.jointId}" of "${track.robotId}"';
+        }
+        if (jointIndex >= joints.length)
+          throw 'Robot motion joint $jointIndex is missing from "${track.robotId}"';
+        var limits = joints[jointIndex].limits;
         if (limits.lower < limits.upper) for (key in track.keys)
           if (key.position < limits.lower || key.position > limits.upper)
-            throw 'Robot motion exceeds joint ${track.joint} limits';
+            throw 'Robot motion exceeds joint $jointIndex limits';
+        resolvedMotions.push(jointIndex == track.joint ? track :
+          new RobotMotionTrack(track.robotId, jointIndex, track.loop, track.keys, track.jointId));
       }
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
@@ -378,7 +388,7 @@ class ApplicationSimulation {
       simulatedIds = [for (robot in candidateRobots) robot.id()];
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
-      robotMotions = candidateMotions.copy();
+      robotMotions = resolvedMotions.copy();
       humanWorkers = candidateWorkers;
       workerWarningsById = candidateWorkerWarnings;
       humanSignalsById.clear();

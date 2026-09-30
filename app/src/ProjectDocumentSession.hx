@@ -196,7 +196,7 @@ class ProjectDocumentSession {
       ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>,
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
-      ?physical:AssemblyPhysicalData, ?recipeText:String):Void {
+      ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -230,6 +230,7 @@ class ProjectDocumentSession {
     projectAssembly = assembly;
     installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit);
     projectPhysical = physical;
+    robotMotions = motions == null ? [] : motions.copy();
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -305,6 +306,7 @@ class ProjectDocumentSession {
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
       generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints);
     projectPhysical = generated.physical;
+    robotMotions = generated.robotMotions == null ? [] : generated.robotMotions.copy();
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
