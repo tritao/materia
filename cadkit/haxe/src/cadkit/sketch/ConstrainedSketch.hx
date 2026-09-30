@@ -101,9 +101,13 @@ class ConstrainedSketch {
 		for (c in constraintValues) if (c.id == id) throw "duplicate sketch ID: " + id;
 	}
 
-	/** Solve into a temporary snapshot. A failure throws and leaves lastSolution unchanged. */
-	public function solve(?seed:SolvedSketch, ?cancellationCheck:Void->Bool):SolvedSketch {
-		var candidate = SketchSolver.solve(this, seed == null ? committed : seed, cancellationCheck);
+	/**
+		Solve into a temporary snapshot. A failure throws and leaves lastSolution unchanged. With `diagnose` false
+		(while dragging), parts that re-solve report their previous diagnosis instead of a new one
+		(`SolveDiagnostic.diagnosed` is then false); solve normally on release.
+	*/
+	public function solve(?seed:SolvedSketch, ?cancellationCheck:Void->Bool, diagnose:Bool = true):SolvedSketch {
+		var candidate = SketchSolver.solve(this, seed == null ? committed : seed, cancellationCheck, diagnose);
 		committed = candidate;
 		return candidate;
 	}

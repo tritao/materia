@@ -399,3 +399,121 @@ branch `loop-flow-stores`), which had broken toolpathkit's
   both cos and sin rows, so it is already oriented.
 - Step 4 (large-sketch benchmark, sparse solves) not started: the dense
   normal-equation solve is now the only O(n³) part; measure before changing.
+
+### C2.4 — Sketch scaling: parts, sparse Cholesky, sparse diagnosis; codec check (2026-09-30)
+
+Measured first (`SketchEditBenchmark` scaling section: rectangles of 4
+points, independent or chained into one part). With C2.2's dense solve,
+chained 200 points took 12.8 s, 97% of it in the dense normal-equation LU.
+
+- **Parts:** constraints are grouped by the variables they reference (not by
+  Jacobian nonzeros, which vanish by accident at special poses); each part
+  runs its own LM, polish, diagnosis and witness pose, and
+  `ConstraintDiagnosis.merge` combines the reports (untouched variables are
+  free). The Jacobian is kept as sparse rows.
+- **Sparse LM step:** `cadkit.solve.EnvelopeCholesky` — reverse
+  Cuthill-McKee ordering per part (from the reference graph, computed once),
+  JᵀJ + λI accumulated in its envelope, Cholesky there.
+- **Sparse diagnosis fast path:** `ConstraintDiagnosis.diagnoseSparse`
+  factors JJᵀ (rows at unit norm) the same way; all pivots ≥ 1e-8 proves
+  independent rows, so the report needs no QR. Otherwise (a dependency to
+  explain, or anything near) it falls back to the dense diagnosis. Redundant
+  constraints are exact in practice, so they show as zero pivots. The
+  diagnosis smoke checks sparse and dense agree on every hand-built case.
+- Numbers (load average 13–20, so noisy): chained 200 points 12.8 s →
+  14–18 ms; chained 1000 points (2000 variables, one part) 30.5 s →
+  0.11–0.15 s; independent 1000 points (250 parts) 60–200 ms; the bracket
+  1–2 ms (80–95 ms on main before C2).
+- Known limit: a large connected part *with* a dependency still takes the
+  dense QR (≈30 s at 1000 points). A sparse rank-revealing path (e.g. QR
+  restricted to the rows the failed pivots touch) would fix it if it matters.
+- **Codec check:** the invariance suite now also saves each sketch fixture
+  in a document (`DocumentCodec`, `ConstrainedSketchFeature`), reloads it
+  without evaluating, and solves again; all pass. This closes the C0 gap.
+- C2 is closed: step 3 was moot (see C2.2), steps 1, 2 and 4 are done.
+
+### C2.5 — Sparse dependency search and incremental re-solve (2026-09-30)
+
+- **Measured first:** a connected 1000-point sketch with one implied
+  constraint took 89 s on the dense QR fallback (200 points: 460 ms per drag
+  step), since the JJᵀ fast path gave up on any dependency.
+- **Sparse dependency search** (`ConstraintDiagnosis.diagnoseSparse`): the
+  JJᵀ Cholesky (rows and columns equilibrated, as the dense path does) drops a
+  row whose pivot is at most t² and reads its fundamental circuit by
+  back-substitution over the earlier kept rows (coefficients can reach past
+  the row's envelope, so the solve runs over all earlier rows). Circuits merge
+  and suggestions follow as in the dense path.
+- **Threshold consistency:** a Gram pivot is about the square of a row's
+  distance from the earlier rows and is accurate only to ~1e-16, so it
+  cannot reproduce a σ threshold below ~1e-8. With a rank tolerance t ≥ 1e-6
+  the sparse path decides alone (dependent at ≤ t², near-degenerate below
+  (1e3 t)², as the dense flag); with a smaller t it only proves clear
+  independence and defers the rest to the QR. `SolverSettings.rankTolerance`
+  now defaults to 1e-6 (was 1e-7). Documents saved with 1e-7 still diagnose
+  correctly, their dependencies just take the dense path. The diagnosis smoke
+  compares sparse and dense at both tolerances on every hand-built case.
+- **Incremental re-solve:** `SolvedSketch.partCache` keeps each converged
+  part's report under a key of its structure (constraint ids, kinds,
+  references, the entities they reach), with its numbers (settings,
+  dimension values, fixed positions, sketch scale) compared exactly rather
+  than through strings. A solve seeded from that solution skips unchanged
+  parts. Per-solve setup is now O(n): one variable→part/local table instead
+  of per-part arrays, residuals walk only the part's constraints, RCM runs
+  only for parts that solve. `SketchIncrementalSmoke` checks edits,
+  re-authored fixed points and reused redundant parts against cold solves.
+- Numbers (load ~5–9): redundant connected 1000 points 89 s → 126 ms;
+  redundant 200 per drag step 463 → 16 ms; 250 independent profiles per drag
+  step 28 → 10 ms; connected 200 per drag step 9.5 ms; bracket edit 1.2 ms.
+- Still slow for dragging: one connected 1000-point part (~69 ms per step,
+  it must re-solve whole) and the O(n) per-solve setup (~10 ms at 1000
+  points with nothing to solve). Next levers if needed: skip diagnosis while
+  dragging (diagnose on release, as FreeCAD does), and keep the part
+  structure between solves when only values change.
+- Aside, not fixed (user's call): haxeon's `Parser.decodeString` only knows
+  `\n \r \t \" \\`; any other escape (`\u0001`, `\x01`) silently compiles to
+  the escaped letter plus the rest (`u0001`). Use `String.fromCharCode`.
+
+### C2.6 — Drag-step profile: warm-start damping, cheaper merge (2026-09-30)
+
+Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
+- One connected part took 7 LM iterations per 0.01 nudge: every solve
+  restarted at damping 1e-3, while a 250-rectangle chain's JᵀJ has soft modes
+  near (π/250)² ≈ 1.6e-4, so the damping swamped exactly what the edit moves.
+  Seeded parts now start at damping 1e-9 (Gauss-Newton; rejected steps still
+  raise it): 1 iteration, LM 48 → 18 ms per step.
+- 250 independent parts spent 5.7 ms merging reports: the sort joined owner
+  lists inside its comparator. Precomputed keys: 1.2 ms.
+- Per drag step now: connected 1000 points ≈ 35 ms (LM 18, diagnosis 14,
+  setup ≈ 3), independent 1000 points ≈ 5 ms. CamKit and MachineKit pass.
+- Remaining levers for the connected case, if 60 fps on 1000-point parts
+  matters: reuse the RCM orderings across solves (the structure is unchanged
+  while dragging), reuse row buffers in the sparse Jacobian and envelope, and
+  skip diagnosis during a drag (diagnose on release).
+
+### C2.7 — Drags under a frame: reused structure, diagnosis on release, fewer allocations (2026-10-01)
+
+- **Structure reuse:** `SolvedSketch.structures` keeps, per part structure,
+  the solve's RCM ordering and envelope, the diagnosis row graph and its
+  ordering, and the last diagnosis. The key now also lists the part's
+  variables in order, so reordering points can never pair a stale envelope
+  with new indices. The diagnosis row graph comes from what constraints
+  reference (a superset of any pose's nonzeros), so no entry falls outside a
+  cached envelope; `ConstraintDiagnosis.diagnoseSparse` takes it as an
+  optional `RowStructure`.
+- **Diagnosis on release:** `ConstrainedSketch.solve(seed, cancel,
+  diagnose = false)` reports each re-solved part's previous diagnosis
+  (`SolveDiagnostic.diagnosed` false) and keeps it out of the value cache, so
+  the next normal solve re-diagnoses exactly the parts that moved. A part
+  that fails to converge is still diagnosed (a conflict mid-drag is reported).
+- **Allocations:** the LM step keeps each part's envelope, merges a row's
+  entries in reused scratch arrays, and the sparse Jacobian reuses its row
+  buffers; polish runs only while the residual is above 1e-3 × tolerance.
+- `SketchIncrementalSmoke` covers drag mode, release and a mid-drag conflict.
+- Per drag step (load ≈ 27, so upper bounds), with diagnosis / on release:
+  connected 1000 points 23.6 / 11.5 ms (was 69); connected 1000 with a
+  redundancy 62 / 11.6 ms (was 129); connected 200 points 3.5 / 2.1 ms; 250
+  independent profiles ≈ 5 ms; bracket edit 1.0 ms. CamKit and MachineKit
+  pass.
+- The editor has no sketch drag yet (C5 adds soft drag targets); when it
+  does, it should solve with `diagnose = false` while dragging and normally
+  on release.

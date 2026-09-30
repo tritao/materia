@@ -2,8 +2,22 @@ package cadkit.sketch;
 
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.solve.ConstraintDiagnosis;
+import cadkit.solve.EnvelopeCholesky;
+import cadkit.solve.ConstraintDiagnosis.RowStructure;
 
 private typedef ResidualSet = { values:Array<Float>, owners:Array<String> };
+/** One Jacobian row as (variable, entry) pairs; a variable may repeat and its entries then add. */
+private typedef SparseRow = { index:Array<Int>, value:Array<Float> };
+/**
+	Constraints that share variables, directly or through each other, and the
+	variables they reach, both ascending. `position`/`first` are filled on
+	first use (a part reused from a previous solve never needs them).
+	`position`/`first` describe the envelope of its normal matrix under a
+	reverse Cuthill-McKee ordering: local index → row, and each row's first
+	structurally nonzero column.
+*/
+private typedef Part = { id:Int, constraints:Array<Int>, variables:Array<Int>, position:Array<Int>, first:Array<Int>, ordered:Bool,
+	envelope:Array<Array<Float>> };
 
 /**
 	Deterministic damped nonlinear least-squares solver implemented entirely in Haxeon.
@@ -24,11 +38,26 @@ class SketchSolver {
 	private var variableCount:Int;
 	private var solveTolerance:Float;
 	private var normalizationScale:Float;
+	static inline var WARM_DAMPING:Float = 1e-9;
 	/** While finding a witness pose, only shape constraints (see `isShapeConstraint`) contribute residuals. */
 	private var shapeOnly:Bool = false;
+	/** When not −1, only this part's constraints contribute residuals and rows. */
+	private var activePart:Int = -1;
+	private var partList:Array<Part> = [];
+	private var allConstraints:Array<Int> = [];
+	/** Each variable's part (−1 when free) and its index within that part. */
+	private var variablePart:Array<Int> = [];
+	private var variableLocal:Array<Int> = [];
+	private var references:Array<Array<Int>> = [];
+	private final constraintList:Array<SketchConstraint>;
 
-	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>) {
-		this.sketch = sketch; pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
+	private final diagnoseParts:Bool;
+	/** Each variable's name (point id with #x/#y, entity id with #r), so a part's key pins its variable order. */
+	private final variableNames:Array<String> = [];
+
+	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool = true) {
+		diagnoseParts = diagnose;
+		this.sketch = sketch; constraintList = sketch.constraints(); pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
 		this.seed = seed;
 		this.cancellationCheck = cancellationCheck;
 		tangentBranches = new Map();
@@ -36,16 +65,19 @@ class SketchSolver {
 		variableCount = 0;
 		solveTolerance = sketch.settings.tolerance;
 		normalizationScale = 1;
-		for (point in sketch.points()) { points.set(point.id, point); pointIndex.set(point.id, variableCount); variableCount += 2; }
+		for (point in sketch.points()) {
+			points.set(point.id, point); pointIndex.set(point.id, variableCount); variableCount += 2;
+			variableNames.push(point.id + "#x"); variableNames.push(point.id + "#y");
+		}
 		for (entity in sketch.entities()) {
 			entities.set(entity.id, entity);
-			if (entity.kind == "circle" || entity.kind == "arc") { radiusIndex.set(entity.id, variableCount); variableCount++; }
+			if (entity.kind == "circle" || entity.kind == "arc") { radiusIndex.set(entity.id, variableCount); variableCount++; variableNames.push(entity.id + "#r"); }
 		}
 	}
 
 	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null,
-		cancellationCheck:Null<Void->Bool> = null):SolvedSketch {
-		return new SketchSolver(sketch, seed, cancellationCheck).run();
+		cancellationCheck:Null<Void->Bool> = null, diagnose:Bool = true):SolvedSketch {
+		return new SketchSolver(sketch, seed, cancellationCheck, diagnose).run();
 	}
 
 	/**
@@ -66,9 +98,18 @@ class SketchSolver {
 		return {
 			variables: x,
 			residuals: values -> solver.residuals(values).values,
-			// Entries are with respect to x / s; dividing by s gives them with respect to x.
-			jacobian: values -> [for (value in solver.analyticJacobian(values, solver.residuals(values).values.length)) value / solver.normalizationScale]
+			jacobian: values -> solver.rawJacobian(values)
 		};
+	}
+
+	/** Dense Jacobian with respect to x itself (entries are with respect to x / s, so divide by s), for `probe`. */
+	private function rawJacobian(values:Array<Float>):Array<Float> {
+		var rows = sparseJacobian(values, residuals(values).values.length);
+		var dense = [for (_ in 0...rows.length * variableCount) 0.0];
+		for (row in 0...rows.length)
+			for (e in 0...rows[row].index.length)
+				dense[row * variableCount + rows[row].index[e]] += rows[row].value[e] / normalizationScale;
+		return dense;
 	}
 
 	private function checkCancelled():Void {
@@ -79,6 +120,11 @@ class SketchSolver {
 	private function invalid(message:String, ids:Array<String>):SketchSolveError
 		return new SketchSolveError(new SolveDiagnostic("invalid", false, 1e300, variableCount, 0, ids, message));
 
+	/**
+		Solves each part (constraints sharing variables) on its own, then
+		diagnoses it; a part's dependency is checked against a witness pose
+		before it is called redundant. Reports merge across parts.
+	*/
 	private function run():SolvedSketch {
 		checkCancelled();
 		validate();
@@ -94,57 +140,80 @@ class SketchSolver {
 		normalizationScale = characteristicScale(x);
 		solveTolerance = sketch.settings.tolerance;
 		initializeTangentBranches(x);
-		var damping = sketch.settings.initialDamping;
-		var current = residuals(x);
-		var currentNorm = norm(current.values);
-		var iterations = 0;
-		while (iterations < sketch.settings.maxIterations && currentNorm > solveTolerance) {
+		var iterations = 0, failed = false, stationary = true, degenerate = false;
+		var conflictingIds:Array<String> = [], failingIds:Array<String> = [];
+		var reports:Array<DiagnosisReport> = [];
+		var cache = new Map<String, CachedPart>(), structures = new Map<String, PartStructure>();
+		var previous = seed == null ? null : seed.partCache, previousStructures = seed == null ? null : seed.structures;
+		var diagnosed = true;
+		for (part in parts()) {
 			checkCancelled();
-			iterations++;
-			var trial = dampedStep(x, current, damping);
-			if (trial == null) { damping *= 10; continue; }
-			var trialSet = residuals(trial); var trialNorm = norm(trialSet.values);
-			if (trialNorm < currentNorm) { x = trial; current = trialSet; currentNorm = trialNorm; damping = Math.max(1e-12, damping * 0.3); }
-			else damping = Math.min(1e12, damping * 10);
-		}
-		// Converging only to the tolerance leaves a visible length error; Gauss-Newton steps are quadratic here,
-		// so polish while each step at least halves the residual.
-		var polish = 0;
-		while (currentNorm <= solveTolerance && currentNorm > 0 && polish < 3) {
-			checkCancelled();
-			polish++;
-			var trial = dampedStep(x, current, 1e-12);
-			if (trial == null) break;
-			var trialSet = residuals(trial), trialNorm = norm(trialSet.values);
-			if (!(trialNorm < currentNorm * 0.5)) break;
-			x = trial; current = trialSet; currentNorm = trialNorm;
-		}
-		checkCancelled();
-		var j = analyticJacobian(x, current.values.length);
-		var report = diagnose(j, current);
-		var degenerate = false;
-		if (currentNorm <= solveTolerance && report.rank < current.values.length) {
-			// A dependency here may belong to this pose only: compare with the rank at a nearby pose of the same shape.
-			var witness = witnessPose(x);
-			if (witness != null) {
-				var generic = diagnose(analyticJacobian(witness, current.values.length), current);
-				if (generic.rank > report.rank) {
-					report = generic;
-					degenerate = true;
+			// A part whose constraints, fixed positions and settings are unchanged, seeded from its own previous
+			// solution, is already solved: reuse its diagnosis. Dragging one profile re-solves only that profile.
+			var key = partKey(part), values = partValues(part);
+			// The same structure (a drag changes only values) keeps its orderings and its last diagnosis.
+			var known = previousStructures == null ? null : previousStructures.get(key);
+			if (known != null) {
+				part.position = known.position;
+				part.first = known.first;
+				part.ordered = true;
+			}
+			var cached = previous == null ? null : previous.get(key);
+			if (cached != null && sameValues(cached.values, values)) {
+				reports.push(cached.report);
+				if (cached.degenerate) degenerate = true;
+				cache.set(key, cached);
+				if (known != null) structures.set(key, known);
+				continue;
+			}
+			var partDegenerate = false;
+			var solved = solvePart(x, part, false);
+			x = solved.x;
+			iterations = iterations > solved.iterations ? iterations : solved.iterations;
+			if (!diagnoseParts && known != null && solved.norm <= solveTolerance) {
+				// Dragging: report the last diagnosis; the solve on release checks this part again.
+				reports.push(known.report);
+				if (known.degenerate) degenerate = true;
+				diagnosed = false;
+				structures.set(key, {position: part.position, first: part.first, rows: known.rows, report: known.report,
+					degenerate: known.degenerate});
+				continue;
+			}
+			var rows = known != null && known.rows != null ? known.rows : structuralRows(part, solved.set.values.length);
+			var report = diagnosePart(x, x, part, solved.set, rows);
+			if (solved.norm > solveTolerance) {
+				failed = true;
+				var limit = Math.max(sketch.settings.rankTolerance, solveTolerance * 10) * (1 + solved.norm);
+				if (norm(partGradient(x, part, solved.set)) > limit)
+					stationary = false;
+				for (id in report.conflictingOwners()) if (!contains(conflictingIds, id)) conflictingIds.push(id);
+				for (id in failingOwners(solved.set, solveTolerance * 10)) if (!contains(failingIds, id)) failingIds.push(id);
+			} else if (report.rank < solved.set.values.length) {
+				// A dependency here may belong to this pose only: compare with the rank at a nearby pose of the same shape.
+				var witness = witnessPose(x, part);
+				if (witness != null) {
+					var generic = diagnosePart(witness, x, part, solved.set);
+					if (generic.rank > report.rank) {
+						report = generic;
+						partDegenerate = true;
+					}
 				}
 			}
+			if (partDegenerate) degenerate = true;
+			if (solved.norm <= solveTolerance)
+				cache.set(key, {values: values, report: report, degenerate: partDegenerate});
+			structures.set(key, {position: part.position, first: part.first, rows: rows, report: report, degenerate: partDegenerate});
+			reports.push(report);
 		}
+		var report = ConstraintDiagnosis.merge(reports, variableCount);
+		var current = residuals(x);
+		var currentNorm = norm(current.values);
 		var dof = report.degreesOfFreedom;
-		var badIds = failingOwners(current, solveTolerance * 10);
-		if (currentNorm > solveTolerance) {
-			var gradientNorm = norm(gradient(j, current.values));
-			var stationaryLimit = Math.max(sketch.settings.rankTolerance, solveTolerance * 10) * (1 + currentNorm);
-			var locallyConflicting = gradientNorm <= stationaryLimit;
-			var status = locallyConflicting ? "conflicting" : "nonconvergent";
-			var conflicting = report.conflictingOwners();
-			if (locallyConflicting && conflicting.length > 0)
-				badIds = conflicting;
-			var message = locallyConflicting
+		if (failed) {
+			var status = stationary ? "conflicting" : "nonconvergent";
+			var badIds = stationary && conflictingIds.length > 0 ? conflictingIds : failingIds;
+			badIds.sort(Reflect.compare);
+			var message = stationary
 				? "solve stopped at a locally stationary residual; the listed constraints are locally incompatible, which is not proof of global inconsistency"
 				: "constraint solve exhausted its iteration limit while a local descent direction remained";
 			var diagnostic = new SolveDiagnostic(status, false, currentNorm, dof, iterations, badIds, message, report);
@@ -156,13 +225,181 @@ class SketchSolver {
 		var message = status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged";
 		if (degenerate)
 			message += "; the constraints are independent in general but the solved pose is degenerate";
-		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids, message, report, degenerate);
+		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids, message, report, degenerate, diagnosed);
 		checkCancelled();
 		var coordinates:Map<String, Array<Float>> = new Map();
 		for (point in sketch.points()) { var i:Int = cast pointIndex.get(point.id); coordinates.set(point.id, [x[i], x[i + 1]]); }
 		var radii:Map<String, Float> = new Map();
 		for (entity in sketch.entities()) if (radiusIndex.exists(entity.id)) { var i:Int = cast radiusIndex.get(entity.id); radii.set(entity.id, x[i]); }
-		return new SolvedSketch(coordinates, radii, diagnostic);
+		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures);
+	}
+
+	/**
+		The part's structure: its variables in order, constraint IDs, kinds and references, and the entities they
+		reach. Numbers are in `partValues`.
+	*/
+	private function partKey(part:Part):String {
+		var key = new StringBuf(), field = String.fromCharCode(1), record = String.fromCharCode(2);
+		for (variable in part.variables) { key.add(variableNames[variable]); key.add(field); }
+		key.add(record);
+		for (index in part.constraints) {
+			var c = constraintList[index];
+			key.add(c.id); key.add(field); key.add(c.kind);
+			for (id in [c.first, c.second, c.third]) {
+				key.add(field);
+				if (id == null) continue;
+				key.add(id);
+				var e = entities.get(id);
+				if (e != null) { key.add("="); key.add(e.kind); key.add(":"); key.add(e.first); key.add(","); key.add(e.second == null ? "" : e.second); }
+			}
+			key.add(record);
+		}
+		return key.toString();
+	}
+
+	/** Everything numeric a part's solution depends on besides its seed: settings, dimension values, fixed positions. */
+	private function partValues(part:Part):Array<Float> {
+		var values = [sketch.settings.tolerance, sketch.settings.rankTolerance, sketch.settings.maxIterations, sketch.settings.initialDamping,
+			normalizationScale];
+		for (index in part.constraints) {
+			var c = constraintList[index];
+			values.push(c.value);
+			if (c.kind == "fixed") {
+				var p = points.get(c.first);
+				if (p != null) { values.push(p.x); values.push(p.y); }
+			}
+		}
+		return values;
+	}
+
+	private static function sameValues(a:Array<Float>, b:Array<Float>):Bool {
+		if (a.length != b.length) return false;
+		for (i in 0...a.length) if (a[i] != b[i]) return false;
+		return true;
+	}
+
+	/**
+		Levenberg-Marquardt on one part from `x` (the part's shape constraints
+		only when `shape`), then up to three Gauss-Newton polish steps while
+		each halves the residual: converging only to the tolerance leaves a
+		visible length error.
+	*/
+	private function solvePart(start:Array<Float>, part:Part, shape:Bool):{x:Array<Float>, set:ResidualSet, norm:Float, iterations:Int} {
+		orderPart(part);
+		activePart = part.id;
+		shapeOnly = shape;
+		// A part seeded from a previous solution starts next to its answer: begin as Gauss-Newton. The authored
+		// damping would swamp the soft modes of a long chain (its JᵀJ has eigenvalues far below 1e-3) and cost
+		// several iterations for a tiny drag; a rejected step still raises the damping.
+		var x = start, damping = seed != null && !shape ? WARM_DAMPING : sketch.settings.initialDamping;
+		var current = residuals(x), currentNorm = norm(current.values), iterations = 0;
+		while (iterations < sketch.settings.maxIterations && currentNorm > solveTolerance) {
+			checkCancelled();
+			iterations++;
+			var trial = dampedStep(x, current, damping, part);
+			if (trial == null) { damping *= 10; continue; }
+			var trialSet = residuals(trial), trialNorm = norm(trialSet.values);
+			if (trialNorm < currentNorm) { x = trial; current = trialSet; currentNorm = trialNorm; damping = Math.max(1e-12, damping * 0.3); }
+			else damping = Math.min(1e12, damping * 10);
+		}
+		var polish = 0;
+		while (currentNorm <= solveTolerance && currentNorm > solveTolerance * 1e-3 && polish < 3) {
+			checkCancelled();
+			polish++;
+			var trial = dampedStep(x, current, 1e-12, part);
+			if (trial == null) break;
+			var trialSet = residuals(trial), trialNorm = norm(trialSet.values);
+			if (!(trialNorm < currentNorm * 0.5)) break;
+			x = trial; current = trialSet; currentNorm = trialNorm;
+		}
+		activePart = -1;
+		shapeOnly = false;
+		return {x: x, set: current, norm: currentNorm, iterations: iterations};
+	}
+
+	/**
+		Parts from what each constraint references (points, line ends, centres,
+		radii), not from Jacobian entries, which can be zero by accident.
+		Variables no constraint references belong to no part: they are free.
+	*/
+	private function parts():Array<Part> {
+		var parent = [for (i in 0...variableCount) i];
+		references = [for (c in constraintList) referencedVariables(c)];
+		allConstraints = [for (index in 0...constraintList.length) index];
+		for (list in references)
+			for (k in 1...list.length)
+				union(parent, list[0], list[k]);
+		var slot = [for (_ in 0...variableCount) -1];
+		partList = [];
+		for (index in 0...constraintList.length) {
+			if (references[index].length == 0) continue;
+			var root = find(parent, references[index][0]);
+			if (slot[root] < 0) {
+				slot[root] = partList.length;
+				partList.push({id: partList.length, constraints: [], variables: [], position: [], first: [], ordered: false, envelope: []});
+			}
+			partList[slot[root]].constraints.push(index);
+		}
+		variablePart = [for (_ in 0...variableCount) -1];
+		variableLocal = [for (_ in 0...variableCount) -1];
+		for (variable in 0...variableCount) {
+			var id = slot[find(parent, variable)];
+			if (id < 0) continue;
+			variablePart[variable] = id;
+			variableLocal[variable] = partList[id].variables.length;
+			partList[id].variables.push(variable);
+		}
+		return partList;
+	}
+
+	/**
+		Reverse Cuthill-McKee over the part's variable graph (two variables are
+		adjacent when one constraint references both), then the envelope of
+		its normal matrix in that order. Chains and grids keep a narrow band.
+	*/
+	private function orderPart(part:Part):Void {
+		if (part.ordered) return;
+		var k = part.variables.length;
+		var neighbours:Array<Array<Int>> = [for (_ in 0...k) []];
+		for (index in part.constraints) {
+			var list = [for (v in references[index]) variableLocal[v]];
+			for (a in list) for (b in list)
+				if (a != b && neighbours[a].indexOf(b) < 0) neighbours[a].push(b);
+		}
+		var ordering = EnvelopeCholesky.order(neighbours);
+		part.position = ordering.position;
+		part.first = ordering.first;
+		part.ordered = true;
+	}
+
+	private function referencedVariables(c:SketchConstraint):Array<Int> {
+		var result:Array<Int> = [];
+		for (id in [c.first, c.second, c.third]) {
+			if (id == null) continue;
+			var p = pointIndex.get(id);
+			if (p != null) { result.push(p); result.push(p + 1); continue; }
+			var e = entities.get(id);
+			if (e == null) continue;
+			var first = pointIndex.get(e.first);
+			if (first != null) { result.push(first); result.push(first + 1); }
+			if (e.second != null) { var second = pointIndex.get(e.second); if (second != null) { result.push(second); result.push(second + 1); } }
+			var r = radiusIndex.get(id);
+			if (r != null) result.push(r);
+		}
+		return result;
+	}
+
+	private static function find(parent:Array<Int>, i:Int):Int {
+		while (parent[i] != i) {
+			parent[i] = parent[parent[i]];
+			i = parent[i];
+		}
+		return i;
+	}
+
+	private static function union(parent:Array<Int>, a:Int, b:Int):Void {
+		var ra = find(parent, a), rb = find(parent, b);
+		if (ra < rb) parent[rb] = ra; else if (rb < ra) parent[ra] = rb;
 	}
 
 	private function validate():Void {
@@ -208,7 +445,8 @@ class SketchSolver {
 	private function residuals(x:Array<Float>):ResidualSet {
 		var values:Array<Float> = []; var owners:Array<String> = [];
 		var constraintIndex = 0;
-		for (c in sketch.constraints()) {
+		for (index in activeConstraints()) {
+			var c = constraintList[index];
 			if (constraintIndex++ % 16 == 0)
 				checkCancelled();
 			if (shapeOnly && !isShapeConstraint(c.kind))
@@ -360,71 +598,100 @@ class SketchSolver {
 		var a=point(pa,x), b=point(pb,x), ends=line(axis,x,owner), d=direction(axis,x,owner); var dd=dot(d,d); if(dd<1e-12) throw invalid("collapsed symmetry axis",[owner]);
 		var mid=[(a[0]+b[0])/2,(a[1]+b[1])/2]; out.push(cross([mid[0]-ends[0][0],mid[1]-ends[0][1]],d)/Math.pow(dd,0.5)); out.push(dot([b[0]-a[0],b[1]-a[1]],d)/Math.pow(dd,0.5));
 	}
-	/** One Levenberg-Marquardt step from `x`, in scaled variables; null when the damped normal matrix is singular. */
-	private function dampedStep(x:Array<Float>, current:ResidualSet, damping:Float):Null<Array<Float>> {
-		var rows = current.values.length, j = analyticJacobian(x, rows);
-		var normal = matrix(variableCount, variableCount, 0);
-		var gradient = fill(variableCount, 0);
-		// A row touches a handful of variables: accumulate JᵀJ over its nonzeros only.
-		var nonzero:Array<Int> = [];
-		for (row in 0...rows) {
+	/**
+		One Levenberg-Marquardt step on a part, in scaled variables: JᵀJ + λI
+		is accumulated in the part's envelope and factored by Cholesky there.
+		Null when the damped matrix is not positive definite.
+	*/
+	private function dampedStep(x:Array<Float>, current:ResidualSet, damping:Float, part:Part):Null<Array<Float>> {
+		var k = part.variables.length, rows = sparseJacobian(x, current.values.length);
+		// envelope[row][column - first[row]] for first[row] <= column <= row, in RCM order; kept per part, zeroed here.
+		if (part.envelope.length != k) part.envelope = EnvelopeCholesky.zero(part.first);
+		var envelope = part.envelope;
+		for (line in envelope) for (i in 0...line.length) line[i] = 0;
+		var gradient = fill(k, 0);
+		var positions = scratchIndex, values = scratchValue;
+		for (row in 0...rows.length) {
 			if (row % 16 == 0)
 				checkCancelled();
-			nonzero.resize(0);
-			var base = row * variableCount;
-			for (a in 0...variableCount)
-				if (j[base + a] != 0) nonzero.push(a);
-			for (a in nonzero) {
-				var value = j[base + a];
-				gradient[a] += value * current.values[row];
-				for (b in nonzero) normal[a][b] += value * j[base + b];
+			// The row's entries by envelope position, repeated variables merged, in reused scratch arrays.
+			var source = rows[row];
+			positions.resize(0);
+			values.resize(0);
+			for (e in 0...source.index.length) {
+				var variable = source.index[e];
+				if (variablePart[variable] != part.id) continue;
+				var position = part.position[variableLocal[variable]], at = positions.indexOf(position);
+				if (at < 0) { positions.push(position); values.push(source.value[e]); } else values[at] += source.value[e];
+			}
+			for (a in 0...positions.length) {
+				var pa = positions[a], va = values[a];
+				gradient[pa] += va * current.values[row];
+				var line = envelope[pa], lineFirst = part.first[pa];
+				for (b in 0...positions.length) {
+					var pb = positions[b];
+					if (pb <= pa) line[pb - lineFirst] += va * values[b];
+				}
 			}
 		}
-		for (i in 0...variableCount) {
-			if (i % 128 == 0)
-				checkCancelled();
-			normal[i][i] += damping;
-		}
-		var rhs:Array<Float> = [];
-		for (index in 0...gradient.length) {
-			if (index % 1024 == 0)
-				checkCancelled();
-			rhs.push(-gradient[index]);
-		}
-		var delta = linearSolve(normal, rhs);
-		if (delta == null) return null;
+		for (row in 0...k)
+			envelope[row][row - part.first[row]] += damping;
+		if (!EnvelopeCholesky.factor(envelope, part.first)) return null;
+		var y = EnvelopeCholesky.solve(envelope, part.first, [for (value in gradient) -value]);
 		var trial = x.copy();
-		for (i in 0...variableCount) {
-			if (i % 1024 == 0)
-				checkCancelled();
-			trial[i] += delta[i] * normalizationScale;
-		}
+		for (i in 0...k)
+			trial[part.variables[i]] += y[part.position[i]] * normalizationScale;
 		return trial;
 	}
 
-	/** Gradient of ½‖r‖² from a row-major Jacobian. */
-	private function gradient(j:Array<Float>, residual:Array<Float>):Array<Float> {
-		var result = fill(variableCount, 0);
-		for (row in 0...residual.length) {
-			if (row % 16 == 0)
-				checkCancelled();
-			for (column in 0...variableCount)
-				result[column] += j[row * variableCount + column] * residual[row];
+	private final scratchIndex:Array<Int> = [];
+	private final scratchValue:Array<Float> = [];
+	/** Row storage `sparseJacobian` reuses between calls; callers consume rows before asking again. */
+	private final rowBuffer:Array<SparseRow> = [];
+
+	/** A row's entries in the part's local numbering, repeated variables added together. */
+	private function localEntries(row:SparseRow, part:Part):SparseRow {
+		var index:Array<Int> = [], value:Array<Float> = [];
+		for (e in 0...row.index.length) {
+			if (variablePart[row.index[e]] != part.id) continue;
+			var local = variableLocal[row.index[e]];
+			var at = index.indexOf(local);
+			if (at < 0) { index.push(local); value.push(row.value[e]); } else value[at] += row.value[e];
+		}
+		return {index: index, value: value};
+	}
+
+	/** Jᵀr over a part: zero at a stationary point of its residual. */
+	private function partGradient(x:Array<Float>, part:Part, set:ResidualSet):Array<Float> {
+		activePart = part.id;
+		var rows = sparseJacobian(x, set.values.length);
+		activePart = -1;
+		var result = fill(part.variables.length, 0);
+		for (row in 0...rows.length) {
+			var entries = localEntries(rows[row], part);
+			for (e in 0...entries.index.length) result[entries.index[e]] += entries.value[e] * set.values[row];
 		}
 		return result;
 	}
 
+	/** The constraints to evaluate, ascending: one part's, or all. */
+	private inline function activeConstraints():Array<Int>
+		return activePart < 0 ? allConstraints : partList[activePart].constraints;
+
 	/**
 		Analytic Jacobian with respect to the scaled variables (x / normalizationScale),
-		row-major, rows in the order `residuals` emits them. Each block below is
+		as sparse rows in the order `residuals` emits them. Each block below is
 		∂f/∂x of the unscaled residual f: linear rows are f / s with variables
 		x / s, so their entries are ∂f/∂x unchanged; angular rows are
 		dimensionless and take ∂f/∂x · s.
 	*/
-	private function analyticJacobian(x:Array<Float>, rows:Int):Array<Float> {
-		var j = [for (_ in 0...rows * variableCount) 0.0];
+	private function sparseJacobian(x:Array<Float>, rows:Int):Array<SparseRow> {
+		while (rowBuffer.length < rows) rowBuffer.push({index: [], value: []});
+		for (r in 0...rows) { rowBuffer[r].index.resize(0); rowBuffer[r].value.resize(0); }
+		var j = rows == rowBuffer.length ? rowBuffer : rowBuffer.slice(0, rows);
 		var row = 0, constraintIndex = 0;
-		for (c in sketch.constraints()) {
+		for (index in activeConstraints()) {
+			var c = constraintList[index];
 			if (constraintIndex++ % 16 == 0)
 				checkCancelled();
 			if (shapeOnly && !isShapeConstraint(c.kind))
@@ -492,12 +759,15 @@ class SketchSolver {
 	}
 
 	/** Where `entry` writes: the Jacobian being built, its current constraint's first row, and that row's scale. */
-	private var jacobianTarget:Array<Float> = [];
+	private var jacobianTarget:Array<SparseRow> = [];
 	private var jacobianRow:Int = 0;
 	private var jacobianScale:Float = 1;
 
-	private inline function entry(r:Int, index:Int, value:Float):Void
-		jacobianTarget[(jacobianRow + r) * variableCount + index] += value * jacobianScale;
+	private inline function entry(r:Int, index:Int, value:Float):Void {
+		var target = jacobianTarget[jacobianRow + r];
+		target.index.push(index);
+		target.value.push(value * jacobianScale);
+	}
 
 	private function pointVar(id:String):Int {
 		var found = pointIndex.get(id);
@@ -616,44 +886,63 @@ class SketchSolver {
 		}
 	}
 
-	/** Diagnoses a Jacobian against the solved residuals; rows count as satisfied within ten times the solve tolerance. */
-	private function diagnose(jacobian:Array<Float>, set:ResidualSet):DiagnosisReport {
+	/**
+		The part's diagnosis row graph from what its constraints reference (a
+		superset of any pose's nonzeros), ordered once and reusable while its
+		structure stands. Null if the row count does not match `rows`.
+	*/
+	private function structuralRows(part:Part, rows:Int):Null<RowStructure> {
+		var rowVariables:Array<Array<Int>> = [];
+		for (index in part.constraints)
+			for (_ in 0...rowCount(constraintList[index].kind))
+				rowVariables.push(references[index]);
+		if (rowVariables.length != rows) return null;
+		return ConstraintDiagnosis.rowGraph([for (list in rowVariables) {index: list, value: [for (_ in list) 1.0]}]);
+	}
+
+	/** Residual rows each constraint kind emits (see `residuals`). */
+	private static function rowCount(kind:String):Int {
+		return switch kind {
+			case "fixed", "coincident", "concentric", "angle", "symmetric": 2;
+			default: 1;
+		};
+	}
+
+	/**
+		Diagnoses a part with its Jacobian taken at `at` (the solution, or a
+		witness pose) and feasibility judged from `set`, the residuals at the
+		solution; rows count as satisfied within ten times the solve tolerance.
+	*/
+	private function diagnosePart(at:Array<Float>, solution:Array<Float>, part:Part, set:ResidualSet, ?rows:RowStructure):DiagnosisReport {
+		activePart = part.id;
+		var jacobian = sparseJacobian(at, set.values.length);
+		activePart = -1;
+		var local = [for (row in jacobian) localEntries(row, part)];
 		var satisfiedWithin = solveTolerance * 10;
-		return ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variableCount, owners: set.owners,
-			residuals: [for (value in set.values) value / satisfiedWithin], rankTolerance: sketch.settings.rankTolerance});
+		return ConstraintDiagnosis.diagnoseSparse(local, part.variables.length, set.owners,
+			[for (value in set.values) value / satisfiedWithin], sketch.settings.rankTolerance, null, rows);
 	}
 
 	/**
 		A pose near `x` with the same shape and no accidental coincidences
-		(plan decision CS-D6): every length moves by a fixed pseudo-random
-		percent of the sketch size, then only the shape constraints are solved
+		(plan decision CS-D6): the part's lengths move by a fixed pseudo-random
+		percent of the sketch size, then only its shape constraints are solved
 		again. Dimensions are left free: their rows' derivatives do not depend
 		on their target values. Null when the shape cannot be restored.
 	*/
-	private function witnessPose(x:Array<Float>):Null<Array<Float>> {
+	private function witnessPose(x:Array<Float>, part:Part):Null<Array<Float>> {
 		var seed = 20260930;
-		var trial = [for (value in x) {
+		var trial = x.copy();
+		for (variable in part.variables) {
 			seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-			value + (seed / 0x7fffffff - 0.5) * 0.02 * normalizationScale;
-		}];
-		for (entity in sketch.entities())
-			if (radiusIndex.exists(entity.id)) {
-				var i:Int = cast radiusIndex.get(entity.id);
-				trial[i] = Math.max(trial[i], 0.5 * x[i]);
-			}
-		shapeOnly = true;
-		var current = residuals(trial), currentNorm = norm(current.values), damping = sketch.settings.initialDamping;
-		var iterations = 0;
-		while (currentNorm > solveTolerance && iterations < sketch.settings.maxIterations) {
-			iterations++;
-			var step = dampedStep(trial, current, damping);
-			if (step == null) { damping *= 10; continue; }
-			var stepSet = residuals(step), stepNorm = norm(stepSet.values);
-			if (stepNorm < currentNorm) { trial = step; current = stepSet; currentNorm = stepNorm; damping = Math.max(1e-12, damping * 0.3); }
-			else damping = Math.min(1e12, damping * 10);
+			trial[variable] += (seed / 0x7fffffff - 0.5) * 0.02 * normalizationScale;
 		}
-		shapeOnly = false;
-		return currentNorm <= solveTolerance ? trial : null;
+		for (entity in sketch.entities()) {
+			var r = radiusIndex.get(entity.id);
+			if (r != null && variablePart[r] == part.id) trial[r] = Math.max(trial[r], 0.5 * x[r]);
+		}
+		var solved = solvePart(trial, part, true);
+		return solved.norm <= solveTolerance ? solved.x : null;
 	}
 
 	/** Constraints that fix shape rather than size: they hold for every scaled or moved copy of a solution. */
@@ -687,56 +976,6 @@ class SketchSolver {
 			if (index % 1024 == 0)
 				checkCancelled();
 			result.push(value);
-		}
-		return result;
-	}
-
-	private function matrix(rowCount:Int, columnCount:Int, value:Float):Array<Array<Float>> {
-		var result:Array<Array<Float>> = [];
-		for (row in 0...rowCount) {
-			if (row % 16 == 0)
-				checkCancelled();
-			result.push(fill(columnCount, value));
-		}
-		return result;
-	}
-	private function linearSolve(a:Array<Array<Float>>, b:Array<Float>):Null<Array<Float>> {
-		var n = b.length;
-		var matrix:Array<Array<Float>> = [];
-		for (index in 0...n) {
-			if (index % 64 == 0)
-				checkCancelled();
-			matrix.push(a[index].copy());
-			matrix[index].push(b[index]);
-		}
-		for (column in 0...n) {
-			checkCancelled();
-			var pivotRow = column;
-			for (row in column...n)
-				if (Math.abs(matrix[row][column]) > Math.abs(matrix[pivotRow][column]))
-					pivotRow = row;
-			if (Math.abs(matrix[pivotRow][column]) < 1e-15)
-				return null;
-			var temporary = matrix[column];
-			matrix[column] = matrix[pivotRow];
-			matrix[pivotRow] = temporary;
-			for (row in (column + 1)...n) {
-				if (row % 16 == 0)
-					checkCancelled();
-				var factor = matrix[row][column] / matrix[column][column];
-				for (entry in column...(n + 1))
-					matrix[row][entry] -= factor * matrix[column][entry];
-			}
-		}
-		var result = fill(n, 0);
-		var row = n - 1;
-		while (row >= 0) {
-			checkCancelled();
-			var value = matrix[row][n];
-			for (column in (row + 1)...n)
-				value -= matrix[row][column] * result[column];
-			result[row] = value / matrix[row][row];
-			row--;
 		}
 		return result;
 	}

@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""Run or inspect bounded editor captures for sustained performance regressions."""
+"""Run or inspect bounded editor captures for sustained performance regressions.
+
+Two kinds of check:
+
+  * leaks and growth (the default): a long tab-inspector run must not keep growing retained state or memory, and its frame
+    p95 stays under a fixed bound;
+  * budgets (`--budgets`): each scenario in app/tests/performance/budgets.json is run and its per-action medians must stay
+    under the ceilings there. Time ceilings are generous because machines differ; allocation ceilings are tight because
+    allocation depends on the code and not on the machine. `--measure` prints the measured values in the budget file's
+    format, to set or update a budget after a deliberate change.
+"""
 
 import argparse
 import json
@@ -121,6 +131,65 @@ def run(command):
     subprocess.run(command, cwd=ROOT, check=True)
 
 
+BUDGETS = ROOT / "app/tests/performance/budgets.json"
+
+
+def action_medians(directory):
+    """Median frame time and allocation per action of a capture, skipping the setup, first (cold) and verification frames."""
+    groups = {}
+    for frame in rows(directory / "frame-timeline.jsonl"):
+        action = frame.get("action") or "frames"
+        if action.startswith(("setup", "initial", "verify")) or frame.get("cycle", 1) == 0:
+            continue
+        groups.setdefault(action, []).append(frame)
+    medians = {}
+    for action, frames in groups.items():
+        times = [frame["frameSeconds"] * 1000 for frame in frames]
+        allocations = [frame["allocatedBytes"] / 1024 for frame in frames if isinstance(frame.get("allocatedBytes"), (int, float))]
+        medians[action] = {"frameMs": round(statistics.median(times), 2), "frames": len(frames)}
+        if allocations:
+            medians[action]["allocKiB"] = round(statistics.median(allocations), 1)
+    return medians
+
+
+def inspect_budget(name, directory, budget):
+    """Each measured action is held to its own ceilings, or to the "*" ones where it has none."""
+    measured = action_medians(directory)
+    actions = budget["actions"]
+    failures = [f"{name}: no frames for action {action}" for action in actions if action != "*" and action not in measured]
+    for key, values in measured.items():
+        ceilings = actions.get(key, actions.get("*"))
+        if ceilings is None:
+            continue
+        for metric, ceiling in ceilings.items():
+            value = values.get(metric)
+            if value is not None and value > ceiling:
+                failures.append(f"{name} {key}: {metric} {value} is over the budget {ceiling}")
+    return {"scenario": name, "capture": str(directory), "measured": measured, "failures": failures}
+
+
+def run_budgets(arguments):
+    budgets = json.loads(BUDGETS.read_text())["scenarios"]
+    results = []
+    for name, budget in budgets.items():
+        if arguments.scenario and name not in arguments.scenario:
+            continue
+        best = None
+        for attempt in range(arguments.runs):
+            capture = arguments.output_root / f"{name}-{attempt + 1}" if arguments.output_root else \
+                ROOT / "app/build/profiles" / time.strftime(f"budget-{name}-%Y%m%d-%H%M%S-{attempt}")
+            run([sys.executable, str(PROFILE), "--no-profile", "--skip-build", "--scenario", name,
+                 "--cycles", str(budget["cycles"]), "--output-dir", str(capture)])
+            result = inspect_budget(name, capture, budget)
+            # A noisy machine can push one run over a time ceiling; a real regression is over in every run.
+            if best is None or len(result["failures"]) < len(best["failures"]):
+                best = result
+            if not result["failures"]:
+                break
+        results.append(best)
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cycles", type=int, default=500)
@@ -129,11 +198,30 @@ def main():
     parser.add_argument("--headless-only", action="store_true",
                         help="skip the desktop idle check when no display server is available")
     parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--budgets", action="store_true", help="check the per-scenario budgets in app/tests/performance/budgets.json")
+    parser.add_argument("--measure", action="store_true", help="with --budgets: print measured values instead of failing")
+    parser.add_argument("--scenario", action="append", help="with --budgets: only these scenarios")
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--capture", action="append", type=Path,
                         help="inspect an existing interaction capture; may be repeated")
     parser.add_argument("--idle-capture", type=Path, help="inspect an existing idle capture")
     args = parser.parse_args()
+    if args.budgets:
+        if not args.skip_build:
+            run([str(HAXEON), "build", "--compiler-only", "--project", str(ROOT / "app/tests/performance/haxeon.json"),
+                 "--output", str(ROOT / "app/build/host/headless-profile.hl")])
+        results = run_budgets(args)
+        for result in results:
+            print(json.dumps(result if args.measure else {key: value for key, value in result.items() if key != "measured"},
+                             sort_keys=True))
+        failures = [failure for result in results for failure in result["failures"]]
+        if failures and not args.measure:
+            for failure in failures:
+                print("  " + failure, file=sys.stderr)
+            print(f"FAIL: {len(failures)} budget(s) exceeded", file=sys.stderr)
+            return 1
+        print("PASS: editor performance budgets")
+        return 0
     if args.cycles < 500 or args.cycles % 100 or args.runs < 1 or args.idle_seconds < 15:
         parser.error("cycles must be a multiple of 100 and at least 500; runs >= 1; idle >= 15s")
     if not args.headless_only and not args.idle_capture and not args.capture and \
