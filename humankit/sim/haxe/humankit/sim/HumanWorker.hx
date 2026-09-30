@@ -75,7 +75,12 @@ class HumanWorker {
 	var lastPick:Null<Pick> = null;
 	var lastPlace:Null<Place> = null;
 	var links:Array<{id:String, pose:Void->SimPose, radius:Float}> = [];
-	var pending:Array<{time:Float, object:SimObject, hand:HumanLimb, both:Bool, kind:Int, carrier:Null<SimPose>,
+	/**
+	 * What one tick's pin, hold, free and re-hold decisions do. The decisions are
+	 * all made first and carried out together at the end of the tick, so none of
+	 * them sees the effect of another; empty between ticks.
+	 */
+	final tickEvents:Array<{object:SimObject, hand:HumanLimb, both:Bool, kind:Int, carrier:Null<SimPose>,
 		touch:Null<Array<Float>>}> = [];
 	var lastAction:Dynamic;
 	var lastGrip:Bool = false;
@@ -179,13 +184,12 @@ class HumanWorker {
 	 * Returns the worker to where its session starts. The session's own reset has
 	 * already put its objects, actors and stabilisers back; this restores what
 	 * lives beside the session: the body at its start pose with nothing reaching,
-	 * carried or held, every pending pin, hold and release forgotten, and a
-	 * document job started again from its first step. A job given to run() cannot
-	 * be rewound, so that worker stands idle at its start pose.
+	 * carried or held, every hold and pin forgotten, and a document job started
+	 * again from its first step. A job given to run() cannot be rewound, so that
+	 * worker stands idle at its start pose.
 	 */
 	public function reset():Void {
 		if (disposed) throw "Worker is disposed";
-		pending.resize(0);
 		pinned = [];
 		releasing = [];
 		held = [];
@@ -252,7 +256,6 @@ class HumanWorker {
 		}
 		var now = session.simulationTime();
 		var dt = session.fixedTimestep();
-		flushPending(now + dt);
 		// A failed or cancelled job leaves nothing pinned in mid-reach.
 		// A job stopped early (failed or cancelled) still has a current action.
 		if (job != null && job.isDone() && job.currentAction() != null && pinned.length > 0) {
@@ -261,10 +264,7 @@ class HumanWorker {
 			releasing = [];
 		}
 		var target = now + LEAD_TICKS * dt;
-		if (target + 1e-9 < animationTime) {
-			animationTime = now;
-			pending.resize(0);
-		}
+		if (target + 1e-9 < animationTime) animationTime = now;
 		var elapsed = Math.max(0.0, target - animationTime);
 		if (elapsed > 1e-9) {
 			if (job != null) job.advance(elapsed); else body.advance(elapsed);
@@ -284,8 +284,8 @@ class HumanWorker {
 			}
 			for (waiting in releasing.copy())
 				if (handsClear(waiting.object)) {
-					pending.push({time: target, object: waiting.object, hand: waiting.hand, both: waiting.both, kind: FREE, carrier: null,
-						touch: null});
+					tickEvents.push({object: waiting.object, hand: waiting.hand, both: waiting.both, kind: FREE,
+						carrier: null, touch: null});
 					releasing.remove(waiting);
 				}
 			for (binding in bindings) {
@@ -295,23 +295,23 @@ class HumanWorker {
 					if (current != lastAction) {
 						lastGrip = Std.isOfType(current, Place);
 						if (Std.isOfType(current, Pick))
-							pending.push({time: target, object: binding.object, hand: binding.hand, both: binding.both, kind: PIN,
+							tickEvents.push({object: binding.object, hand: binding.hand, both: binding.both, kind: PIN,
 								carrier: null, touch: null});
 					}
 					// The session carries a held object on the hand capsule's pose at
 					// the event time, which is the animation pose right now.
 					if (grip != lastGrip) {
-						pending.push({time: target, object: binding.object, hand: binding.hand, both: binding.both,
+						tickEvents.push({object: binding.object, hand: binding.hand, both: binding.both,
 							kind: grip ? HOLD : PIN, carrier: grip ? (binding.both ? twoHandPose() : handPlacement(binding.hand)) : null,
 							touch: grip ? body.gripPoint(binding.hand) : null});
 						if (!grip) placing = {action: current, object: binding.object, hand: binding.hand, both: binding.both};
 					}
 					lastGrip = grip;
 					lastAction = current;
-					if (grip && Std.isOfType(current, Place)) level(binding.object, elapsed, target);
+					if (grip && Std.isOfType(current, Place)) level(binding.object, elapsed);
 				}
 			}
-			flushPending(now + dt);
+			applyTickEvents();
 		}
 	}
 
@@ -320,7 +320,7 @@ class HumanWorker {
 	 * centre, at LEVEL_RATE, while a Place lowers it: the hand rolls during a
 	 * carry, and a part set down tilted would tip over on release.
 	 */
-	function level(object:SimObject, seconds:Float, time:Float):Void {
+	function level(object:SimObject, seconds:Float):Void {
 		for (entry in held) {
 			if (entry.object != object) continue;
 			var hand = entry.both ? twoHandPose() : handPlacement(entry.hand);
@@ -343,8 +343,8 @@ class HumanWorker {
 				turned[3] * turned[3]);
 			var next = multiply([-carrier[0], -carrier[1], -carrier[2], carrier[3]], [for (value in turned) value / length]);
 			entry.offset = new SimPose(entry.offset.x, entry.offset.y, entry.offset.z, next[0], next[1], next[2], next[3]);
-			pending.push({time: time, object: object, hand: entry.hand, both: entry.both, kind: REHOLD, carrier: entry.offset,
-				touch: null});
+			tickEvents.push({object: object, hand: entry.hand, both: entry.both, kind: REHOLD,
+				carrier: entry.offset, touch: null});
 			return;
 		}
 	}
@@ -360,9 +360,11 @@ class HumanWorker {
 	function forgetHeld(object:SimObject):Void
 		for (entry in held.copy()) if (entry.object == object) held.remove(entry);
 
-	function flushPending(until:Float):Void {
-		while (pending.length > 0 && pending[0].time <= until + 1e-9) {
-			var event = pending.shift();
+	/** Carries out the tick's events in the order they were decided, then empties the list. */
+	function applyTickEvents():Void {
+		var events = tickEvents;
+		for (eventIndex in 0...events.length) {
+			var event = events[eventIndex];
 			if (event.kind == PIN) {
 				var frame = session.capture();
 				var objectPose = frame.objectPose(event.object);
@@ -391,7 +393,7 @@ class HumanWorker {
 				if (reach > maxHoldDistance) {
 					if (job != null)
 						job.abort('the object is $reach m from the hand, beyond the $maxHoldDistance m hold limit');
-					pending.resize(0);
+					events.resize(0);
 					return;
 				}
 				if (event.both) {
@@ -400,7 +402,7 @@ class HumanWorker {
 						Math.pow(objectPose.y - right[1], 2) + Math.pow(objectPose.z - right[2], 2));
 					if (rightReach > maxHoldDistance) {
 						if (job != null) job.abort('the object is $rightReach m from the right hand');
-						pending.resize(0);
+						events.resize(0);
 						return;
 					}
 				}
@@ -431,6 +433,7 @@ class HumanWorker {
 				session.releaseObject(event.object);
 			}
 		}
+		events.resize(0);
 	}
 
 	/**
