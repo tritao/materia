@@ -381,6 +381,9 @@ class SceneView {
 	public function hoverOverrideValues():Array<nkscene_render_material_override>
 		return hoverOverrides.copy();
 
+	public function poseOverrideCount():Int
+		return poseOverrides.length;
+
 	public function visibilityOverrideCount():Int
 		return visibilityOverrides.length;
 
