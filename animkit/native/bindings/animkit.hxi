@@ -65,6 +65,10 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 	 */
 	extern fn ak_asset_warning(asset: ak_asset_handle, index: u32) -> utf8 @borrowed;
 	/**
+	 * Removes every turn of one source.
+	 */
+	extern fn ak_instance_clear_joint_rotations(instance: ak_instance_handle, source: u32) -> ak_result;
+	/**
 	 * Creates a posed copy at the rest pose, already evaluated.
 	 */
 	extern fn ak_instance_create(asset: ak_asset_handle, out_instance: ptr<ak_instance_handle> @out @owned) -> ak_result;
@@ -98,9 +102,18 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 	 * Turns one joint by a rotation (x, y, z, w) about its own local axes, on top of its animated pose and
 	 * before inverse kinematics, so the turn carries the joint's children: fingers curl, a spine leans. The
 	 * rotation is normalized; weight in (0, 1] blends from no turn to all of it. A zero weight removes the
-	 * turn from that joint. The turn stays until removed.
+	 * turn. `source` names who is asking: a source has at most one turn per joint, and turns of different
+	 * sources on the same joint compose, lowest source first, so two features never overwrite each other.
+	 * A turn stays until it is removed.
 	 */
-	extern fn ak_instance_set_joint_rotation(instance: ak_instance_handle, joint: i32, x: f32, y: f32, z: f32, w: f32, weight: f32) -> ak_result;
+	extern fn ak_instance_set_joint_rotation(instance: ak_instance_handle, source: u32, joint: i32, x: f32, y: f32, z: f32, w: f32, weight: f32) -> ak_result;
+	/**
+	 * Replaces every turn of one source at once, so a caller turning many joints (a hand of fingers) crosses
+	 * the boundary once. data holds size / 24 records, each little-endian: an int32 joint, then float32 x, y,
+	 * z, w and weight. Turns of other sources are kept. Nothing changes when size is not a multiple of 24 or
+	 * any record is invalid; records with no weight are skipped.
+	 */
+	extern fn ak_instance_set_joint_rotations(instance: ak_instance_handle, source: u32, data: ptr<const<u8>> @in_array("size"), size: u32) -> ak_result;
 	/**
 	 * Sets one of AK_MAX_LAYERS blend layers. A layer contributes when its clip is
 	 * valid and its weight is positive; weights are normalized across layers. Time
