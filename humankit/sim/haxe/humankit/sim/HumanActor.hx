@@ -11,9 +11,8 @@ import nativekit.sim.SimShape;
 /**
  * A person taking part in a SimKit session: the body proxy's capsules as one
  * kinematic actor. The person pushes whatever they walk into and nothing
- * pushes them back. Poses are keyframes in simulation time: a writer stepping
- * the session pushes one per tick; a writer following a realtime session
- * pushes a few ticks ahead.
+ * pushes them back. Poses are keyframes in simulation time: a writer pushes
+ * one per tick, for the tick about to complete.
  */
 class HumanActor {
 	public final actor:SimActor;
