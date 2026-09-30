@@ -36,7 +36,8 @@ class AnimationInstance {
 	/**
 	 * Sets one of MAX_IK_CHAINS two-bone chains solved after the layers blend:
 	 * end reaches target and mid points along pole, both [x, y, z] in scene
-	 * space (pole is a direction). Weight 0 disables the chain.
+	 * space (pole is a direction; a zero pole bends the limb the way the animation
+	 * does, which never flips as the target moves). Weight 0 disables the chain.
 	 */
 	public function setIk(chain:Int, start:Int, mid:Int, end:Int, target:Array<Float>, pole:Array<Float>,
 			weight:Float = 1.0, soften:Float = 1.0):Void {

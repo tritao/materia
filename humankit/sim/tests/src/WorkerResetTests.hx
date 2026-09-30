@@ -56,8 +56,10 @@ class WorkerResetTests {
             throw '$label: picked at tick ${again.pickedAt}, a fresh run at ${fresh.pickedAt}';
         if (again.poses.length != fresh.poses.length)
             throw '$label: took ${again.poses.length} ticks, a fresh run ${fresh.poses.length}';
+        // Leftover state from before the reset shows as millimetres or more. The two runs' float32
+        // skeletons can still differ by an ulp for a tick, which contact turns into microns.
         for (tick in 0...fresh.poses.length)
-            if (gap(fresh.poses[tick], again.poses[tick]) > 1e-6)
+            if (gap(fresh.poses[tick], again.poses[tick]) > 1e-5)
                 throw '$label: the part path left the fresh path at tick $tick by ${gap(fresh.poses[tick], again.poses[tick])} m';
         if (gap(fresh.rest, again.rest) > 1e-5)
             throw '$label: the part came to rest ${gap(fresh.rest, again.rest)} m from where a fresh run left it';

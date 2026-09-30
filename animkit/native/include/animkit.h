@@ -132,8 +132,9 @@ typedef struct ak_bounds {
 /**
  * A two-bone inverse kinematics chain, such as shoulder, elbow, and wrist,
  * solved after the layers blend: the end joint moves to reach target and the
- * middle joint points in the direction pole (a direction, not a position). The joints must be ancestors in that order
- * but need not be direct parents. Positions are in scene space. weight blends
+ * middle joint points in the direction pole (a direction, not a position); a zero pole leaves the bend to the
+ * animation, carrying the direction the animated pose bends the limb onto the new reach. The joints must be
+ * ancestors in that order but need not be direct parents. Positions are in scene space. weight blends
  * from the animated pose (0, which disables the chain) to the solution (1);
  * soften in (0, 1] eases the chain before it straightens, 1 for none.
  */

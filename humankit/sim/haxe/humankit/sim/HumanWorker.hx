@@ -57,7 +57,7 @@ class HumanWorker {
 	var pinned:Array<SimObject> = [];
 	/** The Place whose part stays pinned until the action ends. */
 	var placing:Null<{action:Dynamic, object:SimObject, hand:HumanLimb, both:Bool}> = null;
-	/** Placed parts that stay pinned until no hand or forearm capsule touches them. */
+	/** Placed parts that stay pinned until the hands are back on their animation and clear of them. */
 	var releasing:Array<{object:SimObject, hand:HumanLimb, both:Bool}> = [];
 	/** Parts in a hand, with their offset from the hand capsule. */
 	var held:Array<{object:SimObject, hand:HumanLimb, both:Bool, offset:SimPose}> = [];
@@ -283,7 +283,7 @@ class HumanWorker {
 				placing = null;
 			}
 			for (waiting in releasing.copy())
-				if (handsClear(waiting.object)) {
+				if (armsReleased(waiting) && handsClear(waiting.object)) {
 					tickEvents.push({object: waiting.object, hand: waiting.hand, both: waiting.both, kind: FREE,
 						carrier: null, touch: null});
 					releasing.remove(waiting);
@@ -434,6 +434,18 @@ class HumanWorker {
 			}
 		}
 		events.resize(0);
+	}
+
+	/**
+	 * True once the hands that placed a part are back on their animation, or the job has ended. While
+	 * a hand is still held out by IK, the retreat is under way and the arm's pose can still swing
+	 * back toward the part, so a part freed on one moment of clearance could be knocked off a table.
+	 */
+	function armsReleased(waiting:{object:SimObject, hand:HumanLimb, both:Bool}):Bool {
+		if (job == null || job.isDone()) return true;
+		for (hand in waiting.both ? [ArmL, ArmR] : [waiting.hand])
+			if (body.reachWeight(hand) > 0.0) return false;
+		return true;
 	}
 
 	/**

@@ -168,6 +168,27 @@ void multiplyLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joi
     ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
 }
 
+// The direction the animation bends a limb, carried onto a new start-to-target axis by the smallest
+// rotation that takes the animated axis there, so it changes continuously as the target moves. A
+// fixed pole cannot do this: the bend plane contains the pole and the axis, so whenever the axis
+// passes the pole the plane is undefined and the elbow swings through a half turn. A limb the
+// animation holds straight has no bend of its own; `fallback` is returned for it.
+ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz::math::SimdFloat4 &mid,
+                                   const ozz::math::SimdFloat4 &end, const ozz::math::SimdFloat4 &target,
+                                   const ozz::math::SimdFloat4 &fallback) {
+    namespace m = ozz::math;
+    const m::SimdFloat4 animated_span = end - start, new_span = target - start;
+    const float animated_length = m::GetX(m::Length3(animated_span));
+    if (!(animated_length > 1e-6f) || !(m::GetX(m::Length3(new_span)) > 1e-6f)) return fallback;
+    const m::SimdFloat4 animated_axis = animated_span / m::simd_float4::Load1(animated_length);
+    const m::SimdFloat4 elbow = mid - start;
+    const m::SimdFloat4 bend = elbow - animated_axis * m::SplatX(m::Dot3(elbow, animated_axis));
+    if (!(m::GetX(m::Length3(bend)) > 1e-3f * animated_length)) return fallback;
+    const m::SimdQuaternion carry =
+        m::SimdQuaternion::FromVectors(animated_axis, m::Normalize3(new_span));
+    return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
+}
+
 } // namespace
 
 bool Instance::solveIk() {
@@ -179,9 +200,16 @@ bool Instance::solveIk() {
                           &end = models_[chain.end];
         const m::SimdFloat4 target =
             m::TransformPoint(sceneInverse_, m::simd_float4::Load3PtrU(chain.target));
-        const m::SimdFloat4 pole = m::NormalizeSafe3(
-            m::TransformVector(sceneInverse_, m::simd_float4::Load3PtrU(chain.pole)),
-            m::simd_float4::y_axis());
+        const m::SimdFloat4 requested =
+            m::TransformVector(sceneInverse_, m::simd_float4::Load3PtrU(chain.pole));
+        // A zero pole asks for the animation's own bend direction, with the default elbow direction
+        // (down and back) for a limb the animation holds straight.
+        const m::SimdFloat4 pole = m::GetX(m::Length3(requested)) > 1e-6f
+            ? m::Normalize3(requested)
+            : animatedBend(start.cols[3], mid.cols[3], end.cols[3], target,
+                           m::NormalizeSafe3(m::TransformVector(sceneInverse_,
+                                                 m::simd_float4::Load(-0.4f, 0.0f, -1.0f, 0.0f)),
+                                             m::simd_float4::y_axis()));
         // The hinge opens about the normal of the plane the limb bends in:
         // positive rotation about lower x upper straightens the joint. A
         // straight limb has no bend plane, so its hinge follows the pole.

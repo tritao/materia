@@ -102,6 +102,7 @@ class HumanKitTests {
 		human.dispose();
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
+		elbowStaysPut(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -449,6 +450,33 @@ class HumanKitTests {
 		try human.reach(LegL, [0.3, 0.1, 0.1]) catch (_:Dynamic) rejected = true;
 		if (!rejected)
 			throw "A Quaternius leg, whose foot is not below its shin, was accepted as a chain";
+		human.dispose();
+	}
+
+	/**
+	 * Sweeping the wrist through the point straight under the shoulder moves the elbow a little per
+	 * step. A fixed elbow direction pointing down would make the bend plane undefined there, and the
+	 * elbow would swing through a half turn around the arm on a one-degree step of the hand.
+	 */
+	static function elbowStaysPut(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Sweeper");
+		human.advance(0.0);
+		var shoulder = human.pose.bonePosition(HumanBone.UpperArmR);
+		var description = HumanDescription.measure(human.pose, human.height());
+		var radius = (description.upperArm + description.forearm) * 0.75;
+		var previous:Null<Array<Float>> = null;
+		var worst = 0.0;
+		for (step in 0...81) {
+			var angle = (step - 50) * Math.PI / 180.0;
+			var target = [shoulder[0] + radius * Math.sin(angle), shoulder[1], shoulder[2] - radius * Math.cos(angle)];
+			human.reach(ArmR, target);
+			human.advance(0.0);
+			var elbow = human.pose.bonePosition(HumanBone.ForearmR);
+			if (previous != null) worst = Math.max(worst, distance(elbow, previous));
+			previous = elbow;
+		}
+		if (worst > 0.04)
+			throw 'The elbow moved $worst m for a one-degree step of the wrist';
 		human.dispose();
 	}
 
