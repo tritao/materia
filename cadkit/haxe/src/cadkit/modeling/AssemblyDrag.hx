@@ -10,6 +10,7 @@ import kinematicskit.KinematicState;
 import kinematicskit.KinematicStatus;
 import kinematicskit.SolverWorkspace;
 import kinematicskit.Transform;
+import kinematicskit.Vector3;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
@@ -54,8 +55,9 @@ class AssemblyDragResult {
 }
 
 /**
- * Drags a frame of an assembly (an occurrence's origin, or one of its
- * connectors) towards world targets by moving joints, for an editor IK gizmo.
+ * Drags a frame of an assembly (an occurrence's origin, a point on it, or
+ * one of its connectors) towards world targets by moving joints, for an
+ * editor IK gizmo.
  *
  * The movable joints are the driving joints from the root to the grabbed
  * occurrence (a coupled joint contributes its leader), plus any `dependent`
@@ -91,9 +93,13 @@ class AssemblyDrag {
   /**
    * `keepOrientation` holds the grabbed frame's orientation to the target's
    * (a tool keeps pointing the same way); otherwise only its position follows.
+   * Without a connector, `grabPoint` (in the occurrence's own frame, in the
+   * assembly's length unit) is the point that follows the target, e.g. where
+   * the user pressed; the occurrence's origin by default.
    */
   public function new(state:AssemblyState, occurrence:String, ?connector:String, ?dependent:Array<String>,
-      ?keepOrientation:Bool = true) {
+      ?keepOrientation:Bool = true, ?grabPoint:Vector3) {
+    if (connector != null && grabPoint != null) throw "Assembly drag grabs a connector or a point, not both";
     if (state == null) throw "Assembly drag needs a state";
     this.state = state;
     this.occurrence = occurrence;
@@ -121,10 +127,13 @@ class AssemblyDrag {
     preview = state.kinematicSeed();
     snapshot = new KinematicSnapshot(model);
     snapshot.evaluate(preview);
-    var start = connector == null ? snapshot.bodyPose(body) : snapshot.framePose(kinematics.connectorFrame(occurrence, connector));
+    var offset = grabPoint == null ? null : Transform.translation(grabPoint.x, grabPoint.y, grabPoint.z);
+    var start = connector == null
+      ? (offset == null ? snapshot.bodyPose(body) : snapshot.bodyPose(body).compose(offset))
+      : snapshot.framePose(kinematics.connectorFrame(occurrence, connector));
     var orientation = keepOrientation ? FrameOrientation.Full : FrameOrientation.Free;
     task = connector == null
-      ? new FrameTask(model, body, null, start, positionTolerance, orientationTolerance, FrameTask.ALL_AXES, orientation, occurrence)
+      ? new FrameTask(model, body, offset, start, positionTolerance, orientationTolerance, FrameTask.ALL_AXES, orientation, occurrence)
       : FrameTask.atFrame(model, kinematics.connectorFrame(occurrence, connector), start, positionTolerance,
         orientationTolerance, null, FrameTask.ALL_AXES, orientation);
     // Weigh position in metres whatever the drawing unit, so the damping means the same for a

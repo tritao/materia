@@ -719,3 +719,30 @@ coordinates; for a running robot the target goes through MotionKit.
   rocker swings 10° with the pin closed (the crank turns) and a stretch it
   cannot make is reported; the state is never modified and the committed
   record reproduces the preview.
+
+### E1b — IK drag in the editor viewport (2026-09-30)
+
+- Pressing a joint-driven assembly part (which the object drag refuses)
+  now starts an IK drag from the pressed point: the viewport picks the
+  world hit (`EditorScene.pickHitRayWithView`), the session builds an
+  `AssemblyDrag` grabbing that point (`AssemblyDrag` gained a `grabPoint`),
+  and the point follows the cursor on a camera-facing plane through it.
+  Joints above the part and the project's dependent joints move; closures
+  stay closed.
+- Preview without history through `EditorScene.setAssemblyOccurrenceTransforms`
+  (what the joint slider uses); release records one `EditOperation` with the
+  before and after records (the object drag's `record` pattern); Escape or
+  pointer-cancel restores the starting pose. A green pull line from the
+  grabbed point to the cursor turns amber when the part cannot follow, and
+  the viewport toolbar shows the reason ("Following", "Out of reach: …",
+  "Joint "j3" is at its limit", "Linkage … cannot stay closed here").
+- Layers: `SceneAssemblyDrag` (scene-facing interface), `ProjectAssemblyDrag`
+  (session implementation), `ProjectDocumentSession.beginAssemblyDrag`
+  (public, so it is tested without a window), viewport mode 5.
+- Test (`ProjectSourceTests.checkArmDrag`, on the robot-arm project): the
+  suction cup follows a 3 cm pull in 15 steps and lands within 1e-5 m;
+  release commits, undo restores; a 5 m target reports "out of reach" and
+  cancel leaves the state untouched; the fixed root part cannot be dragged.
+- The app suite's `ScriptedSetupTests` fails at "inspector action is
+  visible: sensor-pause" in this worktree with or without these changes
+  (checked by stashing them and rebuilding); every suite before it passes.

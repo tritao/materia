@@ -100,6 +100,7 @@ class EditorScene {
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
   var assemblyPropertyProvider:Null<String->Array<PropertyDescriptor>> = null;
+  var assemblyDragProvider:Null<(String, Array<Float>) -> Null<SceneAssemblyDrag>> = null;
   /** Optional editor-owned semantic action sink. */
   public var onSemanticAction:Null<String->Dynamic->Void> = null;
   var nextObjectId(get, set):Int;
@@ -1176,7 +1177,9 @@ class EditorScene {
 
   /** Marks generated occurrences as pose-driven and supplies their joint properties. */
   public function configureAssemblyOccurrences(occurrenceIds:Array<String>,
-      propertyProvider:Null<String->Array<PropertyDescriptor>>):Void {
+      propertyProvider:Null<String->Array<PropertyDescriptor>>,
+      ?dragProvider:(String, Array<Float>) -> Null<SceneAssemblyDrag>):Void {
+    assemblyDragProvider = dragProvider;
     kinematicOccurrences.clear();
     if (occurrenceIds != null) for (id in occurrenceIds) {
       if (id == null || id.length == 0) throw "Assembly occurrence IDs must be non-empty";
@@ -1185,6 +1188,21 @@ class EditorScene {
     }
     assemblyPropertyProvider = propertyProvider;
     selection.changed(this);
+  }
+
+  /**
+   * Starts an IK drag of a joint-driven occurrence from `worldPoint` (metres), or null when the
+   * occurrence cannot be dragged (not joint-driven, or no movable joint above it).
+   */
+  public function beginAssemblyDrag(id:String, worldPoint:Array<Float>):Null<SceneAssemblyDrag>
+    return assemblyDragProvider == null || !kinematicOccurrences.exists(id) ? null : assemblyDragProvider(id, worldPoint);
+
+  /** As `pickRayWithView`, with the world point that was hit (metres). */
+  public function pickHitRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
+      directionX:Float, directionY:Float, directionZ:Float):{id:String, x:Float, y:Float, z:Float} {
+    refreshPresentationIfStale();
+    var hit = spatial.pickRayWithView(view, originX, originY, originZ, directionX, directionY, directionZ);
+    return {id: idForHit(hit), x: hit.worldX(), y: hit.worldY(), z: hit.worldZ()};
   }
 
   /** A joint owns a generated occurrence's pose; direct object moves are unavailable. */
