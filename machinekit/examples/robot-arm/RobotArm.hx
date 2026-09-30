@@ -1,5 +1,9 @@
 import cadkit.modeling.Vector;
+import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
+import machinekit.component.ComponentDetail;
+import machinekit.component.Dimension;
+import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
 import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
@@ -14,6 +18,7 @@ import machinekit.robotics.FrameBar;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
  * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`.
@@ -46,6 +51,61 @@ class ArmSuctionTool {
 	}
 }
 
+/** Work table: a slab on four legs, standing on the floor (z=0) with its top at `height`. The origin
+ * is the centre of the footprint. */
+class ArmTable extends MachineComponent {
+	public final width:Float;
+	public final depth:Float;
+	public final height:Float;
+	public final thickness:Float;
+
+	public function new(width:Float, depth:Float, height:Float, thickness:Float = 30) {
+		if (!(width > 0) || !(depth > 0) || !(thickness > 0) || !(height > thickness) || width < 200 || depth < 200)
+			throw "Table needs positive dimensions and legs under its top";
+		super('TABLE-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
+			"Work table", "steel", true);
+		this.width = width;
+		this.depth = depth;
+		this.height = height;
+		this.thickness = thickness;
+		addConnector("base", Mount, Solids.axial(0, 0, 0));
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		var parts = [Part.box(width, depth, thickness).translated(new Vector(0, 0, height - thickness))];
+		var leg = 40.0, inset = 30.0;
+		for (sx in [-1, 1]) for (sy in [-1, 1])
+			parts.push(Part.box(leg, leg, height - thickness)
+				.translated(new Vector(sx * (width / 2 - inset - leg / 2), sy * (depth / 2 - inset - leg / 2), 0)));
+		return Solids.union(parts);
+	}
+}
+
+/** A plain block standing on its base (z=0), centred on its origin. */
+class ArmBlock extends MachineComponent {
+	public final width:Float;
+	public final depth:Float;
+	public final height:Float;
+
+	public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+		if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Block needs positive dimensions";
+		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
+			name, material, true);
+		this.width = width;
+		this.depth = depth;
+		this.height = height;
+		addConnector("base", Mount, Solids.axial(0, 0, 0));
+		addConnector("top", Mount, Solids.axial(0, 0, height));
+	}
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return Part.box(width, depth, height);
+}
+
 /** One joint's motion limits and the pose it starts in, in radians and rad/s. */
 typedef ArmJointSpec = {
 	var id:String;
@@ -66,6 +126,16 @@ typedef ArmJointSpec = {
  */
 class RobotArm extends MachineAssembly {
 	public static inline var PEDESTAL_HEIGHT:Float = 300;
+	/** Work cell in front of the arm (-Y), in millimetres from the pedestal axis and the floor. */
+	public static inline var TABLE_TOP:Float = 250;
+	public static inline var TABLE_CENTRE_Y:Float = -650;
+	public static inline var WORKPIECE_WIDTH:Float = 60;
+	public static inline var WORKPIECE_HEIGHT:Float = 50;
+	public static inline var PAD_HEIGHT:Float = 2;
+	/** Where the workpiece starts, and the pad it is to be carried to. */
+	public static inline var PICK_X:Float = -150;
+	public static inline var PLACE_X:Float = 150;
+	public static inline var WORK_Y:Float = -600;
 
 	public final flange = new RobotFlange(63);
 	public final pedestal:Pedestal;
@@ -122,6 +192,17 @@ class RobotArm extends MachineAssembly {
 		exposeConnector("toolContact", "tool/cup", "contact");
 		// The ejector's compressed-air inlet is the arm's own service input.
 		exposePort("compressedAir", "tool/ejector", "air");
+		addCell();
+	}
+
+	/** Table, workpiece and pad: fixed roots standing where the motion authoring aims the tool. */
+	function addCell():Void {
+		function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
+		addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
+		addComponent("workpiece", new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood",
+			"Workpiece"), at(PICK_X, WORK_Y, TABLE_TOP));
+		addComponent("pad", new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad"),
+			at(PLACE_X, WORK_Y, TABLE_TOP));
 	}
 
 	function revolute(spec:ArmJointSpec, housing:String, rotorConnector:String, child:String,

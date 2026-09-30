@@ -17,4 +17,7 @@ fi
 native_paths="$cadkit_build/core:$cadkit_build/lin64/gcc/libd"
 export LD_LIBRARY_PATH="$native_paths${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$native_paths${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+# The arm's shipped motion must be what its Cartesian waypoints produce.
+LD_LIBRARY_PATH="$materia_root/haxeon/out:$LD_LIBRARY_PATH" "$materia_root/haxeon/.tools/hashlink/hl" \
+	"$repo_root/examples/robot-arm/authoring/build/host/main.hl" check "$repo_root/examples/robot-arm/robot-arm.motion.json"
 exec "$materia_root/haxeon/scripts/haxeon" run --project "$repo_root/tests/haxeon.json"

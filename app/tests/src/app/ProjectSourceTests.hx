@@ -169,8 +169,9 @@ class ProjectSourceTests {
   /** The arm's hierarchy shows its rigid bodies, not its 20-deep joint tree. */
   static function checkArmHierarchy(session:ProjectDocumentSession):Void {
     var tree = new EditorSceneTree(session.scene, session.projectAssemblyDefinition, session.generatedLabels());
-    check(tree.childCount("scene") == 1 && tree.childKeyAt("scene", 0) == "project:pedestal",
-      "the arm's hierarchy starts at its base body");
+    var top = [for (index in 0...tree.childCount("scene")) tree.childKeyAt("scene", index)];
+    check(top.join(",") == "project:pedestal,project:table,project:workpiece,project:pad",
+      "the hierarchy starts at the arm's base body and the cell's fixed bodies (" + top.join(",") + ")");
     var chain = ["pedestal", "turret", "upperArm", "forearm", "wristBody", "hand", "toolFlange"];
     var key = "project:pedestal", rows = 1, depth = 1;
     function bodyBelow(parent:String, id:String):Bool {
@@ -235,30 +236,34 @@ class ProjectSourceTests {
     var startCup = [for (pose in startPoses) if (pose.id == "project:tool/cup") pose];
     check(startCup.length == 1 && [for (pose in startPoses) if (StringTools.startsWith(pose.id, "project:")) pose].length ==
       definition.occurrences.length, "robot arm publishes a pose for every part, tool included");
-    var steps = 0;
-    while (armSimulation.activeSession().simulationTime() < 3.4 && steps++ < 20000) armSimulation.step();
-    var movedCup = [for (pose in armSimulation.capturePresentationSnapshot().environment)
-      if (pose.id == "project:tool/cup") pose];
-    check(movedCup.length == 1, "robot arm keeps publishing the suction cup pose");
-    var travel = 0.0;
-    for (axis in 0...3) travel += Math.pow(movedCup[0].position[axis] - startCup[0].position[axis], 2);
-    check(Math.sqrt(travel) > 0.2, "the suction cup moves with the arm");
-    var observed = armWorld.snapshot().robot(id);
-    if (observed == null) throw "robot arm is missing from the world snapshot";
-    var positions = observed.positions;
-    // Track positions are relative to the initial pose: the pick pose holds from t=3 to t=4.
-    var expected = ["j1" => -0.7, "j2" => 0.5, "j3" => 0.2, "j4" => 0.0, "j5" => -0.3, "j6" => 0.0];
-    var worst = 0.0;
-    for (joint in expected.keys()) {
-      var slot = index.get(joint);
-      if (slot == null) throw 'robot arm has no joint $joint';
-      var actual = positions.get(slot);
-      var error = Math.abs(actual - expected.get(joint));
-      worst = Math.max(worst, error);
-      check(error < 0.05,
-        'robot arm joint $joint follows its track: expected ${expected.get(joint)}, got $actual');
+    // Run the whole authored cycle: the joints must follow their tracks the entire way, which also means
+    // the arm never fights the table or the workpiece.
+    var duration = 0.0;
+    for (track in generated.robotMotions) duration = Math.max(duration, track.keys[track.keys.length - 1].time);
+    var worst = 0.0, farthest = 0.0, nextSample = 0.0, steps = 0;
+    while (armSimulation.activeSession().simulationTime() < duration + 0.5 && steps++ < 100000) {
+      armSimulation.step();
+      var now = armSimulation.activeSession().simulationTime();
+      if (now < nextSample) continue;
+      nextSample = now + 0.25;
+      var observed = armWorld.snapshot().robot(id);
+      if (observed == null) throw "robot arm is missing from the world snapshot";
+      // Track positions are relative to the initial pose, like the joint positions themselves.
+      for (track in generated.robotMotions) {
+        var slot = index.get(track.jointId);
+        if (slot == null) throw 'robot arm has no joint ${track.jointId}';
+        var error = Math.abs(observed.positions.get(slot) - track.sample(now));
+        worst = Math.max(worst, error);
+        check(error < 0.05, 'robot arm joint ${track.jointId} follows its track at $now s: off by $error rad');
+      }
+      for (pose in armSimulation.capturePresentationSnapshot().environment) if (pose.id == "project:tool/cup") {
+        var travel = 0.0;
+        for (axis in 0...3) travel += Math.pow(pose.position[axis] - startCup[0].position[axis], 2);
+        farthest = Math.max(farthest, Math.sqrt(travel));
+      }
     }
-    Sys.println('robot arm followed its motion track to within $worst rad after ${armSimulation.activeSession().simulationTime()} s');
+    check(farthest > 0.2, "the suction cup travels to the workpiece and the pad (moved at most " + farthest + " m)");
+    Sys.println('robot arm followed its motion track to within $worst rad over ${armSimulation.activeSession().simulationTime()} s');
   }
 
   /** A project named at launch builds in the background: queued at once, opened by tick(). */

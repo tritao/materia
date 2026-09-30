@@ -57,19 +57,41 @@ Schmalz ejector, SAF 40 cup, push-in fitting and hose. The arm includes it as
 the cup's `toolContact` connector and the ejector's `compressedAir` inlet. The
 tool is geometry and ports only: nothing here simulates vacuum or grips a part.
 
+## The work cell
+
+The arm stands in front of a table (fixed roots in the assembly, like the pedestal): a workpiece
+block at the pick point and a pad at the place point. `RobotArm` holds their coordinates
+(`TABLE_TOP`, `PICK_X`, `PLACE_X`, `WORK_Y`) so the arm, the cell and the motion authoring agree.
+Nothing in the simulation grips the workpiece: the tool visits the pick and place points and
+dwells there, and the workpiece stays where it started.
+
 ## Motion
 
-`materia.project.json` names `robot-arm.motion.json` in `robotMotions`. The
-file lists one looping track per joint, keyed by the joint's assembly id:
+`materia.project.json` names `robot-arm.motion.json` in `robotMotions`. The file lists one
+looping track per joint, keyed by the joint's assembly id:
 
 ```json
 {"version": 1, "tracks": [{"joint": "j1", "loop": true, "keys": [{"time": 0, "position": 0}, ...]}]}
 ```
 
-Positions are relative to the generated initial pose, like every Materia motion
-track, so `0` means the ready pose. A looping track must end where it starts.
-The tracks are installed with the project and drive the arm's own assembly
-model in the simulation; they are saved with the document like any other track.
+Positions are relative to the generated initial pose, like every Materia motion track, so `0`
+means the ready pose. A looping track must end where it starts. The tracks are installed with the
+project and drive the arm's own assembly model in the simulation; they are saved with the
+document like any other track.
+
+The motion is authored in Cartesian space, not by hand. `authoring/ArmMotionAuthoring.hx` builds
+the arm's kinematic model from its assembly (the same bridge the simulation uses), takes the
+suction cup's contact face as the tool point, and walks it through waypoints: home, above the
+pick, touch, lift, above the place, touch, retreat, home. Moves are straight lines at a fixed
+downward orientation, sampled every 2 cm; motionkit's numeric inverse kinematics solves each
+sample from the previous one, and each step's duration respects both the tool speed and half of
+every joint's velocity limit. To change the cycle, edit the waypoints and regenerate:
+
+```sh
+./haxeon/scripts/haxeon build --project=machinekit/examples/robot-arm/authoring/haxeon.json
+./haxeon/.tools/hashlink/hl machinekit/examples/robot-arm/authoring/build/host/main.hl \
+  write machinekit/examples/robot-arm/robot-arm.motion.json
+```
 
 ## Checks
 
@@ -77,6 +99,10 @@ model in the simulation; they are saved with the document like any other track.
 ./haxeon/scripts/haxeon build --project=machinekit/examples/robot-arm/haxeon.json
 ./haxeon/.tools/hashlink/hl machinekit/examples/robot-arm/build/host/main.hl
 ```
+
+`authoring/…/main.hl check <file>` (also run by `machinekit/scripts/test-haxeon`) re-plans the
+motion and fails if the committed file differs or the tool misses a waypoint, so the file cannot
+drift from the geometry.
 
 The check generates the preview and verifies forward kinematics: with every
 joint at zero the tool flange face is at (35, 0, 1306.5) mm, pointing up, and in
