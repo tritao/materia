@@ -25,8 +25,9 @@ class LayoutTransaction {
 			throw "Layout transaction requires a root node";
 
 		nodeCount = 0;
-		seenById = new Map();
-		seenIdCollisions = new Map();
+		// Cleared, not replaced: the maps keep their storage from frame to frame.
+		seenById.clear();
+		seenIdCollisions.clear();
 		appendNode(root, -1);
 
 		var stringByteCount = 0;

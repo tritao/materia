@@ -10,6 +10,9 @@ class LayoutSession {
 	var disposed:Bool;
 	final transaction:LayoutTransaction;
 	final resolved:Array<ResolvedLayoutItem>;
+	final previousResolvedItems:Array<ResolvedLayoutItem> = [];
+	final previousResolvedIndexById:Map<Int, Int> = new Map();
+	var previousResolvedBytes:Null<Bytes> = null;
 	var hitPathBytes:Bytes;
 	var measureCallback:Null<nkui_layout_measure_callbackCallback>;
 	var measureFunction:Null<LayoutMeasureCallback>;
@@ -75,9 +78,60 @@ class LayoutSession {
 		if (bytes.length % recordBytes != 0)
 			throw "Native layout returned a truncated geometry snapshot";
 		resolved.resize(0);
-		for (index in 0...Std.int(bytes.length / recordBytes))
-			resolved.push(ResolvedLayoutItem.decode(bytes, index * recordBytes));
+		decodeResolvedItems(bytes, recordBytes);
 		return resolved;
+	}
+
+	/**
+	 * Items are immutable, so a record whose bytes match the previous frame's keeps that frame's item instead of being
+	 * decoded again: most of a tree is unchanged between frames, and a decode is four objects.
+	 */
+	function decodeResolvedItems(bytes:Bytes, recordBytes:Int):Void {
+		var count = Std.int(bytes.length / recordBytes);
+		var before = previousResolvedBytes;
+		var reusable = before != null && before != bytes;
+		var previousCount = previousResolvedItems.length;
+		var indexById:Null<Map<Int, Int>> = null;
+		for (index in 0...count) {
+			var offset = index * recordBytes;
+			var item:Null<ResolvedLayoutItem> = null;
+			if (reusable) {
+				if (index < previousCount && sameRecord(before, offset, bytes, offset, recordBytes))
+					item = previousResolvedItems[index];
+				else if (previousCount > 0) {
+					// The order shifted (a subtree changed size): find the same node by its ID.
+					if (indexById == null) {
+						indexById = previousResolvedIndexById;
+						indexById.clear();
+						for (position in 0...previousCount)
+							indexById.set(previousResolvedItems[position].id, position);
+					}
+					var id = bytes.getInt32(offset + 4);
+					if (indexById.exists(id)) {
+						var position:Int = cast indexById.get(id);
+						if (sameRecord(before, position * recordBytes, bytes, offset, recordBytes))
+							item = previousResolvedItems[position];
+					}
+				}
+			}
+			resolved.push(item == null ? ResolvedLayoutItem.decode(bytes, offset) : item);
+		}
+		previousResolvedItems.resize(0);
+		for (item in resolved)
+			previousResolvedItems.push(item);
+		previousResolvedBytes = bytes;
+	}
+
+	static function sameRecord(left:Bytes, leftOffset:Int, right:Bytes, rightOffset:Int, length:Int):Bool {
+		if (leftOffset < 0 || leftOffset + length > left.length)
+			return false;
+		var word = 0;
+		while (word < length) {
+			if (left.getInt32(leftOffset + word) != right.getInt32(rightOffset + word))
+				return false;
+			word += 4;
+		}
+		return true;
 	}
 
 	/** Returns the native root-to-target geometric hit path for viewport coordinates. */

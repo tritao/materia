@@ -60,7 +60,7 @@ class RenderNode {
 	/** Categories raised while this node was compared with its prior frame. */
 	public var invalidationFlags(default, null):Int;
 	/** Most nodes never take handlers, custom paint or decorations, so these are allocated on first use. */
-	var handlers:Null<Map<String, Array<UiEvent->Void>>>;
+	var handlers:Null<Array<HandlerEntry>>;
 	var outsidePointerDownHandlers:Null<Array<UiEvent->Void>>;
 	var resolvedHandlers:Null<Array<ResolvedLayoutItem->Void>>;
 	var paintHandlers:Null<Array<Canvas->ResolvedLayoutItem->Void>>;
@@ -128,9 +128,12 @@ class RenderNode {
 	public function add(child:RenderNode):RenderNode {
 		if (child == null || child == this || child.parent != null)
 			throw "A render node must have one parent and cannot contain itself";
-		for (ancestor in ancestors())
+		var ancestor:Null<RenderNode> = this;
+		while (ancestor != null) {
 			if (ancestor == child)
 				throw "Render tree contains a cycle";
+			ancestor = ancestor.parent;
+		}
 		child.parent = this;
 		children.push(child);
 		layout.add(child.layout);
@@ -194,15 +197,9 @@ class RenderNode {
 		if (kind == null || kind.length == 0 || handler == null ||
 			(phase != "capture" && phase != "target" && phase != "bubble"))
 			throw "Event handlers require a kind and callback";
-		var key = handlerKey(kind, phase);
 		if (handlers == null)
-			handlers = new Map();
-		var values = handlers.get(key);
-		if (values == null) {
-			values = [];
-			handlers.set(key, values);
-		}
-		values.push(handler);
+			handlers = [];
+		handlers.push(new HandlerEntry(kind, phase, handler));
 		return this;
 	}
 
@@ -652,48 +649,41 @@ class RenderNode {
 	}
 
 	function invokePhase(event:UiEvent, phase:String):Void {
-		if (handlers == null)
+		var entries = handlers;
+		if (entries == null)
 			return;
-		var values = handlers.get(handlerKey(event.kind, phase));
-		if (values == null)
-			return;
-		for (handler in values) {
-			handler(event);
+		// Handlers registered while one runs are visited too, as when each kind and phase had its own list.
+		var index = 0;
+		while (index < entries.length) {
+			var entry = entries[index++];
+			if (entry.phase != phase || entry.kind != event.kind)
+				continue;
+			entry.handler(event);
 			if (event.immediatePropagationStopped)
 				return;
 		}
 	}
 
-	static inline function handlerKey(kind:String, phase:String):String
-		return kind + "#" + phase;
-
 	public function find(id:WidgetId):Null<RenderNode> {
 		if (id == null)
 			return null;
-		var pending:Array<RenderNode> = [this];
-		var visited:Array<RenderNode> = [];
-		while (pending.length > 0) {
-			var node = pending.pop();
-			if (node == null)
+		return findFrom(this, id, 0);
+	}
+
+	/** Pre-order search without allocating: a tree never nests this deep, so exceeding it means a node reaches itself. */
+	static function findFrom(node:RenderNode, id:WidgetId, depth:Int):Null<RenderNode> {
+		if (depth > 10000)
+			throw "Render tree is cyclic or too deep";
+		if (node.id.equals(id))
+			return node;
+		var children = node.children;
+		for (index in 0...children.length) {
+			var child = children[index];
+			if (child == null)
 				continue;
-			var alreadyVisited = false;
-			for (visitedNode in visited)
-				if (visitedNode == node) {
-					alreadyVisited = true;
-					break;
-				}
-			if (alreadyVisited)
-				continue;
-			visited.push(node);
-			if (node.id.equals(id))
-				return node;
-			var index = node.children.length - 1;
-			while (index >= 0) {
-				var child = node.children[index];
-				if (child != null)
-					pending.push(child);
-				index--;
-			}
+			var found = findFrom(child, id, depth + 1);
+			if (found != null)
+				return found;
 		}
 		return null;
 	}
@@ -704,20 +694,22 @@ class RenderNode {
 			child.walk(visit);
 	}
 
-	function ancestors():Array<RenderNode> {
-		var result:Array<RenderNode> = [];
-		var node = parent;
-		while (node != null) {
-			var present:RenderNode = cast node;
-			result.push(present);
-			node = present.parent;
-		}
-		return result;
-	}
-
 	function requireResolved():ResolvedLayoutItem {
 		if (resolved == null)
 			throw "Render node has no resolved geometry; submit the UI first";
 		return cast resolved;
+	}
+}
+
+/** One event handler and the kind and phase it listens to; a node has few, so a flat list beats a map per node. */
+private class HandlerEntry {
+	public final kind:String;
+	public final phase:String;
+	public final handler:UiEvent->Void;
+
+	public function new(kind:String, phase:String, handler:UiEvent->Void) {
+		this.kind = kind;
+		this.phase = phase;
+		this.handler = handler;
 	}
 }

@@ -851,7 +851,7 @@ class UiContext {
 	}
 
 	static function sameGeometry(left:ResolvedLayoutItem, right:ResolvedLayoutItem):Bool {
-		return left.flags == right.flags && left.x == right.x && left.y == right.y &&
+		return left == right || left.flags == right.flags && left.x == right.x && left.y == right.y &&
 			left.width == right.width && left.height == right.height && left.baseline == right.baseline &&
 			sameRect(left.clipBounds, right.clipBounds) && sameRect(left.contentBounds, right.contentBounds) &&
 			left.transform.a == right.transform.a && left.transform.b == right.transform.b &&

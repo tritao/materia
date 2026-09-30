@@ -140,3 +140,9 @@ Allocations made entirely inside native code show up as `(native)`; the harness'
 On 2026-09-30 the first census found `BuildContext.claimRetainedTree` building an unused description string for every
 retained node (26% of all bytes); dropping it took a tab-matrix cycle from 5.56 to 4.08 MiB. `Transform2D`, `Point`, `Rect`
 and `LayoutAxis` together were about 16%, which is why converting one of them to a value class could not move the total.
+
+Fixes the census led to, in order (tab-matrix cycle, KiB): unused ID descriptions in `claimRetainedTree` 5,556 -> 4,075; allocation-free
+point mapping and hit testing 3,596; `Map.clear` keeping its storage 3,115; reusing last frame's `ResolvedLayoutItem` when its
+record is byte-identical 2,761; `LayoutTransaction` clearing its maps, an allocation-free `RenderNode.find` 2,570; a flat handler
+list and an allocation-free cycle check in `RenderNode` 2,440. About 12% of what remains is the profiling harness's own JSON and
+frame recording.
