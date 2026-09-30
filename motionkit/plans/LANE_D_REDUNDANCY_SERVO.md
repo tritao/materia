@@ -51,6 +51,8 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
   - task and limit interfaces modelled on mink;
   - Jacobians from our own kinematics (RobotKit's chain now, Pinocchio when
     it arrives), never from the simulator;
+  - (Superseded: the first backend is ProxQP's dense solver, shared with
+    humanoid H7; see `kinematicskit/plans/KINEMATICS.md` KK-D13.)
   - OSQP as the first QP backend, behind a solver interface so it can be
     swapped.
 - **LD-D2 — It implements contract C4's `solveDifferential`** and replaces

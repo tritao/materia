@@ -105,6 +105,31 @@ out to be wrong.
 - **KK-D12 — After K3, native leads and Haxe follows.** New solver features
   land natively. The Haxe solvers stay as the reference and fallback and must
   agree with native in parity tests; they gain only what those tests need.
+- **KK-D13 — One QP solver across the stack: ProxQP, dense backend.**
+  Kinematic QPs here are small and dense (one variable per DOF, 6 to about
+  50; tens of rows, nearly all non-zero). OSQP, a first-order sparse solver,
+  converges to modest accuracy with iteration counts that vary, which suits
+  large sparse problems and not a fixed-rate servo loop. ProxQP
+  (proxsuite) has an Eigen-native dense backend (KK-D10) and is what the
+  humanoid whole-body controller (H7, TSID) will use, so K3 and H7 share one
+  vendored solver and one set of behaviours to learn. No osqp-eigen: the
+  backend interface already hides the solver, and converting to a solver's
+  matrix format is a few dozen lines. OSQP stays out unless a large sparse
+  case appears (e.g. whole-body control with many contacts). Before
+  vendoring, confirm proxsuite's licence, pinned version and dependency set,
+  and that its dense solver builds without optional extras; if it does not,
+  stop and log, with DAQP (small C dense active-set solver) as the fallback
+  to evaluate.
+- **KK-D14 — Dynamics stays out; TSID + Pinocchio own it (H7).** TSID
+  (stack-of-tasks) solves torques, accelerations and contact forces per
+  control tick on Pinocchio's rigid-body dynamics; that is humanoid H7 in
+  RobotKit's native runtime, not this kit. The kit keeps its task vocabulary
+  close to TSID's (`FrameTask` ~ SE3 equality task, `PostureTask` ~ joint
+  posture task) so a goal authored once can drive a kinematic solve or TSID.
+  Once Pinocchio is in the build, its FK and Jacobians become a test oracle
+  for the kit. Pinocchio does not replace the kit: the kit must run in Haxe
+  without native code (editor, CAD design mode) and handles CAD closures and
+  couplings.
 - **KK-D9 — Out of scope:** collision (a validator interface outside the
   kit), time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
@@ -294,7 +319,8 @@ Tests:
 Do:
 - `kinematicskit/native`: C ABI that takes a compiled model once, then per
   solve the state, task rows and limits; FK/Jacobian and one QP step
-  natively. OSQP first, behind a backend interface; Eigen as in MotionKit.
+  natively. ProxQP's dense backend first (KK-D13), behind a backend
+  interface; Eigen as in MotionKit.
   Vendoring follows the Ruckig/TOPP-RA rules (pinned submodule, audited file
   list, `THIRD_PARTY.md`); with no network, stop and log.
 - `KinematicsSolver` adapters in MotionKit use it for `solveDifferential`

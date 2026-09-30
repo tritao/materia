@@ -230,7 +230,14 @@ Do:
   from the simulator (Lane D rule).
 - Extend the Lane D QP with a floating base, contact constraints and a
   centre-of-mass task.
-- TSID-style inverse dynamics on ProxQP or OSQP.
+- Inverse dynamics with TSID (stack-of-tasks, on Pinocchio) and ProxQP, the
+  QP solver kinematicskit's K3 also uses (`kinematicskit/plans/KINEMATICS.md`
+  KK-D13/KK-D14). Build the Pinocchio model directly from `RobotModel` (as
+  the MJCF export does), not through URDF files. TSID and Pinocchio are
+  native dependencies of RobotKit's runtime: before vendoring, confirm
+  licences, pinned versions and the dependency set (Pinocchio has optional
+  Boost-based parts) and log the decision. Keep task definitions aligned
+  with kinematicskit's (SE3 ~ `FrameTask`, posture ~ `PostureTask`).
 
 First target: the policy balances the legs while the whole-body controller
 tracks a hand target.
