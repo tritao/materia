@@ -5,6 +5,9 @@ import app.MateriaProjectRunner.GeneratedAssemblyScene;
 import app.ProjectLoadJob;
 import app.Main.ReferenceEditorApp;
 import app.SetupScriptRegistry;
+import haxe.Json;
+import haxe.io.Path;
+import sys.io.File;
 import sys.FileSystem;
 
 enum ExampleKind {
@@ -55,6 +58,25 @@ class ExampleCatalog {
       kind: WorkerRackToTable}
   ];
 
+  /** Id of the entry built for a project named on the command line; it is not part of `entries`. */
+  public static final LAUNCH_PROJECT_ID:String = "launch-project";
+
+  /** A project named at launch, opened by the same background build as a Start page example. */
+  public static function launchEntry(projectPath:String):ExampleEntry {
+    return {id: LAUNCH_PROJECT_ID, title: projectTitle(projectPath), description: [], tag: "",
+      kind: Project(projectPath)};
+  }
+
+  /** The manifest's own name, or its folder name when the manifest cannot be read yet. */
+  static function projectTitle(projectPath:String):String {
+    try {
+      var name:Dynamic = Reflect.field(Json.parse(File.getContent(projectPath)), "name");
+      if (Std.isOfType(name, String) && StringTools.trim(name).length > 0) return name;
+    } catch (_:Dynamic) {}
+    var folder = Path.withoutDirectory(Path.directory(projectPath));
+    return folder.length > 0 ? folder : projectPath;
+  }
+
   /** Entries that can actually open on this machine. */
   public static function available():Array<ExampleEntry>
     return [for (entry in entries) if (isAvailable(entry)) entry];
@@ -104,7 +126,7 @@ class ExampleCatalog {
       generated.physical, generated.recipeDocument, generated.robotMotions);
     app.documentChanged();
     showModel(app);
-    app.log("Opened example: " + entry.title);
+    app.log((entry.id == LAUNCH_PROJECT_ID ? "Opened project: " : "Opened example: ") + entry.title);
   }
 
   /** Replaces the current document with the example, blocking until it is built (headless use). */

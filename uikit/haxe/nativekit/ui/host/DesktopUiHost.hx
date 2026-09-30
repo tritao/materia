@@ -45,7 +45,7 @@ class DesktopUiHost {
 		var frameHistory:Array<Dynamic> = [];
 		var eventCounts:Map<String, Int> = new Map();
 		var frameRequestCounts:Map<String, Int> = new Map();
-		var captureState = {startedAt: -1.0};
+		var captureState = {startedAt: -1.0, readyFrames: 0};
 		var frameGc = FrameGcScheduler.fromEnvironment();
 		var result = 0;
 		var step:Void->Bool = function() return false;
@@ -224,7 +224,10 @@ class DesktopUiHost {
 									var renderedApp = runtime.app();
 									nextCaretFrameAt = renderedApp != null
 										? renderedApp.context().textInput.takeCaretFrameAt() : -1.0;
-									if (options.captureSeconds > 0.0 && captureState.startedAt < 0.0 && runtime.rendered > 0)
+									var readyCheck = options.captureReady;
+									var captureReady = readyCheck == null || readyCheck();
+									if (captureReady) captureState.readyFrames++;
+									if (options.captureSeconds > 0.0 && captureState.startedAt < 0.0 && captureReady)
 										captureState.startedAt = frameStartedAt;
 									if (options.captureDirectory != null) {
 										var metrics = runtime.app() == null ? null : runtime.app().context().frameMetrics;
@@ -251,7 +254,8 @@ class DesktopUiHost {
 										});
 									}
 									if (session.state == UiHostLifecycle.Failed) active = false;
-									if (options.captureDirectory != null && options.frameLimit > 0 && runtime.rendered >= options.frameLimit) {
+									if (options.captureDirectory != null && options.frameLimit > 0 &&
+										captureState.readyFrames >= options.frameLimit) {
 										writeDiagnostics(options, cast runtime.app(), cast runtime.frameRenderer(), runtime,
 											eventHistory, frameHistory, eventCounts, frameRequestCounts);
 										session.stop();

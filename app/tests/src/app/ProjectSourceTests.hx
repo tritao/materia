@@ -1,6 +1,7 @@
 package app;
 
 import app.MateriaProjectRunner;
+import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
@@ -216,6 +217,39 @@ class ProjectSourceTests {
         'robot arm joint $joint follows its track: expected ${expected.get(joint)}, got $actual');
     }
     Sys.println('robot arm followed its motion track to within $worst rad after ${armSimulation.activeSession().simulationTime()} s');
+  }
+
+  /** A project named at launch builds in the background: queued at once, opened by tick(). */
+  static function checkBackgroundLaunch(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var editor = new ReferenceEditorApp();
+    check(!editor.openingProject() && editor.scene.items().length == 0, "an editor starts with an empty scene");
+    editor.openProjectInBackground(manifest);
+    check(editor.openingProject() && editor.scene.items().length == 0,
+      "a launch project is queued and nothing is built before the first frame");
+    check(editor.workspace.isOpen("start"), "the Start page shows the build's progress");
+    var deadline = Sys.time() + 600.0;
+    while (editor.openingProject() && Sys.time() < deadline) {
+      editor.tick();
+      Sys.sleep(0.01);
+    }
+    check(!editor.openingProject(), "the launch project finishes building");
+    check(editor.session.projectReference != null && editor.scene.items().length > 0,
+      "tick() opens the launch project once its build ends");
+    check(editor.session.robotMotions.length == 6, "the launch project brings its motion");
+    check(!editor.workspace.isOpen("start"), "the Start page closes once the launch project opens");
+    editor.dispose();
+    var missing = new ReferenceEditorApp();
+    missing.openProjectInBackground(FileSystem.fullPath(root) + "/no-such-project/materia.project.json");
+    var failedBy = Sys.time() + 60.0;
+    while (missing.openingProject() && Sys.time() < failedBy) {
+      missing.tick();
+      Sys.sleep(0.01);
+    }
+    check(!missing.openingProject() && missing.scene.items().length == 0,
+      "a launch project that cannot build ends the wait and leaves the empty scene");
+    check(missing.workspace.isOpen("start"), "a failed launch keeps the Start page open to explain");
+    missing.dispose();
   }
 
   public static function main():Int {
@@ -513,6 +547,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkBackgroundLaunch(root);
     return 0;
   }
 }
