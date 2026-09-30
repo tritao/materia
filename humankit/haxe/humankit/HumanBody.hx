@@ -15,6 +15,11 @@ class HumanBody {
 	final poles:Array<Null<Array<Float>>> = [null, null, null, null];
 	final heldPoints:Array<Null<Void->Array<Float>>> = [null, null, null, null];
 	var carrying:Array<HumanLimb> = [];
+	/** Seconds a hand takes to settle into the carry pose from wherever it was. */
+	static inline var CARRY_EASE_SECONDS:Float = 0.3;
+	/** Where each hand was when it began to carry, and how far it has settled (one when done). */
+	final carryFrom:Array<Null<Array<Float>>> = [null, null, null, null];
+	final carrySettled:Array<Float> = [1.0, 1.0, 1.0, 1.0];
 
 	public function new(character:HumanCharacter, ?walker:HumanWalker) {
 		this.character = character;
@@ -164,6 +169,12 @@ class HumanBody {
 
 	public function setCarry(hands:Array<HumanLimb>):Void {
 		for (hand in carrying) if (hands.indexOf(hand) < 0) clearReach(hand);
+		for (hand in hands) if (carrying.indexOf(hand) < 0) {
+			// A hand takes up the carry pose from where it is, not by jumping there.
+			var wrist = character.pose.bonePosition(hand == ArmL ? HandL : HandR);
+			carryFrom[hand] = wrist == null ? null : wrist.copy();
+			carrySettled[hand] = wrist == null ? 1.0 : 0.0;
+		}
 		carrying = hands.copy();
 		for (hand in hands) clearReach(hand);
 	}
@@ -203,6 +214,7 @@ class HumanBody {
 
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
+		for (hand in carrying) carrySettled[hand] = Math.min(1.0, carrySettled[hand] + seconds / CARRY_EASE_SECONDS);
 		walker.advance(seconds);
 		evaluate();
 	}
@@ -217,7 +229,13 @@ class HumanBody {
 					weights[index], poles[index]);
 				changed = true;
 			} else if (isCarrying(limb)) {
-				character.reach(limb, carryTargetModel(limb));
+				var target = carryTargetModel(limb);
+				var settled = carrySettled[index], from = carryFrom[index];
+				if (settled < 1.0 && from != null) {
+					var ease = settled * settled * (3.0 - 2.0 * settled);
+					target = [for (axis in 0...3) from[axis] + (target[axis] - from[axis]) * ease];
+				}
+				character.reach(limb, target);
 				changed = true;
 			}
 		}

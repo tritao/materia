@@ -648,6 +648,7 @@ class HumanKitTests {
 			.add(new Wait(0.05))
 			.add(new PlayClip("wave", 0.1));
 		var approached = false, picked = false, carried = false, advanced = false, fullSpeed = false;
+		var carriedSteps = 0;
 		var step = 1.0 / 60.0;
 		for (_ in 0...900) {
 			var before = body.rootTransform()[12];
@@ -676,7 +677,9 @@ class HumanKitTests {
 				if (distance(palm, pickPoint) > 0.02 || pick.pickError > 0.02)
 					throw 'The pick palm missed its world target: $palm vs $pickPoint (${pick.pickError})';
 			}
-			if (body.isCarrying(ArmR) && body.walker.isWalking()) {
+			carriedSteps = body.isCarrying(ArmR) ? carriedSteps + 1 : 0;
+			// The hand eases into the carry pose over a third of a second, then holds it.
+			if (body.isCarrying(ArmR) && body.walker.isWalking() && carriedSteps > 25) {
 				carried = true;
 				var hand = human.pose.bonePosition(HumanBone.HandR);
 				if (distance(hand, body.carryTargetModel(ArmR)) > 0.03)
@@ -691,7 +694,8 @@ class HumanKitTests {
 			job.failure() != null || body.grip)
 			throw 'The action job did not finish physically: approach=$approached pick=$picked carry=$carried walk=$advanced failure=${job.failure()}';
 		body.setCarry([ArmL, ArmR]);
-		body.advance(0.0);
+		// Both hands ease into the carry pose, then hold it.
+		for (_ in 0...30) body.advance(step);
 		for (hand in [ArmL, ArmR]) {
 			var bone = hand == ArmL ? HumanBone.HandL : HumanBone.HandR;
 			if (distance(human.pose.bonePosition(bone), body.carryTargetModel(hand)) > 0.03)
