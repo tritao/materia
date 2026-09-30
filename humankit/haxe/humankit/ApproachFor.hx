@@ -15,6 +15,12 @@ class ApproachFor extends HumanActionBase {
 	public final limb:HumanLimb;
 	public final speed:Float;
 	public final bothHands:Bool;
+	/**
+	 * How far short of the surface's edge the belly ends, in metres, once the lean and the stretch are spent:
+	 * zero when the stance clears it. A surface low or deep enough to need a crouch leaves this above zero,
+	 * since the worker does not crouch; the job still runs, with the belly over the edge by about this much.
+	 */
+	public var shortfall(default, null):Float = 0.0;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
 	final targetProvider:Null<Void->Array<Float>>;
@@ -82,6 +88,7 @@ class ApproachFor extends HumanActionBase {
 					var aheadMost = Math.sqrt(farthest * farthest - rise * rise);
 					standDistance += Math.min(required - standDistance, Math.max(0.0, aheadMost - ahead));
 				}
+				shortfall = Math.max(0.0, required - standDistance);
 			}
 		}
 		worker.setLean(lean);

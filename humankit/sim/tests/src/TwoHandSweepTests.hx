@@ -7,8 +7,6 @@
  */
 class TwoHandSweepTests {
     static var surfaces:Array<Float> = [1.0, 1.06, 1.16];
-    /** The deepest the belly may stand inside a surface at a metre, where the reach needs a crouch; measured 0.17. */
-    static inline var LOW_CLEARANCE = -0.20;
     static var yaws:Array<Float> = [0.0, 0.7, -1.1];
 
     public static function run():Void {
@@ -35,9 +33,14 @@ class TwoHandSweepTests {
             // crouching. That is held to completing, placing the part, moving without spikes, and not
             // standing deeper in the edge than the measured 17 cm.
             var lowest = surface <= 1.0;
+            // The planner knows which layouts need that crouch, so the belly's depth is not the only witness. Its estimate
+            // is of the stance, not the moving body: a couple of centimetres at 1.06 m that the belly then clears.
+            var shortfall = worker.approachShortfall();
+            if (lowest != (shortfall > 0.05))
+                failures.push('$label: the approach fell ${Math.round(shortfall * 100) / 100} m short, where ${lowest ? "a crouch is needed" : "the stance should clear the edge"}');
             gate.check(label, failures, !lowest);
-            if (lowest && gate.clearance < LOW_CLEARANCE)
-                failures.push('$label: the belly stood ${Math.round(-gate.clearance * 100) / 100} m inside a surface, beyond the ${-LOW_CLEARANCE} m measured for a reach that needs a crouch');
+            if (lowest && gate.clearance < JobGate.CROUCH_CLEARANCE)
+                failures.push('$label: the belly stood ${Math.round(-gate.clearance * 100) / 100} m inside a surface, beyond the ${-JobGate.CROUCH_CLEARANCE} m measured for a reach that needs a crouch');
             var worst = gate.worst();
             report.push('$label clearance ${Math.round(gate.clearance * 100) / 100} lean ${Math.round(gate.lean * 100) / 100} turn ${Math.round(worst.turn * 100) / 100} speed ${Math.round(worst.speed * 100) / 100}');
             runs++;

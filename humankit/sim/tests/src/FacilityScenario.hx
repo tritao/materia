@@ -57,11 +57,8 @@ class FacilityScenario {
 
     public function limb():HumanLimb return ArmR;
 
-    /**
-     * How the job learns what the worker stands at and picks up: "model", the facility describes its own
-     * surfaces and slot items; "explicit", the caller hands them to the job; "none", nothing is described.
-     */
-    public static function build(layout:FacilityLayout, describe:String = "model"):FacilityScenario {
+    /** `describe` says how the job learns what the worker stands at and picks up. */
+    public static function build(layout:FacilityLayout, describe:FacilityDescription = Modelled):FacilityScenario {
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var scene = Scene.create();
         var world = MujocoSimWorld.create(scene, {timestep: 1.0 / 60.0, physicsSubsteps: 4, gravity: [0.0, 0.0, -9.81]});
@@ -77,7 +74,7 @@ class FacilityScenario {
         var last = layout.via.length == 0 ? [0.9, -0.2] : layout.via[layout.via.length - 1];
         var leg = [station[0] - last[0], station[1] - last[1]], legLength = Math.sqrt(leg[0] * leg[0] + leg[1] * leg[1]);
         var stand = [station[0] - 0.65 * leg[0] / legLength, station[1] - 0.65 * leg[1] / legLength];
-        var modelled = describe == "model";
+        var modelled = describe == Modelled;
         var facility = new Facility("sweep", "Sweep");
         facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
         var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(0.9, -0.2),
@@ -104,8 +101,8 @@ class FacilityScenario {
         var partBox:HumanTargetBox = {center: slotPoint, halfExtents: [0.04, 0.04, 0.04], yaw: 0.0};
         var fetch = FacilityJobs.fetch(facility, "rack", "part");
         // A facility that describes its surface and item lets the job find where to set the part down itself.
-        var job = describe == "explicit" ? fetch.deliver("table", placePoint, surfaces[0], surfaces[1], partBox) :
-            describe == "model" ? fetch.deliver("table") : fetch.deliver("table", placePoint);
+        var job = describe == Explicit ? fetch.deliver("table", placePoint, surfaces[0], surfaces[1], partBox) :
+            describe == Modelled ? fetch.deliver("table") : fetch.deliver("table", placePoint);
         var actions = job.orderedActions();
         worker.bindPick(cast actions[1], part, slotPoint);
         worker.bindPlace(cast actions[4], part, slotPoint);

@@ -2,11 +2,15 @@ package humankit;
 
 /**
  * Every tuning number behind how a worker holds and moves its body, in one place. The values are in
- * metres and radians, tuned on the bundled 1.7 m worker rig; build a body with a modified copy to
- * change how it carries itself. Nothing here is a fact about a rig's bones, which HumanKit reads from
+ * metres and radians, tuned on the bundled worker rig (`REFERENCE_STATURE` tall); a body built without a
+ * posture scales the lengths to its own stature (`forStature`), and one built with a modified copy carries
+ * itself as that copy says. Nothing here is a fact about a rig's bones, which HumanKit reads from
  * the skeleton or measures instead.
  */
 class HumanPosture {
+	/** The height of the bundled worker rig the lengths below were tuned on, as its bounds measure it, in metres. */
+	public static inline var REFERENCE_STATURE = 1.834;
+
 	// Reaching.
 
 	/** The fraction of arm length (shoulder to wrist) a standing reach uses; the palm adds no reliable length. */
@@ -80,4 +84,24 @@ class HumanPosture {
 	/** The tuning the bundled worker rig was set up with. */
 	public static function standard():HumanPosture
 		return new HumanPosture();
+
+	/**
+	 * The tuning for a body of `stature` metres: every length, and the speed the wrist may go at, grows with
+	 * the body. Angles, fractions of the arm's length, curls and times do not depend on size and are kept.
+	 * `edgeGap` is also kept: it is the clearance left to a surface, which is not a matter of the worker's size.
+	 */
+	public static function forStature(stature:Float):HumanPosture {
+		if (!(stature > 0.0)) throw "A posture needs a positive stature";
+		var posture = new HumanPosture(), k = stature / REFERENCE_STATURE;
+		posture.handSpread *= k;
+		posture.carryOffset = [for (value in posture.carryOffset) value * k];
+		posture.hangForward *= k;
+		posture.hangOutward *= k;
+		posture.bellyFront *= k;
+		posture.blendSpeed *= k;
+		posture.withdraw *= k;
+		posture.lift *= k;
+		posture.minAhead *= k;
+		return posture;
+	}
 }

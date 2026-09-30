@@ -33,8 +33,8 @@ class HumanBody {
 		this.walker = walker == null ? new HumanWalker(character) : walker;
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
-		this.posture = posture == null ? HumanPosture.standard() : posture;
 		description = HumanDescription.measure(character.pose, character.height());
+		this.posture = posture == null ? HumanPosture.forStature(description.stature) : posture;
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
 		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis]) {

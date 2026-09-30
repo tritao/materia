@@ -34,7 +34,7 @@ it through `HumanBody`. Do not call the character's IK from an action.
 ## Tuning lives in one place
 
 Every number that shapes how a worker holds itself is a field of `HumanPosture`, in metres and radians,
-tuned on the bundled 1.7 m rig: reach comfort, carry offset, finger curls, lean limits, hang target,
+tuned on the bundled rig (see `REFERENCE_STATURE`): reach comfort, carry offset, finger curls, lean limits, hang target,
 belly depth, withdrawal. Build a `HumanBody` with a modified posture to change it. What a rig's bones
 are (which joint curls the fingers, where the spine pitches) is not tuning: it is read from the skeleton
 or measured, as `HumanBody.leanFor` measures how far a lean moves the shoulder.
@@ -104,8 +104,10 @@ to go wrong that the rack job does not exercise.
 - **Low surfaces.** At about a metre or lower the lean reaches its limit before the belly clears the
   surface's edge, leaving it 3 to 4 cm inside for either hand. Reaching that low needs a crouch, which
   the body does not do. The layout sweep (`ScenarioSweepTests`) records this as its `CAPPED_CLEARANCE`.
-- **Tuning is for one rig.** `HumanPosture` is in metres, tuned on the bundled 1.7 m worker; it is not
-  scaled to other statures. The finger-curl axis and the spine shares are checked on that rig only.
+- **Tuning is checked on one rig.** `HumanPosture` is in metres, tuned on the bundled worker
+  (`REFERENCE_STATURE`); a body built without a posture scales its lengths by its stature
+  (`HumanPosture.forStature`), but only the bundled rig is swept. The finger-curl axis and the spine
+  shares are checked on that rig only.
 - **Grips measure one dimension.** The fingers close to the object's depth along the palm's normal and no
   more: they do not wrap a cylinder or a handle differently, the thumb simply follows the index finger,
   and the fingertips reach only about 7 cm from the palm, so a larger object closes the hand as far as it

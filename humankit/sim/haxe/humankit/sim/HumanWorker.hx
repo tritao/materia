@@ -1,5 +1,6 @@
 package humankit.sim;
 
+import humankit.ApproachFor;
 import humankit.HumanBody;
 import humankit.HumanAction;
 import humankit.HumanBodyProxy;
@@ -212,6 +213,21 @@ class HumanWorker {
 
 	public function currentJobFailure():Null<String>
 		return job == null ? null : job.failure();
+
+	/**
+	 * The most any approach in the current job fell short of standing clear of its surface, in metres: above
+	 * zero where the reach needs a crouch the body does not do. See `ApproachFor.shortfall`.
+	 */
+	public function approachShortfall():Float {
+		var worst = 0.0;
+		if (job != null) for (action in job.orderedActions()) {
+			if (Std.isOfType(action, ApproachFor)) {
+				var approach:ApproachFor = cast action;
+				worst = Math.max(worst, approach.shortfall);
+			}
+		}
+		return worst;
+	}
 
 	/** Zero-based document step currently running, or null for an empty or finished job. */
 	public function currentStep():Null<Int> {

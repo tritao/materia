@@ -19,6 +19,8 @@ class JobGate {
      */
     public static inline var CLEARANCE = -0.01;
     public static inline var CAPPED_CLEARANCE = -0.05;
+    /** The same for two hands at a metre, where the reach needs a crouch and the belly was measured 0.17 m inside. */
+    public static inline var CROUCH_CLEARANCE = -0.20;
     static inline var BELLY_FRONT = 0.12;
 
     public final quality:MotionQuality = new MotionQuality();
