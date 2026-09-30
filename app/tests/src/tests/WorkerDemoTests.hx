@@ -108,6 +108,7 @@ class WorkerDemoTests {
         !Math.isFinite(minSeparation) || linkTravel < 0.1 || maxSeparation-minSeparation < 0.1)
       throw 'Worker safety stream is incomplete: rack=$sawRack left=$leftRack table=$sawTable count=$separationCount linkTravel=$linkTravel range=${maxSeparation-minSeparation}';
     Sys.println('worker document placement: horizontal=$horizontal vertical=$vertical speed=$restingSpeed');
+    resetMidJob();
     stalledRealtime();
     var roundTrip = "build/worker-demo-motion-roundtrip.materia";
     editor.session.save(roundTrip);
@@ -221,6 +222,68 @@ class WorkerDemoTests {
         Math.abs(2 * Math.atan2(rotation[2], rotation[3]) - 0.4) > 1e-6)
       throw "Migrated worker retained legacy roll or lost yaw";
     clash.dispose();
+  }
+
+  /**
+   * Resetting in the middle of a job puts the worker, its drawn character and the
+   * part back at the start, and the job then runs to the same end as a fresh one.
+   */
+  static function resetMidJob():Void {
+    var editor = new ReferenceEditorApp();
+    editor.enableWorkerDemo();
+    var worker = editor.simulation.humanWorker("worker-demo");
+    var part = editor.simulation.environmentObject("worker-demo-part");
+    var session = editor.simulation.activeSession();
+    if (worker == null || part == null || session == null) throw "Reset demo is missing its worker or part";
+    var free = session.objectCarrier(part);
+    var partPose = function() return [for (item in editor.simulation.environmentVisualState())
+      if (item.id == "worker-demo-part") item.position][0];
+    var start = partPose();
+    var heldFor = 0, ticks = 0;
+    while (heldFor < 30 && ticks < 1800) {
+      editor.simulation.step();
+      ticks++;
+      if (session.objectCarrier(part) != free) heldFor++;
+    }
+    if (heldFor < 30) throw "The worker never picked the part up before the reset";
+    var away = worker.body.rootTransform();
+    if (Math.abs(away[12]) + Math.abs(away[13]) < 0.1) throw "The worker had not moved before the reset";
+
+    if (!editor.simulation.reset()) throw "Reset failed";
+    var root = worker.body.rootTransform();
+    if (Math.abs(root[12]) > 1e-9 || Math.abs(root[13]) > 1e-9)
+      throw 'Reset left the worker at ${root[12]}, ${root[13]}';
+    if (worker.currentJobDone() || worker.currentStep() != 0) throw "Reset did not restart the worker's job";
+    if (distance(partPose(), start) > 1e-6) throw "Reset did not return the part to the rack";
+    // The character drawn in the scene follows the worker, not the state it had before the reset.
+    var snapshot = editor.scene.runtimeContentScene().snapshot();
+    var drawn = snapshot.findNode(worker.body.character.root);
+    if (drawn == null) throw "The drawn worker is missing after a reset";
+    var drawnX = drawn.worldTransform().element(12), drawnY = drawn.worldTransform().element(13);
+    snapshot.dispose();
+    if (Math.abs(drawnX - root[12]) > 1e-6 || Math.abs(drawnY - root[13]) > 1e-6)
+      throw 'The drawn worker stayed at $drawnX, $drawnY after a reset';
+
+    for (tick in 0...1800) {
+      editor.simulation.step();
+      if (worker.currentJobDone() && tick > 900) break;
+    }
+    var settled:Null<Array<Float>> = null, speed = Math.POSITIVE_INFINITY;
+    for (tick in 0...450) {
+      editor.simulation.step();
+      var now = partPose();
+      if (settled != null) speed = distance(now, settled) / editor.simulation.timestep;
+      settled = now;
+      if (tick >= 90 && speed < 0.001) break;
+    }
+    var table = [for (item in editor.scene.records()) if (item.id == "worker-demo-table") item][0];
+    var record = [for (item in editor.scene.records()) if (item.id == "worker-demo-part") item][0];
+    var horizontal = Math.sqrt(Math.pow(settled[0] - (table.x + 0.1), 2) + Math.pow(settled[1] - (table.y - 0.05), 2));
+    var vertical = Math.abs(settled[2] - (table.z + table.depth / 2 + record.depth / 2));
+    if (!worker.currentJobDone() || worker.currentJobFailure() != null || horizontal > 0.02 || vertical > 0.01)
+      throw 'The job after a reset missed the table: failure=${worker.currentJobFailure()} horizontal=$horizontal vertical=$vertical';
+    Sys.println('reset mid-job: worker, drawn character and part returned; rerun placed the part horizontal=$horizontal vertical=$vertical');
+    editor.dispose();
   }
 
   /**

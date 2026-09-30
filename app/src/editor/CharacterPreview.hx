@@ -154,6 +154,18 @@ class CharacterPreview implements SessionParticipant {
 		lastTime = -1.0;
 	}
 
+	/** The session rewound to its start: walk again from there. */
+	public function reset():Void {
+		angle = 0.0;
+		simulationTime = 0.0;
+		startWalk();
+	}
+
+	/** The preview drives itself from the editor's loop, through advance(). */
+	public function feed():Void {}
+
+	public function present():Void {}
+
 	/**
 	 * Advances the animation, by simulation time while a session is active and
 	 * by wall-clock time otherwise, and publishes it into scene.
@@ -164,13 +176,7 @@ class CharacterPreview implements SessionParticipant {
 		var active = session;
 		if (active != null) {
 			var target = active.simulationTime() + LEAD_TICKS * active.fixedTimestep();
-			// A reset rewinds simulation time: walk again from the start.
-			if (target < simulationTime) {
-				angle = 0.0;
-				simulationTime = 0.0;
-				startWalk();
-			}
-			elapsed = target - simulationTime;
+			elapsed = Math.max(0.0, target - simulationTime);
 			simulationTime = target;
 		} else {
 			var now = Sys.time();
