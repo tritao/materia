@@ -303,6 +303,34 @@ ak_result ak_instance_set_ik(ak_instance_handle handle, uint32_t chain, const ak
     return AK_OK;
 }
 
+ak_result ak_instance_set_joint_rotation(ak_instance_handle handle, int32_t joint, float x, float y, float z,
+                                         float w, float weight) {
+    const auto instance = instances().find(handle.id);
+    if (!instance) return AK_ERROR_INVALID_HANDLE;
+    if (joint < 0 || joint >= instance->asset().skeleton->num_joints()) return AK_ERROR_INVALID_ARGUMENT;
+    if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || !std::isfinite(w) || !std::isfinite(weight))
+        return AK_ERROR_INVALID_ARGUMENT;
+    auto &turns = instance->joint_rotations;
+    const auto existing = std::find_if(turns.begin(), turns.end(),
+                                       [joint](const animkit::JointRotation &turn) { return turn.joint == joint; });
+    if (!(weight > 0.0f)) {
+        if (existing != turns.end()) turns.erase(existing);
+        return AK_OK;
+    }
+    const float length = std::sqrt(x * x + y * y + z * z + w * w);
+    if (!(length > 1e-6f)) return AK_ERROR_INVALID_ARGUMENT;
+    animkit::JointRotation turn;
+    turn.joint = joint;
+    turn.rotation[0] = x / length;
+    turn.rotation[1] = y / length;
+    turn.rotation[2] = z / length;
+    turn.rotation[3] = w / length;
+    turn.weight = std::min(weight, 1.0f);
+    if (existing != turns.end()) *existing = turn;
+    else turns.push_back(turn);
+    return AK_OK;
+}
+
 ak_result ak_instance_evaluate(ak_instance_handle handle) {
     const auto instance = instances().find(handle.id);
     if (!instance) return AK_ERROR_INVALID_HANDLE;

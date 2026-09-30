@@ -1,5 +1,6 @@
 #include "animkit.h"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -359,6 +360,37 @@ int main() {
     ik.soften = 0.0f;
     CHECK(ak_instance_set_ik(instance, 0, &ik) == AK_ERROR_INVALID_ARGUMENT);
     CHECK(ak_instance_set_ik(instance, 0, nullptr) == AK_OK);
+
+    // A joint turn rides on the animated pose and carries the joint's descendants; weight 0 removes it.
+    {
+        auto jointOrigin = [&](int32_t joint) {
+            uint32_t bytes = 0;
+            CHECK(ak_instance_read_joint_matrices(instance, nullptr, &bytes) == AK_OK);
+            std::vector<float> matrices(bytes / sizeof(float));
+            CHECK(ak_instance_read_joint_matrices(instance, reinterpret_cast<uint8_t *>(matrices.data()), &bytes)
+                == AK_OK);
+            return std::array<float, 3>{matrices[joint * 16 + 12], matrices[joint * 16 + 13], matrices[joint * 16 + 14]};
+        };
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto before = jointOrigin(prop);
+        const float quarter = std::sqrt(0.5f);
+        CHECK(ak_instance_set_joint_rotation(instance, bone, 0.0f, quarter, 0.0f, quarter, 1.0f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto turned = jointOrigin(prop);
+        CHECK(!near(turned[0], before[0]) || !near(turned[1], before[1]) || !near(turned[2], before[2]));
+        // Half weight lands between none and all of the turn.
+        CHECK(ak_instance_set_joint_rotation(instance, bone, 0.0f, quarter, 0.0f, quarter, 0.5f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto half = jointOrigin(prop);
+        CHECK(!near(half[0], turned[0]) || !near(half[2], turned[2]));
+        CHECK(ak_instance_set_joint_rotation(instance, bone, 0.0f, quarter, 0.0f, quarter, 0.0f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto restored = jointOrigin(prop);
+        CHECK(near(restored[0], before[0]) && near(restored[1], before[1]) && near(restored[2], before[2]));
+        CHECK(ak_instance_set_joint_rotation(instance, -1, 0, 0, 0, 1, 1) == AK_ERROR_INVALID_ARGUMENT);
+        CHECK(ak_instance_set_joint_rotation(instance, 999, 0, 0, 0, 1, 1) == AK_ERROR_INVALID_ARGUMENT);
+        CHECK(ak_instance_set_joint_rotation(instance, bone, 0, 0, 0, 0, 1) == AK_ERROR_INVALID_ARGUMENT);
+    }
 
     CHECK(ak_instance_set_layer(instance, AK_MAX_LAYERS, 0, 0, 1, 0) == AK_ERROR_INVALID_ARGUMENT);
     CHECK(ak_instance_set_layer(instance, 0, 7, 0, 1, 0) == AK_ERROR_INVALID_ARGUMENT);

@@ -55,6 +55,20 @@ class AnimationInstance {
 		AnimationAsset.check(AnimKitNative.ak_instance_set_ik(handle(), chain, ik), "instance.ik");
 	}
 
+	/**
+	 * Turns a joint by rotation ([x, y, z, w], about its own local axes) on top of its animated pose and
+	 * before inverse kinematics, so its children turn with it: fingers curl, a spine leans. Weight blends
+	 * from no turn (0, which removes it) to all of it (1). The turn stays until it is removed.
+	 */
+	public function setJointRotation(joint:Int, rotation:Array<Float>, weight:Float = 1.0):Void
+		AnimationAsset.check(AnimKitNative.ak_instance_set_joint_rotation(handle(), joint, rotation[0], rotation[1],
+			rotation[2], rotation[3], weight), "instance.jointRotation");
+
+	/** Removes the turn from a joint. */
+	public function clearJointRotation(joint:Int):Void
+		AnimationAsset.check(AnimKitNative.ak_instance_set_joint_rotation(handle(), joint, 0.0, 0.0, 0.0, 1.0, 0.0),
+			"instance.jointRotation");
+
 	/** Disables one inverse kinematics chain. */
 	public function clearIk(chain:Int):Void
 		AnimationAsset.check(AnimKitNative.ak_instance_set_ik(handle(), chain, null), "instance.ik");
