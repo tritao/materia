@@ -17,8 +17,11 @@ import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
 import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
 import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
 import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.robotics.ArmJoint;
+import machinekit.robotics.ArmLink;
 import machinekit.robotics.FrameBar;
 import machinekit.robotics.ParallelGripper;
+import machinekit.robotics.RobotFlange;
 import machinekit.robotics.ToolChangerMaster;
 import machinekit.robotics.ToolChangerTool;
 import machinekit.robotics.schmalz.SchmalzSxtMaster;
@@ -125,6 +128,15 @@ class MachineKitAdditionalRecipes {
 			v -> new SchmalzVacuumHose(v.token("stock"), route(v.token("route"))), true, false, ["route"]),
 		new ComponentType("machinekit.robotics.frame-bar", [n("width", 20), n("depth", 20), n("length", 100)],
 			v -> new FrameBar(v.number("width"), v.number("depth"), v.number("length")), true),
+		new ComponentType("machinekit.robotics.arm-joint", [n("diameter", 100), n("length", 70), n("flangePitchCircle", 0)],
+			v -> new ArmJoint(v.number("diameter"), v.number("length"),
+				v.number("flangePitchCircle") > 0 ? new RobotFlange(v.number("flangePitchCircle")) : null), true),
+		new ComponentType("machinekit.robotics.arm-link", [n("length", 300), n("diameter", 80), n("wall", 5),
+			n("collarDiameter", 100), c("startAxis", ["+X", "-X", "+Z"], "+Z"), c("endAxis", ["+X", "-X", "+Z"], "+Z"),
+			n("endJointLength", 0)],
+			v -> new ArmLink(v.number("length"), v.number("diameter"), v.number("wall"), v.number("collarDiameter"),
+				ArmLink.axisFromToken(v.token("startAxis")), ArmLink.axisFromToken(v.token("endAxis")),
+				v.number("endJointLength")), true),
 		new ComponentType("machinekit.robotics.parallel-gripper", [n("width", 40), n("depth", 20),
 			n("length", 60), n("stroke", 30)],
 			v -> new ParallelGripper(v.number("width"), v.number("depth"), v.number("length"), v.number("stroke")), true),

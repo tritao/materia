@@ -1,118 +1,19 @@
-import cadkit.modeling.Part;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
-import machinekit.component.ComponentDetail;
-import machinekit.component.Dimension;
-import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
 import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
 import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
 import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
 import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.robotics.ArmJoint;
+import machinekit.robotics.ArmLink;
+import machinekit.robotics.ArmLink.ArmAxis;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorPlate;
 import machinekit.robotics.FrameBar;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
 import materia.assembly.AssemblyFrames;
-
-/** Direction of a joint axis, in the frame of the link that carries the joint. */
-enum ArmAxis {
-	PlusX;
-	MinusX;
-	PlusZ;
-}
-
-/** Joint module: a cylindrical housing along local +Z with a fixed `stator` face at z=0 and the
- * rotating output `rotor` face at z=length. The housing belongs to the link before the joint;
- * the next link mates its `start` connector to `rotor` on a revolute joint.
- *
- * A module given a `flange` is the last joint of the arm. Its output carries the `RobotFlange`
- * plate against the housing end, so it has a `tool` connector at the flange's mounting face
- * instead of `rotor`: mate the flange's `face` to it, and a tool mates to the flange's pilot boss.
- */
-class ArmJoint extends MachineComponent {
-	public final diameter:Float;
-	public final length:Float;
-	public final flange:Null<RobotFlange>;
-
-	public function new(diameter:Float, length:Float, ?flange:RobotFlange) {
-		if (!(diameter > 0) || !(length > 0)) throw "Arm joint needs a positive diameter and length";
-		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
-		super(flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}',
-			'Arm joint module, $text mm', "steel 12.9");
-		this.diameter = diameter;
-		this.length = length;
-		this.flange = flange;
-		addConnector("stator", Mount, Solids.axial(0, 0, 0));
-		if (flange == null) {
-			addConnector("rotor", Mount, Solids.axial(0, 0, length));
-		} else {
-			if (!(diameter >= flange.flangeDiameter + 2)) throw "Arm joint is too narrow for its tool flange";
-			addConnector("tool", Mount, flange.pinAlignedFrame(length + flange.thickness));
-		}
-	}
-
-	override public function hasGeometry():Bool return true;
-
-	override public function geometry(detail:ComponentDetail = Preview):Part
-		return Part.cylinderSpan(diameter / 2, 0, length);
-}
-
-/** Hollow tube link along local +Z, closed at both ends, with a collar where it meets the
- * previous joint. Its `start` connector sits at the origin with the joint axis given by
- * `startAxis`; its `end` connector carries the next joint module, whose axis is `endAxis`. A
- * lateral end joint is centred on the tube's end point, so `end` is offset by half the module
- * length against the axis direction.
- */
-class ArmLink extends MachineComponent {
-	public final length:Float;
-	public final diameter:Float;
-	public final wall:Float;
-	public final collarDiameter:Float;
-	public final startAxis:ArmAxis;
-	public final endAxis:ArmAxis;
-
-	static inline var COLLAR_THICKNESS:Float = 6;
-
-	public function new(length:Float, diameter:Float, wall:Float, collarDiameter:Float, startAxis:ArmAxis,
-			endAxis:ArmAxis, endJointLength:Float) {
-		if (!(length > 2 * wall) || !(diameter > 2 * wall) || !(wall > 0))
-			throw "Arm link needs a wall thinner than its radius and length";
-		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
-		super('ARM-LINK-D$text-W${Dimension.format(wall)}', 'Arm link tube, $text mm', "aluminium 6061");
-		this.length = length;
-		this.diameter = diameter;
-		this.wall = wall;
-		this.collarDiameter = collarDiameter;
-		this.startAxis = startAxis;
-		this.endAxis = endAxis;
-		var start = direction(startAxis);
-		addConnector("start", Mount, AssemblyFrames.alongY(0, 0, 0, start.x, start.y, start.z));
-		var end = direction(endAxis);
-		var offset = endAxis == PlusZ ? 0 : endJointLength / 2;
-		addConnector("end", Mount, AssemblyFrames.alongY(-offset * end.x, -offset * end.y,
-			length - offset * end.z, end.x, end.y, end.z));
-	}
-
-	public static function direction(axis:ArmAxis):{x:Float, y:Float, z:Float}
-		return switch axis {
-			case PlusX: {x: 1, y: 0, z: 0};
-			case MinusX: {x: -1, y: 0, z: 0};
-			case PlusZ: {x: 0, y: 0, z: 1};
-		};
-
-	override public function hasGeometry():Bool return true;
-
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var start = direction(startAxis);
-		var collar = Part.cylinderAlong(collarDiameter / 2, new Vector(0, 0, 0),
-			new Vector(start.x, start.y, start.z), COLLAR_THICKNESS);
-		var body = Solids.union([Part.cylinderSpan(diameter / 2, 0, length), collar]);
-		if (detail == Envelope) return body;
-		return Solids.cut(body, [Part.cylinderSpan(diameter / 2 - wall, wall, length - wall)]);
-	}
-}
 
 /** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
  * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`.

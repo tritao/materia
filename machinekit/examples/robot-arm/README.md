@@ -32,6 +32,22 @@ layout:
 At zero on every joint the arm points straight up; the saved pose is a ready
 pose with the tool pointing down.
 
+Every housing belongs to the link before it, so each revolute mate joins a
+housing's `rotor` to the next link's `start`. Joint limits, speeds and torques
+come from `RobotArm.specs`. Housings are steel and links are aluminium, so the
+simulation gets a realistic mass distribution (about 20 kg above the base).
+
+`ArmJoint` and `ArmLink` are MachineKit library parts (`machinekit.robotics`) with editable
+recipes, so a different arm is a matter of parameters:
+
+- `ArmJoint` is a cylindrical joint module. Its `stator` face is fixed to the
+  link before it and its `rotor` face carries the next link. The last module
+  takes a `RobotFlange` (by ISO 9409-1 pitch circle) instead and carries it
+  against the housing end, pilot boss outward, ready for a tool plate.
+- `ArmLink` is a hollow tube closed at both ends, with a collar where it meets
+  the previous joint. Its `start` and `end` connectors point along the joint
+  axes given by `ArmAxis`; a lateral end joint is centred on the tube's end.
+
 ## Suction tool
 
 `ArmSuctionTool` builds an `EndEffector` in the style of `examples/eoat`: an
@@ -40,22 +56,6 @@ Schmalz ejector, SAF 40 cup, push-in fitting and hose. The arm includes it as
 `tool/...` and mates its plate to the flange's pilot boss. The assembly exposes
 the cup's `toolContact` connector and the ejector's `compressedAir` inlet. The
 tool is geometry and ports only: nothing here simulates vacuum or grips a part.
-
-Two generators live beside the assembly, because they only make sense for this
-arm so far:
-
-- `ArmJoint` is a cylindrical joint module. Its `stator` face is fixed to the
-  link before it and its `rotor` face carries the next link. The last module
-  takes a `RobotFlange` instead and carries it against the housing end, pilot
-  boss outward, ready for a tool plate.
-- `ArmLink` is a hollow tube closed at both ends, with a collar where it meets
-  the previous joint. Its `start` and `end` connectors point along the joint
-  axes given by `ArmAxis`; a lateral end joint is centred on the tube's end.
-
-Every housing belongs to the link before it, so each revolute mate joins a
-housing's `rotor` to the next link's `start`. Joint limits, speeds and torques
-come from `RobotArm.specs`. Housings are steel and links are aluminium, so the
-simulation gets a realistic mass distribution (about 20 kg above the base).
 
 ## Motion
 
