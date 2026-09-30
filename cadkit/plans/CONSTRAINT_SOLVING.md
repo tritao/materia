@@ -567,3 +567,15 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
 - The invariance suite's `KNOWN` list is now empty.
 - Not done here: the inspector does not show the report yet (the API
   carries it); the assembly witness check is C3.3.
+
+### C3.3 — Witness pose for closure solves (2026-10-01)
+
+- After a converged solve whose diagnosis has a dependency, the driven
+  coordinates move by ±1e-3 (radians, or that share of the assembly size),
+  the loops close again from there, and the first side that closes is
+  diagnosed (a toggle is often a limit, so one side may not close). More rank
+  there means the dependency belongs to the pose: its report replaces the
+  local one and `AssemblyLoopSolveResult.degenerate` is set. Without driven
+  joints there is nothing to nudge and the check is skipped.
+- A four-bar authored exactly at its toggle reports `degenerate` with the
+  general diagnosis `redundant(pin)-3`; an ordinary pose is not flagged.

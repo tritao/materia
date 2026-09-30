@@ -41,10 +41,15 @@ class AssemblyLoopSolveResult {
 		design) groups.
 	*/
 	public final report:Null<DiagnosisReport>;
+	/**
+		The closures' dependency belongs to the solved pose only (a linkage at a toggle): at a nearby pose reached
+		by nudging the driven joints, the rows are independent. `report` is then that pose's diagnosis.
+	*/
+	public final degenerate:Bool;
 
 	public function new(status:String, converged:Bool, residual:Float, positionResidual:Float,
 		angularResidual:Float, degreesOfFreedom:Int, iterations:Int, closureIds:Array<String>, message:String,
-		?report:DiagnosisReport) {
+		?report:DiagnosisReport, degenerate:Bool = false) {
 		this.status = status;
 		this.converged = converged;
 		this.residual = residual;
@@ -55,6 +60,7 @@ class AssemblyLoopSolveResult {
 		this.closureIds = closureIds.copy();
 		this.message = message;
 		this.report = report;
+		this.degenerate = degenerate;
 	}
 }
 
@@ -76,6 +82,8 @@ class AssemblyLoopSolver {
 		unfinished solves sit near 0.1–1.
 	*/
 	static inline var STATIONARY_RATIO:Float = 1e-4;
+	/** How far driven joints move for the witness pose: radians, or this share of the assembly size. */
+	static inline var WITNESS_STEP:Float = 1e-3;
 
 	/**
 		Adjusts only the named tree-joint coordinates. The supplied state is
@@ -133,9 +141,28 @@ class AssemblyLoopSolver {
 		}
 		var closures = diagnoseClosures(problem, solution.state);
 		if (solution.converged()) {
+			var report = closures.report, degenerate = false;
+			if (report.rank < report.variables && report.dependencyGroups.length > 0) {
+				// Compare with a nearby pose of the same mechanism: nudge the inputs, close the loops again.
+				var driven = [for (joint in state.definition.joints) if (joint.driven == true && model.dofIndex(joint.id) >= 0) model.dofIndex(joint.id)];
+				for (sign in [1.0, -1.0]) {
+					if (driven.length == 0) break;
+					var seed = solution.state.copy();
+					for (dof in driven) seed.q[dof] += sign * WITNESS_STEP * (model.dofIsAngular(dof) ? 1 : assemblyScale(state));
+					var witness = LevenbergMarquardt.solve(problem, seed, maxIterations, initialDamping, rankTolerance, assemblyScale(state));
+					if (!witness.converged()) continue;
+					var generic = diagnoseClosures(problem, witness.state).report;
+					if (generic.rank > report.rank) {
+						report = generic;
+						degenerate = true;
+					}
+					break;
+				}
+			}
 			for (dof in dofs) state.setJoint(model.dofId(dof), solution.state.q[dof]);
 			return new AssemblyLoopSolveResult("converged", true, solution.residualNorm, positionResidual,
-				angularResidual, solution.freeDofs, solution.iterations, [], "assembly closures converged", closures.report);
+				angularResidual, solution.freeDofs, solution.iterations, [],
+				degenerate ? "assembly closures converged at a degenerate pose" : "assembly closures converged", report, degenerate);
 		}
 		var status = switch solution.status {
 			case KinematicStatus.LimitBlocked: "limit-blocked";

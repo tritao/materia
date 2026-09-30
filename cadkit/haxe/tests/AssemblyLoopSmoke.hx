@@ -102,6 +102,18 @@ class AssemblyLoopSmoke {
 		var failed = new AssemblyState(impossible).solveClosures();
 		check(failed.status == "conflicting" && failed.report != null && failed.report.conflictingOwners().join(",") == "pin",
 			'an unclosable four-bar is conflicting at its pin: ${failed.status} ${groups(failed.report)}');
+		check(!closed.degenerate, "an ordinary four-bar pose is not degenerate");
+
+		// Authored exactly at its toggle (coupler folded over the rocker): generically rigid, singular here.
+		var tipX = 1000 * Math.cos(0.6), tipY = 1000 * Math.sin(0.6);
+		var reach = Math.sqrt((2000 - tipX) * (2000 - tipX) + tipY * tipY), heading = Math.atan2(-tipY, 2000 - tipX);
+		var toggle = fourBarDefinition(reach + 1500, null, null, heading);
+		toggle.joints[0].driven = true;
+		toggle.joints[1].defaultValue = heading - 0.6;
+		var atToggle = new AssemblyState(toggle).solveClosures();
+		check(atToggle.converged && atToggle.degenerate && groups(atToggle.report) == "redundant(pin)-3",
+			'a four-bar at its toggle is degenerate, with the general diagnosis: ${atToggle.degenerate} ${groups(atToggle.report)}');
+
 		var excavator = new AssemblyState(ProceduralExcavatorAssembly.buildDefinition()).solveClosures();
 		check(excavator.converged && excavator.report != null && excavator.report.conflictingOwners().length == 0
 			&& excavator.report.redundantOwners().length == 4,
