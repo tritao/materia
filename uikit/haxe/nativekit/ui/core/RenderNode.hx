@@ -166,6 +166,17 @@ class RenderNode {
 	/** Set when this node was rebuilt in place: the node that took its place. Retained caches that still hold this one follow it. */
 	public var replacedBy:Null<RenderNode> = null;
 
+	/** This node, or the node that finally took its place if it was rebuilt in place (possibly more than once). */
+	public static function latest(node:RenderNode):RenderNode {
+		var current = node;
+		var next = current.replacedBy;
+		while (next != null) {
+			current = next;
+			next = current.replacedBy;
+		}
+		return current;
+	}
+
 	/** Puts `next` where this node is in its parent, in the render tree and the layout tree, and detaches this node. */
 	public function replaceWith(next:RenderNode):RenderNode {
 		if (next == null || next == this || next.parent != null)

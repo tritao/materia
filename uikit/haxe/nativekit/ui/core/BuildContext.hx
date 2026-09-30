@@ -346,15 +346,8 @@ class BuildContext {
 		patchPriors.clear();
 
 	/** A retained subtree whose root was rebuilt in place since the cache saw it must return the replacement, not the old node. */
-	public function currentRoot(root:RenderNode):RenderNode {
-		var current = root;
-		var next = current.replacedBy;
-		while (next != null) {
-			current = next;
-			next = current.replacedBy;
-		}
-		return current;
-	}
+	public function currentRoot(root:RenderNode):RenderNode
+		return RenderNode.latest(root);
 
 	public function withScope<T>(key:Key, build:Void->T):T {
 		if (key == null || build == null)

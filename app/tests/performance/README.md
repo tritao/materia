@@ -195,3 +195,14 @@ Scroll frames in the interaction scenario: 340 to 245 KiB (harness floor of abou
 - **Verification.** The interaction scenario compares the tree after a patched keystroke with the tree after a forced full rebuild (hover and press flags excluded: the event dispatcher writes them onto live nodes).
 
 KiB per frame (harness floor of about 52 included), from the start of the interaction work to now: hover onto a tab 340 to 177, scroll the inspector 472 to 215, type a character 480 to 196.
+
+### What did not pay (2026-09-30)
+
+Two attempts to widen in-place rebuilds were measured and removed:
+- Making each tab header (button, indicator, drag handlers, key handling, drop target) a self-updating unit triggered by its button's hover. A patch cost about 13 KiB and the strip was not being rebuilt anyway once the
+  cache validation ignored structural nodes, so per-frame bytes did not fall. It also needed drop targets to follow replaced nodes.
+- Having `TextField` also patch itself on hover, press and focus changes: a hover onto the field went from 199 to 208 KiB.
+
+The interaction scenario now also has `hover-field` and `hover-away`, and `MATERIA_INTERACTION_ONLY=hover-enter,hover-other` (comma list) skips every other action, so the census can be run on one kind of frame.
+The remaining per-frame cost is flat in the census (nothing above about 3%): pane key strings, boxed booleans returned by `RenderNode.walk`, style diffs, event objects. Note that `hl.Gc.totalAllocated` is global, so the 52 KiB idle floor
+includes another thread; the census attributes about 95 KiB to a whole hover frame including the harness.

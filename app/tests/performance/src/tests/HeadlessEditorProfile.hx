@@ -263,7 +263,11 @@ class HeadlessEditorProfile {
     var builtNodes:Map<String, Array<Float>> = new Map();
     var order:Array<String> = [];
     var subtreeNodes:Array<Float> = [];
+    // MATERIA_INTERACTION_ONLY=hover-enter,hover-other limits the run to those actions (for the allocation census); the other actions are skipped entirely.
+    var only = Sys.getEnv("MATERIA_INTERACTION_ONLY");
     var measure = function(name:String, input:Void->Void) {
+      if (only != null && only.length > 0 && only.split(",").indexOf(name) < 0)
+        return;
       var before = hl.Gc.totalAllocated();
       var stateRevision = editor.ui.stateStore.revision;
       input();
@@ -291,10 +295,12 @@ class HeadlessEditorProfile {
       measure("hover-enter", function() editor.ui.pointerMove(tabA.x, tabA.y));
       measure("hover-inside", function() editor.ui.pointerMove(tabA.x + wobble, tabA.y));
       measure("hover-other", function() editor.ui.pointerMove(tabB.x, tabB.y));
+      measure("hover-field", function() editor.ui.pointerMove(field.x, field.y));
+      measure("hover-away", function() editor.ui.pointerMove(tabA.x, tabA.y));
       var beforeY = targetCenter(editor, nameKey, false).y;
       measure("scroll-inspector", function() editor.ui.scroll(field.x, field.y, 0.0, 30.0 * wobble));
       // A scroll must still move the content: it is applied by layout feedback, not by rebuilding.
-      if (cycle == 0 && targetCenter(editor, nameKey, false).y == beforeY)
+      if (cycle == 0 && (only == null || only.length == 0) && targetCenter(editor, nameKey, false).y == beforeY)
         throw "Scrolling the inspector did not move its content";
       measure("idle", function() {});
       action(actions, "interaction", cycle);
@@ -305,7 +311,7 @@ class HeadlessEditorProfile {
     for (cycle in 0...cycles) {
       measure("type-char", function() editor.ui.text(UiEventKind.TextInput, "a"));
       // The typed frame patched the field in place. Rebuilding everything from scratch must give the same tree.
-      if (cycle == 1 || cycle == 7) {
+      if ((cycle == 1 || cycle == 7) && (only == null || only.length == 0)) {
         // The event dispatcher writes hover and press flags onto live nodes, and a fresh build only sets them on widgets that read
         // them, so those two annotations are not compared; everything else (structure, text, geometry, focus) is.
         var pointerFlags = ~/ ?(states=)?(hovered|pressed)/g;
