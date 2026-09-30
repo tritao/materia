@@ -323,12 +323,9 @@ class DiagnosisInvarianceSmoke {
 		return definition;
 	}
 
-	static function excavatorDependent():Array<String> {
-		var candidates = ["link-one-hinge", "link-two-hinge", "boom-cylinder-hinge", "boom-cylinder-slide", "stick-cylinder-hinge",
-			"stick-cylinder-slide", "bucket-cylinder-hinge", "bucket-cylinder-slide"];
-		var tree = [for (joint in ProceduralExcavatorAssembly.buildDefinition().joints) if (joint.role == AssemblyJointRole.Tree) joint.id];
-		return [for (id in candidates) if (tree.indexOf(id) >= 0) id];
-	}
+	/** Derived from the driven hinges (a hand-written list here once missed the cylinders by spelling). */
+	static function excavatorDependent():Array<String>
+		return new AssemblyState(ProceduralExcavatorAssembly.buildDefinition()).dependentJoints();
 
 	/**
 		Scales every length (connector and root positions, prismatic

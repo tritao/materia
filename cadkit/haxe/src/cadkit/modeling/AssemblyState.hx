@@ -211,10 +211,54 @@ class AssemblyState {
 		}
 	}
 
-	/** Adjusts selected tree-joint coordinates until the assembly closures are satisfied. */
-	public function solveClosures(dependentJointIds:Array<String>,
+	/**
+		Adjusts tree-joint coordinates until the assembly closures are satisfied: the named ones, or by default
+		`dependentJoints()`.
+	*/
+	public function solveClosures(?dependentJointIds:Array<String>,
 		?options:AssemblyLoopSolveOptions):AssemblyLoopSolveResult
-		return AssemblyLoopSolver.solve(this, dependentJointIds, options);
+		return AssemblyLoopSolver.solve(this, dependentJointIds == null ? dependentJoints() : dependentJointIds, options);
+
+	/**
+		The coordinates closures depend on: every movable tree joint on the tree path between a closure's two
+		occurrences that is neither driven nor a coupling target (a coupled joint follows its source). In
+		definition order.
+	*/
+	public function dependentJoints():Array<String> {
+		var parentJoint = new Map<String, KinematicJoint>();
+		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) parentJoint.set(joint.child, joint);
+		var coupled = new Map<String, Bool>();
+		if (definition.couplings != null) for (coupling in definition.couplings) coupled.set(coupling.target, true);
+		var onLoop = new Map<String, Bool>();
+		for (closure in definition.joints) if (closure.role == AssemblyJointRole.Closure) {
+			// Occurrences from each end up to its root, then the joints below their lowest common ancestor.
+			var fromParent = pathToRoot(closure.parent, parentJoint), fromChild = pathToRoot(closure.child, parentJoint);
+			var common = new Map<String, Bool>();
+			for (step in fromParent) common.set(step.occurrence, true);
+			var meet:Null<String> = null;
+			for (step in fromChild) if (common.exists(step.occurrence)) { meet = step.occurrence; break; }
+			for (path in [fromParent, fromChild])
+				for (step in path) {
+					if (step.occurrence == meet) break;
+					if (step.joint != null) onLoop.set(step.joint.id, true);
+				}
+		}
+		return [for (joint in definition.joints)
+			if (onLoop.exists(joint.id) && AssemblyDefinitionCodec.hasCoordinate(joint.type) && joint.driven != true && !coupled.exists(joint.id))
+				joint.id];
+	}
+
+	/** Each occurrence from `start` to its root, with the tree joint that attaches it to the next (null at the root). */
+	static function pathToRoot(start:String, parentJoint:Map<String, KinematicJoint>):Array<{occurrence:String, joint:Null<KinematicJoint>}> {
+		var path:Array<{occurrence:String, joint:Null<KinematicJoint>}> = [];
+		var current:Null<String> = start;
+		while (current != null) {
+			var joint = parentJoint.get(current);
+			path.push({occurrence: current, joint: joint});
+			current = joint == null ? null : joint.parent;
+		}
+		return path;
+	}
 
 	public function record():AssemblyStateRecord {
 		var values:Array<AssemblyJointCoordinate> = [];

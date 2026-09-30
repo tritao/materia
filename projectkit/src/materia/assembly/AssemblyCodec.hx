@@ -108,5 +108,15 @@ class AssemblyCodec {
 	}
 	static function validText(value:Null<String>):Bool
 		return value != null && value.length > 0 && value.length <= 4096 &&
-			StringTools.trim(value).length > 0 && value.indexOf("\x00") < 0;
+			StringTools.trim(value).length > 0 && !containsNul(value);
+
+	/**
+		Whether text holds a NUL character. Checked by code: a `"\x00"` literal cannot be a HashLink string
+		constant (and compiled to the text "x00" before haxeon decoded `\x` escapes).
+	*/
+	public static function containsNul(value:String):Bool {
+		for (i in 0...value.length)
+			if (StringTools.fastCodeAt(value, i) == 0) return true;
+		return false;
+	}
 }

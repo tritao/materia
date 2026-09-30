@@ -517,3 +517,34 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
 - The editor has no sketch drag yet (C5 adds soft drag targets); when it
   does, it should solve with `diagnose = false` while dragging and normally
   on release.
+
+### C3.1 — Driven joints; dependents derived from the loops (2026-10-01)
+
+- `KinematicJoint.driven` (optional, wire id 12): an input of the mechanism.
+  Only movable tree joints that are not coupling targets can be driven
+  (codec rejects the rest); the flattener and `AssemblyDocuments` (a boolean
+  relationship property) carry it. `AssemblyModel.drive(id)` sets it.
+- `AssemblyState.dependentJoints()`: every movable tree joint on the tree path
+  between a closure's two occurrences (below their lowest common ancestor)
+  that is neither driven nor a coupling target, in definition order.
+  `solveClosures()` and `AssemblyDrag` use it when given no explicit list.
+- Excavator: its three hinges are driven and `buildState` derives the rest.
+  **Found:** its old hand-written list spelled the cylinder joints
+  `boom-cylinder-…` while they are named `Boom-cylinder-…`, and was filtered
+  by name, so the six cylinder coordinates were silently never dependent
+  (their loops closed only because the authored pose was exact). The derived
+  list has all eight; the invariance fixture had copied the same list and now
+  derives it too.
+- App: with no saved choice the session starts from the derived dependents;
+  a saved list (older projects, or an explicit choice, including an empty
+  one) still overrides, and the scene record saves the list only when it
+  differs from what the definition derives, so later source changes apply.
+  The inspector toggle is unchanged. (The plan said drop the scene field;
+  keeping it as an override is less disruptive and costs nothing.) The app
+  compiles; its native tests were not run (none exercise this path).
+- Also fixed on main's current haxeon pin: haxeon now decodes `\x`
+  escapes (3d205e9e), so projectkit's three `indexOf("\x00")` checks became
+  NUL string constants, which HashLink rejects ("HashLink String cannot
+  contain NUL"), breaking every build that includes projectkit. They had
+  never worked (they looked for the text "x00"); `AssemblyCodec.containsNul`
+  checks by character code.

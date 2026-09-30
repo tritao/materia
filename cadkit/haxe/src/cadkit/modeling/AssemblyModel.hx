@@ -99,6 +99,22 @@ class AssemblyModel {
 		solved = null;
 	}
 
+	/**
+		Marks a movable tree joint as an input of the mechanism (a motor, a cylinder): closure solves never move it,
+		and the other movable joints on its loops follow it.
+	*/
+	public function drive(jointId:String, driven:Bool = true):Void {
+		for (joint in data.joints)
+			if (joint.id == jointId) {
+				if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type))
+					throw 'Assembly joint "$jointId" is not a movable tree joint';
+				if (driven) joint.driven = true; else Reflect.deleteField(joint, "driven");
+				solved = null;
+				return;
+			}
+		throw 'Missing assembly joint "$jointId"';
+	}
+
 	/** Records a closure; its residual is checked against solved poses on read. */
 	public function constrain(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, ?tolerance:Float):Void {
