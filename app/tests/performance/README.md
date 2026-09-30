@@ -128,6 +128,21 @@ allocation from the workspace save worker. On 2026-09-30 a `Text` build cost 3.3
 any one widget, sets the tree-build total (about 530 KiB); shrinking it much further means reusing unchanged subtrees
 instead of rebuilding them.
 
+## Reading a profile
+
+The profiler slows the editor a lot: `selection-stress` measured 21 ms per frame profiled and 2.8 ms without. Every profiled
+headless scenario therefore reruns itself without the profiler (skip with `--no-baseline`) and prints
+`profiler overhead: median frame X ms profiled vs Y ms unprofiled`, also saved as `profiler-overhead.json`. Trust profiled
+numbers for how time divides between functions, and unprofiled ones for what a frame costs.
+
+`profile-report.txt` (printed in short after the run) is `haxeon/scripts/hlprof-report.py` over the Perfetto export. It drops
+samples whose leaf is a blocking wait (about half of a short capture is a parked worker) and keeps only samples taken while
+`UiContext.submit*` is on the stack, so it describes frames and not setup or idle. Run it by hand to change that:
+`python3 haxeon/scripts/hlprof-report.py <capture>/editor.perfetto.json --within <function> --top 30`. It lists self and
+inclusive time with readable generic and lambda names, and flags `<Dynamic>` generic instances on hot paths (boxed values).
+Raise `--sample-rate` (default 500 a second) for a short scenario: a 40-cycle `selection-stress` yields only a few hundred
+samples.
+
 ## Allocation census
 
 `python3 app/tools/profile-editor.py --scenario tab-matrix --cycles 30 --no-profile --census` counts every allocation by

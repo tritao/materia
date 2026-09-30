@@ -37,6 +37,40 @@ def cpu_seconds(pid):
         return None
 
 
+def report_profiler_overhead(args, output, frames):
+    """Reruns the scenario without the profiler, so a reader can tell how much of a profiled frame is the profiler."""
+    baseline_dir = output / "baseline"
+    run = subprocess.run([sys.executable, str(Path(__file__).resolve()), "--scenario", args.scenario,
+                          "--cycles", str(args.cycles), "--no-profile", "--skip-build", "--no-baseline",
+                          "--output-dir", str(baseline_dir)], capture_output=True, text=True)
+    timeline = baseline_dir / "frame-timeline.jsonl"
+    if run.returncode or not timeline.exists():
+        print("profiler overhead: baseline run failed; profiled times are not representative", file=sys.stderr)
+        return
+    baseline = [json.loads(line) for line in timeline.read_text().splitlines() if line.strip()]
+    profiled_median = statistics.median(frame["frameSeconds"] for frame in frames) * 1000
+    baseline_median = statistics.median(frame["frameSeconds"] for frame in baseline) * 1000
+    ratio = profiled_median / baseline_median if baseline_median > 0 else float("inf")
+    print(f"profiler overhead: median frame {profiled_median:.1f}ms profiled vs {baseline_median:.1f}ms unprofiled "
+          f"({ratio:.1f}x); use profiled times for ratios between functions, not for absolute cost")
+    (output / "profiler-overhead.json").write_text(json.dumps(
+        {"profiledMedianMs": profiled_median, "baselineMedianMs": baseline_median, "ratio": ratio}, indent=2) + "\n")
+
+
+def write_profile_report(output):
+    """Self and inclusive time with idle threads dropped and samples limited to frame submission."""
+    report = subprocess.run([sys.executable, str(ROOT / "haxeon/scripts/hlprof-report.py"),
+                             str(output / "editor.perfetto.json"), "--within", "UiContext.submit", "--top", "20"],
+                            capture_output=True, text=True)
+    if report.returncode:
+        print(f"Profile report failed: {report.stderr.strip()}", file=sys.stderr)
+        return
+    (output / "profile-report.txt").write_text(report.stdout)
+    lines = report.stdout.splitlines()
+    print("profile (frame submission only; full report in profile-report.txt):")
+    print("\n".join(lines[:14]))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--frames", type=int, default=240)
@@ -55,6 +89,8 @@ def main():
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
+    parser.add_argument("--no-baseline", action="store_true",
+                        help="do not rerun a headless scenario without the profiler to measure the profiler's overhead")
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("editor_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
@@ -279,6 +315,11 @@ def main():
                           f"GC={spike['gcCollections']:.0f} "
                           f"input GC={spike['inputGcCollections']} "
                           f"cache misses={spike['styleCacheMisses']}")
+    if (frames and args.scenario is not None and not args.no_profile and not args.no_baseline
+            and args.idle_seconds is None and not args.heap_dump and args.census is None):
+        report_profiler_overhead(args, output, frames)
+    if export is not None and export.returncode == 0:
+        write_profile_report(output)
     if samples:
         start = next((row for row in samples if frames and row["timeSeconds"] >= frames[0]["startedAtSeconds"]), samples[0])
         print(f"RSS start={start['rssBytes'] / 2**20:.1f}MiB "
