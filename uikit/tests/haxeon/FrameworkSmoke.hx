@@ -2554,7 +2554,8 @@ class FrameworkSmoke {
 		var copiedAppShell = new AppShell("app-shell-style-copy", new Text("Content"),
 			null, null, null, sourceStyle, sourceBodyStyle);
 		sourceStyle.width.value = 1.0;
-		sourceStyle.padding.left = 1.0;
+		// Insets are immutable, so a later change to the source is a replacement, and the copy must keep the old value.
+		sourceStyle.padding = new Insets(1.0, 12.0, 13.0, 14.0);
 		sourceBodyStyle.childGap = 1.0;
 		if (copiedAppShell.style.width.value != 280.0 ||
 			copiedAppShell.style.padding.left != 11.0 ||
