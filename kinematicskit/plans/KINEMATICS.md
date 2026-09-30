@@ -694,3 +694,28 @@ coordinates; for a running robot the target goes through MotionKit.
   configuration-limit gain. Tests: with k = 0.5 the gap to the stop at
   least halves per step and never closes; the servo slows the base into its
   +2π stop without touching it.
+
+### E1a — Assembly drag session, headless (2026-09-30)
+
+- `cadkit.modeling.AssemblyDrag`: grab an occurrence (or one of its
+  connectors), move world targets, get preview coordinates and a reason when
+  it cannot follow (`Following`, `OutOfReach` with the distance, `Limited`
+  naming the joints, `ClosureBroken` naming the linkages). Movable joints:
+  the driving joints from the root to the grabbed occurrence plus the
+  editor's dependent joints; every closure is a task, so linkages stay
+  closed while dragged. Tracking = damped least squares from the previous
+  preview. Never modifies the `AssemblyState`; `commit()` returns the record
+  for one undoable edit. Position is weighted in metres whatever the drawing
+  unit, so damping means the same in a millimetre assembly as for a robot.
+- `DampedLeastSquares` gained an optional step cap (`maxStep`, prismatic
+  DOFs scaled by `translationScale`), unlimited by default so existing
+  answers are unchanged. Found by the drag test: a target far outside the
+  reach made the uncapped step swing joints by radians per iteration (the
+  arm ended pointing away, 2156 mm from a target it could get within
+  ~1100 mm of). The drag caps steps at 0.1 rad / 0.1 m.
+- `AssemblyDragSmoke` (CadKit): a 60 mm drag of a 3-link arm in 30 steps is
+  followed smoothly (< 0.02 rad per step) and lands on target; out of reach
+  reports the real miss; a blocking elbow limit is named; a four-bar's
+  rocker swings 10° with the pin closed (the crank turns) and a stretch it
+  cannot make is reported; the state is never modified and the committed
+  record reproduces the preview.

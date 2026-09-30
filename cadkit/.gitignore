@@ -7,3 +7,4 @@
 .clangd/
 .DS_Store
 
+haxe/tests/build/

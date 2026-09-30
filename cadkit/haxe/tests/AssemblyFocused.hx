@@ -3,5 +3,6 @@ class AssemblyFocused {
     AssemblyModelSmoke.run();
     AssemblyDocumentsSmoke.run();
     AssemblyLoopSmoke.run();
+    AssemblyDragSmoke.run();
   }
 }

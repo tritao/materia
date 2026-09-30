@@ -126,9 +126,11 @@ class AssemblyState {
 
 	/** The compiled model and a copy of this configuration in its terms, for kinematics solvers. */
 	@:allow(cadkit.modeling.AssemblyLoopSolver)
+	@:allow(cadkit.modeling.AssemblyDrag)
 	function kinematicModel():AssemblyKinematics return kinematics;
 
 	@:allow(cadkit.modeling.AssemblyLoopSolver)
+	@:allow(cadkit.modeling.AssemblyDrag)
 	function kinematicSeed():KinematicState {
 		syncKinematicState();
 		return kinematicState.copy();

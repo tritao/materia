@@ -8,14 +8,21 @@ package kinematicskit;
  * after `maxIterations` steps it reports `IterationLimit` without checking
  * the final step. With a reused `workspace` it allocates nothing per
  * iteration.
+ *
+ * `maxStep` (unlimited by default, which is the original iteration) caps
+ * each step: if any DOF would move more than `maxStep` (radians, or
+ * `maxStep · translationScale` for a prismatic DOF), the whole step is
+ * scaled down, keeping its direction. Targets far outside the reachable set
+ * otherwise produce linearised steps of several radians.
  */
 class DampedLeastSquares {
   public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
-      ?damping:Float = 0.02, ?rankTolerance:Float = 1e-8, ?workspace:SolverWorkspace):KinematicSolution {
+      ?damping:Float = 0.02, ?rankTolerance:Float = 1e-8, ?workspace:SolverWorkspace,
+      ?maxStep:Float = Math.POSITIVE_INFINITY, ?translationScale:Float = 1.0):KinematicSolution {
     if (problem == null || seed == null || seed.model != problem.model)
       throw "Damped least squares requires a problem and a seed state of its model";
-    if (maxIterations < 0 || !Math.isFinite(damping) || damping < 0.0)
-      throw "Damped least squares settings must be finite and non-negative";
+    if (maxIterations < 0 || !Math.isFinite(damping) || damping < 0.0 || !(maxStep > 0.0) || !(translationScale > 0.0))
+      throw "Damped least squares settings must be finite and non-negative, with a positive step cap";
     var work = workspace == null ? new SolverWorkspace() : workspace;
     work.prepare(problem);
     var rows = problem.rowCount();
@@ -33,6 +40,15 @@ class DampedLeastSquares {
       if (!LinearAlgebra.solveInPlace(work.normal, work.rhs, width, work.delta, 1e-15))
         return SolverSupport.finish(problem, state, work, KinematicStatus.NumericalFailure, iteration, rankTolerance,
           false);
+      if (maxStep != Math.POSITIVE_INFINITY) {
+        var ratio = 0.0;
+        for (i in 0...width) {
+          var dof = layout.dofs[i];
+          var cap = problem.model.dofIsAngular(dof) ? maxStep : maxStep * translationScale;
+          ratio = Math.max(ratio, Math.abs(work.delta[i]) / cap);
+        }
+        if (ratio > 1.0) for (i in 0...width) work.delta[i] /= ratio;
+      }
       for (i in 0...width) state.q[layout.dofs[i]] += work.delta[i];
       problem.clamp(state.q);
     }

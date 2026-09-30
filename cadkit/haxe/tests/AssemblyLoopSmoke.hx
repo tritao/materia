@@ -42,32 +42,32 @@ class AssemblyLoopSmoke {
 		throws(() -> fourBar.solveClosures(["coupler", "coupler"]), "dependent coordinates must be distinct");
 	}
 
-	static function frame(x:Float, y:Float, z:Float, ?angle:Float = 0.0):AssemblyFrame
+	public static function frame(x:Float, y:Float, z:Float, ?angle:Float = 0.0):AssemblyFrame
 		return {x: x, y: y, z: z, qx: 0, qy: 0, qz: Math.sin(angle / 2), qw: Math.cos(angle / 2)};
 
-	static function bar(id:String, length:Float):AssemblyComponentDefinition
+	public static function bar(id:String, length:Float):AssemblyComponentDefinition
 		return {id: id, connectors: [{name: "a", frame: frame(0, 0, 0)}, {name: "b", frame: frame(length, 0, 0)}]};
 
-	static function joint(id:String, type:AssemblyJointType, role:AssemblyJointRole, parent:String, parentConnector:String,
+	public static function joint(id:String, type:AssemblyJointType, role:AssemblyJointRole, parent:String, parentConnector:String,
 			child:String, childConnector:String, value:Float, ?lower:Float, ?upper:Float, ?alongX:Bool = false):KinematicJoint
 		return {id: id, type: type, role: role, parent: parent, parentConnector: parentConnector, child: child,
 			childConnector: childConnector, axis: alongX ? {x: 1.0, y: 0.0, z: 0.0} : {x: 0.0, y: 0.0, z: 1.0},
 			limits: {lower: lower, upper: upper, velocity: null, effort: null}, defaultValue: value};
 
-	static function definition(id:String, parts:Array<AssemblyComponentDefinition>, joints:Array<KinematicJoint>):AssemblyDefinition
+	public static function definition(id:String, parts:Array<AssemblyComponentDefinition>, joints:Array<KinematicJoint>):AssemblyDefinition
 		return {schemaVersion: AssemblyDefinitionCodec.VERSION, id: id, lengthUnit: "mm", definitions: parts,
 			occurrences: [for (part in parts) {id: part.id, definition: part.id, initialPose: frame(0, 0, 0)}],
 			joints: joints};
 
 	/** Ground pivots 2000 apart, crank 1000 (driven), coupler, rocker 1500. */
-	static function fourBarDefinition(coupler:Float, lower:Null<Float>, upper:Null<Float>, rocker:Float):AssemblyDefinition
+	public static function fourBarDefinition(coupler:Float, lower:Null<Float>, upper:Null<Float>, rocker:Float):AssemblyDefinition
 		return definition("four-bar", [bar("ground", 2000), bar("crank", 1000), bar("coupler", coupler), bar("rocker", 1500)], [
 			joint("crank", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "ground", "a", "crank", "a", 0.6),
 			joint("coupler", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "crank", "b", "coupler", "a", 0.2),
 			joint("rocker", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "ground", "b", "rocker", "a", rocker, lower, upper),
 			joint("pin", AssemblyJointType.Revolute, AssemblyJointRole.Closure, "coupler", "b", "rocker", "b", 0.0)]);
 
-	static function sliderCrankDefinition():AssemblyDefinition
+	public static function sliderCrankDefinition():AssemblyDefinition
 		return definition("slider-crank", [bar("ground", 0), bar("crank", 500), bar("rod", 1500), bar("slider", 0)], [
 			joint("crank", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "ground", "a", "crank", "a", 0.9),
 			joint("rod", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "crank", "b", "rod", "a", -0.5),
@@ -75,7 +75,7 @@ class AssemblyLoopSmoke {
 			joint("pin", AssemblyJointType.Revolute, AssemblyJointRole.Closure, "rod", "b", "slider", "a", 0.0)]);
 
 	/** Three links welded at their tip to a ground connector placed where q = (0.5, -0.9, 0.7) puts it. */
-	static function fixedChainDefinition():AssemblyDefinition {
+	public static function fixedChainDefinition():AssemblyDefinition {
 		var lengths = [800.0, 600.0, 400.0], q = [0.5, -0.9, 0.7];
 		var x = 0.0, y = 0.0, angle = 0.0;
 		for (i in 0...3) { angle += q[i]; x += lengths[i] * Math.cos(angle); y += lengths[i] * Math.sin(angle); }
