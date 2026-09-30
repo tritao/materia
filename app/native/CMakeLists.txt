@@ -16,6 +16,13 @@ set(NK_BUILD_TESTS OFF CACHE BOOL "Disable dependency tests in the app build" FO
 set(NK_BUILD_EXAMPLES OFF CACHE BOOL "Disable dependency examples in the app build" FORCE)
 set(NKUI_ENABLE_SECTION_GC ON CACHE BOOL "Keep UIKit section garbage collection enabled" FORCE)
 
+# The HashLink profiler reads a thread's stack by following its frame-pointer chain. A thread stopped in native code can
+# only be attributed to the Haxe function that called it if the native code keeps frame pointers, so build every library
+# the editor loads with them (the cost is a register and a few instructions per call).
+if(NOT MSVC)
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+
 get_filename_component(MATERIA_SOURCE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 set(MATERIA_NATIVEKIT_DIR "${MATERIA_SOURCE_ROOT}/nativekit")
 set(MATERIA_UIKIT_DIR "${MATERIA_SOURCE_ROOT}/uikit")

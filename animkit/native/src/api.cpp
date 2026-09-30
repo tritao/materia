@@ -303,31 +303,64 @@ ak_result ak_instance_set_ik(ak_instance_handle handle, uint32_t chain, const ak
     return AK_OK;
 }
 
-ak_result ak_instance_set_joint_rotation(ak_instance_handle handle, int32_t joint, float x, float y, float z,
-                                         float w, float weight) {
-    const auto instance = instances().find(handle.id);
-    if (!instance) return AK_ERROR_INVALID_HANDLE;
-    if (joint < 0 || joint >= instance->asset().skeleton->num_joints()) return AK_ERROR_INVALID_ARGUMENT;
+namespace {
+
+/** Checks one turn and normalizes its rotation; false when it cannot be applied. */
+bool makeTurn(const animkit::Instance &instance, uint32_t source, int32_t joint, float x, float y, float z, float w,
+              float weight, animkit::JointRotation &turn) {
+    if (joint < 0 || joint >= instance.asset().skeleton->num_joints()) return false;
     if (!std::isfinite(x) || !std::isfinite(y) || !std::isfinite(z) || !std::isfinite(w) || !std::isfinite(weight))
-        return AK_ERROR_INVALID_ARGUMENT;
-    auto &turns = instance->joint_rotations;
-    const auto existing = std::find_if(turns.begin(), turns.end(),
-                                       [joint](const animkit::JointRotation &turn) { return turn.joint == joint; });
-    if (!(weight > 0.0f)) {
-        if (existing != turns.end()) turns.erase(existing);
-        return AK_OK;
-    }
-    const float length = std::sqrt(x * x + y * y + z * z + w * w);
-    if (!(length > 1e-6f)) return AK_ERROR_INVALID_ARGUMENT;
-    animkit::JointRotation turn;
+        return false;
+    turn.source = source;
     turn.joint = joint;
+    turn.weight = std::min(weight, 1.0f);
+    if (!(weight > 0.0f)) return true;
+    const float length = std::sqrt(x * x + y * y + z * z + w * w);
+    if (!(length > 1e-6f)) return false;
     turn.rotation[0] = x / length;
     turn.rotation[1] = y / length;
     turn.rotation[2] = z / length;
     turn.rotation[3] = w / length;
-    turn.weight = std::min(weight, 1.0f);
-    if (existing != turns.end()) *existing = turn;
-    else turns.push_back(turn);
+    return true;
+}
+
+} // namespace
+
+ak_result ak_instance_set_joint_rotation(ak_instance_handle handle, uint32_t source, int32_t joint, float x, float y,
+                                         float z, float w, float weight) {
+    const auto instance = instances().find(handle.id);
+    if (!instance) return AK_ERROR_INVALID_HANDLE;
+    animkit::JointRotation turn;
+    if (!makeTurn(*instance, source, joint, x, y, z, w, weight, turn)) return AK_ERROR_INVALID_ARGUMENT;
+    instance->setJointRotation(turn);
+    return AK_OK;
+}
+
+ak_result ak_instance_set_joint_rotations(ak_instance_handle handle, uint32_t source, const uint8_t *data,
+                                          uint32_t size) {
+    const auto instance = instances().find(handle.id);
+    if (!instance) return AK_ERROR_INVALID_HANDLE;
+    constexpr uint32_t kRecord = sizeof(int32_t) + 5 * sizeof(float);
+    if (size % kRecord != 0 || (size > 0 && !data)) return AK_ERROR_INVALID_ARGUMENT;
+    std::vector<animkit::JointRotation> turns;
+    for (uint32_t offset = 0; offset < size; offset += kRecord) {
+        int32_t joint;
+        float values[5];
+        std::memcpy(&joint, data + offset, sizeof(joint));
+        std::memcpy(values, data + offset + sizeof(joint), sizeof(values));
+        animkit::JointRotation turn;
+        if (!makeTurn(*instance, source, joint, values[0], values[1], values[2], values[3], values[4], turn))
+            return AK_ERROR_INVALID_ARGUMENT;
+        turns.push_back(turn);
+    }
+    instance->replaceJointRotations(source, turns);
+    return AK_OK;
+}
+
+ak_result ak_instance_clear_joint_rotations(ak_instance_handle handle, uint32_t source) {
+    const auto instance = instances().find(handle.id);
+    if (!instance) return AK_ERROR_INVALID_HANDLE;
+    instance->replaceJointRotations(source, {});
     return AK_OK;
 }
 

@@ -113,6 +113,9 @@ capsule's local +Z along its bones) through the character's root transform.
 character root, as a `HumanDisplay` of `Mesh`, `Capsules`, or `Skeleton`, to
 check the proxy against the mesh.
 
+How the body is layered, who owns what, and where its tuning lives are described in
+[BODY.md](BODY.md).
+
 ## Document jobs
 
 `HumanJobSpec.parse` accepts strict, versioned JSON. Version 1 has `version`,

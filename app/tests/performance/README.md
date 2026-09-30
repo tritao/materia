@@ -147,6 +147,16 @@ inclusive time with readable generic and lambda names, and flags `<Dynamic>` gen
 Raise `--sample-rate` (default 500 a second; 2000 is fine now) for a short scenario: a 40-cycle `selection-stress` yields only a
 few hundred samples.
 
+## Comparing two runs
+
+`python3 app/tools/profile-compare.py BEFORE AFTER` (capture directories) compares per action the median frame, tree/style,
+native layout and allocation, and, when both captures have a profile, each function's share of frame-submission samples.
+`profile-editor.py ... --compare BEFORE` runs it after a fresh capture. A change is called real only if it exceeds the noise
+of both runs and `--min-change` (10%): two runs of one build differed by up to 8% in a frame's median, so smaller changes are
+reported as noise. Profile shares are relative (one function getting cheaper raises the others), and they count as different
+only beyond two standard errors of the sample counts. To measure a change, capture with `--no-profile` before and after
+(same scenario and `--cycles`), then use `--sample-rate 2000` captures to see where the time moved.
+
 ## Allocation census
 
 `python3 app/tools/profile-editor.py --scenario tab-matrix --cycles 30 --no-profile --census` counts every allocation by

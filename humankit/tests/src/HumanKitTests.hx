@@ -18,6 +18,7 @@ import humankit.Wait;
 import humankit.PlayClip;
 import humankit.HumanBodyView;
 import humankit.HumanBone;
+import humankit.HumanHand;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
@@ -105,6 +106,7 @@ class HumanKitTests {
 		elbowStaysPut(scene, worker, rig);
 		fingersCurl(scene, worker, rig);
 		leaning(scene, worker, rig);
+		grasping(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -489,6 +491,66 @@ class HumanKitTests {
 		human.dispose();
 	}
 
+	/**
+	 * A hand closes on an object to the object's size: each finger curls until its own tip is as deep as the
+	 * object, so a thicker object closes the hand more, fingers of different lengths close differently, a
+	 * thin one is pinched, and the shape goes once the object is let go.
+	 */
+	static function grasping(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Grasper");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (hand in [ArmR, ArmL]) {
+			// Tip depth runs from about 2.3 cm (open) to 6 to 7 cm (curled half way), then falls as the fist closes.
+			var shallow = grasped(body, hand, 0.035), medium = grasped(body, hand, 0.05), deep = grasped(body, hand, 0.06);
+			if (!(shallow[HumanHand.INDEX] < medium[HumanHand.INDEX] && medium[HumanHand.INDEX] < deep[HumanHand.INDEX]))
+				throw 'A thicker object did not close the $hand hand further: ${shallow[1]}, ${medium[1]}, ${deep[1]}';
+			// Each finger's tip ends as deep as the object, to a few millimetres.
+			body.setGrasp(hand, 0.05);
+			human.setHandCurls(hand, body.grasp(hand));
+			human.advance(0.0);
+			for (finger in [HumanHand.INDEX, HumanHand.MIDDLE, HumanHand.RING, HumanHand.PINKY])
+				if (Math.abs(body.fingerDepth(hand, finger) - 0.05) > 0.006)
+					throw 'Finger $finger of the $hand hand is ${body.fingerDepth(hand, finger)} m deep, not 0.05';
+			// Fingers of different lengths close by different amounts to the same depth.
+			var spread = Math.max(Math.max(medium[1], medium[2]), Math.max(medium[3], medium[4])) -
+				Math.min(Math.min(medium[1], medium[2]), Math.min(medium[3], medium[4]));
+			if (spread < 0.02) throw 'Every finger of the $hand hand closed alike to one depth: $medium';
+			// A thin object is pinched: only the thumb and index close on it.
+			var thin = grasped(body, hand, 0.02);
+			if (thin[HumanHand.MIDDLE] > body.posture.relaxedCurl + 1e-6 || thin[HumanHand.PINKY] > body.posture.relaxedCurl + 1e-6)
+				throw 'The $hand hand did not pinch a thin object: $thin';
+			if (Math.abs(thin[HumanHand.THUMB] - body.posture.thumbShare * thin[HumanHand.INDEX]) > 1e-6)
+				throw "The thumb does not follow the index finger";
+			if (medium[HumanHand.PINKY] <= thin[HumanHand.PINKY] && medium[HumanHand.MIDDLE] <= thin[HumanHand.MIDDLE])
+				throw 'A thick object was no more closed on than a thin one by the $hand hand: $medium against $thin';
+		}
+		// Holding, the fingers settle into the grasp; letting go, they relax and the grasp is forgotten.
+		body.setGrasp(ArmR, 0.05);
+		var wanted = body.grasp(ArmR);
+		body.setCarry([ArmR]);
+		for (_ in 0...60) body.advance(step);
+		var held = human.handCurls(ArmR);
+		for (finger in 0...HumanHand.FINGERS)
+			if (Math.abs(held[finger] - wanted[finger]) > 0.02)
+				throw 'Finger $finger did not settle into the grasp: ${held[finger]} against ${wanted[finger]}';
+		body.setCarry([]);
+		for (_ in 0...60) body.advance(step);
+		var relaxed = human.handCurls(ArmR);
+		for (finger in 0...HumanHand.FINGERS)
+			if (Math.abs(relaxed[finger] - body.posture.relaxedCurl) > 0.02)
+				throw 'Finger $finger did not relax after letting go: ${relaxed[finger]}';
+		if (body.grasp(ArmR) != null) throw "The grasp was kept after the object was let go";
+		human.dispose();
+	}
+
+	static function grasped(body:HumanBody, hand:HumanLimb, depth:Float):Array<Float> {
+		body.setGrasp(hand, depth);
+		return body.grasp(hand);
+	}
+
 	/** Leaning carries the shoulders forward, an unused arm hangs instead of swinging back, and standing up undoes it. */
 	static function leaning(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var human = new HumanCharacter(scene, asset, rig, null, "Leaner");
@@ -505,8 +567,8 @@ class HumanKitTests {
 		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 1e-4 || human.spineLean() != 0.0)
 			throw "Working out a lean left the pose changed";
 		var capped = body.leanFor(ArmR, 5.0);
-		if (capped.angle > HumanBody.MAX_LEAN + 1e-6 || capped.shift >= 5.0)
-			throw 'A lean of ${capped.angle} rad was allowed past ${HumanBody.MAX_LEAN}';
+		if (capped.angle > body.posture.maxLean + 1e-6 || capped.shift >= 5.0)
+			throw 'A lean of ${capped.angle} rad was allowed past ${body.posture.maxLean}';
 
 		body.setLean(made.angle);
 		for (_ in 0...90) body.advance(step);
