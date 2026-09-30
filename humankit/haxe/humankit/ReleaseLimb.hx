@@ -28,15 +28,14 @@ class ReleaseLimb extends HumanActionBase {
 			done = true;
 			return;
 		}
-		// Easing peaks at half as much again as the average speed, so the hand's travel sets how long it must take.
-		duration = Math.max(ramp, 1.5 * worker.travelToAnimation(limb) / worker.posture.releaseSpeed);
+		duration = worker.blendSeconds(worker.travelToAnimation(limb), ramp);
 	}
 
 	override public function advance(seconds:Float):Void {
 		if (done) return;
 		elapsed += seconds;
 		var progress = Math.min(1.0, elapsed / duration);
-		var weight = fromWeight * (1.0 - progress * progress * (3.0 - 2.0 * progress));
+		var weight = fromWeight * (1.0 - smooth(progress));
 		if (progress >= 1.0) {
 			worker.clearReach(limb);
 			done = true;

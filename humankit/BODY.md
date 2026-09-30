@@ -60,9 +60,10 @@ and grasp, and ask the body to straighten up when they are done. Actions set int
 A reach target is given in a frame (`ReachSpace`): the world, the body's root, or the torso. A hand that has
 just set a part down is withdrawn to a point against the chest, not in the root frame, because the torso
 straightens as the worker steps away and a point fixed in the root frame ends up against the shoulder, which
-folds the arm and flips the IK. Letting a reach go (`ReleaseLimb`) eases the blend and lasts as long as the
-hand's travel needs to keep its speed down (`HumanPosture.releaseSpeed`, measured by `travelToAnimation`):
-a fixed 0.2 s dragged a hand 0.6 m at 3 m/s or more.
+folds the arm and flips the IK. A reach blends in from the animation, and back out, over a time set by how far
+the wrist has to go and eased at both ends (`HumanBody.blendSeconds` with `HumanPosture.blendSpeed`; the release
+measures its travel with `travelToAnimation`): a fixed 0.2 s dragged a hand 0.6 m at 3 m/s going out and 7 m/s
+going in.
 
 ## Grips follow the object
 

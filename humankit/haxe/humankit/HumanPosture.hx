@@ -61,11 +61,11 @@ class HumanPosture {
 	public var edgeGap:Float = 0.03;
 
 	/**
-	 * How fast, in metres per second, an arm's wrist is allowed to go at the peak of the easing as it returns
-	 * to its animation after a reach, working from the straight-line distance it has to cover. The wrist
-	 * follows an arc and the IK blend is not linear in position, so its real peak is about twice this.
+	 * How fast, in metres per second, a wrist is allowed to go at the peak of the easing as a reach blends in from
+	 * the animation or out to it, working from the straight-line distance it has to cover. The wrist follows an arc
+	 * and the IK blend is not linear in position, so its real peak is about twice this.
 	 */
-	public var releaseSpeed:Float = 1.0;
+	public var blendSpeed:Float = 1.0;
 
 	// Withdrawing from a placed part.
 

@@ -347,6 +347,21 @@ class HumanBody {
 		return free == null ? 0.0 : distance(held, free);
 	}
 
+	/** Where a hand's wrist is in the world now. */
+	public function wristWorld(limb:HumanLimb):Array<Float> {
+		var wrist = character.pose.bonePosition(limb == ArmL ? HandL : HandR);
+		if (wrist == null) throw "The character has no hand bone";
+		return toWorld(wrist);
+	}
+
+	/**
+	 * How long a reach takes to blend in from the animation or out to it, given how far the wrist has to go: at
+	 * least `minimum`, and longer when the distance would otherwise push the wrist past the posture's blend speed.
+	 * Easing peaks at half as much again as the average speed, hence the factor.
+	 */
+	public function blendSeconds(distance:Float, minimum:Float):Float
+		return Math.max(minimum, 1.5 * distance / posture.blendSpeed);
+
 	public function reachPole(limb:HumanLimb):Null<Array<Float>>
 		return limbs[limb].pole;
 
