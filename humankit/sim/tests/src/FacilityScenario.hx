@@ -13,6 +13,7 @@ import materia.automation.facility.Rack;
 import materia.automation.facility.RackSlot;
 import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
+import materia.automation.facility.Surface;
 import materia.automation.facility.Zone;
 import nativekit.scene.Scene;
 import nativekit.sim.MotionType;
@@ -56,8 +57,11 @@ class FacilityScenario {
 
     public function limb():HumanLimb return ArmR;
 
-    /** `describe` tells the job what the worker stands at and picks up; without it the job is built as a facility model alone allows. */
-    public static function build(layout:FacilityLayout, describe:Bool = true):FacilityScenario {
+    /**
+     * How the job learns what the worker stands at and picks up: "model", the facility describes its own
+     * surfaces and slot items; "explicit", the caller hands them to the job; "none", nothing is described.
+     */
+    public static function build(layout:FacilityLayout, describe:String = "model"):FacilityScenario {
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var scene = Scene.create();
         var world = MujocoSimWorld.create(scene, {timestep: 1.0 / 60.0, physicsSubsteps: 4, gravity: [0.0, 0.0, -9.81]});
@@ -73,10 +77,16 @@ class FacilityScenario {
         var last = layout.via.length == 0 ? [0.9, -0.2] : layout.via[layout.via.length - 1];
         var leg = [station[0] - last[0], station[1] - last[1]], legLength = Math.sqrt(leg[0] * leg[0] + leg[1] * leg[1]);
         var stand = [station[0] - 0.65 * leg[0] / legLength, station[1] - 0.65 * leg[1] / legLength];
+        var modelled = describe == "model";
         var facility = new Facility("sweep", "Sweep");
         facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
-        var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(0.9, -0.2), [new RackSlot("part", new RackSlotPose(0, 0, slotPoint[2]))]);
-        var table = new Station("table", "Table", "floor", "map", new Pose2(stand[0], stand[1]));
+        var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(0.9, -0.2),
+            [new RackSlot("part", new RackSlotPose(0, 0, slotPoint[2]), modelled ? [0.04, 0.04, 0.04] : null)],
+            modelled ? new Surface(0.2, 0.2, surface) : null);
+        // The table lies 0.65 m ahead of where the worker stands, along the lane's last leg.
+        var facing = Math.atan2(leg[1], leg[0]);
+        var table = new Station("table", "Table", "floor", "map", new Pose2(stand[0], stand[1], facing),
+            modelled ? new Surface(0.2, 0.2, surface, 0.65) : null);
         facility.addRack(rack);
         facility.addStation(table);
         var lane = [rack.pose];
@@ -92,8 +102,9 @@ class FacilityScenario {
             {center: [station[0], station[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0}
         ];
         var partBox:HumanTargetBox = {center: slotPoint, halfExtents: [0.04, 0.04, 0.04], yaw: 0.0};
-        var job = describe ? FacilityJobs.fetch(facility, "rack", "part").deliver("table", placePoint, surfaces[0], surfaces[1], partBox) :
-            FacilityJobs.fetch(facility, "rack", "part").deliver("table", placePoint);
+        var fetch = FacilityJobs.fetch(facility, "rack", "part");
+        var job = describe == "explicit" ? fetch.deliver("table", placePoint, surfaces[0], surfaces[1], partBox) :
+            fetch.deliver("table", placePoint);
         var actions = job.orderedActions();
         worker.bindPick(cast actions[1], part, slotPoint);
         worker.bindPlace(cast actions[4], part, slotPoint);

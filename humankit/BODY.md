@@ -66,11 +66,13 @@ hand to the plain `gripCurl`.
 ## Jobs that do not describe their surroundings
 
 A worker only leans over an edge and closes its hand to a part's size if the job tells it what it stands at
-and picks up. Spec jobs do (`from`, `onto`, and the boxes the builder resolves). A facility job does not by
-itself: a facility model has poses and slot heights but no footprints. `FacilityFetchJob.deliver` therefore
-takes optional surface and part boxes, and without them the worker stands where its shoulder reaches the
-point and grips plainly. A station's pose is where the worker stands at the table, short of it; the table is
-elsewhere, and stepping back to the station at the end of the job is the retreat.
+and picks up. Spec jobs do (`from`, `onto`, and the boxes the builder resolves). A facility job learns it
+from the facility: a rack's or station's `Surface` and a slot's `itemHalfExtents` (automationkit), which
+`FacilityTargets.surfaceBox` and `slotItemBox` turn into boxes in the facility frame, turned with their
+owners. `FacilityFetchJob.deliver` uses them, and its optional surface and part arguments override or supply
+what the facility does not say. With neither, the worker stands where its shoulder reaches the point and
+grips plainly. A station's pose is where the worker stands at the table, short of it, so its `Surface` sits
+ahead of that pose; stepping back to the station at the end of the job is the retreat.
 
 ## Keeping it natural
 

@@ -23,16 +23,19 @@ class FacilityFetchJob {
   }
 
   /**
-   * The job: fetch the part from its slot, walk the lane, set it down at `placePoint`. A facility model
-   * has no footprints, so the caller may describe what the worker stands at: `rackSurface` and
-   * `stationSurface` are the tops the part rests on at each end, and `part` is the part's box. With them
-   * the worker stands clear of each surface's edge and leans over it, and closes its fingers to the
-   * part's size; without them it stands where its shoulder reaches the point and grips plainly.
+   * The job: fetch the part from its slot, walk the lane, set it down at `placePoint`. The worker leans
+   * over the rack's and the station's tops and closes its fingers to the part's size when the facility
+   * describes them (a rack's and station's `surface`, a slot's `itemHalfExtents`); a caller may pass
+   * `rackSurface`, `stationSurface`, or `part` to override or supply what the facility does not. With
+   * neither, the worker stands where its shoulder reaches the point and grips plainly.
    */
   public function deliver(stationId:String, placePoint:Array<Float>, ?rackSurface:HumanTargetBox,
       ?stationSurface:HumanTargetBox, ?part:HumanTargetBox):HumanJob {
     if (placePoint == null || placePoint.length < 3) throw "Delivery needs a world place point";
     var slot = targets.rackSlotPoint(rackId, slotId);
+    if (rackSurface == null) rackSurface = targets.surfaceBox(rackId);
+    if (stationSurface == null) stationSurface = targets.surfaceBox(stationId);
+    if (part == null) part = targets.slotItemBox(rackId, slotId);
     var route = targets.route(rackId, stationId);
     var path = FacilityWalk.routeFromFacilityRoute(route);
     var station = path[path.length - 1];
