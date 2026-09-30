@@ -206,3 +206,11 @@ Two attempts to widen in-place rebuilds were measured and removed:
 The interaction scenario now also has `hover-field` and `hover-away`, and `MATERIA_INTERACTION_ONLY=hover-enter,hover-other` (comma list) skips every other action, so the census can be run on one kind of frame.
 The remaining per-frame cost is flat in the census (nothing above about 3%): pane key strings, boxed booleans returned by `RenderNode.walk`, style diffs, event objects. Note that `hl.Gc.totalAllocated` is global, so the 52 KiB idle floor
 includes another thread; the census attributes about 95 KiB to a whole hover frame including the harness.
+
+### String literals are created once (2026-09-30, haxeon `23104c59`)
+
+Every string literal evaluation used to allocate a 24-byte `String` object, even a plain comparison, so `RenderNode.invoke` alone allocated about 8 KiB per frame passing `"capture"`, `"target"` and `"bubble"`.
+In a build nothing will patch (the default; `--live` is off) a literal is now a global holding one `String` object, created by the VM from the HLB constants section when the module loads; a live module keeps the old path because
+a patch cannot add a global. Same app source, old compiler against new, tab-matrix cycle: allocations 42,466 to 32,828 (-22.7%), bytes 1,714 to 1,488 KiB (-13.2%), `String` objects 12,034 to 2,396.
+An IR pass that hoisted each literal to the entry block was tried first and made things worse (+14% allocations: error-message literals in loops were allocated on every call, loop or not) and was reverted; only a constant is free.
+Interaction frames with the new compiler (KiB, harness floor of about 48 included): hover onto a tab 153, scroll 196, type a character 174.
