@@ -1,0 +1,28 @@
+{
+	"version": 1,
+	"buildDir": "build/workspace",
+	"projects": [
+		{ "path": "animkit/tests/haxeon.json", "name": "animkit" },
+		{ "path": "automationkit/tests/haxeon.json", "name": "automationkit" },
+		{ "path": "camkit/tests/haxeon.json", "name": "camkit", "tags": ["cadkit"] },
+		{ "path": "cnckit/tests/haxeon.json", "name": "cnckit" },
+		{ "path": "editorkit/tests/haxeon.json", "name": "editorkit" },
+		{ "path": "humankit/tests/haxeon.json", "name": "humankit" },
+		{ "path": "humankit/sim/tests/haxeon.json", "name": "humankit-sim", "tags": ["mujoco"] },
+		{ "path": "machinekit/tests/haxeon.json", "name": "machinekit", "tags": ["cadkit"] },
+		{ "path": "manufacturingkit/tests/haxeon.json", "name": "manufacturingkit" },
+		{ "path": "motionkit/tests/haxeon.json", "name": "motionkit" },
+		{ "path": "processkit/tests/haxeon.json", "name": "processkit" },
+		{ "path": "projectkit/tests/haxeon.json", "name": "projectkit" },
+		{ "path": "robotkit/tests/haxeon.json", "name": "robotkit" },
+		{ "path": "robotkit/tests/integration/haxeon.json", "name": "robotkit-integration", "tags": ["peer"] },
+		{ "path": "robotkit/tests/excavator/haxeon.json", "name": "robotkit-excavator" },
+		{ "path": "robotkit/cadbridge/tests/haxeon.json", "name": "cadbridge", "tags": ["cadkit"] },
+		{ "path": "stockkit/tests/haxeon.json", "name": "stockkit", "tags": ["cadkit"] },
+		{ "path": "toolpathkit/tests/haxeon.json", "name": "toolpathkit" },
+		{ "path": "toolpathkit/motion/tests/haxeon.json", "name": "toolpathkit-motion" },
+		{ "path": "visionkit/tests/haxeon.json", "name": "visionkit", "tags": ["opencv"] },
+		{ "path": "robotkit/tests/mujoco/haxeon.json", "name": "robotkit-mujoco", "tags": ["mujoco"] },
+		{ "path": "robotkit/cadbridge/tests/mujoco/haxeon.json", "name": "cadbridge-mujoco", "tags": ["mujoco", "cadkit"] }
+	]
+}
