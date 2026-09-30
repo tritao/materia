@@ -54,6 +54,9 @@ class AssemblyRobot {
     return free;
   }
 
+  /** How far past a joint limit a simulated joint may settle, in metres or radians. */
+  public static inline final OBSERVED_LIMIT_TOLERANCE = 0.001;
+
   /**
    * Adds the assembly to `candidate` as a robot compiled at `revision`;
    * `robotIndex` is the index that robot will have among the candidate's
@@ -136,6 +139,9 @@ class AssemblyRobot {
         closure.anchorParent, closure.axisParent));
     }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
+    // A simulated joint resting on its stop (a Z axis homed at the top of travel) settles a hair past
+    // it; without slack the runtime reads that as a limit violation and faults before any command.
+    blueprint.observedLimitTolerance = OBSERVED_LIMIT_TOLERANCE;
     var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, null, collisionHulls, closures);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,

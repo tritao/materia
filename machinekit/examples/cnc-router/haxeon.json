@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-cnc-router-example" },
+	"entry": "CncRouterPreview",
+	"sources": ["CncRouter.hx", "CncRouterPreview.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../../projectkit" },
+		"cadkit": { "path": "../../../cadkit" },
+		"machinekit": { "path": "../../" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

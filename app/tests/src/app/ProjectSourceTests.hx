@@ -334,6 +334,68 @@ class ProjectSourceTests {
     Sys.println('robot arm followed its motion track to within $worst rad over ${armSimulation.activeSession().simulationTime()} s');
   }
 
+  /**
+   * The router example opens, its axes simulate as prismatic joints in metres, and the tool follows
+   * the shipped motion that traces the stock's outline.
+   */
+  static function checkCncRouter(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
+    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the router simulates axes y, x and z");
+    for (joint in axes) {
+      var travel = joint.limits.upper - joint.limits.lower;
+      check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
+        'router axis ${joint.id} travel is in metres, got $travel');
+    }
+    check(generated.robotMotions != null && generated.robotMotions.length == 3, "the router ships one track per axis");
+    var passive = [for (record in generated.objects) if (!record.collisionEnabled) record.id];
+    check(passive.indexOf("project:screwX") >= 0 && passive.indexOf("project:blockYRight") >= 0 &&
+      passive.indexOf("project:spindle") < 0, "the router's screws and rail blocks start with collision off, the spindle on");
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session),
+      "the router builds in the shared simulation: " + simulation.error);
+    function toolPosition():Array<Float> {
+      var tool = [for (pose in simulation.capturePresentationSnapshot().environment) if (pose.id == "project:tool") pose];
+      check(tool.length == 1, "the router publishes its tool pose");
+      return tool[0].position;
+    }
+    simulation.step();
+    var start = toolPosition();
+    var tracks = new Map<String, RobotMotionTrack>();
+    for (track in generated.robotMotions) tracks.set(track.jointId, track);
+    var duration = 0.0;
+    for (track in generated.robotMotions) duration = Math.max(duration, track.keys[track.keys.length - 1].time);
+    // Tracks are offsets from the starting pose, in metres, and the tool does not turn, so its displacement is
+    // the tracks' positions whichever point of the tool the pose reports.
+    var worst = 0.0, lowest = 0.0, steps = 0;
+    while (simulation.activeSession().simulationTime() < duration && steps++ < 100000) {
+      simulation.step();
+      var now = simulation.activeSession().simulationTime();
+      var position = toolPosition();
+      var error = 0.0;
+      for (axis in 0...3) {
+        var track = tracks.get(["x", "y", "z"][axis]);
+        check(track != null, "every axis has a track");
+        error += Math.pow(position[axis] - start[axis] - track.sample(now), 2);
+      }
+      worst = Math.max(worst, Math.sqrt(error));
+      lowest = Math.min(lowest, position[2] - start[2]);
+    }
+    check(worst < 0.002, 'the router tool follows its motion to within 2 mm, off by $worst m');
+    check(lowest < -0.029, 'the tool comes down to trace the stock, lowest $lowest m');
+    session.dispose();
+    Sys.println('cnc router followed its motion to within ${Math.round(worst * 1e5) / 100} mm over $duration s');
+  }
+
   /** A project named at launch builds in the background: queued at once, opened by tick(). */
   static function checkBackgroundLaunch(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
@@ -662,6 +724,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkCncRouter(root);
     checkBackgroundLaunch(root);
     return 0;
   }

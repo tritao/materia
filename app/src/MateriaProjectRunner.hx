@@ -68,6 +68,7 @@ class MateriaProjectRunner {
     scene.robotMotions = projectMotions(motion, scene);
     scene.robotGrips = RobotGripEvent.decode(motion == null ? null : Reflect.field(motion, "grips"));
     applyDynamicParts(manifestPath, scene);
+    applyCollisionDisabledParts(manifestPath, scene);
     return scene;
   }
 
@@ -104,6 +105,27 @@ class MateriaProjectRunner {
         found = true;
       }
       if (!found) throw 'Project dynamic part "$id" is not a part of the generated scene';
+    }
+  }
+
+  /**
+   * The manifest's optional `collisionDisabledParts` lists parts that start with collision off, such
+   * as a lead screw running through its nut bracket or a rail block riding its rail: parts of one
+   * machine that touch by design and would otherwise drag on each other in the simulation.
+   */
+  static function applyCollisionDisabledParts(manifestPath:String, scene:GeneratedAssemblyScene):Void {
+    var root:Dynamic = Json.parse(File.getContent(manifestPath));
+    var listed:Dynamic = Reflect.field(root, "collisionDisabledParts");
+    if (listed == null) return;
+    if (!Std.isOfType(listed, Array)) throw 'Project field "collisionDisabledParts" must be a list of part ids';
+    for (id in (cast listed:Array<Dynamic>)) {
+      if (!Std.isOfType(id, String)) throw 'Project field "collisionDisabledParts" must be a list of part ids';
+      var found = false;
+      for (record in scene.objects) if (record.id == "project:" + id) {
+        record.collisionEnabled = false;
+        found = true;
+      }
+      if (!found) throw 'Project collision-disabled part "$id" is not a part of the generated scene';
     }
   }
 
