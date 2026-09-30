@@ -77,6 +77,10 @@ class ApplicationSimulation {
   var humanScene:Null<EditorScene> = null;
   var assemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
   var running:Bool = false;
+  /** Wall-clock stamp of the previous pump, or negative when pacing restarts. */
+  var pumpStamp:Float = -1.0;
+  /** Most ticks one pump runs; a slower owner loses simulation time instead of bursting. */
+  static inline var MAX_TICKS_PER_PUMP:Int = 5;
   var presentAssemblyPhysics:Bool = false;
   var presentationEpoch:Int = 0;
   final participants:Array<SessionParticipant> = [];
@@ -382,7 +386,7 @@ class ApplicationSimulation {
       // Nothing below can fail: participants move to the new session, which
       // then starts if the old one was running.
       for (participant in participants) participant.join(createdSpace.session);
-      if (running) createdSpace.session.start();
+      pumpStamp = -1.0;
       simulation = candidate;
       space = candidateSpace;
       simulatedIds = [for (robot in candidateRobots) robot.id()];
@@ -463,10 +467,10 @@ class ApplicationSimulation {
   public function start():Void {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";
-    if (!running) { active.session.start(); presentationEpoch++; }
+    if (!running) { pumpStamp = -1.0; presentationEpoch++; }
     running = true; presentAssemblyPhysics = true;
   }
-  public function stop():Void { var active = space; if (active != null) active.session.stop(); running = false;
+  public function stop():Void { var active = space; if (active != null) active.session.stop(); running = false; pumpStamp = -1.0;
     if (presentAssemblyPhysics) presentationEpoch++;
     presentAssemblyPhysics = false; }
   public function reset():Bool {
@@ -488,9 +492,34 @@ class ApplicationSimulation {
   }
   public function humanWorkerIds():Array<String> return [for (entry in humanWorkers) entry.id];
 
-  /** Feed worker keyframes from simulation time, also during realtime sessions. */
+  /**
+   * Runs the realtime simulation from the owner's loop: the ticks that the
+   * wall time since the last pump has made due, each fed to the robots and
+   * workers before it runs. Workers advance on the simulation clock, one call
+   * per tick, so a slow frame cannot starve them of motion.
+   */
+  public function pump():Void {
+    var active = space;
+    if (active == null || !running) return;
+    var now = Sys.time();
+    var elapsed = pumpStamp < 0.0 ? 0.0 : Math.max(0.0, now - pumpStamp);
+    pumpStamp = now;
+    var due = active.session.dueTicks(haxe.Int64.fromFloat(elapsed * 1.0e9), MAX_TICKS_PER_PUMP);
+    for (_ in 0...due) {
+      feedTick();
+      active.session.stepPaced();
+    }
+    if (due > 0) presentWorkers();
+  }
+
+  /** Deterministic stepping feeds and presents the workers around each tick. */
   public function advanceWorkers():Void {
-    var scene = humanScene;
+    feedTick();
+    presentWorkers();
+  }
+
+  /** Feeds the robot motion tracks and every worker for the tick about to run. */
+  function feedTick():Void {
     var active = space;
     if (active != null) {
       var commands = new Map<String, Array<JointTarget>>();
@@ -505,9 +534,15 @@ class ApplicationSimulation {
         if (robot != null) robot.submit(RobotCommand.JointTargets(commands.get(id), null));
       }
     }
+    if (humanScene == null) return;
+    for (entry in humanWorkers) entry.worker.advance();
+  }
+
+  /** Publishes each worker's current pose to the scene, once per presented frame. */
+  function presentWorkers():Void {
+    var scene = humanScene;
     if (scene == null) return;
     for (entry in humanWorkers) {
-      entry.worker.advance();
       var matrix = entry.worker.body.rootTransform();
       var transform = Transform.identity();
       for (index in 0...16) transform.set(index, matrix[index]);

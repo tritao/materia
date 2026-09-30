@@ -24,7 +24,8 @@ import NativeKitSim;
 
 /** A job-driven animated worker and its physical capsule actor. */
 class HumanWorker {
-	static inline var LEAD_TICKS:Int = 3;
+	/** The tick about to run completes one step ahead of the session clock. */
+	static inline var LEAD_TICKS:Int = 1;
 	/** Pin a part where it rests: a reach toward it has started, or the hand has just opened on it. */
 	static inline var PIN:Int = 0;
 	/** Move the part to the hand, at the hand's grip-time pose. */
@@ -197,7 +198,12 @@ class HumanWorker {
 		links.push({id: id, pose: pose, radius: radius});
 	}
 
-	/** Call before stepping the session. Jobs and actor poses run three ticks ahead. */
+	/**
+	 * Call once before every tick of the session, however the session is driven
+	 * (`SimSession.stepPaced` from the owner's loop, or `step`). The job and the
+	 * actor pose run one tick ahead: the pose for the tick about to complete, and
+	 * the pin, hold and release events that belong to it, land before it runs.
+	 */
 	public function advance():Void {
 		if (disposed) throw "Worker is disposed";
 		if (loopSpec != null && job != null && job.isDone()) {
@@ -268,6 +274,7 @@ class HumanWorker {
 					if (grip && Std.isOfType(current, Place)) level(binding.object, elapsed, target);
 				}
 			}
+			flushPending(now + dt);
 		}
 	}
 
