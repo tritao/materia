@@ -473,6 +473,33 @@ class KinematicsTests extends MotionKitTestSupport {
     check(overshoot <= 1e-9, 'the base joint never passes its stop ($overshoot)');
     near(positions()[0], 1.2, "the base joint ends on its stop", 1e-3);
     check(worstJump <= accel * dt + 1e-9, 'approaching the stop stays within the acceleration limits ($worstJump)');
+
+    // The host stalls mid-stream: the runtime enforces the deadline itself and brakes every joint.
+    var back = new motionkit.kinematics.Twist6(0.0, 0.0, -0.08, 0.0, 0.0, 0.0);
+    for (_ in 0...60) tickOnce(back);
+    // The last targets sent carry the last command's 100 ms deadline.
+    var stalledAt = session.nowNs();
+    var seen = [for (i in 0...6) robot.snapshot().velocities.get(i)];
+    var moving = 0.0;
+    for (v in seen) moving = Math.max(moving, Math.abs(v));
+    check(moving > 0.05, 'the arm is moving when the host stalls ($moving rad/s)');
+    var stalledJump = 0.0, stoppedAfter = -1.0;
+    for (step in 0...200) {
+      harness.step(Int64.ofInt(tick++));
+      var now = [for (i in 0...6) robot.snapshot().velocities.get(i)];
+      var fastestNow = 0.0;
+      for (i in 0...6) {
+        stalledJump = Math.max(stalledJump, Math.abs(now[i] - seen[i]));
+        fastestNow = Math.max(fastestNow, Math.abs(now[i]));
+      }
+      seen = now;
+      if (fastestNow <= 1e-9 && stoppedAfter < 0.0) stoppedAfter = Int64.toInt(robot.snapshot().sourceTimestampNs - stalledAt) * 1e-9;
+    }
+    check(stoppedAfter >= 0.1, 'the runtime keeps the stream running until its deadline ($stoppedAfter s)');
+    check(stoppedAfter <= 0.1 + moving / accel + 0.02,
+      'the runtime stops a stalled stream within v/a of its deadline ($stoppedAfter s)');
+    check(stalledJump <= accel * dt * 1.01, 'the runtime brakes within the acceleration limits ($stalledJump)');
+    check(robot.snapshot().faultCode == 7, "the snapshot reports the lapsed command");
     session.dispose();
     harness.dispose();
   }

@@ -202,6 +202,8 @@ private:
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
+        /** Source-clock time a velocity target lapses (0: never); see rk_robot_command.expires_at_ns. */
+        uint64_t velocity_expiry_ns[RK_MAX_JOINTS]{};
         std::deque<RuntimeTrajectoryPoint> trajectory;
         std::deque<QueuedEvent> events;
         rk_event_value channel_values[RK_MAX_PROCESS_CHANNELS]{};

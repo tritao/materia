@@ -117,6 +117,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_EVENT_SCHEDULED = 1;
 	const RK_EVENT_STOP_SAFE = 4;
 	const RK_FAULT_CLOCK_SYNC_LOST = 4;
+	/**
+	 * A velocity target outlived its command's expires_at_ns; the joint brakes to zero.
+	 */
+	const RK_FAULT_COMMAND_EXPIRED = 7;
 	const RK_FAULT_DUAL_DRIVE_SKEW = 5;
 	const RK_FAULT_QUEUE_REVISION_MISMATCH = 6;
 	const RK_FAULT_RAMP_LIMIT = 3;
@@ -577,7 +581,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Command metadata and optional fixed-capacity joint-target payload.
 	 */
-	struct rk_robot_command @layout(18464, 8) {
+	struct rk_robot_command @layout(18472, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -608,6 +612,15 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * RK_MAX_SERVO_JOINTS so the command stays small to copy.
 		 */
 		servos: array<rk_joint_servo, 64> @offset(16416);
+		/**
+		 * JOINT_TARGETS only; zero means none. The time, on the robot's source
+		 * clock (rk_robot_state.source_timestamp_ns), after which this batch's
+		 * velocity targets lapse: once the latest sample reaches it, each such
+		 * joint brakes to zero within its max_acceleration (at once without one)
+		 * and holds zero, and the snapshot reports RK_FAULT_COMMAND_EXPIRED. A later target for the joint replaces
+		 * the deadline. Position, effort and servo targets hold their value.
+		 */
+		expires_at_ns: u64 @offset(18464);
 	}
 	/**
 	 * Bulk compiled robot description consumed when a RobotRuntime is created.

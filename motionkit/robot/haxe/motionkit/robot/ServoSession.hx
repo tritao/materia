@@ -41,10 +41,13 @@ class ServoTick {
  *   twist becomes zero and the arm brakes to rest within its acceleration
  *   limits, so a lost operator leaves the arm standing, not moving on.
  *
- * The clock is the snapshot's `sourceTimestampNs`. The host enforces the
- * deadline; the joint targets it sends carry none (the runtime cannot yet
- * enforce one), so `update` must keep being called while the arm moves.
- * Joint targets are sticky in the runtime, so braking ends with exact zeros.
+ * The clock is the snapshot's `sourceTimestampNs`. The joint targets carry
+ * the deadline too (braking ones a two-period keepalive), so if the host
+ * stalls, the runtime brakes each joint to zero within its own acceleration
+ * limit. That brake is plain per joint, so the tool leaves its line and a
+ * joint may reach its limit; while `update` runs, the session's brake keeps
+ * the servo's limits. Joint targets are sticky in the runtime, so braking
+ * ends with exact zeros, sent without a deadline.
  * Needs a cyclic endpoint that accepts joint velocity targets (simulation);
  * devices that interpolate plans need a short-horizon variant.
  */
@@ -133,7 +136,10 @@ class ServoSession {
     // exact zero, or the last tiny command would keep the arm creeping.
     if (!live) for (i in 0...commanded.length) if (Math.abs(commanded[i]) <= restVelocity) commanded[i] = 0.0;
     var targets = [for (i in 0...indices.length) JointTarget.velocity(indices[i], commanded[i])];
-    robot.submit(RobotCommand.JointTargets(targets, null));
+    // The runtime enforces the deadline if this host stalls; a brake in progress gets a short keepalive.
+    var expiry:Null<Int64> = live ? deadlineNs
+      : isAtRest(commanded) ? null : now + Int64.fromFloat(2.0 * controlPeriod * 1e9);
+    robot.submit(RobotCommand.JointTargets(targets, expiry));
     return new ServoTick(commanded.copy(), !live, !live && isAtRest(commanded), step);
   }
 

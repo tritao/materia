@@ -133,14 +133,18 @@ class RobotRuntime {
     return value.get_supports_execution_plans() != 0;
   }
 
-  /** Submits a complete heterogeneous joint-target batch in one native call. */
+  /**
+   * Submits a complete heterogeneous joint-target batch in one native call.
+   * `expiresAtNs` (robot source clock, as in snapshots) makes the batch's
+   * velocity targets lapse then: the runtime brakes those joints to zero.
+   */
   public function submitTargets(targets:Array<robotkit.world.JointTarget>, sequence:Int,
-      ?timestampNs:haxe.Int64):Void {
-    submitTargets64(targets, haxe.Int64.ofInt(sequence), timestampNs);
+      ?timestampNs:haxe.Int64, ?expiresAtNs:haxe.Int64):Void {
+    submitTargets64(targets, haxe.Int64.ofInt(sequence), timestampNs, expiresAtNs);
   }
 
   public function submitTargets64(targets:Array<robotkit.world.JointTarget>, sequence:haxe.Int64,
-      ?timestampNs:haxe.Int64):Void {
+      ?timestampNs:haxe.Int64, ?expiresAtNs:haxe.Int64):Void {
     ensureLive();
     var batch = robotkit.world.JointTarget.copyBatch(targets);
     var command = new rk_robot_command();
@@ -148,6 +152,7 @@ class RobotRuntime {
     command.set_sequence(sequence);
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_JOINT_TARGETS);
+    command.set_expires_at_ns(expiresAtNs == null ? haxe.Int64.ofInt(0) : expiresAtNs);
     command.set_target_count(batch.length);
     for (index in 0...batch.length) {
       var targetValue = batch[index];

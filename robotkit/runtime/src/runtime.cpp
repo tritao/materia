@@ -1193,9 +1193,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         return RK_ERROR_LIMIT;
                     }
                 }
+                if (control_.diagnostic_code == RK_FAULT_COMMAND_EXPIRED)
+                    control_.diagnostic_code = 0;
                 for (uint32_t target_index = 0; target_index < value.target_count; ++target_index) {
                     const auto &target = value.targets[target_index];
                     const auto joint = target.joint;
+                    control_.velocity_expiry_ns[joint] =
+                        target.mode == RK_TARGET_VELOCITY ? value.expires_at_ns : 0;
                     if (target.mode == RK_TARGET_POSITION &&
                         (!control_.active[joint] || control_.targets[joint].mode != RK_TARGET_POSITION)) {
                         control_.position_reference[joint] = current.position[joint];
@@ -1441,6 +1445,26 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             auto target = control_.targets[joint];
             if (target.mode == RK_TARGET_VELOCITY && target.max_rate > 0.0)
                 target.target = std::clamp(target.target, -target.max_rate, target.max_rate);
+            const uint64_t expiry = control_.velocity_expiry_ns[joint];
+            // Deadlines are on the source clock, so they are checked against
+            // the latest sample: the clock the host reads its deadline from.
+            if (target.mode == RK_TARGET_VELOCITY && expiry != 0 &&
+                current.source_timestamp_ns >= expiry) {
+                // A lapsed velocity target: brake to zero within the joint's
+                // acceleration limit, then hold an exact zero.
+                const double acceleration = blueprint_.joints[joint].max_acceleration;
+                const double step = acceleration > 0.0 && std::isfinite(period_seconds)
+                    ? acceleration * period_seconds : std::numeric_limits<double>::infinity();
+                const double speed = std::max(0.0, std::abs(target.target) - step);
+                target.target = std::copysign(speed, target.target);
+                control_.targets[joint].target = target.target;
+                if (speed == 0.0) {
+                    control_.targets[joint].target = 0.0;
+                    target.target = 0.0;
+                    control_.velocity_expiry_ns[joint] = 0;
+                }
+                control_.diagnostic_code = RK_FAULT_COMMAND_EXPIRED;
+            }
             if (target.mode == RK_TARGET_POSITION) {
                 if (!control_.reference_initialized[joint]) {
                     control_.position_reference[joint] = current.position[joint];

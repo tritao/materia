@@ -126,9 +126,29 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
   - Test (SimulatedRobot, 10 ms): follows a 5 cm/s twist, keeps per-tick
     jumps ≤ a·dt, brakes within peak/a after a missed deadline, holds still,
     and turns the base into its stop with no overshoot.
+- 2026-09-30 — **D5b done: runtime-enforced deadlines.**
+  - `rk_robot_command.expires_at_ns` is appended to the ABI. It is on the
+    robot's source clock, and `RobotCommand.JointTargets.expiryNs` finally
+    carries it.
+  - Once the latest sample reaches the deadline, each of the batch's
+    velocity targets brakes to zero at the joint's `max_acceleration` (at
+    once without one), then holds zero. The snapshot reports
+    `RK_FAULT_COMMAND_EXPIRED` (non-latched) until the next target batch.
+  - The deadline is compared with the source clock, not mapped onto the
+    owner clock: the simulation's owner clock is a tick counter, and the
+    host reads its deadline from the source clock anyway. A source clock
+    that stops advancing is the sample-staleness watchdog's job.
+  - `ServoSession` sends the command deadline with live targets, a
+    two-period keepalive while braking, and none on the final zeros.
+  - Tests: a native runtime test covers timing, a·dt per period, the exact
+    zero hold, the diagnostic clearing, lapsing at once, and renewal. In the
+    MotionKit test the host stops calling `update` mid-stream; the simulated
+    arm keeps moving until the deadline (100 ms), then stops within v/a,
+    changing speed by at most a·dt per tick.
   - Still open:
-    - **D5b:** the runtime does not enforce deadlines itself. A stalled host
-      leaves the last velocity target running, so the runtime needs a
-      watchdog with an accel-limited stop.
+    - The runtime's brake is plain per joint (the tool leaves its line).
+      Braking along the path would need the servo in the runtime.
+    - Remote robots (robotd) still reject deadlines until host and robot
+      clocks are mapped.
     - **D5c:** the virtual device rejects JOINT_TARGETS, so servoing there
       needs short plan horizons.

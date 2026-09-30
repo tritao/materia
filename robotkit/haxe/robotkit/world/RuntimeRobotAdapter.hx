@@ -103,10 +103,10 @@ class RuntimeRobotAdapter implements Robot {
     ensureOpen();
     switch command {
       case JointTargets(targets, expiryNs):
-        if (expiryNs != null && Int64.compare(expiryNs, Int64.ofInt(0)) != 0)
-          throw "Runtime command deadlines are not supported; use bounded local intents";
+        // In-process, the deadline is on the snapshot's source clock, which the runtime maps itself.
         commandSequence++;
-        runtime.submitTargets(targets, commandSequence);
+        runtime.submitTargets(targets, commandSequence, null,
+          expiryNs == null || Int64.compare(expiryNs, Int64.ofInt(0)) == 0 ? null : expiryNs);
       case TrajectoryChunk(chunk):
         if (!supportsTrajectoryQueue)
           throw "Runtime endpoint does not support buffered trajectories";
