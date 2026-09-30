@@ -1,6 +1,7 @@
 #include "asset.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -341,6 +342,7 @@ private:
             normals != nullptr && normals->count == vertex_count) {
             primitive.normals.resize(vertex_count * 3);
             cgltf_accessor_unpack_floats(normals, primitive.normals.data(), primitive.normals.size());
+            smoothNormals(primitive);
         } else {
             generateNormals(primitive);
         }
@@ -391,6 +393,54 @@ private:
             for (int i = 0; i < 3; ++i) primitive.joint_weights[v * 3 + i] = weight[i] / sum;
         }
         if (clamped) warn("primitive '" + primitive.name + "' references joints outside its skin");
+    }
+
+    /**
+     * Hard-edge exports duplicate every vertex per face, which shades as
+     * facets. Vertices at one position blend their normals when the authored
+     * normals lie within kCreaseAngle of each other, weighted by face area;
+     * sharper edges stay crisp. Vertex count, UVs, and skin weights are kept.
+     */
+    static void smoothNormals(Primitive &primitive) {
+        constexpr float kCreaseCos = 0.5f; // cos(60 degrees)
+        const auto &p = primitive.positions;
+        const size_t count = p.size() / 3;
+        std::vector<float> area_normals(p.size(), 0.0f);
+        for (size_t t = 0; t + 2 < primitive.indices.size(); t += 3) {
+            const uint32_t a = primitive.indices[t], b = primitive.indices[t + 1], c = primitive.indices[t + 2];
+            const float e1[3] = {p[b * 3] - p[a * 3], p[b * 3 + 1] - p[a * 3 + 1], p[b * 3 + 2] - p[a * 3 + 2]};
+            const float e2[3] = {p[c * 3] - p[a * 3], p[c * 3 + 1] - p[a * 3 + 1], p[c * 3 + 2] - p[a * 3 + 2]};
+            const float n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2],
+                e1[0] * e2[1] - e1[1] * e2[0]};
+            for (uint32_t vertex : {a, b, c})
+                for (int i = 0; i < 3; ++i) area_normals[vertex * 3 + i] += n[i];
+        }
+
+        std::map<std::array<int64_t, 3>, std::vector<uint32_t>> groups;
+        for (size_t v = 0; v < count; ++v) {
+            std::array<int64_t, 3> key;
+            for (int i = 0; i < 3; ++i) key[i] = std::llround(p[v * 3 + i] * 10000.0);
+            groups[key].push_back(static_cast<uint32_t>(v));
+        }
+
+        std::vector<float> smoothed = primitive.normals;
+        for (const auto &entry : groups) {
+            const auto &group = entry.second;
+            if (group.size() < 2) continue;
+            for (uint32_t v : group) {
+                const float *own = primitive.normals.data() + v * 3;
+                float sum[3] = {0.0f, 0.0f, 0.0f};
+                for (uint32_t w : group) {
+                    const float *other = primitive.normals.data() + w * 3;
+                    if (own[0] * other[0] + own[1] * other[1] + own[2] * other[2] < kCreaseCos) continue;
+                    for (int i = 0; i < 3; ++i) sum[i] += area_normals[w * 3 + i];
+                }
+                const float length = std::sqrt(sum[0] * sum[0] + sum[1] * sum[1] + sum[2] * sum[2]);
+                if (length > 0.0f)
+                    for (int i = 0; i < 3; ++i) smoothed[v * 3 + i] = sum[i] / length;
+            }
+        }
+        primitive.normals = std::move(smoothed);
     }
 
     static void generateNormals(Primitive &primitive) {
