@@ -43,6 +43,7 @@ class HumanSimTests {
         GraspShapeTests.run();
         FacilitySweepTests.run();
         TwoHandSweepTests.run();
+        PressSweepTests.run();
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var rig = HumanoidRig.detect(asset);
         var scene = Scene.create();
