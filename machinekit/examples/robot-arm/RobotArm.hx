@@ -1,12 +1,17 @@
-import cadkit.modeling.Location;
 import cadkit.modeling.Part;
-import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
+import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
+import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
+import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorPlate;
+import machinekit.robotics.FrameBar;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
 import materia.assembly.AssemblyFrames;
@@ -22,9 +27,9 @@ enum ArmAxis {
  * rotating output `rotor` face at z=length. The housing belongs to the link before the joint;
  * the next link mates its `start` connector to `rotor` on a revolute joint.
  *
- * A module given a `flange` is the last joint of the arm. It carries a `tool` connector instead of
- * `rotor`, facing back into the housing like `Pedestal`'s `top`, so the flange mated to it sits
- * outside the housing with its pilot boss in a recess cut by the flange's own `mountingCutout`.
+ * A module given a `flange` is the last joint of the arm. Its output carries the `RobotFlange`
+ * plate against the housing end, so it has a `tool` connector at the flange's mounting face
+ * instead of `rotor`: mate the flange's `face` to it, and a tool mates to the flange's pilot boss.
  */
 class ArmJoint extends MachineComponent {
 	public final diameter:Float;
@@ -44,22 +49,14 @@ class ArmJoint extends MachineComponent {
 			addConnector("rotor", Mount, Solids.axial(0, 0, length));
 		} else {
 			if (!(diameter >= flange.flangeDiameter + 2)) throw "Arm joint is too narrow for its tool flange";
-			addConnector("tool", Mount, AssemblyFrames.compose(
-				AssemblyFrames.alongY(0, 0, length, 0, 0, -1), AssemblyFrames.turnY(Math.PI / flange.boltCount)));
+			addConnector("tool", Mount, flange.pinAlignedFrame(length + flange.thickness));
 		}
 	}
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.cylinderSpan(diameter / 2, 0, length);
-		if (flange == null || detail == Envelope) return body;
-		var depth = flange.pilotRecessDepth() + 2 * flange.mountScrewPart(10).diameter;
-		var cut = flange.mountingCutout(depth);
-		var placed = cut.placed(new Location(new Plane(new Vector(0, 0, length), Vector.X(), Vector.Z().scale(-1))));
-		cut.close();
-		return Solids.cut(body, [placed]);
-	}
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return Part.cylinderSpan(diameter / 2, 0, length);
 }
 
 /** Hollow tube link along local +Z, closed at both ends, with a collar where it meets the
@@ -117,6 +114,37 @@ class ArmLink extends MachineComponent {
 	}
 }
 
+/** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
+ * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`.
+ * Its `contact` working frame is the cup's contact face.
+ */
+class ArmSuctionTool {
+	public static function build(flange:RobotFlange):EndEffector {
+		var result = new EndEffector();
+		result.addComponent("plate", new EndEffectorPlate(flange));
+		result.addComponent("bar", new FrameBar(30, 20, 90));
+		result.addComponent("ejector", new SchmalzVacuumGenerator("10.02.01.00563"));
+		result.addComponent("cup", new SchmalzSuctionCup("10.01.01.11401"));
+		result.addComponent("fitting", new SchmalzPushInFitting("10.08.02.00203"));
+		result.addComponent("hose", new SchmalzVacuumHose("10.07.09.00001", [
+			new Vector(20, 0, 40), new Vector(35, 0, 60),
+			new Vector(35, 0, 100), new Vector(-30, 0, 100), new Vector(0, 0, 90)]));
+		result.mount("plate", "robot");
+		result.addMate("bar-mate", "fixed", "plate", "tool", "bar", "base");
+		result.addMemberConnector("bar", "ejector-seat", Solids.axial(20, 0, 20));
+		result.addMate("ejector-mate", "fixed", "bar", "ejector-seat", "ejector", "mount");
+		result.addMate("cup-mate", "fixed", "bar", "end", "cup", "mount");
+		result.addMate("fitting-mate", "fixed", "cup", "mount", "fitting", "mount");
+		result.addMate("hose-mate", "fixed", "bar", "base", "hose", "mount");
+		result.connectPorts("ejector-hose", "ejector", "vacuum", "hose", "input");
+		result.connectPorts("hose-fitting", "hose", "output", "fitting", "hose");
+		result.connectPorts("fitting-cup", "fitting", "thread", "cup", "vacuum");
+		result.exposePort("compressedAir", "ejector", "air");
+		result.workingFrame("contact", "cup", "contact", true);
+		return result;
+	}
+}
+
 /** One joint's motion limits and the pose it starts in, in radians and rad/s. */
 typedef ArmJointSpec = {
 	var id:String;
@@ -128,7 +156,7 @@ typedef ArmJointSpec = {
 	var initial:Float;
 }
 
-/** Six-axis serial arm on a pedestal, in the classic shoulder/elbow/spherical-wrist layout.
+/** Six-axis serial arm on a pedestal with a suction tool, in the classic shoulder/elbow/spherical-wrist layout.
  *
  * At zero on every joint the arm points straight up. Joints `j1`, `j4` and `j6` turn about the
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
@@ -141,6 +169,7 @@ class RobotArm extends MachineAssembly {
 	public final flange = new RobotFlange(63);
 	public final pedestal:Pedestal;
 	public final toolFlange = new RobotFlange(31.5);
+	public final tool:EndEffector;
 	public final joints:Array<ArmJoint>;
 	public final links:Array<ArmLink>;
 	public final specs:Array<ArmJointSpec>;
@@ -185,7 +214,13 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
+		tool = ArmSuctionTool.build(toolFlange);
+		include("tool", tool);
+		addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
 		exposeConnector("toolFace", "toolFlange", "face");
+		exposeConnector("toolContact", "tool/cup", "contact");
+		// The ejector's compressed-air inlet is the arm's own service input.
+		exposePort("compressedAir", "tool/ejector", "air");
 	}
 
 	function revolute(spec:ArmJointSpec, housing:String, rotorConnector:String, child:String,

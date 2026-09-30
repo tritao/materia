@@ -187,8 +187,19 @@ class ProjectSourceTests {
     var index = new Map<String, Int>();
     for (position in 0...model.joints.length) index.set(model.joints[position].id, position);
     var id = "assembly:" + definition.id;
+    armSimulation.step();
+    var startPoses = armSimulation.capturePresentationSnapshot().environment;
+    var startCup = [for (pose in startPoses) if (pose.id == "project:tool/cup") pose];
+    check(startCup.length == 1 && [for (pose in startPoses) if (StringTools.startsWith(pose.id, "project:")) pose].length ==
+      definition.occurrences.length, "robot arm publishes a pose for every part, tool included");
     var steps = 0;
     while (armSimulation.activeSession().simulationTime() < 3.4 && steps++ < 20000) armSimulation.step();
+    var movedCup = [for (pose in armSimulation.capturePresentationSnapshot().environment)
+      if (pose.id == "project:tool/cup") pose];
+    check(movedCup.length == 1, "robot arm keeps publishing the suction cup pose");
+    var travel = 0.0;
+    for (axis in 0...3) travel += Math.pow(movedCup[0].position[axis] - startCup[0].position[axis], 2);
+    check(Math.sqrt(travel) > 0.2, "the suction cup moves with the arm");
     var observed = armWorld.snapshot().robot(id);
     if (observed == null) throw "robot arm is missing from the world snapshot";
     var positions = observed.positions;

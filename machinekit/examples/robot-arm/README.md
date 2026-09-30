@@ -15,9 +15,10 @@ returns.
 
 ## What it contains
 
-`RobotArm` is a `MachineAssembly` of 14 parts: a `Pedestal` with its
-`RobotFlange`, six joint modules, five links, and the tool `RobotFlange`. The
-arm has the classic shoulder, elbow and spherical-wrist layout:
+`RobotArm` is a `MachineAssembly` of 20 parts: a `Pedestal` with its
+`RobotFlange`, six joint modules, five links, the tool `RobotFlange`, and a
+suction tool. The arm has the classic shoulder, elbow and spherical-wrist
+layout:
 
 | Joint | Axis at the zero pose | Range (rad) |
 | ----- | --------------------- | ----------- |
@@ -31,13 +32,22 @@ arm has the classic shoulder, elbow and spherical-wrist layout:
 At zero on every joint the arm points straight up; the saved pose is a ready
 pose with the tool pointing down.
 
+## Suction tool
+
+`ArmSuctionTool` builds an `EndEffector` in the style of `examples/eoat`: an
+`EndEffectorPlate` bolted to the tool flange, a `FrameBar`, and a catalog
+Schmalz ejector, SAF 40 cup, push-in fitting and hose. The arm includes it as
+`tool/...` and mates its plate to the flange's pilot boss. The assembly exposes
+the cup's `toolContact` connector and the ejector's `compressedAir` inlet. The
+tool is geometry and ports only: nothing here simulates vacuum or grips a part.
+
 Two generators live beside the assembly, because they only make sense for this
 arm so far:
 
 - `ArmJoint` is a cylindrical joint module. Its `stator` face is fixed to the
   link before it and its `rotor` face carries the next link. The last module
-  takes a `RobotFlange` instead and cuts the flange's pilot and bolt pattern
-  into its output end.
+  takes a `RobotFlange` instead and carries it against the housing end, pilot
+  boss outward, ready for a tool plate.
 - `ArmLink` is a hollow tube closed at both ends, with a collar where it meets
   the previous joint. Its `start` and `end` connectors point along the joint
   axes given by `ArmAxis`; a lateral end joint is centred on the tube's end.
@@ -69,5 +79,5 @@ model in the simulation; they are saved with the document like any other track.
 ```
 
 The check generates the preview and verifies forward kinematics: with every
-joint at zero the tool flange is at (35, 0, 1299) mm, pointing up, and in the
-ready pose it points down.
+joint at zero the tool flange face is at (35, 0, 1306.5) mm, pointing up, and in
+the ready pose it points down with the cup contact face below it.
