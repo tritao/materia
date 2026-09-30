@@ -569,3 +569,35 @@ coordinates; for a running robot the target goes through MotionKit.
   SIMD (simde), serialization (cereal) and Python bindings are optional and
   not used. A 7-variable box-constrained QP re-solves in about 14 µs with
   warm start.
+
+### K3b — Native QP step on ProxQP; mink-shaped differential IK (2026-09-30)
+
+- proxsuite v0.7.3 vendored (pinned submodule, header-only dense solver,
+  `THIRD_PARTY.md`). `kk_qp_create/solve/destroy` solve
+  `min ½‖J·Δ − e‖² + ½λ²‖Δ‖²  s.t.  lower ≤ Δ ≤ upper` as a box-constrained
+  dense QP, warm-started across calls; the answer is projected onto the
+  bounds so limits hold exactly (ProxQP meets them only to its tolerance).
+- `kinematicskit.native.NativeQpStep` wraps it; `DifferentialIk.step`
+  evaluates a `KinematicProblem`'s tasks in Haxe (so every task kind,
+  closures and look-at included, works unchanged) and bounds Δ by the
+  configuration range and optional velocity limits, mink's formulation with
+  a per-step `gain`. Task evaluation stays in Haxe until a native servo loop
+  needs it.
+- `PostureTask` gained per-DOF weights (mink's posture cost has them).
+- Tests (`native/tests`, 339 assertions): unbounded QP = the Haxe damped
+  step within 1e-6 (the solver's 1e-9 residual tolerance amplified by up to
+  1/λ²); KKT conditions hold with active bounds; warm start does not add
+  iterations; a 7-axis arm reaches a target with velocity limits and never
+  leaves its joint range, and stops exactly on a limit that is in the way;
+  a planar 3-link arm's base-angle preference slides along its self-motion
+  while the target is met to 1e-6.
+- **Haxeon FFI bug found:** `CHeaderImporter.expansionArgument` indexes the
+  decoded header text with clang's byte offsets, so any non-ASCII character
+  earlier in a header makes array-count annotations unresolvable ("could not
+  resolve input-array count parameter"). `kinematicskit.h` stays ASCII;
+  the importer should read bytes. To fix in haxeon separately.
+- **Fixture lesson (7-axis):** a posture preference on one "elbow" joint is a
+  poor redundancy test for a 7-axis arm: at special poses (a2 = a4 = a6 = 0)
+  that joint is not in the self-motion at all, and at generic poses the
+  self-motion moves the base joints ~9x more, so the preference crawls and
+  fights the tool target. A swivel-angle task is the right tool (K3d).

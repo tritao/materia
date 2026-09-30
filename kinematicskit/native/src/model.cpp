@@ -1,8 +1,6 @@
 #include "model.hpp"
 
 #include <cmath>
-#include <mutex>
-#include <new>
 
 namespace kk {
 
@@ -13,21 +11,6 @@ bool finite(const double *values, size_t count) {
         if (!std::isfinite(values[i])) return false;
     return true;
 }
-
-// Handle layout: a 12-bit generation above a 20-bit slot. Slot 0 is never
-// used, so a zero handle is always invalid.
-constexpr uint32_t kSlotBits = 20;
-constexpr uint32_t kSlotMask = (1u << kSlotBits) - 1;
-constexpr uint32_t kGenerationMask = 0xFFF;
-
-struct Entry {
-    std::unique_ptr<Model> model;
-    uint32_t generation = 1;
-};
-
-std::mutex table_mutex;
-std::vector<Entry> table(1);
-std::vector<uint32_t> free_slots;
 
 } // namespace
 
@@ -182,44 +165,6 @@ void rotate(const double *a, double vx, double vy, double vz, double *out) {
     out[0] = vx + qw * tx + qy * tz - qz * ty;
     out[1] = vy + qw * ty + qz * tx - qx * tz;
     out[2] = vz + qw * tz + qx * ty - qy * tx;
-}
-
-uint32_t store(std::unique_ptr<Model> model) {
-    std::lock_guard<std::mutex> lock(table_mutex);
-    uint32_t slot;
-    if (!free_slots.empty()) {
-        slot = free_slots.back();
-        free_slots.pop_back();
-    } else {
-        if (table.size() > kSlotMask) return 0;
-        slot = uint32_t(table.size());
-        table.emplace_back();
-    }
-    table[slot].model = std::move(model);
-    return (table[slot].generation << kSlotBits) | slot;
-}
-
-Model *find(uint32_t handle) {
-    std::lock_guard<std::mutex> lock(table_mutex);
-    const uint32_t slot = handle & kSlotMask;
-    if (slot == 0 || slot >= table.size()) return nullptr;
-    Entry &entry = table[slot];
-    if (entry.generation != (handle >> kSlotBits) || !entry.model) return nullptr;
-    return entry.model.get();
-}
-
-void release(uint32_t handle) {
-    std::lock_guard<std::mutex> lock(table_mutex);
-    const uint32_t slot = handle & kSlotMask;
-    if (slot == 0 || slot >= table.size()) return;
-    Entry &entry = table[slot];
-    if (entry.generation != (handle >> kSlotBits) || !entry.model) return;
-    entry.model.reset();
-    // A slot retires when its generation is exhausted instead of wrapping around.
-    if (entry.generation < kGenerationMask) {
-        ++entry.generation;
-        free_slots.push_back(slot);
-    }
 }
 
 } // namespace kk

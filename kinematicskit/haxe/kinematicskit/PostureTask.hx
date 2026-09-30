@@ -8,15 +8,22 @@ package kinematicskit;
 class PostureTask implements KinematicTask {
   public final targets:Array<Float>;
   public var weight:Float;
+  /** Per-DOF multipliers of `weight` (all 1 by default; 0 leaves a DOF free). */
+  public final dofWeights:Array<Float>;
   final dofCount:Int;
   var lastError = 0.0;
 
-  public function new(model:KinematicModel, targets:Array<Float>, weight:Float) {
+  public function new(model:KinematicModel, targets:Array<Float>, weight:Float, ?dofWeights:Array<Float>) {
     if (model == null || targets == null || targets.length != model.dofCount())
       throw 'Posture task requires ${model == null ? 0 : model.dofCount()} target values';
     if (!Math.isFinite(weight) || weight < 0.0) throw "Posture task weight must be finite and non-negative";
+    if (dofWeights != null && dofWeights.length != targets.length)
+      throw "Posture task needs one DOF weight per target";
+    if (dofWeights != null) for (w in dofWeights) if (!Math.isFinite(w) || w < 0.0)
+      throw "Posture task DOF weights must be finite and non-negative";
     this.targets = targets.copy();
     this.weight = weight;
+    this.dofWeights = dofWeights == null ? [for (_ in 0...targets.length) 1.0] : dofWeights.copy();
     dofCount = model.dofCount();
   }
 
@@ -35,10 +42,11 @@ class PostureTask implements KinematicTask {
     var squared = 0.0;
     for (i in 0...dofCount) {
       var column = layout.columnOfDof[i];
-      var e = column < 0 ? 0.0 : targets[i] - state.q[i];
+      var scale = weight * dofWeights[i];
+      var e = column < 0 || scale == 0.0 ? 0.0 : targets[i] - state.q[i];
       squared += e * e;
-      residual[row + i] = weight * e;
-      for (c in 0...w) jacobian[(row + i) * w + c] = c == column ? weight : 0.0;
+      residual[row + i] = scale * e;
+      for (c in 0...w) jacobian[(row + i) * w + c] = c == column ? scale : 0.0;
     }
     lastError = Math.sqrt(squared);
   }

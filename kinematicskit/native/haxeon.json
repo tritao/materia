@@ -19,7 +19,11 @@
 				"include/kinematicskit.h",
 				"src/api.cpp",
 				"src/model.cpp",
-				"src/model.hpp"
+				"src/model.hpp",
+				"src/handles.hpp",
+				"src/qp.cpp",
+				"src/qp.hpp",
+				"src/proxsuite_config/proxsuite/config.hpp"
 			]
 		}
 	},

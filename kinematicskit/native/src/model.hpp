@@ -31,8 +31,5 @@ void compose(const double *a, const double *b, double *out);
 /** `out` (3) = rotation of `a` applied to `(vx, vy, vz)`. */
 void rotate(const double *a, double vx, double vy, double vz, double *out);
 
-uint32_t store(std::unique_ptr<Model> model);
-Model *find(uint32_t handle);
-void release(uint32_t handle);
 
 } // namespace kk

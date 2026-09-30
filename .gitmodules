@@ -51,3 +51,6 @@
 [submodule "animkit/native/vendor/stb"]
 	path = animkit/native/vendor/stb
 	url = https://github.com/nothings/stb.git
+[submodule "kinematicskit/native/vendor/proxsuite"]
+	path = kinematicskit/native/vendor/proxsuite
+	url = https://github.com/Simple-Robotics/proxsuite.git

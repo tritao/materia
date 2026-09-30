@@ -40,7 +40,7 @@ extern "C" {
 /*
  * KinematicsKit native core: the compiled kinematic model of the Haxe kit
  * (`kinematicskit.KinematicModel`), its forward kinematics and Jacobians,
- * and (from K3b) a QP differential-IK step.
+ * and a bounded damped least-squares QP step (ProxQP, dense).
  *
  * A model arrives once as two packed arrays (layout below, produced by
  * `kinematicskit.native.NativeKinematics`), so the boundary carries only
@@ -112,6 +112,43 @@ KK_API kk_result KK_CALL kk_point_jacobian(kk_model_handle model,
     uint32_t body, const double *point KK_IN_ARRAY(point_count), uint32_t point_count,
     const int32_t *columns KK_IN_ARRAY(column_count), uint32_t column_count,
     double *out_jacobian KK_OUT_ARRAY(jacobian_count), uint32_t jacobian_count);
+
+/** Why a QP step stopped (`kk_qp_solve`'s `out_status`). */
+enum {
+    KK_QP_SOLVED = 0,
+    KK_QP_MAX_ITERATIONS = 1,
+    /** The bounds admit no step (e.g. a lower bound above its upper bound). */
+    KK_QP_INFEASIBLE = 2,
+    KK_QP_FAILED = 3
+};
+
+typedef struct kk_qp_handle { uint32_t id; } kk_qp_handle
+    KK_HANDLE KK_HANDLE_DESTROY(kk_qp_destroy);
+
+/**
+ * A QP step solver for `width` variables. Keep one per problem width and
+ * reuse it: every solve warm-starts from the previous one.
+ */
+KK_API kk_result KK_CALL kk_qp_create(uint32_t width, kk_qp_handle *out_qp KK_OUT KK_OWNED);
+KK_API void KK_CALL kk_qp_destroy(kk_qp_handle qp);
+
+/**
+ * Solves  minimize 1/2 |J*D - e|^2 + 1/2 lambda^2|D|^2  subject to  lower <= D <= upper
+ * for D (`step_count` = width). `jacobian` is `row_count` x width,
+ * row-major; `residual` has `row_count` entries. Infinite bounds mean
+ * unbounded. `tolerance` is the solver's absolute accuracy and
+ * `max_iterations` its budget. Returns KK_OK when the solver ran, with its
+ * outcome in `out_status` (KK_QP_*); `out_step` then holds its last iterate,
+ * projected onto the bounds so they hold exactly.
+ */
+KK_API kk_result KK_CALL kk_qp_solve(kk_qp_handle qp,
+    const double *jacobian KK_IN_ARRAY(jacobian_count), uint32_t jacobian_count,
+    const double *residual KK_IN_ARRAY(row_count), uint32_t row_count,
+    const double *lower KK_IN_ARRAY(lower_count), uint32_t lower_count,
+    const double *upper KK_IN_ARRAY(upper_count), uint32_t upper_count,
+    double damping, double tolerance, uint32_t max_iterations,
+    double *out_step KK_OUT_ARRAY(step_count), uint32_t step_count,
+    int32_t *out_status KK_OUT, uint32_t *out_iterations KK_OUT);
 
 #ifdef __cplusplus
 }

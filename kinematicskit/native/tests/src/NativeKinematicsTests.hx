@@ -6,7 +6,15 @@ import kinematicskit.KinematicSnapshot;
 import kinematicskit.KinematicState;
 import kinematicskit.Transform;
 import kinematicskit.Vector3;
+import kinematicskit.FrameOrientation;
+import kinematicskit.FrameTask;
+import kinematicskit.KinematicProblem;
+import kinematicskit.LinearAlgebra;
+import kinematicskit.PostureTask;
+import kinematicskit.SolverWorkspace;
+import kinematicskit.native.DifferentialIk;
 import kinematicskit.native.NativeKinematics;
+import kinematicskit.native.NativeQpStep;
 
 class NativeKinematicsTests {
   static var assertions = 0;
@@ -14,6 +22,11 @@ class NativeKinematicsTests {
   public static function main():Void {
     testForwardAndJacobianParity();
     testRejectsBadInput();
+    testUnboundedQpMatchesDampedStep();
+    testBoundedQpMeetsOptimalityConditions();
+    testWarmStartHelps();
+    testDifferentialIkReachesWithinLimits();
+    testRedundantArmFollowsPosture();
     Sys.println('KinematicsKit native tests passed ($assertions assertions)');
   }
 
@@ -68,6 +81,167 @@ class NativeKinematicsTests {
     ints[0] = 2;
     check(KinematicsKitNative.kk_model_create(ints, reals).status == KinematicsKitNativeConstants.KK_ERROR_INVALID_ARGUMENT,
       "an unknown packed format is rejected");
+  }
+
+  static function randomSystem(rng:Rng, rows:Int, width:Int):{jacobian:Array<Float>, residual:Array<Float>} {
+    return {jacobian: [for (_ in 0...rows * width) rng.signed()], residual: [for (_ in 0...rows) rng.signed() * 2.0]};
+  }
+
+  static function testUnboundedQpMatchesDampedStep():Void {
+    var rng = new Rng(21);
+    var qp = new NativeQpStep(7);
+    var worst = 0.0;
+    for (_ in 0...20) {
+      var system = randomSystem(rng, 6, 7);
+      var free = [for (_ in 0...7) Math.POSITIVE_INFINITY];
+      var result = qp.solve(system.jacobian, system.residual, [for (v in free) -v], free, 0.05);
+      check(result.solved(), "an unbounded QP step solves");
+      var expected = LinearAlgebra.dampedStep(system.jacobian, 6, 7, [for (i in 0...7) i], system.residual, 0.05);
+      for (i in 0...7) worst = Math.max(worst, Math.abs(result.step[i] - expected[i]));
+    }
+    qp.dispose();
+    // The solver's 1e-9 tolerance bounds its optimality residual; the step itself can be off by up to
+    // about 1/λ² (400 here) times that.
+    check(worst < 1e-6, 'with no bound active the QP is the damped least-squares step (worst $worst)');
+  }
+
+  static function testBoundedQpMeetsOptimalityConditions():Void {
+    var rng = new Rng(22);
+    var qp = new NativeQpStep(7);
+    var damping = 0.05;
+    var boundsHit = 0;
+    for (_ in 0...20) {
+      var system = randomSystem(rng, 6, 7);
+      var lower = [for (_ in 0...7) -0.2 - 0.3 * (rng.signed() + 1.0)];
+      var upper = [for (_ in 0...7) 0.2 + 0.3 * (rng.signed() + 1.0)];
+      var result = qp.solve(system.jacobian, system.residual, lower, upper, damping);
+      check(result.solved(), "a bounded QP step solves");
+      var x = result.step;
+      // Gradient of ½xᵀ(JᵀJ + λ²I)x − (Jᵀe)ᵀx.
+      for (i in 0...7) {
+        var gradient = damping * damping * x[i];
+        for (k in 0...6) {
+          var jx = 0.0;
+          for (j in 0...7) jx += system.jacobian[k * 7 + j] * x[j];
+          gradient += system.jacobian[k * 7 + i] * (jx - system.residual[k]);
+        }
+        check(x[i] >= lower[i] - 1e-9 && x[i] <= upper[i] + 1e-9, "the step respects its bounds");
+        // ProxQP meets complementarity to its tolerance, so an active variable can sit ~1e-6 inside its bound.
+        if (x[i] <= lower[i] + 1e-5) { boundsHit++; check(gradient >= -1e-6, 'a variable at its lower bound would not improve by rising ($gradient)'); }
+        else if (x[i] >= upper[i] - 1e-5) { boundsHit++; check(gradient <= 1e-6, 'a variable at its upper bound would not improve by falling ($gradient)'); }
+        else check(Math.abs(gradient) <= 1e-6, 'a free variable is stationary (gradient $gradient, x ${x[i]} in [${lower[i]}, ${upper[i]}], iterations ${result.iterations})');
+      }
+    }
+    qp.dispose();
+    check(boundsHit > 10, 'the fixture actually exercises active bounds ($boundsHit)');
+  }
+
+  static function testWarmStartHelps():Void {
+    var rng = new Rng(23);
+    var system = randomSystem(rng, 6, 7);
+    var lower = [for (_ in 0...7) -0.3], upper = [for (_ in 0...7) 0.3];
+    var qp = new NativeQpStep(7);
+    var first = qp.solve(system.jacobian, system.residual, lower, upper, 0.05);
+    var again = qp.solve(system.jacobian, system.residual, lower, upper, 0.05);
+    qp.dispose();
+    check(first.solved() && again.solved() && again.iterations <= first.iterations,
+      'a repeated solve warm-starts (${first.iterations} then ${again.iterations} iterations)');
+  }
+
+  /** A 7-axis arm with alternating Z/Y axes (the layout of common collaborative arms), limits ±2.9 rad. */
+  static function sevenAxisArm():KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var previous = builder.addBody("base");
+    var z = new Vector3(0, 0, 1), y = new Vector3(0, 1, 0);
+    var offsets = [0.34, 0.0, 0.4, 0.0, 0.4, 0.0, 0.0];
+    for (i in 0...7) {
+      var body = builder.addBody('link$i');
+      builder.addJoint('a$i', JointKind.Revolute, previous, body, Transform.translation(0, 0, i == 0 ? 0.0 : offsets[i - 1]),
+        Transform.identity(), i % 2 == 0 ? z : y, -2.9, 2.9);
+      previous = body;
+    }
+    builder.addFrame("flange", previous, Transform.translation(0, 0, 0.126));
+    return builder.build();
+  }
+
+  /** Integrates differential IK steps; returns the final state and whether every step stayed legal. */
+  static function track(problem:KinematicProblem, start:Array<Float>, velocityLimits:Array<Float>, steps:Int):{q:Array<Float>, legal:Bool, why:String} {
+    var model = problem.model;
+    var state = new KinematicState(model, start);
+    var qp = new NativeQpStep(problem.layout().width);
+    var workspace = new SolverWorkspace();
+    var dt = 0.01, legal = true, why = "";
+    for (_ in 0...steps) {
+      var step = DifferentialIk.step(problem, state, dt, qp, velocityLimits, 0.5, 1e-3, workspace);
+      if (!(step.status == KinematicsKitNativeConstants.KK_QP_SOLVED)) { legal = false; why = 'status ${step.status}'; }
+      for (column in 0...problem.layout().width) {
+        var dof = problem.layout().dofs[column];
+        if (Math.abs(step.velocity[column]) > velocityLimits[column] + 1e-9) { legal = false; why = 'velocity ${step.velocity[column]}'; }
+        state.q[dof] += step.velocity[column] * dt;
+        if (state.q[dof] < problem.lower[dof] - 1e-12 || state.q[dof] > problem.upper[dof] + 1e-12) { legal = false; why = 'q ${state.q[dof]}'; }
+      }
+    }
+    qp.dispose();
+    return {q: state.q, legal: legal, why: why};
+  }
+
+  static function testDifferentialIkReachesWithinLimits():Void {
+    var model = sevenAxisArm();
+    var flange = model.frameIndex("flange");
+    var goal = KinematicSnapshot.of(new KinematicState(model, [0.4, 0.7, -0.3, -1.1, 0.5, 0.9, 0.2])).framePose(flange);
+    var task = FrameTask.atFrame(model, flange, goal, 1e-6, 1e-6);
+    var problem = new KinematicProblem(model).add(task).add(new PostureTask(model, [for (_ in 0...7) 0.0], 1e-3));
+    var speeds = [for (_ in 0...7) 1.5];
+    var run = track(problem, [0.1, 0.3, 0.0, -0.6, 0.0, 0.4, 0.0], speeds, 600);
+    var reached = KinematicSnapshot.of(new KinematicState(model, run.q)).framePose(flange);
+    check(run.legal, 'every step solves, respects the velocity limits and stays inside the joint range (${run.why})');
+    check(Math.abs(reached.x - goal.x) < 1e-5 && Math.abs(reached.y - goal.y) < 1e-5 && Math.abs(reached.z - goal.z) < 1e-5,
+      "differential IK converges to the target");
+
+    // A target only reachable past a joint's limit: the joint stops exactly on it.
+    var tight = new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-6, 1e-6));
+    tight.setLimits(3, -0.8, 0.8);
+    var held = track(tight, [0.1, 0.3, 0.0, -0.6, 0.0, 0.4, 0.0], speeds, 600);
+    check(held.legal && Math.abs(held.q[3] - (-0.8)) < 1e-9, 'a limit in the way holds exactly (${held.q[3]})');
+  }
+
+  /**
+   * A planar 3-link arm with a position-only target has one redundant DOF. A posture preference on the
+   * base joint alone slides along that self-motion, so the target is still met exactly.
+   * (A 7-axis arm's swivel is a poor fixture for this: at generic poses its self-motion moves the base
+   * joints ~9x more than any single "elbow" joint, so a one-joint preference crawls; a swivel-angle task
+   * is the right tool there.)
+   */
+  static function testRedundantArmFollowsPosture():Void {
+    var builder = new KinematicModelBuilder();
+    var previous = builder.addBody("base");
+    var reach = 0.0;
+    var z = new Vector3(0, 0, 1);
+    for (i in 0...3) {
+      var body = builder.addBody('p$i');
+      builder.addJoint('p$i', JointKind.Revolute, previous, body, Transform.translation(reach, 0, 0), Transform.identity(), z,
+        -3.0, 3.0);
+      reach = [1.0, 0.8, 0.5][i];
+      previous = body;
+    }
+    var tip = builder.addFrame("tip", previous, Transform.translation(reach, 0, 0));
+    var model = builder.build();
+    var target = Transform.translation(1.0, 1.0, 0.0);
+    function reachPreferring(base:Float):Array<Float> {
+      var problem = new KinematicProblem(model)
+        .add(FrameTask.atFrame(model, tip, target, 1e-9, 1e-9, null, FrameTask.AXIS_X | FrameTask.AXIS_Y,
+          FrameOrientation.Free))
+        .add(new PostureTask(model, [base, 0.0, 0.0], 0.05, [1, 0, 0]));
+      var run = track(problem, [0.6, 0.4, 0.3], [for (_ in 0...3) Math.POSITIVE_INFINITY], 400);
+      check(run.legal, 'redundant tracking stays legal (${run.why})');
+      var reached = KinematicSnapshot.of(new KinematicState(model, run.q)).framePose(tip);
+      check(Math.abs(reached.x - 1.0) < 1e-6 && Math.abs(reached.y - 1.0) < 1e-6,
+        'the target is reached whatever the preference (${reached.x}, ${reached.y})');
+      return run.q;
+    }
+    var high = reachPreferring(0.9), low = reachPreferring(0.3);
+    check(Math.abs(high[0] - 0.9) < 1e-4 && Math.abs(low[0] - 0.3) < 1e-4,
+      'the preference picks the base angle along the self-motion (${high[0]} vs ${low[0]})');
   }
 
   /** Two roots; a chain with revolute, prismatic, fixed and coupled joints; a side branch. */
