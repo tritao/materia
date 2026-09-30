@@ -51,7 +51,7 @@ def main():
     parser.add_argument("--heap-dump", action="store_true",
                         help="save a full GC heap dump and its exact bytecode (headless scenario only)")
     parser.add_argument("--scenario", choices=["tab-inspector", "inspector-edits", "selection-stress",
-                                                "tab-matrix", "architecture", "primitives", "noop", "interaction"],
+                                                "tab-matrix", "architecture", "primitives", "noop", "interaction", "dock-drag"],
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
@@ -154,7 +154,7 @@ def main():
             sample_rate = args.sample_rate or (50 if args.scenario == "tab-matrix" else
                                                100 if args.scenario == "architecture" else 500)
             allocation_interval = (args.allocation_interval if args.allocation_interval is not None else
-                                   0 if args.scenario in ("tab-matrix", "architecture", "primitives", "noop", "interaction") else 65536)
+                                   0 if args.scenario in ("tab-matrix", "architecture", "primitives", "noop", "interaction", "dock-drag") else 65536)
             capture = None if args.no_profile else subprocess.Popen(
                 [str(profiler), "--connect-timeout", "15", "--rate", str(sample_rate),
                  "--alloc-interval", str(allocation_interval), "--interval",

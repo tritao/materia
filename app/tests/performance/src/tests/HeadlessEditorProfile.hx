@@ -14,6 +14,7 @@ import nativekit.scene.SpatialIndex;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.docking.DockNode;
 import nativekit.ui.host.FrameGcScheduler;
 import nativekit.ui.editing.EditOperation;
 import nativekit.ui.core.UiEventKind;
@@ -71,7 +72,7 @@ class HeadlessEditorProfile {
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
         Sys.args()[2] == "inspector-edits" ||
         Sys.args()[2] == "selection-stress" ||
-        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop" || Sys.args()[2] == "interaction") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop" || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -104,7 +105,9 @@ class HeadlessEditorProfile {
       var censusInterval = censusText == null ? 0 : Std.parseInt(censusText);
       if (censusInterval == null) censusInterval = 0;
       if (censusInterval > 0) hl.Gc.censusStart(censusInterval);
-      if (scenario == "interaction") {
+      if (scenario == "dock-drag") {
+        runDockDragScenario(editor, frame, frames, actions);
+      } else if (scenario == "interaction") {
         runInteractionScenario(editor, frame, output, cycles, frames, actions);
       } else if (scenario == "noop") {
         // Frames where nothing changed: the floor cost of the pipeline for this tree.
@@ -304,6 +307,49 @@ class HeadlessEditorProfile {
         maxBytes: values[values.length - 1], dirtyFrames: dirtyCounts.get(name), cycles: cycles});
     }
     File.saveContent(output + "/interaction.json", Json.stringify(lines));
+  }
+
+  /** The tab group holding `panelId`, or null when it is not docked. */
+  static function tabGroupOf(node:DockNode, panelId:String):Null<Array<String>> {
+    switch (node) {
+      case DockNode.Panel(id): return id == panelId ? [id] : null;
+      case DockNode.Tabs(ids, _): return ids.indexOf(panelId) >= 0 ? ids : null;
+      case DockNode.Split(_, _, first, second):
+        var found = tabGroupOf(first, panelId);
+        return found != null ? found : tabGroupOf(second, panelId);
+      case DockNode.Empty: return null;
+    }
+  }
+
+  /** Drags a tab onto another pane's tab strip and checks the dock model moved it: the drop targets must survive retained panes. */
+  static function runDockDragScenario(editor:ReferenceEditorApp, frame:LayoutFrame, frames:Array<String>,
+      actions:Array<String>):Void {
+    // Warm every pane's cache first: hover each tab so a stale retained pane would show up during the drag.
+    for (name in ["hierarchy", "sensors", "console", "telemetry"]) {
+      var at = targetCenter(editor, name, true);
+      editor.ui.pointerMove(at.x, at.y);
+      submit(editor, frame, frames, "warm:" + name);
+    }
+    submit(editor, frame, frames, "warm:settle");
+    var before = tabGroupOf(editor.workspace.root, "console");
+    if (before == null || before.indexOf("hierarchy") >= 0) throw "Drag scenario expects console and hierarchy in different panes";
+    var source = targetCenter(editor, "console", true);
+    var target = targetCenter(editor, "hierarchy", true);
+    editor.ui.pointerDown(source.x, source.y, 0);
+    submit(editor, frame, frames, "drag:down");
+    for (step in 1...9) {
+      var t = step / 8.0;
+      editor.ui.pointerMove(source.x + (target.x - source.x) * t, source.y + (target.y - source.y) * t + 2.0);
+      submit(editor, frame, frames, "drag:move");
+    }
+    editor.ui.pointerUp(target.x, target.y, 0);
+    submit(editor, frame, frames, "drag:up");
+    submit(editor, frame, frames, "drag:settle");
+    var after = tabGroupOf(editor.workspace.root, "console");
+    if (after == null || after.indexOf("hierarchy") < 0)
+      throw "Dragging a tab onto another pane's strip did not dock it there: " + Std.string(after);
+    action(actions, "dock-drag", 0);
+    Sys.println("dock-drag: console docked with " + after.join(","));
   }
 
   static function targetCenter(editor:ReferenceEditorApp, key:String, tab:Bool):{x:Float, y:Float} {

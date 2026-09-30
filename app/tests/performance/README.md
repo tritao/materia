@@ -166,3 +166,13 @@ On 2026-09-30 (KiB per frame, harness floor of about 52 included):
 A frame with no state change is free, but any hover, scroll or keystroke rebuilds a whole panel or the whole dock chrome: a panel's cache is invalidated by any state change inside it, and a
 hover changes an interaction state that every widget on the path reads at build time. Getting these frames near zero means updating in place (a hover restyles the node it landed on; a scroll offset is
 applied in layout, not by rebuilding the content) and invalidating at the widget that owns the state, not the panel.
+
+### Retaining dock panes and caching the console and perspective panels (2026-09-30)
+
+`DockWorkspace` now retains each pane (its tab strip and active panel) as one subtree, keyed by the pane's tabs, width, style and viewport, the drag revision and the active panel's cache key,
+and revalidated against the interaction and state inside it. A hit replays the pane's drop-target registrations, because the interaction object forgets them every frame. A pane whose active panel has
+no cache key is never retained. `console` gained a cache key (log revision, stale edits, theme) and `perspective` reuses the chrome revision key plus the two inputs it lacked.
+`profile-editor.py --scenario dock-drag` drags a tab onto another pane and fails if it does not dock: it fails when the replay is removed, so it guards this.
+
+KiB per frame (harness floor of about 52 included), before to after: hover onto a tab 340 to 207, scroll the inspector 472 to 340, type a character 480 to 352.
+What a hover still rebuilds is the hovered pane's own tab strip (about 110 KiB of tree build); scroll and typing still rebuild the whole inspector panel.

@@ -1358,7 +1358,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":simulating=" + simulation.isActive()),
       new DockPanelContent("bim", function(_) return bimEditor),
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
-        function(_, width) return perspectivePanel(width)),
+        function(_, width) return perspectivePanel(width),
+        // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
+        // none of its inputs changed: the chrome key covers grid, snap, simulation, presentation and size.
+        function() return chromeRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
@@ -1368,7 +1371,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
-      new DockPanelContent("console", function(_) return consolePanel()),
+      new DockPanelContent("console", function(_) return consolePanel(), null,
+        function() return "log=" + consoleDocument.revision + ":stale=" + session.staleEdits().join("\n") +
+          ":dark=" + appearance.dark),
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation))
     ];
