@@ -2,6 +2,7 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import haxe.Json;
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.Pose3;
@@ -94,10 +95,6 @@ class ArmMotionAuthoring {
 
 	static function round(value:Float):Float return Math.round(value * 1e6) / 1e6;
 
-	static function cupLinkOf(model:RobotModel):Link {
-		for (link in model.links) if (link.id == "tool/cup") return link;
-		throw "The arm has no suction cup link";
-	}
 
 	/** The cup's contact connector in the cup's own frame, in the assembly's length unit. */
 	static function contactFrame(definition:AssemblyDefinition):AssemblyFrame {
@@ -115,12 +112,18 @@ class ArmMotionAuthoring {
 		var physical:AssemblyPhysicalData = {metresPerUnit: scene.metresPerUnit, parts: [for (part in scene.parts)
 			{id: part.id, materialId: "neutral", volume: 1.0, centerOfMass: [0.0, 0.0, 0.0],
 				inertia: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0], density: 1.0}]};
-		var model = AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState).model;
-		var cupLink = cupLinkOf(model);
+		var converted = AssemblySimulationBridge.toRobotModel(definition, physical, scene.assemblyState);
+		var model = converted.model;
+		// The cup rides the hand's link; its contact face is the cup's offset there, then the connector.
+		var cup = converted.partLinks.get("tool/cup");
+		if (cup == null) throw "The arm has no suction cup";
 		var contact = contactFrame(definition);
-		var tcp = model.addFrame(new Frame("tcp", cupLink));
-		tcp.position = [contact.x * scene.metresPerUnit, contact.y * scene.metresPerUnit, contact.z * scene.metresPerUnit];
-		tcp.rotation = [contact.qx, contact.qy, contact.qz, contact.qw];
+		var metres = scene.metresPerUnit;
+		var tip = AssemblyFrames.compose(cup.offset, {x: contact.x * metres, y: contact.y * metres, z: contact.z * metres,
+			qx: contact.qx, qy: contact.qy, qz: contact.qz, qw: contact.qw});
+		var tcp = model.addFrame(new Frame("tcp", model.links[cup.link]));
+		tcp.position = [tip.x, tip.y, tip.z];
+		tcp.rotation = [tip.qx, tip.qy, tip.qz, tip.qw];
 		var chain = new KinematicChain(model, "assembly-root", ChainTip.Frame(tcp.id));
 		var ids = chain.dofJointIds();
 		require(ids.join(",") == [for (spec in robot.specs) spec.id].join(","),

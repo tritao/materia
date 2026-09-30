@@ -17,6 +17,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	const RK_LINK_SHAPE_SPHERE = 2;
 	const RK_MAX_CONTACT_PAIRS = 128;
+	const RK_MAX_LINK_HULLS = 512;
 	const RK_MAX_LINK_SHAPES = 256;
 	/**
 	 * Contact involving one robot link. tool_piece_index is -1 for link geometry.
@@ -345,6 +346,15 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		reserved: array<u64, 2> @offset(56);
 	}
 	/**
+	 * One convex hull of a link built from several rigid parts, as XYZ vertices in
+	 * the link frame; 4..64 vertices.
+	 */
+	struct rk_simulation_link_hull @layout(1544, 8) {
+		link: u32 @offset(0);
+		vertex_count: u32 @offset(4);
+		vertices: array<f64, 192> @offset(8);
+	}
+	/**
 	 * One primitive collision shape attached to a robot link, posed in the link frame.
 	 */
 	struct rk_simulation_link_shape @layout(136, 8) {
@@ -440,7 +450,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 * Optional settings for one robot added to a Simulation. An initial_pose whose
 	 * struct_size is zero keeps the default placement.
 	 */
-	struct rk_simulation_robot_desc @layout(1679880, 8) {
+	struct rk_simulation_robot_desc @layout(2470416, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		reserved0: u32 @offset(4);
 		initial_pose: rk_simulation_pose @offset(8);
@@ -509,6 +519,13 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		 */
 		contact_pair_count: u32 @offset(1672704);
 		contact_pairs: array<rk_simulation_contact_pair, 128> @offset(1672712);
+		/**
+		 * Optional convex hulls of links built from several rigid parts, one per
+		 * part. A link collides through a compound of its hull or box above, these
+		 * hulls, its primitives and its tool pieces.
+		 */
+		link_hull_count: u32 @offset(1679880);
+		link_hulls: array<rk_simulation_link_hull, 512> @offset(1679888);
 	}
 	/**
 	 * World-frame twist of one body: metres per second and radians per second.

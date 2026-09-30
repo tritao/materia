@@ -225,11 +225,12 @@ class ProjectSourceTests {
     rejectsGrips([{time: 2.0, link: "cup", action: "grip"}, {time: 1.0, link: "cup", action: "release"}], "never decrease");
     rejectsGrips([{time: 1.0, link: "cup", action: "squeeze"}], "grip or release");
     rejectsGrips([{time: 1.0, link: "cup", action: "grip", extra: 1}], "Unknown robot grip field");
-    // A free part gets no link; a part that is joined cannot be freed.
-    var whole = AssemblySimulationBridge.toRobotModel(definition, physical).model;
-    var freed = AssemblySimulationBridge.toRobotModel(definition, physical, null, ["workpiece"]).model;
-    check(freed.links.length == whole.links.length - 1 && freed.joints.length == whole.joints.length - 1,
-      "a free part leaves the assembly robot without its link or its root joint");
+    // A free part is not simulated as part of the assembly; a part that is joined cannot be freed.
+    var whole = AssemblySimulationBridge.toRobotModel(definition, physical);
+    var freed = AssemblySimulationBridge.toRobotModel(definition, physical, null, ["workpiece"]);
+    check(whole.partLinks.exists("workpiece") && !freed.partLinks.exists("workpiece") &&
+      freed.model.links[0].mass < whole.model.links[0].mass && freed.model.joints.length == whole.model.joints.length,
+      "a free part leaves the assembly robot without its mass or its link");
     var message = "";
     try AssemblySimulationBridge.toRobotModel(definition, physical, null, ["turret"]) catch (error:Dynamic) message = Std.string(error);
     check(message.indexOf("cannot be joined") >= 0, "a joined part cannot be freed: " + message);
@@ -496,12 +497,15 @@ class ProjectSourceTests {
     if (machineDefinition != null) {
       var translated = AssemblySimulationBridge.toRobotModel(machineDefinition,
         machineScene.physical);
+      // Parts share their rigid body's link, so the links carry every part's material-derived mass,
+      // plus the root link's 1 g placeholder.
+      var parts = 0.0, links = 0.0;
       for (occurrence in machineDefinition.occurrences) {
-        var link = [for (item in translated.model.links) if (item.id == occurrence.id) item][0];
         var record = [for (item in machineScene.objects) if (item.id == "project:" + occurrence.id) item][0];
-        check(Math.abs(link.mass - record.mass) < 1e-6,
-          "assembly occurrence link keeps material-derived mass: " + occurrence.id);
+        parts += record.mass;
       }
+      for (link in translated.model.links) links += link.mass;
+      check(Math.abs(links - 0.001 - parts) < 1e-6, 'assembly links keep the parts\' material-derived mass ($links, $parts)');
     }
     var machineSession = new ProjectDocumentSession(null, false);
     var machineWorld = new RobotWorld();
@@ -583,11 +587,15 @@ class ProjectSourceTests {
       machineSimulation.stop();
       var target = machineScene.objects[0];
       var dropX = 0.0, dropY = 0.0, dropTop = Math.NEGATIVE_INFINITY;
+      // Parts ride their rigid body's link, each at its own offset there.
+      var partLinks = AssemblySimulationBridge.toRobotModel(machineDefinition, machineScene.physical).partLinks;
       for (occurrence in machineDefinition.occurrences) {
         var physical = [for (part in machineScene.physical.parts)
           if (part.id == occurrence.definition) part][0];
-        var linkPose = [for (link in restFrame.robots[0].links)
-          if (link.id == occurrence.id) link][0];
+        var placed = partLinks.get(occurrence.id);
+        if (placed == null) continue;
+        var body = restFrame.robots[0].links[placed.link];
+        var linkPose = AssemblyRobot.compose({position: body.position, rotation: body.rotation}, placed.offset);
         var hull = physical.collisionHull;
         if (hull == null) continue;
         var centroidX = 0.0, centroidY = 0.0;

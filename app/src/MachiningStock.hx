@@ -35,9 +35,8 @@ class MachiningStock {
 	final preview:StockPreview;
 	final tool:Tool;
 	final simulation:Simulation;
-	final robotIndex:Int;
-	final stockLink:Int;
-	final toolLink:Int;
+	final stockPart:AssemblyPart;
+	final toolPart:AssemblyPart;
 	final center:Array<Float>;
 	var last:Null<Point3> = null;
 	var changed = true;
@@ -52,12 +51,11 @@ class MachiningStock {
 	 * centre, in metres; the stock is that box. `spacing` is the stock's ray spacing.
 	 */
 	public function new(tool:Tool, minimum:Array<Float>, maximum:Array<Float>, center:Array<Float>, spacing:Float,
-			simulation:Simulation, robotIndex:Int, stockLink:Int, toolLink:Int) {
+			simulation:Simulation, stockPart:AssemblyPart, toolPart:AssemblyPart) {
 		this.tool = tool;
 		this.simulation = simulation;
-		this.robotIndex = robotIndex;
-		this.stockLink = stockLink;
-		this.toolLink = toolLink;
+		this.stockPart = stockPart;
+		this.toolPart = toolPart;
 		this.center = center.copy();
 		var low = [for (axis in 0...3) minimum[axis] - center[axis]];
 		var high = [for (axis in 0...3) maximum[axis] - center[axis]];
@@ -128,14 +126,14 @@ class MachiningStock {
 
 	/** The tool tip in the stock's frame. */
 	function toolTip():Point3 {
-		var stockPose = simulation.linkPose(robotIndex, stockLink), toolPose = simulation.linkPose(robotIndex, toolLink);
+		var stockPose = AssemblyRobot.partPose(simulation, stockPart), toolPose = AssemblyRobot.partPose(simulation, toolPart);
 		var local = inverseRotate(stockPose.rotation, [for (axis in 0...3) toolPose.position[axis] - stockPose.position[axis]]);
 		return new Point3(local[0] - center[0], local[1] - center[1], local[2] - center[2]);
 	}
 
 	/** The tool's +Z in the stock's frame. */
 	function toolAxis():Array<Float> {
-		var stockPose = simulation.linkPose(robotIndex, stockLink), toolPose = simulation.linkPose(robotIndex, toolLink);
+		var stockPose = AssemblyRobot.partPose(simulation, stockPart), toolPose = AssemblyRobot.partPose(simulation, toolPart);
 		return inverseRotate(stockPose.rotation, rotate(toolPose.rotation, [0.0, 0.0, 1.0]));
 	}
 

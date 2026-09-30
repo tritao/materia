@@ -767,6 +767,55 @@ static double sphere_rest_height(double time_constant, uint32_t contact_filter =
     return pose.position[2];
 }
 
+// A link built from several rigid parts collides through every part's hull.
+// Two stacked cubes with a gap between them: the lower cube, the second hull,
+// is what rests on the floor.
+static void link_hulls_all_collide() {
+    SessionFixture fixture(0.005, 2, NKSIM_INTEGRATOR_IMPLICIT_FAST);
+    rk_robot_runtime_blueprint model{};
+    model.struct_size = sizeof(model);
+    model.link_count = 1;
+    model.floating_base = 1;
+    model.collision_approximation = RK_COLLISION_APPROXIMATION_NONE;
+    model.links[0].mass = 10.0;
+    model.links[0].inertia_tensor[0] = model.links[0].inertia_tensor[4] =
+        model.links[0].inertia_tensor[8] = 0.05;
+    auto robot_desc_storage = std::make_unique<rk_simulation_robot_desc>();
+    auto &robot_desc = *robot_desc_storage;
+    robot_desc.struct_size = sizeof(robot_desc);
+    robot_desc.initial_pose.struct_size = sizeof(robot_desc.initial_pose);
+    robot_desc.initial_pose.position[2] = 0.3;
+    robot_desc.initial_pose.rotation[3] = 1.0;
+    robot_desc.link_hull_count = 2;
+    for (uint32_t piece = 0; piece < 2; ++piece) {
+        auto &hull = robot_desc.link_hulls[piece];
+        hull.link = 0;
+        hull.vertex_count = 8;
+        const double low = piece == 0 ? 0.0 : -0.2, high = piece == 0 ? 0.1 : -0.1;
+        for (int corner = 0; corner < 8; ++corner) {
+            hull.vertices[corner * 3] = (corner & 1) ? 0.05 : -0.05;
+            hull.vertices[corner * 3 + 1] = (corner & 2) ? 0.05 : -0.05;
+            hull.vertices[corner * 3 + 2] = (corner & 4) ? high : low;
+        }
+    }
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, &robot_desc, &robot) == RK_OK);
+    const double floor_position[3] = {0.0, 0.0, -0.5}, floor_rotation[4] = {0.0, 0.0, 0.0, 1.0},
+                 floor_half_extents[3] = {5.0, 5.0, 0.5};
+    spawn_object(fixture.session, NKSIM_MOTION_STATIC, floor_position, floor_rotation, floor_half_extents);
+    for (int tick = 0; tick < 400; ++tick)
+        assert(fixture.step(tick) == RK_OK);
+    rk_simulation_pose pose{};
+    pose.struct_size = sizeof(pose);
+    assert(rk_simulation_get_robot_pose(fixture.simulation, 0, &pose) == RK_OK);
+    assert(std::abs(pose.position[2] - 0.2) < 0.01);
+    auto invalid = std::make_unique<rk_simulation_robot_desc>();
+    *invalid = robot_desc;
+    invalid->link_hulls[1].link = 3;
+    rk_robot_runtime rejected = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, invalid.get(), &rejected) != RK_OK);
+}
+
 // A softer contact (longer time constant) lets a robot's shape sink further.
 static void link_shape_contact_softness_reaches_the_backend() {
     const double stiff = sphere_rest_height(0.02);
@@ -993,6 +1042,7 @@ int main() {
     observed_limit_tolerance_allows_compliant_stops();
     joint_overtravel_moves_stops_past_the_limits();
     fixed_joint_targets_are_ignored();
+    link_hulls_all_collide();
     actuator_limit_stalls_then_lifts();
     servo_target_runs_through_the_runtime();
     blueprint_joint_friction_holds_an_arm();

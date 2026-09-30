@@ -92,13 +92,17 @@ C1 needed two stopgaps; these replace them, before C2 builds on them.
 - **A4. Homing** (folded into A1). Parking Z on its upper soft limit is how
   LinuxCNC-style machines sit after homing; the switch (here, the end stop) is
   beyond it by the overtravel, so no artificial pull-off is modelled.
-- **A6. One link per rigid body** (in progress). The runtime caps a
-  trajectory submission at 4096 coefficients across all robot joints; with one
-  joint per part the router's 44 joints left 15 segments a chunk, and
-  streaming cost 12 ms a tick with multi-second stalls. The simulation bridge
-  now builds one link per rigid body (parts bolted together, and every
-  world-fixed part in the root link), with combined mass properties and one
-  convex hull per part in a new per-link hull list of the simulation ABI.
+- **A6. One link per rigid body** (done). The runtime caps a trajectory
+  submission at 4096 coefficients across all robot joints; with one joint per
+  part the router's 44 joints left 15 segments a chunk, and streaming cost
+  12 ms a tick with multi-second stalls. The simulation bridge now builds one
+  link per rigid body (parts bolted together; every world-fixed part joins the
+  root link), with combined mass properties and one convex hull per part in a
+  new per-link hull list of the simulation ABI. The router simulates as four
+  links and its three axes: 3.1 ms of compute per 10 ms tick (motion 0.4 ms,
+  meshing 2.4 ms), a 0.76 s compile when the program starts and a 0.2 s hitch
+  when a plan starts. Moving that compile and the stock meshing off the frame
+  thread is what remains for smooth real time.
 - **A5. Shared preview.** One `AssemblyPreview` helper builds the scene for
   every MachineKit example, keeping connectors when parts share geometry.
 
@@ -114,6 +118,6 @@ then C3 → C4 → C5.
 | C0 | not started | |
 | C1 | done: router, checks, outline-trace motion, app test | `c82fe76d` |
 | C2 | done as A3 | |
-| C3 | done: cutting works; real-time speed in progress (streaming cost, see A6) | |
+| C3 | done: 3.1 ms of compute per 10 ms tick after A6 | `29b986cc` |
 | C4 | not started | |
 | C5 | not started | |

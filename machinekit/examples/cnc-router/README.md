@@ -78,7 +78,7 @@ the segment the simulated tool tip travelled is swept through a 0.5 mm
 tri-dexel stock with the tool table's cutter (flat end mill, shank and collet
 nut), and the stock part shows the result, re-contoured a few times a second.
 Because the cut follows the simulated tool, following error is in the
-material. Rapids that cut stock and shank or holder contact are counted as
+material. The whole run takes about 3 ms of compute per 10 ms of machining. Rapids that cut stock and shank or holder contact are counted as
 they happen. Physical collision is off for the stock part: the stock
 simulation, not the physics, decides what touching it means.
 

@@ -105,11 +105,11 @@ class CncProgramPlayer implements SessionMember {
 	public var failure(default, null):Null<String> = null;
 
 	/**
-	 * `robot` is robot `robotIndex` of `simulation`, built from `project`'s assembly. The simulated
+	 * `robot` is `project`'s assembly, simulated in `simulation`. The simulated
 	 * joints read from the assembly's starting pose, so each axis maps machine coordinates onto them
 	 * with that pose as its offset.
 	 */
-	public function new(job:CncJob, robot:AssemblyRobot, robotIndex:Int, simulation:Simulation,
+	public function new(job:CncJob, robot:AssemblyRobot, simulation:Simulation,
 			project:ProjectDocumentSession, session:SimSession) {
 		if (job.axes.length != 3) throw "A CNC job needs its X, Y and Z axes";
 		var definition = project.projectAssemblyDefinition, physical = project.projectPhysical;
@@ -166,7 +166,7 @@ class CncProgramPlayer implements SessionMember {
 		} else {
 			var toolPart = job.toolPart;
 			if (toolPart == null || job.tools.length == 0) throw "A CNC job that cuts stock needs its tool part and tool table";
-			var stockLink = linkOf(robot, stockPart), toolLink = linkOf(robot, toolPart);
+			var stockLink = robot.part("project:" + stockPart), toolLink = robot.part("project:" + toolPart);
 			var occurrence = [for (item in definition.occurrences) if (item.id == stockPart) item];
 			var part = [for (item in physical.parts) if (occurrence.length == 1 && item.id == occurrence[0].definition) item];
 			var center = occurrence.length == 1 ? project.assemblyPreviewCenter(occurrence[0].definition) : null;
@@ -181,7 +181,7 @@ class CncProgramPlayer implements SessionMember {
 			var centerMetres = [for (coordinate in center) coordinate * metresPerUnit];
 			var tool = cutter(job.tools[0], metresPerUnit), spacing = job.stockSpacing * metresPerUnit;
 			// The stock is the stock part's bounding box, which is exact for a block of stock.
-			newStock = () -> new MachiningStock(tool, minimum, maximum, centerMetres, spacing, simulation, robotIndex,
+			newStock = () -> new MachiningStock(tool, minimum, maximum, centerMetres, spacing, simulation,
 				stockLink, toolLink);
 			stockObject = "project:" + stockPart;
 		}
@@ -275,11 +275,6 @@ class CncProgramPlayer implements SessionMember {
 			parent = child;
 		}
 		return {model: planning, indices: indices};
-	}
-
-	static function linkOf(robot:AssemblyRobot, part:String):Int {
-		for (entry in robot.parts) if (entry.id == "project:" + part) return entry.linkIndex;
-		throw 'CNC job part "$part" is not a part of the machine';
 	}
 
 	/** A flat end mill with its shank and the holder above it, in metres. */

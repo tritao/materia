@@ -86,11 +86,11 @@ class Simulation {
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
       ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>):RobotRuntime {
     if (position == null || position.length != 3 || rotation == null || rotation.length != 4)
       throw "Simulation.addRobotAtPose requires a three-component position and four-component rotation";
     return addRobotWithPose(blueprint, makePose(position, rotation), virtualDevice, linkCollisionBoxes,
-      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap);
+      linkCollisionHulls, closures, tool, toolLink, toolMargin, toolGap, linkHulls);
   }
 
   function addRobotWithPose(blueprint:RobotRuntimeBlueprint,
@@ -99,7 +99,7 @@ class Simulation {
       ?linkCollisionBoxes:Array<Null<Array<Float>>>,
       ?linkCollisionHulls:Array<Null<Array<Float>>>,
       ?closures:Array<SimulationClosure>, ?tool:ToolCollisionShape,
-      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float):RobotRuntime {
+      ?toolLink:Int, ?toolMargin:Float, ?toolGap:Float, ?linkHulls:Array<SimulationLinkHull>):RobotRuntime {
     ensureLive();
     var robotDesc:Null<rk_simulation_robot_desc> = null;
     if (initialPose != null || virtualDevice != null) {
@@ -189,6 +189,31 @@ class Simulation {
           if (!Math.isFinite(hull[axis])) throw "Simulation link collision hull has a non-finite vertex";
           robotDesc.set_collision_hull_vertices(link * 64 * 3 + axis, hull[axis]);
         }
+      }
+    }
+    if (linkHulls != null && linkHulls.length > 0) {
+      if (linkHulls.length > RobotKitSimKitConstants.RK_MAX_LINK_HULLS)
+        throw 'Simulation supports at most ${RobotKitSimKitConstants.RK_MAX_LINK_HULLS} link hulls';
+      if (robotDesc == null) {
+        robotDesc = new rk_simulation_robot_desc();
+        robotDesc.set_struct_size(rk_simulation_robot_desc.size());
+      }
+      robotDesc.set_link_hull_count(linkHulls.length);
+      for (index in 0...linkHulls.length) {
+        var source = linkHulls[index];
+        var vertices = source.vertices;
+        if (source.link < 0 || source.link >= blueprint.linkCount)
+          throw "Simulation link hull names an unknown link";
+        if (vertices.length % 3 != 0 || vertices.length < 12 || vertices.length > 64 * 3)
+          throw "Simulation link hull needs 4..64 vertices";
+        var native = new rk_simulation_link_hull();
+        native.set_link(source.link);
+        native.set_vertex_count(Std.int(vertices.length / 3));
+        for (coordinate in 0...vertices.length) {
+          if (!Math.isFinite(vertices[coordinate])) throw "Simulation link hull has a non-finite vertex";
+          native.set_vertices(coordinate, vertices[coordinate]);
+        }
+        robotDesc.set_link_hulls(index, native);
       }
     }
     if (closures != null && closures.length > 0) {
@@ -725,6 +750,12 @@ class Simulation {
 }
 
 /** Omni-wheel plant state; see Simulation.omniDriveState. */
+/** One convex hull of a link built from several rigid parts, as XYZ vertices in the link frame. */
+typedef SimulationLinkHull = {
+  var link:Int;
+  var vertices:Array<Float>;
+}
+
 typedef SimulationOmniDriveState = {
   enabled:Bool,
   x:Float,

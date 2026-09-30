@@ -175,7 +175,7 @@ class ApplicationSimulation {
         // A bad program fails the rebuild here, before anything live changes.
         var job = session.cncJob;
         if (job != null)
-          candidateCnc = new CncProgramPlayer(job, built, robotIndex, candidate, session, createdSpace.session);
+          candidateCnc = new CncProgramPlayer(job, built, candidate, session, createdSpace.session);
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
@@ -188,7 +188,9 @@ class ApplicationSimulation {
         if (assembly == null) throw "Robot grips need the project's assembly";
         var gripRobot = candidateRobots.length - 1;
         for (event in gripEvents) {
-          var linkIndex = candidateLinks[gripRobot].indexOf(event.link);
+          // A grip names the part that holds (the suction cup); it grips through that part's body.
+          var holder = [for (part in candidateAssemblyParts) if (part.id == "project:" + event.link) part];
+          var linkIndex = holder.length == 1 ? holder[0].linkIndex : candidateLinks[gripRobot].indexOf(event.link);
           if (linkIndex < 0) throw 'Robot grip names unknown link "${event.link}"';
           resolvedGrips.push({time: event.time, robotIndex: gripRobot, linkIndex: linkIndex, grip: event.grip});
         }
@@ -429,11 +431,13 @@ class ApplicationSimulation {
       frame.dispose();
     }
     if (presentAssemblyPhysics) for (part in assemblyParts) {
+      // The part's frame on its body's link, then its geometry's centre in that frame.
       var link = robots[part.robotIndex].links[part.linkIndex];
-      var offset = rotateOffset(part.center[0], part.center[1], part.center[2], link.rotation);
+      var pose = AssemblyRobot.compose({position: link.position, rotation: link.rotation}, part.offset);
+      var offset = rotateOffset(part.center[0], part.center[1], part.center[2], pose.rotation);
       orderedEnvironment.push({id:part.id,
-        position:[link.position[0] + offset[0], link.position[1] + offset[1],
-          link.position[2] + offset[2]], rotation:link.rotation});
+        position:[pose.position[0] + offset[0], pose.position[1] + offset[1],
+          pose.position[2] + offset[2]], rotation:pose.rotation});
     }
     return new ApplicationPresentationSnapshot(publication, physics, robots, orderedEnvironment,
       presentationEpoch);
