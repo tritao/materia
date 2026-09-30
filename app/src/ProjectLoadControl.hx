@@ -1,6 +1,8 @@
 package app;
 
+#if !wasm
 import sys.io.Process;
+#end
 import sys.thread.Mutex;
 
 /**
@@ -14,7 +16,9 @@ class ProjectLoadControl {
   final mutex:Mutex = new Mutex();
   var phaseText:String = "Starting";
   var cancelRequested:Bool = false;
+  #if !wasm
   var running:Null<Process> = null;
+  #end
 
   public function new() {}
 
@@ -42,15 +46,20 @@ class ProjectLoadControl {
   public function cancel():Void {
     mutex.acquire();
     cancelRequested = true;
+    #if !wasm
     var process = running;
+    #end
     mutex.release();
+    #if !wasm
     if (process != null) try process.kill() catch (_:Dynamic) {}
+    #end
   }
 
   public function throwIfCancelled():Void {
     if (isCancelled()) throw CANCELLED;
   }
 
+  #if !wasm
   /** Called by the worker around each child process so cancel() can reach it. */
   public function attach(process:Process):Void {
     mutex.acquire();
@@ -65,4 +74,5 @@ class ProjectLoadControl {
     running = null;
     mutex.release();
   }
+  #end
 }
