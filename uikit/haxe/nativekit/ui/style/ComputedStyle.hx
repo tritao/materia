@@ -192,14 +192,8 @@ class ComputedStyle {
 	function ensureWritable():Void {
 		if (!shared)
 			return;
-		var nextValues:Map<String, Dynamic> = new Map();
-		for (key in values.keys())
-			nextValues.set(key, values.get(key));
-		var nextSources:Map<String, StyleSource> = new Map();
-		for (key in sources.keys())
-			nextSources.set(key, sources.get(key));
-		values = nextValues;
-		sources = nextSources;
+		values = values.copy();
+		sources = sources.copy();
 		shared = false;
 	}
 
