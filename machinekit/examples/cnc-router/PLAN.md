@@ -71,7 +71,7 @@ C0 and C1 are independent. After them, C2 → C3 → C4 → C5.
 | Step | State | Commits |
 | --- | --- | --- |
 | C0 | not started | |
-| C1 | done: router, checks, outline-trace motion, app test | |
+| C1 | done: router, checks, outline-trace motion, app test | `c82fe76d` |
 | C2 | not started | |
 | C3 | not started | |
 | C4 | not started | |
