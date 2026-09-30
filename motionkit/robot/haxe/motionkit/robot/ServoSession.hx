@@ -1,0 +1,146 @@
+package motionkit.robot;
+
+import haxe.Int64;
+import motionkit.kinematics.Twist6;
+import robotkit.manipulation.Manipulator;
+import robotkit.policy.VelocityReference.CommandRejection;
+import robotkit.world.JointTarget;
+import robotkit.world.Robot;
+import robotkit.world.RobotCommand;
+
+/** What one servo tick did. */
+class ServoTick {
+  /** The joint velocities commanded for the next period, in arm order. */
+  public final velocity:Array<Float>;
+  /** True while no live command is being followed and the arm is braking (or at rest). */
+  public final braking:Bool;
+  /** True once braking has brought every joint to rest. */
+  public final atRest:Bool;
+  public final step:ServoStep;
+
+  public function new(velocity:Array<Float>, braking:Bool, atRest:Bool, step:ServoStep) {
+    this.velocity = velocity;
+    this.braking = braking;
+    this.atRest = atRest;
+    this.step = step;
+  }
+}
+
+/**
+ * Live Cartesian servoing of an arm (jogging, teleoperation) as a cyclic
+ * reference (motionkit/plans/LANE_D_REDUNDANCY_SERVO.md, LD-D3), not a queue
+ * of trajectories to replace:
+ *
+ * - an operator submits tool twists (base frame, at the TCP) with a sequence
+ *   and a deadline on the robot's clock; older sequences, non-finite twists
+ *   and already-passed deadlines are rejected;
+ * - every robot tick, `update` reads the snapshot, takes one bounded,
+ *   acceleration-limited `ManipulatorServo` step towards the live twist and
+ *   submits the resulting joint velocities;
+ * - when the deadline passes without a newer command (or on `stop`), the
+ *   twist becomes zero and the arm brakes to rest within its acceleration
+ *   limits, so a lost operator leaves the arm standing, not moving on.
+ *
+ * The clock is the snapshot's `sourceTimestampNs`. The host enforces the
+ * deadline; the joint targets it sends carry none (the runtime cannot yet
+ * enforce one), so `update` must keep being called while the arm moves.
+ * Joint targets are sticky in the runtime, so braking ends with exact zeros.
+ * Needs a cyclic endpoint that accepts joint velocity targets (simulation);
+ * devices that interpolate plans need a short-horizon variant.
+ */
+class ServoSession {
+  public final robot:Robot;
+  public final manipulator:Manipulator;
+  final servo:ManipulatorServo;
+  final indices:Array<Int>;
+  final restVelocity:Float;
+  final controlPeriod:Float;
+  var twist:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+  var live = false;
+  var deadlineNs:Int64 = Int64.ofInt(0);
+  var lastSequence = 0;
+  var lastNs:Null<Int64> = null;
+  var commanded:Array<Float>;
+
+  /**
+   * `controlPeriod` is the interval `update` is meant to run at (the robot's
+   * control period). The runtime applies a velocity target at once, so each
+   * update may change a joint's velocity by at most a·controlPeriod even if
+   * updates were missed: a stalled host ramps back up instead of jumping.
+   * `restVelocity`: below this joint speed (rad/s or m/s) a braking arm counts
+   * as at rest.
+   */
+  public function new(robot:Robot, manipulator:Manipulator, ?controlPeriod:Float = 0.01, ?damping:Float = 1e-3,
+      ?restVelocity:Float = 1e-4) {
+    if (robot == null || manipulator == null) throw "Servo session requires a robot and a manipulator";
+    if (!(controlPeriod > 0.0) || !Math.isFinite(controlPeriod)) throw "Servo control period must be positive";
+    this.controlPeriod = controlPeriod;
+    this.robot = robot;
+    this.manipulator = manipulator;
+    this.restVelocity = restVelocity;
+    servo = new ManipulatorServo(manipulator, damping);
+    indices = manipulator.jointIndices();
+    commanded = [for (_ in indices) 0.0];
+  }
+
+  /** The robot's clock now: the latest snapshot's source timestamp. */
+  public function nowNs():Int64 return robot.snapshot().sourceTimestampNs;
+
+  /**
+   * Accepts a tool twist to follow until `deadlineNs` (robot clock), or names
+   * why not. A newer command replaces the current one at once.
+   */
+  public function command(value:Twist6, sequence:Int, deadlineNs:Int64):Null<CommandRejection> {
+    if (value == null) return NotFinite;
+    var values = value.toArray();
+    for (component in values) if (!Math.isFinite(component)) return NotFinite;
+    if (sequence <= lastSequence) return Stale;
+    if (deadlineNs <= nowNs()) return Expired;
+    lastSequence = sequence;
+    this.deadlineNs = deadlineNs;
+    twist = values;
+    live = true;
+    return null;
+  }
+
+  /** Drops the live command: the arm brakes to rest from the next tick. */
+  public function stop():Void {
+    live = false;
+    twist = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+  }
+
+  /** True while a command is being followed (not expired, not stopped). */
+  public function following():Bool return live;
+
+  /** One tick: read the robot, step towards the live twist (or brake) and submit joint velocities. */
+  public function update():ServoTick {
+    var snapshot = robot.snapshot();
+    var now = snapshot.sourceTimestampNs;
+    if (live && now >= deadlineNs) stop();
+    var elapsed = lastNs == null ? 0.0 : Int64.toInt(now - lastNs) * 1e-9;
+    // Missed updates do not license a bigger velocity change: the runtime applies targets at once.
+    var dt = Math.min(elapsed, controlPeriod);
+    lastNs = now;
+    var q = [for (index in indices) snapshot.positions.get(index)];
+    if (!(dt > 0.0)) {
+      // First tick (or no time passed): hold what was commanded.
+      return new ServoTick(commanded.copy(), !live, isAtRest(commanded), null);
+    }
+    var requested = new Twist6(twist[0], twist[1], twist[2], twist[3], twist[4], twist[5]);
+    var step = servo.step(q, requested, dt, null, 1000, 1.0, commanded);
+    commanded = step.velocity.copy();
+    // Joint targets are sticky in the runtime: when braking, a speed below the rest threshold becomes an
+    // exact zero, or the last tiny command would keep the arm creeping.
+    if (!live) for (i in 0...commanded.length) if (Math.abs(commanded[i]) <= restVelocity) commanded[i] = 0.0;
+    var targets = [for (i in 0...indices.length) JointTarget.velocity(indices[i], commanded[i])];
+    robot.submit(RobotCommand.JointTargets(targets, null));
+    return new ServoTick(commanded.copy(), !live, !live && isAtRest(commanded), step);
+  }
+
+  public function dispose():Void servo.dispose();
+
+  function isAtRest(velocity:Array<Float>):Bool {
+    for (value in velocity) if (Math.abs(value) > restVelocity) return false;
+    return true;
+  }
+}

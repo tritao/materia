@@ -50,6 +50,7 @@ class MotionKitBootstrapTests {
     kinematicsTests.testPathConfigurationSelector();
     kinematicsTests.testAxisKinematics();
     kinematicsTests.testManipulatorServo();
+    kinematicsTests.testServoSession();
     programTests.testManipulatorMotion();
     programTests.testManipulatorSessionTransitions();
     programTests.testProcessRunVirtualArmRecovery();

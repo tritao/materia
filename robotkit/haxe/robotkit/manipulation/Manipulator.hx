@@ -102,6 +102,9 @@ class Manipulator {
 
   public function jointIds():Array<JointId> return group.jointIds.copy();
 
+  /** The runtime (compiled `RobotModel.joints`) index of each arm DOF's driving joint, in `q` order. */
+  public function jointIndices():Array<Int> return jointModelIndices.copy();
+
   /** Every joint from the base link to the flange link (fixed ones included), base first. */
   public function pathJoints():Array<Joint> return path.copy();
 

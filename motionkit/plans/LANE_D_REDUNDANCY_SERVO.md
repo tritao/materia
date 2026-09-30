@@ -106,4 +106,29 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
 
 ## Progress log
 
-(not started)
+- 2026-09-30 — **D5a done: `ServoSession` (motionkit-robot).** A tool twist
+  goes through `ManipulatorServo` (one QP step) and out as runtime joint
+  velocity targets on the manipulator's joints (`Manipulator.jointIndices`).
+  - Each command carries a sequence and a deadline in robot time.
+    Out-of-order commands are rejected as `Stale`, non-finite ones as
+    `NotFinite`, and already-expired ones as `Expired`. After the deadline
+    the session brakes to rest with twist 0, then holds exact zero targets.
+    Those targets are sticky in the runtime, so the zero must be exact or
+    the arm creeps.
+  - The servo takes the previous velocity and the acceleration limits. It
+    keeps each joint's velocity change within a·dt, and caps the approach to
+    a stop at a·(√(dt² + 2d/a) − dt). That is the discrete braking bound:
+    one tick of travel plus a full brake fits in the distance left. The
+    continuous √(2ad) overshoots a·dt per tick. On a conflict, staying
+    inside the limits wins over acceleration.
+  - dt is capped at the control period. The runtime applies a velocity
+    target at once, so missed updates ramp back up instead of jumping.
+  - Test (SimulatedRobot, 10 ms): follows a 5 cm/s twist, keeps per-tick
+    jumps ≤ a·dt, brakes within peak/a after a missed deadline, holds still,
+    and turns the base into its stop with no overshoot.
+  - Still open:
+    - **D5b:** the runtime does not enforce deadlines itself. A stalled host
+      leaves the last velocity target running, so the runtime needs a
+      watchdog with an accel-limited stop.
+    - **D5c:** the virtual device rejects JOINT_TARGETS, so servoing there
+      needs short plan horizons.

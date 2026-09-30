@@ -44,6 +44,15 @@ class ServoStep {
  * the joint range. If the QP does not solve, the Haxe damped step is used,
  * clamped into the same bounds, and the answer says so.
  *
+ * With `previousVelocity` (the velocities commanded last tick) the step is
+ * also acceleration-limited: each joint's velocity changes by at most a·dt
+ * (the group's `maxAcceleration`, or `accelerationLimits`; 0 = unknown =
+ * unlimited), and it never approaches a stop faster than it can brake: one
+ * tick of travel plus a full brake must fit in the distance left,
+ * |v|·dt + v²/(2a) ≤ distance (which also keeps the braking itself within a). A zero twist then brakes the arm to rest within its
+ * acceleration limits. Should the bounds conflict (a joint already moving too
+ * fast near a stop), the position and braking bounds win.
+ *
  * Keep one per arm and reuse it: the QP warm-starts from the previous tick.
  */
 class ManipulatorServo {
@@ -62,33 +71,62 @@ class ManipulatorServo {
   }
 
   public function step(q:Array<Float>, twist:Twist6, dt:Float, ?velocityLimits:Array<Float>,
-      ?maxIterations:Int = 1000, ?limitGain:Float = 1.0):ServoStep {
+      ?maxIterations:Int = 1000, ?limitGain:Float = 1.0, ?previousVelocity:Array<Float>,
+      ?accelerationLimits:Array<Float>):ServoStep {
     var n = manipulator.dofCount();
     if (q == null || q.length != n) throw 'Servo requires $n joint values';
     if (twist == null) throw "Servo requires a tool twist";
     if (!(dt > 0.0) || !Math.isFinite(dt)) throw "Servo period must be positive and finite";
     if (velocityLimits != null && velocityLimits.length != n) throw 'Servo needs $n velocity limits';
     if (!(limitGain > 0.0) || limitGain > 1.0) throw "Servo limit gain must be in (0, 1]";
+    if (previousVelocity != null && previousVelocity.length != n) throw 'Servo needs $n previous velocities';
+    if (accelerationLimits != null && accelerationLimits.length != n) throw 'Servo needs $n acceleration limits';
     var jacobian = manipulator.tcpJacobian(q);
     var requested = twist.toArray();
     var displacement = [for (value in requested) value * dt];
     var lower:Array<Float> = [], upper:Array<Float> = [];
     for (joint in 0...n) {
       var limits = manipulator.group.limitsOf(joint);
+      var limited = limits.lower < limits.upper;
+      // Displacement bounds for this tick.
       var low = Math.NEGATIVE_INFINITY, high = Math.POSITIVE_INFINITY;
-      if (limits.lower < limits.upper) {
+      if (limited) {
         low = limitGain * (limits.lower - q[joint]);
         high = limitGain * (limits.upper - q[joint]);
       }
       var speed = velocityLimits != null ? velocityLimits[joint] : (limits.velocity > 0.0 ? limits.velocity : Math.POSITIVE_INFINITY);
       if (!(speed >= 0.0)) throw "Servo velocity limits must be non-negative";
-      low = Math.max(low, -speed * dt);
-      high = Math.min(high, speed * dt);
-      // A joint already outside its range may only move back towards it.
+      var vLow = -speed, vHigh = speed;
+      var accel = accelerationLimits != null ? accelerationLimits[joint] : limits.maxAcceleration;
+      if (!(accel >= 0.0)) throw "Servo acceleration limits must be non-negative";
+      if (previousVelocity != null && accel > 0.0) {
+        var before = previousVelocity[joint];
+        // Braking: one tick of travel plus a full brake must fit in the distance to the stop.
+        var safeLow = vLow, safeHigh = vHigh;
+        if (limited) {
+          safeHigh = Math.min(vHigh, brakingSpeed(accel, dt, limitGain * (limits.upper - q[joint])));
+          safeLow = Math.max(vLow, -brakingSpeed(accel, dt, limitGain * (q[joint] - limits.lower)));
+        }
+        var accelLow = before - accel * dt, accelHigh = before + accel * dt;
+        vLow = Math.max(safeLow, accelLow);
+        vHigh = Math.min(safeHigh, accelHigh);
+        // Entered too fast near a stop: position and braking win over acceleration.
+        if (vLow > vHigh) {
+          if (accelLow > safeHigh) { vLow = safeHigh; vHigh = safeHigh; }
+          else { vLow = safeLow; vHigh = safeLow; }
+        }
+      }
+      // A joint already outside its range may stay or move back, not further out.
       if (low > 0.0) low = 0.0;
       if (high < 0.0) high = 0.0;
-      lower.push(low);
-      upper.push(high);
+      var stepLow = Math.max(low, vLow * dt), stepHigh = Math.min(high, vHigh * dt);
+      // Should velocity and position bounds exclude each other, the position side wins.
+      if (stepLow > stepHigh) {
+        if (vLow * dt > high) { stepLow = high; stepHigh = high; }
+        else { stepLow = low; stepHigh = low; }
+      }
+      lower.push(stepLow);
+      upper.push(stepHigh);
     }
 
     var delta:Array<Float> = null;
@@ -110,4 +148,10 @@ class ManipulatorServo {
   }
 
   public function dispose():Void qp.dispose();
+
+  /** The fastest speed from which v·dt + v²/(2a) ≤ distance: a·(√(dt² + 2·distance/a) − dt). */
+  static function brakingSpeed(accel:Float, dt:Float, distance:Float):Float {
+    if (!(distance > 0.0)) return 0.0;
+    return accel * (Math.sqrt(dt * dt + 2.0 * distance / accel) - dt);
+  }
 }
