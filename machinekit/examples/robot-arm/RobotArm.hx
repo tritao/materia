@@ -132,10 +132,17 @@ class RobotArm extends MachineAssembly {
 	public static inline var WORKPIECE_WIDTH:Float = 60;
 	public static inline var WORKPIECE_HEIGHT:Float = 50;
 	public static inline var PAD_HEIGHT:Float = 2;
-	/** Where the workpiece starts, and the pad it is to be carried to. */
+	/** Two pads, side by side; the workpiece starts on the first and is carried to the second and back. */
 	public static inline var PICK_X:Float = -150;
 	public static inline var PLACE_X:Float = 150;
 	public static inline var WORK_Y:Float = -600;
+	/** Height of the workpiece's top face when it stands on a pad, which the suction cup meets. */
+	public static final WORKPIECE_TOP:Float = TABLE_TOP + PAD_HEIGHT + WORKPIECE_HEIGHT;
+	/**
+	 * How far below the workpiece top the tool aims when it grips. A gap reports no contact, so the
+	 * cup presses lightly; the simulation then seats the held workpiece with a small clearance.
+	 */
+	public static inline var GRIP_PRESS:Float = 0.5;
 
 	public final flange = new RobotFlange(63);
 	public final pedestal:Pedestal;
@@ -195,14 +202,18 @@ class RobotArm extends MachineAssembly {
 		addCell();
 	}
 
-	/** Table, workpiece and pad: fixed roots standing where the motion authoring aims the tool. */
+	/**
+	 * Table, two pads and a workpiece standing where the motion authoring aims the tool. The table and
+	 * pads are fixed roots; the project's `dynamicParts` frees the workpiece so the suction cup can carry it.
+	 */
 	function addCell():Void {
 		function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
 		addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
+		var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad");
+		addComponent("padPick", pad, at(PICK_X, WORK_Y, TABLE_TOP));
+		addComponent("padPlace", pad, at(PLACE_X, WORK_Y, TABLE_TOP));
 		addComponent("workpiece", new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood",
-			"Workpiece"), at(PICK_X, WORK_Y, TABLE_TOP));
-		addComponent("pad", new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad"),
-			at(PLACE_X, WORK_Y, TABLE_TOP));
+			"Workpiece"), at(PICK_X, WORK_Y, TABLE_TOP + PAD_HEIGHT));
 	}
 
 	function revolute(spec:ArmJointSpec, housing:String, rotorConnector:String, child:String,
