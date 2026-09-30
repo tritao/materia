@@ -133,7 +133,9 @@ class BrowserUiHost {
 		#end
 		var activeEvents:NativeKitEvents = cast events;
 		var activeFonts:FontCollection = cast fonts;
-		var context = new UiHostContext(activeFonts, activeEvents, function() session.stop(),
+		// The page's canvas is this host's window and surface, so applications written against the desktop
+		// context (native dialogs, auxiliary renderers) receive the same handles here.
+		var context = new DesktopUiHostContext(activeFonts, activeEvents, window, surface, function() session.stop(),
 			function() frameRequested = true);
 		hostContext = context;
 		var activeRuntime = new UiHostRuntime(session, context, window, surface,

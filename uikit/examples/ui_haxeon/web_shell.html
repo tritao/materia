@@ -453,62 +453,12 @@
       }
     }
 
-    function nativekitImports() {
-      return forward([
-        "nk_api_version", "nk_clipboard_read_text", "nk_clipboard_set_text",
-        "nk_cursor_create_custom", "nk_cursor_create_standard", "nk_cursor_destroy",
-        "nk_event_release", "nk_get_capabilities", "nk_init", "nk_last_error",
-        "nk_poll_event", "nk_shutdown",
-        "nk_surface_accessibility_clear", "nk_surface_accessibility_remove_node",
-        "nk_surface_accessibility_set_focus", "nk_surface_accessibility_set_node",
-        "nk_surface_accessibility_update_with_removed_ids",
-        "nk_surface_create", "nk_surface_destroy", "nk_surface_get_framebuffer_size",
-        "nk_surface_make_current", "nk_surface_present", "nk_surface_set_bounds",
-        "nk_surface_set_text_input_active", "nk_surface_set_text_input_state",
-        "nk_time_seconds", "nk_window_create", "nk_window_destroy", "nk_window_get_cursor_mode",
-        "nk_window_get_scale", "nk_window_set_cursor", "nk_window_set_cursor_mode",
-        "nk_window_set_decoration_regions", "nk_webview_create", "nk_webview_destroy",
-        "nk_webview_set_bounds", "nk_webview_set_html", "nk_webview_show",
-        "nk_resource_load_async"
-      ]);
-    }
-
-    function nativekitUiImports() {
-      return forward([
-        "nkui_display_list_create", "nkui_display_list_destroy",
-        "nkui_display_list_get_info", "nkui_display_list_reset",
-        "nkui_display_list_submit", "nkui_font_collection_add", "nkui_font_collection_add_data",
-        "nkui_font_collection_add_system_fallbacks",
-        "nkui_font_collection_create", "nkui_image_create", "nkui_image_create_filtered",
-        "nkui_image_load_file",
-        "nkui_layout_session_clear_custom_paints",
-        "nkui_layout_session_clear_custom_paint",
-        "nkui_layout_session_clear_custom_paint_composite",
-        "nkui_paint_create_linear_gradient", "nkui_paint_create_solid",
-        "nkui_path_create", "nkui_renderer_create",
-        "nkui_renderer_render", "nkui_renderer_destroy", "nkui_renderer_get_stats",
-        "nkui_renderer_render_frame", "nkui_resource_destroy",
-        "nkui_layout_session_set_custom_paint",
-        "nkui_layout_session_set_custom_paint_cache_policy",
-        "nkui_layout_session_set_cache_policy",
-        "nkui_text_layout_align_grapheme", "nkui_text_layout_caret", "nkui_text_layout_create",
-        "nkui_text_layout_create_styled", "nkui_text_layout_hit_test",
-        "nkui_text_layout_get_selection_rects", "nkui_text_layout_next_grapheme",
-        "nkui_text_layout_line_range_at", "nkui_text_layout_move_paragraph",
-        "nkui_text_layout_move_word",
-        "nkui_text_layout_measure", "nkui_text_layout_position_offset",
-        "nkui_text_layout_previous_grapheme",
-        "nkui_text_layout_set_text", "nkui_text_layout_update",
-        "nkui_text_layout_word_range",
-        "nkui_layout_session_create", "nkui_layout_session_destroy",
-        "nkui_layout_session_get_hit_test_stats",
-        "nkui_layout_session_get_resolved_items",
-        "nkui_layout_session_hit_test",
-        "nkui_layout_session_render_frame", "nkui_layout_session_set_font_collection",
-        "nkui_layout_session_set_measure_callback",
-        "nkui_layout_session_submit", "nkui_showcase_cube_create",
-        "nkui_showcase_cube_set_rotation", "nkui_showcase_diagnostic_report"
-      ]);
+    // Forward every host function the guest imports from these modules, so the
+    // list follows the generated bindings instead of being maintained by hand.
+    function guestHostImports(module, moduleName) {
+      return forward(WebAssembly.Module.imports(module)
+        .filter(entry => entry.module === moduleName && entry.kind === "function")
+        .map(entry => entry.name));
     }
 
     function haxeonBytes(pointer) {
@@ -568,6 +518,7 @@
     function haxeonRuntimeImports() {
       return {
         __math_ceil: Math.ceil,
+        __math_floor: Math.floor,
         __math_is_finite: Number.isFinite,
         __math_is_nan: Number.isNaN,
         __math_cos: Math.cos,
@@ -575,6 +526,8 @@
         __math_pow: Math.pow,
         __math_round: Math.round,
         __math_sin: Math.sin,
+        __math_sqrt: Math.sqrt,
+        __math_tan: Math.tan,
         native_callback_create: (signaturePointer, _pointerSizes, _pointerNullable, closure) => {
           const signature = new TextDecoder().decode(haxeonBytes(signaturePointer));
           const tokens = haxeonCallbackTokens(signature);
@@ -646,8 +599,6 @@
     function startGuest() {
       const imports = {
         env: { memory: hostMemory },
-        nativekit: nativekitImports(),
-        nativekit_ui: nativekitUiImports(),
         std: {
           sys_exit: code => {},
           sys_time: () => performance.now() / 1000
@@ -668,6 +619,8 @@
         })
         .then(module => {
           validateGuestMemoryContract(module, validateMemoryContract());
+          imports.nativekit = guestHostImports(module, "nativekit");
+          imports.nativekit_ui = guestHostImports(module, "nativekit_ui");
           const instantiateStarted = performance.now();
           return WebAssembly.instantiate(module, imports).then(instance => {
             benchmarkGuestInstantiateMs = performance.now() - instantiateStarted;

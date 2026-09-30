@@ -37,7 +37,7 @@ class SetupScriptRegistry {
     if(reference==null||StringTools.trim(reference).length==0||factory==null
       || packageIdentity==null || StringTools.trim(packageIdentity.packageId).length==0
       || StringTools.trim(packageIdentity.packageVersion).length==0
-      || !~/^[0-9a-f]{64}$/.match(packageIdentity.sourceSha256))
+      || !Sha256Digest.isHex(packageIdentity.sourceSha256))
       throw "Invalid setup script registration";
     providers.set(reference,factory);
     identities.set(reference, {packageId: packageIdentity.packageId,

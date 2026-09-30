@@ -18,6 +18,7 @@ import humankit.Wait;
 import humankit.PlayClip;
 import humankit.HumanBodyView;
 import humankit.HumanBone;
+import humankit.HumanHand;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
@@ -39,6 +40,7 @@ import materia.automation.facility.Rack;
 import materia.automation.facility.RackSlot;
 import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
+import materia.automation.facility.Surface;
 import materia.automation.facility.Zone;
 import nativekit.scene.Scene;
 import nativekit.scene.SceneRenderer;
@@ -105,7 +107,9 @@ class HumanKitTests {
 		elbowStaysPut(scene, worker, rig);
 		fingersCurl(scene, worker, rig);
 		leaning(scene, worker, rig);
+		grasping(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
+		facilitySurfaces();
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -489,6 +493,66 @@ class HumanKitTests {
 		human.dispose();
 	}
 
+	/**
+	 * A hand closes on an object to the object's size: each finger curls until its own tip is as deep as the
+	 * object, so a thicker object closes the hand more, fingers of different lengths close differently, a
+	 * thin one is pinched, and the shape goes once the object is let go.
+	 */
+	static function grasping(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Grasper");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (hand in [ArmR, ArmL]) {
+			// Tip depth runs from about 2.3 cm (open) to 6 to 7 cm (curled half way), then falls as the fist closes.
+			var shallow = grasped(body, hand, 0.035), medium = grasped(body, hand, 0.05), deep = grasped(body, hand, 0.06);
+			if (!(shallow[HumanHand.INDEX] < medium[HumanHand.INDEX] && medium[HumanHand.INDEX] < deep[HumanHand.INDEX]))
+				throw 'A thicker object did not close the $hand hand further: ${shallow[1]}, ${medium[1]}, ${deep[1]}';
+			// Each finger's tip ends as deep as the object, to a few millimetres.
+			body.setGrasp(hand, 0.05);
+			human.setHandCurls(hand, body.grasp(hand));
+			human.advance(0.0);
+			for (finger in [HumanHand.INDEX, HumanHand.MIDDLE, HumanHand.RING, HumanHand.PINKY])
+				if (Math.abs(body.fingerDepth(hand, finger) - 0.05) > 0.006)
+					throw 'Finger $finger of the $hand hand is ${body.fingerDepth(hand, finger)} m deep, not 0.05';
+			// Fingers of different lengths close by different amounts to the same depth.
+			var spread = Math.max(Math.max(medium[1], medium[2]), Math.max(medium[3], medium[4])) -
+				Math.min(Math.min(medium[1], medium[2]), Math.min(medium[3], medium[4]));
+			if (spread < 0.02) throw 'Every finger of the $hand hand closed alike to one depth: $medium';
+			// A thin object is pinched: only the thumb and index close on it.
+			var thin = grasped(body, hand, 0.02);
+			if (thin[HumanHand.MIDDLE] > body.posture.relaxedCurl + 1e-6 || thin[HumanHand.PINKY] > body.posture.relaxedCurl + 1e-6)
+				throw 'The $hand hand did not pinch a thin object: $thin';
+			if (Math.abs(thin[HumanHand.THUMB] - body.posture.thumbShare * thin[HumanHand.INDEX]) > 1e-6)
+				throw "The thumb does not follow the index finger";
+			if (medium[HumanHand.PINKY] <= thin[HumanHand.PINKY] && medium[HumanHand.MIDDLE] <= thin[HumanHand.MIDDLE])
+				throw 'A thick object was no more closed on than a thin one by the $hand hand: $medium against $thin';
+		}
+		// Holding, the fingers settle into the grasp; letting go, they relax and the grasp is forgotten.
+		body.setGrasp(ArmR, 0.05);
+		var wanted = body.grasp(ArmR);
+		body.setCarry([ArmR]);
+		for (_ in 0...60) body.advance(step);
+		var held = human.handCurls(ArmR);
+		for (finger in 0...HumanHand.FINGERS)
+			if (Math.abs(held[finger] - wanted[finger]) > 0.02)
+				throw 'Finger $finger did not settle into the grasp: ${held[finger]} against ${wanted[finger]}';
+		body.setCarry([]);
+		for (_ in 0...60) body.advance(step);
+		var relaxed = human.handCurls(ArmR);
+		for (finger in 0...HumanHand.FINGERS)
+			if (Math.abs(relaxed[finger] - body.posture.relaxedCurl) > 0.02)
+				throw 'Finger $finger did not relax after letting go: ${relaxed[finger]}';
+		if (body.grasp(ArmR) != null) throw "The grasp was kept after the object was let go";
+		human.dispose();
+	}
+
+	static function grasped(body:HumanBody, hand:HumanLimb, depth:Float):Array<Float> {
+		body.setGrasp(hand, depth);
+		return body.grasp(hand);
+	}
+
 	/** Leaning carries the shoulders forward, an unused arm hangs instead of swinging back, and standing up undoes it. */
 	static function leaning(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var human = new HumanCharacter(scene, asset, rig, null, "Leaner");
@@ -595,6 +659,38 @@ class HumanKitTests {
 	}
 
 	/** Rack-relative slots resolve in facility space and jobs use routed lanes. */
+	/** A facility's surfaces and slot items become boxes in its frame, turned with their owners. */
+	static function facilitySurfaces():Void {
+		var facility = new Facility("surfaces", "Surfaces");
+		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
+		// A rack turned a quarter turn, its top offset along its own x axis, holding a 10 x 8 x 6 cm item.
+		var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(2, 1, Math.PI / 2),
+			[new RackSlot("B3", new RackSlotPose(0.25, 0, 1.2), [0.05, 0.04, 0.03])], new Surface(0.3, 0.2, 1.1, 0.1, 0.0, 0.25));
+		// A station's table lies ahead of where the worker stands.
+		var table = new Station("table", "Table", "floor", "map", new Pose2(4, 1, 0.0), new Surface(0.2, 0.2, 1.0, 0.65));
+		var bare = new Station("bare", "Bare", "floor", "map", new Pose2(6, 1));
+		facility.addRack(rack);
+		facility.addStation(table);
+		facility.addStation(bare);
+		var targets = new FacilityTargets(facility);
+		var top = targets.surfaceBox("rack");
+		if (top == null || distance(top.center, [2.0, 1.1, 1.05]) > 1e-9 || Math.abs(top.yaw - (Math.PI / 2 + 0.25)) > 1e-9 ||
+			top.halfExtents[0] != 0.3 || top.halfExtents[1] != 0.2)
+			throw 'The rack top was not turned with the rack: $top';
+		var bench = targets.surfaceBox("table");
+		if (bench == null || distance(bench.center, [4.65, 1.0, 0.95]) > 1e-9 || bench.yaw != 0.0)
+			throw 'The table did not lie ahead of its station: $bench';
+		if (Math.abs(bench.center[2] + bench.halfExtents[2] - 1.0) > 1e-9)
+			throw "The table box's top face is not at the surface height";
+		if (targets.surfaceBox("bare") != null) throw "A station without a surface reported one";
+		var item = targets.slotItemBox("rack", "B3");
+		if (item == null || distance(item.center, [2.0, 1.25, 1.2]) > 1e-9 || item.halfExtents[0] != 0.05 || item.halfExtents[2] != 0.03)
+			throw 'The slot item box did not resolve through the rack: $item';
+		var threw = false;
+		try targets.surfaceBox("missing") catch (_:Dynamic) threw = true;
+		if (!threw) throw "An unknown station was accepted";
+	}
+
 	static function facilityTargets(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var facility = new Facility("fetch", "Fetch facility");
 		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
@@ -613,6 +709,9 @@ class HumanKitTests {
 		var slot = targets.rackSlotPoint("rack", "B3");
 		if (distance(slot, [2, 1.25, 1.2]) > 1e-9)
 			throw 'Rack slot did not resolve through yaw: $slot';
+		// A facility that describes no surface or item gives the job nothing to lean over or shape a grip to.
+		if (targets.surfaceBox("rack") != null || targets.surfaceBox("table") != null || targets.slotItemBox("rack", "B3") != null)
+			throw "A facility with no surfaces or items reported one";
 		var route = targets.route("rack", "table");
 		var points = FacilityWalk.routeFromFacilityRoute(route);
 		if (points.length != 3 || distance([points[1][0], points[1][1], 0], [3, 1, 0]) > 1e-9)

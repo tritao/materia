@@ -32,7 +32,7 @@ class HumanJobBuilder {
           var fromId:Null<String> = Reflect.field(step, "from");
           var restingOn = fromId == null ? null : box(targets, fromId);
           job.add(new ApproachFor(point, hands[0], 1.0, hands.length == 2, null, restingOn));
-          var pick = new Pick(point, hands);
+          var pick = new Pick(point, hands, 0.35, b);
           job.add(pick);
           for (hand in hands) holds.push({action: pick, objectId: id, grasp: point.copy(), hand: hand}
           );

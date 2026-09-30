@@ -152,6 +152,28 @@ class HumanCharacter {
 	public function spineLean():Float
 		return lean;
 
+	/**
+	 * Curls each finger of a hand on its own: values are indexed HumanHand.THUMB to PINKY, each 0 open to
+	 * 1 a fist. A rig without finger joints ignores it.
+	 */
+	public function setHandCurls(hand:HumanLimb, curls:Array<Float>):Void {
+		if (hand != ArmL && hand != ArmR) throw "Only a hand has fingers to curl";
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		if (fingers != null) fingers.setCurls(curls);
+	}
+
+	/** How curled each finger of a hand is (THUMB to PINKY), or all zero for a rig without them. */
+	public function handCurls(hand:HumanLimb):Array<Float> {
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		return [for (kind in 0...HumanHand.FINGERS) fingers == null ? 0.0 : fingers.curlOf(kind)];
+	}
+
+	/** The model-space position of a finger's tip on a hand (HumanHand.THUMB to PINKY), or null when it has none. */
+	public function fingertip(hand:HumanLimb, finger:Int):Null<Array<Float>> {
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		return fingers == null ? null : fingers.tipPosition(finger);
+	}
+
 	/** How curled a hand's fingers are, or 0 for a rig without them. */
 	public function handCurl(hand:HumanLimb):Float {
 		var fingers = hands[hand == ArmL ? 0 : 1];

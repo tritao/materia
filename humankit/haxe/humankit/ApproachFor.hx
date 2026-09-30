@@ -36,20 +36,24 @@ class ApproachFor extends HumanActionBase {
 		if (targetProvider != null) target = targetProvider().copy();
 		if (target.length < 3) { fail("Approach target needs x, y, z"); return; }
 		if (limb != ArmL && limb != ArmR) { fail("Approach requires an arm"); return; }
-		var shoulder = worker.character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
+		var shoulder = worker.standingBone(limb == ArmL ? UpperArmL : UpperArmR);
 		if (shoulder == null) { fail("The rig lacks an arm"); return; }
 		var root = worker.rootTransform();
-		var comfortable = worker.posture.comfort * (worker.description.upperArm + worker.description.forearm);
+		var length = worker.description.upperArm + worker.description.forearm;
+		var comfortable = worker.posture.comfort * length, farthest = worker.posture.stretch * length;
 		var rise = target[2] - (root[14] + shoulder[2]);
-		if (rise >= comfortable) {
+		// A point is out of reach only beyond what the arm will stretch to, not beyond the comfortable reach.
+		if (rise >= farthest) {
 			fail("Target is above reachable height");
 			return;
 		}
-		if (-rise >= comfortable) {
+		if (-rise >= farthest) {
 			fail("Target is below standing arm reach; crouching is unsupported");
 			return;
 		}
-		var ahead = Math.sqrt(comfortable * comfortable - rise * rise);
+		// Stand where the shoulder is a comfortable reach away; a point as far below the shoulder as that has
+		// the shoulder straight over it, and any more reach comes from leaning and stretching below.
+		var ahead = Math.abs(rise) < comfortable ? Math.sqrt(comfortable * comfortable - rise * rise) : 0.0;
 		var dx = target[0] - root[12], dy = target[1] - root[13];
 		var distance = Math.sqrt(dx * dx + dy * dy);
 		var ux = distance > 1e-8 ? dx / distance : root[0];
@@ -60,8 +64,8 @@ class ApproachFor extends HumanActionBase {
 		var standDistance = ahead + shoulder[0];
 		var lean = 0.0;
 		if (support != null) {
-			var belly = worker.character.pose.bonePosition(Spine);
-			if (belly == null) belly = worker.character.pose.bonePosition(Pelvis);
+			var belly = worker.standingBone(Spine);
+			if (belly == null) belly = worker.standingBone(Pelvis);
 			var required = edgeDistance(support, target, ux, uy) + (belly == null ? 0.0 : belly[0]) +
 				worker.posture.bellyFront + worker.posture.edgeGap;
 			if (required > standDistance) {
@@ -69,6 +73,11 @@ class ApproachFor extends HumanActionBase {
 				var made = worker.leanFor(limb, required - standDistance);
 				lean = made.angle;
 				standDistance += made.shift;
+				// With the lean spent, stretch the arm past its comfortable reach, up to the posture's limit.
+				if (required > standDistance) {
+					var aheadMost = Math.sqrt(farthest * farthest - rise * rise);
+					standDistance += Math.min(required - standDistance, Math.max(0.0, aheadMost - ahead));
+				}
 			}
 		}
 		worker.setLean(lean);

@@ -7,7 +7,12 @@ extern abstract RobotThreadToken(hl.Abstract<"hl_thread">) {
   public static function current():RobotThreadToken;
 }
 #else
+/** Targets without HashLink threads run on one thread, so every caller shares its token. */
 class RobotThreadToken {
-  public static function current():RobotThreadToken return new RobotThreadToken();
+  static final only = new RobotThreadToken();
+
+  public static function current():RobotThreadToken return only;
+
+  function new() {}
 }
 #end

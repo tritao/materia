@@ -13,6 +13,11 @@ class HumanPosture {
 	public var comfort:Float = 0.8;
 	/** Beyond this fraction of the arm's length a wrist goal is out of reach. */
 	public var reachLimit:Float = 0.95;
+	/**
+	 * How much of the arm's length a worker will stretch to keep clear of a surface's edge, once the lean is
+	 * spent: more than the comfortable reach, and short of the limit the solver refuses at.
+	 */
+	public var stretch:Float = 0.92;
 
 	// Carrying.
 
@@ -29,14 +34,22 @@ class HumanPosture {
 	public var gripCurl:Float = 0.5;
 	/** How fast the fingers open and close, in full curls per second. */
 	public var curlRate:Float = 5.0;
+	/**
+	 * A held object thinner than this (across the palm, in metres) is pinched: thumb and index close on it and
+	 * the other fingers stay relaxed. The thumb closes this share of the fingers' curl.
+	 */
+	public var pinchBelow:Float = 0.025;
+	public var thumbShare:Float = 0.6;
+	/** How many curl steps are measured to find the curl that brings a fingertip to a held object's far side. */
+	public var graspSteps:Int = 20;
 
 	// Leaning over a surface.
 
 	/** The furthest the upper body leans into a reach, in radians, and how fast it leans. */
 	public var maxLean:Float = 0.7;
 	public var leanRate:Float = 0.9;
-	/** Lean at which an arm that is not reaching or carrying is held fully hanging, and where it hangs under the shoulder. */
-	public var hangLean:Float = 0.25;
+	/** How long an arm that is not reaching or carrying takes to settle into hanging (and back) while the body leans, and where it hangs under the shoulder. */
+	public var hangSeconds:Float = 0.5;
 	public var hangDrop:Float = 0.92;
 	public var hangForward:Float = 0.02;
 	public var hangOutward:Float = 0.03;

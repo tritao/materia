@@ -43,8 +43,12 @@ class ProjectUiExtension {
 		var executable = UiPath.join([installation, "haxeon", ".tools", "hashlink", "hl"]);
 		// Haxeon's compiler service may inherit output descriptors after the build command
 		// exits, so use inherited stdio instead of waiting for captured pipe EOF.
+		#if wasm
+		if (builder.length >= 0) throw "Project UI extensions are built by a child process, which the browser build cannot start";
+		#else
 		if (Sys.command(builder, ["build", "--project=" + manifest]) != 0)
 			throw "Could not build project UI extension";
+		#end
 		if (!FileSystem.exists(artifact)) throw "Project UI extension artifact was not built: " + artifact;
 		var result = new ProjectUiExtension(absolute, artifact, executable, command);
 		try {

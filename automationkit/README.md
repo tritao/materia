@@ -15,6 +15,12 @@ The first domain model includes:
 - `mission`: `MissionExecutor` advances each ordered task through a configured
   RobotKit skill and releases the assignment on success, failure, or cancel.
 
+A `Station` or `Rack` may carry a `Surface`, the flat top a person reaches over: a rectangle with a
+height, placed relative to its owner's pose. A rack's pose is the rack itself, so its top is usually
+centred on it; a station's pose is where a person stands, so its table lies ahead of that pose. A rack
+slot may name the half extents of the item it holds. Nothing in the facility requires them; they let a
+worker planning a fetch stand clear of a top's edge and close its hand to an item's size.
+
 Facility lanes retain a `robotkit.navigation.Path` and enforce frame agreement
 with their endpoint stations. `FacilityRouter` plans the least-travel-time lane
 sequence using lane speed and direction, then composes its centerlines into one

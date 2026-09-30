@@ -18,6 +18,8 @@ mkdir -p "$(dirname -- "$output")"
 	"--output=$output" \
 	--entry=SketchEditBenchmark \
 	"--root=$repo_root/haxe/src" \
+	"--root=$repo_root/../projectkit/src" \
+	"--root=$repo_root/../kinematicskit/haxe" \
 	"--root=$repo_root/haxe/tests" \
 	"--root=$repo_root/haxe/benchmarks" \
 	"--root=$repo_root/examples/modeling" \

@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+nativekit_dir=${NATIVEKIT_DIR:-"$(dirname "$repo_dir")/nativekit"}
 artifact_dir=${NATIVEKIT_WEB_ARTIFACT_DIR:-"$repo_dir/build-web"}
 build_dir=${NATIVEKIT_WEB_BUILD_DIR:-"$repo_dir/build-web"}
 browser=${NK_WEB_BROWSER:-}
@@ -47,7 +48,9 @@ python3 -m http.server "$http_port" --bind 127.0.0.1 --directory "$build_dir" \
 http_pid=$!
 
 artifact_rel=$(realpath --relative-to="$build_dir" "$artifact_dir")
-page_url="http://127.0.0.1:${http_port}/${artifact_rel}/nativekit_ui_c_api.html?smoke"
+artifact_path=nativekit_ui_c_api.html
+[[ "$artifact_rel" == . ]] || artifact_path="$artifact_rel/$artifact_path"
+page_url="http://127.0.0.1:${http_port}/${artifact_path}?smoke"
 "$browser" --headless=new --no-sandbox --disable-dev-shm-usage --disable-gpu \
     --enable-unsafe-swiftshader --no-first-run --user-data-dir="$temp_dir/profile" \
     --remote-debugging-port="$debug_port" --remote-allow-origins='*' \
@@ -72,7 +75,7 @@ if [[ "$debug_ready" != 1 ]]; then
     exit 1
 fi
 
-if ! python3 "$repo_dir/tools/web_smoke.py" --debug-port "$debug_port" --page-url "$page_url"; then
+if ! python3 "$nativekit_dir/tools/web_smoke.py" --debug-port "$debug_port" --page-url "$page_url"; then
     cat "$temp_dir/browser.log" >&2 || true
     cat "$temp_dir/http.log" >&2 || true
     exit 1
