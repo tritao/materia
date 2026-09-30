@@ -341,7 +341,8 @@ class ScriptedSetupTests {
     for (attempt in 0...8) {
       if (bounds.width > 0 && bounds.height > 0) break;
       var location:ResolvedLayoutItem = cast button.resolved;
-      editor.ui.scroll(120.0, 500.0, 0.0,
+      // Scroll over the button's own pane: starting the simulation moves the Sensors panel to another dock.
+      editor.ui.scroll(location.x + location.width / 2.0, 500.0, 0.0,
         location.y >= frame.height ? 250.0 : -250.0);
       button = cast findByStyleKey(editor.submit(frame), key);
       bounds = button.resolved.clippedViewportBounds();
