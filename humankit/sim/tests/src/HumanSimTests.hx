@@ -36,6 +36,7 @@ class HumanSimTests {
     static function main():Void {
         PacedStepTests.run();
         WorkerResetTests.run();
+        PlaceWithdrawTests.run();
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var rig = HumanoidRig.detect(asset);
         var scene = Scene.create();
