@@ -83,6 +83,24 @@ class Transform2D {
 			b * point.x + d * point.y + ty);
 	}
 
+	/** The x of `(x, y)` after this transform; allocation-free counterpart of transformPoint. */
+	public inline function transformedX(x:Float, y:Float):Float
+		return a * x + c * y + tx;
+
+	public inline function transformedY(x:Float, y:Float):Float
+		return b * x + d * y + ty;
+
+	/** The x of `(x, y)` after the inverse transform, with the same arithmetic as tryInverse().transformPoint. Requires isInvertible(). */
+	public inline function inverseTransformedX(x:Float, y:Float):Float {
+		var reciprocal = 1.0 / determinant();
+		return d * reciprocal * x + -c * reciprocal * y + (c * ty - d * tx) * reciprocal;
+	}
+
+	public inline function inverseTransformedY(x:Float, y:Float):Float {
+		var reciprocal = 1.0 / determinant();
+		return -b * reciprocal * x + a * reciprocal * y + (b * tx - a * ty) * reciprocal;
+	}
+
 	public function transformVector(vector:Point):Point {
 		if (vector == null)
 			throw "Transform vectors cannot be null";

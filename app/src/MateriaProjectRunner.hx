@@ -356,10 +356,11 @@ class MateriaProjectRunner {
           boundsByDefinition, geometryKeyByDefinition, scale);
       }
     } else if (artifact.assembly != null) {
-      var parts = new Map<String, SceneArtifactPart>();
-      for (part in artifact.parts) parts.set(part.id, part);
+      // A distinct name from the map above: the compiler keeps a local map's facts only when it is declared once.
+      var partsByInstance = new Map<String, SceneArtifactPart>();
+      for (part in artifact.parts) partsByInstance.set(part.id, part);
       for (instance in artifact.assembly.instances) {
-        var component = parts.get(instance.id);
+        var component = partsByInstance.get(instance.id);
         if (component == null) continue;
         addOccurrenceRecord(records, component, instance.id, instance.id, poses.get(instance.id), 1,
           boundsByDefinition, geometryKeyByDefinition, scale);
