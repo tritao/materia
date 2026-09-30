@@ -176,3 +176,10 @@ no cache key is never retained. `console` gained a cache key (log revision, stal
 
 KiB per frame (harness floor of about 52 included), before to after: hover onto a tab 340 to 207, scroll the inspector 472 to 340, type a character 480 to 352.
 What a hover still rebuilds is the hovered pane's own tab strip (about 110 KiB of tree build); scroll and typing still rebuild the whole inspector panel.
+
+### Scrolling without a rebuild (2026-09-30)
+
+A `ScrollView` already applied its offset to the content in place after layout, but its controller also called `State.update`, bumping the state revision and so invalidating every cached
+subtree around it (a scroll rebuilt the whole inspector, about 110 nodes). It now only requests a frame (`commands.refresh()`); the layout feedback that was already there moves the content.
+Scroll frames in the interaction scenario: 340 to 245 KiB (harness floor of about 52 included). The scenario asserts the content really moves.
+`MATERIA_TRACE_STATE=1` prints which states each action changed (`StateStore.idsChangedSince`); a keystroke changes exactly one, the name field's, yet still rebuilds the inspector panel.

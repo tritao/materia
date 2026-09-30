@@ -265,7 +265,12 @@ class HeadlessEditorProfile {
     var subtreeNodes:Array<Float> = [];
     var measure = function(name:String, input:Void->Void) {
       var before = hl.Gc.totalAllocated();
+      var stateRevision = editor.ui.stateStore.revision;
       input();
+      if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)) {
+        var changed = editor.ui.stateStore.idsChangedSince(stateRevision);
+        Sys.println("state-changes " + name + ": " + [for (id in changed) editor.ui.stateStore.describe(new nativekit.ui.core.WidgetId(id))].join(" | "));
+      }
       var dirty = editor.ui.isDirty();
       submit(editor, frame, frames, name);
       var bytes = hl.Gc.totalAllocated() - before;
@@ -286,7 +291,11 @@ class HeadlessEditorProfile {
       measure("hover-enter", function() editor.ui.pointerMove(tabA.x, tabA.y));
       measure("hover-inside", function() editor.ui.pointerMove(tabA.x + wobble, tabA.y));
       measure("hover-other", function() editor.ui.pointerMove(tabB.x, tabB.y));
+      var beforeY = targetCenter(editor, nameKey, false).y;
       measure("scroll-inspector", function() editor.ui.scroll(field.x, field.y, 0.0, 30.0 * wobble));
+      // A scroll must still move the content: it is applied by layout feedback, not by rebuilding.
+      if (cycle == 0 && targetCenter(editor, nameKey, false).y == beforeY)
+        throw "Scrolling the inspector did not move its content";
       measure("idle", function() {});
       action(actions, "interaction", cycle);
     }

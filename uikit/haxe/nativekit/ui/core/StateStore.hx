@@ -132,6 +132,15 @@ class StateStore {
 		valueRevisions.set(id.value, revision);
 	}
 
+	/** IDs of the states set after `since` (a value of `revision`), in no particular order. */
+	public function idsChangedSince(since:Int):Array<Int> {
+		var result:Array<Int> = [];
+		for (id => changedAt in valueRevisions)
+			if (changedAt > since)
+				result.push(id);
+		return result;
+	}
+
 	/** Revision at which this state last changed; zero if it never has been set since creation. */
 	public function valueRevision(id:Int):Int {
 		var result = valueRevisions.get(id);

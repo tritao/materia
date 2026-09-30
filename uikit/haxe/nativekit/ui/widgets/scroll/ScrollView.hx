@@ -66,8 +66,10 @@ class ScrollView implements View {
 				axis == ScrollAxis.Vertical || axis == ScrollAxis.Both;
 			var stored:State<ScrollController> = context.state(viewport.id, controller);
 			controller = stored.value;
-			controller.bind(function(value) {
-				stored.update(value);
+			// The offset is applied to the content in place after layout (see onResolved below), so a scroll needs a new
+			// frame but not a rebuild: bumping the state revision here would invalidate every cached subtree around it.
+			controller.bind(function(_) {
+				context.commands.refresh();
 			});
 
 			var contentStyle = new LayoutStyle();
