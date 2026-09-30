@@ -265,8 +265,17 @@ double rest_shape_radius(const BodyRecord &body) {
     }
 }
 
+bool has_convex_part(const BodyRecord &body) {
+    for (const auto &part : body.desc.shape_parts)
+        if (part.type == NKSIM_SHAPE_CONVEX) return true;
+    return false;
+}
+
 bool geometries_overlap_at_rest(const BodyRecord &a, const BodyRecord &b) {
-    if (a.desc.shape_parts.size() > 1 || b.desc.shape_parts.size() > 1) {
+    // A convex hull has no bounding radius below; its vertices' bounds give
+    // the rest box, as they do for a hull inside a compound shape.
+    if (a.desc.shape_parts.size() > 1 || b.desc.shape_parts.size() > 1 ||
+        has_convex_part(a) || has_convex_part(b)) {
         for (const auto &first : rest_piece_boxes(a))
             for (const auto &second : rest_piece_boxes(b))
                 if (rest_boxes_overlap(first, second)) return true;

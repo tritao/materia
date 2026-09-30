@@ -5,27 +5,6 @@
 	"defaultEntrypoint": "router",
 	"build": { "system": "haxeon", "manifest": "haxeon.json" },
 	"robotMotions": "cnc-router.motion.json",
-	"collisionDisabledParts": [
-		"railYLeft",
-		"railYRight",
-		"blockYLeft",
-		"blockYRight",
-		"railXUpper",
-		"railXLower",
-		"blockXUpper",
-		"blockXLower",
-		"railZLeft",
-		"railZRight",
-		"blockZLeft",
-		"blockZRight",
-		"screwYLeft",
-		"screwYRight",
-		"screwX",
-		"screwZ",
-		"nutBracketYLeft",
-		"nutBracketYRight",
-		"nutBracketX"
-	],
 	"entrypoints": {
 		"router": {
 			"kind": "cad-preview",

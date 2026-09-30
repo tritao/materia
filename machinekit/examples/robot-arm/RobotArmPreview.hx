@@ -1,73 +1,17 @@
+import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
-import cadkit.modeling.Part;
-import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
-import materia.project.MaterialLibrary;
 import materia.project.SceneArtifact;
-import materia.project.SceneArtifact.SceneArtifactPart;
-import materia.units.LengthUnit;
 
 /** Materia project entrypoint for the six-axis robot arm. */
 class RobotArmPreview {
 	public static inline var ASSEMBLY_ID:String = "robot-arm";
 
 	/** Geometry, joints and initial pose of the arm; parts with equal designations share geometry. */
-	public static function arm():Bytes {
-		var robot = new RobotArm();
-		robot.validate();
-		var model = new AssemblyModel("mm");
-		robot.addTo(model, "");
-		var parts:Array<SceneArtifactPart> = [];
-		var definitionByOccurrence = new Map<String, String>();
-		var definitionByDesignation = new Map<String, String>();
-		for (entry in robot.components()) {
-			var definitionId = definitionByDesignation.get(entry.component.designation);
-			if (definitionId == null) {
-				definitionId = entry.id;
-				definitionByDesignation.set(entry.component.designation, definitionId);
-				addPart(parts, definitionId, entry.component.designation,
-					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId);
-			}
-			definitionByOccurrence.set(entry.id, definitionId);
-		}
-		var definition = model.definition(ASSEMBLY_ID);
-		var state = model.initialState(ASSEMBLY_ID).record();
-		definition.definitions = [for (component in definition.definitions)
-			if (definitionByOccurrence.get(component.id) == component.id) component];
-		for (occurrence in definition.occurrences)
-			occurrence.definition = definitionByOccurrence.get(occurrence.id);
-		return SceneArtifact.encode({lengthUnit: "mm",
-			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assembly: model.record(), assemblyDefinition: definition, assemblyState: state});
-	}
-
-	static function addPart(parts:Array<SceneArtifactPart>, id:String, name:String, part:Part,
-			materialId:String):Void {
-		var material = MaterialLibrary.require(materialId);
-		var color = material.visual.baseColor;
-		try {
-			var physical = part.massProperties();
-			var mesh = part.shape.tessellateRelative();
-			parts.push({
-				id: id, name: name, red: color[0], green: color[1], blue: color[2],
-				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,
-				vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
-				volume: physical.volume,
-				centerOfMass: [physical.centerOfMass.x, physical.centerOfMass.y, physical.centerOfMass.z],
-				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
-				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
-				faceRanges: [for (range in mesh.faceRanges) {
-					faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
-				}]
-			});
-		} catch (error:Dynamic) {
-			part.close();
-			throw error;
-		}
-		part.close();
-	}
+	public static function arm():Bytes
+		return SceneArtifact.encode(AssemblyPreview.scene(new RobotArm(), ASSEMBLY_ID));
 }
 
 /** Geometry builds, and forward kinematics puts the tool where the layout says. */

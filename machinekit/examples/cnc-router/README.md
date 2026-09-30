@@ -63,12 +63,11 @@ and for these prismatic joints they are in metres, so `-0.07` on `x` means
 machine X 80. The simulation drives each axis to its track; without a track an
 axis is not driven and the Z slide would fall under gravity.
 
-The simulated parts collide through their convex hulls. Some parts of the
-machine touch by design: a block rides its rail, and a nut bracket's hull
-swallows the screw that runs through its bore. Those would drag on each other,
-so the manifest's `collisionDisabledParts` turns collision off for the rails,
-rail blocks, lead screws and nut brackets. The spindle, tool, Z plate, gantry,
-stock, clamps and bed keep it.
+Every part collides in the simulation, through its convex hull. Parts of the
+machine that touch by design (a block on its rail, a nut bracket whose hull
+swallows the screw through its bore) overlap in the starting pose, and the
+MuJoCo backend never collides parts of one machine that overlap there, so they
+slide freely without any per-project setting.
 
 Z starts at the top of its travel, on its upper limit. The simulated robot
 therefore relies on the runtime's limit tolerance

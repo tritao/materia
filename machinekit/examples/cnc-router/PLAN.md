@@ -62,9 +62,34 @@ cycle-time reports; rest machining from in-process stock; 5-axis or robot
 milling (StockKit phase 7 and KinematicsKit); a lathe; streaming to a real
 controller.
 
+## Architecture fixes found in C1
+
+C1 needed two stopgaps; these replace them, before C2 builds on them.
+
+- **A1. Joint overtravel.** Assembly joint limits gain a per-joint
+  `overtravel`; the robot runtime faults only outside travel ± overtravel,
+  and simulated end stops sit there too. Replaces the app-wide
+  `AssemblyRobot.OBSERVED_LIMIT_TOLERANCE` (a joint parked on its travel limit
+  settled past MuJoCo's soft stop, which was also the fault threshold).
+- **A2. Designed contact** (done). simkit already excluded collision between
+  parts of one machine that overlap in the starting pose, but it measured
+  only boxes, spheres, capsules and cylinders, so a convex hull (every
+  generated part) never matched. With hulls measured by their vertices'
+  bounds, the rail blocks and the screws in their nut brackets slide freely,
+  and the manifest's `collisionDisabledParts` is gone. No guide constraint was
+  needed; on a rigid gantry it would only over-constrain the solver.
+- **A3. Program-driven motion (the new C2).** The project declares a program
+  on the machine; it runs through `CncCompiler` → `ToolpathMotion.lower` →
+  runtime trajectory segments, not motion tracks (which are linear, looping
+  and capped at 10,000 keys). The outline trace becomes a small G-code file.
+- **A4. Homing.** Z homes at the top of travel and pulls off its limit.
+- **A5. Shared preview.** One `AssemblyPreview` helper builds the scene for
+  every MachineKit example, keeping connectors when parts share geometry.
+
 ## Order
 
-C0 and C1 are independent. After them, C2 → C3 → C4 → C5.
+C0 and C1 are independent. Then A5, A1 with A4, A2, and A3 (which is C2),
+then C3 → C4 → C5.
 
 ## Progress
 

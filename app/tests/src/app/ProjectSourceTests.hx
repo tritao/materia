@@ -351,9 +351,8 @@ class ProjectSourceTests {
         'router axis ${joint.id} travel is in metres, got $travel');
     }
     check(generated.robotMotions != null && generated.robotMotions.length == 3, "the router ships one track per axis");
-    var passive = [for (record in generated.objects) if (!record.collisionEnabled) record.id];
-    check(passive.indexOf("project:screwX") >= 0 && passive.indexOf("project:blockYRight") >= 0 &&
-      passive.indexOf("project:spindle") < 0, "the router's screws and rail blocks start with collision off, the spindle on");
+    check([for (record in generated.objects) if (!record.collisionEnabled) record].length == 0,
+      "every router part collides");
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,

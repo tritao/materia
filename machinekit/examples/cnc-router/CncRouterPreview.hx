@@ -1,3 +1,4 @@
+import machinekit.assembly.AssemblyPreview;
 import haxe.io.Bytes;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.AssemblyState;
@@ -9,82 +10,15 @@ import machinekit.component.ComponentDetail;
 import machinekit.motion.LinearRail;
 import machinekit.motion.NemaStepper;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
-import materia.project.MaterialLibrary;
 import materia.project.SceneArtifact;
-import materia.project.SceneArtifact.SceneArtifactPart;
-import materia.units.LengthUnit;
 
 /** Materia project entrypoint for the desktop CNC router. */
 class CncRouterPreview {
 	public static inline var ASSEMBLY_ID:String = "cnc-router";
 
 	/** Geometry, joints and initial pose of the router; parts with equal designations share geometry. */
-	public static function router():Bytes {
-		var router = new CncRouter();
-		router.validate();
-		var model = new AssemblyModel("mm");
-		router.addTo(model, "");
-		var parts:Array<SceneArtifactPart> = [];
-		var definitionByOccurrence = new Map<String, String>();
-		var definitionByDesignation = new Map<String, String>();
-		for (entry in router.components()) {
-			var definitionId = definitionByDesignation.get(entry.component.designation);
-			if (definitionId == null) {
-				definitionId = entry.id;
-				definitionByDesignation.set(entry.component.designation, definitionId);
-				addPart(parts, definitionId, entry.component.designation,
-					entry.component.geometry(ComponentDetail.Preview), entry.component.materialId);
-			}
-			definitionByOccurrence.set(entry.id, definitionId);
-		}
-		var definition = model.definition(ASSEMBLY_ID);
-		var state = model.initialState(ASSEMBLY_ID).record();
-		// A shared definition carries the connectors of every member that uses it; the router names
-		// its mate connectors after their members, so they never clash.
-		var shared = new Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>();
-		for (component in definition.definitions)
-			if (definitionByOccurrence.get(component.id) == component.id) shared.set(component.id, component);
-		for (component in definition.definitions) {
-			var owner = shared.get(definitionByOccurrence.get(component.id));
-			if (owner == null || owner == component) continue;
-			for (connector in component.connectors)
-				if (![for (existing in owner.connectors) existing.name].contains(connector.name))
-					owner.connectors.push(connector);
-		}
-		definition.definitions = [for (component in definition.definitions) if (shared.exists(component.id)) component];
-		for (occurrence in definition.occurrences)
-			occurrence.definition = definitionByOccurrence.get(occurrence.id);
-		return SceneArtifact.encode({lengthUnit: "mm",
-			metresPerUnit: LengthUnit.metresPerUnit("mm"), parts: parts,
-			assembly: model.record(), assemblyDefinition: definition, assemblyState: state});
-	}
-
-	static function addPart(parts:Array<SceneArtifactPart>, id:String, name:String, part:Part,
-			materialId:String):Void {
-		var material = MaterialLibrary.require(materialId);
-		var color = material.visual.baseColor;
-		try {
-			var physical = part.massProperties();
-			var mesh = part.shape.tessellateRelative();
-			parts.push({
-				id: id, name: name, red: color[0], green: color[1], blue: color[2],
-				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,
-				vertexCount: mesh.vertexCount, indexCount: mesh.indexCount,
-				volume: physical.volume,
-				centerOfMass: [physical.centerOfMass.x, physical.centerOfMass.y, physical.centerOfMass.z],
-				vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
-				edgeSegments: mesh.edgeSegments, edgeIds: mesh.edgeIds,
-				faceRanges: [for (range in mesh.faceRanges) {
-					faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
-				}]
-			});
-		} catch (error:Dynamic) {
-			part.close();
-			throw error;
-		}
-		part.close();
-	}
+	public static function router():Bytes
+		return SceneArtifact.encode(AssemblyPreview.scene(new CncRouter(), ASSEMBLY_ID));
 }
 
 /** Geometry builds, the axes move the tool where machine coordinates say, and nothing collides. */
