@@ -10,7 +10,7 @@ class FacilitySweepTests {
     /** Runs one facility layout and reports the belly clearance, the deepest lean, and how far the part ended from the station. */
     static function measure(layout:FacilityLayout, describe:String):{clearance:Float, lean:Float, rest:Float} {
         var scenario = FacilityScenario.build(layout, describe);
-        var gate = new JobGate(scenario.worker, scenario.session, scenario.limb(), scenario.surfaces);
+        var gate = new JobGate(scenario.worker, scenario.session, [scenario.limb()], scenario.surfaces);
         var ticks = 0;
         while (!scenario.worker.currentJobDone() && ticks++ < 2400) {
             scenario.tick();
@@ -33,7 +33,7 @@ class FacilitySweepTests {
             var label = 'lane=${layout.name} surface=$surface';
             var scenario = FacilityScenario.build({station: layout.station, via: layout.via, surface: surface});
             var worker = scenario.worker;
-            var gate = new JobGate(worker, scenario.session, scenario.limb(), scenario.surfaces);
+            var gate = new JobGate(worker, scenario.session, [scenario.limb()], scenario.surfaces);
             var ticks = 0;
             while (!worker.currentJobDone() && ticks++ < 2400) {
                 scenario.tick();

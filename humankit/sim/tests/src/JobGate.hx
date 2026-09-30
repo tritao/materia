@@ -27,14 +27,15 @@ class JobGate {
     final worker:HumanWorker;
     final session:SimSession;
     final surfaces:Array<HumanTargetBox>;
-    final limb:HumanLimb;
+    final limbs:Array<HumanLimb>;
     /** Whether the hand has held something yet: reaching before that is a pick, and after letting go a retreat. */
     var gripped:Bool = false;
 
-    public function new(worker:HumanWorker, session:SimSession, limb:HumanLimb, surfaces:Array<HumanTargetBox>) {
+    /** `limbs` are the hands that do the work: one for a one-handed job, both for a two-handed one. */
+    public function new(worker:HumanWorker, session:SimSession, limbs:Array<HumanLimb>, surfaces:Array<HumanTargetBox>) {
         this.worker = worker;
         this.session = session;
-        this.limb = limb;
+        this.limbs = limbs;
         this.surfaces = surfaces;
     }
 
@@ -45,14 +46,20 @@ class JobGate {
         if (body.grip) gripped = true;
         // Only while reaching for the part, or holding it to place it: walking back past a surface after
         // the hand lets go is not standing at it.
-        if (body.reachWeight(limb) <= 0.0 || !(!gripped || body.grip)) return;
+        var reaching = false;
+        for (limb in limbs) if (body.reachWeight(limb) > 0.0) reaching = true;
+        if (!reaching || !(!gripped || body.grip)) return;
         var belly = pose.bonePosition(HumanBone.Spine);
         var front = body.toWorld([belly[0] + BELLY_FRONT, belly[1], belly[2]]);
         for (surface in surfaces) clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
     }
 
-    /** Appends to `failures` every rule the run broke, each naming `label`. */
-    public function check(label:String, failures:Array<String>):Void {
+    /**
+     * Appends to `failures` every rule the run broke, each naming `label`. With `posture` off, the rules on
+     * where the elbows and belly end up are left to the caller, for a run known to need a crouch the body
+     * does not do; the motion limits still apply.
+     */
+    public function check(label:String, failures:Array<String>, posture:Bool = true):Void {
         for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
             var arm = quality.arm(side), name = side == MotionQuality.RIGHT ? "right" : "left";
             if (arm.planeTurnRate > MotionQualityTests.MAX_PLANE_TURN)
@@ -61,10 +68,12 @@ class JobGate {
                 failures.push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt}');
             if (arm.maxHandAcceleration > MotionQualityTests.MAX_HAND_ACCELERATION)
                 failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt}');
+            if (!posture) continue;
             if (arm.elbowAboveShoulder > 0.0) failures.push('$label: the $name elbow rose ${r(arm.elbowAboveShoulder)} m above the shoulder');
             if (arm.minElbowAngle < MotionQualityTests.MIN_ELBOW_ANGLE)
                 failures.push('$label: the $name elbow bent to ${r(arm.minElbowAngle)} degrees');
         }
+        if (!posture) return;
         var capped = lean >= worker.body.posture.maxLean - 0.01;
         if (clearance < (capped ? CAPPED_CLEARANCE : CLEARANCE))
             failures.push('$label: the belly stood ${r(-clearance)} m inside a surface (lean ${r(lean)} rad${capped ? ", at its limit" : ""})');
