@@ -42,7 +42,7 @@ class BuildContext {
 	/** Bumped when the theme or application sheet is replaced, so swaps never reuse a fingerprint. */
 	var styleEpoch:Int = 0;
 	var focusRequester:WidgetId->Bool;
-	final claimed:Map<Int, Bool>;
+	final claimed:IdSet;
 	final idsByPath:Map<String, WidgetId>;
 	var cachedIdCount:Int;
 	var rootScope:KeyScope;
@@ -80,7 +80,7 @@ class BuildContext {
 		viewportWidth = 0.0;
 		viewportHeight = 0.0;
 		focusRequester = function(_) { return false; };
-		claimed = new Map();
+		claimed = new IdSet();
 		idsByPath = new Map();
 		cachedIdCount = 0;
 		rootScope = new KeyScope();
@@ -264,9 +264,8 @@ class BuildContext {
 		stateStore.rememberPath(id, path);
 		if (patching)
 			return id;
-		if (claimed.exists(id.value))
+		if (!claimed.add(id.value))
 			throw 'Duplicate widget ID ${id.value}; use distinct keys for sibling views';
-		claimed.set(id.value, true);
 		return id;
 	}
 
@@ -390,9 +389,8 @@ class BuildContext {
 		if (root == null)
 			throw "A retained render subtree is required";
 		root.walk(function(node) {
-			if (claimed.exists(node.id.value))
+			if (!claimed.add(node.id.value))
 				throw 'Duplicate retained widget ID ${node.id.value}';
-			claimed.set(node.id.value, true);
 		});
 	}
 

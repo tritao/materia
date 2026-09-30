@@ -8,7 +8,9 @@ class StateStore {
 	final disposers:Map<Int, Void->Void>;
 	final paths:Map<Int, String>;
 	final managed:Map<Int, Bool>;
-	final frameUsed:Map<Int, Bool>;
+	final frameUsed:IdSet;
+	/** Scratch for usedIdsSince, reused so collecting a subtree's states allocates only the result. */
+	final seenScratch:IdSet = new IdSet(256);
 	final frameUseOrder:Array<Int>;
 	var frameActive:Bool;
 	public var revision(default, null):Int;
@@ -18,7 +20,7 @@ class StateStore {
 		disposers = new Map();
 		paths = new Map();
 		managed = new Map();
-		frameUsed = new Map();
+		frameUsed = new IdSet();
 		frameUseOrder = [];
 		frameActive = false;
 		revision = 0;
@@ -54,13 +56,11 @@ class StateStore {
 	public function usedIdsSince(marker:Int):Array<Int> {
 		var start = marker < 0 ? 0 : marker > frameUseOrder.length ? frameUseOrder.length : marker;
 		var result:Array<Int> = [];
-		var seen:Map<Int, Bool> = new Map();
+		seenScratch.clear();
 		for (index in start...frameUseOrder.length) {
 			var id = frameUseOrder[index];
-			if (!seen.exists(id)) {
-				seen.set(id, true);
+			if (seenScratch.add(id))
 				result.push(id);
-			}
 		}
 		return result;
 	}
@@ -72,7 +72,7 @@ class StateStore {
 		for (id in ids)
 			if (values.exists(id))
 				if (frameActive) {
-					frameUsed.set(id, true);
+					frameUsed.add(id);
 					frameUseOrder.push(id);
 				}
 	}
@@ -90,7 +90,7 @@ class StateStore {
 			return;
 		var stale:Array<Int> = [];
 		for (id in managed.keys())
-			if (!frameUsed.exists(id))
+			if (!frameUsed.has(id))
 				stale.push(id);
 		var failure:Dynamic = null;
 		for (id in stale) {
@@ -214,7 +214,7 @@ class StateStore {
 
 	function markUsed(id:WidgetId):Void {
 		if (frameActive) {
-			frameUsed.set(id.value, true);
+			frameUsed.add(id.value);
 			frameUseOrder.push(id.value);
 		}
 	}

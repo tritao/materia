@@ -214,3 +214,10 @@ In a build nothing will patch (the default; `--live` is off) a literal is now a 
 a patch cannot add a global. Same app source, old compiler against new, tab-matrix cycle: allocations 42,466 to 32,828 (-22.7%), bytes 1,714 to 1,488 KiB (-13.2%), `String` objects 12,034 to 2,396.
 An IR pass that hoisted each literal to the entry block was tried first and made things worse (+14% allocations: error-message literals in loops were allocated on every call, loop or not) and was reverted; only a constant is free.
 Interaction frames with the new compiler (KiB, harness floor of about 48 included): hover onto a tab 153, scroll 196, type a character 174.
+
+### Allocation-free ID sets (2026-09-30, haxeon `aa5dc31b`)
+
+`Map<Int, Bool>.set` boxes its value on every insert, and the per-frame ID claim set and the state-usage set are filled for every node. `IdSet` (open addressing over two arrays, `clear` is a generation bump)
+replaces them, and `StateStore.usedIdsSince` reuses a scratch set instead of making a map per call. Tab-matrix cycle with the same compiler: allocations 32,828 to 28,522 (-13.1%), bytes 1,488 to 1,416 KiB (-4.8%), boxed
+booleans 4,251 to 16 per cycle. Interaction frames (KiB, harness floor of about 48 included): hover onto a tab 145, scroll 187, type a character 165.
+What is left in the census is many sites of 1-2% each: pane cache key strings, `FocusManager.collect`, `LayoutAxis.fit` per node, style diffs, geometry decode for changed nodes.
