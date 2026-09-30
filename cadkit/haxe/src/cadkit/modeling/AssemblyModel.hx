@@ -201,6 +201,7 @@ class AssemblyModel {
 			(limits.velocity != null && (!Math.isFinite(limits.velocity) || limits.velocity < 0)) ||
 			(limits.effort != null && (!Math.isFinite(limits.effort) || limits.effort < 0)) ||
 			(limits.overtravel != null && (!Math.isFinite(limits.overtravel) || limits.overtravel < 0)) ||
+			(limits.acceleration != null && (!Math.isFinite(limits.acceleration) || limits.acceleration < 0)) ||
 			(limits.lower != null && limits.upper != null && limits.lower > limits.upper) ||
 			(limits.lower != null && value < limits.lower) || (limits.upper != null && value > limits.upper))
 			throw "Assembly joint limits or default value are invalid";

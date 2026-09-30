@@ -209,6 +209,8 @@ typedef RouterAxisSpec = {
 	var velocity:Float;
 	/** Peak axis force in newtons. */
 	var effort:Float;
+	/** Largest axis acceleration in mm/s². */
+	var acceleration:Float;
 	var initial:Float;
 }
 
@@ -248,9 +250,9 @@ class CncRouter extends MachineAssembly {
 	public final spindle = new RouterSpindle();
 	public final tool = new EndMill(6, 22, 30);
 	public final specs:Array<RouterAxisSpec> = [
-		{id: "x", lower: 0, upper: 300, velocity: 80, effort: 400, initial: 150},
-		{id: "y", lower: 0, upper: 300, velocity: 80, effort: 600, initial: 150},
-		{id: "z", lower: -80, upper: 0, velocity: 40, effort: 400, initial: 0}
+		{id: "x", lower: 0, upper: 300, velocity: 80, effort: 400, acceleration: 500, initial: 150},
+		{id: "y", lower: 0, upper: 300, velocity: 80, effort: 600, acceleration: 400, initial: 150},
+		{id: "z", lower: -80, upper: 0, velocity: 40, effort: 400, acceleration: 300, initial: 0}
 	];
 
 	/** Room past each axis's travel before its rail blocks reach the rail ends, in millimetres. */
@@ -421,7 +423,8 @@ class CncRouter extends MachineAssembly {
 		zeroPoses.set(id, pose);
 		connect(parent, id);
 		addMateOnAxis(spec.id, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort, overtravel: room});
+			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort, overtravel: room,
+				acceleration: spec.acceleration});
 	}
 
 	/**

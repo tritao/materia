@@ -34,6 +34,8 @@ enum abstract AssemblyJointRole(String) from String to String {
 	 * the overtravel. Absent, a simulation picks a small default.
 	 */
 	@:id(5) @:optional var overtravel:Null<Float>;
+	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
+	@:id(6) @:optional var acceleration:Null<Float>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */

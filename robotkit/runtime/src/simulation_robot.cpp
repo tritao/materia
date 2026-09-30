@@ -80,6 +80,10 @@ rk_result SimulationRobot::apply(const rk_robot_command &command) {
     auto &staged = staged_commands();
     for (uint32_t index = 0; index < command.target_count; ++index) {
         const auto &source = command.targets[index];
+        // A fixed joint cannot move, so its target is already met. Planners that
+        // command a whole robot, fixed mounting joints included, rely on this.
+        if (source.joint >= actuated_joints_.size() || !actuated_joints_[source.joint])
+            continue;
         nksim_joint_target target{};
         target.struct_size = sizeof(target);
         target.joint = joints_[source.joint];

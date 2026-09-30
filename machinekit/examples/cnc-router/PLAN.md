@@ -24,15 +24,11 @@ mill, and a clamped stock block on a spoilboard. Its prismatic joints `x`,
 `MachineBinding`'s axis ids. Checks: joint travel, BOM, and the tool tip
 following the joints exactly.
 
-**C2. The machine runs a program, without cutting.** A manifest key such as
-`"cncProgram": "part.ngc"` compiles the G-code (`CncCompiler`), lowers it
-against the assembly's `MachineBinding` (`ToolpathMotion.lower`), and installs
-the timed x/y/z trajectories as the project's motion, the way the robot
-arm's `robotMotions` do. The travel envelope comes from the joint limits, so
-a program that leaves it is diagnosed before it runs. Motion tracks are piecewise
-linear (at most 10,000 keys per track) and read in metres as offsets from the
-starting pose, so the lowering samples the plan into keys and converts machine
-millimetres; a long program may need a denser, streamed feed instead of tracks.
+**C2. The machine runs a program, without cutting.** Done as A3 below: the
+manifest's `cnc` block runs a G-code program on the machine through
+`CncCompiler`, `ToolpathMotion` and MotionKit's trajectory execution. The
+travel envelope comes from the joint limits, so a program that leaves it is
+diagnosed before it runs.
 
 **C3. Cutting in real time.**
 - The stock sits on the table: the program's setup origin is placed on the
@@ -82,10 +78,17 @@ C1 needed two stopgaps; these replace them, before C2 builds on them.
   bounds, the rail blocks and the screws in their nut brackets slide freely,
   and the manifest's `collisionDisabledParts` is gone. No guide constraint was
   needed; on a rigid gantry it would only over-constrain the solver.
-- **A3. Program-driven motion (the new C2).** The project declares a program
-  on the machine; it runs through `CncCompiler` → `ToolpathMotion.lower` →
-  runtime trajectory segments, not motion tracks (which are linear, looping
-  and capped at 10,000 keys). The outline trace becomes a small G-code file.
+- **A3. Program-driven motion (the new C2)** (done). The manifest's `cnc`
+  block names a G-code program, a G54 work offset and whether the job loops.
+  The app compiles it with CncKit against the machine's x/y/z joints (with
+  `MotionAxisBlueprint` offsets from the starting pose, since simulated joints
+  read relative to it), lowers it with `ToolpathMotion`, and a
+  `CncProgramPlayer` streams it through MotionKit's `ManipulatorMotion` as
+  runtime trajectory segments. Assembly joint limits gained `acceleration`.
+  The outline trace is `outline.ngc`; motion tracks are gone from the router.
+  Found on the way: the simulated robot refused targets on fixed joints,
+  which a plan commanding the whole robot sends, and `ToolpathMotionBinding`
+  no longer compiled under the pinned haxeon (field null narrowing).
 - **A4. Homing** (folded into A1). Parking Z on its upper soft limit is how
   LinuxCNC-style machines sit after homing; the switch (here, the end stop) is
   beyond it by the overtravel, so no artificial pull-off is modelled.
@@ -103,7 +106,7 @@ then C3 → C4 → C5.
 | --- | --- | --- |
 | C0 | not started | |
 | C1 | done: router, checks, outline-trace motion, app test | `c82fe76d` |
-| C2 | not started | |
+| C2 | done as A3 | |
 | C3 | not started | |
 | C4 | not started | |
 | C5 | not started | |

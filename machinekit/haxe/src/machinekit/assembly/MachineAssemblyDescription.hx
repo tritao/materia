@@ -46,6 +46,7 @@ import machinekit.component.PortInterface;
 	@:id(3) final velocity:Null<Float>;
 	@:id(4) final effort:Null<Float>;
 	@:id(5) @:optional final overtravel:Null<Float>;
+	@:id(6) @:optional final acceleration:Null<Float>;
 }
 
 @:wire typedef FrozenJoint = {

@@ -46,10 +46,11 @@ class ToolpathMotionBinding {
       }
       envelopeLower.push(low); envelopeUpper.push(high);
     }
-    if (machine.travel != null)
+    var travel = machine.travel;
+    if (travel != null)
       for (axis in 0...3) {
-        var lower = [machine.travel.lower.x, machine.travel.lower.y, machine.travel.lower.z];
-        var upper = [machine.travel.upper.x, machine.travel.upper.y, machine.travel.upper.z];
+        var lower = [travel.lower.x, travel.lower.y, travel.lower.z];
+        var upper = [travel.upper.x, travel.upper.y, travel.upper.z];
         envelopeLower[axis] = Math.max(envelopeLower[axis], lower[axis]);
         envelopeUpper[axis] = Math.min(envelopeUpper[axis], upper[axis]);
       }

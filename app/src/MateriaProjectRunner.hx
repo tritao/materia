@@ -1,5 +1,7 @@
 package app;
 
+import app.CncProgramPlayer.CncJob;
+
 import haxe.Json;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
@@ -68,6 +70,7 @@ class MateriaProjectRunner {
     scene.robotMotions = projectMotions(motion, scene);
     scene.robotGrips = RobotGripEvent.decode(motion == null ? null : Reflect.field(motion, "grips"));
     applyDynamicParts(manifestPath, scene);
+    scene.cncJob = cncJob(manifestPath);
     return scene;
   }
 
@@ -105,6 +108,48 @@ class MateriaProjectRunner {
       }
       if (!found) throw 'Project dynamic part "$id" is not a part of the generated scene';
     }
+  }
+
+  /**
+   * The manifest's optional `cnc` block, a machining job for the project's own machine:
+   * `{"program": "<file>.ngc", "workOffset": [x, y, z], "axes": ["x", "y", "z"], "loop": true}`.
+   * The program is LinuxCNC G-code beside the manifest. `axes` names the assembly joints that are
+   * the machine's X, Y and Z (by default `x`, `y` and `z`); `workOffset` is G54 in machine
+   * coordinates, in the assembly's length unit (by default zero); a looping job starts again when
+   * the program completes.
+   */
+  static function cncJob(manifestPath:String):Null<CncJob> {
+    var root:Dynamic = Json.parse(File.getContent(manifestPath));
+    var block:Dynamic = Reflect.field(root, "cnc");
+    if (block == null) return null;
+    for (name in Reflect.fields(block)) if (["program", "workOffset", "axes", "loop"].indexOf(name) < 0)
+      throw 'Unknown project field "cnc.$name"';
+    var program:Dynamic = Reflect.field(block, "program");
+    if (!Std.isOfType(program, String) || StringTools.trim(program).length == 0)
+      throw 'Project field "cnc.program" must name a G-code file';
+    var file = resolveProjectPath(directory(manifestPath), program);
+    if (!FileSystem.exists(file) || FileSystem.isDirectory(file))
+      throw 'Project CNC program not found: $file';
+    function numbers(name:String, fallback:Array<Float>):Array<Float> {
+      var value:Dynamic = Reflect.field(block, name);
+      if (value == null) return fallback;
+      if (!Std.isOfType(value, Array) || (cast value:Array<Dynamic>).length != 3)
+        throw 'Project field "cnc.$name" must be three numbers';
+      return [for (item in (cast value:Array<Dynamic>)) {
+        if (!Std.isOfType(item, Int) && !Std.isOfType(item, Float) || !Math.isFinite(item))
+          throw 'Project field "cnc.$name" must be three numbers';
+        (item:Float);
+      }];
+    }
+    var axes:Dynamic = Reflect.field(block, "axes");
+    if (axes != null && (!Std.isOfType(axes, Array) || (cast axes:Array<Dynamic>).length != 3 ||
+        [for (axis in (cast axes:Array<Dynamic>)) if (!Std.isOfType(axis, String)) axis].length > 0))
+      throw 'Project field "cnc.axes" must name three joints';
+    var loop:Dynamic = Reflect.field(block, "loop");
+    if (loop != null && !Std.isOfType(loop, Bool)) throw 'Project field "cnc.loop" must be true or false';
+    return {programPath: file, source: File.getContent(file),
+      axes: axes == null ? ["x", "y", "z"] : [for (axis in (cast axes:Array<Dynamic>)) (axis:String)],
+      workOffset: numbers("workOffset", [0.0, 0.0, 0.0]), loop: loop == true};
   }
 
   /**
@@ -447,7 +492,7 @@ class MateriaProjectRunner {
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
-      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips};
+      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips, cncJob: generated.cncJob};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -592,4 +637,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var robotMotions:Array<RobotMotionTrack>;
   /** Vacuum commands that go with the motion: which tool grips or lets go, and when. */
   @:optional var robotGrips:Array<RobotGripEvent>;
+  /** The project's machining job, from its manifest's `cnc` block. */
+  @:optional var cncJob:CncJob;
 }

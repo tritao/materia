@@ -181,7 +181,7 @@ class Main {
         editor.session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, generated.cncJob);
       }
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
       var settleSeconds = 0.0;
@@ -649,7 +649,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, generated.cncJob);
       }
     }
     bimEditor = makeBimEditor();

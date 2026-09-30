@@ -4,7 +4,11 @@
 	"name": "Desktop CNC router",
 	"defaultEntrypoint": "router",
 	"build": { "system": "haxeon", "manifest": "haxeon.json" },
-	"robotMotions": "cnc-router.motion.json",
+	"cnc": {
+		"program": "outline.ngc",
+		"workOffset": [90, 105, -54],
+		"loop": true
+	},
 	"entrypoints": {
 		"router": {
 			"kind": "cad-preview",

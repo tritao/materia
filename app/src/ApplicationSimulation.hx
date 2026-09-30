@@ -52,6 +52,7 @@ class ApplicationSimulation {
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
   var motions:Null<RobotMotionPlayer> = null;
   var gripper:Null<RobotGripPlayer> = null;
+  var cnc:Null<CncProgramPlayer> = null;
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
@@ -111,6 +112,7 @@ class ApplicationSimulation {
     members = [];
     if (motions != null) members.push(motions);
     if (gripper != null) members.push(gripper);
+    if (cnc != null) members.push(cnc);
     if (workforce != null) members.push(workforce);
     for (participant in participants) members.push(participant);
   }
@@ -128,6 +130,7 @@ class ApplicationSimulation {
     var candidateAssemblyParts:Array<AssemblyPart> = [];
     var candidateRuntimes:Array<robotkit.runtime.RobotRuntime> = [];
     var candidateWarnings:Array<String> = [];
+    var candidateCnc:Null<CncProgramPlayer> = null;
     try {
       var models = configuration.robotModels();
       var hasWorkers = false;
@@ -168,6 +171,11 @@ class ApplicationSimulation {
         candidateRobotModels.push(built.model);
         for (part in built.parts) candidateAssemblyParts.push(part);
         for (warning in built.warnings) candidateWarnings.push(warning);
+        // A bad program fails the rebuild here, before anything live changes.
+        var job = session.cncJob, physical = session.projectPhysical;
+        if (job != null && physical != null)
+          candidateCnc = new CncProgramPlayer(job, built, assembly, session.projectAssemblyState,
+            physical.metresPerUnit, createdSpace.session);
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
@@ -248,6 +256,7 @@ class ApplicationSimulation {
       gripper = resolvedGrips.length == 0 ? null : new RobotGripPlayer(createdSpace.session, candidate,
         candidateRuntimes, candidateObjects, resolvedGrips, resolvedPeriod);
       workforce = candidateWorkforce;
+      cnc = candidateCnc;
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
@@ -322,6 +331,9 @@ class ApplicationSimulation {
   public function isRunning():Bool return running;
   /** Scene ids of the objects the tool links are holding right now. */
   public function heldObjectIds():Array<String> return gripper == null ? [] : gripper.heldIds();
+
+  /** Why the project's CNC program stopped, or null while it runs or when there is none. */
+  public function cncFailure():Null<String> return cnc == null ? null : cnc.failure;
   public function humanWorker(id:String):Null<HumanWorker> return workforce == null ? null : workforce.worker(id);
   public function humanSignals(id:String):Null<HumanWorkerSignals>
     return workforce == null ? null : workforce.signals(id);
@@ -439,7 +451,7 @@ class ApplicationSimulation {
       retired.dispose();
       retired.scene.setWorkerVisualsVisible(true);
     }
-    workforce = null; motions = null; gripper = null; refreshMembers();
+    workforce = null; motions = null; gripper = null; cnc = null; refreshMembers();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

@@ -248,7 +248,7 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips, generated.cncJob);
     check(session.robotMotions.length == 6, "opening the arm project installs its motion");
     checkArmHierarchy(session);
     checkGripEvents(definition, generated.physical);
@@ -335,8 +335,8 @@ class ProjectSourceTests {
   }
 
   /**
-   * The router example opens, its axes simulate as prismatic joints in metres, and the tool follows
-   * the shipped motion that traces the stock's outline.
+   * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job, a
+   * G-code outline of the stock, drives the machine through every corner of the outline.
    */
   static function checkCncRouter(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
@@ -349,8 +349,12 @@ class ProjectSourceTests {
       var travel = joint.limits.upper - joint.limits.lower;
       check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
         'router axis ${joint.id} travel is in metres, got $travel');
+      check(joint.limits.overtravel > 0 && joint.limits.maxAcceleration > 0,
+        'router axis ${joint.id} carries its overtravel and acceleration');
     }
-    check(generated.robotMotions != null && generated.robotMotions.length == 3, "the router ships one track per axis");
+    check(generated.cncJob != null && generated.cncJob.loop, "the router ships a looping CNC job");
+    check(generated.robotMotions == null || generated.robotMotions.length == 0,
+      "the router's motion comes from its program, not tracks");
     check([for (record in generated.objects) if (!record.collisionEnabled) record].length == 0,
       "every router part collides");
     var session = new ProjectDocumentSession(null, false);
@@ -358,7 +362,7 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips, generated.cncJob);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     check(simulation.rebuild(session.sensors, session.scene, session),
       "the router builds in the shared simulation: " + simulation.error);
@@ -369,30 +373,32 @@ class ProjectSourceTests {
     }
     simulation.step();
     var start = toolPosition();
-    var tracks = new Map<String, RobotMotionTrack>();
-    for (track in generated.robotMotions) tracks.set(track.jointId, track);
-    var duration = 0.0;
-    for (track in generated.robotMotions) duration = Math.max(duration, track.keys[track.keys.length - 1].time);
-    // Tracks are offsets from the starting pose, in metres, and the tool does not turn, so its displacement is
-    // the tracks' positions whichever point of the tool the pose reports.
-    var worst = 0.0, lowest = 0.0, steps = 0;
-    while (simulation.activeSession().simulationTime() < duration && steps++ < 100000) {
+    // The outline's corners, as offsets from the starting pose (work 60, 45, 54), in metres.
+    var corners = [[-0.07, -0.055, -0.03], [0.07, -0.055, -0.03], [0.07, 0.055, -0.03], [-0.07, 0.055, -0.03]];
+    var nearest = [for (_ in corners) Math.POSITIVE_INFINITY];
+    var lowest = 0.0, steps = 0, leftStart = false, backAt = -1.0;
+    while (simulation.activeSession().simulationTime() < 60.0 && steps++ < 100000) {
       simulation.step();
-      var now = simulation.activeSession().simulationTime();
+      check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
       var position = toolPosition();
-      var error = 0.0;
-      for (axis in 0...3) {
-        var track = tracks.get(["x", "y", "z"][axis]);
-        check(track != null, "every axis has a track");
-        error += Math.pow(position[axis] - start[axis] - track.sample(now), 2);
+      var offset = [for (axis in 0...3) position[axis] - start[axis]];
+      for (index in 0...corners.length) {
+        var distance = Math.sqrt(Math.pow(offset[0] - corners[index][0], 2) + Math.pow(offset[1] - corners[index][1], 2) +
+          Math.pow(offset[2] - corners[index][2], 2));
+        nearest[index] = Math.min(nearest[index], distance);
       }
-      worst = Math.max(worst, Math.sqrt(error));
-      lowest = Math.min(lowest, position[2] - start[2]);
+      lowest = Math.min(lowest, offset[2]);
+      var away = Math.sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]);
+      if (away > 0.01) leftStart = true;
+      else if (leftStart && backAt < 0 && nearest[3] < 0.001) backAt = simulation.activeSession().simulationTime();
     }
-    check(worst < 0.002, 'the router tool follows its motion to within 2 mm, off by $worst m');
-    check(lowest < -0.029, 'the tool comes down to trace the stock, lowest $lowest m');
+    for (index in 0...corners.length)
+      check(nearest[index] < 0.001, 'the tool reaches outline corner $index, missing it by ${nearest[index]} m');
+    check(Math.abs(lowest + 0.03) < 0.001, 'the tool traces 24 mm above the stock, lowest $lowest m');
+    check(backAt > 0, "the program returns the tool to where it started");
     session.dispose();
-    Sys.println('cnc router followed its motion to within ${Math.round(worst * 1e5) / 100} mm over $duration s');
+    Sys.println('cnc router ran its outline program in ${Math.round(backAt * 10) / 10} s, corners within ' +
+      '${Math.round(Math.max(Math.max(nearest[0], nearest[1]), Math.max(nearest[2], nearest[3])) * 1e5) / 100} mm');
   }
 
   /** A project named at launch builds in the background: queued at once, opened by tick(). */

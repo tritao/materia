@@ -9,8 +9,8 @@ aluminium stock clamped on its bed. From the repository root:
 ```
 
 Or open **Desktop CNC router** from the Start page and press **Play**: the
-tool traces the outline of the stock, 10 mm outside it and above the clamps.
-The router does not run a G-code program or cut anything yet;
+machine runs its G-code program, which traces the outline of the stock 10 mm
+outside it and above the clamps. It does not cut anything yet;
 [PLAN.md](PLAN.md) lays out the steps from here to cutting the stock in real
 time.
 
@@ -56,12 +56,21 @@ designation share one definition carrying all of their connectors.
 
 ## Motion and simulation
 
-`materia.project.json` names `cnc-router.motion.json` in `robotMotions`: one
-looping track per axis, 20.4 s long, at 40 mm/s in X and Y and 20 mm/s in Z.
-Like every Materia motion track, positions are offsets from the starting pose,
-and for these prismatic joints they are in metres, so `-0.07` on `x` means
-machine X 80. The simulation drives each axis to its track; without a track an
-axis is not driven and the Z slide would fall under gravity.
+`materia.project.json` gives the machine a CNC job in its `cnc` block:
+
+```json
+"cnc": {"program": "outline.ngc", "workOffset": [90, 105, -54], "loop": true}
+```
+
+`outline.ngc` is LinuxCNC G-code that traces the stock's outline 10 mm outside
+it and 24 mm above it, at F2400 (40 mm/s), and returns to the start. G54 work
+zero is the stock's front-left top corner, which is machine (90, 105, −54) mm.
+The app compiles the program with CncKit against the machine's axes, lowers it
+to MotionKit paths, and streams it to the simulated machine as trajectory
+segments; one pass takes 17 s, and the job loops. The planner respects each
+axis's velocity and acceleration (500, 400 and 300 mm/s² for x, y and z). A
+program that leaves the travel, or fails to compile, fails the simulation
+build with its G-code line.
 
 Every part collides in the simulation, through its convex hull. Parts of the
 machine that touch by design (a block on its rail, a nut bracket whose hull
@@ -86,8 +95,9 @@ machine.
 
 These also run in the MachineKit smoke suite (`machinekit/scripts/test-haxeon`).
 `ProjectSourceTests.checkCncRouter` in the app's project-source suite opens the
-project, builds it in MuJoCo and requires the tool to follow the shipped motion
-to within 2 mm (it tracks to about 1.3 mm).
+project, builds it in MuJoCo, runs the G-code job and requires the tool to pass
+every corner of the outline within 1 mm (it passes within 0.13 mm) and return to
+its start.
 `CncRouterChecks` checks:
 
 - the joints and their limits, and mass properties for every part;

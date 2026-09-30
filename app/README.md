@@ -58,6 +58,14 @@ than bolting them to the assembly. A `grip` holds the free object touching the n
 the simulation puts the stops there and faults only beyond them. A joint whose assembly gives none
 gets 1 mm or 1 degree, so one parked on its limit does not fault on numerical noise.
 
+A project whose assembly is a machine can give it a CNC job in the manifest's `cnc` block:
+`{"program": "<file>.ngc", "workOffset": [x, y, z], "axes": ["x", "y", "z"], "loop": true}`. The
+program is LinuxCNC G-code; `axes` names the prismatic joints that are the machine's X, Y and Z
+(their assembly coordinates are machine coordinates, and their limits need velocity and
+acceleration); `workOffset` is G54 in machine coordinates, in the assembly's unit. The simulation
+compiles the program with CncKit and streams it to the machine through MotionKit
+(`CncProgramPlayer`); a compile or travel error fails the simulation build.
+
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame

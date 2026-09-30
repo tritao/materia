@@ -1,5 +1,7 @@
 package app;
 
+import app.CncProgramPlayer.CncJob;
+
 import sys.io.File;
 import sys.io.AtomicFile;
 import sys.FileSystem;
@@ -65,6 +67,8 @@ class ProjectDocumentSession {
   public var robotMotions(default, null):Array<RobotMotionTrack> = [];
   /** Vacuum commands the open project ships with; they are not part of the saved document. */
   public var robotGrips(default, null):Array<RobotGripEvent> = [];
+  /** The project's machining job, run on its machine in the simulation. */
+  public var cncJob(default, null):Null<CncJob> = null;
   var assemblyRuntime:Null<AssemblyState> = null;
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
@@ -206,7 +210,7 @@ class ProjectDocumentSession {
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
-      ?grips:Array<RobotGripEvent>):Void {
+      ?grips:Array<RobotGripEvent>, ?cnc:CncJob):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -242,6 +246,7 @@ class ProjectDocumentSession {
     projectPhysical = physical;
     robotMotions = motions == null ? [] : motions.copy();
     robotGrips = grips == null ? [] : grips.copy();
+    cncJob = cnc;
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -319,6 +324,7 @@ class ProjectDocumentSession {
     projectPhysical = generated.physical;
     robotMotions = generated.robotMotions == null ? [] : generated.robotMotions.copy();
     robotGrips = generated.robotGrips == null ? [] : generated.robotGrips.copy();
+    cncJob = generated.cncJob;
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -604,6 +610,7 @@ class ProjectDocumentSession {
     customMaterials = [];
     robotMotions = [];
     robotGrips = [];
+    cncJob = null;
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

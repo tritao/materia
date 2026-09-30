@@ -858,6 +858,37 @@ static void joint_overtravel_moves_stops_past_the_limits() {
     assert(rk_robot_runtime_blueprint_validate(&invalid) == RK_ERROR_INVALID_ARGUMENT);
 }
 
+// A plan commands every joint of a robot, fixed mounting joints included, as a
+// CNC program on a generated machine does. A fixed joint is already where its
+// target puts it, so the simulation ignores that target and drives the rest.
+static void fixed_joint_targets_are_ignored() {
+    auto model = gravity_arm(50.0);
+    model.link_count = 3;
+    model.joint_count = 2;
+    model.links[2].mass = 0.5;
+    model.links[2].inertia_tensor[0] = model.links[2].inertia_tensor[4] =
+        model.links[2].inertia_tensor[8] = 0.01;
+    model.joints[1] = {1, RK_RUNTIME_JOINT_FIXED, 1, 2, 0.0, 0.0, 0.0};
+    model.joints[1].parent_frame_rotation[3] = model.joints[1].child_frame_rotation[3] = 1.0;
+    model.joints[1].parent_frame_position[0] = 1.0;
+    model.joints[1].axis[1] = 1.0;
+    SessionFixture fixture(0.01, 5);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    rk_robot_command command{};
+    command.struct_size = sizeof(command);
+    command.sequence = 1;
+    command.kind = RK_COMMAND_JOINT_TARGETS;
+    command.target_count = 2;
+    command.targets[0] = {0, RK_TARGET_POSITION, -0.2, 0.0, 0.0};
+    command.targets[1] = {1, RK_TARGET_POSITION, 0.0, 0.0, 0.0};
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 200; ++tick)
+        assert(fixture.step(static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
+    assert(state(robot).safety != RK_SAFETY_FAULT);
+    assert(std::abs(state(robot).position[0] + 0.2) < 0.01);
+}
+
 // A robot can start in a joint pose: set positions move the links it carries
 // before the first step, out-of-limit poses are refused, and reset returns
 // the joints to zero.
@@ -961,6 +992,7 @@ int main() {
     robots_start_in_a_joint_pose();
     observed_limit_tolerance_allows_compliant_stops();
     joint_overtravel_moves_stops_past_the_limits();
+    fixed_joint_targets_are_ignored();
     actuator_limit_stalls_then_lifts();
     servo_target_runs_through_the_runtime();
     blueprint_joint_friction_holds_an_arm();
