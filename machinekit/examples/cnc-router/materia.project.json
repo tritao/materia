@@ -5,9 +5,14 @@
 	"defaultEntrypoint": "router",
 	"build": { "system": "haxeon", "manifest": "haxeon.json" },
 	"cnc": {
-		"program": "outline.ngc",
+		"program": "slots.ngc",
 		"workOffset": [90, 105, -54],
-		"loop": true
+		"loop": true,
+		"stockPart": "stock",
+		"toolPart": "tool",
+		"tools": [
+			{"number": 1, "diameter": 6, "fluteLength": 22, "length": 30, "holderDiameter": 24, "holderLength": 20}
+		]
 	},
 	"entrypoints": {
 		"router": {

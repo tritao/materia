@@ -1,6 +1,7 @@
 package app;
 
 import app.CncProgramPlayer.CncJob;
+import app.CncProgramPlayer.CncJobTool;
 
 import haxe.Json;
 import haxe.crypto.Sha256;
@@ -71,6 +72,17 @@ class MateriaProjectRunner {
     scene.robotGrips = RobotGripEvent.decode(motion == null ? null : Reflect.field(motion, "grips"));
     applyDynamicParts(manifestPath, scene);
     scene.cncJob = cncJob(manifestPath);
+    var machined = scene.cncJob == null ? null : scene.cncJob.stockPart;
+    if (machined != null) {
+      // The stock simulation cuts the stock and reports what touches it; physical contact would
+      // only stop the tool going in.
+      var found = false;
+      for (record in scene.objects) if (record.id == "project:" + machined) {
+        record.collisionEnabled = false;
+        found = true;
+      }
+      if (!found) throw 'Project CNC stock part "$machined" is not a part of the generated scene';
+    }
     return scene;
   }
 
@@ -116,13 +128,17 @@ class MateriaProjectRunner {
    * The program is LinuxCNC G-code beside the manifest. `axes` names the assembly joints that are
    * the machine's X, Y and Z (by default `x`, `y` and `z`); `workOffset` is G54 in machine
    * coordinates, in the assembly's length unit (by default zero); a looping job starts again when
-   * the program completes.
+   * the program completes. To cut stock, `stockPart` names the part machined (cut as its bounding
+   * box), `toolPart` the part whose origin is the tool tip, and `tools` the tool table
+   * (`{"number", "diameter", "fluteLength", "length", "holderDiameter", "holderLength"}`, the first
+   * entry in the spindle); `stockSpacing` is the simulated stock's ray spacing (0.5 by default).
    */
   static function cncJob(manifestPath:String):Null<CncJob> {
     var root:Dynamic = Json.parse(File.getContent(manifestPath));
     var block:Dynamic = Reflect.field(root, "cnc");
     if (block == null) return null;
-    for (name in Reflect.fields(block)) if (["program", "workOffset", "axes", "loop"].indexOf(name) < 0)
+    for (name in Reflect.fields(block))
+      if (["program", "workOffset", "axes", "loop", "stockPart", "toolPart", "tools", "stockSpacing"].indexOf(name) < 0)
       throw 'Unknown project field "cnc.$name"';
     var program:Dynamic = Reflect.field(block, "program");
     if (!Std.isOfType(program, String) || StringTools.trim(program).length == 0)
@@ -147,9 +163,43 @@ class MateriaProjectRunner {
       throw 'Project field "cnc.axes" must name three joints';
     var loop:Dynamic = Reflect.field(block, "loop");
     if (loop != null && !Std.isOfType(loop, Bool)) throw 'Project field "cnc.loop" must be true or false';
+    function text(name:String):Null<String> {
+      var value:Dynamic = Reflect.field(block, name);
+      if (value != null && (!Std.isOfType(value, String) || StringTools.trim(value).length == 0))
+        throw 'Project field "cnc.$name" must name a part';
+      return value;
+    }
+    function positive(value:Dynamic, name:String):Float {
+      if (!Std.isOfType(value, Int) && !Std.isOfType(value, Float))
+        throw 'Project field "cnc.$name" must be a positive number';
+      var number:Float = value;
+      if (!Math.isFinite(number) || number <= 0) throw 'Project field "cnc.$name" must be a positive number';
+      return number;
+    }
+    var tools:Array<CncJobTool> = [];
+    var table:Dynamic = Reflect.field(block, "tools");
+    if (table != null) {
+      if (!Std.isOfType(table, Array)) throw 'Project field "cnc.tools" must be a list of tools';
+      for (entry in (cast table:Array<Dynamic>)) {
+        for (name in Reflect.fields(entry))
+          if (["number", "diameter", "fluteLength", "length", "holderDiameter", "holderLength"].indexOf(name) < 0)
+            throw 'Unknown project field "cnc.tools.$name"';
+        var number:Dynamic = Reflect.field(entry, "number");
+        if (!Std.isOfType(number, Int) || (number:Int) < 0) throw 'Project field "cnc.tools.number" must be a tool number';
+        var holderDiameter:Dynamic = Reflect.field(entry, "holderDiameter"), holderLength:Dynamic = Reflect.field(entry, "holderLength");
+        tools.push({number: number, diameter: positive(Reflect.field(entry, "diameter"), "tools.diameter"),
+          fluteLength: positive(Reflect.field(entry, "fluteLength"), "tools.fluteLength"),
+          length: positive(Reflect.field(entry, "length"), "tools.length"),
+          holderDiameter: holderDiameter == null ? 0.0 : positive(holderDiameter, "tools.holderDiameter"),
+          holderLength: holderLength == null ? 0.0 : positive(holderLength, "tools.holderLength")});
+      }
+    }
+    var spacing:Dynamic = Reflect.field(block, "stockSpacing");
     return {programPath: file, source: File.getContent(file),
       axes: axes == null ? ["x", "y", "z"] : [for (axis in (cast axes:Array<Dynamic>)) (axis:String)],
-      workOffset: numbers("workOffset", [0.0, 0.0, 0.0]), loop: loop == true};
+      workOffset: numbers("workOffset", [0.0, 0.0, 0.0]), loop: loop == true,
+      stockPart: text("stockPart"), toolPart: text("toolPart"), tools: tools,
+      stockSpacing: spacing == null ? 0.5 : positive(spacing, "stockSpacing")};
   }
 
   /**

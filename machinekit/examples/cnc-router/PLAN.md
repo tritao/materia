@@ -92,6 +92,13 @@ C1 needed two stopgaps; these replace them, before C2 builds on them.
 - **A4. Homing** (folded into A1). Parking Z on its upper soft limit is how
   LinuxCNC-style machines sit after homing; the switch (here, the end stop) is
   beyond it by the overtravel, so no artificial pull-off is modelled.
+- **A6. One link per rigid body** (in progress). The runtime caps a
+  trajectory submission at 4096 coefficients across all robot joints; with one
+  joint per part the router's 44 joints left 15 segments a chunk, and
+  streaming cost 12 ms a tick with multi-second stalls. The simulation bridge
+  now builds one link per rigid body (parts bolted together, and every
+  world-fixed part in the root link), with combined mass properties and one
+  convex hull per part in a new per-link hull list of the simulation ABI.
 - **A5. Shared preview.** One `AssemblyPreview` helper builds the scene for
   every MachineKit example, keeping connectors when parts share geometry.
 
@@ -107,6 +114,6 @@ then C3 → C4 → C5.
 | C0 | not started | |
 | C1 | done: router, checks, outline-trace motion, app test | `c82fe76d` |
 | C2 | done as A3 | |
-| C3 | not started | |
+| C3 | done: cutting works; real-time speed in progress (streaming cost, see A6) | |
 | C4 | not started | |
 | C5 | not started | |

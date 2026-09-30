@@ -9,10 +9,9 @@ aluminium stock clamped on its bed. From the repository root:
 ```
 
 Or open **Desktop CNC router** from the Start page and press **Play**: the
-machine runs its G-code program, which traces the outline of the stock 10 mm
-outside it and above the clamps. It does not cut anything yet;
-[PLAN.md](PLAN.md) lays out the steps from here to cutting the stock in real
-time.
+machine runs its G-code program and cuts three slots in the aluminium stock,
+which you see disappear as the tool moves. [PLAN.md](PLAN.md) lays out what
+comes next.
 
 ## What it contains
 
@@ -59,18 +58,29 @@ designation share one definition carrying all of their connectors.
 `materia.project.json` gives the machine a CNC job in its `cnc` block:
 
 ```json
-"cnc": {"program": "outline.ngc", "workOffset": [90, 105, -54], "loop": true}
+"cnc": {"program": "slots.ngc", "workOffset": [90, 105, -54], "loop": true,
+        "stockPart": "stock", "toolPart": "tool",
+        "tools": [{"number": 1, "diameter": 6, "fluteLength": 22, "length": 30,
+                   "holderDiameter": 24, "holderLength": 20}]}
 ```
 
-`outline.ngc` is LinuxCNC G-code that traces the stock's outline 10 mm outside
-it and 24 mm above it, at F2400 (40 mm/s), and returns to the start. G54 work
-zero is the stock's front-left top corner, which is machine (90, 105, −54) mm.
+`slots.ngc` is LinuxCNC G-code: spindle on, then three 80 mm slots along X,
+2 mm deep, clear of the step clamps, with rapids 5 mm above the stock. G54
+work zero is the stock's front-left top corner, machine (90, 105, −54) mm.
 The app compiles the program with CncKit against the machine's axes, lowers it
 to MotionKit paths, and streams it to the simulated machine as trajectory
-segments; one pass takes 17 s, and the job loops. The planner respects each
-axis's velocity and acceleration (500, 400 and 300 mm/s² for x, y and z). A
-program that leaves the travel, or fails to compile, fails the simulation
-build with its G-code line.
+segments; the planner respects each axis's velocity and acceleration (500, 400
+and 300 mm/s² for x, y and z). A program that leaves the travel, or fails to
+compile, fails the simulation build with its G-code line.
+
+The stock is cut as the machine moves (`MachiningStock`, StockKit): every tick
+the segment the simulated tool tip travelled is swept through a 0.5 mm
+tri-dexel stock with the tool table's cutter (flat end mill, shank and collet
+nut), and the stock part shows the result, re-contoured a few times a second.
+Because the cut follows the simulated tool, following error is in the
+material. Rapids that cut stock and shank or holder contact are counted as
+they happen. Physical collision is off for the stock part: the stock
+simulation, not the physics, decides what touching it means.
 
 Every part collides in the simulation, through its convex hull. Parts of the
 machine that touch by design (a block on its rail, a nut bracket whose hull
@@ -95,9 +105,9 @@ machine.
 
 These also run in the MachineKit smoke suite (`machinekit/scripts/test-haxeon`).
 `ProjectSourceTests.checkCncRouter` in the app's project-source suite opens the
-project, builds it in MuJoCo, runs the G-code job and requires the tool to pass
-every corner of the outline within 1 mm (it passes within 0.13 mm) and return to
-its start.
+project, builds it in MuJoCo and runs the job: the stock must lose the three
+slots' volume within 3% (3047.9 of 3049.6 mm³), no rapid may cut stock and the
+holder must never touch it.
 `CncRouterChecks` checks:
 
 - the joints and their limits, and mass properties for every part;

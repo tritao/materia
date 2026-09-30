@@ -96,6 +96,8 @@ class EditorScene {
   var cadSessions:Map<String, CadDocumentSession>;
   /** Derived per-object simulations; rebuilt from the record's block size when it changes. */
   final stockSimulations:Map<String, StockSimulationSession> = new Map();
+  /** Geometry given to objects by setRuntimeGeometry, which the scene owns. */
+  final ownedRuntimeGeometry:Map<String, Geometry> = new Map();
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
@@ -2204,6 +2206,38 @@ class EditorScene {
     publish([runtime.node], false);
   }
 
+  /**
+    Shows `data` as object `id`'s geometry, such as stock a simulated machine is cutting. View
+    state: not undoable and not saved. The first call gives the object a geometry of its own, since
+    generated parts can share theirs; later calls update it in place.
+  **/
+  public function setRuntimeGeometry(id:String, data:GeometryData):Void {
+    var runtime = runtimeFor(id);
+    var owned = ownedRuntimeGeometry.get(id);
+    if (owned != null && owned == runtime.geometry) {
+      scene.setGeometryData(owned, data);
+      publish([runtime.node], false);
+      return;
+    }
+    var geometry:Null<Geometry> = null;
+    var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
+    try {
+      geometry = scene.createGeometry();
+      scene.setGeometryData(geometry, data);
+      transaction.setGeometry(runtime.node, geometry);
+      changes = transaction.commitWithChanges();
+    } catch (error:Dynamic) {
+      transaction.dispose();
+      if (geometry != null) geometry.dispose();
+      throw error;
+    }
+    bridge.attach(id, runtime.node, geometry, runtime.material);
+    if (owned != null) owned.dispose();
+    ownedRuntimeGeometry.set(id, geometry);
+    publish([runtime.node], false, changes);
+  }
+
   /** Releases simulations whose objects are gone or are no longer simulations. */
   function pruneStockSimulations():Void {
     for (id in [for (key in stockSimulations.keys()) key]) {
@@ -2315,6 +2349,8 @@ class EditorScene {
     for (visual in workerVisuals) visual.dispose(scene, false);
     workerVisuals.clear();
     for (session in stockSimulations) session.dispose();
+    for (geometry in ownedRuntimeGeometry) geometry.dispose();
+    ownedRuntimeGeometry.clear();
     stockSimulations.clear();
     if (pendingRenderChanges != null) pendingRenderChanges.dispose();
     pendingRenderChanges = null;

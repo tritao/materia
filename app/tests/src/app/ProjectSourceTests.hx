@@ -335,8 +335,9 @@ class ProjectSourceTests {
   }
 
   /**
-   * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job, a
-   * G-code outline of the stock, drives the machine through every corner of the outline.
+   * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job cuts
+   * three slots in the stock in real time: the stock loses exactly the slots' volume as the machine
+   * moves, with no rapid through stock and no holder contact.
    */
   static function checkCncRouter(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
@@ -352,11 +353,11 @@ class ProjectSourceTests {
       check(joint.limits.overtravel > 0 && joint.limits.maxAcceleration > 0,
         'router axis ${joint.id} carries its overtravel and acceleration');
     }
-    check(generated.cncJob != null && generated.cncJob.loop, "the router ships a looping CNC job");
+    var job = generated.cncJob;
+    check(job != null && job.loop && job.stockPart == "stock" && job.tools.length == 1,
+      "the router ships a looping job that machines its stock");
     check(generated.robotMotions == null || generated.robotMotions.length == 0,
       "the router's motion comes from its program, not tracks");
-    check([for (record in generated.objects) if (!record.collisionEnabled) record].length == 0,
-      "every router part collides");
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
@@ -373,32 +374,38 @@ class ProjectSourceTests {
     }
     simulation.step();
     var start = toolPosition();
-    // The outline's corners, as offsets from the starting pose (work 60, 45, 54), in metres.
-    var corners = [[-0.07, -0.055, -0.03], [0.07, -0.055, -0.03], [0.07, 0.055, -0.03], [-0.07, 0.055, -0.03]];
-    var nearest = [for (_ in corners) Math.POSITIVE_INFINITY];
-    var lowest = 0.0, steps = 0, leftStart = false, backAt = -1.0;
-    while (simulation.activeSession().simulationTime() < 60.0 && steps++ < 100000) {
+    var lowest = 0.0, steps = 0, leftStart = false, backAt = -1.0, cutting = 0.0;
+    while (backAt < 0 && simulation.activeSession().simulationTime() < 120.0 && steps++ < 100000) {
+      var before = Sys.time();
       simulation.step();
+      cutting += Sys.time() - before;
       check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
       var position = toolPosition();
       var offset = [for (axis in 0...3) position[axis] - start[axis]];
-      for (index in 0...corners.length) {
-        var distance = Math.sqrt(Math.pow(offset[0] - corners[index][0], 2) + Math.pow(offset[1] - corners[index][1], 2) +
-          Math.pow(offset[2] - corners[index][2], 2));
-        nearest[index] = Math.min(nearest[index], distance);
-      }
       lowest = Math.min(lowest, offset[2]);
       var away = Math.sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]);
       if (away > 0.01) leftStart = true;
-      else if (leftStart && backAt < 0 && nearest[3] < 0.001) backAt = simulation.activeSession().simulationTime();
+      else if (leftStart && lowest < -0.05) backAt = simulation.activeSession().simulationTime();
     }
-    for (index in 0...corners.length)
-      check(nearest[index] < 0.001, 'the tool reaches outline corner $index, missing it by ${nearest[index]} m');
-    check(Math.abs(lowest + 0.03) < 0.001, 'the tool traces 24 mm above the stock, lowest $lowest m');
     check(backAt > 0, "the program returns the tool to where it started");
+    // From 54 mm above the stock the tool goes 2 mm into it.
+    check(Math.abs(lowest + 0.056) < 0.0005, 'the tool cuts 2 mm deep, lowest $lowest m');
+    var stock = simulation.machiningStock();
+    if (stock == null) throw "the router cuts no stock";
+    // Each slot is a plunge and an 80 mm pass of a 6 mm flat end mill, 2 mm deep.
+    var slots = 3 * (0.08 * 0.006 + Math.PI * 0.003 * 0.003) * 0.002;
+    check(Math.abs(stock.removed - slots) < slots * 0.03,
+      'the stock loses the three slots, ${stock.removed} m³ removed against $slots');
+    check(stock.rapidContacts == 0 && stock.collisions == 0,
+      'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
+    check(stock.geometry().triangleCount() > 12, "the cut stock meshes with its slots");
+    var player = simulation.cncPlayer();
+    if (player != null) Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
+      '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms');
     session.dispose();
-    Sys.println('cnc router ran its outline program in ${Math.round(backAt * 10) / 10} s, corners within ' +
-      '${Math.round(Math.max(Math.max(nearest[0], nearest[1]), Math.max(nearest[2], nearest[3])) * 1e5) / 100} mm');
+    Sys.println('cnc router cut three slots in ${Math.round(backAt * 10) / 10} s of machining, removing ' +
+      '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(slots * 1e10) / 10}; ' +
+      '${Math.round(cutting / steps * 1e5) / 100} ms per simulated tick');
   }
 
   /** A project named at launch builds in the background: queued at once, opened by tick(). */

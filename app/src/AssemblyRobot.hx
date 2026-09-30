@@ -11,6 +11,7 @@ import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
+import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.SimulatedRobot;
 
 /** Where one generated part sits on its link, for drawing the part where its link is. */
@@ -66,7 +67,8 @@ class AssemblyRobot {
    * closures are needed and `supportsClosures` is false.
    */
   public static function add(candidate:Simulation, scene:EditorScene, session:ProjectDocumentSession,
-      assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int):AssemblyRobot {
+      assembly:AssemblyDefinition, supportsClosures:Bool, revision:Int, robotIndex:Int,
+      ?channels:Array<ProcessChannelDeclaration>):AssemblyRobot {
     var warnings:Array<String> = [];
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
@@ -141,6 +143,8 @@ class AssemblyRobot {
         closure.anchorParent, closure.axisParent));
     }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
+    // Process channels (a machine's spindle and coolant) must be declared before the robot is added.
+    if (channels != null) for (channel in channels) blueprint.channels.push(channel);
     var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, null, collisionHulls, closures);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,

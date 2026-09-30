@@ -1,0 +1,21 @@
+(Desktop CNC router: cut three slots in the stock)
+(Work zero G54 is the stock's front-left top corner; the block is 120 x 90 x 20 mm.)
+(Tool 1 is a 6 mm flat end mill. Each slot runs 80 mm along X, 2 mm deep, clear of the step clamps.)
+G21 G90 G54 G17
+M3 S12000
+G0 X20 Y25
+G0 Z5
+G1 Z-2 F300
+G1 X100 F600
+G0 Z5
+G0 X20 Y45
+G1 Z-2 F300
+G1 X100 F600
+G0 Z5
+G0 X20 Y65
+G1 Z-2 F300
+G1 X100 F600
+G0 Z54
+M5
+G0 X60 Y45
+M2
