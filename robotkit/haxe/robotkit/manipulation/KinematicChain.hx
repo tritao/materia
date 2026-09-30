@@ -1,5 +1,6 @@
 package robotkit.manipulation;
 
+import kinematicskit.FrameTask;
 import kinematicskit.KinematicModel;
 import kinematicskit.KinematicSnapshot;
 import kinematicskit.KinematicState;
@@ -11,6 +12,7 @@ import robotkit.model.FrameId;
 import robotkit.model.Joint;
 import robotkit.model.JointId;
 import robotkit.spatial.Transform3;
+import robotkit.spatial.Vec3;
 
 /**
  * A serial kinematic chain from a base link to a tip (a link's own origin,
@@ -88,6 +90,26 @@ class KinematicChain {
     var n = dofJoints.length;
     var flat = tipFrameIndex >= 0 ? snapshot.frameJacobian(tipFrameIndex) : snapshot.bodyJacobian(tipBody);
     return [for (row in 0...6) [for (column in 0...n) flat[row * n + column]]];
+  }
+
+  /** A task that moves the chain tip (its frame, or its link origin) to `target` in the base frame. */
+  public function tipTask(target:Transform3, positionTolerance:Float, orientationTolerance:Float):FrameTask {
+    var goal = RobotKinematics.toTransform(target);
+    return tipFrameIndex >= 0
+      ? FrameTask.atFrame(model, tipFrameIndex, goal, positionTolerance, orientationTolerance)
+      : new FrameTask(model, tipBody, null, goal, positionTolerance, orientationTolerance);
+  }
+
+  /**
+   * Geometric Jacobian (6 x n, row-major) of the point `tipTPoint` fixed in
+   * the tip frame, e.g. a tool centre point: linear rows are that point's
+   * velocity, angular rows the tip's angular velocity, in the base frame.
+   */
+  public function pointJacobian(q:Array<Float>, tipTPoint:Vec3):Array<Float> {
+    evaluate(q);
+    var tip = tipFrameIndex >= 0 ? snapshot.framePose(tipFrameIndex) : snapshot.bodyPose(tipBody);
+    var point = tip.transformPoint(tipTPoint.x, tipTPoint.y, tipTPoint.z);
+    return snapshot.pointJacobian(tipBody, point.x, point.y, point.z);
   }
 
   function evaluate(q:Array<Float>):Void {

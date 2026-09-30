@@ -119,14 +119,28 @@ class AssemblyState {
 	*/
 	public function forwardKinematics():Void {
 		poses.clear();
+		syncKinematicState();
+		snapshot.evaluate(kinematicState);
+		dirty = false;
+	}
+
+	/** The compiled model and a copy of this configuration in its terms, for kinematics solvers. */
+	@:allow(cadkit.modeling.AssemblyLoopSolver)
+	function kinematicModel():AssemblyKinematics return kinematics;
+
+	@:allow(cadkit.modeling.AssemblyLoopSolver)
+	function kinematicSeed():KinematicState {
+		syncKinematicState();
+		return kinematicState.copy();
+	}
+
+	function syncKinematicState():Void {
 		var model = kinematics.model;
 		for (dof in 0...model.dofCount()) {
 			var value = coordinates.get(model.dofId(dof));
 			kinematicState.q[dof] = value == null ? model.jointDefault[model.dofJoint[dof]] : value;
 		}
 		for (id in rootPoses.keys()) kinematicState.setRootPose(kinematics.body(id), AssemblyKinematics.fromFrame(rootPoses.get(id)));
-		snapshot.evaluate(kinematicState);
-		dirty = false;
 	}
 
 	public function worldPose(id:String):AssemblyFrame {

@@ -1,4 +1,12 @@
 import kinematicskit.ClosureKind;
+import kinematicskit.ClosureTask;
+import kinematicskit.DampedLeastSquares;
+import kinematicskit.FrameOrientation;
+import kinematicskit.FrameTask;
+import kinematicskit.KinematicProblem;
+import kinematicskit.KinematicStatus;
+import kinematicskit.LevenbergMarquardt;
+import kinematicskit.PostureTask;
 import kinematicskit.JointKind;
 import kinematicskit.KinematicModel;
 import kinematicskit.KinematicModelBuilder;
@@ -19,6 +27,11 @@ class KinematicsKitTests {
     testJacobianMatchesFiniteDifferences();
     testCompileErrors();
     testClosuresAreNotTreeEdges();
+    testDampedLeastSquaresReachesAndReports();
+    testMaskedPositionAndAxisTasks();
+    testPostureResolvesRedundancy();
+    testClosureJacobiansMatchFiniteDifferences();
+    testFourBarClosure();
     Sys.println('KinematicsKit tests passed ($assertions assertions)');
   }
 
@@ -271,6 +284,200 @@ class KinematicsKitTests {
       var f = b.addFrame("f", a, Transform.identity());
       b.addClosure("bad", ClosureKind.Revolute, f, f);
     }, "a revolute closure needs an axis");
+  }
+
+  static function planarArm(links:Array<Float>):KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var previous = builder.addBody("base");
+    var z = new Vector3(0.0, 0.0, 1.0);
+    var reach = 0.0;
+    for (i in 0...links.length) {
+      var body = builder.addBody('link$i');
+      builder.addJoint('j$i', JointKind.Revolute, previous, body, Transform.translation(reach, 0.0, 0.0),
+        Transform.identity(), z, -3.0, 3.0);
+      reach = links[i];
+      previous = body;
+    }
+    builder.addFrame("tip", previous, Transform.translation(reach, 0.0, 0.0));
+    return builder.build();
+  }
+
+  static function testDampedLeastSquaresReachesAndReports():Void {
+    var model = planarArm([1.0, 0.7]);
+    var tip = model.frameIndex("tip");
+    var truth = KinematicSnapshot.of(new KinematicState(model, [0.5, -0.8])).framePose(tip);
+    var problem = new KinematicProblem(model)
+      .add(FrameTask.atFrame(model, tip, truth, 1e-6, 1e-6));
+    var solution = DampedLeastSquares.solve(problem, new KinematicState(model, [0.3, -0.4]), 200, 0.01);
+    check(solution.status == KinematicStatus.Converged && solution.tasks[0].positionError <= 1e-6,
+      "DLS reaches a reachable planar pose");
+    check(solution.rank == 2 && solution.freeDofs == 0, "a planar pose task has full rank over two DOFs");
+
+    var far = Transform.translation(10.0, 0.0, 0.0);
+    var unreachable = DampedLeastSquares.solve(new KinematicProblem(model)
+      .add(FrameTask.atFrame(model, tip, far, 1e-6, 1e-6, null, FrameTask.AXIS_X | FrameTask.AXIS_Y, FrameOrientation.Free)),
+      new KinematicState(model, [0.3, 0.2]), 25, 0.02);
+    check(unreachable.status == KinematicStatus.IterationLimit && unreachable.iterations == 25,
+      "an unreachable target reports the iteration limit");
+    check(unreachable.unsatisfied()[0] == "tip", "the solution names the unmet task");
+
+    var seed = new KinematicState(model, [0.3, -0.4]);
+    DampedLeastSquares.solve(problem, seed);
+    check(seed.q[0] == 0.3 && seed.q[1] == -0.4, "solvers leave the seed untouched");
+  }
+
+  static function testMaskedPositionAndAxisTasks():Void {
+    // Three planar links: a position-only target leaves one DOF free.
+    var model = planarArm([1.0, 0.8, 0.5]);
+    var tip = model.frameIndex("tip");
+    var target = new Transform(1.2, 0.9, 0.0, 0.0, 0.0, 0.0, 1.0);
+    var solution = LevenbergMarquardt.solve(new KinematicProblem(model)
+      .add(FrameTask.atFrame(model, tip, target, 1e-8, 1e-8, null, FrameTask.AXIS_X | FrameTask.AXIS_Y,
+        FrameOrientation.Free)), new KinematicState(model, [0.2, 0.3, 0.1]));
+    var pose = KinematicSnapshot.of(solution.state).framePose(tip);
+    check(solution.converged() && near(pose.x, 1.2, 1e-7) && near(pose.y, 0.9, 1e-7),
+      "a position-only task converges");
+    check(solution.rank == 2 && solution.freeDofs == 1, "the unconstrained orientation shows up as one free DOF");
+
+    // A spatial wrist: align the tool's Z with a target Z and ignore roll about it.
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("base");
+    var bodies = [base];
+    var axes = [new Vector3(0, 0, 1), new Vector3(0, 1, 0), new Vector3(0, 1, 0), new Vector3(1, 0, 0),
+      new Vector3(0, 1, 0), new Vector3(1, 0, 0)];
+    for (i in 0...6) {
+      var body = builder.addBody('w$i');
+      builder.addJoint('w$i', JointKind.Revolute, bodies[i], body,
+        Transform.translation(i == 1 ? 0.0 : 0.3, 0.0, i == 0 ? 0.4 : 0.0), Transform.identity(), axes[i]);
+      bodies.push(body);
+    }
+    var tool = builder.addFrame("tool", bodies[6], Transform.translation(0.1, 0.0, 0.0));
+    var arm = builder.build();
+    var goal = KinematicSnapshot.of(new KinematicState(arm, [0.4, -0.3, 0.6, 0.2, -0.5, 1.1])).framePose(tool);
+    var rolled = goal.compose(Transform.axisAngle(0.0, 0.0, 1.0, 1.3));
+    var aligned = LevenbergMarquardt.solve(new KinematicProblem(arm)
+      .add(FrameTask.atFrame(arm, tool, rolled, 1e-8, 1e-8, null, FrameTask.ALL_AXES, FrameOrientation.Axis(0, 0, 1))),
+      new KinematicState(arm, [0.3, -0.2, 0.5, 0.0, -0.4, 0.2]));
+    var reached = KinematicSnapshot.of(aligned.state).framePose(tool);
+    var z = reached.transformVector(0, 0, 1), goalZ = rolled.transformVector(0, 0, 1);
+    check(aligned.converged() && near(z.x * goalZ.x + z.y * goalZ.y + z.z * goalZ.z, 1.0, 1e-12),
+      "an axis task aligns the tool Z");
+    check(aligned.freeDofs == 1, "roll about the aligned axis is left free");
+  }
+
+  static function testPostureResolvesRedundancy():Void {
+    var model = planarArm([1.0, 0.8, 0.5]);
+    var tip = model.frameIndex("tip");
+    var target = new Transform(1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+    function solveNear(posture:Array<Float>):Array<Float> {
+      var problem = new KinematicProblem(model)
+        .add(FrameTask.atFrame(model, tip, target, 1e-6, 1e-6, null, FrameTask.AXIS_X | FrameTask.AXIS_Y,
+          FrameOrientation.Free))
+        .add(new PostureTask(model, posture, 1e-3));
+      var solution = DampedLeastSquares.solve(problem, new KinematicState(model, posture), 500, 0.01);
+      check(solution.converged(), "a soft posture task does not block convergence");
+      return solution.state.q;
+    }
+    var elbowUp = solveNear([0.2, 1.2, 0.8]);
+    var elbowDown = solveNear([1.4, -1.2, -0.3]);
+    check(elbowUp[1] > 0.0 && elbowDown[1] < 0.0, "the posture preference picks the elbow branch");
+  }
+
+  static function testClosureJacobiansMatchFiniteDifferences():Void {
+    var rng = new Rng(3);
+    for (kind in [ClosureKind.Fixed, ClosureKind.Revolute, ClosureKind.Prismatic]) {
+      var builder = new KinematicModelBuilder();
+      var root = builder.addBody("root");
+      var left = builder.addBody("left"), leftTip = builder.addBody("left_tip");
+      var right = builder.addBody("right");
+      builder.addJoint("l1", JointKind.Revolute, root, left, randomTransform(rng), randomTransform(rng), new Vector3(0, 0, 1));
+      builder.addJoint("l2", JointKind.Prismatic, left, leftTip, randomTransform(rng), randomTransform(rng), new Vector3(1, 0, 0));
+      builder.addJoint("r1", JointKind.Revolute, root, right, randomTransform(rng), randomTransform(rng), new Vector3(0, 1, 0));
+      var a = builder.addFrame("a", leftTip, randomTransform(rng));
+      var b = builder.addFrame("b", right, randomTransform(rng));
+      builder.addClosure("loop", kind, a, b, new Vector3(0.2, -0.4, 1.0));
+      var model = builder.build();
+      var task = new ClosureTask(model, 0, 1.0, 1.0);
+      var rows = task.rowCount(), n = model.dofCount();
+      var q = [rng.signed(), rng.signed(), rng.signed()];
+      var residual = [for (_ in 0...rows) 0.0], jacobian = [for (_ in 0...rows * n) 0.0];
+      var snapshot = new KinematicSnapshot(model);
+      var state = new KinematicState(model, q);
+      snapshot.evaluate(state);
+      task.evaluate(state, snapshot, residual, jacobian, 0);
+      var plus = residual.copy(), minus = residual.copy(), scratch = jacobian.copy();
+      // Rows whose Jacobian is exact away from closure: all six for Fixed, the three position rows for Revolute.
+      var exactRows = kind == ClosureKind.Fixed ? 6 : kind == ClosureKind.Revolute ? 3 : 0;
+      for (dof in 0...n) {
+        var eps = 1e-6;
+        var qp = q.copy(); qp[dof] += eps;
+        var qm = q.copy(); qm[dof] -= eps;
+        var sp = new KinematicState(model, qp), sm = new KinematicState(model, qm);
+        snapshot.evaluate(sp); task.evaluate(sp, snapshot, plus, scratch, 0);
+        snapshot.evaluate(sm); task.evaluate(sm, snapshot, minus, scratch, 0);
+        for (row in 0...exactRows)
+          check(near(-(plus[row] - minus[row]) / (2 * eps), jacobian[row * n + dof], 1e-6),
+            'closure ${Std.string(kind)} row $row DOF $dof Jacobian matches central differences');
+      }
+    }
+  }
+
+  /**
+   * Crank-rocker four-bar: ground pivots 2 apart, crank 1, coupler 2.2, rocker 1.5.
+   * The crank is driven; coupler and rocker angles are solved.
+   */
+  static function fourBar(?rockerLower:Float, ?rockerUpper:Float):KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var ground = builder.addBody("ground");
+    var crank = builder.addBody("crank"), coupler = builder.addBody("coupler"), rocker = builder.addBody("rocker");
+    var z = new Vector3(0.0, 0.0, 1.0);
+    builder.addJoint("crank", JointKind.Revolute, ground, crank, Transform.identity(), Transform.identity(), z);
+    builder.addJoint("coupler", JointKind.Revolute, crank, coupler, Transform.translation(1.0, 0.0, 0.0),
+      Transform.identity(), z);
+    builder.addJoint("rocker", JointKind.Revolute, ground, rocker, Transform.translation(2.0, 0.0, 0.0),
+      Transform.identity(), z, rockerLower, rockerUpper);
+    var couplerEnd = builder.addFrame("coupler_end", coupler, Transform.translation(2.2, 0.0, 0.0));
+    var rockerEnd = builder.addFrame("rocker_end", rocker, Transform.translation(1.5, 0.0, 0.0));
+    builder.addClosure("pin", ClosureKind.Revolute, couplerEnd, rockerEnd, z);
+    return builder.build();
+  }
+
+  static function testFourBarClosure():Void {
+    var model = fourBar();
+    function solve(model:KinematicModel, crank:Float, seed:Array<Float>) {
+      var problem = new KinematicProblem(model)
+        .setActiveDofs([model.dofIndex("coupler"), model.dofIndex("rocker")])
+        .add(new ClosureTask(model, 0, 1e-9, 1e-9));
+      return LevenbergMarquardt.solve(problem, new KinematicState(model, [crank, seed[0], seed[1]]));
+    }
+    var closed = solve(model, 0.6, [0.2, 1.4]);
+    check(closed.converged() && closed.freeDofs == 0 && closed.state.q[0] == 0.6,
+      "the four-bar closes with the crank held at its seed");
+    var snapshot = KinematicSnapshot.of(closed.state);
+    var a = snapshot.framePose(model.frameIndex("coupler_end")), b = snapshot.framePose(model.frameIndex("rocker_end"));
+    check(near(a.x, b.x, 1e-8) && near(a.y, b.y, 1e-8), "the coupler and rocker ends meet");
+
+    // A 5.0 coupler cannot close: the residual stops at a stationary configuration.
+    var builder = new KinematicModelBuilder();
+    var ground = builder.addBody("ground"), link = builder.addBody("link");
+    var z = new Vector3(0.0, 0.0, 1.0);
+    builder.addJoint("swing", JointKind.Revolute, ground, link, Transform.identity(), Transform.identity(), z);
+    var end = builder.addFrame("end", link, Transform.translation(1.0, 0.0, 0.0));
+    var anchor = builder.addFrame("anchor", ground, Transform.translation(5.0, 0.0, 0.0));
+    builder.addClosure("pin", ClosureKind.Revolute, end, anchor, z);
+    var impossible = builder.build();
+    var conflicting = LevenbergMarquardt.solve(new KinematicProblem(impossible).add(new ClosureTask(impossible, 0, 1e-9, 1e-9)),
+      new KinematicState(impossible, [0.3]));
+    check(conflicting.status == KinematicStatus.Conflicting && conflicting.unsatisfied()[0] == "pin",
+      "an unclosable loop reports Conflicting and names the closure");
+
+    // Limit the rocker below the angle it needs.
+    var limited = fourBar(1.8, 2.0);
+    var blocked = solve(limited, 0.6, [0.2, 1.9]);
+    var needs = closed.state.q[2];
+    check(needs < 1.8, 'fixture sanity: the closed rocker angle $needs is below the limit');
+    check(blocked.status == KinematicStatus.LimitBlocked && blocked.limitHits.indexOf(limited.dofIndex("rocker")) >= 0,
+      "a limit in the way reports LimitBlocked and the limited DOF");
   }
 
   // -- helpers ---------------------------------------------------------

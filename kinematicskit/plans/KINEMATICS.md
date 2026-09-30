@@ -88,6 +88,18 @@ out to be wrong.
   - Quaternions cross the ABI as (x, y, z, w); `Quaterniond`'s constructor
     takes (w, x, y, z). Convert only through two helpers, covered by a
     round-trip parity test against the Haxe snapshot.
+- **KK-D11 — One default solver per use, reached deliberately.** The K1
+  policies are bug-compatible on purpose: `DampedLeastSquares` reports
+  `IterationLimit` without checking its final step, and
+  `LevenbergMarquardt`'s accept/reject damping stalls on large-residual
+  problems (an unclosable four-bar runs its whole budget). The long-term
+  default is bounded Levenberg-Marquardt for position solves and the K3 QP
+  for differential steps. Each caller (RobotKit IK, CadKit closures, MotionKit
+  sampling) switches in its own commit with its own test changes; the legacy
+  policies are deleted once nothing uses them.
+- **KK-D12 — After K3, native leads and Haxe follows.** New solver features
+  land natively. The Haxe solvers stay as the reference and fallback and must
+  agree with native in parity tests; they gain only what those tests need.
 - **KK-D9 — Out of scope:** collision (a validator interface outside the
   kit), time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
@@ -103,6 +115,19 @@ Ownership after this plan:
 - **MotionKit:** `KinematicsSolver` contract and adapters, OPW, paths,
   configuration selection, timing. It never commands IK output directly;
   IK output goes through planning and validation like any other target.
+
+## Known limits to document, not fix now
+
+- `FrameTask`'s orientation Jacobian is first order (exact at convergence),
+  as RobotKit's IK always was; `ClosureTask` uses the exact SO(3) derivative.
+- `KinematicState.q` is a public mutable array. Solvers copy their seed;
+  callers sharing one state must copy before mutating.
+- Pose types are still duplicated (`Transform3`, `Pose3`, `AssemblyFrame`,
+  `kinematicskit.Transform`); the kit converts only at its boundary.
+- Haxeon's incremental build once produced a wrong kit test binary (an
+  unchanged pure-arithmetic test failed after an unrelated edit; a clean
+  build was correct). Until that is diagnosed (separate session), run the kit
+  suite from a clean `tests/build`.
 
 ## Layout
 
@@ -240,12 +265,27 @@ Do:
   (model, problem shape); measure with the allocation census.
 - A preview entry point for the editor: solve from the authored state,
   return the solution, never write back (KK-D6).
+- **Jacobians over active DOFs only.** Today every task writes
+  `rows × model.dofCount()` even when three DOFs are active, which is fine
+  for an arm and wasteful for a MachineKit assembly with hundreds of joints
+  solving one linkage. Tasks write only the problem's active columns (the
+  problem hands them a column map); snapshots may skip joints that no task
+  depends on. Change the `KinematicTask` interface now, while it has few
+  implementations.
+- **Cache compiled assembly models.** `AssemblyState` compiles a model on
+  every construction, and the app builds a candidate state per joint edit.
+  Cache the `AssemblyKinematics` per flattened definition (models are
+  immutable, so sharing is safe); measure an edit before and after.
 
 Tests:
 - Dual-arm fixture reaches two targets in one solve; each arm alone matches
   the single-target solve.
 - Arm + wrist camera: pose task on the tool, look-at task on the camera.
 - Allocation count per iteration is zero after warm-up.
+- A 200-joint assembly solving one 3-DOF linkage: the Jacobian workspace is
+  sized by the active DOFs, and the solve time does not grow with the
+  unrelated joints.
+- Repeated `AssemblyState` construction for one definition compiles once.
 
 ## K3 — Native QP backend (Lane D D1–D3, rehomed here)
 
@@ -263,13 +303,27 @@ Do:
 Tests: parity with the Haxe solver on K1/K2 fixtures; 7-axis fixture with
 posture preference; mink agreement within tolerance.
 
-## K4 — Retire the façades
+## K4 — Retire the façades (soon after K2, before K3)
 
-Do: migrate the remaining callers of `KinematicChain`, `InverseKinematics`,
-`IKResult`, `ChainTip` (robotkit tests, `DigCyclePlanner`, toolpathkit and
-motionkit tests) to the kit or to `Manipulator`, then delete them.
-`JointGroup` stays in RobotKit as a named selection that builds a DOF
-selection.
+Do:
+- Migrate the remaining callers of `KinematicChain`, `InverseKinematics`,
+  `IKResult`, `ChainTip` (robotkit tests, `DigCyclePlanner`, toolpathkit and
+  motionkit tests) to the kit or to `Manipulator`, then delete them.
+  `JointGroup` stays in RobotKit as a named selection that builds a DOF
+  selection.
+- **`Manipulator` works on the whole compiled model**, not a base-to-tip
+  path. `RobotKinematics.path` ignores `RobotModel.couplings` because chains
+  always did, while `compile` honours them; until this lands the two can
+  disagree on a coupled robot. The tool centre point becomes a frame offset
+  on a `FrameTask` (no flange-target conversion). Delete `path` with the
+  chain.
+- **The two authored models of one machine agree.** The robot-arm example
+  exists as a CAD assembly and, through cadbridge, as a `RobotModel`. Compile
+  both and check that the tool frame's forward kinematics matches over
+  random joint values, so the two descriptions cannot drift apart silently.
+
+Tests: a coupled robot's IK through `Manipulator` moves the follower; the
+robot-arm CAD/robot FK agreement check; every former façade caller passes.
 
 ## K5 — Variable root poses (mobile and floating bases)
 
@@ -324,3 +378,53 @@ coordinates; for a running robot the target goes through MotionKit.
   assertions, plus a new whole-model-vs-chain FK test); CadKit
   `HaxeonSmoke` (all assembly smokes); MachineKit smoke including the
   robot-arm FK check; MotionKit and cadbridge suites.
+
+### K1 — Tasks, limits, solvers, diagnostics (2026-09-30)
+
+- Kit: `LinearAlgebra` (normal equations, pivoted Gaussian solve, damped
+  step, rank; fixed summation order), `KinematicTask` (residual = desired −
+  current, Jacobian rows over all DOFs, hard/soft), `FrameTask` (position
+  mask in the target frame; `FrameOrientation.Full | Axis | Free`),
+  `ClosureTask` (CadKit's residuals; exact Jacobians for position and fixed
+  rotation rows via the inverse left Jacobian of SO(3), first order for axis
+  and transverse rows), `PostureTask`, `KinematicProblem` (active DOFs,
+  limit overrides), `DampedLeastSquares`, `LevenbergMarquardt`,
+  `KinematicSolution` (status, per-task errors, rank, free DOFs, limit hits).
+  Kit suite: 148 assertions (closure Jacobians against central differences,
+  masked and axis tasks, posture choosing the elbow branch, four-bar closing,
+  conflicting and limit-blocked cases, seeds untouched).
+- **Deviations from the item as written:** no `DampingTask` (damping is a
+  policy setting); no active-set limit handling yet — both policies clamp,
+  as their originals did. Limits are diagnosed from the final state instead
+  (next point).
+- **Deliberate behaviour changes in the CadKit algorithm** (KK-D7):
+  - exhausted damping (no step of any size lowers the residual) is
+    `Conflicting`; CadKit called it nonconvergent with a message claiming a
+    descent direction remained;
+  - `LimitBlocked` whenever a non-converged solve ends with an active DOF on a
+    bound and the descent direction pushing it outward. CadKit only reported
+    it when the very last iteration stalled on a limit, so a four-bar with
+    its rocker limited short of closure came back `nonconvergent`.
+- Migrated: `InverseKinematics.solve` (problem + `DampedLeastSquares`; its
+  matrix helpers are gone), `ManipulatorKinematics.solveDifferential`
+  (`KinematicChain.pointJacobian` at the TCP + `LinearAlgebra.dampedStep`;
+  the manual flange→TCP shift and `solveLinear` are gone), and
+  `AssemblyLoopSolver.solve` (closure tasks + `LevenbergMarquardt`; the
+  finite-difference Jacobian, residual code and linear algebra are gone;
+  `finiteDifferenceStep` is still validated but unused).
+- Parity (scratch harnesses with the previous code copied in as `legacy`):
+  - IK on four chains, 80 cases: `q` within 5e-14, identical convergence
+    and iteration counts.
+  - Differential IK at a TCP offset, 80 cases: within 8e-12 relative (damping
+    1e-6 amplifies last-digit Jacobian differences).
+  - Loop solver: excavator, four-bar, slider-crank and a fixed-closure chain
+    converge with the same iteration and DOF counts, joints within 1e-10; an
+    unclosable four-bar fails the same way; the limited four-bar now says
+    `limit-blocked` (above). 30-100x faster (excavator 0.1 ms vs 11 ms).
+- CadKit had no loop-solver tests; `AssemblyLoopSmoke` adds the four-bar,
+  slider-crank, fixed chain, unclosable loop and limit cases, with "state
+  untouched on failure" checks.
+- Haxeon incremental-build miscompile seen here (see "Known limits").
+- Acceptance: kit tests (clean build); RobotKit world tests (4773
+  assertions); CadKit `HaxeonSmoke` with `AssemblyLoopSmoke`; MachineKit
+  smoke; MotionKit (6723); cadbridge (129).
