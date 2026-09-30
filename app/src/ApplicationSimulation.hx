@@ -394,11 +394,6 @@ class ApplicationSimulation {
       presentationEpoch);
   }
 
-  public function visualRevision():Int {
-    var snapshot = capturePresentationSnapshot();
-    var result = snapshot.revision;
-    return result;
-  }
   /** Compatibility helper; frame consumers should share capturePresentationSnapshot(). */
   public function visualState():Array<SimulationRobotVisual> {
     var snapshot = capturePresentationSnapshot();

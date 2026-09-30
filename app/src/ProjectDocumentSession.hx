@@ -168,7 +168,7 @@ class ProjectDocumentSession {
       return;
     }
     var data = SceneCodec.decodeRoot(root);
-    migrateLegacyHumans(data, SceneCodec.decodeSensorsRoot(root));
+    rejectLegacyHumans(SceneCodec.decodeSensorsRoot(root));
     var nextDocument = createDocument();
     var next = new EditorScene(data, nextDocument);
     var nextSensors:SensorConfiguration = null;
@@ -269,7 +269,7 @@ class ProjectDocumentSession {
       generated = MateriaProjectRunner.evaluateAssemblyState(generated, stateRecord);
     var baseline = generated.objects;
     var data = materializeProject(baseline, project, SceneCodec.decodeRoot(root), diagnostics, materials);
-    migrateLegacyHumans(data, SceneCodec.decodeSensorsRoot(root));
+    rejectLegacyHumans(SceneCodec.decodeSensorsRoot(root));
     var nextDocument = createDocument();
     var next:EditorScene = null, nextSensors:SensorConfiguration = null, nextBim:BimDocument = null;
     try {
@@ -519,44 +519,15 @@ class ProjectDocumentSession {
       timestep: materialized.timestep};
   }
 
-  /** Convert M4 sensor humans on load; the sensor writer emits only robot data. */
-  static function migrateLegacyHumans(data:Array<SceneObjectData>, sensors:Dynamic):Void {
+  /**
+   * Scenes from before workers were scene objects kept their people in the sensors section. That
+   * section is no longer read, and dropping it silently would lose the workers, so say so.
+   */
+  static function rejectLegacyHumans(sensors:Dynamic):Void {
     if (sensors == null || !Reflect.hasField(sensors, "humans")) return;
     var raw:Dynamic = Reflect.field(sensors, "humans");
-    if (!Std.isOfType(raw, Array)) throw "Legacy humans must be an array";
-    for (entry in (cast raw:Array<Dynamic>)) {
-      var id:Dynamic = Reflect.field(entry, "id");
-      var asset:Dynamic = Reflect.field(entry, "assetPath");
-      var position:Dynamic = Reflect.field(entry, "position");
-      var rotation:Dynamic = Reflect.field(entry, "rotation");
-      if (!Std.isOfType(id, String) || id == "" || !Std.isOfType(asset, String) || asset == "" ||
-          !Std.isOfType(position, Array) || !Std.isOfType(rotation, Array))
-        throw "Legacy human needs an ID, asset, and pose";
-      var p:Array<Float> = cast position, q:Array<Float> = cast rotation;
-      if (p.length != 3 || q.length != 4) throw "Legacy human pose has wrong dimensions";
-      for (value in p.concat(q)) if (!Math.isFinite(value)) throw "Legacy human pose must be finite";
-      var uniqueId:String = id;
-      var suffix = 2;
-      while (Lambda.exists(data, function(object) return object.id == uniqueId)) {
-        uniqueId = id + "-worker-" + suffix;
-        suffix++;
-      }
-      var oldName:Dynamic = Reflect.field(entry, "jobName");
-      var note = oldName == null ? null : 'Legacy job "$oldName" requires authoring as document steps';
-      if (uniqueId != id) note = (note == null ? "" : note + "; ") +
-        'Legacy ID "$id" renamed to "$uniqueId" because a scene object already uses it';
-      var bounds:Array<Float>;
-      try bounds = app.editor.HumanWorkerKind.boundsFor(asset)
-      catch (_:Dynamic) bounds = app.editor.HumanWorkerKind.boundsFor(app.editor.HumanWorkerKind.DEFAULT_ASSET);
-      var yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]),
-        1 - 2 * (q[1] * q[1] + q[2] * q[2]));
-      data.push({id:uniqueId, label:id, type:"human-worker", x:p[0], y:p[1], z:0.0,
-        width:bounds[3]-bounds[0], height:bounds[4]-bounds[1], depth:bounds[5]-bounds[2], collisionEnabled:false, dynamicBody:false,
-        mass:1.0, red:0.7, green:0.7, blue:0.7, visible:true,
-        rotation:[0.0, 0.0, Math.sin(yaw / 2), Math.cos(yaw / 2)],
-        worker:{asset:asset, job:'{"version":1,"loop":false,"steps":[]}', zones:[],
-          migrationNote:note}});
-    }
+    if (Std.isOfType(raw, Array) && (cast raw:Array<Dynamic>).length == 0) return;
+    throw 'This scene keeps its people in a "humans" section, which is no longer supported; workers are scene objects now';
   }
 
   public function save(?file:String):Void {

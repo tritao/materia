@@ -267,7 +267,7 @@ class EditorScene {
     if (generated != null) return generated;
     if (StringTools.startsWith(snapshot, "materia.artifact-part/1:"))
       throw "Generated preview geometry is missing from its project source";
-    return CadPreviewGeometry.geometry(snapshot);
+    throw "This scene stores CAD preview geometry in a format that is no longer supported";
   }
 
   function sharedPreviewGeometry(snapshot:Null<String>, entries:Map<String, EditorSceneRuntimeObject>,

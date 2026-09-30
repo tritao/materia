@@ -27,6 +27,12 @@ class ProjectKitTests {
     check(threw, message);
   }
 
+  /** The message of the error `action` throws, or empty when it does not throw. */
+  static function refusal(action:Void->Void):String {
+    try action() catch (error:Dynamic) return Std.string(error);
+    return "";
+  }
+
   static function definition():AssemblyDefinition {
     var frame = AssemblyFrames.identity();
     return {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "fixture", lengthUnit: "mm",
@@ -65,6 +71,13 @@ class ProjectKitTests {
       AssemblyDefinitionCodec.encodeState(model, state));
     near(restored.jointCoordinates[0].value, 0.25, "state coordinate round trip");
     near(restored.rootPoses[0].pose.z, 3, "state root round trip");
+    // The older JSON form, keyed by field name with a schemaVersion, is refused with its reason.
+    check(refusal(function() AssemblyDefinitionCodec.decode(
+        '{"schemaVersion":1,"id":"fixture","definitions":[],"occurrences":[],"joints":[]}'))
+      .indexOf("old JSON format") >= 0, "old definition JSON refused with a reason");
+    check(refusal(function() AssemblyDefinitionCodec.decodeState(model,
+        '{"schemaVersion":1,"definition":"fixture","jointCoordinates":[],"rootPoses":[]}'))
+      .indexOf("old JSON format") >= 0, "old state JSON refused with a reason");
     state.jointCoordinates[0].value = 2;
     rejects(function() AssemblyDefinitionCodec.encodeState(model, state),
       "state outside joint limits");

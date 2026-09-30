@@ -5,18 +5,12 @@ import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
-import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
-import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
-import materia.assembly.AssemblyDefinition.AssemblyRootPose;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
-import materia.assembly.AssemblyRecord;
-import materia.assembly.AssemblyRecord.AssemblyConnector;
-import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.units.LengthUnit;
 
 /** Versioned transport and validation for reusable assembly definitions and states. */
@@ -29,52 +23,9 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decode(text:String):AssemblyDefinition {
-		var raw:Dynamic = Json.parse(text);
-		if (!Reflect.hasField(raw, "schemaVersion")) {
-			var result:AssemblyDefinition = JsonWire.decode(text);
-			validate(result);
-			return result;
-		}
-		if (integerField(raw, "schemaVersion") != 1)
-			throw "Unsupported legacy assembly definition version";
-		return decodeLegacy(raw);
-	}
-
-	static function decodeLegacy(raw:Dynamic):AssemblyDefinition {
-		var definitions:Array<AssemblyComponentDefinition> = [];
-		for (item in arrayField(raw, "definitions")) {
-			var connectors:Array<AssemblyConnector> = [];
-			for (connector in arrayField(item, "connectors"))
-				connectors.push({name: textField(connector, "name"), frame: readFrame(field(connector, "frame"))});
-			definitions.push({id: textField(item, "id"), connectors: connectors});
-		}
-		var occurrences:Array<AssemblyComponentOccurrence> = [];
-		for (item in arrayField(raw, "occurrences"))
-			occurrences.push({id: textField(item, "id"), definition: textField(item, "definition"),
-				initialPose: readFrame(field(item, "initialPose"))});
-		var joints:Array<KinematicJoint> = [];
-		for (item in arrayField(raw, "joints")) {
-			var limits = field(item, "limits");
-			joints.push({id: textField(item, "id"), type: cast textField(item, "type"),
-				role: cast textField(item, "role"), parent: textField(item, "parent"),
-				parentConnector: textField(item, "parentConnector"), child: textField(item, "child"),
-				childConnector: textField(item, "childConnector"), axis: readVector(field(item, "axis")),
-				limits: {lower: optionalNumberField(limits, "lower"),
-					upper: optionalNumberField(limits, "upper"), velocity: optionalNumberField(limits, "velocity"),
-					effort: optionalNumberField(limits, "effort")},
-				defaultValue: numberField(item, "defaultValue")});
-		}
-		var result:AssemblyDefinition = {schemaVersion: VERSION,
-			id: textField(raw, "id"), definitions: definitions, occurrences: occurrences, joints: joints};
-		result.lengthUnit = Reflect.hasField(raw, "lengthUnit") && Reflect.field(raw, "lengthUnit") != null
-			? textField(raw, "lengthUnit") : "mm";
-		if (Reflect.hasField(raw, "couplings") && Reflect.field(raw, "couplings") != null) {
-			var couplings:Array<AssemblyJointCoupling> = [];
-			for (item in arrayField(raw, "couplings")) couplings.push({id: textField(item, "id"),
-				source: textField(item, "source"), target: textField(item, "target"),
-				ratio: numberField(item, "ratio"), offset: numberField(item, "offset")});
-			result.couplings = couplings;
-		}
+		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
+			throw "Assembly definitions in the old JSON format are no longer supported";
+		var result:AssemblyDefinition = JsonWire.decode(text);
 		validate(result);
 		return result;
 	}
@@ -85,24 +36,11 @@ class AssemblyDefinitionCodec {
 	}
 
 	public static function decodeState(definition:AssemblyDefinition, text:String):AssemblyStateRecord {
-		var raw:Dynamic = Json.parse(text);
-		if (!Reflect.hasField(raw, "schemaVersion")) {
-			var decoded:AssemblyStateRecord = JsonWire.decode(text);
-			validateState(definition, decoded);
-			return decoded;
-		}
-		if (integerField(raw, "schemaVersion") != 1)
-			throw "Unsupported legacy assembly state version";
-		var coordinates:Array<AssemblyJointCoordinate> = [];
-		for (item in arrayField(raw, "jointCoordinates"))
-			coordinates.push({joint: textField(item, "joint"), value: numberField(item, "value")});
-		var roots:Array<AssemblyRootPose> = [];
-		for (item in arrayField(raw, "rootPoses"))
-			roots.push({occurrence: textField(item, "occurrence"), pose: readFrame(field(item, "pose"))});
-		var state:AssemblyStateRecord = {schemaVersion: VERSION,
-			definition: textField(raw, "definition"), jointCoordinates: coordinates, rootPoses: roots};
-		validateState(definition, state);
-		return state;
+		if (Reflect.hasField(Json.parse(text), "schemaVersion"))
+			throw "Assembly states in the old JSON format are no longer supported";
+		var decoded:AssemblyStateRecord = JsonWire.decode(text);
+		validateState(definition, decoded);
+		return decoded;
 	}
 
 	public static function validate(definition:AssemblyDefinition):Void {
@@ -251,32 +189,6 @@ class AssemblyDefinitionCodec {
 		}
 	}
 
-	public static function fromLegacy(record:AssemblyRecord, id:String = "assembly"):AssemblyDefinition {
-		AssemblyCodec.validate(record);
-		if (!validText(id)) throw "Assembly definition needs an ID";
-		var definitions:Array<AssemblyComponentDefinition> = [];
-		var occurrences:Array<AssemblyComponentOccurrence> = [];
-		for (instance in record.instances) {
-			var componentId = instance.id;
-			definitions.push({id: componentId, connectors: instance.connectors.copy()});
-			occurrences.push({id: instance.id, definition: componentId, initialPose: instance.pose});
-		}
-		var incoming = new Map<String, Bool>(), joints:Array<KinematicJoint> = [];
-		for (joint in record.joints) {
-			var role = incoming.exists(joint.child) ? AssemblyJointRole.Closure : AssemblyJointRole.Tree;
-			if (role == AssemblyJointRole.Tree) incoming.set(joint.child, true);
-			joints.push({id: joint.id, type: cast joint.kind, role: role, parent: joint.parent,
-				parentConnector: joint.parentConnector, child: joint.child,
-				childConnector: joint.childConnector, axis: {x: 0, y: 1, z: 0},
-				limits: {lower: null, upper: null, velocity: null, effort: null},
-				defaultValue: joint.kind == "fixed" ? 0 : joint.value});
-		}
-		var result:AssemblyDefinition = {schemaVersion: VERSION, id: id, definitions: definitions,
-			occurrences: occurrences, joints: joints};
-		validate(result);
-		return result;
-	}
-
 	public static function rootOccurrences(definition:AssemblyDefinition):Map<String, Bool> {
 		definition = AssemblyDefinitionFlattener.flatten(definition);
 		var hasParent = new Map<String, Bool>();
@@ -329,48 +241,6 @@ class AssemblyDefinitionCodec {
 	static function withinLimits(limits:AssemblyJointLimits, value:Float):Bool
 		return (limits.lower == null || value >= limits.lower) && (limits.upper == null || value <= limits.upper);
 
-	static function readFrame(value:Dynamic):AssemblyFrame
-		return {x: numberField(value, "x"), y: numberField(value, "y"), z: numberField(value, "z"),
-			qx: numberField(value, "qx"), qy: numberField(value, "qy"),
-			qz: numberField(value, "qz"), qw: numberField(value, "qw")};
-
-	static function readVector(value:Dynamic):AssemblyVector
-		return {x: numberField(value, "x"), y: numberField(value, "y"), z: numberField(value, "z")};
-
-	static function field(value:Dynamic, name:String):Dynamic {
-		if (value == null || !Reflect.hasField(value, name)) throw 'Assembly field "$name" is missing';
-		return Reflect.field(value, name);
-	}
-	static function arrayField(value:Dynamic, name:String):Array<Dynamic> {
-		var result = field(value, name);
-		if (!Std.isOfType(result, Array)) throw 'Assembly field "$name" must be an array';
-		return cast result;
-	}
-	static function textField(value:Dynamic, name:String):String {
-		var result = field(value, name);
-		if (!Std.isOfType(result, String) || !validText(cast result))
-			throw 'Assembly field "$name" must be nonempty text';
-		return cast result;
-	}
-	static function numberField(value:Dynamic, name:String):Float {
-		var result = field(value, name);
-		if ((!Std.isOfType(result, Float) && !Std.isOfType(result, Int)) || !Math.isFinite(cast result))
-			throw 'Assembly field "$name" must be finite';
-		return cast result;
-	}
-	static function integerField(value:Dynamic, name:String):Int {
-		var result = field(value, name);
-		if (!Std.isOfType(result, Int)) throw 'Assembly field "$name" must be an integer';
-		return cast result;
-	}
-	static function optionalNumberField(value:Dynamic, name:String):Null<Float> {
-		if (value == null || !Reflect.hasField(value, name)) return null;
-		var result = Reflect.field(value, name);
-		if (result == null) return null;
-		if ((!Std.isOfType(result, Float) && !Std.isOfType(result, Int)) || !Math.isFinite(cast result))
-			throw 'Assembly field "$name" must be finite or null';
-		return cast result;
-	}
 	static function validText(value:Null<String>):Bool
 		return value != null && value.length > 0 && value.length <= 4096 &&
 			StringTools.trim(value).length > 0 && value.indexOf("\x00") < 0;

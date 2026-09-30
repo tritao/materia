@@ -349,7 +349,6 @@ class SceneCodec {
           zones.push(zone);
         }
         worker = {asset: stringField(source, "asset"), job: stringField(source, "job"), zones: zones};
-        if (Reflect.hasField(source, "migrationNote")) worker.migrationNote = optionalText(source, "migrationNote");
         // A malformed job remains editable and is reported by the worker inspector.
         try HumanJobSpec.parse(worker.job) catch (_:Dynamic) {}
       } else if (Reflect.hasField(value, "worker") && Reflect.field(value, "worker") != null)
