@@ -264,6 +264,49 @@ void participants_share_every_tick() {
     assert(near(status.gravity[2], -9.81) && near(status.fixed_timestep, 0.01));
 }
 
+void owner_paced_ticks() {
+    Space space;
+    constexpr uint64_t tick_ns = 10'000'000;
+    uint32_t due = 99;
+    assert(nksim_session_due_ticks(space.session, 0, 5, nullptr) == NKSIM_ERROR_INVALID_ARGUMENT);
+    assert(nksim_session_due_ticks(space.session, 0, 5, &due) == NKSIM_OK && due == 0);
+    // A partial tick carries over to the next call.
+    assert(nksim_session_due_ticks(space.session, tick_ns * 3 / 2, 5, &due) == NKSIM_OK && due == 1);
+    assert(nksim_session_due_ticks(space.session, tick_ns / 2, 5, &due) == NKSIM_OK && due == 1);
+    // A stalled owner loses the excess instead of bursting to catch up.
+    assert(nksim_session_due_ticks(space.session, tick_ns * 20, 5, &due) == NKSIM_OK && due == 5);
+    assert(nksim_session_due_ticks(space.session, 0, 5, &due) == NKSIM_OK && due == 0);
+
+    // A paced step advances the clock like an explicit one, and participants
+    // see a realtime tick where an explicit step is not.
+    struct Seen {
+        int realtime = -1;
+    } seen;
+    nksim_participant_desc participant{};
+    participant.struct_size = sizeof(participant);
+    participant.user = &seen;
+    participant.submit = [](void *user, const nksim_tick *tick) -> nksim_result {
+        static_cast<Seen *>(user)->realtime = static_cast<int>(tick->realtime);
+        return NKSIM_OK;
+    };
+    nksim_participant id = 0;
+    assert(nksim_session_add_participant(space.session, &participant, &id) == NKSIM_OK);
+    nksim_clock clock{};
+    clock.struct_size = sizeof(clock);
+    assert(nksim_session_step_paced(space.session, &clock) == NKSIM_OK);
+    assert(clock.step_index == 1 && near(clock.time, 0.01) && seen.realtime == 1);
+    assert(nksim_session_step(space.session, 0, &clock) == NKSIM_OK);
+    assert(clock.step_index == 2 && seen.realtime == 0);
+
+    // The owner loop and the paced calls are exclusive.
+    assert(nksim_session_remove_participant(space.session, id) == NKSIM_OK);
+    assert(nksim_session_start(space.session) == NKSIM_OK);
+    assert(nksim_session_due_ticks(space.session, tick_ns, 5, &due) == NKSIM_ERROR_INVALID_STATE &&
+           due == 0);
+    assert(nksim_session_step_paced(space.session, nullptr) == NKSIM_ERROR_INVALID_STATE);
+    assert(nksim_session_stop(space.session) == NKSIM_OK);
+}
+
 } // namespace
 
 // Ground planes and cylinders are session objects too: a plane must be static,
@@ -313,6 +356,7 @@ void planes_and_cylinders_are_objects() {
 }
 
 int main() {
+    owner_paced_ticks();
     {
         Space space;
         nksim_object_desc desc{};
