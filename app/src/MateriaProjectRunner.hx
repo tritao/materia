@@ -63,30 +63,61 @@ class MateriaProjectRunner {
   public static function loadProject(projectPath:String, ?recipeDocument:String,
       ?control:ProjectLoadControl):GeneratedAssemblyScene {
     var scene = loadGeneratedProject(projectPath, recipeDocument, control);
-    scene.robotMotions = projectMotions(FileSystem.fullPath(projectPath), scene);
+    var manifestPath = FileSystem.fullPath(projectPath);
+    var motion = motionDocument(manifestPath);
+    scene.robotMotions = projectMotions(motion, scene);
+    scene.robotGrips = RobotGripEvent.decode(motion == null ? null : Reflect.field(motion, "grips"));
+    applyDynamicParts(manifestPath, scene);
     return scene;
   }
 
-  /**
-   * Joint motion the project ships with. The manifest's optional `robotMotions` names a JSON file
-   * `{"version": 1, "tracks": [{"joint": "<assembly joint id>", "loop": true, "keys": [...]}]}`
-   * beside it. Positions are joint coordinates relative to the generated initial pose, like every
-   * motion track, and the tracks drive the project's own assembly in a simulation.
-   */
-  static function projectMotions(manifestPath:String, scene:GeneratedAssemblyScene):Array<RobotMotionTrack> {
+  /** The project's motion file, or null when its manifest names none. */
+  static function motionDocument(manifestPath:String):Dynamic {
     var root:Dynamic = Json.parse(File.getContent(manifestPath));
     var reference:Dynamic = Reflect.field(root, "robotMotions");
-    if (reference == null) return [];
+    if (reference == null) return null;
     if (!Std.isOfType(reference, String) || StringTools.trim(reference).length == 0)
       throw 'Project field "robotMotions" must name a file';
-    var definition = scene.assemblyDefinition;
-    if (definition == null) throw "Project robot motions need a kinematic assembly";
     var file = resolveProjectPath(directory(manifestPath), reference);
     if (!FileSystem.exists(file) || FileSystem.isDirectory(file))
       throw 'Project robot motion file not found: $file';
     var document:Dynamic = Json.parse(File.getContent(file));
     if (Reflect.field(document, "version") != 1 || !Std.isOfType(Reflect.field(document, "tracks"), Array))
       throw "Unsupported project robot motion file";
+    return document;
+  }
+
+  /**
+   * The manifest's optional `dynamicParts` lists parts that the simulation moves freely instead of
+   * bolting to their assembly, such as a workpiece; they need mass and must not be joined to anything.
+   */
+  static function applyDynamicParts(manifestPath:String, scene:GeneratedAssemblyScene):Void {
+    var root:Dynamic = Json.parse(File.getContent(manifestPath));
+    var listed:Dynamic = Reflect.field(root, "dynamicParts");
+    if (listed == null) return;
+    if (!Std.isOfType(listed, Array)) throw 'Project field "dynamicParts" must be a list of part ids';
+    for (id in (cast listed:Array<Dynamic>)) {
+      if (!Std.isOfType(id, String)) throw 'Project field "dynamicParts" must be a list of part ids';
+      var found = false;
+      for (record in scene.objects) if (record.id == "project:" + id) {
+        record.dynamicBody = true;
+        found = true;
+      }
+      if (!found) throw 'Project dynamic part "$id" is not a part of the generated scene';
+    }
+  }
+
+  /**
+   * Joint motion the project ships with. The manifest's optional `robotMotions` names a JSON file
+   * `{"version": 1, "tracks": [{"joint": "<assembly joint id>", "loop": true, "keys": [...]}],
+   * "grips": [{"time": 1.4, "link": "<assembly link id>", "action": "grip"}]}` beside it. Positions
+   * are joint coordinates relative to the generated initial pose, like every motion track, and the
+   * tracks drive the project's own assembly in a simulation.
+   */
+  static function projectMotions(document:Dynamic, scene:GeneratedAssemblyScene):Array<RobotMotionTrack> {
+    if (document == null) return [];
+    var definition = scene.assemblyDefinition;
+    if (definition == null) throw "Project robot motions need a kinematic assembly";
     var raw:Array<Dynamic> = [for (track in (cast Reflect.field(document, "tracks"):Array<Dynamic>)) {
       version: 1, robotId: "assembly:" + definition.id, jointId: Reflect.field(track, "joint"),
       loop: Reflect.field(track, "loop"), keys: Reflect.field(track, "keys")
@@ -415,7 +446,7 @@ class MateriaProjectRunner {
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
-      robotMotions: generated.robotMotions};
+      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -558,4 +589,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var recipeDiagnostics:Array<String>;
   /** Joint motion the project ships with, applied to its own assembly in simulation. */
   @:optional var robotMotions:Array<RobotMotionTrack>;
+  /** Vacuum commands that go with the motion: which tool grips or lets go, and when. */
+  @:optional var robotGrips:Array<RobotGripEvent>;
 }

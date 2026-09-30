@@ -15,10 +15,14 @@ import humankit.HumanoidRig;
 import humankit.sim.HumanWorker;
 import humankit.sim.HumanZone;
 import humankit.sim.HumanWorkerSignals;
+import robotkit.runtime.RobotContact;
+import robotkit.runtime.RobotContactOtherKind;
+import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
 import robotkit.runtime.SimulationSpace;
+import robotkit.spatial.Vec3;
 import RobotKitRuntime;
 import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.world.Robot;
@@ -71,6 +75,16 @@ class ApplicationSimulation {
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
   var robotMotions:Array<RobotMotionTrack> = [];
+  var robotRuntimes:Array<RobotRuntime> = [];
+  /** Vacuum commands resolved to robot and link indices, in time order. */
+  var grips:Array<{time:Float, robotIndex:Int, linkIndex:Int, grip:Bool}> = [];
+  /** Seconds after which the motion, and so the grip commands, repeat; zero when they run once. */
+  var gripPeriod:Float = 0.0;
+  var gripNext:Int = 0;
+  var gripCycle:Int = 0;
+  var gripLastTime:Float = 0.0;
+  /** What each gripping link holds, keyed `robot:link`. */
+  var held:Map<String, {id:String, object:SimObject}> = new Map();
   var humanWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter,asset:AnimationAsset}> = [];
   var humanSignalsById:Map<String, HumanWorkerSignals> = new Map();
   var workerWarningsById:Map<String, Array<String>> = new Map();
@@ -133,6 +147,7 @@ class ApplicationSimulation {
     var candidateLinks:Array<Array<String>> = [];
     var candidateRobotModels:Array<robotkit.model.RobotModel> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
+    var candidateRuntimes:Array<RobotRuntime> = [];
     var candidateWorkers:Array<{id:String,worker:HumanWorker,character:HumanCharacter,asset:AnimationAsset}> = [];
     var candidateAssemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
     var candidateWarnings:Array<String> = [];
@@ -159,26 +174,36 @@ class ApplicationSimulation {
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
+        candidateRuntimes.push(runtime);
         candidateLinks.push([for (link in editable.model.links) link.id]);
         candidateRobotModels.push(editable.model);
       }
       var candidateMotions = session == null ? [] : session.robotMotions;
+      // Parts flagged dynamic (a workpiece) are not bolted to the assembly: they simulate as free objects
+      // below, and the assembly robot has no link for them.
+      var sceneParts = new Map<String, SceneObjectData>();
+      for (record in scene.records()) sceneParts.set(record.id, record);
+      var freeSet = new Map<String, Bool>();
+      if (assembly != null) for (occurrence in assembly.occurrences) {
+        var record = sceneParts.get("project:" + occurrence.id);
+        if (record != null && record.dynamicBody) freeSet.set(occurrence.id, true);
+      }
+      var freeOccurrences = [for (id in freeSet.keys()) id];
       if (assembly != null) {
         var physical = session == null ? null : session.projectPhysical;
         if (physical == null) throw "Assembly physical properties are unavailable";
         var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-          session == null ? null : session.projectAssemblyState);
+          session == null ? null : session.projectAssemblyState, freeOccurrences);
         // Link collision geometry is installed with generated-part hulls in the
         // collision phase; the runtime's generic 10 cm robot box is not a part shape.
         converted.model.collisionApproximation = CollisionApproximation.None;
-        var sceneParts = new Map<String, SceneObjectData>();
-        for (record in scene.records()) sceneParts.set(record.id, record);
         var collisionHulls:Array<Null<Array<Float>>> = [for (_ in converted.model.links) null];
         var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
         for (part in physical.parts) physicalParts.set(part.id, part);
         for (part in physical.parts) if (part.collisionWarning != null)
           candidateWarnings.push(part.id + ": " + part.collisionWarning);
         for (occurrence in assembly.occurrences) {
+          if (freeSet.exists(occurrence.id)) continue;
           var record = sceneParts.get("project:" + occurrence.id);
           var part = physicalParts.get(occurrence.definition);
           if (record == null || part == null)
@@ -243,10 +268,12 @@ class ApplicationSimulation {
         candidateRobots.push(new SimulatedRobot(id, runtime, converted.model.name,
           [for (link in converted.model.links) link.id],
           [for (joint in converted.model.joints) joint.id]));
+        candidateRuntimes.push(runtime);
         candidateLinks.push([for (link in converted.model.links) link.id]);
         candidateRobotModels.push(converted.model);
         var robotIndex = candidateRobots.length - 1;
         for (occurrence in assembly.occurrences) {
+          if (freeSet.exists(occurrence.id)) continue;
           var center = session == null ? null : session.assemblyPreviewCenter(occurrence.definition);
           if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
           var linkIndex = -1;
@@ -281,11 +308,27 @@ class ApplicationSimulation {
         resolvedMotions.push(jointIndex == track.joint ? track :
           new RobotMotionTrack(track.robotId, jointIndex, track.loop, track.keys, track.jointId));
       }
+      var resolvedGrips:Array<{time:Float, robotIndex:Int, linkIndex:Int, grip:Bool}> = [];
+      var resolvedPeriod = 0.0;
+      for (track in resolvedMotions) if (track.loop)
+        resolvedPeriod = Math.max(resolvedPeriod, track.keys[track.keys.length - 1].time);
+      var gripEvents = session == null ? [] : session.robotGrips;
+      if (gripEvents.length > 0) {
+        if (assembly == null) throw "Robot grips need the project's assembly";
+        var gripRobot = candidateRobots.length - 1;
+        for (event in gripEvents) {
+          var linkIndex = -1;
+          var linkIds = candidateLinks[gripRobot];
+          for (i in 0...linkIds.length) if (linkIds[i] == event.link) { linkIndex = i; break; }
+          if (linkIndex < 0) throw 'Robot grip names unknown link "${event.link}"';
+          resolvedGrips.push({time: event.time, robotIndex: gripRobot, linkIndex: linkIndex, grip: event.grip});
+        }
+      }
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var assemblyOwned = new Map<String, Bool>();
       if (assembly != null) for (occurrence in assembly.occurrences)
-        assemblyOwned.set("project:" + occurrence.id, true);
+        if (!freeSet.exists(occurrence.id)) assemblyOwned.set("project:" + occurrence.id, true);
       for (object in environmentRecords) if (object.collisionEnabled && !assemblyOwned.exists(object.id)) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
@@ -393,6 +436,10 @@ class ApplicationSimulation {
       simulatedLinks = candidateLinks;
       simulatedObjects = candidateObjects;
       robotMotions = resolvedMotions.copy();
+      robotRuntimes = candidateRuntimes;
+      grips = resolvedGrips;
+      gripPeriod = resolvedPeriod;
+      resetGrips();
       humanWorkers = candidateWorkers;
       workerWarningsById = candidateWorkerWarnings;
       humanSignalsById.clear();
@@ -477,6 +524,7 @@ class ApplicationSimulation {
     var active = space;
     if (active == null) return false;
     active.session.stop(); active.session.reset(); running = false; presentAssemblyPhysics = false;
+    resetGrips();
     presentationEpoch++; return true;
   }
   public function isRunning():Bool return running;
@@ -518,6 +566,113 @@ class ApplicationSimulation {
     presentWorkers();
   }
 
+  /** How far from a tool link an object may be for its vacuum to seal on it, in metres. */
+  static inline var GRIP_REACH:Float = 0.004;
+  /**
+   * The gap left between the cup and the workpiece it holds. A held object is driven to follow its
+   * carrier and cannot yield, so a contact between them would push back on the arm; a gap far larger
+   * than the contact's own tolerance keeps that force at exactly zero and is invisible at this scale.
+   */
+  static inline var GRIP_CLEARANCE:Float = 0.001;
+
+  /** Scene ids of the objects the tool links are holding right now. */
+  public function heldObjectIds():Array<String> return [for (entry in held) entry.id];
+
+  function resetGrips():Void {
+    gripNext = 0;
+    gripCycle = 0;
+    gripLastTime = 0.0;
+    held.clear();
+  }
+
+  /** Fires every vacuum command whose time has come, once per cycle of the motion it goes with. */
+  function advanceGrips(now:Float):Void {
+    if (grips.length == 0) return;
+    // Time only runs backward when the session was reset: start the commands over.
+    if (now < gripLastTime) resetGrips();
+    gripLastTime = now;
+    while (gripNext < grips.length) {
+      var event = grips[gripNext];
+      if (now < gripCycle * gripPeriod + event.time) break;
+      applyGrip(event);
+      gripNext++;
+      // A motion that repeats also repeats its commands; one that runs once is done.
+      if (gripNext >= grips.length && gripPeriod > 0) {
+        gripNext = 0;
+        gripCycle++;
+      }
+    }
+  }
+
+  function applyGrip(event:{time:Float, robotIndex:Int, linkIndex:Int, grip:Bool}):Void {
+    var active = space, robots = simulation;
+    if (active == null || robots == null) return;
+    var key = event.robotIndex + ":" + event.linkIndex;
+    if (!event.grip) {
+      var holding = held.get(key);
+      if (holding == null) return;
+      held.remove(key);
+      active.session.releaseObject(holding.object);
+      return;
+    }
+    if (held.exists(key)) return;
+    var touched = gripCandidate(robots, event);
+    // Nothing under the cup: the vacuum finds no seal, so nothing is held.
+    if (touched == null) return;
+    var link = robots.linkPose(event.robotIndex, event.linkIndex);
+    var frame = active.session.capture();
+    var pose:SimPose;
+    try pose = frame.objectPose(touched.entry.object) catch (failure:Dynamic) {
+      frame.dispose();
+      throw failure;
+    }
+    frame.dispose();
+    // Ease the object to the clearance along the contact normal, away from the cup.
+    var away = touched.contact.normal;
+    var toObject = new Vec3(pose.x - link.position[0], pose.y - link.position[1], pose.z - link.position[2]);
+    if (away.dot(toObject) < 0.0) away = new Vec3(-away.x, -away.y, -away.z);
+    var shift = Math.max(0.0, GRIP_CLEARANCE - touched.contact.distance);
+    var seated = new SimPose(pose.x + away.x * shift, pose.y + away.y * shift, pose.z + away.z * shift,
+      pose.qx, pose.qy, pose.qz, pose.qw);
+    active.session.holdObject(touched.entry.object, robots.linkBody(event.robotIndex, event.linkIndex),
+      relativePose(link.position, link.rotation, seated));
+    held.set(key, touched.entry);
+  }
+
+  /** The free object nearest the link within reach, that no other link already holds. */
+  function gripCandidate(robots:Simulation, event:{time:Float, robotIndex:Int, linkIndex:Int, grip:Bool}):
+      Null<{entry:{id:String, object:SimObject}, contact:RobotContact}> {
+    var best:Null<{entry:{id:String, object:SimObject}, contact:RobotContact}> = null;
+    var bestDistance = GRIP_REACH;
+    for (contact in robots.robotContacts(robotRuntimes[event.robotIndex])) {
+      if (contact.linkIndex != event.linkIndex || contact.otherKind != RobotContactOtherKind.Object ||
+          contact.distance > bestDistance) continue;
+      for (entry in simulatedObjects) {
+        if (entry.object.handle.rawValue() != contact.otherObject || entry.object.motion != MotionType.Dynamic)
+          continue;
+        var taken = false;
+        for (holding in held) if (holding.object == entry.object) taken = true;
+        if (taken) continue;
+        best = {entry: entry, contact: contact};
+        bestDistance = contact.distance;
+      }
+    }
+    return best;
+  }
+
+  /** The object's pose in the frame of the link that carries it. */
+  static function relativePose(linkPosition:Array<Float>, linkRotation:Array<Float>, object:SimPose):SimPose {
+    var inverse = [-linkRotation[0], -linkRotation[1], -linkRotation[2], linkRotation[3]];
+    var offset = rotateOffset(object.x - linkPosition[0], object.y - linkPosition[1],
+      object.z - linkPosition[2], inverse);
+    var ax = inverse[0], ay = inverse[1], az = inverse[2], aw = inverse[3];
+    return new SimPose(offset[0], offset[1], offset[2],
+      aw * object.qx + ax * object.qw + ay * object.qz - az * object.qy,
+      aw * object.qy - ax * object.qz + ay * object.qw + az * object.qx,
+      aw * object.qz + ax * object.qy - ay * object.qx + az * object.qw,
+      aw * object.qw - ax * object.qx - ay * object.qy - az * object.qz);
+  }
+
   /** Feeds the robot motion tracks and every worker for the tick about to run. */
   function feedTick():Void {
     var active = space;
@@ -533,6 +688,7 @@ class ApplicationSimulation {
         var robot = world.robot(id);
         if (robot != null) robot.submit(RobotCommand.JointTargets(commands.get(id), null));
       }
+      advanceGrips(active.session.simulationTime());
     }
     if (humanScene == null) return;
     for (entry in humanWorkers) entry.worker.advance();
@@ -639,6 +795,7 @@ class ApplicationSimulation {
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);
+    robotRuntimes = []; grips = []; resetGrips();
     robotMotions = [];
     assemblyParts.resize(0);
     collisionWarnings = [];

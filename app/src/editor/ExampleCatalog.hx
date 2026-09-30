@@ -123,7 +123,7 @@ class ExampleCatalog {
     app.session.openGeneratedScene(generated.objects, path, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions);
+      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
     app.documentChanged();
     showModel(app);
     app.log((entry.id == LAUNCH_PROJECT_ID ? "Opened project: " : "Opened example: ") + entry.title);

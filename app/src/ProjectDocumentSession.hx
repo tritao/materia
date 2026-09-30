@@ -63,6 +63,8 @@ class ProjectDocumentSession {
   }
   public var customMaterials(default, null):Array<MaterialDef> = [];
   public var robotMotions(default, null):Array<RobotMotionTrack> = [];
+  /** Vacuum commands the open project ships with; they are not part of the saved document. */
+  public var robotGrips(default, null):Array<RobotGripEvent> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
@@ -203,7 +205,8 @@ class ProjectDocumentSession {
       ?assembly:AssemblyRecord, ?geometryBySnapshot:Map<String, GeometryData>,
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
-      ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>):Void {
+      ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
+      ?grips:Array<RobotGripEvent>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -238,6 +241,7 @@ class ProjectDocumentSession {
     installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit);
     projectPhysical = physical;
     robotMotions = motions == null ? [] : motions.copy();
+    robotGrips = grips == null ? [] : grips.copy();
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -314,6 +318,7 @@ class ProjectDocumentSession {
       generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints);
     projectPhysical = generated.physical;
     robotMotions = generated.robotMotions == null ? [] : generated.robotMotions.copy();
+    robotGrips = generated.robotGrips == null ? [] : generated.robotGrips.copy();
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -627,6 +632,7 @@ class ProjectDocumentSession {
     projectPhysical = null;
     customMaterials = [];
     robotMotions = [];
+    robotGrips = [];
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

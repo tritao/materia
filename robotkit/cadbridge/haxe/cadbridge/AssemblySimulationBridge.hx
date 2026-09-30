@@ -53,8 +53,15 @@ typedef AssemblyPhysicalData = {
 
 /** Converts an assembly's tree joints and physical parts to a RobotKit model. */
 class AssemblySimulationBridge {
+  /**
+   * `freeOccurrences` are parts the simulation moves on its own instead of bolting them to the
+   * assembly, such as a workpiece; they get no link, and no joint may touch them.
+   */
   public static function toRobotModel(definition:AssemblyDefinition,
-      artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord):AssemblySimulationModel {
+      artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord,
+      ?freeOccurrences:Array<String>):AssemblySimulationModel {
+    var free = new Map<String, Bool>();
+    if (freeOccurrences != null) for (id in freeOccurrences) free.set(id, true);
     AssemblyDefinitionCodec.validate(definition);
     var sourceDefinition = definition;
     definition = AssemblyDefinitionFlattener.flatten(definition);
@@ -72,6 +79,7 @@ class AssemblySimulationBridge {
     var links = new Map<String, Link>();
     var linkCollisionHulls:Array<Null<Array<Float>>> = [null];
     for (occurrence in definition.occurrences) {
+      if (free.exists(occurrence.id)) continue;
       var part = parts.get(occurrence.definition);
       if (part == null) throw 'Assembly occurrence "${occurrence.id}" has no physical part';
       if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density) ||
@@ -98,7 +106,7 @@ class AssemblySimulationBridge {
     }
     var roots = AssemblyDefinitionCodec.rootOccurrences(definition);
     var placement = new AssemblyState(sourceDefinition, savedState);
-    for (occurrence in definition.occurrences) if (roots.exists(occurrence.id)) {
+    for (occurrence in definition.occurrences) if (roots.exists(occurrence.id) && !free.exists(occurrence.id)) {
       var joint = model.addJoint(new Joint("root-" + occurrence.id, JointType.Fixed,
         root, links.get(occurrence.id)));
       setFrame(joint, placement.worldPose(occurrence.id), true, scale);
@@ -106,6 +114,8 @@ class AssemblySimulationBridge {
     var closures:Array<String> = [];
     var closureGeometry:Array<AssemblySimulationClosure> = [];
     for (edge in definition.joints) {
+      if (free.exists(edge.parent) || free.exists(edge.child))
+        throw 'Free part is joined by "${edge.id}"; a part the simulation moves on its own cannot be joined';
       if (edge.role == AssemblyJointRole.Closure) {
         closures.push(edge.id);
         var frame = connector(definitions.get(occurrenceDefinition(definition, edge.parent)),
