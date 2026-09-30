@@ -73,6 +73,7 @@ class HaxeonSmoke {
 		JacobianCheckSmoke.run();
 		SketchJacobianSmoke.run();
 		ConstrainedSketchSmoke.run();
+		SketchIncrementalSmoke.run();
 		ConstraintDiagnosisSmoke.run();
 		DiagnosisInvarianceSmoke.run();
 		PatternSmoke.run();

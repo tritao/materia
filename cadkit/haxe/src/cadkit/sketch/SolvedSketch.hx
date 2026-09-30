@@ -4,9 +4,13 @@ class SolvedSketch {
 	private final coordinates:Map<String, Array<Float>>;
 	private final radii:Map<String, Float>;
 	public final diagnostic:SolveDiagnostic;
+	/** Solved parts by structure, for incremental solves seeded from this one (see `CachedPart`). */
+	public final partCache:Map<String, CachedPart>;
 
-	public function new(coordinates:Map<String, Array<Float>>, radii:Map<String, Float>, diagnostic:SolveDiagnostic) {
+	public function new(coordinates:Map<String, Array<Float>>, radii:Map<String, Float>, diagnostic:SolveDiagnostic,
+			?partCache:Map<String, CachedPart>) {
 		this.coordinates = coordinates; this.radii = radii; this.diagnostic = diagnostic;
+		this.partCache = partCache == null ? new Map() : partCache;
 	}
 
 	public function x(id:String):Float return point(id)[0];

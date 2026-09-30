@@ -431,3 +431,44 @@ chained 200 points took 12.8 s, 97% of it in the dense normal-equation LU.
   in a document (`DocumentCodec`, `ConstrainedSketchFeature`), reloads it
   without evaluating, and solves again; all pass. This closes the C0 gap.
 - C2 is closed: step 3 was moot (see C2.2), steps 1, 2 and 4 are done.
+
+### C2.5 — Sparse dependency search and incremental re-solve (2026-09-30)
+
+- **Measured first:** a connected 1000-point sketch with one implied
+  constraint took 89 s on the dense QR fallback (200 points: 460 ms per drag
+  step), since the JJᵀ fast path gave up on any dependency.
+- **Sparse dependency search** (`ConstraintDiagnosis.diagnoseSparse`): the
+  JJᵀ Cholesky (rows and columns equilibrated, as the dense path does) drops a
+  row whose pivot is at most t² and reads its fundamental circuit by
+  back-substitution over the earlier kept rows (coefficients can reach past
+  the row's envelope, so the solve runs over all earlier rows). Circuits merge
+  and suggestions follow as in the dense path.
+- **Threshold consistency:** a Gram pivot is about the square of a row's
+  distance from the earlier rows and is accurate only to ~1e-16, so it
+  cannot reproduce a σ threshold below ~1e-8. With a rank tolerance t ≥ 1e-6
+  the sparse path decides alone (dependent at ≤ t², near-degenerate below
+  (1e3 t)², as the dense flag); with a smaller t it only proves clear
+  independence and defers the rest to the QR. `SolverSettings.rankTolerance`
+  now defaults to 1e-6 (was 1e-7). Documents saved with 1e-7 still diagnose
+  correctly, their dependencies just take the dense path. The diagnosis smoke
+  compares sparse and dense at both tolerances on every hand-built case.
+- **Incremental re-solve:** `SolvedSketch.partCache` keeps each converged
+  part's report under a key of its structure (constraint ids, kinds,
+  references, the entities they reach), with its numbers (settings,
+  dimension values, fixed positions, sketch scale) compared exactly rather
+  than through strings. A solve seeded from that solution skips unchanged
+  parts. Per-solve setup is now O(n): one variable→part/local table instead
+  of per-part arrays, residuals walk only the part's constraints, RCM runs
+  only for parts that solve. `SketchIncrementalSmoke` checks edits,
+  re-authored fixed points and reused redundant parts against cold solves.
+- Numbers (load ~5–9): redundant connected 1000 points 89 s → 126 ms;
+  redundant 200 per drag step 463 → 16 ms; 250 independent profiles per drag
+  step 28 → 10 ms; connected 200 per drag step 9.5 ms; bracket edit 1.2 ms.
+- Still slow for dragging: one connected 1000-point part (~69 ms per step,
+  it must re-solve whole) and the O(n) per-solve setup (~10 ms at 1000
+  points with nothing to solve). Next levers if needed: skip diagnosis while
+  dragging (diagnose on release, as FreeCAD does), and keep the part
+  structure between solves when only values change.
+- Aside, not fixed (user's call): haxeon's `Parser.decodeString` only knows
+  `\n \r \t \" \\`; any other escape (`\u0001`, `\x01`) silently compiles to
+  the escaped letter plus the rest (`u0001`). Use `String.fromCharCode`.
