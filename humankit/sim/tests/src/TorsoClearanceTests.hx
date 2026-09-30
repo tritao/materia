@@ -9,19 +9,19 @@ import humankit.HumanBone;
 class TorsoClearanceTests {
     static inline var BELLY_FRONT = 0.12;
 
-    /** Signed distance from a point to a rectangle's footprint: negative inside, by how far in. */
-    static function outside(point:Array<Float>, center:Array<Float>, half:Array<Float>):Float {
-        var dx = Math.abs(point[0] - center[0]) - half[0], dy = Math.abs(point[1] - center[1]) - half[1];
-        if (dx <= 0.0 && dy <= 0.0) return Math.max(dx, dy);
-        return Math.sqrt(Math.max(dx, 0.0) * Math.max(dx, 0.0) + Math.max(dy, 0.0) * Math.max(dy, 0.0));
+    /** Signed distance from a point to a box's footprint: negative inside, by how far in. */
+    public static function outside(point:Array<Float>, box:humankit.HumanTargetBox):Float {
+        var c = Math.cos(box.yaw), s = Math.sin(box.yaw);
+        var dx = point[0] - box.center[0], dy = point[1] - box.center[1];
+        var lx = Math.abs(c * dx + s * dy) - box.halfExtents[0], ly = Math.abs(-s * dx + c * dy) - box.halfExtents[1];
+        if (lx <= 0.0 && ly <= 0.0) return Math.max(lx, ly);
+        return Math.sqrt(Math.max(lx, 0.0) * Math.max(lx, 0.0) + Math.max(ly, 0.0) * Math.max(ly, 0.0));
     }
 
     /** The shallowest the belly front came while reaching, and the deepest lean, over a whole job. */
     static function measure(restingOn:Bool):{clearance:Float, lean:Float} {
         var scenario = RackScenario.build(restingOn);
         var body = scenario.worker.body;
-        var rack = {center: [scenario.partStart[0], scenario.partStart[1]], half: [0.2, 0.2]};
-        var table = {center: [scenario.partStart[0] + 1.0, scenario.partStart[1]], half: [0.2, 0.2]};
         var clearance = Math.POSITIVE_INFINITY, lean = 0.0, ticks = 0;
         while (!scenario.worker.currentJobDone() && ticks++ < 900) {
             scenario.tick();
@@ -32,7 +32,7 @@ class TorsoClearanceTests {
                 continue;
             var belly = body.character.pose.bonePosition(HumanBone.Spine);
             var front = body.toWorld([belly[0] + BELLY_FRONT, belly[1], belly[2]]);
-            var now = Math.min(outside(front, rack.center, rack.half), outside(front, table.center, table.half));
+            var now = Math.min(outside(front, scenario.rack), outside(front, scenario.table));
             if (false) Sys.println('TC tick=$ticks step=' + scenario.worker.currentStep() + ' clearance=' + now + ' lean=' + body.character.spineLean() + ' root=' + body.rootTransform()[12] + ' bellyModel=' + belly + ' front=' + front);
             clearance = Math.min(clearance, now);
         }

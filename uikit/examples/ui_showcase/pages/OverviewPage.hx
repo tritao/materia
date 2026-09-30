@@ -93,6 +93,7 @@ class OverviewPage {
 	static function destinationStyle(explorer:UiExplorer):LayoutStyle {
 		var style = explorer.panelStyle();
 		style.width = LayoutAxis.percent(0.332);
+		// Insets are immutable, and the default is shared, so a change replaces the value.
 		style.padding = new Insets(16.0, style.padding.top, 16.0, style.padding.bottom);
 		return style;
 	}
