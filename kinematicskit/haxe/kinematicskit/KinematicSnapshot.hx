@@ -49,16 +49,16 @@ class KinematicSnapshot {
       var parentOffset = model.jointParent[joint] * 7;
       var childOffset = model.jointChild[joint] * 7;
       // scratch[0..6]: world joint frame; scratch[7..13]: motion; scratch[14..20]: frame after motion.
-      compose(poses, parentOffset, parentTJoint, joint * 7, scratch, 0);
+      FlatTransform.compose(poses, parentOffset, parentTJoint, joint * 7, scratch, 0);
       var kind = model.jointKind[joint];
       if (kind == JointKind.Fixed) {
-        compose(scratch, 0, jointTChild, joint * 7, poses, childOffset);
+        FlatTransform.compose(scratch, 0, jointTChild, joint * 7, poses, childOffset);
         continue;
       }
       var a = joint * 3;
       var ax = jointAxis[a], ay = jointAxis[a + 1], az = jointAxis[a + 2];
       origins[a] = scratch[0]; origins[a + 1] = scratch[1]; origins[a + 2] = scratch[2];
-      rotate(scratch, 0, ax, ay, az, axes, a);
+      FlatTransform.rotate(scratch, 0, ax, ay, az, axes, a);
       var value = values[joint];
       if (kind == JointKind.Revolute) {
         var s = Math.sin(value * 0.5);
@@ -68,8 +68,8 @@ class KinematicSnapshot {
         scratch[7] = ax * value; scratch[8] = ay * value; scratch[9] = az * value;
         scratch[10] = 0.0; scratch[11] = 0.0; scratch[12] = 0.0; scratch[13] = 1.0;
       }
-      compose(scratch, 0, scratch, 7, scratch, 14);
-      compose(scratch, 14, jointTChild, joint * 7, poses, childOffset);
+      FlatTransform.compose(scratch, 0, scratch, 7, scratch, 14);
+      FlatTransform.compose(scratch, 14, jointTChild, joint * 7, poses, childOffset);
     }
     evaluated = true;
   }
@@ -100,8 +100,22 @@ class KinematicSnapshot {
 
   public function framePose(frame:Int):Transform {
     requireEvaluated();
-    compose(poses, model.frameBody[frame] * 7, model.frameOffset, frame * 7, scratch, 0);
+    FlatTransform.compose(poses, model.frameBody[frame] * 7, model.frameOffset, frame * 7, scratch, 0);
     return new Transform(scratch[0], scratch[1], scratch[2], scratch[3], scratch[4], scratch[5], scratch[6]);
+  }
+
+  /** Writes a body's world pose (seven floats) into `out` at `offset`. */
+  public function bodyPoseInto(body:Int, out:Array<Float>, offset:Int):Void {
+    requireEvaluated();
+    var o = body * 7;
+    for (i in 0...7) out[offset + i] = poses[o + i];
+  }
+
+  /** Writes the world pose of `body · bodyTPoint` (seven floats at `pointOffset`) into `out` at `offset`. */
+  public function attachedPoseInto(body:Int, bodyTPoint:Array<Float>, pointOffset:Int, out:Array<Float>,
+      offset:Int):Void {
+    requireEvaluated();
+    FlatTransform.compose(poses, body * 7, bodyTPoint, pointOffset, out, offset);
   }
 
   /** World origin of a movable joint's frame (its position before its own motion). */
@@ -125,7 +139,7 @@ class KinematicSnapshot {
    */
   public function frameJacobian(frame:Int, ?out:Array<Float>):Array<Float> {
     requireEvaluated();
-    compose(poses, model.frameBody[frame] * 7, model.frameOffset, frame * 7, scratch, 0);
+    FlatTransform.compose(poses, model.frameBody[frame] * 7, model.frameOffset, frame * 7, scratch, 0);
     return pointJacobian(model.frameBody[frame], scratch[0], scratch[1], scratch[2], out);
   }
 
@@ -166,36 +180,39 @@ class KinematicSnapshot {
     return result;
   }
 
+  /**
+   * As `pointJacobian`, but only for the DOFs in `layout`: writes 6 rows of
+   * `layout.width` columns into `out` (which must hold 6 x width values).
+   * Allocates nothing.
+   */
+  public function pointJacobianColumns(body:Int, px:Float, py:Float, pz:Float, layout:JacobianLayout,
+      out:Array<Float>):Void {
+    requireEvaluated();
+    var w = layout.width;
+    for (i in 0...6 * w) out[i] = 0.0;
+    for (joint in model.bodyChain[body]) {
+      var column = layout.columnOfDof[model.jointDof[joint]];
+      if (column < 0) continue;
+      var scale = model.jointScale[joint];
+      var a = joint * 3;
+      var ax = axes[a], ay = axes[a + 1], az = axes[a + 2];
+      if (model.jointKind[joint] == JointKind.Prismatic) {
+        out[column] += scale * ax;
+        out[w + column] += scale * ay;
+        out[2 * w + column] += scale * az;
+      } else {
+        var rx = px - origins[a], ry = py - origins[a + 1], rz = pz - origins[a + 2];
+        out[column] += scale * (ay * rz - az * ry);
+        out[w + column] += scale * (az * rx - ax * rz);
+        out[2 * w + column] += scale * (ax * ry - ay * rx);
+        out[3 * w + column] += scale * ax;
+        out[4 * w + column] += scale * ay;
+        out[5 * w + column] += scale * az;
+      }
+    }
+  }
+
   function requireEvaluated():Void {
     if (!evaluated) throw "Kinematic snapshot has not been evaluated";
-  }
-
-  /** `out[oi..] = a[ai..] · b[bi..]`; `out` may alias either input. */
-  static function compose(a:Array<Float>, ai:Int, b:Array<Float>, bi:Int, out:Array<Float>, oi:Int):Void {
-    var x = a[ai], y = a[ai + 1], z = a[ai + 2];
-    var qx = a[ai + 3], qy = a[ai + 4], qz = a[ai + 5], qw = a[ai + 6];
-    var bx = b[bi], by = b[bi + 1], bz = b[bi + 2];
-    var bqx = b[bi + 3], bqy = b[bi + 4], bqz = b[bi + 5], bqw = b[bi + 6];
-    var tx = 2.0 * (qy * bz - qz * by);
-    var ty = 2.0 * (qz * bx - qx * bz);
-    var tz = 2.0 * (qx * by - qy * bx);
-    out[oi] = bx + qw * tx + qy * tz - qz * ty + x;
-    out[oi + 1] = by + qw * ty + qz * tx - qx * tz + y;
-    out[oi + 2] = bz + qw * tz + qx * ty - qy * tx + z;
-    out[oi + 3] = qw * bqx + qx * bqw + qy * bqz - qz * bqy;
-    out[oi + 4] = qw * bqy - qx * bqz + qy * bqw + qz * bqx;
-    out[oi + 5] = qw * bqz + qx * bqy - qy * bqx + qz * bqw;
-    out[oi + 6] = qw * bqw - qx * bqx - qy * bqy - qz * bqz;
-  }
-
-  /** `out[oi..oi+2]` = rotation of `a[ai..]` applied to `(vx, vy, vz)`. */
-  static function rotate(a:Array<Float>, ai:Int, vx:Float, vy:Float, vz:Float, out:Array<Float>, oi:Int):Void {
-    var qx = a[ai + 3], qy = a[ai + 4], qz = a[ai + 5], qw = a[ai + 6];
-    var tx = 2.0 * (qy * vz - qz * vy);
-    var ty = 2.0 * (qz * vx - qx * vz);
-    var tz = 2.0 * (qx * vy - qy * vx);
-    out[oi] = vx + qw * tx + qy * tz - qz * ty;
-    out[oi + 1] = vy + qw * ty + qz * tx - qx * tz;
-    out[oi + 2] = vz + qw * tz + qx * ty - qy * tx;
   }
 }

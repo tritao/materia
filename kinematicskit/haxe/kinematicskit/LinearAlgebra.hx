@@ -28,47 +28,70 @@ class LinearAlgebra {
     }
   }
 
+  /** `A = Jᵀ J` and `b = Jᵀ e` for a dense `rows` x `width` matrix; same summation order as `normalEquations`. */
+  public static function normalEquationsDense(jacobian:Array<Float>, rows:Int, width:Int, residual:Array<Float>,
+      normal:Array<Float>, rhs:Array<Float>):Void {
+    for (i in 0...width) {
+      for (j in 0...width) {
+        var sum = 0.0;
+        for (k in 0...rows) sum += jacobian[k * width + i] * jacobian[k * width + j];
+        normal[i * width + j] = sum;
+      }
+      var sum = 0.0;
+      for (k in 0...rows) sum += jacobian[k * width + i] * residual[k];
+      rhs[i] = sum;
+    }
+  }
+
+  /**
+   * As `solve`, but destroys `a` and `b` and writes the answer into `x`
+   * instead of allocating. Returns false where `solve` returns null.
+   */
+  public static function solveInPlace(a:Array<Float>, b:Array<Float>, n:Int, x:Array<Float>,
+      pivotTolerance:Float):Bool {
+    for (col in 0...n) {
+      var pivotRow = col;
+      var pivotValue = Math.abs(a[col * n + col]);
+      for (row in (col + 1)...n) if (Math.abs(a[row * n + col]) > pivotValue) {
+        pivotRow = row;
+        pivotValue = Math.abs(a[row * n + col]);
+      }
+      if (!Math.isFinite(pivotValue) || pivotValue < pivotTolerance) return false;
+      if (pivotRow != col) {
+        for (k in 0...n) {
+          var swap = a[col * n + k]; a[col * n + k] = a[pivotRow * n + k]; a[pivotRow * n + k] = swap;
+        }
+        var swapValue = b[col]; b[col] = b[pivotRow]; b[pivotRow] = swapValue;
+      }
+      var pivot = a[col * n + col];
+      for (row in (col + 1)...n) {
+        var factor = a[row * n + col] / pivot;
+        if (factor == 0.0) continue;
+        for (k in col...n) a[row * n + k] -= factor * a[col * n + k];
+        b[row] -= factor * b[col];
+      }
+    }
+    var row = n - 1;
+    while (row >= 0) {
+      var sum = b[row];
+      for (k in (row + 1)...n) sum -= a[row * n + k] * x[k];
+      x[row] = sum / a[row * n + row];
+      if (!Math.isFinite(x[row])) return false;
+      row--;
+    }
+    return true;
+  }
+
   /**
    * Solves `A x = b` (`n` square, row-major) by Gaussian elimination with
    * partial pivoting. `A` and `b` are left unchanged. Returns null when a
    * pivot is below `pivotTolerance` or not finite, or the result is not finite.
    */
   public static function solve(a:Array<Float>, b:Array<Float>, n:Int, ?pivotTolerance:Float = 1e-15):Null<Array<Float>> {
-    var m = a.copy();
-    var v = b.copy();
-    for (col in 0...n) {
-      var pivotRow = col;
-      var pivotValue = Math.abs(m[col * n + col]);
-      for (row in (col + 1)...n) if (Math.abs(m[row * n + col]) > pivotValue) {
-        pivotRow = row;
-        pivotValue = Math.abs(m[row * n + col]);
-      }
-      if (!Math.isFinite(pivotValue) || pivotValue < pivotTolerance) return null;
-      if (pivotRow != col) {
-        for (k in 0...n) {
-          var swap = m[col * n + k]; m[col * n + k] = m[pivotRow * n + k]; m[pivotRow * n + k] = swap;
-        }
-        var swapValue = v[col]; v[col] = v[pivotRow]; v[pivotRow] = swapValue;
-      }
-      var pivot = m[col * n + col];
-      for (row in (col + 1)...n) {
-        var factor = m[row * n + col] / pivot;
-        if (factor == 0.0) continue;
-        for (k in col...n) m[row * n + k] -= factor * m[col * n + k];
-        v[row] -= factor * v[col];
-      }
-    }
     var x = [for (_ in 0...n) 0.0];
-    var row = n - 1;
-    while (row >= 0) {
-      var sum = v[row];
-      for (k in (row + 1)...n) sum -= m[row * n + k] * x[k];
-      x[row] = sum / m[row * n + row];
-      if (!Math.isFinite(x[row])) return null;
-      row--;
-    }
-    return x;
+    return solveInPlace(a.copy(), b.copy(), n, x, pivotTolerance) ? x : null;
   }
+
 
   /**
    * One damped least-squares step: `(JᵀJ + λ²I) Δ = Jᵀ e` over the selected
@@ -113,10 +136,10 @@ class LinearAlgebra {
     return row;
   }
 
-  public static function norm(values:Array<Float>, ?count:Int = -1):Float {
-    var n = count < 0 ? values.length : count;
+  /** Euclidean norm of the first `count` values (required, not optional: an optional Int is boxed per call). */
+  public static function norm(values:Array<Float>, count:Int):Float {
     var sum = 0.0;
-    for (i in 0...n) sum += values[i] * values[i];
+    for (i in 0...count) sum += values[i] * values[i];
     return Math.sqrt(sum);
   }
 }

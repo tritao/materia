@@ -272,10 +272,8 @@ Do:
   problem hands them a column map); snapshots may skip joints that no task
   depends on. Change the `KinematicTask` interface now, while it has few
   implementations.
-- **Cache compiled assembly models.** `AssemblyState` compiles a model on
-  every construction, and the app builds a candidate state per joint edit.
-  Cache the `AssemblyKinematics` per flattened definition (models are
-  immutable, so sharing is safe); measure an edit before and after.
+- ~~Cache compiled assembly models.~~ Measured instead (K2 log): compiling
+  is ~4% of `AssemblyState` construction; not worth a cache.
 
 Tests:
 - Dual-arm fixture reaches two targets in one solve; each arm alone matches
@@ -285,7 +283,6 @@ Tests:
 - A 200-joint assembly solving one 3-DOF linkage: the Jacobian workspace is
   sized by the active DOFs, and the solve time does not grow with the
   unrelated joints.
-- Repeated `AssemblyState` construction for one definition compiles once.
 
 ## K3 — Native QP backend (Lane D D1–D3, rehomed here)
 
@@ -428,3 +425,41 @@ coordinates; for a running robot the target goes through MotionKit.
 - Acceptance: kit tests (clean build); RobotKit world tests (4773
   assertions); CadKit `HaxeonSmoke` with `AssemblyLoopSmoke`; MachineKit
   smoke; MotionKit (6723); cadbridge (129).
+
+### K2 — Active columns, allocation-free iterations, several targets (2026-09-30)
+
+- **Active-column Jacobians.** `JacobianLayout` (one column per active DOF)
+  is owned by `KinematicProblem`; `KinematicTask.evaluate` now takes it and
+  writes `layout.width` columns. `KinematicSnapshot.pointJacobianColumns`
+  only visits the body's ancestor joints that have a column. A four-bar
+  solved inside a 203-DOF model uses a 5 x 2 Jacobian and gives the same
+  answer and iteration count as the four-bar alone.
+- **Zero allocation per iteration.** `FlatTransform` (shared flat-array
+  transform arithmetic), `Rotations` writing into caller arrays,
+  `SolverWorkspace` (buffers and snapshot sized per problem shape, reused
+  across solves; both solvers take one optionally), in-place
+  `LinearAlgebra.solveInPlace` / `normalEquationsDense`. Tested with
+  `hl.Gc.totalAllocated()`: a 60-iteration solve allocates exactly as much
+  as a 10-iteration one, for DLS (frame + posture tasks) and LM (closure).
+  Note for haxeon/HashLink code: an optional `Int`/`Float` parameter is boxed
+  per call, so hot helpers take required parameters (`LinearAlgebra.norm`).
+- **Several targets and DOF selection.** `KinematicProblem.setActiveJoints`
+  (by joint ID). Dual-arm fixture: both hands in one solve with a shared
+  torso; one arm alone leaves the torso and the other arm at the seed.
+- **`LookAtTask`**: a frame axis points at a world point (2 rows; the line of
+  sight's own motion is in the Jacobian). Fixture: a hand holds its height
+  while its X axis looks at a part.
+- **Editor preview API**: nothing new was needed. Solvers never write back
+  (KK-D6), `FrameTask.setTarget` / `LookAtTask.setTarget` move targets
+  without rebuilding the problem, and a reused `SolverWorkspace` makes a
+  per-frame solve allocation-free after warm-up.
+- **Model caching dropped after measuring:** on the excavator (13
+  occurrences, 16 joints) `AssemblyState` construction takes ~2.2 ms, of
+  which compiling the kinematic model is ~87 µs (4%) and FK ~14 µs; the rest
+  is definition validation and flattening, a CadKit concern outside this plan.
+- Parity harnesses rerun after the refactor: unchanged from K1 (IK `q`
+  within 5e-14, identical iterations; loop solver identical statuses,
+  iterations and DOF counts).
+- Acceptance (clean Haxe outputs): kit tests (159 assertions); RobotKit
+  world tests (4773); CadKit `HaxeonSmoke` incl. `AssemblyLoopSmoke`;
+  MachineKit smoke; MotionKit (6723); cadbridge (129).

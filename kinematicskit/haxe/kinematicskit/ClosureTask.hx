@@ -20,6 +20,9 @@ class ClosureTask implements KinematicTask {
   final rows:Int;
   final jacobianA:Array<Float> = [];
   final jacobianB:Array<Float> = [];
+  /** Pose A (0..6), pose B (7..13), axis A (14..16), axis B (17..19), rotation vector (20..22),
+      basis (23..28), per-column temporaries (29..34). */
+  final scratch:Array<Float> = [for (_ in 0...35) 0.0];
   var lastPositionError = 0.0;
   var lastOrientationError = 0.0;
 
@@ -46,91 +49,102 @@ class ClosureTask implements KinematicTask {
   public function satisfied():Bool
     return lastPositionError <= positionTolerance && lastOrientationError <= angularTolerance;
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, residual:Array<Float>,
-      jacobian:Array<Float>, row:Int):Void {
-    var n = model.dofCount();
+  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
+      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+    var w = layout.width;
+    if (jacobianA.length < 6 * w) { jacobianA.resize(6 * w); jacobianB.resize(6 * w); }
     var frameA = model.closureFrameA[closure], frameB = model.closureFrameB[closure];
-    var first = snapshot.framePose(frameA), second = snapshot.framePose(frameB);
-    snapshot.frameJacobian(frameA, jacobianA);
-    snapshot.frameJacobian(frameB, jacobianB);
-    var ax = model.closureAxis[closure * 3], ay = model.closureAxis[closure * 3 + 1], az = model.closureAxis[closure * 3 + 2];
-    var axisA = first.transformVector(ax, ay, az), axisB = second.transformVector(ax, ay, az);
-    var dx = second.x - first.x, dy = second.y - first.y, dz = second.z - first.z;
+    var bodyA = model.frameBody[frameA], bodyB = model.frameBody[frameB];
+    var s = scratch;
+    snapshot.attachedPoseInto(bodyA, model.frameOffset, frameA * 7, s, 0);
+    snapshot.attachedPoseInto(bodyB, model.frameOffset, frameB * 7, s, 7);
+    snapshot.pointJacobianColumns(bodyA, s[0], s[1], s[2], layout, jacobianA);
+    snapshot.pointJacobianColumns(bodyB, s[7], s[8], s[9], layout, jacobianB);
+    var c3 = closure * 3;
+    FlatTransform.rotate(s, 0, model.closureAxis[c3], model.closureAxis[c3 + 1], model.closureAxis[c3 + 2], s, 14);
+    FlatTransform.rotate(s, 7, model.closureAxis[c3], model.closureAxis[c3 + 1], model.closureAxis[c3 + 2], s, 17);
+    var dx = s[7] - s[0], dy = s[8] - s[1], dz = s[9] - s[2];
     var p = 1.0 / positionTolerance, g = 1.0 / angularTolerance;
     var r = row;
     switch kind {
       case ClosureKind.Fixed:
         lastPositionError = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        r = positionRows(residual, jacobian, r, n, [dx, dy, dz], p);
-        var phi = Rotations.relativeRotationVector(first, second);
-        lastOrientationError = Math.sqrt(phi.x * phi.x + phi.y * phi.y + phi.z * phi.z);
+        r = positionRows(residual, jacobian, r, w, dx, dy, dz, p);
+        Rotations.relativeRotationVector(s, 0, s, 7, s, 20);
+        var phx = s[20], phy = s[21], phz = s[22];
+        lastOrientationError = Math.sqrt(phx * phx + phy * phy + phz * phz);
         // dφ = J_l⁻¹(φ) · R_Aᵀ (ω_B − ω_A), one column at a time.
-        var inverseA = new Transform(0.0, 0.0, 0.0, -first.qx, -first.qy, -first.qz, first.qw);
-        for (c in 0...n) {
-          var local = inverseA.transformVector(jacobianB[3 * n + c] - jacobianA[3 * n + c],
-            jacobianB[4 * n + c] - jacobianA[4 * n + c], jacobianB[5 * n + c] - jacobianA[5 * n + c]);
-          var d = Rotations.inverseLeftJacobian(phi, local);
-          jacobian[r * n + c] = g * d.x;
-          jacobian[(r + 1) * n + c] = g * d.y;
-          jacobian[(r + 2) * n + c] = g * d.z;
+        for (c in 0...w) {
+          FlatTransform.rotateInverse(s, 0, jacobianB[3 * w + c] - jacobianA[3 * w + c],
+            jacobianB[4 * w + c] - jacobianA[4 * w + c], jacobianB[5 * w + c] - jacobianA[5 * w + c], s, 29);
+          Rotations.inverseLeftJacobian(phx, phy, phz, s[29], s[30], s[31], s, 32);
+          jacobian[r * w + c] = g * s[32];
+          jacobian[(r + 1) * w + c] = g * s[33];
+          jacobian[(r + 2) * w + c] = g * s[34];
         }
-        residual[r] = -g * phi.x; residual[r + 1] = -g * phi.y; residual[r + 2] = -g * phi.z;
-        r += 3;
+        residual[r] = -g * phx; residual[r + 1] = -g * phy; residual[r + 2] = -g * phz;
       case ClosureKind.Revolute:
         lastPositionError = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        r = positionRows(residual, jacobian, r, n, [dx, dy, dz], p);
-        lastOrientationError = axisAngle(axisA, axisB);
-        axisRows(residual, jacobian, r, n, axisA, axisB, g);
+        r = positionRows(residual, jacobian, r, w, dx, dy, dz, p);
+        lastOrientationError = axisAngle();
+        axisRows(residual, jacobian, r, w, g);
       default: // Prismatic
-        var along = dx * axisA.x + dy * axisA.y + dz * axisA.z;
-        var basis = Rotations.perpendicularBasis(axisA.x, axisA.y, axisA.z);
+        var ax = s[14], ay = s[15], az = s[16];
+        var along = dx * ax + dy * ay + dz * az;
+        Rotations.perpendicularBasis(ax, ay, az, s, 23);
         var squared = 0.0;
-        for (u in basis) {
-          var transverse = dx * u.x + dy * u.y + dz * u.z;
+        for (k in 0...2) {
+          var ux = s[23 + 3 * k], uy = s[24 + 3 * k], uz = s[25 + 3 * k];
+          var transverse = dx * ux + dy * uy + dz * uz;
           squared += transverse * transverse;
           residual[r] = -p * transverse;
           // d(d·u) ≈ u·(v_B − v_A) − along · (a × u)·ω_A, since u stays perpendicular to a.
-          var cx = axisA.y * u.z - axisA.z * u.y, cy = axisA.z * u.x - axisA.x * u.z, cz = axisA.x * u.y - axisA.y * u.x;
-          for (c in 0...n) {
-            var linear = u.x * (jacobianB[c] - jacobianA[c]) + u.y * (jacobianB[n + c] - jacobianA[n + c]) +
-              u.z * (jacobianB[2 * n + c] - jacobianA[2 * n + c]);
-            var turning = cx * jacobianA[3 * n + c] + cy * jacobianA[4 * n + c] + cz * jacobianA[5 * n + c];
-            jacobian[r * n + c] = p * (linear - along * turning);
+          var cx = ay * uz - az * uy, cy = az * ux - ax * uz, cz = ax * uy - ay * ux;
+          for (c in 0...w) {
+            var linear = ux * (jacobianB[c] - jacobianA[c]) + uy * (jacobianB[w + c] - jacobianA[w + c]) +
+              uz * (jacobianB[2 * w + c] - jacobianA[2 * w + c]);
+            var turning = cx * jacobianA[3 * w + c] + cy * jacobianA[4 * w + c] + cz * jacobianA[5 * w + c];
+            jacobian[r * w + c] = p * (linear - along * turning);
           }
           r++;
         }
         lastPositionError = Math.sqrt(squared);
-        lastOrientationError = axisAngle(axisA, axisB);
-        axisRows(residual, jacobian, r, n, axisA, axisB, g);
+        lastOrientationError = axisAngle();
+        axisRows(residual, jacobian, r, w, g);
     }
   }
 
   /** Rows for `d = pB − pA`: residual `−d`, Jacobian `v_B − v_A`. */
-  function positionRows(residual:Array<Float>, jacobian:Array<Float>, row:Int, n:Int, d:Array<Float>,
+  function positionRows(residual:Array<Float>, jacobian:Array<Float>, row:Int, w:Int, dx:Float, dy:Float, dz:Float,
       scale:Float):Int {
-    for (axis in 0...3) {
-      residual[row] = -scale * d[axis];
-      for (c in 0...n) jacobian[row * n + c] = scale * (jacobianB[axis * n + c] - jacobianA[axis * n + c]);
-      row++;
-    }
-    return row;
+    residual[row] = -scale * dx;
+    residual[row + 1] = -scale * dy;
+    residual[row + 2] = -scale * dz;
+    for (axis in 0...3) for (c in 0...w)
+      jacobian[(row + axis) * w + c] = scale * (jacobianB[axis * w + c] - jacobianA[axis * w + c]);
+    return row + 3;
   }
 
   /** B's axis components across A's axis (sign-corrected so anti-parallel also closes). */
-  function axisRows(residual:Array<Float>, jacobian:Array<Float>, row:Int, n:Int, a:Vector3, b:Vector3,
-      scale:Float):Void {
-    var sign = a.x * b.x + a.y * b.y + a.z * b.z < 0 ? -1.0 : 1.0;
-    for (u in Rotations.perpendicularBasis(a.x, a.y, a.z)) {
-      residual[row] = -scale * sign * (b.x * u.x + b.y * u.y + b.z * u.z);
+  function axisRows(residual:Array<Float>, jacobian:Array<Float>, row:Int, w:Int, scale:Float):Void {
+    var s = scratch;
+    var ax = s[14], ay = s[15], az = s[16], bx = s[17], by = s[18], bz = s[19];
+    var sign = ax * bx + ay * by + az * bz < 0 ? -1.0 : 1.0;
+    Rotations.perpendicularBasis(ax, ay, az, s, 23);
+    for (k in 0...2) {
+      var ux = s[23 + 3 * k], uy = s[24 + 3 * k], uz = s[25 + 3 * k];
+      residual[row] = -scale * sign * (bx * ux + by * uy + bz * uz);
       // d(b·u) ≈ (b × u)·(ω_B − ω_A) near closure.
-      var cx = b.y * u.z - b.z * u.y, cy = b.z * u.x - b.x * u.z, cz = b.x * u.y - b.y * u.x;
-      for (c in 0...n)
-        jacobian[row * n + c] = scale * sign * (cx * (jacobianB[3 * n + c] - jacobianA[3 * n + c]) +
-          cy * (jacobianB[4 * n + c] - jacobianA[4 * n + c]) + cz * (jacobianB[5 * n + c] - jacobianA[5 * n + c]));
+      var cx = by * uz - bz * uy, cy = bz * ux - bx * uz, cz = bx * uy - by * ux;
+      for (c in 0...w)
+        jacobian[row * w + c] = scale * sign * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
+          cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
       row++;
     }
   }
 
-  static function axisAngle(a:Vector3, b:Vector3):Float
-    return Math.acos(Math.min(1.0, Math.max(-1.0, Math.abs(a.x * b.x + a.y * b.y + a.z * b.z))));
+  function axisAngle():Float {
+    var s = scratch;
+    return Math.acos(Math.min(1.0, Math.max(-1.0, Math.abs(s[14] * s[17] + s[15] * s[18] + s[16] * s[19]))));
+  }
 }

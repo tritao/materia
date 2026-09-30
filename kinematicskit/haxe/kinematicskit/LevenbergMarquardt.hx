@@ -18,31 +18,29 @@ package kinematicskit;
  */
 class LevenbergMarquardt {
   public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
-      ?initialDamping:Float = 1e-3, ?rankTolerance:Float = 1e-8, ?translationScale:Float = 1.0):KinematicSolution {
+      ?initialDamping:Float = 1e-3, ?rankTolerance:Float = 1e-8, ?translationScale:Float = 1.0,
+      ?workspace:SolverWorkspace):KinematicSolution {
     if (problem == null || seed == null || seed.model != problem.model)
       throw "Levenberg-Marquardt requires a problem and a seed state of its model";
     if (maxIterations <= 0 || !(initialDamping > 0.0) || !Math.isFinite(initialDamping) ||
         !(rankTolerance > 0.0) || !(translationScale > 0.0) || !Math.isFinite(translationScale))
       throw "Levenberg-Marquardt settings must be finite and positive";
     var model = problem.model;
-    var n = model.dofCount();
+    var work = workspace == null ? new SolverWorkspace() : workspace;
+    work.prepare(problem);
     var rows = problem.rowCount();
-    var active = problem.activeDofs();
+    var active = problem.layout().dofs;
     var count = active.length;
-    var scales = [for (dof in active) model.dofIsAngular(dof) ? 1.0 : translationScale];
-    var residual = SolverSupport.workspace(rows);
-    var jacobian = SolverSupport.workspace(rows * n);
-    var scaled = SolverSupport.workspace(rows * count);
-    var normal = SolverSupport.workspace(count * count);
-    var rhs = SolverSupport.workspace(count);
-    var columns = [for (j in 0...count) j];
-    var snapshot = new KinematicSnapshot(model);
+    var scales = work.scales, residual = work.residual, jacobian = work.jacobian, scaled = work.scaled;
+    var normal = work.normal, rhs = work.rhs, delta = work.delta, accepted = work.accepted;
+    for (j in 0...count) scales[j] = model.dofIsAngular(active[j]) ? 1.0 : translationScale;
+    var snapshot = work.snapshot;
 
     var state = seed.copy();
     problem.evaluate(state, snapshot, residual, jacobian);
     var converged = problem.satisfied();
     var currentNorm = LinearAlgebra.norm(residual, rows);
-    var accepted = [for (dof in active) state.q[dof]];
+    for (j in 0...count) accepted[j] = state.q[active[j]];
     var damping = initialDamping;
     var iterations = 0;
     var limitStalled = false;
@@ -51,18 +49,17 @@ class LevenbergMarquardt {
       limitStalled = false;
       iterations++;
       // The residual and Jacobian always describe the last accepted state here.
-      for (k in 0...rows) for (j in 0...count) scaled[k * count + j] = jacobian[k * n + active[j]] * scales[j];
-      LinearAlgebra.normalEquations(scaled, rows, count, columns, residual, normal, rhs);
+      for (k in 0...rows) for (j in 0...count) scaled[k * count + j] = jacobian[k * count + j] * scales[j];
+      LinearAlgebra.normalEquationsDense(scaled, rows, count, residual, normal, rhs);
       for (j in 0...count) normal[j * count + j] += damping * Math.max(normal[j * count + j], 1e-12);
-      var delta = LinearAlgebra.solve(normal, rhs, count, 1e-30);
-      if (delta == null) {
+      if (!LinearAlgebra.solveInPlace(normal, rhs, count, delta, 1e-30)) {
         damping = Math.min(1e16, damping * 10);
         if (damping >= 1e16) { exhausted = true; break; }
         continue;
       }
 
       var maxDelta = 0.0;
-      for (value in delta) maxDelta = Math.max(maxDelta, Math.abs(value));
+      for (j in 0...count) maxDelta = Math.max(maxDelta, Math.abs(delta[j]));
       var stepFactor = maxDelta > 1 ? 1 / maxDelta : 1.0;
       var moved = false;
       var outwardAtLimit = false;
@@ -103,11 +100,10 @@ class LevenbergMarquardt {
     }
 
     if (problem.satisfied())
-      return SolverSupport.finish(problem, state, snapshot, residual, jacobian, KinematicStatus.Converged,
-        iterations, rankTolerance, scales);
+      return SolverSupport.finish(problem, state, work, KinematicStatus.Converged, iterations, rankTolerance, true);
     // Stationary test on the scaled gradient Jᵀe at the final state.
-    for (k in 0...rows) for (j in 0...count) scaled[k * count + j] = jacobian[k * n + active[j]] * scales[j];
-    LinearAlgebra.normalEquations(scaled, rows, count, columns, residual, normal, rhs);
+    for (k in 0...rows) for (j in 0...count) scaled[k * count + j] = jacobian[k * count + j] * scales[j];
+    LinearAlgebra.normalEquationsDense(scaled, rows, count, residual, normal, rhs);
     var gradientNorm = LinearAlgebra.norm(rhs, count);
     var jacobianNorm = LinearAlgebra.norm(scaled, rows * count);
     var threshold = 1e-10 * (1 + jacobianNorm * LinearAlgebra.norm(residual, rows));
@@ -121,6 +117,6 @@ class LevenbergMarquardt {
     }
     var status = limitStalled || blocked ? KinematicStatus.LimitBlocked
       : stationary || exhausted ? KinematicStatus.Conflicting : KinematicStatus.IterationLimit;
-    return SolverSupport.finish(problem, state, snapshot, residual, jacobian, status, iterations, rankTolerance, scales);
+    return SolverSupport.finish(problem, state, work, status, iterations, rankTolerance, true);
   }
 }

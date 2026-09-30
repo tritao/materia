@@ -3,6 +3,9 @@ import kinematicskit.ClosureTask;
 import kinematicskit.DampedLeastSquares;
 import kinematicskit.FrameOrientation;
 import kinematicskit.FrameTask;
+import kinematicskit.JacobianLayout;
+import kinematicskit.LookAtTask;
+import kinematicskit.SolverWorkspace;
 import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicStatus;
 import kinematicskit.LevenbergMarquardt;
@@ -32,6 +35,10 @@ class KinematicsKitTests {
     testPostureResolvesRedundancy();
     testClosureJacobiansMatchFiniteDifferences();
     testFourBarClosure();
+    testDualArmTargets();
+    testCameraLooksAtPart();
+    testLargeAssemblyUsesActiveColumns();
+    testNoAllocationPerIteration();
     Sys.println('KinematicsKit tests passed ($assertions assertions)');
   }
 
@@ -403,8 +410,9 @@ class KinematicsKitTests {
       var residual = [for (_ in 0...rows) 0.0], jacobian = [for (_ in 0...rows * n) 0.0];
       var snapshot = new KinematicSnapshot(model);
       var state = new KinematicState(model, q);
+      var layout = JacobianLayout.all(model);
       snapshot.evaluate(state);
-      task.evaluate(state, snapshot, residual, jacobian, 0);
+      task.evaluate(state, snapshot, layout, residual, jacobian, 0);
       var plus = residual.copy(), minus = residual.copy(), scratch = jacobian.copy();
       // Rows whose Jacobian is exact away from closure: all six for Fixed, the three position rows for Revolute.
       var exactRows = kind == ClosureKind.Fixed ? 6 : kind == ClosureKind.Revolute ? 3 : 0;
@@ -413,8 +421,8 @@ class KinematicsKitTests {
         var qp = q.copy(); qp[dof] += eps;
         var qm = q.copy(); qm[dof] -= eps;
         var sp = new KinematicState(model, qp), sm = new KinematicState(model, qm);
-        snapshot.evaluate(sp); task.evaluate(sp, snapshot, plus, scratch, 0);
-        snapshot.evaluate(sm); task.evaluate(sm, snapshot, minus, scratch, 0);
+        snapshot.evaluate(sp); task.evaluate(sp, snapshot, layout, plus, scratch, 0);
+        snapshot.evaluate(sm); task.evaluate(sm, snapshot, layout, minus, scratch, 0);
         for (row in 0...exactRows)
           check(near(-(plus[row] - minus[row]) / (2 * eps), jacobian[row * n + dof], 1e-6),
             'closure ${Std.string(kind)} row $row DOF $dof Jacobian matches central differences');
@@ -478,6 +486,139 @@ class KinematicsKitTests {
     check(needs < 1.8, 'fixture sanity: the closed rocker angle $needs is below the limit');
     check(blocked.status == KinematicStatus.LimitBlocked && blocked.limitHits.indexOf(limited.dofIndex("rocker")) >= 0,
       "a limit in the way reports LimitBlocked and the limited DOF");
+  }
+
+  /** Torso yaw, then two 3-joint planar-ish arms offset ±0.3 along Y, with hand frames. */
+  static function dualArm():KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("base"), torso = builder.addBody("torso");
+    var z = new Vector3(0, 0, 1), y = new Vector3(0, 1, 0);
+    builder.addJoint("torso", JointKind.Revolute, base, torso, Transform.translation(0, 0, 1.0), Transform.identity(), z,
+      -1.5, 1.5);
+    for (side in ["left", "right"]) {
+      var previous = torso;
+      var offsets = [Transform.translation(0, side == "left" ? 0.3 : -0.3, 0.2), Transform.translation(0.3, 0, 0),
+        Transform.translation(0.25, 0, 0)];
+      var axes = [z, y, y];
+      for (i in 0...3) {
+        var body = builder.addBody('${side}_$i');
+        builder.addJoint('${side}_$i', JointKind.Revolute, previous, body, offsets[i], Transform.identity(), axes[i], -2.5, 2.5);
+        previous = body;
+      }
+      builder.addFrame('${side}_hand', previous, Transform.translation(0.2, 0, 0));
+    }
+    return builder.build();
+  }
+
+  static function testDualArmTargets():Void {
+    var model = dualArm();
+    var truth = new KinematicState(model, [0.2, 0.4, -0.5, 0.9, -0.3, 0.6, -0.8]);
+    var snapshot = KinematicSnapshot.of(truth);
+    var left = model.frameIndex("left_hand"), right = model.frameIndex("right_hand");
+    var leftGoal = snapshot.framePose(left), rightGoal = snapshot.framePose(right);
+    var position = FrameTask.ALL_AXES;
+    var seed = new KinematicState(model, [0.1, 0.3, -0.3, 0.7, -0.2, 0.4, -0.6]);
+
+    // Both hands in one solve, torso shared.
+    var both = LevenbergMarquardt.solve(new KinematicProblem(model)
+      .add(FrameTask.atFrame(model, left, leftGoal, 1e-8, 1e-8, null, position, FrameOrientation.Free))
+      .add(FrameTask.atFrame(model, right, rightGoal, 1e-8, 1e-8, null, position, FrameOrientation.Free)), seed);
+    check(both.converged() && both.tasks[0].satisfied && both.tasks[1].satisfied, "one solve reaches both hand targets");
+
+    // The arms alone, torso held: the right arm's solve never touches the left arm or torso.
+    var rightOnly = LevenbergMarquardt.solve(new KinematicProblem(model)
+      .setActiveJoints(["right_0", "right_1", "right_2"])
+      .add(FrameTask.atFrame(model, right, rightGoal, 1e-8, 1e-8, null, position, FrameOrientation.Free)),
+      new KinematicState(model, [0.2, 0.4, -0.5, 0.9, -0.2, 0.4, -0.6]));
+    check(rightOnly.converged() && rightOnly.state.q[0] == 0.2 && rightOnly.state.q[1] == 0.4,
+      "an arm solved alone leaves the torso and the other arm at the seed");
+    check(rightOnly.freeDofs == 0, "three joints fully used by a position target");
+    rejects(() -> new KinematicProblem(model).setActiveJoints(["nope"]), "unknown joint IDs are rejected");
+  }
+
+  static function testCameraLooksAtPart():Void {
+    var model = dualArm();
+    var left = model.frameIndex("left_hand");
+    var part = new Vector3(0.6, 0.8, 0.9);
+    // Keep the hand at a height of 1.2 while its X axis looks at the part.
+    var hold = FrameTask.atFrame(model, left, Transform.translation(0, 0, 1.2), 1e-8, 1e-8, null, FrameTask.AXIS_Z,
+      FrameOrientation.Free);
+    var look = LookAtTask.atFrame(model, left, new Vector3(1, 0, 0), part, 1e-8);
+    var solution = LevenbergMarquardt.solve(new KinematicProblem(model)
+      .setActiveJoints(["torso", "left_0", "left_1", "left_2"]).add(hold).add(look),
+      new KinematicState(model, [0.1, 0.3, -0.3, 0.7, 0.0, 0.0, 0.0]));
+    var pose = KinematicSnapshot.of(solution.state).framePose(left);
+    var axis = pose.transformVector(1, 0, 0);
+    var lx = part.x - pose.x, ly = part.y - pose.y, lz = part.z - pose.z;
+    var distance = Math.sqrt(lx * lx + ly * ly + lz * lz);
+    check(solution.converged() && near(pose.z, 1.2, 1e-7), "the hand holds its height");
+    check(near((axis.x * lx + axis.y * ly + axis.z * lz) / distance, 1.0, 1e-12), "the hand's X axis points at the part");
+  }
+
+  static function testLargeAssemblyUsesActiveColumns():Void {
+    // A four-bar next to 200 unrelated hinged plates.
+    var builder = new KinematicModelBuilder();
+    var ground = builder.addBody("ground");
+    var z = new Vector3(0.0, 0.0, 1.0);
+    for (i in 0...200) {
+      var plate = builder.addBody('plate$i');
+      builder.addJoint('plate$i', JointKind.Revolute, ground, plate, Transform.translation(10.0 + i, 0.0, 0.0),
+        Transform.identity(), z);
+    }
+    var crank = builder.addBody("crank"), coupler = builder.addBody("coupler"), rocker = builder.addBody("rocker");
+    builder.addJoint("crank", JointKind.Revolute, ground, crank, Transform.identity(), Transform.identity(), z);
+    builder.addJoint("coupler", JointKind.Revolute, crank, coupler, Transform.translation(1.0, 0.0, 0.0), Transform.identity(), z);
+    builder.addJoint("rocker", JointKind.Revolute, ground, rocker, Transform.translation(2.0, 0.0, 0.0), Transform.identity(), z);
+    var a = builder.addFrame("coupler_end", coupler, Transform.translation(2.2, 0.0, 0.0));
+    var b = builder.addFrame("rocker_end", rocker, Transform.translation(1.5, 0.0, 0.0));
+    builder.addClosure("pin", ClosureKind.Revolute, a, b, z);
+    var large = builder.build();
+    var seed = [for (_ in 0...large.dofCount()) 0.0];
+    seed[large.dofIndex("crank")] = 0.6; seed[large.dofIndex("coupler")] = 0.2; seed[large.dofIndex("rocker")] = 1.4;
+    var workspace = new SolverWorkspace();
+    var solution = LevenbergMarquardt.solve(new KinematicProblem(large).setActiveJoints(["coupler", "rocker"])
+      .add(new ClosureTask(large, 0, 1e-9, 1e-9)), new KinematicState(large, seed), 100, 1e-3, 1e-8, 1.0, workspace);
+    check(solution.converged() && solution.freeDofs == 0, "the linkage closes inside a 203-DOF model");
+    check(workspace.jacobian.length == 5 * 2, 'the Jacobian holds 5 rows x 2 active columns (${workspace.jacobian.length})');
+    var small = fourBar();
+    var reference = LevenbergMarquardt.solve(new KinematicProblem(small).setActiveJoints(["coupler", "rocker"])
+      .add(new ClosureTask(small, 0, 1e-9, 1e-9)), new KinematicState(small, [0.6, 0.2, 1.4]));
+    check(solution.state.q[large.dofIndex("rocker")] == reference.state.q[2] &&
+      solution.iterations == reference.iterations, "unrelated joints do not change the answer");
+  }
+
+  static function testNoAllocationPerIteration():Void {
+    // DLS towards an unreachable point runs its whole budget.
+    var arm = planarArm([1.0, 0.8, 0.5]);
+    var dlsProblem = new KinematicProblem(arm)
+      .add(FrameTask.atFrame(arm, arm.frameIndex("tip"), Transform.translation(10.0, 0.0, 0.0), 1e-9, 1e-9))
+      .add(new PostureTask(arm, [0.0, 0.0, 0.0], 1e-3));
+    var seed = new KinematicState(arm, [0.2, 0.3, 0.1]);
+    var workspace = new SolverWorkspace();
+    var perIteration = bytesPerIteration(maxIterations -> DampedLeastSquares.solve(dlsProblem, seed, maxIterations,
+      0.02, 1e-8, workspace).iterations);
+    check(perIteration == 0.0, 'DLS allocates nothing per iteration ($perIteration bytes)');
+
+    // LM on a four-bar whose limit stops it short of closing also runs its whole budget.
+    var limited = fourBar(1.8, 2.0);
+    var lmProblem = new KinematicProblem(limited).setActiveJoints(["coupler", "rocker"])
+      .add(new ClosureTask(limited, 0, 1e-9, 1e-9));
+    var lmSeed = new KinematicState(limited, [0.6, 0.2, 1.9]);
+    perIteration = bytesPerIteration(maxIterations -> LevenbergMarquardt.solve(lmProblem, lmSeed, maxIterations, 1e-3,
+      1e-8, 1.0, workspace).iterations);
+    check(perIteration == 0.0, 'LM allocates nothing per iteration ($perIteration bytes)');
+  }
+
+  /** Bytes allocated by a 60-iteration run beyond a 10-iteration run, per extra iteration. */
+  static function bytesPerIteration(run:Int->Int):Float {
+    run(10); run(60); // warm up (JIT, lazily sized buffers)
+    var before = hl.Gc.totalAllocated();
+    var shortIterations = run(10);
+    var middle = hl.Gc.totalAllocated();
+    var longIterations = run(60);
+    var after = hl.Gc.totalAllocated();
+    if (longIterations <= shortIterations) throw 'fixture did not run longer ($shortIterations vs $longIterations)';
+    return ((after - middle) - (middle - before)) / (longIterations - shortIterations);
   }
 
   // -- helpers ---------------------------------------------------------

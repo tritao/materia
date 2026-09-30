@@ -24,18 +24,21 @@ class PostureTask implements KinematicTask {
   public function rowCount():Int return dofCount;
   public function isSoft():Bool return true;
   public function positionError():Float return 0.0;
-  /** Euclidean distance from the targets (mixed units when DOFs mix kinds). */
+  /** Euclidean distance of the solved DOFs from their targets (mixed units when DOFs mix kinds). */
   public function orientationError():Float return lastError;
   public function satisfied():Bool return true;
 
-  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, residual:Array<Float>,
-      jacobian:Array<Float>, row:Int):Void {
+  /** Rows for DOFs outside the solve are zero: they cannot move, so they do not count. */
+  public function evaluate(state:KinematicState, snapshot:KinematicSnapshot, layout:JacobianLayout,
+      residual:Array<Float>, jacobian:Array<Float>, row:Int):Void {
+    var w = layout.width;
     var squared = 0.0;
     for (i in 0...dofCount) {
-      var e = targets[i] - state.q[i];
+      var column = layout.columnOfDof[i];
+      var e = column < 0 ? 0.0 : targets[i] - state.q[i];
       squared += e * e;
       residual[row + i] = weight * e;
-      for (c in 0...dofCount) jacobian[(row + i) * dofCount + c] = c == i ? weight : 0.0;
+      for (c in 0...w) jacobian[(row + i) * w + c] = c == column ? weight : 0.0;
     }
     lastError = Math.sqrt(squared);
   }
