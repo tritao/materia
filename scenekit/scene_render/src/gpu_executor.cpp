@@ -364,24 +364,40 @@ struct NativeKitGpuExecutor::State {
         std::size_t instance = 0;
     };
 
+    /* The pipelines of the surface, stroke and workplane passes for one sample count. */
+    struct PassPipelines {
+        nkgpu_pipeline surface{};
+        nkgpu_pipeline indexed{};
+        nkgpu_pipeline blend{};
+        nkgpu_pipeline indexed_blend{};
+        nkgpu_pipeline stroke{};
+        nkgpu_pipeline workplane{};
+    };
+
     nkgpu_renderer renderer{};
     nkgpu_shader shader{};
-    nkgpu_pipeline pipeline{};
-    nkgpu_pipeline indexed_pipeline{};
-    nkgpu_pipeline blend_pipeline{};
-    nkgpu_pipeline indexed_blend_pipeline{};
+    /* Slot 0 draws single-sample passes; slot 1 draws the multisampled capture pass. */
+    std::array<PassPipelines, 2> pipelines{};
     nkgpu_shader stroke_shader{};
-    nkgpu_pipeline stroke_pipeline{};
     nkgpu_shader pick_shader{};
     nkgpu_pipeline pick_pipeline{};
     nkgpu_shader postprocess_shader{};
     nkgpu_pipeline postprocess_pipeline{};
     nkgpu_buffer postprocess_vertex_buffer{};
     nkgpu_shader workplane_shader{};
-    nkgpu_pipeline workplane_pipeline{};
     nkgpu_buffer workplane_vertex_buffer{};
     nkgpu_image capture_color{};
     nkgpu_image capture_depth{};
+    /* The multisampled color target that resolves into capture_color, when capturing with MSAA. */
+    nkgpu_image capture_msaa_color{};
+    /* The sample count the capture targets were made for. */
+    std::uint32_t capture_samples = 1;
+    /* The sample count asked for, the count the GPU supports for it, and whether that is known. */
+    std::uint32_t requested_samples = 1;
+    std::uint32_t effective_samples = 1;
+    bool samples_resolved = false;
+    /* The sample count the slot 1 pipelines were built for. */
+    std::uint32_t msaa_pipeline_samples = 1;
     nkgpu_image postprocess_color{};
     nkgpu_sampler postprocess_sampler{};
     nkgpu_image pick_color{};
@@ -414,6 +430,15 @@ struct NativeKitGpuExecutor::State {
 
     ~State() { release_gpu(); }
 
+    void destroy_pass_pipelines(PassPipelines &set) noexcept {
+        for (auto *pipeline : {&set.surface, &set.indexed, &set.blend, &set.indexed_blend, &set.stroke,
+                               &set.workplane}) {
+            if (renderer.id && pipeline->id)
+                (void)nkgpu_pipeline_destroy(renderer, *pipeline);
+            *pipeline = {};
+        }
+    }
+
     void release_gpu() noexcept {
         for (auto &[id, resource] : geometry_resources) {
             (void)id;
@@ -442,6 +467,8 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_image_destroy(renderer, capture_color);
         if (renderer.id && capture_depth.id)
             (void)nkgpu_image_destroy(renderer, capture_depth);
+        if (renderer.id && capture_msaa_color.id)
+            (void)nkgpu_image_destroy(renderer, capture_msaa_color);
         if (renderer.id && postprocess_color.id)
             (void)nkgpu_image_destroy(renderer, postprocess_color);
         if (renderer.id && postprocess_vertex_buffer.id)
@@ -460,16 +487,8 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_image_destroy(renderer, default_image);
         if (renderer.id && default_sampler.id)
             (void)nkgpu_sampler_destroy(renderer, default_sampler);
-        if (renderer.id && pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, pipeline);
-        if (renderer.id && indexed_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, indexed_pipeline);
-        if (renderer.id && blend_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, blend_pipeline);
-        if (renderer.id && indexed_blend_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, indexed_blend_pipeline);
-        if (renderer.id && stroke_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, stroke_pipeline);
+        for (auto &set : pipelines)
+            destroy_pass_pipelines(set);
         if (renderer.id && stroke_shader.id)
             (void)nkgpu_shader_destroy(renderer, stroke_shader);
         if (renderer.id && shader.id)
@@ -484,8 +503,6 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_pipeline_destroy(renderer, postprocess_pipeline);
         if (renderer.id && postprocess_shader.id)
             (void)nkgpu_shader_destroy(renderer, postprocess_shader);
-        if (renderer.id && workplane_pipeline.id)
-            (void)nkgpu_pipeline_destroy(renderer, workplane_pipeline);
         if (renderer.id && workplane_shader.id)
             (void)nkgpu_shader_destroy(renderer, workplane_shader);
         geometry_resources.clear();
@@ -500,11 +517,6 @@ struct NativeKitGpuExecutor::State {
         plan_identity = 0;
         plan_revision = 0;
         plan_initialized = false;
-        pipeline = {};
-        indexed_pipeline = {};
-        blend_pipeline = {};
-        indexed_blend_pipeline = {};
-        stroke_pipeline = {};
         stroke_shader = {};
         shader = {};
         pick_pipeline = {};
@@ -513,10 +525,14 @@ struct NativeKitGpuExecutor::State {
         postprocess_shader = {};
         postprocess_vertex_buffer = {};
         workplane_vertex_buffer = {};
-        workplane_pipeline = {};
         workplane_shader = {};
         capture_color = {};
         capture_depth = {};
+        capture_msaa_color = {};
+        capture_samples = 1;
+        samples_resolved = false;
+        effective_samples = 1;
+        msaa_pipeline_samples = 1;
         postprocess_color = {};
         postprocess_sampler = {};
         pick_color = {};
@@ -609,10 +625,15 @@ bool set_failure(StateT &state, GpuExecutionStats &stats, nkgpu_result result) {
  * translucent surfaces never hide what lies behind them. The shader outputs
  * unpremultiplied color, hence SRC_ALPHA rather than ONE for the color factor.
  */
+/* Single-sample passes share one set of pipelines; every multisampled pass shares the other. */
+inline std::size_t pipeline_slot(std::uint32_t samples) { return samples > 1 ? 1 : 0; }
+
 template <class StateT>
-bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool blended = false) {
-    auto &pipeline = blended ? (indexed ? state.indexed_blend_pipeline : state.blend_pipeline)
-                             : (indexed ? state.indexed_pipeline : state.pipeline);
+bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool blended,
+                     std::uint32_t samples) {
+    auto &set = state.pipelines[pipeline_slot(samples)];
+    auto &pipeline = blended ? (indexed ? set.indexed_blend : set.blend)
+                             : (indexed ? set.indexed : set.surface);
     if (pipeline.id)
         return true;
 
@@ -717,53 +738,59 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool
             (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK)
             return set_failure(state, stats, result);
     }
+    if (samples > 1 && (result = nkgpu_pipeline_multisample(pipeline_builder, samples, 0)) != NKGPU_OK)
+        return set_failure(state, stats, result);
     if ((result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
 
 template <class StateT>
-bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
-    if (state.stroke_pipeline.id)
+bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples) {
+    auto &pipeline = state.pipelines[pipeline_slot(samples)].stroke;
+    if (pipeline.id)
         return true;
-    const auto sources = render_internal::stroke_shader_sources(
-        nkgpu_query_backend(state.renderer));
-    if (!sources.vertex || !sources.fragment)
-        return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
-    nkgpu_shader_builder shader_builder{};
-    auto result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
-                                     sources.fragment, &shader_builder);
-    if (result != NKGPU_OK)
-        return set_failure(state, stats, result);
-    const auto attribute = [&](std::uint32_t location, const char *name) {
-        return nkgpu_shader_attribute(shader_builder, location, name, "TEXCOORD", location);
-    };
-    if ((result = nkgpu_shader_attribute(shader_builder, 0, "start_position", "TEXCOORD", 0)) != NKGPU_OK ||
-        (result = nkgpu_shader_attribute(shader_builder, 1, "end_position", "TEXCOORD", 1)) != NKGPU_OK ||
-        (result = nkgpu_shader_attribute(shader_builder, 2, "stroke_coordinate", "TEXCOORD", 2)) != NKGPU_OK ||
-        (result = attribute(3, "transform0")) != NKGPU_OK ||
-        (result = attribute(4, "transform1")) != NKGPU_OK ||
-        (result = attribute(5, "transform2")) != NKGPU_OK ||
-        (result = attribute(6, "transform3")) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
-                                             sizeof(float) * 16)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
-                                       NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
-                                             sizeof(StrokeUniformData))) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
-                                       NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                             sizeof(float) * 4)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
-                                       NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
-                                             sizeof(ClipUniformData))) != NKGPU_OK ||
-        (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
-                                       NKGPU_UNIFORMTYPE_FLOAT4,
-                                       RenderPlan::max_clip_planes + 1)) != NKGPU_OK ||
-        (result = nkgpu_shader_end(shader_builder, &state.stroke_shader)) != NKGPU_OK)
-        return set_failure(state, stats, result);
+    nkgpu_result result = NKGPU_OK;
+    if (!state.stroke_shader.id) {
+        const auto sources = render_internal::stroke_shader_sources(
+            nkgpu_query_backend(state.renderer));
+        if (!sources.vertex || !sources.fragment)
+            return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
+        nkgpu_shader_builder shader_builder{};
+        result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
+                                         sources.fragment, &shader_builder);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+        const auto attribute = [&](std::uint32_t location, const char *name) {
+            return nkgpu_shader_attribute(shader_builder, location, name, "TEXCOORD", location);
+        };
+        if ((result = nkgpu_shader_attribute(shader_builder, 0, "start_position", "TEXCOORD", 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_attribute(shader_builder, 1, "end_position", "TEXCOORD", 1)) != NKGPU_OK ||
+            (result = nkgpu_shader_attribute(shader_builder, 2, "stroke_coordinate", "TEXCOORD", 2)) != NKGPU_OK ||
+            (result = attribute(3, "transform0")) != NKGPU_OK ||
+            (result = attribute(4, "transform1")) != NKGPU_OK ||
+            (result = attribute(5, "transform2")) != NKGPU_OK ||
+            (result = attribute(6, "transform3")) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(shader_builder, 1, NKGPU_SHADERSTAGE_VERTEX,
+                                                 sizeof(float) * 16)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 1, 0, "view_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(shader_builder, 3, NKGPU_SHADERSTAGE_VERTEX,
+                                                 sizeof(StrokeUniformData))) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 3, 0, "stroke_view_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                                 sizeof(float) * 4)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 0, 0, "stroke_color_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 0)) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform_block(shader_builder, 2, NKGPU_SHADERSTAGE_FRAGMENT,
+                                                 sizeof(ClipUniformData))) != NKGPU_OK ||
+            (result = nkgpu_shader_uniform(shader_builder, 2, 0, "clip_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4,
+                                           RenderPlan::max_clip_planes + 1)) != NKGPU_OK ||
+            (result = nkgpu_shader_end(shader_builder, &state.stroke_shader)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
 
     nkgpu_pipeline_builder pipeline_builder{};
     if ((result = nkgpu_pipeline_begin(state.renderer, state.stroke_shader, stroke_vertex_stride,
@@ -809,9 +836,11 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
     blend.src_alpha = NKGPU_BLENDFACTOR_ONE;
     blend.dst_alpha = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
     blend.op_alpha = NKGPU_BLENDOP_ADD;
+    if (samples > 1 && (result = nkgpu_pipeline_multisample(pipeline_builder, samples, 0)) != NKGPU_OK)
+        return set_failure(state, stats, result);
     if ((result = nkgpu_pipeline_depth(pipeline_builder, &depth)) != NKGPU_OK ||
         (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_end(pipeline_builder, &state.stroke_pipeline)) != NKGPU_OK)
+        (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
@@ -836,7 +865,7 @@ bool material_is_invisible(const MaterialState &state) {
 
 template <class StateT>
 bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
-                         GpuExecutionStats &stats) {
+                         std::uint32_t samples, GpuExecutionStats &stats) {
     const auto has_strokes = std::any_of(state.batches.begin(), state.batches.end(),
         [&](const auto &batch) {
             const auto found = state.geometry_resources.find(batch.key.geometry);
@@ -845,8 +874,9 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         });
     if (!has_strokes)
         return true;
-    if (!ensure_stroke_pipeline(state, stats))
+    if (!ensure_stroke_pipeline(state, stats, samples))
         return false;
+    const auto &stroke_pipeline = state.pipelines[pipeline_slot(samples)].stroke;
     const auto width = std::max(state.viewport_width, 1u);
     const auto height = std::max(state.viewport_height, 1u);
     const StrokeUniformData viewport{{static_cast<float>(width), static_cast<float>(height),
@@ -862,7 +892,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
         const auto *material = snapshot.find_material(batch.key.material);
         if (material && material_is_invisible(*material->state))
             continue;
-        auto result = nkgpu_apply_pipeline(state.renderer, state.stroke_pipeline);
+        auto result = nkgpu_apply_pipeline(state.renderer, stroke_pipeline);
         if (result == NKGPU_OK)
             result = nkgpu_apply_uniform_data(state.renderer, 1,
                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
@@ -893,7 +923,7 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnaps
 
 /* Makes the surface pipelines the scene's batches need, before a frame begins. */
 template <class StateT>
-bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot,
+bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot, std::uint32_t samples,
                               GpuExecutionStats &stats) {
     for (const auto &batch : state.batches) {
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
@@ -904,10 +934,11 @@ bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot,
                                                                  : geometry->second.vertex_count;
             const auto *material = snapshot.find_material(batch.key.material);
             const auto blended = material && material_is_blended(*material->state);
-            if (element_count && !ensure_pipeline(state, stats, geometry->second.indexed, blended))
+            if (element_count &&
+                !ensure_pipeline(state, stats, geometry->second.indexed, blended, samples))
                 return false;
         }
-        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(state, stats))
+        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(state, stats, samples))
             return false;
     }
     return true;
@@ -922,7 +953,8 @@ bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot,
 template <class StateT>
 nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
                            const ClipUniformData &clip_data, const LightingUniformData &lighting_data,
-                           GpuExecutionStats &stats) {
+                           std::uint32_t samples, GpuExecutionStats &stats) {
+    const auto &set = state.pipelines[pipeline_slot(samples)];
     const auto draw = [&](const auto &batch, std::size_t first_instance,
                           std::size_t instance_count, bool blended) -> nkgpu_result {
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
@@ -933,9 +965,8 @@ nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSna
         if (!element_count)
             return NKGPU_OK;
         const auto &pipeline =
-            blended ? (geometry->second.indexed ? state.indexed_blend_pipeline
-                                                : state.blend_pipeline)
-                    : (geometry->second.indexed ? state.indexed_pipeline : state.pipeline);
+            blended ? (geometry->second.indexed ? set.indexed_blend : set.blend)
+                    : (geometry->second.indexed ? set.indexed : set.surface);
         const auto *material = snapshot.find_material(batch.key.material);
         MaterialUniformData material_data;
         if (material) {
@@ -1192,18 +1223,31 @@ bool ensure_pick_targets(StateT &state, std::uint32_t width, std::uint32_t heigh
     return true;
 }
 
+/*
+ * The capture targets for one sample count. With more than one sample the scene
+ * renders into a multisampled color image that resolves into capture_color,
+ * which stays single-sample because it is what post-processing samples and what
+ * the caller receives.
+ */
 template <class StateT>
 bool ensure_capture_targets(StateT &state, std::uint32_t width, std::uint32_t height,
-                            GpuExecutionStats &stats) {
+                            std::uint32_t samples, GpuExecutionStats &stats) {
     if (state.capture_color.id && state.capture_depth.id && state.capture_width == width &&
-        state.capture_height == height)
+        state.capture_height == height && state.capture_samples == samples &&
+        (samples <= 1 || state.capture_msaa_color.id))
         return true;
-    if (state.capture_color.id)
-        (void)nkgpu_image_destroy(state.renderer, state.capture_color);
-    if (state.capture_depth.id)
-        (void)nkgpu_image_destroy(state.renderer, state.capture_depth);
-    state.capture_color = {};
-    state.capture_depth = {};
+    for (auto *image : {&state.capture_color, &state.capture_depth, &state.capture_msaa_color}) {
+        if (image->id)
+            (void)nkgpu_image_destroy(state.renderer, *image);
+        *image = {};
+    }
+    const auto discard_targets = [&]() {
+        for (auto *image : {&state.capture_color, &state.capture_depth, &state.capture_msaa_color}) {
+            if (image->id)
+                (void)nkgpu_image_destroy(state.renderer, *image);
+            *image = {};
+        }
+    };
 
     nkgpu_image_desc color{};
     color.struct_size = sizeof(color);
@@ -1226,17 +1270,73 @@ bool ensure_capture_targets(StateT &state, std::uint32_t width, std::uint32_t he
     depth.format = NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8;
     depth.usage = NKGPU_IMAGE_DEPTH_STENCIL;
     depth.mip_count = 1;
-    depth.sample_count = 1;
+    depth.sample_count = samples;
     depth.layer_count = 1;
     result = nkgpu_image_create_desc(state.renderer, &depth, &state.capture_depth);
     if (result != NKGPU_OK) {
-        (void)nkgpu_image_destroy(state.renderer, state.capture_color);
-        state.capture_color = {};
+        discard_targets();
         return set_failure(state, stats, result);
+    }
+
+    if (samples > 1) {
+        nkgpu_image_desc multisampled = color;
+        multisampled.usage = NKGPU_IMAGE_RENDER_TARGET;
+        multisampled.sample_count = samples;
+        result = nkgpu_image_create_desc(state.renderer, &multisampled, &state.capture_msaa_color);
+        if (result != NKGPU_OK) {
+            discard_targets();
+            return set_failure(state, stats, result);
+        }
     }
     state.capture_width = width;
     state.capture_height = height;
+    state.capture_samples = samples;
     return true;
+}
+
+/*
+ * The largest sample count up to `requested` that the GPU can render and resolve
+ * for both capture formats, or 1. Counts are powers of two.
+ */
+template <class StateT>
+std::uint32_t supported_samples(StateT &state, std::uint32_t requested) {
+    if (requested <= 1 || !state.renderer.id)
+        return 1;
+    nkgpu_features features{};
+    features.struct_size = sizeof(features);
+    nkgpu_image_format_support color{}, depth{};
+    color.struct_size = sizeof(color);
+    depth.struct_size = sizeof(depth);
+    if (nkgpu_query_features(state.renderer, &features) != NKGPU_OK ||
+        nkgpu_query_image_format_support(state.renderer, NKGPU_IMAGEFORMAT_RGBA8, &color) != NKGPU_OK ||
+        nkgpu_query_image_format_support(state.renderer, NKGPU_IMAGEFORMAT_DEPTH24_STENCIL8, &depth) !=
+            NKGPU_OK ||
+        !color.multisample || !depth.multisample)
+        return 1;
+    const auto limit = std::min(requested, features.max_samples);
+    for (const std::uint32_t candidate : {16u, 8u, 4u, 2u})
+        if (candidate <= limit)
+            return candidate;
+    return 1;
+}
+
+/* The sample count capture passes use now, resolved once per requested count and renderer. */
+template <class StateT>
+std::uint32_t resolve_samples(StateT &state) {
+    if (state.samples_resolved)
+        return state.effective_samples;
+    state.effective_samples = supported_samples(state, state.requested_samples);
+    state.samples_resolved = state.renderer.id != 0;
+    return state.effective_samples;
+}
+
+/* Drops the multisampled pipelines when they were built for another sample count. */
+template <class StateT>
+void sync_msaa_pipelines(StateT &state, std::uint32_t samples) {
+    if (samples <= 1 || state.msaa_pipeline_samples == samples)
+        return;
+    state.destroy_pass_pipelines(state.pipelines[1]);
+    state.msaa_pipeline_samples = samples;
 }
 
 template <class StateT>
@@ -1364,34 +1464,38 @@ bool ensure_postprocess_pipeline(StateT &state, GpuExecutionStats &stats) {
 }
 
 template <class StateT>
-bool ensure_workplane_pipeline(StateT &state, GpuExecutionStats &stats) {
-    if (state.workplane_pipeline.id)
+bool ensure_workplane_pipeline(StateT &state, GpuExecutionStats &stats, std::uint32_t samples) {
+    auto &pipeline = state.pipelines[pipeline_slot(samples)].workplane;
+    if (pipeline.id)
         return true;
-    const auto sources = render_internal::workplane_shader_sources(
-        nkgpu_query_backend(state.renderer));
-    if (!sources.vertex || !sources.fragment)
-        return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
-    constexpr float triangle[] = {-1.0f, -1.0f, 3.0f, -1.0f, -1.0f, 3.0f};
-    auto result = nkgpu_buffer_create(state.renderer,
-        reinterpret_cast<const std::uint8_t *>(triangle), sizeof(triangle),
-        &state.workplane_vertex_buffer);
-    if (result != NKGPU_OK)
-        return set_failure(state, stats, result);
-    nkgpu_shader_builder shader_builder{};
-    if ((result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
-                                    sources.fragment, &shader_builder)) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    if ((result = nkgpu_shader_attribute(shader_builder, 0, "position", "TEXCOORD", 0)) !=
-        NKGPU_OK)
-        return set_failure(state, stats, result);
-    if ((result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
-                                            sizeof(WorkplaneUniformData))) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    if ((result = nkgpu_shader_uniform(shader_builder, 0, 0, "grid_params",
-                                       NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK)
-        return set_failure(state, stats, result);
-    if ((result = nkgpu_shader_end(shader_builder, &state.workplane_shader)) != NKGPU_OK)
-        return set_failure(state, stats, result);
+    nkgpu_result result = NKGPU_OK;
+    if (!state.workplane_shader.id) {
+        const auto sources = render_internal::workplane_shader_sources(
+            nkgpu_query_backend(state.renderer));
+        if (!sources.vertex || !sources.fragment)
+            return set_failure(state, stats, NKGPU_ERROR_UNSUPPORTED);
+        constexpr float triangle[] = {-1.0f, -1.0f, 3.0f, -1.0f, -1.0f, 3.0f};
+        result = nkgpu_buffer_create(state.renderer,
+            reinterpret_cast<const std::uint8_t *>(triangle), sizeof(triangle),
+            &state.workplane_vertex_buffer);
+        if (result != NKGPU_OK)
+            return set_failure(state, stats, result);
+        nkgpu_shader_builder shader_builder{};
+        if ((result = nkgpu_shader_begin(state.renderer, sources.language, sources.vertex,
+                                        sources.fragment, &shader_builder)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+        if ((result = nkgpu_shader_attribute(shader_builder, 0, "position", "TEXCOORD", 0)) !=
+            NKGPU_OK)
+            return set_failure(state, stats, result);
+        if ((result = nkgpu_shader_uniform_block(shader_builder, 0, NKGPU_SHADERSTAGE_FRAGMENT,
+                                                sizeof(WorkplaneUniformData))) != NKGPU_OK)
+            return set_failure(state, stats, result);
+        if ((result = nkgpu_shader_uniform(shader_builder, 0, 0, "grid_params",
+                                           NKGPU_UNIFORMTYPE_FLOAT4, 4)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+        if ((result = nkgpu_shader_end(shader_builder, &state.workplane_shader)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
     nkgpu_pipeline_builder pipeline_builder{};
     if ((result = nkgpu_pipeline_begin(state.renderer, state.workplane_shader,
                                        sizeof(float) * 2, &pipeline_builder)) != NKGPU_OK)
@@ -1418,8 +1522,11 @@ bool ensure_workplane_pipeline(StateT &state, GpuExecutionStats &stats) {
         (result = nkgpu_pipeline_depth(pipeline_builder, &grid_depth)) != NKGPU_OK ||
         (result = nkgpu_pipeline_color_target(pipeline_builder, 0, NKGPU_IMAGEFORMAT_RGBA8,
                                               NKGPU_COLORMASK_RGBA, nullptr)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_end(pipeline_builder, &state.workplane_pipeline)) != NKGPU_OK)
+        (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    if (samples > 1 && (result = nkgpu_pipeline_multisample(pipeline_builder, samples, 0)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    if ((result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
@@ -2433,6 +2540,20 @@ void NativeKitGpuExecutor::set_renderer(nkgpu_renderer renderer) noexcept {
     state_->last_result = NKGPU_OK;
 }
 
+std::uint32_t NativeKitGpuExecutor::set_sample_count(std::uint32_t requested) {
+    state_->requested_samples = requested == 0 ? 1 : requested;
+    state_->samples_resolved = false;
+    return resolve_samples(*state_);
+}
+
+std::uint32_t NativeKitGpuExecutor::sample_count() {
+    return resolve_samples(*state_);
+}
+
+std::uint32_t NativeKitGpuExecutor::max_sample_count() {
+    return supported_samples(*state_, 16);
+}
+
 nkgpu_renderer NativeKitGpuExecutor::renderer() const noexcept {
     return state_->renderer;
 }
@@ -2561,7 +2682,7 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
         stats.draw_calls = stats.commands;
         return stats;
     }
-    if (!ensure_surface_pipelines(*state_, snapshot, stats))
+    if (!ensure_surface_pipelines(*state_, snapshot, 1, stats))
         return stats;
 
     auto result = nkgpu_begin_frame(state_->renderer);
@@ -2572,13 +2693,13 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
     set_lighting_camera(lighting_data, plan);
-    result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, stats);
+    result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, 1, stats);
     if (result != NKGPU_OK) {
         set_failure(*state_, stats, result);
         (void)nkgpu_end_frame(state_->renderer);
         return stats;
     }
-    if (!draw_stroke_batches(*state_, plan, snapshot, stats)) {
+    if (!draw_stroke_batches(*state_, plan, snapshot, 1, stats)) {
         (void)nkgpu_end_frame(state_->renderer);
         return stats;
     }
@@ -2619,16 +2740,18 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     GpuExecutionStats stats;
     if (!synchronize(plan, snapshot, stats))
         return state_->last_result;
-    if (!ensure_capture_targets(*state_, width, height, stats))
+    const auto samples = resolve_samples(*state_);
+    sync_msaa_pipelines(*state_, samples);
+    if (!ensure_capture_targets(*state_, width, height, samples, stats))
         return state_->last_result;
-    if (plan.workplane_grid().enabled && !ensure_workplane_pipeline(*state_, stats))
+    if (plan.workplane_grid().enabled && !ensure_workplane_pipeline(*state_, stats, samples))
         return state_->last_result;
     const auto apply_post_process = post_process.enabled();
     if (apply_post_process &&
         (!ensure_postprocess_target(*state_, width, height, stats) ||
          !ensure_postprocess_pipeline(*state_, stats)))
         return state_->last_result;
-    if (!ensure_surface_pipelines(*state_, snapshot, stats))
+    if (!ensure_surface_pipelines(*state_, snapshot, samples, stats))
         return state_->last_result;
 
     auto result = nkgpu_frame_begin(state_->renderer);
@@ -2648,14 +2771,18 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     nkgpu_render_pass_desc pass{};
     pass.struct_size = sizeof(pass);
     pass.color_count = 1;
-    pass.colors[0].image = state_->capture_color;
+    // Multisampled passes draw into the multisampled image and keep only its resolve.
+    const bool multisampled = samples > 1;
+    pass.colors[0].image = multisampled ? state_->capture_msaa_color : state_->capture_color;
+    if (multisampled)
+        pass.colors[0].resolve_image = state_->capture_color;
     pass.colors[0].action.load_action = NKGPU_LOADACTION_CLEAR;
-    pass.colors[0].action.store_action = NKGPU_STOREACTION_STORE;
+    pass.colors[0].action.store_action = multisampled ? NKGPU_STOREACTION_DISCARD : NKGPU_STOREACTION_STORE;
     pass.colors[0].action.clear_color = {
         clear_color[0], clear_color[1], clear_color[2], clear_color[3]};
     pass.depth_stencil = state_->capture_depth;
     pass.depth_stencil_action.load_action = NKGPU_LOADACTION_CLEAR;
-    pass.depth_stencil_action.store_action = NKGPU_STOREACTION_STORE;
+    pass.depth_stencil_action.store_action = multisampled ? NKGPU_STOREACTION_DISCARD : NKGPU_STOREACTION_STORE;
     pass.depth_stencil_action.clear_depth = 1.0f;
     result = nkgpu_begin_render_pass(state_->renderer, &pass);
     if (result != NKGPU_OK)
@@ -2670,7 +2797,7 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         const auto &grid = plan.workplane_grid();
         WorkplaneUniformData data{grid.eye_spacing, grid.forward, grid.right, grid.up};
         if ((result = nkgpu_apply_pipeline(state_->renderer,
-                                            state_->workplane_pipeline)) != NKGPU_OK ||
+                                            state_->pipelines[pipeline_slot(samples)].workplane)) != NKGPU_OK ||
             (result = nkgpu_apply_vertex_buffer(state_->renderer, 0,
                                                  state_->workplane_vertex_buffer, 0)) != NKGPU_OK ||
             (result = nkgpu_apply_uniform_data(state_->renderer, 0,
@@ -2682,10 +2809,10 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
     set_lighting_camera(lighting_data, plan);
-    if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, stats)) !=
+    if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, samples, stats)) !=
         NKGPU_OK)
         return fail_frame(result);
-    if (!draw_stroke_batches(*state_, plan, snapshot, stats))
+    if (!draw_stroke_batches(*state_, plan, snapshot, samples, stats))
         return fail_frame(stats.result);
     if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
         pass_active = false;
