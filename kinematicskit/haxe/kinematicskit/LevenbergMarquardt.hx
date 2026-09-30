@@ -30,17 +30,20 @@ class LevenbergMarquardt {
     work.prepare(problem);
     var rows = problem.rowCount();
     var active = problem.layout().dofs;
-    var count = active.length;
+    var dofCount = active.length;
+    // Columns: the active DOFs, then any moving roots' twist components.
+    var count = problem.layout().width;
     var scales = work.scales, residual = work.residual, jacobian = work.jacobian, scaled = work.scaled;
-    var normal = work.normal, rhs = work.rhs, delta = work.delta, accepted = work.accepted;
-    for (j in 0...count) scales[j] = model.dofIsAngular(active[j]) ? 1.0 : translationScale;
+    var normal = work.normal, rhs = work.rhs, delta = work.delta, accepted = work.accepted, step = work.step;
+    for (j in 0...count) scales[j] = DampedLeastSquares.columnScale(problem, j, translationScale);
     var snapshot = work.snapshot;
 
     var state = seed.copy();
     problem.evaluate(state, snapshot, residual, jacobian);
     var converged = problem.satisfied();
     var currentNorm = LinearAlgebra.norm(residual, rows);
-    for (j in 0...count) accepted[j] = state.q[active[j]];
+    for (j in 0...dofCount) accepted[j] = state.q[active[j]];
+    SolverSupport.saveRoots(problem, state, work.roots);
     var damping = initialDamping;
     var iterations = 0;
     var limitStalled = false;
@@ -63,7 +66,7 @@ class LevenbergMarquardt {
       var stepFactor = maxDelta > 1 ? 1 / maxDelta : 1.0;
       var moved = false;
       var outwardAtLimit = false;
-      for (j in 0...count) {
+      for (j in 0...dofCount) {
         var dof = active[j];
         var current = state.q[dof];
         var requested = current + delta[j] * stepFactor * scales[j];
@@ -73,7 +76,14 @@ class LevenbergMarquardt {
             ((current <= problem.lower[dof] && requested < current) || (current >= problem.upper[dof] && requested > current)))
           outwardAtLimit = true;
         state.q[dof] = value;
+        step[j] = 0.0;
       }
+      // Moving roots have no limits: their share of the step applies on the manifold.
+      for (j in dofCount...count) {
+        step[j] = delta[j] * stepFactor * scales[j];
+        if (Math.abs(step[j]) > 1e-14) moved = true;
+      }
+      if (count > dofCount) SolverSupport.applyStep(problem, state, step, 1.0);
       if (!moved) {
         limitStalled = outwardAtLimit;
         damping = Math.min(1e16, damping * 10);
@@ -90,9 +100,11 @@ class LevenbergMarquardt {
         currentNorm = trialNorm;
         limitStalled = false;
         damping = Math.max(1e-12, damping * 0.3);
-        for (j in 0...count) accepted[j] = state.q[active[j]];
+        for (j in 0...dofCount) accepted[j] = state.q[active[j]];
+        SolverSupport.saveRoots(problem, state, work.roots);
       } else {
-        for (j in 0...count) state.q[active[j]] = accepted[j];
+        for (j in 0...dofCount) state.q[active[j]] = accepted[j];
+        SolverSupport.restoreRoots(problem, state, work.roots);
         problem.evaluate(state, snapshot, residual, jacobian);
         damping = Math.min(1e16, damping * 10);
         if (damping >= 1e16) { exhausted = true; break; }
@@ -110,7 +122,7 @@ class LevenbergMarquardt {
     var stationary = gradientNorm <= threshold;
     // A DOF on a bound whose descent direction (Jᵀe) points outward is held by its limit.
     var blocked = false;
-    for (j in 0...count) {
+    for (j in 0...dofCount) {
       var dof = active[j];
       if ((state.q[dof] >= problem.upper[dof] && rhs[j] > threshold) ||
           (state.q[dof] <= problem.lower[dof] && rhs[j] < -threshold)) blocked = true;

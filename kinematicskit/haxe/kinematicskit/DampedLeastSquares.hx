@@ -42,17 +42,24 @@ class DampedLeastSquares {
           false);
       if (maxStep != Math.POSITIVE_INFINITY) {
         var ratio = 0.0;
-        for (i in 0...width) {
-          var dof = layout.dofs[i];
-          var cap = problem.model.dofIsAngular(dof) ? maxStep : maxStep * translationScale;
-          ratio = Math.max(ratio, Math.abs(work.delta[i]) / cap);
-        }
+        for (i in 0...width) ratio = Math.max(ratio, Math.abs(work.delta[i]) / (maxStep * columnScale(problem, i, translationScale)));
         if (ratio > 1.0) for (i in 0...width) work.delta[i] /= ratio;
       }
-      for (i in 0...width) state.q[layout.dofs[i]] += work.delta[i];
+      SolverSupport.applyStep(problem, state, work.delta, 1.0);
       problem.clamp(state.q);
     }
     return SolverSupport.finish(problem, state, work, KinematicStatus.IterationLimit, maxIterations, rankTolerance,
       false);
+  }
+
+  /** 1 for an angular column, `translationScale` for a translational one (prismatic DOF, root v). */
+  public static function columnScale(problem:KinematicProblem, column:Int, translationScale:Float):Float {
+    var layout = problem.layout();
+    if (column < layout.dofs.length) return problem.model.dofIsAngular(layout.dofs[column]) ? 1.0 : translationScale;
+    var block = layout.rootColumns.length - 1;
+    while (block > 0 && layout.rootColumns[block] > column) block--;
+    var offset = column - layout.rootColumns[block];
+    var linear = layout.rootModes[block] == RootMotion.Planar ? offset < 2 : offset < 3;
+    return linear ? translationScale : 1.0;
   }
 }

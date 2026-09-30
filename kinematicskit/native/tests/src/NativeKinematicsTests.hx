@@ -13,6 +13,9 @@ import kinematicskit.LinearAlgebra;
 import kinematicskit.PostureTask;
 import kinematicskit.SolverWorkspace;
 import kinematicskit.SwivelTask;
+import kinematicskit.RootMotion;
+import kinematicskit.RootDampingTask;
+import kinematicskit.SolverSupport;
 import kinematicskit.native.DifferentialIk;
 import kinematicskit.native.NativeKinematics;
 import kinematicskit.native.NativeQpStep;
@@ -30,6 +33,7 @@ class NativeKinematicsTests {
     testRedundantArmFollowsPosture();
     testSwivelPicksTheSevenAxisConfiguration();
     testMinkOracle();
+    testMobileBaseTracking();
     Sys.println('KinematicsKit native tests passed ($assertions assertions)');
   }
 
@@ -353,6 +357,47 @@ class NativeKinematicsTests {
     // rotation, about 10x less difference.
     var ratio = poseDifferences[0] / poseDifferences[1];
     check(ratio > 7.0 && ratio < 13.0, 'the pose difference scales with the rotation error (ratio $ratio)');
+  }
+
+  /** A cart driving (planar base, speed-limited) while its arm tracks a target 4 m away. */
+  static function testMobileBaseTracking():Void {
+    var builder = new KinematicModelBuilder();
+    var cart = builder.addBody("cart");
+    var previous = cart, reach = 0.0;
+    var z = new Vector3(0, 0, 1);
+    for (i in 0...3) {
+      var body = builder.addBody('m$i');
+      builder.addJoint('m$i', JointKind.Revolute, previous, body, Transform.translation(reach, 0, i == 0 ? 0.5 : 0.0),
+        Transform.identity(), z, -2.8, 2.8);
+      reach = [1.0, 0.8, 0.5][i];
+      previous = body;
+    }
+    var tool = builder.addFrame("tool", previous, Transform.translation(reach, 0, 0));
+    var model = builder.build();
+    var target = Transform.translation(4.0, 1.5, 0.5);
+    var problem = new KinematicProblem(model).setRootMotion(cart, RootMotion.Planar)
+      .add(FrameTask.atFrame(model, tool, target, 1e-6, 1e-6, null, FrameTask.ALL_AXES, FrameOrientation.Free))
+      .add(new RootDampingTask(model, cart, 0.3));
+    var width = problem.layout().width;
+    check(width == 6, 'three arm joints plus a planar base give six columns ($width)');
+    // Arm joints up to 1.5 rad/s; the base up to 0.5 m/s and 0.5 rad/s.
+    var limits = [1.5, 1.5, 1.5, 0.5, 0.5, 0.5];
+    var state = new KinematicState(model, [0.3, 0.4, -0.2]);
+    var qp = new NativeQpStep(width);
+    var dt = 0.02, legal = true;
+    for (_ in 0...1000) {
+      var step = DifferentialIk.step(problem, state, dt, qp, limits, 0.5, 1e-3);
+      for (c in 0...width) if (Math.abs(step.velocity[c]) > limits[c] + 1e-9) legal = false;
+      SolverSupport.applyStep(problem, state, step.velocity, dt);
+      for (dof in 0...3) if (state.q[dof] < -2.8 - 1e-12 || state.q[dof] > 2.8 + 1e-12) legal = false;
+    }
+    qp.dispose();
+    var reached = KinematicSnapshot.of(state).framePose(tool);
+    check(legal, "base and joint velocities stay within their limits, joints within their range");
+    check(Math.abs(reached.x - 4.0) < 1e-5 && Math.abs(reached.y - 1.5) < 1e-5,
+      'the base drives until the arm reaches the target (${reached.x}, ${reached.y})');
+    var base = state.rootPose(cart);
+    check(Math.sqrt(base.x * base.x + base.y * base.y) > 1.2, "the base actually drove");
   }
 
   /** Two roots; a chain with revolute, prismatic, fixed and coupled joints; a side branch. */

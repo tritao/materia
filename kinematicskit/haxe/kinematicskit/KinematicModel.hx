@@ -18,6 +18,8 @@ class KinematicModel {
   public final bodyOrder:Array<Int>;
   /** Movable joints from each body's root to the body, root first. */
   public final bodyChain:Array<Array<Int>>;
+  /** The root body each body hangs from (itself for a root). */
+  public final bodyRoot:Array<Int>;
 
   public final jointIds:Array<String>;
   public final jointKind:Array<JointKind>;
@@ -70,6 +72,7 @@ class KinematicModel {
     this.bodyIds = parts.bodyIds;
     this.bodyParentJoint = parts.bodyParentJoint;
     this.bodyRootPoses = parts.bodyRootPoses;
+    this.bodyRoot = parts.bodyRoot;
     this.bodyOrder = parts.bodyOrder;
     this.bodyChain = parts.bodyChain;
     this.jointIds = parts.jointIds;

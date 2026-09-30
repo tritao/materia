@@ -210,6 +210,26 @@ class KinematicSnapshot {
         out[5 * w + column] += scale * az;
       }
     }
+    // A moving root: the world twist about the root's origin moves the point by v + ω × (p − o).
+    var root = model.bodyRoot[body];
+    var block = layout.blockOfRoot[root];
+    if (block < 0) return;
+    var c = layout.rootColumns[block];
+    var o = root * 7;
+    var rx = px - poses[o], ry = py - poses[o + 1], rz = pz - poses[o + 2];
+    if (layout.rootModes[block] == RootMotion.Planar) {
+      out[c] = 1.0;
+      out[w + c + 1] = 1.0;
+      out[c + 2] = -ry;
+      out[w + c + 2] = rx;
+      out[5 * w + c + 2] = 1.0;
+    } else {
+      for (axis in 0...3) out[axis * w + c + axis] = 1.0;
+      // ω along x, y, z: linear e × r, angular e.
+      out[w + c + 3] = -rz; out[2 * w + c + 3] = ry; out[3 * w + c + 3] = 1.0;
+      out[c + 4] = rz; out[2 * w + c + 4] = -rx; out[4 * w + c + 4] = 1.0;
+      out[c + 5] = -ry; out[w + c + 5] = rx; out[5 * w + c + 5] = 1.0;
+    }
   }
 
   function requireEvaluated():Void {

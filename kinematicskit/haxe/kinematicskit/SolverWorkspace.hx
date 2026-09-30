@@ -16,6 +16,9 @@ class SolverWorkspace {
   public final delta:Array<Float> = [];
   public final accepted:Array<Float> = [];
   public final scales:Array<Float> = [];
+  public final step:Array<Float> = [];
+  /** Saved poses of the problem's moving roots (see `SolverSupport.saveRoots`). */
+  public final roots:Array<Transform> = [];
 
   public function new() {}
 
@@ -30,6 +33,7 @@ class SolverWorkspace {
     grow(delta, width);
     grow(accepted, width);
     grow(scales, width);
+    grow(step, width);
   }
 
   static function grow(values:Array<Float>, size:Int):Void {

@@ -12,6 +12,8 @@ class KinematicProblem {
   public final upper:Array<Float>;
   var active:Array<Int>;
   var columns:JacobianLayout;
+  final rootBodies:Array<Int> = [];
+  final rootModes:Array<RootMotion> = [];
 
   public function new(model:KinematicModel) {
     if (model == null) throw "Kinematic problem requires a model";
@@ -38,7 +40,23 @@ class KinematicProblem {
       seen.set(dof, true);
     }
     active = dofs.copy();
-    columns = new JacobianLayout(model, active);
+    columns = new JacobianLayout(model, active, rootBodies, rootModes);
+    return this;
+  }
+
+  /**
+   * Lets the solve move a root body (`RootMotion.Planar` for a wheeled base,
+   * `Floating` for a free one; `Fixed` to stop). Its pose changes in the
+   * solved state; its columns follow the active DOFs'. Add a
+   * `RootDampingTask` to prefer joint motion over root motion.
+   */
+  public function setRootMotion(body:Int, mode:RootMotion):KinematicProblem {
+    if (body < 0 || body >= model.bodyCount() || model.bodyParentJoint[body] >= 0)
+      throw 'Kinematic problem body $body is not a root';
+    var index = rootBodies.indexOf(body);
+    if (index >= 0) { rootBodies.splice(index, 1); rootModes.splice(index, 1); }
+    if (mode != RootMotion.Fixed) { rootBodies.push(body); rootModes.push(mode); }
+    columns = new JacobianLayout(model, active, rootBodies, rootModes);
     return this;
   }
 

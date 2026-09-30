@@ -4,9 +4,13 @@ import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicState;
 import kinematicskit.SolverWorkspace;
 
-/** One differential step: the velocities of the problem's active DOFs, and why the QP stopped. */
+/**
+ * One differential step: a velocity per layout column (the active DOFs, then
+ * any moving root's twist, world frame), and why the QP stopped. Integrate
+ * roots with `SolverSupport.applyStep(problem, state, velocity, dt)`.
+ */
 class DifferentialStep {
-  /** DOF velocity per active DOF (the problem's layout order), in DOF units per second. */
+  /** Velocity per layout column (active DOFs, then moving roots' v and ω), per second. */
   public final velocity:Array<Float>;
   public final status:Int;
   public final iterations:Int;
@@ -47,7 +51,7 @@ class DifferentialIk {
     var width = layout.width;
     if (qp.width != width) throw 'Differential IK QP has ${qp.width} variables, the problem ${width}';
     if (velocityLimits != null && velocityLimits.length != width)
-      throw 'Differential IK needs one velocity limit per active DOF ($width)';
+      throw 'Differential IK needs one velocity limit per column ($width: active DOFs, then moving roots)';
     var work = workspace == null ? new SolverWorkspace() : workspace;
     work.prepare(problem);
     var rows = problem.rowCount();
@@ -56,8 +60,13 @@ class DifferentialIk {
     var residual = [for (row in 0...rows) gain * work.residual[row]];
     var lower:Array<Float> = [], upper:Array<Float> = [];
     for (column in 0...width) {
-      var dof = layout.dofs[column];
-      var low = limitGain * (problem.lower[dof] - state.q[dof]), high = limitGain * (problem.upper[dof] - state.q[dof]);
+      // Moving roots (after the DOF columns) have no position limits.
+      var low = Math.NEGATIVE_INFINITY, high = Math.POSITIVE_INFINITY;
+      if (column < layout.dofs.length) {
+        var dof = layout.dofs[column];
+        low = limitGain * (problem.lower[dof] - state.q[dof]);
+        high = limitGain * (problem.upper[dof] - state.q[dof]);
+      }
       if (velocityLimits != null) {
         var reach = velocityLimits[column] * dt;
         if (!(reach >= 0.0)) throw "Differential IK velocity limits must be non-negative";

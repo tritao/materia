@@ -7,6 +7,9 @@ import kinematicskit.JacobianLayout;
 import kinematicskit.LookAtTask;
 import kinematicskit.SolverWorkspace;
 import kinematicskit.SwivelTask;
+import kinematicskit.RootDampingTask;
+import kinematicskit.RootMotion;
+import kinematicskit.SolverSupport;
 import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicStatus;
 import kinematicskit.LevenbergMarquardt;
@@ -41,6 +44,9 @@ class KinematicsKitTests {
     testLargeAssemblyUsesActiveColumns();
     testNoAllocationPerIteration();
     testSwivelJacobian();
+    testRootJacobianMatchesFiniteDifferences();
+    testMobileManipulatorDrivesWhenTheArmCannotReach();
+    testFloatingBodyIsPlacedExactly();
     Sys.println('KinematicsKit tests passed ($assertions assertions)');
   }
 
@@ -661,6 +667,107 @@ class KinematicsKitTests {
     // The wrist joints (a4..a6) turn the hand, not the elbow: their columns vanish.
     check(Math.abs(jacobian[4]) < 1e-9 && Math.abs(jacobian[5]) < 1e-9 && Math.abs(jacobian[6]) < 1e-9,
       "joints beyond the wrist point do not change the swivel");
+  }
+
+  /** A cart (root) carrying a planar 3-link arm on vertical hinges, 1.0 + 0.8 + 0.5 m, with a tool frame. */
+  static function mobileArm():KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var cart = builder.addBody("cart");
+    var previous = cart;
+    var z = new Vector3(0, 0, 1);
+    var reach = 0.0;
+    for (i in 0...3) {
+      var body = builder.addBody('m$i');
+      builder.addJoint('m$i', JointKind.Revolute, previous, body, Transform.translation(reach, 0, i == 0 ? 0.5 : 0.0),
+        Transform.identity(), z, -2.8, 2.8);
+      reach = [1.0, 0.8, 0.5][i];
+      previous = body;
+    }
+    builder.addFrame("tool", previous, Transform.translation(reach, 0, 0));
+    return builder.build();
+  }
+
+  static function testRootJacobianMatchesFiniteDifferences():Void {
+    var model = mobileArm();
+    var cart = model.bodyIndex("cart"), tool = model.frameIndex("tool");
+    for (mode in [RootMotion.Planar, RootMotion.Floating]) {
+      var problem = new KinematicProblem(model).setRootMotion(cart, mode);
+      var layout = problem.layout();
+      var state = new KinematicState(model, [0.4, -0.7, 0.3]);
+      state.setRootPose(cart, new Transform(0.3, -0.2, 0.1, 0, 0, 0, 1).compose(Transform.axisAngle(0.6, 0.0, 0.8, 0.7)));
+      var snapshot = KinematicSnapshot.of(state);
+      var pose = snapshot.framePose(tool);
+      var jacobian = [for (_ in 0...6 * layout.width) 0.0];
+      snapshot.pointJacobianColumns(model.frameBody[tool], pose.x, pose.y, pose.z, layout, jacobian);
+      var eps = 1e-6, worst = 0.0;
+      for (column in layout.dofs.length...layout.width) {
+        var plus = state.copy(), minus = state.copy();
+        var nudge = [for (c in 0...layout.width) c == column ? eps : 0.0];
+        SolverSupport.applyStep(problem, plus, nudge, 1.0);
+        SolverSupport.applyStep(problem, minus, nudge, -1.0);
+        var a = KinematicSnapshot.of(minus).framePose(tool), b = KinematicSnapshot.of(plus).framePose(tool);
+        var w = logMap(a, b);
+        var numeric = [(b.x - a.x) / (2 * eps), (b.y - a.y) / (2 * eps), (b.z - a.z) / (2 * eps), w.x / (2 * eps),
+          w.y / (2 * eps), w.z / (2 * eps)];
+        for (row in 0...6) worst = Math.max(worst, Math.abs(jacobian[row * layout.width + column] - numeric[row]));
+      }
+      check(worst < 1e-6, 'root columns (${mode == RootMotion.Planar ? "planar" : "floating"}) match central differences ($worst)');
+    }
+  }
+
+  static function testMobileManipulatorDrivesWhenTheArmCannotReach():Void {
+    var model = mobileArm();
+    var cart = model.bodyIndex("cart"), tool = model.frameIndex("tool");
+    var seed = new KinematicState(model, [0.3, 0.4, -0.2]);
+    var far = Transform.translation(5.0, 1.0, 0.5);
+    function task() return FrameTask.atFrame(model, tool, far, 1e-7, 1e-7, null, FrameTask.ALL_AXES, FrameOrientation.Free);
+    var armOnly = LevenbergMarquardt.solve(new KinematicProblem(model).add(task()), seed);
+    check(!armOnly.converged(), "a 2.3 m arm cannot reach 5 m on its own");
+    var driving = LevenbergMarquardt.solve(new KinematicProblem(model).setRootMotion(cart, RootMotion.Planar).add(task()), seed);
+    var reached = KinematicSnapshot.of(driving.state).framePose(tool);
+    check(driving.converged() && Math.abs(reached.x - 5.0) < 1e-6 && Math.abs(reached.y - 1.0) < 1e-6,
+      "with a planar base the tool reaches it");
+    var base = driving.state.rootPose(cart);
+    check(Math.abs(base.z) < 1e-12 && Math.abs(base.qx) < 1e-12 && Math.abs(base.qy) < 1e-12,
+      "a planar base stays on the floor and upright");
+    check(seed.rootPose(cart).x == 0.0, "the seed's root pose is untouched");
+
+    // Within the arm's reach: damping the base keeps it (nearly) still and lets the arm do the work.
+    var near = Transform.translation(1.6, 0.9, 0.5);
+    function baseTravel(damping:Float):Float {
+      var problem = new KinematicProblem(model).setRootMotion(cart, RootMotion.Planar)
+        .add(FrameTask.atFrame(model, tool, near, 1e-7, 1e-7, null, FrameTask.ALL_AXES, FrameOrientation.Free));
+      if (damping > 0.0) problem.add(new RootDampingTask(model, cart, damping));
+      var solution = DampedLeastSquares.solve(problem, seed, 400, 0.02);
+      check(solution.converged(), 'the near target is reached (base damping $damping)');
+      var p = solution.state.rootPose(cart);
+      return Math.sqrt(p.x * p.x + p.y * p.y);
+    }
+    var free = baseTravel(0.0), damped = baseTravel(1.0);
+    check(damped < 0.1 * free, 'root damping makes the arm do the work (base moved $damped m vs $free m)');
+  }
+
+  static function testFloatingBodyIsPlacedExactly():Void {
+    // A free box with three corner frames; targets are those corners under an unknown pose.
+    var builder = new KinematicModelBuilder();
+    var box = builder.addBody("box");
+    var corners = [new Vector3(0.2, 0.0, 0.0), new Vector3(0.0, 0.3, 0.0), new Vector3(0.0, 0.0, 0.4)];
+    for (i in 0...3) builder.addFrame('corner$i', box, Transform.translation(corners[i].x, corners[i].y, corners[i].z));
+    var model = builder.build();
+    var truth = new Transform(1.5, -0.7, 2.0, 0, 0, 0, 1).compose(Transform.axisAngle(0.0, 0.6, 0.8, 2.5));
+    var problem = new KinematicProblem(model).setRootMotion(box, RootMotion.Floating);
+    for (i in 0...3) {
+      var target = truth.compose(Transform.translation(corners[i].x, corners[i].y, corners[i].z));
+      problem.add(FrameTask.atFrame(model, model.frameIndex('corner$i'), target, 1e-10, 1e-10, null, FrameTask.ALL_AXES,
+        FrameOrientation.Free));
+    }
+    var solution = LevenbergMarquardt.solve(problem, new KinematicState(model, []), 200);
+    var placed = solution.state.rootPose(box);
+    var dot = Math.abs(placed.qx * truth.qx + placed.qy * truth.qy + placed.qz * truth.qz + placed.qw * truth.qw);
+    check(solution.converged() && Math.abs(placed.x - truth.x) < 1e-9 && Math.abs(placed.y - truth.y) < 1e-9 &&
+      Math.abs(placed.z - truth.z) < 1e-9 && Math.abs(dot - 1.0) < 1e-12,
+      'a floating body is placed exactly from three points under a 2.5 rad rotation (${solution.status})');
+    check(solution.rank == 6 && solution.freeDofs == 0, "three non-collinear points fix all six DOFs");
   }
 
   // -- helpers ---------------------------------------------------------

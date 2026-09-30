@@ -239,6 +239,12 @@ class KinematicModelBuilder {
       bodyChain[body] = chain;
     }
 
+    var bodyRoot = [for (body in 0...bodyCount) body];
+    for (body in bodyOrder) {
+      var joint = parentJoint[body];
+      if (joint >= 0) bodyRoot[body] = bodyRoot[joints[joint].parent];
+    }
+
     var rootPoses:Array<Transform> = [];
     for (body in 0...bodyCount) rootPoses.push(bodyRootPoses[body] == null ? Transform.identity() : bodyRootPoses[body]);
 
@@ -248,6 +254,7 @@ class KinematicModelBuilder {
     parts.bodyRootPoses = rootPoses;
     parts.bodyOrder = bodyOrder;
     parts.bodyChain = bodyChain;
+    parts.bodyRoot = bodyRoot;
     parts.jointIds = [for (joint in joints) joint.id];
     parts.jointKind = [for (joint in joints) joint.kind];
     parts.jointParent = [for (joint in joints) joint.parent];

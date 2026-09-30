@@ -746,3 +746,34 @@ coordinates; for a running robot the target goes through MotionKit.
 - The app suite's `ScriptedSetupTests` fails at "inspector action is
   visible: sensor-pause" in this worktree with or without these changes
   (checked by stashing them and rebuilding); every suite before it passes.
+
+### K5 — Moving roots: mobile and floating bases (2026-09-30)
+
+- `KinematicProblem.setRootMotion(root, RootMotion.Planar | Floating)`:
+  the root's pose becomes solver variables. `JacobianLayout` appends one
+  block per moving root after the DOF columns (Planar: vx, vy, ωz;
+  Floating: v, ω; world frame, twist about the root's origin), and
+  `KinematicSnapshot.pointJacobianColumns` fills them (v + ω × (p − o), ω),
+  so every task (frame, look-at, swivel, closure, posture) sees them with no
+  change. `KinematicModel.bodyRoot` maps bodies to their roots.
+- Steps apply on the manifold (`SolverSupport.applyStep`: rotation
+  Exp(ω)·q on the left, position + v; no Euler angles, so no gimbal lock).
+  DLS and LM handle root columns (LM rolls root poses back with the joints;
+  its step cap scales root v by `translationScale`), native `DifferentialIk`
+  bounds them only by velocity limits. Each moving root allocates one pose
+  per iteration (roots live as `Transform`s in `KinematicState`).
+- `RootDampingTask` (soft): a cost on base motion, so the joints do what
+  they can and the base moves for the rest.
+- Tests: root columns match central differences (perturbing on the
+  manifold) for both modes; a 2.3 m arm on a cart reaches a target 5 m away
+  only with a planar base, which stays on the floor and upright; with root
+  damping the base moves < 10% of the undamped distance for a target in
+  reach; a floating box is placed exactly (1e-9) from three corner targets
+  under a 2.5 rad rotation, rank 6; native differential IK drives a
+  speed-limited cart until its arm reaches a target 4 m away, all velocity
+  and joint limits held. Loop-solver parity, CadKit assembly tests,
+  MotionKit and RobotKit unchanged.
+- Not done here: RobotKit's `Manipulator` still solves with a fixed base
+  (a `baseMotion` option would wire `RobotModel.mobileBase` /
+  `floatingBase` to this); H7's whole-body control (contacts, centre of
+  mass, dynamics) stays in HUMANOID.md.

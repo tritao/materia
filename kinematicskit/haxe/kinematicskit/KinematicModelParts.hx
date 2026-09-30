@@ -9,6 +9,7 @@ class KinematicModelParts {
   var bodyRootPoses:Array<Transform>;
   var bodyOrder:Array<Int>;
   var bodyChain:Array<Array<Int>>;
+  var bodyRoot:Array<Int>;
   var jointIds:Array<String>;
   var jointKind:Array<JointKind>;
   var jointParent:Array<Int>;
