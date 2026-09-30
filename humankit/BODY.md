@@ -24,7 +24,9 @@ overwrite an earlier one only through the interface below it.
 the character's IK holds now (`applied`). `apply` reconciles the two and is the only place that calls
 `reach` or `release` on the character. `Hang` is not a mode anyone asks for: a `Free` arm is held
 hanging under its shoulder while the body leans, because a lean swings an unused arm back with the
-torso. Since "what is applied" is one recorded value, there is no flag that can go stale.
+torso. Since "what is applied" is one recorded value, there is no flag that can go stale. A free arm eases
+into hanging over `HumanPosture.hangSeconds`, and back out, independently of how fast the lean moves; tying
+the blend to the lean dragged the arm to its hanging pose in a quarter of a second, mid-swing.
 
 To add a limb behaviour, add a `LimbMode`, handle it in `LimbControl.apply`, and let an action ask for
 it through `HumanBody`. Do not call the character's IK from an action.
@@ -41,7 +43,11 @@ or measured, as `HumanBody.leanFor` measures how far a lean moves the shoulder.
 
 `ApproachFor` decides where to stand: the shoulder a comfortable reach from the point, and, given the
 surface the point rests on (`from` on a pick, `onto` on a place), far enough back that the belly clears
-that surface's edge, leaning the upper body over it for the rest of the reach. `Pick` and `Place` reach
+that surface's edge, leaning the upper body over it for the rest of the reach and, once the lean is
+spent, stretching the arm past comfortable up to `HumanPosture.stretch`. It plans from the body's
+standing posture (`HumanBody.standingBone`, captured when the body is built), not from the animated pose,
+which bobs with the gait: a reach near a limit must not be possible in one phase of a stride and not in
+another. A point is out of reach only beyond the stretch, not beyond the comfortable distance. `Pick` and `Place` reach
 and grasp, and ask the body to straighten up when they are done. Actions set intent (`setLean`,
 `setCarry`, `setReachWorld`); they never touch joints.
 
@@ -57,12 +63,25 @@ object thinner than `HumanPosture.pinchBelow` is pinched (the other fingers stay
 is kept while the hand holds the object and forgotten when it lets go. A pick with no box closes the
 hand to the plain `gripCurl`.
 
+## Jobs that do not describe their surroundings
+
+A worker only leans over an edge and closes its hand to a part's size if the job tells it what it stands at
+and picks up. Spec jobs do (`from`, `onto`, and the boxes the builder resolves). A facility job learns it
+from the facility: a rack's or station's `Surface` and a slot's `itemHalfExtents` (automationkit), which
+`FacilityTargets.surfaceBox` and `slotItemBox` turn into boxes in the facility frame, turned with their
+owners. `FacilityFetchJob.deliver` uses them, and its optional surface and part arguments override or supply
+what the facility does not say. With neither, the worker stands where its shoulder reaches the point and
+grips plainly. A station's pose is where the worker stands at the table, short of it, so its `Surface` sits
+ahead of that pose; stepping back to the station at the end of the job is the retreat.
+
 ## Keeping it natural
 
 `MotionQuality` samples a pose each tick and reports, per arm, the bend-plane turn rate, the elbow's
 height against the shoulder, its sharpest bend, and the wrist's speed and acceleration.
 `humankit/sim/tests` holds the rack job to limits just above ordinary gait, and measures how far the
-belly stays from the surface it reaches over. A change that flips an arm or snaps a pose in one tick
+belly stays from the surface it reaches over. `JobGate` applies those rules to any job: the rack sweep
+(either hand, three heights, three turns) and the facility sweep (a straight lane, a corner and a U-turn,
+at three heights) both run through it. A change that flips an arm or snaps a pose in one tick
 fails there with the sample at which it happened. Add a scenario there when a new behaviour has a way
 to go wrong that the rack job does not exercise.
 

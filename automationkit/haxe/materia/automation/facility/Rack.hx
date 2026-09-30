@@ -6,9 +6,10 @@ import robotkit.mobile.Pose2;
 class Rack extends Station {
   final slotValues:Array<RackSlot>;
 
+  /** The rack's pose is the rack itself; its optional surface is the top its slots sit on, usually centred on it. */
   public function new(id:String, name:String, zoneId:String, frameId:String, pose:Pose2,
-      slots:Array<RackSlot>) {
-    super(id, name, zoneId, frameId, pose);
+      slots:Array<RackSlot>, ?surface:Surface) {
+    super(id, name, zoneId, frameId, pose, surface);
     if (slots == null || slots.length == 0) throw "Rack requires at least one slot";
     slotValues = [];
     var seen = new Map<String,Bool>();
@@ -16,7 +17,7 @@ class Rack extends Station {
       if (slot == null || seen.exists(slot.id))
         throw "Rack slot IDs must be non-empty and unique";
       seen.set(slot.id, true);
-      slotValues.push(new RackSlot(slot.id, slot.pose));
+      slotValues.push(new RackSlot(slot.id, slot.pose, slot.itemHalfExtents));
     }
   }
 

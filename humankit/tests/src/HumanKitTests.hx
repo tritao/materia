@@ -40,6 +40,7 @@ import materia.automation.facility.Rack;
 import materia.automation.facility.RackSlot;
 import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
+import materia.automation.facility.Surface;
 import materia.automation.facility.Zone;
 import nativekit.scene.Scene;
 import nativekit.scene.SceneRenderer;
@@ -108,6 +109,7 @@ class HumanKitTests {
 		leaning(scene, worker, rig);
 		grasping(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
+		facilitySurfaces();
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -657,6 +659,38 @@ class HumanKitTests {
 	}
 
 	/** Rack-relative slots resolve in facility space and jobs use routed lanes. */
+	/** A facility's surfaces and slot items become boxes in its frame, turned with their owners. */
+	static function facilitySurfaces():Void {
+		var facility = new Facility("surfaces", "Surfaces");
+		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
+		// A rack turned a quarter turn, its top offset along its own x axis, holding a 10 x 8 x 6 cm item.
+		var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(2, 1, Math.PI / 2),
+			[new RackSlot("B3", new RackSlotPose(0.25, 0, 1.2), [0.05, 0.04, 0.03])], new Surface(0.3, 0.2, 1.1, 0.1, 0.0, 0.25));
+		// A station's table lies ahead of where the worker stands.
+		var table = new Station("table", "Table", "floor", "map", new Pose2(4, 1, 0.0), new Surface(0.2, 0.2, 1.0, 0.65));
+		var bare = new Station("bare", "Bare", "floor", "map", new Pose2(6, 1));
+		facility.addRack(rack);
+		facility.addStation(table);
+		facility.addStation(bare);
+		var targets = new FacilityTargets(facility);
+		var top = targets.surfaceBox("rack");
+		if (top == null || distance(top.center, [2.0, 1.1, 1.05]) > 1e-9 || Math.abs(top.yaw - (Math.PI / 2 + 0.25)) > 1e-9 ||
+			top.halfExtents[0] != 0.3 || top.halfExtents[1] != 0.2)
+			throw 'The rack top was not turned with the rack: $top';
+		var bench = targets.surfaceBox("table");
+		if (bench == null || distance(bench.center, [4.65, 1.0, 0.95]) > 1e-9 || bench.yaw != 0.0)
+			throw 'The table did not lie ahead of its station: $bench';
+		if (Math.abs(bench.center[2] + bench.halfExtents[2] - 1.0) > 1e-9)
+			throw "The table box's top face is not at the surface height";
+		if (targets.surfaceBox("bare") != null) throw "A station without a surface reported one";
+		var item = targets.slotItemBox("rack", "B3");
+		if (item == null || distance(item.center, [2.0, 1.25, 1.2]) > 1e-9 || item.halfExtents[0] != 0.05 || item.halfExtents[2] != 0.03)
+			throw 'The slot item box did not resolve through the rack: $item';
+		var threw = false;
+		try targets.surfaceBox("missing") catch (_:Dynamic) threw = true;
+		if (!threw) throw "An unknown station was accepted";
+	}
+
 	static function facilityTargets(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var facility = new Facility("fetch", "Fetch facility");
 		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
@@ -675,6 +709,9 @@ class HumanKitTests {
 		var slot = targets.rackSlotPoint("rack", "B3");
 		if (distance(slot, [2, 1.25, 1.2]) > 1e-9)
 			throw 'Rack slot did not resolve through yaw: $slot';
+		// A facility that describes no surface or item gives the job nothing to lean over or shape a grip to.
+		if (targets.surfaceBox("rack") != null || targets.surfaceBox("table") != null || targets.slotItemBox("rack", "B3") != null)
+			throw "A facility with no surfaces or items reported one";
 		var route = targets.route("rack", "table");
 		var points = FacilityWalk.routeFromFacilityRoute(route);
 		if (points.length != 3 || distance([points[1][0], points[1][1], 0], [3, 1, 0]) > 1e-9)

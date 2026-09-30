@@ -25,6 +25,8 @@ class HumanBody {
 	final wasHolding:Array<Bool> = [false, false, false, false];
 	var leanGoal:Float = 0.0;
 	var leanNow:Float = 0.0;
+	/** Where the bones planning reads stand when the body is upright and at rest, in model space. */
+	final standing:Map<String, Array<Float>> = new Map();
 
 	public function new(character:HumanCharacter, ?walker:HumanWalker, ?posture:HumanPosture) {
 		this.character = character;
@@ -35,6 +37,20 @@ class HumanBody {
 		description = HumanDescription.measure(character.pose, character.height());
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
+		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis]) {
+			var position = character.pose.bonePosition(bone);
+			if (position != null) standing.set(bone, position.copy());
+		}
+	}
+
+	/**
+	 * Where a bone stands when the body is upright and at rest, in model space, for planning where to
+	 * stand: the animated pose bobs with the gait, so reading it at the instant a plan is made would let
+	 * a reach near the limit be possible in one phase of a stride and not another.
+	 */
+	public function standingBone(bone:HumanBone):Null<Array<Float>> {
+		var position = standing.get(bone);
+		return position == null ? null : position.copy();
 	}
 
 	/** What each finger is asked to close to: around what it holds, open while reaching, relaxed otherwise. */
@@ -358,7 +374,8 @@ class HumanBody {
 
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
-		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds);
+		// A lean swings an unused arm back with the torso, so while the body leans a free arm is held hanging.
+		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02, posture.hangSeconds);
 		moveFingers(seconds);
 		moveLean(seconds);
 		walker.advance(seconds);
@@ -367,10 +384,8 @@ class HumanBody {
 
 	/** Re-evaluates reaches at the current animation time for in-frame IK solving. */
 	public function evaluate():Void {
-		// A lean swings an unused arm back with the torso; hold it hanging, more so the further the lean.
-		var hang = leanNow > 0.02 ? Math.min(1.0, leanNow / posture.hangLean) : 0.0;
 		var changed = false;
-		for (control in limbs) if (control.apply(this, hang)) changed = true;
+		for (control in limbs) if (control.apply(this)) changed = true;
 		if (changed) character.advance(0.0);
 	}
 }

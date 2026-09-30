@@ -11,6 +11,7 @@ import materia.automation.facility.Rack;
 import materia.automation.facility.RackSlot;
 import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
+import materia.automation.facility.Surface;
 import materia.automation.facility.Zone;
 import materia.automation.fleet.Dispatcher;
 import materia.automation.fleet.Fleet;
@@ -121,6 +122,25 @@ class AutomationTests {
       throws(function() new Rack("bad-rack", "Bad", "main", "map", new Pose2(),
         [new RackSlot("A", new RackSlotPose(0, 0, 1)), new RackSlot("A", new RackSlotPose(0, 0, 2))]),
         "rack rejects duplicate slot IDs");
+      // A surface is the top a worker reaches over, positioned relative to its owner and turning with it.
+      var top = new Surface(0.3, 0.2, 1.05, 0.5, 0.0, 0.25);
+      var topCenter = top.centerIn(new Pose2(2.0, 1.0, Math.PI / 2));
+      check(Math.abs(topCenter.x - 2.0) < 1e-9 && Math.abs(topCenter.y - 1.5) < 1e-9 &&
+        Math.abs(topCenter.yaw - (Math.PI / 2 + 0.25)) < 1e-9,
+        "a surface's centre and turn follow the pose of its owner");
+      throws(function() new Surface(0.0, 0.2, 1.0), "a surface needs a positive width");
+      throws(function() new Surface(0.3, Math.NaN, 1.0), "a surface needs a finite depth");
+      var bench = new Station("bench", "Bench", "main", "map", new Pose2(1.0, 0.0), top);
+      check(bench.surface == top && outbound.surface == null, "a station keeps the surface it was given, or none");
+      var shelf = new Rack("shelf", "Shelf", "main", "map", new Pose2(6.0, 0.0),
+        [new RackSlot("S1", new RackSlotPose(0, 0, 1.0), [0.05, 0.04, 0.03])], new Surface(0.4, 0.3, 0.9));
+      var shelfSlot = shelf.slot("S1"), plainSlot = storedRack.slot("A1");
+      var shelfItem = shelfSlot == null ? null : shelfSlot.itemHalfExtents;
+      check(shelf.surface != null && shelfItem != null && shelfItem[1] == 0.04 && storedRack.surface == null &&
+        plainSlot != null && plainSlot.itemHalfExtents == null,
+        "a rack keeps its surface, and its slots keep the size of what they hold, through its defensive copy");
+      throws(function() new RackSlot("S", new RackSlotPose(0, 0, 1), [0.05, 0.04]), "a slot's item extents need x, y, and z");
+      throws(function() new RackSlot("S", new RackSlotPose(0, 0, 1), [0.05, -0.04, 0.03]), "a slot's item extents must be positive");
       var router = new FacilityRouter(facility);
       var route = router.route(inbound.id, outbound.id);
       var routeLegs = route.legs();

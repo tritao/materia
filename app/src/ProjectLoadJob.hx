@@ -2,7 +2,9 @@ package app;
 
 import app.MateriaProjectRunner.GeneratedAssemblyScene;
 import sys.thread.Mutex;
+#if !wasm
 import sys.thread.Thread;
+#end
 
 /** Builds and decodes a Materia project on a worker thread so the editor stays responsive meanwhile. */
 class ProjectLoadJob {
@@ -16,6 +18,12 @@ class ProjectLoadJob {
   public function new(projectPath:String) {
     startedAt = Sys.time();
     var self = this;
+    #if wasm
+    // The browser build has no worker threads yet, so the load runs before the first frame after it.
+    try result = MateriaProjectRunner.loadProject(projectPath, null, control)
+    catch (error:Dynamic) failure = Std.string(error);
+    finished = true;
+    #else
     Thread.create(function() {
       var loaded:Null<GeneratedAssemblyScene> = null;
       var problem:Null<String> = null;
@@ -27,6 +35,7 @@ class ProjectLoadJob {
       self.finished = true;
       self.mutex.release();
     });
+    #end
   }
 
   public function isFinished():Bool {

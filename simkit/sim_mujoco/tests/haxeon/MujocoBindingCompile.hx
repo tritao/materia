@@ -2,6 +2,7 @@ import nativekit.scene.Scene;
 import nativekit.sim.Joint;
 import nativekit.sim.MujocoSimWorld;
 import nativekit.sim.SimWorld;
+import nativekit.sim.SimWorldOptions;
 
 /** Compile-only smoke for the engine-neutral MuJoCo Haxeon façade. */
 class MujocoBindingCompile {

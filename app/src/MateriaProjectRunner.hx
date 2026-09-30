@@ -26,9 +26,13 @@ import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart;
 import sys.FileSystem;
 import sys.io.File;
+#if !wasm
 import sys.io.Process;
+#end
 import sys.thread.Mutex;
+#if !wasm
 import sys.thread.Thread;
+#end
 
 /** Resolves a Materia project entrypoint and materializes its generated viewport geometry. */
 class MateriaProjectRunner {
@@ -242,7 +246,7 @@ class MateriaProjectRunner {
       "--run", "MateriaProjectFingerprint", haxeonManifest, module, functionName, tools, home].concat(inputs);
     var fingerprint = StringTools.trim(runCommand(haxe, arguments,
       "Could not fingerprint Materia project entrypoint", control));
-    if (!~/^[0-9a-f]{64}$/.match(fingerprint)) throw "Project fingerprint has an invalid result";
+    if (!Sha256Digest.isHex(fingerprint)) throw "Project fingerprint has an invalid result";
     return ProjectPath.join([cacheDirectory, fingerprint + ".mtrg"]);
   }
 
@@ -273,6 +277,12 @@ class MateriaProjectRunner {
 
   public static function runCommand(command:String, arguments:Array<String>, description:String,
       ?control:ProjectLoadControl):String {
+    #if wasm
+    // Projects are compiled by child processes, which the browser cannot start. The guard keeps callers'
+    // following statements reachable for the compiler's no-return analysis.
+    if (command.length >= 0) throw description + ": external commands are not available in the browser build";
+    return "";
+    #else
     var process:Process;
     try process = Process.run(command, arguments)
     catch (error:Dynamic) throw description + ": " + Std.string(error);
@@ -316,6 +326,7 @@ class MateriaProjectRunner {
       throw '$description (exit $status):\n$details';
     }
     return stdout;
+    #end
   }
 
   static function previewRecords(snapshot:Bytes):GeneratedAssemblyScene {

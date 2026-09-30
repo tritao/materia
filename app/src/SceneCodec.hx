@@ -240,8 +240,8 @@ class SceneCodec {
       packageVersion = stringField(value, "packageVersion");
       sourceSha256 = stringField(value, "sourceSha256");
       configurationSha256 = stringField(value, "configurationSha256");
-      if (!~/^[0-9a-f]{64}$/.match(sourceSha256)
-        || !~/^[0-9a-f]{64}$/.match(configurationSha256))
+      if (!Sha256Digest.isHex(sourceSha256)
+        || !Sha256Digest.isHex(configurationSha256))
         throw "Invalid setup script digest";
     }
     return {
