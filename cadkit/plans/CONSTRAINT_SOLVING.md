@@ -276,3 +276,36 @@ Sources behind the decisions:
   do not treat graph structural rank as exact DOF; test invariance under
   scale, transforms, reordering and reload.
 - **Ceres and code generation considered and rejected** for now (CS-D1).
+
+### C0 — Jacobian oracle and invariance suite (2026-09-30)
+
+- `cadkit.solve.JacobianCheck`: central differences with a per-column step
+  `1e-6 × max(1, |x|)`, reports the worst entry by relative error. Its smoke
+  checks a correct Jacobian at 20 random points and finds a flipped sign.
+- `DiagnosisInvarianceSmoke` (in `HaxeonSmoke`): 6 sketch fixtures × 8 checks (expected answer, 6 transforms, repeat)
+  and 5 assembly fixtures × 9 (7 transforms). The `KNOWN` list is the baseline; the
+  smoke fails when it is wrong either way.
+- Assemblies scale up by 1e5, not 1e6: the schema caps positions at 1e9
+  units (`AssemblyCodec.validateFrame`).
+- Not done: a codec round trip for sketches (no standalone sketch codec; the
+  document codec is the only one). Add it with C2 if the sketch record grows.
+
+Baseline (13 known failures):
+- **Scale 1e6:** every sketch reports `conflicting` (absolute solve and rank
+  tolerances; `characteristicScale` only normalises lengths above 1).
+- **Scale 1e-6:** the redundant list gains `h0`/`h1` (absolute rank
+  tolerance).
+- **Redundant lists are unstable:** translate, rotate, perturb and even a
+  second solve of the same sketch change which members of a dependency are
+  listed (`height` comes and goes), because redundancy is "dropping this
+  constraint keeps the rank" per constraint at whatever pose the solve lands.
+- **The unclosable four-bar reports `nonconvergent`, not `conflicting`.**
+- Passing, and worth knowing: touching circles and the toggle four-bar are
+  not flagged, because the solve stops near the singular pose rather than
+  on it; assemblies are invariant under every transform tried.
+
+Found on the way (fixed separately): `AssemblyNestingSmoke` still expected the
+old JSON form fd97d023 removed; haxeon forgot every flow fact at loop entry
+when the body stored to any array element or field (haxeon e199f1d3,
+branch `loop-flow-stores`), which had broken toolpathkit's
+`ToolpathMotionBinding` under the current pin.
