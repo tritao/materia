@@ -14,7 +14,7 @@ import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 private typedef SketchFixture = {
 	var name:String;
-	/** The correct classification: status and degrees of freedom, e.g. "fully-constrained dof=0". */
+	/** The correct classification, e.g. "fully-constrained dof=0"; with " ids=…" the constraints it names too. */
 	var expected:String;
 	var build:Void->ConstrainedSketch;
 }
@@ -35,16 +35,9 @@ private typedef AssemblyFixture = {
 */
 class DiagnosisInvarianceSmoke {
 	static final KNOWN:Array<String> = [
-		// Absolute solve and rank tolerances: a sketch a million times larger no longer converges.
-		"rectangle/scale-1e6", "rectangle-open/scale-1e6", "rectangle-redundant/scale-1e6", "rectangle-conflict/scale-1e6",
-		"two-rectangles-redundant/scale-1e6", "touching-circles/scale-1e6",
-		// ... and a million times smaller, the absolute rank tolerance counts the horizontal constraints as redundant.
-		"rectangle-redundant/scale-1e-6", "two-rectangles-redundant/scale-1e-6",
-		// Redundancy is "removing this constraint keeps the rank", judged per constraint, so which members of a
-		// dependency are listed depends on the pose the solve lands in, even solving the same sketch again.
-		"rectangle-redundant/translate", "two-rectangles-redundant/rotate", "two-rectangles-redundant/perturb",
-		"two-rectangles-redundant/repeat",
-		// An unclosable loop ends at a stationary residual but is reported as out of iterations.
+		// Local rank at a singular pose is read as redundancy; the generic-rank experiment (CS-D6) targets this.
+		"touching-circles-exact/expected", "touching-circles-exact/rotate", "touching-circles-exact/perturb",
+		// An unclosable loop ends at a stationary residual but is reported as out of iterations (C3).
 		"four-bar-impossible/expected",
 	];
 
@@ -72,18 +65,21 @@ class DiagnosisInvarianceSmoke {
 		return [
 			{name: "rectangle", expected: "fully-constrained dof=0", build: () -> rectangle(true, null)},
 			{name: "rectangle-open", expected: "under-constrained dof=1", build: () -> rectangle(false, null)},
-			{name: "rectangle-redundant", expected: "redundant dof=0", build: () -> rectangle(true, 10)},
-			{name: "rectangle-conflict", expected: "conflicting", build: () -> rectangle(true, 12)},
-			{name: "two-rectangles-redundant", expected: "redundant dof=0", build: twoRedundantRectangles},
+			{name: "rectangle-redundant", expected: "redundant dof=0 ids=top-length,v0,v1,width", build: () -> rectangle(true, 10)},
+			{name: "rectangle-conflict", expected: "conflicting ids=top-length,v0,v1,width", build: () -> rectangle(true, 12)},
+			{name: "two-rectangles-redundant", expected: "redundant dof=0 ids=a.top-length,a.v0,a.v1,a.width,b.top-length,b.v0,b.v1,b.width",
+				build: twoRedundantRectangles},
 			// Generically fully constrained; at this solution the two circles C lies on touch, so the local
 			// Jacobian loses a rank the design does not.
-			{name: "touching-circles", expected: "fully-constrained dof=0", build: touchingCircles},
+			{name: "touching-circles", expected: "fully-constrained dof=0", build: () -> touchingCircles(false)},
+			// The same, authored exactly on the singular pose: the solve starts there and never leaves.
+			{name: "touching-circles-exact", expected: "fully-constrained dof=0", build: () -> touchingCircles(true)},
 		];
 	}
 
 	static function checkSketch(fixture:SketchFixture, failures:Array<String>):Void {
 		var base = sketchSummary(fixture.build());
-		if (classification(base) != fixture.expected)
+		if ((fixture.expected.indexOf(" ids=") >= 0 ? base : classification(base)) != fixture.expected)
 			failures.push('${fixture.name}/expected: want ${fixture.expected}, got $base');
 		var transforms:Array<{name:String, apply:ConstrainedSketch->ConstrainedSketch}> = [
 			{name: "scale-1e-6", apply: s -> transformSketch(s, 1e-6, 0, 0, 0, false, 0)},
@@ -159,9 +155,13 @@ class DiagnosisInvarianceSmoke {
 	}
 
 	/** A fixed, B on a horizontal line 10 away, C 5 from both: C must be the midpoint. */
-	static function touchingCircles():ConstrainedSketch {
+	static function touchingCircles(exact:Bool):ConstrainedSketch {
 		var sketch = new ConstrainedSketch();
-		sketch.addPoint(new SketchPoint("a", 0, 0)).addPoint(new SketchPoint("b", 9.8, 0.2)).addPoint(new SketchPoint("c", 5.1, 0.6));
+		sketch.addPoint(new SketchPoint("a", 0, 0));
+		if (exact)
+			sketch.addPoint(new SketchPoint("b", 10, 0)).addPoint(new SketchPoint("c", 5, 0));
+		else
+			sketch.addPoint(new SketchPoint("b", 9.8, 0.2)).addPoint(new SketchPoint("c", 5.1, 0.6));
 		sketch.addEntity(SketchEntity.line("ab", "a", "b"));
 		sketch.addConstraint(SketchConstraint.fixed("origin", "a"))
 			.addConstraint(SketchConstraint.horizontal("level", "ab"))

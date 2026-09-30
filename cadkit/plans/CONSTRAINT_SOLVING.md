@@ -309,3 +309,43 @@ old JSON form fd97d023 removed; haxeon forgot every flow fact at loop entry
 when the body stored to any array element or field (haxeon e199f1d3,
 branch `loop-flow-stores`), which had broken toolpathkit's
 `ToolpathMotionBinding` under the current pin.
+
+### C1 — `ConstraintDiagnosis` (2026-09-30)
+
+- `cadkit.solve.ConstraintDiagnosis`: union-find subsystems (shared variable
+  or owner); two-pass row/column equilibration; Householder QR with column
+  pivoting of Jᵀ; rank relative to the first pivot (default 1e-9);
+  fundamental circuits from R₁₁⁻¹R₁₂ (member if |coefficient| > 1e-7 of the
+  largest), merged by shared owner. Merged circuits are the matroid's
+  connected components, so groups do not depend on the pivot order (a smoke
+  reverses the rows to check). `nearDegenerate` when a kept pivot is within
+  1e3 of the threshold. Suggestions use FreeCAD's order (most groups, fewest
+  rows, newest) and skip protected owners.
+- Lesson: equilibrating columns means a variable seen only with a tiny
+  coefficient is not a degeneracy (it is just in small units); the first
+  "near-degenerate" test was wrong for that reason.
+- The generic-rank experiment (CS-D6) moved to after C2.1: it needs real
+  sketch Jacobians. Its target fixture is `touching-circles-exact`.
+
+### C2.1 — Sketch solver on `ConstraintDiagnosis`, scale-free (2026-09-30)
+
+- `SketchSolver` now steps in lengths divided by the characteristic size
+  (no longer clamped at 1), so its damping and tolerances are dimensionless;
+  at 1e6 the fixed damping of 1e-3 used to swamp JᵀJ (~1e-14) and the solve
+  never moved. `SolverSettings.rankTolerance` is now relative.
+- Diagnosis: central differences at the solution (the loop still uses
+  forward differences until C2.2), fed to `ConstraintDiagnosis`; rows are
+  satisfied within 10 × the solve tolerance. `SolveDiagnostic.report` holds
+  the full report; `status`, `degreesOfFreedom` and `constraintIds` are
+  derived from it (redundant ids = members of satisfied groups; conflicting
+  ids = members of unsatisfied groups when the stop is stationary).
+- Polish: after reaching the tolerance, up to 3 Gauss-Newton steps while each
+  halves the residual (a unit-conversion smoke checks area to 1e-5 mm²).
+- Invariance: all 12 sketch baseline failures pass; fixtures now pin the
+  dependency groups themselves (e.g. `top-length,v0,v1,width`).
+  New fixture `touching-circles-exact` (authored on the singular pose)
+  reports `redundant dof=1`: the CS-D6 target, recorded in `KNOWN`.
+- `SketchEditBenchmark` (script fixed: it lacked the projectkit and
+  kinematicskit roots): solve p50 75 → 28 ms, document recompute
+  190 → 122 ms, since one QR replaces a rank computation per constraint.
+- CamKit (12223 assertions) passes on the new solver.

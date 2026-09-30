@@ -1,10 +1,16 @@
 package cadkit.sketch;
 
 import cadkit.parametric.EvaluationCancelled;
+import cadkit.solve.ConstraintDiagnosis;
 
 private typedef ResidualSet = { values:Array<Float>, owners:Array<String> };
 
-/** Deterministic damped nonlinear least-squares solver implemented entirely in Haxeon. */
+/**
+	Deterministic damped nonlinear least-squares solver implemented entirely in Haxeon.
+	It works in lengths divided by the sketch's characteristic size, so its
+	damping and tolerances mean the same at any scale, and diagnoses the result
+	with `ConstraintDiagnosis`.
+*/
 class SketchSolver {
 	private final sketch:ConstrainedSketch;
 	private final pointIndex:Map<String, Int>;
@@ -70,63 +76,48 @@ class SketchSolver {
 		while (iterations < sketch.settings.maxIterations && currentNorm > solveTolerance) {
 			checkCancelled();
 			iterations++;
-			var j = jacobian(x, current.values);
-			var normal = matrix(variableCount, variableCount, 0);
-			var gradient = fill(variableCount, 0);
-			for (row in 0...j.length) {
-				if (row % 16 == 0)
-					checkCancelled();
-				for (a in 0...variableCount) {
-					if (a % 8 == 0)
-						checkCancelled();
-					gradient[a] += j[row][a] * current.values[row];
-					for (b in 0...variableCount) normal[a][b] += j[row][a] * j[row][b];
-				}
-			}
-			for (i in 0...variableCount) {
-				if (i % 128 == 0)
-					checkCancelled();
-				normal[i][i] += damping;
-			}
-			var rhs:Array<Float> = [];
-			for (index in 0...gradient.length) {
-				if (index % 1024 == 0)
-					checkCancelled();
-				rhs.push(-gradient[index]);
-			}
-			var delta = linearSolve(normal, rhs);
-			if (delta == null) { damping *= 10; continue; }
-			var trial = x.copy();
-			for (i in 0...variableCount) {
-				if (i % 1024 == 0)
-					checkCancelled();
-				trial[i] += delta[i];
-			}
+			var trial = dampedStep(x, current, damping);
+			if (trial == null) { damping *= 10; continue; }
 			var trialSet = residuals(trial); var trialNorm = norm(trialSet.values);
 			if (trialNorm < currentNorm) { x = trial; current = trialSet; currentNorm = trialNorm; damping = Math.max(1e-12, damping * 0.3); }
 			else damping = Math.min(1e12, damping * 10);
 		}
+		// Converging only to the tolerance leaves a visible length error; Gauss-Newton steps are quadratic here,
+		// so polish while each step at least halves the residual.
+		var polish = 0;
+		while (currentNorm <= solveTolerance && currentNorm > 0 && polish < 3) {
+			checkCancelled();
+			polish++;
+			var trial = dampedStep(x, current, 1e-12);
+			if (trial == null) break;
+			var trialSet = residuals(trial), trialNorm = norm(trialSet.values);
+			if (!(trialNorm < currentNorm * 0.5)) break;
+			x = trial; current = trialSet; currentNorm = trialNorm;
+		}
 		checkCancelled();
 		var j = jacobian(x, current.values);
-		var rankValue = rank(j, sketch.settings.rankTolerance);
-		var dof = variableCount - rankValue;
+		var report = diagnose(x, current);
+		var dof = report.degreesOfFreedom;
 		var badIds = failingOwners(current, solveTolerance * 10);
 		if (currentNorm > solveTolerance) {
 			var gradientNorm = norm(gradient(j, current.values));
 			var stationaryLimit = Math.max(sketch.settings.rankTolerance, solveTolerance * 10) * (1 + currentNorm);
 			var locallyConflicting = gradientNorm <= stationaryLimit;
 			var status = locallyConflicting ? "conflicting" : "nonconvergent";
+			var conflicting = report.conflictingOwners();
+			if (locallyConflicting && conflicting.length > 0)
+				badIds = conflicting;
 			var message = locallyConflicting
 				? "solve stopped at a locally stationary residual; the listed constraints are locally incompatible, which is not proof of global inconsistency"
 				: "constraint solve exhausted its iteration limit while a local descent direction remained";
-			var diagnostic = new SolveDiagnostic(status, false, currentNorm, dof, iterations, badIds, message);
+			var diagnostic = new SolveDiagnostic(status, false, currentNorm, dof, iterations, badIds, message, report);
 			throw new SketchSolveError(diagnostic);
 		}
-		var redundant = redundantIds(x, j, rankValue);
+		var redundant = report.redundantOwners();
 		var status = redundant.length > 0 ? "redundant" : (dof == 0 ? "fully-constrained" : "under-constrained");
 		var ids = redundant.length > 0 ? redundant : [];
 		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids,
-			status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged");
+			status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged", report);
 		checkCancelled();
 		var coordinates:Map<String, Array<Float>> = new Map();
 		for (point in sketch.points()) { var i:Int = cast pointIndex.get(point.id); coordinates.set(point.id, [x[i], x[i + 1]]); }
@@ -318,7 +309,7 @@ class SketchSolver {
 		for (constraint in sketch.constraints())
 			if (constraint.kind == "distance" || constraint.kind == "radius")
 				scale = Math.max(scale, Math.abs(constraint.value));
-		return Math.max(1, scale);
+		return scale > 0 ? scale : 1;
 	}
 
 	private static function hasLinearResidual(kind:String):Bool {
@@ -328,6 +319,44 @@ class SketchSolver {
 		var a=point(pa,x), b=point(pb,x), ends=line(axis,x,owner), d=direction(axis,x,owner); var dd=dot(d,d); if(dd<1e-12) throw invalid("collapsed symmetry axis",[owner]);
 		var mid=[(a[0]+b[0])/2,(a[1]+b[1])/2]; out.push(cross([mid[0]-ends[0][0],mid[1]-ends[0][1]],d)/Math.pow(dd,0.5)); out.push(dot([b[0]-a[0],b[1]-a[1]],d)/Math.pow(dd,0.5));
 	}
+	/** One Levenberg-Marquardt step from `x`, in scaled variables; null when the damped normal matrix is singular. */
+	private function dampedStep(x:Array<Float>, current:ResidualSet, damping:Float):Null<Array<Float>> {
+		var j = jacobian(x, current.values);
+		var normal = matrix(variableCount, variableCount, 0);
+		var gradient = fill(variableCount, 0);
+		for (row in 0...j.length) {
+			if (row % 16 == 0)
+				checkCancelled();
+			for (a in 0...variableCount) {
+				if (a % 8 == 0)
+					checkCancelled();
+				gradient[a] += j[row][a] * current.values[row];
+				for (b in 0...variableCount) normal[a][b] += j[row][a] * j[row][b];
+			}
+		}
+		for (i in 0...variableCount) {
+			if (i % 128 == 0)
+				checkCancelled();
+			normal[i][i] += damping;
+		}
+		var rhs:Array<Float> = [];
+		for (index in 0...gradient.length) {
+			if (index % 1024 == 0)
+				checkCancelled();
+			rhs.push(-gradient[index]);
+		}
+		var delta = linearSolve(normal, rhs);
+		if (delta == null) return null;
+		var trial = x.copy();
+		for (i in 0...variableCount) {
+			if (i % 1024 == 0)
+				checkCancelled();
+			trial[i] += delta[i] * normalizationScale;
+		}
+		return trial;
+	}
+
+	/** Forward differences with respect to the scaled variables (x / normalizationScale). */
 	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> {
 		var j = matrix(base.length, variableCount, 0);
 		for (column in 0...variableCount) {
@@ -340,7 +369,7 @@ class SketchSolver {
 			for (row in 0...base.length) {
 				if (row % 128 == 0)
 					checkCancelled();
-				j[row][column] = (values[row] - base[row]) / step;
+				j[row][column] = (values[row] - base[row]) / 1e-6;
 			}
 		}
 		return j;
@@ -358,22 +387,27 @@ class SketchSolver {
 		}
 		return result;
 	}
-	private function redundantIds(x:Array<Float>, full:Array<Array<Float>>, fullRank:Int):Array<String> {
-		var result:Array<String> = [];
-		var set = residuals(x);
-		for (constraint in sketch.constraints()) {
-			checkCancelled();
-			var reduced:Array<Array<Float>> = [];
-			for (index in 0...full.length) {
-				if (index % 128 == 0)
-					checkCancelled();
-				if (set.owners[index] != constraint.id)
-					reduced.push(full[index]);
-			}
-			if (rank(reduced, sketch.settings.rankTolerance) == fullRank)
-				result.push(constraint.id);
+	/**
+		Diagnoses the solved point. The Jacobian is central differences in the
+		scaled variables, accurate enough for relative rank decisions; rows
+		count as satisfied within ten times the solve tolerance.
+	*/
+	private function diagnose(x:Array<Float>, set:ResidualSet):DiagnosisReport {
+		var rows = set.values.length, flat = [for (_ in 0...rows * variableCount) 0.0];
+		for (column in 0...variableCount) {
+			if (column % 8 == 0)
+				checkCancelled();
+			var step = 1e-6 * normalizationScale;
+			var plus = x.copy(), minus = x.copy();
+			plus[column] += step;
+			minus[column] -= step;
+			var high = residuals(plus).values, low = residuals(minus).values;
+			for (row in 0...rows)
+				flat[row * variableCount + column] = (high[row] - low[row]) / 2e-6;
 		}
-		return result;
+		var satisfiedWithin = solveTolerance * 10;
+		return ConstraintDiagnosis.diagnose({jacobian: flat, variables: variableCount, owners: set.owners,
+			residuals: [for (value in set.values) value / satisfiedWithin], rankTolerance: sketch.settings.rankTolerance});
 	}
 	private function failingOwners(set:ResidualSet,t:Float):Array<String>{var out:Array<String> = [];for(i in 0...set.values.length)if(Math.abs(set.values[i])>t&&!contains(out,set.owners[i]))out.push(set.owners[i]);return out;}
 	private static function contains(a:Array<String>,v:String):Bool{for(x in a)if(x==v)return true;return false;}
@@ -450,49 +484,5 @@ class SketchSolver {
 			row--;
 		}
 		return result;
-	}
-
-	private function rank(input:Array<Array<Float>>, tolerance:Float):Int {
-		if (input.length == 0)
-			return 0;
-		var matrix:Array<Array<Float>> = [];
-		for (index in 0...input.length) {
-			if (index % 16 == 0)
-				checkCancelled();
-			matrix.push(input[index].copy());
-		}
-		var rowCount = matrix.length;
-		var columnCount = matrix[0].length;
-		var row = 0;
-		var column = 0;
-		while (row < rowCount && column < columnCount) {
-			checkCancelled();
-			var pivotRow = row;
-			for (candidate in row...rowCount)
-				if (Math.abs(matrix[candidate][column]) > Math.abs(matrix[pivotRow][column]))
-					pivotRow = candidate;
-			if (Math.abs(matrix[pivotRow][column]) <= tolerance) {
-				column++;
-				continue;
-			}
-			var temporary = matrix[row];
-			matrix[row] = matrix[pivotRow];
-			matrix[pivotRow] = temporary;
-			var pivot = matrix[row][column];
-			for (entry in column...columnCount)
-				matrix[row][entry] /= pivot;
-			for (candidate in 0...rowCount) {
-				if (candidate % 16 == 0)
-					checkCancelled();
-				if (candidate == row)
-					continue;
-				var factor = matrix[candidate][column];
-				for (entry in column...columnCount)
-					matrix[candidate][entry] -= factor * matrix[row][entry];
-			}
-			row++;
-			column++;
-		}
-		return row;
 	}
 }
