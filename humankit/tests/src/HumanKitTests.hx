@@ -104,6 +104,7 @@ class HumanKitTests {
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
 		fingersCurl(scene, worker, rig);
+		leaning(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -485,6 +486,43 @@ class HumanKitTests {
 		var rejected = false;
 		try human.setHandCurl(LegL, 1.0) catch (_:Dynamic) rejected = true;
 		if (!rejected) throw "A leg was given fingers to curl";
+		human.dispose();
+	}
+
+	/** Leaning carries the shoulders forward, an unused arm hangs instead of swinging back, and standing up undoes it. */
+	static function leaning(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Leaner");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		var shoulderX = function(bone:HumanBone):Float return human.pose.bonePosition(bone)[0];
+		var upright = shoulderX(HumanBone.UpperArmR);
+		var wanted = 0.06;
+		var made = body.leanFor(ArmR, wanted);
+		if (Math.abs(made.shift - wanted) > 0.005)
+			throw 'A lean asked to move the shoulder $wanted m is predicted to move it ${made.shift} m';
+		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 1e-4 || human.spineLean() != 0.0)
+			throw "Working out a lean left the pose changed";
+		var capped = body.leanFor(ArmR, 5.0);
+		if (capped.angle > HumanBody.MAX_LEAN + 1e-6 || capped.shift >= 5.0)
+			throw 'A lean of ${capped.angle} rad was allowed past ${HumanBody.MAX_LEAN}';
+
+		body.setLean(made.angle);
+		for (_ in 0...90) body.advance(step);
+		var leaned = shoulderX(HumanBone.UpperArmR) - upright;
+		if (Math.abs(leaned - made.shift) > 0.01)
+			throw 'Leaning moved the shoulder $leaned m, not the ${made.shift} m predicted';
+		body.setLean(0.5);
+		for (_ in 0...90) body.advance(step);
+		var far = human.pose.bonePosition(HumanBone.UpperArmL), hand = human.pose.bonePosition(HumanBone.HandL);
+		var length = body.description.upperArm + body.description.forearm;
+		if (far[2] - hand[2] < 0.6 * length || Math.abs(hand[0] - far[0]) > 0.25 * length)
+			throw 'The arm not reaching does not hang under its shoulder while leaning: $far to $hand';
+		body.setLean(0.0);
+		for (_ in 0...120) body.advance(step);
+		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 0.01 || human.spineLean() > 1e-3)
+			throw "Standing up did not undo the lean";
 		human.dispose();
 	}
 

@@ -29,7 +29,7 @@ class RackScenario {
         this.partStart = partStart;
     }
 
-    public static function build():RackScenario {
+    public static function build(restingOn:Bool = true):RackScenario {
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var rig = HumanoidRig.detect(asset);
         var scene = Scene.create();
@@ -51,10 +51,11 @@ class RackScenario {
         var targets = new JobTargets();
         targets.boxes.set("part", {center: partStart.copy(), halfExtents: [partHalf, partHalf, partHalf], yaw: 0.0});
         targets.boxes.set("table", {center: [placePoint[0], placePoint[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0});
+        targets.boxes.set("rack", {center: [partStart[0], partStart[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0});
         var objects:Map<String, nativekit.sim.SimObject> = new Map();
         objects.set("part", part);
         objects.set("table", table);
-        worker.runSpec(HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"},{"action":"place","onto":"table"}]}'), targets, objects);
+        worker.runSpec(HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"' + (restingOn ? ',"from":"rack"' : '') + '},{"action":"place","onto":"table"}]}'), targets, objects);
         return new RackScenario(session, world, worker, part, partStart);
     }
 

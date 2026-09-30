@@ -43,6 +43,7 @@ class HumanCharacter {
 	public final attachments:Array<HumanAttachment> = [];
 	/** The left and right hands' fingers; null for a rig without them. */
 	final hands:Array<Null<HumanHand>>;
+	var lean:Float = 0.0;
 	public var root(get, never):NodeId;
 
 	final scene:Scene;
@@ -115,6 +116,28 @@ class HumanCharacter {
 		var fingers = hands[hand == ArmL ? 0 : 1];
 		if (fingers != null) fingers.setCurl(curl);
 	}
+
+	/**
+	 * Leans the upper body forward by angle radians (0 upright), on top of the animation, by pitching
+	 * the spine's upper joints together. Takes effect from the next advance.
+	 */
+	public function setSpineLean(angle:Float):Void {
+		if (Math.abs(angle - lean) < 1e-5) return;
+		lean = angle;
+		var joints = [rig.joint(HumanBone.Spine2), rig.joint(HumanBone.Chest)];
+		// Mostly the chest joint, which sits about at table height: the belly below stays put and the chest
+		// can overhang a table, the way a person leans over one.
+		var shares = [0.25, 0.75];
+		for (index in 0...joints.length) {
+			if (joints[index] < 0) continue;
+			var turn = angle * shares[index];
+			if (Math.abs(turn) < 1e-5) instance.clearJointRotation(joints[index]);
+			else instance.setJointRotation(joints[index], [Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+		}
+	}
+
+	public function spineLean():Float
+		return lean;
 
 	/** How curled a hand's fingers are, or 0 for a rig without them. */
 	public function handCurl(hand:HumanLimb):Float {

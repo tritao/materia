@@ -131,6 +131,8 @@ class Place extends HumanActionBase {
 		if (stableTime >= 0.15 || elapsed >= 0.5) {
 			grip = false;
 			worker.setGrip(false);
+			// The part is down; straighten up as the hands withdraw.
+			worker.setLean(0.0);
 			stage = 2;
 			elapsed = 0.0;
 		}
