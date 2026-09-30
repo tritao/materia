@@ -130,9 +130,7 @@ class ProgramCompiler {
       throw "Program compiler selector must use its kinematics solver";
     if (configurationSelector != null) {
       this.configurationSelector = configurationSelector;
-    // Haxeon currently misidentifies an OPW object through this interface as
-    // KinematicsSolver when Std.isOfType checks its concrete class.
-    } else if (Reflect.field(solver, "nativePathSample") != null) {
+    } else if (Std.isOfType(solver, OpwKinematics)) {
       var arm:OpwKinematics = cast solver;
       var lower:Array<Float> = [], upper:Array<Float> = [];
       for (joint in 0...count) {
@@ -142,7 +140,7 @@ class ProgramCompiler {
       }
       this.configurationSelector = new PathConfigurationSelector(solver,
         lower, upper, this.perJointMaxJump, maxVelocity);
-    } else if (Reflect.field(solver, "refinePath") != null &&
+    } else if (Std.isOfType(solver, ManipulatorKinematics) &&
         (cast solver:ManipulatorKinematics).manipulator.redundant()) {
       // A redundant arm's swivel is chosen along the whole path, not drifted into point by point.
       var arm:ManipulatorKinematics = cast solver;

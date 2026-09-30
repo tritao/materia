@@ -63,9 +63,7 @@ class PathConfigurationSelector {
         distances.length == 0 || startQ == null || startQ.length != solver.jointCount() ||
         tolerance == null)
       throw "Configuration selector needs aligned path samples and start joints";
-    // Match the OPW capability through the interface until Haxeon restores
-    // concrete-class checks on interface-typed values.
-    if (Reflect.field(solver, "nativePathSample") != null) {
+    if (Std.isOfType(solver, OpwKinematics)) {
       var opw:OpwKinematics = cast solver;
       var nativeSamples:Array<mk_opw_path_sample> = [];
       for (index in 0...poses.length)
@@ -75,9 +73,8 @@ class PathConfigurationSelector {
       return readResult(selected.status, selected.out_sequence);
     }
     var candidates:Array<Array<Array<Float>>> = [];
-    // Same Haxeon interface-check workaround as for OPW above.
     var redundant:Null<ManipulatorKinematics> = null;
-    if (Reflect.field(solver, "continueCandidates") != null) {
+    if (Std.isOfType(solver, ManipulatorKinematics)) {
       var arm:ManipulatorKinematics = cast solver;
       if (arm.manipulator.redundant()) redundant = arm;
     }

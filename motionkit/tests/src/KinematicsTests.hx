@@ -239,6 +239,16 @@ class KinematicsTests extends MotionKitTestSupport {
     near(solver.parameters.a1, 0.1, "OPW extracts a1", 1e-9);
     near(solver.parameters.a2, -0.135, "OPW extracts a2", 1e-9);
     near(solver.parameters.c1, 0.615, "OPW extracts c1", 1e-9);
+    // Recognised through the interface, so the compiler picks its analytic path selector.
+    {
+      var general:KinematicsSolver = solver;
+      check(Std.isOfType(general, OpwKinematics) && !Std.isOfType(general, ManipulatorKinematics),
+        "an OPW solver is recognised through the KinematicsSolver interface");
+      var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+      var compiler = new ProgramCompiler(general, limits, "work", [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
+        [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+      check(compiler.configurationSelector != null, "the compiler selects OPW configurations along paths");
+    }
     var q = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
     var reference = new ManipulatorKinematics(manipulator).forward(q);
     var actual = solver.forward(q);
