@@ -70,6 +70,8 @@ class DockWorkspace implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
+		var observed = context.buildProbe != null;
+		var started = observed ? Sys.time() : 0.0;
 		var mounted:State<DockWorkspaceMount> = context.resourceState(context.id("workspace-mount:" + key),
 			function() { return new DockWorkspaceMount(model, interaction); },
 			function(value) { value.dispose(); });
@@ -87,7 +89,11 @@ class DockWorkspace implements View {
 			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight,
 			labelWidths, panelCache);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
-		return new Column(key, [new KeyedView("content", layout)], style).build(context);
+		var root = new Column(key, [new KeyedView("content", layout)], style).build(context);
+		// Includes the panels built inside it; subtract their own probes to get the chrome.
+		if (observed)
+			context.reportBuild("dock-workspace", 0.0, Sys.time() - started, root);
+		return root;
 	}
 
 	function buildNode(node:DockNode, context:BuildContext, path:Array<Int>, nodeKey:String,
@@ -327,10 +333,13 @@ private class DockPanelView implements View {
 			"|viewport=" + context.viewportWidth + "x" + context.viewportHeight +
 			"|width=" + availableWidth;
 		var cached = cacheKey == null ? null : panelCache.entry(descriptor.id);
+		var hitStarted = context.buildProbe != null ? Sys.time() : 0.0;
 		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
 			context.retainStateIds(cached.stateIds);
 			context.claimRetainedTree(cached.root);
 			cached.root.detach();
+			if (context.buildProbe != null)
+				context.reportBuild("panel-hit:" + descriptor.id, 0.0, Sys.time() - hitStarted, cached.root);
 			return cached.root;
 		}
 		if (cached != null)

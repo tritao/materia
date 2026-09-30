@@ -1,6 +1,6 @@
 # Retained subtrees
 
-Status: design, 2026-09-30. Nothing here is implemented; the measurements are.
+Status: 2026-09-30. **Stopped after stage 1 and a bound on stage 3; nothing below was implemented.** See "Outcome".
 
 ## What the numbers say
 
@@ -60,3 +60,23 @@ The risk is the key, not the mechanism, so:
 4. **Optional: cached encoding** for retained subtrees, only if the profile after stage 3 shows the Haxe encode is worth it.
 
 If stage 1 or 3 misses its target the work stops there; the primitive from stage 2 is still a simplification of two duplicated caches.
+
+## Outcome
+
+Stage 1 (measured with `dock-workspace` and `panel-hit:*` build probes, tab-matrix, median of 40 cycles):
+
+| transition | tree + style ms | dock workspace ms | panel cache hits ms | panels built ms |
+|---|---|---|---|---|
+| hierarchy to sensors | 0.96 | 0.50 | 0.05 | 0.10 |
+| sensors to hierarchy | 0.71 | 0.39 | 0.02 | 0.09 |
+| console to telemetry | 0.74 | 0.42 | 0.02 | 0.08 |
+| telemetry to console | 0.94 | 0.64 | 0.02 | 0.35 |
+
+- The dock chrome (tab strips, dividers, tab buttons) is 37-41% of tree-and-style time, which passed the stage 1 bar.
+- A panel cache hit, including its `statesMatch` and `claimRetainedTree` walks, costs 0.02-0.05 ms. The general primitive of stage 2 would speed up almost nothing, so it is dropped as a performance project.
+- Timing `Tabs.build` separately (header strip only, the tab contents subtracted) gave 0.17-0.21 ms for all four strips together, about 0.05 ms each.
+  Retaining the three strips of panes that did not change would save at most 0.12-0.16 ms (6-8% of a 2.0 ms frame) before the cost of a hit: the retained-subtree checks, and replaying the drop-target registrations that each header's build performs (`onTabHeaderBuilt` calls `interaction.registerTabTarget`).
+  `Tabs` also builds its header and the active panel content together, so a strip could not be retained without splitting the widget.
+  Realistic gain is about 0.1 ms, below the 0.15 ms keep threshold and inside measurement noise on a shared machine, so stage 3 is a no-go.
+
+Conclusion: the remaining tab-switch cost is spread thinly over hundreds of nodes and over native layout and shaping of content that really changed, not over work a retained subtree can skip. Revisit only if the tree grows much larger or a frame with many independent panes becomes common; then a retention keyed on the pane's tab list, active tab, label widths and drag preview, with the drop-target registrations replayed on a hit, is where to start.
