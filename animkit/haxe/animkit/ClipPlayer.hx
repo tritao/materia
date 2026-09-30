@@ -57,6 +57,23 @@ class ClipPlayer {
 		this.loop = loop;
 	}
 
+	/**
+	 * Starts a clip from its beginning with no fade, even when it is already the
+	 * current clip, dropping any crossfade in progress and returning the rate to
+	 * normal. This puts the player back as if the clip had just been started.
+	 */
+	public function restart(index:Int, loop:Bool = true):Void {
+		if (index < 0 || index >= instance.asset.clipNames.length)
+			throw 'Clip index $index is out of range';
+		previousClip = -1;
+		fadeDuration = 0.0;
+		fadeElapsed = 0.0;
+		clip = index;
+		time = 0.0;
+		this.loop = loop;
+		speed = 1.0;
+	}
+
 	/** Advances playback, updates the instance layers, and evaluates the pose. */
 	public function advance(seconds:Float):Void {
 		var step = seconds * speed;

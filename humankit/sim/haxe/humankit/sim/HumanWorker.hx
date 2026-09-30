@@ -66,6 +66,11 @@ class HumanWorker {
 	var loopSpec:Null<HumanJobSpec>;
 	var loopTargets:Null<HumanJobTargets>;
 	var loopObjects:Null<Map<String, SimObject>>;
+	/** The document job last started with runSpec, which reset() starts again. */
+	var jobSpec:Null<HumanJobSpec>;
+	final startX:Float;
+	final startY:Float;
+	final startHeading:Float;
 	var bindings:Array<{action:Dynamic, object:SimObject, hand:HumanLimb, both:Bool, grasp:Array<Float>}> = [];
 	var lastPick:Null<Pick> = null;
 	var lastPlace:Null<Place> = null;
@@ -81,9 +86,11 @@ class HumanWorker {
 	public function new(session:SimSession, character:HumanCharacter, proxy:HumanBodyProxy, startPose:SimPose) {
 		this.session = session;
 		body = new HumanBody(character);
-		body.walker.place(startPose.x, startPose.y,
-			Math.atan2(2 * (startPose.qw * startPose.qz + startPose.qx * startPose.qy),
-				1 - 2 * (startPose.qy * startPose.qy + startPose.qz * startPose.qz)));
+		startX = startPose.x;
+		startY = startPose.y;
+		startHeading = Math.atan2(2 * (startPose.qw * startPose.qz + startPose.qx * startPose.qy),
+			1 - 2 * (startPose.qy * startPose.qy + startPose.qz * startPose.qz));
+		body.walker.place(startX, startY, startHeading);
 		body.advance(0.0);
 		actor = new HumanActor(session, proxy, character.pose, body.rootTransform());
 		stabiliser = session.createActor([SimShape.sphere(0.001)], [STABILISER_POSE]);
@@ -121,6 +128,7 @@ class HumanWorker {
 		job.bind(body);
 		this.job = job;
 		loopSpec = null;
+		jobSpec = null;
 		lastAction = null;
 		lastGrip = false;
 	}
@@ -131,6 +139,8 @@ class HumanWorker {
 		bindings = [];
 		lastPick = null;
 		lastPlace = null;
+		loopTargets = targets;
+		loopObjects = objectsById;
 		var built:HumanJobBuildResult;
 		try built = HumanJobBuilder.build(spec, targets, body) catch (error:Dynamic) {
 			var failed = new HumanJob(body).add(new Wait(1.0));
@@ -162,8 +172,35 @@ class HumanWorker {
 		run(built.job);
 		if (failure != null) built.job.abort(failure);
 		loopSpec = spec.loop && failure == null ? spec : null;
-		loopTargets = targets;
-		loopObjects = objectsById;
+		jobSpec = spec;
+	}
+
+	/**
+	 * Returns the worker to where its session starts. The session's own reset has
+	 * already put its objects, actors and stabilisers back; this restores what
+	 * lives beside the session: the body at its start pose with nothing reaching,
+	 * carried or held, every pending pin, hold and release forgotten, and a
+	 * document job started again from its first step. A job given to run() cannot
+	 * be rewound, so that worker stands idle at its start pose.
+	 */
+	public function reset():Void {
+		if (disposed) throw "Worker is disposed";
+		pending.resize(0);
+		pinned = [];
+		releasing = [];
+		held = [];
+		placing = null;
+		bindings = [];
+		lastPick = null;
+		lastPlace = null;
+		actionSteps = [];
+		lastAction = null;
+		lastGrip = false;
+		animationTime = 0.0;
+		body.reset(startX, startY, startHeading);
+		job = null;
+		var spec = jobSpec, targets = loopTargets, objects = loopObjects;
+		if (spec != null && targets != null && objects != null) runSpec(spec, targets, objects);
 	}
 
 	public function currentJobDone():Bool

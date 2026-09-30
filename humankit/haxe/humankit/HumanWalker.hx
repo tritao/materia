@@ -102,6 +102,27 @@ class HumanWalker {
 		facing = null;
 	}
 
+	/**
+	 * Returns to rest at a floor pose as if newly constructed: no route, no turn
+	 * pending, and the idle clip playing from its start.
+	 */
+	public function restart(x:Float, y:Float, heading:Float):Void {
+		points = [];
+		distances = [];
+		loop = false;
+		speed = 0.0;
+		travelled = 0.0;
+		velocity = 0.0;
+		walking = false;
+		facing = null;
+		preserveHeading = false;
+		retreating = false;
+		this.x = x;
+		this.y = y;
+		this.heading = wrap(heading);
+		character.player.restart(idleClip);
+	}
+
 	/** Turns in place at turnRate, including after a route has ended. */
 	public function face(angle:Float):Void
 		facing = wrap(angle);

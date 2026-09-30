@@ -191,6 +191,16 @@ class HumanBody {
 		for (limb in [ArmL, ArmR, LegL, LegR]) clearReach(limb);
 	}
 
+	/**
+	 * Returns the body to rest at a floor pose as if newly constructed: no route,
+	 * no reach, nothing carried or held, and the idle pose evaluated.
+	 */
+	public function reset(x:Float, y:Float, heading:Float):Void {
+		cancel();
+		walker.restart(x, y, heading);
+		advance(0.0);
+	}
+
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
 		walker.advance(seconds);
