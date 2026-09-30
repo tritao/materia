@@ -219,3 +219,50 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
       would swamp the motion cost; this needs a normalised state cost.
     - `PoseTarget` resolution (`MoveJ` to a pose) still takes the candidate
       nearest the start.
+- 2026-10-01 — **D6 done: coordinated external axes.** The arm, a rail under
+  it and a positioner holding the workpiece are one robot model, so one
+  plan over all their joints runs on one runtime clock. That shared clock
+  is the synchronized-execution contract.
+  - kinematicskit:
+    - `FrameTask.relativeTo(body, offset)` targets a frame relative to
+      another moving body. Its rows are J_frame − J_reference, the
+      reference's taken at the target point (exact for position).
+    - `DofDampingTask` adds per-DOF step damping with zero target: it shapes
+      steps without biasing the answer.
+  - RobotKit `CoordinatedGroup`:
+    - The joints root→flange (rail, arm) plus root→work frame (positioner).
+      Tool poses are in the work frame.
+    - External axes (the work branch and any named rail joints) are damped.
+    - An optional preferred arm posture: a first pass draws the arm towards
+      it, so the external axes bring the work round. A second pass, without
+      the pull, meets the tool target exactly.
+    - `relativeJacobian` gives the work-frame Jacobian.
+  - MotionKit `CoordinatedKinematics` (a `KinematicsSolver`) makes
+    `ProgramCompiler` and `ManipulatorMotion` work unchanged on a cell.
+  - Test (workcell: the 6-axis arm on a 2 m rail plus a turntable):
+    - A 0.3 m circle round the workpiece, the tool following the tangent.
+      The far side is beyond the arm's reach.
+    - The turntable turns 6.24 rad, the rail moves 2 cm, and no arm joint
+      moves more than 0.025 rad.
+    - The compiled plan passes the task-space check. Executed through
+      `ManipulatorMotion` (the long plan streamed in chunks), the tool stays
+      within 0.1 mm of the path in the work frame.
+  - Bugs found on the way, all fixed with tests:
+    - Runtime: an accepted plan did not clear the joint targets held before
+      it, so when the plan ended the robot jumped back to them. Trajectory
+      chunks already cleared them; plans now do too.
+    - MotionKit timing: stretching or softening a time law re-derives every
+      stage from rounded durations. Over 24k stages the rest boundary
+      drifted (end speed −6e-7), and the law was rejected as an invalid
+      argument. The exact rest boundary is now re-applied after each
+      stretch or soften.
+    - `ProgramCompiler`'s task-space check timed inspected distances by
+      interpolating between sample times. Braking to rest over the last
+      sample interval that was off by about a quarter of the interval
+      (0.6 mm of false error). It now uses the time law's exact times.
+  - Open:
+    - Robots in separate runtimes (an external positioner on its own
+      controller) need a cross-runtime synchronization contract: a shared
+      start time and clock mapping.
+    - Candidate selection over external-axis redundancy (D3-style lattice)
+      instead of continuation with a posture preference.

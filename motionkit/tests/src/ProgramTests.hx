@@ -44,10 +44,12 @@ import motionkit.path.PathTimeLaw;
 import motionkit.path.PathTimeLaw.PathTimeStage;
 import motionkit.path.PosePath;
 import motionkit.path.PoseLine;
+import motionkit.path.PosePrimitive;
 import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
 import motionkit.robot.ToolpathPosePath;
+import motionkit.robot.CoordinatedKinematics;
 import robotkit.process.Toolpath;
 import robotkit.process.ToolpathPoint;
 import robotkit.spatial.Transform3;
@@ -268,6 +270,108 @@ class ProgramTests extends MotionKitTestSupport {
     // Choosing the swivel for the whole path moves the joints less than solving point by point.
     check(planTravel < 0.8 * pointTravel, 'the path moves the joints less than point-by-point IK ($planTravel vs $pointTravel rad)');
     line.dispose();
+  }
+
+  /** D6: a path on a turning workpiece, planned over the arm, its rail and the positioner as one plan. */
+  public function testCoordinatedExternalAxes():Void {
+    var fixture = buildWorkcellFixture();
+    var cell = fixture.group;
+    check(cell.dofCount() == 8, 'the group holds the rail, the arm and the turntable (${cell.dofCount()})');
+    check(cell.external[0] && !cell.external[1] && cell.external[7], "the rail and the turntable are external axes");
+    var solver = new CoordinatedKinematics(cell, 1e-8);
+    var tolerance = new IkTolerance();
+    // Rail in front of the table, arm reaching forward with the tool pointing down.
+    var start = [0.75, 1.57, -1.2, 1.6, -1.97, -1.57, 0.0, 0.0];
+    var here = solver.forward(start);
+
+    // The relative Jacobian is the derivative of the tool pose in the work frame.
+    var jacobian = cell.relativeJacobian(start);
+    var eps = 1e-6;
+    for (column in [0, 2, 7]) {
+      var plus = start.copy(); plus[column] += eps;
+      var minus = start.copy(); minus[column] -= eps;
+      var a = solver.forward(plus), b = solver.forward(minus);
+      near(jacobian[column], (a.x - b.x) / (2 * eps), 'relative Jacobian x column $column', 1e-6);
+      near(jacobian[8 + column], (a.y - b.y) / (2 * eps), 'relative Jacobian y column $column', 1e-6);
+    }
+
+    // A 0.3 m circle round the workpiece, starting on the side facing the arm, the tool pointing down and
+    // turning with the circle's tangent (as a torch or cutter follows a seam). The far side is out of the
+    // arm's reach, so the turntable must bring it round, and in the world the tool then barely turns.
+    var radius = 0.3, lines:Array<PosePrimitive> = [];
+    function onCircle(turn:Float):Pose3 {
+      var angle = -0.5 * Math.PI + turn, half = 0.5 * turn;
+      // Rz(turn) · (pointing down: half a turn about X).
+      return new Pose3(radius * Math.cos(angle), radius * Math.sin(angle), 0.15, Math.cos(half), Math.sin(half), 0, 0);
+    }
+    var points = [for (k in 0...33) onCircle(2.0 * Math.PI * k / 32)];
+    // Enter the circle in the configuration that leaves the turntable nearest home.
+    var options = solver.sampleCandidates(points[0], 8, tolerance);
+    check(options.length > 0, "the circle's first point is reachable");
+    var entry = options[0];
+    for (option in options) if (Math.abs(option[7]) < Math.abs(entry[7])) entry = option;
+    cell.preferredPosture = entry;
+    for (k in 0...32) lines.push(new PoseLine(new PoseWaypoint(points[k], 0.0005, 0.005),
+      new PoseWaypoint(points[k + 1], 0.0005, 0.005), OrientationPolicy.Interpolated, 0.1, 0.1));
+    var path = new PosePath("work", lines);
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var limits = new ValidationLimits(8, Int64.ofInt(blueprint.revision), Int64.ofInt(blueprint.calibrationRevision));
+    for (joint in 0...8) limits.jerk(joint, 20.0);
+    var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in 0...8) 1.0], [for (_ in 0...8) 2.0],
+      [for (_ in 0...8) 20.0], StartTolerances.uniform(8, 0.02, 0.02, 0.02), null, 0.0025);
+    var compiled = compiler.compile(new MotionProgram([MotionOp.FollowPath(path, "work", 0.05, [])]), entry,
+      Int64.ofInt(500));
+    var plan = compiled.blocks[0].plans[0];
+    check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
+    var turned = 0.0, railMoved = 0.0, armMoved = 0.0;
+    var first = plan.evaluate(0.0).positions;
+    for (k in 0...101) {
+      var q = plan.evaluate(plan.durationSeconds * k / 100).positions;
+      turned = Math.max(turned, Math.abs(q[7] - first[7]));
+      railMoved = Math.max(railMoved, Math.abs(q[0] - first[0]));
+      for (j in 1...7) armMoved = Math.max(armMoved, Math.abs(q[j] - first[j]));
+    }
+    check(turned > Math.PI, 'the positioner turns the workpiece round ($turned rad)');
+    check(armMoved < 0.2, 'the arm stays near its posture while the work turns ($armMoved rad)');
+
+    // One plan drives every joint of the cell on one clock.
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("workcell", runtime, fixture.model.name, [for (link in fixture.model.links) link.name],
+      [for (joint in fixture.model.joints) joint.name]);
+    robot.submit(RobotCommand.JointTargets([for (j in 0...8) robotkit.world.JointTarget.position(j, entry[j])], null));
+    var tick = 0;
+    for (_ in 0...300) harness.step(Int64.ofInt(++tick));
+    // Executed through the program runner, which streams the long plan to the runtime in chunks.
+    var motion = new ManipulatorMotion(robot, compiler, function(_) return null,
+      function() return {events: [], overflow: false}, cell.jointIndices());
+    motion.run(new MotionProgram([MotionOp.FollowPath(path, "work", 0.05, [])]));
+    function offPath(tool:Pose3):Float {
+      var best = Math.POSITIVE_INFINITY;
+      for (k in 0...32) {
+        var a = points[k], b = points[k + 1];
+        var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+        var f = Math.max(0.0, Math.min(1.0, ((tool.x - a.x) * dx + (tool.y - a.y) * dy + (tool.z - a.z) * dz) /
+          (dx * dx + dy * dy + dz * dz)));
+        var ex = tool.x - a.x - f * dx, ey = tool.y - a.y - f * dy, ez = tool.z - a.z - f * dz;
+        best = Math.min(best, Math.sqrt(ex * ex + ey * ey + ez * ez));
+      }
+      return best;
+    }
+    var worst = 0.0, guard = 0;
+    while (!motion.completed && motion.failure == null && guard++ < 10000) {
+      motion.update(0.01);
+      harness.step(Int64.ofInt(++tick));
+      var q = [for (j in 0...8) robot.snapshot().positions.get(j)];
+      worst = Math.max(worst, offPath(solver.forward(q)));
+    }
+    check(motion.completed, 'the coordinated program completes (${motion.failure})');
+    check(worst < 1e-3, 'executed, the tool stays on the path in the work frame ($worst m)');
+    near(robot.snapshot().positions.get(7), plan.evaluate(plan.durationSeconds).positions[7],
+      "the turntable ends where the plan does", 1e-4);
+    harness.dispose();
+    compiled.dispose();
   }
 
   public function testProgramCompiler():Void {

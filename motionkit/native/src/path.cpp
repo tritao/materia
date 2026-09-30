@@ -362,6 +362,19 @@ mk_timing_binding binding_for_stage(const std::vector<mk_path_sample> &path,
     return binding;
 }
 
+// Nanosecond rounding perturbs the last constant-acceleration stage's exit
+// speed, and re-deriving every stage's acceleration (stretching, softening)
+// accumulates that error over thousands of stages. Enforce an authored rest
+// boundary exactly; the path-distance change stays below the quantization
+// error, which is checked.
+bool settle_at_rest(std::vector<mk_time_stage> &stages) {
+    auto &last = stages.back();
+    const double duration = static_cast<double>(last.duration_ns) * 1e-9;
+    const double old_end = end_s(last);
+    last.acceleration = -last.speed / duration;
+    return std::abs(end_s(last) - old_end) <= 1e-8 * std::max(1.0, std::abs(old_end));
+}
+
 bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
     int64_t start_ns = 0;
     double speed = stages.front().speed / factor;
@@ -684,20 +697,8 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             speed += path_acceleration * rounded;
             start_ns += duration_ns;
         }
-        if (end_speed == 0.0 && !stages.empty()) {
-            // Nanosecond rounding perturbs the last constant-acceleration
-            // stage's computed exit speed. Enforce the authored rest boundary
-            // exactly; the resulting path-distance change is below the
-            // nanosecond quantization error and is checked before lowering.
-            auto &last = stages.back();
-            const double duration = static_cast<double>(last.duration_ns) * 1e-9;
-            const double corrected = -last.speed / duration;
-            const double old_end = end_s(last);
-            last.acceleration = corrected;
-            if (std::abs(end_s(last) - old_end) > 1e-8 *
-                    std::max(1.0, std::abs(old_end)))
-                return MK_ERROR_GENERATION;
-        }
+        if (end_speed == 0.0 && !stages.empty() && !settle_at_rest(stages))
+            return MK_ERROR_GENERATION;
         mk_time_law_handle created{};
         bool accepted = false;
         for (int attempt = 0; attempt < 24; ++attempt) {
@@ -745,11 +746,15 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             // speed, so report infeasibility instead of returning a law with
             // a different boundary contract.
             if (start_speed > 0.0 || end_speed > 0.0) return MK_ERROR_GENERATION;
+            // Both boundaries are at rest here (checked above).
             if (stages.size() > 1000 &&
                 acceleration_check.status == MK_CHECK_FAILED && attempt < 20 &&
-                soften_stages(stages, acceleration_check.time_seconds, factor * 1.002))
+                soften_stages(stages, acceleration_check.time_seconds, factor * 1.002)) {
+                if (!settle_at_rest(stages)) return MK_ERROR_GENERATION;
                 continue;
-            if (!stretch_stages(stages, factor * 1.002)) return MK_ERROR_GENERATION;
+            }
+            if (!stretch_stages(stages, factor * 1.002) || !settle_at_rest(stages))
+                return MK_ERROR_GENERATION;
         }
         if (!accepted) return MK_ERROR_GENERATION;
         {

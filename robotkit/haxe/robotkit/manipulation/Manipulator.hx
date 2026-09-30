@@ -349,7 +349,7 @@ class Manipulator {
     return baseIsIdentity ? world : snapshot.bodyPose(baseBody).inverse().compose(world);
 
   /** The joints from `baseLink` to `tipLink`, base first; throws when the tip is not below the base. */
-  static function walk(robot:RobotModel, baseLink:LinkId, tipLink:LinkId):Array<Joint> {
+  public static function walk(robot:RobotModel, baseLink:LinkId, tipLink:LinkId):Array<Joint> {
     var joints:Array<Joint> = [];
     var current = tipLink;
     var guard = 0;

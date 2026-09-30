@@ -154,6 +154,51 @@ class MotionKitTestSupport {
     return {model: model, arm: new Manipulator(model, links[0].id, flange.id)};
   }
 
+  /**
+   * A workcell: the contract 6-axis arm (joints ±π) on a 2 m rail along X,
+   * and a turntable positioner beside it carrying the workpiece ("work"
+   * frame), placed so the arm cannot reach round its far side.
+   * Joints in model order: rail, the arm's six, the turntable.
+   */
+  public function buildWorkcellFixture():{model:RobotModel, group:robotkit.manipulation.CoordinatedGroup} {
+    var model = new RobotModel("motionkit-workcell");
+    var floor = model.addLink(new Link("floor"));
+    var carriage = model.addLink(new Link("carriage"));
+    var rail = model.addJoint(new Joint("rail", JointType.Prismatic, floor, carriage));
+    rail.axis = [1.0, 0.0, 0.0];
+    rail.limits.lower = 0.0;
+    rail.limits.upper = 2.0;
+    var links = [carriage].concat([for (name in ["shoulder", "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"])
+      model.addLink(new Link(name))]);
+    var offsets = [[0.0, 0.0, 0.089159], [0.0, 0.13585, 0.0], [0.0, -0.1197, 0.425], [0.0, 0.0, 0.39225],
+      [0.0, 0.10915, 0.0], [0.0, 0.0, 0.09465]];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    for (joint in 0...6) {
+      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
+      value.parentFramePosition = offsets[joint];
+      value.axis = axes[joint];
+      value.limits.lower = -Math.PI;
+      value.limits.upper = Math.PI;
+    }
+    var flange = model.addFrame(new Frame("flange", links[6]));
+    flange.position = [0.0, 0.0823, 0.0];
+    var table = model.addLink(new Link("table"));
+    var turntable = model.addJoint(new Joint("turntable", JointType.Revolute, floor, table));
+    // Two turns either way: a positioner turns the workpiece round and round.
+    turntable.parentFramePosition = [0.75, 0.75, 0.1];
+    turntable.axis = [0.0, 0.0, 1.0];
+    turntable.limits.lower = -4.0 * Math.PI;
+    turntable.limits.upper = 4.0 * Math.PI;
+    var work = model.addFrame(new Frame("work", table));
+    work.position = [0.0, 0.0, 0.05];
+    for (joint in model.joints) {
+      joint.limits.velocity = 1.0;
+      joint.limits.maxAcceleration = 2.0;
+    }
+    return {model: model, group: new robotkit.manipulation.CoordinatedGroup(model, floor.id, flange.id, work.id,
+      null, [rail.id])};
+  }
+
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
     var x = to.qw * -from.qx + to.qx * from.qw + to.qy * -from.qz - to.qz * -from.qy;
     var y = to.qw * -from.qy - to.qx * -from.qz + to.qy * from.qw + to.qz * -from.qx;

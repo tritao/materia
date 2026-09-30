@@ -539,6 +539,12 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         control_.trajectory = std::move(candidate);
         control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
+        // A plan takes over every joint, as a trajectory chunk does: targets
+        // set before it must not come back when it ends, or the robot would
+        // return to where it stood before the plan.
+        std::fill_n(control_.active, RK_MAX_JOINTS, false);
+        std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
+        std::fill_n(control_.velocity_expiry_ns, RK_MAX_JOINTS, uint64_t{0});
         std::fill_n(velocity_anchor_pending_, blueprint_.joint_count, false);
         control_.plan_just_submitted = was_idle;
         if (was_idle) control_.trajectory_time_ns = 0;

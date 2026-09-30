@@ -1849,6 +1849,43 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
     }
 }
 
+void plan_end_does_not_restore_earlier_targets(const rk_robot_runtime_blueprint &blueprint) {
+    // Position targets place the robot, then a plan moves it on. When the
+    // plan ends the robot must stay at the plan's end, not return to the
+    // targets it held before.
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    auto placed = velocity_batch(1, {{0, 0.0}, {1, 0.0}});
+    placed.targets[0].mode = RK_TARGET_POSITION;
+    placed.targets[0].target = 0.2;
+    placed.targets[1].mode = RK_TARGET_POSITION;
+    placed.targets[1].target = -0.2;
+    assert(runtime.submit(placed) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 2;
+    plan.plan_id = 1;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.start_position[0] = 0.2;
+    plan.start_position[1] = -0.2;
+    plan.ends_at_rest = 1;
+    plan.segments = sampled_batch([](double t) { return 0.2 + 2.0 * t; }, 100'000'000, 10'000'000, 1);
+    assert(runtime.submit_plan(plan) == RK_OK);
+    rk_robot_state state{};
+    for (int cycle = 0; cycle < 40; ++cycle) {
+        assert(runtime.apply_pending_commands() == RK_OK);
+        assert(runtime.publish_sample(timestamp += 10'000'000) == RK_OK);
+        state.struct_size = sizeof(state);
+        assert(runtime.snapshot(state) == RK_OK);
+    }
+    assert(std::abs(state.position[0] - 0.4) < 1e-9);
+    assert(std::abs(state.position[1] + 0.4) < 1e-9);
+    assert(state.trajectory_active == 0);
+}
+
 void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
     // Joint 0 brakes at 2 rad/s^2; joint 1 has no acceleration limit.
     auto limited = blueprint;
@@ -1968,6 +2005,7 @@ int main() {
     stop_beyond_queued_path_ramps_within_limits(blueprint);
     stop_ramp_stays_within_travel(blueprint);
     expired_velocity_targets_brake_within_limits(blueprint);
+    plan_end_does_not_restore_earlier_targets(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
     trajectory_chunk_speed_is_limited(blueprint);
