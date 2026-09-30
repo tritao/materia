@@ -14,8 +14,8 @@ class LimbControl {
 	public var modelSpace(default, null):Bool = false;
 	public var weight(default, null):Float = 0.0;
 	public var pole(default, null):Null<Array<Float>> = null;
-	/** The curl of this hand's fingers now; moves toward what the limb's state asks for. */
-	public var curl:Float;
+	/** The curl of each of this hand's fingers now (HumanHand.THUMB to PINKY); they move toward what the limb's state asks for. */
+	public final curls:Array<Float>;
 	/** Where the wrist was when carrying began, and how far it has settled into the carry pose (one when done). */
 	var carryFrom:Null<Array<Float>> = null;
 	var carrySettled:Float = 1.0;
@@ -24,7 +24,7 @@ class LimbControl {
 
 	public function new(limb:HumanLimb, curl:Float) {
 		this.limb = limb;
-		this.curl = curl;
+		curls = [for (_ in 0...HumanHand.FINGERS) curl];
 	}
 
 	public function isArm():Bool

@@ -22,6 +22,8 @@ typedef RackLayout = {
     var surface:Float;
     /** Turn of the whole layout about the worker's start, in radians. */
     var yaw:Float;
+    /** Half the part's side, in metres; 0.04 when not given. */
+    @:optional var partHalf:Float;
 }
 
 /** The rack-to-table job on a bare session: a worker fetches a part from a pedestal and sets it on a table. */
@@ -66,7 +68,7 @@ class RackScenario {
         human.advance(0.0);
         var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
         var worker = new HumanWorker(session, human, proxy, new SimPose(0.0, 0.0, 0.0));
-        var partHalf = 0.04, surface = layout.surface;
+        var partHalf = layout.partHalf == null ? 0.04 : layout.partHalf, surface = layout.surface;
         // The layout is built facing +X with the part on the working hand's side, then turned about the start.
         var side = layout.hand == "left" ? 1.0 : -1.0, cosine = Math.cos(layout.yaw), sine = Math.sin(layout.yaw);
         var turned = function(x:Float, y:Float):Array<Float> return [cosine * x - sine * y, sine * x + cosine * y];

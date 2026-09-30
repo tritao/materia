@@ -19,6 +19,10 @@ class HumanBody {
 	/** The four limbs, indexed by HumanLimb. */
 	final limbs:Array<LimbControl>;
 	final heldPoints:Array<Null<Void->Array<Float>>> = [null, null, null, null];
+	/** What each hand's fingers close to around what it holds, per finger; null for the plain grip. */
+	final grasps:Array<Null<Array<Float>>> = [null, null, null, null];
+	/** Whether each hand was holding something last step, so a grasp is dropped once what it held is let go. */
+	final wasHolding:Array<Bool> = [false, false, false, false];
 	var leanGoal:Float = 0.0;
 	var leanNow:Float = 0.0;
 
@@ -33,11 +37,103 @@ class HumanBody {
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
 	}
 
-	/** Open while reaching for something, closed while holding it, relaxed otherwise. */
-	function curlFor(hand:HumanLimb):Float {
+	/** What each finger is asked to close to: around what it holds, open while reaching, relaxed otherwise. */
+	function curlsFor(hand:HumanLimb):Array<Float> {
 		var control = limbs[hand];
-		if (control.mode == Carry || heldPoints[hand] != null) return posture.gripCurl;
-		return control.mode == Reach && control.weight > 0.0 ? posture.openCurl : posture.relaxedCurl;
+		var holding = control.mode == Carry || heldPoints[hand] != null;
+		if (holding) {
+			wasHolding[hand] = true;
+			var grasp = grasps[hand];
+			return grasp != null ? grasp : uniformCurl(posture.gripCurl);
+		}
+		// What was held is let go: its shape goes with it.
+		if (wasHolding[hand]) {
+			wasHolding[hand] = false;
+			grasps[hand] = null;
+		}
+		return uniformCurl(control.mode == Reach && control.weight > 0.0 ? posture.openCurl : posture.relaxedCurl);
+	}
+
+	static function uniformCurl(value:Float):Array<Float>
+		return [for (_ in 0...HumanHand.FINGERS) value];
+
+	/**
+	 * How far an object reaches from the palm, straight out along the palm's normal, for the hand that
+	 * is about to close on it: the fingers must curl down that far. `object` is the object's box.
+	 */
+	public function graspDepth(hand:HumanLimb, object:HumanTargetBox):Float {
+		var normal = palmNormal(hand), root = rootTransform();
+		var world = [root[0] * normal[0] + root[4] * normal[1] + root[8] * normal[2],
+			root[1] * normal[0] + root[5] * normal[1] + root[9] * normal[2],
+			root[2] * normal[0] + root[6] * normal[1] + root[10] * normal[2]];
+		var c = Math.cos(object.yaw), s = Math.sin(object.yaw);
+		return 2.0 * (Math.abs(world[0] * c + world[1] * s) * object.halfExtents[0] +
+			Math.abs(-world[0] * s + world[1] * c) * object.halfExtents[1] + Math.abs(world[2]) * object.halfExtents[2]);
+	}
+
+	/** The direction the palm faces, in model space. The hand frame's Z leaves the two hands through opposite faces. */
+	function palmNormal(hand:HumanLimb):Array<Float> {
+		var frame = character.pose.boneFrame(hand == ArmL ? HandL : HandR);
+		if (frame == null) throw "The character has no hand frame";
+		var sign = hand == ArmL ? 1.0 : -1.0;
+		return [sign * frame[8], sign * frame[9], sign * frame[10]];
+	}
+
+	/** Closes a hand's fingers around an object that reaches `depth` metres from the palm, and keeps them so while it holds it. */
+	public function setGrasp(hand:HumanLimb, depth:Float):Void
+		grasps[hand] = graspCurls(hand, depth);
+
+	/** The curl each finger closes to around what a hand holds (THUMB to PINKY), or null when it holds nothing shaped. */
+	public function grasp(hand:HumanLimb):Null<Array<Float>> {
+		var curls = grasps[hand];
+		return curls == null ? null : curls.copy();
+	}
+
+	/**
+	 * How far a fingertip is from the palm along the palm's normal, in metres: positive on the palm's
+	 * side, where an object is held. Zero for a hand without that finger.
+	 */
+	public function fingerDepth(hand:HumanLimb, finger:Int):Float {
+		var tip = character.fingertip(hand, finger);
+		var wrist = character.pose.bonePosition(hand == ArmL ? HandL : HandR);
+		if (tip == null || wrist == null) return 0.0;
+		var knuckle = character.pose.bonePosition(hand == ArmL ? MiddleL : MiddleR);
+		var palm = knuckle == null ? wrist : [for (axis in 0...3) (wrist[axis] + knuckle[axis]) * 0.5];
+		var normal = palmNormal(hand);
+		return (tip[0] - palm[0]) * normal[0] + (tip[1] - palm[1]) * normal[1] + (tip[2] - palm[2]) * normal[2];
+	}
+
+	/**
+	 * The curl each finger needs (THUMB to PINKY) to bring its tip to `depth` metres from the palm along
+	 * its normal. Measured on the skeleton: the hand is curled in steps and each finger's tip depth
+	 * recorded, so a short finger closes further than a long one to reach the same depth, and any rig
+	 * works. A finger that never gets that deep closes as far as it gets; an object thinner than the
+	 * posture's pinch limit is pinched between thumb and index. The pose is left as it was.
+	 */
+	function graspCurls(hand:HumanLimb, depth:Float):Array<Float> {
+		var saved = character.handCurls(hand);
+		var steps = posture.graspSteps;
+		var depths:Array<Array<Float>> = [for (_ in 0...HumanHand.FINGERS) []];
+		for (step in 0...steps + 1) {
+			character.setHandCurl(hand, step / steps);
+			character.advance(0.0);
+			for (kind in 0...HumanHand.FINGERS) depths[kind].push(fingerDepth(hand, kind));
+		}
+		character.setHandCurls(hand, saved);
+		character.advance(0.0);
+		var curls = uniformCurl(0.0);
+		for (kind in 1...HumanHand.FINGERS) {
+			var reached = depths[kind], peak = 0, found = -1;
+			for (step in 0...steps + 1) if (reached[step] > reached[peak]) peak = step;
+			for (step in 0...steps + 1) if (reached[step] >= depth) { found = step; break; }
+			// The first curl that brings the tip that deep; a finger that never gets there closes as far as it does.
+			curls[kind] = found < 0 ? peak / steps : found == 0 ? 0.0 :
+				(found - 1 + (depth - reached[found - 1]) / (reached[found] - reached[found - 1])) / steps;
+		}
+		if (depth < posture.pinchBelow)
+			for (kind in [HumanHand.MIDDLE, HumanHand.RING, HumanHand.PINKY]) curls[kind] = Math.min(curls[kind], posture.relaxedCurl);
+		curls[HumanHand.THUMB] = posture.thumbShare * curls[HumanHand.INDEX];
+		return curls;
 	}
 
 	/** Where the torso is asked to lean; it eases there. Zero stands upright. */
@@ -78,10 +174,11 @@ class HumanBody {
 	function moveFingers(seconds:Float):Void {
 		for (hand in [ArmL, ArmR]) {
 			var control = limbs[hand];
-			var step = posture.curlRate * seconds, wanted = curlFor(hand);
-			control.curl = Math.abs(wanted - control.curl) <= step ? wanted :
-				control.curl + (wanted > control.curl ? step : -step);
-			character.setHandCurl(hand, control.curl);
+			var step = posture.curlRate * seconds, wanted = curlsFor(hand);
+			for (kind in 0...HumanHand.FINGERS)
+				control.curls[kind] = Math.abs(wanted[kind] - control.curls[kind]) <= step ? wanted[kind] :
+					control.curls[kind] + (wanted[kind] > control.curls[kind] ? step : -step);
+			character.setHandCurls(hand, control.curls);
 		}
 	}
 
@@ -239,8 +336,10 @@ class HumanBody {
 		for (hand in [ArmL, ArmR]) setHeldPoint(hand, null);
 		for (control in limbs) control.release(character);
 		for (hand in [ArmL, ArmR]) {
-			limbs[hand].curl = posture.relaxedCurl;
+			for (kind in 0...HumanHand.FINGERS) limbs[hand].curls[kind] = posture.relaxedCurl;
 			character.setHandCurl(hand, posture.relaxedCurl);
+			grasps[hand] = null;
+			wasHolding[hand] = false;
 		}
 		leanGoal = 0.0;
 		leanNow = 0.0;

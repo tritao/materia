@@ -29,6 +29,14 @@ class HumanPosture {
 	public var gripCurl:Float = 0.5;
 	/** How fast the fingers open and close, in full curls per second. */
 	public var curlRate:Float = 5.0;
+	/**
+	 * A held object thinner than this (across the palm, in metres) is pinched: thumb and index close on it and
+	 * the other fingers stay relaxed. The thumb closes this share of the fingers' curl.
+	 */
+	public var pinchBelow:Float = 0.025;
+	public var thumbShare:Float = 0.6;
+	/** How many curl steps are measured to find the curl that brings a fingertip to a held object's far side. */
+	public var graspSteps:Int = 20;
 
 	// Leaning over a surface.
 

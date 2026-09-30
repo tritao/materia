@@ -45,6 +45,18 @@ that surface's edge, leaning the upper body over it for the rest of the reach. `
 and grasp, and ask the body to straighten up when they are done. Actions set intent (`setLean`,
 `setCarry`, `setReachWorld`); they never touch joints.
 
+## Grips follow the object
+
+A hand's fingers curl on their own (`HumanHand.setCurls`, thumb to pinky). When a pick knows the object's
+box, `Pick` asks the body to close the hand to it (`HumanBody.setGrasp`): `graspDepth` measures how far
+the box reaches from the palm along the palm's normal as the hand lies at the grasp, and `graspCurls`
+finds, for each finger, the curl that brings its own tip that deep. It does so by curling the skeleton in
+steps and recording each tip's depth, the way `leanFor` measures a lean, so a shorter finger closes
+further than a longer one to the same depth and any rig works. The thumb follows the index finger, an
+object thinner than `HumanPosture.pinchBelow` is pinched (the other fingers stay relaxed), and the shape
+is kept while the hand holds the object and forgotten when it lets go. A pick with no box closes the
+hand to the plain `gripCurl`.
+
 ## Keeping it natural
 
 `MotionQuality` samples a pose each tick and reports, per arm, the bend-plane turn rate, the elbow's
@@ -61,5 +73,9 @@ to go wrong that the rack job does not exercise.
   the body does not do. The layout sweep (`ScenarioSweepTests`) records this as its `CAPPED_CLEARANCE`.
 - **Tuning is for one rig.** `HumanPosture` is in metres, tuned on the bundled 1.7 m worker; it is not
   scaled to other statures. The finger-curl axis and the spine shares are checked on that rig only.
+- **Grips measure one dimension.** The fingers close to the object's depth along the palm's normal and no
+  more: they do not wrap a cylinder or a handle differently, the thumb simply follows the index finger,
+  and the fingertips reach only about 7 cm from the palm, so a larger object closes the hand as far as it
+  goes and no further.
 - **Both hands and the left hand** share the same code as the right, and the sweep covers a left-hand
   fetch, but two-handed lean and hang are exercised by far fewer scenarios.
