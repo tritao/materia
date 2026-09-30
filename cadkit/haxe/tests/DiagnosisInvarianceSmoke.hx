@@ -35,8 +35,6 @@ private typedef AssemblyFixture = {
 */
 class DiagnosisInvarianceSmoke {
 	static final KNOWN:Array<String> = [
-		// Local rank at a singular pose is read as redundancy; the generic-rank experiment (CS-D6) targets this.
-		"touching-circles-exact/expected", "touching-circles-exact/rotate", "touching-circles-exact/perturb",
 		// An unclosable loop ends at a stationary residual but is reported as out of iterations (C3).
 		"four-bar-impossible/expected",
 	];
@@ -47,6 +45,7 @@ class DiagnosisInvarianceSmoke {
 			checkSketch(fixture, failures);
 		for (fixture in assemblyFixtures())
 			checkAssembly(fixture, failures);
+		checkDegenerateFlag(failures);
 
 		var unexpected = [for (failure in failures) if (KNOWN.indexOf(key(failure)) < 0) failure];
 		var failedKeys = [for (failure in failures) key(failure)];
@@ -74,6 +73,8 @@ class DiagnosisInvarianceSmoke {
 			{name: "touching-circles", expected: "fully-constrained dof=0", build: () -> touchingCircles(false)},
 			// The same, authored exactly on the singular pose: the solve starts there and never leaves.
 			{name: "touching-circles-exact", expected: "fully-constrained dof=0", build: () -> touchingCircles(true)},
+			// Parallelism is transitive only on the shape itself: a witness pose must keep this dependency.
+			{name: "parallel-lines", expected: "redundant dof=10 ids=p12,p13,p23", build: parallelLines},
 		];
 	}
 
@@ -99,6 +100,16 @@ class DiagnosisInvarianceSmoke {
 		var again = sketchSummary(sketch);
 		if (again != base)
 			failures.push('${fixture.name}/repeat: $again, first $base');
+	}
+
+	/** Degeneracy belongs to a pose, so it is checked directly rather than through the invariant summary. */
+	static function checkDegenerateFlag(failures:Array<String>):Void {
+		if (!touchingCircles(true).solve().diagnostic.degenerate)
+			failures.push("touching-circles-exact/degenerate-flag: the singular pose is not reported degenerate");
+		if (touchingCircles(false).solve().diagnostic.degenerate)
+			failures.push("touching-circles/degenerate-flag: a regular pose is reported degenerate");
+		if (rectangle(true, 10).solve().diagnostic.degenerate)
+			failures.push("rectangle-redundant/degenerate-flag: a real redundancy is reported as degeneracy");
 	}
 
 	/** "status dof=N ids=a,b" with ids sorted; a failed solve reports its diagnostic too. */
@@ -168,6 +179,20 @@ class DiagnosisInvarianceSmoke {
 			.addConstraint(SketchConstraint.distance("ab-length", "a", "b", 10))
 			.addConstraint(SketchConstraint.distance("ac-length", "a", "c", 5))
 			.addConstraint(SketchConstraint.distance("bc-length", "b", "c", 5));
+		return sketch;
+	}
+
+	/** Three free lines, each pair constrained parallel: one of the three constraints is implied by the others. */
+	static function parallelLines():ConstrainedSketch {
+		var sketch = new ConstrainedSketch();
+		var ends = [[0.0, 0.0, 10.0, 1.0], [0.0, 3.0, 9.0, 4.2], [1.0, 7.0, 11.0, 7.8]];
+		for (i in 0...3) {
+			sketch.addPoint(new SketchPoint('s$i', ends[i][0], ends[i][1])).addPoint(new SketchPoint('e$i', ends[i][2], ends[i][3]));
+			sketch.addEntity(SketchEntity.line('l$i', 's$i', 'e$i'));
+		}
+		sketch.addConstraint(SketchConstraint.parallel("p12", "l0", "l1"))
+			.addConstraint(SketchConstraint.parallel("p23", "l1", "l2"))
+			.addConstraint(SketchConstraint.parallel("p13", "l0", "l2"));
 		return sketch;
 	}
 

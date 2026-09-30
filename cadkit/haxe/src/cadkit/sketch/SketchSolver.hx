@@ -24,6 +24,8 @@ class SketchSolver {
 	private var variableCount:Int;
 	private var solveTolerance:Float;
 	private var normalizationScale:Float;
+	/** While finding a witness pose, only shape constraints (see `isShapeConstraint`) contribute residuals. */
+	private var shapeOnly:Bool = false;
 
 	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>) {
 		this.sketch = sketch; pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
@@ -96,7 +98,19 @@ class SketchSolver {
 		}
 		checkCancelled();
 		var j = jacobian(x, current.values);
-		var report = diagnose(x, current);
+		var report = diagnose(centralJacobian(x, current.values.length), current);
+		var degenerate = false;
+		if (currentNorm <= solveTolerance && report.rank < current.values.length) {
+			// A dependency here may belong to this pose only: compare with the rank at a nearby pose of the same shape.
+			var witness = witnessPose(x);
+			if (witness != null) {
+				var generic = diagnose(centralJacobian(witness, current.values.length), current);
+				if (generic.rank > report.rank) {
+					report = generic;
+					degenerate = true;
+				}
+			}
+		}
 		var dof = report.degreesOfFreedom;
 		var badIds = failingOwners(current, solveTolerance * 10);
 		if (currentNorm > solveTolerance) {
@@ -116,8 +130,10 @@ class SketchSolver {
 		var redundant = report.redundantOwners();
 		var status = redundant.length > 0 ? "redundant" : (dof == 0 ? "fully-constrained" : "under-constrained");
 		var ids = redundant.length > 0 ? redundant : [];
-		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids,
-			status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged", report);
+		var message = status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged";
+		if (degenerate)
+			message += "; the constraints are independent in general but the solved pose is degenerate";
+		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids, message, report, degenerate);
 		checkCancelled();
 		var coordinates:Map<String, Array<Float>> = new Map();
 		for (point in sketch.points()) { var i:Int = cast pointIndex.get(point.id); coordinates.set(point.id, [x[i], x[i + 1]]); }
@@ -172,6 +188,8 @@ class SketchSolver {
 		for (c in sketch.constraints()) {
 			if (constraintIndex++ % 16 == 0)
 				checkCancelled();
+			if (shapeOnly && !isShapeConstraint(c.kind))
+				continue;
 			var before = values.length;
 			switch (c.kind) {
 				case "fixed": var p = point(c.first, x); var authored = needPoint(c.first, c.id); values.push(p[0] - authored.x); values.push(p[1] - authored.y);
@@ -387,13 +405,9 @@ class SketchSolver {
 		}
 		return result;
 	}
-	/**
-		Diagnoses the solved point. The Jacobian is central differences in the
-		scaled variables, accurate enough for relative rank decisions; rows
-		count as satisfied within ten times the solve tolerance.
-	*/
-	private function diagnose(x:Array<Float>, set:ResidualSet):DiagnosisReport {
-		var rows = set.values.length, flat = [for (_ in 0...rows * variableCount) 0.0];
+	/** Central differences in the scaled variables, row-major: accurate enough for relative rank decisions. */
+	private function centralJacobian(x:Array<Float>, rows:Int):Array<Float> {
+		var flat = [for (_ in 0...rows * variableCount) 0.0];
 		for (column in 0...variableCount) {
 			if (column % 8 == 0)
 				checkCancelled();
@@ -405,10 +419,57 @@ class SketchSolver {
 			for (row in 0...rows)
 				flat[row * variableCount + column] = (high[row] - low[row]) / 2e-6;
 		}
+		return flat;
+	}
+
+	/** Diagnoses a Jacobian against the solved residuals; rows count as satisfied within ten times the solve tolerance. */
+	private function diagnose(jacobian:Array<Float>, set:ResidualSet):DiagnosisReport {
 		var satisfiedWithin = solveTolerance * 10;
-		return ConstraintDiagnosis.diagnose({jacobian: flat, variables: variableCount, owners: set.owners,
+		return ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variableCount, owners: set.owners,
 			residuals: [for (value in set.values) value / satisfiedWithin], rankTolerance: sketch.settings.rankTolerance});
 	}
+
+	/**
+		A pose near `x` with the same shape and no accidental coincidences
+		(plan decision CS-D6): every length moves by a fixed pseudo-random
+		percent of the sketch size, then only the shape constraints are solved
+		again. Dimensions are left free: their rows' derivatives do not depend
+		on their target values. Null when the shape cannot be restored.
+	*/
+	private function witnessPose(x:Array<Float>):Null<Array<Float>> {
+		var seed = 20260930;
+		var trial = [for (value in x) {
+			seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+			value + (seed / 0x7fffffff - 0.5) * 0.02 * normalizationScale;
+		}];
+		for (entity in sketch.entities())
+			if (radiusIndex.exists(entity.id)) {
+				var i:Int = cast radiusIndex.get(entity.id);
+				trial[i] = Math.max(trial[i], 0.5 * x[i]);
+			}
+		shapeOnly = true;
+		var current = residuals(trial), currentNorm = norm(current.values), damping = sketch.settings.initialDamping;
+		var iterations = 0;
+		while (currentNorm > solveTolerance && iterations < sketch.settings.maxIterations) {
+			iterations++;
+			var step = dampedStep(trial, current, damping);
+			if (step == null) { damping *= 10; continue; }
+			var stepSet = residuals(step), stepNorm = norm(stepSet.values);
+			if (stepNorm < currentNorm) { trial = step; current = stepSet; currentNorm = stepNorm; damping = Math.max(1e-12, damping * 0.3); }
+			else damping = Math.min(1e12, damping * 10);
+		}
+		shapeOnly = false;
+		return currentNorm <= solveTolerance ? trial : null;
+	}
+
+	/** Constraints that fix shape rather than size: they hold for every scaled or moved copy of a solution. */
+	private static function isShapeConstraint(kind:String):Bool {
+		return switch kind {
+			case "fixed", "distance", "radius", "angle": false;
+			default: true;
+		};
+	}
+
 	private function failingOwners(set:ResidualSet,t:Float):Array<String>{var out:Array<String> = [];for(i in 0...set.values.length)if(Math.abs(set.values[i])>t&&!contains(out,set.owners[i]))out.push(set.owners[i]);return out;}
 	private static function contains(a:Array<String>,v:String):Bool{for(x in a)if(x==v)return true;return false;}
 	private static function vectorDifference(a:Array<Float>,b:Array<Float>,out:Array<Float>):Void{out.push(a[0]-b[0]);out.push(a[1]-b[1]);}

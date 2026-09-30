@@ -71,7 +71,7 @@ whenever this plan turns out to be wrong.
   DOF.** Structural (matching-based) rank cannot see algebraic dependencies
   (three concurrent lines), so it is used for decomposition only.
 - **CS-D6 — Generic rank is an experiment until it passes the invariance
-  suite.** Candidate: rank at a random nearby configuration that still
+  suite.** (Adopted for sketches in C2.1b; see the progress log.) Candidate: rank at a random nearby configuration that still
   satisfies the zero-valued constraints (dimension values taken from that
   configuration). Adopted only if it keeps every invariance fixture stable;
   otherwise the report carries local rank and a near-degenerate flag only.
@@ -349,3 +349,22 @@ branch `loop-flow-stores`), which had broken toolpathkit's
   kinematicskit roots): solve p50 75 → 28 ms, document recompute
   190 → 122 ms, since one QR replaces a rank computation per constraint.
 - CamKit (12223 assertions) passes on the new solver.
+
+### C2.1b — Generic rank by a witness pose; CS-D6 adopted for sketches (2026-09-30)
+
+- When the local diagnosis finds a dependency, `SketchSolver` builds a
+  witness pose: every length moves by a fixed pseudo-random ±1% of the sketch
+  size, then only the shape constraints (all but fixed, distance, radius,
+  angle) are re-solved. The generic rank is the larger of the two; when the
+  witness wins, its groups replace the local ones (feasibility still from the
+  real residuals) and `SolveDiagnostic.degenerate` is set.
+- Evidence: `touching-circles-exact` (authored on the singular pose) goes
+  from `redundant dof=1` to `fully-constrained dof=0` with the flag set; the
+  nudged version, the redundant rectangle and a new `parallel-lines` fixture
+  (a dependency that holds only on the shape: pairwise parallel lines) keep
+  their answers and are not flagged. Adopted: the invariance suite passes
+  with only `four-bar-impossible/expected` left in `KNOWN`.
+- Cost: nothing when the local rank equals the row count (the common case);
+  otherwise one shape-only solve, one Jacobian and one QR more.
+- Assemblies get the same treatment with C3 (toggle four-bar authored exactly
+  on its toggle is the analogous fixture).
