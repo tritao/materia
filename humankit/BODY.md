@@ -7,8 +7,11 @@ overwrite an earlier one only through the interface below it.
    nothing about jobs. Clips that start during a fade continue from the blend they were in.
 2. **Joint turns.** `HumanCharacter` turns single joints on top of the clip, before IK: `setSpineLean`
    bends the upper body forward and `setHandCurl` curls the fingers (`HumanHand`). A turn rides on the
-   animation and carries the joint's children. There is one turn per joint, so two features must not
-   share one.
+   animation and carries the joint's children. Each feature applies its turns under its own source
+   (`HumanCharacter.LEAN`, `LEFT_FINGERS`, `RIGHT_FINGERS`): a source has one turn per joint and the
+   turns of different sources on one joint compose, lowest source first, so a new feature that turns a
+   joint another already turns adds to it instead of overwriting it. A feature sets all its turns in one
+   batched call.
 3. **IK.** `HumanCharacter.reach` solves a limb's wrist or ankle to a target, bending the joint the way
    the animation does (a zero pole), so the elbow cannot flip as the hand passes the shoulder.
 4. **Body.** `HumanBody` is what actions talk to. It owns each limb's role, the lean, and the fingers'

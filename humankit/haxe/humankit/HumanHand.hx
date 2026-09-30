@@ -16,21 +16,24 @@ class HumanHand {
 	static final THUMB_ANGLES:Array<Float> = [0.4, 0.6, 0.6];
 
 	final instance:AnimationInstance;
+	/** The joint-turn source the curl is applied under, so it never overwrites another feature's turns. */
+	final source:Int;
 	/** Each finger's curling joints with the largest turn of each. */
 	final fingers:Array<Array<{joint:Int, angle:Float}>> = [];
 	/** How curled the hand is now, or -1 before the first curl. */
 	public var curl(default, null):Float = -1.0;
 
-	function new(instance:AnimationInstance) {
+	function new(instance:AnimationInstance, source:Int) {
 		this.instance = instance;
+		this.source = source;
 	}
 
 	/** The fingers below a rig's wrist bone, or null when the skeleton has none. */
-	public static function find(asset:AnimationAsset, rig:HumanoidRig, instance:AnimationInstance,
-			wrist:HumanBone):Null<HumanHand> {
+	public static function find(asset:AnimationAsset, rig:HumanoidRig, instance:AnimationInstance, wrist:HumanBone,
+			source:Int):Null<HumanHand> {
 		var root = rig.joint(wrist);
 		if (root < 0) return null;
-		var hand = new HumanHand(instance);
+		var hand = new HumanHand(instance, source);
 		for (first in children(asset, root)) {
 			var chain = [first];
 			while (true) {
@@ -69,10 +72,16 @@ class HumanHand {
 		value = Math.max(0.0, Math.min(1.0, value));
 		if (Math.abs(value - curl) < 1e-4) return;
 		curl = value;
+		var joints:Array<Int> = [], rotations:Array<Array<Float>> = [], weights:Array<Float> = [];
 		for (finger in fingers) for (segment in finger) {
 			var turn = segment.angle * value;
-			if (turn < 1e-4) instance.clearJointRotation(segment.joint);
-			else instance.setJointRotation(segment.joint, [-Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+			if (turn < 1e-4) continue;
+			joints.push(segment.joint);
+			rotations.push([-Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+			weights.push(1.0);
 		}
+		// One call replaces the whole hand's turns.
+		if (joints.length == 0) instance.clearJointRotations(source);
+		else instance.setJointRotations(source, joints, rotations, weights);
 	}
 }

@@ -44,6 +44,14 @@ class HumanCharacter {
 	/** The left and right hands' fingers; null for a rig without them. */
 	final hands:Array<Null<HumanHand>>;
 	var lean:Float = 0.0;
+	/**
+	 * The joint-turn sources each feature applies its turns under (see AnimationInstance.setJointRotation),
+	 * so features that turn the same joint compose instead of overwriting one another. A feature added
+	 * later takes the next number; lower sources apply first.
+	 */
+	static inline var LEAN:Int = 1;
+	static inline var LEFT_FINGERS:Int = 2;
+	static inline var RIGHT_FINGERS:Int = 3;
 	public var root(get, never):NodeId;
 
 	final scene:Scene;
@@ -56,7 +64,8 @@ class HumanCharacter {
 		instance = new AnimationInstance(asset);
 		pose = new HumanPose(this.rig, instance.readJointMatrices());
 		player = new ClipPlayer(instance);
-		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL), HumanHand.find(asset, this.rig, instance, HumanBone.HandR)];
+		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS),
+			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
 	}
 
@@ -124,16 +133,20 @@ class HumanCharacter {
 	public function setSpineLean(angle:Float):Void {
 		if (Math.abs(angle - lean) < 1e-5) return;
 		lean = angle;
-		var joints = [rig.joint(HumanBone.Spine2), rig.joint(HumanBone.Chest)];
+		var joints:Array<Int> = [], rotations:Array<Array<Float>> = [], weights:Array<Float> = [];
+		var bones = [rig.joint(HumanBone.Spine2), rig.joint(HumanBone.Chest)];
 		// Mostly the chest joint, which sits about at table height: the belly below stays put and the chest
 		// can overhang a table, the way a person leans over one.
 		var shares = [0.25, 0.75];
-		for (index in 0...joints.length) {
-			if (joints[index] < 0) continue;
+		for (index in 0...bones.length) {
 			var turn = angle * shares[index];
-			if (Math.abs(turn) < 1e-5) instance.clearJointRotation(joints[index]);
-			else instance.setJointRotation(joints[index], [Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+			if (bones[index] < 0 || Math.abs(turn) < 1e-5) continue;
+			joints.push(bones[index]);
+			rotations.push([Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+			weights.push(1.0);
 		}
+		if (joints.length == 0) instance.clearJointRotations(LEAN);
+		else instance.setJointRotations(LEAN, joints, rotations, weights);
 	}
 
 	public function spineLean():Float
