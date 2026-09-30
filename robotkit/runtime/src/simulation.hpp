@@ -71,6 +71,7 @@ public:
     rk_result apply_robot_force(uint32_t robot_index, const rk_simulation_wrench &wrench);
     rk_result get_link_pose(uint32_t robot_index, uint32_t link_index,
                             rk_simulation_pose &out_pose) const;
+    rk_result get_link_body(uint32_t robot_index, uint32_t link_index, nksim_body &out_body) const;
     rk_result get_robot_contacts(rk_robot_runtime runtime,
                                  std::vector<rk_robot_contact> &out,
                                  uint64_t *step_index = nullptr) const;

@@ -1,5 +1,6 @@
 package robotkit.runtime;
 
+import NativeKitSim;
 import RobotKitSimKit;
 import haxe.Int64;
 import nativekit.sim.SimFrame;
@@ -623,6 +624,17 @@ class Simulation {
     check(result.status, "simulation.getRobotBaseVelocity");
     return {linear: [for (index in 0...3) twist.get_linear(index)],
       angular: [for (index in 0...3) twist.get_angular(index)]};
+  }
+
+  /**
+   * The physics body that carries a robot link, to use as the carrier when a session object is held by
+   * that link (`SimSession.holdObject`), for instance a workpiece gripped by a suction cup.
+   */
+  public function linkBody(robotIndex:Int, linkIndex:Int):nksim_body {
+    ensureLive();
+    var result = RobotKitSimKit.rk_simulation_get_link_body(owner.borrow(), robotIndex, linkIndex);
+    check(result.status, "simulation.linkBody");
+    return result.out_body;
   }
 
   /** Reads an articulated link pose without mutating the simulation. */
