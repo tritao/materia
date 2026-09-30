@@ -15,7 +15,13 @@ import Transform2D;
 
 /** Metadata and layout bridge for one typed style property. */
 class StyleProperty<T> {
+	static var nextSlot:Int = 0;
+
 	public final name:String;
+	/** Dense index among all properties, so a computed style stores its values in arrays instead of hashing names. */
+	public final slot:Int;
+	/** Values of this property are mutable objects that a computed style hands out as copies. */
+	public final copiedOnRead:Bool;
 	public final defaultValue:T;
 	public final inherited:Bool;
 	public final impact:StyleImpact;
@@ -30,6 +36,8 @@ class StyleProperty<T> {
 		if (name == null || name.length == 0)
 			throw "Style properties require a name";
 		this.name = name;
+		this.slot = nextSlot++;
+		this.copiedOnRead = name == "effects" || name == "backdropEffects" || name == "decorations" || name == "mask";
 		this.defaultValue = defaultValue;
 		this.inherited = inherited;
 		this.impact = impact;
@@ -38,6 +46,10 @@ class StyleProperty<T> {
 		this.writeLayout = writeLayout;
 		this.equalValue = equalValue;
 	}
+
+	/** How many slots exist so far; every property created later gets a higher one. */
+	public static function slotCount():Int
+		return nextSlot;
 
 	public function read(style:LayoutStyle):T {
 		if (style == null || readLayout == null)
