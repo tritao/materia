@@ -80,14 +80,14 @@ class RobotArmChecks {
 	public static function run():Void {
 		var scene = SceneArtifact.decode(RobotArmPreview.arm());
 		var definition = scene.assemblyDefinition;
-		if (definition == null || definition.occurrences.length != 14)
+		var robot = new RobotArm();
+		if (definition == null || definition.occurrences.length != robot.components().length)
 			throw "Robot arm preview has the wrong number of occurrences";
 		for (part in scene.parts) if (part.volume == null || part.volume <= 0 || part.inertia == null)
 			throw 'Robot arm part "${part.id}" has no mass properties';
 		var revolutes = [for (joint in definition.joints) if (Std.string(joint.type) == "revolute") joint.id];
 		if (revolutes.join(",") != "j1,j2,j3,j4,j5,j6") throw "Robot arm should have joints j1 to j6";
 
-		var robot = new RobotArm();
 		var model = new AssemblyModel("mm");
 		robot.addTo(model, "");
 		var straight = new AssemblyState(model.definition(RobotArmPreview.ASSEMBLY_ID));
@@ -99,17 +99,25 @@ class RobotArmChecks {
 		var tool = straight.worldPose("toolFlange");
 		near(tool.x, 35, "tool flange x at the straight pose", 1e-3);
 		near(tool.y, 0, "tool flange y at the straight pose", 1e-3);
-		near(tool.z, 1299, "tool flange z at the straight pose", 1e-3);
-		near(AssemblyFrames.transformVector(tool, 0, 0, -1).z, 1, "tool axis points up when straight", 1e-6);
+		near(tool.z, 1299 + robot.toolFlange.thickness, "tool flange z at the straight pose", 1e-3);
+		near(AssemblyFrames.transformVector(tool, 0, 0, 1).z, 1, "tool axis points up when straight", 1e-6);
 
 		var ready = new AssemblyState(model.definition(RobotArmPreview.ASSEMBLY_ID));
 		for (spec in robot.specs) ready.setJoint(spec.id, spec.initial);
 		ready.forwardKinematics();
 		var readyTool = ready.worldPose("toolFlange");
-		near(AssemblyFrames.transformVector(readyTool, 0, 0, -1).z, -1, "tool axis points down in the ready pose", 1e-6);
+		near(AssemblyFrames.transformVector(readyTool, 0, 0, 1).z, -1, "tool axis points down in the ready pose", 1e-6);
+		// The cup's contact face hangs below the flange in the ready pose, facing the work below.
+		var contact = ready.worldConnector("tool/cup", "contact");
+		var lift = readyTool.z - contact.z;
+		if (!(lift > 80)) throw 'Suction cup should hang well below the tool flange, got $lift mm';
+		var approach = AssemblyFrames.transformVector(contact, 0, 1, 0);
+		Sys.println('robot arm: cup contact at ${Math.round(contact.x)}, ${Math.round(contact.y)}, ${Math.round(contact.z)} mm, ' +
+			'axis ${Math.round(approach.x * 100) / 100}, ${Math.round(approach.y * 100) / 100}, ${Math.round(approach.z * 100) / 100}');
 		var moving = robot.toolFlange.massProperties().mass;
 		for (joint in robot.joints) moving += joint.massProperties().mass;
 		for (link in robot.links) moving += link.massProperties().mass;
+		moving += robot.tool.massPropertiesAtMount().mass;
 		Sys.println('robot arm: ${Math.round(moving * 10) / 10} kg above the base flange, ' +
 			'${Math.round(robot.massProperties().mass * 10) / 10} kg in all');
 		Sys.println('robot arm: ${scene.parts.length} definitions, ${definition.occurrences.length} occurrences, tool at ' +

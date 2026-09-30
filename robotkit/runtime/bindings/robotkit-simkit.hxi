@@ -129,6 +129,11 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_get_differential_drive_state(simulation: rk_simulation, robot_index: u32, out_state: ptr<rk_simulation_differential_drive_state> @inout) -> rk_result;
 	/**
+	 * The physics body that carries one robot link. Pass it to nksim_session_hold_object() as the
+	 * carrier to attach a session object to that link, for instance a workpiece held by a suction cup.
+	 */
+	extern fn rk_simulation_get_link_body(simulation: rk_simulation, robot_index: u32, link_index: u32, out_body: ptr<nksim_body> @out) -> rk_result;
+	/**
 	 * Reads one robot link pose from the latest physics state.
 	 */
 	extern fn rk_simulation_get_link_pose(simulation: rk_simulation, robot_index: u32, link_index: u32, out_pose: ptr<rk_simulation_pose> @inout) -> rk_result;
@@ -149,6 +154,10 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 	 */
 	extern fn rk_simulation_get_robot_base_velocity(simulation: rk_simulation, robot_index: u32, out_twist: ptr<rk_simulation_twist> @inout) -> rk_result;
 	extern fn rk_simulation_get_robot_contact(simulation: rk_simulation, runtime: rk_robot_runtime, index: u32, out_contact: ptr<rk_robot_contact> @inout) -> rk_result;
+	/**
+	 * A zero out[0].struct_size uses sizeof(rk_robot_contact). Otherwise it
+	 * supplies the stride and copied prefix size for each output entry.
+	 */
 	extern fn rk_simulation_get_robot_contacts(simulation: rk_simulation, runtime: rk_robot_runtime, out: ptr<rk_robot_contact>, capacity: u32, out_count: ptr<u32> @out) -> rk_result;
 	/**
 	 * Reads one robot base pose from the latest physics state.
@@ -510,7 +519,6 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		linear: array<f64, 3> @offset(8);
 		angular: array<f64, 3> @offset(32);
 	}
-	handle rk_robot_contact_list : u32 @destroy("rk_robot_contact_list_destroy");
 	/**
 	 * A force (N) and torque (N m), world frame, at a body's centre of mass.
 	 */
@@ -519,6 +527,7 @@ interface RobotKitSimKit @target("portable-abi64") @library("robotkit_runtime") 
 		force: array<f64, 3> @offset(8);
 		torque: array<f64, 3> @offset(32);
 	}
+	handle rk_robot_contact_list : u32 @destroy("rk_robot_contact_list_destroy");
 	/**
 	 * Opaque handle for one shared simulation universe and clock.
 	 */

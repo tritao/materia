@@ -164,7 +164,8 @@ class ScenePresentation {
     view.applySelection(selection, selectionMaterial);
     var faceHoverNode = hoveredId == null || hoveredFaceIndex == null || hoveredFaceIndex < 0
       ? null : faceHoverNodes.get(hoveredId);
-    if (faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex) {
+    var faceHoverShown = faceHoverNode != null && faceHoverIndexes.get(hoveredId) == hoveredFaceIndex;
+    if (faceHoverShown) {
       // The face node is hidden in the scene and shown only in this presentation view.
       view.setVisibility(faceHoverNode, true);
       view.setMaterial(faceHoverNode, hoverMaterial);
@@ -186,6 +187,12 @@ class ScenePresentation {
         if (runtime != null) {
           poseNodes.push(runtime.node);
           poseTransforms.push(EditorScene.poseTransform(pose.position, pose.rotation));
+          // The face overlay is a child of its object with an identity transform, but a pose
+          // override moves only its own node, so the overlay needs the object's pose as well.
+          if (faceHoverShown && pose.id == hoveredId) {
+            poseNodes.push(faceHoverNode);
+            poseTransforms.push(poseTransforms[poseTransforms.length - 1]);
+          }
         }
       }
       view.replacePoses(poseNodes, poseTransforms);

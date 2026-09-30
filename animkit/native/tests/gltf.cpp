@@ -147,6 +147,81 @@ void checkPoint(const std::vector<float> &p, size_t vertex, float x, float y, fl
 
 } // namespace
 
+
+/*
+ * Two meshes of two triangles sharing an edge, each triangle with its own
+ * flat normals as hard-edge exports author them. "Soft" folds by 30 degrees,
+ * "Hard" by 90.
+ */
+std::string creaseDocument() {
+    const float c = std::cos(0.5235988f), s = std::sin(0.5235988f);
+    std::vector<uint8_t> buffer;
+    append<float>(buffer, {0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, -c, -s}); // 0: soft positions
+    append<float>(buffer, {0, 0, 1, 0, 0, 1, 0, 0, 1, 0, -s, c, 0, -s, c, 0, -s, c}); // 72: soft normals
+    append<float>(buffer, {0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, -1}); // 144: hard positions
+    append<float>(buffer, {0, 0, 1, 0, 0, 1, 0, 0, 1, 0, -1, 0, 0, -1, 0, 0, -1, 0}); // 216: hard normals
+    append<uint16_t>(buffer, {0, 1, 2, 3, 4, 5}); // 288: indices, 12 bytes
+    const size_t length = buffer.size();
+    std::string json = R"({
+  "asset": {"version": "2.0"},
+  "scene": 0,
+  "scenes": [{"nodes": [0, 1]}],
+  "nodes": [{"name": "Soft", "mesh": 0}, {"name": "Hard", "mesh": 1}],
+  "meshes": [
+    {"name": "Soft", "primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1}, "indices": 4}]},
+    {"name": "Hard", "primitives": [{"attributes": {"POSITION": 2, "NORMAL": 3}, "indices": 4}]}
+  ],
+  "accessors": [
+    {"bufferView": 0, "componentType": 5126, "count": 6, "type": "VEC3", "min": [0, -1, -1], "max": [1, 1, 0]},
+    {"bufferView": 1, "componentType": 5126, "count": 6, "type": "VEC3"},
+    {"bufferView": 2, "componentType": 5126, "count": 6, "type": "VEC3", "min": [0, 0, -1], "max": [1, 1, 0]},
+    {"bufferView": 3, "componentType": 5126, "count": 6, "type": "VEC3"},
+    {"bufferView": 4, "componentType": 5123, "count": 6, "type": "SCALAR"}
+  ],
+  "bufferViews": [
+    {"buffer": 0, "byteOffset": 0, "byteLength": 72},
+    {"buffer": 0, "byteOffset": 72, "byteLength": 72},
+    {"buffer": 0, "byteOffset": 144, "byteLength": 72},
+    {"buffer": 0, "byteOffset": 216, "byteLength": 72},
+    {"buffer": 0, "byteOffset": 288, "byteLength": 12}
+  ],
+  "buffers": [{"byteLength": )" + std::to_string(length)
+        + R"(, "uri": "data:application/octet-stream;base64,)" + base64(buffer) + R"("}]
+})";
+    return json;
+}
+
+void checkCreaseSmoothing() {
+    const std::string document = creaseDocument();
+    ak_asset_handle asset{};
+    if (ak_asset_load_memory(reinterpret_cast<const uint8_t *>(document.data()),
+            static_cast<uint32_t>(document.size()), &asset) != AK_OK) {
+        std::fprintf(stderr, "crease load failed: %s\n", ak_last_error());
+        ++failures;
+        return;
+    }
+    ak_instance_handle instance{};
+    CHECK(ak_instance_create(asset, &instance) == AK_OK);
+    ak_asset_destroy(asset);
+    CHECK(ak_instance_evaluate(instance) == AK_OK);
+
+    // Soft: vertex 0 (shared with the neighbour) blends the two face normals,
+    // so it tilts off the authored +Z (scene +X) by about half the fold.
+    const std::vector<float> soft = read<float>(ak_instance_read_normals, instance, 0);
+    const std::vector<float> hard = read<float>(ak_instance_read_normals, instance, 1);
+    CHECK(soft.size() == 18 && hard.size() == 18);
+    if (soft.size() == 18 && hard.size() == 18) {
+        // Coincident vertices 0 and 3 agree after smoothing.
+        for (int i = 0; i < 3; ++i) CHECK(near(soft[i], soft[9 + i]));
+        // Scene +X is glTF +Z: the smoothed normal leans away from it, not onto it.
+        CHECK(soft[0] < 0.999f && soft[0] > 0.9f);
+        // A 90 degree edge stays hard: each vertex keeps its own face normal.
+        CHECK(near(hard[0], 1.0f));
+        CHECK(near(hard[9], 0.0f) && near(hard[9 + 2], -1.0f)); // glTF -Y is scene -Z
+    }
+    ak_instance_destroy(instance);
+}
+
 int main() {
     // JSON numbers must parse the same under a comma-decimal locale, as in a
     // desktop session with LC_NUMERIC=pt_PT.UTF-8.
@@ -295,6 +370,8 @@ int main() {
     CHECK(ak_asset_load_memory(reinterpret_cast<const uint8_t *>(broken), sizeof(broken) - 1, &empty)
         == AK_ERROR_IMPORT);
     CHECK(std::strlen(ak_last_error()) > 0);
+
+    checkCreaseSmoothing();
 
     if (failures == 0) std::printf("animkit gltf: ok\n");
     return failures == 0 ? 0 : 1;

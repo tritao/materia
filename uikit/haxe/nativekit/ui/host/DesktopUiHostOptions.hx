@@ -10,6 +10,12 @@ class DesktopUiHostOptions extends UiHostOptions {
 	public var frameLimit:Int = 0;
 	/** Capture after this wall-clock interval while preserving normal frame scheduling. */
 	public var captureSeconds:Float = 0.0;
+	/**
+	 * Holds capture until the application says its content is loaded. Frames rendered while this
+	 * returns false do not count toward `frameLimit` or start the `captureSeconds` timer, so a capture of
+	 * an application that opens its document in the background shows the document, not its loading state.
+	 */
+	public var captureReady:Null<Void->Bool> = null;
 	/** True while application state changes without input events, such as live simulation. */
 	public var continuousFrames:Null<Void->Bool> = null;
 	public var eventHistoryLimit:Int = 100;

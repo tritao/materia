@@ -1,0 +1,17 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-robot-arm-authoring" },
+	"entry": "ArmMotionAuthoring",
+	"sourceRoots": [".", ".."],
+	"dependencies": {
+		"projectkit": { "path": "../../../../projectkit" },
+		"cadkit": { "path": "../../../../cadkit" },
+		"machinekit": { "path": "../../.." },
+		"robotkit": { "path": "../../../../robotkit" },
+		"cadbridge": { "path": "../../../../robotkit/cadbridge" },
+		"motionkit": { "path": "../../../../motionkit" },
+		"motionkit-robot": { "path": "../../../../motionkit/robot" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

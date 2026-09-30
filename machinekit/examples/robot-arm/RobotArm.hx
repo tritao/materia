@@ -1,120 +1,109 @@
-import cadkit.modeling.Location;
-import cadkit.modeling.Part;
-import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
+import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
+import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
+import machinekit.pneumatic.schmalz.SchmalzVacuumHose;
+import machinekit.robotics.ArmJoint;
+import machinekit.robotics.ArmLink;
+import machinekit.robotics.ArmLink.ArmAxis;
+import machinekit.robotics.EndEffector;
+import machinekit.robotics.EndEffectorPlate;
+import machinekit.robotics.FrameBar;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
 import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
 
-/** Direction of a joint axis, in the frame of the link that carries the joint. */
-enum ArmAxis {
-	PlusX;
-	MinusX;
-	PlusZ;
+/** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
+ * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`.
+ * Its `contact` working frame is the cup's contact face.
+ */
+class ArmSuctionTool {
+	public static function build(flange:RobotFlange):EndEffector {
+		var result = new EndEffector();
+		result.addComponent("plate", new EndEffectorPlate(flange));
+		result.addComponent("bar", new FrameBar(30, 20, 90));
+		result.addComponent("ejector", new SchmalzVacuumGenerator("10.02.01.00563"));
+		result.addComponent("cup", new SchmalzSuctionCup("10.01.01.11401"));
+		result.addComponent("fitting", new SchmalzPushInFitting("10.08.02.00203"));
+		result.addComponent("hose", new SchmalzVacuumHose("10.07.09.00001", [
+			new Vector(20, 0, 40), new Vector(35, 0, 60),
+			new Vector(35, 0, 100), new Vector(-30, 0, 100), new Vector(0, 0, 90)]));
+		result.mount("plate", "robot");
+		result.addMate("bar-mate", "fixed", "plate", "tool", "bar", "base");
+		result.addMemberConnector("bar", "ejector-seat", Solids.axial(20, 0, 20));
+		result.addMate("ejector-mate", "fixed", "bar", "ejector-seat", "ejector", "mount");
+		result.addMate("cup-mate", "fixed", "bar", "end", "cup", "mount");
+		result.addMate("fitting-mate", "fixed", "cup", "mount", "fitting", "mount");
+		result.addMate("hose-mate", "fixed", "bar", "base", "hose", "mount");
+		result.connectPorts("ejector-hose", "ejector", "vacuum", "hose", "input");
+		result.connectPorts("hose-fitting", "hose", "output", "fitting", "hose");
+		result.connectPorts("fitting-cup", "fitting", "thread", "cup", "vacuum");
+		result.exposePort("compressedAir", "ejector", "air");
+		result.workingFrame("contact", "cup", "contact", true);
+		return result;
+	}
 }
 
-/** Joint module: a cylindrical housing along local +Z with a fixed `stator` face at z=0 and the
- * rotating output `rotor` face at z=length. The housing belongs to the link before the joint;
- * the next link mates its `start` connector to `rotor` on a revolute joint.
- *
- * A module given a `flange` is the last joint of the arm. It carries a `tool` connector instead of
- * `rotor`, facing back into the housing like `Pedestal`'s `top`, so the flange mated to it sits
- * outside the housing with its pilot boss in a recess cut by the flange's own `mountingCutout`.
- */
-class ArmJoint extends MachineComponent {
-	public final diameter:Float;
-	public final length:Float;
-	public final flange:Null<RobotFlange>;
+/** Work table: a slab on four legs, standing on the floor (z=0) with its top at `height`. The origin
+ * is the centre of the footprint. */
+class ArmTable extends MachineComponent {
+	public final width:Float;
+	public final depth:Float;
+	public final height:Float;
+	public final thickness:Float;
 
-	public function new(diameter:Float, length:Float, ?flange:RobotFlange) {
-		if (!(diameter > 0) || !(length > 0)) throw "Arm joint needs a positive diameter and length";
-		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
-		super(flange == null ? 'ARM-JOINT-D$text' : 'ARM-JOINT-D$text-${flange.designation}',
-			'Arm joint module, $text mm', "steel 12.9");
-		this.diameter = diameter;
-		this.length = length;
-		this.flange = flange;
-		addConnector("stator", Mount, Solids.axial(0, 0, 0));
-		if (flange == null) {
-			addConnector("rotor", Mount, Solids.axial(0, 0, length));
-		} else {
-			if (!(diameter >= flange.flangeDiameter + 2)) throw "Arm joint is too narrow for its tool flange";
-			addConnector("tool", Mount, AssemblyFrames.compose(
-				AssemblyFrames.alongY(0, 0, length, 0, 0, -1), AssemblyFrames.turnY(Math.PI / flange.boltCount)));
-		}
+	public function new(width:Float, depth:Float, height:Float, thickness:Float = 30) {
+		if (!(width > 0) || !(depth > 0) || !(thickness > 0) || !(height > thickness) || width < 200 || depth < 200)
+			throw "Table needs positive dimensions and legs under its top";
+		super('TABLE-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
+			"Work table", "steel", true);
+		this.width = width;
+		this.depth = depth;
+		this.height = height;
+		this.thickness = thickness;
+		addConnector("base", Mount, Solids.axial(0, 0, 0));
 	}
 
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.cylinderSpan(diameter / 2, 0, length);
-		if (flange == null || detail == Envelope) return body;
-		var depth = flange.pilotRecessDepth() + 2 * flange.mountScrewPart(10).diameter;
-		var cut = flange.mountingCutout(depth);
-		var placed = cut.placed(new Location(new Plane(new Vector(0, 0, length), Vector.X(), Vector.Z().scale(-1))));
-		cut.close();
-		return Solids.cut(body, [placed]);
+		var parts = [Part.box(width, depth, thickness).translated(new Vector(0, 0, height - thickness))];
+		var leg = 40.0, inset = 30.0;
+		for (sx in [-1, 1]) for (sy in [-1, 1])
+			parts.push(Part.box(leg, leg, height - thickness)
+				.translated(new Vector(sx * (width / 2 - inset - leg / 2), sy * (depth / 2 - inset - leg / 2), 0)));
+		return Solids.union(parts);
 	}
 }
 
-/** Hollow tube link along local +Z, closed at both ends, with a collar where it meets the
- * previous joint. Its `start` connector sits at the origin with the joint axis given by
- * `startAxis`; its `end` connector carries the next joint module, whose axis is `endAxis`. A
- * lateral end joint is centred on the tube's end point, so `end` is offset by half the module
- * length against the axis direction.
- */
-class ArmLink extends MachineComponent {
-	public final length:Float;
-	public final diameter:Float;
-	public final wall:Float;
-	public final collarDiameter:Float;
-	public final startAxis:ArmAxis;
-	public final endAxis:ArmAxis;
+/** A plain block standing on its base (z=0), centred on its origin. */
+class ArmBlock extends MachineComponent {
+	public final width:Float;
+	public final depth:Float;
+	public final height:Float;
 
-	static inline var COLLAR_THICKNESS:Float = 6;
-
-	public function new(length:Float, diameter:Float, wall:Float, collarDiameter:Float, startAxis:ArmAxis,
-			endAxis:ArmAxis, endJointLength:Float) {
-		if (!(length > 2 * wall) || !(diameter > 2 * wall) || !(wall > 0))
-			throw "Arm link needs a wall thinner than its radius and length";
-		var text = '${Dimension.format(diameter)}x${Dimension.format(length)}';
-		super('ARM-LINK-D$text-W${Dimension.format(wall)}', 'Arm link tube, $text mm', "aluminium 6061");
-		this.length = length;
-		this.diameter = diameter;
-		this.wall = wall;
-		this.collarDiameter = collarDiameter;
-		this.startAxis = startAxis;
-		this.endAxis = endAxis;
-		var start = direction(startAxis);
-		addConnector("start", Mount, AssemblyFrames.alongY(0, 0, 0, start.x, start.y, start.z));
-		var end = direction(endAxis);
-		var offset = endAxis == PlusZ ? 0 : endJointLength / 2;
-		addConnector("end", Mount, AssemblyFrames.alongY(-offset * end.x, -offset * end.y,
-			length - offset * end.z, end.x, end.y, end.z));
+	public function new(width:Float, depth:Float, height:Float, material:String, name:String) {
+		if (!(width > 0) || !(depth > 0) || !(height > 0)) throw "Block needs positive dimensions";
+		super('${name.toUpperCase()}-${Dimension.format(width)}x${Dimension.format(depth)}x${Dimension.format(height)}',
+			name, material, true);
+		this.width = width;
+		this.depth = depth;
+		this.height = height;
+		addConnector("base", Mount, Solids.axial(0, 0, 0));
+		addConnector("top", Mount, Solids.axial(0, 0, height));
 	}
-
-	public static function direction(axis:ArmAxis):{x:Float, y:Float, z:Float}
-		return switch axis {
-			case PlusX: {x: 1, y: 0, z: 0};
-			case MinusX: {x: -1, y: 0, z: 0};
-			case PlusZ: {x: 0, y: 0, z: 1};
-		};
 
 	override public function hasGeometry():Bool return true;
 
-	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var start = direction(startAxis);
-		var collar = Part.cylinderAlong(collarDiameter / 2, new Vector(0, 0, 0),
-			new Vector(start.x, start.y, start.z), COLLAR_THICKNESS);
-		var body = Solids.union([Part.cylinderSpan(diameter / 2, 0, length), collar]);
-		if (detail == Envelope) return body;
-		return Solids.cut(body, [Part.cylinderSpan(diameter / 2 - wall, wall, length - wall)]);
-	}
+	override public function geometry(detail:ComponentDetail = Preview):Part
+		return Part.box(width, depth, height);
 }
 
 /** One joint's motion limits and the pose it starts in, in radians and rad/s. */
@@ -128,7 +117,7 @@ typedef ArmJointSpec = {
 	var initial:Float;
 }
 
-/** Six-axis serial arm on a pedestal, in the classic shoulder/elbow/spherical-wrist layout.
+/** Six-axis serial arm on a pedestal with a suction tool, in the classic shoulder/elbow/spherical-wrist layout.
  *
  * At zero on every joint the arm points straight up. Joints `j1`, `j4` and `j6` turn about the
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
@@ -137,10 +126,28 @@ typedef ArmJointSpec = {
  */
 class RobotArm extends MachineAssembly {
 	public static inline var PEDESTAL_HEIGHT:Float = 300;
+	/** Work cell in front of the arm (-Y), in millimetres from the pedestal axis and the floor. */
+	public static inline var TABLE_TOP:Float = 250;
+	public static inline var TABLE_CENTRE_Y:Float = -650;
+	public static inline var WORKPIECE_WIDTH:Float = 60;
+	public static inline var WORKPIECE_HEIGHT:Float = 50;
+	public static inline var PAD_HEIGHT:Float = 2;
+	/** Two pads, side by side; the workpiece starts on the first and is carried to the second and back. */
+	public static inline var PICK_X:Float = -150;
+	public static inline var PLACE_X:Float = 150;
+	public static inline var WORK_Y:Float = -600;
+	/** Height of the workpiece's top face when it stands on a pad, which the suction cup meets. */
+	public static final WORKPIECE_TOP:Float = TABLE_TOP + PAD_HEIGHT + WORKPIECE_HEIGHT;
+	/**
+	 * How far below the workpiece top the tool aims when it grips. A gap reports no contact, so the
+	 * cup presses lightly; the simulation then seats the held workpiece with a small clearance.
+	 */
+	public static inline var GRIP_PRESS:Float = 0.5;
 
 	public final flange = new RobotFlange(63);
 	public final pedestal:Pedestal;
 	public final toolFlange = new RobotFlange(31.5);
+	public final tool:EndEffector;
 	public final joints:Array<ArmJoint>;
 	public final links:Array<ArmLink>;
 	public final specs:Array<ArmJointSpec>;
@@ -185,7 +192,28 @@ class RobotArm extends MachineAssembly {
 		}
 		addComponent("toolFlange", toolFlange);
 		revolute(specs[5], "joint6", "tool", "toolFlange", "face");
+		tool = ArmSuctionTool.build(toolFlange);
+		include("tool", tool);
+		addMate("tool-mount", "fixed", "toolFlange", "face", "tool/plate", "robot");
 		exposeConnector("toolFace", "toolFlange", "face");
+		exposeConnector("toolContact", "tool/cup", "contact");
+		// The ejector's compressed-air inlet is the arm's own service input.
+		exposePort("compressedAir", "tool/ejector", "air");
+		addCell();
+	}
+
+	/**
+	 * Table, two pads and a workpiece standing where the motion authoring aims the tool. The table and
+	 * pads are fixed roots; the project's `dynamicParts` frees the workpiece so the suction cup can carry it.
+	 */
+	function addCell():Void {
+		function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);
+		addComponent("table", new ArmTable(800, 500, TABLE_TOP), at(0, TABLE_CENTRE_Y, 0));
+		var pad = new ArmBlock(WORKPIECE_WIDTH + 20, WORKPIECE_WIDTH + 20, PAD_HEIGHT, "rubber", "Pad");
+		addComponent("padPick", pad, at(PICK_X, WORK_Y, TABLE_TOP));
+		addComponent("padPlace", pad, at(PLACE_X, WORK_Y, TABLE_TOP));
+		addComponent("workpiece", new ArmBlock(WORKPIECE_WIDTH, WORKPIECE_WIDTH, WORKPIECE_HEIGHT, "birch plywood",
+			"Workpiece"), at(PICK_X, WORK_Y, TABLE_TOP + PAD_HEIGHT));
 	}
 
 	function revolute(spec:ArmJointSpec, housing:String, rotorConnector:String, child:String,

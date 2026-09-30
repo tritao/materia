@@ -1551,7 +1551,21 @@ class EditorScene {
   public function hoverHitRay(originX:Float, originY:Float, originZ:Float,
       directionX:Float, directionY:Float, directionZ:Float):{id:String, faceIndex:Int} {
     refreshPresentationIfStale();
-    var hit = spatial.pickRay(originX, originY, originZ, directionX, directionY, directionZ);
+    return resolveHover(spatial.pickRay(originX, originY, originZ, directionX, directionY, directionZ));
+  }
+
+  /**
+   * Hover hit against a presentation view. Use this while a simulation poses the scene: the plain
+   * variant tests the authored placement, so the cursor would meet geometry that is no longer there.
+   */
+  public function hoverHitRayWithView(view:SceneView, originX:Float, originY:Float, originZ:Float,
+      directionX:Float, directionY:Float, directionZ:Float):{id:String, faceIndex:Int} {
+    refreshPresentationIfStale();
+    return resolveHover(spatial.pickRayWithView(view, originX, originY, originZ,
+      directionX, directionY, directionZ));
+  }
+
+  function resolveHover(hit:PickResult):{id:String, faceIndex:Int} {
     var id = idForHit(hit);
     var faceIndex = -1;
     var item = object(id);

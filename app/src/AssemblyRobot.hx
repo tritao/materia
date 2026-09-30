@@ -6,6 +6,7 @@ import materia.assembly.AssemblyDefinition;
 import materia.project.MaterialLibrary;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotModel;
+import robotkit.runtime.RobotRuntime;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
@@ -21,13 +22,15 @@ typedef AssemblyPart = {id:String, robotIndex:Int, linkIndex:Int, center:Array<F
  */
 class AssemblyRobot {
   public final robot:SimulatedRobot;
+  public final runtime:RobotRuntime;
   public final model:RobotModel;
   public final parts:Array<AssemblyPart>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
   public final warnings:Array<String>;
 
-  function new(robot:SimulatedRobot, model:RobotModel, parts:Array<AssemblyPart>, warnings:Array<String>) {
+  function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, parts:Array<AssemblyPart>, warnings:Array<String>) {
     this.robot = robot;
+    this.runtime = runtime;
     this.model = model;
     this.parts = parts;
     this.warnings = warnings;
@@ -35,6 +38,21 @@ class AssemblyRobot {
 
   /** The id the assembly's robot takes in the world. */
   public static function idFor(assembly:AssemblyDefinition):String return "assembly:" + assembly.id;
+
+  /**
+   * The occurrences that are not bolted to the assembly: parts flagged dynamic (a workpiece)
+   * simulate as free objects, and the assembly robot has no link for them.
+   */
+  public static function freeOccurrences(scene:EditorScene, assembly:AssemblyDefinition):Map<String, Bool> {
+    var sceneParts = new Map<String, SceneObjectData>();
+    for (record in scene.records()) sceneParts.set(record.id, record);
+    var free = new Map<String, Bool>();
+    for (occurrence in assembly.occurrences) {
+      var record = sceneParts.get("project:" + occurrence.id);
+      if (record != null && record.dynamicBody) free.set(occurrence.id, true);
+    }
+    return free;
+  }
 
   /**
    * Adds the assembly to `candidate` as a robot compiled at `revision`;
@@ -48,8 +66,9 @@ class AssemblyRobot {
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
     if (physical == null) throw "Assembly physical properties are unavailable";
+    var free = freeOccurrences(scene, assembly);
     var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-      session.projectAssemblyState);
+      session.projectAssemblyState, [for (id in free.keys()) id]);
     // Link collision geometry is installed with generated-part hulls in the
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
@@ -61,6 +80,7 @@ class AssemblyRobot {
     for (part in physical.parts) if (part.collisionWarning != null)
       warnings.push(part.id + ": " + part.collisionWarning);
     for (occurrence in assembly.occurrences) {
+      if (free.exists(occurrence.id)) continue;
       var record = sceneParts.get("project:" + occurrence.id);
       var part = physicalParts.get(occurrence.definition);
       if (record == null || part == null)
@@ -122,6 +142,7 @@ class AssemblyRobot {
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);
     for (occurrence in assembly.occurrences) {
+      if (free.exists(occurrence.id)) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);
       if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
       var linkIndex = -1;
@@ -132,6 +153,6 @@ class AssemblyRobot {
         linkIndex: linkIndex, center: [for (coordinate in center) coordinate *
           physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, converted.model, parts, warnings);
+    return new AssemblyRobot(robot, runtime, converted.model, parts, warnings);
   }
 }

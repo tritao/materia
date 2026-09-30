@@ -181,7 +181,7 @@ class Main {
         editor.session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
       }
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
       var settleSeconds = 0.0;
@@ -253,6 +253,8 @@ class Main {
     host.frameLimit = diagnostics.frameLimit;
     host.captureSeconds = diagnostics.captureSeconds;
     var activeEditor:Null<ReferenceEditorApp> = null;
+    // A launch project builds in the background; captures wait for it so they show the project.
+    host.captureReady = function() return activeEditor == null || !activeEditor.openingProject();
     host.continuousFrames = function() return activeEditor != null &&
       (activeEditor.simulation.isRunning() || diagnostics.robotHost != null ||
         activeEditor.hasCharacterPreview());
@@ -547,6 +549,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // The worker-thread build behind startLoading, when the example is a project.
   var startJob:Null<ProjectLoadJob> = null;
   var startFailure:Null<String> = null;
+  // The Start page was opened only to show a launch project's progress, so it closes once that opens.
+  var closeStartAfterOpen:Bool = false;
   var lastRecordedPath:Null<String> = null;
   // Each mode keeps the layout it was left in; the mode set itself is never persisted.
   final modeSnapshots:Map<String, DockWorkspaceSnapshot> = new Map();
@@ -635,12 +639,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
+    // A window must paint its first frame before a project builds, so a hosted editor opens the launch
+    // project on a worker thread once it is up. Without a window there is nothing to keep responsive.
+    var deferredProject:Null<String> = null;
     if(projectPath!=null){
-      var generated=MateriaProjectRunner.loadProject(projectPath);
-      session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
-        generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-        generated.localCentersByDefinition, generated.metresPerUnit,
-        generated.physical, generated.recipeDocument, generated.robotMotions);
+      if(hostContext!=null) deferredProject=projectPath;
+      else {
+        var generated=MateriaProjectRunner.loadProject(projectPath);
+        session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
+          generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+          generated.localCentersByDefinition, generated.metresPerUnit,
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+      }
     }
     bimEditor = makeBimEditor();
     files = hostContext == null ? null : new SceneFileDialogs(hostContext);
@@ -659,7 +669,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       }
       documents.requestClose(close);
     };
-    treeModel = new EditorSceneTree(scene, session.projectAssembly);
+    treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
@@ -687,7 +697,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     EditorWorkspaceLayout.migrateLegacyViewport(workspace);
     // Layouts saved before transient panels existed can still contain them; they open only on request.
     for (id in TRANSIENT_PANELS) if (workspace.isOpen(id)) workspace.close(id);
-    if(projectPath!=null&&perspectiveViewport!=null){
+    if(deferredProject!=null) openProjectInBackground(deferredProject);
+    else if(projectPath!=null&&perspectiveViewport!=null){
       workspace.activate("perspective");
       scene.select("scene");
       perspectiveViewport.frameSelected();
@@ -884,10 +895,14 @@ class ReferenceEditorApp implements DesktopUiApplication {
           startJob = null;
           startLoading = null;
           if (job.wasCancelled()) log("Cancelled opening " + queued.title);
-          else try ExampleCatalog.finish(this, queued, job.take()) catch (failure:Dynamic) {
+          else try {
+            ExampleCatalog.finish(this, queued, job.take());
+            if (closeStartAfterOpen) workspace.close("start");
+          } catch (failure:Dynamic) {
             startFailure = "Could not open " + queued.title + ": " + Std.string(failure);
             log(startFailure);
           }
+          closeStartAfterOpen = false;
           invalidateView();
         }
       } else if (startLoadDelay > 0) {
@@ -917,6 +932,21 @@ class ReferenceEditorApp implements DesktopUiApplication {
     var needsFrame = scene.advanceCadMeshRefinement();
     if ((needsFrame || scene.visualRevision != before) && hostContext != null)
       hostContext.requestFrame();
+  }
+
+  /** True from launch until the project named on the command line has opened, failed, or been cancelled. */
+  public function openingProject():Bool return startLoading != null;
+
+  /**
+   * Queues a project as if it had been chosen on the Start page, and shows that page so the build's
+   * progress and Cancel button are visible while it runs. The build runs on a worker thread, so the
+   * caller returns at once and the window keeps painting; `tick()` opens the result.
+   */
+  public function openProjectInBackground(path:String):Void {
+    startLoading = ExampleCatalog.launchEntry(path);
+    startLoadDelay = 3;
+    closeStartAfterOpen = workspace.get("start") != null && !workspace.isOpen("start");
+    showStartPage();
   }
 
   /** Opens the Start page beside the 3D view. */
@@ -1684,7 +1714,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
       sceneGeneration = session.generation;
-      treeModel = new EditorSceneTree(scene, session.projectAssembly);
+      treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
       treeModel.setFilter(hierarchySearch);
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :

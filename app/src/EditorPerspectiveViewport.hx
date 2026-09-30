@@ -317,8 +317,13 @@ class EditorPerspectiveViewport implements View {
     fitCameraClipRange();
     var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth),
       Math.max(1, renderedHeight));
-    var hit = scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
-      ray.directionX, ray.directionY, ray.directionZ);
+    // A running simulation poses the scene, so hover must test the posed geometry, as picking does.
+    var hit = simulationActive
+      ? scene.hoverHitRayWithView(scene.configureRenderView(new SceneView(),
+          camera.viewProjection(aspect()), simulationPoses),
+          ray.originX, ray.originY, ray.originZ, ray.directionX, ray.directionY, ray.directionZ)
+      : scene.hoverHitRay(ray.originX, ray.originY, ray.originZ,
+          ray.directionX, ray.directionY, ray.directionZ);
     var next:Null<String> = hit.id;
     var nextFace = hit.faceIndex;
     if (next == "scene") next = null;
