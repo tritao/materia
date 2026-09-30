@@ -71,7 +71,7 @@ class HeadlessEditorProfile {
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
         Sys.args()[2] == "inspector-edits" ||
         Sys.args()[2] == "selection-stress" ||
-        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop" || Sys.args()[2] == "interaction") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -104,7 +104,9 @@ class HeadlessEditorProfile {
       var censusInterval = censusText == null ? 0 : Std.parseInt(censusText);
       if (censusInterval == null) censusInterval = 0;
       if (censusInterval > 0) hl.Gc.censusStart(censusInterval);
-      if (scenario == "noop") {
+      if (scenario == "interaction") {
+        runInteractionScenario(editor, frame, output, cycles, frames, actions);
+      } else if (scenario == "noop") {
         // Frames where nothing changed: the floor cost of the pipeline for this tree.
         for (cycle in 0...cycles) {
           submit(editor, frame, frames, "noop", cycle);
@@ -240,6 +242,77 @@ class HeadlessEditorProfile {
     var expectedVisible = boxVisibleToggles % 2 == 0 ? initialVisible : !initialVisible;
     if (box == null || box.x == initialX || box.visible != expectedVisible)
       throw "Inspector property edit scenario did not apply the expected values";
+  }
+
+  /**
+   * Frames driven by pointer and keyboard input that leave the tree structure alone: what a user does most of the time.
+   * Each action reports the bytes allocated across the input events and the frame, and whether a frame was needed.
+   */
+  static function runInteractionScenario(editor:ReferenceEditorApp, frame:LayoutFrame, output:String,
+      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+    click(editor, "inspector");
+    submit(editor, frame, frames, "setup:inspector");
+    var nameKey = propertyEditorKey(editor, "name");
+    var tabA = targetCenter(editor, "hierarchy", true), tabB = targetCenter(editor, "sensors", true);
+    var field = targetCenter(editor, nameKey, false);
+    var results:Map<String, Array<Float>> = new Map();
+    var dirtyCounts:Map<String, Int> = new Map();
+    var builtNodes:Map<String, Array<Float>> = new Map();
+    var order:Array<String> = [];
+    var subtreeNodes:Array<Float> = [];
+    var measure = function(name:String, input:Void->Void) {
+      var before = hl.Gc.totalAllocated();
+      input();
+      var dirty = editor.ui.isDirty();
+      submit(editor, frame, frames, name);
+      var bytes = hl.Gc.totalAllocated() - before;
+      if (!results.exists(name)) {
+        results.set(name, []);
+        dirtyCounts.set(name, 0);
+        order.push(name);
+      }
+      results.get(name).push(bytes);
+      if (dirty) {
+        var count:Int = cast dirtyCounts.get(name);
+        dirtyCounts.set(name, count + 1);
+      }
+    };
+    // Unfocused: hovering and scrolling the way a user moves around the editor.
+    for (cycle in 0...cycles) {
+      var wobble = cycle % 2 == 0 ? 1.0 : -1.0;
+      measure("hover-enter", function() editor.ui.pointerMove(tabA.x, tabA.y));
+      measure("hover-inside", function() editor.ui.pointerMove(tabA.x + wobble, tabA.y));
+      measure("hover-other", function() editor.ui.pointerMove(tabB.x, tabB.y));
+      measure("scroll-inspector", function() editor.ui.scroll(field.x, field.y, 0.0, 30.0 * wobble));
+      measure("idle", function() {});
+      action(actions, "interaction", cycle);
+    }
+    // Focused: typing into the inspector's name field.
+    click(editor, nameKey);
+    submit(editor, frame, frames, "setup:focus");
+    for (cycle in 0...cycles) {
+      measure("type-char", function() editor.ui.text(UiEventKind.TextInput, "a"));
+      measure("type-backspace", function() editor.ui.key(UiEventKind.KeyDown, UiKey.Backspace));
+      measure("idle-focused", function() {});
+      action(actions, "typing", cycle);
+    }
+    var lines:Array<Dynamic> = [];
+    for (name in order) {
+      var values = results.get(name).slice(Std.int(cycles / 4));
+      values.sort(function(a, b) return a < b ? -1 : a > b ? 1 : 0);
+      lines.push({action: name, medianBytes: values[Std.int(values.length / 2)],
+        maxBytes: values[values.length - 1], dirtyFrames: dirtyCounts.get(name), cycles: cycles});
+    }
+    File.saveContent(output + "/interaction.json", Json.stringify(lines));
+  }
+
+  static function targetCenter(editor:ReferenceEditorApp, key:String, tab:Bool):{x:Float, y:Float} {
+    var root = editor.ui.root;
+    if (root == null) throw "UI tree is not ready";
+    var node = findByStyleKey(root, key, tab);
+    if (node == null || node.resolved == null) throw "Benchmark target is unavailable: " + key;
+    var bounds = node.resolved.clippedViewportBounds();
+    return {x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2};
   }
 
   static function propertyEditorKey(editor:ReferenceEditorApp, property:String):String

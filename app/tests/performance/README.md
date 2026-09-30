@@ -146,3 +146,23 @@ point mapping and hit testing 3,596; `Map.clear` keeping its storage 3,115; reus
 record is byte-identical 2,761; `LayoutTransaction` clearing its maps, an allocation-free `RenderNode.find` 2,570; a flat handler
 list and an allocation-free cycle check in `RenderNode` 2,440. About 12% of what remains is the profiling harness's own JSON and
 frame recording.
+
+## Interaction frames
+
+`python3 app/tools/profile-editor.py --scenario interaction --cycles 60 --no-profile` drives input that leaves the tree structure alone and writes
+`interaction.json`: bytes allocated across the input events and the frame (`hl.Gc.totalAllocated`), and how many frames were dirty, per action. The `idle` and
+`hover-inside` actions show the measurement floor: about 52 KiB of that is the harness recording its own frame JSON, not the app, so subtract it.
+
+On 2026-09-30 (KiB per frame, harness floor of about 52 included):
+
+| action | total | dirty | what it rebuilds |
+|---|---|---|---|
+| hover onto another tab button | 340 | always | dock chrome, `console` and `perspective` (no cache key); `inspector` and `hierarchy` hit their caches |
+| hover inside the same node | 54 | never | nothing |
+| scroll the inspector | 472 | always | the whole inspector panel (about 110 nodes) |
+| type a character in the inspector | 480 | always | the whole inspector panel, plus the field |
+| idle | 52 | never | nothing |
+
+A frame with no state change is free, but any hover, scroll or keystroke rebuilds a whole panel or the whole dock chrome: a panel's cache is invalidated by any state change inside it, and a
+hover changes an interaction state that every widget on the path reads at build time. Getting these frames near zero means updating in place (a hover restyles the node it landed on; a scroll offset is
+applied in layout, not by rebuilding the content) and invalidating at the widget that owns the state, not the panel.
