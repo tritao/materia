@@ -990,6 +990,18 @@ void runtime_pose_overrides_render_and_pick_without_mutating_snapshot() {
     const auto &item = plan.items().front();
     assert(plan.transforms()[item.transformIndex].transform.matrix[12] == 4.0f);
 
+    // The GPU skips re-uploading an instance whose transform revision is unchanged, so a moved
+    // pose must carry a new revision, and the same pose must keep its revision.
+    const auto first_revision = plan.transforms()[item.transformIndex].revision;
+    nkscene::SceneView moved_view;
+    moved_view.pose_overrides.push_back({node, translated(5.0f)});
+    const auto moved_plan = nkscene::compile(snapshot, moved_view);
+    assert(moved_plan.transforms()[moved_plan.items().front().transformIndex].revision != first_revision);
+    const auto repeat_plan = nkscene::compile(snapshot, view);
+    assert(repeat_plan.transforms()[repeat_plan.items().front().transformIndex].revision == first_revision);
+    const auto unposed_plan = nkscene::compile(snapshot, nkscene::SceneView{});
+    assert(unposed_plan.transforms()[unposed_plan.items().front().transformIndex].revision != first_revision);
+
     const nkscene::Ray design_ray{{-4.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
     const nkscene::Ray runtime_ray{{4.0f, 0.0f, 5.0f}, {0.0f, 0.0f, -1.0f}};
     nkscene::SceneSpatialIndex design_index(snapshot);

@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <functional>
 #include <limits>
 #include <unordered_set>
@@ -10,6 +12,22 @@
 namespace nkscene::render_internal {
 
 namespace {
+
+/// A posed node keeps its authored transform revision, but consumers such as the GPU instance
+/// buffer skip an upload when a revision is unchanged. Folding the pose matrix into the revision
+/// makes a new pose read as a new transform. The top bit keeps it apart from authored revisions.
+std::uint64_t pose_revision(std::uint64_t authored, const LocalTransform &pose) noexcept {
+    std::uint64_t hash = 14695981039346656037ull ^ authored;
+    for (const float value : pose.matrix) {
+        std::uint32_t bits = 0;
+        std::memcpy(&bits, &value, sizeof(bits));
+        for (int shift = 0; shift < 32; shift += 8) {
+            hash ^= (bits >> shift) & 0xffu;
+            hash *= 1099511628211ull;
+        }
+    }
+    return hash | (1ull << 63);
+}
 
 Bounds transformed_bounds(const Bounds &local, const LocalTransform &transform) noexcept {
     Bounds result;
@@ -484,7 +502,8 @@ void build_items(RenderPlan &plan, const SceneSnapshot &snapshot, const SceneVie
         const auto transform = pose == view.pose_overrides.end()
                                    ? node.world_transform
                                    : WorldTransform{pose->world_transform,
-                                                    node.world_transform.revision};
+                                                    pose_revision(node.world_transform.revision,
+                                                                  pose->world_transform)};
         plan.transforms_.push_back(transform);
         RenderItem item;
         item.node = node.node;
