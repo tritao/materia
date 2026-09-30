@@ -505,8 +505,8 @@ class HumanKitTests {
 		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 1e-4 || human.spineLean() != 0.0)
 			throw "Working out a lean left the pose changed";
 		var capped = body.leanFor(ArmR, 5.0);
-		if (capped.angle > HumanBody.MAX_LEAN + 1e-6 || capped.shift >= 5.0)
-			throw 'A lean of ${capped.angle} rad was allowed past ${HumanBody.MAX_LEAN}';
+		if (capped.angle > body.posture.maxLean + 1e-6 || capped.shift >= 5.0)
+			throw 'A lean of ${capped.angle} rad was allowed past ${body.posture.maxLean}';
 
 		body.setLean(made.angle);
 		for (_ in 0...90) body.advance(step);

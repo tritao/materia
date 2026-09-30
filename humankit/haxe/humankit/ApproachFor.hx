@@ -11,16 +11,6 @@ package humankit;
  * forward over it to keep the shoulder where the reach is comfortable.
  */
 class ApproachFor extends HumanActionBase {
-	/**
-	 * Fraction of the arm (shoulder to wrist) a standing reach uses. The palm
-	 * adds no reliable length: IK sets only the wrist, so the hand may hang
-	 * across the reach direction.
-	 */
-	static inline var COMFORT = 0.8;
-	/** How far the front of the belly sits ahead of the abdomen bone, and the gap left to an edge, in metres. */
-	static inline var BELLY_FRONT = 0.12;
-	static inline var EDGE_GAP = 0.03;
-
 	public var target(default, null):Array<Float>;
 	public final limb:HumanLimb;
 	public final speed:Float;
@@ -49,7 +39,7 @@ class ApproachFor extends HumanActionBase {
 		var shoulder = worker.character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
 		if (shoulder == null) { fail("The rig lacks an arm"); return; }
 		var root = worker.rootTransform();
-		var comfortable = COMFORT * (worker.description.upperArm + worker.description.forearm);
+		var comfortable = worker.posture.comfort * (worker.description.upperArm + worker.description.forearm);
 		var rise = target[2] - (root[14] + shoulder[2]);
 		if (rise >= comfortable) {
 			fail("Target is above reachable height");
@@ -72,8 +62,8 @@ class ApproachFor extends HumanActionBase {
 		if (support != null) {
 			var belly = worker.character.pose.bonePosition(Spine);
 			if (belly == null) belly = worker.character.pose.bonePosition(Pelvis);
-			var required = edgeDistance(support, target, ux, uy) + (belly == null ? 0.0 : belly[0]) + BELLY_FRONT +
-				EDGE_GAP;
+			var required = edgeDistance(support, target, ux, uy) + (belly == null ? 0.0 : belly[0]) +
+				worker.posture.bellyFront + worker.posture.edgeGap;
 			if (required > standDistance) {
 				// Standing back from the edge leaves the shoulder short of the point: lean to make it up.
 				var made = worker.leanFor(limb, required - standDistance);
