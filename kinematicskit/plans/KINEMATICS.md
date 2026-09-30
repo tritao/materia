@@ -88,15 +88,20 @@ out to be wrong.
   - Quaternions cross the ABI as (x, y, z, w); `Quaterniond`'s constructor
     takes (w, x, y, z). Convert only through two helpers, covered by a
     round-trip parity test against the Haxe snapshot.
-- **KK-D11 — One default solver per use, reached deliberately.** The K1
-  policies are bug-compatible on purpose: `DampedLeastSquares` reports
-  `IterationLimit` without checking its final step, and
-  `LevenbergMarquardt`'s accept/reject damping stalls on large-residual
-  problems (an unclosable four-bar runs its whole budget). The long-term
-  default is bounded Levenberg-Marquardt for position solves and the K3 QP
-  for differential steps. Each caller (RobotKit IK, CadKit closures, MotionKit
-  sampling) switches in its own commit with its own test changes; the legacy
-  policies are deleted once nothing uses them.
+- **KK-D11 — Each solver keeps the job it is good at (revised in K4b).**
+  - **Tracking** (sequential IK along a path, jogging, gizmo dragging):
+    damped least squares. Its *fixed* damping, and stopping as soon as the
+    tolerances are met, keep each step small, so joint paths stay smooth
+    near singularities. Switching RobotKit's IK to Levenberg-Marquardt broke
+    a wall-finishing path near a wrist singularity (K4b log), so this is a
+    property to keep, not a legacy quirk. The K3 QP (damped differential IK
+    with posture and limits) is its successor for tracking.
+  - **Reaching** (closing assembly loops, a far target from a cold start):
+    Levenberg-Marquardt, whose adaptive damping and trial steps converge
+    reliably and whose diagnostics say why they did not.
+  - DLS's `IterationLimit`-without-final-check quirk is still bug-compatible
+    and gets fixed on its own, with its own test changes. Deleting DLS waits
+    until the QP covers tracking.
 - **KK-D12 — After K3, native leads and Haxe follows.** New solver features
   land natively. The Haxe solvers stay as the reference and fallback and must
   agree with native in parity tests; they gain only what those tests need.
@@ -489,3 +494,28 @@ coordinates; for a running robot the target goes through MotionKit.
 - Acceptance: RobotKit world tests (4777 assertions); MotionKit (6723);
   cadbridge (129); ToolpathKit motion (9 + 10 + 2975); MachineKit smoke
   including the robot-arm motion check.
+
+### K4b — Switching RobotKit IK to Levenberg-Marquardt: tried and reverted (2026-09-30)
+
+- Tried `Manipulator.solveIk*` on `LevenbergMarquardt`, solving at the TCP
+  directly. RobotKit's wall-finishing scenario then failed in TOPP-RA
+  (`path.time failed with MotionKit error -1`: a time-law stage collapsed to
+  zero speed). Instrumented rather than guessed: the time limits and caps
+  were valid; the joint path had a spike of 7.4 rad/m at sample 99 of 300,
+  with the wrist joint at −π/2 (a wrist singularity).
+- Cause: sequential IK along a path. DLS takes fixed-damping steps from the
+  previous sample and stops inside the tolerance, so it moves the joints as
+  little as possible; LM drives its damping towards zero and heads for the
+  exact solution, which near a singularity needs large joint motion.
+- Reverted. KK-D11 now keeps DLS for tracking and LM for reaching (above).
+  The TCP-as-frame-offset part of the item is deferred with it: solving at
+  the TCP changes where tolerances apply, so it goes with the next tracking
+  change (the K3 QP) rather than alone.
+
+### K4c — CAD and robot models of one arm agree (2026-09-30)
+
+- The robot-arm authoring tool (run by `machinekit/scripts/test-haxeon`)
+  now compiles both descriptions of the arm, the CAD `AssemblyState` and the
+  `RobotModel` cadbridge derives from it, and compares the cup contact over
+  25 random joint vectors within limits: worst 1.4e-15 m and 9e-8 rad (the
+  `acos` precision floor). The check fails above 1e-9 m / 1e-6 rad.

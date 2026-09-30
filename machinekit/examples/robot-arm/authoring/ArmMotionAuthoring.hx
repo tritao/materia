@@ -1,8 +1,10 @@
 import cadbridge.AssemblySimulationBridge;
+import cadkit.modeling.AssemblyState;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import haxe.Json;
 import materia.assembly.AssemblyDefinition;
 import materia.project.SceneArtifact;
+import materia.project.SceneArtifact.SceneArtifactData;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.Pose3;
 import motionkit.robot.ManipulatorKinematics;
@@ -98,7 +100,42 @@ class ArmMotionAuthoring {
 		var ids = arm.jointIds();
 		require(ids.join(",") == [for (spec in robot.specs) spec.id].join(","),
 			"The kinematic chain should turn joints " + [for (spec in robot.specs) spec.id].join(",") + ", got " + ids.join(","));
+		verifyModelsAgree(robot, definition, scene, arm);
 		return new ManipulatorKinematics(arm, 1e-8);
+	}
+
+	/**
+	 * The arm exists twice: as the CAD assembly and as the RobotModel cadbridge derives from it. Both
+	 * must put the cup contact in the same place for any joint values, or the motion authored here would
+	 * not be the motion the assembly shows. Robot joint values are relative to the scene's posed state.
+	 */
+	static function verifyModelsAgree(robot:RobotArm, definition:AssemblyDefinition, scene:SceneArtifactData,
+			arm:Manipulator):Void {
+		var assembly = new AssemblyState(definition, scene.assemblyState);
+		var initial = [for (spec in robot.specs) assembly.joint(spec.id)];
+		var seed = 12345;
+		function next():Float {
+			seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+			return seed / 2147483647.0;
+		}
+		var worstPosition = 0.0, worstAngle = 0.0;
+		for (_ in 0...25) {
+			var q = [for (index in 0...robot.specs.length) {
+				var spec = robot.specs[index];
+				var value = spec.lower + (spec.upper - spec.lower) * next();
+				value - initial[index];
+			}];
+			for (index in 0...robot.specs.length) assembly.setJoint(robot.specs[index].id, initial[index] + q[index]);
+			var cad = assembly.worldConnector("tool/cup", "contact");
+			var tcp = arm.forwardKinematics(q);
+			var dx = cad.x * scene.metresPerUnit - tcp.translation.x, dy = cad.y * scene.metresPerUnit - tcp.translation.y,
+				dz = cad.z * scene.metresPerUnit - tcp.translation.z;
+			worstPosition = Math.max(worstPosition, Math.sqrt(dx * dx + dy * dy + dz * dz));
+			var dot = Math.abs(cad.qx * tcp.rotation.x + cad.qy * tcp.rotation.y + cad.qz * tcp.rotation.z + cad.qw * tcp.rotation.w);
+			worstAngle = Math.max(worstAngle, 2 * Math.acos(Math.min(1.0, dot)));
+		}
+		require(worstPosition < 1e-9 && worstAngle < 1e-6,
+			'The CAD assembly and the robot model disagree on the cup contact by $worstPosition m, $worstAngle rad');
 	}
 
 	/** Joint keyframes for the whole cycle; positions are relative to the arm's ready pose. */
