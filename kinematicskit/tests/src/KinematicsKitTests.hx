@@ -47,6 +47,7 @@ class KinematicsKitTests {
     testRootJacobianMatchesFiniteDifferences();
     testMobileManipulatorDrivesWhenTheArmCannotReach();
     testFloatingBodyIsPlacedExactly();
+    testDampedLeastSquaresChecksItsLastStep();
     Sys.println('KinematicsKit tests passed ($assertions assertions)');
   }
 
@@ -768,6 +769,22 @@ class KinematicsKitTests {
       Math.abs(placed.z - truth.z) < 1e-9 && Math.abs(dot - 1.0) < 1e-12,
       'a floating body is placed exactly from three points under a 2.5 rad rotation (${solution.status})');
     check(solution.rank == 6 && solution.freeDofs == 0, "three non-collinear points fix all six DOFs");
+  }
+
+  static function testDampedLeastSquaresChecksItsLastStep():Void {
+    var model = planarArm([1.0, 0.7]);
+    var tip = model.frameIndex("tip");
+    var goal = KinematicSnapshot.of(new KinematicState(model, [0.9, -0.4])).framePose(tip);
+    var problem = new KinematicProblem(model).add(FrameTask.atFrame(model, tip, goal, 1e-8, 1e-8));
+    var seed = new KinematicState(model, [0.3, 0.2]);
+    // How many steps it needs, then exactly that budget: the last step lands inside the tolerance.
+    var needed = DampedLeastSquares.solve(problem, seed, 200, 0.02).iterations;
+    check(needed > 2, 'fixture needs several steps ($needed)');
+    var exact = DampedLeastSquares.solve(problem, seed, needed, 0.02);
+    check(exact.status == KinematicStatus.Converged && exact.iterations == needed,
+      'a solve whose last step converges reports it (${exact.status} after ${exact.iterations})');
+    var short = DampedLeastSquares.solve(problem, seed, needed - 1, 0.02);
+    check(short.status == KinematicStatus.IterationLimit, "one step fewer is still the iteration limit");
   }
 
   // -- helpers ---------------------------------------------------------

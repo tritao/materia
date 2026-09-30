@@ -1,6 +1,9 @@
 package robotkit.manipulation;
 
 import kinematicskit.DampedLeastSquares;
+import kinematicskit.LevenbergMarquardt;
+import kinematicskit.RootDampingTask;
+import kinematicskit.RootMotion;
 import kinematicskit.FrameTask;
 import kinematicskit.JacobianLayout;
 import kinematicskit.KinematicModel;
@@ -176,6 +179,60 @@ class Manipulator {
     if (target == null) throw "TCP inverse kinematics requires a target";
     return solveIk(target.compose(flangeTTcp.inverse()), seed, positionTolerance, orientationTolerance,
       maxIterations, damping);
+  }
+
+  /**
+   * How the robot's base may move in `solveIkWithBase`: `Floating` for a
+   * `floatingBase` robot, `Planar` (x, y, yaw on the floor) for a
+   * `mobileBase` one, `Fixed` otherwise. Planar treats the base as able to
+   * reach any floor pose, which is right for deciding where to stand, not
+   * for instantaneous motion of a differential drive.
+   */
+  public function baseMotion():RootMotion
+    return robot.floatingBase ? RootMotion.Floating : robot.mobileBase != null ? RootMotion.Planar : RootMotion.Fixed;
+
+  /**
+   * IK for a tool-centre-point target in the world frame, moving the base
+   * as well as the arm when the robot has a movable base (`baseMotion`):
+   * where to put the base and how to set the arm so the tool reaches the
+   * target. `rootPose` is the robot root's current world pose; the result's
+   * `rootPose` is where the solve moved it. `baseCost` (> 0) makes the arm
+   * do what it can before the base moves. Levenberg-Marquardt (a reaching
+   * solve; see KINEMATICS.md KK-D11), tolerances at the TCP. On a
+   * fixed-base robot this is `solveIkForTcp` expressed in the world frame.
+   */
+  public function solveIkWithBase(target:Transform3, seed:Array<Float>, rootPose:Transform3,
+      ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3, ?maxIterations:Int = 200,
+      ?baseCost:Float = 0.1):IKResult {
+    if (target == null || rootPose == null) throw "Inverse kinematics with a base requires a target and a root pose";
+    if (!(baseCost >= 0.0)) throw "Base cost must be non-negative";
+    var n = dofs.length;
+    var start = seed == null ? [for (_ in 0...n) 0.0] : seed;
+    if (start.length != n) throw 'Joint group requires $n values, got ${start.length}';
+    var root = model.bodyRoot[baseBody];
+    var problem = new KinematicProblem(model).setActiveDofs(dofs);
+    for (i in 0...n) {
+      var limits = group.limitsOf(i);
+      if (limits.lower < limits.upper) problem.setLimits(dofs[i], limits.lower, limits.upper);
+      else problem.setLimits(dofs[i], Math.NEGATIVE_INFINITY, Math.POSITIVE_INFINITY);
+    }
+    // The tool task first, so the result reports it.
+    problem.add(FrameTask.atFrame(model, flangeFrameIndex, RobotKinematics.toTransform(target), positionTolerance,
+      orientationTolerance, RobotKinematics.toTransform(flangeTTcp)));
+    var motion = baseMotion();
+    if (motion != RootMotion.Fixed) {
+      problem.setRootMotion(root, motion);
+      if (baseCost > 0.0) problem.add(new RootDampingTask(model, root, baseCost));
+    }
+    var seedState = new KinematicState(model);
+    for (i in 0...n) seedState.q[dofs[i]] = start[i];
+    seedState.setRootPose(root, RobotKinematics.toTransform(rootPose));
+    problem.clamp(seedState.q);
+    var solution = LevenbergMarquardt.solve(problem, seedState, maxIterations, 1e-3, 1e-8, 1.0, workspace);
+    var tip = solution.tasks[0];
+    return new IKResult(solution.status == KinematicStatus.Converged, [for (dof in dofs) solution.state.q[dof]],
+      tip.positionError, tip.orientationError, solution.iterations, solution.status,
+      RobotKinematics.toTransform3(solution.state.rootPose(root)));
   }
 
   /** Position targets for every arm DOF's driving joint, indexed by its compiled RobotModel position. */

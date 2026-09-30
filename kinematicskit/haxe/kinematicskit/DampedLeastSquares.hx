@@ -3,11 +3,12 @@ package kinematicskit;
 /**
  * Fixed-damping least squares: each iteration takes the full step
  * `(JᵀJ + λ²I) Δq = Jᵀe` over the active DOFs, then clamps them into their
- * limits. This is RobotKit's original IK iteration, kept exactly: it stops
- * as soon as the hard tasks are met (reporting the iteration index), and
- * after `maxIterations` steps it reports `IterationLimit` without checking
- * the final step. With a reused `workspace` it allocates nothing per
- * iteration.
+ * limits. This is RobotKit's original IK iteration: it stops as soon as the
+ * hard tasks are met (reporting the iteration index). After `maxIterations`
+ * steps it checks the final state too, reporting `Converged` if the last
+ * step landed inside the tolerances (the original iteration reported
+ * `IterationLimit` there). With a reused `workspace` it allocates nothing
+ * per iteration.
  *
  * `maxStep` (unlimited by default, which is the original iteration) caps
  * each step: if any DOF would move more than `maxStep` (radians, or
@@ -48,8 +49,10 @@ class DampedLeastSquares {
       SolverSupport.applyStep(problem, state, work.delta, 1.0);
       problem.clamp(state.q);
     }
-    return SolverSupport.finish(problem, state, work, KinematicStatus.IterationLimit, maxIterations, rankTolerance,
-      false);
+    // The last step may have landed inside the tolerances.
+    problem.evaluate(state, snapshot, work.residual, work.jacobian);
+    var status = problem.satisfied() ? KinematicStatus.Converged : KinematicStatus.IterationLimit;
+    return SolverSupport.finish(problem, state, work, status, maxIterations, rankTolerance, false);
   }
 
   /** 1 for an angular column, `translationScale` for a translational one (prismatic DOF, root v). */

@@ -777,3 +777,23 @@ coordinates; for a running robot the target goes through MotionKit.
   (a `baseMotion` option would wire `RobotModel.mobileBase` /
   `floatingBase` to this); H7's whole-body control (contacts, centre of
   mass, dynamics) stays in HUMANOID.md.
+
+### Follow-ups: Manipulator with a moving base; DLS checks its last step (2026-09-30)
+
+- `Manipulator.baseMotion()` maps the robot's flags to the K5 modes
+  (`floatingBase` → Floating, `mobileBase` → Planar, else Fixed), and
+  `solveIkWithBase(worldTarget, seed, rootPose, …, baseCost)` solves arm and
+  base together (Levenberg-Marquardt, a reaching solve; tolerances at the
+  TCP; `RootDampingTask` so the arm does what it can first) and returns the
+  joints plus the new root pose (`IKResult.rootPose`). Planar treats the
+  base as able to reach any floor pose: right for where to stand, not for
+  the instantaneous motion of a differential drive. RobotKit test: a UR5-size
+  arm and a target 2.2 m away — out of reach on a fixed base; reached by a
+  mobile base that stays on the floor and upright, the world tool pose on
+  target; reached with a floating base too.
+- `DampedLeastSquares` now checks the state after its last step and reports
+  `Converged` if that step landed inside the tolerances (it reported
+  `IterationLimit`; the known quirk from KK-D11). Kit test: with exactly the
+  needed budget a solve now converges; one step fewer is still the limit.
+  The robot-arm motion check, MotionKit (6746), ToolpathKit (2975),
+  cadbridge (129) and RobotKit (4785) are unchanged by it.

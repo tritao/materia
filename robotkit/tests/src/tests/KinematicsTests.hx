@@ -7,6 +7,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Frame;
 import robotkit.model.JointCoupling;
+import robotkit.model.RobotMobileConfiguration;
+import robotkit.model.RobotDriveConfiguration;
+import kinematicskit.RootMotion;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
@@ -36,6 +39,7 @@ class KinematicsTests {
     testToJointTargetsThroughSimulatedRobot();
     testWholeModelMatchesChain();
     testCoupledArm();
+    testSolveWithMovingBase();
     Sys.println('RobotKit kinematics tests passed ($assertions assertions)');
     return assertions;
   }
@@ -196,6 +200,40 @@ class KinematicsTests {
     var result = arm.solveIk(pose, [0.1, 0.5], 1e-9, 1e-9, 200, 0.01);
     check(result.converged && approx(result.q[1], 0.8, 1e-6), "IK through the coupling recovers the leader angle");
     check(arm.toJointTargets(q).length == 2, "joint targets go to the leaders; the runtime moves followers");
+  }
+
+  /** A UR5-sized arm and a tool target 2.2 m away: out of reach from a fixed base, reachable once the base moves. */
+  static function testSolveWithMovingBase():Void {
+    var fixture = buildUR5Fixture();
+    var arm = fixture.arm;
+    var seed = [0.3, -0.8, 1.1, -0.5, 0.4, 0.2];
+    var target = new Transform3(new Vec3(2.0, 0.9, 0.35), Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), Math.PI * 0.5));
+    check(arm.baseMotion() == RootMotion.Fixed, "a robot without base flags has a fixed base");
+    var fixed = arm.solveIkWithBase(target, seed, Transform3.identity());
+    var fixedBase:Null<Transform3> = fixed.rootPose;
+    check(!fixed.converged && fixedBase != null && (cast fixedBase:Transform3).translation.norm() == 0.0,
+      "from a fixed base the far target is out of reach and the base stays put");
+
+    fixture.model.mobileBase = new RobotMobileConfiguration(RobotDriveConfiguration.Differential("left", "right", 0.1, 0.5),
+      1.0, 1.0);
+    check(arm.baseMotion() == RootMotion.Planar, "a mobile-base robot moves on the floor");
+    var driven = arm.solveIkWithBase(target, seed, Transform3.identity());
+    check(driven.converged && driven.rootPose != null, 'a mobile base drives so the arm reaches (${driven.status})');
+    var base:Transform3 = cast driven.rootPose;
+    check(Math.abs(base.translation.z) < 1e-12 && Math.abs(base.rotation.x) < 1e-12 && Math.abs(base.rotation.y) < 1e-12,
+      "the mobile base stays on the floor and upright");
+    var tool = base.compose(arm.tcpPose(driven.q));
+    check(tool.translation.sub(target.translation).norm() < 1e-4 && tool.rotation.angularDistance(target.rotation) < 1e-3,
+      "base pose and joints together put the tool on the target");
+
+    fixture.model.mobileBase = null;
+    fixture.model.floatingBase = true;
+    check(arm.baseMotion() == RootMotion.Floating, "a floating-base robot moves freely");
+    var floating = arm.solveIkWithBase(target, seed, Transform3.identity());
+    var floatingBase = floating.rootPose;
+    check(floating.converged && floatingBase != null &&
+      floatingBase.compose(arm.tcpPose(floating.q)).translation.sub(target.translation).norm() < 1e-4,
+      'a floating base reaches it too (${floating.status})');
   }
 
   // -- fixtures --------------------------------------------------------
