@@ -54,6 +54,10 @@ struct TextEngine::State {
     TextLayoutId active_layout_id = 0;
     uint64_t layout_use_sequence = 0;
     std::unordered_map<TextLayoutId, std::unique_ptr<RetainedLayout>> layouts;
+    // Intrinsic (unwrapped) measurements by text and style. Layout asks for every text node on every frame, and shaping
+    // a paragraph to answer is most of the cost of a layout in which nothing changed. Invalidated with the fonts.
+    std::unordered_map<std::string, TextIntrinsicMetrics> intrinsic_cache;
+    uint64_t intrinsic_cache_generation = 0;
     uint32_t layout_builds = 0;
     uint64_t prepared_batch_count = 0;
     uint64_t layout_cache_hits = 0;
@@ -392,6 +396,25 @@ bool TextEngine::measure_intrinsic_utf8(const char *text, const TextLayoutOption
         options.line_height < 0.0f)
         return false;
 
+    constexpr std::size_t max_cached_measurements = 8192;
+    const uint64_t font_generation = state_->font_collection->generation();
+    if (state_->intrinsic_cache_generation != font_generation) {
+        state_->intrinsic_cache.clear();
+        state_->intrinsic_cache_generation = font_generation;
+    }
+    std::string cache_key(text);
+    cache_key.push_back('\0');
+    const float key_floats[] = {options.font_size, options.letter_spacing, options.line_height};
+    cache_key.append(reinterpret_cast<const char *>(key_floats), sizeof(key_floats));
+    const uint32_t key_family = static_cast<uint32_t>(options.family);
+    cache_key.append(reinterpret_cast<const char *>(&key_family), sizeof(key_family));
+    if (const auto cached = state_->intrinsic_cache.find(cache_key);
+        cached != state_->intrinsic_cache.end()) {
+        if (result)
+            *result = cached->second;
+        return true;
+    }
+
     const skb_attribute_t attributes[] = {
         skb_attribute_make_font_size(options.font_size),
         skb_attribute_make_font_family(static_cast<uint8_t>(options.family)),
@@ -419,8 +442,13 @@ bool TextEngine::measure_intrinsic_utf8(const char *text, const TextLayoutOption
     const bool has_baseline = line_count > 0 && lines && std::isfinite(lines[0].baseline);
     const float baseline = has_baseline ? lines[0].baseline - bounds.y : 0.0f;
     skb_layout_destroy(layout);
+    const TextIntrinsicMetrics metrics{{bounds.x, bounds.y, bounds.width, bounds.height}, baseline,
+                                       has_baseline};
+    if (state_->intrinsic_cache.size() >= max_cached_measurements)
+        state_->intrinsic_cache.clear();
+    state_->intrinsic_cache.emplace(std::move(cache_key), metrics);
     if (result)
-        *result = {{bounds.x, bounds.y, bounds.width, bounds.height}, baseline, has_baseline};
+        *result = metrics;
     return true;
 }
 
