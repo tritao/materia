@@ -601,3 +601,20 @@ coordinates; for a running robot the target goes through MotionKit.
   that joint is not in the self-motion at all, and at generic poses the
   self-motion moves the base joints ~9x more, so the preference crawls and
   fights the tool target. A swivel-angle task is the right tool (K3d).
+
+### K3c — Deferred to Lane D's servoing item (2026-09-30)
+
+- Nothing in production calls `KinematicsSolver.solveDifferential`; only
+  MotionKit's own tests do. Its contract `(q, twist)` has no period and no
+  limits, so the QP's reason to exist (velocity and joint bounds that hold
+  exactly) cannot be expressed through it, and swapping the solver under it
+  would only add a native dependency to every MotionKit consumer.
+- Moving it to the QP also would not preserve its answers: it uses damping
+  1e-6, and the QP's step accuracy is its residual tolerance amplified by up
+  to 1/λ² (1e12 there).
+- So the switch happens with its first real consumer, Lane D's live servoing
+  (D5): a servo-step contract with a period, velocity limits and deadlines,
+  built on `kinematicskit.native.DifferentialIk`, with the Haxe damped step
+  as the fallback. `solveDifferential` stays on the Haxe solver until then.
+- K3d's mink oracle needs Python with `mink` and `mujoco`, which this machine
+  does not have; those tests will skip with a message where they are absent.
