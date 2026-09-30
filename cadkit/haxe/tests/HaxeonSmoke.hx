@@ -72,6 +72,7 @@ class HaxeonSmoke {
 		PlacementFramesSmoke.run();
 		ConstrainedSketchSmoke.run();
 		JacobianCheckSmoke.run();
+		ConstraintDiagnosisSmoke.run();
 		DiagnosisInvarianceSmoke.run();
 		PatternSmoke.run();
 		HoleSmoke.run();
