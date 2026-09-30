@@ -1153,6 +1153,17 @@ rk_result Simulation::get_link_pose(uint32_t robot_index,uint32_t link_index,
     return read_body_pose(binding->bodies_[link_index],out_pose);
 }
 
+rk_result Simulation::get_link_body(uint32_t robot_index,uint32_t link_index,
+                                     nksim_body &out_body) const {
+    Lock lock(session_);
+    if(robot_index>=bindings_.size())return RK_ERROR_INVALID_ARGUMENT;
+    const auto binding=bindings_[robot_index].lock();
+    if(!binding)return RK_ERROR_INVALID_HANDLE;
+    if(link_index>=binding->bodies_.size())return RK_ERROR_INVALID_ARGUMENT;
+    out_body=binding->bodies_[link_index];
+    return RK_OK;
+}
+
 rk_result Simulation::get_robot_contacts(rk_robot_runtime runtime,
                                          std::vector<rk_robot_contact> &out,
                                          uint64_t *step_index) const {

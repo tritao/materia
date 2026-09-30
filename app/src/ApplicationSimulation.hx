@@ -51,6 +51,7 @@ class ApplicationSimulation {
   var simulatedLinks:Array<Array<String>> = [];
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
   var motions:Null<RobotMotionPlayer> = null;
+  var gripper:Null<RobotGripPlayer> = null;
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
@@ -109,6 +110,7 @@ class ApplicationSimulation {
   function refreshMembers():Void {
     members = [];
     if (motions != null) members.push(motions);
+    if (gripper != null) members.push(gripper);
     if (workforce != null) members.push(workforce);
     for (participant in participants) members.push(participant);
   }
@@ -124,6 +126,7 @@ class ApplicationSimulation {
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
     var candidateWorkforce:Null<HumanWorkforce> = null;
     var candidateAssemblyParts:Array<AssemblyPart> = [];
+    var candidateRuntimes:Array<robotkit.runtime.RobotRuntime> = [];
     var candidateWarnings:Array<String> = [];
     try {
       var models = configuration.robotModels();
@@ -148,6 +151,7 @@ class ApplicationSimulation {
         var id = editable.id;
         candidateRobots.push(new SimulatedRobot(id, runtime, editable.model.name,
           [for (link in editable.model.links) link.id], [for (joint in editable.model.joints) joint.id]));
+        candidateRuntimes.push(runtime);
         candidateLinks.push([for (link in editable.model.links) link.id]);
         candidateRobotModels.push(editable.model);
       }
@@ -159,6 +163,7 @@ class ApplicationSimulation {
         var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
           appliedRevision + 1, candidateRobots.length);
         candidateRobots.push(built.robot);
+        candidateRuntimes.push(built.runtime);
         candidateLinks.push([for (link in built.model.links) link.id]);
         candidateRobotModels.push(built.model);
         for (part in built.parts) candidateAssemblyParts.push(part);
@@ -166,11 +171,28 @@ class ApplicationSimulation {
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
+      var resolvedGrips:Array<ResolvedGrip> = [];
+      var resolvedPeriod = 0.0;
+      for (track in resolvedMotions) if (track.loop)
+        resolvedPeriod = Math.max(resolvedPeriod, track.keys[track.keys.length - 1].time);
+      var gripEvents = session == null ? [] : session.robotGrips;
+      if (gripEvents.length > 0) {
+        if (assembly == null) throw "Robot grips need the project's assembly";
+        var gripRobot = candidateRobots.length - 1;
+        for (event in gripEvents) {
+          var linkIndex = candidateLinks[gripRobot].indexOf(event.link);
+          if (linkIndex < 0) throw 'Robot grip names unknown link "${event.link}"';
+          resolvedGrips.push({time: event.time, robotIndex: gripRobot, linkIndex: linkIndex, grip: event.grip});
+        }
+      }
       var environmentRecords = scene.records();
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var assemblyOwned = new Map<String, Bool>();
-      if (assembly != null) for (occurrence in assembly.occurrences)
-        assemblyOwned.set("project:" + occurrence.id, true);
+      if (assembly != null) {
+        var free = AssemblyRobot.freeOccurrences(scene, assembly);
+        for (occurrence in assembly.occurrences)
+          if (!free.exists(occurrence.id)) assemblyOwned.set("project:" + occurrence.id, true);
+      }
       for (object in environmentRecords) if (object.collisionEnabled && !assemblyOwned.exists(object.id)) {
         var centerX=object.x,centerY=object.y,centerZ=object.z;
         var halfX=object.width/2.0,halfY=object.height/2.0,halfZ=object.depth/2.0;
@@ -223,6 +245,8 @@ class ApplicationSimulation {
       simulatedObjects = candidateObjects;
       motions = resolvedMotions.length == 0 ? null :
         new RobotMotionPlayer(world, createdSpace.session, resolvedMotions);
+      gripper = resolvedGrips.length == 0 ? null : new RobotGripPlayer(createdSpace.session, candidate,
+        candidateRuntimes, candidateObjects, resolvedGrips, resolvedPeriod);
       workforce = candidateWorkforce;
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
@@ -257,7 +281,7 @@ class ApplicationSimulation {
     if (released != null) released.dispose();
   }
 
-  static function rotateOffset(x:Float, y:Float, z:Float, rotation:Null<Array<Float>>):Array<Float> {
+  public static function rotateOffset(x:Float, y:Float, z:Float, rotation:Null<Array<Float>>):Array<Float> {
     if (rotation == null) return [x, y, z];
     var qx = rotation[0], qy = rotation[1], qz = rotation[2], qw = rotation[3];
     var tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
@@ -296,6 +320,8 @@ class ApplicationSimulation {
     presentationEpoch++; return true;
   }
   public function isRunning():Bool return running;
+  /** Scene ids of the objects the tool links are holding right now. */
+  public function heldObjectIds():Array<String> return gripper == null ? [] : gripper.heldIds();
   public function humanWorker(id:String):Null<HumanWorker> return workforce == null ? null : workforce.worker(id);
   public function humanSignals(id:String):Null<HumanWorkerSignals>
     return workforce == null ? null : workforce.signals(id);
@@ -413,7 +439,7 @@ class ApplicationSimulation {
       retired.dispose();
       retired.scene.setWorkerVisualsVisible(true);
     }
-    workforce = null; motions = null; refreshMembers();
+    workforce = null; motions = null; gripper = null; refreshMembers();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

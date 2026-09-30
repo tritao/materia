@@ -2,6 +2,7 @@ package eoat;
 
 import cadkit.modeling.Part;
 import machinekit.assembly.MachineAssembly;
+import machinekit.component.BomItem;
 import machinekit.component.ComponentDetail;
 import machinekit.component.MachineComponent;
 import machinekit.robotics.EndEffector;
@@ -21,6 +22,12 @@ private class ExampleAirSource extends MachineComponent {
 /** Smoke checks for both generic changer configurations. */
 class EndEffectorExampleChecks {
 	static function check(value:Bool, message:String):Void if (!value) throw message;
+
+	static function sortedLines(lines:Array<BomItem>):Array<BomItem> {
+		var result = lines.copy();
+		result.sort((a, b) -> Reflect.compare(a.partNumber, b.partNumber));
+		return result;
+	}
 
 	public static function run():Void {
 		var set = EndEffectorExample.build();
@@ -48,7 +55,10 @@ class EndEffectorExampleChecks {
 			var rebuilt = EndEffector.fromDescription(JsonWire.decode(configuration.encode()));
 			check(Equality.equals(configuration.describe(), rebuilt.describe()),
 				"EOAT configuration description changed after save and rebuild");
-			check(Equality.equals(configuration.billOfMaterials().lines(), rebuilt.billOfMaterials().lines()),
+			// A saved description lists members by sorted id, so a rebuild adds them in that order
+			// rather than the order the original was assembled in.
+			check(Equality.equals(sortedLines(configuration.billOfMaterials().lines()),
+				sortedLines(rebuilt.billOfMaterials().lines())),
 				"EOAT configuration BOM changed after save and rebuild");
 			check(Equality.equals(configuration.mountTFrame("contact"), rebuilt.mountTFrame("contact")),
 				"EOAT contact frame changed after save and rebuild");

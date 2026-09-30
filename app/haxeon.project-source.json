@@ -86,7 +86,12 @@
         "../cadkit/CMakeLists.txt",
         "../cadkit/core/CMakeLists.txt",
         "../robotkit/CMakeLists.txt",
-        "../robotkit/runtime/CMakeLists.txt"
+        "../robotkit/runtime/CMakeLists.txt",
+        "../animkit/native/CMakeLists.txt",
+        "../animkit/native/include/animkit.h",
+        "../animkit/native/src/api.cpp",
+        "../animkit/native/src/import.cpp",
+        "../animkit/native/src/runtime.cpp"
       ]
     }
   },

@@ -42,7 +42,7 @@ struct Primitive {
     int32_t skin = -1; // index into Asset::skins, or -1 for a rigid primitive
     int32_t node_joint = -1; // rigid primitives follow this joint
     std::vector<float> positions; // xyz
-    std::vector<float> normals; // xyz; generated flat-free when missing
+    std::vector<float> normals; // xyz; generated when missing, smoothed across split vertices
     std::vector<float> texcoords; // uv, empty when absent
     std::vector<uint32_t> indices;
     std::vector<uint16_t> joint_indices; // 4 per vertex, into the skin palette

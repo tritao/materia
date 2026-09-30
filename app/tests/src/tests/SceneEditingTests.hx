@@ -1088,7 +1088,8 @@ class SceneEditingTests {
     scene.dispose();
   }
 
-  static function cadPreviewFaceHoverPresentation():Void {
+  /** A one-triangle preview object whose only face carries hover identity 7. */
+  static function trianglePreviewScene():EditorScene {
     var positions = haxe.io.Bytes.alloc(3 * 12);
     positions.setFloat(0, -0.1); positions.setFloat(4, -0.1); positions.setFloat(8, 0.0);
     positions.setFloat(12, 0.1); positions.setFloat(16, -0.1); positions.setFloat(20, 0.0);
@@ -1115,7 +1116,11 @@ class SceneEditingTests {
       dynamicBody: false, mass: 1.0, red: 0.4, green: 0.6, blue: 0.8,
       visible: true, meshSnapshot: "preview-mesh"
     }];
-    var scene = new EditorScene(data, null, null, generated);
+    return new EditorScene(data, null, null, generated);
+  }
+
+  static function cadPreviewFaceHoverPresentation():Void {
+    var scene = trianglePreviewScene();
     try {
       var hit = scene.hoverHit(0.0, 0.0);
       check(hit.id == "preview", "CAD preview face hover resolves the preview object");
@@ -1126,6 +1131,49 @@ class SceneEditingTests {
         "CAD preview face hover presents a dedicated face overlay node");
       check(view.hoverOverrideCount() == 0,
         "CAD preview face hover does not replace the whole-object presentation");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw error;
+    }
+    scene.dispose();
+  }
+
+  static function simulatedHoverFollowsPose():Void {
+    var scene = trianglePreviewScene();
+    try {
+      var half = Math.PI / 8;
+      var pose:{id:String, position:Array<Float>, rotation:Array<Float>} = {
+        id: "preview", position: [5.0, 0.0, 0.0], rotation: [0.0, 0.0, Math.sin(half), Math.cos(half)]};
+      var moved = new PerspectiveCamera();
+      moved.frame(5.0, 0.0, 0.0, 0.4, 0.4, 0.2, 4.0 / 3.0);
+      var rest = new PerspectiveCamera();
+      rest.frame(0.0, 0.0, 0.0, 0.4, 0.4, 0.2, 4.0 / 3.0);
+      var view = scene.configureRenderView(new SceneView(), moved.viewProjection(4.0 / 3.0), [pose]);
+      var movedRay = moved.screenRay(400, 300, 800, 600);
+      var restRay = rest.screenRay(400, 300, 800, 600);
+
+      // Hover tests the posed geometry, not the authored placement.
+      var hit = scene.hoverHitRayWithView(view, movedRay.originX, movedRay.originY, movedRay.originZ,
+        movedRay.directionX, movedRay.directionY, movedRay.directionZ);
+      check(hit.id == "preview" && hit.faceIndex == 7,
+        "simulated hover finds the face where the pose put it (" + hit.id + ")");
+      var vacated = scene.hoverHitRayWithView(view, restRay.originX, restRay.originY, restRay.originZ,
+        restRay.directionX, restRay.directionY, restRay.directionZ);
+      check(vacated.id == "scene", "simulated hover ignores the authored placement the pose vacated");
+      var authored = scene.hoverHitRay(movedRay.originX, movedRay.originY, movedRay.originZ,
+        movedRay.directionX, movedRay.directionY, movedRay.directionZ);
+      check(authored.id == "scene", "unposed hover keeps testing the authored placement");
+
+      // The face overlay is a child node, so it needs the object's pose as well.
+      check(view.poseOverrideCount() == 1, "an unhovered simulated view poses only the object");
+      var hovered = scene.configureRenderView(new SceneView(), moved.viewProjection(4.0 / 3.0), [pose],
+        hit.id, hit.faceIndex);
+      check(hovered.poseOverrideCount() == 2,
+        "the simulated face overlay is posed with its object (" + hovered.poseOverrideCount() + ")");
+      check(hovered.visibilityOverrideCount() == 1, "the simulated face overlay is shown");
+      var elsewhere = scene.configureRenderView(new SceneView(), moved.viewProjection(4.0 / 3.0), [pose],
+        "scene", -1);
+      check(elsewhere.poseOverrideCount() == 1, "no overlay pose without a hovered face");
     } catch (error:Dynamic) {
       scene.dispose();
       throw error;
@@ -1150,6 +1198,7 @@ class SceneEditingTests {
     perspectiveHoverInput();
     cadFaceHoverPresentation();
     cadPreviewFaceHoverPresentation();
+    simulatedHoverFollowsPose();
     var scene = new EditorScene();
     try {
       check(scene.items().length == 2, "two initial objects");

@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
+import RobotArmPreview.RobotArmChecks;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.InstancePath;
@@ -66,6 +67,8 @@ import machinekit.standard.HexBolt;
 import machinekit.standard.HexNut;
 import machinekit.standard.ParallelKey;
 import machinekit.robotics.EndEffectorPlate;
+import machinekit.robotics.ArmJoint;
+import machinekit.robotics.ArmLink;
 import machinekit.robotics.Pedestal;
 import machinekit.robotics.RobotFlange;
 import eoat.EndEffectorExampleChecks;
@@ -2163,6 +2166,35 @@ class MachineKitSmoke {
 		fused.close();
 	}
 
+	static function connectorNames(component:MachineComponent):String
+		return [for (connector in component.connectors()) connector.name].join(",");
+
+	static function armParts():Void {
+		var joint = new ArmJoint(100, 70);
+		check(connectorNames(joint) == "stator,rotor",
+			"a joint module has a stator and a rotor");
+		near(joint.connector("rotor").frame.z, 70, "the rotor face sits at the module length");
+		var flange = new RobotFlange(31.5);
+		var last = new ArmJoint(55, 40, flange);
+		check(connectorNames(last) == "stator,tool", "a flanged module ends in a tool connector");
+		near(last.connector("tool").frame.z, 40 + flange.thickness, "the tool connector sits on the flange plate");
+		throws(() -> new ArmJoint(40, 40, flange), "too narrow");
+		throws(() -> new ArmJoint(0, 40), "positive diameter and length");
+		var link = new ArmLink(320, 80, 5, 100, PlusX, MinusX, 90);
+		near(link.connector("end").frame.z, 320, "a lateral end joint stays at the tube end");
+		near(link.connector("end").frame.x, 45, "a lateral end joint is centred on the tube end");
+		near(new ArmLink(90, 90, 5, 100, PlusZ, PlusZ, 70).connector("end").frame.z, 90, "an axial end joint sits on the tube end");
+		throws(() -> new ArmLink(8, 80, 5, 100, PlusZ, PlusZ, 0), "wall thinner");
+		throws(() -> ArmLink.axisFromToken("+Y"), "Unknown arm axis");
+		var rebuilt = ArmLink.recipeType().create(link.values());
+		check(rebuilt.designation == link.designation, "an arm link rebuilds from its recipe values");
+		check(ArmJoint.recipeType().create(last.values()).designation == last.designation,
+			"a flanged joint module rebuilds from its recipe values");
+		var solid = link.geometry();
+		check(solid.valid() && solid.solidCount() == 1, "an arm link is one solid");
+		solid.close();
+	}
+
 	static function robotics():Void {
 		var flange = new RobotFlange(50);
 		check(flange.designation == "ISO9409-STYLE-50-4-M6", "robot flange designation");
@@ -2467,6 +2499,7 @@ class MachineKitSmoke {
 		EndEffectorSetTests.run();
 		EndEffectorComponentTests.run();
 		EndEffectorExampleChecks.run();
+		RobotArmChecks.run();
 		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();
@@ -2490,6 +2523,7 @@ class MachineKitSmoke {
 		pickingFrames();
 		catalogExtras();
 		robotics();
+		armParts();
 		assembly();
 		ports();
 		trace("MachineKit smoke passed");
