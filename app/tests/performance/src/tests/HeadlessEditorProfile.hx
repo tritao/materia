@@ -71,7 +71,7 @@ class HeadlessEditorProfile {
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
         Sys.args()[2] == "inspector-edits" ||
         Sys.args()[2] == "selection-stress" ||
-        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -104,7 +104,13 @@ class HeadlessEditorProfile {
       var censusInterval = censusText == null ? 0 : Std.parseInt(censusText);
       if (censusInterval == null) censusInterval = 0;
       if (censusInterval > 0) hl.Gc.censusStart(censusInterval);
-      if (scenario == "primitives") {
+      if (scenario == "noop") {
+        // Frames where nothing changed: the floor cost of the pipeline for this tree.
+        for (cycle in 0...cycles) {
+          submit(editor, frame, frames, "noop", cycle);
+          action(actions, "noop", cycle);
+        }
+      } else if (scenario == "primitives") {
         runPrimitives(editor);
       } else if (scenario == "tab-matrix") {
         var groups = [["hierarchy", "sensors"],
