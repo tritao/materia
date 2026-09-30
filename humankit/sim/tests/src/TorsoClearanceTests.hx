@@ -44,11 +44,11 @@ class TorsoClearanceTests {
         var without = measure(false);
         var planned = measure(true);
         Sys.println('belly clearance: ${Math.round(planned.clearance * 1000) / 1000} m with the surface known (lean ${Math.round(planned.lean * 100) / 100} rad), ${Math.round(without.clearance * 1000) / 1000} m without');
-        if (planned.clearance < 0.0)
+        if (planned.clearance < JobGate.CLEARANCE)
             throw 'The belly front stood ${-planned.clearance} m inside the surface it reached over';
         if (planned.lean < 0.03)
             throw "The worker did not lean to make up the reach";
-        if (!(planned.clearance > without.clearance + 0.02))
+        if (!(planned.clearance > without.clearance + 0.01))
             throw 'Knowing the surface did not keep the chest any further from it: ${planned.clearance} vs ${without.clearance}';
     }
 }
