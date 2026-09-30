@@ -46,6 +46,7 @@ class MotionKitBootstrapTests {
     kinematicsTests.testOpwKinematics();
     programTests.testMotionProgramContracts();
     programTests.testProgramCompiler();
+    programTests.testRedundantArmPaths();
     programTests.testProgramStartTolerances();
     kinematicsTests.testPathConfigurationSelector();
     kinematicsTests.testAxisKinematics();

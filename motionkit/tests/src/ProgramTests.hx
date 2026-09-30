@@ -190,6 +190,86 @@ class ProgramTests extends MotionKitTestSupport {
     compiled.dispose();
   }
 
+  /** D3: a 7-axis arm keeps its swivel point by point, and a path picks and smooths it as a whole. */
+  public function testRedundantArmPaths():Void {
+    var fixture = buildSevenAxisArmFixture();
+    var arm = fixture.arm;
+    check(arm.redundant(), "a 7-axis arm has a swivel by default");
+    var start = [0.3, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2];
+    var swivel = arm.swivelAngle(start);
+    check(Math.isFinite(swivel), 'the swivel is defined at the start ($swivel)');
+    var pose = arm.tcpPose(start);
+    var turned = arm.solveIkAtSwivel(pose, start, swivel + 0.5);
+    check(turned.converged, "the same tool pose solves at another swivel");
+    near(arm.swivelAngle(turned.q), swivel + 0.5, "the arm turns to the asked swivel", 1e-3);
+    var reached = arm.tcpPose(turned.q).translation;
+    near(reached.x, pose.translation.x, "the tool stays put while the elbow turns (x)", 1e-4);
+    near(reached.z, pose.translation.z, "the tool stays put while the elbow turns (z)", 1e-4);
+
+    // Point by point, the elbow no longer drifts with each solve.
+    var solver = new ManipulatorKinematics(arm, 1e-8);
+    var tolerance = new IkTolerance();
+    var startPose = solver.forward(start);
+    var q = start, drift = 0.0;
+    for (i in 1...21) {
+      var target = new Pose3(startPose.x, startPose.y + 0.01 * i, startPose.z, startPose.qx, startPose.qy,
+        startPose.qz, startPose.qw);
+      var solved = solver.solvePose(target, q, tolerance);
+      check(solved != null, 'point IK reaches step $i');
+      q = solved;
+      drift = Math.max(drift, Math.abs(arm.swivelAngle(q) - swivel));
+    }
+    check(drift < 1e-3, 'point IK keeps the swivel along a 20 cm move ($drift rad)');
+
+    // The same line solved point by point, each solve seeded by the last: the baseline.
+    var endPose = new Pose3(startPose.x - 0.1, startPose.y + 0.3, startPose.z - 0.15, startPose.qx, startPose.qy,
+      startPose.qz, startPose.qw);
+    var pointTravel = 0.0;
+    {
+      var chain = start;
+      for (i in 1...36) {
+        var f = i / 35.0;
+        var target = new Pose3(startPose.x - 0.1 * f, startPose.y + 0.3 * f, startPose.z - 0.15 * f, startPose.qx,
+          startPose.qy, startPose.qz, startPose.qw);
+        var solved = solver.solvePose(target, chain, tolerance);
+        check(solved != null, 'the line solves point by point at $f');
+        for (j in 0...7) pointTravel += Math.abs(solved[j] - chain[j]);
+        chain = solved;
+      }
+    }
+
+    // A compiled line: the swivel is chosen for the whole path and changes smoothly.
+    var limits = new ValidationLimits(7, Int64.ofInt(1), Int64.ofInt(1));
+    for (joint in 0...7) limits.jerk(joint, 20.0);
+    var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in 0...7) 2.0], [for (_ in 0...7) 4.0],
+      [for (_ in 0...7) 20.0], StartTolerances.uniform(7, 0.02, 0.02, 0.02));
+    var line = compiler.compile(new MotionProgram([MotionOp.MoveL(endPose, "work", 0.1, Blend.ExactStop)]), start,
+      Int64.ofInt(400));
+    var plan = line.blocks[0].plans[0];
+    check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+      MotionKitNativeConstants.MK_CHECK_PASSED, "the 7-axis line meets the Cartesian tolerance");
+    var samples = 200;
+    var angles:Array<Float> = [];
+    var worstJump = 0.0, planTravel = 0.0;
+    var previous:Array<Float> = null;
+    for (k in 0...(samples + 1)) {
+      var joints = plan.evaluate(plan.durationSeconds * k / samples).positions;
+      angles.push(arm.swivelAngle(joints));
+      if (previous != null) for (j in 0...7) {
+        worstJump = Math.max(worstJump, Math.abs(joints[j] - previous[j]));
+        planTravel += Math.abs(joints[j] - previous[j]);
+      }
+      previous = joints;
+    }
+    var worstBend = 0.0;
+    for (k in 1...samples) worstBend = Math.max(worstBend, Math.abs(angles[k + 1] - 2.0 * angles[k] + angles[k - 1]));
+    check(worstJump < 0.05, 'the 7-axis line moves its joints smoothly ($worstJump rad per sample)');
+    check(worstBend < 5e-3, 'the swivel changes smoothly along the line ($worstBend)');
+    // Choosing the swivel for the whole path moves the joints less than solving point by point.
+    check(planTravel < 0.8 * pointTravel, 'the path moves the joints less than point-by-point IK ($planTravel vs $pointTravel rad)');
+    line.dispose();
+  }
+
   public function testProgramCompiler():Void {
     var fixture = buildContractArmFixture();
     var solver = new ManipulatorKinematics(fixture.arm, 1e-8);

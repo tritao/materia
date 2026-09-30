@@ -135,6 +135,25 @@ class MotionKitTestSupport {
       arm: new Manipulator(model, links[0].id, flange.id)};
   }
 
+  /** A 7-axis arm with alternating Z/Y axes (the layout of common collaborative arms), limits ±2.9 rad. */
+  public function buildSevenAxisArmFixture():{model:RobotModel, arm:Manipulator} {
+    var model = new RobotModel("motionkit-seven-axis-arm");
+    var links = [for (i in 0...8) model.addLink(new Link(i == 0 ? "base" : 'link-$i'))];
+    var offsets = [0.0, 0.34, 0.0, 0.4, 0.0, 0.4, 0.0];
+    for (joint in 0...7) {
+      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
+      value.parentFramePosition = [0.0, 0.0, offsets[joint]];
+      value.axis = joint % 2 == 0 ? [0.0, 0.0, 1.0] : [0.0, 1.0, 0.0];
+      value.limits.lower = -2.9;
+      value.limits.upper = 2.9;
+      value.limits.velocity = 2.0;
+      value.limits.maxAcceleration = 4.0;
+    }
+    var flange = model.addFrame(new Frame("flange", links[7]));
+    flange.position = [0.0, 0.0, 0.126];
+    return {model: model, arm: new Manipulator(model, links[0].id, flange.id)};
+  }
+
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
     var x = to.qw * -from.qx + to.qx * from.qw + to.qy * -from.qz - to.qz * -from.qy;
     var y = to.qw * -from.qy - to.qx * -from.qz + to.qy * from.qw + to.qz * -from.qx;

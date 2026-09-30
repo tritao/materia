@@ -12,7 +12,9 @@ import kinematicskit.KinematicSnapshot;
 import kinematicskit.KinematicState;
 import kinematicskit.KinematicStatus;
 import kinematicskit.SolverWorkspace;
+import kinematicskit.SwivelTask;
 import kinematicskit.Transform;
+import kinematicskit.Vector3;
 import robotkit.kinematics.RobotKinematics;
 import robotkit.model.Frame;
 import robotkit.model.FrameId;
@@ -35,6 +37,9 @@ import robotkit.world.JointTarget;
  * The arm's joint values `q` are one per arm DOF, in base-to-flange order:
  * each movable joint on the path that drives its own DOF, or the leader of
  * a coupled one. Robot DOFs off the arm stay at their defaults.
+ *
+ * A redundant arm has a `swivel` naming its extra motion: given, or for a
+ * 7-DOF arm by default through the pivots of its 2nd, 4th and 6th joints.
  */
 class Manipulator {
   public final robot:RobotModel;
@@ -46,6 +51,8 @@ class Manipulator {
   public final flangeTTcp:Transform3;
   /** The arm DOFs' driving joints and their limits, in `q` order. */
   public final group:JointGroup;
+  /** How the swivel (elbow) angle of a redundant arm is measured; null when none is defined. */
+  public final swivel:Null<ArmSwivel>;
 
   final path:Array<Joint>;
   final dofs:Array<Int>;
@@ -58,9 +65,14 @@ class Manipulator {
   final state:KinematicState;
   final snapshot:KinematicSnapshot;
   final workspace = new SolverWorkspace();
+  /** Swivel bodies (shoulder, elbow, wrist), their points, and the reference in world coordinates. */
+  final swivelBodies:Array<Int> = [];
+  final swivelPoints:Array<Vector3> = [];
+  var swivelReference:Null<Vector3> = null;
+  var swivelProbe:Null<SwivelTask> = null;
 
   public function new(robot:RobotModel, baseLink:LinkId, flangeFrame:FrameId, ?flangeTTcp:Transform3,
-      ?compiled:KinematicModel) {
+      ?compiled:KinematicModel, ?swivel:ArmSwivel) {
     if (robot == null) throw "Manipulator requires a robot model";
     var frame:Null<Frame> = null;
     for (candidate in robot.frames) if (candidate != null && candidate.id == flangeFrame) { frame = candidate; break; }
@@ -92,11 +104,92 @@ class Manipulator {
       root.qy == 0.0 && root.qz == 0.0 && root.qw == 1.0;
     state = new KinematicState(model);
     snapshot = new KinematicSnapshot(model);
+    this.swivel = swivel != null ? swivel : drivers.length == 7 ? ArmSwivel.throughJoints(drivers[1], drivers[3], drivers[5]) : null;
+    if (this.swivel != null) {
+      var definition:ArmSwivel = this.swivel;
+      for (link in [definition.shoulderLink, definition.elbowLink, definition.wristLink]) {
+        var body = model.bodyIndex(link);
+        if (body < 0) throw 'Arm swivel link "$link" is not part of the model';
+        swivelBodies.push(body);
+      }
+      for (point in [definition.shoulder, definition.elbow, definition.wrist])
+        swivelPoints.push(new Vector3(point.x, point.y, point.z));
+      // The reference is given in the base frame; the base does not move with the arm.
+      snapshot.evaluate(state);
+      var r = definition.reference;
+      var world = snapshot.bodyPose(baseBody).compose(Transform.translation(r.x, r.y, r.z));
+      var origin = snapshot.bodyPose(baseBody);
+      swivelReference = new Vector3(world.x - origin.x, world.y - origin.y, world.z - origin.z);
+      swivelProbe = swivelTask(0.0, 1.0, false);
+    }
   }
 
   /** The same arm carrying a different tool; shares the compiled model. */
   public function withTool(flangeTTcp:Transform3):Manipulator
-    return new Manipulator(robot, baseLink, flangeFrame, flangeTTcp, model);
+    return new Manipulator(robot, baseLink, flangeFrame, flangeTTcp, model, swivel);
+
+  /** True when the arm has more DOFs than a tool pose fixes and a swivel names the extra one. */
+  public function redundant():Bool return swivel != null && dofs.length > 6;
+
+  /**
+   * The swivel angle at `q` in radians (see `ArmSwivel`), or NaN without a
+   * swivel or where it is undefined (the elbow straight, or the
+   * shoulder-wrist line along the reference).
+   */
+  public function swivelAngle(q:Array<Float>):Float {
+    if (swivelProbe == null) return Math.NaN;
+    evaluate(q);
+    var probe:SwivelTask = swivelProbe;
+    try return probe.angle(snapshot) catch (_:Dynamic) return Math.NaN;
+  }
+
+  /**
+   * IK for a tool-centre-point target that also sets the swivel: exactly
+   * (within `swivelTolerance`), or with `soft` as a preference the tool
+   * target wins over. Needs a swivel. Reports non-convergence, never throws,
+   * also where the swivel is undefined along the way.
+   */
+  public function solveIkAtSwivel(target:Transform3, seed:Array<Float>, swivelAngle:Float, ?soft:Bool = false,
+      ?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3, ?swivelTolerance:Float = 1e-4,
+      ?maxIterations:Int = 100, ?damping:Float = 0.02):IKResult {
+    if (target == null) throw "Inverse kinematics requires a target";
+    if (swivel == null) throw "Solving at a swivel angle needs an arm swivel";
+    if (!Math.isFinite(swivelAngle)) throw "Swivel angle must be finite";
+    var n = dofs.length;
+    var start = seed == null ? [for (_ in 0...n) 0.0] : seed;
+    if (start.length != n) throw 'Joint group requires $n values, got ${start.length}';
+    var problem = limitedProblem();
+    evaluate(start);
+    var goal = RobotKinematics.toTransform(target);
+    if (!baseIsIdentity) goal = snapshot.bodyPose(baseBody).compose(goal);
+    problem.add(FrameTask.atFrame(model, flangeFrameIndex, goal, positionTolerance, orientationTolerance,
+      RobotKinematics.toTransform(flangeTTcp)));
+    problem.add(swivelTask(swivelAngle, swivelTolerance, soft));
+    try {
+      var solution = DampedLeastSquares.solve(problem, state, maxIterations, damping, 1e-8, workspace);
+      var tip = solution.tasks[0];
+      return new IKResult(solution.status == KinematicStatus.Converged, [for (dof in dofs) solution.state.q[dof]],
+        tip.positionError, tip.orientationError, solution.iterations, solution.status);
+    } catch (_:Dynamic) {
+      return new IKResult(false, start.copy(), Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, 0,
+        KinematicStatus.NumericalFailure);
+    }
+  }
+
+  function swivelTask(target:Float, tolerance:Float, soft:Bool):SwivelTask
+    return new SwivelTask(model, swivelBodies[0], swivelPoints[0], swivelBodies[1], swivelPoints[1], swivelBodies[2],
+      swivelPoints[2], target, tolerance, swivelReference, soft, "swivel");
+
+  /** A problem over the arm's DOFs within the group's limits. */
+  function limitedProblem():KinematicProblem {
+    var problem = new KinematicProblem(model).setActiveDofs(dofs);
+    for (i in 0...dofs.length) {
+      var limits = group.limitsOf(i);
+      if (limits.lower < limits.upper) problem.setLimits(dofs[i], limits.lower, limits.upper);
+      else problem.setLimits(dofs[i], Math.NEGATIVE_INFINITY, Math.POSITIVE_INFINITY);
+    }
+    return problem;
+  }
 
   public function dofCount():Int return dofs.length;
 

@@ -142,6 +142,18 @@ class ProgramCompiler {
       }
       this.configurationSelector = new PathConfigurationSelector(solver,
         lower, upper, this.perJointMaxJump, maxVelocity);
+    } else if (Reflect.field(solver, "refinePath") != null &&
+        (cast solver:ManipulatorKinematics).manipulator.redundant()) {
+      // A redundant arm's swivel is chosen along the whole path, not drifted into point by point.
+      var arm:ManipulatorKinematics = cast solver;
+      var lower:Array<Float> = [], upper:Array<Float> = [];
+      for (joint in 0...count) {
+        var bounds = arm.manipulator.group.limitsOf(joint);
+        lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
+        upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
+      }
+      this.configurationSelector = new PathConfigurationSelector(solver,
+        lower, upper, this.perJointMaxJump, maxVelocity, null, 1, 48);
     } else {
       this.configurationSelector = null;
     }

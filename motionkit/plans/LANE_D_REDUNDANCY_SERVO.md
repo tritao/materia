@@ -182,3 +182,40 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
     the device's step quantisation (1e-4 rad) on the virtual device.
   - Still open: a device underflow latches a fault, so after a host stall
     on a device the operator must reset safety before servoing again.
+- 2026-09-30 — **Status of D1–D3.** D1 (the QP differential IK core) and
+  D2 (MJCF export for the mink oracle) were done inside kinematicskit (K3,
+  see `kinematicskit/plans/KINEMATICS.md`). They use ProxQP rather than
+  OSQP (KK-D13).
+- 2026-09-30 — **D3 done: 7-axis redundancy along a path.**
+  - RobotKit's `Manipulator` has an `ArmSwivel`. By default a 7-DOF arm
+    uses the pivots of its 2nd, 4th and 6th joints; the definition can be
+    overridden. It also has `swivelAngle(q)` and `solveIkAtSwivel`
+    (exact or preferred), both on kinematicskit's `SwivelTask`.
+  - `ManipulatorKinematics` for a redundant arm:
+    - `solvePose` keeps the seed's swivel as a preference, so the elbow no
+      longer drifts with each solve.
+    - `sampleCandidates` sweeps the swivel on each IK branch.
+    - `continueCandidates` grows a path's candidates sample by sample: each
+      one continues at its own swivel and at ±0.05 rad. Where a limit
+      blocks, the swivel becomes a preference and the limit bends it. One
+      candidate is kept per swivel bin.
+    - `refinePath` smooths the chosen swivel (a Gaussian over about 1/8 of
+      the samples) and re-solves each sample exactly at that swivel.
+  - `ProgramCompiler` enables this whole-path selection for redundant arms,
+    as it already did for OPW arms.
+  - First cut: independent swivel sweeps per sample did not line up from
+    one sample to the next, and the search found no connected route. Growing
+    the candidates along the path fixes that by construction.
+  - Test (7-axis RobotModel fixture):
+    - The swivel is controllable, and point IK holds it within 1e-4 rad
+      over 20 cm.
+    - A compiled 35 cm line meets the Cartesian tolerance with smooth
+      joints and swivel.
+    - The whole-path choice moves the joints 4.8 rad against 7.8 rad point
+      by point.
+  - Open:
+    - Joint-limit margins and a preferred swivel as costs in the search. The
+      native preferred-posture cost is per sample, so on a long path it
+      would swamp the motion cost; this needs a normalised state cost.
+    - `PoseTarget` resolution (`MoveJ` to a pose) still takes the candidate
+      nearest the start.

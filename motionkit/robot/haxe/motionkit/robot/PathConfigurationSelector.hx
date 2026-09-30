@@ -6,8 +6,18 @@ import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.robot.OpwKinematics;
 
-/** Chooses one continuous joint configuration per Cartesian path sample. */
+/**
+ * Chooses one continuous joint configuration per Cartesian path sample.
+ *
+ * For a redundant arm (`ManipulatorKinematics` over a `Manipulator` with a
+ * swivel) the candidates sweep its swivel, the search picks the cheapest
+ * swivel path among them, and `ManipulatorKinematics.refinePath` then
+ * smooths that choice so the joints do not step between swivel samples.
+ */
 class PathConfigurationSelector {
+  /** Swivel resolution (radians) of a redundant arm's candidate lattice. */
+  static inline var SWIVEL_STEP = 0.05;
+
   public final solver:KinematicsSolver;
   public final lower:Array<Float>;
   public final upper:Array<Float>;
@@ -65,10 +75,29 @@ class PathConfigurationSelector {
       return readResult(selected.status, selected.out_sequence);
     }
     var candidates:Array<Array<Array<Float>>> = [];
-    for (index in 0...poses.length)
-      candidates.push(index == 0 ? [startQ.copy()] :
-        solver.sampleCandidates(poses[index], maxCandidates, tolerance));
-    return select(distances, candidates);
+    // Same Haxeon interface-check workaround as for OPW above.
+    var redundant:Null<ManipulatorKinematics> = null;
+    if (Reflect.field(solver, "continueCandidates") != null) {
+      var arm:ManipulatorKinematics = cast solver;
+      if (arm.manipulator.redundant()) redundant = arm;
+    }
+    for (index in 0...poses.length) {
+      if (index == 0) candidates.push([startQ.copy()]);
+      else if (redundant != null) {
+        var arm:ManipulatorKinematics = redundant;
+        var next = arm.continueCandidates(poses[index], candidates[index - 1], maxCandidates, SWIVEL_STEP, tolerance);
+        if (next.length == 0) throw 'No continuous configuration reaches path sample $index';
+        candidates.push(next);
+      } else candidates.push(solver.sampleCandidates(poses[index], maxCandidates, tolerance));
+    }
+    var chosen = select(distances, candidates);
+    if (redundant != null) {
+      var arm:ManipulatorKinematics = redundant;
+      var radius = Std.int(Math.max(3, Math.round(poses.length / 8)));
+      var refined = arm.refinePath(poses, chosen, radius, maxJump, tolerance);
+      if (refined != null) return refined;
+    }
+    return chosen;
   }
 
   /** Candidate sets are grouped by sample and passed to Descartes in bulk. */
