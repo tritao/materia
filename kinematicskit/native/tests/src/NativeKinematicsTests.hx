@@ -12,6 +12,7 @@ import kinematicskit.KinematicProblem;
 import kinematicskit.LinearAlgebra;
 import kinematicskit.PostureTask;
 import kinematicskit.SolverWorkspace;
+import kinematicskit.SwivelTask;
 import kinematicskit.native.DifferentialIk;
 import kinematicskit.native.NativeKinematics;
 import kinematicskit.native.NativeQpStep;
@@ -27,6 +28,8 @@ class NativeKinematicsTests {
     testWarmStartHelps();
     testDifferentialIkReachesWithinLimits();
     testRedundantArmFollowsPosture();
+    testSwivelPicksTheSevenAxisConfiguration();
+    testMinkOracle();
     Sys.println('KinematicsKit native tests passed ($assertions assertions)');
   }
 
@@ -242,6 +245,99 @@ class NativeKinematicsTests {
     var high = reachPreferring(0.9), low = reachPreferring(0.3);
     check(Math.abs(high[0] - 0.9) < 1e-4 && Math.abs(low[0] - 0.3) < 1e-4,
       'the preference picks the base angle along the self-motion (${high[0]} vs ${low[0]})');
+  }
+
+  static function testSwivelPicksTheSevenAxisConfiguration():Void {
+    var model = sevenAxisArm();
+    var flange = model.frameIndex("flange");
+    var start = [0.3, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2];
+    var goal = KinematicSnapshot.of(new KinematicState(model, start)).framePose(flange);
+    var origin = new Vector3(0, 0, 0);
+    function reachAt(swivel:Float):Array<Float> {
+      var task = new SwivelTask(model, model.bodyIndex("link1"), origin, model.bodyIndex("link3"), origin,
+        model.bodyIndex("link5"), origin, swivel, 1e-9, new Vector3(1, 0, 0));
+      var problem = new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-9, 1e-9)).add(task);
+      var run = track(problem, start, [for (_ in 0...7) Math.POSITIVE_INFINITY], 300);
+      var snapshot = KinematicSnapshot.of(new KinematicState(model, run.q));
+      var reached = snapshot.framePose(flange);
+      check(run.legal, 'swivel tracking stays legal (${run.why})');
+      check(Math.abs(reached.x - goal.x) < 1e-6 && Math.abs(reached.y - goal.y) < 1e-6 && Math.abs(reached.z - goal.z) < 1e-6 &&
+        Math.abs(Math.abs(reached.qw * goal.qw + reached.qx * goal.qx + reached.qy * goal.qy + reached.qz * goal.qz) - 1.0) < 1e-9,
+        'the 6D tool target is met at swivel $swivel');
+      check(Math.abs(task.angle(snapshot) - swivel) < 1e-6, 'the arm swivels to $swivel (${task.angle(snapshot)})');
+      return run.q;
+    }
+    var one = reachAt(0.4), other = reachAt(-0.6);
+    var differs = 0.0;
+    for (i in 0...7) differs = Math.max(differs, Math.abs(one[i] - other[i]));
+    check(differs > 0.3, 'different swivels are different arm configurations for the same tool pose ($differs)');
+  }
+
+  /**
+   * The same differential-IK step solved by mink (MuJoCo kinematics, DAQP) and by us (our kinematics,
+   * ProxQP). Needs `KK_MINK_PYTHON`: a Python with `mink` and `mujoco` (see mink_oracle.py); skipped otherwise.
+   */
+  static function testMinkOracle():Void {
+    var python = Sys.getEnv("KK_MINK_PYTHON");
+    if (python == null || python == "" || !sys.FileSystem.exists(python)) {
+      Sys.println("mink oracle skipped: set KK_MINK_PYTHON to a Python with mink and mujoco");
+      return;
+    }
+    // The script lives next to this suite; the working directory is wherever `haxeon run` started.
+    var script = [for (candidate in ["mink_oracle.py", "tests/mink_oracle.py", "native/tests/mink_oracle.py",
+      "kinematicskit/native/tests/mink_oracle.py"]) if (sys.FileSystem.exists(candidate)) candidate][0];
+    if (script == null) throw "mink oracle script not found from the working directory";
+    var dir = haxe.io.Path.directory(script);
+    dir = (dir == "" ? "." : dir) + "/build/oracle";
+    var model = sevenAxisArm();
+    var flange = model.frameIndex("flange");
+    var q = [0.3, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2];
+    var here = KinematicSnapshot.of(new KinematicState(model, q)).framePose(flange);
+    // mink's frame error is the SE(3) logarithm, whose translational part couples with any rotation error,
+    // so the position-only cases keep the current orientation (there both formulations coincide).
+    var shifted = new Transform(here.x + 0.04, here.y - 0.03, here.z + 0.02, here.qx, here.qy, here.qz, here.qw);
+    var turned = shifted.compose(Transform.axisAngle(0.6, 0.0, 0.8, 0.05));
+    var nudged = shifted.compose(Transform.axisAngle(0.6, 0.0, 0.8, 0.005));
+    var dt = 0.01, lambda = 1e-3, gain = 0.8;
+    var cases:Array<{name:String, target:Transform, orientation:Bool, velocity:Null<Array<Float>>, tolerance:Float}> = [
+      {name: "position target", target: shifted, orientation: false, velocity: null, tolerance: 1e-6},
+      {name: "position target, speed-limited", target: shifted, orientation: false, velocity: [for (_ in 0...7) 0.5],
+        tolerance: 1e-6},
+      // With a rotation error, our world-frame position rows and first-order orientation Jacobian differ from
+      // mink's SE(3) logarithm and its exact Jacobian: to first order in the 0.05 rad rotation times the offset.
+      {name: "pose target, 0.05 rad", target: turned, orientation: true, velocity: null, tolerance: 5e-2},
+      {name: "pose target, 0.005 rad", target: nudged, orientation: true, velocity: null, tolerance: 5e-3}
+    ];
+    var poseDifferences:Array<Float> = [];
+    for (c in cases) {
+      var nearby = c.target;
+      var task = FrameTask.atFrame(model, flange, nearby, 1e-9, 1e-9, null, FrameTask.ALL_AXES,
+        c.orientation ? FrameOrientation.Full : FrameOrientation.Free);
+      var posture = [0.0, 0.5, 0.0, -1.0, 0.0, 0.5, 0.0];
+      var problem = new KinematicProblem(model).add(task).add(new PostureTask(model, posture, 0.05));
+      var qp = new NativeQpStep(7);
+      var ours = DifferentialIk.step(problem, new KinematicState(model, q), dt, qp, c.velocity, gain, lambda).velocity;
+      qp.dispose();
+      var request = {mjcf: Mjcf.write(model), q: q, dt: dt, damping: lambda * lambda, site: "flange",
+        target_position: [nearby.x, nearby.y, nearby.z], target_wxyz: [nearby.qw, nearby.qx, nearby.qy, nearby.qz],
+        position_cost: 1.0, orientation_cost: c.orientation ? 1.0 : 0.0, gain: gain, posture_cost: 0.05,
+        posture_target: posture, velocity_limits: c.velocity, joint_names: [for (i in 0...7) 'a$i']};
+      sys.FileSystem.createDirectory(dir);
+      sys.io.File.saveContent('$dir/request.json', haxe.Json.stringify(request));
+      var exit = Sys.command(python, [script, '$dir/request.json', '$dir/answer.json']);
+      check(exit == 0, 'the mink oracle ran for the ${c.name}');
+      var answer:Dynamic = haxe.Json.parse(sys.io.File.getContent('$dir/answer.json'));
+      var theirs:Array<Float> = Reflect.field(answer, "velocity");
+      var worst = 0.0, size = 0.0;
+      for (i in 0...7) { worst = Math.max(worst, Math.abs(ours[i] - theirs[i])); size = Math.max(size, Math.abs(theirs[i])); }
+      Sys.println('mink oracle, ${c.name}: worst difference $worst rad/s (largest velocity $size)');
+      check(worst <= c.tolerance * Math.max(1.0, size), 'our step agrees with mink for the ${c.name}');
+      if (c.orientation) poseDifferences.push(worst / size);
+    }
+    // The pose-target difference is the SE(3)-log coupling, first order in the rotation error: 10x less
+    // rotation, about 10x less difference.
+    var ratio = poseDifferences[0] / poseDifferences[1];
+    check(ratio > 7.0 && ratio < 13.0, 'the pose difference scales with the rotation error (ratio $ratio)');
   }
 
   /** Two roots; a chain with revolute, prismatic, fixed and coupled joints; a side branch. */

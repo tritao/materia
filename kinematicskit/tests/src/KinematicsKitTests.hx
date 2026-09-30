@@ -6,6 +6,7 @@ import kinematicskit.FrameTask;
 import kinematicskit.JacobianLayout;
 import kinematicskit.LookAtTask;
 import kinematicskit.SolverWorkspace;
+import kinematicskit.SwivelTask;
 import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicStatus;
 import kinematicskit.LevenbergMarquardt;
@@ -39,6 +40,7 @@ class KinematicsKitTests {
     testCameraLooksAtPart();
     testLargeAssemblyUsesActiveColumns();
     testNoAllocationPerIteration();
+    testSwivelJacobian();
     Sys.println('KinematicsKit tests passed ($assertions assertions)');
   }
 
@@ -619,6 +621,46 @@ class KinematicsKitTests {
     var after = hl.Gc.totalAllocated();
     if (longIterations <= shortIterations) throw 'fixture did not run longer ($shortIterations vs $longIterations)';
     return ((after - middle) - (middle - before)) / (longIterations - shortIterations);
+  }
+
+  /** A 7-axis arm with alternating Z/Y axes: spherical shoulder at 0.34, elbow 0.4 above, spherical wrist 0.4 above. */
+  public static function sevenAxisArm():KinematicModel {
+    var builder = new KinematicModelBuilder();
+    var previous = builder.addBody("base");
+    var z = new Vector3(0, 0, 1), y = new Vector3(0, 1, 0);
+    var offsets = [0.34, 0.0, 0.4, 0.0, 0.4, 0.0, 0.0];
+    for (i in 0...7) {
+      var body = builder.addBody('link$i');
+      builder.addJoint('a$i', JointKind.Revolute, previous, body, Transform.translation(0, 0, i == 0 ? 0.0 : offsets[i - 1]),
+        Transform.identity(), i % 2 == 0 ? z : y, -2.9, 2.9);
+      previous = body;
+    }
+    builder.addFrame("flange", previous, Transform.translation(0, 0, 0.126));
+    return builder.build();
+  }
+
+  static function testSwivelJacobian():Void {
+    var model = sevenAxisArm();
+    var origin = new Vector3(0, 0, 0);
+    // Shoulder at link1's origin, elbow at link3's, wrist at link5's.
+    var task = new SwivelTask(model, model.bodyIndex("link1"), origin, model.bodyIndex("link3"), origin,
+      model.bodyIndex("link5"), origin, 0.0, 1e-9, new Vector3(1, 0, 0));
+    var q = [0.3, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2];
+    var layout = JacobianLayout.all(model);
+    var snapshot = KinematicSnapshot.of(new KinematicState(model, q));
+    var residual = [0.0], jacobian = [for (_ in 0...7) 0.0];
+    task.evaluate(new KinematicState(model, q), snapshot, layout, residual, jacobian, 0);
+    var eps = 1e-6;
+    for (dof in 0...7) {
+      var qp = q.copy(); qp[dof] += eps;
+      var qm = q.copy(); qm[dof] -= eps;
+      var numeric = (task.angle(KinematicSnapshot.of(new KinematicState(model, qp))) -
+        task.angle(KinematicSnapshot.of(new KinematicState(model, qm)))) / (2 * eps);
+      check(near(jacobian[dof], numeric, 1e-6), 'swivel Jacobian column $dof matches central differences (${jacobian[dof]} vs $numeric)');
+    }
+    // The wrist joints (a4..a6) turn the hand, not the elbow: their columns vanish.
+    check(Math.abs(jacobian[4]) < 1e-9 && Math.abs(jacobian[5]) < 1e-9 && Math.abs(jacobian[6]) < 1e-9,
+      "joints beyond the wrist point do not change the swivel");
   }
 
   // -- helpers ---------------------------------------------------------

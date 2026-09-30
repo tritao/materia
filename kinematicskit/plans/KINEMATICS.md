@@ -618,3 +618,46 @@ coordinates; for a running robot the target goes through MotionKit.
   as the fallback. `solveDifferential` stays on the Haxe solver until then.
 - K3d's mink oracle needs Python with `mink` and `mujoco`, which this machine
   does not have; those tests will skip with a message where they are absent.
+
+### K3c — Bounded servo step in MotionKit (2026-09-30, revises the deferral above)
+
+- Done without waiting for Lane D, as a new contract rather than a change to
+  `solveDifferential` (whose answers and unbounded contract stay as they
+  are): `motionkit.robot.ManipulatorServo.step(q, twist, dt, ?velocityLimits)`
+  solves the bounded QP over the TCP Jacobian with the group's position
+  limits and velocity limits (`velocity <= 0` = unlimited), warm-started
+  across ticks; if the QP does not solve, the Haxe damped step clamped into
+  the same bounds is used and the answer says so (`fallback`, `qpStatus`,
+  `limited`). Lane D's live servoing (D5) builds on it.
+- `motionkit-robot` now depends on `kinematicskit-native`, so every MotionKit
+  consumer builds `kinematicskit_core`; RobotKit world tests (4777),
+  cadbridge (129), ToolpathKit (2975) and the MachineKit smoke pass with it.
+- Tests (MotionKit, +22 assertions): unconstrained ticks equal the damped
+  step; velocity limits hold exactly and report the held joints; turning the
+  arm about its base axis drives the base joint into its +2π stop and holds
+  it there, never leaving the range; a starved QP falls back within limits.
+
+### K3d — Swivel task and the mink oracle (2026-09-30)
+
+- `SwivelTask`: the elbow's angle about the shoulder-wrist line from a
+  reference plane, one row that picks a 7-axis arm's configuration. Exact
+  residual; Jacobian = gradient of the closed-form angle w.r.t. the three
+  points (central differences, no extra FK) times their point Jacobians;
+  allocation-free. Kit test: matches central differences through full FK,
+  and joints beyond the wrist point have zero columns. Native test: one 6D
+  tool pose reached at swivel 0.4 and −0.6 — two configurations, both meeting
+  the tool target to 1e-6 and the swivel to 1e-6.
+- mink oracle (`native/tests/mink_oracle.py`, `testMinkOracle`): the test
+  writes the 7-axis arm as MJCF (`Mjcf.hx`, test-only; no couplings or
+  closures), mink (1.3.0, MuJoCo 3.14, DAQP) solves the same step with
+  `damping = λ²` and `ConfigurationLimit(gain = 1)`, and the answers are
+  compared. Skipped unless `KK_MINK_PYTHON` names a Python with mink.
+  - position target: 4.5e-6 rad/s on 30.6 rad/s (1.5e-7 relative);
+  - position target with speed limits: 8e-9 (same active set);
+  - pose target: 2.4% apart at 0.05 rad rotation error, 0.33% at 0.005 rad.
+    mink's frame error is the SE(3) logarithm with its exact Jacobian; ours is
+    world-frame position plus a first-order orientation Jacobian (exact at
+    convergence). The gap is first order in the rotation error (the test
+    checks the ratio). Both converge to the same target; they take slightly
+    different paths. An SE(3)-log `FrameTask` option would close it if a
+    use needs mink-identical transients.
