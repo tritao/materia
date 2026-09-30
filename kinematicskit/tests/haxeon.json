@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "kinematicskit-tests" },
+	"entry": "KinematicsKitTests",
+	"sourceRoots": ["src"],
+	"dependencies": { "kinematicskit": { "path": ".." } },
+	"target": "host",
+	"outputDir": "build"
+}

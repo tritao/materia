@@ -74,6 +74,20 @@ out to be wrong.
   because they replace Haxe code one-for-one. The QP backend (K3) is native
   (MotionKit decision D1: numerical code is native), behind the same problem
   description, with the Haxe solver as reference and fallback.
+- **KK-D10 — The native core uses Eigen, privately.** Eigen 3.3+ through
+  `find_package(Eigen3 3.3 REQUIRED NO_MODULE)`, as MotionKit already does
+  (no new dependency or licence). Rules:
+  - Eigen never appears in the C ABI: `kinematicskit.h` takes flat
+    `double*` arrays and sizes; Eigen is linked `PRIVATE`.
+  - No allocation per solve: workspaces (`MatrixXd`/`VectorXd`,
+    decompositions reused with `.compute()`) are sized once per
+    model/problem shape; native tests build with `EIGEN_RUNTIME_NO_MALLOC`
+    and solve under `set_is_malloc_allowed(false)`.
+  - Fixed-size types for spatial values (`Quaterniond`, `Vector3d`, 6-vectors),
+    dynamic sizes for Jacobians.
+  - Quaternions cross the ABI as (x, y, z, w); `Quaterniond`'s constructor
+    takes (w, x, y, z). Convert only through two helpers, covered by a
+    round-trip parity test against the Haxe snapshot.
 - **KK-D9 — Out of scope:** collision (a validator interface outside the
   kit), time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
