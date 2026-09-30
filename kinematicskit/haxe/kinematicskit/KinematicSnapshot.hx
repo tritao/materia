@@ -129,6 +129,13 @@ class KinematicSnapshot {
     return pointJacobian(model.frameBody[frame], scratch[0], scratch[1], scratch[2], out);
   }
 
+  /** As `frameJacobian`, at a body's own origin. */
+  public function bodyJacobian(body:Int, ?out:Array<Float>):Array<Float> {
+    requireEvaluated();
+    var o = body * 7;
+    return pointJacobian(body, poses[o], poses[o + 1], poses[o + 2], out);
+  }
+
   /** As `frameJacobian`, for a world point `(px, py, pz)` moving rigidly with `body`. */
   public function pointJacobian(body:Int, px:Float, py:Float, pz:Float, ?out:Array<Float>):Array<Float> {
     requireEvaluated();

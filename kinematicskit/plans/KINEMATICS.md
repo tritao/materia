@@ -288,4 +288,39 @@ coordinates; for a running robot the target goes through MotionKit.
 
 ## Progress log
 
-(not started)
+### K0 — Compiled model and snapshot (2026-09-30)
+
+- `kinematicskit` exists with no dependencies: `Transform`, `Vector3`,
+  `JointKind`, `ClosureKind`, `KinematicModelBuilder` → `KinematicModel`,
+  `KinematicState`, `KinematicSnapshot` (world poses, joint origins/axes,
+  frame/body/point Jacobians into caller-supplied arrays). Its own suite
+  (`tests/`, pure Haxe, ~5 s) has 104 assertions, including Jacobians
+  against central differences on a tree with revolute, prismatic, fixed and
+  coupled joints and a side branch.
+- **HashLink limit found:** the JIT rejects calls with more than 32
+  arguments (`MAX_TMP_ARGS` in `hashlink/src/jit_emit.c`: "JIT ERROR
+  get_tmp_args ... Too many arguments"). The builder hands the model a single
+  `KinematicModelParts` object instead of 34 constructor arguments.
+- `Transform.checked` accepts a quaternion whose squared norm is within 1e-4
+  of one (the `AssemblyCodec.validateFrame` tolerance) and normalizes it.
+  Assembly FK used to compose such frames unnormalized.
+- RobotKit: `robotkit.kinematics.RobotKinematics.compile` (whole model,
+  including `RobotModel.couplings`) and `.path` (base→tip only, no couplings,
+  which is how chains always behaved). `KinematicChain` is now a view over
+  `.path`, with one FK per call. Parity against the previous implementation
+  (copied into a scratch project) on a UR5 and a random mixed-joint chain
+  with rotated joint/child frames: FK and Jacobians within 6e-15, IK `q`
+  within 6e-14 with identical convergence and iteration counts in all 80
+  cases. FK + Jacobian is 3.7× faster (70 ms vs 257 ms for 20 000 calls).
+- CadKit: `cadkit.modeling.AssemblyKinematics.compile` (occurrences →
+  bodies, connectors → frames, tree joints, couplings, closures).
+  `AssemblyState.forwardKinematics`/`worldPose` read a snapshot; the
+  recursive tree walk is gone. **Behaviour change:** a coupled joint's pose
+  now always follows its source; before, FK used the joint's stored
+  coordinate, which could only differ when a definition's coupled defaults
+  are inconsistent (and `record()` already rejects that state).
+  `AssemblyLoopSolver` is unchanged and runs on the new FK.
+- Acceptance: kinematicskit tests; RobotKit world tests (all suites, 4762
+  assertions, plus a new whole-model-vs-chain FK test); CadKit
+  `HaxeonSmoke` (all assembly smokes); MachineKit smoke including the
+  robot-arm FK check; MotionKit and cadbridge suites.

@@ -9,6 +9,9 @@ import robotkit.model.Frame;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
+import kinematicskit.KinematicSnapshot;
+import kinematicskit.KinematicState;
+import robotkit.kinematics.RobotKinematics;
 import robotkit.manipulation.ChainTip;
 import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.JointGroup;
@@ -33,6 +36,7 @@ class KinematicsTests {
     testIKRecoversReachableTargets();
     testIKReportsNonConvergence();
     testToJointTargetsThroughSimulatedRobot();
+    testWholeModelMatchesChain();
     Sys.println('RobotKit kinematics tests passed ($assertions assertions)');
     return assertions;
   }
@@ -145,6 +149,27 @@ class KinematicsTests {
       check(approx(snapshot.positions.get(i), q[i], 1e-6),
         'Joint $i reaches its commanded target through RobotCommand and SimulatedRobot');
     simulationHarness.dispose();
+  }
+
+  static function testWholeModelMatchesChain():Void {
+    var fixture = buildUR5Fixture();
+    var model = RobotKinematics.compile(fixture.model);
+    check(model.dofCount() == 6 && model.dofId(0) == "shoulder_pan_joint",
+      "whole-model compile keeps authored joint order and IDs");
+    var flange = model.frameIndex("flange");
+    var state = new KinematicState(model);
+    var snapshot = new KinematicSnapshot(model);
+    var rng = new Rng(99);
+    for (_ in 0...10) {
+      var q = [for (_ in 0...6) (rng.next() - 0.5) * 4.0];
+      for (i in 0...6) state.q[i] = q[i];
+      snapshot.evaluate(state);
+      var whole = RobotKinematics.toTransform3(snapshot.framePose(flange));
+      var chain = fixture.chain.forwardKinematics(q);
+      check(whole.translation.sub(chain.translation).norm() < 1e-12 &&
+        whole.rotation.angularDistance(chain.rotation) < 1e-9,
+        "whole-model FK agrees with the chain view at the flange");
+    }
   }
 
   // -- fixtures --------------------------------------------------------

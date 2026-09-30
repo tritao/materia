@@ -36,15 +36,20 @@ class Transform {
     return new Transform(0.0, 0.0, 0.0, ax * s, ay * s, az * s, Math.cos(angle * 0.5));
   }
 
-  /** Rejects non-finite values and a quaternion far from unit length; returns the transform normalized. */
+  /**
+   * Rejects non-finite values and a quaternion whose squared norm is more
+   * than 1e-4 from one (the tolerance `AssemblyCodec.validateFrame` allows);
+   * returns the transform with its quaternion normalized.
+   */
   public static function checked(value:Transform, what:String):Transform {
     if (value == null) throw '$what requires a transform';
     if (!Math.isFinite(value.x) || !Math.isFinite(value.y) || !Math.isFinite(value.z) ||
         !Math.isFinite(value.qx) || !Math.isFinite(value.qy) || !Math.isFinite(value.qz) ||
         !Math.isFinite(value.qw))
       throw '$what must be finite';
-    var norm = Math.sqrt(value.qx * value.qx + value.qy * value.qy + value.qz * value.qz + value.qw * value.qw);
-    if (Math.abs(norm - 1.0) > 1e-6) throw '$what rotation must be a unit quaternion';
+    var squared = value.qx * value.qx + value.qy * value.qy + value.qz * value.qz + value.qw * value.qw;
+    if (Math.abs(squared - 1.0) > 1e-4) throw '$what rotation must be a unit quaternion';
+    var norm = Math.sqrt(squared);
     if (norm == 1.0) return value;
     return new Transform(value.x, value.y, value.z, value.qx / norm, value.qy / norm, value.qz / norm, value.qw / norm);
   }

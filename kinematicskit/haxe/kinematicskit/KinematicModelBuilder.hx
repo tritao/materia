@@ -12,17 +12,17 @@ class KinematicModelBuilder {
   final couplings:Array<CouplingSpec> = [];
   final frames:Array<FrameSpec> = [];
   final closures:Array<ClosureSpec> = [];
-  final bodyIndex = new Map<String, Int>();
-  final jointIndex = new Map<String, Int>();
-  final frameIndex = new Map<String, Int>();
-  final closureIndex = new Map<String, Int>();
+  final bodyIndexById = new Map<String, Int>();
+  final jointIndexById = new Map<String, Int>();
+  final frameIndexById = new Map<String, Int>();
+  final closureIndexById = new Map<String, Int>();
 
   public function new() {}
 
   public function addBody(id:String):Int {
     requireId(id, "Kinematic body");
-    if (bodyIndex.exists(id)) throw 'Kinematic body "$id" is declared more than once';
-    bodyIndex.set(id, bodyIds.length);
+    if (bodyIndexById.exists(id)) throw 'Kinematic body "$id" is declared more than once';
+    bodyIndexById.set(id, bodyIds.length);
     bodyIds.push(id);
     bodyRootPoses.push(null);
     return bodyIds.length - 1;
@@ -43,7 +43,7 @@ class KinematicModelBuilder {
       jointTChild:Transform, ?axis:Vector3, ?lower:Float, ?upper:Float, ?defaultValue:Float = 0.0,
       ?continuous:Bool = false):Int {
     requireId(id, "Kinematic joint");
-    if (jointIndex.exists(id)) throw 'Kinematic joint "$id" is declared more than once';
+    if (jointIndexById.exists(id)) throw 'Kinematic joint "$id" is declared more than once';
     requireBody(parent);
     requireBody(child);
     if (parent == child) throw 'Kinematic joint "$id" connects body "${bodyIds[child]}" to itself';
@@ -59,7 +59,7 @@ class KinematicModelBuilder {
     var hi = upper == null ? Math.POSITIVE_INFINITY : upper;
     if (Math.isNaN(lo) || Math.isNaN(hi) || lo > hi) throw 'Kinematic joint "$id" has invalid limits';
     if (!Math.isFinite(defaultValue)) throw 'Kinematic joint "$id" default value must be finite';
-    jointIndex.set(id, joints.length);
+    jointIndexById.set(id, joints.length);
     joints.push(new JointSpec(id, kind, parent, child,
       Transform.checked(parentTJoint, 'Kinematic joint "$id" parent frame'),
       Transform.checked(jointTChild, 'Kinematic joint "$id" child frame'),
@@ -76,11 +76,17 @@ class KinematicModelBuilder {
 
   public function addFrame(id:String, body:Int, bodyTFrame:Transform):Int {
     requireId(id, "Kinematic frame");
-    if (frameIndex.exists(id)) throw 'Kinematic frame "$id" is declared more than once';
+    if (frameIndexById.exists(id)) throw 'Kinematic frame "$id" is declared more than once';
     requireBody(body);
-    frameIndex.set(id, frames.length);
+    frameIndexById.set(id, frames.length);
     frames.push(new FrameSpec(id, body, Transform.checked(bodyTFrame, 'Kinematic frame "$id"')));
     return frames.length - 1;
+  }
+
+  /** Index of a frame added so far; -1 when absent. */
+  public function frameIndex(id:String):Int {
+    var index = frameIndexById.get(id);
+    return index == null ? -1 : index;
   }
 
   /**
@@ -92,7 +98,7 @@ class KinematicModelBuilder {
   public function addClosure(id:String, kind:ClosureKind, frameA:Int, frameB:Int, ?axis:Vector3,
       ?tolerance:Float):Int {
     requireId(id, "Kinematic closure");
-    if (closureIndex.exists(id)) throw 'Kinematic closure "$id" is declared more than once';
+    if (closureIndexById.exists(id)) throw 'Kinematic closure "$id" is declared more than once';
     if (frameA < 0 || frameA >= frames.length || frameB < 0 || frameB >= frames.length)
       throw 'Kinematic closure "$id" references an unknown frame';
     var ax = 0.0, ay = 0.0, az = 1.0;
@@ -103,7 +109,7 @@ class KinematicModelBuilder {
     } else if (kind != ClosureKind.Fixed) throw 'Kinematic closure "$id" needs an axis';
     if (tolerance != null && (!Math.isFinite(tolerance) || tolerance <= 0.0))
       throw 'Kinematic closure "$id" tolerance must be finite and positive';
-    closureIndex.set(id, closures.length);
+    closureIndexById.set(id, closures.length);
     closures.push(new ClosureSpec(id, kind, frameA, frameB, ax, ay, az, tolerance));
     return closures.length - 1;
   }
@@ -144,8 +150,8 @@ class KinematicModelBuilder {
     // Couplings: resolve each coupled joint to the DOF that ultimately drives it.
     var couplingOf = new Map<Int, CouplingSpec>();
     for (coupling in couplings) {
-      var target = jointIndex.get(coupling.target);
-      var source = jointIndex.get(coupling.source);
+      var target = jointIndexById.get(coupling.target);
+      var source = jointIndexById.get(coupling.source);
       if (target == null || source == null)
         throw 'Kinematic coupling "${coupling.target}" <- "${coupling.source}" references an unknown joint';
       if (target == source) throw 'Kinematic joint "${coupling.target}" cannot drive itself';
@@ -185,7 +191,7 @@ class KinematicModelBuilder {
           throw 'Kinematic couplings form a cycle through joint "${joints[current].id}"';
         path.push(current);
         var link:CouplingSpec = couplingOf.get(current);
-        var next = jointIndex.get(link.source);
+        var next = jointIndexById.get(link.source);
         if (next == null) throw 'Kinematic coupling source "${link.source}" is not a joint';
         current = next;
       }
@@ -193,7 +199,7 @@ class KinematicModelBuilder {
       while (i >= 0) {
         var target = path[i];
         var coupling:CouplingSpec = couplingOf.get(target);
-        var source = jointIndex.get(coupling.source);
+        var source = jointIndexById.get(coupling.source);
         if (source == null) throw 'Kinematic coupling source "${coupling.source}" is not a joint';
         jointSource[target] = source;
         jointRatio[target] = coupling.ratio;
