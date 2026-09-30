@@ -67,13 +67,10 @@ class AssemblyNestingSmoke {
 			throw "Saved subassembly root pose did not reach its flattened member";
 		var legacy:Dynamic = Json.parse(Json.stringify(handBuilt));
 		Reflect.setField(legacy, "schemaVersion", 1);
-		var upgraded = AssemblyDefinitionCodec.decode(Json.stringify(legacy));
-		handBuilt.lengthUnit = "mm";
-		if (!Equality.equals(upgraded, handBuilt)) throw "Version 1 assembly did not upgrade";
+		reject(() -> AssemblyDefinitionCodec.decode(Json.stringify(legacy)), "old JSON assembly definition");
 		var oldState:Dynamic = Json.parse(Json.stringify(saved));
 		Reflect.setField(oldState, "schemaVersion", 1);
-		if (!Equality.equals(AssemblyDefinitionCodec.decodeState(restored, Json.stringify(oldState)), saved))
-			throw "Version 1 assembly state did not upgrade";
+		reject(() -> AssemblyDefinitionCodec.decodeState(restored, Json.stringify(oldState)), "old JSON assembly state");
 		nested.assemblies[0].exposedConnectors[0].connector = "missing";
 		reject(() -> AssemblyDefinitionCodec.validate(nested), "missing connector");
 		nested.assemblies[0].exposedConnectors[0].connector = "base";
