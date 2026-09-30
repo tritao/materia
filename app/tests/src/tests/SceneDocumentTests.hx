@@ -2,7 +2,7 @@ package tests;
 
 import app.EditorScene;
 import app.SceneCodec;
-import app.SceneDocumentSession;
+import app.ProjectDocumentSession;
 import app.SceneDocumentController;
 import app.SceneFileDialogs;
 import app.PerspectiveCamera;
@@ -30,7 +30,7 @@ class SceneDocumentTests {
     try action() catch (_:Dynamic) rejected = true;
     check(rejected, message);
   }
-  static function edit(session:SceneDocumentSession, value:Float):Void {
+  static function edit(session:ProjectDocumentSession, value:Float):Void {
     session.scene.select("box");
     new PropertyBinding(property(session.scene.properties(), "position-0"), session.scene.context()).apply(PropertyValue.Float(value));
   }
@@ -42,7 +42,7 @@ class SceneDocumentTests {
     var second = directory + "/copy.materia.json";
     var bad = directory + "/invalid.materia.json";
     var codeOwned = directory + "/code-owned.materia.json";
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     try {
       edit(session, 1.25);
       session.save(first);

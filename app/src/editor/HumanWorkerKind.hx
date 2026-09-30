@@ -74,7 +74,7 @@ class HumanWorkerKind implements ObjectKindProvider {
 
   static function copy(data:WorkerObjectData, ?job:String, ?asset:String, ?zones:Array<String>):WorkerObjectData
     return {asset:asset == null ? data.asset : asset, job:job == null ? data.job : job,
-      zones:zones == null ? data.zones.copy() : zones, migrationNote:data.migrationNote};
+      zones:zones == null ? data.zones.copy() : zones};
 
   static function parsed(scene:EditorScene, id:String):HumanJobSpec
     return HumanJobSpec.parse(current(scene, id).job);
@@ -297,8 +297,6 @@ class HumanWorkerKind implements ObjectKindProvider {
     var error:Null<String> = null;
     var spec:Null<HumanJobSpec> = null;
     try spec = parsed(scene, id) catch (failure:Dynamic) error = Std.string(failure);
-    var note = current(scene,id).migrationNote;
-    if (note != null) error = note + (error == null ? "" : "; " + error);
     for (zoneId in current(scene,id).zones) if (scene.object(zoneId) == null)
       error = (error == null ? "" : error + "; ") + 'Missing zone "$zoneId"';
     if (spec != null && error == null) {

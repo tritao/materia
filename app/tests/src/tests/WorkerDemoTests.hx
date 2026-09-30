@@ -13,7 +13,7 @@ class WorkerDemoTests {
   static function run():Void {
     linkBounds();
     motionCodec();
-    migration();
+    legacyHumansRefused();
     var editor = new ReferenceEditorApp();
     editor.enableWorkerDemo();
     if (editor.sensors.model.links[1].collisionShapes.length != 1)
@@ -183,45 +183,17 @@ class WorkerDemoTests {
     editor.dispose();
   }
 
-  static function migration():Void {
+  /** A scene that keeps its people in the retired sensors section is refused, not silently emptied. */
+  static function legacyHumansRefused():Void {
     var editor = new ReferenceEditorApp();
-    editor.session.open("fixtures/worker-legacy.materia");
-    var worker = [for (item in editor.scene.records()) if (item.id == "legacy-worker") item];
-    if (worker.length != 1) throw "Legacy human was not migrated";
-    var data = worker[0].worker;
-    if (data == null || data.migrationNote == null ||
-        data.migrationNote.indexOf("rack-to-table") < 0)
-      throw "Legacy human did not migrate with its job name";
-    var destination = "build/legacy-worker-migrated.materia";
-    editor.session.save(destination);
-    var saved = sys.io.File.getContent(destination);
-    if (saved.indexOf('"humans"') >= 0 || saved.indexOf('"human-worker"') < 0)
-      throw "Migrated document saved in the old format";
+    var refused:Null<String> = null;
+    try editor.session.open("fixtures/worker-legacy.materia") catch (error:Dynamic) refused = Std.string(error);
+    if (refused == null) throw "A scene with the retired humans section opened";
+    if (refused.indexOf("humans") < 0 || refused.indexOf("no longer supported") < 0)
+      throw 'The refusal does not say why: $refused';
+    if ([for (item in editor.scene.records()) if (item.type == "human-worker") item].length != 0)
+      throw "A refused scene left workers behind";
     editor.dispose();
-    var source:Dynamic = haxe.Json.parse(sys.io.File.getContent("fixtures/worker-legacy.materia"));
-    var legacy:Array<Dynamic> = Reflect.field(Reflect.field(source, "sensors"), "humans");
-    var halfRoll = 0.1, halfYaw = 0.2;
-    Reflect.setField(legacy[0], "rotation", [Math.sin(halfRoll) * Math.cos(halfYaw),
-      Math.sin(halfRoll) * Math.sin(halfYaw), Math.cos(halfRoll) * Math.sin(halfYaw),
-      Math.cos(halfRoll) * Math.cos(halfYaw)]);
-    var objects:Array<Dynamic> = Reflect.field(source,"objects");
-    var collision:Dynamic = haxe.Json.parse(haxe.Json.stringify(objects[0]));
-    Reflect.setField(collision,"id","legacy-worker");
-    objects.push(collision);
-    var clashPath = "build/legacy-worker-id-clash.materia";
-    sys.io.File.saveContent(clashPath,haxe.Json.stringify(source));
-    var clash = new ReferenceEditorApp();
-    clash.session.open(clashPath);
-    var migrated = [for (item in clash.scene.records()) if (item.type == "human-worker") item];
-    var migratedData = migrated.length == 1 ? migrated[0].worker : null;
-    if (migrated.length != 1 || migrated[0].id == "legacy-worker" ||
-        migratedData == null || migratedData.migrationNote == null)
-      throw "Legacy human ID clash did not migrate with a note";
-    var rotation = migrated[0].rotation;
-    if (rotation == null || Math.abs(rotation[0]) > 1e-9 || Math.abs(rotation[1]) > 1e-9 ||
-        Math.abs(2 * Math.atan2(rotation[2], rotation[3]) - 0.4) > 1e-6)
-      throw "Migrated worker retained legacy roll or lost yaw";
-    clash.dispose();
   }
 
   /**

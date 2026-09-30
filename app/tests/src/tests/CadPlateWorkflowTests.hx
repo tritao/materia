@@ -11,7 +11,7 @@ import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.sketch.SketchConstraint;
 import app.EditorScene;
 import app.PerspectiveCamera;
-import app.SceneDocumentSession;
+import app.ProjectDocumentSession;
 import app.SceneCodec;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.parametric.ParametricError;
@@ -194,7 +194,7 @@ class CadPlateWorkflowTests {
   static function sketchDraftPersistenceWorkflow():Void {
     var file = "/tmp/cadkit-sketch-draft-roundtrip.scene";
     if (FileSystem.exists(file)) FileSystem.deleteFile(file);
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     try {
       var scene = session.scene;
       check(scene.createCadPart(), "create a part for draft persistence");
@@ -501,7 +501,7 @@ class CadPlateWorkflowTests {
   }
 
   static function stepImportWorkflow():Void {
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     var root = Sys.getCwd() + "/../build-cad";
     if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
     var sourceFile = root + "/generic-import.step";
@@ -597,7 +597,7 @@ class CadPlateWorkflowTests {
   }
 
   static function run():Void {
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     var root = Sys.getCwd() + "/../build-cad";
     if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
     var sceneFile = root + "/plate-workflow.scene";
@@ -681,7 +681,7 @@ class CadPlateWorkflowTests {
   }
 
   static function faceHoleWorkflow():Void {
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     var root = Sys.getCwd() + "/../build-cad";
     if (!FileSystem.exists(root)) FileSystem.createDirectory(root);
     var sceneFile = root + "/face-hole-workflow.scene";
@@ -739,7 +739,7 @@ class CadPlateWorkflowTests {
   }
 
   static function bracketWorkflow():Void {
-    var session=new SceneDocumentSession();
+    var session=new ProjectDocumentSession();
     var root=Sys.getCwd()+"/../build-cad";
     if(!FileSystem.exists(root))FileSystem.createDirectory(root);
     var sceneFile=root+"/bracket-workflow.scene";
@@ -870,7 +870,7 @@ class CadPlateWorkflowTests {
 
   static function latestOnlyPublication():Void {
     var resourcesBefore=CadKit.resourceCountsGetChecked();
-    var session=new SceneDocumentSession();
+    var session=new ProjectDocumentSession();
     try {
       var scene=session.scene;
       check(scene.createBracket(),"create bracket for cancellation checks");

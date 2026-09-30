@@ -1,7 +1,7 @@
 package tests;
 
 import app.ApplicationSimulation;
-import app.SceneDocumentSession;
+import app.ProjectDocumentSession;
 import app.ScriptOwnership;
 import app.SceneCodec;
 import app.Main.ReferenceEditorApp;
@@ -46,7 +46,7 @@ class ScriptedSetupTests {
   }
 
   public static function run():Void {
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     var setup = session.openScript(TwoRobotSetupScript.REFERENCE);
     check(setup.sensors.configuredRobotIds().length == 2, "script creates two stable robots");
     var lidar:Sensor = setup.sensors.selected();
@@ -144,7 +144,7 @@ class ScriptedSetupTests {
       encodedObjects.length == 0 && Reflect.field(encoded, "sensors") == null,
       "script document saves a reference and overrides without an editable configuration copy"
     );
-    var reopened = new SceneDocumentSession();
+    var reopened = new ProjectDocumentSession();
     reopened.open(path);
     var reopenedLidar:Sensor = reopened.sensors.selected();
     check(
