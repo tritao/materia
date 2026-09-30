@@ -94,6 +94,13 @@ class ProjectDocumentSession {
     bim.cad.clearHistory();
   }
 
+  /** The label the project gave each generated object, so callers can tell which ones were renamed. */
+  public function generatedLabels():Map<String, String> {
+    var result = new Map<String, String>();
+    if (projectBaseline != null) for (record in projectBaseline) result.set(record.id, record.label);
+    return result;
+  }
+
   public function newDocument():Void {
     var nextDocument = createDocument();
     replace(new EditorScene(demoContent ? null : [], nextDocument), new SensorConfiguration(null, nextDocument),

@@ -661,7 +661,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       }
       documents.requestClose(close);
     };
-    treeModel = new EditorSceneTree(scene, session.projectAssembly);
+    treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
@@ -1698,7 +1698,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if(ownership!=null){simulation.setBackend(ownership.backend());simulation.setTimestep(ownership.timestep());}
       log("Document configuration replaced");
       sceneGeneration = session.generation;
-      treeModel = new EditorSceneTree(scene, session.projectAssembly);
+      treeModel = new EditorSceneTree(scene, session.projectAssemblyDefinition, session.generatedLabels());
       treeModel.setFilter(hierarchySearch);
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :

@@ -4,6 +4,7 @@ import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord;
@@ -162,12 +163,53 @@ class ProjectKitTests {
     return bytes;
   }
 
+  static function bodies():Void {
+    var frame = AssemblyFrames.identity();
+    function joint(id:String, type:AssemblyJointType, parent:String, child:String,
+        ?role:AssemblyJointRole):materia.assembly.AssemblyDefinition.KinematicJoint
+      return {id: id, type: type, role: role == null ? AssemblyJointRole.Tree : role, parent: parent,
+        parentConnector: "pin", child: child, childConnector: "pin", axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: null, upper: null, velocity: null, effort: null}, defaultValue: 0.0};
+    var chain:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "chain", lengthUnit: "mm",
+      definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
+      occurrences: [for (id in ["tip", "base", "plate", "arm", "spare"])
+        {id: id, definition: "body", initialPose: frame}],
+      // Listed out of order on purpose: a body's root need not be its first occurrence.
+      joints: [joint("tip-seat", AssemblyJointType.Fixed, "arm", "tip"),
+        joint("plate-seat", AssemblyJointType.Fixed, "base", "plate"),
+        joint("hinge", AssemblyJointType.Revolute, "plate", "arm"),
+        joint("loop", AssemblyJointType.Revolute, "tip", "base", AssemblyJointRole.Closure)]};
+    var found = AssemblyBodies.of(chain);
+    check(found.length == 3, "fixed joints merge occurrences into bodies");
+    var byId = new Map<String, materia.assembly.AssemblyBodies.AssemblyBody>();
+    for (body in found) byId.set(body.id, body);
+    function named(id:String):materia.assembly.AssemblyBodies.AssemblyBody {
+      var body = byId.get(id);
+      if (body == null) throw 'missing body "$id"';
+      return body;
+    }
+    check(named("base").occurrences.join(",") == "base,plate" && named("base").parent == null,
+      "a body lists its root first and has no parent when nothing carries it");
+    check(named("arm").occurrences.join(",") == "arm,tip" && named("arm").parent == "base" &&
+      named("arm").joint == "hinge" && named("arm").jointType == AssemblyJointType.Revolute,
+      "a moving joint separates bodies and names the parent");
+    check(named("spare").occurrences.join(",") == "spare" && named("spare").parent == null,
+      "an unjoined occurrence is a body of its own");
+    check(found[0].id == "arm", "bodies follow the order their first occurrence appears");
+    check(AssemblyBodies.displayName("upperArm") == "Upper arm", "camel case words");
+    check(AssemblyBodies.displayName("joint1") == "Joint 1", "trailing digits");
+    check(AssemblyBodies.displayName("joint12") == "Joint 12", "multi-digit numbers stay together");
+    check(AssemblyBodies.displayName("tool/suctionCup") == "Tool › Suction cup", "path segments");
+    check(AssemblyBodies.displayName("rack-frame_2") == "Rack frame 2", "separators");
+    check(AssemblyBodies.displayName("ARM") == "Arm", "capitals in a row stay one word");
+  }
+
   static function main():Void {
     near(LengthUnit.metresPerUnit("mm"), 0.001, "millimetres");
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene();
+    assembly(); frames(); scene(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

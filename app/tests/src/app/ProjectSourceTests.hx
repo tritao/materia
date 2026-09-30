@@ -166,6 +166,47 @@ class ProjectSourceTests {
       z + q[3] * tz + q[0] * ty - q[1] * tx];
   }
 
+  /** The arm's hierarchy shows its rigid bodies, not its 20-deep joint tree. */
+  static function checkArmHierarchy(session:ProjectDocumentSession):Void {
+    var tree = new EditorSceneTree(session.scene, session.projectAssemblyDefinition, session.generatedLabels());
+    check(tree.childCount("scene") == 1 && tree.childKeyAt("scene", 0) == "project:pedestal",
+      "the arm's hierarchy starts at its base body");
+    var chain = ["pedestal", "turret", "upperArm", "forearm", "wristBody", "hand", "toolFlange"];
+    var key = "project:pedestal", rows = 1, depth = 1;
+    function bodyBelow(parent:String, id:String):Bool {
+      for (index in 0...tree.childCount(parent)) if (tree.childKeyAt(parent, index) == "project:" + id) return true;
+      return false;
+    }
+    for (index in 1...chain.length) {
+      check(bodyBelow(key, chain[index]), 'body ${chain[index]} hangs below ${chain[index - 1]} by its moving joint');
+      key = "project:" + chain[index];
+    }
+    // Rows shown with the default expansion: every body, and each body's collapsed Parts node.
+    function count(parent:String, level:Int):Void {
+      for (index in 0...tree.childCount(parent)) {
+        var child = tree.childKeyAt(parent, index);
+        rows++;
+        depth = Std.int(Math.max(depth, level));
+        if (tree.initiallyExpanded(child)) count(child, level + 1);
+      }
+    }
+    count("project:pedestal", 2);
+    // Seven bodies chain seven levels deep; the last body's own Parts node is the eighth.
+    check(rows == 14 && depth == 8, 'the arm shows 7 bodies and 7 collapsed Parts nodes, got $rows rows, depth $depth');
+    check(tree.childCount("parts:pedestal") == 2 && tree.childCount("parts:toolFlange") == 6,
+      "a body's Parts node holds the parts fixed to its root");
+    check(tree.isGroup("parts:toolFlange") && !tree.isGroup("project:turret"), "Parts nodes are not selectable objects");
+    check(!tree.initiallyExpanded("parts:toolFlange"), "Parts nodes start collapsed");
+    session.scene.select("project:tool/cup");
+    tree.revision();
+    check(tree.initiallyExpanded("parts:toolFlange") && !tree.initiallyExpanded("parts:pedestal"),
+      "selecting a part opens the Parts node that holds it");
+    var before = tree.revision();
+    session.scene.select("project:turret");
+    check(tree.revision() != before && !tree.initiallyExpanded("parts:toolFlange"),
+      "selecting elsewhere closes it again and changes the model revision");
+  }
+
   /** The arm example opens with its shipped motion and the simulation follows it. */
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
@@ -181,6 +222,7 @@ class ProjectSourceTests {
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
       generated.recipeDocument, generated.robotMotions);
     check(session.robotMotions.length == 6, "opening the arm project installs its motion");
+    checkArmHierarchy(session);
     armSimulation.setBackend(ApplicationSimulation.MUJOCO);
     check(armSimulation.rebuild(session.sensors, session.scene, session),
       "robot arm builds in the shared simulation: " + armSimulation.error);
