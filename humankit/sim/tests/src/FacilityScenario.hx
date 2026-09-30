@@ -71,7 +71,7 @@ class FacilityScenario {
         var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
         var worker = new HumanWorker(session, human, proxy, new SimPose(0, 0, 0));
         var surface = layout.surface, station = layout.station;
-        var slotPoint = [0.9, -0.2, surface + 0.09], placePoint = [station[0], station[1], surface + 0.09];
+        var slotPoint = [0.9, -0.2, surface + 0.09], placePoint = [station[0], station[1], surface + 0.04];
         // A facility station is where a worker stands at the table, not the table itself: short of it along
         // the lane's last leg, where the worker steps back to once the part is down.
         var last = layout.via.length == 0 ? [0.9, -0.2] : layout.via[layout.via.length - 1];
@@ -103,8 +103,9 @@ class FacilityScenario {
         ];
         var partBox:HumanTargetBox = {center: slotPoint, halfExtents: [0.04, 0.04, 0.04], yaw: 0.0};
         var fetch = FacilityJobs.fetch(facility, "rack", "part");
+        // A facility that describes its surface and item lets the job find where to set the part down itself.
         var job = describe == "explicit" ? fetch.deliver("table", placePoint, surfaces[0], surfaces[1], partBox) :
-            fetch.deliver("table", placePoint);
+            describe == "model" ? fetch.deliver("table") : fetch.deliver("table", placePoint);
         var actions = job.orderedActions();
         worker.bindPick(cast actions[1], part, slotPoint);
         worker.bindPlace(cast actions[4], part, slotPoint);

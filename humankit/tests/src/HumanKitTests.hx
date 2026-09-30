@@ -672,6 +672,7 @@ class HumanKitTests {
 		facility.addRack(rack);
 		facility.addStation(table);
 		facility.addStation(bare);
+		facility.addLane(new Lane("rack-table", "rack", "table", new Path([rack.pose, new Pose2(3, 1), table.pose], "map"), 1, 1));
 		var targets = new FacilityTargets(facility);
 		var top = targets.surfaceBox("rack");
 		if (top == null || distance(top.center, [2.0, 1.1, 1.05]) > 1e-9 || Math.abs(top.yaw - (Math.PI / 2 + 0.25)) > 1e-9 ||
@@ -689,6 +690,13 @@ class HumanKitTests {
 		var threw = false;
 		try targets.surfaceBox("missing") catch (_:Dynamic) threw = true;
 		if (!threw) throw "An unknown station was accepted";
+		// With no place point given, the part is set down on the station's surface, at its middle and resting on it.
+		var place:Place = cast FacilityJobs.fetch(facility, "rack", "B3").deliver("table").orderedActions()[4];
+		if (distance(place.target, [4.65, 1.0, 1.03]) > 1e-9)
+			throw 'The part was not set down on the station surface: ${place.target}';
+		var undescribed = false;
+		try FacilityJobs.fetch(facility, "rack", "B3").deliver("bare") catch (_:Dynamic) undescribed = true;
+		if (!undescribed) throw "A delivery with no place point and no station surface was accepted";
 	}
 
 	static function facilityTargets(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
