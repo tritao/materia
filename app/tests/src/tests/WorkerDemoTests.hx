@@ -108,6 +108,7 @@ class WorkerDemoTests {
         !Math.isFinite(minSeparation) || linkTravel < 0.1 || maxSeparation-minSeparation < 0.1)
       throw 'Worker safety stream is incomplete: rack=$sawRack left=$leftRack table=$sawTable count=$separationCount linkTravel=$linkTravel range=${maxSeparation-minSeparation}';
     Sys.println('worker document placement: horizontal=$horizontal vertical=$vertical speed=$restingSpeed');
+    stalledRealtime();
     var roundTrip = "build/worker-demo-motion-roundtrip.materia";
     editor.session.save(roundTrip);
     var savedMotion:Array<Dynamic> = Reflect.field(haxe.Json.parse(sys.io.File.getContent(roundTrip)),
@@ -220,6 +221,40 @@ class WorkerDemoTests {
         Math.abs(2 * Math.atan2(rotation[2], rotation[3]) - 0.4) > 1e-6)
       throw "Migrated worker retained legacy roll or lost yaw";
     clash.dispose();
+  }
+
+  /**
+   * The realtime session is pumped from the editor's loop, so frames that stall
+   * for many ticks must still deliver the part: the worker is fed per tick on
+   * the simulation clock, not per frame.
+   */
+  static function stalledRealtime():Void {
+    var editor = new ReferenceEditorApp();
+    editor.enableWorkerDemo(0, true);
+    var worker = editor.simulation.humanWorker("worker-demo");
+    if (worker == null) throw "Realtime demo created no worker";
+    var deadline = Sys.time() + 90.0;
+    var frame = 0;
+    while (!worker.currentJobDone() && Sys.time() < deadline) {
+      editor.tick();
+      // Three quick frames, then one that stalls for about four ticks.
+      Sys.sleep(frame++ % 4 == 3 ? 0.045 : 0.004);
+    }
+    if (!worker.currentJobDone() || worker.currentJobFailure() != null)
+      throw 'Stalled realtime job did not finish: failure=${worker.currentJobFailure()}';
+    var settleUntil = Sys.time() + 4.0;
+    while (Sys.time() < settleUntil) { editor.tick(); Sys.sleep(0.004); }
+    var pose = [for (item in editor.simulation.environmentVisualState())
+      if (item.id == "worker-demo-part") item][0];
+    var table = [for (item in editor.scene.records()) if (item.id == "worker-demo-table") item][0];
+    var part = [for (item in editor.scene.records()) if (item.id == "worker-demo-part") item][0];
+    var horizontal = Math.sqrt(Math.pow(pose.position[0] - (table.x + 0.1), 2) +
+      Math.pow(pose.position[1] - (table.y - 0.05), 2));
+    var vertical = Math.abs(pose.position[2] - (table.z + table.depth / 2 + part.depth / 2));
+    if (horizontal > 0.02 || vertical > 0.01)
+      throw 'Stalled realtime run missed the table: horizontal=$horizontal vertical=$vertical';
+    Sys.println('stalled realtime placement: horizontal=$horizontal vertical=$vertical');
+    editor.dispose();
   }
 
   static function distance(a:Array<Float>, b:Array<Float>):Float

@@ -289,9 +289,34 @@ public:
     }
 
     nksim_result step(std::uint64_t owner_time_ns, nksim_clock *out_clock) {
+        return step_with(owner_time_ns, false, out_clock);
+    }
+
+    nksim_result step_paced(nksim_clock *out_clock) {
+        return step_with(monotonic_now_ns(), true, out_clock);
+    }
+
+    nksim_result due_ticks(std::uint64_t elapsed_ns, std::uint32_t max_ticks, std::uint32_t &out) {
+        std::lock_guard lock(mutex);
+        out = 0;
+        if (running_) return NKSIM_ERROR_INVALID_STATE;
+        const auto period = static_cast<std::uint64_t>(period_.count());
+        pace_ns_ += elapsed_ns;
+        const auto due = pace_ns_ / period;
+        if (due > max_ticks) {
+            out = max_ticks;
+            pace_ns_ = 0;
+        } else {
+            out = static_cast<std::uint32_t>(due);
+            pace_ns_ -= due * period;
+        }
+        return NKSIM_OK;
+    }
+
+    nksim_result step_with(std::uint64_t owner_time_ns, bool realtime, nksim_clock *out_clock) {
         std::lock_guard lock(mutex);
         if (running_) return NKSIM_ERROR_INVALID_STATE;
-        const auto result = tick(owner_time_ns, false);
+        const auto result = tick(owner_time_ns, realtime);
         if (result == NKSIM_OK && out_clock) {
             out_clock->step_index = step_index_;
             out_clock->time = simulation_time_;
@@ -306,6 +331,7 @@ public:
         const auto hosted = ensure_host();
         if (hosted != NKSIM_OK) return hosted;
         sealed_ = true;
+        pace_ns_ = 0;
         {
             std::lock_guard state(state_mutex_);
             running_ = true;
@@ -345,6 +371,7 @@ public:
         if ((result = nksim_world_reset(world_)) != NKSIM_OK) return result;
         step_index_ = 0;
         simulation_time_ = 0.0;
+        pace_ns_ = 0;
         for (auto &[id, object] : objects_)
             if ((result = place(object.part, object.part.initial, object.motion_type)) != NKSIM_OK)
                 return result;
@@ -1010,6 +1037,8 @@ private:
     double fixed_timestep_;
     double gravity_[3]{};
     std::chrono::nanoseconds period_;
+    // Owner wall time not yet spent on a tick; see nksim_session_due_ticks().
+    std::uint64_t pace_ns_ = 0;
     nksim_host host_ = 0;
     nksim_snapshot snapshot_ = 0;
     std::unordered_map<nksim_body, nksim_body_state> latest_;
@@ -1113,6 +1142,21 @@ nksim_result NKSIM_CALL nksim_session_step(nksim_session session, uint64_t owner
         return NKSIM_ERROR_INVALID_ARGUMENT;
     NKSIM_SESSION_OR_FAIL(value);
     return value->step(owner_time_ns, out_clock);
+}
+
+nksim_result NKSIM_CALL nksim_session_step_paced(nksim_session session, nksim_clock *out_clock) {
+    if (out_clock && !nksim::valid_struct_size(out_clock->struct_size, sizeof(*out_clock)))
+        return NKSIM_ERROR_INVALID_ARGUMENT;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->step_paced(out_clock);
+}
+
+nksim_result NKSIM_CALL nksim_session_due_ticks(nksim_session session, uint64_t elapsed_ns,
+                                                uint32_t max_ticks, uint32_t *out_ticks) {
+    if (!out_ticks) return NKSIM_ERROR_INVALID_ARGUMENT;
+    *out_ticks = 0;
+    NKSIM_SESSION_OR_FAIL(value);
+    return value->due_ticks(elapsed_ns, max_ticks, *out_ticks);
 }
 
 nksim_result NKSIM_CALL nksim_session_start(nksim_session session) {

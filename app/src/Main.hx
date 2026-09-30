@@ -893,7 +893,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       }
     }
     if (simulation.isActive() && simulation.isRunning()) {
-      simulation.advanceWorkers();
+      simulation.pump();
       if (hostContext != null) hostContext.requestFrame();
     }
     if (characterPreview != null) {

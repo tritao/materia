@@ -38,12 +38,40 @@ class SimSession {
         var result = NativeKitSim.nksim_session_step(owner.borrow(),
             ownerTimeNs == null ? haxe.Int64.ofInt(0) : ownerTimeNs, clock);
         SimWorld.check(result.status, "session.step");
+        notifyStepObservers();
+        return clock.get_time();
+    }
+
+    function notifyStepObservers():Void {
         for (entry in stepObservers.copy()) {
             var registered = false;
             for (current in stepObservers)
                 if (current.id == entry.id) registered = true;
             if (registered) entry.callback();
         }
+    }
+
+    /**
+     * Owner-paced realtime: adds `elapsedNs` of wall time and returns how many
+     * fixed ticks are due, at most `maxTicks` (the excess is dropped, so a slow
+     * owner slows simulation time). Run each with `stepPaced`, acting on the
+     * session between them.
+     */
+    public function dueTicks(elapsedNs:haxe.Int64, maxTicks:Int):Int {
+        ensureLive();
+        var result = NativeKitSim.nksim_session_due_ticks(owner.borrow(), elapsedNs, maxTicks);
+        SimWorld.check(result.status, "session.dueTicks");
+        return result.out_ticks;
+    }
+
+    /** Like `step`, but participants see a realtime tick on the native monotonic clock. */
+    public function stepPaced():Float {
+        ensureLive();
+        var clock = new nksim_clock();
+        clock.set_struct_size(nksim_clock.size());
+        var result = NativeKitSim.nksim_session_step_paced(owner.borrow(), clock);
+        SimWorld.check(result.status, "session.stepPaced");
+        notifyStepObservers();
         return clock.get_time();
     }
 

@@ -101,6 +101,26 @@ NKSIM_API nksim_result NKSIM_CALL nksim_session_get_status(
  */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_step(
     nksim_session session, uint64_t owner_time_ns, nksim_clock *out_clock NK_INOUT);
+/**
+ * Owner-paced realtime, for an owner that must act between ticks (for
+ * example to feed a participant) without a second thread. Adds elapsed_ns of
+ * the owner's wall time to the session's pacing accumulator and returns in
+ * out_ticks how many fixed ticks are now due, at most max_ticks. When more are
+ * due than max_ticks the excess is dropped, so a stalled owner slows
+ * simulation time instead of bursting to catch up. Returns
+ * NKSIM_ERROR_INVALID_STATE while running realtime.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_due_ticks(
+    nksim_session session, uint64_t elapsed_ns, uint32_t max_ticks, uint32_t *out_ticks NK_OUT);
+/**
+ * Advances exactly one fixed tick on the caller's thread like
+ * nksim_session_step(), but participants see a realtime tick stamped with the
+ * same monotonic clock as nksim_session_start()'s loop, which is the clock
+ * robot commands are received on. Pair it with nksim_session_due_ticks().
+ * Returns NKSIM_ERROR_INVALID_STATE while running realtime.
+ */
+NKSIM_API nksim_result NKSIM_CALL nksim_session_step_paced(
+    nksim_session session, nksim_clock *out_clock NK_INOUT);
 /** Starts a realtime owner loop that ticks at the fixed timestep. */
 NKSIM_API nksim_result NKSIM_CALL nksim_session_start(nksim_session session);
 /** Stops the realtime loop and returns the world to the caller's thread. */

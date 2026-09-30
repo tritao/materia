@@ -134,6 +134,16 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 */
 	extern fn nksim_session_drive_object(session: nksim_session, object: nksim_object, pose: ptr<const<nksim_pose>>) -> nksim_result;
 	/**
+	 * Owner-paced realtime, for an owner that must act between ticks (for
+	 * example to feed a participant) without a second thread. Adds elapsed_ns of
+	 * the owner's wall time to the session's pacing accumulator and returns in
+	 * out_ticks how many fixed ticks are now due, at most max_ticks. When more are
+	 * due than max_ticks the excess is dropped, so a stalled owner slows
+	 * simulation time instead of bursting to catch up. Returns
+	 * NKSIM_ERROR_INVALID_STATE while running realtime.
+	 */
+	extern fn nksim_session_due_ticks(session: nksim_session, elapsed_ns: u64, max_ticks: u32, out_ticks: ptr<u32> @out) -> nksim_result;
+	/**
 	 * The session object bound to a body, for a body a session participant
 	 * observes in a contact or elsewhere. Returns NKSIM_ERROR_INVALID_HANDLE if
 	 * the body is not a current session object's body (for instance, a robot
@@ -192,6 +202,14 @@ interface NativeKitSim @target("portable-abi64") @library("nativekit_sim_core") 
 	 * receive. Returns NKSIM_ERROR_INVALID_STATE while running realtime.
 	 */
 	extern fn nksim_session_step(session: nksim_session, owner_time_ns: u64, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
+	/**
+	 * Advances exactly one fixed tick on the caller's thread like
+	 * nksim_session_step(), but participants see a realtime tick stamped with the
+	 * same monotonic clock as nksim_session_start()'s loop, which is the clock
+	 * robot commands are received on. Pair it with nksim_session_due_ticks().
+	 * Returns NKSIM_ERROR_INVALID_STATE while running realtime.
+	 */
+	extern fn nksim_session_step_paced(session: nksim_session, out_clock: ptr<nksim_clock> @inout) -> nksim_result;
 	/**
 	 * Stops the realtime loop and returns the world to the caller's thread.
 	 */
