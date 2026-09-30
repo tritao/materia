@@ -263,6 +263,7 @@ class UiContext {
 			return cast root;
 		}
 		buildContext.beginFrame();
+		buildContext.applyPatches();
 		diagnosticStage = 4;
 		var viewStartedAt = Sys.time();
 		var viewAllocatedAt = AllocationProbe.now();
@@ -275,7 +276,8 @@ class UiContext {
 		diagnosticStage = 5;
 		var treeBuiltAllocatedAt = AllocationProbe.now();
 		var styleInvalidation = UiStyleInvalidationMetrics.compare(root, next,
-			previousNodesById, currentNodesById);
+			previousNodesById, currentNodesById, buildContext.patchedPriors());
+		buildContext.endPatchFrame();
 		var compareAllocatedAt = AllocationProbe.now();
 		next.walk(function(node) {
 			node.syncHitTestPolicy();

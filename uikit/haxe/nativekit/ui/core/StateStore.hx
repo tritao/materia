@@ -132,6 +132,13 @@ class StateStore {
 		valueRevisions.set(id.value, revision);
 	}
 
+	@:allow(nativekit.ui.core.State)
+	function setValueQuietly(id:WidgetId, value:Dynamic):Void {
+		if (id == null)
+			throw "State requires a widget ID";
+		values.set(id.value, value);
+	}
+
 	/** IDs of the states set after `since` (a value of `revision`), in no particular order. */
 	public function idsChangedSince(since:Int):Array<Int> {
 		var result:Array<Int> = [];

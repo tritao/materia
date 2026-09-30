@@ -372,11 +372,13 @@ private class DockPanelView implements View {
 		var hitStarted = context.buildProbe != null ? Sys.time() : 0.0;
 		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
 			context.retainStateIds(cached.stateIds);
-			context.claimRetainedTree(cached.root);
-			cached.root.detach();
+			var retained = context.currentRoot(cached.root);
+			cached.replaceRoot(retained);
+			context.claimRetainedTree(retained);
+			retained.detach();
 			if (context.buildProbe != null)
-				context.reportBuild("panel-hit:" + descriptor.id, 0.0, Sys.time() - hitStarted, cached.root);
-			return cached.root;
+				context.reportBuild("panel-hit:" + descriptor.id, 0.0, Sys.time() - hitStarted, retained);
+			return retained;
 		}
 		if (cached != null)
 			cached.root.detach();
@@ -424,10 +426,12 @@ private class DockPaneView implements View {
 		var cached = cacheKey == null ? null : cache.entry(key);
 		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
 			context.retainStateIds(cached.stateIds);
-			context.claimRetainedTree(cached.root);
-			cached.root.detach();
+			var retained = context.currentRoot(cached.root);
+			cached.replaceRoot(retained);
+			context.claimRetainedTree(retained);
+			retained.detach();
 			interaction.replay(cached.targets, cached.tabTargets);
-			return cached.root;
+			return retained;
 		}
 		if (cached != null)
 			cached.root.detach();
@@ -468,7 +472,7 @@ private class DockPanelCache {
 
 private class DockPanelCacheEntry {
 	public final key:String;
-	public final root:RenderNode;
+	public var root(default, null):RenderNode;
 	public final stateIds:Array<Int>;
 	/** Drop targets the build registered; a hit replays them because the interaction forgets them every frame. */
 	public final targets:Array<DockDropTarget>;
@@ -485,6 +489,10 @@ private class DockPanelCacheEntry {
 		this.tabTargets = tabTargets == null ? [] : tabTargets;
 	}
 
+	/** A self-updating widget at the root of the subtree was rebuilt in place; keep the replacement. */
+	public function replaceRoot(next:RenderNode):Void
+		root = next;
+
 	public function statesMatch(context:BuildContext):Bool {
 		// A widget inside the panel changed its own state (a select opening, a section toggling). The
 		// panel's cache key knows nothing about that, so the built tree is stale and must be rebuilt.
@@ -494,8 +502,8 @@ private class DockPanelCacheEntry {
 				return false;
 		var mask = StyleState.Hovered | StyleState.Pressed | StyleState.Focused;
 		var result = true;
-		root.walk(function(node) {
-			if ((node.states & mask) != (context.interactionStates.get(node.id) & mask))
+		context.currentRoot(root).walk(function(node) {
+			if (node.recordsInteraction && (node.states & mask) != (context.interactionStates.get(node.id) & mask))
 				result = false;
 		});
 		return result;

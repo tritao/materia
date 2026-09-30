@@ -304,6 +304,21 @@ class HeadlessEditorProfile {
     submit(editor, frame, frames, "setup:focus");
     for (cycle in 0...cycles) {
       measure("type-char", function() editor.ui.text(UiEventKind.TextInput, "a"));
+      // The typed frame patched the field in place. Rebuilding everything from scratch must give the same tree.
+      if (cycle == 1 || cycle == 7) {
+        // The event dispatcher writes hover and press flags onto live nodes, and a fresh build only sets them on widgets that read
+        // them, so those two annotations are not compared; everything else (structure, text, geometry, focus) is.
+        var pointerFlags = ~/ ?(states=)?(hovered|pressed)/g;
+        var patched = pointerFlags.replace(editor.ui.dumpTree(), "");
+        editor.ui.buildContext.setTheme(editor.ui.buildContext.theme);
+        submit(editor, frame, frames, "verify:rebuild");
+        var rebuilt = pointerFlags.replace(editor.ui.dumpTree(), "");
+        if (patched != rebuilt) {
+          File.saveContent(output + "/patched.tree", patched);
+          File.saveContent(output + "/rebuilt.tree", rebuilt);
+          throw "An in-place patch and a full rebuild produced different trees (see patched.tree and rebuilt.tree)";
+        }
+      }
       measure("type-backspace", function() editor.ui.key(UiEventKind.KeyDown, UiKey.Backspace));
       measure("idle-focused", function() {});
       action(actions, "typing", cycle);

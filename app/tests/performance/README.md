@@ -183,3 +183,15 @@ A `ScrollView` already applied its offset to the content in place after layout, 
 subtree around it (a scroll rebuilt the whole inspector, about 110 nodes). It now only requests a frame (`commands.refresh()`); the layout feedback that was already there moves the content.
 Scroll frames in the interaction scenario: 340 to 245 KiB (harness floor of about 52 included). The scenario asserts the content really moves.
 `MATERIA_TRACE_STATE=1` prints which states each action changed (`StateStore.idsChangedSince`); a keystroke changes exactly one, the name field's, yet still rebuilds the inspector panel.
+
+### In-place widget patches and cache validation that ignores structural nodes (2026-09-30)
+
+- **Cache validation.** `RetainedView` and the dock caches compared every node's recorded hover, press and focus bits with the current ones. Structural nodes (`tab-strip`, `scroll-content`, `editor-content`) sit in the
+  hovered chain but never record interaction state, so while the pointer rested inside a panel or a tab strip its cache could never validate and it rebuilt every frame. `RenderNode.recordsInteraction` (set when a widget assigns `states`)
+  now limits the comparison to nodes that actually read interaction state.
+- **Self-updating widgets.** `BuildContext.selfUpdating(id, build)` records the scope, inherited style and text style a widget was built in. When the widget's own state changes it updates that state with
+  `State.updateQuietly` (no revision bump, so no ancestor cache is invalidated) and calls `requestPatch(id)`. `applyPatches()` runs after `beginFrame()` and before the root builds: it re-runs the builder, swaps the new node into the retained
+  tree (`RenderNode.replaceWith`), claims no IDs (the retained walk claims them), and hands the frame comparison the replaced nodes as its priors. `TextField` is the first adopter.
+- **Verification.** The interaction scenario compares the tree after a patched keystroke with the tree after a forced full rebuild (hover and press flags excluded: the event dispatcher writes them onto live nodes).
+
+KiB per frame (harness floor of about 52 included), from the start of the interaction work to now: hover onto a tab 340 to 177, scroll the inspector 472 to 215, type a character 480 to 196.

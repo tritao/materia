@@ -34,7 +34,18 @@ class RenderNode {
 	public var cachePolicy:CachePolicy;
 	public var enabled:Bool;
 	/** Generic pseudo-state flags maintained by the routed interaction system. */
-	public var states:Int;
+	/** Interaction state (hover, press, focus) the widget saw when it built this node. */
+	public var states(default, set):Int;
+	/**
+	 * Whether a widget recorded interaction state on this node. Structural nodes that never read it have no reason to rebuild
+	 * when the pointer moves over them, so cache validation ignores them.
+	 */
+	public var recordsInteraction(default, null):Bool = false;
+
+	inline function set_states(value:Int):Int {
+		recordsInteraction = true;
+		return states = value;
+	}
 	public var styleType:Null<String>;
 	public var styleKey:Null<String>;
 	public var styleId:Null<String>;
@@ -85,6 +96,7 @@ class RenderNode {
 		cachePolicy = CachePolicy.None;
 		enabled = true;
 		states = 0;
+		recordsInteraction = false;
 		styleType = null;
 		styleKey = null;
 		styleId = null;
@@ -149,6 +161,27 @@ class RenderNode {
 		previous.layout.remove(layout);
 		parent = null;
 		return this;
+	}
+
+	/** Set when this node was rebuilt in place: the node that took its place. Retained caches that still hold this one follow it. */
+	public var replacedBy:Null<RenderNode> = null;
+
+	/** Puts `next` where this node is in its parent, in the render tree and the layout tree, and detaches this node. */
+	public function replaceWith(next:RenderNode):RenderNode {
+		if (next == null || next == this || next.parent != null)
+			throw "A replacement render node must be a fresh, unparented node";
+		var owner = parent;
+		if (owner == null)
+			throw "Only a node with a parent can be replaced in place";
+		var index = owner.children.indexOf(this);
+		if (index < 0)
+			throw "Render tree is inconsistent: node is missing from its parent";
+		owner.children[index] = next;
+		owner.layout.children[index] = next.layout;
+		next.parent = owner;
+		parent = null;
+		replacedBy = next;
+		return next;
 	}
 
 	/** Converts a point in this node's local space into viewport/global space. */
