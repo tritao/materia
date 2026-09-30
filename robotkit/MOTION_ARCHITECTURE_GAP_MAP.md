@@ -36,7 +36,7 @@ to rename, formalize, or replace.
 | `ExecutionPlan` (§6.4) | Missing | Nothing carries revisions, validation, required capabilities |
 | Positioning pipeline (§7A) | Partial | Trapezoidal, rest-to-rest; jerk not enforced; no Ruckig |
 | Path-preserving pipeline (§7B) | Partial | Gantry XYZ only; arm toolpaths use a separate stop-at-every-point timer |
-| Live servo (§7C) | Partial | `ServoSession` (twist → QP step → velocity targets) with runtime-enforced deadlines, in-process only; not on plan-interpolating devices |
+| Live servo (§7C) | Partial | `ServoSession` (twist → QP step → velocity targets with runtime-enforced deadlines, or streamed plan chunks on plan-executing devices), in-process only |
 | Lookahead / blending (§8) | Partial | Junction-velocity lookahead with exact-stop/blend |
 | Kinematics (§9) | Partial | One DLS IK, no solver interface, no multi-solution selection |
 | Collision checking (§9) | Missing on the planning side | Only MuJoCo contacts in simulation |

@@ -150,5 +150,35 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
       Braking along the path would need the servo in the runtime.
     - Remote robots (robotd) still reject deadlines until host and robot
       clocks are mapped.
-    - **D5c:** the virtual device rejects JOINT_TARGETS, so servoing there
-      needs short plan horizons.
+- 2026-09-30 — **D5c done: servoing through streamed plan chunks.** With
+  `ServoPlanOptions`, `ServoSession` drives robots that execute plans (the
+  virtual device, and the runtime's own plan path).
+  - Each update appends one-period chunks (`ServoPlan`) to keep about 40 ms
+    queued. Each chunk is quadratic and ramps every arm joint to the
+    servo's next velocity from the state at the end of the queue.
+    Consecutive chunks keep position and velocity continuous but not
+    acceleration, so they are submitted jerk-unchecked.
+  - Braking ends the stream with a chunk that ends at rest. A stalled host
+    lets the queue run dry within the lead. The runtime then ramps to a
+    stop and reports `RK_FAULT_TRAJECTORY_UNDERFLOW`; the device brakes
+    each actuator at its limit and latches a fault.
+  - Why append rather than replace: on the device a replacement is only
+    accepted at a segment boundary inside its committed window, and it
+    commits the whole sent queue at once. So a plan's braking tail could
+    never be replaced. Appending is the device's native streaming model,
+    and underflow is its native watchdog.
+  - `ManipulatorServo.step(..., ramped)` counts the ramp's travel,
+    (before + v)·dt/2, in the position and braking bounds, and keeps the
+    turning point of a ramp that reverses within the tick inside the range.
+    Without that, a chunk reversing at a stop overshot it mid-chunk.
+  - A device reports no motion until a new queue's start delay passes, so a
+    stream only counts as drained after it has been seen running. A
+    stream's first chunk starts from the measured positions, allowed 1e-3
+    off the held setpoint (a step or two).
+  - Test: the D5a scenario on both backends. Streaming holds 5 cm/s,
+    braking takes about v/a, the arm reaches the base-joint stop without
+    passing it, and a host stall stops the arm within lead + v/a. Measured
+    accelerations stay within the limit: exactly on the runtime, and within
+    the device's step quantisation (1e-4 rad) on the virtual device.
+  - Still open: a device underflow latches a fault, so after a host stall
+    on a device the operator must reset safety before servoing again.

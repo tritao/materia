@@ -26,6 +26,7 @@ import kinematicskit.LinearAlgebra;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.ManipulatorServo;
 import motionkit.robot.ServoSession;
+import motionkit.robot.ServoPlan.ServoPlanOptions;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
@@ -393,6 +394,154 @@ class KinematicsTests extends MotionKitTestSupport {
    * velocity and acceleration limits, stale and expired commands are rejected, a lost operator brakes the
    * arm to rest within its acceleration limits, and driving into a joint stop ends exactly on it.
    */
+  /** Servoing through short plans, on the plan-executing runtime and on the virtual device. */
+  public function testServoPlans():Void {
+    for (virtual in [false, true]) servoPlanTrial(virtual);
+  }
+
+  function servoPlanTrial(virtual:Bool):Void {
+    var label = virtual ? "virtual device" : "plan runtime";
+    var fixture = buildContractArmFixture();
+    for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }
+    fixture.model.joints[0].limits.upper = 1.2;
+    var blueprint = RobotRuntimeCompiler.compile(fixture.model);
+    var harness = new SimulationHarness(0.01);
+    var options:Null<VirtualDeviceOptions> = null;
+    if (virtual) {
+      options = new VirtualDeviceOptions();
+      // 1e-4 rad steps: up to 2 rad/s fits the default 40 kHz step clock.
+      options.stepsPerUnit = [for (_ in 0...6) 10000.0];
+    }
+    var runtime = harness.simulation.addRobot(blueprint, null, options);
+    var tick = 0;
+    for (_ in 0...20) harness.step(Int64.ofInt(++tick));
+    var robot = new SimulatedRobot('servo-plans-$virtual', runtime, fixture.model.name,
+      [for (link in fixture.model.links) link.name], [for (joint in fixture.model.joints) joint.name]);
+    var arm = fixture.arm;
+    function positions():Array<Float> return [for (i in 0...6) robot.snapshot().positions.get(i)];
+    var model = Int64.ofInt(blueprint.revision), calibration = Int64.ofInt(blueprint.calibrationRevision);
+
+    var quantumStart = virtual ? 1e-4 : 1e-9;
+    // Reach the start with one rest-to-rest quintic (the virtual device takes plans only).
+    var from = positions();
+    var start = [0.3, -0.8, 1.1, -0.5, 0.4, 0.2];
+    var span = 2.0;
+    var coefficients = [for (j in 0...6) {
+      var d = start[j] - from[j];
+      [from[j], 0.0, 0.0, 10.0 * d / Math.pow(span, 3), -15.0 * d / Math.pow(span, 4), 6.0 * d / Math.pow(span, 5)];
+    }];
+    var zero = [for (_ in 0...6) 0.0];
+    robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(Int64.ofInt(1), model, calibration, 1, from,
+      zero, zero, [new TrajectorySegment(Int64.ofInt(0), Int64.fromFloat(span * 1e9), coefficients)])));
+    for (_ in 0...260) harness.step(Int64.ofInt(++tick));
+    for (j in 0...6) near(positions()[j], start[j], '$label: the arm reaches its start (joint $j)', 2.0 * quantumStart);
+
+    var session = new ServoSession(robot, arm, 0.01, 1e-3, 1e-4, new ServoPlanOptions(model, calibration));
+    var ms = Int64.ofInt(1000000);
+    var accel = 4.0, dt = 0.01;
+    // Joint motion is judged from the measured positions: second differences bound the acceleration.
+    var quantum = virtual ? 2e-4 : 1e-9;
+    var trace:Array<Array<Float>> = [positions()];
+    var sequence = 0;
+    function advance():Void {
+      harness.step(Int64.ofInt(++tick));
+      trace.push(positions());
+    }
+    function tickOnce(refresh:Null<motionkit.kinematics.Twist6>) {
+      if (refresh != null) check(session.command(refresh, ++sequence, session.nowNs() + ms * 100) == null, '$label: a fresh command is accepted');
+      var result = session.update();
+      advance();
+      return result;
+    }
+    function worstAcceleration(from:Int):Float {
+      var worst = 0.0;
+      for (i in (from + 2)...trace.length) for (j in 0...6)
+        worst = Math.max(worst, Math.abs(trace[i][j] - 2.0 * trace[i - 1][j] + trace[i - 2][j]) / (dt * dt));
+      return worst;
+    }
+    function worstSpeed(from:Int):Float {
+      var worst = 0.0;
+      for (i in (from + 1)...trace.length) for (j in 0...6) worst = Math.max(worst, Math.abs(trace[i][j] - trace[i - 1][j]) / dt);
+      return worst;
+    }
+    function still(count:Int):Bool {
+      var last = trace.length - 1;
+      for (i in (last - count)...last) for (j in 0...6) if (Math.abs(trace[i + 1][j] - trace[i][j]) > 1e-9) return false;
+      return true;
+    }
+    var slack = accel + 2.0 * quantum / (dt * dt);
+
+    // Stream 5 cm/s along x for 1.5 s.
+    var pull = new motionkit.kinematics.Twist6(0.05, 0.0, 0.0, 0.0, 0.0, 0.0);
+    var first = trace.length - 1;
+    var samples:Array<{t:Float, x:Float, y:Float}> = [];
+    for (i in 0...150) {
+      tickOnce(pull);
+      if (i >= 100) {
+        var tool = arm.tcpPose(positions()).translation;
+        samples.push({t: i * dt, x: tool.x, y: tool.y});
+      }
+    }
+    var a = samples[0], b = samples[samples.length - 1];
+    near((b.x - a.x) / (b.t - a.t), 0.05, '$label: the tool moves at the streamed 5 cm/s', 0.0025);
+    near((b.y - a.y) / (b.t - a.t), 0.0, '$label: the tool does not drift sideways', 0.0025);
+    check(worstAcceleration(first) <= slack, '$label: streaming stays within the acceleration limits (${worstAcceleration(first)})');
+    check(worstSpeed(first) <= 2.0 + quantum / dt, '$label: streaming stays within the velocity limits');
+
+    // The operator stops (the host keeps updating): the arm brakes to rest.
+    var peak = worstSpeed(trace.length - 2);
+    session.stop();
+    first = trace.length - 1;
+    var rested = false, ticks = 0;
+    while (!rested && ticks < 200) {
+      rested = session.update().atRest;
+      advance();
+      ticks++;
+    }
+    check(rested, '$label: a stopped servo comes to rest');
+    // Braking starts at the end of the queue, one lead ahead.
+    check(ticks * dt <= peak / accel + 0.04 + 0.03, '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)');
+    check(worstAcceleration(first) <= slack, '$label: braking stays within the acceleration limits (${worstAcceleration(first)})');
+    for (_ in 0...10) advance();
+    check(still(9), '$label: the arm stays at rest');
+
+    // Turn about the base into the base joint's 1.2 rad stop.
+    first = trace.length - 1;
+    var overshoot = 0.0;
+    for (_ in 0...400) {
+      var tool = arm.tcpPose(positions()).translation;
+      tickOnce(new motionkit.kinematics.Twist6(-tool.y * 1.5, tool.x * 1.5, 0.0, 0.0, 0.0, 1.5));
+      overshoot = Math.max(overshoot, positions()[0] - 1.2);
+    }
+    check(overshoot <= quantum, '$label: the base joint never passes its stop ($overshoot)');
+    near(positions()[0], 1.2, '$label: the base joint ends on its stop', 2e-3);
+    check(worstAcceleration(first) <= slack, '$label: approaching the stop stays within the acceleration limits (${worstAcceleration(first)})');
+    // Last, as a device latches its stop: the host stalls mid-stream, the queue runs dry within the lead,
+    // and the robot brakes every joint by itself.
+    first = trace.length - 1;
+    var back = new motionkit.kinematics.Twist6(0.0, 0.0, -0.08, 0.0, 0.0, 0.0);
+    for (_ in 0...60) tickOnce(back);
+    var moving = worstSpeed(trace.length - 2);
+    check(moving > 0.05, '$label: the arm is moving when the host stalls ($moving rad/s)');
+    var stalledAt = trace.length - 1, stoppedAt = -1;
+    for (_ in 0...100) {
+      advance();
+      if (stoppedAt < 0 && still(1)) stoppedAt = trace.length - 2;
+    }
+    var stopSeconds = (stoppedAt - stalledAt) * dt;
+    check(stoppedAt >= 0 && stopSeconds <= 0.04 + moving / accel + 0.04,
+      '$label: a stalled host leaves the arm stopping within the lead plus v/a ($stopSeconds s)');
+    check(still(40), '$label: the stalled arm stays at rest');
+    // The runtime reports the underflow and stays ready; a device latches its stop as a fault.
+    if (virtual) check(robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_FAULT, '$label: the device latches the underflow stop');
+    else check(robot.snapshot().safety == RobotKitRuntimeConstants.RK_SAFETY_READY &&
+      robot.snapshot().faultCode == RobotKitRuntimeConstants.RK_FAULT_TRAJECTORY_UNDERFLOW, '$label: the runtime reports the underflow');
+    check(worstAcceleration(first) <= slack, '$label: the stalled stop stays within the acceleration limits (${worstAcceleration(first)})');
+
+    session.dispose();
+    harness.dispose();
+  }
+
   public function testServoSession():Void {
     var fixture = buildContractArmFixture();
     for (joint in fixture.model.joints) { joint.limits.velocity = 2.0; joint.limits.maxAcceleration = 4.0; }

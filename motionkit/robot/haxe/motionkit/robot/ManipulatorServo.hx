@@ -53,6 +53,12 @@ class ServoStep {
  * acceleration limits. Should the bounds conflict (a joint already moving too
  * fast near a stop), the position and braking bounds win.
  *
+ * `ramped` says the velocity will ramp linearly from `previousVelocity` to
+ * the answer over the tick (a streamed plan chunk) rather than switch at
+ * once, so a joint travels (before + v)·dt/2. The position and braking
+ * bounds then count that travel, (before + v)·dt/2 + v²/(2a) ≤ distance,
+ * and a ramp that turns back within the tick keeps its turning point in range.
+ *
  * Keep one per arm and reuse it: the QP warm-starts from the previous tick.
  */
 class ManipulatorServo {
@@ -72,7 +78,8 @@ class ManipulatorServo {
 
   public function step(q:Array<Float>, twist:Twist6, dt:Float, ?velocityLimits:Array<Float>,
       ?maxIterations:Int = 1000, ?limitGain:Float = 1.0, ?previousVelocity:Array<Float>,
-      ?accelerationLimits:Array<Float>):ServoStep {
+      ?accelerationLimits:Array<Float>, ?ramped:Bool = false):ServoStep {
+    if (ramped && previousVelocity == null) throw "A ramped servo step needs the previous velocities";
     var n = manipulator.dofCount();
     if (q == null || q.length != n) throw 'Servo requires $n joint values';
     if (twist == null) throw "Servo requires a tool twist";
@@ -103,7 +110,10 @@ class ManipulatorServo {
         var before = previousVelocity[joint];
         // Braking: one tick of travel plus a full brake must fit in the distance to the stop.
         var safeLow = vLow, safeHigh = vHigh;
-        if (limited) {
+        if (limited && ramped) {
+          safeHigh = Math.min(vHigh, rampedBrakingSpeed(accel, dt, before, limitGain * (limits.upper - q[joint])));
+          safeLow = Math.max(vLow, -rampedBrakingSpeed(accel, dt, -before, limitGain * (q[joint] - limits.lower)));
+        } else if (limited) {
           safeHigh = Math.min(vHigh, brakingSpeed(accel, dt, limitGain * (limits.upper - q[joint])));
           safeLow = Math.max(vLow, -brakingSpeed(accel, dt, limitGain * (q[joint] - limits.lower)));
         }
@@ -119,6 +129,12 @@ class ManipulatorServo {
       // A joint already outside its range may stay or move back, not further out.
       if (low > 0.0) low = 0.0;
       if (high < 0.0) high = 0.0;
+      // Ramped, the tick's travel is (before + v)·dt/2: bound v·dt so that travel stays in range.
+      if (ramped && limited) {
+        var drift = previousVelocity[joint] * dt;
+        low = 2.0 * low - drift;
+        high = 2.0 * high - drift;
+      }
       var stepLow = Math.max(low, vLow * dt), stepHigh = Math.min(high, vHigh * dt);
       // Should velocity and position bounds exclude each other, the position side wins.
       if (stepLow > stepHigh) {
@@ -148,6 +164,19 @@ class ManipulatorServo {
   }
 
   public function dispose():Void qp.dispose();
+
+  /**
+   * The fastest speed v such that ramping from `before` to v over dt, then
+   * braking at a, stays within `distance`: (before + v)·dt/2 + v²/(2a) ≤ distance.
+   */
+  static function rampedBrakingSpeed(accel:Float, dt:Float, before:Float, distance:Float):Float {
+    var left = distance - 0.5 * before * dt;
+    if (left > 0.0) return accel * (Math.sqrt(0.25 * dt * dt + 2.0 * left / accel) - 0.5 * dt);
+    // The joint must turn back within this tick: keep the ramp's turning point,
+    // before²·dt / (2·(before − v)), inside the distance.
+    if (distance > 0.0 && before > 0.0) return before - before * before * dt / (2.0 * distance);
+    return 2.0 * left / dt;
+  }
 
   /** The fastest speed from which v·dt + v²/(2a) ≤ distance: a·(√(dt² + 2·distance/a) − dt). */
   static function brakingSpeed(accel:Float, dt:Float, distance:Float):Float {

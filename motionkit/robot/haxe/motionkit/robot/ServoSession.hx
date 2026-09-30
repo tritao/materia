@@ -4,6 +4,7 @@ import haxe.Int64;
 import motionkit.kinematics.Twist6;
 import robotkit.manipulation.Manipulator;
 import robotkit.policy.VelocityReference.CommandRejection;
+import robotkit.runtime.RobotRuntimeError;
 import robotkit.world.JointTarget;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
@@ -48,8 +49,14 @@ class ServoTick {
  * joint may reach its limit; while `update` runs, the session's brake keeps
  * the servo's limits. Joint targets are sticky in the runtime, so braking
  * ends with exact zeros, sent without a deadline.
- * Needs a cyclic endpoint that accepts joint velocity targets (simulation);
- * devices that interpolate plans need a short-horizon variant.
+ *
+ * With `ServoPlanOptions` the session drives robots that execute plans
+ * instead (the virtual device): `update` keeps a short stream of one-period
+ * `ServoPlan` chunks queued ahead of execution, each stepping the servo from
+ * the state at the end of the queue (so the servo acts `leadSeconds` ahead).
+ * Braking ends the stream with a chunk at rest. A stalled host lets the
+ * queue run dry within the lead, and the runtime or device then brakes
+ * every joint at its acceleration limit (reporting an underflow).
  */
 class ServoSession {
   public final robot:Robot;
@@ -64,6 +71,7 @@ class ServoSession {
   var lastSequence = 0;
   var lastNs:Null<Int64> = null;
   var commanded:Array<Float>;
+  final plan:Null<ServoPlan>;
 
   /**
    * `controlPeriod` is the interval `update` is meant to run at (the robot's
@@ -74,7 +82,7 @@ class ServoSession {
    * as at rest.
    */
   public function new(robot:Robot, manipulator:Manipulator, ?controlPeriod:Float = 0.01, ?damping:Float = 1e-3,
-      ?restVelocity:Float = 1e-4) {
+      ?restVelocity:Float = 1e-4, ?plans:ServoPlanOptions) {
     if (robot == null || manipulator == null) throw "Servo session requires a robot and a manipulator";
     if (!(controlPeriod > 0.0) || !Math.isFinite(controlPeriod)) throw "Servo control period must be positive";
     this.controlPeriod = controlPeriod;
@@ -84,6 +92,9 @@ class ServoSession {
     servo = new ManipulatorServo(manipulator, damping);
     indices = manipulator.jointIndices();
     commanded = [for (_ in indices) 0.0];
+    if (plans != null && !robot.capabilities().supportsExecutionPlans)
+      throw "Servo plans need a robot that executes plans";
+    plan = plans == null ? null : new ServoPlan(plans, manipulator, robot.snapshot().positions.length);
   }
 
   /** The robot's clock now: the latest snapshot's source timestamp. */
@@ -120,6 +131,7 @@ class ServoSession {
     var snapshot = robot.snapshot();
     var now = snapshot.sourceTimestampNs;
     if (live && now >= deadlineNs) stop();
+    if (plan != null) return updatePlan(snapshot);
     var elapsed = lastNs == null ? 0.0 : Int64.toInt(now - lastNs) * 1e-9;
     // Missed updates do not license a bigger velocity change: the runtime applies targets at once.
     var dt = Math.min(elapsed, controlPeriod);
@@ -141,6 +153,48 @@ class ServoSession {
       : isAtRest(commanded) ? null : now + Int64.fromFloat(2.0 * controlPeriod * 1e9);
     robot.submit(RobotCommand.JointTargets(targets, expiry));
     return new ServoTick(commanded.copy(), !live, !live && isAtRest(commanded), step);
+  }
+
+  function updatePlan(snapshot:robotkit.world.RobotSnapshot):ServoTick {
+    var plan:ServoPlan = this.plan;
+    var active = snapshot.trajectoryActive;
+    // The stream drained: it ended at rest, or ran dry and the robot braked it. A device starts a new
+    // queue after a delay and reports no motion until then, so only a stream seen running can drain.
+    if (plan.streaming && active) plan.markRunning();
+    if (plan.streaming && plan.running && !active) plan.clear();
+    if (!plan.streaming) {
+      if (!live || active) {
+        commanded = [for (_ in indices) 0.0];
+        return new ServoTick(commanded.copy(), !live, !live && !active, null);
+      }
+      plan.begin([for (j in 0...snapshot.positions.length) snapshot.positions.get(j)]);
+    }
+    if (plan.endedAtRest) return new ServoTick(commanded.copy(), !live, false, null);
+    var periodNs = Int64.fromFloat(Math.round(controlPeriod * 1e9));
+    var leadNs = Int64.fromFloat(plan.options.leadSeconds * 1e9);
+    var executed = active ? snapshot.trajectoryTimeNs : Int64.ofInt(0);
+    var step:Null<ServoStep> = null;
+    // One chunk per period; a few more catch up after a late update.
+    var chunks = 0;
+    while (chunks < 4 && !plan.endedAtRest && (!plan.streaming || plan.endNs - executed < leadNs)) {
+      var requested = new Twist6(twist[0], twist[1], twist[2], twist[3], twist[4], twist[5]);
+      var armV = plan.armVelocity();
+      step = servo.step(plan.armPosition(), requested, controlPeriod, null, 1000, 1.0, armV,
+        plan.accelerationLimits, true);
+      var velocity = step.velocity.copy();
+      if (!live) for (i in 0...velocity.length) if (Math.abs(velocity[i]) <= restVelocity) velocity[i] = 0.0;
+      var submission = plan.chunk(velocity, periodNs, !live && isAtRest(velocity));
+      try robot.submit(RobotCommand.ExecutionPlan(submission)) catch (error:RobotRuntimeError) {
+        // The queue moved on underneath (it ran dry): start a new stream next update.
+        if (error.status != RobotKitRuntimeConstants.RK_ERROR_INVALID_STATE) throw error;
+        plan.clear();
+        break;
+      }
+      plan.accept(submission);
+      commanded = velocity;
+      chunks++;
+    }
+    return new ServoTick(commanded.copy(), !live, false, step);
   }
 
   public function dispose():Void servo.dispose();
