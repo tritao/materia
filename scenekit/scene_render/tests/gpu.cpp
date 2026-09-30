@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -757,6 +758,126 @@ int main() {
         move_spot.close();
         assert(capture(authored_view) == point_pixels);
         assert(capture(studio_view) == studio_before);
+    }
+
+    {
+        // Transparency: zero opacity draws nothing, partial opacity blends with what lies
+        // behind, opaque surfaces still hide translucent ones, and translucent surfaces
+        // blend far to near whatever order they were created in.
+        struct Quad {
+            std::array<float, 3> emissive;
+            float alpha;
+            float z;
+            bool opaque_surface;
+        };
+        const auto render_pixels = [&](const std::vector<Quad> &quads, bool reverse_creation,
+                                       std::array<float, 4> clear) -> std::vector<std::uint8_t> {
+            auto scene = std::make_shared<Scene>();
+            const auto geometry = scene->reserve_geometry_id();
+            auto &geometry_resource = scene->geometry_store().create(geometry);
+            geometry_resource.edit_payload().vertices = {
+                {{{-0.5f, -0.5f, 0.0f}}}, {{{0.5f, -0.5f, 0.0f}}},
+                {{{0.5f, 0.5f, 0.0f}}}, {{{-0.5f, 0.5f, 0.0f}}}};
+            std::array<float, 12> normals{};
+            for (std::size_t vertex = 0; vertex < 4; ++vertex)
+                normals[vertex * 3 + 2] = 1.0f;
+            nkscene::GeometryVertexStream normal_stream;
+            normal_stream.semantic = nkscene::VertexSemantic::Normal;
+            normal_stream.format = nkscene::VertexFormat::Float32x3;
+            normal_stream.stride = sizeof(float) * 3;
+            normal_stream.count = 4;
+            normal_stream.data.resize(sizeof(normals));
+            std::memcpy(normal_stream.data.data(), normals.data(), sizeof(normals));
+            geometry_resource.edit_payload().streams = {normal_stream};
+            geometry_resource.edit_payload().indices = {0, 1, 2, 0, 2, 3};
+            // Outline the quad, so a test can tell whether its edges were drawn.
+            const std::array<std::array<float, 3>, 4> corners{
+                {{-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.5f, 0.5f, 0.0f}, {-0.5f, 0.5f, 0.0f}}};
+            for (std::size_t corner = 0; corner < 4; ++corner)
+                geometry_resource.edit_payload().stroke_segments.push_back(
+                    {corners[corner], corners[(corner + 1) % 4], 1});
+
+            std::vector<std::size_t> order;
+            for (std::size_t index = 0; index < quads.size(); ++index)
+                order.push_back(reverse_creation ? quads.size() - 1 - index : index);
+            for (const auto index : order) {
+                const auto &quad = quads[index];
+                const auto material = scene->reserve_material_id();
+                auto &resource = scene->material_store().create(material);
+                // Emissive only, so lighting cannot change the expected color.
+                resource.edit_state().base_color = {0.0f, 0.0f, 0.0f, quad.alpha};
+                resource.edit_state().emissive = quad.emissive;
+                if (!quad.opaque_surface)
+                    resource.edit_state().flags &=
+                        ~static_cast<std::uint32_t>(nkscene::MaterialFlags::Opaque);
+                Transaction create(scene);
+                const auto node = scene->reserve_node_id();
+                create.add_create(node);
+                ChangeSet changes;
+                assert(scene->commit(create, changes) == NKS_OK);
+                create.close();
+                Transaction configure(scene);
+                configure.add_geometry(node, geometry);
+                configure.add_material(node, material);
+                nkscene::LocalTransform placement;
+                placement.matrix[14] = quad.z;
+                configure.add_transform(node, placement);
+                assert(scene->commit(configure, changes) == NKS_OK);
+                configure.close();
+            }
+            nkscene::SceneView view;
+            auto plan = nkscene::compile(scene->snapshot(), view);
+            nkscene::NativeKitGpuExecutor executor(renderer);
+            std::vector<std::uint8_t> pixels;
+            assert(executor.capture_rgba8(plan, scene->snapshot(), options.width, options.height,
+                       clear, pixels) == NKGPU_OK);
+            return pixels;
+        };
+        const auto render = [&](const std::vector<Quad> &quads,
+                                bool reverse_creation) -> std::array<std::uint8_t, 4> {
+            const auto pixels = render_pixels(quads, reverse_creation, {0.0f, 0.0f, 0.0f, 1.0f});
+            const auto at = (static_cast<std::size_t>(options.height / 2) * options.width +
+                             options.width / 2) * 4;
+            return {pixels[at], pixels[at + 1], pixels[at + 2], pixels[at + 3]};
+        };
+        const std::array<float, 3> red{1.0f, 0.0f, 0.0f}, green{0.0f, 1.0f, 0.0f},
+            blue{0.0f, 0.0f, 1.0f};
+
+        // Lighting leaves a floor of about 70 in the other channels, so compare against that.
+        // Depth convention: the smaller clip z is nearer, so an opaque surface at -0.3 wins.
+        const auto near_green = render({{green, 1.0f, -0.3f, true}, {red, 1.0f, 0.3f, true}}, false);
+        assert(near_green[1] > 200 && near_green[0] < 100);
+
+        const auto opaque_only = render({{green, 1.0f, 0.3f, true}}, false);
+        assert(opaque_only[1] > 200 && opaque_only[0] < 100);
+        // A surface with no opacity is invisible, and does not hide what is behind it.
+        const auto ghost = render({{green, 1.0f, 0.3f, true}, {red, 0.0f, -0.3f, false}}, false);
+        assert(ghost == opaque_only);
+        // Half opacity in front blends with what lies behind.
+        const auto half = render({{green, 1.0f, 0.3f, true}, {red, 0.5f, -0.3f, false}}, false);
+        assert(half[0] > 110 && half[0] < 220 && half[1] > 110 && half[1] < opaque_only[1]);
+        // Translucent color over the empty background fades toward the clear color.
+        const auto over_black = render({{red, 0.5f, 0.0f, false}}, false);
+        assert(over_black[0] > 90 && over_black[0] < 200 && over_black[1] < 60);
+        // An opaque surface in front hides a translucent one behind it.
+        const auto hidden = render({{green, 1.0f, -0.3f, true}, {red, 0.5f, 0.3f, false}}, false);
+        assert(hidden[1] > 200 && hidden[0] < 100);
+
+        // Two translucent surfaces blend far to near, whatever order they were created in.
+        const std::vector<Quad> red_in_front{{red, 0.5f, -0.3f, false}, {blue, 0.5f, 0.3f, false}};
+        const std::vector<Quad> blue_in_front{{red, 0.5f, 0.3f, false}, {blue, 0.5f, -0.3f, false}};
+        const auto red_front = render(red_in_front, false);
+        const auto blue_front = render(blue_in_front, false);
+        assert(red_front[0] > red_front[2] && blue_front[2] > blue_front[0]);
+        assert(render(red_in_front, true) == red_front);
+        assert(render(blue_in_front, true) == blue_front);
+
+        // A surface with no alpha shows nothing, its edge strokes included: on a light
+        // background the image matches an empty scene, while a visible quad differs.
+        const std::array<float, 4> light{0.9f, 0.9f, 0.9f, 1.0f};
+        const auto empty_scene = render_pixels({}, false, light);
+        assert(render_pixels({{red, 0.0f, 0.0f, false}}, false, light) == empty_scene);
+        assert(render_pixels({{red, 1.0f, 0.0f, true}}, false, light) != empty_scene);
     }
 
 cleanup:

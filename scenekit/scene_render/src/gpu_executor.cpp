@@ -368,6 +368,8 @@ struct NativeKitGpuExecutor::State {
     nkgpu_shader shader{};
     nkgpu_pipeline pipeline{};
     nkgpu_pipeline indexed_pipeline{};
+    nkgpu_pipeline blend_pipeline{};
+    nkgpu_pipeline indexed_blend_pipeline{};
     nkgpu_shader stroke_shader{};
     nkgpu_pipeline stroke_pipeline{};
     nkgpu_shader pick_shader{};
@@ -462,6 +464,10 @@ struct NativeKitGpuExecutor::State {
             (void)nkgpu_pipeline_destroy(renderer, pipeline);
         if (renderer.id && indexed_pipeline.id)
             (void)nkgpu_pipeline_destroy(renderer, indexed_pipeline);
+        if (renderer.id && blend_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, blend_pipeline);
+        if (renderer.id && indexed_blend_pipeline.id)
+            (void)nkgpu_pipeline_destroy(renderer, indexed_blend_pipeline);
         if (renderer.id && stroke_pipeline.id)
             (void)nkgpu_pipeline_destroy(renderer, stroke_pipeline);
         if (renderer.id && stroke_shader.id)
@@ -496,6 +502,8 @@ struct NativeKitGpuExecutor::State {
         plan_initialized = false;
         pipeline = {};
         indexed_pipeline = {};
+        blend_pipeline = {};
+        indexed_blend_pipeline = {};
         stroke_pipeline = {};
         stroke_shader = {};
         shader = {};
@@ -595,9 +603,16 @@ bool set_failure(StateT &state, GpuExecutionStats &stats, nkgpu_result result) {
     return false;
 }
 
+/*
+ * Surface pipelines come in an opaque and a blended variant. The blended one
+ * fades a fragment over what is already drawn and leaves depth unwritten, so
+ * translucent surfaces never hide what lies behind them. The shader outputs
+ * unpremultiplied color, hence SRC_ALPHA rather than ONE for the color factor.
+ */
 template <class StateT>
-bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
-    auto &pipeline = indexed ? state.indexed_pipeline : state.pipeline;
+bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed, bool blended = false) {
+    auto &pipeline = blended ? (indexed ? state.indexed_blend_pipeline : state.blend_pipeline)
+                             : (indexed ? state.indexed_pipeline : state.pipeline);
     if (pipeline.id)
         return true;
 
@@ -683,8 +698,26 @@ bool ensure_pipeline(StateT &state, GpuExecutionStats &stats, bool indexed) {
             NKGPU_OK ||
         (indexed && (result = nkgpu_pipeline_index_type(pipeline_builder,
                                                         NKGPU_INDEXTYPE_UINT32)) != NKGPU_OK) ||
-        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK ||
-        (result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
+        (result = nkgpu_pipeline_depth_stencil(pipeline_builder, 1)) != NKGPU_OK)
+        return set_failure(state, stats, result);
+    if (blended) {
+        nkgpu_depth_state depth{};
+        depth.enabled = 1;
+        depth.compare = NKGPU_COMPAREFUNC_LESS_EQUAL;
+        depth.write_enabled = 0;
+        nkgpu_blend_state blend{};
+        blend.enabled = 1;
+        blend.src_rgb = NKGPU_BLENDFACTOR_SRC_ALPHA;
+        blend.dst_rgb = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        blend.op_rgb = NKGPU_BLENDOP_ADD;
+        blend.src_alpha = NKGPU_BLENDFACTOR_ONE;
+        blend.dst_alpha = NKGPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+        blend.op_alpha = NKGPU_BLENDOP_ADD;
+        if ((result = nkgpu_pipeline_depth(pipeline_builder, &depth)) != NKGPU_OK ||
+            (result = nkgpu_pipeline_blend(pipeline_builder, &blend)) != NKGPU_OK)
+            return set_failure(state, stats, result);
+    }
+    if ((result = nkgpu_pipeline_end(pipeline_builder, &pipeline)) != NKGPU_OK)
         return set_failure(state, stats, result);
     return true;
 }
@@ -783,8 +816,27 @@ bool ensure_stroke_pipeline(StateT &state, GpuExecutionStats &stats) {
     return true;
 }
 
+/*
+ * A material draws in the blended pass when it asks for blending, or when it
+ * is marked non-opaque and its base alpha is below one. Alpha alone never
+ * moves an opaque-marked material out of the opaque pass, and mask materials
+ * stay opaque and cut out in the shader.
+ */
+bool material_is_blended(const MaterialState &state) {
+    if (state.alpha_mode == AlphaMode::Blend)
+        return true;
+    return !(state.flags & static_cast<std::uint32_t>(MaterialFlags::Opaque)) &&
+           state.base_color[3] * state.opacity < 1.0f;
+}
+
+/* A blended surface with no base alpha contributes nothing at any fragment. */
+bool material_is_invisible(const MaterialState &state) {
+    return material_is_blended(state) && state.base_color[3] * state.opacity <= 0.0f;
+}
+
 template <class StateT>
-bool draw_stroke_batches(StateT &state, const RenderPlan &plan, GpuExecutionStats &stats) {
+bool draw_stroke_batches(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
+                         GpuExecutionStats &stats) {
     const auto has_strokes = std::any_of(state.batches.begin(), state.batches.end(),
         [&](const auto &batch) {
             const auto found = state.geometry_resources.find(batch.key.geometry);
@@ -805,6 +857,10 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, GpuExecutionStat
         const auto geometry = state.geometry_resources.find(batch.key.geometry);
         if (geometry == state.geometry_resources.end() || !geometry->second.stroke_buffer.id ||
             !geometry->second.stroke_vertex_count)
+            continue;
+        // An object with no alpha shows nothing, edges included.
+        const auto *material = snapshot.find_material(batch.key.material);
+        if (material && material_is_invisible(*material->state))
             continue;
         auto result = nkgpu_apply_pipeline(state.renderer, state.stroke_pipeline);
         if (result == NKGPU_OK)
@@ -833,6 +889,157 @@ bool draw_stroke_batches(StateT &state, const RenderPlan &plan, GpuExecutionStat
         ++stats.draw_calls;
     }
     return true;
+}
+
+/* Makes the surface pipelines the scene's batches need, before a frame begins. */
+template <class StateT>
+bool ensure_surface_pipelines(StateT &state, const SceneSnapshot &snapshot,
+                              GpuExecutionStats &stats) {
+    for (const auto &batch : state.batches) {
+        const auto geometry = state.geometry_resources.find(batch.key.geometry);
+        if (geometry == state.geometry_resources.end())
+            continue;
+        if (geometry->second.buffer.id) {
+            const auto element_count = geometry->second.indexed ? geometry->second.index_count
+                                                                 : geometry->second.vertex_count;
+            const auto *material = snapshot.find_material(batch.key.material);
+            const auto blended = material && material_is_blended(*material->state);
+            if (element_count && !ensure_pipeline(state, stats, geometry->second.indexed, blended))
+                return false;
+        }
+        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(state, stats))
+            return false;
+    }
+    return true;
+}
+
+/*
+ * Draws every surface: opaque batches first, then blended instances from far
+ * to near. Instances of a blended batch are drawn one at a time, because two
+ * translucent instances can only blend correctly in depth order and a batch's
+ * instances are not contiguous in depth. Returns the failing result, if any.
+ */
+template <class StateT>
+nkgpu_result draw_surfaces(StateT &state, const RenderPlan &plan, const SceneSnapshot &snapshot,
+                           const ClipUniformData &clip_data, const LightingUniformData &lighting_data,
+                           GpuExecutionStats &stats) {
+    const auto draw = [&](const auto &batch, std::size_t first_instance,
+                          std::size_t instance_count, bool blended) -> nkgpu_result {
+        const auto geometry = state.geometry_resources.find(batch.key.geometry);
+        if (geometry == state.geometry_resources.end() || !geometry->second.buffer.id)
+            return NKGPU_OK;
+        const auto element_count =
+            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
+        if (!element_count)
+            return NKGPU_OK;
+        const auto &pipeline =
+            blended ? (geometry->second.indexed ? state.indexed_blend_pipeline
+                                                : state.blend_pipeline)
+                    : (geometry->second.indexed ? state.indexed_pipeline : state.pipeline);
+        const auto *material = snapshot.find_material(batch.key.material);
+        MaterialUniformData material_data;
+        if (material) {
+            material_data.base_color = material->state->base_color;
+            material_data.base_color[3] *= material->state->opacity;
+            material_data.surface_params = {
+                material->state->metallic, material->state->roughness,
+                material->state->alpha_cutoff,
+                static_cast<float>(static_cast<std::uint32_t>(material->state->alpha_mode))};
+            material_data.emissive = {material->state->emissive[0], material->state->emissive[1],
+                                      material->state->emissive[2], 1.0f};
+        }
+        const auto material_gpu = state.material_resources.find(batch.key.material);
+        if (material_gpu == state.material_resources.end())
+            return NKGPU_ERROR_INVALID_HANDLE;
+        material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
+        material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
+        material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
+        nkgpu_result result = NKGPU_OK;
+        if ((result = nkgpu_apply_pipeline(state.renderer, pipeline)) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state.renderer, 1,
+                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
+                 sizeof(float) * 16)) != NKGPU_OK ||
+            (result = nkgpu_apply_vertex_buffer(state.renderer, 0, geometry->second.buffer, 0)) !=
+                NKGPU_OK ||
+            (geometry->second.indexed &&
+             (result = nkgpu_apply_index_buffer(state.renderer, geometry->second.index_buffer,
+                                                0)) != NKGPU_OK) ||
+            (result = nkgpu_apply_vertex_buffer(
+                 state.renderer, 1, batch.buffer,
+                 static_cast<std::uint32_t>(first_instance * instance_stride))) != NKGPU_OK ||
+            (result = nkgpu_apply_image(state.renderer, 0, material_gpu->second.images[0])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state.renderer, 1, material_gpu->second.images[1])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state.renderer, 2, material_gpu->second.images[2])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state.renderer, 3, material_gpu->second.images[3])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_image(state.renderer, 4, material_gpu->second.images[4])) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_sampler(state.renderer, 0, material_gpu->second.sampler)) !=
+                NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state.renderer, 0, reinterpret_cast<const std::uint8_t *>(&material_data),
+                 sizeof(material_data))) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(
+                 state.renderer, 3, reinterpret_cast<const std::uint8_t *>(&lighting_data),
+                 sizeof(lighting_data))) != NKGPU_OK ||
+            (result = nkgpu_apply_uniform_data(state.renderer, 2,
+                                               reinterpret_cast<const std::uint8_t *>(&clip_data),
+                                               sizeof(clip_data))) != NKGPU_OK ||
+            (result = nkgpu_draw(state.renderer, 0, element_count,
+                                 static_cast<std::uint32_t>(instance_count))) != NKGPU_OK)
+            return result;
+        ++stats.draw_calls;
+        return NKGPU_OK;
+    };
+
+    struct BlendedInstance {
+        std::size_t batch;
+        std::size_t instance;
+        float depth;
+    };
+    std::vector<BlendedInstance> blended;
+    const auto &view_projection = plan.view_projection();
+    const auto transforms = plan.transforms();
+    for (std::size_t index = 0; index < state.batches.size(); ++index) {
+        const auto &batch = state.batches[index];
+        const auto *material = snapshot.find_material(batch.key.material);
+        if (!material || !material_is_blended(*material->state)) {
+            const auto result = draw(batch, 0, batch.instances.size(), false);
+            if (result != NKGPU_OK)
+                return result;
+            continue;
+        }
+        if (material_is_invisible(*material->state))
+            continue;
+        for (std::size_t instance = 0; instance < batch.instances.size(); ++instance) {
+            const auto item_index = plan.item_index(batch.instances[instance]);
+            if (item_index == static_cast<std::size_t>(-1) ||
+                plan.items()[item_index].transformIndex >= transforms.size())
+                continue;
+            const auto &matrix = transforms[plan.items()[item_index].transformIndex].transform.matrix;
+            // Clip-space depth of the instance origin; larger is farther.
+            const auto x = matrix[12], y = matrix[13], z = matrix[14];
+            const auto clip_z = view_projection[2] * x + view_projection[6] * y +
+                                view_projection[10] * z + view_projection[14];
+            const auto clip_w = view_projection[3] * x + view_projection[7] * y +
+                                view_projection[11] * z + view_projection[15];
+            blended.push_back({index, instance, clip_w != 0.0f ? clip_z / clip_w : clip_z});
+        }
+    }
+    std::stable_sort(blended.begin(), blended.end(),
+                     [](const BlendedInstance &left, const BlendedInstance &right) {
+                         return left.depth > right.depth;
+                     });
+    for (const auto &entry : blended) {
+        const auto result = draw(state.batches[entry.batch], entry.instance, 1, true);
+        if (result != NKGPU_OK)
+            return result;
+    }
+    return NKGPU_OK;
 }
 
 template <class StateT>
@@ -2216,19 +2423,8 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
         stats.draw_calls = stats.commands;
         return stats;
     }
-    for (const auto &batch : state_->batches) {
-        const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end())
-            continue;
-        if (geometry->second.buffer.id) {
-            const auto element_count = geometry->second.indexed ? geometry->second.index_count
-                                                                 : geometry->second.vertex_count;
-            if (element_count && !ensure_pipeline(*state_, stats, geometry->second.indexed))
-                return stats;
-        }
-        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(*state_, stats))
-            return stats;
-    }
+    if (!ensure_surface_pipelines(*state_, snapshot, stats))
+        return stats;
 
     auto result = nkgpu_begin_frame(state_->renderer);
     if (result != NKGPU_OK) {
@@ -2238,79 +2434,13 @@ GpuExecutionStats NativeKitGpuExecutor::execute(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
     set_lighting_camera(lighting_data, plan);
-    for (const auto &batch : state_->batches) {
-        const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
-            continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (!element_count)
-            continue;
-        const auto &pipeline =
-            geometry->second.indexed ? state_->indexed_pipeline : state_->pipeline;
-        const auto *material = snapshot.find_material(batch.key.material);
-        MaterialUniformData material_data;
-        if (material) {
-            material_data.base_color = material->state->base_color;
-            material_data.base_color[3] *= material->state->opacity;
-            material_data.surface_params = {
-                material->state->metallic, material->state->roughness,
-                material->state->alpha_cutoff,
-                static_cast<float>(static_cast<std::uint32_t>(material->state->alpha_mode))};
-            material_data.emissive = {material->state->emissive[0], material->state->emissive[1],
-                                      material->state->emissive[2], 1.0f};
-        }
-        const auto material_gpu = state_->material_resources.find(batch.key.material);
-        if (material_gpu == state_->material_resources.end()) {
-            set_failure(*state_, stats, NKGPU_ERROR_INVALID_HANDLE);
-            (void)nkgpu_end_frame(state_->renderer);
-            return stats;
-        }
-        material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
-        material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
-        material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
-        if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state_->renderer, 1,
-                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
-                 sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.buffer, 0)) !=
-                NKGPU_OK ||
-            (geometry->second.indexed &&
-             (result = nkgpu_apply_index_buffer(state_->renderer, geometry->second.index_buffer,
-                                                0)) != NKGPU_OK) ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 0, material_gpu->second.images[0])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 1, material_gpu->second.images[1])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 2, material_gpu->second.images[2])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 3, material_gpu->second.images[3])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 4, material_gpu->second.images[4])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_sampler(state_->renderer, 0, material_gpu->second.sampler)) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&material_data),
-                 sizeof(material_data))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state_->renderer, 3, reinterpret_cast<const std::uint8_t *>(&lighting_data),
-                 sizeof(lighting_data))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(state_->renderer, 2,
-                                               reinterpret_cast<const std::uint8_t *>(&clip_data),
-                                               sizeof(clip_data))) != NKGPU_OK ||
-            (result = nkgpu_draw(state_->renderer, 0, element_count,
-                                 static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK) {
-            set_failure(*state_, stats, result);
-            (void)nkgpu_end_frame(state_->renderer);
-            return stats;
-        }
-        ++stats.draw_calls;
+    result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, stats);
+    if (result != NKGPU_OK) {
+        set_failure(*state_, stats, result);
+        (void)nkgpu_end_frame(state_->renderer);
+        return stats;
     }
-    if (!draw_stroke_batches(*state_, plan, stats)) {
+    if (!draw_stroke_batches(*state_, plan, snapshot, stats)) {
         (void)nkgpu_end_frame(state_->renderer);
         return stats;
     }
@@ -2360,19 +2490,8 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
         (!ensure_postprocess_target(*state_, width, height, stats) ||
          !ensure_postprocess_pipeline(*state_, stats)))
         return state_->last_result;
-    for (const auto &batch : state_->batches) {
-        const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end())
-            continue;
-        if (geometry->second.buffer.id) {
-            const auto element_count = geometry->second.indexed ? geometry->second.index_count
-                                                                 : geometry->second.vertex_count;
-            if (element_count && !ensure_pipeline(*state_, stats, geometry->second.indexed))
-                return state_->last_result;
-        }
-        if (geometry->second.stroke_vertex_count && !ensure_stroke_pipeline(*state_, stats))
-            return state_->last_result;
-    }
+    if (!ensure_surface_pipelines(*state_, snapshot, stats))
+        return state_->last_result;
 
     auto result = nkgpu_frame_begin(state_->renderer);
     if (result != NKGPU_OK) {
@@ -2425,72 +2544,10 @@ nkgpu_result NativeKitGpuExecutor::capture_rgba8(const RenderPlan &plan,
     const auto clip_data = clip_uniform_data(plan);
     auto lighting_data = lighting_uniform_data(plan, snapshot);
     set_lighting_camera(lighting_data, plan);
-    for (const auto &batch : state_->batches) {
-        const auto geometry = state_->geometry_resources.find(batch.key.geometry);
-        if (geometry == state_->geometry_resources.end() || !geometry->second.buffer.id)
-            continue;
-        const auto element_count =
-            geometry->second.indexed ? geometry->second.index_count : geometry->second.vertex_count;
-        if (!element_count)
-            continue;
-        const auto &pipeline =
-            geometry->second.indexed ? state_->indexed_pipeline : state_->pipeline;
-        const auto *material = snapshot.find_material(batch.key.material);
-        MaterialUniformData material_data;
-        if (material) {
-            material_data.base_color = material->state->base_color;
-            material_data.base_color[3] *= material->state->opacity;
-            material_data.surface_params = {
-                material->state->metallic, material->state->roughness,
-                material->state->alpha_cutoff,
-                static_cast<float>(static_cast<std::uint32_t>(material->state->alpha_mode))};
-            material_data.emissive = {material->state->emissive[0], material->state->emissive[1],
-                                      material->state->emissive[2], 1.0f};
-        }
-        const auto material_gpu = state_->material_resources.find(batch.key.material);
-        if (material_gpu == state_->material_resources.end())
-            return fail_frame(NKGPU_ERROR_INVALID_HANDLE);
-        material_data.texture_flags[0] = material_gpu->second.has_normal_map ? 1.0f : 0.0f;
-        material_data.texture_flags[1] = material_gpu->second.base_color_srgb ? 1.0f : 0.0f;
-        material_data.texture_flags[2] = material_gpu->second.emissive_srgb ? 1.0f : 0.0f;
-        if ((result = nkgpu_apply_pipeline(state_->renderer, pipeline)) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state_->renderer, 1,
-                 reinterpret_cast<const std::uint8_t *>(plan.view_projection().data()),
-                 sizeof(float) * 16)) != NKGPU_OK ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 0, geometry->second.buffer, 0)) !=
-                NKGPU_OK ||
-            (geometry->second.indexed &&
-             (result = nkgpu_apply_index_buffer(state_->renderer, geometry->second.index_buffer,
-                                                0)) != NKGPU_OK) ||
-            (result = nkgpu_apply_vertex_buffer(state_->renderer, 1, batch.buffer, 0)) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 0, material_gpu->second.images[0])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 1, material_gpu->second.images[1])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 2, material_gpu->second.images[2])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 3, material_gpu->second.images[3])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_image(state_->renderer, 4, material_gpu->second.images[4])) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_sampler(state_->renderer, 0, material_gpu->second.sampler)) !=
-                NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state_->renderer, 0, reinterpret_cast<const std::uint8_t *>(&material_data),
-                 sizeof(material_data))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(
-                 state_->renderer, 3, reinterpret_cast<const std::uint8_t *>(&lighting_data),
-                 sizeof(lighting_data))) != NKGPU_OK ||
-            (result = nkgpu_apply_uniform_data(state_->renderer, 2,
-                                               reinterpret_cast<const std::uint8_t *>(&clip_data),
-                                               sizeof(clip_data))) != NKGPU_OK ||
-            (result = nkgpu_draw(state_->renderer, 0, element_count,
-                                 static_cast<std::uint32_t>(batch.instances.size()))) != NKGPU_OK)
-            return fail_frame(result);
-    }
-    if (!draw_stroke_batches(*state_, plan, stats))
+    if ((result = draw_surfaces(*state_, plan, snapshot, clip_data, lighting_data, stats)) !=
+        NKGPU_OK)
+        return fail_frame(result);
+    if (!draw_stroke_batches(*state_, plan, snapshot, stats))
         return fail_frame(stats.result);
     if ((result = nkgpu_end_pass(state_->renderer)) != NKGPU_OK) {
         pass_active = false;

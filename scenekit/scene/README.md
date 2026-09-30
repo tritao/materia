@@ -35,6 +35,14 @@ normal, tangent, UV, and color streams are optional and independently packed.
 Scene images, textures, and samplers are asset descriptions owned by the scene;
 their GPU realizations belong to `scene_render`.
 
-Materials use a compact metallic/roughness model. Cameras and lights are
+Materials use a compact metallic/roughness model. Surfaces draw in two passes.
+Opaque materials draw first and write depth. A material is blended when its
+alpha mode is blend, or when it is not marked opaque and its base alpha times
+opacity is below one; alpha alone never moves an opaque-marked material into the
+blended pass, and mask materials cut out at their alpha cutoff. Blended
+instances draw afterwards, one at a time from far to near by instance origin,
+with depth tested but not written, so an instance's position is what orders it
+against other translucent ones. A blended surface with no alpha draws nothing,
+yet picking ignores opacity and it stays pickable. Cameras and lights are
 generic scene resources attached to nodes through their own references;
 sensor-specific concepts remain above the scene layer.

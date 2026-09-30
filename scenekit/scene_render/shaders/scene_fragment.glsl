@@ -132,7 +132,9 @@ void main() {
         emissive_texel = srgb_to_linear(emissive_texel);
     vec3 color = ambient + direct + srgb_to_linear(emissive.rgb) * emissive_texel;
     float alpha = base_color.a * texture_color.a * vertex_color.a;
-    if (material_params.w > 1.5 && alpha < material_params.z)
+    // Only alpha-mask materials cut out below their cutoff (mode 2). Blended
+    // materials (mode 3) keep every fragment and let the blend state fade it.
+    if (material_params.w > 1.5 && material_params.w < 2.5 && alpha < material_params.z)
         discard;
     fragment_color = vec4(linear_to_srgb(color), alpha);
 }
