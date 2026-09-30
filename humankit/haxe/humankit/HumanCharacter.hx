@@ -41,6 +41,9 @@ class HumanCharacter {
 	public final pose:HumanPose;
 	public final model:SkinnedModel;
 	public final attachments:Array<HumanAttachment> = [];
+	/** The left and right hands' fingers; null for a rig without them. */
+	final hands:Array<Null<HumanHand>>;
+	var lean:Float = 0.0;
 	public var root(get, never):NodeId;
 
 	final scene:Scene;
@@ -53,6 +56,7 @@ class HumanCharacter {
 		instance = new AnimationInstance(asset);
 		pose = new HumanPose(this.rig, instance.readJointMatrices());
 		player = new ClipPlayer(instance);
+		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL), HumanHand.find(asset, this.rig, instance, HumanBone.HandR)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
 	}
 
@@ -90,8 +94,9 @@ class HumanCharacter {
 	/**
 	 * Reaches a limb's wrist or ankle for target ([x, y, z] in model space)
 	 * on top of the animation, from the next advance on. The elbow or knee
-	 * points along pole, a model-space direction: by default elbows point down
-	 * and back and knees forward. weight blends from the animation (0) to the
+	 * points along pole, a model-space direction: by default an elbow bends the
+	 * way the animation bends it, which stays continuous wherever the hand goes,
+	 * and knees point forward. weight blends from the animation (0) to the
 	 * full reach (1). Throws when the rig's limb is not one chain, as with
 	 * Quaternius legs, whose feet hang off the body as IK controls.
 	 */
@@ -99,7 +104,45 @@ class HumanCharacter {
 		var bones = limbBones(limb);
 		var arm = limb == ArmL || limb == ArmR;
 		instance.setIk(limb, rig.joint(bones[0]), rig.joint(bones[1]), rig.joint(bones[2]), target,
-			pole != null ? pole : arm ? [-0.4, 0.0, -1.0] : [1.0, 0.0, 0.0], weight);
+			pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0], weight);
+	}
+
+	/**
+	 * Curls a hand's fingers, from open (0) to a fist (1), on top of the animation. A rig without finger
+	 * joints ignores it. Takes effect from the next advance.
+	 */
+	public function setHandCurl(hand:HumanLimb, curl:Float):Void {
+		if (hand != ArmL && hand != ArmR) throw "Only a hand has fingers to curl";
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		if (fingers != null) fingers.setCurl(curl);
+	}
+
+	/**
+	 * Leans the upper body forward by angle radians (0 upright), on top of the animation, by pitching
+	 * the spine's upper joints together. Takes effect from the next advance.
+	 */
+	public function setSpineLean(angle:Float):Void {
+		if (Math.abs(angle - lean) < 1e-5) return;
+		lean = angle;
+		var joints = [rig.joint(HumanBone.Spine2), rig.joint(HumanBone.Chest)];
+		// Mostly the chest joint, which sits about at table height: the belly below stays put and the chest
+		// can overhang a table, the way a person leans over one.
+		var shares = [0.25, 0.75];
+		for (index in 0...joints.length) {
+			if (joints[index] < 0) continue;
+			var turn = angle * shares[index];
+			if (Math.abs(turn) < 1e-5) instance.clearJointRotation(joints[index]);
+			else instance.setJointRotation(joints[index], [Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+		}
+	}
+
+	public function spineLean():Float
+		return lean;
+
+	/** How curled a hand's fingers are, or 0 for a rig without them. */
+	public function handCurl(hand:HumanLimb):Float {
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		return fingers == null || fingers.curl < 0.0 ? 0.0 : fingers.curl;
 	}
 
 	/** Returns a limb to its animation. */

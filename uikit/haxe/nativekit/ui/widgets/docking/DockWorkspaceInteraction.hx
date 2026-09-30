@@ -43,6 +43,27 @@ class DockWorkspaceInteraction {
 		tabTargets.splice(0, tabTargets.length);
 	}
 
+	/** How many drop targets are registered so far, so a retained subtree can record the ones its build adds. */
+	public function targetCount():Int
+		return targets.length;
+
+	public function tabTargetCount():Int
+		return tabTargets.length;
+
+	public function targetsSince(mark:Int):Array<DockDropTarget>
+		return targets.slice(mark);
+
+	public function tabTargetsSince(mark:Int):Array<DockTabDropTarget>
+		return tabTargets.slice(mark);
+
+	/** Registers the targets a retained subtree recorded, since beginFrame() cleared them and its build did not run. */
+	public function replay(recorded:Array<DockDropTarget>, recordedTabs:Array<DockTabDropTarget>):Void {
+		for (target in recorded)
+			registerTarget(target);
+		for (target in recordedTabs)
+			registerTabTarget(target);
+	}
+
 	/** Registers one tab header as a precise before/after reorder target. */
 	public function registerTabTarget(target:DockTabDropTarget):Void {
 		if (target == null)

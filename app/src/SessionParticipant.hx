@@ -3,10 +3,11 @@ package app;
 import nativekit.sim.SimSession;
 
 /**
- * Something that takes part in the application simulation beyond its robots
- * and editable scene, such as a person. Every rebuild builds a new session.
+ * A member that outlives any one session and joins each new one, such as a
+ * person placed from outside the document. Every rebuild builds a new session.
+ * Members built with a session, like the document's workers, need no join.
  */
-interface SessionParticipant {
+interface SessionParticipant extends SessionMember {
 	/** Joins a newly built session while it is still stopped. */
 	function join(session:SimSession):Void;
 

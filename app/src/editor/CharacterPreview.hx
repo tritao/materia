@@ -31,7 +31,7 @@ import nativekit.sim.SimSession;
  *
  * A humanoid also takes part in the application simulation as a person: its
  * body proxy joins every session as a kinematic actor, and while a session is
- * active the character lives on simulation time, a few ticks ahead of the
+ * active the session feeds it on simulation time, one tick ahead of the
  * physics so the actor always has a keyframe to move towards. It stands still
  * while the simulation is paused and walks by the wall clock without one.
  * A humanoid can be drawn as its mesh, its collision capsules, or its skeleton.
@@ -48,8 +48,6 @@ class CharacterPreview implements SessionParticipant {
 	static inline var WALK_HEIGHTS_PER_SECOND:Float = 0.75;
 	/** Where a held prop is gripped, as a fraction of its length from its origin. */
 	static inline var GRIP_FRACTION:Float = 0.4;
-	/** How many ticks ahead of the physics the character's keyframes run. */
-	static inline var LEAD_TICKS:Int = 3;
 
 	final path:String;
 	final clipName:Null<String>;
@@ -81,7 +79,7 @@ class CharacterPreview implements SessionParticipant {
 	var view:Null<HumanBodyView> = null;
 	var session:Null<SimSession> = null;
 	var actor:Null<HumanActor> = null;
-	/** Simulation time the character was last advanced to. */
+	/** Simulation time of the keyframe the character was last fed. */
 	var simulationTime:Float = 0.0;
 
 	/** Loads the character, and optionally a prop for its right hand. */
@@ -154,30 +152,52 @@ class CharacterPreview implements SessionParticipant {
 		lastTime = -1.0;
 	}
 
+	/** The session rewound to its start: walk again from there. */
+	public function reset():Void {
+		angle = 0.0;
+		simulationTime = 0.0;
+		var walking = walker;
+		if (walking != null) walking.restart(0.0, 0.0, 0.0);
+		startWalk();
+	}
+
 	/**
-	 * Advances the animation, by simulation time while a session is active and
-	 * by wall-clock time otherwise, and publishes it into scene.
+	 * Runs before each tick of the session: moves the character on by that tick
+	 * and gives its actor the keyframe for the tick about to complete.
+	 */
+	public function feed():Void {
+		var active = session, character = human;
+		if (active == null || character == null) return;
+		var step = active.fixedTimestep();
+		simulationTime = active.simulationTime() + step;
+		animate(step);
+		var body = actor;
+		if (body != null) body.pushPose(simulationTime, character.pose, rootMatrix());
+	}
+
+	/** Shows the character where the session has put it, once per frame. */
+	public function present():Void {
+		var scene = owner;
+		if (scene != null) publish(scene);
+	}
+
+	/**
+	 * Keeps the preview attached to the editor's scene, and walks it by the
+	 * wall clock while no session is active. A session drives it through feed()
+	 * and present() instead, so it stands still while the simulation is paused.
 	 */
 	public function advance(scene:EditorScene):Void {
 		if (owner != scene) attach(scene);
-		var elapsed:Float;
-		var active = session;
-		if (active != null) {
-			var target = active.simulationTime() + LEAD_TICKS * active.fixedTimestep();
-			// A reset rewinds simulation time: walk again from the start.
-			if (target < simulationTime) {
-				angle = 0.0;
-				simulationTime = 0.0;
-				startWalk();
-			}
-			elapsed = target - simulationTime;
-			simulationTime = target;
-		} else {
-			var now = Sys.time();
-			elapsed = lastTime < 0.0 ? 0.0 : Math.min(now - lastTime, 0.1);
-			lastTime = now;
-		}
-		var root:NodeId;
+		if (session != null) return;
+		var now = Sys.time();
+		var elapsed = lastTime < 0.0 ? 0.0 : Math.min(now - lastTime, 0.1);
+		lastTime = now;
+		animate(elapsed);
+		publish(scene);
+	}
+
+	/** Moves the animation on by `elapsed` seconds; nothing is written to the scene. */
+	function animate(elapsed:Float):Void {
 		var character = human;
 		var walking = walker;
 		if (character != null) {
@@ -187,29 +207,43 @@ class CharacterPreview implements SessionParticipant {
 					task.advance(elapsed);
 				else
 					walking.advance(elapsed);
-				var transaction = scene.runtimeContentScene().beginTransaction();
-				transaction.setTransform(character.root, matrixTransform(walking.rootTransform()));
-				transaction.commit();
 			} else
 				character.advance(elapsed);
-			root = character.root;
 		} else {
 			var presented = model;
 			if (presented == null)
 				return;
 			player.advance(elapsed);
 			presented.update();
+		}
+		if (moving)
+			angle += elapsed * walkSpeed / PATH_RADIUS;
+	}
+
+	/** Writes the current animation into the scene. */
+	function publish(scene:EditorScene):Void {
+		var root:NodeId;
+		var character = human;
+		var walking = walker;
+		if (character != null) {
+			if (walking != null) {
+				var transaction = scene.runtimeContentScene().beginTransaction();
+				transaction.setTransform(character.root, matrixTransform(walking.rootTransform()));
+				transaction.commit();
+			}
+			root = character.root;
+		} else {
+			var presented = model;
+			if (presented == null)
+				return;
 			root = presented.root;
 		}
 		if (moving) {
-			angle += elapsed * walkSpeed / PATH_RADIUS;
 			var transaction = scene.runtimeContentScene().beginTransaction();
 			transaction.setTransform(root, pathTransform());
 			transaction.commit();
 		}
-		var body = actor, drawn = view;
-		if (body != null && character != null)
-			body.pushPose(simulationTime, character.pose, rootMatrix());
+		var drawn = view;
 		if (drawn != null && character != null)
 			drawn.update(character.pose);
 		scene.publishRuntimeNodes(updatedNodes);

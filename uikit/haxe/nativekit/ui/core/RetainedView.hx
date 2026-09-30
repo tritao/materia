@@ -30,9 +30,11 @@ class RetainedView implements View {
 		var cached = cache.entry;
 		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
 			context.retainStateIds(cached.stateIds);
-			context.claimRetainedTree(cached.root);
-			cached.root.detach();
-			return cached.root;
+			var retained = context.currentRoot(cached.root);
+			cached.replaceRoot(retained);
+			context.claimRetainedTree(retained);
+			retained.detach();
+			return retained;
 		}
 		if (cached != null)
 			cached.root.detach();
@@ -68,7 +70,7 @@ private class RetainedViewCache {
 
 private class RetainedViewEntry {
 	public final key:String;
-	public final root:RenderNode;
+	public var root(default, null):RenderNode;
 	public final stateIds:Array<Int>;
 	final stateRevisions:Array<Int>;
 
@@ -79,6 +81,10 @@ private class RetainedViewEntry {
 		this.stateRevisions = stateRevisions == null ? [] : stateRevisions.copy();
 	}
 
+	/** A self-updating widget at the root of the subtree was rebuilt in place; keep the replacement. */
+	public function replaceRoot(next:RenderNode):Void
+		root = next;
+
 	public function statesMatch(context:BuildContext):Bool {
 		// See DockPanelCacheEntry: a widget inside changed its own state, so the built tree is stale.
 		var current = context.stateRevisions(stateIds);
@@ -87,8 +93,8 @@ private class RetainedViewEntry {
 				return false;
 		var mask = StyleState.Hovered | StyleState.Pressed | StyleState.Focused;
 		var result = true;
-		root.walk(function(node) {
-			if ((node.states & mask) != (context.interactionStates.get(node.id) & mask))
+		context.currentRoot(root).walk(function(node) {
+			if (node.recordsInteraction && (node.states & mask) != (context.interactionStates.get(node.id) & mask))
 				result = false;
 		});
 		return result;

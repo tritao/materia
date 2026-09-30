@@ -29,7 +29,9 @@ class HumanJobBuilder {
           var b = box(targets, id);
           var point = [b.center[0], b.center[1], b.center[2] + b.halfExtents[2] + 0.01];
           var hands = limbs(Reflect.field(step, "hand"));
-          job.add(new ApproachFor(point, hands[0], 1.0, hands.length == 2));
+          var fromId:Null<String> = Reflect.field(step, "from");
+          var restingOn = fromId == null ? null : box(targets, fromId);
+          job.add(new ApproachFor(point, hands[0], 1.0, hands.length == 2, null, restingOn));
           var pick = new Pick(point, hands);
           job.add(pick);
           for (hand in hands) holds.push({action: pick, objectId: id, grasp: point.copy(), hand: hand}
@@ -50,7 +52,7 @@ class HumanJobBuilder {
             support.center[1] + s * offset[0] + c * offset[1],
             support.center[2] + support.halfExtents[2] + held.halfExtents[2]
           ];
-          job.add(new ApproachFor(point, heldHands[0], 1.0, heldHands.length == 2));
+          job.add(new ApproachFor(point, heldHands[0], 1.0, heldHands.length == 2, null, support));
           var place = new Place(point, heldHands);
           job.add(place);
           for (hand in heldHands) holds.push({action: place, objectId: heldId, grasp: point.copy(), hand: hand}

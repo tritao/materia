@@ -78,6 +78,31 @@ class SceneRenderer {
 		return pixels;
 	}
 
+	/**
+	 * Sets how many samples rendered images use and returns the count that will be used.
+	 * One means no multisampling, which is the default. The request is clamped to what the
+	 * GPU can render and resolve and rounded down to a power of two. Picking is never
+	 * multisampled, and the image returned by renderImage() is always single-sample: the
+	 * multisampled result is resolved into it.
+	 */
+	public function setSampleCount(requested:Int):Int {
+		ensureLive();
+		if (requested < 1)
+			throw "Sample count must be at least one";
+		var result = NativeKitSceneRender.nkscene_render_executor_set_sample_count(
+			executor.borrow(), requested);
+		checkScene(result.status, "sceneRenderer.setSampleCount");
+		return result.out_count;
+	}
+
+	/** The largest sample count this GPU can render and resolve for rendered images. */
+	public function maxSampleCount():Int {
+		ensureLive();
+		var result = NativeKitSceneRender.nkscene_render_executor_get_max_sample_count(executor.borrow());
+		checkScene(result.status, "sceneRenderer.maxSampleCount");
+		return result.out_count;
+	}
+
 	/** Renders directly into a retained, backend-neutral GPU image. */
 	public function renderImage(snapshot:SceneSnapshot, view:SceneView, width:Int, height:Int,
 			clearRed:Float = 0.025, clearGreen:Float = 0.035, clearBlue:Float = 0.055,

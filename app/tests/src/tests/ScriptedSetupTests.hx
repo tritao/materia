@@ -1,7 +1,7 @@
 package tests;
 
 import app.ApplicationSimulation;
-import app.SceneDocumentSession;
+import app.ProjectDocumentSession;
 import app.ScriptOwnership;
 import app.SceneCodec;
 import app.Main.ReferenceEditorApp;
@@ -46,7 +46,7 @@ class ScriptedSetupTests {
   }
 
   public static function run():Void {
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     var setup = session.openScript(TwoRobotSetupScript.REFERENCE);
     check(setup.sensors.configuredRobotIds().length == 2, "script creates two stable robots");
     var lidar:Sensor = setup.sensors.selected();
@@ -144,7 +144,7 @@ class ScriptedSetupTests {
       encodedObjects.length == 0 && Reflect.field(encoded, "sensors") == null,
       "script document saves a reference and overrides without an editable configuration copy"
     );
-    var reopened = new SceneDocumentSession();
+    var reopened = new ProjectDocumentSession();
     reopened.open(path);
     var reopenedLidar:Sensor = reopened.sensors.selected();
     check(
@@ -341,7 +341,8 @@ class ScriptedSetupTests {
     for (attempt in 0...8) {
       if (bounds.width > 0 && bounds.height > 0) break;
       var location:ResolvedLayoutItem = cast button.resolved;
-      editor.ui.scroll(120.0, 500.0, 0.0,
+      // Scroll over the button's own pane: starting the simulation moves the Sensors panel to another dock.
+      editor.ui.scroll(location.x + location.width / 2.0, 500.0, 0.0,
         location.y >= frame.height ? 250.0 : -250.0);
       button = cast findByStyleKey(editor.submit(frame), key);
       bounds = button.resolved.clippedViewportBounds();

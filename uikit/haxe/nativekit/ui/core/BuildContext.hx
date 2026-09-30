@@ -42,12 +42,18 @@ class BuildContext {
 	/** Bumped when the theme or application sheet is replaced, so swaps never reuse a fingerprint. */
 	var styleEpoch:Int = 0;
 	var focusRequester:WidgetId->Bool;
-	final claimed:Map<Int, String>;
+	final claimed:IdSet;
 	final idsByPath:Map<String, WidgetId>;
 	var cachedIdCount:Int;
 	var rootScope:KeyScope;
 	var scope:KeyScope;
 	var textStyleStack:Array<ResolvedTextStyle>;
+	/** Widgets that rebuild themselves in place, by widget ID; see selfUpdating. */
+	final selfUpdatingBuilds:Map<Int, SelfUpdatingBuild> = new Map();
+	var pendingPatches:Array<SelfUpdatingBuild> = [];
+	/** True while a patch runs: its IDs are claimed later, when the retained tree that holds them is claimed. */
+	var patching:Bool = false;
+	final patchPriors:Map<Int, RenderNode> = new Map();
 
 	public function new(stateStore:StateStore, ?fonts:FontCollection, ?textInput:TextInputBridge,
 			?clipboard:ClipboardService, ?theme:Theme, ?gestures:GestureArena,
@@ -74,7 +80,7 @@ class BuildContext {
 		viewportWidth = 0.0;
 		viewportHeight = 0.0;
 		focusRequester = function(_) { return false; };
-		claimed = new Map();
+		claimed = new IdSet();
 		idsByPath = new Map();
 		cachedIdCount = 0;
 		rootScope = new KeyScope();
@@ -256,11 +262,91 @@ class BuildContext {
 			cachedIdCount++;
 		}
 		stateStore.rememberPath(id, path);
-		if (claimed.exists(id.value))
+		if (patching)
+			return id;
+		if (!claimed.add(id.value))
 			throw 'Duplicate widget ID ${id.value}; use distinct keys for sibling views';
-		claimed.set(id.value, path);
 		return id;
 	}
+
+	/**
+	 * Builds a widget so that it can rebuild just itself later. `build` must be re-runnable: it creates the widget's whole
+	 * subtree and is called again, in the same scope and inherited style, when the widget asks for a patch. The widget
+	 * then keeps its own changing state out of the revision that ancestors' caches watch (State.updateQuietly).
+	 */
+	public function selfUpdating(id:WidgetId, build:Void->RenderNode):RenderNode {
+		var entry = new SelfUpdatingBuild(build, scope, styleParent, textStyleStack.copy());
+		selfUpdatingBuilds.set(id.value, entry);
+		entry.root = build();
+		return entry.root;
+	}
+
+	/**
+	 * Asks for the widget to be rebuilt in place at the start of the next frame and for that frame to run. Returns false when
+	 * the widget was never built as self-updating, so the caller falls back to an ordinary state update.
+	 */
+	public function requestPatch(id:WidgetId):Bool {
+		var entry = selfUpdatingBuilds.get(id.value);
+		if (entry == null || entry.root == null)
+			return false;
+		if (!entry.pending) {
+			entry.pending = true;
+			pendingPatches.push(entry);
+		}
+		commands.refresh();
+		return true;
+	}
+
+	/** Rebuilds the pending self-updating widgets and swaps them into the retained tree; runs after beginFrame, before the root builds. */
+	public function applyPatches():Void {
+		if (pendingPatches.length == 0)
+			return;
+		var work = pendingPatches;
+		pendingPatches = [];
+		for (entry in work) {
+			entry.pending = false;
+			var old = entry.root;
+			// Not in a tree any more: whatever now owns it builds a fresh one.
+			if (old == null || old.parent == null)
+				continue;
+			// The frame comparison walks the tree it is given, which now holds the replacement, so hand it the replaced nodes.
+			old.walk(function(node) {
+				if (!patchPriors.exists(node.id.value))
+					patchPriors.set(node.id.value, node);
+			});
+			var savedScope = scope, savedParent = styleParent, savedStack = textStyleStack;
+			scope = entry.scope;
+			styleParent = entry.styleParent;
+			textStyleStack = entry.textStyleStack.copy();
+			patching = true;
+			try {
+				var next = entry.build();
+				old.replaceWith(next);
+				entry.root = next;
+			} catch (error:Dynamic) {
+				patching = false;
+				scope = savedScope;
+				styleParent = savedParent;
+				textStyleStack = savedStack;
+				throw error;
+			}
+			patching = false;
+			scope = savedScope;
+			styleParent = savedParent;
+			textStyleStack = savedStack;
+		}
+	}
+
+	/** The nodes patches replaced this frame, by ID, so the frame comparison can see what changed. */
+	public function patchedPriors():Map<Int, RenderNode>
+		return patchPriors;
+
+	public function endPatchFrame():Void
+		patchPriors.clear();
+
+	/** A retained subtree whose root was rebuilt in place since the cache saw it must return the replacement, not the old node. */
+	public function currentRoot(root:RenderNode):RenderNode
+		return RenderNode.latest(root);
 
 	public function withScope<T>(key:Key, build:Void->T):T {
 		if (key == null || build == null)
@@ -303,9 +389,8 @@ class BuildContext {
 		if (root == null)
 			throw "A retained render subtree is required";
 		root.walk(function(node) {
-			if (claimed.exists(node.id.value))
+			if (!claimed.add(node.id.value))
 				throw 'Duplicate retained widget ID ${node.id.value}';
-			claimed.set(node.id.value, stateStore.describe(node.id));
 		});
 	}
 
@@ -334,4 +419,21 @@ class BuildContext {
 
 	static inline function finite(value:Float):Bool
 		return value == value && value - value == 0.0;
+}
+
+/** A self-updating widget's builder and the build context it needs to run again. */
+private class SelfUpdatingBuild {
+	public final build:Void->RenderNode;
+	public final scope:KeyScope;
+	public final styleParent:Null<ComputedStyle>;
+	public final textStyleStack:Array<ResolvedTextStyle>;
+	public var root:Null<RenderNode> = null;
+	public var pending:Bool = false;
+
+	public function new(build:Void->RenderNode, scope:KeyScope, styleParent:Null<ComputedStyle>, textStyleStack:Array<ResolvedTextStyle>) {
+		this.build = build;
+		this.scope = scope;
+		this.styleParent = styleParent;
+		this.textStyleStack = textStyleStack;
+	}
 }

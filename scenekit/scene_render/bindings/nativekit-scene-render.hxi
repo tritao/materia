@@ -21,6 +21,10 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	extern fn nkscene_render_executor_execute(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, out_stats: ptr<nkscene_render_execution_stats> @out) -> nkscene_result;
 	extern fn nkscene_render_executor_get_last_result(executor: nkscene_render_executor, out_result: ptr<nkgpu_result> @out) -> nkscene_result;
 	/**
+	 * Reports the largest sample count offscreen captures can use on this GPU.
+	 */
+	extern fn nkscene_render_executor_get_max_sample_count(executor: nkscene_render_executor, out_count: ptr<u32> @out) -> nkscene_result;
+	/**
 	 * Runs the GPU ID pass and resolves one pixel to scene ownership.
 	 */
 	extern fn nkscene_render_executor_pick_pixel(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, x: u32, y: u32, out_result: ptr<nkscene_render_pick_result> @out) -> nkscene_result;
@@ -38,6 +42,13 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 	 * is borrowed until the executor is destroyed or its target is resized.
 	 */
 	extern fn nkscene_render_executor_render_image_id(executor: nkscene_render_executor, plan: nkscene_render_plan, snapshot: nkscene_snapshot, width: u32, height: u32, clear_red: f32, clear_green: f32, clear_blue: f32, clear_alpha: f32, out_image_id: ptr<u32> @out) -> nkscene_result;
+	/**
+	 * Sets how many samples offscreen captures render with, and reports in out_count the
+	 * count that will be used. The request is clamped to what the GPU can render and resolve
+	 * for the capture formats and rounded down to a power of two; 1 means no multisampling,
+	 * which is also the default. Pixel picking is never multisampled.
+	 */
+	extern fn nkscene_render_executor_set_sample_count(executor: nkscene_render_executor, requested: u32, out_count: ptr<u32> @out) -> nkscene_result;
 	extern fn nkscene_render_pick_request_destroy(request: nkscene_render_pick_request) -> void;
 	extern fn nkscene_render_plan_compile(snapshot: nkscene_snapshot, view: ptr<const<nkscene_render_view>>, out_plan: ptr<nkscene_render_plan> @out @owned) -> nkscene_result;
 	extern fn nkscene_render_plan_destroy(plan: nkscene_render_plan) -> void;
@@ -198,6 +209,7 @@ interface NativeKitSceneRender @target("portable-abi64") @library("nativekit_sce
 		camera_orthographic: u32 @offset(412);
 		/**
 		 * Optional infinite z=0 presentation grid. Ray vectors address clip-space x/y.
+		 * eye_spacing.w is cell size; forward.w is camera distance for fading.
 		 */
 		workplane_grid_enabled: u32 @offset(416);
 		workplane_grid_eye_spacing: array<f32, 4> @offset(420);

@@ -40,13 +40,17 @@ class UiStyleInvalidationMetrics {
 
 	/** Compares current nodes against the prior submitted tree without touching layout. */
 	public static function compare(previous:Null<RenderNode>, current:Null<RenderNode>,
-			?previousById:Map<Int, RenderNode>, ?currentById:Map<Int, RenderNode>):UiStyleInvalidationMetrics {
+			?previousById:Map<Int, RenderNode>, ?currentById:Map<Int, RenderNode>, ?priorOverrides:Map<Int, RenderNode>):UiStyleInvalidationMetrics {
 		var previousIndex = previousById == null ? new Map<Int, RenderNode>() : previousById;
 		var currentIndex = currentById == null ? new Map<Int, RenderNode>() : currentById;
 		previousIndex.clear();
 		currentIndex.clear();
 		if (previous != null)
 			previous.walk(function(node) previousIndex.set(node.id.value, node));
+		// Nodes rebuilt in place are in `previous` already, as their replacements: what they replaced is the real prior.
+		if (priorOverrides != null)
+			for (id => node in priorOverrides)
+				previousIndex.set(id, node);
 
 		var styleChangedNodes = 0;
 		var styleUnchangedNodes = 0;

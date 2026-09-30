@@ -23,7 +23,9 @@ import nativekit.ui.semantics.Semantics;
 class RenderNode {
 	public final id:WidgetId;
 	public final layout:LayoutNode;
-	public final children:Array<RenderNode>;
+	/** Shared and empty until the first `add`, so leaves allocate no array; change it only through `add`, `remove` and `replaceWith`. */
+	public var children(default, null):Array<RenderNode>;
+	static final NoChildren:Array<RenderNode> = [];
 	public var parent(default, null):Null<RenderNode>;
 	public var resolved:Null<ResolvedLayoutItem>;
 	public var focusable:Bool;
@@ -34,7 +36,18 @@ class RenderNode {
 	public var cachePolicy:CachePolicy;
 	public var enabled:Bool;
 	/** Generic pseudo-state flags maintained by the routed interaction system. */
-	public var states:Int;
+	/** Interaction state (hover, press, focus) the widget saw when it built this node. */
+	public var states(default, set):Int;
+	/**
+	 * Whether a widget recorded interaction state on this node. Structural nodes that never read it have no reason to rebuild
+	 * when the pointer moves over them, so cache validation ignores them.
+	 */
+	public var recordsInteraction(default, null):Bool = false;
+
+	inline function set_states(value:Int):Int {
+		recordsInteraction = true;
+		return states = value;
+	}
 	public var styleType:Null<String>;
 	public var styleKey:Null<String>;
 	public var styleId:Null<String>;
@@ -60,7 +73,7 @@ class RenderNode {
 	/** Categories raised while this node was compared with its prior frame. */
 	public var invalidationFlags(default, null):Int;
 	/** Most nodes never take handlers, custom paint or decorations, so these are allocated on first use. */
-	var handlers:Null<Map<String, Array<UiEvent->Void>>>;
+	var handlers:Null<Array<HandlerEntry>>;
 	var outsidePointerDownHandlers:Null<Array<UiEvent->Void>>;
 	var resolvedHandlers:Null<Array<ResolvedLayoutItem->Void>>;
 	var paintHandlers:Null<Array<Canvas->ResolvedLayoutItem->Void>>;
@@ -75,7 +88,7 @@ class RenderNode {
 			throw "Render nodes require a stable widget ID";
 		this.id = id;
 		layout = new LayoutNode(id.value, kind, style);
-		children = [];
+		children = NoChildren;
 		parent = null;
 		resolved = null;
 		focusable = false;
@@ -85,6 +98,7 @@ class RenderNode {
 		cachePolicy = CachePolicy.None;
 		enabled = true;
 		states = 0;
+		recordsInteraction = false;
 		styleType = null;
 		styleKey = null;
 		styleId = null;
@@ -128,10 +142,15 @@ class RenderNode {
 	public function add(child:RenderNode):RenderNode {
 		if (child == null || child == this || child.parent != null)
 			throw "A render node must have one parent and cannot contain itself";
-		for (ancestor in ancestors())
+		var ancestor:Null<RenderNode> = this;
+		while (ancestor != null) {
 			if (ancestor == child)
 				throw "Render tree contains a cycle";
+			ancestor = ancestor.parent;
+		}
 		child.parent = this;
+		if (children == NoChildren)
+			children = [];
 		children.push(child);
 		layout.add(child.layout);
 		return child;
@@ -146,6 +165,38 @@ class RenderNode {
 		previous.layout.remove(layout);
 		parent = null;
 		return this;
+	}
+
+	/** Set when this node was rebuilt in place: the node that took its place. Retained caches that still hold this one follow it. */
+	public var replacedBy:Null<RenderNode> = null;
+
+	/** This node, or the node that finally took its place if it was rebuilt in place (possibly more than once). */
+	public static function latest(node:RenderNode):RenderNode {
+		var current = node;
+		var next = current.replacedBy;
+		while (next != null) {
+			current = next;
+			next = current.replacedBy;
+		}
+		return current;
+	}
+
+	/** Puts `next` where this node is in its parent, in the render tree and the layout tree, and detaches this node. */
+	public function replaceWith(next:RenderNode):RenderNode {
+		if (next == null || next == this || next.parent != null)
+			throw "A replacement render node must be a fresh, unparented node";
+		var owner = parent;
+		if (owner == null)
+			throw "Only a node with a parent can be replaced in place";
+		var index = owner.children.indexOf(this);
+		if (index < 0)
+			throw "Render tree is inconsistent: node is missing from its parent";
+		owner.children[index] = next;
+		owner.layout.children[index] = next.layout;
+		next.parent = owner;
+		parent = null;
+		replacedBy = next;
+		return next;
 	}
 
 	/** Converts a point in this node's local space into viewport/global space. */
@@ -194,15 +245,9 @@ class RenderNode {
 		if (kind == null || kind.length == 0 || handler == null ||
 			(phase != "capture" && phase != "target" && phase != "bubble"))
 			throw "Event handlers require a kind and callback";
-		var key = handlerKey(kind, phase);
 		if (handlers == null)
-			handlers = new Map();
-		var values = handlers.get(key);
-		if (values == null) {
-			values = [];
-			handlers.set(key, values);
-		}
-		values.push(handler);
+			handlers = [];
+		handlers.push(new HandlerEntry(kind, phase, handler));
 		return this;
 	}
 
@@ -652,48 +697,46 @@ class RenderNode {
 	}
 
 	function invokePhase(event:UiEvent, phase:String):Void {
-		if (handlers == null)
+		var entries = handlers;
+		if (entries == null)
 			return;
-		var values = handlers.get(handlerKey(event.kind, phase));
-		if (values == null)
-			return;
-		for (handler in values) {
-			handler(event);
+		// Handlers registered while one runs are visited too, as when each kind and phase had its own list.
+		var index = 0;
+		while (index < entries.length) {
+			var entry = entries[index++];
+			if (entry.phase != phase || entry.kind != event.kind)
+				continue;
+			entry.handler(event);
 			if (event.immediatePropagationStopped)
 				return;
 		}
 	}
 
-	static inline function handlerKey(kind:String, phase:String):String
-		return kind + "#" + phase;
-
 	public function find(id:WidgetId):Null<RenderNode> {
 		if (id == null)
 			return null;
-		var pending:Array<RenderNode> = [this];
-		var visited:Array<RenderNode> = [];
-		while (pending.length > 0) {
-			var node = pending.pop();
-			if (node == null)
+		return findFrom(this, id, ++findCounter);
+	}
+
+	/** Identifies one find() call, so a node reached twice (a cycle, or two parents) is searched once. */
+	static var findCounter:Int = 0;
+	var findStamp:Int = 0;
+
+	/** Pre-order search that allocates nothing: each node carries the stamp of the last search that visited it. */
+	static function findFrom(node:RenderNode, id:WidgetId, stamp:Int):Null<RenderNode> {
+		if (node.findStamp == stamp)
+			return null;
+		node.findStamp = stamp;
+		if (node.id.equals(id))
+			return node;
+		var children = node.children;
+		for (index in 0...children.length) {
+			var child = children[index];
+			if (child == null)
 				continue;
-			var alreadyVisited = false;
-			for (visitedNode in visited)
-				if (visitedNode == node) {
-					alreadyVisited = true;
-					break;
-				}
-			if (alreadyVisited)
-				continue;
-			visited.push(node);
-			if (node.id.equals(id))
-				return node;
-			var index = node.children.length - 1;
-			while (index >= 0) {
-				var child = node.children[index];
-				if (child != null)
-					pending.push(child);
-				index--;
-			}
+			var found = findFrom(child, id, stamp);
+			if (found != null)
+				return found;
 		}
 		return null;
 	}
@@ -704,20 +747,22 @@ class RenderNode {
 			child.walk(visit);
 	}
 
-	function ancestors():Array<RenderNode> {
-		var result:Array<RenderNode> = [];
-		var node = parent;
-		while (node != null) {
-			var present:RenderNode = cast node;
-			result.push(present);
-			node = present.parent;
-		}
-		return result;
-	}
-
 	function requireResolved():ResolvedLayoutItem {
 		if (resolved == null)
 			throw "Render node has no resolved geometry; submit the UI first";
 		return cast resolved;
+	}
+}
+
+/** One event handler and the kind and phase it listens to; a node has few, so a flat list beats a map per node. */
+private class HandlerEntry {
+	public final kind:String;
+	public final phase:String;
+	public final handler:UiEvent->Void;
+
+	public function new(kind:String, phase:String, handler:UiEvent->Void) {
+		this.kind = kind;
+		this.phase = phase;
+		this.handler = handler;
 	}
 }

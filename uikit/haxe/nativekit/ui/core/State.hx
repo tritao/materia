@@ -21,4 +21,13 @@ class State<T> {
 		store.setValue(id, value);
 		return value;
 	}
+
+	/**
+	 * Sets the value without bumping any revision, for a widget that rebuilds itself in place (see
+	 * BuildContext.selfUpdating): cached subtrees around it stay valid because nothing outside it reads this state.
+	 */
+	public function updateQuietly(value:T):T {
+		store.setValueQuietly(id, value);
+		return value;
+	}
 }

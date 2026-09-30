@@ -35,6 +35,10 @@ import nativekit.sim.SimFrame;
 class HumanSimTests {
     static function main():Void {
         PacedStepTests.run();
+        WorkerResetTests.run();
+        PlaceWithdrawTests.run();
+        TorsoClearanceTests.run();
+        MotionQualityTests.run();
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var rig = HumanoidRig.detect(asset);
         var scene = Scene.create();

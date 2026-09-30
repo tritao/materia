@@ -320,6 +320,13 @@ rk_result RK_CALL rk_simulation_get_link_pose(rk_simulation simulation,uint32_t 
     return value?value->get_link_pose(robot_index,link_index,*out_pose):RK_ERROR_INVALID_HANDLE;
 }
 
+rk_result RK_CALL rk_simulation_get_link_body(rk_simulation simulation,uint32_t robot_index,
+                                               uint32_t link_index,nksim_body *out_body) {
+    if(!out_body)return RK_ERROR_INVALID_ARGUMENT;
+    const auto value=resolve(simulation);
+    return value?value->get_link_body(robot_index,link_index,*out_body):RK_ERROR_INVALID_HANDLE;
+}
+
 rk_result RK_CALL rk_simulation_get_robot_contacts(rk_simulation simulation,
     rk_robot_runtime runtime, rk_robot_contact *out, uint32_t capacity,
     uint32_t *out_count) {

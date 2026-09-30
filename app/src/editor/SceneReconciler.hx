@@ -17,7 +17,7 @@ import app.CadDocumentSession;
 class SceneReconciler {
   static function sameWorker(a:Null<app.WorkerObjectData>, b:Null<app.WorkerObjectData>):Bool {
     if (a == null || b == null) return a == null && b == null;
-    if (a.asset != b.asset || a.job != b.job || a.migrationNote != b.migrationNote ||
+    if (a.asset != b.asset || a.job != b.job ||
         a.zones.length != b.zones.length) return false;
     for (index in 0...a.zones.length) if (a.zones[index] != b.zones[index]) return false;
     return true;

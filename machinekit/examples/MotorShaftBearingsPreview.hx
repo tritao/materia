@@ -140,8 +140,8 @@ class MotorShaftBearingsPreview {
 
 function main():Void {
 	var scene = SceneArtifact.decode(MotorShaftBearingsPreview.preview());
-	if (scene.parts.length != 8 || scene.assemblyDefinition == null ||
-		scene.assemblyDefinition.occurrences.length != 13)
+	var definition = scene.assemblyDefinition;
+	if (scene.parts.length != 8 || definition == null || definition.occurrences.length != 13)
 		throw "Bearing preview has missing render regions";
 	for (part in scene.parts) if (part.materialId == null || part.materialDensity == null ||
 		part.materialDensity <= 0 || part.materialSpec == null || part.volume == null ||
@@ -154,9 +154,9 @@ function main():Void {
 	for (bearingId in ["bearingA", "bearingB"]) {
 		var shieldId = bearingId + "-shields";
 		var attached = false, shared = false;
-		for (joint in scene.assemblyDefinition.joints)
+		for (joint in definition.joints)
 			if (joint.parent == bearingId && joint.child == shieldId) attached = true;
-		for (occurrence in scene.assemblyDefinition.occurrences)
+		for (occurrence in definition.occurrences)
 			if (occurrence.id == shieldId && occurrence.definition == "bearingA-shields") shared = true;
 		if (!attached || !shared) throw 'Bearing shield "$shieldId" does not share its geometry';
 	}

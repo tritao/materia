@@ -129,6 +129,14 @@ class PlannerTests extends MotionKitTestSupport {
         1.0, 1.0, 0.0)
     ]);
     near(law.distanceToTime(1.0), 1.0, "native path time law preserves knots");
+    // Unit speed over two one-second stages, so distance equals time; times outside the law clamp to its ends.
+    var distances = law.timesToDistances([0.0, 0.5, 1.0, 1.5, 2.0, 3.0, -1.0]);
+    var expected = [0.0, 0.5, 1.0, 1.5, 2.0, 2.0, 0.0];
+    check(distances.length == expected.length, "time-to-distance returns one distance per time");
+    for (index in 0...expected.length)
+      near(distances[index], expected[index], "time-to-distance follows the stages", 1e-12);
+    check(law.timesToDistances([]).length == 0, "time-to-distance accepts an empty batch");
+    throws(function() law.timesToDistances([0.5, Math.NaN]), "time-to-distance rejects non-finite times");
     var trajectory = path.lower(law, 1e-6);
     near(trajectory.evaluate(1.5).positions[0], 2.25,
       "native path lowering follows quadratic path");
@@ -149,6 +157,20 @@ class PlannerTests extends MotionKitTestSupport {
       "TOPP-RA end distance maps to end time", 1e-6);
     check(timed.bindingConstraints.length > 0,
       "TOPP-RA reports binding constraints");
+    // The direct inverse must agree with the forward map at every sample: time -> distance -> time.
+    check(timed.hasDirectInverse(), "TOPP-RA timing offers the closed-form time-to-distance map");
+    var duration = timed.trajectory.durationSeconds();
+    var times = [for (sample in 0...401) duration * sample / 400];
+    var mapped = timed.timesToDistances(times);
+    var previousDistance = -1.0;
+    for (index in 0...times.length) {
+      check(mapped[index] >= previousDistance, "time-to-distance is monotonic");
+      previousDistance = mapped[index];
+      near(timed.distanceToTime(mapped[index]), times[index],
+        "time-to-distance inverts distance-to-time", 1e-6);
+    }
+    near(mapped[0], 0.0, "time-to-distance starts at the path start", 1e-12);
+    near(mapped[400], 1.0, "time-to-distance ends at the path end", 1e-6);
     timed.releaseDistanceMap();
     timed.trajectory.dispose();
   }
@@ -163,6 +185,7 @@ class PlannerTests extends MotionKitTestSupport {
       "simple path timing starts at the authored joint position", 1e-12);
     near(timed.trajectory.evaluate(timed.trajectory.durationSeconds()).positions[0], 1.0,
       "simple path timing reaches the authored joint endpoint", 1e-12);
+    check(!timed.hasDirectInverse(), "simple path timing has no closed-form inverse, so callers search");
     near(timed.distanceToTime(0.0), 0.0,
       "distance-to-time map hits the path start exactly", 1e-12);
     near(timed.distanceToTime(1.0), timed.trajectory.durationSeconds(),

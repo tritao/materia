@@ -45,10 +45,13 @@ def main():
     parser.add_argument("--no-profile", action="store_true", help="measure without profiler overhead")
     parser.add_argument("--sample-rate", type=int, help="profiler samples per second")
     parser.add_argument("--allocation-interval", type=int, help="allocation sampling interval in bytes; 0 disables it")
+    parser.add_argument("--census", type=int, nargs="?", const=4096, metavar="BYTES",
+                        help="count every allocation by type and sample stacks per BYTES allocated "
+                             "(default 4096; headless scenario only; writes census.json)")
     parser.add_argument("--heap-dump", action="store_true",
                         help="save a full GC heap dump and its exact bytecode (headless scenario only)")
     parser.add_argument("--scenario", choices=["tab-inspector", "inspector-edits", "selection-stress",
-                                                "tab-matrix", "architecture", "primitives"],
+                                                "tab-matrix", "architecture", "primitives", "noop", "interaction", "dock-drag"],
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
@@ -75,6 +78,8 @@ def main():
         parser.error("--cycles requires --scenario")
     if args.scenario is not None and args.editor_args:
         parser.error("editor arguments after -- are not supported by headless scenarios")
+    if args.census is not None and args.scenario is None:
+        parser.error("--census requires a headless scenario")
     if args.heap_dump and args.scenario is None:
         parser.error("--heap-dump requires a headless scenario")
     output = (args.output_dir or APP / "build/profiles" / time.strftime("%Y%m%d-%H%M%S")).resolve()
@@ -115,6 +120,8 @@ def main():
                     return build.returncode
         native_dirs = sorted({str(path.parent) for path in (APP / "build/host/native").rglob("*.so")})
         environment = os.environ.copy()
+        if args.census is not None:
+            environment["MATERIA_ALLOC_CENSUS"] = str(args.census)
         if args.scenario == "tab-matrix" and not args.no_profile:
             environment["HAXEON_PROFILE_SPANS"] = "1"
         environment["LD_LIBRARY_PATH"] = os.pathsep.join(
@@ -147,7 +154,7 @@ def main():
             sample_rate = args.sample_rate or (50 if args.scenario == "tab-matrix" else
                                                100 if args.scenario == "architecture" else 500)
             allocation_interval = (args.allocation_interval if args.allocation_interval is not None else
-                                   0 if args.scenario in ("tab-matrix", "architecture", "primitives") else 65536)
+                                   0 if args.scenario in ("tab-matrix", "architecture", "primitives", "noop", "interaction", "dock-drag") else 65536)
             capture = None if args.no_profile else subprocess.Popen(
                 [str(profiler), "--connect-timeout", "15", "--rate", str(sample_rate),
                  "--alloc-interval", str(allocation_interval), "--interval",

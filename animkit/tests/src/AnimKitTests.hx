@@ -44,6 +44,29 @@ class AnimKitTests {
 		if (instance.readJointMatrices().length != asset.jointNames.length * 64)
 			throw "Joint matrix buffer has the wrong size";
 
+		// A clip started in the middle of a crossfade continues from the blend it was in: the pose
+		// must not snap to the current clip alone.
+		player.restart(walk);
+		player.advance(asset.clipDurations[walk] * 0.25);
+		player.play(idle, 0.4);
+		player.advance(0.2);
+		var blended = instance.readJointMatrices();
+		var settled = new ClipPlayer(instance);
+		settled.restart(idle);
+		settled.advance(0.2);
+		var idleOnly = instance.readJointMatrices();
+		if (matrixGap(blended, idleOnly) < 1e-3)
+			throw "The mid-fade blend is indistinguishable from the current clip, so the test proves nothing";
+		player.restart(walk);
+		player.advance(asset.clipDurations[walk] * 0.25);
+		player.play(idle, 0.4);
+		player.advance(0.2);
+		player.play(walk, 0.4);
+		player.advance(0.0);
+		var continued = instance.readJointMatrices();
+		if (matrixGap(blended, continued) > 1e-3)
+			throw 'Starting a clip mid-fade snapped the pose by ${matrixGap(blended, continued)}';
+
 		var scene = Scene.create();
 		var model = new SkinnedModel(scene, instance, null, "Soldier");
 		if (model.primitiveNodes.length != 2)
@@ -65,6 +88,12 @@ class AnimKitTests {
 		if (!missing)
 			throw "Loading a missing file did not fail";
 		Sys.println("animkit haxe tests: ok");
+	}
+
+	static function matrixGap(a:haxe.io.Bytes, b:haxe.io.Bytes):Float {
+		var worst = 0.0;
+		for (index in 0...Std.int(a.length / 4)) worst = Math.max(worst, Math.abs(a.getFloat(index * 4) - b.getFloat(index * 4)));
+		return worst;
 	}
 
 	static function soldierPath():String {

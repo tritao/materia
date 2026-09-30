@@ -49,6 +49,8 @@ class Pick extends HumanActionBase {
 	override public function advance(seconds:Float):Void {
 		if (fullTick) {
 			worker.setCarry(hands);
+			// The grasp is made; stand up straight to carry.
+			worker.setLean(0.0);
 			done = true;
 			return;
 		}

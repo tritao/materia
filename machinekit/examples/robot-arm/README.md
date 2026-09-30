@@ -9,9 +9,8 @@ Materia. From the repository root:
 ```
 
 Or open **Six-axis robot arm** from the Start page. Press **Play** in the
-toolbar to run the arm's pick motion: it swings to one side, lowers the tool,
-lifts, swings to the other side while turning the tool, lowers it again, and
-returns.
+toolbar to run the arm's pick-and-place cycle: the suction cup picks a block off
+one pad, carries it to the other, sets it down, and then carries it back.
 
 ## What it contains
 
@@ -57,21 +56,34 @@ Schmalz ejector, SAF 40 cup, push-in fitting and hose. The arm includes it as
 the cup's `toolContact` connector and the ejector's `compressedAir` inlet. The
 tool is geometry and ports only: nothing here simulates vacuum or grips a part.
 
-## The work cell
+## The work cell and the grip
 
-The arm stands in front of a table (fixed roots in the assembly, like the pedestal): a workpiece
-block at the pick point and a pad at the place point. `RobotArm` holds their coordinates
-(`TABLE_TOP`, `PICK_X`, `PLACE_X`, `WORK_Y`) so the arm, the cell and the motion authoring agree.
-Nothing in the simulation grips the workpiece: the tool visits the pick and place points and
-dwells there, and the workpiece stays where it started.
+The arm stands in front of a table with two pads and a workpiece block, all in the assembly.
+`RobotArm` holds their coordinates (`TABLE_TOP`, `PICK_X`, `PLACE_X`, `WORK_Y`) so the arm, the
+cell and the motion authoring agree. The table and pads are fixed roots, like the pedestal.
+
+The workpiece is different: `materia.project.json` lists it in `dynamicParts`, which frees it from
+the assembly. The simulation gives it no link on the arm's robot and instead simulates it as a
+dynamic box that rests on a pad under gravity and collides with everything.
+
+The motion file's `grips` list is the vacuum: `grip` and `release` commands for the link that
+carries the cup. When a `grip` fires, the simulation looks for a free object touching that link;
+if there is one it holds the object to the link at the offset it had (`SimSession.holdObject`),
+with a 1 mm gap, so the cup carries it without pushing back on the arm. A `release` lets it go
+as an ordinary dynamic body. With nothing under the cup the vacuum finds no seal and holds
+nothing. The hold is a kinematic attachment, not a suction model: there is no evacuation time,
+leakage, or load limit, and the workpiece's weight does not load the arm.
 
 ## Motion
 
 `materia.project.json` names `robot-arm.motion.json` in `robotMotions`. The file lists one
-looping track per joint, keyed by the joint's assembly id:
+looping track per joint, keyed by the joint's assembly id, and the vacuum commands that go with
+them, with times in the same clock:
 
 ```json
-{"version": 1, "tracks": [{"joint": "j1", "loop": true, "keys": [{"time": 0, "position": 0}, ...]}]}
+{"version": 1,
+ "tracks": [{"joint": "j1", "loop": true, "keys": [{"time": 0, "position": 0}, ...]}],
+ "grips": [{"time": 3.0, "link": "tool/cup", "action": "grip"}, ...]}
 ```
 
 Positions are relative to the generated initial pose, like every Materia motion track, so `0`
@@ -82,10 +94,12 @@ document like any other track.
 The motion is authored in Cartesian space, not by hand. `authoring/ArmMotionAuthoring.hx` builds
 the arm's kinematic model from its assembly (the same bridge the simulation uses), takes the
 suction cup's contact face as the tool point, and walks it through waypoints: home, above the
-pick, touch, lift, above the place, touch, retreat, home. Moves are straight lines at a fixed
+pick, touch (vacuum on), lift, above the place, touch (vacuum off), retreat, home, and then the
+same back the other way. Moves are straight lines at a fixed
 downward orientation, sampled every 2 cm; motionkit's numeric inverse kinematics solves each
 sample from the previous one, and each step's duration respects both the tool speed and half of
-every joint's velocity limit. To change the cycle, edit the waypoints and regenerate:
+every joint's velocity limit. The vacuum commands are emitted at the moments the tool has settled
+on a pad. To change the cycle, edit the waypoints and regenerate:
 
 ```sh
 ./haxeon/scripts/haxeon build --project=machinekit/examples/robot-arm/authoring/haxeon.json

@@ -46,18 +46,28 @@ class ResolvedLayoutItem {
 	public function localToViewport(point:Point):Point {
 		if (point == null)
 			throw "Local points cannot be null";
-		return transform.transformPoint(new Point(x + point.x, y + point.y));
+		var absoluteX = x + point.x, absoluteY = y + point.y;
+		return new Point(transform.transformedX(absoluteX, absoluteY), transform.transformedY(absoluteX, absoluteY));
 	}
+
+	/** Whether viewport points can be mapped into this node's space (its transform is invertible). */
+	public inline function canMapViewport():Bool
+		return transform.isInvertible();
+
+	/** Allocation-free viewportToLocal for callers that checked canMapViewport(). */
+	public inline function viewportToLocalX(viewportX:Float, viewportY:Float):Float
+		return transform.inverseTransformedX(viewportX, viewportY) - x;
+
+	public inline function viewportToLocalY(viewportX:Float, viewportY:Float):Float
+		return transform.inverseTransformedY(viewportX, viewportY) - y;
 
 	/** Attempts to convert a viewport point into this node's local space. */
 	public function tryViewportToLocal(point:Point):Null<Point> {
 		if (point == null)
 			throw "Viewport points cannot be null";
-		var layoutPoint = transform.tryInverse();
-		if (layoutPoint == null)
+		if (!canMapViewport())
 			return null;
-		var absolute = layoutPoint.transformPoint(point);
-		return new Point(absolute.x - x, absolute.y - y);
+		return new Point(viewportToLocalX(point.x, point.y), viewportToLocalY(point.x, point.y));
 	}
 
 	/** Converts a viewport point into this node's local space. */
@@ -70,14 +80,15 @@ class ResolvedLayoutItem {
 
 	/** Returns the axis-aligned viewport bounds of this transformed node. */
 	public function viewportBounds():Rect {
-		var topLeft = localToViewport(new Point(0.0, 0.0));
-		var topRight = localToViewport(new Point(width, 0.0));
-		var bottomLeft = localToViewport(new Point(0.0, height));
-		var bottomRight = localToViewport(new Point(width, height));
-		var left = Math.min(Math.min(topLeft.x, topRight.x), Math.min(bottomLeft.x, bottomRight.x));
-		var top = Math.min(Math.min(topLeft.y, topRight.y), Math.min(bottomLeft.y, bottomRight.y));
-		var right = Math.max(Math.max(topLeft.x, topRight.x), Math.max(bottomLeft.x, bottomRight.x));
-		var bottom = Math.max(Math.max(topLeft.y, topRight.y), Math.max(bottomLeft.y, bottomRight.y));
+		var farX = x + width, farY = y + height;
+		var topLeftX = transform.transformedX(x, y), topLeftY = transform.transformedY(x, y);
+		var topRightX = transform.transformedX(farX, y), topRightY = transform.transformedY(farX, y);
+		var bottomLeftX = transform.transformedX(x, farY), bottomLeftY = transform.transformedY(x, farY);
+		var bottomRightX = transform.transformedX(farX, farY), bottomRightY = transform.transformedY(farX, farY);
+		var left = Math.min(Math.min(topLeftX, topRightX), Math.min(bottomLeftX, bottomRightX));
+		var top = Math.min(Math.min(topLeftY, topRightY), Math.min(bottomLeftY, bottomRightY));
+		var right = Math.max(Math.max(topLeftX, topRightX), Math.max(bottomLeftX, bottomRightX));
+		var bottom = Math.max(Math.max(topLeftY, topRightY), Math.max(bottomLeftY, bottomRightY));
 		return new Rect(left, top, right - left, bottom - top);
 	}
 
@@ -97,25 +108,22 @@ class ResolvedLayoutItem {
 		var visible = clippedViewportBounds();
 		if (visible.width <= 0.0 || visible.height <= 0.0)
 			return new Rect(0.0, 0.0, 0.0, 0.0);
-		var corners = [
-			tryViewportToLocal(new Point(visible.x, visible.y)),
-			tryViewportToLocal(new Point(visible.x + visible.width, visible.y)),
-			tryViewportToLocal(new Point(visible.x, visible.y + visible.height)),
-			tryViewportToLocal(new Point(visible.x + visible.width, visible.y + visible.height))
-		];
-		for (point in corners)
-			if (point == null)
-				return localBounds();
+		if (!canMapViewport())
+			return localBounds();
+		var farX = visible.x + visible.width, farY = visible.y + visible.height;
 		var left = width;
 		var top = height;
 		var right = 0.0;
 		var bottom = 0.0;
-		for (point in corners) {
-			var local:Point = cast point;
-			left = Math.min(left, local.x);
-			top = Math.min(top, local.y);
-			right = Math.max(right, local.x);
-			bottom = Math.max(bottom, local.y);
+		for (corner in 0...4) {
+			var viewportX = (corner & 1) == 0 ? visible.x : farX;
+			var viewportY = (corner & 2) == 0 ? visible.y : farY;
+			var localX = viewportToLocalX(viewportX, viewportY);
+			var localY = viewportToLocalY(viewportX, viewportY);
+			left = Math.min(left, localX);
+			top = Math.min(top, localY);
+			right = Math.max(right, localX);
+			bottom = Math.max(bottom, localY);
 		}
 		left = Math.max(0.0, left);
 		top = Math.max(0.0, top);
@@ -127,19 +135,19 @@ class ResolvedLayoutItem {
 
 	/** Converts a viewport point back to this node's pre-transform layout space. */
 	public function viewportToLayout(x:Float, y:Float):Point {
-		var result = transform.tryInverse();
-		if (result == null)
+		if (!transform.isInvertible())
 			throw "Resolved layout transform is not invertible";
-		return result.transformPoint(new Point(x, y));
+		return new Point(transform.inverseTransformedX(x, y), transform.inverseTransformedY(x, y));
 	}
 
 	/** Checks visibility, inherited clipping, and the transformed node bounds. */
 	public function hitTest(x:Float, y:Float):Bool {
 		if (!visible || !contains(clipBounds, x, y))
 			return false;
-		var point = tryViewportToLocal(new Point(x, y));
-		return point != null && point.x >= 0.0 && point.y >= 0.0 && point.x <= width &&
-			point.y <= height;
+		if (!canMapViewport())
+			return false;
+		var localX = viewportToLocalX(x, y), localY = viewportToLocalY(x, y);
+		return localX >= 0.0 && localY >= 0.0 && localX <= width && localY <= height;
 	}
 
 	public static function decode(bytes:Bytes, offset:Int):ResolvedLayoutItem {

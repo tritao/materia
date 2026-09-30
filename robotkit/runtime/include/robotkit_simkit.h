@@ -493,6 +493,13 @@ RK_API rk_result RK_CALL rk_simulation_get_link_pose(
     rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
     rk_simulation_pose *out_pose RK_INOUT);
 /**
+ * The physics body that carries one robot link. Pass it to nksim_session_hold_object() as the
+ * carrier to attach a session object to that link, for instance a workpiece held by a suction cup.
+ */
+RK_API rk_result RK_CALL rk_simulation_get_link_body(
+    rk_simulation simulation, uint32_t robot_index, uint32_t link_index,
+    nksim_body *out_body RK_OUT);
+/**
  * Contact involving one robot link. tool_piece_index is -1 for link geometry.
  * other_object is nonzero only for Object contacts. RobotLink contacts carry
  * zero-based other_robot/other_link; World covers unowned geometry.

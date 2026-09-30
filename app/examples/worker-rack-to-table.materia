@@ -127,7 +127,7 @@
       "width": 0.6379895508289337,
       "worker": {
         "asset": "animkit/assets/quaternius/worker.glb",
-        "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\"},{\"action\":\"walkTo\",\"target\":{\"point\":[1.0,1.1]}},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\",\"offset\":[0.1,-0.05],\"retreat\":\"backward\"}]}",
+        "job": "{\"version\":1,\"loop\":false,\"steps\":[{\"action\":\"pick\",\"object\":\"worker-demo-part\",\"hand\":\"right\",\"from\":\"worker-demo-rack\"},{\"action\":\"walkTo\",\"target\":{\"point\":[1.0,1.1]}},{\"action\":\"place\",\"onto\":\"worker-demo-table\",\"hand\":\"right\",\"offset\":[0.1,-0.05],\"retreat\":\"backward\"}]}",
         "migrationNote": null,
         "zones": [
           "worker-demo-rack",

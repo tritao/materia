@@ -83,6 +83,18 @@ class PathTimeLaw {
     return result.out_seconds;
   }
 
+  /**
+   * Path distance reached at each time (seconds from the law's epoch): the inverse of `distanceToTime`,
+   * evaluated in closed form. Times outside the law clamp to its first and last distance.
+   */
+  public function timesToDistances(seconds:Array<Float>):Array<Float> {
+    if (seconds.length == 0) return [];
+    var result = MotionKitNative.mk_path_times_to_distances(borrow(), seconds);
+    if (result.status != MotionKitNativeConstants.MK_OK)
+      throw 'timeLaw.timesToDistances failed with MotionKit error ${result.status}';
+    return result.out_distances;
+  }
+
   public function dispose():Void {
     if (disposed) return;
     disposed = true;

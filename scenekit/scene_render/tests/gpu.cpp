@@ -11,6 +11,7 @@
 #include <cstring>
 #include <memory>
 #include <thread>
+#include <vector>
 
 namespace {
 
@@ -757,6 +758,235 @@ int main() {
         move_spot.close();
         assert(capture(authored_view) == point_pixels);
         assert(capture(studio_view) == studio_before);
+    }
+
+    {
+        // Transparency: zero opacity draws nothing, partial opacity blends with what lies
+        // behind, opaque surfaces still hide translucent ones, and translucent surfaces
+        // blend far to near whatever order they were created in.
+        struct Quad {
+            std::array<float, 3> emissive;
+            float alpha;
+            float z;
+            bool opaque_surface;
+            /* Turns the quad about its center, so its edges are not pixel-aligned. */
+            float angle = 0.0f;
+        };
+        struct Capture {
+            std::vector<std::uint8_t> pixels;
+            /* Whether picking the middle pixel found the first quad created. */
+            bool picked_first = false;
+        };
+        // Renders the quads once for each sample count in `samples`, all through one executor.
+        const auto render_samples = [&](const std::vector<Quad> &quads, bool reverse_creation,
+                                        std::array<float, 4> clear,
+                                        const std::vector<std::uint32_t> &samples, bool outlines = true,
+                                        bool grid = false,
+                                        const nkscene::RgbaPostProcess &post = {}) -> std::vector<Capture> {
+            auto scene = std::make_shared<Scene>();
+            const auto geometry = scene->reserve_geometry_id();
+            auto &geometry_resource = scene->geometry_store().create(geometry);
+            geometry_resource.edit_payload().vertices = {
+                {{{-0.5f, -0.5f, 0.0f}}}, {{{0.5f, -0.5f, 0.0f}}},
+                {{{0.5f, 0.5f, 0.0f}}}, {{{-0.5f, 0.5f, 0.0f}}}};
+            std::array<float, 12> normals{};
+            for (std::size_t vertex = 0; vertex < 4; ++vertex)
+                normals[vertex * 3 + 2] = 1.0f;
+            nkscene::GeometryVertexStream normal_stream;
+            normal_stream.semantic = nkscene::VertexSemantic::Normal;
+            normal_stream.format = nkscene::VertexFormat::Float32x3;
+            normal_stream.stride = sizeof(float) * 3;
+            normal_stream.count = 4;
+            normal_stream.data.resize(sizeof(normals));
+            std::memcpy(normal_stream.data.data(), normals.data(), sizeof(normals));
+            geometry_resource.edit_payload().streams = {normal_stream};
+            geometry_resource.edit_payload().indices = {0, 1, 2, 0, 2, 3};
+            // Outline the quad, so a test can tell whether its edges were drawn.
+            const std::array<std::array<float, 3>, 4> corners{
+                {{-0.5f, -0.5f, 0.0f}, {0.5f, -0.5f, 0.0f}, {0.5f, 0.5f, 0.0f}, {-0.5f, 0.5f, 0.0f}}};
+            for (std::size_t corner = 0; outlines && corner < 4; ++corner)
+                geometry_resource.edit_payload().stroke_segments.push_back(
+                    {corners[corner], corners[(corner + 1) % 4], 1});
+
+            std::vector<nkscene::NodeId> nodes;
+            std::vector<std::size_t> order;
+            for (std::size_t index = 0; index < quads.size(); ++index)
+                order.push_back(reverse_creation ? quads.size() - 1 - index : index);
+            for (const auto index : order) {
+                const auto &quad = quads[index];
+                const auto material = scene->reserve_material_id();
+                auto &resource = scene->material_store().create(material);
+                // Emissive only, so lighting cannot change the expected color.
+                resource.edit_state().base_color = {0.0f, 0.0f, 0.0f, quad.alpha};
+                resource.edit_state().emissive = quad.emissive;
+                if (!quad.opaque_surface)
+                    resource.edit_state().flags &=
+                        ~static_cast<std::uint32_t>(nkscene::MaterialFlags::Opaque);
+                Transaction create(scene);
+                const auto node = scene->reserve_node_id();
+                nodes.push_back(node);
+                create.add_create(node);
+                ChangeSet changes;
+                assert(scene->commit(create, changes) == NKS_OK);
+                create.close();
+                Transaction configure(scene);
+                configure.add_geometry(node, geometry);
+                configure.add_material(node, material);
+                nkscene::LocalTransform placement;
+                placement.matrix[14] = quad.z;
+                if (quad.angle != 0.0f) {
+                    placement.matrix[0] = std::cos(quad.angle);
+                    placement.matrix[1] = std::sin(quad.angle);
+                    placement.matrix[4] = -std::sin(quad.angle);
+                    placement.matrix[5] = std::cos(quad.angle);
+                }
+                configure.add_transform(node, placement);
+                assert(scene->commit(configure, changes) == NKS_OK);
+                configure.close();
+            }
+            nkscene::SceneView view;
+            if (grid) {
+                view.workplane_grid.enabled = true;
+                view.workplane_grid.eye_spacing = {0.0f, 0.0f, 3.0f, 0.25f};
+                view.workplane_grid.forward = {0.0f, 0.0f, -1.0f, 3.0f};
+                view.workplane_grid.right = {1.0f, 0.0f, 0.0f, 0.0f};
+                view.workplane_grid.up = {0.0f, 1.0f, 0.0f, 0.0f};
+            }
+            auto plan = nkscene::compile(scene->snapshot(), view);
+            nkscene::NativeKitGpuExecutor executor(renderer);
+            std::vector<Capture> captures;
+            for (const auto count : samples) {
+                executor.set_sample_count(count);
+                Capture capture;
+                assert(executor.capture_rgba8(plan, scene->snapshot(), options.width, options.height,
+                           clear, capture.pixels, post) == NKGPU_OK);
+                nkscene::PickResult picked;
+                capture.picked_first = !nodes.empty() &&
+                    executor.pick_pixel(plan, scene->snapshot(), options.width, options.height,
+                                        options.width / 2, options.height / 2, &picked) == NKGPU_OK &&
+                    picked.node == nodes[0];
+                captures.push_back(std::move(capture));
+            }
+            return captures;
+        };
+        const auto render_pixels = [&](const std::vector<Quad> &quads, bool reverse_creation,
+                                       std::array<float, 4> clear) {
+            return render_samples(quads, reverse_creation, clear, {1})[0].pixels;
+        };
+        const auto render = [&](const std::vector<Quad> &quads,
+                                bool reverse_creation) -> std::array<std::uint8_t, 4> {
+            const auto pixels = render_pixels(quads, reverse_creation, {0.0f, 0.0f, 0.0f, 1.0f});
+            const auto at = (static_cast<std::size_t>(options.height / 2) * options.width +
+                             options.width / 2) * 4;
+            return {pixels[at], pixels[at + 1], pixels[at + 2], pixels[at + 3]};
+        };
+        const std::array<float, 3> red{1.0f, 0.0f, 0.0f}, green{0.0f, 1.0f, 0.0f},
+            blue{0.0f, 0.0f, 1.0f};
+
+        // Lighting leaves a floor of about 70 in the other channels, so compare against that.
+        // Depth convention: the smaller clip z is nearer, so an opaque surface at -0.3 wins.
+        const auto near_green = render({{green, 1.0f, -0.3f, true}, {red, 1.0f, 0.3f, true}}, false);
+        assert(near_green[1] > 200 && near_green[0] < 100);
+
+        const auto opaque_only = render({{green, 1.0f, 0.3f, true}}, false);
+        assert(opaque_only[1] > 200 && opaque_only[0] < 100);
+        // A surface with no opacity is invisible, and does not hide what is behind it.
+        const auto ghost = render({{green, 1.0f, 0.3f, true}, {red, 0.0f, -0.3f, false}}, false);
+        assert(ghost == opaque_only);
+        // Half opacity in front blends with what lies behind.
+        const auto half = render({{green, 1.0f, 0.3f, true}, {red, 0.5f, -0.3f, false}}, false);
+        assert(half[0] > 110 && half[0] < 220 && half[1] > 110 && half[1] < opaque_only[1]);
+        // Translucent color over the empty background fades toward the clear color.
+        const auto over_black = render({{red, 0.5f, 0.0f, false}}, false);
+        assert(over_black[0] > 90 && over_black[0] < 200 && over_black[1] < 60);
+        // An opaque surface in front hides a translucent one behind it.
+        const auto hidden = render({{green, 1.0f, -0.3f, true}, {red, 0.5f, 0.3f, false}}, false);
+        assert(hidden[1] > 200 && hidden[0] < 100);
+
+        // Two translucent surfaces blend far to near, whatever order they were created in.
+        const std::vector<Quad> red_in_front{{red, 0.5f, -0.3f, false}, {blue, 0.5f, 0.3f, false}};
+        const std::vector<Quad> blue_in_front{{red, 0.5f, 0.3f, false}, {blue, 0.5f, -0.3f, false}};
+        const auto red_front = render(red_in_front, false);
+        const auto blue_front = render(blue_in_front, false);
+        assert(red_front[0] > red_front[2] && blue_front[2] > blue_front[0]);
+        assert(render(red_in_front, true) == red_front);
+        assert(render(blue_in_front, true) == blue_front);
+
+        // A surface with no alpha shows nothing, its edge strokes included: on a light
+        // background the image matches an empty scene, while a visible quad differs.
+        const std::array<float, 4> light{0.9f, 0.9f, 0.9f, 1.0f};
+        const auto empty_scene = render_pixels({}, false, light);
+        assert(render_pixels({{red, 0.0f, 0.0f, false}}, false, light) == empty_scene);
+        assert(render_pixels({{red, 1.0f, 0.0f, true}}, false, light) != empty_scene);
+
+        // A surface drawn from an index buffer does not stop its own outline from drawing: the
+        // outline's pipeline is not indexed, and a stale index buffer left bound would make the
+        // GPU layer reject it.
+        assert(render_pixels({{red, 1.0f, 0.0f, true}}, false, light) !=
+               render_samples({{red, 1.0f, 0.0f, true}}, false, light, {1}, false)[0].pixels);
+
+        // Multisampling. A capture is single-sample until a count is asked for, and the count
+        // is clamped to what the GPU can render and resolve.
+        nkscene::NativeKitGpuExecutor probe(renderer);
+        const auto max_samples = probe.max_sample_count();
+        assert(max_samples >= 1 && probe.sample_count() == 1);
+        assert(probe.set_sample_count(1) == 1 && probe.set_sample_count(0) == 1);
+        if (max_samples >= 2) {
+            for (const std::uint32_t asked : {2u, 3u, 4u, 5u, 1000u}) {
+                const auto got = probe.set_sample_count(asked);
+                assert(got >= 2 && got <= asked && got <= max_samples && (got & (got - 1)) == 0);
+            }
+            const auto partial = [](const std::vector<std::uint8_t> &pixels) {
+                std::size_t count = 0;
+                for (std::size_t at = 3; at < pixels.size(); at += 4)
+                    if (pixels[at] > 8 && pixels[at] < 247)
+                        ++count;
+                return count;
+            };
+            const auto middle = [&](const std::vector<std::uint8_t> &pixels) {
+                const auto at = (static_cast<std::size_t>(options.height / 2) * options.width +
+                                 options.width / 2) * 4;
+                return std::array<std::uint8_t, 4>{pixels[at], pixels[at + 1], pixels[at + 2],
+                                                   pixels[at + 3]};
+            };
+            // A tilted opaque quad on a transparent background, with its outline off so the only
+            // edges are the geometry's own. Changing the count while running rebuilds the
+            // targets and pipelines, and returning to one sample reproduces the first image.
+            const std::array<float, 4> transparent{0.0f, 0.0f, 0.0f, 0.0f};
+            const std::vector<Quad> tilted{{red, 1.0f, 0.0f, true, 0.35f}};
+            const auto runs = render_samples(tilted, false, transparent, {1, 4, 1, 2, 4}, false);
+            assert(partial(runs[0].pixels) == 0);
+            assert(partial(runs[1].pixels) > 8);
+            assert(runs[2].pixels == runs[0].pixels);
+            assert(partial(runs[3].pixels) > 4);
+            assert(runs[4].pixels == runs[1].pixels);
+            // The interior is untouched, and an edge pixel never has a channel above its alpha
+            // because the resolve of a transparent background is premultiplied.
+            assert(middle(runs[1].pixels) == middle(runs[0].pixels));
+            for (std::size_t at = 0; at + 3 < runs[1].pixels.size(); at += 4)
+                assert(runs[1].pixels[at] <= runs[1].pixels[at + 3] + 2 &&
+                       runs[1].pixels[at + 1] <= runs[1].pixels[at + 3] + 2 &&
+                       runs[1].pixels[at + 2] <= runs[1].pixels[at + 3] + 2);
+            // Picking is exact with multisampling on, since it never resolves.
+            assert(runs[0].picked_first && runs[1].picked_first && runs[3].picked_first);
+
+            // A translucent surface over an opaque one blends the same in its interior.
+            const std::vector<Quad> layered{{green, 1.0f, 0.3f, true, 0.35f},
+                                            {red, 0.5f, -0.3f, false, 0.35f}};
+            const auto blended = render_samples(layered, false, transparent, {1, 4}, false);
+            const auto plain = middle(blended[0].pixels), smooth = middle(blended[1].pixels);
+            for (std::size_t channel = 0; channel < 4; ++channel)
+                assert(std::abs(int(plain[channel]) - int(smooth[channel])) <= 2);
+
+            // The workplane grid and the outlines share the multisampled pass, and post-processing
+            // reads the resolved image.
+            render_samples(tilted, false, light, {4}, true, true);
+            nkscene::RgbaPostProcess dim;
+            dim.gain = 0.5f;
+            const auto undimmed = render_samples(tilted, false, light, {4}, true)[0];
+            const auto dimmed = render_samples(tilted, false, light, {4}, true, false, dim)[0];
+            assert(middle(dimmed.pixels)[0] + 20 < middle(undimmed.pixels)[0]);
+        }
     }
 
 cleanup:

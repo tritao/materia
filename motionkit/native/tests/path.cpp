@@ -39,6 +39,24 @@ int main() {
     assert(mk_path_distance_to_time(law, 2.0, &time) == MK_OK);
     assert(time == 2.0);
 
+    // The closed-form inverse: s(0.5) = 0.5*0.5 + 0.5*0.25, s(1.5) = 1 + 1.5*0.5 - 0.5*0.25; times outside clamp.
+    const double query[7] = {0.0, 0.5, 1.0, 1.5, 2.0, 5.0, -1.0};
+    const double wanted[7] = {0.0, 0.375, 1.0, 1.625, 2.0, 2.0, 0.0};
+    double reached[7] = {};
+    assert(mk_path_times_to_distances(law, query, 7, reached) == MK_OK);
+    for (int i = 0; i < 7; ++i) assert(std::abs(reached[i] - wanted[i]) < 1e-12);
+    for (int i = 0; i < 5; ++i) {
+        assert(mk_path_distance_to_time(law, reached[i], &time) == MK_OK);
+        assert(std::abs(time - query[i]) < 1e-9); // round trip through the forward map
+    }
+    const double not_finite[1] = {std::nan("")};
+    assert(mk_path_times_to_distances(law, not_finite, 1, reached) == MK_ERROR_INVALID_ARGUMENT);
+    assert(mk_path_times_to_distances(law, nullptr, 1, reached) == MK_ERROR_INVALID_ARGUMENT);
+    assert(mk_path_times_to_distances(law, query, 0, nullptr) == MK_OK);
+    mk_time_law_handle missing{};
+    missing.id = 0xffffff;
+    assert(mk_path_times_to_distances(missing, query, 7, reached) == MK_ERROR_INVALID_HANDLE);
+
     mk_trajectory_handle tight{}, loose{};
     assert(mk_path_lower(path, law, 1e-6, &tight) == MK_OK);
     assert(mk_path_lower(path, law, 1e-2, &loose) == MK_OK);

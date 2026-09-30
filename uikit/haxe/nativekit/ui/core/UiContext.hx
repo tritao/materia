@@ -263,6 +263,7 @@ class UiContext {
 			return cast root;
 		}
 		buildContext.beginFrame();
+		buildContext.applyPatches();
 		diagnosticStage = 4;
 		var viewStartedAt = Sys.time();
 		var viewAllocatedAt = AllocationProbe.now();
@@ -275,7 +276,8 @@ class UiContext {
 		diagnosticStage = 5;
 		var treeBuiltAllocatedAt = AllocationProbe.now();
 		var styleInvalidation = UiStyleInvalidationMetrics.compare(root, next,
-			previousNodesById, currentNodesById);
+			previousNodesById, currentNodesById, buildContext.patchedPriors());
+		buildContext.endPatchFrame();
 		var compareAllocatedAt = AllocationProbe.now();
 		next.walk(function(node) {
 			node.syncHitTestPolicy();
@@ -851,7 +853,7 @@ class UiContext {
 	}
 
 	static function sameGeometry(left:ResolvedLayoutItem, right:ResolvedLayoutItem):Bool {
-		return left.flags == right.flags && left.x == right.x && left.y == right.y &&
+		return left == right || left.flags == right.flags && left.x == right.x && left.y == right.y &&
 			left.width == right.width && left.height == right.height && left.baseline == right.baseline &&
 			sameRect(left.clipBounds, right.clipBounds) && sameRect(left.contentBounds, right.contentBounds) &&
 			left.transform.a == right.transform.a && left.transform.b == right.transform.b &&

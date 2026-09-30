@@ -70,6 +70,8 @@ class DockWorkspace implements View {
 	}
 
 	public function build(context:BuildContext):RenderNode {
+		var observed = context.buildProbe != null;
+		var started = observed ? Sys.time() : 0.0;
 		var mounted:State<DockWorkspaceMount> = context.resourceState(context.id("workspace-mount:" + key),
 			function() { return new DockWorkspaceMount(model, interaction); },
 			function(value) { value.dispose(); });
@@ -83,33 +85,44 @@ class DockWorkspace implements View {
 		var panelCache:DockPanelCache = context.state(
 			context.id("panel-tree-cache:" + key), new DockPanelCache()).value;
 		panelCache.retain(context);
+		var paneCache:DockPanelCache = context.state(
+			context.id("pane-tree-cache:" + key), new DockPanelCache()).value;
+		paneCache.retain(context);
 		var content = buildNode(model.root, context, [], "layout",
 			context.viewportWidth, availableHeight == null ? context.viewportHeight : availableHeight,
-			labelWidths, panelCache);
+			labelWidths, panelCache, paneCache);
 		var layout = new SizedBox("layout", content, LayoutAxis.grow(), LayoutAxis.grow());
-		return new Column(key, [new KeyedView("content", layout)], style).build(context);
+		var root = new Column(key, [new KeyedView("content", layout)], style).build(context);
+		// Includes the panels built inside it; subtract their own probes to get the chrome.
+		if (observed)
+			context.reportBuild("dock-workspace", 0.0, Sys.time() - started, root);
+		return root;
 	}
 
 	function buildNode(node:DockNode, context:BuildContext, path:Array<Int>, nodeKey:String,
 		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache,
-		panelCache:DockPanelCache):View {
+		panelCache:DockPanelCache, paneCache:DockPanelCache):View {
 		if (node == null)
 			return new Text("No dock layout");
 		switch (node) {
 			case DockNode.Empty: return new Text("No panels");
 			case DockNode.Panel(panelId):
-				return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey,
-					availableWidth, labelWidths, panelCache));
+				return paneView([panelId], panelId, context, nodeKey, availableWidth, paneCache, function() {
+					return targetView(panelId, buildTabs([panelId], panelId, context, nodeKey,
+						availableWidth, labelWidths, panelCache));
+				});
 			case DockNode.Tabs(panelIds, activePanelId):
 				var targetPanelId = activePanelId == null && panelIds != null && panelIds.length > 0
 					? panelIds[0] : activePanelId;
-				return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey,
-					availableWidth, labelWidths, panelCache) : targetView(targetPanelId,
-					buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth, labelWidths,
-						panelCache));
+				return paneView(panelIds, activePanelId, context, nodeKey, availableWidth, paneCache, function() {
+					return targetPanelId == null ? buildTabs(panelIds, activePanelId, context, nodeKey,
+						availableWidth, labelWidths, panelCache) : targetView(targetPanelId,
+						buildTabs(panelIds, activePanelId, context, nodeKey, availableWidth, labelWidths,
+							panelCache));
+				});
 			case DockNode.Split(axis, ratio, first, second):
 				return buildSplit(axis, ratio, first, second, context, path, nodeKey,
-					availableWidth, availableHeight, labelWidths, panelCache);
+					availableWidth, availableHeight, labelWidths, panelCache, paneCache);
 		}
 	}
 
@@ -202,7 +215,7 @@ class DockWorkspace implements View {
 	function buildSplit(axis:DockSplitAxis, ratio:Float, first:DockNode, second:DockNode,
 		context:BuildContext, path:Array<Int>, nodeKey:String,
 		availableWidth:Float, availableHeight:Float, labelWidths:DockTextWidthCache,
-		panelCache:DockPanelCache):View {
+		panelCache:DockPanelCache, paneCache:DockPanelCache):View {
 		var firstPath = path.copy();
 		firstPath.push(0);
 		var secondPath = path.copy();
@@ -234,10 +247,39 @@ class DockWorkspace implements View {
 		var secondHeight = horizontal ? availableHeight : remaining;
 		return new SplitView(nodeKey,
 			buildNode(first, context, firstPath, nodeKey + ":first", firstWidth, firstHeight,
-				labelWidths, panelCache),
+				labelWidths, panelCache, paneCache),
 			buildNode(second, context, secondPath, nodeKey + ":second", secondWidth, secondHeight,
-				labelWidths, panelCache),
+				labelWidths, panelCache, paneCache),
 			options);
+	}
+
+	/**
+	 * One pane (its tab strip and active panel) as a retained subtree: rebuilt only when what it shows, or a hover,
+	 * focus or state inside it, changed. The view is created lazily so a hit skips measuring labels and building tab items.
+	 */
+	function paneView(panelIds:Array<String>, activePanelId:Null<String>, context:BuildContext, nodeKey:String,
+			availableWidth:Float, paneCache:DockPanelCache, create:Void->View):View
+		return new DockPaneView(nodeKey, paneCacheKey(panelIds, activePanelId, context, nodeKey, availableWidth), create, paneCache,
+			interaction);
+
+	/** Null when the pane cannot be retained: its active panel has no cache key, so building it has effects the cache cannot see. */
+	function paneCacheKey(panelIds:Array<String>, activePanelId:Null<String>, context:BuildContext, nodeKey:String,
+			availableWidth:Float):Null<String> {
+		if (panelIds == null || panelIds.length == 0)
+			return null;
+		var selected = activePanelId == null ? panelIds[0] : activePanelId;
+		var content = panelContents.get(selected);
+		var contentKey:Null<DockPanelCacheKeyBuilder> = content == null ? null : content.cacheKey;
+		if (contentKey == null)
+			return null;
+		var text = nodeKey + "|width=" + availableWidth + "|style=" + context.styleRevision + "|viewport=" + context.viewportWidth + "x" +
+			context.viewportHeight + "|drag=" + interaction.revision + "|active=" + selected;
+		for (panelId in panelIds) {
+			var descriptor = model.get(panelId);
+			if (descriptor != null)
+				text += "|" + panelId + ":" + descriptor.title + ":" + Std.string(descriptor.icon) + ":" + descriptor.enabled;
+		}
+		return text + "|content=" + contentKey();
 	}
 
 	function panelView(panelId:String, availableWidth:Float, panelCache:DockPanelCache):View {
@@ -327,11 +369,16 @@ private class DockPanelView implements View {
 			"|viewport=" + context.viewportWidth + "x" + context.viewportHeight +
 			"|width=" + availableWidth;
 		var cached = cacheKey == null ? null : panelCache.entry(descriptor.id);
+		var hitStarted = context.buildProbe != null ? Sys.time() : 0.0;
 		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
 			context.retainStateIds(cached.stateIds);
-			context.claimRetainedTree(cached.root);
-			cached.root.detach();
-			return cached.root;
+			var retained = context.currentRoot(cached.root);
+			cached.replaceRoot(retained);
+			context.claimRetainedTree(retained);
+			retained.detach();
+			if (context.buildProbe != null)
+				context.reportBuild("panel-hit:" + descriptor.id, 0.0, Sys.time() - hitStarted, retained);
+			return retained;
 		}
 		if (cached != null)
 			cached.root.detach();
@@ -359,6 +406,47 @@ private class DockPanelView implements View {
 	}
 }
 
+/** A retained pane: reuses the built tab strip and panel while its key and the interaction state inside it are unchanged. */
+private class DockPaneView implements View {
+	final key:String;
+	final cacheKey:Null<String>;
+	final create:Void->View;
+	final cache:DockPanelCache;
+	final interaction:DockWorkspaceInteraction;
+
+	public function new(key:String, cacheKey:Null<String>, create:Void->View, cache:DockPanelCache, interaction:DockWorkspaceInteraction) {
+		this.key = key;
+		this.cacheKey = cacheKey;
+		this.create = create;
+		this.cache = cache;
+		this.interaction = interaction;
+	}
+
+	public function build(context:BuildContext):RenderNode {
+		var cached = cacheKey == null ? null : cache.entry(key);
+		if (cached != null && cached.key == cacheKey && cached.statesMatch(context)) {
+			context.retainStateIds(cached.stateIds);
+			var retained = context.currentRoot(cached.root);
+			cached.replaceRoot(retained);
+			context.claimRetainedTree(retained);
+			retained.detach();
+			interaction.replay(cached.targets, cached.tabTargets);
+			return retained;
+		}
+		if (cached != null)
+			cached.root.detach();
+		var stateMarker = context.stateUsageMarker();
+		var targetMark = interaction.targetCount(), tabMark = interaction.tabTargetCount();
+		var root = create().build(context);
+		if (cacheKey != null) {
+			var usedStates = context.stateIdsUsedSince(stateMarker);
+			cache.put(key, cacheKey, root, usedStates, context.stateRevisions(usedStates), interaction.targetsSince(targetMark),
+				interaction.tabTargetsSince(tabMark));
+		}
+		return root;
+	}
+}
+
 private class DockPanelCache {
 	final entries:Map<String, DockPanelCacheEntry>;
 
@@ -369,11 +457,11 @@ private class DockPanelCache {
 		return entries.get(panelId);
 
 	public function put(panelId:String, key:String, root:RenderNode, stateIds:Array<Int>,
-			stateRevisions:Array<Int>):Void {
+			stateRevisions:Array<Int>, ?targets:Array<DockDropTarget>, ?tabTargets:Array<DockTabDropTarget>):Void {
 		var previous = entries.get(panelId);
 		if (previous != null && previous.root != root)
 			previous.root.detach();
-		entries.set(panelId, new DockPanelCacheEntry(key, root, stateIds, stateRevisions));
+		entries.set(panelId, new DockPanelCacheEntry(key, root, stateIds, stateRevisions, targets, tabTargets));
 	}
 
 	public function retain(context:BuildContext):Void {
@@ -384,16 +472,26 @@ private class DockPanelCache {
 
 private class DockPanelCacheEntry {
 	public final key:String;
-	public final root:RenderNode;
+	public var root(default, null):RenderNode;
 	public final stateIds:Array<Int>;
+	/** Drop targets the build registered; a hit replays them because the interaction forgets them every frame. */
+	public final targets:Array<DockDropTarget>;
+	public final tabTargets:Array<DockTabDropTarget>;
 	final stateRevisions:Array<Int>;
 
-	public function new(key:String, root:RenderNode, stateIds:Array<Int>, stateRevisions:Array<Int>) {
+	public function new(key:String, root:RenderNode, stateIds:Array<Int>, stateRevisions:Array<Int>, ?targets:Array<DockDropTarget>,
+			?tabTargets:Array<DockTabDropTarget>) {
 		this.key = key;
 		this.root = root;
 		this.stateIds = stateIds == null ? [] : stateIds.copy();
 		this.stateRevisions = stateRevisions == null ? [] : stateRevisions.copy();
+		this.targets = targets == null ? [] : targets;
+		this.tabTargets = tabTargets == null ? [] : tabTargets;
 	}
+
+	/** A self-updating widget at the root of the subtree was rebuilt in place; keep the replacement. */
+	public function replaceRoot(next:RenderNode):Void
+		root = next;
 
 	public function statesMatch(context:BuildContext):Bool {
 		// A widget inside the panel changed its own state (a select opening, a section toggling). The
@@ -404,8 +502,8 @@ private class DockPanelCacheEntry {
 				return false;
 		var mask = StyleState.Hovered | StyleState.Pressed | StyleState.Focused;
 		var result = true;
-		root.walk(function(node) {
-			if ((node.states & mask) != (context.interactionStates.get(node.id) & mask))
+		context.currentRoot(root).walk(function(node) {
+			if (node.recordsInteraction && (node.states & mask) != (context.interactionStates.get(node.id) & mask))
 				result = false;
 		});
 		return result;

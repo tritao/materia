@@ -46,16 +46,16 @@ deeper subassembly. `AssemblyDefinitionFlattener` prefixes nested IDs with the
 occurrence path and resolves exposed connectors before solving or simulation.
 Saved root poses may name a subassembly occurrence; flattening carries those
 poses to its leaf roots. Definitions and states use generated JSON wire codecs.
-The decoder upgrades version 1 flat JSON files and states.
+The older human-readable JSON form, keyed by field name with a `schemaVersion`,
+is no longer read; decoding it fails with an error that says so.
 
-The legacy codec remains available for existing scene artifacts. Its joint
-records did not store tree-versus-closure roles or explicit axes; the
-`fromLegacy()` adapter uses a deterministic spanning tree and the historical
-local-Y axis convention when converting those records.
+The legacy assembly record codec remains because scene artifacts still carry a
+legacy `assembly` record beside the definition, and the editor's tree view is
+built from it.
 
 Run the direct ProjectKit suite with
 `./haxeon/scripts/haxeon run --project=projectkit/tests/haxeon.json` from the
 repository root. It exercises units, assembly codecs and frames, scene artifact
 versions, and materials without loading a downstream kit or any native library.
-The suite currently has 50 assertions; keep it passing when changing the
+The suite currently has 52 assertions; keep it passing when changing the
 portable assembly or scene records consumed by other kits.

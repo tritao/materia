@@ -369,6 +369,14 @@ class SceneView {
 		return this;
 	}
 
+	/** Replaces the hover layer with every node of one object that is drawn as several. */
+	public function applyHoverNodes(nodes:Array<NodeId>, highlight:Material):SceneView {
+		clearHoverOverrides();
+		for (node in nodes)
+			setHoverMaterial(node, highlight);
+		return this;
+	}
+
 	public function visibilityOverrideValues():Array<nkscene_render_visibility_override>
 		return visibilityOverrides.copy();
 

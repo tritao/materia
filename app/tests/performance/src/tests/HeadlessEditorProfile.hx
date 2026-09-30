@@ -14,6 +14,7 @@ import nativekit.scene.SpatialIndex;
 import nativekit.scene.SceneView;
 import nativekit.scene.Transform;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.docking.DockNode;
 import nativekit.ui.host.FrameGcScheduler;
 import nativekit.ui.editing.EditOperation;
 import nativekit.ui.core.UiEventKind;
@@ -71,7 +72,7 @@ class HeadlessEditorProfile {
       var scenario = Sys.args().length >= 3 && (Sys.args()[2] == "tab-inspector" ||
         Sys.args()[2] == "inspector-edits" ||
         Sys.args()[2] == "selection-stress" ||
-        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives") ? Sys.args()[2] : "tab-inspector";
+        Sys.args()[2] == "tab-matrix" || Sys.args()[2] == "architecture" || Sys.args()[2] == "primitives" || Sys.args()[2] == "noop" || Sys.args()[2] == "interaction" || Sys.args()[2] == "dock-drag") ? Sys.args()[2] : "tab-inspector";
       if (Sys.args().length == 4 && scenario == "tab-inspector" && Sys.args()[2] != "tab-inspector")
         throw "Unknown headless scenario: " + Sys.args()[2];
       var heapDumpPath = Sys.args().length == 4 ? Sys.args()[3] :
@@ -99,7 +100,22 @@ class HeadlessEditorProfile {
     var retained:Array<String> = [];
     try {
       submit(editor, frame, frames, "initial");
-      if (scenario == "primitives") {
+      // MATERIA_ALLOC_CENSUS=<bytes> counts every allocation by type and samples stacks once per that many bytes.
+      var censusText = Sys.getEnv("MATERIA_ALLOC_CENSUS");
+      var censusInterval = censusText == null ? 0 : Std.parseInt(censusText);
+      if (censusInterval == null) censusInterval = 0;
+      if (censusInterval > 0) hl.Gc.censusStart(censusInterval);
+      if (scenario == "dock-drag") {
+        runDockDragScenario(editor, frame, frames, actions);
+      } else if (scenario == "interaction") {
+        runInteractionScenario(editor, frame, output, cycles, frames, actions);
+      } else if (scenario == "noop") {
+        // Frames where nothing changed: the floor cost of the pipeline for this tree.
+        for (cycle in 0...cycles) {
+          submit(editor, frame, frames, "noop", cycle);
+          action(actions, "noop", cycle);
+        }
+      } else if (scenario == "primitives") {
         runPrimitives(editor);
       } else if (scenario == "tab-matrix") {
         var groups = [["hierarchy", "sensors"],
@@ -118,6 +134,8 @@ class HeadlessEditorProfile {
             action(actions, name, cycle);
           }
           if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
+          // The first cycle builds cold caches; the census reports the steady state that follows.
+          if (cycle == 0 && censusInterval > 0) hl.Gc.censusReset();
         }
       } else if (scenario == "architecture") {
         runArchitectureScenario(editor, frame, output, cycles, frames, actions);
@@ -158,6 +176,10 @@ class HeadlessEditorProfile {
         idleCollections: frameGc.idleCollections, forcedCollections: frameGc.forcedCollections,
         idleSeconds: idleSeconds, idleMarkMicros: idleMarkMicros, totalCollections: hl.Gc.collections(),
         totalMarkMicros: hl.Gc.markMicros(), maxPauseMicros: hl.Gc.maxPauseMicros()}));
+      if (censusInterval > 0) {
+        hl.Gc.censusStop();
+        hl.Gc.censusDump(cast haxe.io.Bytes.ofString(output + "/census.json").getData());
+      }
       if (heapDumpPath != null) {
         frames.resize(0);
         actions.resize(0);
@@ -223,6 +245,150 @@ class HeadlessEditorProfile {
     var expectedVisible = boxVisibleToggles % 2 == 0 ? initialVisible : !initialVisible;
     if (box == null || box.x == initialX || box.visible != expectedVisible)
       throw "Inspector property edit scenario did not apply the expected values";
+  }
+
+  /**
+   * Frames driven by pointer and keyboard input that leave the tree structure alone: what a user does most of the time.
+   * Each action reports the bytes allocated across the input events and the frame, and whether a frame was needed.
+   */
+  static function runInteractionScenario(editor:ReferenceEditorApp, frame:LayoutFrame, output:String,
+      cycles:Int, frames:Array<String>, actions:Array<String>):Void {
+    click(editor, "inspector");
+    submit(editor, frame, frames, "setup:inspector");
+    var nameKey = propertyEditorKey(editor, "name");
+    var tabA = targetCenter(editor, "hierarchy", true), tabB = targetCenter(editor, "sensors", true);
+    var field = targetCenter(editor, nameKey, false);
+    var results:Map<String, Array<Float>> = new Map();
+    var dirtyCounts:Map<String, Int> = new Map();
+    var builtNodes:Map<String, Array<Float>> = new Map();
+    var order:Array<String> = [];
+    var subtreeNodes:Array<Float> = [];
+    // MATERIA_INTERACTION_ONLY=hover-enter,hover-other limits the run to those actions (for the allocation census); the other actions are skipped entirely.
+    var only = Sys.getEnv("MATERIA_INTERACTION_ONLY");
+    var measure = function(name:String, input:Void->Void) {
+      if (only != null && only.length > 0 && only.split(",").indexOf(name) < 0)
+        return;
+      var before = hl.Gc.totalAllocated();
+      var stateRevision = editor.ui.stateStore.revision;
+      input();
+      if (Sys.getEnv("MATERIA_TRACE_STATE") == "1" && !results.exists(name)) {
+        var changed = editor.ui.stateStore.idsChangedSince(stateRevision);
+        Sys.println("state-changes " + name + ": " + [for (id in changed) editor.ui.stateStore.describe(new nativekit.ui.core.WidgetId(id))].join(" | "));
+      }
+      var dirty = editor.ui.isDirty();
+      submit(editor, frame, frames, name);
+      var bytes = hl.Gc.totalAllocated() - before;
+      if (!results.exists(name)) {
+        results.set(name, []);
+        dirtyCounts.set(name, 0);
+        order.push(name);
+      }
+      results.get(name).push(bytes);
+      if (dirty) {
+        var count:Int = cast dirtyCounts.get(name);
+        dirtyCounts.set(name, count + 1);
+      }
+    };
+    // Unfocused: hovering and scrolling the way a user moves around the editor.
+    for (cycle in 0...cycles) {
+      var wobble = cycle % 2 == 0 ? 1.0 : -1.0;
+      measure("hover-enter", function() editor.ui.pointerMove(tabA.x, tabA.y));
+      measure("hover-inside", function() editor.ui.pointerMove(tabA.x + wobble, tabA.y));
+      measure("hover-other", function() editor.ui.pointerMove(tabB.x, tabB.y));
+      measure("hover-field", function() editor.ui.pointerMove(field.x, field.y));
+      measure("hover-away", function() editor.ui.pointerMove(tabA.x, tabA.y));
+      var beforeY = targetCenter(editor, nameKey, false).y;
+      measure("scroll-inspector", function() editor.ui.scroll(field.x, field.y, 0.0, 30.0 * wobble));
+      // A scroll must still move the content: it is applied by layout feedback, not by rebuilding.
+      if (cycle == 0 && (only == null || only.length == 0) && targetCenter(editor, nameKey, false).y == beforeY)
+        throw "Scrolling the inspector did not move its content";
+      measure("idle", function() {});
+      action(actions, "interaction", cycle);
+    }
+    // Focused: typing into the inspector's name field.
+    click(editor, nameKey);
+    submit(editor, frame, frames, "setup:focus");
+    for (cycle in 0...cycles) {
+      measure("type-char", function() editor.ui.text(UiEventKind.TextInput, "a"));
+      // The typed frame patched the field in place. Rebuilding everything from scratch must give the same tree.
+      if ((cycle == 1 || cycle == 7) && (only == null || only.length == 0)) {
+        // The event dispatcher writes hover and press flags onto live nodes, and a fresh build only sets them on widgets that read
+        // them, so those two annotations are not compared; everything else (structure, text, geometry, focus) is.
+        var pointerFlags = ~/ ?(states=)?(hovered|pressed)/g;
+        var patched = pointerFlags.replace(editor.ui.dumpTree(), "");
+        editor.ui.buildContext.setTheme(editor.ui.buildContext.theme);
+        submit(editor, frame, frames, "verify:rebuild");
+        var rebuilt = pointerFlags.replace(editor.ui.dumpTree(), "");
+        if (patched != rebuilt) {
+          File.saveContent(output + "/patched.tree", patched);
+          File.saveContent(output + "/rebuilt.tree", rebuilt);
+          throw "An in-place patch and a full rebuild produced different trees (see patched.tree and rebuilt.tree)";
+        }
+      }
+      measure("type-backspace", function() editor.ui.key(UiEventKind.KeyDown, UiKey.Backspace));
+      measure("idle-focused", function() {});
+      action(actions, "typing", cycle);
+    }
+    var lines:Array<Dynamic> = [];
+    for (name in order) {
+      var values = results.get(name).slice(Std.int(cycles / 4));
+      values.sort(function(a, b) return a < b ? -1 : a > b ? 1 : 0);
+      lines.push({action: name, medianBytes: values[Std.int(values.length / 2)],
+        maxBytes: values[values.length - 1], dirtyFrames: dirtyCounts.get(name), cycles: cycles});
+    }
+    File.saveContent(output + "/interaction.json", Json.stringify(lines));
+  }
+
+  /** The tab group holding `panelId`, or null when it is not docked. */
+  static function tabGroupOf(node:DockNode, panelId:String):Null<Array<String>> {
+    switch (node) {
+      case DockNode.Panel(id): return id == panelId ? [id] : null;
+      case DockNode.Tabs(ids, _): return ids.indexOf(panelId) >= 0 ? ids : null;
+      case DockNode.Split(_, _, first, second):
+        var found = tabGroupOf(first, panelId);
+        return found != null ? found : tabGroupOf(second, panelId);
+      case DockNode.Empty: return null;
+    }
+  }
+
+  /** Drags a tab onto another pane's tab strip and checks the dock model moved it: the drop targets must survive retained panes. */
+  static function runDockDragScenario(editor:ReferenceEditorApp, frame:LayoutFrame, frames:Array<String>,
+      actions:Array<String>):Void {
+    // Warm every pane's cache first: hover each tab so a stale retained pane would show up during the drag.
+    for (name in ["hierarchy", "sensors", "console", "telemetry"]) {
+      var at = targetCenter(editor, name, true);
+      editor.ui.pointerMove(at.x, at.y);
+      submit(editor, frame, frames, "warm:" + name);
+    }
+    submit(editor, frame, frames, "warm:settle");
+    var before = tabGroupOf(editor.workspace.root, "console");
+    if (before == null || before.indexOf("hierarchy") >= 0) throw "Drag scenario expects console and hierarchy in different panes";
+    var source = targetCenter(editor, "console", true);
+    var target = targetCenter(editor, "hierarchy", true);
+    editor.ui.pointerDown(source.x, source.y, 0);
+    submit(editor, frame, frames, "drag:down");
+    for (step in 1...9) {
+      var t = step / 8.0;
+      editor.ui.pointerMove(source.x + (target.x - source.x) * t, source.y + (target.y - source.y) * t + 2.0);
+      submit(editor, frame, frames, "drag:move");
+    }
+    editor.ui.pointerUp(target.x, target.y, 0);
+    submit(editor, frame, frames, "drag:up");
+    submit(editor, frame, frames, "drag:settle");
+    var after = tabGroupOf(editor.workspace.root, "console");
+    if (after == null || after.indexOf("hierarchy") < 0)
+      throw "Dragging a tab onto another pane's strip did not dock it there: " + Std.string(after);
+    action(actions, "dock-drag", 0);
+    Sys.println("dock-drag: console docked with " + after.join(","));
+  }
+
+  static function targetCenter(editor:ReferenceEditorApp, key:String, tab:Bool):{x:Float, y:Float} {
+    var root = editor.ui.root;
+    if (root == null) throw "UI tree is not ready";
+    var node = findByStyleKey(root, key, tab);
+    if (node == null || node.resolved == null) throw "Benchmark target is unavailable: " + key;
+    var bounds = node.resolved.clippedViewportBounds();
+    return {x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2};
   }
 
   static function propertyEditorKey(editor:ReferenceEditorApp, property:String):String

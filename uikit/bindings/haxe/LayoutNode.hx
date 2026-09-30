@@ -21,7 +21,12 @@ class LayoutNode {
 	public var geometryRevision:Int;
 	/** Opacity/effects revision shared by native scene consumers. */
 	public var compositeRevision:Int;
-	public final children:Array<LayoutNode>;
+	/** Shared and empty until the first `add`, so leaves allocate no array; change it only through `add` and `remove`. */
+	public var children(default, null):Array<LayoutNode>;
+	static final NoChildren:Array<LayoutNode> = [];
+	/** Set by LayoutTransaction to the encode that last visited this node, so duplicates are found without a lookup table. */
+	@:allow(LayoutTransaction)
+	var encodeStamp:Int;
 
 	public function new(id:Int, visualKind:LayoutVisualKind = LayoutVisualKind.Box,
 			?style:LayoutStyle) {
@@ -41,12 +46,15 @@ class LayoutNode {
 		contentRevision = 0;
 		geometryRevision = 0;
 		compositeRevision = 0;
-		children = [];
+		encodeStamp = 0;
+		children = NoChildren;
 	}
 
 	public function add(child:LayoutNode):LayoutNode {
 		if (child == null || child == this)
 			throw "A layout node cannot contain itself";
+		if (children == NoChildren)
+			children = [];
 		children.push(child);
 		return child;
 	}

@@ -14,7 +14,7 @@ import nativekit.scene.Transform;
 import nativekit.scene.GeometryData;
 import LayoutFrame;
 import NativeKitEvents;
-import app.SceneDocumentSession;
+import app.ProjectDocumentSession;
 import app.SceneCodec;
 import app.SensorConfiguration;
 import app.ApplicationSimulation;
@@ -401,7 +401,7 @@ class SceneEditingTests {
     FileSystem.createDirectory(directory);
     var file = directory + "/scene.materia.json";
     File.saveContent(file, '{"format":"materia.scene","version":1,"objects":[]}');
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     session.open(file);
     var empty = session.scene;
     var tree = new EditorSceneTree(empty);
@@ -749,7 +749,7 @@ class SceneEditingTests {
       "applied sensor configuration produces simulated measurements");
     simulation.dispose();world.close();scene.dispose();sensors.dispose();
 
-    var lifecycleSession = new SceneDocumentSession(), lifecycleWorld = new RobotWorld();
+    var lifecycleSession = new ProjectDocumentSession(), lifecycleWorld = new RobotWorld();
     var lifecycleSimulation = new ApplicationSimulation(lifecycleWorld);
     var lifecycleRemote = new ReplayRobot("remote/lifecycle", new RobotRecording());
     lifecycleWorld.attach(lifecycleRemote);
@@ -769,7 +769,7 @@ class SceneEditingTests {
     FileSystem.createDirectory(directory);
     var documentPath = directory + "/robot.materia.json";
     var recordingPath = directory + "/robot.mcap";
-    var session = new SceneDocumentSession();
+    var session = new ProjectDocumentSession();
     var rate = new PropertyBinding(property(session.sensors.properties(), "rate"), session.sensors.context());
     var mountXProperty = [for (property in session.sensors.properties())
       if (StringTools.endsWith(property.id, ":position-0")) property][0];

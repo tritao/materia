@@ -13,6 +13,8 @@ typedef HumanJobStep = {
   @:optional var target:HumanJobTarget;
   @:optional var via:Array<Array<Float>>;
   @:optional var object:String;
+  /** The surface a picked object rests on, so the worker stands clear of its edge. */
+  @:optional var from:String;
   @:optional var onto:String;
   @:optional var offset:Array<Float>;
   @:optional var retreat:String;
@@ -73,8 +75,9 @@ class HumanJobSpec {
             Reflect.setField(clean, "via", [for (p in(cast via:Array<Dynamic>)) pointValue(p, '$label.via point')]);
           }
         case "pick":
-          fields(step, ["action", "object", "hand"], label);
+          fields(step, ["action", "object", "hand", "from"], label);
           var id = string(step, "object", label);
+          if (Reflect.hasField(step, "from")) Reflect.setField(clean, "from", string(step, "from", label));
           var hand = hand(step, label);
           for (h in hands(hand)) if (held.exists(h)) throw '$label: hand $h already holds an object';
           for (h in hands(hand)) held.set(h, id);

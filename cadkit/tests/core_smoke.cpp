@@ -17,6 +17,112 @@ void assert_close(double actual, double expected) {
     assert(std::abs(actual - expected) < 1e-9);
 }
 
+struct MeshVertices {
+    std::vector<cad_vec3> vertices;
+    std::vector<cad_vec3> normals;
+};
+
+MeshVertices tessellate_vertices(cad_shape shape, cad_mesh_options options) {
+    cad_mesh mesh = 0;
+    assert(cad_shape_tessellate(shape, &options, &mesh) == CAD_OK);
+    std::uint32_t count = 0;
+    assert(cad_mesh_vertex_count(mesh, &count) == CAD_OK);
+    MeshVertices result{std::vector<cad_vec3>(count), std::vector<cad_vec3>(count)};
+    assert(cad_mesh_copy_vertices(mesh, result.vertices.data(), count) == CAD_OK);
+    assert(cad_mesh_copy_normals(mesh, result.normals.data(), count) == CAD_OK);
+    cad_mesh_destroy(mesh);
+    return result;
+}
+
+double length(cad_vec3 value) {
+    return std::sqrt(value.x * value.x + value.y * value.y + value.z * value.z);
+}
+
+// A curved face is shaded from its surface, not from each triangle: a vertex's normal is the
+// surface normal there, so the shading is smooth across the facets of a cylinder or sphere.
+// Flat faces keep the exact flat normal, and a hole's wall faces its axis.
+void smooth_normals() {
+    const cad_mesh_options coarse{0.5, 0.5};
+
+    cad_shape cylinder = 0;
+    assert(cad_cylinder(5.0, 20.0, &cylinder) == CAD_OK);
+    auto mesh = tessellate_vertices(cylinder, coarse);
+    std::size_t wall = 0, caps = 0;
+    for (std::size_t index = 0; index < mesh.vertices.size(); ++index) {
+        const auto point = mesh.vertices[index];
+        const auto normal = mesh.normals[index];
+        assert(std::abs(length(normal) - 1.0) < 1e-9);
+        if (std::abs(normal.z) < 1e-6) {
+            // Wall: the normal points straight out from the axis at this very vertex.
+            ++wall;
+            const auto radius = std::hypot(point.x, point.y);
+            assert(std::abs(radius - 5.0) < 1e-6);
+            assert(std::abs(normal.x - point.x / radius) < 1e-6);
+            assert(std::abs(normal.y - point.y / radius) < 1e-6);
+        } else {
+            // Caps stay flat, along the axis.
+            ++caps;
+            assert(std::abs(std::abs(normal.z) - 1.0) < 1e-9);
+            assert(std::abs(normal.x) < 1e-9 && std::abs(normal.y) < 1e-9);
+        }
+    }
+    assert(wall > 0 && caps > 0);
+
+    cad_shape sphere = 0;
+    assert(cad_sphere(3.0, &sphere) == CAD_OK);
+    mesh = tessellate_vertices(sphere, coarse);
+    std::size_t radial = 0;
+    for (std::size_t index = 0; index < mesh.vertices.size(); ++index) {
+        const auto point = mesh.vertices[index];
+        const auto normal = mesh.normals[index];
+        assert(std::abs(length(normal) - 1.0) < 1e-9);
+        // Every vertex faces out from the center, including near the poles where the
+        // parametrisation degenerates and the flat triangle normal is used instead.
+        const auto along = (normal.x * point.x + normal.y * point.y + normal.z * point.z) / 3.0;
+        assert(along > 0.9);
+        if (along > 1.0 - 1e-6)
+            ++radial;
+    }
+    assert(radial > mesh.vertices.size() / 2);
+
+    cad_shape box = 0;
+    assert(cad_box(10.0, 20.0, 30.0, &box) == CAD_OK);
+    mesh = tessellate_vertices(box, coarse);
+    for (const auto normal : mesh.normals) {
+        assert(std::abs(length(normal) - 1.0) < 1e-9);
+        assert(std::abs(std::max({std::abs(normal.x), std::abs(normal.y), std::abs(normal.z)}) - 1.0) < 1e-9);
+    }
+
+    // A cylinder cut through a box leaves a hole whose wall faces the hole's axis.
+    cad_shape hole_tool = 0, hole_tool_offset = 0, plate = 0, drilled = 0;
+    assert(cad_cylinder(2.0, 30.0, &hole_tool) == CAD_OK);
+    assert(cad_shape_translate(hole_tool, {5.0, 10.0, 0.0}, &hole_tool_offset) == CAD_OK);
+    assert(cad_box(10.0, 20.0, 30.0, &plate) == CAD_OK);
+    assert(cad_cut(plate, hole_tool_offset, &drilled) == CAD_OK);
+    mesh = tessellate_vertices(drilled, coarse);
+    std::size_t hole_wall = 0;
+    for (std::size_t index = 0; index < mesh.vertices.size(); ++index) {
+        const auto point = mesh.vertices[index];
+        const auto normal = mesh.normals[index];
+        const auto dx = point.x - 5.0, dy = point.y - 10.0;
+        const auto radius = std::hypot(dx, dy);
+        if (std::abs(radius - 2.0) > 1e-6 || std::abs(normal.z) > 1e-6)
+            continue;
+        ++hole_wall;
+        assert(std::abs(normal.x + dx / radius) < 1e-6);
+        assert(std::abs(normal.y + dy / radius) < 1e-6);
+    }
+    assert(hole_wall > 0);
+
+    cad_shape_destroy(drilled);
+    cad_shape_destroy(plate);
+    cad_shape_destroy(hole_tool_offset);
+    cad_shape_destroy(hole_tool);
+    cad_shape_destroy(box);
+    cad_shape_destroy(sphere);
+    cad_shape_destroy(cylinder);
+}
+
 } // namespace
 
 int main() {
@@ -746,5 +852,6 @@ int main() {
         cad_shape_destroy(churn);
     }
 
+    smooth_normals();
     return 0;
 }

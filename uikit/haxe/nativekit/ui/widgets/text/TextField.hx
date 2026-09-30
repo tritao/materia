@@ -108,6 +108,12 @@ class TextField implements View {
 	public function build(context:BuildContext):RenderNode {
 		return context.withScope(new Key(key), function() {
 			var id = context.id("field");
+			// The field rebuilds only itself when its own state changes (typing, selection, caret), so the panel around it stays cached.
+			return context.selfUpdating(id, function() return buildField(context, id));
+		});
+	}
+
+	function buildField(context:BuildContext, id:nativekit.ui.core.WidgetId):RenderNode {
 			var resolved = context.resolveTextRole(TextRole.Body,
 				TextStyleOverride.fromTextStyle(textStyle));
 			if (textColor != null)
@@ -119,6 +125,12 @@ class TextField implements View {
 			resolved = new ResolvedTextStyle(resolved.textStyle, paragraph, resolved.textColor);
 			var stored:State<TextEditorState> = acquireState(context, id, value, resolved, document);
 			var editor:TextEditorState = stored.value;
+			// Quiet update plus a patch request: only this field rebuilds. Falls back to a full state update if it is not self-updating.
+			var refresh = function() {
+				stored.updateQuietly(editor);
+				if (!context.requestPatch(id))
+					stored.update(editor);
+			};
 			editor.configureTail(followTail && readOnly);
 			var documentChanged = document != null
 				? editor.syncDocument(document)
@@ -249,10 +261,10 @@ class TextField implements View {
 				semantics.setValueProvider(function() return editor.text, editor.documentLength());
 				semantics.selectionStart = editor.selectionStart;
 				semantics.selectionEnd = editor.selectionEnd;
-				stored.update(editor);
+				refresh();
 				if (multiline && editorContent.resolved != null &&
 					editor.ensureCaretVisible(editorContent.resolved.height))
-					stored.update(editor);
+					refresh();
 			};
 			var publishTextChange = function(previousRevision:Int) {
 				updateState();
@@ -320,16 +332,16 @@ class TextField implements View {
 						// A read-only view keeps what the user scrolled to instead of chasing the caret.
 						editor.setViewportHeight(geometry.height);
 						if (editor.tailFollowing && editor.scrollToEnd())
-							stored.update(editor);
+							refresh();
 					} else if (editor.ensureCaretVisible(geometry.height))
-						stored.update(editor);
+						refresh();
 				}
 			});
 			textNode.onResolved(function(geometry) {
 				editor.updateLayout(geometry.width);
 				if (multiline && !readOnly && editorContent.resolved != null &&
 					editor.ensureCaretVisible(editorContent.resolved.height))
-					stored.update(editor);
+					refresh();
 				syncCursor(geometry);
 			});
 			node.on(UiEventKind.Focus, function(_) {
@@ -338,7 +350,7 @@ class TextField implements View {
 				editor.focused = true;
 				editor.resetCaretBlink(Sys.time());
 				semantics.states |= AccessibilityState.Focused;
-				stored.update(editor);
+				refresh();
 				context.textInput.activate(id);
 				if (textNode.resolved != null)
 					syncCursor(cast textNode.resolved);
@@ -352,7 +364,7 @@ class TextField implements View {
 				editor.draggingSelection = false;
 				editor.cancelPointerClick();
 				semantics.states &= ~AccessibilityState.Focused;
-				stored.update(editor);
+				refresh();
 				context.textInput.deactivate(id);
 				publishDiagnostics(null);
 			};
@@ -520,7 +532,7 @@ class TextField implements View {
 			if (multiline && readOnly)
 				node.on(UiEventKind.Scroll, function(event) {
 					if (scrollReadOnly(editor, event.deltaY)) {
-						stored.update(editor);
+						refresh();
 						event.stopPropagation();
 					}
 				});
@@ -559,7 +571,6 @@ class TextField implements View {
 				}
 			});
 			return node;
-		});
 	}
 
 	/** Applies a wheel delta and re-pins to the tail when the view reaches the end again. */

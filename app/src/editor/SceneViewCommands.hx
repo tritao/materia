@@ -21,6 +21,9 @@ class SceneViewCommands {
     registerLightingPreset(app, "scene.lighting-studio", "Lighting: Studio", 0);
     registerLightingPreset(app, "scene.lighting-soft", "Lighting: Soft", 1);
     registerLightingPreset(app, "scene.lighting-contrast", "Lighting: Contrast", 2);
+    registerAntialiasing(app, "scene.antialiasing-off", "Anti-aliasing: Off", 1);
+    registerAntialiasing(app, "scene.antialiasing-2x", "Anti-aliasing: 2x", 2);
+    registerAntialiasing(app, "scene.antialiasing-4x", "Anti-aliasing: 4x", 4);
     app.commands.register(new Command("scene.toggle-grid", "Toggle grid", function() {
       app.gridVisible = !app.gridVisible;
       app.log(app.gridVisible ? "Grid enabled" : "Grid disabled");
@@ -67,6 +70,16 @@ class SceneViewCommands {
     }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null,
       function() return app.perspectiveViewport != null &&
         app.perspectiveViewport.lightingPresetId() == preset));
+  }
+
+  static function registerAntialiasing(app:ReferenceEditorApp, id:String, label:String, samples:Int):Void {
+    app.commands.register(new Command(id, label, function() {
+      app.setAntialiasing(samples);
+      app.log(label);
+      app.commands.refresh();
+    }, null, function() return !app.documents.blocked() && app.perspectiveViewport != null &&
+      app.perspectiveViewport.supportsSamples(samples),
+      function() return app.antialiasing == samples));
   }
 
   static function registerNudgeCommand(app:ReferenceEditorApp, id:String, label:String, key:Int, modifiers:Int,

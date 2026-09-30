@@ -78,14 +78,13 @@ class UiEvent {
 		if (node == null)
 			throw "Routed events require a current target";
 		currentTarget = node.id;
-		var local = node.resolved == null ? null :
-			node.resolved.tryViewportToLocal(new Point(globalX, globalY));
-		if (local == null) {
+		var geometry = node.resolved;
+		if (geometry == null || !geometry.canMapViewport()) {
 			localX = globalX;
 			localY = globalY;
 		} else {
-			localX = local.x;
-			localY = local.y;
+			localX = geometry.viewportToLocalX(globalX, globalY);
+			localY = geometry.viewportToLocalY(globalX, globalY);
 		}
 	}
 

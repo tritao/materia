@@ -48,6 +48,13 @@ name a robot and joint, use increasing `{time, position}` keys starting at zero,
 and interpolate linearly in simulation time. A non-looping track holds its last
 position; a looping track must end where it starts.
 
+A project can ship such tracks itself: its manifest's `robotMotions` names a JSON file with a `tracks`
+list (keyed by assembly joint id, positions relative to the generated initial pose) and an optional
+`grips` list of `{time, link, action}` vacuum commands, `grip` or `release`, which repeat with the
+looping motion. The manifest's `dynamicParts` lists parts to simulate as free dynamic bodies rather
+than bolting them to the assembly. A `grip` holds the free object touching the named link, and a
+`release` lets it go.
+
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.
   Duplicate (`Ctrl+D`) and Delete sit beside Add; double-click a tree row to frame
@@ -346,6 +353,13 @@ capture the visual, structural, application, event, and performance state:
 ../haxeon/scripts/haxeon run --project haxeon.json -- \
   --capture-dir=build/captures/default --frames=3
 ```
+
+The 3D viewport smooths geometry edges with multisampling, four samples per
+pixel by default or as many as the GPU supports. Choose Off, 2x or 4x in the
+viewport options menu; the choice is saved in `preferences.json`. For a run that
+should not touch the saved choice, such as a capture, pass `--msaa=SAMPLES`
+(`--msaa=1` turns it off). The `sampleCount` in `app-state.json` is the count the
+last render used.
 
 The capture directory contains `frame.png`, `ui-tree.txt`, `layout.json`,
 `app-state.json`, `frame-metrics.json`, and `events.jsonl`. Paths are resolved

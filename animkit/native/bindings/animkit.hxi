@@ -95,6 +95,13 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 	 */
 	extern fn ak_instance_set_ik(instance: ak_instance_handle, chain: u32, ik: ptr<const<ak_two_bone_ik>>) -> ak_result;
 	/**
+	 * Turns one joint by a rotation (x, y, z, w) about its own local axes, on top of its animated pose and
+	 * before inverse kinematics, so the turn carries the joint's children: fingers curl, a spine leans. The
+	 * rotation is normalized; weight in (0, 1] blends from no turn to all of it. A zero weight removes the
+	 * turn from that joint. The turn stays until removed.
+	 */
+	extern fn ak_instance_set_joint_rotation(instance: ak_instance_handle, joint: i32, x: f32, y: f32, z: f32, w: f32, weight: f32) -> ak_result;
+	/**
 	 * Sets one of AK_MAX_LAYERS blend layers. A layer contributes when its clip is
 	 * valid and its weight is positive; weights are normalized across layers. Time
 	 * is in seconds and wraps when loop is non-zero, otherwise it clamps. With no
@@ -159,8 +166,9 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 	/**
 	 * A two-bone inverse kinematics chain, such as shoulder, elbow, and wrist,
 	 * solved after the layers blend: the end joint moves to reach target and the
-	 * middle joint points in the direction pole (a direction, not a position). The joints must be ancestors in that order
-	 * but need not be direct parents. Positions are in scene space. weight blends
+	 * middle joint points in the direction pole (a direction, not a position); a zero pole leaves the bend to the
+	 * animation, carrying the direction the animated pose bends the limb onto the new reach. The joints must be
+	 * ancestors in that order but need not be direct parents. Positions are in scene space. weight blends
 	 * from the animated pose (0, which disables the chain) to the solution (1);
 	 * soften in (0, 1] eases the chain before it straightens, 1 for none.
 	 */

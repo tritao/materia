@@ -15,6 +15,27 @@ class HumanBody {
 	final poles:Array<Null<Array<Float>>> = [null, null, null, null];
 	final heldPoints:Array<Null<Void->Array<Float>>> = [null, null, null, null];
 	var carrying:Array<HumanLimb> = [];
+	/** Finger curl of a resting hand, of one reaching for something, and of one holding it. */
+	static inline var RELAXED_CURL:Float = 0.25;
+	static inline var OPEN_CURL:Float = 0.05;
+	static inline var GRIP_CURL:Float = 0.5;
+	/** How fast the fingers open and close, in full curls per second. */
+	static inline var CURL_RATE:Float = 5.0;
+	/** The furthest the torso leans into a reach, in radians, and how fast it leans. */
+	public static inline var MAX_LEAN:Float = 0.7;
+	static inline var LEAN_RATE:Float = 0.9;
+	var leanGoal:Float = 0.0;
+	var leanNow:Float = 0.0;
+	/** Lean at which an idle arm is fully held hanging, and whether each arm is held that way now. */
+	static inline var HANG_LEAN:Float = 0.25;
+	final hanging:Array<Bool> = [false, false, false, false];
+	/** The curl each hand is at now (left, right), moving toward what its state asks for. */
+	final curls:Array<Float> = [RELAXED_CURL, RELAXED_CURL];
+	/** Seconds a hand takes to settle into the carry pose from wherever it was. */
+	static inline var CARRY_EASE_SECONDS:Float = 0.3;
+	/** Where each hand was when it began to carry, and how far it has settled (one when done). */
+	final carryFrom:Array<Null<Array<Float>>> = [null, null, null, null];
+	final carrySettled:Array<Float> = [1.0, 1.0, 1.0, 1.0];
 
 	public function new(character:HumanCharacter, ?walker:HumanWalker) {
 		this.character = character;
@@ -22,6 +43,59 @@ class HumanBody {
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
 		description = HumanDescription.measure(character.pose, character.height());
+		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, RELAXED_CURL);
+	}
+
+	/** Open while reaching for something, closed while holding it, relaxed otherwise. */
+	function curlFor(hand:HumanLimb):Float {
+		if (isCarrying(hand) || heldPoints[hand] != null) return GRIP_CURL;
+		var index:Int = hand;
+		return active[index] && weights[index] > 0.0 ? OPEN_CURL : RELAXED_CURL;
+	}
+
+	/** Where the torso is asked to lean; it eases there. Zero stands upright. */
+	public function setLean(angle:Float):Void
+		leanGoal = Math.max(0.0, Math.min(MAX_LEAN, angle));
+
+	/**
+	 * The lean that carries a hand's shoulder `shift` metres further forward, and the shift it can
+	 * deliver (less than asked when that would pass MAX_LEAN). Measured by leaning the skeleton a test
+	 * amount, so it holds for any rig; the pose is left as it was.
+	 */
+	public function leanFor(hand:HumanLimb, shift:Float):{angle:Float, shift:Float} {
+		var none = {angle: 0.0, shift: 0.0};
+		if (!(shift > 1e-4)) return none;
+		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
+		var saved = character.spineLean();
+		var probe = 0.2;
+		character.setSpineLean(0.0);
+		character.advance(0.0);
+		var upright = character.pose.bonePosition(bone);
+		character.setSpineLean(probe);
+		character.advance(0.0);
+		var leaned = character.pose.bonePosition(bone);
+		character.setSpineLean(saved);
+		character.advance(0.0);
+		if (upright == null || leaned == null || leaned[0] - upright[0] < 1e-4) return none;
+		var perRadian = (leaned[0] - upright[0]) / probe;
+		var angle = Math.min(MAX_LEAN, shift / perRadian);
+		return {angle: angle, shift: angle * perRadian};
+	}
+
+	function moveLean(seconds:Float):Void {
+		var step = LEAN_RATE * seconds;
+		leanNow = Math.abs(leanGoal - leanNow) <= step ? leanGoal : leanNow + (leanGoal > leanNow ? step : -step);
+		character.setSpineLean(leanNow);
+	}
+
+	function moveFingers(seconds:Float):Void {
+		for (hand in [ArmL, ArmR]) {
+			var index:Int = hand;
+			var step = CURL_RATE * seconds, wanted = curlFor(hand);
+			curls[index] = Math.abs(wanted - curls[index]) <= step ? wanted :
+				curls[index] + (wanted > curls[index] ? step : -step);
+			character.setHandCurl(hand, curls[index]);
+		}
 	}
 
 	public function rootTransform():Array<Float>
@@ -164,6 +238,12 @@ class HumanBody {
 
 	public function setCarry(hands:Array<HumanLimb>):Void {
 		for (hand in carrying) if (hands.indexOf(hand) < 0) clearReach(hand);
+		for (hand in hands) if (carrying.indexOf(hand) < 0) {
+			// A hand takes up the carry pose from where it is, not by jumping there.
+			var wrist = character.pose.bonePosition(hand == ArmL ? HandL : HandR);
+			carryFrom[hand] = wrist == null ? null : wrist.copy();
+			carrySettled[hand] = wrist == null ? 1.0 : 0.0;
+		}
 		carrying = hands.copy();
 		for (hand in hands) clearReach(hand);
 	}
@@ -189,10 +269,30 @@ class HumanBody {
 		grip = false;
 		for (hand in [ArmL, ArmR]) setHeldPoint(hand, null);
 		for (limb in [ArmL, ArmR, LegL, LegR]) clearReach(limb);
+		for (hand in [ArmL, ArmR]) {
+			curls[hand] = RELAXED_CURL;
+			character.setHandCurl(hand, RELAXED_CURL);
+		}
+		leanGoal = 0.0;
+		leanNow = 0.0;
+		character.setSpineLean(0.0);
+	}
+
+	/**
+	 * Returns the body to rest at a floor pose as if newly constructed: no route,
+	 * no reach, nothing carried or held, and the idle pose evaluated.
+	 */
+	public function reset(x:Float, y:Float, heading:Float):Void {
+		cancel();
+		walker.restart(x, y, heading);
+		advance(0.0);
 	}
 
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
+		for (hand in carrying) carrySettled[hand] = Math.min(1.0, carrySettled[hand] + seconds / CARRY_EASE_SECONDS);
+		moveFingers(seconds);
+		moveLean(seconds);
 		walker.advance(seconds);
 		evaluate();
 	}
@@ -203,11 +303,34 @@ class HumanBody {
 		for (limb in [ArmL, ArmR, LegL, LegR]) {
 			var index:Int = limb;
 			if (active[index]) {
+				hanging[index] = false;
 				character.reach(limb, modelTargets[index] ? targets[index] : toModel(targets[index]),
 					weights[index], poles[index]);
 				changed = true;
 			} else if (isCarrying(limb)) {
-				character.reach(limb, carryTargetModel(limb));
+				hanging[index] = false;
+				var target = carryTargetModel(limb);
+				var settled = carrySettled[index], from = carryFrom[index];
+				if (settled < 1.0 && from != null) {
+					var ease = settled * settled * (3.0 - 2.0 * settled);
+					target = [for (axis in 0...3) from[axis] + (target[axis] - from[axis]) * ease];
+				}
+				character.reach(limb, target);
+				changed = true;
+			} else if ((limb == ArmL || limb == ArmR) && leanNow > 0.02) {
+				// An arm the lean is not using would swing back with the torso; let it hang under the shoulder.
+				var shoulder = character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
+				if (shoulder != null) {
+					var length = description.upperArm + description.forearm;
+					var side = limb == ArmL ? 1.0 : -1.0;
+					character.reach(limb, [shoulder[0] + 0.02, shoulder[1] + side * 0.03, shoulder[2] - 0.92 * length],
+						Math.min(1.0, leanNow / HANG_LEAN));
+					hanging[index] = true;
+					changed = true;
+				}
+			} else if (hanging[index]) {
+				hanging[index] = false;
+				character.release(limb);
 				changed = true;
 			}
 		}

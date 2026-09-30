@@ -737,6 +737,32 @@ nkscene_result NKS_CALL nkscene_render_executor_get_last_result(
     return NKS_OK;
 }
 
+nkscene_result NKS_CALL nkscene_render_executor_set_sample_count(
+    nkscene_render_executor executor_handle, uint32_t requested, uint32_t *out_count) {
+    if (!out_count)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto executor = state.executors.get(nkscene::unpack_handle(executor_handle));
+    if (!executor)
+        return NKS_ERROR_INVALID_HANDLE;
+    *out_count = executor->set_sample_count(requested);
+    return NKS_OK;
+}
+
+nkscene_result NKS_CALL nkscene_render_executor_get_max_sample_count(
+    nkscene_render_executor executor_handle, uint32_t *out_count) {
+    if (!out_count)
+        return NKS_ERROR_INVALID_ARGUMENT;
+    auto &state = registry();
+    std::lock_guard lock(state.mutex);
+    const auto executor = state.executors.get(nkscene::unpack_handle(executor_handle));
+    if (!executor)
+        return NKS_ERROR_INVALID_HANDLE;
+    *out_count = executor->max_sample_count();
+    return NKS_OK;
+}
+
 nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
     nkscene_render_executor executor_handle, nkscene_render_plan plan_handle,
     nkscene_snapshot snapshot_handle, uint32_t width, uint32_t height, float clear_red,

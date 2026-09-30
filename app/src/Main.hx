@@ -147,7 +147,7 @@ class Main {
           arg.indexOf("--story=") != 0 &&
           arg.indexOf("--width=") != 0 && arg.indexOf("--height=") != 0 &&
           arg.indexOf("--capture-dir=") != 0 && arg.indexOf("--frames=") != 0 &&
-          arg.indexOf("--capture-seconds=") != 0 &&
+          arg.indexOf("--capture-seconds=") != 0 && arg.indexOf("--msaa=") != 0 &&
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
           arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" &&
@@ -159,7 +159,7 @@ class Main {
           arg != "--worker-demo=rack-to-table" && arg.indexOf("--worker-demo-step=") != 0) {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
-          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] " +
+          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
           "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] " +
           "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
@@ -181,7 +181,7 @@ class Main {
         editor.session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
       }
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
       var settleSeconds = 0.0;
@@ -275,6 +275,11 @@ class Main {
       liveEditor = editor;
       for (arg in args) if (arg.indexOf("--project-action=") == 0)
         editor.projectInitialAction = arg.substr(17);
+      for (arg in args) if (arg.indexOf("--msaa=") == 0) {
+        var samples = Std.parseInt(arg.substr(7));
+        if (samples == null || samples < 1) throw "--msaa takes a sample count of 1 or more";
+        editor.setAntialiasing(samples, false);
+      }
       if (diagnostics.componentLab) editor.enableComponentLab(diagnostics.storyId);
       for (arg in args) if (arg.indexOf("--character=") == 0) {
         var clip:Null<String> = null;
@@ -536,6 +541,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var toolbarDensity:EditorToolbarDensity = Full;
   public var mode(default, null):EditorMode = EditorMode.Design;
   public var preferences(default, null):AppPreferences;
+  /** Samples per pixel the 3D viewport asks for; one is off. Kept when the viewport is replaced. */
+  public var antialiasing(default, null):Int = AppPreferences.DEFAULT_ANTIALIASING;
   // Start page example that is queued to open; it runs a few frames later so "Opening..." is visible first.
   var startLoading:Null<ExampleEntry> = null;
   var startLoadDelay:Int = 0;
@@ -628,6 +635,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspacePath = workspaceFile == null || workspaceFile.length == 0 ? defaultWorkspacePath() : workspaceFile;
     storage = new FileDockWorkspacePersistence(workspacePath);
     preferences = AppPreferences.besideWorkspace(workspacePath);
+    antialiasing = preferences.antialiasing;
     session.beforeReplace=simulation.clear;
     if(setupScript!=null){var scripted=session.openScript(setupScript);
       simulation.setBackend(scripted.backend);simulation.setTimestep(scripted.timestep);}
@@ -641,7 +649,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
       }
     }
     bimEditor = makeBimEditor();
@@ -665,6 +673,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     if (hostContext != null) {
       perspectiveViewport = new EditorPerspectiveViewport("scene-perspective", scene,
         hostContext);
+      perspectiveViewport.setSampleCount(antialiasing);
     }
     telemetry = new TelemetryPanel(demo);
     logLines = [];
@@ -806,6 +815,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var optionIds = ["scene.grid-spacing-0.1", "scene.grid-spacing-0.2", "scene.grid-spacing-0.5"];
       optionIds = optionIds.concat([
         "scene.lighting-studio", "scene.lighting-soft", "scene.lighting-contrast"]);
+      optionIds = optionIds.concat([
+        "scene.antialiasing-off", "scene.antialiasing-2x", "scene.antialiasing-4x"]);
       var options = new CommandMenu("viewport-options-menu", optionIds,
         viewportOptionsX, viewportOptionsY, commands, ui.commandContext,
         function() { viewportOptionsVisible = false; invalidateView(); },
@@ -1388,7 +1399,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":simulating=" + simulation.isActive()),
       new DockPanelContent("bim", function(_) return bimEditor),
       new DockPanelContent("perspective", function(_) return perspectivePanel(),
-        function(_, width) return perspectivePanel(width)),
+        function(_, width) return perspectivePanel(width),
+        // perspectivePanel() pushes grid and simulation settings into the viewport, so a hit may only skip it when
+        // none of its inputs changed: the chrome key covers grid, snap, simulation, presentation and size.
+        function() return chromeRevisionKey() + ":gridVisible=" + gridVisible + ":options=" + viewportOptionsVisible),
       new DockPanelContent("inspector", function(_) return inspectorPanel(), null,
         function() return "scene=" + scene.revision + ":selection=" + scene.selectionRevision +
           ":simulation=" + simulation.appliedRevision + ":active=" + simulation.isActive() +
@@ -1398,7 +1412,9 @@ class ReferenceEditorApp implements DesktopUiApplication {
           ":sensors=" + sensors.revision() + ":robot=" + sensors.robotId +
           ":selected=" + sensors.selectedIndex + ":simulation=" + simulation.appliedRevision +
           ":active=" + simulation.isActive() + ":running=" + simulation.isRunning()),
-      new DockPanelContent("console", function(_) return consolePanel()),
+      new DockPanelContent("console", function(_) return consolePanel(), null,
+        function() return "log=" + consoleDocument.revision + ":stale=" + session.staleEdits().join("\n") +
+          ":dark=" + appearance.dark),
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
         appearance.theme.tokens.textSecondary, simulation))
     ];
@@ -1708,6 +1724,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
       if (perspectiveViewport != null) perspectiveViewport.dispose();
       perspectiveViewport = hostContext == null ? null :
         new EditorPerspectiveViewport("scene-perspective", scene, hostContext);
+      if (perspectiveViewport != null) perspectiveViewport.setSampleCount(antialiasing);
       sceneInspector = null;
     }
     scene.onSelectionChanged = updateCommandContext;
@@ -1866,6 +1883,18 @@ class ReferenceEditorApp implements DesktopUiApplication {
     try File.appendContent(semanticRecordPath,
       Json.stringify({kind:"action", at:Sys.time(), action:action, data:data}) + "\n")
     catch (error:Dynamic) Sys.println("Materia recording failed: " + Std.string(error));
+  }
+
+  /**
+   * Chooses the viewport's samples per pixel. `remember` keeps the choice for the next launch;
+   * a launch option passes false so it does not overwrite the saved preference.
+   */
+  public function setAntialiasing(samples:Int, remember:Bool = true):Void {
+    if (samples < 1) throw "Anti-aliasing needs at least one sample per pixel";
+    antialiasing = samples;
+    if (remember) preferences.setAntialiasing(samples);
+    if (perspectiveViewport != null) perspectiveViewport.setSampleCount(samples);
+    invalidateView();
   }
 
   /** Switches dock layout and toolbar emphasis; the document, selection, and history are untouched. */

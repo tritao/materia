@@ -172,7 +172,12 @@ class ScenePresentation {
       view.applyHover(null, hoverMaterial);
     } else {
       var hovered = hoveredId == null ? null : owner.object(hoveredId);
-      view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, hoverMaterial);
+      // A worker's own node is an invisible pick proxy; highlight the character it stands for.
+      var hoveredWorker = hovered == null ? null : owner.workerVisuals.get(hovered.id);
+      if (hoveredWorker != null)
+        view.applyHoverNodes(hoveredWorker.character.model.primitiveNodes, hoverMaterial);
+      else
+        view.applyHover(hovered == null ? null : owner.runtimeFor(hovered.id).node, hoverMaterial);
     }
     if (poses != null) {
       var poseNodes:Array<NodeId> = [];

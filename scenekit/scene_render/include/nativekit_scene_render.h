@@ -297,6 +297,15 @@ NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_execute(
     nkscene_render_execution_stats *out_stats NK_OUT);
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_get_last_result(
     nkscene_render_executor executor, nkgpu_result *out_result NK_OUT);
+/** Sets how many samples offscreen captures render with, and reports in out_count the
+ * count that will be used. The request is clamped to what the GPU can render and resolve
+ * for the capture formats and rounded down to a power of two; 1 means no multisampling,
+ * which is also the default. Pixel picking is never multisampled. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_set_sample_count(
+    nkscene_render_executor executor, uint32_t requested, uint32_t *out_count NK_OUT);
+/** Reports the largest sample count offscreen captures can use on this GPU. */
+NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_get_max_sample_count(
+    nkscene_render_executor executor, uint32_t *out_count NK_OUT);
 /** Renders into an offscreen RGBA8 target and copies tightly packed pixels. */
 NKSRENDER_API nkscene_result NKS_CALL nkscene_render_executor_capture_rgba8(
     nkscene_render_executor executor, nkscene_render_plan plan, nkscene_snapshot snapshot,

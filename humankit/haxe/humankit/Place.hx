@@ -9,6 +9,11 @@ package humankit;
  */
 class Place extends HumanActionBase {
 	static inline var TOLERANCE = 0.005;
+	/** How far the wrists pull back from a placed part, and how far they lift, in metres. */
+	static inline var WITHDRAW = 0.25;
+	static inline var LIFT = 0.03;
+	/** The least a withdrawn wrist stays ahead of the chest, in metres. */
+	static inline var MIN_AHEAD = 0.15;
 
 	public final target:Array<Float>;
 	public final hands:Array<HumanLimb>;
@@ -69,12 +74,17 @@ class Place extends HumanActionBase {
 			// IK here lets the idle or walking arm swing into the free part.
 			elapsed += seconds;
 			var fraction = ramp == 0.0 ? 1.0 : Math.min(1.0, elapsed / ramp);
-			var root = worker.rootTransform();
 			for (index in 0...hands.length) {
-				var goal = goals[index];
-				worker.setReachWorld(hands[index],
-					[goal[0] - root[0] * 0.25 * fraction,
-					 goal[1] - root[1] * 0.25 * fraction, goal[2] + 0.03 * fraction], 1.0);
+				// Pull the wrist back toward the body, but never behind a hand's width in front of the
+				// chest: a worker standing at the table has little room, and a wrist dragged through
+				// the torso folds the arm into an elbow raised to the shoulder.
+				var goal = worker.toModel(goals[index]);
+				var chest = worker.character.pose.bonePosition(Chest);
+				if (chest == null) chest = worker.character.pose.bonePosition(Pelvis);
+				var room = chest == null ? WITHDRAW : Math.max(0.0, goal[0] - chest[0] - MIN_AHEAD);
+				var back = Math.min(WITHDRAW, room) * fraction;
+				// In the body's frame, so the arm keeps its pose while the worker walks away.
+				worker.setReachModel(hands[index], [goal[0] - back, goal[1], goal[2] + LIFT * fraction], 1.0);
 			}
 			if (fraction >= 1.0) done = true;
 			return;
@@ -121,6 +131,8 @@ class Place extends HumanActionBase {
 		if (stableTime >= 0.15 || elapsed >= 0.5) {
 			grip = false;
 			worker.setGrip(false);
+			// The part is down; straighten up as the hands withdraw.
+			worker.setLean(0.0);
 			stage = 2;
 			elapsed = 0.0;
 		}

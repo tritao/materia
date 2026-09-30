@@ -23,6 +23,7 @@
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_Transform.hxx>
 #include <BRepFilletAPI_MakeChamfer.hxx>
@@ -54,6 +55,7 @@
 #include <Geom_BezierSurface.hxx>
 #include <Geom_BSplineSurface.hxx>
 #include <GeomAbs_CurveType.hxx>
+#include <GeomAbs_SurfaceType.hxx>
 #include <Geom_ConicalSurface.hxx>
 #include <Geom_CylindricalSurface.hxx>
 #include <Geom_Plane.hxx>
@@ -1374,6 +1376,51 @@ cad_result build_mesh(
         }
 
         const auto location_transform = location.Transformation();
+
+        // Curved faces are shaded from the surface itself: each vertex takes the surface normal at
+        // its own parameters, so shading is smooth across the facets. Planar faces keep the flat
+        // triangle normal, which is already exact for them.
+        TopLoc_Location surface_location;
+        occ::handle<Geom_Surface> surface;
+        if (triangulation->HasUVNodes() &&
+            BRepAdaptor_Surface(face, false).GetType() != GeomAbs_Plane) {
+            surface = BRep_Tool::Surface(face, surface_location);
+        }
+        const bool smooth = !surface.IsNull();
+        std::vector<gp_Vec> node_normals(smooth ? triangulation->NbNodes() : 0);
+        // 0: not evaluated yet, 1: usable, 2: undefined here, as at a pole or apex.
+        std::vector<char> node_state(node_normals.size(), 0);
+        const auto surface_normal = [&](int node) -> const gp_Vec* {
+            auto& state = node_state[static_cast<std::size_t>(node - 1)];
+            if (state == 0) {
+                state = 2;
+                try {
+                    const auto uv = triangulation->UVNode(node);
+                    gp_Pnt point;
+                    gp_Vec derivative_u;
+                    gp_Vec derivative_v;
+                    surface->D1(uv.X(), uv.Y(), point, derivative_u, derivative_v);
+                    derivative_u.Transform(surface_location.Transformation());
+                    derivative_v.Transform(surface_location.Transformation());
+                    const auto length_u = derivative_u.Magnitude();
+                    const auto length_v = derivative_v.Magnitude();
+                    auto direction = derivative_u.Crossed(derivative_v);
+                    if (length_u > 1e-12 && length_v > 1e-12 &&
+                        direction.Magnitude() > 1e-9 * length_u * length_v) {
+                        direction.Normalize();
+                        if (std::isfinite(direction.X()) && std::isfinite(direction.Y()) &&
+                            std::isfinite(direction.Z())) {
+                            node_normals[static_cast<std::size_t>(node - 1)] = direction;
+                            state = 1;
+                        }
+                    }
+                } catch (const Standard_Failure&) {
+                    state = 2;
+                }
+            }
+            return state == 1 ? &node_normals[static_cast<std::size_t>(node - 1)] : nullptr;
+        };
+
         for (int triangle_index = 1;
              triangle_index <= triangulation->NbTriangles();
              ++triangle_index) {
@@ -1391,6 +1438,7 @@ cad_result build_mesh(
 
             if (face.Orientation() == TopAbs_REVERSED) {
                 std::swap(point2, point3);
+                std::swap(node2, node3);
             }
 
             const gp_Vec edge1(point1, point2);
@@ -1406,13 +1454,31 @@ cad_result build_mesh(
                 return fail(CAD_ERROR_OPERATION_FAILED, "mesh exceeds 32-bit index range");
             }
 
+            // The surface gives the direction at each vertex and the triangle gives the sign, so
+            // a face's orientation cannot flip the shading. Where the surface normal is undefined,
+            // or disagrees with the triangle by more than about 75 degrees, the flat normal stays.
+            gp_Vec vertex_normals[3] = {normal, normal, normal};
+            if (smooth) {
+                const int nodes[3] = {node1, node2, node3};
+                for (int corner = 0; corner < 3; ++corner) {
+                    const auto* direction = surface_normal(nodes[corner]);
+                    if (direction == nullptr) {
+                        continue;
+                    }
+                    const auto alignment = direction->Dot(normal);
+                    if (std::abs(alignment) >= 0.25) {
+                        vertex_normals[corner] = alignment < 0.0 ? direction->Reversed() : *direction;
+                    }
+                }
+            }
+
             const auto first_index = static_cast<std::uint32_t>(out_mesh.vertices.size());
             out_mesh.vertices.push_back({point1.X(), point1.Y(), point1.Z()});
             out_mesh.vertices.push_back({point2.X(), point2.Y(), point2.Z()});
             out_mesh.vertices.push_back({point3.X(), point3.Y(), point3.Z()});
-            out_mesh.normals.push_back({normal.X(), normal.Y(), normal.Z()});
-            out_mesh.normals.push_back({normal.X(), normal.Y(), normal.Z()});
-            out_mesh.normals.push_back({normal.X(), normal.Y(), normal.Z()});
+            for (const auto& vertex_normal : vertex_normals) {
+                out_mesh.normals.push_back({vertex_normal.X(), vertex_normal.Y(), vertex_normal.Z()});
+            }
             out_mesh.indices.push_back(first_index);
             out_mesh.indices.push_back(first_index + 1u);
             out_mesh.indices.push_back(first_index + 2u);

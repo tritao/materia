@@ -132,8 +132,9 @@ typedef struct ak_bounds {
 /**
  * A two-bone inverse kinematics chain, such as shoulder, elbow, and wrist,
  * solved after the layers blend: the end joint moves to reach target and the
- * middle joint points in the direction pole (a direction, not a position). The joints must be ancestors in that order
- * but need not be direct parents. Positions are in scene space. weight blends
+ * middle joint points in the direction pole (a direction, not a position); a zero pole leaves the bend to the
+ * animation, carrying the direction the animated pose bends the limb onto the new reach. The joints must be
+ * ancestors in that order but need not be direct parents. Positions are in scene space. weight blends
  * from the animated pose (0, which disables the chain) to the solution (1);
  * soften in (0, 1] eases the chain before it straightens, 1 for none.
  */
@@ -217,6 +218,14 @@ AK_API ak_result AK_CALL ak_instance_set_layer(ak_instance_handle instance, uint
  */
 AK_API ak_result AK_CALL ak_instance_set_ik(ak_instance_handle instance, uint32_t chain,
     const ak_two_bone_ik *ik);
+/**
+ * Turns one joint by a rotation (x, y, z, w) about its own local axes, on top of its animated pose and
+ * before inverse kinematics, so the turn carries the joint's children: fingers curl, a spine leans. The
+ * rotation is normalized; weight in (0, 1] blends from no turn to all of it. A zero weight removes the
+ * turn from that joint. The turn stays until removed.
+ */
+AK_API ak_result AK_CALL ak_instance_set_joint_rotation(ak_instance_handle instance, int32_t joint,
+    float x, float y, float z, float w, float weight);
 /** Samples, blends, solves inverse kinematics, and skins the current layers. */
 AK_API ak_result AK_CALL ak_instance_evaluate(ak_instance_handle instance);
 

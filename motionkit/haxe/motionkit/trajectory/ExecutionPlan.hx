@@ -189,21 +189,17 @@ class ExecutionPlan {
 
   public function evaluate(timeSeconds:Float):TrajectoryState {
     if (disposed) throw "Native plan has been disposed";
-    var state = new mk_trajectory_state();
-    state.set_struct_size(mk_trajectory_state.size());
-    check(MotionKitNative.mk_plan_evaluate(owner.borrow(),
-      Trajectory.nanoseconds(timeSeconds), state), "plan.evaluate");
-    var positions:Array<Float> = [];
-    var velocities:Array<Float> = [];
-    var accelerations:Array<Float> = [];
-    var jerks:Array<Float> = [];
-    for (joint in 0...state.get_joint_count()) {
-      positions.push(state.get_position(joint));
-      velocities.push(state.get_velocity(joint));
-      accelerations.push(state.get_acceleration(joint));
-      jerks.push(state.get_jerk(joint));
+    var state = TrajectoryStateBuffer.acquire();
+    try {
+      check(MotionKitNative.mk_plan_evaluate(owner.borrow(),
+        Trajectory.nanoseconds(timeSeconds), state), "plan.evaluate");
+      var result = TrajectoryStateBuffer.copyOut();
+      TrajectoryStateBuffer.release();
+      return result;
+    } catch (error:Dynamic) {
+      TrajectoryStateBuffer.release();
+      throw error;
     }
-    return new TrajectoryState(positions, velocities, accelerations, jerks);
   }
 
   public function dispose():Void {
