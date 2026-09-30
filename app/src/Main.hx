@@ -116,7 +116,12 @@ import nativekit.ui.host.DesktopUiHostOptions;
 import nativekit.ui.host.DesktopUiHostContext;
 import nativekit.ui.host.DesktopUiHostSession;
 import nativekit.ui.widgets.overlays.Dialog;
+import nativekit.ui.settings.ShortcutBindings;
+import nativekit.ui.widgets.controls.TabItem;
+import nativekit.ui.widgets.controls.Tabs;
+import nativekit.ui.widgets.controls.TabsSelectionMode;
 import nativekit.ui.widgets.settings.SettingsPanel;
+import nativekit.ui.widgets.settings.ShortcutsPanel;
 
 /**
 	Small executable driver for the shared reference-editor shell.
@@ -545,6 +550,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
   public var preferences(default, null):AppPreferences;
   /** The open Editor Settings dialog's state, or null while it is closed. */
   public var settingsPanel(default, null):Null<SettingsPanel> = null;
+  public var shortcutsPanel(default, null):Null<ShortcutsPanel> = null;
+  /** "general" or "shortcuts": the Editor Settings tab shown. */
+  public var settingsTab(default, null):String = "general";
+  /** The user's shortcut choices, applied to `commands` and saved with the settings. */
+  public var shortcutBindings(default, null):ShortcutBindings;
   /** Samples per pixel the 3D viewport asks for; one is off. Kept when the viewport is replaced. */
   public var antialiasing(default, null):Int = AppPreferences.DEFAULT_ANTIALIASING;
   // Start page example that is queued to open; it runs a few frames later so "Opening..." is visible first.
@@ -715,6 +725,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspaceSaves = new WorkspaceSaveWorker(storage, WORKSPACE_KEY);
     workspace.listen(queueWorkspaceSave);
     installCommands();
+    shortcutBindings = new ShortcutBindings(commands, preferences.store);
   }
 
   /** Build the shared view tree for one host frame. */
@@ -1477,15 +1488,23 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Opens the Editor Settings dialog on its first category. */
   public function openSettings():Void {
     if (settingsPanel == null) settingsPanel = new SettingsPanel("editor-settings", preferences.store, invalidateView);
+    if (shortcutsPanel == null) shortcutsPanel = new ShortcutsPanel("editor-shortcuts", shortcutBindings, invalidateView);
     paletteVisible = false;
     contextMenuVisible = false;
     toolbarMenuVisible = false;
     invalidateView();
   }
 
+  public function showSettingsTab(tab:String):Void {
+    if (tab != "general" && tab != "shortcuts") throw 'Unknown settings tab: $tab';
+    settingsTab = tab;
+    invalidateView();
+  }
+
   public function closeSettings():Void {
     if (settingsPanel == null) return;
     settingsPanel = null;
+    shortcutsPanel = null;
     invalidateView();
   }
 
@@ -1499,7 +1518,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
     closeRow.width = LayoutAxis.grow();
     closeRow.childDistribution = LayoutDistribution.Center;
     var content = new Column("editor-settings-content", [
-      new KeyedView("panel", new Column("editor-settings-body", [new KeyedView("settings", panel)], body)),
+      new KeyedView("panel", new Column("editor-settings-body", [new KeyedView("tabs", new Tabs("editor-settings-tabs", [
+        new TabItem("general", "General", panel),
+        new TabItem("shortcuts", "Shortcuts", shortcutsPanel == null ? new Text("") : shortcutsPanel)
+      ], settingsTab, showSettingsTab, fillStyle(), null, null, null, null, TabsSelectionMode.Controlled))], body)),
       new KeyedView("actions", new Row("editor-settings-actions", [new KeyedView("close", close)], closeRow))
     ], actionColumnStyle());
     return new Dialog("editor-settings", "Editor Settings", content, closeSettings,

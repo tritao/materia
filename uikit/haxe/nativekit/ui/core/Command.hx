@@ -39,6 +39,16 @@ class Command {
 		return this;
 	}
 
+	/** The shortcuts the command was registered with, primary first. */
+	public function defaultShortcuts():Array<Shortcut> {
+		var result:Array<Shortcut> = [];
+		if (shortcut != null)
+			result.push(shortcut);
+		for (alternate in alternateShortcuts)
+			result.push(alternate);
+		return result;
+	}
+
 	public function matchesShortcut(key:Int, modifiers:Int):Bool {
 		if (shortcut != null && shortcut.matches(key, modifiers)) return true;
 		for (alternate in alternateShortcuts)

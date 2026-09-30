@@ -3,12 +3,14 @@ package tests;
 import app.AppSettings;
 import app.Main.ReferenceEditorApp;
 import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
 import nativekit.ui.core.UiModifier;
 import nativekit.ui.properties.PropertyValue;
 import FontCollection;
 import LayoutFrame;
 import nativekit.ui.widgets.settings.SettingsPanel;
+import nativekit.ui.widgets.settings.ShortcutsPanel;
 import sys.FileSystem;
 
 /** The Editor Settings dialog: opening, editing, resetting and closing it in a laid-out editor. */
@@ -80,10 +82,49 @@ class EditorSettingsDialogTests {
     check(panel(editor).selectedCategory == null, "nothing matches");
     editor.submit(frame);
 
+    // Shortcuts tab: rebind Editor Settings to Ctrl+Shift+O by clicking its shortcut and pressing the chord.
+    editor.showSettingsTab("shortcuts");
+    root = editor.submit(frame);
+    check(!visible(root, "editor:" + AppSettings.ANTIALIASING + ":numeric"), "the General tab is hidden");
+    check(find(root, "shortcut:editor.undo") != null && find(root, "shortcut:editor.settings") != null,
+      "the Shortcuts tab lists the commands");
+    shortcuts(editor).setFilter("editor settings");
+    root = editor.submit(frame);
+    check(visible(root, "shortcut:editor.settings") && find(root, "shortcut:editor.undo") == null,
+      "the filter narrows the list");
+    click(editor, frame, "shortcut:editor.settings");
+    check(shortcuts(editor).recordingId == "editor.settings", "clicking a shortcut records");
+    editor.ui.key(UiEventKind.KeyDown, 340, UiModifier.Shift);
+    editor.ui.key(UiEventKind.KeyDown, 79, UiModifier.Control | UiModifier.Shift);
+    editor.submit(frame);
+    check(shortcuts(editor).recordingId == null, "the chord ends recording");
+    check(shortcuts(editor).shortcutText("editor.settings") == "Ctrl+Shift+O",
+      "the chord is assigned: " + shortcuts(editor).shortcutText("editor.settings"));
+    check(editor.settingsPanel != null, "the recorded chord did not run anything or close the dialog");
+    click(editor, frame, "shortcut:editor.settings");
+    editor.ui.key(UiEventKind.KeyDown, UiKey.Escape, 0);
+    editor.submit(frame);
+    check(editor.settingsPanel != null && shortcuts(editor).shortcutText("editor.settings") == "Ctrl+Shift+O",
+      "Escape cancels recording without closing the dialog");
+    check(visible(editor.submit(frame), "shortcut-reset:editor.settings"), "a changed shortcut offers reset");
+
     click(editor, frame, "editor-settings-close");
     check(editor.settingsPanel == null && find(editor.submit(frame), "editor-settings-close") == null,
       "Close dismisses the dialog");
+    check(!editor.commands.dispatch(UiKey.Comma, UiModifier.Control), "the old chord no longer opens settings");
+    check(editor.commands.dispatch(79, UiModifier.Control | UiModifier.Shift) && editor.settingsPanel != null,
+      "the new chord does");
+    editor.closeSettings();
     editor.dispose();
+
+    // A restarted editor keeps the new binding.
+    var restarted = new ReferenceEditorApp(fonts, DIRECTORY + "/workspace.json");
+    check(!restarted.commands.dispatch(UiKey.Comma, UiModifier.Control)
+      && restarted.commands.dispatch(79, UiModifier.Control | UiModifier.Shift) && restarted.settingsPanel != null,
+      "custom shortcuts survive a restart");
+    restarted.shortcutBindings.reset("editor.settings");
+    check(restarted.commands.shortcutsFor("editor.settings")[0].label() == "Ctrl+,", "reset restores Ctrl+,");
+    restarted.dispose();
     fonts.dispose();
   }
 
@@ -112,6 +153,12 @@ class EditorSettingsDialogTests {
       if (found != null) return found;
     }
     return null;
+  }
+
+  static function shortcuts(editor:ReferenceEditorApp):ShortcutsPanel {
+    var open:Null<ShortcutsPanel> = editor.shortcutsPanel;
+    if (open == null) throw "the shortcuts tab is not open";
+    return open;
   }
 
   static function panel(editor:ReferenceEditorApp):SettingsPanel {

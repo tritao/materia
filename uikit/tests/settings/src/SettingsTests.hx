@@ -1,4 +1,9 @@
+import nativekit.ui.core.Command;
 import nativekit.ui.core.CommandContext;
+import nativekit.ui.core.CommandRegistry;
+import nativekit.ui.core.Shortcut;
+import nativekit.ui.core.UiKey;
+import nativekit.ui.core.UiModifier;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyEditResult;
 import nativekit.ui.properties.PropertyOption;
@@ -8,10 +13,12 @@ import nativekit.ui.properties.PropertyValueTools;
 import nativekit.ui.settings.SettingDefinition;
 import nativekit.ui.settings.SettingOptions;
 import nativekit.ui.settings.SettingsCatalog;
+import nativekit.ui.settings.ShortcutBindings;
 import nativekit.ui.settings.SettingsRegistry;
 import nativekit.ui.settings.SettingsStore;
 import nativekit.ui.widgets.properties.PropertyInspector;
 import nativekit.ui.widgets.settings.SettingsPanel;
+import nativekit.ui.widgets.settings.ShortcutsPanel;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -30,6 +37,10 @@ class SettingsTests {
 			catalog();
 			editing();
 			panel();
+			shortcutNames();
+			customShortcuts();
+			shortcutPersistence();
+			shortcutsPanel();
 			Sys.println("Settings tests passed");
 			return 0;
 		} catch (error:Dynamic) {
@@ -415,5 +426,121 @@ class SettingsTests {
 		if (inspector == null)
 			throw "the panel shows no inspector";
 		return inspector;
+	}
+
+	static function shortcutNames():Void {
+		var save = new Shortcut(UiKey.S, UiModifier.Control | UiModifier.Shift);
+		check(save.label() == "Ctrl+Shift+S" && save.serialize() == "ctrl+shift+s", 'names: ${save.label()} ${save.serialize()}');
+		check(new Shortcut(UiKey.Comma, UiModifier.Control).label() == "Ctrl+,", "punctuation shows as itself");
+		check(new Shortcut(UiKey.F5).label() == "F5" && new Shortcut(UiKey.Escape).label() == "Esc", "F-keys and named keys");
+		for (shortcut in [save, new Shortcut(UiKey.Comma, UiModifier.Control), new Shortcut(UiKey.F10, UiModifier.Alt),
+			new Shortcut(49, UiModifier.Super), new Shortcut(UiKey.PageDown), new Shortcut(123456, UiModifier.Control)])
+			check(shortcut.equals(Shortcut.parse(shortcut.serialize())), "round trip: " + shortcut.serialize());
+		check(Shortcut.parse("CTRL+S") != null, "parsing ignores case");
+		for (bad in ["", "ctrl+", "hyper+s", "ctrl+nosuchkey", "f0", "key-3", "ctrl+key340"])
+			check(Shortcut.parse(bad) == null, "rejected: " + bad);
+		check(Shortcut.isModifierKey(340) && Shortcut.isModifierKey(347) && !Shortcut.isModifierKey(UiKey.S), "modifier keys");
+	}
+
+	static function sampleCommands(log:Array<String>):CommandRegistry {
+		var commands = new CommandRegistry();
+		commands.register(new Command("editor.save", "Save", () -> log.push("save"), new Shortcut(UiKey.S, UiModifier.Control)));
+		var palette = new Command("editor.palette", "Command Palette", () -> log.push("palette"), new Shortcut(UiKey.K, UiModifier.Control));
+		palette.addShortcut(new Shortcut(UiKey.P, UiModifier.Control));
+		commands.register(palette);
+		commands.register(new Command("scene.frame", "Frame Selected", () -> log.push("frame")));
+		commands.register(new Command("viewport.save", "Save View", () -> log.push("view"), new Shortcut(UiKey.S, UiModifier.Control)), "viewport");
+		return commands;
+	}
+
+	static function customShortcuts():Void {
+		var log:Array<String> = [];
+		var commands = sampleCommands(log);
+		check(commands.shortcutsFor("editor.palette").length == 2, "registered shortcuts, primary first");
+		commands.setShortcuts("scene.frame", [new Shortcut(UiKey.F2)]);
+		check(commands.dispatch(UiKey.F2, 0) && log.join(",") == "frame", "a custom binding runs its command");
+		commands.setShortcuts("editor.save", []);
+		check(!commands.dispatch(UiKey.S, UiModifier.Control) && log.length == 1, "an unbound command no longer runs");
+		commands.resetShortcuts("editor.save");
+		check(commands.dispatch(UiKey.S, UiModifier.Control) && log[1] == "save", "reset restores the registered shortcut");
+		commands.setShortcuts("editor.palette", [new Shortcut(UiKey.K, UiModifier.Control), new Shortcut(UiKey.P, UiModifier.Control)]);
+		check(!commands.hasCustomShortcuts("editor.palette"), "choosing the registered shortcuts is not a custom binding");
+		check(commands.commandsBoundTo(new Shortcut(UiKey.S, UiModifier.Control)).join(",") == "editor.save", "lookup stays in its scope");
+		check(commands.commandsBoundTo(new Shortcut(UiKey.S, UiModifier.Control), "viewport").join(",") == "viewport.save",
+			"other scopes are separate");
+		commands.setShortcuts("plugin.later", [new Shortcut(UiKey.F5)]);
+		check(commands.customShortcutIds().indexOf("plugin.later") >= 0, "bindings for commands not registered yet are kept");
+		commands.register(new Command("plugin.later", "Later", () -> log.push("later")));
+		check(commands.dispatch(UiKey.F5, 0) && log[2] == "later", "and apply once the command is registered");
+	}
+
+	static function shortcutPersistence():Void {
+		var file = prepareFile("shortcuts.json");
+		var log:Array<String> = [];
+		var bindings = new ShortcutBindings(sampleCommands(log), new SettingsStore(sampleRegistry(), file));
+		bindings.assign("scene.frame", new Shortcut(UiKey.F2, UiModifier.Shift));
+		bindings.clear("editor.palette");
+		var reopened = new ShortcutBindings(sampleCommands(log), new SettingsStore(sampleRegistry(), file));
+		check(reopened.commands.shortcutsFor("scene.frame")[0].label() == "Shift+F2", "a new binding survives a restart");
+		check(reopened.commands.shortcutsFor("editor.palette").length == 0, "an unbound command stays unbound");
+		check(!reopened.commands.hasCustomShortcuts("editor.save"), "untouched commands are not saved");
+		reopened.resetAll();
+		check(new SettingsStore(sampleRegistry(), file).getState(ShortcutBindings.STATE_KEY) == null, "resetting everything saves nothing");
+
+		// Taking a chord from another command in the same scope, and only there.
+		var taking = new ShortcutBindings(sampleCommands(log), new SettingsStore(sampleRegistry()));
+		var taken = taking.assign("scene.frame", new Shortcut(UiKey.S, UiModifier.Control));
+		check(taken.join(",") == "editor.save", "the chord is taken from the command that had it");
+		check(taking.commands.shortcutsFor("editor.save").length == 0, "which is left without it");
+		check(taking.commands.shortcutsFor("viewport.save").length == 1, "a command in another scope keeps it");
+
+		// Unreadable saved values are skipped.
+		var store = new SettingsStore(sampleRegistry());
+		var saved:Dynamic = {};
+		Reflect.setField(saved, "editor.save", ["nonsense"]);
+		Reflect.setField(saved, "scene.frame", "ctrl+f");
+		var none:Array<String> = [];
+		Reflect.setField(saved, "editor.palette", none);
+		store.setState(ShortcutBindings.STATE_KEY, saved);
+		var junk = new ShortcutBindings(sampleCommands(log), store);
+		check(!junk.commands.hasCustomShortcuts("editor.save") && !junk.commands.hasCustomShortcuts("scene.frame"),
+			"unreadable bindings fall back to the registered shortcuts");
+		check(junk.commands.shortcutsFor("editor.palette").length == 0, "an empty list still means unbound");
+	}
+
+	static function shortcutsPanel():Void {
+		var log:Array<String> = [];
+		var changes = 0;
+		var panel = new ShortcutsPanel("shortcuts", new ShortcutBindings(sampleCommands(log), new SettingsStore(sampleRegistry())),
+			() -> changes++);
+		var groups = panel.groups();
+		check([for (group in groups) group.name].join(",") == "editor,scene,viewport", "commands are grouped by ID prefix");
+		check(panel.shortcutText("editor.palette") == "Ctrl+K, Ctrl+P" && panel.shortcutText("scene.frame") == "None",
+			"shortcut text");
+
+		check(!panel.press(UiKey.F2, 0), "keys are ignored until a row records");
+		panel.record("scene.frame");
+		check(panel.recordingId == "scene.frame" && changes == 1, "clicking a shortcut starts recording");
+		check(panel.press(340, UiModifier.Shift) && panel.recordingId == "scene.frame", "a modifier alone keeps waiting");
+		check(panel.press(70, UiModifier.Shift | UiModifier.CapsLock) && panel.recordingId == null, "a chord is recorded");
+		check(panel.shortcutText("scene.frame") == "Shift+F", "lock keys are not part of the chord");
+
+		panel.record("scene.frame");
+		check(panel.press(UiKey.Escape, 0) && panel.shortcutText("scene.frame") == "Shift+F", "Escape cancels recording");
+
+		panel.record("scene.frame");
+		panel.press(UiKey.S, UiModifier.Control);
+		check(panel.notice == "Ctrl+S was moved from Save.", 'moving a chord is explained: ${panel.notice}');
+		panel.reset("editor.save");
+		check(panel.notice == "Ctrl+S is also used by Frame Selected.", 'a reset that clashes is explained: ${panel.notice}');
+
+		panel.clear("editor.palette");
+		check(panel.shortcutText("editor.palette") == "None", "clear removes every shortcut");
+
+		panel.setFilter("ctrl+s");
+		check([for (group in panel.groups()) group.ids.join(",")].join(";") == "editor.save;scene.frame;viewport.save",
+			'the filter matches shortcuts: ${[for (group in panel.groups()) group.ids.join(",")].join(";")}');
+		panel.setFilter("palette");
+		check(panel.groups().length == 1 && panel.groups()[0].ids[0] == "editor.palette", "and names");
 	}
 }
