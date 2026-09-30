@@ -919,6 +919,12 @@ int main() {
         assert(render_pixels({{red, 0.0f, 0.0f, false}}, false, light) == empty_scene);
         assert(render_pixels({{red, 1.0f, 0.0f, true}}, false, light) != empty_scene);
 
+        // A surface drawn from an index buffer does not stop its own outline from drawing: the
+        // outline's pipeline is not indexed, and a stale index buffer left bound would make the
+        // GPU layer reject it.
+        assert(render_pixels({{red, 1.0f, 0.0f, true}}, false, light) !=
+               render_samples({{red, 1.0f, 0.0f, true}}, false, light, {1}, false)[0].pixels);
+
         // Multisampling. A capture is single-sample until a count is asked for, and the count
         // is clamped to what the GPU can render and resolve.
         nkscene::NativeKitGpuExecutor probe(renderer);
