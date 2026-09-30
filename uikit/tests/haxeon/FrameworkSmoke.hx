@@ -1052,6 +1052,9 @@ class FrameworkSmoke {
 		var frame = new LayoutFrame(256.0, 192.0);
 		var cycleRoot = new RenderNode(new WidgetId(0x7fffff00));
 		var cycleChild = new RenderNode(new WidgetId(0x7fffff01));
+		// Leaves share one empty children array, so give each node its own before writing to it directly.
+		cycleRoot.add(new RenderNode(new WidgetId(0x7fffff03)));
+		cycleChild.add(new RenderNode(new WidgetId(0x7fffff04)));
 		cycleRoot.children.push(cycleChild);
 		cycleChild.children.push(cycleRoot);
 		if (cycleRoot.find(new WidgetId(0x7fffff02)) != null)

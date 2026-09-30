@@ -23,7 +23,9 @@ import nativekit.ui.semantics.Semantics;
 class RenderNode {
 	public final id:WidgetId;
 	public final layout:LayoutNode;
-	public final children:Array<RenderNode>;
+	/** Shared and empty until the first `add`, so leaves allocate no array; change it only through `add`, `remove` and `replaceWith`. */
+	public var children(default, null):Array<RenderNode>;
+	static final NoChildren:Array<RenderNode> = [];
 	public var parent(default, null):Null<RenderNode>;
 	public var resolved:Null<ResolvedLayoutItem>;
 	public var focusable:Bool;
@@ -86,7 +88,7 @@ class RenderNode {
 			throw "Render nodes require a stable widget ID";
 		this.id = id;
 		layout = new LayoutNode(id.value, kind, style);
-		children = [];
+		children = NoChildren;
 		parent = null;
 		resolved = null;
 		focusable = false;
@@ -147,6 +149,8 @@ class RenderNode {
 			ancestor = ancestor.parent;
 		}
 		child.parent = this;
+		if (children == NoChildren)
+			children = [];
 		children.push(child);
 		layout.add(child.layout);
 		return child;
