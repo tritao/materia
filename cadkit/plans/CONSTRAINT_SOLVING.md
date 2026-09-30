@@ -489,3 +489,31 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   matters: reuse the RCM orderings across solves (the structure is unchanged
   while dragging), reuse row buffers in the sparse Jacobian and envelope, and
   skip diagnosis during a drag (diagnose on release).
+
+### C2.7 — Drags under a frame: reused structure, diagnosis on release, fewer allocations (2026-10-01)
+
+- **Structure reuse:** `SolvedSketch.structures` keeps, per part structure,
+  the solve's RCM ordering and envelope, the diagnosis row graph and its
+  ordering, and the last diagnosis. The key now also lists the part's
+  variables in order, so reordering points can never pair a stale envelope
+  with new indices. The diagnosis row graph comes from what constraints
+  reference (a superset of any pose's nonzeros), so no entry falls outside a
+  cached envelope; `ConstraintDiagnosis.diagnoseSparse` takes it as an
+  optional `RowStructure`.
+- **Diagnosis on release:** `ConstrainedSketch.solve(seed, cancel,
+  diagnose = false)` reports each re-solved part's previous diagnosis
+  (`SolveDiagnostic.diagnosed` false) and keeps it out of the value cache, so
+  the next normal solve re-diagnoses exactly the parts that moved. A part
+  that fails to converge is still diagnosed (a conflict mid-drag is reported).
+- **Allocations:** the LM step keeps each part's envelope, merges a row's
+  entries in reused scratch arrays, and the sparse Jacobian reuses its row
+  buffers; polish runs only while the residual is above 1e-3 × tolerance.
+- `SketchIncrementalSmoke` covers drag mode, release and a mid-drag conflict.
+- Per drag step (load ≈ 27, so upper bounds), with diagnosis / on release:
+  connected 1000 points 23.6 / 11.5 ms (was 69); connected 1000 with a
+  redundancy 62 / 11.6 ms (was 129); connected 200 points 3.5 / 2.1 ms; 250
+  independent profiles ≈ 5 ms; bracket edit 1.0 ms. CamKit and MachineKit
+  pass.
+- The editor has no sketch drag yet (C5 adds soft drag targets); when it
+  does, it should solve with `diagnose = false` while dragging and normally
+  on release.

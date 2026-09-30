@@ -41,6 +41,23 @@ class SketchIncrementalSmoke {
 		check(reused.diagnostic.status == "redundant" && reused.diagnostic.constraintIds.join(",") == "a.top-length,a.v0,a.v1,a.width",
 			'the redundant part keeps its diagnosis while the other re-solves: ${reused.diagnostic.constraintIds}');
 		sameAsCold(sketch, reused, "after editing the other part");
+
+		// Dragging solves without diagnosis: geometry is exact, the diagnosis is the last one and says so.
+		var dragged = reused;
+		for (step in 0...5) {
+			setValue(sketch, "b.height", 5 + 0.1 * (step + 1));
+			dragged = sketch.solve(dragged, null, false);
+			near(dragged.y("b.p2") - dragged.y("b.p1"), 5 + 0.1 * (step + 1), 'drag step $step follows the height');
+		}
+		check(!dragged.diagnostic.diagnosed && dragged.diagnostic.status == "redundant", "a drag reports the previous diagnosis, flagged");
+		var released = sketch.solve(dragged);
+		check(released.diagnostic.diagnosed, "the solve on release diagnoses again");
+		sameAsCold(sketch, released, "after a drag and release");
+		// A dragged value that makes the part conflict is still caught while dragging.
+		setValue(sketch, "a.top-length", 13);
+		var conflicted = false;
+		try sketch.solve(released, null, false) catch (error:cadkit.sketch.SketchSolveError) conflicted = error.diagnostic.status == "conflicting";
+		check(conflicted, "a conflict during a drag is reported, not hidden behind the old diagnosis");
 	}
 
 	static function rectangle(sketch:ConstrainedSketch, prefix:String, dx:Float, width:Float):Void {

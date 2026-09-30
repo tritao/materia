@@ -156,8 +156,17 @@ class SketchEditBenchmark {
 					drag.push(Sys.time() - started);
 				}
 				drag.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
+				// The same drag without diagnosis, as an editor would run it before the solve on release.
+				var quick:Array<Float> = [];
+				for (step in 0...20) {
+					setDimension(sketch, "r0.width", 10.8 + 0.01 * (step + 1));
+					started = Sys.time();
+					previous = sketch.solve(previous, null, false);
+					quick.push(Sys.time() - started);
+				}
+				quick.sort((a, b) -> a < b ? -1 : a > b ? 1 : 0);
 				Sys.println("scaling " + (chained ? "chained" : "independent") + (entry.redundant ? "-redundant" : "") + " points=" + points
-					+ " cold_ms=" + milliseconds(cold) + " edit_ms=" + milliseconds(edit) + " drag_p50_ms=" + milliseconds(drag[10])
+					+ " cold_ms=" + milliseconds(cold) + " edit_ms=" + milliseconds(edit) + " drag_p50_ms=" + milliseconds(drag[10]) + " drag_undiagnosed_p50_ms=" + milliseconds(quick[10])
 					+ " iterations=" + edited.diagnostic.iterations + " diagnostic=" + edited.diagnostic.status
 					+ " subsystems=" + (edited.diagnostic.report == null ? 0 : edited.diagnostic.report.subsystems.length));
 			}

@@ -77,6 +77,18 @@ class DiagnosisReport {
 	}
 }
 
+/**
+	A row graph for `ConstraintDiagnosis.diagnoseSparse` and its envelope
+	ordering, computed once by a caller whose structure does not change
+	between diagnoses (a drag). `neighbours` must include every pair of rows
+	that can share a variable, so no entry ever falls outside the envelope.
+*/
+typedef RowStructure = {
+	var neighbours:Array<Array<Int>>;
+	var position:Array<Int>;
+	var first:Array<Int>;
+}
+
 /** Inputs to `ConstraintDiagnosis.diagnose`. */
 typedef DiagnosisInput = {
 	/** Row-major, `owners.length` rows by `variables` columns. Rows are residuals divided by their tolerance. */
@@ -156,11 +168,11 @@ class ConstraintDiagnosis {
 		(pivot ≥ `INDEPENDENT_PIVOT`); anything else goes to the dense QR.
 	*/
 	public static function diagnoseSparse(rows:Array<{index:Array<Int>, value:Array<Float>}>, variables:Int, owners:Array<String>,
-			residuals:Array<Float>, ?rankTolerance:Float, ?protectedOwners:Array<String>):DiagnosisReport {
+			residuals:Array<Float>, ?rankTolerance:Float, ?protectedOwners:Array<String>, ?structure:RowStructure):DiagnosisReport {
 		if (rows.length != owners.length || rows.length != residuals.length)
 			throw 'Diagnosis has ${rows.length} rows, ${owners.length} owners and ${residuals.length} residuals';
 		var tolerance = rankTolerance == null ? DEFAULT_RANK_TOLERANCE : rankTolerance;
-		var factored = sparseFactor(rows, tolerance);
+		var factored = sparseFactor(rows, tolerance, structure);
 		if (factored != null) {
 			var unsatisfiedRow = [for (row in 0...rows.length) !(Math.abs(residuals[row]) <= 1)];
 			var groups = mergeCircuits(owners, factored.circuits, unsatisfiedRow);
@@ -187,8 +199,8 @@ class ConstraintDiagnosis {
 		fundamental circuit (the row and the kept rows its coefficients reach)
 		and which rows were dropped; null when a pivot is ambiguous.
 	*/
-	static function sparseFactor(source:Array<{index:Array<Int>, value:Array<Float>}>,
-			tolerance:Float):Null<{circuits:Array<Array<Int>>, dropped:Array<Bool>, nearDegenerate:Bool}> {
+	static function sparseFactor(source:Array<{index:Array<Int>, value:Array<Float>}>, tolerance:Float,
+			?structure:RowStructure):Null<{circuits:Array<Array<Int>>, dropped:Array<Bool>, nearDegenerate:Bool}> {
 		// Dependent at or below t², independent above it; near-degenerate below (1e3 t)², as the dense flag.
 		var decides = tolerance >= SPARSE_TOLERANCE;
 		var dependentPivot = decides ? tolerance * tolerance : -1.0;
@@ -211,19 +223,8 @@ class ConstraintDiagnosis {
 				if (norm != null && norm > 0) row.value[e] /= Math.sqrt(norm);
 			}
 		var scale = normalizeRows(rows);
-		// Rows are adjacent when they share a variable.
-		var rowsOf = new Map<Int, Array<Int>>();
-		for (row in 0...m)
-			for (variable in rows[row].index) {
-				var list = rowsOf.get(variable);
-				if (list == null) { list = []; rowsOf.set(variable, list); }
-				list.push(row);
-			}
-		var neighbours:Array<Array<Int>> = [for (_ in 0...m) []];
-		for (list in rowsOf)
-			for (a in list) for (b in list)
-				if (a != b && neighbours[a].indexOf(b) < 0) neighbours[a].push(b);
-		var ordering = EnvelopeCholesky.order(neighbours), first = ordering.first;
+		if (structure == null) structure = rowGraph(rows);
+		var neighbours = structure.neighbours, ordering = structure, first = structure.first;
 		var original = [for (_ in 0...m) 0];
 		for (row in 0...m) original[ordering.position[row]] = row;
 		var envelope = EnvelopeCholesky.zero(first);
@@ -286,6 +287,23 @@ class ConstraintDiagnosis {
 			circuits.push(circuit);
 		}
 		return {circuits: circuits, dropped: [for (row in 0...m) dropped[ordering.position[row]]], nearDegenerate: nearDegenerate};
+	}
+
+	/** Rows are adjacent when they share a variable; ordered by reverse Cuthill-McKee. */
+	public static function rowGraph(rows:Array<{index:Array<Int>, value:Array<Float>}>):RowStructure {
+		var rowsOf = new Map<Int, Array<Int>>();
+		for (row in 0...rows.length)
+			for (variable in rows[row].index) {
+				var list = rowsOf.get(variable);
+				if (list == null) { list = []; rowsOf.set(variable, list); }
+				list.push(row);
+			}
+		var neighbours:Array<Array<Int>> = [for (_ in 0...rows.length) []];
+		for (list in rowsOf)
+			for (a in list) for (b in list)
+				if (a != b && neighbours[a].indexOf(b) < 0) neighbours[a].push(b);
+		var ordering = EnvelopeCholesky.order(neighbours);
+		return {neighbours: neighbours, position: ordering.position, first: ordering.first};
 	}
 
 	/** Scales each row to unit norm in place; returns the norms before scaling (0 for an empty row, left as is). */

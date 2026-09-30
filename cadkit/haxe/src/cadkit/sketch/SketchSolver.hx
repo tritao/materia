@@ -3,6 +3,7 @@ package cadkit.sketch;
 import cadkit.parametric.EvaluationCancelled;
 import cadkit.solve.ConstraintDiagnosis;
 import cadkit.solve.EnvelopeCholesky;
+import cadkit.solve.ConstraintDiagnosis.RowStructure;
 
 private typedef ResidualSet = { values:Array<Float>, owners:Array<String> };
 /** One Jacobian row as (variable, entry) pairs; a variable may repeat and its entries then add. */
@@ -15,7 +16,8 @@ private typedef SparseRow = { index:Array<Int>, value:Array<Float> };
 	reverse Cuthill-McKee ordering: local index → row, and each row's first
 	structurally nonzero column.
 */
-private typedef Part = { id:Int, constraints:Array<Int>, variables:Array<Int>, position:Array<Int>, first:Array<Int>, ordered:Bool };
+private typedef Part = { id:Int, constraints:Array<Int>, variables:Array<Int>, position:Array<Int>, first:Array<Int>, ordered:Bool,
+	envelope:Array<Array<Float>> };
 
 /**
 	Deterministic damped nonlinear least-squares solver implemented entirely in Haxeon.
@@ -49,7 +51,12 @@ class SketchSolver {
 	private var references:Array<Array<Int>> = [];
 	private final constraintList:Array<SketchConstraint>;
 
-	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>) {
+	private final diagnoseParts:Bool;
+	/** Each variable's name (point id with #x/#y, entity id with #r), so a part's key pins its variable order. */
+	private final variableNames:Array<String> = [];
+
+	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool = true) {
+		diagnoseParts = diagnose;
 		this.sketch = sketch; constraintList = sketch.constraints(); pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
 		this.seed = seed;
 		this.cancellationCheck = cancellationCheck;
@@ -58,16 +65,19 @@ class SketchSolver {
 		variableCount = 0;
 		solveTolerance = sketch.settings.tolerance;
 		normalizationScale = 1;
-		for (point in sketch.points()) { points.set(point.id, point); pointIndex.set(point.id, variableCount); variableCount += 2; }
+		for (point in sketch.points()) {
+			points.set(point.id, point); pointIndex.set(point.id, variableCount); variableCount += 2;
+			variableNames.push(point.id + "#x"); variableNames.push(point.id + "#y");
+		}
 		for (entity in sketch.entities()) {
 			entities.set(entity.id, entity);
-			if (entity.kind == "circle" || entity.kind == "arc") { radiusIndex.set(entity.id, variableCount); variableCount++; }
+			if (entity.kind == "circle" || entity.kind == "arc") { radiusIndex.set(entity.id, variableCount); variableCount++; variableNames.push(entity.id + "#r"); }
 		}
 	}
 
 	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null,
-		cancellationCheck:Null<Void->Bool> = null):SolvedSketch {
-		return new SketchSolver(sketch, seed, cancellationCheck).run();
+		cancellationCheck:Null<Void->Bool> = null, diagnose:Bool = true):SolvedSketch {
+		return new SketchSolver(sketch, seed, cancellationCheck, diagnose).run();
 	}
 
 	/**
@@ -133,25 +143,44 @@ class SketchSolver {
 		var iterations = 0, failed = false, stationary = true, degenerate = false;
 		var conflictingIds:Array<String> = [], failingIds:Array<String> = [];
 		var reports:Array<DiagnosisReport> = [];
-		var cache = new Map<String, CachedPart>();
-		var previous = seed == null ? null : seed.partCache;
+		var cache = new Map<String, CachedPart>(), structures = new Map<String, PartStructure>();
+		var previous = seed == null ? null : seed.partCache, previousStructures = seed == null ? null : seed.structures;
+		var diagnosed = true;
 		for (part in parts()) {
 			checkCancelled();
 			// A part whose constraints, fixed positions and settings are unchanged, seeded from its own previous
 			// solution, is already solved: reuse its diagnosis. Dragging one profile re-solves only that profile.
 			var key = partKey(part), values = partValues(part);
+			// The same structure (a drag changes only values) keeps its orderings and its last diagnosis.
+			var known = previousStructures == null ? null : previousStructures.get(key);
+			if (known != null) {
+				part.position = known.position;
+				part.first = known.first;
+				part.ordered = true;
+			}
 			var cached = previous == null ? null : previous.get(key);
 			if (cached != null && sameValues(cached.values, values)) {
 				reports.push(cached.report);
 				if (cached.degenerate) degenerate = true;
 				cache.set(key, cached);
+				if (known != null) structures.set(key, known);
 				continue;
 			}
 			var partDegenerate = false;
 			var solved = solvePart(x, part, false);
 			x = solved.x;
 			iterations = iterations > solved.iterations ? iterations : solved.iterations;
-			var report = diagnosePart(x, x, part, solved.set);
+			if (!diagnoseParts && known != null && solved.norm <= solveTolerance) {
+				// Dragging: report the last diagnosis; the solve on release checks this part again.
+				reports.push(known.report);
+				if (known.degenerate) degenerate = true;
+				diagnosed = false;
+				structures.set(key, {position: part.position, first: part.first, rows: known.rows, report: known.report,
+					degenerate: known.degenerate});
+				continue;
+			}
+			var rows = known != null && known.rows != null ? known.rows : structuralRows(part, solved.set.values.length);
+			var report = diagnosePart(x, x, part, solved.set, rows);
 			if (solved.norm > solveTolerance) {
 				failed = true;
 				var limit = Math.max(sketch.settings.rankTolerance, solveTolerance * 10) * (1 + solved.norm);
@@ -173,6 +202,7 @@ class SketchSolver {
 			if (partDegenerate) degenerate = true;
 			if (solved.norm <= solveTolerance)
 				cache.set(key, {values: values, report: report, degenerate: partDegenerate});
+			structures.set(key, {position: part.position, first: part.first, rows: rows, report: report, degenerate: partDegenerate});
 			reports.push(report);
 		}
 		var report = ConstraintDiagnosis.merge(reports, variableCount);
@@ -195,18 +225,23 @@ class SketchSolver {
 		var message = status == "redundant" ? "solution converged with locally redundant constraints" : "solution converged";
 		if (degenerate)
 			message += "; the constraints are independent in general but the solved pose is degenerate";
-		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids, message, report, degenerate);
+		var diagnostic = new SolveDiagnostic(status, true, currentNorm, dof, iterations, ids, message, report, degenerate, diagnosed);
 		checkCancelled();
 		var coordinates:Map<String, Array<Float>> = new Map();
 		for (point in sketch.points()) { var i:Int = cast pointIndex.get(point.id); coordinates.set(point.id, [x[i], x[i + 1]]); }
 		var radii:Map<String, Float> = new Map();
 		for (entity in sketch.entities()) if (radiusIndex.exists(entity.id)) { var i:Int = cast radiusIndex.get(entity.id); radii.set(entity.id, x[i]); }
-		return new SolvedSketch(coordinates, radii, diagnostic, cache);
+		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures);
 	}
 
-	/** The part's structure: constraint IDs, kinds and references, and the entities they reach. Numbers are in `partValues`. */
+	/**
+		The part's structure: its variables in order, constraint IDs, kinds and references, and the entities they
+		reach. Numbers are in `partValues`.
+	*/
 	private function partKey(part:Part):String {
 		var key = new StringBuf(), field = String.fromCharCode(1), record = String.fromCharCode(2);
+		for (variable in part.variables) { key.add(variableNames[variable]); key.add(field); }
+		key.add(record);
 		for (index in part.constraints) {
 			var c = constraintList[index];
 			key.add(c.id); key.add(field); key.add(c.kind);
@@ -268,7 +303,7 @@ class SketchSolver {
 			else damping = Math.min(1e12, damping * 10);
 		}
 		var polish = 0;
-		while (currentNorm <= solveTolerance && currentNorm > 0 && polish < 3) {
+		while (currentNorm <= solveTolerance && currentNorm > solveTolerance * 1e-3 && polish < 3) {
 			checkCancelled();
 			polish++;
 			var trial = dampedStep(x, current, 1e-12, part);
@@ -301,7 +336,7 @@ class SketchSolver {
 			var root = find(parent, references[index][0]);
 			if (slot[root] < 0) {
 				slot[root] = partList.length;
-				partList.push({id: partList.length, constraints: [], variables: [], position: [], first: [], ordered: false});
+				partList.push({id: partList.length, constraints: [], variables: [], position: [], first: [], ordered: false, envelope: []});
 			}
 			partList[slot[root]].constraints.push(index);
 		}
@@ -570,19 +605,32 @@ class SketchSolver {
 	*/
 	private function dampedStep(x:Array<Float>, current:ResidualSet, damping:Float, part:Part):Null<Array<Float>> {
 		var k = part.variables.length, rows = sparseJacobian(x, current.values.length);
-		// envelope[row][column - first[row]] for first[row] <= column <= row, in RCM order.
-		var envelope = EnvelopeCholesky.zero(part.first);
+		// envelope[row][column - first[row]] for first[row] <= column <= row, in RCM order; kept per part, zeroed here.
+		if (part.envelope.length != k) part.envelope = EnvelopeCholesky.zero(part.first);
+		var envelope = part.envelope;
+		for (line in envelope) for (i in 0...line.length) line[i] = 0;
 		var gradient = fill(k, 0);
+		var positions = scratchIndex, values = scratchValue;
 		for (row in 0...rows.length) {
 			if (row % 16 == 0)
 				checkCancelled();
-			var entries = localEntries(rows[row], part);
-			for (a in 0...entries.index.length) {
-				var pa = part.position[entries.index[a]], va = entries.value[a];
+			// The row's entries by envelope position, repeated variables merged, in reused scratch arrays.
+			var source = rows[row];
+			positions.resize(0);
+			values.resize(0);
+			for (e in 0...source.index.length) {
+				var variable = source.index[e];
+				if (variablePart[variable] != part.id) continue;
+				var position = part.position[variableLocal[variable]], at = positions.indexOf(position);
+				if (at < 0) { positions.push(position); values.push(source.value[e]); } else values[at] += source.value[e];
+			}
+			for (a in 0...positions.length) {
+				var pa = positions[a], va = values[a];
 				gradient[pa] += va * current.values[row];
-				for (b in 0...entries.index.length) {
-					var pb = part.position[entries.index[b]];
-					if (pb <= pa) envelope[pa][pb - part.first[pa]] += va * entries.value[b];
+				var line = envelope[pa], lineFirst = part.first[pa];
+				for (b in 0...positions.length) {
+					var pb = positions[b];
+					if (pb <= pa) line[pb - lineFirst] += va * values[b];
 				}
 			}
 		}
@@ -595,6 +643,11 @@ class SketchSolver {
 			trial[part.variables[i]] += y[part.position[i]] * normalizationScale;
 		return trial;
 	}
+
+	private final scratchIndex:Array<Int> = [];
+	private final scratchValue:Array<Float> = [];
+	/** Row storage `sparseJacobian` reuses between calls; callers consume rows before asking again. */
+	private final rowBuffer:Array<SparseRow> = [];
 
 	/** A row's entries in the part's local numbering, repeated variables added together. */
 	private function localEntries(row:SparseRow, part:Part):SparseRow {
@@ -633,7 +686,9 @@ class SketchSolver {
 		dimensionless and take ∂f/∂x · s.
 	*/
 	private function sparseJacobian(x:Array<Float>, rows:Int):Array<SparseRow> {
-		var j:Array<SparseRow> = [for (_ in 0...rows) {index: [], value: []}];
+		while (rowBuffer.length < rows) rowBuffer.push({index: [], value: []});
+		for (r in 0...rows) { rowBuffer[r].index.resize(0); rowBuffer[r].value.resize(0); }
+		var j = rows == rowBuffer.length ? rowBuffer : rowBuffer.slice(0, rows);
 		var row = 0, constraintIndex = 0;
 		for (index in activeConstraints()) {
 			var c = constraintList[index];
@@ -832,18 +887,40 @@ class SketchSolver {
 	}
 
 	/**
+		The part's diagnosis row graph from what its constraints reference (a
+		superset of any pose's nonzeros), ordered once and reusable while its
+		structure stands. Null if the row count does not match `rows`.
+	*/
+	private function structuralRows(part:Part, rows:Int):Null<RowStructure> {
+		var rowVariables:Array<Array<Int>> = [];
+		for (index in part.constraints)
+			for (_ in 0...rowCount(constraintList[index].kind))
+				rowVariables.push(references[index]);
+		if (rowVariables.length != rows) return null;
+		return ConstraintDiagnosis.rowGraph([for (list in rowVariables) {index: list, value: [for (_ in list) 1.0]}]);
+	}
+
+	/** Residual rows each constraint kind emits (see `residuals`). */
+	private static function rowCount(kind:String):Int {
+		return switch kind {
+			case "fixed", "coincident", "concentric", "angle", "symmetric": 2;
+			default: 1;
+		};
+	}
+
+	/**
 		Diagnoses a part with its Jacobian taken at `at` (the solution, or a
 		witness pose) and feasibility judged from `set`, the residuals at the
 		solution; rows count as satisfied within ten times the solve tolerance.
 	*/
-	private function diagnosePart(at:Array<Float>, solution:Array<Float>, part:Part, set:ResidualSet):DiagnosisReport {
+	private function diagnosePart(at:Array<Float>, solution:Array<Float>, part:Part, set:ResidualSet, ?rows:RowStructure):DiagnosisReport {
 		activePart = part.id;
-		var rows = sparseJacobian(at, set.values.length);
+		var jacobian = sparseJacobian(at, set.values.length);
 		activePart = -1;
-		var local = [for (row in rows) localEntries(row, part)];
+		var local = [for (row in jacobian) localEntries(row, part)];
 		var satisfiedWithin = solveTolerance * 10;
 		return ConstraintDiagnosis.diagnoseSparse(local, part.variables.length, set.owners,
-			[for (value in set.values) value / satisfiedWithin], sketch.settings.rankTolerance);
+			[for (value in set.values) value / satisfiedWithin], sketch.settings.rankTolerance, null, rows);
 	}
 
 	/**
