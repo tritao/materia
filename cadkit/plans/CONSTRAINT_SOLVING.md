@@ -579,3 +579,13 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   joints there is nothing to nudge and the check is skipped.
 - A four-bar authored exactly at its toggle reports `degenerate` with the
   general diagnosis `redundant(pin)-3`; an ordinary pose is not flagged.
+
+### C3.4 — Loop-closing joints become closures automatically (2026-10-01)
+
+- `AssemblyModel.mate`/`mateOnAxis` record a closure (via `constrainOnAxis`)
+  when the child already hangs from a tree joint or is an ancestor of the
+  parent, instead of throwing "already has a parent joint". A closure has no
+  coordinate, so a non-zero value there is an error. The editor creates no
+  joints yet, so the builder is the only place this applies today.
+- Smoke: a four-bar built from four plain mates records `pin` as a closure;
+  mating back up the tree is a closure too; a valued closing mate is refused.
