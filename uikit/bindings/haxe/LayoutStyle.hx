@@ -80,8 +80,8 @@ class LayoutStyle {
 	/** Returns an independent style value for compositional widget builders. */
 	public function copy():LayoutStyle {
 		var result = new LayoutStyle();
-		result.width = copyAxis(width);
-		result.height = copyAxis(height);
+		result.width = width;
+		result.height = height;
 		result.aspectRatio = aspectRatio;
 		result.direction = direction;
 		result.childAlignX = childAlignX;
@@ -112,6 +112,4 @@ class LayoutStyle {
 		return result;
 	}
 
-	static function copyAxis(axis:LayoutAxis):LayoutAxis
-		return new LayoutAxis(axis.sizing, axis.value, axis.min, axis.max, axis.growWeight);
 }
