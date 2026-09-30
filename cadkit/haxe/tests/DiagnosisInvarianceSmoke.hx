@@ -37,10 +37,7 @@ private typedef AssemblyFixture = {
 	remove its entry and a regression cannot hide.
 */
 class DiagnosisInvarianceSmoke {
-	static final KNOWN:Array<String> = [
-		// An unclosable loop ends at a stationary residual but is reported as out of iterations (C3).
-		"four-bar-impossible/expected",
-	];
+	static final KNOWN:Array<String> = [];
 
 	public static function run():Void {
 		var failures:Array<String> = [];

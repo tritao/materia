@@ -39,6 +39,7 @@ class AssemblyLoopSmoke {
 		check(limited.joint("rocker") == 1.9, "a limit-blocked solve leaves the state untouched");
 
 		checkDrivers();
+		checkReports();
 		throws(() -> fourBar.solveClosures(["pin"]), "a closure joint cannot be a dependent coordinate");
 		throws(() -> fourBar.solveClosures(["coupler", "coupler"]), "dependent coordinates must be distinct");
 	}
@@ -88,6 +89,27 @@ class AssemblyLoopSmoke {
 			joint("j3", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "l2", "b", "l3", "a", 0.6),
 			joint("weld", AssemblyJointType.Fixed, AssemblyJointRole.Closure, "l3", "b", "ground", "b", 0.0)]);
 	}
+
+	/** Closure solves carry a diagnosis: planar loops built from 3D closures show consistent redundant rows. */
+	static function checkReports():Void {
+		var driven = fourBarDefinition(2200, null, null, 1.4);
+		driven.joints[0].driven = true;
+		var closed = new AssemblyState(driven).solveClosures();
+		check(closed.report != null && groups(closed.report) == "redundant(pin)-3",
+			'a planar four-bar has three out-of-plane closure rows, satisfied: ${groups(closed.report)}');
+		var impossible = fourBarDefinition(5000, null, null, 1.4);
+		impossible.joints[0].driven = true;
+		var failed = new AssemblyState(impossible).solveClosures();
+		check(failed.status == "conflicting" && failed.report != null && failed.report.conflictingOwners().join(",") == "pin",
+			'an unclosable four-bar is conflicting at its pin: ${failed.status} ${groups(failed.report)}');
+		var excavator = new AssemblyState(ProceduralExcavatorAssembly.buildDefinition()).solveClosures();
+		check(excavator.converged && excavator.report != null && excavator.report.conflictingOwners().length == 0
+			&& excavator.report.redundantOwners().length == 4,
+			'the excavator\'s four closures are consistent and redundant only by design: ${groups(excavator.report)}');
+	}
+
+	static function groups(report:Null<cadkit.solve.ConstraintDiagnosis.DiagnosisReport>):String
+		return report == null ? "none" : [for (group in report.dependencyGroups) group.toString()].join(" ");
 
 	/** Driven joints are inputs; the dependent coordinates of every loop are derived from them. */
 	static function checkDrivers():Void {

@@ -548,3 +548,22 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   contain NUL"), breaking every build that includes projectkit. They had
   never worked (they looked for the text "x00"); `AssemblyCodec.containsNul`
   checks by character code.
+
+### C3.2 — Closure diagnosis; unclosable loops are conflicting (2026-10-01)
+
+- `AssemblyLoopSolveResult.report`: the closure rows (already divided by
+  their tolerances) at the final state, diagnosed over the dependent columns
+  by `ConstraintDiagnosis.diagnoseSparse` at `SPARSE_TOLERANCE`, owners =
+  closure IDs. A planar four-bar's revolute closure shows
+  `redundant(pin)-3` (its out-of-plane rows); the excavator's four closures
+  are all consistent-redundant, none conflicting.
+- Status: kinematicskit's LM calls a stop stationary only below
+  1e-10 (1 + ‖J‖‖r‖), and a large-residual (unclosable) loop approaches its
+  least-squares pose only linearly, so it ran out of iterations. The
+  unclosable four-bar ends with ‖Jᵀr‖/‖J‖‖r‖ ≈ 1.15e-6; unfinished solves sit
+  at 0.1–0.9. CadKit now reports an iteration-limit stop with that ratio
+  ≤ 1e-4 as `conflicting` (kinematicskit's own status, which RobotKit uses,
+  is unchanged).
+- The invariance suite's `KNOWN` list is now empty.
+- Not done here: the inspector does not show the report yet (the API
+  carries it); the assembly witness check is C3.3.
