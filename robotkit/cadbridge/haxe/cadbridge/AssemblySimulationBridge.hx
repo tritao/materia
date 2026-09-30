@@ -54,6 +54,14 @@ typedef AssemblyPhysicalData = {
 /** Converts an assembly's tree joints and physical parts to a RobotKit model. */
 class AssemblySimulationBridge {
   /**
+   * End-stop room past a joint's limits when its assembly states no overtravel: 1 mm for a slide,
+   * 1 degree for a rotary joint. A joint parked on its limit reads noise either side of it, and a
+   * runtime that faulted exactly at the limit would stop the robot before any command.
+   */
+  public static inline final DEFAULT_PRISMATIC_OVERTRAVEL = 0.001;
+  public static final DEFAULT_ROTARY_OVERTRAVEL = Math.PI / 180;
+
+  /**
    * `freeOccurrences` are parts the simulation moves on its own instead of bolting them to the
    * assembly, such as a workpiece; they get no link, and no joint may touch them.
    */
@@ -146,6 +154,8 @@ class AssemblySimulationBridge {
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
         edge.limits.velocity == null ? 0 : edge.limits.velocity * factor,
         edge.limits.effort == null ? 0 : edge.limits.effort);
+      joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
+        edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }
     if (definition.couplings != null) for (coupling in definition.couplings) {
       var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;

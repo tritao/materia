@@ -276,7 +276,9 @@ class LinearAxis extends MachineAssembly {
 		addMate("coupling", "continuous", "motor", "shaftTip", "coupling", "axis");
 		addMate("coupling-screw", "fixed", "coupling", "axis", "screw", "input");
 		addMateOnAxis("carriage-slide", "prismatic", "motor", "shaftTip", "carriage", "bore",
-			{x: 0, y: 1, z: 0}, travelMin, {lower: travelMin, upper: travelMax, velocity: null, effort: null});
+			{x: 0, y: 1, z: 0}, travelMin,
+			// The carriage can pass either end of its stroke by the end margin before it meets a bearing housing.
+			{lower: travelMin, upper: travelMax, velocity: null, effort: null, overtravel: margin});
 		var ratio = 2 * Math.PI / (transmission.lead * transmission.direction);
 		addCoupling("lead-screw", "carriage-slide", "coupling", ratio,
 			-transmission.linearOffset * ratio);

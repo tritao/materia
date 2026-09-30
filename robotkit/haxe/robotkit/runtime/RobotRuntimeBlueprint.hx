@@ -168,6 +168,9 @@ class RobotRuntimeBlueprint {
     for (index in 0...joints.length) {
       var joint = joints[index];
       value.set_joints(index, joint.nativeValue());
+      if (!Math.isFinite(joint.overtravel) || joint.overtravel < 0.0)
+        throw "Joint overtravel must be finite and non-negative";
+      value.set_joint_overtravel(index, joint.overtravel);
       var dynamics = new rk_robot_joint_dynamics();
       dynamics.set_armature(joint.armature);
       dynamics.set_damping(joint.damping);

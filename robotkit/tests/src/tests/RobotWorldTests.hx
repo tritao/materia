@@ -773,6 +773,7 @@ class RobotWorldTests {
     source.joints[2].limitTimeConstant = 0.008;
     source.joints[2].limitDampingRatio = 1.0;
     source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
+    source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
     source.actuators[0].servoDamping = 2.0;
 
@@ -783,6 +784,8 @@ class RobotWorldTests {
     equal(RobotModelCodec.encode(restored).toString(), encoded.toString(),
       "canonical RobotModel artifact round-trips byte for byte");
     equal(restored.links[0].mass, 42.5, "RobotModel codec preserves link mass");
+    equal(restored.joints[1].limits.overtravel, 0.004, "RobotModel codec preserves joint overtravel");
+    equal(restored.joints[0].limits.overtravel, 0.0, "a joint written without overtravel has none");
     equal(restored.links[0].inertiaTensor[7], 0.2, "RobotModel codec preserves inertia tensor");
     equal(restored.links[0].visualGeometry, "meshes/base.glb",
       "RobotModel codec preserves geometry references");

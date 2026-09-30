@@ -53,9 +53,10 @@ list (keyed by assembly joint id, positions relative to the generated initial po
 `grips` list of `{time, link, action}` vacuum commands, `grip` or `release`, which repeat with the
 looping motion. The manifest's `dynamicParts` lists parts to simulate as free dynamic bodies rather
 than bolting them to the assembly. A `grip` holds the free object touching the named link, and a
-`release` lets it go. Track positions for a prismatic joint are in metres. A
-simulated joint may settle up to 1 mm or 1 mrad past a limit it rests on
-(`AssemblyRobot.OBSERVED_LIMIT_TOLERANCE`) before the runtime reports a limit fault.
+`release` lets it go. Track positions for a prismatic joint are in metres. A joint's
+`overtravel` (assembly joint limits) is how far it can pass its limits before meeting its end stop:
+the simulation puts the stops there and faults only beyond them. A joint whose assembly gives none
+gets 1 mm or 1 degree, so one parked on its limit does not fault on numerical noise.
 
 - The hierarchy's Add menu groups primitive, CAD, feature, and import commands.
   Search filters objects by name or type and includes matching CAD features.

@@ -90,6 +90,10 @@ class CncRouterChecks {
 		checkClear(router, state, [150, 150, 0], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 		checkClear(router, state, [150, 150, -80], ["zPlate", "spindle", "spindleClamp"], ["motorBracketZ", "motorZ", "xPlate", "screwZ"]);
 
+		// Every axis has room past its travel before its blocks reach their rail ends.
+		near(router.axisOvertravel("x"), 62.65, "x overtravel", 1e-6);
+		near(router.axisOvertravel("y"), 6.65, "y overtravel", 1e-6);
+		near(router.axisOvertravel("z"), 0.5, "z overtravel", 1e-6);
 		var bom = router.billOfMaterials().lines();
 		var motors = [for (entry in router.components()) if (Std.isOfType(entry.component, NemaStepper)) entry.id];
 		if (motors.length != 4) throw 'CNC router should have four stepper motors, got $motors';

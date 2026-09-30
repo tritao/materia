@@ -423,6 +423,16 @@ typedef struct rk_robot_runtime_blueprint {
      * Commanded positions must still lie within the limits.
      */
     double observed_limit_tolerance;
+    /**
+     * Versioned: per-joint overtravel in joint units, indexed by joint: how
+     * far a joint can travel past its position limits before it meets its end
+     * stop, as a machine's limit switch sits beyond its soft limit. Commands
+     * must still lie within the limits; the runtime faults only when an
+     * observed position passes a limit by more than the joint's overtravel
+     * plus observed_limit_tolerance, and a simulation puts the joint's end
+     * stops at the limits widened by it. Zero puts the stops at the limits.
+     */
+    double joint_overtravel[RK_MAX_JOINTS];
 } rk_robot_runtime_blueprint;
 
 /* ------------------------------------------------------------------------- */

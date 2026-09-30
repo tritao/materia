@@ -1623,10 +1623,13 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         offsetof(rk_robot_runtime_blueprint, observed_limit_tolerance) +
             sizeof(blueprint_.observed_limit_tolerance)
         ? blueprint_.observed_limit_tolerance : 0.0;
+    const bool has_overtravel = blueprint_.struct_size >=
+        offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
-        if (next.position[joint] < limits.lower_limit - tolerance ||
-            next.position[joint] > limits.upper_limit + tolerance) {
+        const double margin = tolerance + (has_overtravel ? blueprint_.joint_overtravel[joint] : 0.0);
+        if (next.position[joint] < limits.lower_limit - margin ||
+            next.position[joint] > limits.upper_limit + margin) {
             latch_fault();
             return RK_ERROR_LIMIT;
         }

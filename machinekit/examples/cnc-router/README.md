@@ -37,11 +37,11 @@ axes yet.
 The prismatic joints `x`, `y` and `z` read in machine coordinates, in
 millimetres, which is what `toolpathkit.motion.MachineBinding` expects:
 
-| Joint | Moves | Range (mm) | Start |
-| ----- | ----- | ---------- | ----- |
-| `x`   | X carriage along the gantry | 0 to 300 | 150 |
-| `y`   | gantry along the frame | 0 to 300 | 150 |
-| `z`   | Z plate and spindle | −80 to 0 | 0 |
+| Joint | Moves | Range (mm) | Start | Overtravel (mm) |
+| ----- | ----- | ---------- | ----- | --------------- |
+| `x`   | X carriage along the gantry | 0 to 300 | 150 | 62.65 |
+| `y`   | gantry along the frame | 0 to 300 | 150 | 6.65 |
+| `z`   | Z plate and spindle | −80 to 0 | 0 | 0.5 |
 
 Machine zero is the front-left corner of travel with Z at the top. The
 assembly frame has the floor at z = 0 and the bed centred on the origin, so
@@ -69,11 +69,13 @@ swallows the screw through its bore) overlap in the starting pose, and the
 MuJoCo backend never collides parts of one machine that overlap there, so they
 slide freely without any per-project setting.
 
-Z starts at the top of its travel, on its upper limit. The simulated robot
-therefore relies on the runtime's limit tolerance
-(`AssemblyRobot.OBSERVED_LIMIT_TOLERANCE`, 1 mm); with none, the first
-settling step past the limit latched a fault and the robot ignored every
-command.
+Each axis declares its overtravel: the room its rail blocks have left before
+the rail ends at either end of travel, where the end stops are (see the table
+above). The simulation puts the stops there and faults only past them. Z
+starts at the top of its travel, on its upper limit, as a machine does after
+homing, and reads numerical noise on both sides of it; without the half
+millimetre of overtravel the first reading above the limit would fault the
+machine.
 
 ## Checks
 

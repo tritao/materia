@@ -1014,7 +1014,7 @@ class MachineAssembly {
 			child: joint.child, childConnector: joint.childConnector,
 			axis: {x: joint.axis.x, y: joint.axis.y, z: joint.axis.z},
 			limits: {lower: joint.limits.lower, upper: joint.limits.upper,
-				velocity: joint.limits.velocity, effort: joint.limits.effort},
+				velocity: joint.limits.velocity, effort: joint.limits.effort, overtravel: joint.limits.overtravel},
 			defaultValue: joint.defaultValue};
 		if (joint.role == AssemblyJointRole.Closure && tolerance != null)
 			saved.closureTolerance = tolerance;

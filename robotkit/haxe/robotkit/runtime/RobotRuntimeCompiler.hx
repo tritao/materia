@@ -90,6 +90,7 @@ class RobotRuntimeCompiler {
         joint.parentFramePosition, joint.parentFrameRotation,
         joint.childFramePosition, joint.childFrameRotation, joint.axis,
         joint.limits.maxAcceleration);
+      compiled.overtravel = joint.limits.overtravel;
       compiled.armature = joint.armature;
       compiled.damping = joint.damping;
       compiled.frictionLoss = joint.frictionLoss;

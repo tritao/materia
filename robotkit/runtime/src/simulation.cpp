@@ -520,8 +520,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             std::copy_n(source.parent_frame_rotation, 4, desc.rotation_a);
             std::copy_n(source.child_frame_rotation, 4, desc.rotation_b);
-            desc.lower_limit = source.lower_limit;
-            desc.upper_limit = source.upper_limit;
+            // The end stops sit beyond the limits by the joint's overtravel.
+            const double overtravel = blueprint.struct_size >=
+                offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel)
+                ? blueprint.joint_overtravel[index] : 0.0;
+            desc.lower_limit = source.lower_limit - overtravel;
+            desc.upper_limit = source.upper_limit + overtravel;
             desc.max_force = source.max_effort;
             if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
                     sizeof(blueprint.joint_dynamics)) {

@@ -75,6 +75,9 @@ class RobotModelCodec {
       finite(joint.limits.maxAcceleration, "joint limits.maxAcceleration");
       if (joint.limits.maxAcceleration < 0.0)
         throw "joint limits.maxAcceleration must be non-negative";
+      finite(joint.limits.overtravel, "joint limits.overtravel");
+      if (joint.limits.overtravel < 0.0)
+        throw "joint limits.overtravel must be non-negative";
       jointTypeName(joint.type);
     }
     var actuators = new Map<String, Bool>();
@@ -128,9 +131,7 @@ class RobotModelCodec {
       joints: [for (joint in model.joints) {
         id: joint.id, name: joint.name, type: jointTypeName(joint.type),
         parentLink: joint.parent.id, childLink: joint.child.id,
-        limits: {lower: joint.limits.lower, upper: joint.limits.upper,
-          velocity: joint.limits.velocity, effort: joint.limits.effort,
-          maxAcceleration: joint.limits.maxAcceleration},
+        limits: encodeLimits(joint.limits),
         parentFramePosition: joint.parentFramePosition,
         parentFrameRotation: joint.parentFrameRotation,
         childFramePosition: joint.childFramePosition,
@@ -213,6 +214,8 @@ class RobotModelCodec {
       var maxAcceleration = number(limits, "maxAcceleration");
       joint.limits = new JointLimits(number(limits, "lower"), number(limits, "upper"),
         number(limits, "velocity"), number(limits, "effort"), maxAcceleration);
+      // Written only when a joint has some, so older models without it still load.
+      if (Reflect.hasField(limits, "overtravel")) joint.limits.overtravel = number(limits, "overtravel");
       joint.parentFramePosition = vectorField(record, "parentFramePosition", 3);
       joint.parentFrameRotation = vectorField(record, "parentFrameRotation", 4);
       joint.childFramePosition = vectorField(record, "childFramePosition", 3);
@@ -529,6 +532,14 @@ class RobotModelCodec {
     var result:Dynamic = required(value, name);
     if (!Std.isOfType(result, String)) throw 'Invalid RobotModel field $name';
     requireText(result, name);
+    return result;
+  }
+
+  /** Overtravel is written only when a joint has some, so models without it keep their bytes. */
+  static function encodeLimits(limits:JointLimits):Dynamic {
+    var result:Dynamic = {lower: limits.lower, upper: limits.upper, velocity: limits.velocity,
+      effort: limits.effort, maxAcceleration: limits.maxAcceleration};
+    if (limits.overtravel > 0.0) Reflect.setField(result, "overtravel", limits.overtravel);
     return result;
   }
 

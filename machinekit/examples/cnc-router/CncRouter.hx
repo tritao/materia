@@ -253,6 +253,9 @@ class CncRouter extends MachineAssembly {
 		{id: "z", lower: -80, upper: 0, velocity: 40, effort: 400, initial: 0}
 	];
 
+	/** Room past each axis's travel before its rail blocks reach the rail ends, in millimetres. */
+	final overtravel = new Map<String, Float>();
+
 	/** Pose of every member with all axes at zero, used to derive mate connectors. */
 	final zeroPoses = new Map<String, AssemblyFrame>();
 
@@ -361,6 +364,13 @@ class CncRouter extends MachineAssembly {
 		exposeConnector("toolTip", "tool", "tip");
 	}
 
+	/** Room past the travel of axis `id` before its rail blocks reach the rail ends, in millimetres. */
+	public function axisOvertravel(id:String):Float {
+		var room = overtravel.get(id);
+		if (room == null) throw 'CNC router has no axis "$id"';
+		return room;
+	}
+
 	/** Assembly-frame position of the tool tip at machine coordinates (x, y, z), in millimetres. */
 	public static function toolTipAt(x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float}
 		return {x: MACHINE_ZERO_X + x, y: MACHINE_ZERO_Y + y, z: MACHINE_ZERO_Z + z};
@@ -388,13 +398,30 @@ class CncRouter extends MachineAssembly {
 	}
 
 	/** A member sliding on `parent` along a world axis; `pose` is where it sits at coordinate zero. */
+	/**
+	 * A rail block sliding on its rail (`parent`) along a world axis; `pose` is where it sits at
+	 * coordinate zero. The axis's overtravel is the room its block has left on the rail at either end
+	 * of travel, where the rail's end stops are.
+	 */
 	function slide(spec:RouterAxisSpec, parent:String, id:String, component:MachineComponent, pose:AssemblyFrame,
 			axis:{x:Float, y:Float, z:Float}):Void {
+		var rail = [for (entry in components()) if (entry.id == parent) entry.component][0];
+		if (!Std.isOfType(rail, LinearRail)) throw 'Axis ${spec.id} must slide on a rail';
+		var guide:LinearRail = cast rail;
+		var railFrame = AssemblyFrames.inverse(zeroPose(parent));
+		function alongRail(coordinate:Float):Float
+			return AssemblyFrames.transformPoint(railFrame, pose.x + axis.x * coordinate, pose.y + axis.y * coordinate,
+				pose.z + axis.z * coordinate).z;
+		var reach = guide.spec.railEndMargin + guide.spec.blockLength / 2;
+		var first = alongRail(spec.lower), last = alongRail(spec.upper);
+		var room = Math.min(Math.min(first, last) - reach, guide.length - reach - Math.max(first, last));
+		if (room < 0) throw 'Axis ${spec.id} runs its block off its rail by ${Dimension.format(-room)} mm';
+		overtravel.set(spec.id, room);
 		addComponent(id, component);
 		zeroPoses.set(id, pose);
 		connect(parent, id);
 		addMateOnAxis(spec.id, "prismatic", parent, 'to-$id', id, 'attach-$id', axis, spec.initial,
-			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort});
+			{lower: spec.lower, upper: spec.upper, velocity: spec.velocity, effort: spec.effort, overtravel: room});
 	}
 
 	/**

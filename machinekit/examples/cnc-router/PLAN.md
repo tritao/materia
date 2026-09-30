@@ -66,11 +66,15 @@ controller.
 
 C1 needed two stopgaps; these replace them, before C2 builds on them.
 
-- **A1. Joint overtravel.** Assembly joint limits gain a per-joint
-  `overtravel`; the robot runtime faults only outside travel ± overtravel,
-  and simulated end stops sit there too. Replaces the app-wide
-  `AssemblyRobot.OBSERVED_LIMIT_TOLERANCE` (a joint parked on its travel limit
-  settled past MuJoCo's soft stop, which was also the fault threshold).
+- **A1. Joint overtravel** (done). Assembly joint limits carry a per-joint
+  `overtravel`, through RobotKit's `JointLimits` to a new runtime blueprint
+  array `joint_overtravel`. The runtime faults only outside the limits
+  widened by it, and the simulation puts end stops there. The router's axes
+  derive it from their rails, `LinearAxis` from its end margin; joints without
+  one get 1 mm or 1 degree from the assembly bridge. Replaced the app-wide
+  `AssemblyRobot.OBSERVED_LIMIT_TOLERANCE`. The fault it fixed: Z parked on
+  its upper limit read noise-level positions just above it, and the runtime
+  compared exactly against the limit, where MuJoCo's stop also sat.
 - **A2. Designed contact** (done). simkit already excluded collision between
   parts of one machine that overlap in the starting pose, but it measured
   only boxes, spheres, capsules and cylinders, so a convex hull (every
@@ -82,7 +86,9 @@ C1 needed two stopgaps; these replace them, before C2 builds on them.
   on the machine; it runs through `CncCompiler` → `ToolpathMotion.lower` →
   runtime trajectory segments, not motion tracks (which are linear, looping
   and capped at 10,000 keys). The outline trace becomes a small G-code file.
-- **A4. Homing.** Z homes at the top of travel and pulls off its limit.
+- **A4. Homing** (folded into A1). Parking Z on its upper soft limit is how
+  LinuxCNC-style machines sit after homing; the switch (here, the end stop) is
+  beyond it by the overtravel, so no artificial pull-off is modelled.
 - **A5. Shared preview.** One `AssemblyPreview` helper builds the scene for
   every MachineKit example, keeping connectors when parts share geometry.
 

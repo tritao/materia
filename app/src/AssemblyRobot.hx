@@ -7,6 +7,7 @@ import materia.project.MaterialLibrary;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
+import robotkit.runtime.RobotRuntimeBlueprint;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationClosure;
@@ -24,14 +25,18 @@ class AssemblyRobot {
   public final robot:SimulatedRobot;
   public final runtime:RobotRuntime;
   public final model:RobotModel;
+  /** The runtime blueprint the robot was compiled to, for motion planners that need its limits. */
+  public final blueprint:RobotRuntimeBlueprint;
   public final parts:Array<AssemblyPart>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
   public final warnings:Array<String>;
 
-  function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, parts:Array<AssemblyPart>, warnings:Array<String>) {
+  function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
+      parts:Array<AssemblyPart>, warnings:Array<String>) {
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
+    this.blueprint = blueprint;
     this.parts = parts;
     this.warnings = warnings;
   }
@@ -53,9 +58,6 @@ class AssemblyRobot {
     }
     return free;
   }
-
-  /** How far past a joint limit a simulated joint may settle, in metres or radians. */
-  public static inline final OBSERVED_LIMIT_TOLERANCE = 0.001;
 
   /**
    * Adds the assembly to `candidate` as a robot compiled at `revision`;
@@ -139,9 +141,6 @@ class AssemblyRobot {
         closure.anchorParent, closure.axisParent));
     }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
-    // A simulated joint resting on its stop (a Z axis homed at the top of travel) settles a hair past
-    // it; without slack the runtime reads that as a limit violation and faults before any command.
-    blueprint.observedLimitTolerance = OBSERVED_LIMIT_TOLERANCE;
     var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
       [0.0, 0.0, 0.0, 1.0], null, null, collisionHulls, closures);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
@@ -159,6 +158,6 @@ class AssemblyRobot {
         linkIndex: linkIndex, center: [for (coordinate in center) coordinate *
           physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, parts, warnings);
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings);
   }
 }

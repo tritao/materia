@@ -806,6 +806,58 @@ static void observed_limit_tolerance_allows_compliant_stops() {
     assert(rk_robot_runtime_blueprint_validate(&invalid) == RK_ERROR_INVALID_ARGUMENT);
 }
 
+// A joint held at its limit ends up a hair past it: a machine's Z axis parked
+// at the top of travel reads noise-level positions on both sides, and here a
+// torque limit just under the load lets the arm settle a few mrad past. With
+// no overtravel the end stop is at the limit, the joint rests on it and the
+// runtime faults; with overtravel the stop is beyond, and the joint holds.
+static bool held_at_limit_faults(double overtravel, double &position) {
+    // Gravity loads the arm 4.905 cos(q) N m; 4.68 N m balances it at 0.3045 rad.
+    auto model = gravity_arm(4.68, 0.0, 2.0);
+    model.joints[0].upper_limit = 0.3;
+    model.joint_overtravel[0] = overtravel;
+    SessionFixture fixture(0.01, 5);
+    auto simulation = fixture.simulation;
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    // Parked at the limit, as the axis is after homing.
+    const double parked[] = {0.3};
+    assert(rk_simulation_set_joint_positions(simulation, 0, parked, 1) == RK_OK);
+    const auto hold = arm_command(RK_TARGET_POSITION, 0.3);
+    assert(rk_robot_runtime_submit(robot, &hold) == RK_OK);
+    for (int tick = 0; tick < 300; ++tick)
+        assert(fixture.step(static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
+    position = state(robot).position[0];
+    return state(robot).safety == RK_SAFETY_FAULT;
+}
+
+// An unpowered arm falls onto its end stop, which overtravel moves out.
+static double unpowered_arm_stop(double overtravel) {
+    auto model = gravity_arm(0.0);
+    model.joints[0].upper_limit = 0.3;
+    model.joint_overtravel[0] = overtravel;
+    model.observed_limit_tolerance = 0.05;
+    SessionFixture fixture(0.01, 5);
+    rk_robot_runtime robot = 0;
+    assert(rk_simulation_add_robot(fixture.simulation, &model, nullptr, &robot) == RK_OK);
+    for (int tick = 0; tick < 200; ++tick)
+        assert(fixture.step(static_cast<uint64_t>(tick) * 10'000'000u) == RK_OK);
+    return state(robot).position[0];
+}
+
+static void joint_overtravel_moves_stops_past_the_limits() {
+    double position = 0.0;
+    assert(held_at_limit_faults(0.0, position));
+    assert(!held_at_limit_faults(0.02, position));
+    assert(position > 0.301 && position < 0.31);
+    assert(unpowered_arm_stop(0.0) < 0.31);
+    const double moved = unpowered_arm_stop(0.03);
+    assert(moved > 0.325 && moved < 0.35);
+    auto invalid = gravity_arm(0.0);
+    invalid.joint_overtravel[0] = -0.01;
+    assert(rk_robot_runtime_blueprint_validate(&invalid) == RK_ERROR_INVALID_ARGUMENT);
+}
+
 // A robot can start in a joint pose: set positions move the links it carries
 // before the first step, out-of-limit poses are refused, and reset returns
 // the joints to zero.
@@ -908,6 +960,7 @@ int main() {
     link_shape_contact_filters_reach_the_backend();
     robots_start_in_a_joint_pose();
     observed_limit_tolerance_allows_compliant_stops();
+    joint_overtravel_moves_stops_past_the_limits();
     actuator_limit_stalls_then_lifts();
     servo_target_runs_through_the_runtime();
     blueprint_joint_friction_holds_an_arm();

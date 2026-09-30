@@ -23,6 +23,8 @@ class RobotRuntimeJointBlueprint {
   public final childFrameRotation:Array<Float>;
   public final axis:Array<Float>;
   /** Passive dynamics: reflected inertia, viscous damping and dry friction. */
+  /** How far past its limits the joint's end stops sit; see `JointLimits.overtravel`. */
+  public var overtravel:Float = 0.0;
   public var armature:Float = 0.0;
   public var damping:Float = 0.0;
   public var frictionLoss:Float = 0.0;
