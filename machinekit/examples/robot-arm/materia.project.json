@@ -1,0 +1,15 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Six-axis robot arm",
+	"defaultEntrypoint": "arm",
+	"build": { "system": "haxeon", "manifest": "haxeon.json" },
+	"robotMotions": "robot-arm.motion.json",
+	"entrypoints": {
+		"arm": {
+			"kind": "cad-preview",
+			"module": "RobotArmPreview",
+			"function": "arm"
+		}
+	}
+}

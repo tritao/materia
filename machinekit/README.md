@@ -67,6 +67,10 @@ semantic reduced-diameter threaded ends; thread flanks remain unmodelled.
 `journalDiameterAt()` and `journalDiameterAllowance()` make the selected fit
 allowance explicit for a journal position.
 
+`examples/robot-arm/` is a larger assembly: a six-axis arm on a `Pedestal` with a
+`RobotFlange` tool mount, six revolute joints and a shipped pick motion. Its
+[README](examples/robot-arm/README.md) covers the layout and how to run it.
+
 `examples/MotorShaftBearings.hx` mounts a NEMA 17 motor on a plate with four
 M3 screws and carries an output shaft on two 608 bearings through a continuous
 coupling joint. The shaft steps down past the outboard bearing to carry a

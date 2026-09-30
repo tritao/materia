@@ -165,6 +165,48 @@ class ProjectSourceTests {
       z + q[3] * tz + q[0] * ty - q[1] * tx];
   }
 
+  /** The arm example opens with its shipped motion and the simulation follows it. */
+  static function checkRobotArm(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    check(generated.robotMotions != null && generated.robotMotions.length == 6,
+      "robot arm project ships one motion track for each joint");
+    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var session = new ProjectDocumentSession(null, false);
+    var armWorld = new RobotWorld();
+    var armSimulation = new ApplicationSimulation(armWorld);
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions);
+    check(session.robotMotions.length == 6, "opening the arm project installs its motion");
+    armSimulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(armSimulation.rebuild(session.sensors, session.scene, session),
+      "robot arm builds in the shared simulation: " + armSimulation.error);
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var index = new Map<String, Int>();
+    for (position in 0...model.joints.length) index.set(model.joints[position].id, position);
+    var id = "assembly:" + definition.id;
+    var steps = 0;
+    while (armSimulation.activeSession().simulationTime() < 3.4 && steps++ < 20000) armSimulation.step();
+    var observed = armWorld.snapshot().robot(id);
+    if (observed == null) throw "robot arm is missing from the world snapshot";
+    var positions = observed.positions;
+    // Track positions are relative to the initial pose: the pick pose holds from t=3 to t=4.
+    var expected = ["j1" => -0.7, "j2" => 0.5, "j3" => 0.2, "j4" => 0.0, "j5" => -0.3, "j6" => 0.0];
+    var worst = 0.0;
+    for (joint in expected.keys()) {
+      var slot = index.get(joint);
+      if (slot == null) throw 'robot arm has no joint $joint';
+      var actual = positions.get(slot);
+      var error = Math.abs(actual - expected.get(joint));
+      worst = Math.max(worst, error);
+      check(error < 0.05,
+        'robot arm joint $joint follows its track: expected ${expected.get(joint)}, got $actual');
+    }
+    Sys.println('robot arm followed its motion track to within $worst rad after ${armSimulation.activeSession().simulationTime()} s');
+  }
+
   public static function main():Int {
     var flat = Bytes.alloc(4 * 24);
     for (index in 0...4) {
@@ -459,6 +501,7 @@ class ProjectSourceTests {
     }
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
+    checkRobotArm(root);
     return 0;
   }
 }
