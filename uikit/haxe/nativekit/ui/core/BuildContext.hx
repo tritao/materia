@@ -42,7 +42,7 @@ class BuildContext {
 	/** Bumped when the theme or application sheet is replaced, so swaps never reuse a fingerprint. */
 	var styleEpoch:Int = 0;
 	var focusRequester:WidgetId->Bool;
-	final claimed:Map<Int, String>;
+	final claimed:Map<Int, Bool>;
 	final idsByPath:Map<String, WidgetId>;
 	var cachedIdCount:Int;
 	var rootScope:KeyScope;
@@ -258,7 +258,7 @@ class BuildContext {
 		stateStore.rememberPath(id, path);
 		if (claimed.exists(id.value))
 			throw 'Duplicate widget ID ${id.value}; use distinct keys for sibling views';
-		claimed.set(id.value, path);
+		claimed.set(id.value, true);
 		return id;
 	}
 
@@ -305,7 +305,7 @@ class BuildContext {
 		root.walk(function(node) {
 			if (claimed.exists(node.id.value))
 				throw 'Duplicate retained widget ID ${node.id.value}';
-			claimed.set(node.id.value, stateStore.describe(node.id));
+			claimed.set(node.id.value, true);
 		});
 	}
 

@@ -127,3 +127,16 @@ allocation from the workspace save worker. On 2026-09-30 a `Text` build cost 3.3
 `RenderNode` is 0.9 KB, a scope and id 0.5 KB. A tab switch rebuilds about 320 nodes, so the fixed per-node cost, not
 any one widget, sets the tree-build total (about 530 KiB); shrinking it much further means reusing unchanged subtrees
 instead of rebuilding them.
+
+## Allocation census
+
+`python3 app/tools/profile-editor.py --scenario tab-matrix --cycles 30 --no-profile --census` counts every allocation by
+type (exact) and samples the allocating call stack once per 4 KiB (jittered), then writes `census.json` to the capture
+directory; `python3 app/tools/allocation-census.py <capture-dir> --cycles 29` prints allocation per cycle by type and by
+allocating function. The first tab-matrix cycle is excluded so cold caches do not count. It runs in the runtime
+(`hl.Gc.censusStart/Reset/Stop/Dump`), so it sees runtime allocations (strings, arrays, boxed values) as well as compiled `new`.
+Allocations made entirely inside native code show up as `(native)`; the harness's own JSON and frame recording appear too.
+
+On 2026-09-30 the first census found `BuildContext.claimRetainedTree` building an unused description string for every
+retained node (26% of all bytes); dropping it took a tab-matrix cycle from 5.56 to 4.08 MiB. `Transform2D`, `Point`, `Rect`
+and `LayoutAxis` together were about 16%, which is why converting one of them to a value class could not move the total.

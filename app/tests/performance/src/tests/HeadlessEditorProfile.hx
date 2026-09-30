@@ -99,6 +99,11 @@ class HeadlessEditorProfile {
     var retained:Array<String> = [];
     try {
       submit(editor, frame, frames, "initial");
+      // MATERIA_ALLOC_CENSUS=<bytes> counts every allocation by type and samples stacks once per that many bytes.
+      var censusText = Sys.getEnv("MATERIA_ALLOC_CENSUS");
+      var censusInterval = censusText == null ? 0 : Std.parseInt(censusText);
+      if (censusInterval == null) censusInterval = 0;
+      if (censusInterval > 0) hl.Gc.censusStart(censusInterval);
       if (scenario == "primitives") {
         runPrimitives(editor);
       } else if (scenario == "tab-matrix") {
@@ -118,6 +123,8 @@ class HeadlessEditorProfile {
             action(actions, name, cycle);
           }
           if ((cycle + 1) % 20 == 0) retained.push(retainedCounts(editor, cycle + 1));
+          // The first cycle builds cold caches; the census reports the steady state that follows.
+          if (cycle == 0 && censusInterval > 0) hl.Gc.censusReset();
         }
       } else if (scenario == "architecture") {
         runArchitectureScenario(editor, frame, output, cycles, frames, actions);
@@ -158,6 +165,10 @@ class HeadlessEditorProfile {
         idleCollections: frameGc.idleCollections, forcedCollections: frameGc.forcedCollections,
         idleSeconds: idleSeconds, idleMarkMicros: idleMarkMicros, totalCollections: hl.Gc.collections(),
         totalMarkMicros: hl.Gc.markMicros(), maxPauseMicros: hl.Gc.maxPauseMicros()}));
+      if (censusInterval > 0) {
+        hl.Gc.censusStop();
+        hl.Gc.censusDump(cast haxe.io.Bytes.ofString(output + "/census.json").getData());
+      }
       if (heapDumpPath != null) {
         frames.resize(0);
         actions.resize(0);
