@@ -33,11 +33,41 @@
     "robotkit": {
       "path": "../robotkit"
     },
+    "simkit": {
+      "path": "../simkit"
+    },
     "cadbridge": {
       "path": "../robotkit/cadbridge"
     },
     "scenekit": {
       "path": "../scenekit"
+    },
+    "animkit": {
+      "path": "../animkit"
+    },
+    "humankit": {
+      "path": "../humankit"
+    },
+    "humankit-sim": {
+      "path": "../humankit/sim"
+    },
+    "humankit-facility": {
+      "path": "../humankit/facility"
+    },
+    "materia-automation": {
+      "path": "../automationkit"
+    },
+    "stockkit": {
+      "path": "../stockkit"
+    },
+    "camkit": {
+      "path": "../camkit"
+    },
+    "cnckit": {
+      "path": "../cnckit"
+    },
+    "toolpathkit": {
+      "path": "../toolpathkit"
     }
   },
   "native": {
@@ -56,7 +86,12 @@
         "../cadkit/CMakeLists.txt",
         "../cadkit/core/CMakeLists.txt",
         "../robotkit/CMakeLists.txt",
-        "../robotkit/runtime/CMakeLists.txt"
+        "../robotkit/runtime/CMakeLists.txt",
+        "../animkit/native/CMakeLists.txt",
+        "../animkit/native/include/animkit.h",
+        "../animkit/native/src/api.cpp",
+        "../animkit/native/src/import.cpp",
+        "../animkit/native/src/runtime.cpp"
       ]
     }
   },

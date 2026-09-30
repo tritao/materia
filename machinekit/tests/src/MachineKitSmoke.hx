@@ -4,6 +4,7 @@ import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
+import RobotArmPreview.RobotArmChecks;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.InstancePath;
@@ -2467,6 +2468,7 @@ class MachineKitSmoke {
 		EndEffectorSetTests.run();
 		EndEffectorComponentTests.run();
 		EndEffectorExampleChecks.run();
+		RobotArmChecks.run();
 		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();
