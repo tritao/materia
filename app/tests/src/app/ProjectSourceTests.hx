@@ -3,6 +3,7 @@ package app;
 import app.MateriaProjectRunner;
 import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
+import cadkit.modeling.AssemblyState;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
 import cadbridge.AssemblySimulationBridge;
@@ -209,6 +210,47 @@ class ProjectSourceTests {
       "selecting elsewhere closes it again and changes the model revision");
   }
 
+  /**
+   * The IK drag the viewport starts when a jointed part is pressed: the suction cup follows a target
+   * pulled 3 cm, the drag commits as one undoable edit, a far target is reported and cancelled, and a
+   * part with no joint above it cannot be dragged.
+   */
+  static function checkArmDrag(session:ProjectDocumentSession, metresPerUnit:Float):Void {
+    var definition = session.projectAssemblyDefinition;
+    var before = session.projectAssemblyState;
+    if (definition == null || before == null) throw "robot arm has no assembly state";
+    var cup = new AssemblyState(definition, before).worldPose("tool/cup");
+    var start = [cup.x * metresPerUnit, cup.y * metresPerUnit, cup.z * metresPerUnit];
+    var drag = session.beginAssemblyDrag("project:tool/cup", start);
+    check(drag != null, "pressing the suction cup starts an IK drag");
+    for (step in 1...16) {
+      drag.update(start[0] + 0.002 * step, start[1], start[2]);
+      check(drag.following(), 'the cup follows each small pull (${drag.message()})');
+    }
+    var held = drag.grabbedPoint();
+    check(Math.abs(held[0] - (start[0] + 0.03)) < 1e-5 && Math.abs(held[1] - start[1]) < 1e-5 &&
+      Math.abs(held[2] - start[2]) < 1e-5, 'the cup ends 3 cm along x ($held)');
+    check(drag.commit(), "releasing records the dragged pose");
+    var moved = new AssemblyState(definition, session.projectAssemblyState).worldPose("tool/cup");
+    check(Math.abs(moved.x * metresPerUnit - (start[0] + 0.03)) < 1e-5, "the committed state holds the dragged pose");
+    session.document.undo();
+    var restored = new AssemblyState(definition, session.projectAssemblyState).worldPose("tool/cup");
+    check(Math.abs(restored.x - cup.x) < 1e-9 && Math.abs(restored.z - cup.z) < 1e-9, "undo puts the cup back");
+
+    var far = session.beginAssemblyDrag("project:tool/cup", start);
+    far.update(start[0] + 5.0, start[1], start[2]);
+    check(!far.following() && far.message().indexOf("reach") >= 0, 'a target 5 m away is reported (${far.message()})');
+    far.cancel();
+    var untouched = new AssemblyState(definition, session.projectAssemblyState).worldPose("tool/cup");
+    check(Math.abs(untouched.x - cup.x) < 1e-9, "cancelling leaves the state as it was");
+
+    var driven = new Map<String, Bool>();
+    for (joint in definition.joints) if (joint.role == materia.assembly.AssemblyDefinition.AssemblyJointRole.Tree)
+      driven.set(joint.child, true);
+    var root = [for (occurrence in definition.occurrences) if (!driven.exists(occurrence.id)) occurrence.id][0];
+    check(session.beginAssemblyDrag("project:" + root, start) == null, 'the fixed root part "$root" cannot be dragged');
+  }
+
   static function rejectsGrips(raw:Dynamic, fragment:String):Void {
     var message = "";
     try RobotGripEvent.decode(raw) catch (error:Dynamic) message = Std.string(error);
@@ -251,6 +293,7 @@ class ProjectSourceTests {
       generated.recipeDocument, generated.robotMotions, generated.robotGrips);
     check(session.robotMotions.length == 6, "opening the arm project installs its motion");
     checkArmHierarchy(session);
+    checkArmDrag(session, generated.metresPerUnit);
     checkGripEvents(definition, generated.physical);
     armSimulation.setBackend(ApplicationSimulation.MUJOCO);
     check(armSimulation.rebuild(session.sensors, session.scene, session),

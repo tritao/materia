@@ -521,7 +521,7 @@ imported CAD collision model.
 `q = 0` and sets each link's scene node to its actual rest pose
 (`world_T_child = world_T_parent . T(parent_frame_position, parent_frame_rotation)
 . T(child_frame_position, child_frame_rotation)^-1`, the same composition
-`robotkit.manipulation.KinematicChain`'s FK uses at zero joint values) before
+`robotkit.manipulation.Manipulator`'s FK uses at zero joint values) before
 creating that link's native body — not the identity-rotation placeholder
 transform every link previously shared. `nksim_joint_desc`/`BackendJointDesc`
 carry the joint frame's orientation relative to each body,
@@ -676,7 +676,7 @@ joint-connected `DYNAMIC` body's world pose from its parent and current
 joint position, in topological order:
 `world_T_child = world_T_parent . T(anchor_a, rotation_a) . M(q) . T(anchor_b, rotation_b)^-1`
 (`M(q)` built from the joint-frame axis recovered from `axis_a`/`rotation_a`,
-the same composition `KinematicChain`'s FK and F1's rest-pose fix use). A
+the same composition `Manipulator`'s FK and F1's rest-pose fix use). A
 joint-connected `DYNAMIC` body no longer accumulates gravity/force in
 `step()`; its linear/angular velocity is instead set by finite difference
 from the recompute so IMU-style consumers on arm links still read something
@@ -939,51 +939,56 @@ already implements for the planar frame tree; `robotkit.manipulation`'s
 forward kinematics is the full-3D version of that same read, not a new
 convention.
 
-## Kinematic chains and IK
+## Kinematics and IK
 
-`robotkit.manipulation` sits above `robotkit.spatial` and below the future
-`robotkit.tool`/`robotkit.process` layers (milestones 3-4); it does not
-touch `Robot`, `RobotRuntime`, or the native runtime.
+Kinematics run on `kinematicskit` (see `kinematicskit/plans/KINEMATICS.md`),
+a dependency-free kit that CadKit assemblies also use.
+`robotkit.kinematics.RobotKinematics.compile(model)` turns a `RobotModel`
+into a `kinematicskit.KinematicModel`: every link becomes a body, every
+joint a tree joint using the joint-frame convention documented above,
+every `Frame` a frame, and `RobotModel.couplings` become shared degrees of
+freedom (a follower moves with its leader). Revolute and continuous joints
+are rotational, prismatic joints translational, fixed joints constant; any
+other joint type (`Floating`) is a construction error — the same
+restriction `RobotRuntimeCompiler` enforces. A `KinematicSnapshot` of a
+`KinematicState` gives world poses and geometric Jacobians (rows linear
+x/y/z, then angular x/y/z — `Twist3`'s field order).
 
-`KinematicChain` walks a `RobotModel`'s `Joint`s from a base `LinkId` to a
-tip, which is either a link's own origin or a mounted `Frame`
-(`ChainTip.Link`/`ChainTip.Frame`), using the joint-frame convention
-documented above. Revolute and continuous joints become rotational degrees
-of freedom, prismatic joints become translational ones, fixed joints fold
-into constant transforms, and any other joint type (`Floating`, or an
-unrecognized value) is a construction error — the same restriction
-`RobotRuntimeCompiler` enforces. `forwardKinematics(q)` returns
-`base_T_tip`; `allLinkTransforms(q)` returns `base_T_link` for the base
-link and every link visited along the chain; `jacobian(q)` returns the
-geometric Jacobian as 6 rows (linear x/y/z, then angular x/y/z) by `n`
-degrees of freedom, expressed in the base frame — the same row order as
-`Twist3`'s `(linear, angular)` fields.
+`robotkit.manipulation` sits above that and below `robotkit.tool` /
+`robotkit.process`; it does not touch `Robot`, `RobotRuntime`, or the
+native runtime.
 
-`JointGroup` is an ordered, named joint/limit selection independent of any
-one chain (`JointGroup.fromChain` is the common case). A joint whose
-limits have `lower >= upper` — `JointLimits`'s own default, and the
-existing convention for continuous joints — is treated as unlimited and is
-never clamped.
+`Manipulator` is an arm of a robot: the joints from a base `LinkId` to the
+link carrying a flange `Frame`, compiled from the whole robot. Its joint
+values `q` are one per arm degree of freedom in base-to-flange order (the
+path's joints that drive their own DOF, or the leader of a coupled one);
+robot DOFs off the arm stay at their defaults. `forwardKinematics(q)` is
+`base_T_flange`, `jacobian(q)` the 6 x n flange Jacobian and
+`pointJacobian`/`tcpJacobian` the same at a point on the flange, all in the
+base link's frame. `pathJoints()` lists every joint from base to flange.
 
-`InverseKinematics.solve` is damped least squares (Levenberg-Marquardt
-style) against the normal equations `(J^T J + λ^2 I) dq = J^T e`, with
+`JointGroup` is an ordered, named joint/limit selection
+(`Manipulator.group` is the arm's). A joint whose limits have
+`lower >= upper` — `JointLimits`'s own default, and the existing convention
+for continuous joints — is treated as unlimited and is never clamped.
+
+`Manipulator.solveIk(target, seed, ...)` is damped least squares against
+`(J^T J + λ^2 I) dq = J^T e` (`kinematicskit.DampedLeastSquares`), with
 joint limits clamped every iteration. The orientation error is the exact
-axis-angle (log-map) rotation from the current tip orientation to the
-target, not a small-angle linearization, so it remains well-defined for
-large initial errors. It always returns an `IKResult`
-(`converged`, `q`, `positionError`, `orientationError`, `iterations`); it
-never throws for non-convergence. Like most redundant-looking wrists, this
-chain family has more than one joint configuration reaching the same pose,
-so a solver seeded far from the intended configuration can converge to a
-different, still-valid, solution branch — callers that care which branch
-they land in should seed close to their last known configuration.
+axis-angle (log-map) rotation from the current flange orientation to the
+target, so it remains well-defined for large initial errors. It always
+returns an `IKResult` (`converged`, `q`, `positionError`,
+`orientationError`, `iterations`, `status` — the solver's reason for
+stopping); it never throws for non-convergence. Arms with several joint
+configurations reaching the same pose can converge to a different, still
+valid, branch when seeded far away — callers that care which branch they
+land in should seed close to their last known configuration.
 
-`Manipulator` pairs a `KinematicChain` (whose tip must be a `Frame`, the
-flange) with the compiled joint indices `toJointTargets(q)` needs: it
-looks up each chain joint's position in `RobotModel.joints`, which is the
-same index `RobotRuntimeCompiler` assigns as the runtime joint index, and
-emits one `robotkit.world.JointTarget.position(...)` per degree of
-freedom — the existing typed joint-command boundary, unchanged.
+`toJointTargets(q)` looks up each arm DOF's driving joint in
+`RobotModel.joints`, which is the same index `RobotRuntimeCompiler` assigns
+as the runtime joint index, and emits one
+`robotkit.world.JointTarget.position(...)` per degree of freedom — the
+existing typed joint-command boundary, unchanged.
 
 ## Tools and TCP
 
@@ -1078,10 +1083,10 @@ binding it. Configuration-qualified tool IDs keep swappable tools distinct.
 
 `Manipulator` carries the mounted tool's `flangeTTcp` (identity when no
 tool is attached) and exposes it at the TCP level: `tcpPose(q)` is
-`chain.forwardKinematics(q).compose(flangeTTcp)`, and
+`forwardKinematics(q).compose(flangeTTcp)`, and
 `solveIkForTcp(target, seed, ...)` converts a TCP-frame target to the
 equivalent flange target (`target.compose(flangeTTcp.inverse())`) before
-delegating to `InverseKinematics.solve`, so callers can work entirely in
+delegating to `solveIk`, so callers can work entirely in
 tool-center-point coordinates without re-deriving the flange offset.
 
 ## Toolpaths and Cartesian trajectories

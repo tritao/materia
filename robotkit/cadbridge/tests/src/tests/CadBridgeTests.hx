@@ -20,8 +20,6 @@ import robotkit.model.Link;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.Frame;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.WorkPatchPlanner;
 import cadbridge.FaceBridge;
@@ -419,9 +417,9 @@ class CadBridgeTests {
       "attached tube contributes rotated off-diagonal inertia");
 
     var fixture = buildUR5Fixture();
-    var manipulator = new Manipulator(fixture.model, fixture.chain, tool.flangeTTcp);
+    var manipulator = fixture.arm.withTool(tool.flangeTTcp);
     var q = [0.2, -0.4, 0.3, 0.1, -0.2, 0.15];
-    var flangePose = fixture.chain.forwardKinematics(q);
+    var flangePose = fixture.arm.forwardKinematics(q);
     var expected = flangePose.transformPoint(new Vec3(0, 0, 0.03));
     var tcp = manipulator.tcpPose(q);
     check(approx(tcp.translation.x, expected.x, 1e-9) &&
@@ -662,7 +660,7 @@ class CadBridgeTests {
     check(design.exclusions.length == 1, "the hosted opening becomes exactly one WorkSurface exclusion");
 
     var fixture = buildUR5Fixture();
-    var manipulator = new Manipulator(fixture.model, fixture.chain);
+    var manipulator = fixture.arm;
     var mapTSurface = design.frame_T_surface;
     var seed = [0.2, -1.0, 1.3, -0.3, 0.5, 0.0];
     var plan = WorkPatchPlanner.plan(design, mapTSurface, manipulator,
@@ -686,7 +684,7 @@ class CadBridgeTests {
     bim.cad.close();
   }
 
-  static function buildUR5Fixture():{model:RobotModel, chain:KinematicChain} {
+  static function buildUR5Fixture():{model:RobotModel, arm:Manipulator} {
     var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
       a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
     var model = new RobotModel("ur5-fixture");
@@ -718,8 +716,8 @@ class CadBridgeTests {
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = flangeOffset.toArray();
-    var chain = new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id));
-    return { model: model, chain: chain };
+    var arm = new Manipulator(model, links[0].id, flange.id);
+    return { model: model, arm: arm };
   }
 
   static function testFaceBridgeOnPlainBoxFace():Void {

@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import kinematicskit.LinearAlgebra;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
@@ -22,7 +23,7 @@ class ManipulatorKinematics implements KinematicsSolver {
     this.differentialDamping = differentialDamping;
   }
 
-  public function jointCount():Int return manipulator.chain.dofCount();
+  public function jointCount():Int return manipulator.dofCount();
 
   public function forward(q:Array<Float>):Pose3 return fromTransform(manipulator.tcpPose(q));
 
@@ -76,39 +77,10 @@ class ManipulatorKinematics implements KinematicsSolver {
     if (q == null || q.length != jointCount())
       throw 'Differential IK requires ${jointCount()} joint values';
     if (twist == null) throw "Differential IK requires a tool twist";
-    var jacobian = manipulator.chain.jacobian(q);
-
-    // The chain Jacobian is at the flange. Shift its linear rows to the TCP.
-    var flange = manipulator.forwardKinematics(q);
-    var tcpOffset = flange.rotation.rotate(manipulator.flangeTTcp.translation);
-    for (joint in 0...jointCount()) {
-      var angular = new Vec3(jacobian[3][joint], jacobian[4][joint], jacobian[5][joint]);
-      var shiftedLinear = angular.cross(tcpOffset);
-      jacobian[0][joint] += shiftedLinear.x;
-      jacobian[1][joint] += shiftedLinear.y;
-      jacobian[2][joint] += shiftedLinear.z;
-    }
-
     var n = jointCount();
-    var normal:Array<Array<Float>> = [];
-    for (row in 0...n) {
-      var values:Array<Float> = [];
-      for (column in 0...n) {
-        var value = 0.0;
-        for (axis in 0...6) value += jacobian[axis][row] * jacobian[axis][column];
-        if (row == column) value += differentialDamping * differentialDamping;
-        values.push(value);
-      }
-      normal.push(values);
-    }
-    var requested = twist.toArray();
-    var rhs:Array<Float> = [];
-    for (joint in 0...n) {
-      var value = 0.0;
-      for (axis in 0...6) value += jacobian[axis][joint] * requested[axis];
-      rhs.push(value);
-    }
-    return solveLinear(normal, rhs);
+    var jacobian = manipulator.tcpJacobian(q);
+    return LinearAlgebra.dampedStep(jacobian, 6, n, [for (joint in 0...n) joint], twist.toArray(),
+      differentialDamping);
   }
 
   static function requireTolerance(tolerance:IkTolerance):Void {
@@ -136,40 +108,5 @@ class ManipulatorKinematics implements KinematicsSolver {
       if (Math.sqrt(squaredDistance) < separation) return true;
     }
     return false;
-  }
-
-  static function solveLinear(matrix:Array<Array<Float>>,
-      right:Array<Float>):Null<Array<Float>> {
-    var n = right.length;
-    var values:Array<Array<Float>> = [for (row in matrix) row.copy()];
-    var result = right.copy();
-    for (column in 0...n) {
-      var pivot = column;
-      var pivotMagnitude = Math.abs(values[column][column]);
-      for (row in (column + 1)...n) {
-        var magnitude = Math.abs(values[row][column]);
-        if (magnitude > pivotMagnitude) { pivot = row; pivotMagnitude = magnitude; }
-      }
-      if (!Math.isFinite(pivotMagnitude) || pivotMagnitude < 1e-15) return null;
-      if (pivot != column) {
-        var rowSwap = values[column]; values[column] = values[pivot]; values[pivot] = rowSwap;
-        var valueSwap = result[column]; result[column] = result[pivot]; result[pivot] = valueSwap;
-      }
-      for (row in (column + 1)...n) {
-        var factor = values[row][column] / values[column][column];
-        for (entry in column...n) values[row][entry] -= factor * values[column][entry];
-        result[row] -= factor * result[column];
-      }
-    }
-    var solution:Array<Float> = [for (_ in 0...n) 0.0];
-    var row = n - 1;
-    while (row >= 0) {
-      var value = result[row];
-      for (column in (row + 1)...n) value -= values[row][column] * solution[column];
-      solution[row] = value / values[row][row];
-      if (!Math.isFinite(solution[row])) return null;
-      row--;
-    }
-    return solution;
   }
 }

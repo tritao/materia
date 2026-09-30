@@ -20,8 +20,8 @@ class FocusManager {
 
 	public function rebuild(root:Null<RenderNode>):Void {
 		this.root = root;
-		order = [];
-		eligible = new Map();
+		order.resize(0);
+		eligible.clear();
 		var trap = findTrap(root);
 		var nextTrapId = trap == null ? null : trap.id;
 		if (trap != null) {

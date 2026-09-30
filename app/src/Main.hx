@@ -1629,6 +1629,11 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("snap", viewportToolbarAction("viewport-snap",
       "scene.toggle-grid-snap", "Snap", IconName.Magnet, compact)));
     controls.push(new KeyedView("options", options));
+    // While a jointed part is dragged, say whether it follows the cursor and why not.
+    var dragMessage = perspectiveViewport == null ? null : perspectiveViewport.assemblyDragMessage();
+    if (dragMessage != null)
+      controls.push(new KeyedView("assembly-drag-status", new Text(dragMessage, null,
+        appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
     var barStyle = new LayoutStyle();
     barStyle.width = LayoutAxis.grow();
     barStyle.height = LayoutAxis.fixed(38.0);

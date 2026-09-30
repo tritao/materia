@@ -218,6 +218,26 @@ AK_API ak_result AK_CALL ak_instance_set_layer(ak_instance_handle instance, uint
  */
 AK_API ak_result AK_CALL ak_instance_set_ik(ak_instance_handle instance, uint32_t chain,
     const ak_two_bone_ik *ik);
+/**
+ * Turns one joint by a rotation (x, y, z, w) about its own local axes, on top of its animated pose and
+ * before inverse kinematics, so the turn carries the joint's children: fingers curl, a spine leans. The
+ * rotation is normalized; weight in (0, 1] blends from no turn to all of it. A zero weight removes the
+ * turn. `source` names who is asking: a source has at most one turn per joint, and turns of different
+ * sources on the same joint compose, lowest source first, so two features never overwrite each other.
+ * A turn stays until it is removed.
+ */
+AK_API ak_result AK_CALL ak_instance_set_joint_rotation(ak_instance_handle instance, uint32_t source,
+    int32_t joint, float x, float y, float z, float w, float weight);
+/**
+ * Replaces every turn of one source at once, so a caller turning many joints (a hand of fingers) crosses
+ * the boundary once. data holds size / 24 records, each little-endian: an int32 joint, then float32 x, y,
+ * z, w and weight. Turns of other sources are kept. Nothing changes when size is not a multiple of 24 or
+ * any record is invalid; records with no weight are skipped.
+ */
+AK_API ak_result AK_CALL ak_instance_set_joint_rotations(ak_instance_handle instance, uint32_t source,
+    const uint8_t *data AK_IN_ARRAY(size), uint32_t size);
+/** Removes every turn of one source. */
+AK_API ak_result AK_CALL ak_instance_clear_joint_rotations(ak_instance_handle instance, uint32_t source);
 /** Samples, blends, solves inverse kinematics, and skins the current layers. */
 AK_API ak_result AK_CALL ak_instance_evaluate(ak_instance_handle instance);
 

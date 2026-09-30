@@ -5,6 +5,13 @@
 D4. Before it starts, expand each item below into the full handoff format
 used by Lanes A–C: problem, code locations, what to change, tests.
 
+**Moved (2026-09-30):** D1–D3 (the QP differential IK core and 7-axis
+redundancy) are now item K3 of `kinematicskit/plans/KINEMATICS.md`, and the
+native core lives in `kinematicskit/native` rather than `motionkit/native`,
+so RobotKit (humanoid H7) and CadKit can use it without depending on
+MotionKit. D4–D6 (collision limits, live servoing, external axes) stay in
+this lane and build on that core.
+
 **Goal:**
 - constrained differential IK as a native QP;
 - real 7-axis redundancy handling;
@@ -44,6 +51,8 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
   - task and limit interfaces modelled on mink;
   - Jacobians from our own kinematics (RobotKit's chain now, Pinocchio when
     it arrives), never from the simulator;
+  - (Superseded: the first backend is ProxQP's dense solver, shared with
+    humanoid H7; see `kinematicskit/plans/KINEMATICS.md` KK-D13.)
   - OSQP as the first QP backend, behind a solver interface so it can be
     swapped.
 - **LD-D2 — It implements contract C4's `solveDifferential`** and replaces

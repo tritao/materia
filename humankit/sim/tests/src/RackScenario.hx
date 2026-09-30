@@ -3,6 +3,8 @@ import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanJobSpec;
+import humankit.HumanLimb;
+import humankit.HumanTargetBox;
 import humankit.HumanoidRig;
 import humankit.sim.HumanWorker;
 import nativekit.scene.Scene;
@@ -12,24 +14,49 @@ import nativekit.sim.SimPose;
 import nativekit.sim.SimSession;
 import nativekit.sim.SimShape;
 
+/** How the rack and table are laid out: which hand fetches, the surfaces' height, and the layout's turn about the worker. */
+typedef RackLayout = {
+    /** "right" or "left"; the part sits on that hand's side. */
+    var hand:String;
+    /** Height of the surfaces' tops, in metres. */
+    var surface:Float;
+    /** Turn of the whole layout about the worker's start, in radians. */
+    var yaw:Float;
+}
+
 /** The rack-to-table job on a bare session: a worker fetches a part from a pedestal and sets it on a table. */
 class RackScenario {
     public final session:SimSession;
     public final worker:HumanWorker;
     public final part:nativekit.sim.SimObject;
     public final partStart:Array<Float>;
+    public final placePoint:Array<Float>;
+    public final rack:HumanTargetBox;
+    public final table:HumanTargetBox;
+    public final layout:RackLayout;
     final world:MujocoSimWorld;
 
     function new(session:SimSession, world:MujocoSimWorld, worker:HumanWorker, part:nativekit.sim.SimObject,
-            partStart:Array<Float>) {
+            partStart:Array<Float>, placePoint:Array<Float>, rack:HumanTargetBox, table:HumanTargetBox, layout:RackLayout) {
         this.session = session;
         this.world = world;
         this.worker = worker;
         this.part = part;
         this.partStart = partStart;
+        this.placePoint = placePoint;
+        this.rack = rack;
+        this.table = table;
+        this.layout = layout;
     }
 
-    public static function build():RackScenario {
+    /** The limb of the hand that does the work. */
+    public function limb():HumanLimb return layout.hand == "left" ? ArmL : ArmR;
+
+    static function yawPose(x:Float, y:Float, z:Float, yaw:Float):SimPose
+        return new SimPose(x, y, z, 0.0, 0.0, Math.sin(yaw * 0.5), Math.cos(yaw * 0.5));
+
+    public static function build(restingOn:Bool = true, ?layout:RackLayout):RackScenario {
+        if (layout == null) layout = {hand: "right", surface: 1.06, yaw: 0.0};
         var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
         var rig = HumanoidRig.detect(asset);
         var scene = Scene.create();
@@ -39,23 +66,32 @@ class RackScenario {
         human.advance(0.0);
         var proxy = HumanBodyProxy.standard(human.pose, HumanDescription.measure(human.pose, human.height()));
         var worker = new HumanWorker(session, human, proxy, new SimPose(0.0, 0.0, 0.0));
-        var partHalf = 0.04, surface = 1.06;
-        var partStart = [0.9, -0.2, surface + partHalf];
+        var partHalf = 0.04, surface = layout.surface;
+        // The layout is built facing +X with the part on the working hand's side, then turned about the start.
+        var side = layout.hand == "left" ? 1.0 : -1.0, cosine = Math.cos(layout.yaw), sine = Math.sin(layout.yaw);
+        var turned = function(x:Float, y:Float):Array<Float> return [cosine * x - sine * y, sine * x + cosine * y];
+        var rackXY = turned(0.9, side * 0.2), tableXY = turned(1.9, side * 0.2);
+        var partStart = [rackXY[0], rackXY[1], surface + partHalf];
         var part = session.createObject(MotionType.Dynamic, SimShape.box(partHalf, partHalf, partHalf),
             new SimPose(partStart[0], partStart[1], partStart[2]), 0.1);
-        session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05), new SimPose(partStart[0], partStart[1], surface - 0.05));
+        session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05), yawPose(partStart[0], partStart[1], surface - 0.05, layout.yaw));
         session.createObject(MotionType.Static, SimShape.box(4.0, 4.0, 0.1), new SimPose(0.0, 0.0, -0.05));
-        var placePoint = [partStart[0] + 1.0, partStart[1], surface + partHalf];
-        var table = session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05),
-            new SimPose(placePoint[0], placePoint[1], surface - 0.05));
+        var placePoint = [tableXY[0], tableXY[1], surface + partHalf];
+        var tableObject = session.createObject(MotionType.Static, SimShape.box(0.2, 0.2, 0.05),
+            yawPose(placePoint[0], placePoint[1], surface - 0.05, layout.yaw));
         var targets = new JobTargets();
-        targets.boxes.set("part", {center: partStart.copy(), halfExtents: [partHalf, partHalf, partHalf], yaw: 0.0});
-        targets.boxes.set("table", {center: [placePoint[0], placePoint[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0});
+        var rackBox:HumanTargetBox = {center: [partStart[0], partStart[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: layout.yaw};
+        var tableBox:HumanTargetBox = {center: [placePoint[0], placePoint[1], surface - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: layout.yaw};
+        targets.boxes.set("part", {center: partStart.copy(), halfExtents: [partHalf, partHalf, partHalf], yaw: layout.yaw});
+        targets.boxes.set("table", tableBox);
+        targets.boxes.set("rack", rackBox);
         var objects:Map<String, nativekit.sim.SimObject> = new Map();
         objects.set("part", part);
-        objects.set("table", table);
-        worker.runSpec(HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"},{"action":"place","onto":"table"}]}'), targets, objects);
-        return new RackScenario(session, world, worker, part, partStart);
+        objects.set("table", tableObject);
+        var hand = ',"hand":"' + layout.hand + '"';
+        worker.runSpec(HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"pick","object":"part"' + hand +
+            (restingOn ? ',"from":"rack"' : '') + '},{"action":"place","onto":"table"' + hand + '}]}'), targets, objects);
+        return new RackScenario(session, world, worker, part, partStart, placePoint, rackBox, tableBox, layout);
     }
 
     /** Feeds the worker and runs one tick; returns where the part is afterwards. */

@@ -84,6 +84,71 @@ Instance::Instance(std::shared_ptr<const Asset> asset) : asset_(std::move(asset)
     evaluate();
 }
 
+namespace {
+
+// Rotates one joint's local rotation, stored four joints to a SoA lane, by q.
+void multiplyLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joint,
+                           const ozz::math::SimdQuaternion &q) {
+    ozz::math::SoaTransform &soa = locals[joint / 4];
+    ozz::math::SimdQuaternion quaternions[4];
+    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
+    quaternions[joint & 3] = quaternions[joint & 3] * q;
+    ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
+}
+
+// The direction the animation bends a limb, carried onto a new start-to-target axis by the smallest
+// rotation that takes the animated axis there, so it changes continuously as the target moves. A
+// fixed pole cannot do this: the bend plane contains the pole and the axis, so whenever the axis
+// passes the pole the plane is undefined and the elbow swings through a half turn. A limb the
+// animation holds straight has no bend of its own; `fallback` is returned for it.
+ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz::math::SimdFloat4 &mid,
+                                   const ozz::math::SimdFloat4 &end, const ozz::math::SimdFloat4 &target,
+                                   const ozz::math::SimdFloat4 &fallback) {
+    namespace m = ozz::math;
+    const m::SimdFloat4 animated_span = end - start, new_span = target - start;
+    const float animated_length = m::GetX(m::Length3(animated_span));
+    if (!(animated_length > 1e-6f) || !(m::GetX(m::Length3(new_span)) > 1e-6f)) return fallback;
+    const m::SimdFloat4 animated_axis = animated_span / m::simd_float4::Load1(animated_length);
+    const m::SimdFloat4 elbow = mid - start;
+    const m::SimdFloat4 bend = elbow - animated_axis * m::SplatX(m::Dot3(elbow, animated_axis));
+    if (!(m::GetX(m::Length3(bend)) > 1e-3f * animated_length)) return fallback;
+    const m::SimdQuaternion carry =
+        m::SimdQuaternion::FromVectors(animated_axis, m::Normalize3(new_span));
+    return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
+}
+
+} // namespace
+
+namespace {
+
+bool turnBefore(const JointRotation &a, const JointRotation &b) {
+    return a.source != b.source ? a.source < b.source : a.joint < b.joint;
+}
+
+} // namespace
+
+void Instance::setJointRotation(const JointRotation &turn) {
+    auto existing = std::find_if(joint_rotations.begin(), joint_rotations.end(), [&](const JointRotation &other) {
+        return other.source == turn.source && other.joint == turn.joint;
+    });
+    if (!(turn.weight > 0.0f)) {
+        if (existing != joint_rotations.end()) joint_rotations.erase(existing);
+        return;
+    }
+    if (existing != joint_rotations.end()) {
+        *existing = turn;
+        return;
+    }
+    joint_rotations.insert(std::upper_bound(joint_rotations.begin(), joint_rotations.end(), turn, turnBefore), turn);
+}
+
+void Instance::replaceJointRotations(uint32_t source, const std::vector<JointRotation> &turns) {
+    joint_rotations.erase(std::remove_if(joint_rotations.begin(), joint_rotations.end(),
+                                         [source](const JointRotation &turn) { return turn.source == source; }),
+                          joint_rotations.end());
+    for (const JointRotation &turn : turns) setJointRotation(turn);
+}
+
 bool Instance::evaluate() {
     const auto &skeleton = *asset_->skeleton;
     ozz::animation::BlendingJob::Layer blend_layers[kMaxLayers];
@@ -131,6 +196,18 @@ bool Instance::evaluate() {
         if (!blending.Run()) valid = false;
     }
 
+    for (const JointRotation &turn : joint_rotations) {
+        // Blend from no turn toward the full one, along the shorter arc.
+        namespace m = ozz::math;
+        const float w = std::clamp(turn.weight, 0.0f, 1.0f);
+        const float sign = turn.rotation[3] < 0.0f ? -1.0f : 1.0f;
+        const m::SimdQuaternion blended = m::Normalize(
+            m::SimdQuaternion{m::simd_float4::Load(sign * turn.rotation[0] * w, sign * turn.rotation[1] * w,
+                                                   sign * turn.rotation[2] * w,
+                                                   1.0f - w + sign * turn.rotation[3] * w)});
+        multiplyLocalRotation(locals_, turn.joint, blended);
+    }
+
     ozz::animation::LocalToModelJob local_to_model;
     local_to_model.skeleton = &skeleton;
     local_to_model.input = ozz::make_span(locals_);
@@ -156,40 +233,6 @@ bool Instance::validChain(int32_t start, int32_t mid, int32_t end) const {
     return descends(end, mid) && descends(mid, start);
 }
 
-namespace {
-
-// Rotates one joint's local rotation, stored four joints to a SoA lane, by q.
-void multiplyLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joint,
-                           const ozz::math::SimdQuaternion &q) {
-    ozz::math::SoaTransform &soa = locals[joint / 4];
-    ozz::math::SimdQuaternion quaternions[4];
-    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
-    quaternions[joint & 3] = quaternions[joint & 3] * q;
-    ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
-}
-
-// The direction the animation bends a limb, carried onto a new start-to-target axis by the smallest
-// rotation that takes the animated axis there, so it changes continuously as the target moves. A
-// fixed pole cannot do this: the bend plane contains the pole and the axis, so whenever the axis
-// passes the pole the plane is undefined and the elbow swings through a half turn. A limb the
-// animation holds straight has no bend of its own; `fallback` is returned for it.
-ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz::math::SimdFloat4 &mid,
-                                   const ozz::math::SimdFloat4 &end, const ozz::math::SimdFloat4 &target,
-                                   const ozz::math::SimdFloat4 &fallback) {
-    namespace m = ozz::math;
-    const m::SimdFloat4 animated_span = end - start, new_span = target - start;
-    const float animated_length = m::GetX(m::Length3(animated_span));
-    if (!(animated_length > 1e-6f) || !(m::GetX(m::Length3(new_span)) > 1e-6f)) return fallback;
-    const m::SimdFloat4 animated_axis = animated_span / m::simd_float4::Load1(animated_length);
-    const m::SimdFloat4 elbow = mid - start;
-    const m::SimdFloat4 bend = elbow - animated_axis * m::SplatX(m::Dot3(elbow, animated_axis));
-    if (!(m::GetX(m::Length3(bend)) > 1e-3f * animated_length)) return fallback;
-    const m::SimdQuaternion carry =
-        m::SimdQuaternion::FromVectors(animated_axis, m::Normalize3(new_span));
-    return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
-}
-
-} // namespace
 
 bool Instance::solveIk() {
     namespace m = ozz::math;

@@ -4,6 +4,7 @@
 	"sourceRoots": ["haxe"],
 	"scopeSourceRoots": false,
 	"dependencies": {
+		"kinematicskit": { "path": "../kinematicskit" },
 		"nativekit": { "path": "../nativekit" },
 		"simkit": { "path": "../simkit" },
 		"visionkit": { "path": "../visionkit" }

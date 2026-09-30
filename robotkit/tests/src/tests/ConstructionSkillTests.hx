@@ -13,8 +13,6 @@ import robotkit.model.RobotDriveConfiguration;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ToolBoxObstacle;
 import robotkit.manipulation.ToolPlanningContext;
@@ -84,7 +82,7 @@ class ConstructionSkillTests {
   static function testConstructionSkillsOnSimulationAndReplay():Void {
     var fixture = buildFixture();
     var model = fixture.model;
-    var manipulator = new Manipulator(model, fixture.chain);
+    var manipulator = fixture.arm;
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
     var blueprint = RobotRuntimeCompiler.compile(model);
@@ -256,7 +254,7 @@ class ConstructionSkillTests {
       sys.FileSystem.deleteFile(recordingPath + ".incomplete.status");
   }
 
-  static function buildFixture():{model:RobotModel, chain:KinematicChain, wheelRadius:Float, baseRadius:Float} {
+  static function buildFixture():{model:RobotModel, arm:Manipulator, wheelRadius:Float, baseRadius:Float} {
     var model = new RobotModel("construction-skill-robot");
     var base = model.addLink(new Link("base", "link/base"));
 
@@ -313,8 +311,8 @@ class ConstructionSkillTests {
     }
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = [0.0, d6, 0.0];
-    var chain = new KinematicChain(model, base.id, ChainTip.Frame(flange.id));
-    return { model: model, chain: chain, wheelRadius: wheelRadius, baseRadius: baseRadius };
+    var arm = new Manipulator(model, base.id, flange.id);
+    return { model: model, arm: arm, wheelRadius: wheelRadius, baseRadius: baseRadius };
   }
 
   static function check(value:Bool, message:String):Void {

@@ -1,5 +1,6 @@
 #include "animkit.h"
 
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -359,6 +360,88 @@ int main() {
     ik.soften = 0.0f;
     CHECK(ak_instance_set_ik(instance, 0, &ik) == AK_ERROR_INVALID_ARGUMENT);
     CHECK(ak_instance_set_ik(instance, 0, nullptr) == AK_OK);
+
+    // A joint turn rides on the animated pose and carries the joint's descendants; weight 0 removes it.
+    {
+        auto jointOrigin = [&](int32_t joint) {
+            uint32_t bytes = 0;
+            CHECK(ak_instance_read_joint_matrices(instance, nullptr, &bytes) == AK_OK);
+            std::vector<float> matrices(bytes / sizeof(float));
+            CHECK(ak_instance_read_joint_matrices(instance, reinterpret_cast<uint8_t *>(matrices.data()), &bytes)
+                == AK_OK);
+            return std::array<float, 3>{matrices[joint * 16 + 12], matrices[joint * 16 + 13], matrices[joint * 16 + 14]};
+        };
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto before = jointOrigin(prop);
+        const float quarter = std::sqrt(0.5f);
+        CHECK(ak_instance_set_joint_rotation(instance, 1, bone, 0.0f, quarter, 0.0f, quarter, 1.0f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto turned = jointOrigin(prop);
+        CHECK(!near(turned[0], before[0]) || !near(turned[1], before[1]) || !near(turned[2], before[2]));
+        // Half weight lands between none and all of the turn.
+        CHECK(ak_instance_set_joint_rotation(instance, 1, bone, 0.0f, quarter, 0.0f, quarter, 0.5f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto half = jointOrigin(prop);
+        CHECK(!near(half[0], turned[0]) || !near(half[2], turned[2]));
+        CHECK(ak_instance_set_joint_rotation(instance, 1, bone, 0.0f, quarter, 0.0f, quarter, 0.0f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto restored = jointOrigin(prop);
+        CHECK(near(restored[0], before[0]) && near(restored[1], before[1]) && near(restored[2], before[2]));
+        CHECK(ak_instance_set_joint_rotation(instance, 1, -1, 0, 0, 0, 1, 1) == AK_ERROR_INVALID_ARGUMENT);
+        CHECK(ak_instance_set_joint_rotation(instance, 1, 999, 0, 0, 0, 1, 1) == AK_ERROR_INVALID_ARGUMENT);
+        CHECK(ak_instance_set_joint_rotation(instance, 1, bone, 0, 0, 0, 0, 1) == AK_ERROR_INVALID_ARGUMENT);
+
+        // Sources compose on one joint and never overwrite each other.
+        CHECK(ak_instance_set_joint_rotation(instance, 1, bone, 0.0f, quarter, 0.0f, quarter, 1.0f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto first = jointOrigin(prop);
+        CHECK(ak_instance_set_joint_rotation(instance, 2, bone, quarter, 0.0f, 0.0f, quarter, 1.0f) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto both = jointOrigin(prop);
+        CHECK(!near(both[0], first[0]) || !near(both[1], first[1]) || !near(both[2], first[2]));
+        // Removing the first source leaves the second's turn alone, as if it had been the only one.
+        CHECK(ak_instance_clear_joint_rotations(instance, 1) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto second = jointOrigin(prop);
+        CHECK(!near(second[0], before[0]) || !near(second[1], before[1]) || !near(second[2], before[2]));
+        CHECK(ak_instance_clear_joint_rotations(instance, 2) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto cleared = jointOrigin(prop);
+        CHECK(near(cleared[0], before[0]) && near(cleared[1], before[1]) && near(cleared[2], before[2]));
+
+        // A batch replaces its source's turns in one call, and matches the same turn set singly.
+        auto record = [&](std::vector<uint8_t> &bytes, int32_t joint, float x, float y, float z, float w, float weight) {
+            const float values[5] = {x, y, z, w, weight};
+            const size_t at = bytes.size();
+            bytes.resize(at + sizeof(joint) + sizeof(values));
+            std::memcpy(bytes.data() + at, &joint, sizeof(joint));
+            std::memcpy(bytes.data() + at + sizeof(joint), values, sizeof(values));
+        };
+        std::vector<uint8_t> batch;
+        record(batch, bone, 0.0f, quarter, 0.0f, quarter, 1.0f);
+        CHECK(ak_instance_set_joint_rotations(instance, 3, batch.data(), static_cast<uint32_t>(batch.size())) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto batched = jointOrigin(prop);
+        CHECK(near(batched[0], turned[0]) && near(batched[1], turned[1]) && near(batched[2], turned[2]));
+        // A second batch replaces the first rather than adding to it.
+        std::vector<uint8_t> empty;
+        CHECK(ak_instance_set_joint_rotations(instance, 3, empty.data(), 0) == AK_OK);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto emptied = jointOrigin(prop);
+        CHECK(near(emptied[0], before[0]) && near(emptied[1], before[1]) && near(emptied[2], before[2]));
+        // One bad record, or a size that is not whole records, changes nothing.
+        CHECK(ak_instance_set_joint_rotations(instance, 3, batch.data(), static_cast<uint32_t>(batch.size())) == AK_OK);
+        std::vector<uint8_t> broken = batch;
+        record(broken, 999, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f);
+        CHECK(ak_instance_set_joint_rotations(instance, 3, broken.data(), static_cast<uint32_t>(broken.size()))
+            == AK_ERROR_INVALID_ARGUMENT);
+        CHECK(ak_instance_set_joint_rotations(instance, 3, batch.data(), static_cast<uint32_t>(batch.size()) - 1)
+            == AK_ERROR_INVALID_ARGUMENT);
+        CHECK(ak_instance_evaluate(instance) == AK_OK);
+        const auto kept = jointOrigin(prop);
+        CHECK(near(kept[0], turned[0]) && near(kept[1], turned[1]) && near(kept[2], turned[2]));
+        CHECK(ak_instance_clear_joint_rotations(instance, 3) == AK_OK);
+    }
 
     CHECK(ak_instance_set_layer(instance, AK_MAX_LAYERS, 0, 0, 1, 0) == AK_ERROR_INVALID_ARGUMENT);
     CHECK(ak_instance_set_layer(instance, 0, 7, 0, 1, 0) == AK_ERROR_INVALID_ARGUMENT);

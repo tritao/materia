@@ -13,11 +13,12 @@ import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
-import materia.assembly.AssemblyRecord.AssemblyConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.units.LengthUnit;
 import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveOptions;
 import cadkit.modeling.AssemblyLoopSolver.AssemblyLoopSolveResult;
+import kinematicskit.KinematicSnapshot;
+import kinematicskit.KinematicState;
 
 typedef AssemblyClosureResidual = {
 	var joint:String;
@@ -33,9 +34,11 @@ class AssemblyState {
 	final rootPoses:Map<String, AssemblyFrame> = [];
 	final occurrences:Map<String, AssemblyComponentOccurrence> = [];
 	final components:Map<String, AssemblyComponentDefinition> = [];
-	final incoming:Map<String, KinematicJoint> = [];
 	final joints:Map<String, KinematicJoint> = [];
 	final poses:Map<String, AssemblyFrame> = [];
+	final kinematics:AssemblyKinematics;
+	final kinematicState:KinematicState;
+	final snapshot:KinematicSnapshot;
 	var dirty:Bool = true;
 
 	public function new(definition:AssemblyDefinition, ?state:AssemblyStateRecord) {
@@ -48,11 +51,13 @@ class AssemblyState {
 		for (joint in definition.joints) {
 			joints.set(joint.id, joint);
 			if (joint.role == AssemblyJointRole.Tree) {
-				incoming.set(joint.child, joint);
 				if (AssemblyDefinitionCodec.hasCoordinate(joint.type))
 					coordinates.set(joint.id, joint.defaultValue);
 			}
 		}
+		kinematics = AssemblyKinematics.compile(definition);
+		kinematicState = new KinematicState(kinematics.model);
+		snapshot = new KinematicSnapshot(kinematics.model);
 		if (state != null) {
 			AssemblyDefinitionCodec.validateState(definition, state);
 			for (coordinate in state.jointCoordinates) coordinates.set(coordinate.joint, coordinate.value);
@@ -107,18 +112,48 @@ class AssemblyState {
 		dirty = true;
 	}
 
-	/** Recomputes all occurrence poses from root placements and tree-joint coordinates. */
+	/**
+		Recomputes all occurrence poses from root placements and tree-joint
+		coordinates. A coupled joint follows its source through the compiled
+		coupling, so its pose never depends on a stale stored coordinate.
+	*/
 	public function forwardKinematics():Void {
 		poses.clear();
-		var visiting = new Map<String, Bool>();
-		for (occurrence in definition.occurrences) solveOccurrence(occurrence.id, visiting);
+		syncKinematicState();
+		snapshot.evaluate(kinematicState);
 		dirty = false;
+	}
+
+	/** The compiled model and a copy of this configuration in its terms, for kinematics solvers. */
+	@:allow(cadkit.modeling.AssemblyLoopSolver)
+	@:allow(cadkit.modeling.AssemblyDrag)
+	function kinematicModel():AssemblyKinematics return kinematics;
+
+	@:allow(cadkit.modeling.AssemblyLoopSolver)
+	@:allow(cadkit.modeling.AssemblyDrag)
+	function kinematicSeed():KinematicState {
+		syncKinematicState();
+		return kinematicState.copy();
+	}
+
+	function syncKinematicState():Void {
+		var model = kinematics.model;
+		for (dof in 0...model.dofCount()) {
+			var value = coordinates.get(model.dofId(dof));
+			kinematicState.q[dof] = value == null ? model.jointDefault[model.dofJoint[dof]] : value;
+		}
+		for (id in rootPoses.keys()) kinematicState.setRootPose(kinematics.body(id), AssemblyKinematics.fromFrame(rootPoses.get(id)));
 	}
 
 	public function worldPose(id:String):AssemblyFrame {
 		if (!occurrences.exists(id)) throw 'Missing assembly occurrence "$id"';
 		if (dirty) forwardKinematics();
-		return poses.get(id);
+		var pose = poses.get(id);
+		if (pose == null) {
+			pose = AssemblyKinematics.toFrame(snapshot.bodyPose(kinematics.body(id)));
+			poses.set(id, pose);
+		}
+		return pose;
 	}
 
 	public function worldConnector(id:String, name:String):AssemblyFrame {
@@ -196,40 +231,5 @@ class AssemblyState {
 			definition: definition.id, jointCoordinates: values, rootPoses: roots};
 		AssemblyDefinitionCodec.validateState(definition, result);
 		return result;
-	}
-
-	function solveOccurrence(id:String, visiting:Map<String, Bool>):AssemblyFrame {
-		var solved = poses.get(id);
-		if (solved != null) return solved;
-		if (visiting.exists(id)) throw 'Assembly kinematic tree contains a cycle at "$id"';
-		visiting.set(id, true);
-		var joint = incoming.get(id);
-		var pose:AssemblyFrame;
-		if (joint == null) {
-			var occurrence = occurrences.get(id);
-			if (occurrence == null) throw 'Missing assembly occurrence "$id"';
-			pose = rootPoses.exists(id) ? rootPoses.get(id) : occurrence.initialPose;
-		} else {
-			var parentPose = solveOccurrence(joint.parent, visiting);
-			var parentConnector = connector(joint.parent, joint.parentConnector);
-			var childConnector = connector(joint.child, joint.childConnector);
-			var parentFrame = AssemblyFrames.compose(parentPose, parentConnector.frame);
-			var value = coordinates.get(joint.id);
-			if (value == null) value = joint.defaultValue;
-			var motion = AssemblyFrames.axisMotion(joint.type, joint.axis, value);
-			pose = AssemblyFrames.compose(AssemblyFrames.compose(parentFrame, motion), AssemblyFrames.inverse(childConnector.frame));
-		}
-		visiting.remove(id);
-		poses.set(id, pose);
-		return pose;
-	}
-
-	function connector(occurrenceId:String, name:String):AssemblyConnector {
-		var occurrence = occurrences.get(occurrenceId);
-		if (occurrence == null) throw 'Missing assembly occurrence "$occurrenceId"';
-		var component = components.get(occurrence.definition);
-		if (component == null) throw 'Missing assembly component "${occurrence.definition}"';
-		for (connector in component.connectors) if (connector.name == name) return connector;
-		throw 'Missing assembly connector "$occurrenceId/$name"';
 	}
 }

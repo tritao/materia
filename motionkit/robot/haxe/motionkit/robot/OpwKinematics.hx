@@ -275,22 +275,9 @@ class OpwKinematics implements KinematicsSolver {
       pose.get_quaternion(1), pose.get_quaternion(2), pose.get_quaternion(3)));
   }
 
-  static function orderedJoints(model:RobotModel, manipulator:Manipulator):Array<Joint> {
-    var result:Array<Joint> = [];
-    var current = manipulator.chain.tipLink;
-    var guard = 0;
-    while (current != manipulator.chain.baseLink) {
-      if (guard++ > model.joints.length) throw "OPW model has cyclic joint ancestry";
-      var found:Null<Joint> = null;
-      for (joint in model.joints)
-        if (joint.child.id == current) { found = joint; break; }
-      if (found == null) throw 'OPW cannot reach base from link $current';
-      result.push(found);
-      current = found.parent.id;
-    }
-    result.reverse();
-    return result;
-  }
+  static function orderedJoints(model:RobotModel, manipulator:Manipulator):Array<Joint>
+    return manipulator.pathJoints();
+
 }
 
 /** Parameters inferred from physical joint origins, axis directions, and TCP. */

@@ -8,6 +8,9 @@
   ],
   "scopeSourceRoots": false,
   "dependencies": {
+    "kinematicskit": {
+      "path": "../kinematicskit"
+    },
     "projectkit": {
       "path": "../projectkit"
     }

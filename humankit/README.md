@@ -113,6 +113,9 @@ capsule's local +Z along its bones) through the character's root transform.
 character root, as a `HumanDisplay` of `Mesh`, `Capsules`, or `Skeleton`, to
 check the proxy against the mesh.
 
+How the body is layered, who owns what, and where its tuning lives are described in
+[BODY.md](BODY.md).
+
 ## Document jobs
 
 `HumanJobSpec.parse` accepts strict, versioned JSON. Version 1 has `version`,
@@ -121,7 +124,7 @@ saved job can be reopened without Haxe code:
 
 ```json
 {"version":1,"loop":false,"steps":[
-  {"action":"pick","object":"part","hand":"right"},
+  {"action":"pick","object":"part","hand":"right","from":"rack"},
   {"action":"place","onto":"table","hand":"right"}
 ]}
 ```
@@ -130,7 +133,10 @@ Available actions are `walkTo` (an object or XY point, with optional `via`
 points), `pick`, `place` (optional XY `offset` on the support and
 `retreat: "backward"` to keep facing the part for the first step away), `press` (object
 anchor or XYZ point), `wait` (seconds), and `playClip` (clip and seconds).
-Pick and place hands can be `left`, `right`, or `both`. The parser rejects unknown fields,
+Pick and place hands can be `left`, `right`, or `both`. A pick may name the
+surface the object rests on with `from`, as a place names its `onto`: the worker
+then stands clear of that surface's edge and leans the upper body over it to keep
+the reach comfortable, instead of standing in the edge. The parser rejects unknown fields,
 invalid pick and place sequences, and unsupported versions. `toJson()` writes
 a normalized spec. Parsed steps use the typed `HumanJobStep` shape; the parser
 enforces action-specific fields before publishing them.

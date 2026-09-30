@@ -1052,6 +1052,9 @@ class FrameworkSmoke {
 		var frame = new LayoutFrame(256.0, 192.0);
 		var cycleRoot = new RenderNode(new WidgetId(0x7fffff00));
 		var cycleChild = new RenderNode(new WidgetId(0x7fffff01));
+		// Leaves share one empty children array, so give each node its own before writing to it directly.
+		cycleRoot.add(new RenderNode(new WidgetId(0x7fffff03)));
+		cycleChild.add(new RenderNode(new WidgetId(0x7fffff04)));
 		cycleRoot.children.push(cycleChild);
 		cycleChild.children.push(cycleRoot);
 		if (cycleRoot.find(new WidgetId(0x7fffff02)) != null)
@@ -2036,7 +2039,6 @@ class FrameworkSmoke {
 		if (cachedAxisLayout.width.sizing != LayoutSizing.Grow || cachedAxisLayout.width.min != 100.0 ||
 			cachedAxisLayout.width.max != 500.0 || cachedAxisLayout.width.growWeight != 3.0)
 			return 236;
-		cachedSecond.get(StyleProperty.Width).value = 123.0;
 		cachedFirst.set(StyleProperty.Background, Color.rgba(1.0, 0.0, 0.0, 1.0), null);
 		var cachedThird = cacheResolver.resolve(cacheTarget, null, null, cacheSheet);
 		if (cacheResolver.cacheHits != 2 || cachedThird.get(StyleProperty.Background).red != 0.3 ||
@@ -2057,7 +2059,7 @@ class FrameworkSmoke {
 		if (localAxisResolver.cacheMisses != 2 || localAxisResolver.cacheHits != 0 ||
 			localAxisSecondValue.sizing != LayoutSizing.Grow || localAxisSecondValue.growWeight != 3.0)
 			return 238;
-		localAxis.width.growWeight = 4.0;
+		localAxis.width = LayoutAxis.grow(100.0, 500.0, 4.0);
 		var localAxisThird = localAxisResolver.resolve(localAxisTarget, null, null, null, localAxis);
 		if (localAxisResolver.cacheMisses != 3 || localAxisThird.get(StyleProperty.Width).growWeight != 4.0)
 			return 239;
@@ -2553,8 +2555,9 @@ class FrameworkSmoke {
 		sourceBodyStyle.childGap = 17.0;
 		var copiedAppShell = new AppShell("app-shell-style-copy", new Text("Content"),
 			null, null, null, sourceStyle, sourceBodyStyle);
-		sourceStyle.width.value = 1.0;
-		sourceStyle.padding.left = 1.0;
+		sourceStyle.width = LayoutAxis.fixed(1.0);
+		// Insets are immutable, so a later change to the source is a replacement, and the copy must keep the old value.
+		sourceStyle.padding = new Insets(1.0, 12.0, 13.0, 14.0);
 		sourceBodyStyle.childGap = 1.0;
 		if (copiedAppShell.style.width.value != 280.0 ||
 			copiedAppShell.style.padding.left != 11.0 ||

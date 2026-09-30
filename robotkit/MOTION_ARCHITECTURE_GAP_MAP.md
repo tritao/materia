@@ -217,14 +217,13 @@ TOPP-RA and conservative segment timing are missing.
 
 ## 5. Kinematics, collision, dynamics (§9, §10)
 
-- **FK / Jacobian — Exists:** `manipulation/KinematicChain.hx` (6×N geometric
-  Jacobian).
-- **IK — Partial:** `manipulation/InverseKinematics.solve`, a static damped
-  least-squares solver with joint clamping.
-  - There is no solver interface, so this is the plan's "hard-coded IK choice".
-  - Missing: analytic IK (OPW), candidate sampling, configuration selection
-    across a path, a velocity-level differential IK API, and null-space or
-    redundancy handling.
+- **FK / Jacobian / IK — moved to `kinematicskit`** (see
+  `kinematicskit/plans/KINEMATICS.md`): compiled whole-robot models, tasks
+  (frame, look-at, closure, posture), damped least squares and
+  Levenberg-Marquardt with diagnostics. `Manipulator` is the RobotKit view of
+  an arm. Analytic OPW IK, candidate sampling and path configuration
+  selection live in MotionKit (Lane C). Redundancy and a native QP are
+  kinematicskit K3.
 - **Collision — Missing** on the planning side.
   - `tool/ToolCollisionShape.hx` is declared but never checked.
   - `manipulation/BaseObstacle.hx` is a 2D circle used for base placement only.

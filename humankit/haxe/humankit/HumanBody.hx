@@ -1,32 +1,88 @@
 package humankit;
 
-/** Animation and locomotion state shared by every action in a worker's job. */
+/**
+ * Animation and locomotion state shared by every action in a worker's job.
+ *
+ * The body is what actions talk to: where it stands, which limbs reach or carry, how the hands
+ * grip, how far the upper body leans. Each limb keeps its own small state machine
+ * (`LimbControl`); the body steps them, solves wrist goals against the animated pose, and turns
+ * the tuning in `HumanPosture` into the pose. See BODY.md for how the layers fit together.
+ */
 class HumanBody {
 	public final character:HumanCharacter;
 	public final walker:HumanWalker;
 	public final description:HumanDescription;
+	public final posture:HumanPosture;
 	/** True between a completed pick and its matching place. */
 	public var grip(default, null):Bool = false;
 
-	final active:Array<Bool> = [false, false, false, false];
-	final modelTargets:Array<Bool> = [false, false, false, false];
-	final targets:Array<Array<Float>> = [[], [], [], []];
-	final weights:Array<Float> = [0.0, 0.0, 0.0, 0.0];
-	final poles:Array<Null<Array<Float>>> = [null, null, null, null];
+	/** The four limbs, indexed by HumanLimb. */
+	final limbs:Array<LimbControl>;
 	final heldPoints:Array<Null<Void->Array<Float>>> = [null, null, null, null];
-	var carrying:Array<HumanLimb> = [];
-	/** Seconds a hand takes to settle into the carry pose from wherever it was. */
-	static inline var CARRY_EASE_SECONDS:Float = 0.3;
-	/** Where each hand was when it began to carry, and how far it has settled (one when done). */
-	final carryFrom:Array<Null<Array<Float>>> = [null, null, null, null];
-	final carrySettled:Array<Float> = [1.0, 1.0, 1.0, 1.0];
+	var leanGoal:Float = 0.0;
+	var leanNow:Float = 0.0;
 
-	public function new(character:HumanCharacter, ?walker:HumanWalker) {
+	public function new(character:HumanCharacter, ?walker:HumanWalker, ?posture:HumanPosture) {
 		this.character = character;
 		this.walker = walker == null ? new HumanWalker(character) : walker;
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
+		this.posture = posture == null ? HumanPosture.standard() : posture;
 		description = HumanDescription.measure(character.pose, character.height());
+		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
+		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
+	}
+
+	/** Open while reaching for something, closed while holding it, relaxed otherwise. */
+	function curlFor(hand:HumanLimb):Float {
+		var control = limbs[hand];
+		if (control.mode == Carry || heldPoints[hand] != null) return posture.gripCurl;
+		return control.mode == Reach && control.weight > 0.0 ? posture.openCurl : posture.relaxedCurl;
+	}
+
+	/** Where the torso is asked to lean; it eases there. Zero stands upright. */
+	public function setLean(angle:Float):Void
+		leanGoal = Math.max(0.0, Math.min(posture.maxLean, angle));
+
+	/**
+	 * The lean that carries a hand's shoulder `shift` metres further forward, and the shift it can
+	 * deliver (less than asked when that would pass the posture's maximum lean). Measured by leaning
+	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was.
+	 */
+	public function leanFor(hand:HumanLimb, shift:Float):{angle:Float, shift:Float} {
+		var none = {angle: 0.0, shift: 0.0};
+		if (!(shift > 1e-4)) return none;
+		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
+		var saved = character.spineLean();
+		var probe = 0.2;
+		character.setSpineLean(0.0);
+		character.advance(0.0);
+		var upright = character.pose.bonePosition(bone);
+		character.setSpineLean(probe);
+		character.advance(0.0);
+		var leaned = character.pose.bonePosition(bone);
+		character.setSpineLean(saved);
+		character.advance(0.0);
+		if (upright == null || leaned == null || leaned[0] - upright[0] < 1e-4) return none;
+		var perRadian = (leaned[0] - upright[0]) / probe;
+		var angle = Math.min(posture.maxLean, shift / perRadian);
+		return {angle: angle, shift: angle * perRadian};
+	}
+
+	function moveLean(seconds:Float):Void {
+		var step = posture.leanRate * seconds;
+		leanNow = Math.abs(leanGoal - leanNow) <= step ? leanGoal : leanNow + (leanGoal > leanNow ? step : -step);
+		character.setSpineLean(leanNow);
+	}
+
+	function moveFingers(seconds:Float):Void {
+		for (hand in [ArmL, ArmR]) {
+			var control = limbs[hand];
+			var step = posture.curlRate * seconds, wanted = curlFor(hand);
+			control.curl = Math.abs(wanted - control.curl) <= step ? wanted :
+				control.curl + (wanted > control.curl ? step : -step);
+			character.setHandCurl(hand, control.curl);
+		}
 	}
 
 	public function rootTransform():Array<Float>
@@ -48,28 +104,16 @@ class HumanBody {
 		];
 
 	public function setReachWorld(limb:HumanLimb, target:Array<Float>, weight:Float,
-			?pole:Array<Float>):Void {
-		var index:Int = limb;
-		active[index] = true;
-		modelTargets[index] = false;
-		targets[index] = target.copy();
-		weights[index] = Math.max(0.0, Math.min(1.0, weight));
-		poles[index] = pole == null ? null : pole.copy();
-	}
+			?pole:Array<Float>):Void
+		limbs[limb].reach(target, false, weight, pole);
 
 	/** Legacy model-space reach target used by HumanReachTask. */
 	public function setReachModel(limb:HumanLimb, target:Array<Float>, weight:Float,
-			?pole:Array<Float>):Void {
-		var index:Int = limb;
-		active[index] = true;
-		modelTargets[index] = true;
-		targets[index] = target.copy();
-		weights[index] = Math.max(0.0, Math.min(1.0, weight));
-		poles[index] = pole == null ? null : pole.copy();
-	}
+			?pole:Array<Float>):Void
+		limbs[limb].reach(target, true, weight, pole);
 
 	public function reachWeight(limb:HumanLimb):Float
-		return weights[limb];
+		return limbs[limb].weight;
 
 	/** Predicted world position of the object reference point held by a hand. */
 	public function setHeldPoint(hand:HumanLimb, provider:Null<Void->Array<Float>>):Void {
@@ -99,7 +143,7 @@ class HumanBody {
 		var shoulder = character.pose.bonePosition(hand == ArmL ? UpperArmL : UpperArmR);
 		if (shoulder == null) return "The character has no shoulder bone";
 		var fromShoulder = distance(toWorld(shoulder), goal);
-		var limit = 0.95 * (description.upperArm + description.forearm);
+		var limit = posture.reachLimit * (description.upperArm + description.forearm);
 		return fromShoulder > limit ? 'out of reach (${fromShoulder} m from the shoulder, limit ${limit} m)' : null;
 	}
 
@@ -151,36 +195,30 @@ class HumanBody {
 		return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
 
 	public function reachPole(limb:HumanLimb):Null<Array<Float>>
-		return poles[limb];
+		return limbs[limb].pole;
 
 	public function reachTargetWorld(limb:HumanLimb):Null<Array<Float>> {
-		var index:Int = limb;
-		if (!active[index]) return null;
-		return modelTargets[index] ? toWorld(targets[index]) : targets[index].copy();
+		var control = limbs[limb];
+		if (control.mode != Reach) return null;
+		return control.modelSpace ? toWorld(control.target) : control.target.copy();
 	}
 
-	public function clearReach(limb:HumanLimb):Void {
-		var index:Int = limb;
-		active[index] = false;
-		weights[index] = 0.0;
-		poles[index] = null;
-		character.release(limb);
-	}
+	public function clearReach(limb:HumanLimb):Void
+		limbs[limb].release(character);
 
 	public function setCarry(hands:Array<HumanLimb>):Void {
-		for (hand in carrying) if (hands.indexOf(hand) < 0) clearReach(hand);
-		for (hand in hands) if (carrying.indexOf(hand) < 0) {
+		for (control in limbs) if (control.mode == Carry && hands.indexOf(control.limb) < 0) clearReach(control.limb);
+		for (hand in hands) {
+			var control = limbs[hand];
 			// A hand takes up the carry pose from where it is, not by jumping there.
 			var wrist = character.pose.bonePosition(hand == ArmL ? HandL : HandR);
-			carryFrom[hand] = wrist == null ? null : wrist.copy();
-			carrySettled[hand] = wrist == null ? 1.0 : 0.0;
+			control.carry(wrist);
+			control.dropIk(character);
 		}
-		carrying = hands.copy();
-		for (hand in hands) clearReach(hand);
 	}
 
 	public function isCarrying(limb:HumanLimb):Bool
-		return carrying.indexOf(limb) >= 0;
+		return limbs[limb].mode == Carry;
 
 	/** Current carry target in model space, tied to the animated chest. */
 	public function carryTargetModel(limb:HumanLimb):Array<Float> {
@@ -188,7 +226,8 @@ class HumanBody {
 		if (chest == null) chest = character.pose.bonePosition(Pelvis);
 		if (chest == null) throw "The character has no chest or pelvis";
 		var side = limb == ArmL ? 1.0 : -1.0;
-		return [chest[0] + 0.24, chest[1] + side * 0.12, chest[2] - 0.22];
+		return [chest[0] + posture.carryOffset[0], chest[1] + side * posture.carryOffset[1],
+			chest[2] + posture.carryOffset[2]];
 	}
 
 	public function setGrip(held:Bool):Void
@@ -196,10 +235,16 @@ class HumanBody {
 
 	public function cancel():Void {
 		walker.stop();
-		carrying = [];
 		grip = false;
 		for (hand in [ArmL, ArmR]) setHeldPoint(hand, null);
-		for (limb in [ArmL, ArmR, LegL, LegR]) clearReach(limb);
+		for (control in limbs) control.release(character);
+		for (hand in [ArmL, ArmR]) {
+			limbs[hand].curl = posture.relaxedCurl;
+			character.setHandCurl(hand, posture.relaxedCurl);
+		}
+		leanGoal = 0.0;
+		leanNow = 0.0;
+		character.setSpineLean(0.0);
 	}
 
 	/**
@@ -214,31 +259,19 @@ class HumanBody {
 
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
-		for (hand in carrying) carrySettled[hand] = Math.min(1.0, carrySettled[hand] + seconds / CARRY_EASE_SECONDS);
+		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds);
+		moveFingers(seconds);
+		moveLean(seconds);
 		walker.advance(seconds);
 		evaluate();
 	}
 
 	/** Re-evaluates reaches at the current animation time for in-frame IK solving. */
 	public function evaluate():Void {
+		// A lean swings an unused arm back with the torso; hold it hanging, more so the further the lean.
+		var hang = leanNow > 0.02 ? Math.min(1.0, leanNow / posture.hangLean) : 0.0;
 		var changed = false;
-		for (limb in [ArmL, ArmR, LegL, LegR]) {
-			var index:Int = limb;
-			if (active[index]) {
-				character.reach(limb, modelTargets[index] ? targets[index] : toModel(targets[index]),
-					weights[index], poles[index]);
-				changed = true;
-			} else if (isCarrying(limb)) {
-				var target = carryTargetModel(limb);
-				var settled = carrySettled[index], from = carryFrom[index];
-				if (settled < 1.0 && from != null) {
-					var ease = settled * settled * (3.0 - 2.0 * settled);
-					target = [for (axis in 0...3) from[axis] + (target[axis] - from[axis]) * ease];
-				}
-				character.reach(limb, target);
-				changed = true;
-			}
-		}
+		for (control in limbs) if (control.apply(this, hang)) changed = true;
 		if (changed) character.advance(0.0);
 	}
 }

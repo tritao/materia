@@ -27,15 +27,17 @@ private class InheritedKeyCache {
 
 /** Authoritative Haxe-side result of style resolution. */
 class ComputedStyle {
-	var values:Map<String, Dynamic>;
-	var sources:Map<String, StyleSource>;
+	/** Indexed by `StyleProperty.slot`: null is absent, and `NullValue` stands for a stored null. */
+	var values:Array<Dynamic>;
+	var sources:Array<Null<StyleSource>>;
+	static final NullValue:Dynamic = new InheritedKeyCache();
 	public var matchingRules(default, null):Array<StyleSource>;
 	var shared:Bool;
 	var inheritedKeyCache:Null<InheritedKeyCache>;
 
 	public function new() {
-		values = new Map();
-		sources = new Map();
+		values = [];
+		sources = [];
 		matchingRules = [];
 		shared = false;
 		inheritedKeyCache = null;
@@ -47,25 +49,37 @@ class ComputedStyle {
 		ensureWritable();
 		if (property.inherited)
 			inheritedKeyCache = null;
-		values.set(property.name, value);
-		if (source == null)
-			sources.remove(property.name);
-		else
-			sources.set(property.name, source);
+		var slot = property.slot;
+		if (slot >= values.length) {
+			values.resize(slot + 1);
+			sources.resize(slot + 1);
+		}
+		values[slot] = value == null ? NullValue : value;
+		sources[slot] = source;
 	}
 
+	inline function isSet(slot:Int):Bool
+		return slot < values.length && values[slot] != null;
+
+	inline function valueAt(slot:Int):Dynamic {
+		var value = slot < values.length ? values[slot] : null;
+		return value == NullValue ? null : value;
+	}
+
+	inline function sourceAt(slot:Int):Null<StyleSource>
+		return slot < sources.length ? sources[slot] : null;
+
 	public function has<T>(property:StyleProperty<T>):Bool
-		return property != null && values.exists(property.name);
+		return property != null && isSet(property.slot);
 
 	public function get<T>(property:StyleProperty<T>):T {
 		if (property == null)
 			throw "Computed styles require a property";
-		var value = values.get(property.name);
-		if (value == null && !values.exists(property.name))
+		var slot = property.slot;
+		if (!isSet(slot))
 			return property.defaultValue;
-		return shared || property.name == "effects" || property.name == "backdropEffects" ||
-			property.name == "decorations" || property.name == "mask"
-			? cast copyValue(cast property, value) : cast value;
+		var value = valueAt(slot);
+		return property.copiedOnRead ? cast copyValue(cast property, value) : cast value;
 	}
 
 	/** True when both styles read the same value storage (cache forks do until one mutates), so no value can differ. */
@@ -74,13 +88,13 @@ class ComputedStyle {
 
 	/** Reads a value without the defensive copy `get` makes; the caller must not mutate it. */
 	public function peek<T>(property:StyleProperty<T>):T
-		return cast values.get(property.name);
+		return cast valueAt(property.slot);
 
 	public function property<T>(property:StyleProperty<T>):ComputedProperty<T>
-		return new ComputedProperty(get(property), sources.get(property.name));
+		return new ComputedProperty(get(property), sourceAt(property.slot));
 
 	public function source<T>(property:StyleProperty<T>):Null<StyleSource>
-		return sources.get(property.name);
+		return sourceAt(property.slot);
 
 	/** Records every matching rule, including rules whose declarations were overridden. */
 	public function recordMatch(source:StyleSource):Void {
@@ -97,69 +111,69 @@ class ComputedStyle {
 	public function entries():Array<StyleInspectionEntry> {
 		var result:Array<StyleInspectionEntry> = [];
 		for (property in StyleProperty.all())
-			if (values.exists(property.name))
-				result.push(new StyleInspectionEntry(property.name, copyValue(property, values.get(property.name)),
-					sources.get(property.name)));
+			if (isSet(property.slot))
+				result.push(new StyleInspectionEntry(property.name, copyValue(property, valueAt(property.slot)),
+					sourceAt(property.slot)));
 		return result;
 	}
 
 	/** Materializes the resolved layout subset without mutating any input style. */
 	public function toLayoutStyle(?base:LayoutStyle):LayoutStyle {
 		var result = base == null ? new LayoutStyle() : base.copy();
-		if (values.exists(StyleProperty.Width.name)) {
-			var width:LayoutAxis = cast copyValue(cast StyleProperty.Width, values.get(StyleProperty.Width.name));
+		if (isSet(StyleProperty.Width.slot)) {
+			var width:LayoutAxis = cast valueAt(StyleProperty.Width.slot);
 			result.width = width;
 		}
-		if (values.exists(StyleProperty.Height.name)) {
-			var height:LayoutAxis = cast copyValue(cast StyleProperty.Height, values.get(StyleProperty.Height.name));
+		if (isSet(StyleProperty.Height.slot)) {
+			var height:LayoutAxis = cast valueAt(StyleProperty.Height.slot);
 			result.height = height;
 		}
-		if (values.exists(StyleProperty.Direction.name)) result.direction = cast values.get(StyleProperty.Direction.name);
-		if (values.exists(StyleProperty.ChildAlignX.name)) result.childAlignX = cast values.get(StyleProperty.ChildAlignX.name);
-		if (values.exists(StyleProperty.ChildAlignY.name)) result.childAlignY = cast values.get(StyleProperty.ChildAlignY.name);
-		if (values.exists(StyleProperty.ChildDistribution.name)) result.childDistribution = cast values.get(StyleProperty.ChildDistribution.name);
-		if (values.exists(StyleProperty.Positioning.name)) result.positioning = cast values.get(StyleProperty.Positioning.name);
-		if (values.exists(StyleProperty.AspectRatio.name)) result.aspectRatio = cast values.get(StyleProperty.AspectRatio.name);
-		if (values.exists(StyleProperty.WrapMode.name)) result.wrapMode = cast values.get(StyleProperty.WrapMode.name);
-		if (values.exists(StyleProperty.RowGap.name)) result.rowGap = cast values.get(StyleProperty.RowGap.name);
-		if (values.exists(StyleProperty.ColumnGap.name)) result.columnGap = cast values.get(StyleProperty.ColumnGap.name);
-		if (values.exists(StyleProperty.AlignSelf.name)) result.alignSelf = cast values.get(StyleProperty.AlignSelf.name);
-		if (values.exists(StyleProperty.PositionX.name)) result.positionX = cast values.get(StyleProperty.PositionX.name);
-		if (values.exists(StyleProperty.PositionY.name)) result.positionY = cast values.get(StyleProperty.PositionY.name);
-		if (values.exists(StyleProperty.ZIndex.name)) result.zIndex = cast values.get(StyleProperty.ZIndex.name);
-		if (values.exists(StyleProperty.ClipToParent.name)) result.clipToParent = cast values.get(StyleProperty.ClipToParent.name);
-		if (values.exists(StyleProperty.Padding.name)) {
-			var padding:Insets = cast copyValue(cast StyleProperty.Padding, values.get(StyleProperty.Padding.name));
+		if (isSet(StyleProperty.Direction.slot)) result.direction = cast valueAt(StyleProperty.Direction.slot);
+		if (isSet(StyleProperty.ChildAlignX.slot)) result.childAlignX = cast valueAt(StyleProperty.ChildAlignX.slot);
+		if (isSet(StyleProperty.ChildAlignY.slot)) result.childAlignY = cast valueAt(StyleProperty.ChildAlignY.slot);
+		if (isSet(StyleProperty.ChildDistribution.slot)) result.childDistribution = cast valueAt(StyleProperty.ChildDistribution.slot);
+		if (isSet(StyleProperty.Positioning.slot)) result.positioning = cast valueAt(StyleProperty.Positioning.slot);
+		if (isSet(StyleProperty.AspectRatio.slot)) result.aspectRatio = cast valueAt(StyleProperty.AspectRatio.slot);
+		if (isSet(StyleProperty.WrapMode.slot)) result.wrapMode = cast valueAt(StyleProperty.WrapMode.slot);
+		if (isSet(StyleProperty.RowGap.slot)) result.rowGap = cast valueAt(StyleProperty.RowGap.slot);
+		if (isSet(StyleProperty.ColumnGap.slot)) result.columnGap = cast valueAt(StyleProperty.ColumnGap.slot);
+		if (isSet(StyleProperty.AlignSelf.slot)) result.alignSelf = cast valueAt(StyleProperty.AlignSelf.slot);
+		if (isSet(StyleProperty.PositionX.slot)) result.positionX = cast valueAt(StyleProperty.PositionX.slot);
+		if (isSet(StyleProperty.PositionY.slot)) result.positionY = cast valueAt(StyleProperty.PositionY.slot);
+		if (isSet(StyleProperty.ZIndex.slot)) result.zIndex = cast valueAt(StyleProperty.ZIndex.slot);
+		if (isSet(StyleProperty.ClipToParent.slot)) result.clipToParent = cast valueAt(StyleProperty.ClipToParent.slot);
+		if (isSet(StyleProperty.Padding.slot)) {
+			var padding:Insets = cast valueAt(StyleProperty.Padding.slot);
 			result.padding = padding;
 		}
-		if (values.exists(StyleProperty.ChildGap.name)) result.childGap = cast values.get(StyleProperty.ChildGap.name);
-		if (values.exists(StyleProperty.Background.name)) {
-			var background:Color = cast values.get(StyleProperty.Background.name);
+		if (isSet(StyleProperty.ChildGap.slot)) result.childGap = cast valueAt(StyleProperty.ChildGap.slot);
+		if (isSet(StyleProperty.Background.slot)) {
+			var background:Color = cast valueAt(StyleProperty.Background.slot);
 			result.background = background;
 		}
-		if (values.exists(StyleProperty.RadiusTopLeft.name)) result.radiusTopLeft = cast values.get(StyleProperty.RadiusTopLeft.name);
-		if (values.exists(StyleProperty.RadiusTopRight.name)) result.radiusTopRight = cast values.get(StyleProperty.RadiusTopRight.name);
-		if (values.exists(StyleProperty.RadiusBottomRight.name)) result.radiusBottomRight = cast values.get(StyleProperty.RadiusBottomRight.name);
-		if (values.exists(StyleProperty.RadiusBottomLeft.name)) result.radiusBottomLeft = cast values.get(StyleProperty.RadiusBottomLeft.name);
-		if (values.exists(StyleProperty.ClipHorizontal.name)) result.clipHorizontal = cast values.get(StyleProperty.ClipHorizontal.name);
-		if (values.exists(StyleProperty.ClipVertical.name)) result.clipVertical = cast values.get(StyleProperty.ClipVertical.name);
-		if (values.exists(StyleProperty.Visible.name)) result.visible = cast values.get(StyleProperty.Visible.name);
-		if (values.exists(StyleProperty.Transform.name)) {
-			var transform:Transform2D = cast copyValue(cast StyleProperty.Transform, values.get(StyleProperty.Transform.name));
+		if (isSet(StyleProperty.RadiusTopLeft.slot)) result.radiusTopLeft = cast valueAt(StyleProperty.RadiusTopLeft.slot);
+		if (isSet(StyleProperty.RadiusTopRight.slot)) result.radiusTopRight = cast valueAt(StyleProperty.RadiusTopRight.slot);
+		if (isSet(StyleProperty.RadiusBottomRight.slot)) result.radiusBottomRight = cast valueAt(StyleProperty.RadiusBottomRight.slot);
+		if (isSet(StyleProperty.RadiusBottomLeft.slot)) result.radiusBottomLeft = cast valueAt(StyleProperty.RadiusBottomLeft.slot);
+		if (isSet(StyleProperty.ClipHorizontal.slot)) result.clipHorizontal = cast valueAt(StyleProperty.ClipHorizontal.slot);
+		if (isSet(StyleProperty.ClipVertical.slot)) result.clipVertical = cast valueAt(StyleProperty.ClipVertical.slot);
+		if (isSet(StyleProperty.Visible.slot)) result.visible = cast valueAt(StyleProperty.Visible.slot);
+		if (isSet(StyleProperty.Transform.slot)) {
+			var transform:Transform2D = cast valueAt(StyleProperty.Transform.slot);
 			result.transform = transform;
 		}
-		if (values.exists(StyleProperty.TransformOriginX.name))
-			result.transformOriginX = cast values.get(StyleProperty.TransformOriginX.name);
-		if (values.exists(StyleProperty.TransformOriginY.name))
-			result.transformOriginY = cast values.get(StyleProperty.TransformOriginY.name);
+		if (isSet(StyleProperty.TransformOriginX.slot))
+			result.transformOriginX = cast valueAt(StyleProperty.TransformOriginX.slot);
+		if (isSet(StyleProperty.TransformOriginY.slot))
+			result.transformOriginY = cast valueAt(StyleProperty.TransformOriginY.slot);
 		return result;
 	}
 
 	public function copy():ComputedStyle {
 		var result = new ComputedStyle();
 		for (property in StyleProperty.all())
-			if (values.exists(property.name))
-				result.set(property, copyValue(property, values.get(property.name)), sources.get(property.name));
+			if (isSet(property.slot))
+				result.set(property, copyValue(property, valueAt(property.slot)), sourceAt(property.slot));
 		for (source in matchingRules)
 			result.recordMatch(source);
 		return result;
@@ -201,10 +215,9 @@ class ComputedStyle {
 	static function copyValue(property:StyleProperty<Dynamic>, value:Dynamic):Dynamic {
 		if (value == null)
 			return null;
+		if (!property.copiedOnRead)
+			return value;
 		return switch property.name {
-			case "width" | "height":
-				var axis:LayoutAxis = cast value;
-				new LayoutAxis(axis.sizing, axis.value, axis.min, axis.max, axis.growWeight);
 			case "effects" | "backdropEffects":
 				var effects:EffectChain = cast value;
 				effects == null ? null : effects.copy();

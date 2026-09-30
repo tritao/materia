@@ -20,6 +20,14 @@ struct Layer {
     bool loop = true;
 };
 
+/** A turn about a joint's local axes, applied on top of its animated pose. */
+struct JointRotation {
+    uint32_t source = 0;
+    int32_t joint = -1;
+    float rotation[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    float weight = 0.0f;
+};
+
 /** A two-bone chain reaching for a scene-space target; weight 0 disables it. */
 struct IkChain {
     int32_t start = -1;
@@ -43,6 +51,16 @@ public:
     const Asset &asset() const { return *asset_; }
     std::array<Layer, kMaxLayers> layers;
     std::array<IkChain, kMaxIkChains> ik;
+    /**
+     * Turns applied to joints before inverse kinematics, at most one per source and joint, kept in order
+     * of source then joint so turns of several sources on one joint compose the same way every time.
+     */
+    std::vector<JointRotation> joint_rotations;
+
+    /** Sets (or, at zero weight, removes) one source's turn of a joint. */
+    void setJointRotation(const JointRotation &turn);
+    /** Replaces every turn of a source; turns of other sources are kept. */
+    void replaceJointRotations(uint32_t source, const std::vector<JointRotation> &turns);
 
     /** True when start, mid, and end name joints where each is an ancestor of the next. */
     bool validChain(int32_t start, int32_t mid, int32_t end) const;

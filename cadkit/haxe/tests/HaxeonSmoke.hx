@@ -67,6 +67,8 @@ class HaxeonSmoke {
 		AssemblyModelSmoke.run();
 		AssemblyNestingSmoke.run();
 		AssemblyDocumentsSmoke.run();
+		AssemblyLoopSmoke.run();
+		AssemblyDragSmoke.run();
 		PlacementFramesSmoke.run();
 		ConstrainedSketchSmoke.run();
 		PatternSmoke.run();

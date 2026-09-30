@@ -128,6 +128,35 @@ allocation from the workspace save worker. On 2026-09-30 a `Text` build cost 3.3
 any one widget, sets the tree-build total (about 530 KiB); shrinking it much further means reusing unchanged subtrees
 instead of rebuilding them.
 
+## Reading a profile
+
+Sampling used to hold the program stopped for about 650 us per sample (`selection-stress` measured 21-25 ms per frame profiled
+against 2.8 ms without), because the stack capture scanned the whole stack and asked a quadratic question about every
+candidate. It now follows the frame-pointer chain and stops a thread for about 8 us, so at 2000 samples a second a frame costs
+about what it does unprofiled. Every profiled headless scenario still reruns itself without the profiler (skip with
+`--no-baseline`) and prints `profiler overhead: median frame X ms profiled vs Y ms unprofiled`, also saved as
+`profiler-overhead.json`, so a regression shows up. `HL_PROFILE_STATS=1` makes the VM print, when profiling stops, how long
+threads were stopped per sample and how long a sample took. The runtime needs the current fork (`cmake --build --preset release`
+in `haxeon`); an older `hl` still shows the old overhead.
+
+`profile-report.txt` (printed in short after the run) is `haxeon/scripts/hlprof-report.py` over the Perfetto export. It drops
+samples whose leaf is a blocking wait (about half of a short capture is a parked worker) and keeps only samples taken while
+`UiContext.submit*` is on the stack, so it describes frames and not setup or idle. Run it by hand to change that:
+`python3 haxeon/scripts/hlprof-report.py <capture>/editor.perfetto.json --within <function> --top 30`. It lists self and
+inclusive time with readable generic and lambda names, and flags `<Dynamic>` generic instances on hot paths (boxed values).
+Raise `--sample-rate` (default 500 a second; 2000 is fine now) for a short scenario: a 40-cycle `selection-stress` yields only a
+few hundred samples.
+
+## Comparing two runs
+
+`python3 app/tools/profile-compare.py BEFORE AFTER` (capture directories) compares per action the median frame, tree/style,
+native layout and allocation, and, when both captures have a profile, each function's share of frame-submission samples.
+`profile-editor.py ... --compare BEFORE` runs it after a fresh capture. A change is called real only if it exceeds the noise
+of both runs and `--min-change` (10%): two runs of one build differed by up to 8% in a frame's median, so smaller changes are
+reported as noise. Profile shares are relative (one function getting cheaper raises the others), and they count as different
+only beyond two standard errors of the sample counts. To measure a change, capture with `--no-profile` before and after
+(same scenario and `--cycles`), then use `--sample-rate 2000` captures to see where the time moved.
+
 ## Allocation census
 
 `python3 app/tools/profile-editor.py --scenario tab-matrix --cycles 30 --no-profile --census` counts every allocation by

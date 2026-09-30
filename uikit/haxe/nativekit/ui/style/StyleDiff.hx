@@ -10,13 +10,26 @@ class StyleDiff {
 		this.impact = impact;
 	}
 
+	static final Unchanged = new StyleDiff(false, StyleImpact.None);
+	/** Results are immutable and `impact` is a mask of six bits, so each distinct changed result is created once. */
+	static final changedByImpact:Array<Null<StyleDiff>> = [for (_ in 0...64) null];
+
+	static function changedWith(impact:StyleImpact):StyleDiff {
+		var cached = changedByImpact[impact];
+		if (cached != null)
+			return cached;
+		var created = new StyleDiff(true, impact);
+		changedByImpact[impact] = created;
+		return created;
+	}
+
 	/**
 	 * Compares resolved values only. Provenance changes do not invalidate work
 	 * when the resulting value is unchanged.
 	 */
 	public static function compare(previous:Null<ComputedStyle>, current:Null<ComputedStyle>):StyleDiff {
 		if (previous == current || previous != null && previous.sharesValuesWith(current))
-			return new StyleDiff(false, StyleImpact.None);
+			return Unchanged;
 
 		var changed = false;
 		var impact:StyleImpact = StyleImpact.None;
@@ -29,6 +42,6 @@ class StyleDiff {
 			changed = true;
 			impact |= property.impact;
 		}
-		return new StyleDiff(changed, impact);
+		return changed ? changedWith(impact) : Unchanged;
 	}
 }

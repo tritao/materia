@@ -6,7 +6,8 @@
   "dependencies": {
     "motionkit": { "path": ".." },
     "robotkit": { "path": "../../robotkit" },
-    "machinekit": { "path": "../../machinekit" }
+    "machinekit": { "path": "../../machinekit" },
+    "kinematicskit-native": { "path": "../../kinematicskit/native" }
   },
   "target": "host"
 }

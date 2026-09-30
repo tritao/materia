@@ -18,12 +18,13 @@ import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
-import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
+import kinematicskit.LinearAlgebra;
 import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.ManipulatorServo;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
@@ -80,8 +81,6 @@ import robotkit.model.RobotModel;
 import robotkit.model.Actuator;
 import robotkit.model.Transmission;
 import robotkit.model.JointCoupling;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
@@ -143,7 +142,7 @@ class KinematicsTests extends MotionKitTestSupport {
 
   public function testKinematicsContract():Void {
     var fixture = buildContractArmFixture();
-    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var solver = new ManipulatorKinematics(fixture.arm, 1e-8);
     check(solver.jointCount() == 6, "kinematics adapter reports the manipulator joint count");
 
     var q = [0.3, -0.5, 0.8, -0.2, 0.6, -0.4];
@@ -174,7 +173,7 @@ class KinematicsTests extends MotionKitTestSupport {
     }
 
     var expectedQdot = [0.08, -0.04, 0.05, 0.03, -0.02, 0.06];
-    var jacobian = fixture.chain.jacobian(q);
+    var jacobian = fixture.arm.jacobian(q);
     var requested:Array<Float> = [];
     for (row in 0...6) {
       var value = 0.0;
@@ -231,8 +230,8 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     var flange = model.addFrame(new Frame("opw-flange", links[6]));
     flange.position = [0.0, 0.0, 0.085];
-    var chain = new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id));
-    var manipulator = new Manipulator(model, chain);
+    var arm = new Manipulator(model, links[0].id, flange.id);
+    var manipulator = arm;
     var solver = new OpwKinematics(model, manipulator);
     near(solver.parameters.a1, 0.1, "OPW extracts a1", 1e-9);
     near(solver.parameters.a2, -0.135, "OPW extracts a2", 1e-9);
@@ -294,8 +293,8 @@ class KinematicsTests extends MotionKitTestSupport {
       }
       var tool = fixture.addFrame(new Frame('$name-flange', parts[6]));
       tool.position = [0.0, 0.0, values[6]];
-      var chain = new KinematicChain(fixture, parts[0].id, ChainTip.Frame(tool.id));
-      var robot = new Manipulator(fixture, chain);
+      var arm = new Manipulator(fixture, parts[0].id, tool.id);
+      var robot = arm;
       var analytic = new OpwKinematics(fixture, robot);
       for (index in 0...7) {
         var extracted = [analytic.parameters.a1, analytic.parameters.a2,
@@ -326,10 +325,65 @@ class KinematicsTests extends MotionKitTestSupport {
       [0.0, 0.0, -Math.PI * 0.5, 0.0, 0.0, 0.0], [1, 1, 1, 1, 1, 1]);
     var bad = buildContractArmFixture();
     var diagnostic = "";
-    try new OpwKinematics(bad.model, new Manipulator(bad.model, bad.chain))
+    try new OpwKinematics(bad.model, bad.arm)
     catch (error:Dynamic) diagnostic = Std.string(error);
     check(diagnostic.indexOf("joint-3") >= 0,
       "non-spherical UR5 wrist names its violating joint");
+  }
+
+  public function testManipulatorServo():Void {
+    var fixture = buildContractArmFixture();
+    var arm = fixture.arm;
+    var servo = new ManipulatorServo(arm, 1e-3);
+    var q = [0.3, -0.8, 1.1, -0.5, 0.4, 0.2];
+    var twist = new Twist6(0.05, -0.02, 0.03, 0.1, -0.05, 0.08);
+    var unlimited = [for (_ in 0...6) Math.POSITIVE_INFINITY];
+
+    // Far from every bound it is the damped least-squares step at the same damping.
+    var free = servo.step(q, twist, 0.01, unlimited);
+    var expected = LinearAlgebra.dampedStep(arm.tcpJacobian(q), 6, 6, [for (i in 0...6) i],
+      [for (value in twist.toArray()) value * 0.01], 1e-3);
+    check(!free.fallback && free.limited.length == 0, "an unconstrained servo tick solves on the QP");
+    for (joint in 0...6) near(free.velocity[joint], expected[joint] / 0.01,
+      "an unconstrained servo tick is the damped least-squares step", 1e-5);
+
+    // Velocity limits hold exactly.
+    var fast = new Twist6(2.0, -1.0, 1.5, 3.0, -2.0, 2.5);
+    var capped = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5]);
+    for (joint in 0...6) check(Math.abs(capped.velocity[joint]) <= 0.5 + 1e-12, "servo velocities stay within their limits");
+    check(capped.limited.length > 0, "a too-fast twist reports the joints held by their velocity limit");
+
+    // Turning the whole arm about the base axis (the tool twist v = ω × p, ω = z) is the base joint's
+    // own motion; a steady turn drives it into its +2π stop and holds it there.
+    var state = q.copy();
+    var crossed = false;
+    for (_ in 0...1200) {
+      var tcp = arm.tcpPose(state).translation;
+      var yaw = new Twist6(-tcp.y, tcp.x, 0.0, 0.0, 0.0, 1.0);
+      var tick = servo.step(state, yaw, 0.01, [for (_ in 0...6) 2.0]);
+      for (joint in 0...6) {
+        state[joint] += tick.velocity[joint] * 0.01;
+        var limits = arm.group.limitsOf(joint);
+        if (state[joint] > limits.upper + 1e-12 || state[joint] < limits.lower - 1e-12) crossed = true;
+      }
+    }
+    check(!crossed, "integrating servo ticks never leaves the joint range");
+    near(state[0], 2.0 * Math.PI, "the base joint ends on its stop", 1e-9);
+
+    // With a limit gain the base slows into its stop instead of arriving in one tick.
+    var soft = q.copy();
+    for (_ in 0...1200) {
+      var tcp = arm.tcpPose(soft).translation;
+      var tick = servo.step(soft, new Twist6(-tcp.y, tcp.x, 0.0, 0.0, 0.0, 1.0), 0.01, [for (_ in 0...6) 2.0], 1000, 0.3);
+      for (joint in 0...6) soft[joint] += tick.velocity[joint] * 0.01;
+    }
+    check(soft[0] < 2.0 * Math.PI && 2.0 * Math.PI - soft[0] < 1e-6, "a limit gain slows the base into its stop without touching it");
+
+    // A QP that runs out of iterations falls back to the clamped damped step, still within limits.
+    var starved = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5], 1);
+    if (starved.fallback) for (joint in 0...6)
+      check(Math.abs(starved.velocity[joint]) <= 0.5 + 1e-12, "the fallback step also respects the limits");
+    servo.dispose();
   }
 
   public function testTransmissionDerivedAxisMapping():Void {

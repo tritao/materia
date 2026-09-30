@@ -31,6 +31,7 @@ import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
+import cadkit.modeling.AssemblyDrag;
 import cadkit.modeling.AssemblyState;
 import cadkit.parametric.DocumentCodec;
 import machinekit.document.MachineKitRecipes;
@@ -325,7 +326,8 @@ class ProjectDocumentSession {
     if (definition == null) return;
     var ids:Array<String> = [];
     for (occurrence in definition.occurrences) ids.push(occurrence.id);
-    target.configureAssemblyOccurrences(ids, function(id) return assemblyPropertiesForOccurrence(id));
+    target.configureAssemblyOccurrences(ids, function(id) return assemblyPropertiesForOccurrence(id),
+      function(id, point) return beginAssemblyDrag(id, point));
   }
 
   function installAssemblyRuntime(definition:Null<AssemblyDefinition>, state:Null<AssemblyState>,
@@ -435,6 +437,59 @@ class ProjectDocumentSession {
     return document.apply(new EditOperation("Set joint " + jointId,
       function() applyAssemblyStateRecord(after),
       function() applyAssemblyStateRecord(before)));
+  }
+
+  /**
+   * Starts an IK drag of an assembly occurrence (`project:<id>`) from a world point in metres: the
+   * point follows the targets given to `update`, moving the joints above it and the dependent joints
+   * (so closures stay closed). Returns null when nothing can move it.
+   */
+  public function beginAssemblyDrag(sceneId:String, worldPoint:Array<Float>):Null<SceneAssemblyDrag> {
+    var state = assemblyRuntime;
+    var definition = projectAssemblyDefinition;
+    if (state == null || definition == null || !StringTools.startsWith(sceneId, "project:")) return null;
+    if (worldPoint == null || worldPoint.length != 3) throw "Assembly drag needs a world point";
+    var occurrence = sceneId.substr(8);
+    var unit = assemblyMetresPerUnit;
+    var pose = state.worldPose(occurrence);
+    var local = AssemblyFrames.transformPoint(AssemblyFrames.inverse(pose),
+      worldPoint[0] / unit, worldPoint[1] / unit, worldPoint[2] / unit);
+    var drag = try new AssemblyDrag(state, occurrence, null, assemblyDependentJointIds(), false,
+      new kinematicskit.Vector3(local.x, local.y, local.z)) catch (_:Dynamic) null;
+    if (drag == null) return null;
+    return new ProjectAssemblyDrag(this, drag, state.record(), unit);
+  }
+
+  @:allow(app.ProjectAssemblyDrag)
+  function previewAssemblyDrag(drag:AssemblyDrag):Void {
+    var definition = projectAssemblyDefinition;
+    var centers = assemblyLocalCentersByDefinition;
+    if (definition == null || centers == null) throw "Assembly placement data is unavailable";
+    var transforms:Array<{id:String, x:Float, y:Float, z:Float, rotation:Array<Float>}> = [];
+    for (occurrence in definition.occurrences) {
+      var center = centers.get(occurrence.definition);
+      if (center == null || center.length != 3)
+        throw 'Assembly component "${occurrence.definition}" has no local preview center';
+      var pose = drag.previewPose(occurrence.id);
+      var world = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
+      transforms.push({id: "project:" + occurrence.id, x: world.x * assemblyMetresPerUnit,
+        y: world.y * assemblyMetresPerUnit, z: world.z * assemblyMetresPerUnit,
+        rotation: [pose.qx, pose.qy, pose.qz, pose.qw]});
+    }
+    scene.setAssemblyOccurrenceTransforms(transforms);
+  }
+
+  @:allow(app.ProjectAssemblyDrag)
+  function finishAssemblyDrag(label:String, before:AssemblyStateRecord, after:Null<AssemblyStateRecord>):Bool {
+    if (after == null || sameAssemblyState(before, after)) {
+      applyAssemblyStateRecord(before);
+      return false;
+    }
+    applyAssemblyStateRecord(after);
+    document.record(new EditOperation(label,
+      function() applyAssemblyStateRecord(after),
+      function() applyAssemblyStateRecord(before)));
+    return true;
   }
 
   /** Select whether a tree coordinate is driven by the user or solved from loop closures. */

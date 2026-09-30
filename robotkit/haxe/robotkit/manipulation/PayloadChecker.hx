@@ -23,7 +23,7 @@ class PayloadChecker {
       throw "Payload check requires the tool's centre of mass, not mass alone";
     var load:MassProperties = cast tool.massProperties;
     if (workpiece != null) load = load.combined(workpiece.atFlange());
-    var dof = manipulator.chain.dofJointIds().length;
+    var dof = manipulator.dofCount();
     for (waypoint in waypoints) {
       if (waypoint == null || waypoint.length != dof)
         throw "Payload path waypoint has the wrong joint count";

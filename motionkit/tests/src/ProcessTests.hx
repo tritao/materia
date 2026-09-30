@@ -18,7 +18,6 @@ import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
-import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
@@ -80,8 +79,9 @@ import robotkit.model.RobotModel;
 import robotkit.model.Actuator;
 import robotkit.model.Transmission;
 import robotkit.model.JointCoupling;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
+import kinematicskit.KinematicSnapshot;
+import kinematicskit.KinematicState;
+import robotkit.kinematics.RobotKinematics;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.SimulationHarness;
 import robotkit.runtime.Simulation;
@@ -342,16 +342,21 @@ class ProcessTests extends MotionKitTestSupport {
       -(zAxis.screwStart + zAxis.travelMin) * 0.001,
       "Z carriage frame compensates the inherited gantry orientation");
 
-    var chain = new KinematicChain(blueprint.model, "gantry.base",
-      ChainTip.Link("z.carriage"));
-    var tip = chain.forwardKinematics([0.0, 0.0, 0.0]).translation;
+    // The carriage is a link, not a flange frame: use the compiled model directly.
+    var gantry = RobotKinematics.compile(blueprint.model);
+    var carriage = gantry.bodyIndex("z.carriage");
+    var gantrySnapshot = KinematicSnapshot.of(new KinematicState(gantry));
+    var tip = gantrySnapshot.bodyPose(carriage);
     near(tip.x, (xAxis.screwStart + xAxis.travelMin) * 0.001,
       "XYZ gantry forward kinematics preserves X origin");
     near(tip.y, (yAxis.screwStart + yAxis.travelMin) * 0.001,
       "XYZ gantry forward kinematics preserves Y origin");
     near(tip.z, (zAxis.screwStart + zAxis.travelMin) * 0.001,
       "XYZ gantry forward kinematics preserves Z origin");
-    var jacobian = chain.jacobian([0.0, 0.0, 0.0]);
+    if (gantry.dofCount() != 3 || gantry.bodyParentJoint[gantry.bodyIndex("gantry.base")] >= 0)
+      throw "XYZ gantry should compile to three DOFs under its root base";
+    var flatJacobian = gantrySnapshot.bodyJacobian(carriage);
+    var jacobian = [for (row in 0...6) [for (column in 0...3) flatJacobian[row * 3 + column]]];
     near(jacobian[0][0], 1.0, "XYZ gantry X joint moves along world X");
     near(jacobian[1][1], 1.0, "XYZ gantry Y joint moves along world Y");
     near(jacobian[2][2], 1.0, "XYZ gantry Z joint moves along world Z");

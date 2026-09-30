@@ -103,6 +103,8 @@ class HumanKitTests {
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
+		fingersCurl(scene, worker, rig);
+		leaning(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -453,6 +455,77 @@ class HumanKitTests {
 		human.dispose();
 	}
 
+	/** Curling a hand brings its fingertips toward the wrist, on both hands, and opening returns them. */
+	static function fingersCurl(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Curler");
+		human.instance.clearLayers();
+		for (side in ["L", "R"]) {
+			var hand = side == "L" ? HumanLimb.ArmL : HumanLimb.ArmR;
+			var spread = function():Float {
+				human.instance.evaluate();
+				var matrices = human.instance.readJointMatrices();
+				var tip = asset.jointIndex('Middle4.$side') * 64, wrist = asset.jointIndex('Wrist.$side') * 64;
+				return distance([matrices.getFloat(tip + 48), matrices.getFloat(tip + 52), matrices.getFloat(tip + 56)],
+					[matrices.getFloat(wrist + 48), matrices.getFloat(wrist + 52), matrices.getFloat(wrist + 56)]);
+			};
+			human.setHandCurl(hand, 0.0);
+			var open = spread();
+			human.setHandCurl(hand, 1.0);
+			var fist = spread();
+			if (open - fist < 0.05)
+				throw 'Curling the $side hand moved the middle fingertip from ${open} m to ${fist} m of the wrist';
+			human.setHandCurl(hand, 0.5);
+			var half = spread();
+			if (half > open - 0.01 || half < fist + 0.01)
+				throw 'A half curl of the $side hand is not between open and closed: $open, $half, $fist';
+			human.setHandCurl(hand, 0.0);
+			if (Math.abs(spread() - open) > 1e-4)
+				throw 'Opening the $side hand did not return the fingers';
+			if (human.handCurl(hand) != 0.0) throw "handCurl does not report the curl";
+		}
+		var rejected = false;
+		try human.setHandCurl(LegL, 1.0) catch (_:Dynamic) rejected = true;
+		if (!rejected) throw "A leg was given fingers to curl";
+		human.dispose();
+	}
+
+	/** Leaning carries the shoulders forward, an unused arm hangs instead of swinging back, and standing up undoes it. */
+	static function leaning(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Leaner");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		var shoulderX = function(bone:HumanBone):Float return human.pose.bonePosition(bone)[0];
+		var upright = shoulderX(HumanBone.UpperArmR);
+		var wanted = 0.06;
+		var made = body.leanFor(ArmR, wanted);
+		if (Math.abs(made.shift - wanted) > 0.005)
+			throw 'A lean asked to move the shoulder $wanted m is predicted to move it ${made.shift} m';
+		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 1e-4 || human.spineLean() != 0.0)
+			throw "Working out a lean left the pose changed";
+		var capped = body.leanFor(ArmR, 5.0);
+		if (capped.angle > body.posture.maxLean + 1e-6 || capped.shift >= 5.0)
+			throw 'A lean of ${capped.angle} rad was allowed past ${body.posture.maxLean}';
+
+		body.setLean(made.angle);
+		for (_ in 0...90) body.advance(step);
+		var leaned = shoulderX(HumanBone.UpperArmR) - upright;
+		if (Math.abs(leaned - made.shift) > 0.01)
+			throw 'Leaning moved the shoulder $leaned m, not the ${made.shift} m predicted';
+		body.setLean(0.5);
+		for (_ in 0...90) body.advance(step);
+		var far = human.pose.bonePosition(HumanBone.UpperArmL), hand = human.pose.bonePosition(HumanBone.HandL);
+		var length = body.description.upperArm + body.description.forearm;
+		if (far[2] - hand[2] < 0.6 * length || Math.abs(hand[0] - far[0]) > 0.25 * length)
+			throw 'The arm not reaching does not hang under its shoulder while leaning: $far to $hand';
+		body.setLean(0.0);
+		for (_ in 0...120) body.advance(step);
+		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 0.01 || human.spineLean() > 1e-3)
+			throw "Standing up did not undo the lean";
+		human.dispose();
+	}
+
 	/**
 	 * Sweeping the wrist through the point straight under the shoulder moves the elbow a little per
 	 * step. A fixed elbow direction pointing down would make the bend plane undefined there, and the
@@ -681,6 +754,8 @@ class HumanKitTests {
 			// The hand eases into the carry pose over a third of a second, then holds it.
 			if (body.isCarrying(ArmR) && body.walker.isWalking() && carriedSteps > 25) {
 				carried = true;
+				// The fingers closed on what the hand carries.
+				if (human.handCurl(ArmR) < 0.45) throw 'The carrying hand is only ${human.handCurl(ArmR)} curled';
 				var hand = human.pose.bonePosition(HumanBone.HandR);
 				if (distance(hand, body.carryTargetModel(ArmR)) > 0.03)
 					throw 'The carrying hand left its chest-relative pose: $hand';
@@ -693,6 +768,10 @@ class HumanKitTests {
 		if (!approached || !picked || !carried || !advanced || !fullSpeed || !job.isDone() ||
 			job.failure() != null || body.grip)
 			throw 'The action job did not finish physically: approach=$approached pick=$picked carry=$carried walk=$advanced failure=${job.failure()}';
+		// With the job over, the hand relaxes from its grip.
+		for (_ in 0...30) body.advance(step);
+		if (Math.abs(human.handCurl(ArmR) - 0.25) > 0.02)
+			throw 'The hand did not relax after the job: ${human.handCurl(ArmR)}';
 		body.setCarry([ArmL, ArmR]);
 		// Both hands ease into the carry pose, then hold it.
 		for (_ in 0...30) body.advance(step);

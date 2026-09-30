@@ -1,0 +1,31 @@
+{
+	"version": 1,
+	"package": { "name": "kinematicskit-native" },
+	"sourceRoots": ["haxe"],
+	"scopeSourceRoots": false,
+	"dependencies": {
+		"kinematicskit": { "path": ".." }
+	},
+	"ffi": {
+		"interfaces": ["bindings/kinematicskit.hxi"]
+	},
+	"native": {
+		"cmake": {
+			"source": ".",
+			"target": "kinematicskit_core",
+			"library": "kinematicskit_core",
+			"inputs": [
+				"CMakeLists.txt",
+				"include/kinematicskit.h",
+				"src/api.cpp",
+				"src/model.cpp",
+				"src/model.hpp",
+				"src/handles.hpp",
+				"src/qp.cpp",
+				"src/qp.hpp",
+				"src/proxsuite_config/proxsuite/config.hpp"
+			]
+		}
+	},
+	"target": "host"
+}

@@ -58,6 +58,10 @@ class EditorPerspectiveViewport implements View {
   var hoveredFaceIndex:Int = -1;
   var hoverRevision:Int = 0;
   var objectDrag:Null<PerspectiveSceneDrag> = null;
+  /** An IK drag of a joint-driven part: the pressed point follows a screen-parallel plane. */
+  var assemblyDrag:Null<SceneAssemblyDrag> = null;
+  var assemblyDragPlane:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
+  var assemblyDragRevision:Int = 0;
   var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
   var gridSnapEnabled:Bool = false;
   var gridStep:Float = app.editor.EditorGrid.STEP;
@@ -101,6 +105,7 @@ class EditorPerspectiveViewport implements View {
   /** Revision key for state that changes the retained viewport presentation. */
   public function presentationKey():String
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
+      assemblyDragRevision + ":" +
       hoverRevision + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested;
 
   public function setLightingPreset(preset:Int):Void {
@@ -117,7 +122,7 @@ class EditorPerspectiveViewport implements View {
       node.semantics = new Semantics(AccessibilityRole.Image,
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" +
-        sketchDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
+        sketchDragRevision + ":" + assemblyDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
         ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
       installNavigation(node);
@@ -211,6 +216,7 @@ class EditorPerspectiveViewport implements View {
     paintWorkplane(canvas, geometry.width, geometry.height);
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
     paintSensors(canvas,geometry.width,geometry.height);
+    paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
   }
 
@@ -270,11 +276,16 @@ class EditorPerspectiveViewport implements View {
   }
   public function editingEnabled():Bool return !simulationActive;
 
-  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null;
+  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null;
+
+  /** While a jointed part is dragged, why it is or is not following the cursor; null otherwise. */
+  public function assemblyDragMessage():Null<String> return assemblyDrag == null ? null : assemblyDrag.message();
 
   public function commitDrag():Null<PerspectivePointer> {
     if (objectDrag != null) {
       objectDrag.commit(); objectDrag = null;
+    } else if (assemblyDrag != null) {
+      assemblyDrag.commit(); assemblyDrag = null; assemblyDragRevision++;
     } else if (sketchRectangleDrag != null) {
       var active = sketchRectangleDrag;
       scene.addSketchDraftRectangleBetween(active.startX, active.startY, active.currentX, active.currentY);
@@ -287,11 +298,60 @@ class EditorPerspectiveViewport implements View {
   public function cancelDrag():Null<PerspectivePointer> {
     if (objectDrag != null) {
       objectDrag.cancel(); objectDrag = null;
+    } else if (assemblyDrag != null) {
+      assemblyDrag.cancel(); assemblyDrag = null; assemblyDragRevision++;
     } else if (sketchRectangleDrag != null) {
       sketchRectangleDrag = null;
       sketchDragRevision++;
     } else return null;
     return releaseNavigation();
+  }
+
+  /** Starts an IK drag when the press lands on a joint-driven part; the drag plane faces the camera. */
+  function beginAssemblyDrag(localX:Float, localY:Float):Bool {
+    fitCameraClipRange();
+    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+    var view = scene.configureRenderView(new SceneView(), camera.viewProjection(aspect()), null);
+    var hit = scene.pickHitRayWithView(view, ray.originX, ray.originY, ray.originZ,
+      ray.directionX, ray.directionY, ray.directionZ);
+    if (hit.id == "scene" || !Math.isFinite(hit.x) || !Math.isFinite(hit.y) || !Math.isFinite(hit.z)) return false;
+    var drag = scene.beginAssemblyDrag(hit.id, [hit.x, hit.y, hit.z]);
+    if (drag == null) return false;
+    var normal = camera.viewDirection();
+    assemblyDragPlane = [hit.x, hit.y, hit.z, normal[0], normal[1], normal[2]];
+    assemblyDrag = drag;
+    assemblyDragRevision++;
+    return true;
+  }
+
+  function updateAssemblyDrag(localX:Float, localY:Float):Void {
+    var drag = assemblyDrag;
+    if (drag == null) return;
+    var ray = camera.screenRay(localX, localY, Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+    var p = assemblyDragPlane;
+    var denominator = ray.directionX * p[3] + ray.directionY * p[4] + ray.directionZ * p[5];
+    if (Math.abs(denominator) < 1e-9) return;
+    var distance = ((p[0] - ray.originX) * p[3] + (p[1] - ray.originY) * p[4] + (p[2] - ray.originZ) * p[5]) / denominator;
+    if (distance < 0.0) return;
+    drag.update(ray.originX + ray.directionX * distance, ray.originY + ray.directionY * distance,
+      ray.originZ + ray.directionZ * distance);
+    assemblyDragRevision++;
+    host.requestFrame();
+  }
+
+  /** The pull line from the grabbed point to the cursor: green while following, amber when it cannot. */
+  function paintAssemblyDrag(canvas:Canvas, width:Float, height:Float):Void {
+    var drag = assemblyDrag;
+    if (drag == null) return;
+    var from = drag.grabbedPoint(), to = drag.target();
+    var color = drag.following() ? Color.rgba(0.25, 0.85, 0.45, 0.95) : Color.rgba(1.0, 0.62, 0.15, 0.95);
+    var target = camera.project(to[0], to[1], to[2], width, height);
+    if (target != null) canvas.fillRect(new Rect(target.x - 4, target.y - 4, 8, 8), color);
+    var segment = camera.projectSegment(from[0], from[1], from[2], to[0], to[1], to[2], width, height);
+    if (segment == null) return;
+    var path = new PathBuilder();
+    path.moveTo(segment[0].x, segment[0].y).lineTo(segment[1].x, segment[1].y);
+    canvas.strokeTransient(path.build(), color, 2.0);
   }
 
   function releaseNavigation():Null<PerspectivePointer> {
@@ -636,6 +696,7 @@ class EditorPerspectiveViewport implements View {
           objectDrag = PerspectiveSceneDrag.begin(scene, camera, hit, event.localX, event.localY,
             Math.max(1, renderedWidth), Math.max(1, renderedHeight), gridSnapEnabled, gridStep);
           if (objectDrag != null) navigationMode = 3;
+          else if (beginAssemblyDrag(event.localX, event.localY)) navigationMode = 5;
         }
       }
       pointerX = event.x; pointerY = event.y;
@@ -657,6 +718,7 @@ class EditorPerspectiveViewport implements View {
       else if (navigationMode == 2) camera.pan(deltaX, deltaY, Math.max(1, renderedHeight));
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
         Math.max(1, renderedWidth), Math.max(1, renderedHeight));
+      else if (navigationMode == 5 && assemblyDrag != null) updateAssemblyDrag(event.localX, event.localY);
       else if (navigationMode == 4 && sketchDrag != null) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point != null) {
@@ -682,6 +744,10 @@ class EditorPerspectiveViewport implements View {
       if (navigationMode == 3 && objectDrag != null) {
         if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
         objectDrag = null;
+      } else if (navigationMode == 5 && assemblyDrag != null) {
+        if (event.kind == UiEventKind.PointerUp) assemblyDrag.commit(); else assemblyDrag.cancel();
+        assemblyDrag = null;
+        assemblyDragRevision++;
       } else if (navigationMode == 4 && sketchDrag != null) {
         if (event.kind == UiEventKind.PointerUp) {
           var point = sketchPlanePoint(event.localX, event.localY);
@@ -713,6 +779,13 @@ class EditorPerspectiveViewport implements View {
         sketchDragRevision++;
         navigationPointer = null; navigationMode = 0;
         event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
+      if (event.key == UiKey.Escape && assemblyDrag != null) {
+        assemblyDrag.cancel(); assemblyDrag = null; assemblyDragRevision++;
+        navigationPointer = null; navigationMode = 0;
+        event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        host.requestFrame();
         return;
       }
       if (event.key != UiKey.Escape || objectDrag == null) return;

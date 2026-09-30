@@ -23,7 +23,9 @@ import nativekit.ui.semantics.Semantics;
 class RenderNode {
 	public final id:WidgetId;
 	public final layout:LayoutNode;
-	public final children:Array<RenderNode>;
+	/** Shared and empty until the first `add`, so leaves allocate no array; change it only through `add`, `remove` and `replaceWith`. */
+	public var children(default, null):Array<RenderNode>;
+	static final NoChildren:Array<RenderNode> = [];
 	public var parent(default, null):Null<RenderNode>;
 	public var resolved:Null<ResolvedLayoutItem>;
 	public var focusable:Bool;
@@ -86,7 +88,7 @@ class RenderNode {
 			throw "Render nodes require a stable widget ID";
 		this.id = id;
 		layout = new LayoutNode(id.value, kind, style);
-		children = [];
+		children = NoChildren;
 		parent = null;
 		resolved = null;
 		focusable = false;
@@ -147,6 +149,8 @@ class RenderNode {
 			ancestor = ancestor.parent;
 		}
 		child.parent = this;
+		if (children == NoChildren)
+			children = [];
 		children.push(child);
 		layout.add(child.layout);
 		return child;
@@ -711,13 +715,18 @@ class RenderNode {
 	public function find(id:WidgetId):Null<RenderNode> {
 		if (id == null)
 			return null;
-		return findFrom(this, id, 0);
+		return findFrom(this, id, ++findCounter);
 	}
 
-	/** Pre-order search without allocating: a tree never nests this deep, so exceeding it means a node reaches itself. */
-	static function findFrom(node:RenderNode, id:WidgetId, depth:Int):Null<RenderNode> {
-		if (depth > 10000)
-			throw "Render tree is cyclic or too deep";
+	/** Identifies one find() call, so a node reached twice (a cycle, or two parents) is searched once. */
+	static var findCounter:Int = 0;
+	var findStamp:Int = 0;
+
+	/** Pre-order search that allocates nothing: each node carries the stamp of the last search that visited it. */
+	static function findFrom(node:RenderNode, id:WidgetId, stamp:Int):Null<RenderNode> {
+		if (node.findStamp == stamp)
+			return null;
+		node.findStamp = stamp;
 		if (node.id.equals(id))
 			return node;
 		var children = node.children;
@@ -725,7 +734,7 @@ class RenderNode {
 			var child = children[index];
 			if (child == null)
 				continue;
-			var found = findFrom(child, id, depth + 1);
+			var found = findFrom(child, id, stamp);
 			if (found != null)
 				return found;
 		}

@@ -18,7 +18,6 @@ import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
-import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
@@ -80,8 +79,6 @@ import robotkit.model.RobotModel;
 import robotkit.model.Actuator;
 import robotkit.model.Transmission;
 import robotkit.model.JointCoupling;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
@@ -195,7 +192,7 @@ class ProgramTests extends MotionKitTestSupport {
 
   public function testProgramCompiler():Void {
     var fixture = buildContractArmFixture();
-    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var solver = new ManipulatorKinematics(fixture.arm, 1e-8);
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
     for (joint in 0...6) limits.jerk(joint, 20.0);
     var velocity = [for (_ in 0...6) 2.0];
@@ -386,7 +383,7 @@ class ProgramTests extends MotionKitTestSupport {
     var robot = new SimulatedRobot("program-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
-    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var solver = new ManipulatorKinematics(fixture.arm, 1e-8);
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
     var compiler = new ProgramCompiler(solver, limits, "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0], [for (_ in 0...6) 20.0],
@@ -535,8 +532,7 @@ class ProgramTests extends MotionKitTestSupport {
     var robot = new FaultingArmRobot("process-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
-    var solver = new ManipulatorKinematics(new Manipulator(fixture.model,
-      fixture.chain), 1e-8);
+    var solver = new ManipulatorKinematics(fixture.arm, 1e-8);
     var compiler = new ProgramCompiler(solver,
       new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0)), "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
@@ -670,8 +666,7 @@ class ProgramTests extends MotionKitTestSupport {
     var robot = new FaultingArmRobot("session-arm", runtime, fixture.model.name,
       [for (link in fixture.model.links) link.name],
       [for (joint in fixture.model.joints) joint.name]);
-    var solver = new ManipulatorKinematics(new Manipulator(fixture.model,
-      fixture.chain), 1e-8);
+    var solver = new ManipulatorKinematics(fixture.arm, 1e-8);
     var compiler = new ProgramCompiler(solver,
       new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0)), "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],

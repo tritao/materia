@@ -4,8 +4,8 @@ import robotkit.model.JointId;
 import robotkit.model.JointLimits;
 
 /**
- * An ordered, named selection of joints with their limits, independent of
- * any one chain. A joint whose limits have `lower >= upper` (the
+ * An ordered, named selection of joints with their limits (e.g. an arm's
+ * joints; see `Manipulator.group`). A joint whose limits have `lower >= upper` (the
  * `JointLimits` default, and the convention for unbounded/continuous
  * joints) is treated as unlimited and is never clamped.
  */
@@ -24,11 +24,6 @@ class JointGroup {
     }
     this.jointIds = jointIds.copy();
     this.limits = limits.copy();
-  }
-
-  public static function fromChain(chain:KinematicChain):JointGroup {
-    var joints = chain.dofJointsCopy();
-    return new JointGroup([for (joint in joints) joint.id], [for (joint in joints) joint.limits]);
   }
 
   public function count():Int return jointIds.length;
