@@ -368,3 +368,34 @@ branch `loop-flow-stores`), which had broken toolpathkit's
   otherwise one shape-only solve, one Jacobian and one QR more.
 - Assemblies get the same treatment with C3 (toggle four-bar authored exactly
   on its toggle is the analogous fixture).
+
+### C2.2 — Analytic sketch Jacobians (2026-09-30)
+
+- `SketchSolver.analyticJacobian`: one hand-derived block per constraint
+  kind, over the existing geometry (distance rows, cross/dot over |a||b|,
+  signed point-line distance with its axis terms, the along-axis row of
+  symmetry, tangency following the stored side and contact branch). Entries
+  are with respect to the scaled variables: linear rows unchanged, angular
+  rows × s. The forward-difference path and the central-difference
+  diagnosis Jacobian are gone; LM, diagnosis and the witness pose all use it.
+  JᵀJ is accumulated over each row's nonzeros.
+- `SketchJacobianSmoke` (runs before the other sketch smokes so a wrong
+  derivative is named, not seen as a failed solve): every kind, both
+  line-circle tangent argument orders, internal and external contact, at the
+  authored pose and 10 random poses, at scale 1, 1e-6 and 1e6.
+  `SketchSolver.probe` is the test hook.
+- `JacobianCheck` fixes found by it: the step is relative to the variables'
+  magnitude (a fixed floor of 1e-6 probed a 1e-6 sketch with steps as large
+  as the sketch), and the error is relative to the row's largest entry (with
+  `max(1, …)` any tiny-scale entry passed).
+- Mutation check: flipping one term of the angle row fails
+  `SketchJacobianSmoke` at (10, 10), "row 10 is constraint angle".
+- `SketchEditBenchmark` against main's solver, back to back on a loaded
+  machine: solve p50 80–95 → 8–9 ms; document recompute is now dominated by
+  profile building (~210 → ~150 ms).
+- CamKit (12223 assertions) and MachineKit pass on it.
+- Step 3 (branch storage) is moot: there is no point-line distance dimension
+  (`distance` is point-to-point, `pointOn` is zero-valued) and `angle` has
+  both cos and sin rows, so it is already oriented.
+- Step 4 (large-sketch benchmark, sparse solves) not started: the dense
+  normal-equation solve is now the only O(n³) part; measure before changing.

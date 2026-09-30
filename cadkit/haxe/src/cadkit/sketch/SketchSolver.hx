@@ -48,6 +48,29 @@ class SketchSolver {
 		return new SketchSolver(sketch, seed, cancellationCheck).run();
 	}
 
+	/**
+		Test hook for `cadkit.solve.JacobianCheck`: the authored variables (point
+		x/y pairs, then radii) and this solver's residuals and analytic Jacobian
+		as functions of them, in sketch units. Tangent sides and branches are
+		fixed from the authored pose, as a solve would fix them.
+	*/
+	public static function probe(sketch:ConstrainedSketch):{variables:Array<Float>, residuals:Array<Float>->Array<Float>,
+			jacobian:Array<Float>->Array<Float>} {
+		var solver = new SketchSolver(sketch, null, null);
+		solver.validate();
+		var x:Array<Float> = [];
+		for (point in sketch.points()) { x.push(point.x); x.push(point.y); }
+		for (entity in sketch.entities()) if (entity.kind == "circle" || entity.kind == "arc") x.push(entity.radius);
+		solver.normalizationScale = solver.characteristicScale(x);
+		solver.initializeTangentBranches(x);
+		return {
+			variables: x,
+			residuals: values -> solver.residuals(values).values,
+			// Entries are with respect to x / s; dividing by s gives them with respect to x.
+			jacobian: values -> [for (value in solver.analyticJacobian(values, solver.residuals(values).values.length)) value / solver.normalizationScale]
+		};
+	}
+
 	private function checkCancelled():Void {
 		if (cancellationCheck != null && cancellationCheck())
 			throw new EvaluationCancelled();
@@ -97,14 +120,14 @@ class SketchSolver {
 			x = trial; current = trialSet; currentNorm = trialNorm;
 		}
 		checkCancelled();
-		var j = jacobian(x, current.values);
-		var report = diagnose(centralJacobian(x, current.values.length), current);
+		var j = analyticJacobian(x, current.values.length);
+		var report = diagnose(j, current);
 		var degenerate = false;
 		if (currentNorm <= solveTolerance && report.rank < current.values.length) {
 			// A dependency here may belong to this pose only: compare with the rank at a nearby pose of the same shape.
 			var witness = witnessPose(x);
 			if (witness != null) {
-				var generic = diagnose(centralJacobian(witness, current.values.length), current);
+				var generic = diagnose(analyticJacobian(witness, current.values.length), current);
 				if (generic.rank > report.rank) {
 					report = generic;
 					degenerate = true;
@@ -339,17 +362,22 @@ class SketchSolver {
 	}
 	/** One Levenberg-Marquardt step from `x`, in scaled variables; null when the damped normal matrix is singular. */
 	private function dampedStep(x:Array<Float>, current:ResidualSet, damping:Float):Null<Array<Float>> {
-		var j = jacobian(x, current.values);
+		var rows = current.values.length, j = analyticJacobian(x, rows);
 		var normal = matrix(variableCount, variableCount, 0);
 		var gradient = fill(variableCount, 0);
-		for (row in 0...j.length) {
+		// A row touches a handful of variables: accumulate JᵀJ over its nonzeros only.
+		var nonzero:Array<Int> = [];
+		for (row in 0...rows) {
 			if (row % 16 == 0)
 				checkCancelled();
-			for (a in 0...variableCount) {
-				if (a % 8 == 0)
-					checkCancelled();
-				gradient[a] += j[row][a] * current.values[row];
-				for (b in 0...variableCount) normal[a][b] += j[row][a] * j[row][b];
+			nonzero.resize(0);
+			var base = row * variableCount;
+			for (a in 0...variableCount)
+				if (j[base + a] != 0) nonzero.push(a);
+			for (a in nonzero) {
+				var value = j[base + a];
+				gradient[a] += value * current.values[row];
+				for (b in nonzero) normal[a][b] += value * j[base + b];
 			}
 		}
 		for (i in 0...variableCount) {
@@ -374,52 +402,218 @@ class SketchSolver {
 		return trial;
 	}
 
-	/** Forward differences with respect to the scaled variables (x / normalizationScale). */
-	private function jacobian(x:Array<Float>, base:Array<Float>):Array<Array<Float>> {
-		var j = matrix(base.length, variableCount, 0);
-		for (column in 0...variableCount) {
-			if (column % 8 == 0)
+	/** Gradient of ½‖r‖² from a row-major Jacobian. */
+	private function gradient(j:Array<Float>, residual:Array<Float>):Array<Float> {
+		var result = fill(variableCount, 0);
+		for (row in 0...residual.length) {
+			if (row % 16 == 0)
 				checkCancelled();
-			var step = 1e-6 * normalizationScale;
-			var trial = x.copy();
-			trial[column] += step;
-			var values = residuals(trial).values;
-			for (row in 0...base.length) {
-				if (row % 128 == 0)
-					checkCancelled();
-				j[row][column] = (values[row] - base[row]) / 1e-6;
+			for (column in 0...variableCount)
+				result[column] += j[row * variableCount + column] * residual[row];
+		}
+		return result;
+	}
+
+	/**
+		Analytic Jacobian with respect to the scaled variables (x / normalizationScale),
+		row-major, rows in the order `residuals` emits them. Each block below is
+		∂f/∂x of the unscaled residual f: linear rows are f / s with variables
+		x / s, so their entries are ∂f/∂x unchanged; angular rows are
+		dimensionless and take ∂f/∂x · s.
+	*/
+	private function analyticJacobian(x:Array<Float>, rows:Int):Array<Float> {
+		var j = [for (_ in 0...rows * variableCount) 0.0];
+		var row = 0, constraintIndex = 0;
+		for (c in sketch.constraints()) {
+			if (constraintIndex++ % 16 == 0)
+				checkCancelled();
+			if (shapeOnly && !isShapeConstraint(c.kind))
+				continue;
+			jacobianTarget = j;
+			jacobianRow = row;
+			jacobianScale = hasLinearResidual(c.kind) ? 1.0 : normalizationScale;
+			switch (c.kind) {
+				case "fixed":
+					var p = pointVar(c.first);
+					entry(0, p, 1); entry(1, p + 1, 1);
+					row += 2;
+				case "coincident", "concentric":
+					var a = c.kind == "coincident" ? pointVar(c.first) : pointVar(entity(c.first, c.id).first);
+					var b = c.kind == "coincident" ? pointVar(needSecond(c)) : pointVar(entity(needSecond(c), c.id).first);
+					entry(0, a, 1); entry(0, b, -1); entry(1, a + 1, 1); entry(1, b + 1, -1);
+					row += 2;
+				case "horizontal", "vertical":
+					var e = entity(c.first, c.id), offset = c.kind == "horizontal" ? 1 : 0;
+					entry(0, pointVar(e.second) + offset, 1); entry(0, pointVar(e.first) + offset, -1);
+					row += 1;
+				case "distance":
+					distanceRow(x, pointVar(c.first), pointVar(needSecond(c)), 1);
+					row += 1;
+				case "radius":
+					entry(0, radiusVar(c.first), 1);
+					row += 1;
+				case "equal":
+					measureRow(x, c.first, 1, c.id);
+					measureRow(x, needSecond(c), -1, c.id);
+					row += 1;
+				case "parallel", "perpendicular":
+					angleRow(x, c.first, needSecond(c), c.kind == "parallel", 0, c.id);
+					row += 1;
+				case "angle":
+					angleRow(x, c.first, needSecond(c), false, 0, c.id);
+					angleRow(x, c.first, needSecond(c), true, 1, c.id);
+					row += 2;
+				case "pointOn":
+					var e = entity(needSecond(c), c.id);
+					if (e.kind == "line")
+						pointLineRow(x, pointVar(c.first), 1, 1, needSecond(c), 0, c.id);
+					else {
+						distanceRow(x, pointVar(c.first), pointVar(e.first), 1);
+						entry(0, radiusVar(needSecond(c)), -1);
+					}
+					row += 1;
+				case "tangent":
+					tangentRow(x, c.first, needSecond(c), c.id);
+					row += 1;
+				case "symmetric":
+					var a = pointVar(c.first), b = pointVar(needSecond(c));
+					// Row 0: the midpoint lies on the axis; each point carries half the weight.
+					pointLineRow(x, a, 0.5, 0, needThird(c), 0, c.id);
+					pointLineRow(x, b, 0.5, 0, needThird(c), 0, c.id);
+					pointLineAxisTerms(x, midpoint(x, a, b), needThird(c), 0, c.id);
+					// Row 1: (b − a)·d / |d| = 0.
+					alongRow(x, a, b, needThird(c), 1, c.id);
+					row += 2;
+				default:
+					throw invalid("unsupported constraint kind: " + c.kind, [c.id]);
 			}
 		}
 		return j;
 	}
-	private function gradient(j:Array<Array<Float>>, residual:Array<Float>):Array<Float> {
-		var result = fill(variableCount, 0);
-		for (row in 0...j.length) {
-			if (row % 16 == 0)
-				checkCancelled();
-			for (column in 0...variableCount) {
-				if (column % 1024 == 0)
-					checkCancelled();
-				result[column] += j[row][column] * residual[row];
+
+	/** Where `entry` writes: the Jacobian being built, its current constraint's first row, and that row's scale. */
+	private var jacobianTarget:Array<Float> = [];
+	private var jacobianRow:Int = 0;
+	private var jacobianScale:Float = 1;
+
+	private inline function entry(r:Int, index:Int, value:Float):Void
+		jacobianTarget[(jacobianRow + r) * variableCount + index] += value * jacobianScale;
+
+	private function pointVar(id:String):Int {
+		var found = pointIndex.get(id);
+		if (found == null) throw invalid("missing point: " + id, [id]);
+		return found;
+	}
+
+	private function radiusVar(id:String):Int {
+		var found = radiusIndex.get(id);
+		if (found == null) throw invalid("constraint requires a circle or arc", [id]);
+		return found;
+	}
+
+	private static function midpoint(x:Array<Float>, a:Int, b:Int):Array<Float>
+		return [(x[a] + x[b]) / 2, (x[a + 1] + x[b + 1]) / 2];
+
+	/** f = |a − b| (times `sign`): ∂f/∂a = (a − b)/|a − b|, ∂f/∂b = −∂f/∂a. */
+	private function distanceRow(x:Array<Float>, a:Int, b:Int, sign:Float):Void {
+		var dx = x[a] - x[b], dy = x[a + 1] - x[b + 1], length = Math.sqrt(dx * dx + dy * dy);
+		if (length == 0) return;
+		entry(0, a, sign * dx / length); entry(0, a + 1, sign * dy / length);
+		entry(0, b, -sign * dx / length); entry(0, b + 1, -sign * dy / length);
+	}
+
+	/** A line's length or a circle's radius, times `sign`. */
+	private function measureRow(x:Array<Float>, id:String, sign:Float, owner:String):Void {
+		var e = entity(id, owner);
+		if (e.kind == "line") distanceRow(x, pointVar(e.second), pointVar(e.first), sign);
+		else entry(0, radiusVar(id), sign);
+	}
+
+	/**
+		For line directions a and b with n = |a||b|: f = (a×b)/n when `cross`,
+		else (a·b)/n. ∂f/∂a = ∂(a×b or a·b)/∂a / n − f a/|a|², and likewise for b;
+		each direction is its second point minus its first.
+	*/
+	private function angleRow(x:Array<Float>, first:String, second:String, cross:Bool, r:Int, owner:String):Void {
+		var e1 = entity(first, owner), e2 = entity(second, owner);
+		var a0 = pointVar(e1.first), a1 = pointVar(e1.second), b0 = pointVar(e2.first), b1 = pointVar(e2.second);
+		var ax = x[a1] - x[a0], ay = x[a1 + 1] - x[a0 + 1], bx = x[b1] - x[b0], by = x[b1 + 1] - x[b0 + 1];
+		var aa = ax * ax + ay * ay, bb = bx * bx + by * by, n = Math.sqrt(aa * bb);
+		if (n < 1e-12) return;
+		var f = (cross ? ax * by - ay * bx : ax * bx + ay * by) / n;
+		var dax = (cross ? by : bx) / n - f * ax / aa, day = (cross ? -bx : by) / n - f * ay / aa;
+		var dbx = (cross ? -ay : ax) / n - f * bx / bb, dby = (cross ? ax : ay) / n - f * by / bb;
+		entry(r, a1, dax); entry(r, a1 + 1, day); entry(r, a0, -dax); entry(r, a0 + 1, -day);
+		entry(r, b1, dbx); entry(r, b1 + 1, dby); entry(r, b0, -dbx); entry(r, b0 + 1, -dby);
+	}
+
+	/**
+		Signed distance of point p from a line through e0 along d = e1 − e0:
+		f = (p − e0)×d / |d|. `pointWeight` scales ∂f/∂p = (dy, −dx)/|d|
+		(a midpoint gives each end half). With `axisWeight` 1 the line's own
+		terms are added here; symmetric rows add them once via `pointLineAxisTerms`.
+	*/
+	private function pointLineRow(x:Array<Float>, p:Int, pointWeight:Float, axisWeight:Float, lineId:String, r:Int,
+			owner:String):Void {
+		var e = entity(lineId, owner), e0 = pointVar(e.first), e1 = pointVar(e.second);
+		var dx = x[e1] - x[e0], dy = x[e1 + 1] - x[e0 + 1], dd = dx * dx + dy * dy, length = Math.sqrt(dd);
+		if (length < 1e-12) return;
+		entry(r, p, pointWeight * dy / length); entry(r, p + 1, -pointWeight * dx / length);
+		if (axisWeight != 0)
+			pointLineAxisTerms(x, [x[p], x[p + 1]], lineId, r, owner);
+	}
+
+	/** The line's part of ∂f/∂(e0, e1) for f = (p − e0)×d/|d| at a fixed point p. */
+	private function pointLineAxisTerms(x:Array<Float>, p:Array<Float>, lineId:String, r:Int, owner:String):Void {
+		var e = entity(lineId, owner), e0 = pointVar(e.first), e1 = pointVar(e.second);
+		var dx = x[e1] - x[e0], dy = x[e1 + 1] - x[e0 + 1], dd = dx * dx + dy * dy, length = Math.sqrt(dd);
+		if (length < 1e-12) return;
+		var wx = p[0] - x[e0], wy = p[1] - x[e0 + 1];
+		var f = (wx * dy - wy * dx) / length;
+		// ∂f/∂d, then d = e1 − e0; w = p − e0 adds −(dy, −dx)/|d| to e0.
+		var ddx = -wy / length - f * dx / dd, ddy = wx / length - f * dy / dd;
+		entry(r, e1, ddx); entry(r, e1 + 1, ddy);
+		entry(r, e0, -ddx - dy / length); entry(r, e0 + 1, -ddy + dx / length);
+	}
+
+	/** f = (b − a)·d / |d| for the axis d = e1 − e0. */
+	private function alongRow(x:Array<Float>, a:Int, b:Int, lineId:String, r:Int, owner:String):Void {
+		var e = entity(lineId, owner), e0 = pointVar(e.first), e1 = pointVar(e.second);
+		var dx = x[e1] - x[e0], dy = x[e1 + 1] - x[e0 + 1], dd = dx * dx + dy * dy, length = Math.sqrt(dd);
+		if (length < 1e-12) return;
+		var vx = x[b] - x[a], vy = x[b + 1] - x[a + 1], f = (vx * dx + vy * dy) / length;
+		entry(r, b, dx / length); entry(r, b + 1, dy / length); entry(r, a, -dx / length); entry(r, a + 1, -dy / length);
+		var ddx = vx / length - f * dx / dd, ddy = vy / length - f * dy / dd;
+		entry(r, e1, ddx); entry(r, e1 + 1, ddy); entry(r, e0, -ddx); entry(r, e0 + 1, -ddy);
+	}
+
+	/** Tangency rows, following the stored side (line-circle) or contact branch (circle-circle). */
+	private function tangentRow(x:Array<Float>, aid:String, bid:String, owner:String):Void {
+		var first = entity(aid, owner), second = entity(bid, owner);
+		if (first.kind == "line" || second.kind == "line") {
+			var lineId = first.kind == "line" ? aid : bid, circleId = first.kind == "line" ? bid : aid;
+			var circle = entity(circleId, owner);
+			pointLineRow(x, pointVar(circle.first), 1, 1, lineId, 0, owner);
+			var storedSide = tangentSides.get(owner);
+			var side:Float = storedSide == null ? 1 : storedSide;
+			if (storedSide == null) {
+				var e = entity(lineId, owner), c = pointVar(circle.first), e0 = pointVar(e.first), e1 = pointVar(e.second);
+				var signed = (x[c] - x[e0]) * (x[e1 + 1] - x[e0 + 1]) - (x[c + 1] - x[e0 + 1]) * (x[e1] - x[e0]);
+				side = signed < 0 ? -1 : 1;
+			}
+			entry(0, radiusVar(circleId), -side);
+		} else {
+			distanceRow(x, pointVar(first.first), pointVar(second.first), 1);
+			var storedBranch = tangentBranches.get(owner);
+			var external:Bool = storedBranch == null ? true : storedBranch;
+			var ra = radiusVar(aid), rb = radiusVar(bid);
+			if (external) {
+				entry(0, ra, -1); entry(0, rb, -1);
+			} else {
+				var sign = x[ra] - x[rb] >= 0 ? 1.0 : -1.0;
+				entry(0, ra, -sign); entry(0, rb, sign);
 			}
 		}
-		return result;
-	}
-	/** Central differences in the scaled variables, row-major: accurate enough for relative rank decisions. */
-	private function centralJacobian(x:Array<Float>, rows:Int):Array<Float> {
-		var flat = [for (_ in 0...rows * variableCount) 0.0];
-		for (column in 0...variableCount) {
-			if (column % 8 == 0)
-				checkCancelled();
-			var step = 1e-6 * normalizationScale;
-			var plus = x.copy(), minus = x.copy();
-			plus[column] += step;
-			minus[column] -= step;
-			var high = residuals(plus).values, low = residuals(minus).values;
-			for (row in 0...rows)
-				flat[row * variableCount + column] = (high[row] - low[row]) / 2e-6;
-		}
-		return flat;
 	}
 
 	/** Diagnoses a Jacobian against the solved residuals; rows count as satisfied within ten times the solve tolerance. */
