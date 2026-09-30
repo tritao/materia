@@ -32,13 +32,15 @@ class ServoStep {
  * period `dt`. It solves, natively on ProxQP,
  *
  *   minimize ½‖J·Δ − twist·dt‖² + ½λ²‖Δ‖²
- *   subject to  lower − q ≤ Δ ≤ upper − q   and   −v·dt ≤ Δ ≤ v·dt
+ *   subject to  k·(lower − q) ≤ Δ ≤ k·(upper − q)   and   −v·dt ≤ Δ ≤ v·dt
  *
  * with `J` the tool-centre-point Jacobian in the base frame (as
  * `ManipulatorKinematics.solveDifferential`), the group's position limits
  * (`lower >= upper` means unlimited) and velocity limits (`velocity <= 0`
  * means unlimited, unless `velocityLimits` overrides them), and returns
- * Δ / dt. The limits hold exactly, so integrating the answer never leaves
+ * Δ / dt. `limitGain` k in (0, 1] (1 by default) lets a joint cover at most
+ * that fraction of its remaining distance to a stop per tick, so it slows
+ * into the stop instead of arriving in one tick. The limits hold exactly, so integrating the answer never leaves
  * the joint range. If the QP does not solve, the Haxe damped step is used,
  * clamped into the same bounds, and the answer says so.
  *
@@ -60,12 +62,13 @@ class ManipulatorServo {
   }
 
   public function step(q:Array<Float>, twist:Twist6, dt:Float, ?velocityLimits:Array<Float>,
-      ?maxIterations:Int = 1000):ServoStep {
+      ?maxIterations:Int = 1000, ?limitGain:Float = 1.0):ServoStep {
     var n = manipulator.dofCount();
     if (q == null || q.length != n) throw 'Servo requires $n joint values';
     if (twist == null) throw "Servo requires a tool twist";
     if (!(dt > 0.0) || !Math.isFinite(dt)) throw "Servo period must be positive and finite";
     if (velocityLimits != null && velocityLimits.length != n) throw 'Servo needs $n velocity limits';
+    if (!(limitGain > 0.0) || limitGain > 1.0) throw "Servo limit gain must be in (0, 1]";
     var jacobian = manipulator.tcpJacobian(q);
     var requested = twist.toArray();
     var displacement = [for (value in requested) value * dt];
@@ -74,8 +77,8 @@ class ManipulatorServo {
       var limits = manipulator.group.limitsOf(joint);
       var low = Math.NEGATIVE_INFINITY, high = Math.POSITIVE_INFINITY;
       if (limits.lower < limits.upper) {
-        low = limits.lower - q[joint];
-        high = limits.upper - q[joint];
+        low = limitGain * (limits.lower - q[joint]);
+        high = limitGain * (limits.upper - q[joint]);
       }
       var speed = velocityLimits != null ? velocityLimits[joint] : (limits.velocity > 0.0 ? limits.velocity : Math.POSITIVE_INFINITY);
       if (!(speed >= 0.0)) throw "Servo velocity limits must be non-negative";

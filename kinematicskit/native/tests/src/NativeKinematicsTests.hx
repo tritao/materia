@@ -206,6 +206,21 @@ class NativeKinematicsTests {
     tight.setLimits(3, -0.8, 0.8);
     var held = track(tight, [0.1, 0.3, 0.0, -0.6, 0.0, 0.4, 0.0], speeds, 600);
     check(held.legal && Math.abs(held.q[3] - (-0.8)) < 1e-9, 'a limit in the way holds exactly (${held.q[3]})');
+
+    // With limit gain 0.5 the joint covers at most half its remaining distance per step: it slows into the
+    // stop and never quite touches it.
+    var state = new KinematicState(model, [0.1, 0.3, 0.0, -0.6, 0.0, 0.4, 0.0]);
+    var qp = new NativeQpStep(7);
+    var gaps:Array<Float> = [];
+    for (_ in 0...60) {
+      var step = DifferentialIk.step(tight, state, 0.01, qp, speeds, 0.5, 1e-3, null, 0.5);
+      for (column in 0...7) state.q[tight.layout().dofs[column]] += step.velocity[column] * 0.01;
+      gaps.push(state.q[3] - (-0.8));
+    }
+    qp.dispose();
+    var halving = true;
+    for (i in 1...gaps.length) if (gaps[i] < 0.5 * gaps[i - 1] - 1e-12 || gaps[i] <= 0.0) halving = false;
+    check(halving && gaps[gaps.length - 1] < 1e-3, 'a limit gain of 0.5 approaches the stop gradually (last gap ${gaps[gaps.length - 1]})');
   }
 
   /**

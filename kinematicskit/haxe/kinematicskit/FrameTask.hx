@@ -10,8 +10,14 @@ package kinematicskit;
  *
  * Orientation (`FrameOrientation`): `Full` uses the rotation vector of
  * `target · current⁻¹` in world coordinates with the angular Jacobian rows
- * (first order, exact at convergence); `Axis(u)` aligns the frame's local
- * axis `u` with the target's, leaving rotation about it free.
+ * (first order, exact at convergence; the exact log-map derivative was
+ * measured and rejected, see KINEMATICS.md K-log "orientation Jacobian");
+ * `Axis(u)` aligns the frame's local axis `u` with the target's, leaving
+ * rotation about it free.
+ *
+ * Position and orientation errors stay separate (straight-line position
+ * error, per-part masks and tolerances). A different error formulation
+ * (e.g. mink's SE(3) logarithm) belongs in its own task type, not a mode.
  */
 class FrameTask implements KinematicTask {
   public static inline var AXIS_X = 1;

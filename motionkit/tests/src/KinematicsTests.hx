@@ -370,6 +370,15 @@ class KinematicsTests extends MotionKitTestSupport {
     check(!crossed, "integrating servo ticks never leaves the joint range");
     near(state[0], 2.0 * Math.PI, "the base joint ends on its stop", 1e-9);
 
+    // With a limit gain the base slows into its stop instead of arriving in one tick.
+    var soft = q.copy();
+    for (_ in 0...1200) {
+      var tcp = arm.tcpPose(soft).translation;
+      var tick = servo.step(soft, new Twist6(-tcp.y, tcp.x, 0.0, 0.0, 0.0, 1.0), 0.01, [for (_ in 0...6) 2.0], 1000, 0.3);
+      for (joint in 0...6) soft[joint] += tick.velocity[joint] * 0.01;
+    }
+    check(soft[0] < 2.0 * Math.PI && 2.0 * Math.PI - soft[0] < 1e-6, "a limit gain slows the base into its stop without touching it");
+
     // A QP that runs out of iterations falls back to the clamped damped step, still within limits.
     var starved = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5], 1);
     if (starved.fallback) for (joint in 0...6)

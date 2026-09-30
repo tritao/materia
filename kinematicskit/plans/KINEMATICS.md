@@ -661,3 +661,36 @@ coordinates; for a running robot the target goes through MotionKit.
     checks the ratio). Both converge to the same target; they take slightly
     different paths. An SE(3)-log `FrameTask` option would close it if a
     use needs mink-identical transients.
+
+### Orientation Jacobian: exact log-map derivative measured and rejected; limit-approach gain added (2026-09-30)
+
+- Tried `FrameTask` orientation rows with the exact derivative of the error
+  φ = log(R_target·R_currentᵀ), i.e. J_r⁻¹(φ)·J_ω (mink uses the exact
+  Jacobian of its own error). It matched central differences, but measured
+  on a 6R arm (40 targets per band, same seeds for both):
+
+  | rotation error | DLS converged, first-order / exact | LM converged, first-order / exact (mean iterations) |
+  |---|---|---|
+  | ~0.3 rad | 40 / 40 | 40 / 40 (2.2 / 2.2) |
+  | ~1 rad | 39 / 39 | 39 / 39 (3.7 / 3.7) |
+  | ~1.8 rad | 28 / 25 | 34 / 34 (5.5 / 5.5) |
+  | ~2.5 rad | 18 / 15 | 23 / 24 (6.7 / 7.6) |
+  | ~3 rad | 13 / 11 | 14 / 15 (7.5 / 9.3) |
+
+  Identical up to ~1 rad, worse beyond: J_r⁻¹ grows without bound as the
+  error nears π (the logarithm is singular there), while the first-order
+  rows are steepest descent on the rotation distance. It also broke
+  RobotKit's reachability test (a cold-start point 2.54 rad off stalled at
+  0.50 rad). The mink oracle's pose-target gap did not move, so that gap is
+  mink's SE(3) translation/rotation coupling, not the Jacobian.
+- Decision: one formulation (first order) and no option. Do not reintroduce
+  the exact derivative without new evidence. If convergence from far
+  orientations ever matters, fix the cause: better seeds (OPW solutions,
+  `sampleCandidates`) or an error without a singularity at π (e.g.
+  quaternion-based), as a separate task type.
+- Kept: `limitGain` k in (0, 1] on `DifferentialIk.step` and
+  `ManipulatorServo.step` (default 1 = hard stops as before): a DOF covers at
+  most k of its remaining distance to a stop per step, mink's
+  configuration-limit gain. Tests: with k = 0.5 the gap to the stop at
+  least halves per step and never closes; the servo slows the base into its
+  +2π stop without touching it.
