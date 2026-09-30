@@ -22,7 +22,9 @@ import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
+import kinematicskit.LinearAlgebra;
 import motionkit.robot.ManipulatorKinematics;
+import motionkit.robot.ManipulatorServo;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
@@ -327,6 +329,52 @@ class KinematicsTests extends MotionKitTestSupport {
     catch (error:Dynamic) diagnostic = Std.string(error);
     check(diagnostic.indexOf("joint-3") >= 0,
       "non-spherical UR5 wrist names its violating joint");
+  }
+
+  public function testManipulatorServo():Void {
+    var fixture = buildContractArmFixture();
+    var arm = fixture.arm;
+    var servo = new ManipulatorServo(arm, 1e-3);
+    var q = [0.3, -0.8, 1.1, -0.5, 0.4, 0.2];
+    var twist = new Twist6(0.05, -0.02, 0.03, 0.1, -0.05, 0.08);
+    var unlimited = [for (_ in 0...6) Math.POSITIVE_INFINITY];
+
+    // Far from every bound it is the damped least-squares step at the same damping.
+    var free = servo.step(q, twist, 0.01, unlimited);
+    var expected = LinearAlgebra.dampedStep(arm.tcpJacobian(q), 6, 6, [for (i in 0...6) i],
+      [for (value in twist.toArray()) value * 0.01], 1e-3);
+    check(!free.fallback && free.limited.length == 0, "an unconstrained servo tick solves on the QP");
+    for (joint in 0...6) near(free.velocity[joint], expected[joint] / 0.01,
+      "an unconstrained servo tick is the damped least-squares step", 1e-5);
+
+    // Velocity limits hold exactly.
+    var fast = new Twist6(2.0, -1.0, 1.5, 3.0, -2.0, 2.5);
+    var capped = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5]);
+    for (joint in 0...6) check(Math.abs(capped.velocity[joint]) <= 0.5 + 1e-12, "servo velocities stay within their limits");
+    check(capped.limited.length > 0, "a too-fast twist reports the joints held by their velocity limit");
+
+    // Turning the whole arm about the base axis (the tool twist v = ω × p, ω = z) is the base joint's
+    // own motion; a steady turn drives it into its +2π stop and holds it there.
+    var state = q.copy();
+    var crossed = false;
+    for (_ in 0...1200) {
+      var tcp = arm.tcpPose(state).translation;
+      var yaw = new Twist6(-tcp.y, tcp.x, 0.0, 0.0, 0.0, 1.0);
+      var tick = servo.step(state, yaw, 0.01, [for (_ in 0...6) 2.0]);
+      for (joint in 0...6) {
+        state[joint] += tick.velocity[joint] * 0.01;
+        var limits = arm.group.limitsOf(joint);
+        if (state[joint] > limits.upper + 1e-12 || state[joint] < limits.lower - 1e-12) crossed = true;
+      }
+    }
+    check(!crossed, "integrating servo ticks never leaves the joint range");
+    near(state[0], 2.0 * Math.PI, "the base joint ends on its stop", 1e-9);
+
+    // A QP that runs out of iterations falls back to the clamped damped step, still within limits.
+    var starved = servo.step(q, fast, 0.01, [for (_ in 0...6) 0.5], 1);
+    if (starved.fallback) for (joint in 0...6)
+      check(Math.abs(starved.velocity[joint]) <= 0.5 + 1e-12, "the fallback step also respects the limits");
+    servo.dispose();
   }
 
   public function testTransmissionDerivedAxisMapping():Void {
