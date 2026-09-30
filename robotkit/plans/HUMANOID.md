@@ -16,6 +16,8 @@ Read first:
 4. `sensorkit/README.md`: IMU measurement models.
 5. `motionkit/plans/LANE_D_REDUNDANCY_SERVO.md`: the QP IK design that H7
    extends.
+   The QP core itself is now `kinematicskit` (`kinematicskit/plans/KINEMATICS.md`,
+   K3 and K5).
 
 Work in `../materia-worktrees/humanoid` on branch `humanoid`. Failing test
 first, one commit per item, merge to `main` after each green item. Append to
