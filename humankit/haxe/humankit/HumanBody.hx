@@ -15,6 +15,14 @@ class HumanBody {
 	final poles:Array<Null<Array<Float>>> = [null, null, null, null];
 	final heldPoints:Array<Null<Void->Array<Float>>> = [null, null, null, null];
 	var carrying:Array<HumanLimb> = [];
+	/** Finger curl of a resting hand, of one reaching for something, and of one holding it. */
+	static inline var RELAXED_CURL:Float = 0.25;
+	static inline var OPEN_CURL:Float = 0.05;
+	static inline var GRIP_CURL:Float = 0.5;
+	/** How fast the fingers open and close, in full curls per second. */
+	static inline var CURL_RATE:Float = 5.0;
+	/** The curl each hand is at now (left, right), moving toward what its state asks for. */
+	final curls:Array<Float> = [RELAXED_CURL, RELAXED_CURL];
 	/** Seconds a hand takes to settle into the carry pose from wherever it was. */
 	static inline var CARRY_EASE_SECONDS:Float = 0.3;
 	/** Where each hand was when it began to carry, and how far it has settled (one when done). */
@@ -27,6 +35,24 @@ class HumanBody {
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
 		description = HumanDescription.measure(character.pose, character.height());
+		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, RELAXED_CURL);
+	}
+
+	/** Open while reaching for something, closed while holding it, relaxed otherwise. */
+	function curlFor(hand:HumanLimb):Float {
+		if (isCarrying(hand) || heldPoints[hand] != null) return GRIP_CURL;
+		var index:Int = hand;
+		return active[index] && weights[index] > 0.0 ? OPEN_CURL : RELAXED_CURL;
+	}
+
+	function moveFingers(seconds:Float):Void {
+		for (hand in [ArmL, ArmR]) {
+			var index:Int = hand;
+			var step = CURL_RATE * seconds, wanted = curlFor(hand);
+			curls[index] = Math.abs(wanted - curls[index]) <= step ? wanted :
+				curls[index] + (wanted > curls[index] ? step : -step);
+			character.setHandCurl(hand, curls[index]);
+		}
 	}
 
 	public function rootTransform():Array<Float>
@@ -200,6 +226,10 @@ class HumanBody {
 		grip = false;
 		for (hand in [ArmL, ArmR]) setHeldPoint(hand, null);
 		for (limb in [ArmL, ArmR, LegL, LegR]) clearReach(limb);
+		for (hand in [ArmL, ArmR]) {
+			curls[hand] = RELAXED_CURL;
+			character.setHandCurl(hand, RELAXED_CURL);
+		}
 	}
 
 	/**
@@ -215,6 +245,7 @@ class HumanBody {
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
 		for (hand in carrying) carrySettled[hand] = Math.min(1.0, carrySettled[hand] + seconds / CARRY_EASE_SECONDS);
+		moveFingers(seconds);
 		walker.advance(seconds);
 		evaluate();
 	}

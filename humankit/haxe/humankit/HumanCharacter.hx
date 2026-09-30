@@ -41,6 +41,8 @@ class HumanCharacter {
 	public final pose:HumanPose;
 	public final model:SkinnedModel;
 	public final attachments:Array<HumanAttachment> = [];
+	/** The left and right hands' fingers; null for a rig without them. */
+	final hands:Array<Null<HumanHand>>;
 	public var root(get, never):NodeId;
 
 	final scene:Scene;
@@ -53,6 +55,7 @@ class HumanCharacter {
 		instance = new AnimationInstance(asset);
 		pose = new HumanPose(this.rig, instance.readJointMatrices());
 		player = new ClipPlayer(instance);
+		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL), HumanHand.find(asset, this.rig, instance, HumanBone.HandR)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
 	}
 
@@ -101,6 +104,22 @@ class HumanCharacter {
 		var arm = limb == ArmL || limb == ArmR;
 		instance.setIk(limb, rig.joint(bones[0]), rig.joint(bones[1]), rig.joint(bones[2]), target,
 			pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0], weight);
+	}
+
+	/**
+	 * Curls a hand's fingers, from open (0) to a fist (1), on top of the animation. A rig without finger
+	 * joints ignores it. Takes effect from the next advance.
+	 */
+	public function setHandCurl(hand:HumanLimb, curl:Float):Void {
+		if (hand != ArmL && hand != ArmR) throw "Only a hand has fingers to curl";
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		if (fingers != null) fingers.setCurl(curl);
+	}
+
+	/** How curled a hand's fingers are, or 0 for a rig without them. */
+	public function handCurl(hand:HumanLimb):Float {
+		var fingers = hands[hand == ArmL ? 0 : 1];
+		return fingers == null || fingers.curl < 0.0 ? 0.0 : fingers.curl;
 	}
 
 	/** Returns a limb to its animation. */
