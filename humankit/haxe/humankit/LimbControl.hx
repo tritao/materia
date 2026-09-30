@@ -9,9 +9,9 @@ package humankit;
 class LimbControl {
 	public final limb:HumanLimb;
 	public var mode(default, null):LimbMode = Free;
-	/** The reach target, and whether it is in the body's model space or the world. */
+	/** The reach target, and the frame it is given in. */
 	public var target(default, null):Array<Float> = [];
-	public var modelSpace(default, null):Bool = false;
+	public var space(default, null):ReachSpace = ReachSpace.World;
 	public var weight(default, null):Float = 0.0;
 	public var pole(default, null):Null<Array<Float>> = null;
 	/** The curl of each of this hand's fingers now (HumanHand.THUMB to PINKY); they move toward what the limb's state asks for. */
@@ -32,9 +32,9 @@ class LimbControl {
 	public function isArm():Bool
 		return limb == ArmL || limb == ArmR;
 
-	public function reach(target:Array<Float>, modelSpace:Bool, weight:Float, ?pole:Array<Float>):Void {
+	public function reach(target:Array<Float>, space:ReachSpace, weight:Float, ?pole:Array<Float>):Void {
 		mode = Reach;
-		this.modelSpace = modelSpace;
+		this.space = space;
 		this.target = target.copy();
 		this.weight = Math.max(0.0, Math.min(1.0, weight));
 		this.pole = pole == null ? null : pole.copy();
@@ -81,7 +81,7 @@ class LimbControl {
 		var wanted = mode == Free && isArm() && hang > 0.0 ? Hang : mode;
 		switch wanted {
 			case Reach:
-				character.reach(limb, modelSpace ? target : body.toModel(target), weight, pole);
+				character.reach(limb, body.reachTargetModel(this), weight, pole);
 			case Carry:
 				var goal = body.carryTargetModel(limb);
 				var from = carryFrom;

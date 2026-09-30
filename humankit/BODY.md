@@ -47,9 +47,22 @@ that surface's edge, leaning the upper body over it for the rest of the reach an
 spent, stretching the arm past comfortable up to `HumanPosture.stretch`. It plans from the body's
 standing posture (`HumanBody.standingBone`, captured when the body is built), not from the animated pose,
 which bobs with the gait: a reach near a limit must not be possible in one phase of a stride and not in
-another. A point is out of reach only beyond the stretch, not beyond the comfortable distance. `Pick` and `Place` reach
+another. A point is out of reach only beyond the stretch, not beyond the comfortable distance. With two hands
+on one object each shoulder stays a little to the side of its hand's grasp point (`HumanPosture.handSpread`),
+and that sideways gap takes its share of the arm, so the reach ahead and below is measured with it removed.
+The stretch sits a few centimetres short of the solver's hard limit on purpose: it has to absorb the walker's
+stopping error. `Pick` and `Place` reach
 and grasp, and ask the body to straighten up when they are done. Actions set intent (`setLean`,
 `setCarry`, `setReachWorld`); they never touch joints.
+
+## Reaches are held against the torso
+
+A reach target is given in a frame (`ReachSpace`): the world, the body's root, or the torso. A hand that has
+just set a part down is withdrawn to a point against the chest, not in the root frame, because the torso
+straightens as the worker steps away and a point fixed in the root frame ends up against the shoulder, which
+folds the arm and flips the IK. Letting a reach go (`ReleaseLimb`) eases the blend and lasts as long as the
+hand's travel needs to keep its speed down (`HumanPosture.releaseSpeed`, measured by `travelToAnimation`):
+a fixed 0.2 s dragged a hand 0.6 m at 3 m/s or more.
 
 ## Grips follow the object
 
@@ -96,5 +109,9 @@ to go wrong that the rack job does not exercise.
   more: they do not wrap a cylinder or a handle differently, the thumb simply follows the index finger,
   and the fingertips reach only about 7 cm from the palm, so a larger object closes the hand as far as it
   goes and no further.
+- **Two hands at about a metre.** The arms have about 10 cm of horizontal reach left after the drop from the
+  shoulder, and each hand spends some of it sideways, so the worker cannot stand clear of a 0.4 m top without
+  crouching: the belly ends about 17 cm inside the edge (the one-handed case measures 3 to 4 cm). The two-hand
+  sweep holds that height to completing, placing the part and moving without spikes, and to that measured depth.
 - **Both hands and the left hand** share the same code as the right, and the sweep covers a left-hand
   fetch, but two-handed lean and hang are exercised by far fewer scenarios.

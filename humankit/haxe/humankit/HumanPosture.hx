@@ -17,7 +17,10 @@ class HumanPosture {
 	 * How much of the arm's length a worker will stretch to keep clear of a surface's edge, once the lean is
 	 * spent: more than the comfortable reach, and short of the limit the solver refuses at.
 	 */
-	public var stretch:Float = 0.92;
+	public var stretch:Float = 0.91;
+
+	/** With two hands on one object, how far each hand's grasp point sits to its own side of the object's centre, in metres. */
+	public var handSpread:Float = 0.08;
 
 	// Carrying.
 
@@ -56,6 +59,13 @@ class HumanPosture {
 	/** How far the front of the belly sits ahead of the abdomen bone, and the gap left to a surface edge. */
 	public var bellyFront:Float = 0.12;
 	public var edgeGap:Float = 0.03;
+
+	/**
+	 * How fast, in metres per second, an arm's wrist is allowed to go at the peak of the easing as it returns
+	 * to its animation after a reach, working from the straight-line distance it has to cover. The wrist
+	 * follows an arc and the IK blend is not linear in position, so its real peak is about twice this.
+	 */
+	public var releaseSpeed:Float = 1.0;
 
 	// Withdrawing from a placed part.
 
