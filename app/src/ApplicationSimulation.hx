@@ -5,18 +5,13 @@ import humankit.sim.HumanWorker;
 import humankit.sim.HumanWorkerSignals;
 import robotkit.runtime.RobotRuntimeCompiler;
 import robotkit.runtime.Simulation;
-import robotkit.runtime.SimulationClosure;
 import robotkit.runtime.SimulationSpace;
-import RobotKitRuntime;
 import robotkit.runtime.SimulationPresentationSnapshot;
 import robotkit.world.Robot;
 import robotkit.world.RobotWorld;
 import robotkit.world.SimulatedRobot;
 import robotkit.world.WorldSnapshot;
 import robotkit.world.SensorFrame;
-import robotkit.model.CollisionApproximation;
-import materia.project.MaterialLibrary;
-import cadbridge.AssemblySimulationBridge;
 import nativekit.sim.MotionType;
 import nativekit.sim.SimObject;
 import nativekit.sim.SimPose;
@@ -59,7 +54,7 @@ class ApplicationSimulation {
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
-  var assemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
+  var assemblyParts:Array<AssemblyPart> = [];
   var running:Bool = false;
   /** Wall-clock stamp of the previous pump, or negative when pacing restarts. */
   var pumpStamp:Float = -1.0;
@@ -128,7 +123,7 @@ class ApplicationSimulation {
     var candidateRobotModels:Array<robotkit.model.RobotModel> = [];
     var candidateObjects:Array<{id:String,object:SimObject}> = [];
     var candidateWorkforce:Null<HumanWorkforce> = null;
-    var candidateAssemblyParts:Array<{id:String,robotIndex:Int,linkIndex:Int,center:Array<Float>}> = [];
+    var candidateAssemblyParts:Array<AssemblyPart> = [];
     var candidateWarnings:Array<String> = [];
     try {
       var models = configuration.robotModels();
@@ -157,100 +152,17 @@ class ApplicationSimulation {
         candidateRobotModels.push(editable.model);
       }
       var candidateMotions = session == null ? [] : session.robotMotions;
-      if (assembly != null) {
-        var physical = session == null ? null : session.projectPhysical;
-        if (physical == null) throw "Assembly physical properties are unavailable";
-        var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-          session == null ? null : session.projectAssemblyState);
-        // Link collision geometry is installed with generated-part hulls in the
-        // collision phase; the runtime's generic 10 cm robot box is not a part shape.
-        converted.model.collisionApproximation = CollisionApproximation.None;
-        var sceneParts = new Map<String, SceneObjectData>();
-        for (record in scene.records()) sceneParts.set(record.id, record);
-        var collisionHulls:Array<Null<Array<Float>>> = [for (_ in converted.model.links) null];
-        var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
-        for (part in physical.parts) physicalParts.set(part.id, part);
-        for (part in physical.parts) if (part.collisionWarning != null)
-          candidateWarnings.push(part.id + ": " + part.collisionWarning);
-        for (occurrence in assembly.occurrences) {
-          var record = sceneParts.get("project:" + occurrence.id);
-          var part = physicalParts.get(occurrence.definition);
-          if (record == null || part == null)
-            throw 'Assembly occurrence "${occurrence.id}" is missing its generated part';
-          var link:Null<robotkit.model.Link> = null;
-          for (item in converted.model.links) if (item.id == occurrence.id) { link = item; break; }
-          if (link == null) throw 'Assembly occurrence "${occurrence.id}" has no simulated link';
-          var baseMass = link.mass;
-          var chosenMass = record.mass;
-          if (record.materialId != null && record.materialId != part.materialId &&
-              Math.abs(record.mass - baseMass) <= 1e-9 * Math.max(1.0, baseMass)) {
-            var density:Null<Float> = null;
-            var customMaterials = session == null ? [] : session.customMaterials;
-            for (material in customMaterials)
-              if (material.id == record.materialId) { density = material.physical.density; break; }
-            if (density == null) density = MaterialLibrary.require(record.materialId).physical.density;
-            chosenMass = part.volume * density * Math.pow(physical.metresPerUnit, 3);
-          }
-          if (!Math.isFinite(chosenMass) || chosenMass <= 0)
-            throw 'Assembly occurrence "${occurrence.id}" has an invalid mass';
-          link.inertiaTensor = [for (value in link.inertiaTensor) value * chosenMass / baseMass];
-          link.mass = chosenMass;
-          if (record.collisionEnabled) {
-            if (part.collisionHull == null || part.collisionHull.length < 12)
-              throw 'Assembly part "${occurrence.definition}" has no convex collision hull';
-            var linkIndex = converted.model.links.indexOf(link);
-            collisionHulls[linkIndex] = [for (value in part.collisionHull)
-              value * physical.metresPerUnit];
-          }
-        }
-        if (converted.closureIds.length > 0 && backend != MUJOCO)
-          throw "Assembly closures require MuJoCo equality constraints: " +
-            converted.closureIds.join(", ");
-        var closures:Array<SimulationClosure> = [];
-        for (closure in converted.closures) {
-          var type = switch (closure.type) {
-            case materia.assembly.AssemblyDefinition.AssemblyJointType.Fixed:
-              RobotKitRuntimeConstants.RK_RUNTIME_JOINT_FIXED;
-            case materia.assembly.AssemblyDefinition.AssemblyJointType.Revolute,
-                 materia.assembly.AssemblyDefinition.AssemblyJointType.Continuous:
-              RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
-            case materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic:
-              RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
-            default: throw 'Unknown assembly closure "${closure.id}" type';
-          }
-          var parent = -1, child = -1;
-          for (index in 0...converted.model.links.length) {
-            if (converted.model.links[index].id == closure.parent) parent = index;
-            if (converted.model.links[index].id == closure.child) child = index;
-          }
-          if (parent < 0 || child < 0)
-            throw 'Assembly closure "${closure.id}" references an unknown link';
-          closures.push(new SimulationClosure(parent, child, type,
-            closure.anchorParent, closure.axisParent));
-        }
-        var id = "assembly:" + assembly.id;
+      if (assembly != null && session != null) {
+        var id = AssemblyRobot.idFor(assembly);
         if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
-        var blueprint = RobotRuntimeCompiler.compile(converted.model, appliedRevision + 1);
-        var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
-          [0.0, 0.0, 0.0, 1.0], null, null, collisionHulls, closures);
-        candidateRobots.push(new SimulatedRobot(id, runtime, converted.model.name,
-          [for (link in converted.model.links) link.id],
-          [for (joint in converted.model.joints) joint.id]));
-        candidateLinks.push([for (link in converted.model.links) link.id]);
-        candidateRobotModels.push(converted.model);
-        var robotIndex = candidateRobots.length - 1;
-        for (occurrence in assembly.occurrences) {
-          var center = session == null ? null : session.assemblyPreviewCenter(occurrence.definition);
-          if (center == null) throw 'Assembly part "${occurrence.definition}" has no preview center';
-          var linkIndex = -1;
-          for (index in 0...converted.model.links.length)
-            if (converted.model.links[index].id == occurrence.id) { linkIndex = index; break; }
-          if (linkIndex < 0) throw 'Assembly occurrence "${occurrence.id}" has no simulated link';
-          candidateAssemblyParts.push({id: "project:" + occurrence.id, robotIndex: robotIndex,
-            linkIndex: linkIndex, center: [for (coordinate in center) coordinate *
-              physical.metresPerUnit]});
-        }
+        var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
+          appliedRevision + 1, candidateRobots.length);
+        candidateRobots.push(built.robot);
+        candidateLinks.push([for (link in built.model.links) link.id]);
+        candidateRobotModels.push(built.model);
+        for (part in built.parts) candidateAssemblyParts.push(part);
+        for (warning in built.warnings) candidateWarnings.push(warning);
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
