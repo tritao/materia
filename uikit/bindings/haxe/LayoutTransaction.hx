@@ -8,13 +8,19 @@ class LayoutTransaction {
 	var parents:Array<Int> = [];
 	var stringValues:Array<String> = [];
 	var stringBytes:Array<Bytes> = [];
-	var seenById:Map<Int, LayoutNode> = new Map();
-	var seenIdCollisions:Map<Int, Array<LayoutNode>> = new Map();
+	/** Identifies the current encode; a node stamped with it has already been appended, so it is duplicated or cyclic. */
+	static var encodeCounter:Int = 0;
+	var encodeStamp:Int = 0;
+	final intrinsicNodes:Array<LayoutNode> = [];
 	var nodeCount:Int = 0;
 	var output:Null<Bytes>;
 	var outputLength:Int = 0;
 
 	public function new() {}
+
+	/** The nodes of the last encoded tree that carry intrinsic content, in tree order. */
+	public function nodesWithIntrinsicContent():Array<LayoutNode>
+		return intrinsicNodes;
 
 	public static function encode(root:LayoutNode):Bytes
 		return new LayoutTransaction().encodeInto(root);
@@ -25,9 +31,8 @@ class LayoutTransaction {
 			throw "Layout transaction requires a root node";
 
 		nodeCount = 0;
-		// Cleared, not replaced: the maps keep their storage from frame to frame.
-		seenById.clear();
-		seenIdCollisions.clear();
+		encodeStamp = ++encodeCounter;
+		intrinsicNodes.resize(0);
 		appendNode(root, -1);
 
 		var stringByteCount = 0;
@@ -213,23 +218,11 @@ class LayoutTransaction {
 	function appendNode(node:LayoutNode, parent:Int):Void {
 		if (node == null)
 			throw "Layout tree contains a duplicate or cyclic node";
-		var previous = seenById.get(node.id);
-		if (previous == null)
-			seenById.set(node.id, node);
-		else {
-			// IDs make the common path constant time; retain identity checks when IDs repeat.
-			if (previous == node)
-				throw "Layout tree contains a duplicate or cyclic node";
-			var collisions = seenIdCollisions.get(node.id);
-			if (collisions == null) {
-				collisions = [];
-				seenIdCollisions.set(node.id, collisions);
-			} else for (candidate in collisions) {
-				if (candidate == node)
-					throw "Layout tree contains a duplicate or cyclic node";
-			}
-			collisions.push(node);
-		}
+		if (node.encodeStamp == encodeStamp)
+			throw "Layout tree contains a duplicate or cyclic node";
+		node.encodeStamp = encodeStamp;
+		if (node.intrinsicContent != null)
+			intrinsicNodes.push(node);
 		var index = nodeCount++;
 		if (index == nodes.length) {
 			nodes.push(node);

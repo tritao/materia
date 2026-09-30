@@ -22,6 +22,9 @@ class LayoutNode {
 	/** Opacity/effects revision shared by native scene consumers. */
 	public var compositeRevision:Int;
 	public final children:Array<LayoutNode>;
+	/** Set by LayoutTransaction to the encode that last visited this node, so duplicates are found without a lookup table. */
+	@:allow(LayoutTransaction)
+	var encodeStamp:Int;
 
 	public function new(id:Int, visualKind:LayoutVisualKind = LayoutVisualKind.Box,
 			?style:LayoutStyle) {
@@ -41,6 +44,7 @@ class LayoutNode {
 		contentRevision = 0;
 		geometryRevision = 0;
 		compositeRevision = 0;
+		encodeStamp = 0;
 		children = [];
 	}
 

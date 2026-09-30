@@ -16,6 +16,8 @@ def main() -> int:
     parser.add_argument("--cycles", type=int, required=True, help="cycles the census covered (the tab-matrix skips cycle 0)")
     parser.add_argument("--top", type=int, default=25)
     parser.add_argument("--depth", type=int, default=1, help="stack frames to group by (default: allocating function)")
+    parser.add_argument("--exclude", action="append", default=[], metavar="PREFIX",
+                        help="drop sampled stacks whose top frame starts with PREFIX (e.g. tests. haxe.format.)")
     parser.add_argument("--json", action="store_true", help="print machine-readable output")
     args = parser.parse_args()
     path = args.census / "census.json" if args.census.is_dir() else args.census
@@ -25,6 +27,8 @@ def main() -> int:
     total_bytes = sum(item["bytes"] for item in types) or 1
     functions = defaultdict(lambda: [0, defaultdict(int)])
     for stack in data["stacks"]:
+        if any(stack["frames"] and stack["frames"][0].startswith(prefix) for prefix in args.exclude):
+            continue
         frames = stack["frames"][:args.depth] or ["(native)"]
         key = " < ".join(frames)
         functions[key][0] += stack["bytes"]

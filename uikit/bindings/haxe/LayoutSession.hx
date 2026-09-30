@@ -330,21 +330,19 @@ class LayoutSession {
 		measureContents.clear();
 		renderableContents.clear();
 		hasMeasureContents = false;
-		collectMeasureContentsFrom(root);
-	}
-
-	function collectMeasureContentsFrom(node:LayoutNode):Void {
-		if (node.intrinsicContent != null) {
+		// The transaction already visited every node in tree order and noted the ones with content.
+		for (node in transaction.nodesWithIntrinsicContent()) {
+			var content = node.intrinsicContent;
+			if (content == null)
+				continue;
 			if (node.visualKind != LayoutVisualKind.Custom)
 				throw "Intrinsic content requires a Custom layout node";
-			measureContents.set(node.id, node.intrinsicContent);
-			var renderable = node.intrinsicContent.asRenderable();
+			measureContents.set(node.id, content);
+			var renderable = content.asRenderable();
 			if (renderable != null)
 				renderableContents.set(node.id, renderable);
 			hasMeasureContents = true;
 		}
-		for (child in node.children)
-			collectMeasureContentsFrom(child);
 	}
 
 	function updateRenderablePaints():Void {
