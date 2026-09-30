@@ -353,8 +353,13 @@ class ConstraintDiagnosis {
 			for (owner in report.unsatisfied) if (unsatisfied.indexOf(owner) < 0) unsatisfied.push(owner);
 			for (owner in report.suggestedRemovals) if (suggestions.indexOf(owner) < 0) suggestions.push(owner);
 		}
-		subsystems.sort((a, b) -> Reflect.compare(a.owners.join(","), b.owners.join(",")));
-		groups.sort((a, b) -> Reflect.compare(a.owners.join(","), b.owners.join(",")));
+		// Sort by precomputed keys: joining owner lists inside the comparator dominated merging many parts.
+		var subsystemKeys = [for (subsystem in subsystems) {key: subsystem.owners.join(","), value: subsystem}];
+		subsystemKeys.sort((a, b) -> Reflect.compare(a.key, b.key));
+		subsystems = [for (entry in subsystemKeys) entry.value];
+		var groupKeys = [for (group in groups) {key: group.owners.join(","), value: group}];
+		groupKeys.sort((a, b) -> Reflect.compare(a.key, b.key));
+		groups = [for (entry in groupKeys) entry.value];
 		unsatisfied.sort(Reflect.compare);
 		suggestions.sort(Reflect.compare);
 		return new DiagnosisReport(variables, rank, subsystems, groups, unsatisfied, nearDegenerate, suggestions);

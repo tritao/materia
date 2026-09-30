@@ -472,3 +472,20 @@ chained 200 points took 12.8 s, 97% of it in the dense normal-equation LU.
 - Aside, not fixed (user's call): haxeon's `Parser.decodeString` only knows
   `\n \r \t \" \\`; any other escape (`\u0001`, `\x01`) silently compiles to
   the escaped letter plus the rest (`u0001`). Use `String.fromCharCode`.
+
+### C2.6 — Drag-step profile: warm-start damping, cheaper merge (2026-09-30)
+
+Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
+- One connected part took 7 LM iterations per 0.01 nudge: every solve
+  restarted at damping 1e-3, while a 250-rectangle chain's JᵀJ has soft modes
+  near (π/250)² ≈ 1.6e-4, so the damping swamped exactly what the edit moves.
+  Seeded parts now start at damping 1e-9 (Gauss-Newton; rejected steps still
+  raise it): 1 iteration, LM 48 → 18 ms per step.
+- 250 independent parts spent 5.7 ms merging reports: the sort joined owner
+  lists inside its comparator. Precomputed keys: 1.2 ms.
+- Per drag step now: connected 1000 points ≈ 35 ms (LM 18, diagnosis 14,
+  setup ≈ 3), independent 1000 points ≈ 5 ms. CamKit and MachineKit pass.
+- Remaining levers for the connected case, if 60 fps on 1000-point parts
+  matters: reuse the RCM orderings across solves (the structure is unchanged
+  while dragging), reuse row buffers in the sparse Jacobian and envelope, and
+  skip diagnosis during a drag (diagnose on release).

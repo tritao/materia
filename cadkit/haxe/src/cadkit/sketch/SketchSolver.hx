@@ -36,6 +36,7 @@ class SketchSolver {
 	private var variableCount:Int;
 	private var solveTolerance:Float;
 	private var normalizationScale:Float;
+	static inline var WARM_DAMPING:Float = 1e-9;
 	/** While finding a witness pose, only shape constraints (see `isShapeConstraint`) contribute residuals. */
 	private var shapeOnly:Bool = false;
 	/** When not −1, only this part's constraints contribute residuals and rows. */
@@ -252,7 +253,10 @@ class SketchSolver {
 		orderPart(part);
 		activePart = part.id;
 		shapeOnly = shape;
-		var x = start, damping = sketch.settings.initialDamping;
+		// A part seeded from a previous solution starts next to its answer: begin as Gauss-Newton. The authored
+		// damping would swamp the soft modes of a long chain (its JᵀJ has eigenvalues far below 1e-3) and cost
+		// several iterations for a tiny drag; a rejected step still raises the damping.
+		var x = start, damping = seed != null && !shape ? WARM_DAMPING : sketch.settings.initialDamping;
 		var current = residuals(x), currentNorm = norm(current.values), iterations = 0;
 		while (iterations < sketch.settings.maxIterations && currentNorm > solveTolerance) {
 			checkCancelled();
