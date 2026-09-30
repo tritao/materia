@@ -17,6 +17,10 @@ import sys.io.File;
  * unchanged, because another build or a module that loads later may define
  * them. A saved value that no longer fits its setting falls back to the
  * default. Every change saves at once unless it happens inside batch().
+ *
+ * The same file also keeps application state that is not a setting, such as
+ * recently opened files: JSON-compatible values under a key, never shown in
+ * the settings dialog and never validated.
  */
 class SettingsStore {
 	public static inline var FORMAT_VERSION:Int = 1;
@@ -31,6 +35,7 @@ class SettingsStore {
 
 	final overrides:Map<String, PropertyValue>;
 	final unknown:Map<String, Dynamic>;
+	final state:Map<String, Dynamic>;
 	final listeners:Array<SettingsListener>;
 	var batchDepth:Int;
 	var dirty:Bool;
@@ -44,6 +49,7 @@ class SettingsStore {
 		lastError = null;
 		overrides = new Map();
 		unknown = new Map();
+		state = new Map();
 		listeners = [];
 		batchDepth = 0;
 		dirty = false;
@@ -134,6 +140,23 @@ class SettingsStore {
 		return function() listeners.remove(entry);
 	}
 
+	/** Application state saved under the key, or null. */
+	public function getState(key:String):Dynamic
+		return state.get(key);
+
+	/** Saves JSON-compatible application state under the key; null removes it. Listeners are not told. */
+	public function setState(key:String, value:Dynamic):Void {
+		if (key == null || key.length == 0)
+			throw "State keys cannot be empty";
+		if (value == null)
+			state.remove(key);
+		else
+			state.set(key, value);
+		dirty = true;
+		if (batchDepth == 0)
+			save();
+	}
+
 	/** Runs the work and saves once at the end instead of after every change. */
 	public function batch(work:Void->Void):Void {
 		batchDepth++;
@@ -165,10 +188,13 @@ class SettingsStore {
 			Reflect.setField(values, path, unknown.get(path));
 		for (path in sortedKeys(overrides))
 			Reflect.setField(values, path, encode(overrides.get(path)));
+		var saved:Dynamic = {};
+		for (key in sortedKeys(state))
+			Reflect.setField(saved, key, state.get(key));
 		var temporary = file + ".tmp";
 		try {
 			createDirectories(Path.directory(file));
-			File.saveContent(temporary, Json.stringify({version: FORMAT_VERSION, values: values}, null, "\t"));
+			File.saveContent(temporary, Json.stringify({version: FORMAT_VERSION, values: values, state: saved}, null, "\t"));
 			FileSystem.rename(temporary, file);
 			lastError = null;
 			return true;
@@ -192,6 +218,10 @@ class SettingsStore {
 				throw "missing \"values\" object";
 			for (path in Reflect.fields(values))
 				unknown.set(path, Reflect.field(values, path));
+			var saved:Dynamic = Reflect.field(raw, "state");
+			if (saved != null && Reflect.isObject(saved) && !SettingsJsonValue.isArray(saved))
+				for (key in Reflect.fields(saved))
+					state.set(key, Reflect.field(saved, key));
 		} catch (error:Dynamic) {
 			// A damaged file only resets these conveniences; the next save replaces it.
 			lastError = 'Could not read settings from "$file": $error';

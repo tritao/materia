@@ -244,6 +244,20 @@ class SettingsTests {
 		check(new SettingsStore(sampleRegistry(), batched).getInt("interface/editor/fonts/main_font_size") == 21,
 			"the batch is saved when it ends");
 
+		// Application state rides along in the same file.
+		var stateFile = prepareFile("state.json");
+		var withState = new SettingsStore(sampleRegistry(), stateFile);
+		var heard = 0;
+		withState.onChanged("", _ -> heard++);
+		withState.setState("recent", ["/a.scene", "/b.scene"]);
+		check(heard == 0, "state changes are not setting changes");
+		var reloaded = new SettingsStore(sampleRegistry(), stateFile);
+		var recent:Array<Dynamic> = reloaded.getState("recent");
+		check(recent != null && recent.length == 2 && recent[1] == "/b.scene", "state survives a restart");
+		check(reloaded.getState("missing") == null, "missing state is null");
+		reloaded.setState("recent", null);
+		check(new SettingsStore(sampleRegistry(), stateFile).getState("recent") == null, "null removes state");
+
 		// Saving into a folder that does not exist yet creates it.
 		var nested = DIRECTORY + "/nested/deeper/settings.json";
 		var deep = new SettingsStore(sampleRegistry(), nested);
