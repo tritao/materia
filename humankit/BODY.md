@@ -50,3 +50,13 @@ height against the shoulder, its sharpest bend, and the wrist's speed and accele
 belly stays from the surface it reaches over. A change that flips an arm or snaps a pose in one tick
 fails there with the sample at which it happened. Add a scenario there when a new behaviour has a way
 to go wrong that the rack job does not exercise.
+
+## Known limits
+
+- **Low surfaces.** At about a metre or lower the lean reaches its limit before the belly clears the
+  surface's edge, leaving it 3 to 4 cm inside for either hand. Reaching that low needs a crouch, which
+  the body does not do. The layout sweep (`ScenarioSweepTests`) records this as its `CAPPED_CLEARANCE`.
+- **Tuning is for one rig.** `HumanPosture` is in metres, tuned on the bundled 1.7 m worker; it is not
+  scaled to other statures. The finger-curl axis and the spine shares are checked on that rig only.
+- **Both hands and the left hand** share the same code as the right, and the sweep covers a left-hand
+  fetch, but two-handed lean and hang are exercised by far fewer scenarios.
