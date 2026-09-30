@@ -49,3 +49,5 @@ fi
     xvfb-run -a "$hashlink_runtime" "$build_dir/haxeon-ui-transaction.hl")
 
 echo "PASS: Haxeon rendered a validated Canvas transaction through NativeKit UI and NativeKit GPU"
+
+"$module_dir/tools/test-settings.sh"
