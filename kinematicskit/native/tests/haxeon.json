@@ -1,0 +1,9 @@
+{
+	"version": 1,
+	"package": { "name": "kinematicskit-native-tests" },
+	"entry": "NativeKinematicsTests",
+	"sourceRoots": ["src"],
+	"dependencies": { "kinematicskit-native": { "path": ".." } },
+	"target": "host",
+	"outputDir": "build"
+}
