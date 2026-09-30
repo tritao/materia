@@ -10,8 +10,6 @@ import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Inertia3;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.PayloadChecker;
 import robotkit.manipulation.RobotPayloadLimit;
@@ -48,7 +46,7 @@ class ToolTests {
     var fixture = buildSingleJointFixture();
     var tool = new Tool("probe", "probe", new Transform3(new Vec3(0.2, 0.0, 0.0), Quat.identity()),
       ToolCollisionShape.NoCollision, 0.1);
-    var manipulator = new Manipulator(fixture.model, fixture.chain, tool.flangeTTcp);
+    var manipulator = fixture.arm.withTool(tool.flangeTTcp);
 
     var zero = manipulator.tcpPose([0.0]);
     check(approx(zero.translation.x, 1.2, 1e-9) && approx(zero.translation.y, 0.0, 1e-9),
@@ -62,7 +60,7 @@ class ToolTests {
   static function testIkToTcpTarget():Void {
     var fixture = buildUR5Fixture();
     var tool = new Tool("sprayer", "sprayer", new Transform3(new Vec3(0.0, 0.0, 0.08), Quat.identity()));
-    var manipulator = new Manipulator(fixture.model, fixture.chain, tool.flangeTTcp);
+    var manipulator = fixture.arm.withTool(tool.flangeTTcp);
 
     var qTrue = [0.3, -0.6, 0.9, -0.4, 0.5, -0.2];
     var target = manipulator.tcpPose(qTrue);
@@ -125,8 +123,7 @@ class ToolTests {
     joint.limits.lower = 0.0;
     joint.limits.upper = 3.0;
     var flange = model.addFrame(new Frame("flange", carriage));
-    var manipulator = new Manipulator(model,
-      new KinematicChain(model, base.id, ChainTip.Frame(flange.id)));
+    var manipulator = new Manipulator(model, base.id, flange.id);
     var tool = new Tool("pickup", "pickup", Transform3.identity(),
       ToolCollisionShape.NoCollision, 1.0,
       new MassProperties(1.0, new Vec3(0.1, 0, 0), Inertia3.zero()));
@@ -207,7 +204,7 @@ class ToolTests {
 
   // -- fixtures --------------------------------------------------------
 
-  static function buildSingleJointFixture():{model:RobotModel, chain:KinematicChain} {
+  static function buildSingleJointFixture():{model:RobotModel, arm:Manipulator} {
     var model = new RobotModel("single-joint-arm");
     var base = model.addLink(new Link("base"));
     var link1 = model.addLink(new Link("link1"));
@@ -215,12 +212,12 @@ class ToolTests {
     joint1.axis = [0.0, 0.0, 1.0];
     var flange = model.addFrame(new Frame("flange", link1));
     flange.position = [1.0, 0.0, 0.0];
-    var chain = new KinematicChain(model, base.id, ChainTip.Frame(flange.id));
-    return { model: model, chain: chain };
+    var arm = new Manipulator(model, base.id, flange.id);
+    return { model: model, arm: arm };
   }
 
   /** A 6R arm laid out with the axis pattern and published DH-equivalent offsets of a UR5. */
-  static function buildUR5Fixture():{model:RobotModel, chain:KinematicChain} {
+  static function buildUR5Fixture():{model:RobotModel, arm:Manipulator} {
     var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
       a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
     var model = new RobotModel("ur5-fixture");
@@ -252,8 +249,8 @@ class ToolTests {
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = flangeOffset.toArray();
-    var chain = new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id));
-    return { model: model, chain: chain };
+    var arm = new Manipulator(model, links[0].id, flange.id);
+    return { model: model, arm: arm };
   }
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool return Math.abs(a - b) <= tolerance;

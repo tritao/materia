@@ -19,8 +19,6 @@ import robotkit.model.RobotMobileConfiguration;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.WorkPatchPlanner;
 import robotkit.tool.SimulatedSprayer;
@@ -124,7 +122,7 @@ class WallFinishingScenarioTests {
       strictFkCrossCheck:Bool, minCoverage:Float):Void {
     var fixture = buildWallFinishingRobotModel();
     var model = fixture.model;
-    var manipulator = new Manipulator(model, fixture.chain, fixture.flangeTTcp);
+    var manipulator = fixture.arm.withTool(fixture.flangeTTcp);
     var linkNames = [for (link in model.links) link.name];
     var jointNames = [for (joint in model.joints) joint.name];
     var blueprint = RobotRuntimeCompiler.compile(model);
@@ -480,7 +478,7 @@ class WallFinishingScenarioTests {
    * fixture, attached directly to the base link) + sprayer flange offset +
    * a base-mounted lidar-kind "scanner" sensor.
    */
-  static function buildWallFinishingRobotModel():{model:RobotModel, chain:KinematicChain, flangeTTcp:Transform3, linkTFlange:Transform3} {
+  static function buildWallFinishingRobotModel():{model:RobotModel, arm:Manipulator, flangeTTcp:Transform3, linkTFlange:Transform3} {
     var model = new RobotModel("wall-finishing-robot");
     var base = model.addLink(new Link("base", "link/base"));
 
@@ -533,7 +531,7 @@ class WallFinishingScenarioTests {
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6], "frame/flange"));
     flange.position = flangeOffset.toArray();
-    var chain = new KinematicChain(model, base.id, ChainTip.Frame(flange.id));
+    var arm = new Manipulator(model, base.id, flange.id);
 
     var scannerFrame = model.addFrame(new Frame("scanner mount", base, "frame/scanner"));
     scannerFrame.position = [0.3, 0.0, 0.1];
@@ -544,7 +542,7 @@ class WallFinishingScenarioTests {
 
     var flangeTTcp = new Transform3(new Vec3(0.0, 0.0, 0.08), robotkit.spatial.Quat.identity());
     var linkTFlange = new Transform3(flangeOffset, robotkit.spatial.Quat.identity());
-    return { model: model, chain: chain, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
+    return { model: model, arm: arm, flangeTTcp: flangeTTcp, linkTFlange: linkTFlange };
   }
 
   static function check(value:Bool, message:String):Void {

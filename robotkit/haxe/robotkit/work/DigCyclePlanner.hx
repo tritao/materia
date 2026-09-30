@@ -13,10 +13,10 @@ import robotkit.process.ToolpathPoint;
  * parallel axis, the chain's *only* reachable tip orientations are
  * `Rz(slew) * Ry(totalPitch)` (see `poseAt`, and ARCHITECTURE.md's
  * "Simulated excavator (M12)" section for the derivation from
- * `KinematicChain.evaluate`'s own composition order). Every waypoint this
+ * the joint-frame composition order in `kinematicskit.KinematicSnapshot`). Every waypoint this
  * planner emits sets its orientation from `poseAt`, so it always lies
- * exactly on that manifold; the existing generic (undamped-least-squares)
- * `InverseKinematics` then converges to near-zero
+ * exactly on that manifold; the generic numerical IK
+ * (`Manipulator.solveIkForTcp`) then converges to near-zero
  * position *and* orientation error with no weighting or closed-form solver
  * of its own, since a target already on the manifold leaves the "extra" two
  * 6-DOF error components at zero by construction.

@@ -10,11 +10,8 @@ import robotkit.model.Frame;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
-import robotkit.manipulation.InverseKinematics;
-import robotkit.manipulation.JointGroup;
 import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.JointGroup;
 import robotkit.tool.Tool;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.runtime.RobotRuntimeCompiler;
@@ -126,12 +123,12 @@ class ExcavatorTests {
       "Excavator zero-pose TCP position matches the summed fixture offsets");
     check(tcp.rotation.angularDistance(Quat.identity()) < 1e-9,
       "Excavator zero-pose TCP has no net rotation");
-    check(fixture.chain.dofCount() == 4, "Excavator fixture exposes four degrees of freedom");
+    check(fixture.arm.dofCount() == 4, "Excavator fixture exposes four degrees of freedom");
   }
 
   static function testFourDofIkRecoversManifoldTargets():Void {
     var fixture = buildExcavatorFixture();
-    var group = JointGroup.fromChain(fixture.chain);
+    var group = fixture.arm.group;
     var seed = [0.0, 0.3, -1.0, -1.0];
     var samples = [
       { x: 3.2, y: 0.0, z: -0.4, pitch: -0.4 },
@@ -141,9 +138,9 @@ class ExcavatorTests {
     var current = seed;
     for (sample in samples) {
       var target = DigCyclePlanner.poseAt(sample.x, sample.y, sample.z, sample.pitch);
-      var result = InverseKinematics.solve(fixture.chain, group, target, current, 1e-4, 1e-3, 300, 0.02);
+      var result = fixture.arm.solveIk(target, current, 1e-4, 1e-3, 300, 0.02);
       check(result.converged, 'Excavator IK converges for manifold target ($sample.x, $sample.y, $sample.z, pitch=$sample.pitch)');
-      var achieved = fixture.chain.forwardKinematics(result.q);
+      var achieved = fixture.arm.forwardKinematics(result.q);
       check(approx(achieved.translation.x, target.translation.x, 1e-3) &&
         approx(achieved.translation.y, target.translation.y, 1e-3) &&
         approx(achieved.translation.z, target.translation.z, 1e-3),
@@ -372,7 +369,7 @@ class ExcavatorTests {
 
   // -- fixture --------------------------------------------------------
 
-  static function buildExcavatorFixture():{model:RobotModel, chain:KinematicChain, manipulator:Manipulator, tool:Tool} {
+  static function buildExcavatorFixture():{model:RobotModel, arm:Manipulator, manipulator:Manipulator, tool:Tool} {
     var model = new RobotModel("excavator-fixture");
     var undercarriage = model.addLink(new Link("undercarriage"));
     var upperStructure = model.addLink(new Link("upper_structure"));
@@ -405,11 +402,11 @@ class ExcavatorTests {
 
     var flange = model.addFrame(new Frame("bucket_flange", bucketLink));
 
-    var chain = new KinematicChain(model, undercarriage.id, ChainTip.Frame(flange.id));
+    var arm = new Manipulator(model, undercarriage.id, flange.id);
     var tool = new Tool("bucket", "bucket", new Transform3(new Vec3(0.9, 0.0, -0.1), Quat.identity()),
       ToolCollisionShape.Box(new Vec3(0.5, 0.6, 0.4)), 400.0);
-    var manipulator = new Manipulator(model, chain, tool.flangeTTcp);
-    return { model: model, chain: chain, manipulator: manipulator, tool: tool };
+    var manipulator = arm.withTool(tool.flangeTTcp);
+    return { model: model, arm: arm, manipulator: manipulator, tool: tool };
   }
 
   // -- small local helpers ---------------------------------------------

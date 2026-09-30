@@ -23,7 +23,7 @@ class ManipulatorKinematics implements KinematicsSolver {
     this.differentialDamping = differentialDamping;
   }
 
-  public function jointCount():Int return manipulator.chain.dofCount();
+  public function jointCount():Int return manipulator.dofCount();
 
   public function forward(q:Array<Float>):Pose3 return fromTransform(manipulator.tcpPose(q));
 
@@ -78,7 +78,7 @@ class ManipulatorKinematics implements KinematicsSolver {
       throw 'Differential IK requires ${jointCount()} joint values';
     if (twist == null) throw "Differential IK requires a tool twist";
     var n = jointCount();
-    var jacobian = manipulator.chain.pointJacobian(q, manipulator.flangeTTcp.translation);
+    var jacobian = manipulator.tcpJacobian(q);
     return LinearAlgebra.dampedStep(jacobian, 6, n, [for (joint in 0...n) joint], twist.toArray(),
       differentialDamping);
   }

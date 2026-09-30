@@ -18,7 +18,6 @@ import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
 import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
-import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
@@ -80,8 +79,6 @@ import robotkit.model.RobotModel;
 import robotkit.model.Actuator;
 import robotkit.model.Transmission;
 import robotkit.model.JointCoupling;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.runtime.Simulation;
 import robotkit.runtime.SimulationHarness;
@@ -115,7 +112,7 @@ class MotionKitTestSupport {
   public static var assertions:Int = 0;
   public function new() {}
 
-  public function buildContractArmFixture():{model:RobotModel, chain:KinematicChain} {
+  public function buildContractArmFixture():{model:RobotModel, arm:Manipulator} {
     var model = new RobotModel("motionkit-contract-arm");
     var links = [for (name in ["base", "shoulder", "upper-arm", "forearm",
       "wrist-1", "wrist-2", "wrist-3"]) model.addLink(new Link(name))];
@@ -135,7 +132,7 @@ class MotionKitTestSupport {
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = [0.0, 0.0823, 0.0];
     return {model: model,
-      chain: new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id))};
+      arm: new Manipulator(model, links[0].id, flange.id)};
   }
 
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {

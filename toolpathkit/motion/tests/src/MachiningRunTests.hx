@@ -9,6 +9,7 @@ import motionkit.robot.MachineKitRobotCompiler;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.SessionState;
 import robotkit.runtime.Simulation;
+import robotkit.manipulation.Manipulator;
 import robotkit.runtime.SimulationHarness;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessEventValue;

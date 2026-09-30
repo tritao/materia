@@ -7,8 +7,6 @@ import kinematicskit.Transform;
 import kinematicskit.Vector3;
 import robotkit.model.Joint;
 import robotkit.model.JointType;
-import robotkit.model.Link;
-import robotkit.model.LinkId;
 import robotkit.model.RobotModel;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
@@ -29,47 +27,6 @@ class RobotKinematics {
     for (link in robot.links) if (link != null) bodies.set(link.id, builder.addBody(link.id));
     for (joint in robot.joints) if (joint != null) addJoint(builder, joint, bodies);
     for (coupling in robot.couplings) builder.couple(coupling.follower, coupling.leader, coupling.ratio, coupling.offset);
-    addFrames(builder, robot, bodies);
-    return builder.build();
-  }
-
-  /**
-   * Only the serial path from `baseLink` to `tipLink`, with `baseLink` as the
-   * root at identity and every frame mounted on a path link. Joint couplings
-   * are not applied: each movable path joint is its own DOF, which is how
-   * `KinematicChain` has always treated a chain.
-   */
-  public static function path(robot:RobotModel, baseLink:LinkId, tipLink:LinkId):KinematicModel {
-    if (robot == null) throw "Kinematic chain requires a robot model";
-    var base = findLink(robot, baseLink);
-    if (base == null) throw 'Kinematic chain base link "$baseLink" is not part of the model';
-    var tip = findLink(robot, tipLink);
-    if (tip == null) throw 'Kinematic chain tip link "$tipLink" is not part of the model';
-    var chainJoints:Array<Joint> = [];
-    var current = tip;
-    var guard = 0;
-    while (current.id != base.id) {
-      if (guard++ > robot.links.length)
-        throw "Kinematic chain walk did not terminate; check the model topology";
-      var incoming:Null<Joint> = null;
-      for (joint in robot.joints) if (joint != null && joint.child != null && joint.child.id == current.id) {
-        incoming = joint;
-        break;
-      }
-      if (incoming == null)
-        throw 'Kinematic chain has no path from base link "$baseLink" to link "${current.id}"';
-      chainJoints.push(incoming);
-      current = incoming.parent;
-    }
-    chainJoints.reverse();
-
-    var builder = new KinematicModelBuilder();
-    var bodies = new Map<String, Int>();
-    bodies.set(base.id, builder.addBody(base.id));
-    for (joint in chainJoints) {
-      bodies.set(joint.child.id, builder.addBody(joint.child.id));
-      addJoint(builder, joint, bodies);
-    }
     addFrames(builder, robot, bodies);
     return builder.build();
   }
@@ -123,10 +80,5 @@ class RobotKinematics {
     if (!Math.isFinite(norm) || Math.abs(norm - 1.0) > 1e-6)
       throw 'Joint "${joint.id}" motion axis must be unit length';
     return new Vector3(x, y, z);
-  }
-
-  static function findLink(robot:RobotModel, id:LinkId):Null<Link> {
-    for (link in robot.links) if (link != null && link.id == id) return link;
-    return null;
   }
 }

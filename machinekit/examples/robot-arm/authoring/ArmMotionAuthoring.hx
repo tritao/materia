@@ -6,8 +6,6 @@ import materia.project.SceneArtifact;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.Pose3;
 import motionkit.robot.ManipulatorKinematics;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import robotkit.model.Frame;
@@ -96,11 +94,11 @@ class ArmMotionAuthoring {
 		var tcp = model.addFrame(new Frame("tcp", cupLink));
 		tcp.position = [contact.x * scene.metresPerUnit, contact.y * scene.metresPerUnit, contact.z * scene.metresPerUnit];
 		tcp.rotation = [contact.qx, contact.qy, contact.qz, contact.qw];
-		var chain = new KinematicChain(model, "assembly-root", ChainTip.Frame(tcp.id));
-		var ids = chain.dofJointIds();
+		var arm = new Manipulator(model, "assembly-root", tcp.id);
+		var ids = arm.jointIds();
 		require(ids.join(",") == [for (spec in robot.specs) spec.id].join(","),
 			"The kinematic chain should turn joints " + [for (spec in robot.specs) spec.id].join(",") + ", got " + ids.join(","));
-		return new ManipulatorKinematics(new Manipulator(model, chain), 1e-8);
+		return new ManipulatorKinematics(arm, 1e-8);
 	}
 
 	/** Joint keyframes for the whole cycle; positions are relative to the arm's ready pose. */

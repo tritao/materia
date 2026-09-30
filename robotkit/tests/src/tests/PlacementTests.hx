@@ -8,8 +8,6 @@ import robotkit.model.Frame;
 import robotkit.spatial.Vec3;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
-import robotkit.manipulation.ChainTip;
-import robotkit.manipulation.KinematicChain;
 import robotkit.manipulation.Manipulator;
 import robotkit.manipulation.ReachabilityChecker;
 import robotkit.manipulation.WorkPatchPlanner;
@@ -44,7 +42,7 @@ class PlacementTests {
 
   static function testReachabilityCheckerReportsFractionAndFirstFailure():Void {
     var fixture = buildUR5Fixture();
-    var manipulator = new Manipulator(fixture.model, fixture.chain);
+    var manipulator = fixture.arm;
     var referenceQ = [0.3, -0.9, 1.2, -0.3, 0.5, 0.0];
     var referencePose = manipulator.tcpPose(referenceQ);
 
@@ -107,7 +105,7 @@ class PlacementTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     var flange = model.addFrame(new Frame("flange", moving));
-    var manipulator = new Manipulator(model, new KinematicChain(model, base.id, ChainTip.Frame(flange.id)));
+    var manipulator = new Manipulator(model, base.id, flange.id);
     var checker = new ToolClearanceChecker(ToolCollisionShape.Hulls([
       boxVertices(Vec3.zero(), new Vec3(0.05, 0.05, 0.05))], 0.0),
       [new ToolBoxObstacle(Transform3.identity(), new Vec3(0.1, 0.1, 0.1))]);
@@ -181,7 +179,7 @@ class PlacementTests {
     joint.limits.lower = -1.0;
     joint.limits.upper = 1.0;
     var flange = model.addFrame(new Frame("flange", moving));
-    return new Manipulator(model, new KinematicChain(model, base.id, ChainTip.Frame(flange.id)));
+    return new Manipulator(model, base.id, flange.id);
   }
 
   static function boxVertices(centre:Vec3, half:Vec3):Array<Float> {
@@ -208,12 +206,12 @@ class PlacementTests {
     var map_T_surface = new Transform3(new Vec3(-0.47, 0.0, -0.15), rotation);
 
     var fixture = buildUR5Fixture();
-    var manipulator = new Manipulator(fixture.model, fixture.chain);
+    var manipulator = fixture.arm;
     var seed = [0.2, -1.0, 1.3, -0.3, 0.5, 0.0];
     return { design: design, map_T_surface: map_T_surface, manipulator: manipulator, seed: seed };
   }
 
-  static function buildUR5Fixture():{model:RobotModel, chain:KinematicChain} {
+  static function buildUR5Fixture():{model:RobotModel, arm:Manipulator} {
     var d1 = 0.089159, shoulderOffset = 0.13585, elbowOffset = -0.1197,
       a2 = 0.425, a3 = 0.39225, d4 = 0.10915, d5 = 0.09465, d6 = 0.0823;
     var model = new RobotModel("ur5-fixture");
@@ -245,8 +243,8 @@ class PlacementTests {
     var flangeOffset = new Vec3(0.0, d6, 0.0);
     var flange = model.addFrame(new Frame("flange", links[6]));
     flange.position = flangeOffset.toArray();
-    var chain = new KinematicChain(model, links[0].id, ChainTip.Frame(flange.id));
-    return { model: model, chain: chain };
+    var arm = new Manipulator(model, links[0].id, flange.id);
+    return { model: model, arm: arm };
   }
 
   static function approx(a:Float, b:Float, tolerance:Float):Bool return Math.abs(a - b) <= tolerance;

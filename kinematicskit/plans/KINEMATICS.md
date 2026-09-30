@@ -463,3 +463,29 @@ coordinates; for a running robot the target goes through MotionKit.
 - Acceptance (clean Haxe outputs): kit tests (159 assertions); RobotKit
   world tests (4773); CadKit `HaxeonSmoke` incl. `AssemblyLoopSmoke`;
   MachineKit smoke; MotionKit (6723); cadbridge (129).
+
+### K4a — `Manipulator` on the whole robot; chain layer deleted (2026-09-30)
+
+- `Manipulator(robot, baseLink, flangeFrame, ?flangeTTcp)` compiles the
+  whole robot (`RobotKinematics.compile`), so `RobotModel.couplings` apply;
+  arm `q` has one value per arm DOF (a coupled follower is not one). FK,
+  Jacobians and IK targets are in the base link's frame; `withTool` shares
+  the compiled model; `pathJoints()` feeds OPW's parameter extraction.
+- Deleted: `KinematicChain`, `ChainTip`, `InverseKinematics`,
+  `RobotKinematics.path`, `JointGroup.fromChain`. **Kept, deviating from the
+  item as written:** `IKResult` (now with the solver `status`) as the
+  arm-ordered result type, since every IK caller wants `q` in arm order.
+- The IK is still `DampedLeastSquares` with flange-target conversion, so
+  every answer is unchanged; the LM switch is the next, separate step
+  (KK-D11).
+- Callers migrated: RobotKit (tests, `PayloadChecker`, `DigCyclePlanner`
+  docs), MotionKit (`ManipulatorKinematics`, `OpwKinematics`, tests),
+  ToolpathKit motion tests, cadbridge tests, the robot-arm authoring tool.
+  The gantry test with a link tip uses the compiled model directly.
+  `robotkit/ARCHITECTURE.md` and the gap map describe the new layering.
+- New RobotKit test: a planar arm whose third joint follows the second; the
+  arm has two DOFs, FK turns the follower, IK recovers the leader, and joint
+  targets go to leaders only.
+- Acceptance: RobotKit world tests (4777 assertions); MotionKit (6723);
+  cadbridge (129); ToolpathKit motion (9 + 10 + 2975); MachineKit smoke
+  including the robot-arm motion check.
