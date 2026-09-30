@@ -41,6 +41,7 @@ import nativekit.ui.core.CommandResult;
 import nativekit.ui.docking.DockPanelDescriptor;
 import nativekit.ui.docking.DockWorkspaceCommands;
 import nativekit.ui.docking.DockWorkspaceModel;
+import nativekit.ui.docking.DockNodeTools;
 import nativekit.ui.docking.DockWorkspaceSnapshot;
 import nativekit.ui.docking.DockWorkspacePersistence;
 import nativekit.ui.docking.DockWorkspaceStorage;
@@ -324,8 +325,6 @@ class Main {
         args.indexOf("--worker-demo=rack-to-table") >= 0 ||
         Lambda.exists(args, function(arg) return arg.indexOf("--character=") == 0);
       if (!explicitContent && editor.preferences.showStartPage) editor.showStartPage();
-      else if (!editor.preferences.showStartPage && editor.workspace.isOpen("start"))
-        editor.workspace.close("start");
       return editor;
     });
     return new DesktopUiHostSession(function() {
@@ -677,6 +676,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     workspace = makeWorkspace();
     DockWorkspaceStorage.restoreOrDefault(workspace, storage, WORKSPACE_KEY);
     EditorWorkspaceLayout.migrateLegacyViewport(workspace);
+    // Layouts saved before transient panels existed can still contain them; they open only on request.
+    for (id in TRANSIENT_PANELS) if (workspace.isOpen(id)) workspace.close(id);
     if(projectPath!=null&&perspectiveViewport!=null){
       workspace.activate("perspective");
       scene.select("scene");
@@ -1835,7 +1836,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   /** Switches dock layout and toolbar emphasis; the document, selection, and history are untouched. */
   public function switchMode(next:EditorMode):Void {
     if (next == mode) return;
-    modeSnapshots.set(mode.id, workspace.snapshot());
+    modeSnapshots.set(mode.id, layoutSnapshot());
     mode = next;
     // The mode's default layout backs "Reset workspace" while it is active.
     workspace.setDefaultLayout(next.layout());
@@ -1867,7 +1868,27 @@ class ReferenceEditorApp implements DesktopUiApplication {
   // Only the Design layout is written, so a session ending in another mode reopens in Design.
   function persistedWorkspace():DockWorkspaceSnapshot
     return mode == EditorMode.Design || !modeSnapshots.exists(EditorMode.Design.id)
-      ? workspace.snapshot() : modeSnapshots.get(EditorMode.Design.id);
+      ? layoutSnapshot() : modeSnapshots.get(EditorMode.Design.id);
+
+  /**
+   * Panels that belong to the session rather than to a layout. They are opened by an explicit action
+   * (launch, or the Show Start page command) and are left out of every saved layout, so switching modes
+   * or restarting can never bring them back on their own.
+   */
+  static final TRANSIENT_PANELS:Array<String> = ["start"];
+
+  /** The current layout without the transient panels, for the per-mode memory and the workspace file. */
+  function layoutSnapshot():DockWorkspaceSnapshot {
+    var snapshot = workspace.snapshot();
+    var root = snapshot.root;
+    var active = snapshot.activePanelId;
+    for (id in TRANSIENT_PANELS) {
+      root = DockNodeTools.remove(root, id);
+      // The tab that was in front goes with the panel; the model is what should be showing instead.
+      if (active == id) active = DockNodeTools.contains(root, "perspective") ? "perspective" : null;
+    }
+    return new DockWorkspaceSnapshot(root, active);
+  }
 
   function saveWorkspace():Void {
     try {

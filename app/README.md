@@ -89,6 +89,8 @@ position; a looping track must end where it starts.
   phase and elapsed time with a Cancel button, the rest of the editor stays responsive, and later
   opens reuse the cached build. "Show this page at startup" and the recent-file list are
   stored in `preferences.json` beside the workspace layout.
+  Start is a transient panel: it opens at launch (when enabled) or from **Show Start page**, and is never
+  saved in a mode's layout or the workspace file, so switching modes or restarting does not bring it back.
 - The Console is a read-only text area over a 1000-line log: select with the mouse, copy with
   `Ctrl+C`, scroll with the wheel, or use **Copy all** (`console.copy-all`). It follows new output
   until you scroll away from the end.
