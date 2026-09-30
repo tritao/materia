@@ -1,11 +1,17 @@
+import nativekit.ui.core.CommandContext;
+import nativekit.ui.properties.PropertyBinding;
+import nativekit.ui.properties.PropertyEditResult;
 import nativekit.ui.properties.PropertyOption;
 import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.properties.PropertyValueTools;
 import nativekit.ui.settings.SettingDefinition;
 import nativekit.ui.settings.SettingOptions;
+import nativekit.ui.settings.SettingsCatalog;
 import nativekit.ui.settings.SettingsRegistry;
 import nativekit.ui.settings.SettingsStore;
+import nativekit.ui.widgets.properties.PropertyInspector;
+import nativekit.ui.widgets.settings.SettingsPanel;
 import sys.FileSystem;
 import sys.io.File;
 
@@ -21,6 +27,9 @@ class SettingsTests {
 			listeners();
 			persistence();
 			damagedFiles();
+			catalog();
+			editing();
+			panel();
 			Sys.println("Settings tests passed");
 			return 0;
 		} catch (error:Dynamic) {
@@ -72,6 +81,10 @@ class SettingsTests {
 	static function definitions():Void {
 		var size = new SettingDefinition("interface/editor/fonts/main_font_size", PropertyType.Int, PropertyValue.Int(14));
 		check(size.label == "Main Font Size", "labels come from the last path segment");
+		check(SettingDefinition.labelFor("show_at_startup") == "Show at Startup", "small words stay lowercase");
+		check(SettingDefinition.labelFor("at_startup") == "At Startup", "except the first");
+		check(SettingDefinition.labelFor("3d") == "3D" && SettingDefinition.labelFor("tls_ui_scale") == "TLS UI Scale",
+			"acronyms are capitalized");
 		check(size.segments.length == 4 && size.segments[1] == "editor", "paths split into segments");
 		var named = new SettingOptions();
 		named.label = "TLS Certificates";
@@ -294,4 +307,113 @@ class SettingsTests {
 			"a file of the wrong shape is reported and ignored");
 	}
 
+
+	static function catalogRegistry():SettingsRegistry {
+		var registry = sampleRegistry();
+		var advanced = new SettingOptions();
+		advanced.advanced = true;
+		registry.define("interface/editor/fonts/font_hinting", PropertyType.Bool, PropertyValue.Bool(true), advanced);
+		registry.define("interface/editor/editor_language", PropertyType.Text, PropertyValue.Text("auto"));
+		var hidden = new SettingOptions();
+		hidden.internal = true;
+		registry.define("interface/editor/window_placement", PropertyType.Text, PropertyValue.Text(""), hidden);
+		registry.define("network/debug_port", PropertyType.Int, PropertyValue.Int(6007));
+		var restart = new SettingOptions();
+		restart.restartRequired = true;
+		registry.define("interface/theme/preset", PropertyType.Text, PropertyValue.Text("dark"), restart);
+		return registry;
+	}
+
+	static function catalog():Void {
+		var catalog = new SettingsCatalog(new SettingsStore(catalogRegistry()));
+		check(catalog.categories("", false).join(",") == "interface/editor,filesystem/directories,network,interface/theme",
+			'categories in definition order: ${catalog.categories("", false).join(",")}');
+
+		var sections = catalog.sections("interface/editor", "", false);
+		var labels = [for (section in sections) section.label].join(",");
+		check(labels == "Editor,Fonts,Appearance,Docks", 'unsectioned settings come first under the category label: $labels');
+		check(sections[0].descriptors.length == 1 && sections[0].descriptors[0].id == "interface/editor/editor_language",
+			"internal settings never show");
+		check(sections[1].descriptors.length == 1, "advanced settings are hidden by default");
+		check(catalog.sections("interface/editor", "", true)[1].descriptors.length == 2, "and shown when asked for");
+		check(sections[1].descriptors[0].label == "Main Font Size", "rows use the setting labels");
+		check(catalog.sections("interface/theme", "", false)[0].descriptors[0].label == "Preset *",
+			"settings that need a restart are marked");
+
+		check(catalog.categories("font", false).join(",") == "interface/editor", "the filter narrows the categories");
+		var fonts = catalog.sections("interface/editor", "font", false);
+		check(fonts.length == 1 && fonts[0].descriptors.length == 2, "a filter shows matching advanced settings too");
+		check(catalog.categories("MAIN font", false).length == 1, "the filter ignores case");
+		check(catalog.categories("debug port", false).join(",") == "network", "the filter matches paths with spaces");
+		check(catalog.categories("nothing matches this", true).length == 0, "no match, no categories");
+		check(catalog.categories("placement", true).length == 0, "the filter never reveals internal settings");
+
+		check(catalog.descriptor(catalogRegistry().get("network/debug_port")) == catalog.descriptor(catalogRegistry().get("network/debug_port")),
+			"a setting keeps one descriptor, so its editor keeps its state");
+	}
+
+	/** Rows edit the store through the same binding inspectors use, with no document open. */
+	static function editing():Void {
+		var store = new SettingsStore(sampleRegistry());
+		var catalog = new SettingsCatalog(store);
+		var size = catalog.descriptor(store.registry.get("interface/editor/fonts/main_font_size"));
+		check(!size.recordHistory, "settings stay out of undo history");
+		var context = new CommandContext();
+		check(context.document == null, "no document is open");
+		var binding = new PropertyBinding(size, context);
+		check(sameResult(binding.apply(PropertyValue.Int(20)), PropertyEditResult.Applied), "an edit applies without a document");
+		check(store.getInt("interface/editor/fonts/main_font_size") == 20, "the edit reaches the store");
+		check(sameResult(binding.apply(PropertyValue.Int(20)), PropertyEditResult.Unchanged), "the same value is unchanged");
+		check(!sameResult(binding.apply(PropertyValue.Int(500)), PropertyEditResult.Applied), "out of range is rejected");
+		check(store.getInt("interface/editor/fonts/main_font_size") == 20, "a rejected edit leaves the store alone");
+		store.reset("interface/editor/fonts/main_font_size");
+		check(PropertyValueTools.same(binding.read(), PropertyValue.Int(14)), "the row reads what the store holds");
+	}
+
+	static function sameResult(first:PropertyEditResult, second:PropertyEditResult):Bool
+		return switch ([first, second]) {
+			case [Applied, Applied] | [Unchanged, Unchanged]: true;
+			case [Rejected(_), Rejected(_)]: true;
+			default: false;
+		};
+
+	/** The dialog's state: selection follows the filter, and the inspector is kept while nothing changes. */
+	static function panel():Void {
+		var changes = 0;
+		var panel = new SettingsPanel("settings", new SettingsStore(catalogRegistry()), () -> changes++);
+		check(panel.selectedCategory == "interface/editor", "the first category starts selected");
+		var inspector = shown(panel);
+		check(inspector != null && inspector == panel.currentInspector(), "the inspector is kept between frames");
+		check(inspector.sections.length == 4, "the inspector shows the category's sections");
+
+		panel.select("interface/theme");
+		check(panel.selectedCategory == "interface/theme" && changes > 0, "selecting a category reports a change");
+		panel.select("interface");
+		check(panel.selectedCategory == "interface/editor", "selecting a group selects its first category");
+		panel.select("network");
+		check(panel.selectedCategory == "network", "a one-segment category is selectable");
+
+		panel.setFilter("font");
+		check(panel.categories().join(",") == "interface/editor", "the filter narrows the tree");
+		check(panel.selectedCategory == "interface/editor", "a selection the filter hides moves to the first match");
+		check(panel.currentInspector() != inspector, "a new filter builds a new inspector");
+		check(shown(panel).sections[0].descriptors.length == 2, "and it shows the matches");
+
+		panel.setFilter("nothing matches this");
+		check(panel.selectedCategory == null && panel.currentInspector() == null, "no match, nothing selected");
+		panel.setFilter("");
+		check(panel.selectedCategory == "interface/editor", "clearing the filter selects again");
+
+		var before = panel.currentInspector();
+		panel.setShowAdvanced(true);
+		check(panel.showAdvanced && panel.currentInspector() != before, "the Advanced switch rebuilds the inspector");
+		check(shown(panel).sections[1].descriptors.length == 2, "and shows advanced settings");
+	}
+
+	static function shown(panel:SettingsPanel):PropertyInspector {
+		var inspector:Null<PropertyInspector> = panel.currentInspector();
+		if (inspector == null)
+			throw "the panel shows no inspector";
+		return inspector;
+	}
 }

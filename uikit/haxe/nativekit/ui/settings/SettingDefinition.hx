@@ -135,14 +135,24 @@ class SettingDefinition {
 		return null;
 	}
 
-	/** Turns "main_font_size" into "Main Font Size". */
+	/** Turns "main_font_size" into "Main Font Size", "show_at_startup" into "Show at Startup" and "3d" into "3D". */
 	public static function labelFor(segment:String):String {
 		var words:Array<String> = [];
-		for (word in segment.split("_"))
-			if (word.length > 0)
+		for (word in segment.split("_")) {
+			if (word.length == 0)
+				continue;
+			if (ACRONYMS.indexOf(word) >= 0)
+				words.push(word.toUpperCase());
+			else if (words.length > 0 && SMALL_WORDS.indexOf(word) >= 0)
+				words.push(word);
+			else
 				words.push(word.charAt(0).toUpperCase() + word.substr(1));
+		}
 		return words.join(" ");
 	}
+
+	static final ACRONYMS:Array<String> = ["2d", "3d", "api", "cpu", "fps", "gpu", "id", "io", "lsp", "msaa", "ssh", "ssl", "tls", "ui", "url", "xr"];
+	static final SMALL_WORDS:Array<String> = ["a", "an", "and", "as", "at", "by", "for", "in", "of", "on", "or", "the", "to", "with"];
 
 	static function validPath(path:String):Bool {
 		if (path == null || path.length == 0)
