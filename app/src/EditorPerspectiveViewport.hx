@@ -63,6 +63,11 @@ class EditorPerspectiveViewport implements View {
   var gridStep:Float = app.editor.EditorGrid.STEP;
   var gridVisible:Bool = true;
   var simulationActive:Bool=false;
+  /** Samples per pixel the editor asked for, and what the renderer was last given. */
+  var sampleCountRequested:Int = 1;
+  var sampleCountApplied:Int = 0;
+  var sampleCountEffective:Int = 1;
+  var renderedSampleCount:Int = 0;
   var runtimeRevision:Int=0;
   var simulationPoses:Array<SimulationPoseVisual> = [];
   var robotVisuals:Array<SimulationRobotVisual> = [];
@@ -76,10 +81,27 @@ class EditorPerspectiveViewport implements View {
 
   public function lightingPresetId():Int return lightingPreset;
 
+  /** Asks for this many samples per pixel; the GPU may support fewer, and one turns anti-aliasing off. */
+  public function setSampleCount(requested:Int):Void {
+    if (requested < 1 || requested == sampleCountRequested) return;
+    sampleCountRequested = requested;
+  }
+
+  /** Samples per pixel the last render used. */
+  public function sampleCount():Int return sampleCountEffective;
+
+  /** Whether this GPU can render the viewport with `samples` samples per pixel. */
+  public function supportsSamples(samples:Int):Bool {
+    if (samples <= 1) return true;
+    ensureRenderer();
+    var active = renderer;
+    return active != null && active.maxSampleCount() >= samples;
+  }
+
   /** Revision key for state that changes the retained viewport presentation. */
   public function presentationKey():String
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
-      hoverRevision + ":" + gridVisible + ":" + gridStep;
+      hoverRevision + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested;
 
   public function setLightingPreset(preset:Int):Void {
     if (preset < 0 || preset > 2 || preset == lightingPreset) return;
@@ -96,7 +118,7 @@ class EditorPerspectiveViewport implements View {
         "Scene perspective GPU view");
       node.onPaint(paint, "perspective:" + scene.visualRevision + ":" + runtimeRevision + ":" +
         sketchDragRevision + ":hover:" + hoverRevision + ":" + camera.revision +
-        ":light:" + lightingRevision + ":" +
+        ":light:" + lightingRevision + ":aa:" + sampleCountRequested + ":" +
         renderedWidth + "x" + renderedHeight + ":grid:" + gridVisible + ":" + gridStep);
       installNavigation(node);
       return node;
@@ -111,6 +133,7 @@ class EditorPerspectiveViewport implements View {
     if (renderer != null && (surface == null || renderedRevision != displayRevision ||
         renderedCameraRevision != camera.revision ||
         renderedLightingRevision != lightingRevision ||
+        renderedSampleCount != sampleCountRequested ||
         renderedHoverRevision != hoverRevision ||
         width != renderedWidth || height != renderedHeight)) {
       var started = Sys.time();
@@ -153,6 +176,10 @@ class EditorPerspectiveViewport implements View {
       view.setStudioLighting(directions, sky, ground);
       // Keep the scene image transparent so the UI gradient shows through
       // wherever the renderer has no geometry.
+      if (sampleCountApplied != sampleCountRequested) {
+        sampleCountEffective = renderer.setSampleCount(sampleCountRequested);
+        sampleCountApplied = sampleCountRequested;
+      }
       var changes = scene.takeRenderChanges();
       var rendered:GraphicsImageRef;
       try rendered = renderer.renderImage(scene.renderSnapshot(), view, width, height,
@@ -169,6 +196,7 @@ class EditorPerspectiveViewport implements View {
       renderedRevision = displayRevision;
       renderedCameraRevision = camera.revision;
       renderedLightingRevision = lightingRevision;
+      renderedSampleCount = sampleCountRequested;
       renderedHoverRevision = hoverRevision;
       renderedWidth = width;
       renderedHeight = height;
@@ -191,6 +219,7 @@ class EditorPerspectiveViewport implements View {
     height: renderedHeight,
     composition: "gpu-surface",
     renders: renderCount,
+    sampleCount: sampleCountEffective,
     cpuTransferBytes: 0,
     lastRenderMilliseconds: lastRenderSeconds * 1000.0,
     averageRenderMilliseconds: renderCount == 0 ? 0.0 : totalRenderSeconds * 1000.0 / renderCount,
