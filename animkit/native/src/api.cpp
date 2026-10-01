@@ -290,7 +290,7 @@ ak_result ak_instance_set_ik(ak_instance_handle handle, uint32_t chain, const ak
     for (int axis = 0; axis < 3; ++axis)
         if (!std::isfinite(ik->target[axis]) || !std::isfinite(ik->pole[axis]))
             return AK_ERROR_INVALID_ARGUMENT;
-    if (!std::isfinite(ik->weight) || !(ik->soften > 0.0f) || ik->soften > 1.0f)
+    if (!std::isfinite(ik->weight) || !(ik->soften > 0.0f) || ik->soften > 1.0f || !std::isfinite(ik->keep_end_rotation))
         return AK_ERROR_INVALID_ARGUMENT;
     animkit::IkChain &value = instance->ik[chain];
     value.start = ik->start_joint;
@@ -300,6 +300,7 @@ ak_result ak_instance_set_ik(ak_instance_handle handle, uint32_t chain, const ak
     std::copy_n(ik->pole, 3, value.pole);
     value.weight = std::min(ik->weight, 1.0f);
     value.soften = ik->soften;
+    value.keepEnd = std::clamp(ik->keep_end_rotation, 0.0f, 1.0f);
     return AK_OK;
 }
 

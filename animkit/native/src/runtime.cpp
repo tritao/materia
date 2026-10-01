@@ -96,6 +96,52 @@ void multiplyLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joi
     ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
 }
 
+// A joint's local rotation, read from its SoA lane and replaced.
+ozz::math::SimdQuaternion getLocalRotation(const std::vector<ozz::math::SoaTransform> &locals, int joint) {
+    ozz::math::SoaTransform soa = locals[joint / 4];
+    ozz::math::SimdQuaternion quaternions[4];
+    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
+    return quaternions[joint & 3];
+}
+
+void setLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joint, const ozz::math::SimdQuaternion &q) {
+    ozz::math::SoaTransform &soa = locals[joint / 4];
+    ozz::math::SimdQuaternion quaternions[4];
+    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
+    quaternions[joint & 3] = q;
+    ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
+}
+
+// The rotation of a model-space matrix (its scale is taken out), as a quaternion.
+ozz::math::SimdQuaternion rotationOf(const ozz::math::Float4x4 &matrix) {
+    namespace m = ozz::math;
+    float c[3][4];
+    for (int column = 0; column < 3; ++column) m::StorePtrU(matrix.cols[column], c[column]);
+    for (int column = 0; column < 3; ++column) {
+        const float length = std::sqrt(c[column][0] * c[column][0] + c[column][1] * c[column][1] + c[column][2] * c[column][2]);
+        if (length > 1e-8f) for (int row = 0; row < 3; ++row) c[column][row] /= length;
+    }
+    // r[row][column]
+    const float r00 = c[0][0], r10 = c[0][1], r20 = c[0][2], r01 = c[1][0], r11 = c[1][1], r21 = c[1][2],
+                r02 = c[2][0], r12 = c[2][1], r22 = c[2][2];
+    float x, y, z, w;
+    const float trace = r00 + r11 + r22;
+    if (trace > 0.0f) {
+        const float s = std::sqrt(trace + 1.0f) * 2.0f;
+        w = 0.25f * s; x = (r21 - r12) / s; y = (r02 - r20) / s; z = (r10 - r01) / s;
+    } else if (r00 > r11 && r00 > r22) {
+        const float s = std::sqrt(1.0f + r00 - r11 - r22) * 2.0f;
+        w = (r21 - r12) / s; x = 0.25f * s; y = (r01 + r10) / s; z = (r02 + r20) / s;
+    } else if (r11 > r22) {
+        const float s = std::sqrt(1.0f + r11 - r00 - r22) * 2.0f;
+        w = (r02 - r20) / s; x = (r01 + r10) / s; y = 0.25f * s; z = (r12 + r21) / s;
+    } else {
+        const float s = std::sqrt(1.0f + r22 - r00 - r11) * 2.0f;
+        w = (r10 - r01) / s; x = (r02 + r20) / s; y = (r12 + r21) / s; z = 0.25f * s;
+    }
+    return m::Normalize(m::SimdQuaternion{m::simd_float4::Load(x, y, z, w)});
+}
+
 // The direction the animation bends a limb, carried onto a new start-to-target axis by the smallest
 // rotation that takes the animated axis there, so it changes continuously as the target moves. A
 // fixed pole cannot do this: the bend plane contains the pole and the axis, so whenever the axis
@@ -242,6 +288,7 @@ bool Instance::solveIk() {
         if (!(chain.weight > 0.0f)) continue;
         const m::Float4x4 &start = models_[chain.start], &mid = models_[chain.mid],
                           &end = models_[chain.end];
+        const m::Float4x4 endBefore = end;
         const m::SimdFloat4 target =
             m::TransformPoint(sceneInverse_, m::simd_float4::Load3PtrU(chain.target));
         const m::SimdFloat4 requested =
@@ -292,6 +339,30 @@ bool Instance::solveIk() {
         update.output = ozz::make_span(models_);
         update.from = chain.start;
         if (!update.Run()) solved = false;
+        if (chain.keepEnd > 0.0f) {
+            // Turn the end joint back toward the orientation it had in the animation: the world rotation it was
+            // given, expressed in its parent's new frame, blended in from the local rotation the solve left it.
+            const int parent = asset_->skeleton->joint_parents()[chain.end];
+            if (parent >= 0) {
+                const m::SimdQuaternion wanted = rotationOf(endBefore);
+                const m::SimdQuaternion parentNow = rotationOf(models_[parent]);
+                const m::SimdQuaternion desired = m::Conjugate(parentNow) * wanted;
+                const m::SimdQuaternion current = getLocalRotation(locals_, chain.end);
+                const float weight = std::clamp(chain.keepEnd, 0.0f, 1.0f);
+                // Along the shorter arc, then normalized: a nlerp.
+                const m::SimdFloat4 a = current.xyzw, b = desired.xyzw;
+                const float dot = m::GetX(m::Dot4(a, b));
+                const m::SimdFloat4 signedB = dot < 0.0f ? -b : b;
+                const m::SimdFloat4 mixed = a * m::simd_float4::Load1(1.0f - weight) + signedB * m::simd_float4::Load1(weight);
+                setLocalRotation(locals_, chain.end, m::Normalize(m::SimdQuaternion{mixed}));
+                ozz::animation::LocalToModelJob endUpdate;
+                endUpdate.skeleton = asset_->skeleton.get();
+                endUpdate.input = ozz::make_span(locals_);
+                endUpdate.output = ozz::make_span(models_);
+                endUpdate.from = chain.end;
+                if (!endUpdate.Run()) solved = false;
+            }
+        }
     }
     return solved;
 }

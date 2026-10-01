@@ -190,8 +190,11 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 	 * ancestors in that order but need not be direct parents. Positions are in scene space. weight blends
 	 * from the animated pose (0, which disables the chain) to the solution (1);
 	 * soften in (0, 1] eases the chain before it straightens, 1 for none.
+	 * keep_end_rotation in [0, 1] turns the end joint back toward the orientation it had before the solve, in model
+	 * space (0 leaves it turned with the shin and the rest of the chain, 1 restores it): a foot reached to a spot
+	 * keeps lying flat on the floor instead of tilting with the leg.
 	 */
-	struct ak_two_bone_ik @layout(48, 4) {
+	struct ak_two_bone_ik @layout(52, 4) {
 		struct_size: u32 @offset(0) @struct_size;
 		start_joint: i32 @offset(4);
 		mid_joint: i32 @offset(8);
@@ -200,6 +203,7 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 		pole: array<f32, 3> @offset(28);
 		weight: f32 @offset(40);
 		soften: f32 @offset(44);
+		keep_end_rotation: f32 @offset(48);
 	}
 	/**
 	 * Opaque registry identity; only AnimKit may interpret id.

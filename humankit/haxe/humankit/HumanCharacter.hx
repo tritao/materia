@@ -119,8 +119,9 @@ class HumanCharacter {
 	public function reach(limb:HumanLimb, target:Array<Float>, weight:Float = 1.0, ?pole:Array<Float>):Void {
 		var bones = limbBones(limb);
 		var arm = limb == ArmL || limb == ArmR;
+		// A foot reached to a spot keeps the orientation it was animated with, instead of tilting with the leg.
 		instance.setIk(limb, rig.joint(bones[0]), rig.joint(bones[1]), rig.joint(bones[2]), target,
-			pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0], weight);
+			pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0], weight, 1.0, arm ? 0.0 : 1.0);
 	}
 
 	/**

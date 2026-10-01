@@ -40,11 +40,14 @@ class Naturalness {
 	/** Largest jerk of the pelvis and of either wrist, in metres per second cubed. */
 	public var maxPelvisJerk(default, null):Float = 0.0;
 	public var maxWristJerk(default, null):Float = 0.0;
+	/** The most a planted foot tilted from the way it first stood (ankle to toe, pitched up or down), in degrees. */
+	public var maxFootTilt(default, null):Float = 0.0;
 	/** Largest jerk of either ankle: a foot held in the world and let go again must not pop. */
 	public var maxFootJerk(default, null):Float = 0.0;
 	public var samples(default, null):Int = 0;
 
 	var restHeight:Array<Float> = [];
+	var restPitch:Array<Null<Float>> = [null, null];
 	var lastFoot:Array<Null<Array<Float>>> = [null, null];
 	var lowFor:Array<Int> = [0, 0];
 	var plantedAt:Array<Null<Array<Float>>> = [null, null];
@@ -95,6 +98,14 @@ class Naturalness {
 				}
 			}
 			planted[side] = plantedAt[side] != null;
+			var toeAt = pose.bonePosition(toes[side]);
+			if (toeAt != null) {
+				var run = Math.sqrt(Math.pow(toeAt[0] - local[0], 2) + Math.pow(toeAt[1] - local[1], 2));
+				var pitch = Math.atan2(toeAt[2] - local[2], run) * 180.0 / Math.PI;
+				var rest = restPitch[side];
+				if (rest == null) restPitch[side] = pitch;
+				else if (planted[side]) maxFootTilt = Math.max(maxFootTilt, Math.abs(pitch - rest));
+			}
 			if (planted[side]) plantedSeconds += seconds;
 			lastFoot[side] = world;
 			// The foot's outline: from a heel behind the ankle to the toe (its bone when the rig has one, else a foot's
@@ -185,7 +196,7 @@ class Naturalness {
 	public function summary():String {
 		var r = function(value:Float, scale:Float):Float return Math.round(value * scale) / scale;
 		return 'slide ${r(maxSlide, 100)} m at most (${r(slideTotal, 100)} m in all over ${r(plantedSeconds, 10)} s planted), support margin '
-			+ (minSupportMargin == Math.POSITIVE_INFINITY ? "n/a" : '${r(minSupportMargin, 100)} m') + ', floor ${r(floorPenetration, 100)} m, jerk pelvis '
+			+ (minSupportMargin == Math.POSITIVE_INFINITY ? "n/a" : '${r(minSupportMargin, 100)} m') + ', floor ${r(floorPenetration, 100)} m, foot tilt ${Math.round(maxFootTilt)} deg, jerk pelvis '
 			+ '${Math.round(maxPelvisJerk)} wrist ${Math.round(maxWristJerk)} foot ${Math.round(maxFootJerk)} m/s3';
 	}
 }

@@ -120,6 +120,7 @@ class HumanKitTests {
 		turning(scene, worker, rig);
 		retreating(scene, worker, rig);
 		holdingFeet(scene);
+		footKeepsItsPitch(scene);
 		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -970,6 +971,36 @@ class HumanKitTests {
 		var held = dragOf(true), loose = dragOf(false);
 		if (!(held < 0.03) || !(loose > held + 0.05))
 			throw 'Holding the feet did not stop the drag at the start of a walk: ${held} m held, ${loose} m loose';
+	}
+
+	/**
+	 * A foot reached to a spot keeps the way it lies when asked to (`keep_end_rotation`): the ankle goes where it is sent and
+	 * the foot's pitch does not follow the shin, where without it the pitch swings by the amount the leg bends.
+	 */
+	static function footKeepsItsPitch(scene:Scene):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var human = new HumanCharacter(scene, asset, rig, null, "FootPitch");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var pitch = function():Float {
+			var ankle = human.pose.bonePosition(HumanBone.FootL), toe = human.pose.bonePosition(HumanBone.ToeL);
+			return Math.atan2(toe[2] - ankle[2], Math.sqrt(Math.pow(toe[0] - ankle[0], 2) + Math.pow(toe[1] - ankle[1], 2))) * 180 / Math.PI;
+		};
+		var foot = human.pose.bonePosition(HumanBone.FootL);
+		var before = pitch();
+		var target = [foot[0] - 0.12, foot[1], foot[2] + 0.12];
+		var bones = [rig.joint(HumanBone.ThighL), rig.joint(HumanBone.ShinL), rig.joint(HumanBone.FootL)];
+		var swing = [0.0, 0.0];
+		for (index in 0...2) {
+			human.instance.setIk(2, bones[0], bones[1], bones[2], target, [1.0, 0.0, 0.0], 1.0, 1.0, index);
+			human.advance(0.0);
+			swing[index] = Math.abs(pitch() - before);
+			if (distance(human.pose.bonePosition(HumanBone.FootL), target) > 0.01) throw "The ankle did not reach its target with the foot's pitch kept";
+		}
+		human.dispose();
+		if (!(swing[0] > 15.0) || !(swing[1] < 3.0))
+			throw 'Keeping the foot\'s rotation did not hold its pitch: it swung ${swing[0]} degrees loose and ${swing[1]} kept';
 	}
 
 	/** A posture's lengths grow with the body; its angles, fractions and times do not. */

@@ -134,8 +134,10 @@ that eases in and out (`lockFrom`, `lockSpan`, `lockSeconds`, `lockReach` in `Hu
 relative to the body, so a body that starts to move used to drag them and one that rose from a crouch slid them. The share of
 idle in the pose is `HumanWalker.stanceShare`; in a steady walk the gait already keeps a planted foot still, and the hold is off.
 The bundled worker's feet are controls, not a chain, and are left as they were. On the library sweep it takes the worst foot slide
-from 0.23 m to 0.11 m, at the cost of some more foot jerk (2089 to 2400 m/s3). The foot is not turned with the leg: it
-keeps its animated pose, so a hold that has to bend the leg a long way shows as a tilted foot.
+from 0.23 m to 0.11 m, at the cost of some more foot jerk (2089 to 2400 m/s3). The foot is not turned with the leg: the IK
+restores the orientation the foot had in the animation (`keep_end_rotation` in the native two-bone solve, on for legs), so reaching
+an ankle to a spot moves the ankle and leaves the foot's pitch alone; without it a leg that bent 30 degrees tilted the foot by as much.
+The foot tilt `Naturalness` reports (44 degrees worst, in a crouch) is the animation's own heel lift, not the hold's.
 
 ## Measuring without showing
 
