@@ -27,16 +27,29 @@ as scene objects, jobs as versioned JSON). These come after it.
 - The automatic step-back after placement does not avoid support or zone boxes;
   author a clear retreat route until obstacle-aware planning is available.
 - A dedicated backward gait for short retreats; the current backward retreat
-  keeps the heading and idle pose while translating away from the part.
-- Crouching and kneeling. `ApproachFor` fails below standing arm reach.
-- A carry clip and gait for two-handed carrying of larger parts.
+  keeps the heading and idle pose while translating away from the part. The
+  library has `Walk_Bwd_Loop` (extracted, not wired).
+- Kneeling and floor-level picks. Crouching works (`BODY.md`), to about half a
+  metre; `PickUp_Kneeling` is extracted but not wired.
+- Turns in place use the root rotating over the idle pose, so the feet slide;
+  `Turn90_L/R` are extracted but not wired, and root-motion (`_RM`) clips need
+  support in the walker.
+- Leaning onto a deep top (a braced hand and a hip hinge) so the chest overhangs
+  the edge; today a 0.8 m top is beyond the library character's reach.
 - Look-at for head and eyes (needs aim IK from AnimKit, see its TODO).
 - Hand orientation. IK sets the wrist position only, so a part keeps the
   orientation it was carried with (apart from `Place` levelling it); yaw
   alignment and insertion need an oriented grasp.
-- A grip animation: hands do not close on what they hold.
 
 ## Body
+
+- Judge naturalness beyond numbers: contact sheets at job events, and a
+  reference-motion comparison (time-warped distance of wrist and pelvis paths
+  to the authored `PickUp_Table`). `Naturalness` gives foot slide, balance and
+  jerk; nothing yet compares to a reference or renders.
+- Cache a body model per rig (shoulder, belly and hip positions over crouch,
+  hinge and lean) so the planner is a pure function, and evaluate poses without
+  skinning or touching the scene; today each probe is a full `advance(0)`.
 
 - Bone-length fitting to `HumanDescription`. An explicit description only
   scales the whole rig uniformly.

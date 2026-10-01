@@ -118,6 +118,17 @@ does not sweep a hand across the part.
 The Universal Animation Library character (`animkit/assets/quaternius-ual`) is the first that crouches;
 `UniversalSweepTests` runs the rack job on it from half a metre to a shelf.
 
+## Measuring how natural it looks
+
+`MotionQuality` judges the arms (bend-plane turn, hand speed and acceleration, elbow range). `Naturalness` judges the
+body from the floor up, one sample per tick: how far a planted foot slides (planted is low and slow for three
+samples), where the centre of mass projects against the hull of both feet while both are down, how far a foot goes
+into the floor, and the jerk of the pelvis and wrists. `JobGate` carries both and reports which step of the job a
+finding came from; the sweeps print the worst of each. Baselines: the bundled worker slides a foot at most 0.04 m over
+the rack sweep and keeps its mass 7 cm inside its feet; the library character slides up to 0.23 m where it crouches and turns,
+and 2 cm inside. These are limits to hold, not claims of naturalness: nothing yet compares to a reference motion or
+renders a frame.
+
 ## Known limits
 
 - **Low surfaces on the bundled worker.** At about a metre or lower the lean reaches its limit before the

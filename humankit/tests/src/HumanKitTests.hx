@@ -27,6 +27,7 @@ import humankit.HumanLimb;
 import humankit.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.HumanPose;
+import humankit.Naturalness;
 import humankit.HumanPosture;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
@@ -116,6 +117,7 @@ class HumanKitTests {
 		facilityRoute(scene, worker, rig);
 		facilitySurfaces();
 		postureStature();
+		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -214,6 +216,8 @@ class HumanKitTests {
 		// The checks that name no joints hold on the library character too.
 		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
 		var againRig = HumanoidRig.detect(again);
+		// The library character's ankle rolls heel to toe through a stance, which this reads as a slide of about 15 cm.
+		naturalness(scene, again, againRig, "library", 0.2);
 		walking(scene, again, againRig);
 		elbowStaysPut(scene, again, againRig);
 		leaning(scene, again, againRig);
@@ -820,6 +824,34 @@ class HumanKitTests {
 		// straight line from start to destination.
 		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
 			throw "The facility walk does not face along the last lane";
+		human.dispose();
+	}
+
+	/**
+	 * The floor-up measures on motions whose answer is known: standing still has no skate and a mass well inside
+	 * its feet, and a steady walk at the gait's own speed keeps a planted foot where it is. The same measures
+	 * on a whole job are reported by the sim sweeps.
+	 */
+	static function naturalness(scene:Scene, asset:AnimationAsset, rig:HumanoidRig, label:String, slideLimit:Float = 0.08):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Natural");
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (_ in 0...30) body.advance(step);
+		var still = new Naturalness();
+		for (_ in 0...120) {
+			body.advance(step);
+			still.sample(body, step);
+		}
+		if (still.maxSlide > 0.005 || still.minSupportMargin < -0.02)
+			throw 'A worker standing still slid or tipped ($label): ${still.summary()}';
+		var walking = new Naturalness();
+		body.walker.follow([[0.0, 0.0], [20.0, 0.0]], 1.0);
+		for (index in 0...360) {
+			body.advance(step);
+			if (index >= 60) walking.sample(body, step);
+		}
+		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
+			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
 		human.dispose();
 	}
 

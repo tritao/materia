@@ -24,6 +24,15 @@ class JobGate {
     static inline var BELLY_FRONT = 0.12;
 
     public final quality:MotionQuality = new MotionQuality();
+    /** The body's feet, balance and jerk over the run; see `Naturalness`. */
+    public final naturalness:humankit.Naturalness = new humankit.Naturalness();
+    /**
+     * The furthest a planted foot may slide, and the least margin the centre of mass may keep inside the feet, in metres.
+     * Measured on the sweeps with the bundled worker: 0.05 m of slide and a mass on the edge of its feet; the library
+     * character slides further (0.23 m) where it crouches and turns, so its sweep sets its own.
+     */
+    public var slideLimit:Float = 0.10;
+    public var supportLimit:Float = -0.10;
     public var clearance(default, null):Float = Math.POSITIVE_INFINITY;
     public var lean(default, null):Float = 0.0;
     final worker:HumanWorker;
@@ -50,6 +59,7 @@ class JobGate {
     public function sample():Void {
         var body = worker.body, pose = body.character.pose;
         quality.sample(pose, session.fixedTimestep());
+        naturalness.sample(body, session.fixedTimestep());
         var step = worker.currentStep();
         steps.push(step == null ? -1 : step);
         lean = Math.max(lean, body.character.spineLean());
@@ -84,6 +94,10 @@ class JobGate {
             if (arm.minElbowAngle < elbowLimit)
                 failures.push('$label: the $name elbow bent to ${r(arm.minElbowAngle)} degrees at sample ${arm.minElbowAt} (step ${stepAt(arm.minElbowAt)})');
         }
+        if (naturalness.maxSlide > slideLimit)
+            failures.push('$label: a planted foot slid ${r(naturalness.maxSlide)} m');
+        if (naturalness.minSupportMargin < supportLimit)
+            failures.push('$label: the centre of mass stood ${r(-naturalness.minSupportMargin)} m outside the feet');
         if (!posture) return;
         var capped = lean >= worker.body.posture.maxLean - 0.01;
         // A stance the planner itself reports as short of clearing an edge may stand that far inside it, and a little more.
