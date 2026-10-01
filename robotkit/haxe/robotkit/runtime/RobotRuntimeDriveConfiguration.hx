@@ -8,7 +8,10 @@ enum RobotRuntimeDriveConfiguration {
     rightWheelJoint:Int,
     rightWheelName:String,
     wheelRadius:Float,
-    trackWidth:Float
+    trackWidth:Float,
+    /** +1 when a positive rate on that wheel's joint rolls the base forward, -1 when backward. */
+    leftDirection:Int,
+    rightDirection:Int
   );
   Ackermann(
     steeringJoint:Int,

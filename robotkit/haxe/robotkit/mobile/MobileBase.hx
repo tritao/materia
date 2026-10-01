@@ -38,10 +38,10 @@ class MobileBase {
     var config:RobotRuntimeMobileConfiguration = cast maybeConfig;
     var drive:DriveModel = switch config.drive {
       case RobotRuntimeDriveConfiguration.Differential(leftIndex, leftName,
-          rightIndex, rightName, wheelRadius, trackWidth):
+          rightIndex, rightName, wheelRadius, trackWidth, leftDirection, rightDirection):
         requireJoint(robot, leftIndex, leftName);
         requireJoint(robot, rightIndex, rightName);
-        new DifferentialDrive(leftIndex, rightIndex, wheelRadius, trackWidth);
+        new DifferentialDrive(leftIndex, rightIndex, wheelRadius, trackWidth, leftDirection, rightDirection);
       case RobotRuntimeDriveConfiguration.Ackermann(steeringIndex, steeringName,
           driveIndex, driveName, wheelBase, wheelRadius, maxSteeringAngle):
         requireJoint(robot, steeringIndex, steeringName);

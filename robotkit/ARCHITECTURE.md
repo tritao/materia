@@ -342,6 +342,16 @@ target batch: differential drive emits both wheel rates, while Ackermann drive
 emits steering position and drive-wheel rate together. Runtime joint limits and
 safety remain authoritative below this application-level mapping.
 
+Differential wheel joints stay mechanical truth: each turns about its own
+axle as authored, often both along their outward motor shafts, so one wheel
+rolls backward on a positive rate. The runtime compiler resolves each wheel's
+direction from its joint axis in the root link frame (upstream joints at
+zero): +1 for a turn about +Y, which rolls the base along +X, -1 about -Y, and
+`RK_ROLE_WHEEL_AXIS` for an axis that is not lateral. `DifferentialDrive`,
+`DifferentialOdometry` and the native plant (`reversed_wheels` on
+`rk_simulation_differential_drive_desc`) apply it, so joint rates and
+positions always read like the wheel's encoder.
+
 `HolonomicDrive` (M9) adds a third `DriveModel`: an omnidirectional ("kiwi")
 base with three wheels at 120-degree intervals, each rolling tangentially.
 `Twist2` now carries forward speed, body +Y lateral speed, and yaw rate.

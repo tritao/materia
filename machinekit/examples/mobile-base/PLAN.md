@@ -89,6 +89,6 @@ M7 are stretch goals.
 
 | Step | State | Commits |
 | --- | --- | --- |
-| M0 | done | (this commit) |
-| M1 | done | (this commit) |
-| M2 | next | |
+| M0 | done | c6e9da67 |
+| M1 | done | c6e9da67, 512baf40 (plates own the layout, mates throughout) |
+| M2 | in progress | wheel directions from joint axes in RobotKit (this commit); bridge next |

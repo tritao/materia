@@ -139,8 +139,8 @@
       ],
       "axis": [
         0,
-        0,
-        1
+        1,
+        0
       ],
       "dynamics": {
         "armature": 0,
@@ -188,8 +188,8 @@
       ],
       "axis": [
         0,
-        0,
-        1
+        1,
+        0
       ],
       "dynamics": {
         "armature": 0,

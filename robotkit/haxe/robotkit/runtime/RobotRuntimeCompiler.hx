@@ -1,7 +1,10 @@
 package robotkit.runtime;
 
 import robotkit.model.RobotModel;
+import robotkit.model.Joint;
 import robotkit.model.JointType;
+import robotkit.spatial.Quat;
+import robotkit.spatial.Vec3;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotDriveConfiguration;
 import robotkit.model.RobotForkConfiguration;
@@ -561,8 +564,13 @@ class RobotRuntimeCompiler {
       if (mobile.footprintWidth != null) positive(mobile.footprintWidth, "mobileBase.footprint.width");
       switch mobile.drive {
         case Differential(leftId, rightId, radius, trackWidth):
-          resolveRole(leftId, "mobileBase.drive.leftWheelJointId", [JointType.Revolute, JointType.Continuous]);
-          resolveRole(rightId, "mobileBase.drive.rightWheelJointId", [JointType.Revolute, JointType.Continuous]);
+          for (role in [{id: leftId, path: "mobileBase.drive.leftWheelJointId"},
+              {id: rightId, path: "mobileBase.drive.rightWheelJointId"}]) {
+            var index = resolveRole(role.id, role.path, [JointType.Revolute, JointType.Continuous]);
+            if (index != null && wheelDirection(robot, index) == 0)
+              diagnostics.push(new RobotCompileDiagnostic("RK_ROLE_WHEEL_AXIS", role.path,
+                'wheel joint "${robot.joints[index].name}" must turn about the base\'s lateral (Y) axis'));
+          }
           positive(radius, "mobileBase.drive.wheelRadius");
           positive(trackWidth, "mobileBase.drive.trackWidth");
         case Ackermann(steeringId, driveId, wheelBase, radius, maxSteeringAngle):
@@ -615,7 +623,8 @@ class RobotRuntimeCompiler {
         case Differential(leftId, rightId, radius, trackWidth):
           var leftIndex = jointIndex(leftId), rightIndex = jointIndex(rightId);
           RobotRuntimeDriveConfiguration.Differential(leftIndex, robot.joints[leftIndex].name,
-            rightIndex, robot.joints[rightIndex].name, radius, trackWidth);
+            rightIndex, robot.joints[rightIndex].name, radius, trackWidth,
+            wheelDirection(robot, leftIndex), wheelDirection(robot, rightIndex));
         case Ackermann(steeringId, driveId, wheelBase, radius, maxAngle):
           var steeringIndex = jointIndex(steeringId), driveIndex = jointIndex(driveId);
           RobotRuntimeDriveConfiguration.Ackermann(steeringIndex, robot.joints[steeringIndex].name,
@@ -645,6 +654,32 @@ class RobotRuntimeCompiler {
         forks.maxMassKg, forks.maxLoadMomentKgMeters, forks.maxLiftHeightMeters);
     }
     return new RobotRuntimeConfiguration(mobileConfig, forkConfig);
+  }
+
+  /**
+   * Which way positive motion of wheel joint `index` drives the base, with every
+   * joint above it at zero: +1 when the wheel spins about the root link's +Y, so
+   * it rolls along +X, -1 about -Y, and 0 when its axis is not lateral.
+   */
+  public static function wheelDirection(robot:RobotModel, index:Int):Int {
+    var joint = robot.joints[index];
+    if (joint == null || joint.axis == null || joint.axis.length != 3) return 0;
+    // Rotation from the joint frame to the root: child = parent · parentFrame · motion · childFrame⁻¹.
+    var rotation = Quat.fromArray(joint.parentFrameRotation);
+    var link = joint.parent;
+    for (_ in 0...robot.joints.length) {
+      var above:Null<Joint> = null;
+      for (candidate in robot.joints) if (candidate != null && candidate.child == link) above = candidate;
+      if (above == null) break;
+      rotation = Quat.fromArray(above.parentFrameRotation)
+        .multiply(Quat.fromArray(above.childFrameRotation).conjugate()).multiply(rotation);
+      link = above.parent;
+    }
+    var axis = rotation.rotate(new Vec3(joint.axis[0], joint.axis[1], joint.axis[2]));
+    var length = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+    if (!(length > 0)) return 0;
+    var lateral = axis.y / length;
+    return lateral > 0.999 ? 1 : lateral < -0.999 ? -1 : 0;
   }
 
   static function validVector(value:Array<Float>, count:Int):Bool {

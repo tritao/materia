@@ -498,10 +498,12 @@ class Simulation {
    * tick the base rolls by the wheel targets the robot applied for that tick
    * (after runtime clamping, zero after any stop), before physics advances,
    * whatever submitted them. Joint indices are robot joint indices; lengths
-   * are metres. The plant starts from the base's current pose.
+   * are metres. A wheel's direction is -1 when a positive joint rate rolls it
+   * backward. The plant starts from the base's current pose.
    */
   public function setDifferentialDrive(robotIndex:Int, leftWheelJoint:Int,
-      rightWheelJoint:Int, wheelRadius:Float, trackWidth:Float):Void {
+      rightWheelJoint:Int, wheelRadius:Float, trackWidth:Float,
+      leftDirection:Int = 1, rightDirection:Int = 1):Void {
     ensureLive();
     if (leftWheelJoint < 0 || rightWheelJoint < 0)
       throw "Simulation.setDifferentialDrive requires wheel joint indices";
@@ -511,6 +513,10 @@ class Simulation {
     desc.set_right_wheel_joint(rightWheelJoint);
     desc.set_wheel_radius(wheelRadius);
     desc.set_track_width(trackWidth);
+    if (Math.abs(leftDirection) != 1 || Math.abs(rightDirection) != 1)
+      throw "Simulation.setDifferentialDrive wheel directions must be 1 or -1";
+    desc.set_reversed_wheels((leftDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_LEFT : 0)
+      | (rightDirection < 0 ? RobotKitSimKitConstants.RK_DRIVE_REVERSED_RIGHT : 0));
     check(RobotKitSimKit.rk_simulation_set_differential_drive(owner.borrow(), robotIndex, desc),
       "simulation.setDifferentialDrive");
   }

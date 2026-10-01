@@ -548,6 +548,26 @@ class RobotWorldTests {
     throws(function() differential.command(new Twist2(0.0, 0.0, 0.1)),
       "differential drive rejects a lateral command");
 
+    var reversedRobot = new FakeRobot("reversed-base");
+    reversedRobot.positions = [0.0, 0.0];
+    var reversed = new MobileBase(reversedRobot, new DifferentialDrive(0, 1, 0.2, 0.6, 1, -1),
+      new MotionLimits(1.0, 2.0, 0.5, 1.0));
+    reversed.command(new Twist2(2.0, 4.0), 1.0);
+    check(switch reversedRobot.lastCommand {
+      case JointTargets(targets, _):
+        Math.abs(targets[0].target - 1.0) < 1e-9 && Math.abs(targets[1].target + 4.0) < 1e-9;
+      case _: false;
+    }, "a reversed wheel gets the negated rate for the same twist");
+    throws(function() new DifferentialDrive(0, 1, 0.2, 0.6, 1, 0), "wheel directions must be 1 or -1");
+    var reversedOdometry = new DifferentialOdometry(0, 1, 0.1, 0.5, null, 1, -1);
+    function reversedSample(time:Int, left:Float, right:Float):RobotSnapshot
+      return new RobotSnapshot("odom", Int64.ofInt(time), Int64.ofInt(time),
+        [left, right], [], [], 1, 0, null, [], "source-A", "host");
+    reversedOdometry.update(reversedSample(10, 0.0, 0.0));
+    var reversedForward = reversedOdometry.update(reversedSample(20, 1.0, -1.0));
+    check(Math.abs(reversedForward.x - 0.1) < 1e-9 && Math.abs(reversedForward.yaw) < 1e-9,
+      "wheel odometry reads a reversed wheel's opposite rotation as straight travel");
+
     var odometry = new DifferentialOdometry(0, 1, 0.1, 0.5);
     function sample(time:Int, left:Float, right:Float, clock:String):RobotSnapshot
       return new RobotSnapshot("odom", Int64.ofInt(time), Int64.ofInt(time),
@@ -612,8 +632,8 @@ class RobotWorldTests {
       joint.limits = new JointLimits(lower, upper, 20.0, 100.0);
       return model.addJoint(joint);
     }
-    addJoint("joint/left-wheel", "left wheel joint", JointType.Continuous, left, -100.0, 100.0);
-    addJoint("joint/right-wheel", "right wheel joint", JointType.Continuous, right, -100.0, 100.0);
+    addJoint("joint/left-wheel", "left wheel joint", JointType.Continuous, left, -100.0, 100.0).axis = [0.0, 1.0, 0.0];
+    addJoint("joint/right-wheel", "right wheel joint", JointType.Continuous, right, -100.0, 100.0).axis = [0.0, 1.0, 0.0];
     addJoint("joint/lift", "mast lift", JointType.Prismatic, mast, 0.0, 2.0);
     addJoint("joint/tilt", "fork tilt", JointType.Revolute, tilt, -0.5, 0.7);
     addJoint("joint/spread", "fork spread", JointType.Prismatic, spread, 0.0, 0.8);
@@ -636,9 +656,10 @@ class RobotWorldTests {
     var forkConfig:RobotRuntimeForkConfiguration = cast forkRuntime;
     check(switch mobileConfig.drive {
       case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(leftIndex, leftName,
-          rightIndex, rightName, radius, track):
+          rightIndex, rightName, radius, track, leftDirection, rightDirection):
         leftIndex == 0 && leftName == "left wheel joint" && rightIndex == 1 &&
-          rightName == "right wheel joint" && radius == 0.1 && track == 0.5;
+          rightName == "right wheel joint" && radius == 0.1 && track == 0.5 &&
+          leftDirection == 1 && rightDirection == 1;
       case _: false;
     }, "runtime compilation resolves stable drive joint IDs to command indices");
     equal(forkConfig.lift.jointIndex, 2,
@@ -735,6 +756,34 @@ class RobotWorldTests {
     for (value in duplicateDiagnostics) if (value.code == "RK_ROLE_DUPLICATE") hasDuplicateRole = true;
     check(hasDuplicateRole,
       "robot model validation rejects assigning one joint to multiple mechanism roles");
+
+    // Each wheel's direction comes from its joint axis in the base frame: a right wheel
+    // turning about its outward motor shaft (-Y) rolls back on a positive rate.
+    model.mobileBase = new RobotMobileConfiguration(
+      RobotDriveConfiguration.Differential("joint/left-wheel", "joint/right-wheel", 0.1, 0.5),
+      1.2, 1.5);
+    var rightWheel = model.joints[1];
+    function directions():Array<Int> {
+      var configuration:RobotRuntimeConfiguration = cast RobotRuntimeCompiler.compile(model).configuration;
+      var mobile:RobotRuntimeMobileConfiguration = cast configuration.mobileBase;
+      return switch mobile.drive {
+        case robotkit.runtime.RobotRuntimeDriveConfiguration.Differential(_, _, _, _, _, _, left, right): [left, right];
+        case _: [];
+      };
+    }
+    rightWheel.axis = [0.0, -1.0, 0.0];
+    equal(directions().join(","), "1,-1", "a wheel joint about -Y drives backward on a positive rate");
+    // The same axis seen through a joint frame turned half way about Z reads +Y in the base.
+    rightWheel.parentFrameRotation = [0.0, 0.0, 1.0, 0.0];
+    equal(directions().join(","), "1,1", "wheel directions follow the joint frame into the base frame");
+    rightWheel.parentFrameRotation = [0.0, 0.0, 0.0, 1.0];
+    rightWheel.axis = [0.0, 0.0, 1.0];
+    var axisDiagnostics = RobotRuntimeCompiler.validate(model);
+    var hasAxisError = false;
+    for (value in axisDiagnostics)
+      if (value.code == "RK_ROLE_WHEEL_AXIS" && value.path == "mobileBase.drive.rightWheelJointId") hasAxisError = true;
+    check(hasAxisError, "robot model validation rejects a wheel joint that does not turn about the lateral axis");
+    rightWheel.axis = [0.0, 1.0, 0.0];
   }
 
   static function testRobotModelCodec():Void {
@@ -752,7 +801,7 @@ class RobotWorldTests {
     source.addCoupling(new robotkit.model.JointCoupling("paired-wheels",
       source.joints[0].id, source.joints[1].id, -2.0, 0.25));
     source.joints[0].parentFramePosition = [0.0, 0.25, 0.1];
-    source.joints[0].parentFrameRotation = [0.0, 0.0, 0.1, 0.99498743710662];
+    source.joints[0].parentFrameRotation = [0.0, 0.1, 0.0, 0.99498743710662];
     source.joints[0].axis = [0.0, 1.0, 0.0];
     source.frames[0].rotation = [0.0, 0.0, 0.38268343236509, 0.923879532511287];
     source.sensors[0].startAngleRadians = -0.4;
@@ -1789,10 +1838,12 @@ class RobotWorldTests {
     var rightLink = model.addLink(new Link("right wheel", "right-wheel"));
     var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
       "joint/left-wheel");
+    left.axis = [0.0, 1.0, 0.0];
     left.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(left);
     var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
       "joint/right-wheel");
+    right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
     model.mobileBase = new RobotMobileConfiguration(
@@ -2055,10 +2106,12 @@ class RobotWorldTests {
     var rightLink = model.addLink(new Link("right wheel", "link/right-wheel"));
     var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
       "joint/left-wheel");
+    left.axis = [0.0, 1.0, 0.0];
     left.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(left);
     var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
       "joint/right-wheel");
+    right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-100.0, 100.0, 20.0, 100.0);
     model.addJoint(right);
     model.mobileBase = new RobotMobileConfiguration(
@@ -2334,10 +2387,12 @@ class RobotWorldTests {
     var rightLink = model.addLink(new Link("right wheel", "link/right-wheel"));
     var left = new Joint("left wheel", JointType.Continuous, baseLink, leftLink,
       "joint/left-wheel");
+    left.axis = [0.0, 1.0, 0.0];
     left.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
     model.addJoint(left);
     var right = new Joint("right wheel", JointType.Continuous, baseLink, rightLink,
       "joint/right-wheel");
+    right.axis = [0.0, 1.0, 0.0];
     right.limits = new JointLimits(-1000.0, 1000.0, 10.0, 100.0);
     model.addJoint(right);
     model.mobileBase = new RobotMobileConfiguration(
@@ -3584,6 +3639,8 @@ class RobotWorldTests {
     function addJoint(id:String, name:String, type:JointType, child:robotkit.model.Link,
         lower:Float, upper:Float, velocity:Float):Void {
       var joint = new Joint(name, type, base, child, id);
+      // Wheels turn about the base's lateral axis.
+      if (type == JointType.Continuous) joint.axis = [0.0, 1.0, 0.0];
       joint.limits = new JointLimits(lower, upper, velocity, 1000.0);
       model.addJoint(joint);
     }

@@ -895,6 +895,45 @@ void driven_base_far_from_origin_reads_exact_imu() {
 
 // A ground robot rolls on the level floor: the plant keeps the base's authored
 // roll and pitch (turning them with the heading) instead of snapping upright.
+// A right wheel whose joint turns about -Y (its motor shaft points outward)
+// rolls backward on a positive rate: flagged reversed, opposite joint rates
+// drive the base straight ahead, and the state reports the joint rates.
+void differential_drive_reads_reversed_wheels() {
+    auto fixture = make_fixture(0.02);
+    auto simulation = fixture.simulation;
+    auto session = fixture.session;
+    const auto model = wheeled_blueprint();
+    rk_robot_runtime robot = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_simulation_add_robot(simulation, &model, nullptr, &robot) == RK_OK);
+    rk_simulation_differential_drive_desc drive{};
+    drive.struct_size = sizeof(drive);
+    drive.left_wheel_joint = 0;
+    drive.right_wheel_joint = 1;
+    drive.wheel_radius = 0.1;
+    drive.track_width = 0.5;
+    drive.reversed_wheels = 4;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &drive) == RK_ERROR_INVALID_ARGUMENT);
+    drive.reversed_wheels = RK_DRIVE_REVERSED_RIGHT;
+    assert(rk_simulation_set_differential_drive(simulation, 0, &drive) == RK_OK);
+    const auto start = drive_state(simulation);
+    uint64_t time = 0;
+    auto command = wheel_targets(5.0, -5.0, 1);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    for (int tick = 0; tick < 10; ++tick)
+        assert(step(session, time += 100) == RK_OK);
+    auto plant = drive_state(simulation);
+    assert(plant.left_wheel_rate == 5.0 && plant.right_wheel_rate == -5.0);
+    assert(std::abs(plant.x - (start.x + 0.1)) < 1e-12 && std::abs(plant.y - start.y) < 1e-12);
+    assert(std::abs(plant.yaw - start.yaw) < 1e-12);
+    // Equal rates now spin the base in place, counter-clockwise for positive.
+    command = wheel_targets(-5.0, -5.0, 2);
+    assert(rk_robot_runtime_submit(robot, &command) == RK_OK);
+    assert(step(session, time += 100) == RK_OK);
+    const auto turned = drive_state(simulation);
+    assert(std::abs(turned.x - plant.x) < 1e-12 && turned.yaw > plant.yaw);
+    rk_simulation_destroy(simulation);
+}
+
 void differential_drive_keeps_authored_tilt() {
     constexpr double dt = 0.02;
     auto fixture = make_fixture(dt);
@@ -1225,6 +1264,7 @@ int main() {
     normal_stop_zeroes_wheel_velocities();
     differential_drive_follows_applied_wheel_targets();
     driven_base_far_from_origin_reads_exact_imu();
+    differential_drive_reads_reversed_wheels();
     differential_drive_keeps_authored_tilt();
     omni_drive_follows_applied_wheel_targets();
     robots_attach_to_a_shared_session();

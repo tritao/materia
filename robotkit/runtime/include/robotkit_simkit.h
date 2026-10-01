@@ -200,18 +200,24 @@ typedef struct rk_simulation_robot_desc {
     rk_simulation_link_hull link_hulls[RK_MAX_LINK_HULLS];
 } rk_simulation_robot_desc;
 
+/** rk_simulation_differential_drive_desc.reversed_wheels bits. */
+enum { RK_DRIVE_REVERSED_LEFT = 1, RK_DRIVE_REVERSED_RIGHT = 2 };
+
 /**
  * Ideal rolling differential-drive coupling for one robot's kinematic base.
  *
  * The wheel joints are robot joint indices of actuated wheel joints. Lengths
  * are metres and must be positive; track_width is the distance between the
- * wheel contact points.
+ * wheel contact points. A wheel whose joint turns about the base's -Y axis
+ * rolls backward on a positive rate; set its bit in reversed_wheels
+ * (RK_DRIVE_REVERSED_LEFT, RK_DRIVE_REVERSED_RIGHT) so the plant reads it the
+ * right way. No other bits may be set.
  */
 typedef struct rk_simulation_differential_drive_desc {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t left_wheel_joint;
     uint32_t right_wheel_joint;
-    uint32_t reserved0;
+    uint32_t reversed_wheels;
     double wheel_radius;
     double track_width;
     uint64_t reserved[2];

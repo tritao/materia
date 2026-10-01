@@ -149,6 +149,8 @@ private:
         uint32_t joints[3] = {0, 0, 0};
         double wheel_radius = 0.0;
         double track_width = 0.0; // Differential only.
+        // Differential only: -1 for a wheel that rolls backward on a positive joint rate.
+        double directions[2] = {1.0, 1.0};
         // Omni only: maps wheel rim speeds to the body twist (vx, vy, omega).
         double inverse[3][3] = {};
         double x = 0.0;
