@@ -28,6 +28,8 @@ typedef RackLayout = {
     @:optional var partSize:Array<Float>;
     /** Half the rack's and table's side, in metres; 0.2 when not given. */
     @:optional var surfaceHalf:Float;
+    /** The character's glTF, relative to the tests' folder; the bundled Quaternius worker when not given. */
+    @:optional var character:String;
 }
 
 /** The rack-to-table job on a bare session: a worker fetches a part from a pedestal and sets it on a table. */
@@ -66,7 +68,7 @@ class RackScenario {
 
     public static function build(restingOn:Bool = true, ?layout:RackLayout):RackScenario {
         if (layout == null) layout = {hand: "right", surface: 1.06, yaw: 0.0};
-        var asset = AnimationAsset.load("../../../animkit/assets/quaternius/worker.glb");
+        var asset = AnimationAsset.load("../../../animkit/assets/" + (layout.character == null ? "quaternius/worker.glb" : layout.character));
         var rig = HumanoidRig.detect(asset);
         var scene = Scene.create();
         var world = MujocoSimWorld.create(scene, {timestep: 0.01, physicsSubsteps: 4, gravity: [0.0, 0.0, -9.81]});

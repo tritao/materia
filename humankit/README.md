@@ -116,6 +116,14 @@ check the proxy against the mesh.
 How the body is layered, who owns what, and where its tuning lives are described in
 [BODY.md](BODY.md).
 
+## Characters
+
+The bundled Quaternius worker (`animkit/assets/quaternius/worker.glb`) is the default. The Universal
+Animation Library character (`animkit/assets/quaternius-ual/ual-standard.glb`, CC0, 46 clips) is also
+supported: its rig matches the `universal` preset, its legs are real chains, and it has a crouch clip, so it
+reaches surfaces from half a metre up (see `BODY.md`). Pick it in the editor with the worker's "Character
+asset" property.
+
 ## Document jobs
 
 `HumanJobSpec.parse` accepts strict, versioned JSON. Version 1 has `version`,

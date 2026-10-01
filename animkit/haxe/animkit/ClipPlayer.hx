@@ -2,15 +2,17 @@ package animkit;
 
 /**
  * Plays one clip at a time on an instance and crossfades between clips.
- * The outgoing clips keep advancing while their weights fade to zero.
+ * The outgoing clips keep advancing while their weights fade to zero. One overlay clip may be mixed over
+ * all of that at a weight the caller sets, to hold a pose such as a crouch at any depth between the two.
  */
 class ClipPlayer {
 	public final instance:AnimationInstance;
 	/** Playback rate multiplier applied to both clips. */
 	public var speed:Float = 1.0;
 
-	/** Layers the instance holds besides the current clip's. */
-	static inline var MAX_OUTGOING:Int = AnimationInstance.MAX_LAYERS - 1;
+	/** Layers the instance holds besides the current clip's and the overlay's. */
+	static inline var MAX_OUTGOING:Int = AnimationInstance.MAX_LAYERS - 2;
+	static inline var OVERLAY_LAYER:Int = AnimationInstance.MAX_LAYERS - 1;
 
 	var clip:Int = -1;
 	var time:Float = 0.0;
@@ -23,6 +25,9 @@ class ClipPlayer {
 	final outgoing:Array<{clip:Int, time:Float, loop:Bool, share:Float}> = [];
 	var fadeDuration:Float = 0.0;
 	var fadeElapsed:Float = 0.0;
+	var overlayClip:Int = -1;
+	var overlayTime:Float = 0.0;
+	var overlayWeight:Float = 0.0;
 
 	public function new(instance:AnimationInstance) {
 		this.instance = instance;
@@ -82,6 +87,24 @@ class ClipPlayer {
 		speed = 1.0;
 	}
 
+	/**
+	 * Mixes a clip over everything else at `weight` (0 none, 1 only the overlay), looping on its own clock. A
+	 * negative clip, or a weight of zero, takes it out of the mix; the clock keeps running, so putting the same
+	 * clip back picks up where it would be rather than from its start. Takes effect from the next advance.
+	 */
+	public function setOverlay(index:Int, weight:Float):Void {
+		if (index >= instance.asset.clipNames.length)
+			throw 'Clip index $index is out of range';
+		if (index >= 0 && index != overlayClip) {
+			overlayClip = index;
+			overlayTime = 0.0;
+		}
+		overlayWeight = index < 0 ? 0.0 : Math.max(0.0, Math.min(1.0, weight));
+	}
+
+	public function overlayAmount():Float
+		return overlayWeight;
+
 	/** The current clip's weight: how far its fade-in has run, or one when nothing is fading out. */
 	function currentWeight():Float
 		return outgoing.length == 0 || fadeDuration <= 0.0 ? 1.0 : Math.min(1.0, fadeElapsed / fadeDuration);
@@ -107,15 +130,18 @@ class ClipPlayer {
 			for (entry in outgoing) entry.time += step;
 			if (fadeElapsed >= fadeDuration) outgoing.resize(0);
 		}
-		var weight = currentWeight();
-		instance.setLayer(0, clip, time, weight, loop);
+		if (overlayClip >= 0) overlayTime += step;
+		var weight = currentWeight(), base = 1.0 - overlayWeight;
+		instance.setLayer(0, clip, time, weight * base, loop);
 		for (index in 0...MAX_OUTGOING) {
 			if (index < outgoing.length) {
 				var entry = outgoing[index];
-				instance.setLayer(index + 1, entry.clip, entry.time, entry.share * (1.0 - weight), entry.loop);
+				instance.setLayer(index + 1, entry.clip, entry.time, entry.share * (1.0 - weight) * base, entry.loop);
 			} else
 				instance.setLayer(index + 1, -1, 0.0, 0.0);
 		}
+		if (overlayClip >= 0 && overlayWeight > 0.0) instance.setLayer(OVERLAY_LAYER, overlayClip, overlayTime, overlayWeight);
+		else instance.setLayer(OVERLAY_LAYER, -1, 0.0, 0.0);
 		instance.evaluate();
 	}
 }

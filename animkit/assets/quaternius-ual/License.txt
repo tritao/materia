@@ -1,0 +1,9 @@
+Universal Animation Library (Standard), from Quaternius (https://quaternius.com)
+https://quaternius.itch.io/universal-animation-library
+
+glTF copy of the free Standard version as mirrored at
+https://github.com/J-Ponzo/gltf-universal-animation-library (the .gltf and its .bin packed into one .glb;
+nothing else changed).
+
+License: Creative Commons Zero (CC0)
+http://creativecommons.org/publicdomain/zero/1.0/

@@ -99,11 +99,37 @@ at three heights) both run through it. A change that flips an arm or snaps a pos
 fails there with the sample at which it happened. Add a scenario there when a new behaviour has a way
 to go wrong that the rack job does not exercise.
 
+## Crouching
+
+A character with a crouch clip (`Crouch_Idle_Loop`, found by `clipIndex("crouch_idle")`) can lower its body.
+The clip is mixed over the animation at a weight (`ClipPlayer.setOverlay`), so 0 stands, 1 is the clip's
+full crouch, and anything between is a blend: the legs, pelvis and feet come from the animation, not from
+leg IK, which the bundled worker's rig could not take (its feet hang off the body as IK controls).
+
+`ApproachFor` plans it. A body that can crouch tries standing first and then ever deeper (`crouchLevels`),
+measuring the shoulder and belly at each depth on the skeleton (`HumanBody.crouchShift`), and takes the
+first stance that is comfortable: the belly clears the surface's edge, the lean stays under `comfortLean`,
+and the point is no further below the shoulder than the arm comfortably reaches. A body that cannot crouch
+has only the standing stance, as before. The body lowers once the worker has arrived and turned, and
+`Pick` and `Place` stand it up as they finish; `WalkTo` waits for it to be upright, since a crouched body
+does not walk. While a worker walks up to a surface its free arms are held down (`setArmsDown`) so a swing
+does not sweep a hand across the part.
+
+The Universal Animation Library character (`animkit/assets/quaternius-ual`) is the first that crouches;
+`UniversalSweepTests` runs the rack job on it from half a metre to a shelf.
+
 ## Known limits
 
-- **Low surfaces.** At about a metre or lower the lean reaches its limit before the belly clears the
-  surface's edge, leaving it 3 to 4 cm inside for either hand. Reaching that low needs a crouch, which
-  the body does not do. The layout sweep (`ScenarioSweepTests`) records this as its `CAPPED_CLEARANCE`.
+- **Low surfaces on the bundled worker.** At about a metre or lower the lean reaches its limit before the
+  belly clears the surface's edge, leaving it 3 to 4 cm inside for either hand. That worker has no crouch
+  clip, so it cannot do what the library character does here. The layout sweep (`ScenarioSweepTests`)
+  records this as its `CAPPED_CLEARANCE`.
+- **Crouch is one clip.** Depth is a blend between standing and the clip's full crouch, so a middle depth is
+  a mixed pose, not a clip of its own; the planner reaches down to about half a metre, not the floor, and a
+  crouched worker does not walk. The clip's feet are not pinned: a foot may lift a few centimetres at full depth.
+- **Curls are tuned on the bundled hand.** The library character's relaxed idle hand starts partly curled, so
+  a full curl overshoots toward a tight fist and a grip of a thin part cannot open the fingers further than
+  the clip. The curl axis is found on the skeleton, but the angles are not calibrated per rig.
 - **Tuning is checked on one rig.** `HumanPosture` is in metres, tuned on the bundled worker
   (`REFERENCE_STATURE`); a body built without a posture scales its lengths by its stature
   (`HumanPosture.forStature`), but only the bundled rig is swept. The finger-curl axis and the spine

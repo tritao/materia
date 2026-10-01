@@ -44,6 +44,9 @@ class HumanCharacter {
 	/** The left and right hands' fingers; null for a rig without them. */
 	final hands:Array<Null<HumanHand>>;
 	var lean:Float = 0.0;
+	/** The asset's crouching-in-place clip, or -1 when it has none; see setCrouch. */
+	final crouchClip:Int;
+	var crouchDepth:Float = 0.0;
 	/**
 	 * The joint-turn sources each feature applies its turns under (see AnimationInstance.setJointRotation),
 	 * so features that turn the same joint compose instead of overwriting one another. A feature added
@@ -64,8 +67,9 @@ class HumanCharacter {
 		instance = new AnimationInstance(asset);
 		pose = new HumanPose(this.rig, instance.readJointMatrices());
 		player = new ClipPlayer(instance);
-		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS),
-			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS)];
+		crouchClip = asset.clipIndex("crouch_idle");
+		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS, pose),
+			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS, pose)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
 	}
 
@@ -151,6 +155,24 @@ class HumanCharacter {
 
 	public function spineLean():Float
 		return lean;
+
+	/** Whether the asset has a crouch clip to lower the body with. */
+	public function canCrouch():Bool
+		return crouchClip >= 0;
+
+	/**
+	 * Lowers the body toward a crouch, by mixing the asset's crouching clip over the animation: 0 stands, 1 is
+	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay planted. Throws when the
+	 * asset has no crouch clip. Takes effect from the next advance, and is meant for a worker standing still.
+	 */
+	public function setCrouch(amount:Float):Void {
+		if (crouchClip < 0) throw "The character has no crouch clip";
+		crouchDepth = Math.max(0.0, Math.min(1.0, amount));
+		player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
+	}
+
+	public function crouch():Float
+		return crouchDepth;
 
 	/**
 	 * Curls each finger of a hand on its own: values are indexed HumanHand.THUMB to PINKY, each 0 open to

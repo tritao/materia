@@ -67,6 +67,43 @@ class AnimKitTests {
 		if (matrixGap(blended, continued) > 1e-3)
 			throw 'Starting a clip mid-fade snapped the pose by ${matrixGap(blended, continued)}';
 
+		// An overlay mixes a clip over the playing one at the weight it is given: none is the clip alone, all is the
+		// overlay alone, and half is a pose of neither.
+		var overlay = new ClipPlayer(instance);
+		overlay.restart(idle);
+		overlay.advance(0.3);
+		var plain = instance.readJointMatrices();
+		overlay.setOverlay(walk, 0.0);
+		overlay.advance(0.0);
+		if (matrixGap(plain, instance.readJointMatrices()) > 1e-4)
+			throw "An overlay at no weight changed the pose";
+		overlay.setOverlay(walk, 1.0);
+		overlay.advance(0.0);
+		var onlyOverlay = instance.readJointMatrices();
+		var walkAlone = new ClipPlayer(instance);
+		walkAlone.restart(walk);
+		walkAlone.advance(0.0);
+		if (matrixGap(onlyOverlay, instance.readJointMatrices()) > 1e-4)
+			throw "An overlay at full weight is not the overlay clip alone";
+		overlay.setOverlay(walk, 0.5);
+		overlay.advance(0.0);
+		var halfway = instance.readJointMatrices();
+		if (matrixGap(halfway, plain) < 1e-3 || matrixGap(halfway, onlyOverlay) < 1e-3)
+			throw "An overlay at half weight is not between the two poses";
+		overlay.setOverlay(-1, 1.0);
+		overlay.advance(0.0);
+		if (overlay.overlayAmount() != 0.0)
+			throw "Removing the overlay left a weight";
+		// Taking the overlay out and putting it back keeps its clock: it does not start over.
+		overlay.setOverlay(walk, 1.0);
+		overlay.advance(0.2);
+		var later = instance.readJointMatrices();
+		overlay.setOverlay(-1, 0.0);
+		overlay.setOverlay(walk, 1.0);
+		overlay.advance(0.0);
+		if (matrixGap(later, instance.readJointMatrices()) > 1e-4)
+			throw "Putting the overlay back restarted its clip";
+
 		var scene = Scene.create();
 		var model = new SkinnedModel(scene, instance, null, "Soldier");
 		if (model.primitiveNodes.length != 2)

@@ -139,6 +139,12 @@ class AnimationAsset {
 			if (clip.substr(clip.lastIndexOf("|") + 1).toLowerCase() == wanted)
 				return index;
 		}
+		// Some libraries name a looping clip with a "_Loop" suffix: "walk" finds "Walk_Loop".
+		for (index in 0...clipNames.length) {
+			var clip = clipNames[index];
+			if (clip.substr(clip.lastIndexOf("|") + 1).toLowerCase() == wanted + "_loop")
+				return index;
+		}
 		return -1;
 	}
 

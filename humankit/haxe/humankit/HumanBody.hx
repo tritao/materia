@@ -25,6 +25,10 @@ class HumanBody {
 	final wasHolding:Array<Bool> = [false, false, false, false];
 	var leanGoal:Float = 0.0;
 	var leanNow:Float = 0.0;
+	/** Whether free arms are held down at the sides, as when walking up to a surface they must not sweep over. */
+	var armsDown:Bool = false;
+	var crouchGoal:Float = 0.0;
+	var crouchNow:Float = 0.0;
 	/** Where the bones planning reads stand when the body is upright and at rest, in model space. */
 	final standing:Map<String, Array<Float>> = new Map();
 
@@ -156,17 +160,64 @@ class HumanBody {
 	public function setLean(angle:Float):Void
 		leanGoal = Math.max(0.0, Math.min(posture.maxLean, angle));
 
+	/** Whether the character can crouch: its asset has a crouch clip to lower the body with. */
+	public function canCrouch():Bool
+		return character.canCrouch();
+
+	/** Where the body is asked to crouch (0 stands, 1 is the clip's full crouch); it eases there. */
+	public function setCrouch(amount:Float):Void
+		crouchGoal = character.canCrouch() ? Math.max(0.0, Math.min(1.0, amount)) : 0.0;
+
+	/** How far the body is into its crouch now. */
+	public function crouchAmount():Float
+		return crouchNow;
+
+	/**
+	 * Holds the arms that are not reaching or carrying down at the sides instead of letting the gait swing them,
+	 * so walking up to a surface does not sweep a hand across what lies on it. Eases in and out like the hang a
+	 * lean asks for. Pick and Place let go of it once their hand has the part.
+	 */
+	public function setArmsDown(down:Bool):Void
+		armsDown = down;
+
+	/** Whether the body has finished easing to the crouch it was asked for. */
+	public function crouchReached():Bool
+		return Math.abs(crouchGoal - crouchNow) < 1e-6;
+
+	/**
+	 * How far a bone sits from where it stands upright when the body crouches `amount`, in model space.
+	 * Measured on the skeleton at the current animation time, with no lean; the pose is left as it was.
+	 */
+	public function crouchShift(bone:HumanBone, amount:Float):Array<Float> {
+		if (amount <= 0.0 || !character.canCrouch()) return [0.0, 0.0, 0.0];
+		var savedCrouch = character.crouch(), savedLean = character.spineLean();
+		character.setSpineLean(0.0);
+		character.setCrouch(0.0);
+		character.advance(0.0);
+		var upright = character.pose.bonePosition(bone);
+		character.setCrouch(amount);
+		character.advance(0.0);
+		var crouched = character.pose.bonePosition(bone);
+		character.setCrouch(savedCrouch);
+		character.setSpineLean(savedLean);
+		character.advance(0.0);
+		if (upright == null || crouched == null) return [0.0, 0.0, 0.0];
+		return [crouched[0] - upright[0], crouched[1] - upright[1], crouched[2] - upright[2]];
+	}
+
 	/**
 	 * The lean that carries a hand's shoulder `shift` metres further forward, and the shift it can
 	 * deliver (less than asked when that would pass the posture's maximum lean). Measured by leaning
-	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was.
+	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
+	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float):{angle:Float, shift:Float} {
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float} {
 		var none = {angle: 0.0, shift: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
-		var saved = character.spineLean();
+		var saved = character.spineLean(), savedCrouch = character.crouch();
 		var probe = 0.2;
+		if (character.canCrouch()) character.setCrouch(crouch);
 		character.setSpineLean(0.0);
 		character.advance(0.0);
 		var upright = character.pose.bonePosition(bone);
@@ -174,6 +225,7 @@ class HumanBody {
 		character.advance(0.0);
 		var leaned = character.pose.bonePosition(bone);
 		character.setSpineLean(saved);
+		if (character.canCrouch()) character.setCrouch(savedCrouch);
 		character.advance(0.0);
 		if (upright == null || leaned == null || leaned[0] - upright[0] < 1e-4) return none;
 		var perRadian = (leaned[0] - upright[0]) / probe;
@@ -185,6 +237,12 @@ class HumanBody {
 		var step = posture.leanRate * seconds;
 		leanNow = Math.abs(leanGoal - leanNow) <= step ? leanGoal : leanNow + (leanGoal > leanNow ? step : -step);
 		character.setSpineLean(leanNow);
+	}
+
+	function moveCrouch(seconds:Float):Void {
+		var step = posture.crouchRate * seconds;
+		crouchNow = Math.abs(crouchGoal - crouchNow) <= step ? crouchGoal : crouchNow + (crouchGoal > crouchNow ? step : -step);
+		if (character.canCrouch() && Math.abs(character.crouch() - crouchNow) > 1e-9) character.setCrouch(crouchNow);
 	}
 
 	function moveFingers(seconds:Float):Void {
@@ -413,6 +471,10 @@ class HumanBody {
 		leanGoal = 0.0;
 		leanNow = 0.0;
 		character.setSpineLean(0.0);
+		armsDown = false;
+		crouchGoal = 0.0;
+		crouchNow = 0.0;
+		if (character.canCrouch()) character.setCrouch(0.0);
 	}
 
 	/**
@@ -428,9 +490,10 @@ class HumanBody {
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
 		// A lean swings an unused arm back with the torso, so while the body leans a free arm is held hanging.
-		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02, posture.hangSeconds);
+		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || crouchNow > 0.02 || armsDown, posture.hangSeconds);
 		moveFingers(seconds);
 		moveLean(seconds);
+		moveCrouch(seconds);
 		walker.advance(seconds);
 		evaluate();
 	}

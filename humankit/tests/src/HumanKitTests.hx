@@ -19,6 +19,7 @@ import humankit.PlayClip;
 import humankit.HumanBodyView;
 import humankit.HumanBone;
 import humankit.HumanHand;
+import humankit.HumanTargetBox;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
@@ -103,6 +104,7 @@ class HumanKitTests {
 			throw 'Attaching a one-mesh prop changed draw calls from $before to $after';
 		bodyView(scene, human);
 		human.dispose();
+		universalCharacter(scene, worker, rig);
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
@@ -119,6 +121,95 @@ class HumanKitTests {
 		jobSpecs(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
+	}
+
+	/**
+	 * Quaternius's Universal Animation Library character: a second rig, with real leg chains and a crouch clip. The
+	 * checks that name no joints run on it as they do on the bundled worker; the rest are about what it adds.
+	 */
+	static function universalCharacter(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
+		var rig = HumanoidRig.detect(asset);
+		if (rig.mapping.name != "universal") throw 'The library character matched the ${rig.mapping.name} preset';
+		var human = new HumanCharacter(scene, asset, rig, null, "Universal");
+		inRange(human.height(), 1.7, 1.95, "library character height");
+		// Its fingers curl by the same joint turns, about the axis found on its own skeleton: in the rest pose a
+		// light curl brings the middle fingertip toward the palm's face. (Its relaxed idle hand already starts
+		// partly curled, so a full curl overshoots there; only the rest pose is held to this.)
+		var depth = function():Float {
+			var frame = human.pose.boneFrame(HumanBone.HandR), wrist = human.pose.bonePosition(HumanBone.HandR);
+			var knuckle = human.pose.bonePosition(HumanBone.MiddleR), tip = human.fingertip(ArmR, HumanHand.MIDDLE);
+			var total = 0.0;
+			for (axis in 0...3) total -= (tip[axis] - (wrist[axis] + knuckle[axis]) * 0.5) * frame[8 + axis];
+			return total;
+		};
+		human.advance(0.0);
+		var open = depth();
+		human.setHandCurl(ArmR, 0.3);
+		human.advance(0.0);
+		var closing = depth();
+		if (closing - open < 0.02) throw 'Curling a library hand moved the middle fingertip from $open to $closing m off the palm';
+		human.setHandCurl(ArmR, 0.0);
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		// Its legs are chains, so an ankle can be reached, which the bundled worker's cannot.
+		var foot = human.pose.bonePosition(HumanBone.FootL);
+		var ankle = [foot[0] + 0.15, foot[1], foot[2] + 0.15];
+		human.reach(LegL, ankle, 1.0);
+		human.advance(0.0);
+		if (distance(human.pose.bonePosition(HumanBone.FootL), ankle) > 0.03)
+			throw "A library character's ankle did not reach its target";
+		human.release(LegL);
+		// It crouches: the pelvis comes down steadily and the feet stay on the floor.
+		if (!human.canCrouch()) throw "The library character has a crouch clip but cannot crouch";
+		var last = 10.0;
+		for (amount in [0.0, 0.25, 0.5, 0.75, 1.0]) {
+			human.setCrouch(amount);
+			human.advance(0.0);
+			var pelvis = human.pose.bonePosition(HumanBone.Pelvis)[2];
+			if (!(pelvis < last)) throw 'The pelvis did not come down at crouch $amount: $pelvis after $last';
+			last = pelvis;
+			for (bone in [HumanBone.FootL, HumanBone.FootR])
+				if (human.pose.bonePosition(bone)[2] > 0.2) throw 'A foot left the floor at crouch $amount: ${human.pose.bonePosition(bone)[2]}';
+		}
+		human.setCrouch(0.0);
+		human.advance(0.0);
+		var standing = human.pose.bonePosition(HumanBone.Pelvis)[2];
+		if (standing - last < 0.3) throw 'A full crouch only lowered the pelvis ${standing - last} m';
+		// The planner crouches for a low surface and not for a shelf; the bundled worker, which cannot, refuses the low one.
+		var body = new HumanBody(human);
+		var bench:HumanTargetBox = {center: [0.6, 0.0, 0.55], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
+		var shelf:HumanTargetBox = {center: [0.6, 0.0, 1.15], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
+		var low = new ApproachFor([0.6, 0.0, 0.62], ArmR, 1.0, false, null, bench);
+		var lowJob = new HumanJob(body).add(low);
+		lowJob.advance(1.0 / 60.0);
+		if (lowJob.failure() != null) throw 'A bench was not reachable crouched: ${lowJob.failure()}';
+		var high = new ApproachFor([0.6, 0.0, 1.22], ArmR, 1.0, false, null, shelf);
+		var highJob = new HumanJob(body).add(high);
+		highJob.advance(1.0 / 60.0);
+		if (highJob.failure() != null) throw 'A shelf was not reachable: ${highJob.failure()}';
+		if (!(low.crouch >= 0.4) || !(high.crouch <= 0.1))
+			throw 'The planner crouched ${low.crouch} for a bench and ${high.crouch} for a shelf';
+		body.cancel();
+		human.dispose();
+		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");
+		var plainBody = new HumanBody(plain);
+		if (plain.canCrouch() || plainBody.canCrouch()) throw "The bundled worker has no crouch clip but claims to crouch";
+		plainBody.setCrouch(1.0);
+		plainBody.advance(0.1);
+		if (plainBody.crouchAmount() != 0.0) throw "A body that cannot crouch crouched";
+		var refused = new HumanJob(plainBody).add(new ApproachFor([0.6, 0.0, 0.62], ArmR, 1.0, false, null, bench));
+		refused.advance(1.0 / 60.0);
+		if (refused.failure() == null || refused.failure().indexOf("crouching is unsupported") < 0)
+			throw 'A bench was not refused by the worker that cannot crouch: ${refused.failure()}';
+		plain.dispose();
+		// The checks that name no joints hold on the library character too.
+		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
+		var againRig = HumanoidRig.detect(again);
+		walking(scene, again, againRig);
+		elbowStaysPut(scene, again, againRig);
+		leaning(scene, again, againRig);
+		facilityRoute(scene, again, againRig);
 	}
 
 	static function jobSpecs(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
