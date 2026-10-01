@@ -597,9 +597,20 @@ int main() {
         return 129;
     if (!long_word.edit_utf8(edit_offset, edit_offset, "a", &edited_rows) ||
         long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
-                                            GlyphMode::Alpha) == preceding ||
-        long_word.prepared_glyphs_current(*preceding))
+                                            GlyphMode::Alpha) != preceding ||
+        !long_word.prepared_glyphs_current(*preceding) ||
+        long_word.published_glyphs_for_line(long_layout.id, middle + 20, 0, 0, 1,
+                                            GlyphMode::Alpha) == following ||
+        long_word.prepared_glyphs_current(*following))
         return 130;
+    const auto after_insert = long_word.published_glyphs_for_line(
+        long_layout.id, middle + 20, 0, 0, 1, GlyphMode::Alpha);
+    if (!after_insert || !long_word.edit_utf8(edit_offset, edit_offset + 1, "", &edited_rows) ||
+        long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
+                                            GlyphMode::Alpha) != preceding ||
+        !long_word.prepared_glyphs_current(*preceding) ||
+        long_word.prepared_glyphs_current(*after_insert))
+        return 131;
 
 
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;

@@ -683,11 +683,12 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
                                  std::strlen(replacement);
         for (int32_t index = 0; index < line_count; ++index) {
             const auto &line = lines[index];
-            const bool reusable = same_length && index < static_cast<int32_t>(current->line_ranges.size()) &&
+            const bool reusable = index < static_cast<int32_t>(current->line_ranges.size()) &&
                 index < static_cast<int32_t>(current->line_revisions.size()) &&
                 line.text_range.start == current->line_ranges[index].start &&
                 line.text_range.end == current->line_ranges[index].end &&
-                (line.text_range.end < start || line.text_range.start > end) &&
+                (line.text_range.end < start ||
+                 (same_length && line.text_range.start > end)) &&
                 line.bounds.x == layout_result.lines[index].bounds.x &&
                 line.bounds.y == layout_result.lines[index].bounds.y &&
                 line.bounds.width == layout_result.lines[index].bounds.width &&
