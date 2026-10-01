@@ -147,6 +147,10 @@ class HumanWalker {
 	public function isTurning():Bool
 		return facing != null;
 
+	/** Whether the character stands still with its walk faded out: not walking, not turning, not mid-crossfade. */
+	public function settled():Bool
+		return !walking && facing == null && !character.player.fading();
+
 	/** Stops where the character stands and idles. */
 	public function stop():Void {
 		facing = null;

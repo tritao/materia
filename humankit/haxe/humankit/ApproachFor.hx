@@ -17,13 +17,16 @@ class ApproachFor extends HumanActionBase {
 	public final bothHands:Bool;
 	/**
 	 * How far short of the surface's edge the belly ends, in metres, once the lean and the stretch are spent:
-	 * zero when the stance clears it. A surface low or deep enough to need a crouch leaves this above zero,
-	 * since the worker does not crouch; the job still runs, with the belly over the edge by about this much.
+	 * zero when the stance clears it. A surface too deep for the arm to reach over (a crouch does not help: it
+	 * lowers the shoulder, not carries it over the edge), or a body that cannot crouch at a low one, leaves this above
+	 * zero; the job still runs, with the belly over the edge by about this much.
 	 */
 	public var shortfall(default, null):Float = 0.0;
 	/** How deep a crouch the worker takes at the stand (0 upright, 1 the clip's full crouch), once it has arrived. */
 	public var crouch(default, null):Float = 0.0;
-	var crouchIssued:Bool = false;
+	/** How far the upper body leans over the surface at the stand, in radians, once the worker has arrived. */
+	public var lean(default, null):Float = 0.0;
+	var postureIssued:Bool = false;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
 	final targetProvider:Null<Void->Array<Float>>;
@@ -51,10 +54,11 @@ class ApproachFor extends HumanActionBase {
 		var bellyBone = worker.standingBone(Spine) != null ? Spine : Pelvis;
 		var belly = worker.standingBone(bellyBone);
 		var root = worker.rootTransform();
-		// A body that can crouch tries standing first and then ever deeper, and takes the first stance that is
-		// comfortable: clear of the surface's edge, without leaning further than a worker would, and with the
-		// point no further below the shoulder than the arm comfortably reaches. A body that cannot crouch has
-		// only the standing stance.
+		// Standing is tried first. A worker crouches only for a point lower than the arm comfortably reaches below
+		// the shoulder: crouching brings the shoulder down, not forward over a surface, so it does nothing for a
+		// point at table height. For a lower one, ever deeper crouches are tried and the first that is comfortable
+		// is taken: clear of the surface's edge, leaning no more than a worker would, the point in comfortable reach.
+		// Failing that, the best of those tried: least short of the edge, then least lean.
 		var levels = worker.canCrouch() ? Std.int(Math.max(1.0, worker.posture.crouchLevels)) : 1;
 		var chosen:Null<Stance> = null;
 		var failure:Null<String> = null;
@@ -68,7 +72,11 @@ class ApproachFor extends HumanActionBase {
 			if (chosen == null || stance.shortfall < chosen.shortfall - 0.01 ||
 				(Math.abs(stance.shortfall - chosen.shortfall) <= 0.01 && stance.lean < chosen.lean - 0.01))
 				chosen = stance;
-			if (levels == 1 || (stance.shortfall <= 0.01 && stance.lean <= worker.posture.comfortLean && stance.comfortable)) break;
+			if (step == 0 && stance.comfortable) break;
+			if (stance.shortfall <= 0.01 && stance.lean <= worker.posture.comfortLean && stance.comfortable) {
+				chosen = stance;
+				break;
+			}
 		}
 		if (chosen == null) {
 			fail(failure == null ? "Target is out of reach" : failure);
@@ -76,9 +84,9 @@ class ApproachFor extends HumanActionBase {
 		}
 		shortfall = chosen.shortfall;
 		crouch = chosen.crouch;
-		worker.setLean(chosen.lean);
+		lean = chosen.lean;
+		worker.setLean(lean);
 		worker.setArmsDown(support != null);
-		if (crouch <= 0.0) worker.setCrouch(0.0);
 		var standX = target[0] - chosen.ux * chosen.standDistance + chosen.uy * chosen.lateral;
 		var standY = target[1] - chosen.uy * chosen.standDistance - chosen.ux * chosen.lateral;
 		faceAngle = Math.atan2(chosen.uy, chosen.ux);
@@ -137,15 +145,18 @@ class ApproachFor extends HumanActionBase {
 			var required = edgeDistance(support, target, stance.ux, stance.uy) + (belly == null ? 0.0 : belly[0]) +
 				worker.posture.bellyFront + worker.posture.edgeGap;
 			if (required > stance.standDistance) {
-				// Standing back from the edge leaves the shoulder short of the point: lean to make it up.
+				// Standing back from the edge leaves the shoulder short of the point: lean to make it up. The lean
+				// carries the shoulder forward and also lowers it, both as measured, and the arm then stretches
+				// past its comfortable reach, but no further from the shoulder where it ends up than the posture allows.
 				var made = worker.leanFor(limb, required - stance.standDistance, depth);
 				stance.lean = made.angle;
-				stance.standDistance += made.shift;
-				// With the lean spent, stretch the arm past its comfortable reach, up to the posture's limit.
-				if (required > stance.standDistance) {
-					var aheadMost = Math.sqrt(farthest * farthest - rise * rise);
-					stance.standDistance += Math.min(required - stance.standDistance, Math.max(0.0, aheadMost - ahead));
+				var riseAfter = rise - made.drop;
+				if (Math.abs(riseAfter) >= farthest) {
+					stance.failure = riseAfter > 0.0 ? "Target is above reachable height" : "Target is below the arm's reach when leaning";
+					return stance;
 				}
+				var reachMost = shoulder[0] + made.shift + Math.sqrt(farthest * farthest - riseAfter * riseAfter) - worker.posture.reachSlack;
+				stance.standDistance = Math.max(stance.standDistance, Math.min(required, reachMost));
 				stance.shortfall = Math.max(0.0, required - stance.standDistance);
 			}
 		}
@@ -177,13 +188,14 @@ class ApproachFor extends HumanActionBase {
 			worker.walker.face(faceAngle);
 			turnIssued = true;
 		}
-		// The body lowers once it stands where it will work and has turned to face the point.
-		if (!done && turnIssued && !crouchIssued && crouch > 0.0 && !worker.walker.isTurning()) {
-			crouchIssued = true;
+		// The body lowers and leans once it stands where it will work and has turned to face the point, not on the
+		// way there, and the reach waits until it has: a shoulder still on its way would put the point out of reach.
+		if (!done && turnIssued && !postureIssued && !worker.walker.isTurning()) {
+			postureIssued = true;
 			worker.setCrouch(crouch);
 		}
 	}
 
 	override public function isDone():Bool
-		return done || (turnIssued && !worker.walker.isTurning() && (crouchIssued || crouch <= 0.0) && worker.crouchReached());
+		return done || (turnIssued && !worker.walker.isTurning() && postureIssued && worker.crouchReached() && worker.leanReached() && worker.walker.settled());
 }

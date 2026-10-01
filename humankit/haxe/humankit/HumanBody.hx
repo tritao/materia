@@ -180,6 +180,10 @@ class HumanBody {
 	public function setArmsDown(down:Bool):Void
 		armsDown = down;
 
+	/** Whether the body has finished easing to the lean it was asked for. */
+	public function leanReached():Bool
+		return Math.abs(leanGoal - leanNow) < 1e-6;
+
 	/** Whether the body has finished easing to the crouch it was asked for. */
 	public function crouchReached():Bool
 		return Math.abs(crouchGoal - crouchNow) < 1e-6;
@@ -211,26 +215,40 @@ class HumanBody {
 	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
 	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float} {
-		var none = {angle: 0.0, shift: 0.0};
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float, drop:Float} {
+		var none = {angle: 0.0, shift: 0.0, drop: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
 		var saved = character.spineLean(), savedCrouch = character.crouch();
-		var probe = 0.2;
 		if (character.canCrouch()) character.setCrouch(crouch);
 		character.setSpineLean(0.0);
 		character.advance(0.0);
 		var upright = character.pose.bonePosition(bone);
-		character.setSpineLean(probe);
-		character.advance(0.0);
-		var leaned = character.pose.bonePosition(bone);
+		var at = function(angle:Float):Null<Array<Float>> {
+			character.setSpineLean(angle);
+			character.advance(0.0);
+			return character.pose.bonePosition(bone);
+		};
+		// The forward shift is not linear in the lean, so the probe only gives a first guess: the angle is then
+		// corrected where it is used, and the shift and the drop of the shoulder reported are the measured ones.
+		var probe = 0.2;
+		var leaned = at(probe);
+		var result = none;
+		if (upright != null && leaned != null && leaned[0] - upright[0] > 1e-4) {
+			var angle = Math.min(posture.maxLean, shift * probe / (leaned[0] - upright[0]));
+			for (round in 0...3) {
+				var there = at(angle);
+				if (there == null) break;
+				var made = there[0] - upright[0];
+				result = {angle: angle, shift: made, drop: there[2] - upright[2]};
+				if (Math.abs(made - shift) < 5e-4 || angle >= posture.maxLean - 1e-6 && made < shift) break;
+				angle = Math.min(posture.maxLean, angle * shift / Math.max(1e-4, made));
+			}
+		}
 		character.setSpineLean(saved);
 		if (character.canCrouch()) character.setCrouch(savedCrouch);
 		character.advance(0.0);
-		if (upright == null || leaned == null || leaned[0] - upright[0] < 1e-4) return none;
-		var perRadian = (leaned[0] - upright[0]) / probe;
-		var angle = Math.min(posture.maxLean, shift / perRadian);
-		return {angle: angle, shift: angle * perRadian};
+		return result;
 	}
 
 	function moveLean(seconds:Float):Void {

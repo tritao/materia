@@ -162,7 +162,7 @@ class HumanCharacter {
 
 	/**
 	 * Lowers the body toward a crouch, by mixing the asset's crouching clip over the animation: 0 stands, 1 is
-	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay planted. Throws when the
+	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not pinned: one may lift a few centimetres at full depth). Throws when the
 	 * asset has no crouch clip. Takes effect from the next advance, and is meant for a worker standing still.
 	 */
 	public function setCrouch(amount:Float):Void {

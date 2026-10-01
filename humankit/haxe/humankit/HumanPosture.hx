@@ -23,6 +23,13 @@ class HumanPosture {
 	 */
 	public var stretch:Float = 0.91;
 
+	/**
+	 * Reach held back from the stretch when a stance is planned, in metres: the shoulder is measured at one moment
+	 * and the grasp point is not exactly the planned one, so a stance planned to the stretch would sometimes be a
+	 * little past what the arm can reach.
+	 */
+	public var reachSlack:Float = 0.03;
+
 	/** With two hands on one object, how far each hand's grasp point sits to its own side of the object's centre, in metres. */
 	public var handSpread:Float = 0.08;
 

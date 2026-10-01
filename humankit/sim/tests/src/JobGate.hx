@@ -32,6 +32,8 @@ class JobGate {
     final limbs:Array<HumanLimb>;
     /** Whether the hand has held something yet: reaching before that is a pick, and after letting go a retreat. */
     var gripped:Bool = false;
+    /** The document step that was running at each sample, so a finding can say where in the job it happened. */
+    final steps:Array<Int> = [];
 
     /** `limbs` are the hands that do the work: one for a one-handed job, both for a two-handed one. */
     public function new(worker:HumanWorker, session:SimSession, limbs:Array<HumanLimb>, surfaces:Array<HumanTargetBox>) {
@@ -41,9 +43,15 @@ class JobGate {
         this.surfaces = surfaces;
     }
 
+    /** The document step running at a sample (1-based, as `MotionQuality` counts), or -1. */
+    public function stepAt(sample:Int):Int
+        return sample >= 1 && sample <= steps.length ? steps[sample - 1] : -1;
+
     public function sample():Void {
         var body = worker.body, pose = body.character.pose;
         quality.sample(pose, session.fixedTimestep());
+        var step = worker.currentStep();
+        steps.push(step == null ? -1 : step);
         lean = Math.max(lean, body.character.spineLean());
         if (body.grip) gripped = true;
         // Only while reaching for the part, or holding it to place it: walking back past a surface after
@@ -61,7 +69,8 @@ class JobGate {
      * where the elbows and belly end up are left to the caller, for a run known to need a crouch the body
      * does not do; the motion limits still apply.
      */
-    public function check(label:String, failures:Array<String>, posture:Bool = true):Void {
+    public function check(label:String, failures:Array<String>, posture:Bool = true, ?minElbow:Float):Void {
+        var elbowLimit = minElbow == null ? MotionQualityTests.MIN_ELBOW_ANGLE : minElbow;
         for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
             var arm = quality.arm(side), name = side == MotionQuality.RIGHT ? "right" : "left";
             if (arm.planeTurnRate > MotionQualityTests.MAX_PLANE_TURN)
@@ -72,12 +81,14 @@ class JobGate {
                 failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt}');
             if (!posture) continue;
             if (arm.elbowAboveShoulder > 0.0) failures.push('$label: the $name elbow rose ${r(arm.elbowAboveShoulder)} m above the shoulder');
-            if (arm.minElbowAngle < MotionQualityTests.MIN_ELBOW_ANGLE)
-                failures.push('$label: the $name elbow bent to ${r(arm.minElbowAngle)} degrees');
+            if (arm.minElbowAngle < elbowLimit)
+                failures.push('$label: the $name elbow bent to ${r(arm.minElbowAngle)} degrees at sample ${arm.minElbowAt} (step ${stepAt(arm.minElbowAt)})');
         }
         if (!posture) return;
         var capped = lean >= worker.body.posture.maxLean - 0.01;
-        if (clearance < (capped ? CAPPED_CLEARANCE : CLEARANCE))
+        // A stance the planner itself reports as short of clearing an edge may stand that far inside it, and a little more.
+        var allowed = Math.min(capped ? CAPPED_CLEARANCE : CLEARANCE, -(worker.approachShortfall() + 0.02));
+        if (clearance < allowed)
             failures.push('$label: the belly stood ${r(-clearance)} m inside a surface (lean ${r(lean)} rad${capped ? ", at its limit" : ""})');
     }
 

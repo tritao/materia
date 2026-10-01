@@ -192,6 +192,12 @@ class HumanKitTests {
 		if (highJob.failure() != null) throw 'A shelf was not reachable: ${highJob.failure()}';
 		if (!(low.crouch >= 0.4) || !(high.crouch <= 0.1))
 			throw 'The planner crouched ${low.crouch} for a bench and ${high.crouch} for a shelf';
+		// A deep top at table height is no reason to crouch: it lowers the shoulder, not forward over the edge.
+		var wide:HumanTargetBox = {center: [0.7, 0.0, 1.01], halfExtents: [0.4, 0.4, 0.05], yaw: 0.0};
+		var deep = new ApproachFor([0.7, 0.0, 1.1], ArmR, 1.0, false, null, wide);
+		var deepJob = new HumanJob(body).add(deep);
+		deepJob.advance(1.0 / 60.0);
+		if (!(deep.crouch <= 0.1)) throw 'The planner crouched ${deep.crouch} for a deep top at table height';
 		body.cancel();
 		human.dispose();
 		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");

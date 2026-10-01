@@ -36,6 +36,10 @@ class ClipPlayer {
 	public function currentClip():Int
 		return clip;
 
+	/** Whether a crossfade between clips is still running. */
+	public function fading():Bool
+		return outgoing.length > 0;
+
 	public function currentTime():Float
 		return time;
 
