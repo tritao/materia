@@ -86,16 +86,17 @@ class Carriage extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.box(width, width, length);
+		var body = Solids.named(Part.box(width, width, length), "body");
 		if (detail == Envelope) return body;
-		var tools = [Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1)];
+		var tools = [Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1), "bore")];
 		if (!hasRailMount) {
-			tools.push(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, -guideSpacing));
-			tools.push(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, guideSpacing));
+			tools.push(Solids.named(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, -guideSpacing), "guide.left"));
+			tools.push(Solids.named(Part.cylinderSpan(guideSeatDiameter / 2, -0.1, length + 0.1, guideSpacing), "guide.right"));
 		}
 		var mountHoleRadius = nut.mountScrewPart(10).clearanceDiameter(Medium) / 2;
+		var bolt = 1;
 		for (point in nut.boltPattern())
-			tools.push(Part.cylinderSpan(mountHoleRadius, -0.1, length + 0.1, point.x, point.y));
+			tools.push(Solids.named(Part.cylinderSpan(mountHoleRadius, -0.1, length + 0.1, point.x, point.y), "nutbolt" + bolt++));
 		return Solids.cut(body, tools);
 	}
 }

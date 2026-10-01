@@ -182,8 +182,10 @@ class NemaStepper extends MachineComponent {
 	public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {
 		if (!(thickness > 0)) throw "Motor mounting plate needs a positive thickness";
 		var radius = mountScrew(10).clearanceDiameter(fit) / 2;
-		var tools = [Part.cylinderSpan((spec.pilotDiameter + pilotClearance) / 2, 0, thickness)];
-		for (point in boltPattern()) tools.push(Part.cylinderSpan(radius, 0, thickness, point.x, point.y));
+		// Named like the motor's own bodies, so the faces a cutout leaves in a mating plate stay distinguishable.
+		var tools = [Solids.named(Part.cylinderSpan((spec.pilotDiameter + pilotClearance) / 2, 0, thickness), "pilot")];
+		var bolt = 1;
+		for (point in boltPattern()) tools.push(Solids.named(Part.cylinderSpan(radius, 0, thickness, point.x, point.y), "bolt" + bolt++));
 		return Solids.union(tools);
 	}
 

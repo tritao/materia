@@ -96,16 +96,17 @@ class LeadScrewNut extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength);
-		var flange = Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness);
+		var body = Solids.named(Part.cylinderSpan(bodyDiameter / 2, 0, bodyLength), "body");
+		var flange = Solids.named(Part.cylinderSpan(flangeDiameter / 2, bodyLength, bodyLength + flangeThickness), "flange");
 		var solidPart = Solids.union([body, flange]);
-		var boreTool = Part.cylinderSpan(screwDiameter / 2, -0.1, bodyLength + flangeThickness + 0.1);
+		var boreTool = Solids.named(Part.cylinderSpan(screwDiameter / 2, -0.1, bodyLength + flangeThickness + 0.1), "bore");
 		if (detail == Envelope) return Solids.cut(solidPart, [boreTool]);
 		var screw = mountScrewPart(10);
 		var tools = [boreTool];
+		var bolt = 1;
 		for (point in boltPattern())
-			tools.push(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, bodyLength - 0.1,
-				bodyLength + flangeThickness + 0.1, point.x, point.y));
+			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, bodyLength - 0.1,
+				bodyLength + flangeThickness + 0.1, point.x, point.y), "bolt" + bolt++));
 		return Solids.cut(solidPart, tools);
 	}
 

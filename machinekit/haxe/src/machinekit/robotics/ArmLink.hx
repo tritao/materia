@@ -98,10 +98,10 @@ class ArmLink extends MachineComponent {
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var start = direction(startAxis);
-		var collar = Part.cylinderAlong(collarDiameter / 2, new Vector(0, 0, 0),
-			new Vector(start.x, start.y, start.z), COLLAR_THICKNESS);
-		var body = Solids.union([Part.cylinderSpan(diameter / 2, 0, length), collar]);
+		var collar = Solids.named(Part.cylinderAlong(collarDiameter / 2, new Vector(0, 0, 0),
+			new Vector(start.x, start.y, start.z), COLLAR_THICKNESS), "collar");
+		var body = Solids.union([Solids.named(Part.cylinderSpan(diameter / 2, 0, length), "tube"), collar]);
 		if (detail == Envelope) return body;
-		return Solids.cut(body, [Part.cylinderSpan(diameter / 2 - wall, wall, length - wall)]);
+		return Solids.cut(body, [Solids.named(Part.cylinderSpan(diameter / 2 - wall, wall, length - wall), "cavity")]);
 	}
 }

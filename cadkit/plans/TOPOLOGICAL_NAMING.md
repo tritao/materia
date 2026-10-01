@@ -854,3 +854,32 @@ TN6 (STEP names) stays optional and last.
   "choose the right-hand piece" applies x = 28 with the sketch on that
   piece; undo puts back both the slot and the original face; redo
   reapplies both.
+
+### 2026-10-01 — TN8 done: MachineKit recipes name their bodies
+
+- `MachineKitNamingAudit` (in `MachineKitSmoke`) builds every component
+  type's default geometry and requires strong, unique face names.
+  `MACHINEKIT_NAMING_AUDIT=print` lists the offenders. A component in its
+  `UNNAMED` list must still fail, so the list can only shrink.
+- **Before:** 15 component types had weak or repeated faces, all from
+  same-kind primitives colliding (`cyl.side@0/@1`): deep-groove bearing,
+  socket-head cap screw, flat washer, shaft collar, bushing, linear
+  bearing, pillow block, flange bearing housing, lead-screw nut, robot
+  flange, end-effector plate, pedestal, arm link, shaft coupling, carriage.
+- **After:** they name their bodies with `Solids.named`:
+  - by role: `body`, `bore`, `head`, `shank`, `socket`, `rings`,
+    `cavity`, `flange`, `pilot`, `pin`, `barrel`, `base`, `column`,
+    `tube`, `collar`, `guide.left/right`, `rim.front/back`,
+    `seal.front/back`;
+  - by position in an authored hole pattern: `bolt<k>`, `toolbolt<k>`,
+    `nutbolt<k>`, `anchor<k>`, `foot<k>`, `gusset<k>`, `setscrew<k>`
+    (1-based like the `bolt<k>` connectors; the same convention as pattern
+    instances).
+- **Cutting tools too:** the mounting cutouts (`RobotFlange` and
+  `NemaStepper`), so the faces a cutout leaves in a mating plate (the
+  end-effector plate, the pedestal's top) stay distinguishable.
+- **Two remain, by design** (`UNNAMED`, documented): the pillow block's
+  barrel side and the coupling's set-screw hole ends are each split into
+  mirror-image pieces with identical neighbours. They get weak ordinals by
+  position, resolved only when the geometry agrees.
+- MachineKit's full script (examples and the robot-arm motion check) passes.

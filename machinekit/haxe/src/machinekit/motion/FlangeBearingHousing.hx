@@ -64,13 +64,15 @@ class FlangeBearingHousing extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var body = Part.box(face, face, depth);
-		var boreTool = Part.cylinderSpan((bearing.outside + allowance) / 2, -0.1, depth + 0.1);
+		var body = Solids.named(Part.box(face, face, depth), "body");
+		var boreTool = Solids.named(Part.cylinderSpan((bearing.outside + allowance) / 2, -0.1, depth + 0.1), "bore");
 		if (detail == Envelope) return Solids.cut(body, [boreTool]);
 		var screw = mountScrewPart(10);
 		var tools = [boreTool];
+		var bolt = 1;
 		for (point in boltPattern())
-			tools.push(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, point.x, point.y));
+			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -0.1, depth + 0.1, point.x, point.y),
+				"bolt" + bolt++));
 		return Solids.cut(body, tools);
 	}
 

@@ -2512,6 +2512,7 @@ class MachineKitSmoke {
 
 	static function main():Void {
 		namedStepperFaces();
+		MachineKitNamingAudit.run();
 		MachineAssemblyDescriptionTests.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();
