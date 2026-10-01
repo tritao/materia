@@ -792,3 +792,34 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   - widening the plate moves the bore and the pin follows;
   - a second bore of the same radius → ambiguous;
   - a connector on a face the part lacks → reported.
+
+### Post-C4.4 review: fixes and refactors (2026-10-01)
+
+1. **Angle and distance mates are regular** (`f1dccb2f`).
+   - The angle row is `acos(a·b) − value`, in radians.
+   - At 0 or π, a single row cannot express alignment (that is two
+     constraints, and the angle is not differentiable there). So those
+     values compile to stereographic alignment rows
+     `2σ(b·u)/(1 + σ a·b)`, which vanish only in the requested direction.
+   - Validation refuses a zero distance (use coincident) and angles outside
+     [0, π].
+2. **One assembly-solve core** (`AssemblySolve`) for `AssemblyLoopSolver`
+   and `AssemblyMateSolver`. It holds:
+   - one options type and tolerance policy (1 µm, 1e-6 rad, 200
+     iterations);
+   - one assembly scale (the diagonal of the occurrence origins plus the
+     connectors' reach);
+   - the LM call, the status names, and the witness check for degenerate
+     poses.
+
+   The loop solver's witness nudges the driven joints; the mate solver's
+   nudges everything the mates move. The mate result now reports
+   `degenerate`. The unused `finiteDifferenceStep` option is gone.
+3. **Negligible Jacobian entries are dropped before diagnosis**
+   (`AssemblyClosureDiagnosis`). An entry is dropped when moving its
+   variable over its characteristic range (a radian, or the assembly scale)
+   changes the tolerance-scaled row by less than 1e-6. Without this, the
+   diagnosis's row equilibration blew roundoff up into a unit row, and a
+   singular pose looked regular. Test: a folded two-link arm whose tip is
+   at its mated distance from a point on its own line is reported as a
+   degenerate placement with one degree of freedom.

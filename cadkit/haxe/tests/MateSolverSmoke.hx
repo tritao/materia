@@ -1,6 +1,7 @@
 import cadkit.modeling.AssemblyMateSolver;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
@@ -54,6 +55,31 @@ class MateSolverSmoke {
 		var armState = new AssemblyState(arm, reach.state(arm));
 		var tip = armState.worldConnector("link", "tip"), target = armState.worldConnector("base", "fixture");
 		near(Math.sqrt(Math.pow(tip.x - target.x, 2) + Math.pow(tip.y - target.y, 2)), 0, "the tip is on the fixture point");
+		check(!reach.degenerate, "an ordinary placement is not degenerate");
+
+		// A folded arm whose tip is already at the mated distance from a point on its line: there, both joints move the
+		// tip across the distance, so its row vanishes; anywhere else on the solutions it does not. The witness tells.
+		var folded = foldedArm();
+		var singular = AssemblyMateSolver.solve(folded);
+		check(singular.converged && singular.degenerate && singular.report.degreesOfFreedom == 1,
+			'a folded arm at its mated distance is a degenerate placement with one freedom (${singular.degenerate}, ${singular.report.degreesOfFreedom})');
+	}
+
+	/** Two links (100 and 40 mm) folded back along x, so the tip is at x = 60, 140 mm from a point at x = 200. */
+	static function foldedArm():AssemblyDefinition {
+		var free:AssemblyJointLimits = {lower: null, upper: null, velocity: null, effort: null};
+		return {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "folded-arm", lengthUnit: "mm",
+			definitions: [{id: "base", connectors: [{name: "pivot", frame: frame(0, 0, 0)}, {name: "point", frame: frame(200, 0, 0)}]},
+				{id: "upper", connectors: [{name: "root", frame: frame(0, 0, 0)}, {name: "elbow", frame: frame(100, 0, 0)}]},
+				{id: "fore", connectors: [{name: "root", frame: frame(0, 0, 0)}, {name: "tip", frame: frame(40, 0, 0)}]}],
+			occurrences: [{id: "base", definition: "base", initialPose: frame(0, 0, 0), grounded: true},
+				{id: "upper", definition: "upper", initialPose: frame(0, 0, 0)}, {id: "fore", definition: "fore", initialPose: frame(100, 0, 0)}],
+			joints: [{id: "shoulder", type: AssemblyJointType.Revolute, role: AssemblyJointRole.Tree, parent: "base", parentConnector: "pivot",
+				child: "upper", childConnector: "root", axis: {x: 0, y: 0, z: 1}, limits: free, defaultValue: 0},
+				{id: "elbow", type: AssemblyJointType.Revolute, role: AssemblyJointRole.Tree, parent: "upper", parentConnector: "elbow",
+					child: "fore", childConnector: "root", axis: {x: 0, y: 0, z: 1}, limits: free, defaultValue: Math.PI}],
+			mates: [{id: "reach", kind: AssemblyMateKind.Distance, first: "base", firstConnector: "point", second: "fore",
+				secondConnector: "tip", axis: {x: 0, y: 0, z: 1}, value: 140}]};
 	}
 
 	/** Mates and grounded occurrences survive assembly documents and a document save and reload. */

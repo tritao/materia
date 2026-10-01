@@ -4,11 +4,8 @@ import cadkit.solve.ConstraintDiagnosis;
 import kinematicskit.ClosureTask;
 import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicState;
-import kinematicskit.KinematicStatus;
-import kinematicskit.LevenbergMarquardt;
 import kinematicskit.RootMotion;
 import materia.assembly.AssemblyDefinition;
-import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoordinate;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyRootPose;
@@ -18,13 +15,9 @@ import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
-import materia.units.LengthUnit;
+import cadkit.modeling.AssemblySolve.AssemblySolveOptions;
 
-typedef AssemblyMateSolveOptions = {
-	@:optional var positionTolerance:Float;
-	@:optional var angularTolerance:Float;
-	@:optional var maxIterations:Int;
-}
+typedef AssemblyMateSolveOptions = AssemblySolveOptions;
 
 /** Outcome of placing an assembly's parts by its mates (see `AssemblyMateSolver`). */
 class AssemblyMateSolveResult {
@@ -36,6 +29,8 @@ class AssemblyMateSolveResult {
 	public final message:String;
 	/** The mates' and closures' diagnosis: what is still free, redundant or conflicting (owners are their IDs). */
 	public final report:DiagnosisReport;
+	/** The mates are dependent only at the solved placement (see `AssemblySolveOutcome.degenerate`); `report` is a nearby one's. */
+	public final degenerate:Bool;
 	/** Occurrences the solve could move as whole parts, in definition order. */
 	public final freeRoots:Array<String>;
 	/** Solved poses of the free roots and coordinates of the joints the mates reached. */
@@ -43,7 +38,7 @@ class AssemblyMateSolveResult {
 	public final jointCoordinates:Array<AssemblyJointCoordinate>;
 
 	public function new(status:String, converged:Bool, iterations:Int, unsatisfied:Array<String>, message:String,
-			report:DiagnosisReport, freeRoots:Array<String>, rootPoses:Array<AssemblyRootPose>,
+			report:DiagnosisReport, degenerate:Bool, freeRoots:Array<String>, rootPoses:Array<AssemblyRootPose>,
 			jointCoordinates:Array<AssemblyJointCoordinate>) {
 		this.status = status;
 		this.converged = converged;
@@ -51,6 +46,7 @@ class AssemblyMateSolveResult {
 		this.unsatisfied = unsatisfied;
 		this.message = message;
 		this.report = report;
+		this.degenerate = degenerate;
 		this.freeRoots = freeRoots;
 		this.rootPoses = rootPoses;
 		this.jointCoordinates = jointCoordinates;
@@ -75,10 +71,6 @@ class AssemblyMateSolveResult {
 	diagnosed: the report's degrees of freedom are what the mates leave free.
 */
 class AssemblyMateSolver {
-	static inline var DEFAULT_POSITION_TOLERANCE:Float = 1e-3; // millimetres
-	static inline var DEFAULT_ANGULAR_TOLERANCE:Float = 1e-6;
-	static inline var DEFAULT_MAX_ITERATIONS:Int = 200;
-
 	public static function solve(definition:AssemblyDefinition, ?state:AssemblyStateRecord,
 			?options:AssemblyMateSolveOptions):AssemblyMateSolveResult {
 		AssemblyDefinitionCodec.validate(definition);
@@ -86,11 +78,7 @@ class AssemblyMateSolver {
 		var flat = AssemblyDefinitionFlattener.flatten(definition);
 		var flatState = state == null ? null : AssemblyDefinitionFlattener.flattenState(definition, state);
 		var kinematics = AssemblyKinematics.compile(flat, true), model = kinematics.model;
-		var metresPerUnit = LengthUnit.metresPerUnit(flat.lengthUnit == null ? "mm" : flat.lengthUnit);
-		var positionTolerance = options != null && options.positionTolerance != null ? options.positionTolerance
-			: DEFAULT_POSITION_TOLERANCE * 0.001 / metresPerUnit;
-		var angularTolerance = options != null && options.angularTolerance != null ? options.angularTolerance : DEFAULT_ANGULAR_TOLERANCE;
-		var maxIterations = options != null && options.maxIterations != null ? options.maxIterations : DEFAULT_MAX_ITERATIONS;
+		var settings = AssemblySolve.settings(flat.lengthUnit, options);
 
 		// What may move: free roots as rigid bodies, and the joints between mated occurrences and their roots.
 		var roots = AssemblyDefinitionCodec.rootOccurrences(flat);
@@ -111,27 +99,45 @@ class AssemblyMateSolver {
 		var problem = new KinematicProblem(model).setActiveDofs(dofs);
 		for (id in freeRoots) problem.setRootMotion(kinematics.body(id), RootMotion.Floating);
 		for (closure in 0...model.closureCount())
-			problem.add(new ClosureTask(model, closure, positionTolerance, angularTolerance));
+			problem.add(new ClosureTask(model, closure, settings.positionTolerance, settings.angularTolerance));
 
-		var scale = assemblyScale(flat);
-		var solution = LevenbergMarquardt.solve(problem, seed, maxIterations, 1e-3, 1e-8, scale, null, true);
-		var report = AssemblyClosureDiagnosis.diagnose(problem, solution.state);
-		var status = solution.converged() ? "converged" : switch solution.status {
-			case KinematicStatus.LimitBlocked: "limit-blocked";
-			case KinematicStatus.Conflicting: "conflicting";
-			default: "nonconvergent";
-		};
-		var message = switch status {
-			case "converged": report.degreesOfFreedom == 0 ? "the mates place every part" : 'the mates leave ${report.degreesOfFreedom} degrees of freedom';
+		var scale = AssemblySolve.scale(flat);
+		// Mates are usually under-determined, hence Levenberg's damping. A witness placement: nudge everything the
+		// mates move (by a fixed uneven pattern, so the nudges do not cancel) and place the parts again.
+		var outcome = AssemblySolve.run(problem, seed, settings, scale, true, (solved, sign) -> {
+			var nudged = solved.copy(), k = 0;
+			for (dof in dofs) {
+				nudged.q[dof] += sign * nudge(k++) * (model.dofIsAngular(dof) ? 1 : scale);
+			}
+			for (id in freeRoots) {
+				var body = kinematics.body(id), pose = AssemblyKinematics.toFrame(nudged.rootPose(body));
+				var hx = sign * nudge(k + 3) / 2, hy = sign * nudge(k + 4) / 2, hz = sign * nudge(k + 5) / 2;
+				var norm = Math.sqrt(1 + hx * hx + hy * hy + hz * hz);
+				var turn = AssemblyFrames.compose(pose, {x: sign * nudge(k) * scale, y: sign * nudge(k + 1) * scale,
+					z: sign * nudge(k + 2) * scale, qx: hx / norm, qy: hy / norm, qz: hz / norm, qw: 1 / norm});
+				k += 6;
+				nudged.setRootPose(body, AssemblyKinematics.fromFrame(turn));
+			}
+			return nudged;
+		});
+		var solution = outcome.solution, report = outcome.report;
+		var message = switch outcome.status {
+			case "converged":
+				var free = report.degreesOfFreedom == 0 ? "the mates place every part" : 'the mates leave ${report.degreesOfFreedom} degrees of freedom';
+				outcome.degenerate ? free + " (the solved placement is singular)" : free;
 			case "conflicting": "the mates cannot all hold; see the report's conflicting groups";
 			case "limit-blocked": "joint limits stop the mates from closing";
 			default: "the mate solve ran out of iterations while still improving";
 		};
 		var rootPoses = [for (id in freeRoots) {occurrence: id, pose: AssemblyKinematics.toFrame(solution.state.rootPose(kinematics.body(id)))}];
 		var coordinates = [for (dof in dofs) {joint: model.dofId(dof), value: solution.state.q[dof]}];
-		return new AssemblyMateSolveResult(status, solution.converged(), solution.iterations, solution.unsatisfied(), message,
-			report, freeRoots, rootPoses, coordinates);
+		return new AssemblyMateSolveResult(outcome.status, solution.converged(), solution.iterations, solution.unsatisfied(), message,
+			report, outcome.degenerate, freeRoots, rootPoses, coordinates);
 	}
+
+	/** The k-th witness nudge: `AssemblySolve.WITNESS_STEP` times one of 1, 0.6, 0.8, cycling. */
+	static function nudge(k:Int):Float
+		return AssemblySolve.WITNESS_STEP * [1.0, 0.6, 0.8][k % 3];
 
 	/**
 		`definition` with each solved free root's initial pose and each reached
@@ -174,21 +180,5 @@ class AssemblyMateSolver {
 				!coupled.exists(joint.id) && model.dofIndex(joint.id) >= 0)
 				dofs.push(model.dofIndex(joint.id));
 		return dofs;
-	}
-
-	/** The extent of occurrence origins and connectors: prismatic and root translations are solved in this unit. */
-	static function assemblyScale(flat:AssemblyDefinition):Float {
-		var extent = 0.0;
-		var components = new Map<String, AssemblyComponentDefinition>();
-		for (component in flat.definitions) components.set(component.id, component);
-		for (occurrence in flat.occurrences) {
-			extent = Math.max(extent, Math.sqrt(occurrence.initialPose.x * occurrence.initialPose.x +
-				occurrence.initialPose.y * occurrence.initialPose.y + occurrence.initialPose.z * occurrence.initialPose.z));
-			var component = components.get(occurrence.definition);
-			if (component != null) for (connector in component.connectors)
-				extent = Math.max(extent, Math.sqrt(connector.frame.x * connector.frame.x + connector.frame.y * connector.frame.y +
-					connector.frame.z * connector.frame.z));
-		}
-		return Math.max(1, extent);
 	}
 }

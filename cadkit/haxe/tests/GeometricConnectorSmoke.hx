@@ -195,8 +195,9 @@ class GeometricConnectorSmoke {
 					axis: {x: 0, y: 0, z: 1}}]};
 	}
 
+	/** Within the mate solver's default position tolerance, 1 µm. */
 	static function near(actual:Float, expected:Float, label:String):Void {
-		if (!(Math.abs(actual - expected) <= 1e-4)) throw '$label: expected $expected, got $actual';
+		if (!(Math.abs(actual - expected) <= 1e-3)) throw '$label: expected $expected, got $actual';
 	}
 
 	static function check(value:Bool, label:String):Void {
