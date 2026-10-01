@@ -13,12 +13,12 @@ class TopologyReferenceUpdate {
 	public final skipped:Bool;
 	/** How the element was found (`NotFound` when it was not). */
 	public final method:ResolutionMethod;
-	/** When ambiguous: the candidate indices in the producer's shape. */
-	public final candidates:Array<Int>;
+	/** When ambiguous: the candidate elements, captured from the shape it was resolved against. */
+	public final candidates:Array<TopologyFingerprint>;
 	public var published(default, null):Bool;
 
 	public function new(reference:TopologyReference, current:Null<Shape>, fingerprint:TopologyFingerprint,
-		state:ReferenceState, fallbackAmbiguous:Bool, skipped:Bool = false, ?method:ResolutionMethod, ?candidates:Array<Int>) {
+		state:ReferenceState, fallbackAmbiguous:Bool, skipped:Bool = false, ?method:ResolutionMethod, ?candidates:Array<TopologyFingerprint>) {
 		this.reference = reference;
 		this.current = current;
 		this.fingerprint = fingerprint;

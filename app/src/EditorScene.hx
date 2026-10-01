@@ -67,6 +67,17 @@ import haxe.io.Path as FilePath;
 
 /** One scene and one document shared by the hierarchy, inspector and viewport. */
 @:allow(tests.SceneAtomicityTests)
+/** A topology reference of the selected CAD feature that needs a look (plans/TOPOLOGICAL_NAMING.md, TN5). */
+typedef CadReferenceIssue = {
+  /** The reference's index on its feature (`Feature.topologyReferenceAt`). */
+  var index:Int;
+  var message:String;
+  /** What the reference could mean now, for `repairSelectedReference`; empty when there is nothing to choose. */
+  var candidates:Array<String>;
+  /** False for a warning only: the reference resolved, but by its shape alone. */
+  var broken:Bool;
+}
+
 class EditorScene {
   static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
     return Appearances.same(left, right);
@@ -630,6 +641,75 @@ class EditorScene {
     var feature = selectedCadFeature(selectedId);
     return feature != null && feature.active && Std.isOfType(feature, ConstrainedSketchFeature) &&
       (cast(feature, ConstrainedSketchFeature)).supportFaceReference != null && feature.currentShape() != null;
+  }
+
+  /**
+    The selected CAD feature's references that need a look: broken ones (ambiguous, lost, or made by a deleted feature),
+    with the elements an ambiguous one could mean, and ones found again only by their shape.
+  */
+  public function selectedReferenceIssues():Array<CadReferenceIssue> {
+    var issues:Array<CadReferenceIssue> = [];
+    var feature = activeSketchEdit != null ? null : selectedCadFeature(selectedId);
+    if (feature == null)
+      return issues;
+    for (index in 0...feature.topologyReferenceCount()) {
+      var reference = feature.topologyReferenceAt(index);
+      var what = referenceLabel(feature, reference, index);
+      var candidates = [for (candidate in reference.candidates()) candidate.describe()];
+      var message:Null<String> = null;
+      var broken = true;
+      if (reference.state == ReferenceState.Ambiguous)
+        message = candidates.length > 0
+          ? '$what now matches ${candidates.length} elements (it was split or repeated). Choose the one it means.'
+          : '$what is ambiguous. Select a replacement.';
+      else if (reference.state == ReferenceState.Unresolved)
+        message = '$what is no longer in the model. Select a replacement.';
+      else if (reference.state == ReferenceState.Deleted)
+        message = '$what was made by a feature that is gone. Select a replacement.';
+      else if (reference.isResolved() && reference.resolvedBy() == cadkit.parametric.TopologyResolution.ResolutionMethod.Geometry) {
+        message = '$what was found again by its shape only. Check it is still the one you meant.';
+        broken = false;
+      }
+      if (message != null)
+        issues.push({index: index, message: message, candidates: candidates, broken: broken});
+    }
+    return issues;
+  }
+
+  function referenceLabel(feature:Feature, reference:TopologyReference, index:Int):String {
+    if (Std.isOfType(feature, ConstrainedSketchFeature) && (cast(feature, ConstrainedSketchFeature)).supportFaceReference == reference)
+      return "The sketch's support face";
+    var kind = reference.kind == CadKit.ShapeKind.Edge ? "edge" : reference.kind == CadKit.ShapeKind.Face ? "face" : "vertex";
+    return feature.topologyReferenceCount() == 1 ? 'The selected $kind' : 'Selected $kind ${index + 1}';
+  }
+
+  /** Point the selected feature's reference `referenceIndex` at its candidate `candidateIndex`, as one undoable edit. */
+  public function repairSelectedReference(referenceIndex:Int, candidateIndex:Int):Bool {
+    var id = selectedId;
+    var feature = selectedCadFeature(id);
+    if (feature == null || activeSketchEdit != null || referenceIndex < 0 || referenceIndex >= feature.topologyReferenceCount())
+      return false;
+    var reference = feature.topologyReferenceAt(referenceIndex);
+    var candidates = reference.candidates();
+    if (candidateIndex < 0 || candidateIndex >= candidates.length)
+      return false;
+    var replacement = candidates[candidateIndex];
+    var beforeFingerprint = reference.fingerprintData();
+    var beforeState = reference.state;
+    var featureId = feature.id.toInt();
+    function referenceIn(owner:CadDocumentSession):TopologyReference {
+      var current = owner.document.featureById(featureId);
+      if (current == null || referenceIndex >= current.topologyReferenceCount())
+        throw "the repaired feature is no longer available";
+      return current.topologyReferenceAt(referenceIndex);
+    }
+    return applyCadEdit(id, "Repair reference", function(owner) {
+      referenceIn(owner).retarget(replacement);
+      owner.document.recompute();
+    }, function(owner) {
+      // Undo restores the broken identity and leaves the prior result visible, like the support-face repair.
+      cadkit.parametric.TopologyReferenceChange.apply(referenceIn(owner), beforeFingerprint, beforeState);
+    });
   }
 
   /** Describe a broken support-face identity on the selected sketch feature. */

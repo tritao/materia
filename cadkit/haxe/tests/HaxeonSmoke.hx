@@ -68,6 +68,7 @@ class HaxeonSmoke {
 		GeometricConnectorSmoke.run();
 		NamingSmoke.run();
 		NamingFeaturesSmoke.run();
+		NamingRepairSmoke.run();
 		NamingGoldenSmoke.run();
 		NamingRobustnessSmoke.run();
 		AssemblyDragSmoke.run();

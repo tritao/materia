@@ -768,3 +768,51 @@ always written qualified.
 Results: TN0 is still 25 / 2 / 0. All suites pass: the core naming, core
 and modeling smokes, the full CadKit Haxe smoke, MachineKit (clean build),
 and the app compile.
+
+### 2026-10-01 — TN5 done: repairing references in the editor
+
+- **Candidates survive the failure.** A failed recompute discards the
+  shape the ambiguity was found in, so `TopologyReference.candidates()`
+  holds fingerprints (geometry plus name) captured at resolution time, not
+  indices. `TopologyFingerprint.describe()` gives people a short summary
+  ("planar face at (44, 20, 10), 1040 mm²"). The ambiguity error names its
+  candidates too, so an edit that the editor rolls back on this error still
+  says what it split.
+- **Repair is a retarget.** `TopologyReference.retarget(fingerprint)` is one
+  undoable document change (`TopologyReferenceChange`). The reference is
+  pending until the next recompute finds the element, by its name first.
+  No geometry has to be resolved at repair time, which matters because the
+  candidates exist only in the discarded result. `Document.brokenReferences()`
+  lists every reference that needs a decision.
+- **Editor:**
+  - `EditorScene.selectedReferenceIssues()` covers every topology reference
+    of the selected feature (sketch support faces, fillet and chamfer
+    edges): ambiguous ("now matches 2 elements … choose the one it means"),
+    lost, deleted, and, as a warning only, found again by shape alone.
+  - The inspector shows one "Use <candidate>" button per candidate, wired
+    to `repairSelectedReference(reference, candidate)`, a project-level
+    undoable edit.
+  - The sketch's old support-face status line now shows only when there is
+    no such issue; its "pick a replacement face" repair is unchanged.
+- **Where broken references come from in the editor.**
+  `CadDocumentSession.perform` rolls back an edit whose recompute fails, so a
+  parameter edit that splits a referenced face is undone and reported (with
+  the candidates in the message). It does not leave a broken reference.
+  Broken references persist when a document *loads* broken (older saves,
+  regenerated recipes), and that is what this UI repairs. **Follow-up:**
+  offer the candidates at edit time ("this edit splits the sketch's face:
+  which piece?") and re-apply the edit with the choice.
+- **Tests:**
+  - `NamingRepairSmoke` (CadKit): split, candidates, `describe`, retarget,
+    resolve by name, undo, redo.
+  - `CadPlateWorkflowTests.splitSupportRepairWorkflow` (app, real editor
+    session): the inspector issue lists two pieces, choosing the right-hand
+    one moves the sketch onto it, and project undo/redo restore and reapply
+    the choice.
+  - All app suites pass (`app/tests/haxeon.json`).
+- **Environment:** the worktree now has every native submodule (MuJoCo,
+  UI, animation and motion vendors) and its own app native build, which took
+  about 2 minutes. Disk: 7.0 GB free afterwards. Run the app tests with
+  `CADKIT_OCCT_DIR=… haxeon/scripts/haxeon run --project
+  app/tests/cad-plate/haxeon.json` (CAD only) or `app/tests/haxeon.json`
+  (all).

@@ -1397,6 +1397,19 @@ class Document {
 		return evaluateNamed(parameter, visiting, cached).value;
 	}
 
+	/** Every topology reference that needs a person's decision: ambiguous, unresolved or deleted (TN5). */
+	public function brokenReferences():Array<TopologyReference> {
+		var broken:Array<TopologyReference> = [];
+		for (feature in features)
+			for (index in 0...feature.topologyReferenceCount()) {
+				var reference = feature.topologyReferenceAt(index);
+				if (reference.state == ReferenceState.Ambiguous || reference.state == ReferenceState.Unresolved
+					|| reference.state == ReferenceState.Deleted)
+					broken.push(reference);
+			}
+		return broken;
+	}
+
 	public function featureCount():Int {
 		return features.length;
 	}

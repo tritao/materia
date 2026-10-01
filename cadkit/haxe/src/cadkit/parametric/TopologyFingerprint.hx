@@ -91,6 +91,35 @@ class TopologyFingerprint {
 			measured.dx, measured.dy, measured.dz, measured.measure, measured.midpoint, names[0]);
 	}
 
+	/** A short description for people choosing between elements: "planar face at (30, 20, 10), 1100 mm²". */
+	public function describe():String {
+		var at = 'at (${round(x)}, ${round(y)}, ${round(z)})';
+		if (kind == CadKit.ShapeKind.Face)
+			return '${surfaceWord()} face $at, ${round(measure)} mm²';
+		if (kind == CadKit.ShapeKind.Edge)
+			return '${curveWord()} edge $at, ${round(measure)} mm long';
+		return 'vertex $at';
+	}
+
+	function surfaceWord():String {
+		if (surfaceKind == CadKit.SurfaceKind.Plane) return "planar";
+		if (surfaceKind == CadKit.SurfaceKind.Cylinder) return "cylindrical";
+		if (surfaceKind == CadKit.SurfaceKind.Cone) return "conical";
+		if (surfaceKind == CadKit.SurfaceKind.Sphere) return "spherical";
+		if (surfaceKind == CadKit.SurfaceKind.Torus) return "toroidal";
+		return "curved";
+	}
+
+	function curveWord():String {
+		if (curveKind == CadKit.CurveKind.Line) return "straight";
+		if (curveKind == CadKit.CurveKind.Circle) return "circular";
+		if (curveKind == CadKit.CurveKind.Ellipse) return "elliptical";
+		return "curved";
+	}
+
+	static function round(value:Float):Float
+		return Math.round(value * 100) / 100;
+
 	/** `fingerprint`'s geometry alone, for resolution that must not consult names. */
 	public static function withoutName(fingerprint:TopologyFingerprint):TopologyFingerprint {
 		return new TopologyFingerprint(fingerprint.kind, fingerprint.surfaceKind, fingerprint.curveKind, fingerprint.x, fingerprint.y,

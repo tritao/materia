@@ -92,9 +92,23 @@ class InspectorPanel {
       rows.push(new KeyedView("sketch-edit-action",
         sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
     }
+    // References that need a look (TN5): what each lost, with a button per element it could mean now.
+    var referenceIssues = scene.selectedReferenceIssues();
+    for (issue in referenceIssues) {
+      var key = "reference-" + issue.index;
+      rows.push(new KeyedView(key + "-status", new Text(issue.message)));
+      for (candidate in 0...issue.candidates.length) {
+        var referenceIndex = issue.index;
+        rows.push(new KeyedView(key + "-candidate-" + candidate, new Button("Use " + issue.candidates[candidate], null, function() {
+          app.runSceneEdit("Could not repair reference", function() app.scene.repairSelectedReference(referenceIndex, candidate));
+          app.commands.refresh();
+        }, "repair-reference-" + referenceIndex + "-" + candidate)));
+      }
+    }
     var supportStatus = scene.selectedSketchSupportStatus();
     if (supportStatus != null) {
-      rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
+      if (referenceIssues.length == 0)
+        rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
       if (scene.canRepairSelectedSketchSupportFace())
         rows.push(new KeyedView("repair-sketch-support",
           sceneAction("repair-sketch-support-face", "scene.repair-sketch-support-face",

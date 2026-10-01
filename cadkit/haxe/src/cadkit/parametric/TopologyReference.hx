@@ -27,7 +27,7 @@ class TopologyReference {
 	private var fallbackAmbiguous:Bool;
 	private var stateGenerationValue:Int;
 	private var resolvedByValue:ResolutionMethod;
-	private var candidatesValue:Array<Int>;
+	private var candidatesValue:Array<TopologyFingerprint>;
 
 	public function new(
 		feature:Feature,
@@ -165,7 +165,7 @@ class TopologyReference {
 		var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
 		fallbackAmbiguous = resolution.state == ReferenceState.Ambiguous;
 		resolvedByValue = resolution.method;
-		candidatesValue = resolution.candidates.copy();
+		candidatesValue = capturedCandidates(result, resolution);
 		if (resolution.state == ReferenceState.Resolved)
 			return result.subshape(kind, resolution.index);
 		if (fallbackSelection != null) {
@@ -175,7 +175,10 @@ class TopologyReference {
 		}
 		if (fallbackAmbiguous) {
 			markAmbiguous();
-			throw new ParametricError("topology reference is Ambiguous", ReferenceState.Ambiguous);
+			// Name what it could mean, so an edit rolled back on this error still tells the user what happened.
+			var choices = [for (candidate in candidatesValue) candidate.describe()];
+			throw new ParametricError("topology reference is Ambiguous" + (choices.length > 0 ? " between " + choices.join(" and ") : ""),
+				ReferenceState.Ambiguous);
 		}
 		if (creatorRemoved()) {
 			markDeleted();
@@ -194,7 +197,7 @@ class TopologyReference {
 		var nextFingerprint = fingerprint;
 		var nextAmbiguous = false;
 		var method:ResolutionMethod = ResolutionMethod.NotFound;
-		var candidates:Array<Int> = [];
+		var candidates:Array<TopologyFingerprint> = [];
 		try {
 			if (result != null) {
 				var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
@@ -203,7 +206,7 @@ class TopologyReference {
 					method = resolution.method;
 				} else if (resolution.state == ReferenceState.Ambiguous) {
 					nextAmbiguous = true;
-					candidates = resolution.candidates;
+					candidates = capturedCandidates(result, resolution);
 				}
 
 				if (next == null && fallbackSelection != null) {
@@ -247,11 +250,44 @@ class TopologyReference {
 		return resolvedByValue;
 
 	/**
-		When ambiguous: the indices, among the producer's subshapes of this kind, of the elements it could not choose
-		between (for a repair UI to offer). Empty otherwise.
+		When ambiguous: the elements it could not choose between, best first, captured from the shape it was resolved
+		against (a failed recompute discards that shape, so they are kept as fingerprints with their names). A repair
+		UI offers them; `retarget` to one. Empty otherwise.
 	*/
-	public function candidates():Array<Int>
+	public function candidates():Array<TopologyFingerprint>
 		return candidatesValue.copy();
+
+	/**
+		Point this reference at `replacement` (one of `candidates()`, or a face or edge the user picked), as one undoable
+		document change. The reference is pending until the next recompute finds the element, by its name first.
+	*/
+	public function retarget(replacement:TopologyFingerprint):Void {
+		if (state == ReferenceState.Closed)
+			throw new ParametricError("closed topology references cannot be retargeted");
+		if (replacement == null || replacement.kind != kind)
+			throw new ParametricError("replacement topology has the wrong kind");
+		var owner = feature.document;
+		if (owner == null)
+			throw new ParametricError("retargeting a topology reference requires an attached feature");
+		var change = new TopologyReferenceChange(this, fingerprint, state, replacement);
+		change.redo();
+		owner.recordDocumentChange(change);
+	}
+
+	function capturedCandidates(result:Shape, resolution:TopologyResolution):Array<TopologyFingerprint> {
+		var captured:Array<TopologyFingerprint> = [];
+		for (index in resolution.candidates) {
+			var element = result.subshape(kind, index);
+			try {
+				captured.push(TopologyFingerprint.capture(element));
+			} catch (error:Dynamic) {
+				element.close();
+				throw error;
+			}
+			element.close();
+		}
+		return captured;
+	}
 
 	/**
 		Whether the feature whose tag starts the element's name no longer exists or is suppressed: the element was not

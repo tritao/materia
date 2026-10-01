@@ -443,6 +443,83 @@ class CadPlateWorkflowTests {
     scene.dispose();
   }
 
+  /**
+    A document that loads with a sketch whose support face was split (plans/TOPOLOGICAL_NAMING.md, TN5): the inspector
+    lists the two pieces, choosing one repairs the sketch, and project undo/redo restore and reapply the choice.
+  */
+  static function splitSupportRepairWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "build a plate that a slot will split";
+    try {
+      check(scene.createCadPart(), "create an editable part for split-face repair");
+      var id = scene.selectedId;
+      var session = scene.cadSession(id);
+      var slot:Null<cadkit.parametric.features.TransformFeature> = null;
+      var sketchIndex = -1;
+      session.perform(function(owner) {
+        var d = owner.document;
+        var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
+        var tool = d.add(new cadkit.parametric.features.TransformFeature(d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
+          -50, -10, -5));
+        slot = tool;
+        var body = d.add(new cadkit.parametric.features.BooleanFeature(plate, tool, cadkit.parametric.features.BooleanOperation.Cut));
+        d.recompute();
+        var shape = body.currentShape();
+        var names = shape.elementNames(CadKit.ShapeKind.Face);
+        var top = names.indexOf("f" + plate.id.toInt() + ":box.+z");
+        var face = shape.subshape(CadKit.ShapeKind.Face, top);
+        var sketch = d.add(new ConstrainedSketchFeature(square(), body, null, cadkit.modeling.Vector.X(), 0, false, face));
+        face.close();
+        d.recompute();
+        sketchIndex = d.featureCount() - 1;
+      });
+      var feature:ConstrainedSketchFeature = cast session.document.featureAt(sketchIndex);
+      var reference:TopologyReference = feature.supportFaceReference;
+      check(reference.isResolved(), "the sketch sits on the plate's top face");
+
+      step = "load it with the slot across the plate";
+      // As a document saved before its support was split would load: the reference stays broken, with its candidates.
+      var moving:cadkit.parametric.features.TransformFeature = cast slot;
+      session.perform(function(owner) {
+        moving.x.set(28);
+        try owner.document.recompute() catch (_:Dynamic) {}
+      });
+      check(reference.state == ReferenceState.Ambiguous, "the split support face is ambiguous");
+      check(scene.selectTreeKey(id + ":feature:" + sketchIndex), "select the broken sketch");
+      var issues = scene.selectedReferenceIssues();
+      check(issues.length == 1 && issues[0].broken && issues[0].candidates.length == 2 &&
+        issues[0].message.indexOf("2 elements") >= 0, "the inspector lists the two pieces: " + Std.string(issues));
+
+      step = "choose the right-hand piece";
+      var candidates = reference.candidates();
+      var right = candidates[0].x > candidates[1].x ? 0 : 1;
+      check(scene.repairSelectedReference(0, right), "repair the reference with the chosen piece");
+      check(reference.isResolved() && reference.currentShape().center().get_x() > 30, "the sketch now sits on the chosen piece");
+      check(scene.selectedReferenceIssues().length == 0, "nothing is left to repair");
+
+      step = "undo and redo the repair";
+      check(scene.document.undo() && reference.state == ReferenceState.Ambiguous, "project undo restores the broken reference");
+      check(scene.document.redo() && reference.isResolved() && reference.currentShape().center().get_x() > 30,
+        "project redo reapplies the choice");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "split-face repair workflow failed at " + step + ": " + Std.string(error);
+    }
+    scene.dispose();
+  }
+
+  static function square():cadkit.sketch.ConstrainedSketch {
+    var sketch = new cadkit.sketch.ConstrainedSketch();
+    var corners = [[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0]];
+    for (index in 0...4) {
+      sketch.addPoint(new cadkit.sketch.SketchPoint("p" + index, corners[index][0], corners[index][1]));
+      sketch.addConstraint(SketchConstraint.fixed("fixed" + index, "p" + index));
+    }
+    for (index in 0...4)
+      sketch.addEntity(cadkit.sketch.SketchEntity.line("edge" + index, "p" + index, "p" + ((index + 1) % 4)));
+    return sketch;
+  }
+
   static function verticalFilletWorkflow():Void {
     var scene = new EditorScene([]);
     try {
@@ -925,6 +1002,7 @@ class CadPlateWorkflowTests {
       sketchExtrusionWorkflow();
       faceSketchPocketWorkflow();
       supportFaceRepairWorkflow();
+      splitSupportRepairWorkflow();
       verticalFilletWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();
