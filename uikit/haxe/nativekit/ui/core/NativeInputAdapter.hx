@@ -122,10 +122,10 @@ class NativeInputAdapter {
 					context.key(kind, key, modifiers, scancode);
 					true;
 				}
-			case TextInput(eventSource, codepoint) if (matches(eventSource)):
+			case TextInput(eventSource, codepoint) if (matchesText(eventSource)):
 				context.text(UiEventKind.TextInput, fromCodepoint(codepoint), codepoint);
 				true;
-			case TextEdit(eventSource, edit) if (matches(eventSource)):
+			case TextEdit(eventSource, edit) if (matchesText(eventSource)):
 				context.text(UiEventKind.TextEdit, edit.text, edit);
 				true;
 			case AccessibilityAction(eventSource, nodeId, action, value, selectionStart,
@@ -156,6 +156,13 @@ class NativeInputAdapter {
 
 	function matches(eventSource:Handle):Bool
 		return eventSource == source;
+
+	/**
+	 * Text events come from the window or the graphics surface that has text input (NativeKit's api.md): Windows
+	 * reports the window, the web backend the surface.
+	 */
+	function matchesText(eventSource:Handle):Bool
+		return eventSource == source || eventSource == accessibilitySource;
 
 	static function keyKind(action:InputAction):Null<String> {
 		if (action == InputAction.Press)

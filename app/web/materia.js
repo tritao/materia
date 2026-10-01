@@ -1,11 +1,13 @@
 // Starts the browser editor: the Emscripten host (materia_web.js/.wasm) owns the linear memory and the
 // NativeKit, UIKit and SceneKit C ABIs; the Haxeon guest (materia_guest.wasm, wasm32 or wasm-gc) is the editor.
-// haxeon-host.js connects them. window.materia reports progress for tests: {state, frames, error, unavailable}.
+// haxeon-host.js connects them. window.materia reports progress for tests: {state, frames, error, unavailable}, and
+// window.materia.inspect() prints the editor's state as a `materia-report` console line (app.MainWeb.report).
 "use strict";
 
 const canvas = document.getElementById("canvas");
 const statusLine = document.getElementById("status");
-const report = window.materia = {state: "loading", frames: 0, error: null, unavailable: []};
+const report = window.materia = {state: "loading", frames: 0, error: null, unavailable: [],
+  inspect: () => guest ? guest["app.MainWeb.report"]() : -1};
 let hostMemory = null;
 let guest = null;
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Opens the built browser editor in headless Chrome and checks that it starts and draws.
 #   app/web/test.sh [--screenshot PATH] [--frames N]
+#   app/web/test.sh --tour [--screenshot PATH] [--dump]   walk through common edits and check each step
 set -euo pipefail
 
 app_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -38,4 +39,10 @@ page_url="http://127.0.0.1:$http_port/index.html"
 	--window-size=1400,900 --no-first-run --user-data-dir="$temp_dir/profile" \
 	--remote-debugging-port="$debug_port" --remote-allow-origins='*' "$page_url" >"$temp_dir/browser.log" 2>&1 &
 browser_pid=$!
-python3 "$app_dir/web/tools/smoke.py" --debug-port "$debug_port" --page-url "$page_url" "$@"
+# --tour walks the editor through tools/tour.py; otherwise tools/smoke.py checks that it starts and draws.
+driver="$app_dir/web/tools/smoke.py"
+if [[ "${1:-}" == "--tour" ]]; then
+	driver="$app_dir/web/tools/tour.py"
+	shift
+fi
+python3 "$driver" --debug-port "$debug_port" --page-url "$page_url" "$@"

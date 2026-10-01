@@ -77,6 +77,64 @@ class MainWeb {
     }
   }
 
+  /** Commands whose availability the browser tests check. */
+  static final REPORTED_COMMANDS = ["editor.new", "editor.undo", "editor.redo", "scene.create", "scene.delete", "sim.play", "sim.step",
+    "sim.stop", "sim.reset"];
+
+  /**
+   * Prints one `materia-report` line of JSON to the page's console: the editor's mode, scene objects, command
+   * availability and diagnostic state, and every visible widget with a style key or accessibility label, with its
+   * bounds in CSS pixels. Browser tests (`web/tools/tour.py`) find controls through it and check each step.
+   */
+  @:expose public static function report():Int {
+    var app = editor;
+    if (app == null) return 1;
+    try {
+      var widgets:Array<Dynamic> = [];
+      var root = app.ui.root;
+      if (root != null) collectWidgets(root, widgets);
+      var state:Dynamic = null, stateError:Null<String> = null;
+      try {
+        state = app.diagnosticState();
+      } catch (error:Dynamic) {
+        stateError = Std.string(error);
+      }
+      Sys.println("materia-report " + haxe.Json.stringify({
+        mode: app.mode.id,
+        simulationRunning: app.simulation.isRunning(),
+        objects: [for (record in app.scene.records()) {id: record.id, label: record.label, type: record.type, x: record.x, y: record.y}],
+        selected: app.scene.selectedId,
+        commands: [for (id in REPORTED_COMMANDS) {id: id, enabled: commandEnabled(app, id)}],
+        state: state,
+        stateError: stateError,
+        widgets: widgets
+      }));
+      return 0;
+    } catch (error:Dynamic) {
+      record(error);
+      return 2;
+    }
+  }
+
+  static function commandEnabled(app:ReferenceEditorApp, id:String):Bool {
+    var command = app.commands.get(id);
+    if (command == null) return false;
+    return command.isEnabled();
+  }
+
+  static function collectWidgets(node:nativekit.ui.core.RenderNode, into:Array<Dynamic>):Void {
+    var resolved = node.resolved, semantics = node.semantics;
+    var label:Null<String> = null;
+    if (semantics != null) label = semantics.label;
+    if (resolved != null && (node.styleKey != null || label != null)) {
+      var bounds = resolved.clippedViewportBounds();
+      if (bounds.width > 0 && bounds.height > 0)
+        into.push({key: node.styleKey, label: label, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
+          enabled: node.enabled});
+    }
+    for (child in node.children) collectWidgets(child, into);
+  }
+
   /** Failures go to the page's console; `main` and `frame` also report them through their result. */
   static function record(error:Dynamic):Void {
     Sys.println("materia: " + Std.string(error) + "\n" + CallStack.toString(CallStack.exceptionStack(true)));

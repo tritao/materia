@@ -25,6 +25,19 @@ python3 -m http.server --directory app/build/web/site 8080
 starts and draws. `--click X,Y` clicks after startup and `--screenshot PATH`
 saves the result.
 
+`app/web/test.sh --tour` walks through the edits people make most (an empty
+scene, adding rectangles from the Add menu, undo and redo, typing a position
+into the inspector, delete, the 3D view) and checks the editor's state after
+each step. Controls are found by style key or accessibility label through
+`window.materia.inspect()`, which prints `app.MainWeb.report` as a
+`materia-report` console line, so the tour survives layout changes. Run it
+against both guest targets:
+
+```sh
+./app/web/build.sh && ./app/web/test.sh --tour
+MATERIA_WEB_TARGET=wasm32 ./app/web/build.sh && ./app/web/test.sh --tour
+```
+
 ## Guest target
 
 `build.sh` compiles the guest with Haxeon's `wasm-gc` backend, which keeps Haxe
@@ -57,8 +70,10 @@ and so does editing primitive objects. The following do not work yet:
 
 - **Kits with no browser build:** CadKit (OCCT), SimKit and MuJoCo, RobotKit's
   runtime, AnimKit and StockKit. The page gives their imports stubs that throw,
-  so features that call them fail when used, and the page's `window.materia.unavailable`
-  lists them.
+  and the JavaScript exception unwinds through the guest uncaught, so a feature
+  that calls one stops the editor; `window.materia.unavailable` lists them. The
+  simulation commands (Play, Step, Reset) are disabled in the browser build for
+  that reason until MuJoCo has a web build.
 - **Opening projects:** this compiles and runs child processes, which the browser
   cannot start.
 - **Files:** they live in an in-memory filesystem for the session.
