@@ -49,6 +49,25 @@ class TextLayout extends NativeKitUIResource {
 			"textLayout.setColor");
 	}
 
+	/** Replaces sorted, disjoint foreground ranges without changing measured geometry.
+	 * Offsets are codepoints; shaped clusters use their first codepoint's color.
+	 * An empty array clears overrides. Updating text/layout also clears them.
+	 */
+	public function setColorRanges(ranges:Array<TextColorRange>):Void {
+		if (ranges == null)
+			throw "Text color ranges cannot be null";
+		var nativeRanges:Array<nkui_text_color_range> = [];
+		var previousEnd = 0;
+		for (range in ranges) {
+			if (range == null || range.start < previousEnd)
+				throw "Text color ranges must be sorted and disjoint";
+			nativeRanges.push(range.nativeValue());
+			previousEnd = range.end;
+		}
+		UiResult.check(NativeKitUI.nkui_text_layout_set_color_ranges(nativeHandle(), nativeRanges),
+			"textLayout.setColorRanges");
+	}
+
 	/** Re-shapes this retained layout with new content, width, or semantic styles. */
 	public function update(value:String, newWidth:Float, style:TextStyle,
 			paragraph:ParagraphStyle):Void {

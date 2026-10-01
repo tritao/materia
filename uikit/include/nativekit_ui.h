@@ -67,7 +67,7 @@ extern "C" {
 /** Version of the stable NativeKit UI C ABI. */
 enum {
     /** Current UI ABI version. */
-    NKUI_API_VERSION = 7
+    NKUI_API_VERSION = 8
 };
 
 /** Result returned by a NativeKit UI operation. */
@@ -916,6 +916,24 @@ NKUI_API nkui_result nkui_text_layout_update(nkui_resource layout,
  * is empty. */
 NKUI_API nkui_result nkui_text_layout_set_text(nkui_resource layout,
                                                const char *text NKUI_NULLABLE_UTF8);
+
+/** A half-open logical codepoint range with an overriding foreground color. */
+typedef struct nkui_text_color_range {
+    int32_t start;
+    int32_t end;
+    nkui_color color;
+} nkui_text_color_range;
+
+/**
+ * Replaces copied foreground ranges without reshaping or rasterizing text.
+ * Ranges must be sorted, disjoint, nonempty and within the current text; colors
+ * must contain finite components in [0,1]. A shaped cluster uses the color at
+ * its first codepoint. Zero count clears overrides; null is valid only then.
+ * Invalid input leaves the previous ranges unchanged. Updating text or layout
+ * clears ranges; changing the base color preserves overrides.
+ */
+NKUI_API nkui_result nkui_text_layout_set_color_ranges(nkui_resource layout,
+    const nkui_text_color_range *ranges NKUI_IN_ARRAY(count), uint32_t count);
 
 /** Sets the color used when this retained text layout is drawn. */
 NKUI_API nkui_result nkui_text_layout_set_color(nkui_resource layout, nkui_color color);

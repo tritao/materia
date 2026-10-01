@@ -245,6 +245,7 @@ class TextEngine {
                               float pixel_scale, GlyphMode mode, GlyphTint tint = {},
                               const std::vector<GlyphColorRange> &ranges = {});
     bool prepared_glyphs_current(const PreparedGlyphs &glyphs) const;
+    int32_t text_count() const;
     TextRect bounds() const;
     TextPosition hit_test(float x, float y) const;
     int32_t offset_from_position(TextPosition position) const;

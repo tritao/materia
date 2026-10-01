@@ -575,15 +575,17 @@ int main() {
         /*
          * A custom-paint node that draws a retained TextLayout (the path
          * TextField/TextArea use for their editable content) must paint the
-         * layout's current color, not the shaping engine's untinted glyphs.
+         * layout's foreground override and base color, including retained snapshots.
          * Regression coverage for the layout-session owned/sealed glyph
          * snapshot silently defaulting to opaque white.
          */
         nkui_resource text_layout{};
         nkui_display_list text_list{};
+        const nkui_text_color_range first_letter{0, 1, {0.0f, 0.85f, 0.0f, 1.0f}};
         if (!result) {
             if (nkui_text_layout_create(fonts, "Hg", 140.0f, 40.0f, &text_layout) != NKUI_OK ||
-                nkui_text_layout_set_color(text_layout, {0.0f, 0.85f, 0.0f, 1.0f}) != NKUI_OK ||
+                nkui_text_layout_set_color_ranges(text_layout, &first_letter, 1) != NKUI_OK ||
+                nkui_text_layout_set_color(text_layout, {0.0f, 0.0f, 0.85f, 1.0f}) != NKUI_OK ||
                 nkui_display_list_create(&text_list) != NKUI_OK)
                 result = 37;
         }
@@ -623,9 +625,12 @@ int main() {
             std::array<uint8_t, 160 * 64 * 4> block{};
             glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
             int best_green = -1;
+            int blue_pixels = 0;
             uint8_t best_rgba[4] = {0, 0, 0, 0};
             for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
                 const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80)
+                    ++blue_pixels;
                 if (rgba[1] > best_green) {
                     best_green = rgba[1];
                     std::memcpy(best_rgba, rgba, 4);
@@ -633,7 +638,7 @@ int main() {
             }
             // Opaque white glyphs (the untinted-snapshot bug) leave red and blue as high
             // as green; a correctly tinted green layout keeps them low.
-            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80) {
+            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80 || blue_pixels == 0) {
                 std::fprintf(stderr,
                              "custom-paint text layout did not render its set color: "
                              "peak rgba = %d,%d,%d,%d\n",
@@ -650,21 +655,64 @@ int main() {
             std::array<uint8_t, 160 * 64 * 4> block{};
             glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
             int best_green = -1;
+            int blue_pixels = 0;
             uint8_t best_rgba[4] = {0, 0, 0, 0};
             for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
                 const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80)
+                    ++blue_pixels;
                 if (rgba[1] > best_green) {
                     best_green = rgba[1];
                     std::memcpy(best_rgba, rgba, 4);
                 }
             }
-            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80) {
+            if (best_green < 150 || best_rgba[0] > 80 || best_rgba[2] > 80 || blue_pixels == 0) {
                 std::fprintf(stderr,
                              "custom-paint text layout lost its set color on a cached repaint: "
                              "peak rgba = %d,%d,%d,%d\n",
                              best_rgba[0], best_rgba[1], best_rgba[2], best_rgba[3]);
                 result = 42;
             }
+        }
+        // Recolor a retained layout after the node has a live raster cache.
+        const nkui_text_color_range recolored_letter{0, 1, {0.85f, 0.0f, 0.0f, 1.0f}};
+        if (!result && (nkui_text_layout_set_color_ranges(text_layout, &recolored_letter, 1) != NKUI_OK ||
+            nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK))
+            result = 43;
+        if (!result) {
+            std::array<uint8_t, 160 * 64 * 4> block{};
+            glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
+            int red_pixels = 0;
+            int green_pixels = 0;
+            for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
+                const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[0] > 150 && rgba[1] < 80 && rgba[2] < 80)
+                    ++red_pixels;
+                if (rgba[1] > 150 && rgba[0] < 80 && rgba[2] < 80)
+                    ++green_pixels;
+            }
+            if (!red_pixels || green_pixels) {
+                std::fprintf(stderr, "cached text recolor: red=%d green=%d\n", red_pixels, green_pixels);
+                result = 44;
+            }
+        }
+        if (!result && (nkui_text_layout_set_text(text_layout, "Hg") != NKUI_OK ||
+            nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK))
+            result = 45;
+        if (!result) {
+            std::array<uint8_t, 160 * 64 * 4> block{};
+            glReadPixels(12, 108, 160, 64, GL_RGBA, GL_UNSIGNED_BYTE, block.data());
+            int blue_pixels = 0;
+            int stale_pixels = 0;
+            for (std::size_t pixel = 0; pixel < 160 * 64; ++pixel) {
+                const uint8_t *rgba = block.data() + pixel * 4;
+                if (rgba[2] > 150 && rgba[0] < 80 && rgba[1] < 80)
+                    ++blue_pixels;
+                if (rgba[0] > 150 || rgba[1] > 150)
+                    ++stale_pixels;
+            }
+            if (!blue_pixels || stale_pixels)
+                result = 46;
         }
         nkui_layout_session_clear_custom_paints(session);
         nkui_display_list_destroy(text_list);

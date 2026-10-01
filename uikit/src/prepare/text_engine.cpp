@@ -833,6 +833,11 @@ bool TextEngine::prepared_glyphs_current(const PreparedGlyphs &glyphs) const {
     return true;
 }
 
+int32_t TextEngine::text_count() const {
+    const auto *layout = find_layout(*state_, active_layout_id());
+    return layout ? skb_layout_get_text_count(layout->layout) : 0;
+}
+
 TextRect TextEngine::bounds() const {
     const auto *layout = active_layout(*state_);
     if (!layout)

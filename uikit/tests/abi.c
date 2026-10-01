@@ -126,6 +126,19 @@ int main(void) {
     if (nkui_text_layout_create_styled(fonts, "NativeKit مرحبا", 300.0f, &text_style,
                                        &paragraph_style, &layout) != NKUI_OK)
         return 7;
+    const nkui_text_color_range color_ranges[] = {{0, 3, {1, 0, 0, 1}}, {5, 8, {0, 1, 0, 1}}};
+    const nkui_text_color_range invalid_ranges[] = {{0, 3, {1, 0, 0, 1}}, {2, 5, {0, 1, 0, 1}}};
+    const nkui_text_color_range outside_range = {0, 1000, {1, 0, 0, 1}};
+    const nkui_text_color_range invalid_color = {0, 1, {2, 0, 0, 1}};
+    if (nkui_text_layout_set_color_ranges(layout, color_ranges, 2) != NKUI_OK ||
+        nkui_text_layout_set_color(layout, (nkui_color){0, 0, 1, 1}) != NKUI_OK ||
+        nkui_text_layout_set_color_ranges(layout, invalid_ranges, 2) != NKUI_ERROR_INVALID_ARGUMENT ||
+        nkui_text_layout_set_color_ranges(layout, &outside_range, 1) != NKUI_ERROR_INVALID_ARGUMENT ||
+        nkui_text_layout_set_color_ranges(layout, &invalid_color, 1) != NKUI_ERROR_INVALID_ARGUMENT ||
+        nkui_text_layout_set_color_ranges(layout, NULL, 1) != NKUI_ERROR_INVALID_ARGUMENT ||
+        nkui_text_layout_set_color_ranges((nkui_resource){0}, NULL, 0) != NKUI_ERROR_INVALID_HANDLE ||
+        nkui_text_layout_set_color_ranges(layout, NULL, 0) != NKUI_OK)
+        return 22;
     nkui_resource later_layout = {0};
     if (nkui_font_collection_add(fonts, NKUI_TEST_FONT_PATH, NKUI_FONT_FAMILY_DEFAULT) != NKUI_OK ||
         nkui_text_layout_create(fonts, "copy-on-write", 200.0f, 16.0f, &later_layout) != NKUI_OK ||
