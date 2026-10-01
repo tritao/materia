@@ -41,7 +41,12 @@ class ArmFlipProbe {
             var handSpeed = 0.0, shoulderSpeed = 0.0;
             if (lastHand != null) { handSpeed = len(Mat4.subtract(hand, lastHand)) / 0.01; shoulderSpeed = len(Mat4.subtract(shoulder, lastShoulder)) / 0.01; }
             lastHand = hand; lastShoulder = shoulder;
-            rows.push('$ticks ${worker.currentActionLabel()} crouch=${f(worker.body.crouchAmount())} kneel=${f(worker.body.kneelAmount())} hinge=${f(worker.body.character.spineHinge())} lean=${f(worker.body.character.spineLean())} elbow=${f(angle)}deg reach=${f(len(Mat4.subtract(hand, shoulder)))} handSpeed=${f(handSpeed)} shoulderSpeed=${f(shoulderSpeed)} rate=${f(rate)} normal=${normal == null ? "-" : normal.map(f).join(",")} shoulder=${shoulder.map(f).join(",")} elbowPos=${elbow.map(f).join(",")} hand=${hand.map(f).join(",")}');
+            var feetInfo = "";
+            if (Sys.getEnv("PROBE_FEET") != null) {
+                var footL = worker.body.toWorld(pose.bonePosition(HumanBone.FootL)), footR = worker.body.toWorld(pose.bonePosition(HumanBone.FootR));
+                feetInfo = ' footL=${footL.map(f).join(",")} footR=${footR.map(f).join(",")} lock=${f(worker.body.footHold())} walking=${worker.body.walker.isWalking()} turning=${worker.body.walker.isTurning()} share=${f(worker.body.walker.stanceShare())}';
+            }
+            rows.push('$ticks ${worker.currentActionLabel()} crouch=${f(worker.body.crouchAmount())} kneel=${f(worker.body.kneelAmount())} hinge=${f(worker.body.character.spineHinge())} lean=${f(worker.body.character.spineLean())} elbow=${f(angle)}deg reach=${f(len(Mat4.subtract(hand, shoulder)))} handSpeed=${f(handSpeed)} shoulderSpeed=${f(shoulderSpeed)}$feetInfo rate=${f(rate)} normal=${normal == null ? "-" : normal.map(f).join(",")} shoulder=${shoulder.map(f).join(",")} elbowPos=${elbow.map(f).join(",")} hand=${hand.map(f).join(",")}');
         }
         var failures:Array<String> = [];
         gate.check("probe", failures);

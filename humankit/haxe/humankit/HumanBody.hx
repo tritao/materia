@@ -457,6 +457,9 @@ class HumanBody {
 		return [for (axis in 0...3) shoulder[axis] + control.target[axis]];
 	}
 
+	/** How firmly the feet are held where they stand, 0 (free) to 1 (held). */
+	public function footHold():Float return footLock;
+
 	/** How far the upper body is pitched forward now, in radians: the lean and the hip hinge together. */
 	public function torsoPitch():Float
 		return character.spineLean() + character.spineHinge();
