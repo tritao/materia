@@ -23,6 +23,16 @@ class MountPlateJob {
 	static final WIDTH = CncRouter.STOCK_WIDTH;
 	static final DEPTH = CncRouter.STOCK_DEPTH;
 	static final HEIGHT = CncRouter.STOCK_HEIGHT;
+	/**
+	 * How closely the part's round edges are followed, in metres: CAM samples them within this, and fits
+	 * its cutting lines back into arcs within it, so circles are cut as G2/G3.
+	 */
+	static inline final CHORD = 0.00002;
+	/**
+	 * How far cutting moves may round the corners left between them (G64 P), in metres: half the 0.02 mm
+	 * the app counts as on target.
+	 */
+	static inline final BLEND = 0.00001;
 	/** How far the drill's full diameter goes past the plate's underside, in millimetres. */
 	static inline final BREAKTHROUGH = 0.5;
 
@@ -35,7 +45,7 @@ class MountPlateJob {
 			face.normal().get_z() > 1 - 1e-9) face];
 		var topFace = [for (face in upward) if (Math.abs(face.center().get_z() - top) < 1e-6) face];
 		if (topFace.length != 1) throw "The motor plate should have one top face";
-		var outlines = CamContour.fromFaceBoundaries(topFace[0], "mm", 0.00002).slice(1);
+		var outlines = CamContour.fromFaceBoundaries(topFace[0], "mm", CHORD).slice(1);
 		if (outlines.length == 0) throw "The motor plate's top face has no recesses";
 		var tools = router.tools(), mill = tools[0], drill = tools[1];
 		if (Math.abs(router.drill.diameter - plate.holeDiameter) > 1e-9)
@@ -51,7 +61,8 @@ class MountPlateJob {
 		var offset = CncRouter.workOffset();
 		var start = [for (spec in router.specs) spec.initial];
 		var job = new CamJob(0.02, 12000,
-			new Point3((start[0] - offset[0]) / 1000, (start[1] - offset[1]) / 1000, (start[2] - offset[2]) / 1000));
+			new Point3((start[0] - offset[0]) / 1000, (start[1] - offset[1]) / 1000, (start[2] - offset[2]) / 1000),
+			BLEND, CHORD);
 		for (outline in outlines) {
 			var floor = floorBelow(upward, outline, top);
 			// The outline in work coordinates, and its depth to the floor found in the part.

@@ -70,8 +70,10 @@ with CamKit from the plate's faces: the top face's inner boundaries are the
 recesses' outlines, each pocketed down to the floor found under it with the
 end mill, keeping clear of the step clamps; then the drill makes the four
 holes from the counterbore floors through the plate and 0.5 mm past its point
-into the spoilboard. CncKit writes it as LinuxCNC G-code, each tool programmed
-at its tip through `G43 Hn`. Work zero (G54) is the stock's front-left top
+into the spoilboard. Cutting lines that lie on a circle are fitted back into
+arcs and the remaining corners blend within 0.01 mm, so the pockets are cut as
+G2/G3 rings without stopping at every vertex. CncKit writes it as LinuxCNC
+G-code, each tool programmed at its tip through `G43 Hn`. Work zero (G54) is the stock's front-left top
 corner, machine (90, 105, −84) mm.
 
 The scene artifact's machining section carries what the app needs to run it,
@@ -101,8 +103,10 @@ the segment the loaded tool's tip travelled, its length below the simulated
 spindle nose, is swept through a 0.5 mm tri-dexel stock with the tool's
 cutter (flutes, shank and collet nut), and the stock part shows the result,
 re-contoured a few times a second. Because the cut follows the simulated
-machine, following error is in the material. A pass takes 343 s of
-machining at about 3.7 ms of compute per 10 ms tick. The stock is coloured against
+machine, following error is in the material: the servos lag slightly on the
+pocket circles, which leaves a few hundredths of a millimetre on their walls. A
+pass takes 197 s of machining at about 3 ms of compute per 10 ms tick, after
+about 4 s of planning when the program starts. The stock is coloured against
 the finished plate: green where it is on the part, yellow where stock is left
 on it, red where the cut went into it. Rapids that cut stock and shank or
 holder contact are counted as they happen. Physical collision is off for the
@@ -134,7 +138,7 @@ These also run in the MachineKit smoke suite (`machinekit/scripts/test-haxeon`).
 `ProjectSourceTests.checkCncRouter` in the app's project-source suite opens the
 project, builds it in MuJoCo and runs one pass of the job: it must change
 from the end mill to the drill, the stock must lose the plate's recesses and
-holes within 2% (9967.6 of 9996.5 mm³, with 10.8 mm³ left on the plate),
+holes within 2% (9914.9 of 9996.5 mm³, with 63.5 mm³ left on the plate),
 under 1 mm³ may be cut from the finished plate (0.6 mm³), no rapid may cut
 stock and the holder must never touch it; the next pass must then start
 cleanly.

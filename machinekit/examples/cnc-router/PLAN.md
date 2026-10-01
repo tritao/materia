@@ -78,7 +78,7 @@ What it took, each as the long-term shape rather than a stopgap:
   wrong package; a target meshed at preview resolution read as gouge (its
   chords sit inside round walls), so the generator meshes it to 2 µm.
 
-**C4 follow-ups: exact geometry end to end.** The plate's circles reach the
+**C4 follow-ups: exact geometry end to end** (done). The plate's circles reached the
 machine as 128-sided polygons, and their pocket offsets shrink the sides to
 50 µm: the job is 3240 exact-stop moves, about 10 s and 3 GB to plan, and
 most of a pass is stopping at vertices. Blending the corners (CamJob's blend
@@ -97,8 +97,16 @@ tolerance, `G64 P`) showed the real limits are underneath:
    by their curve kind, other curves as simplified polylines), offsets keep
    arcs concentric, and CamJob writes G2/G3: a circular pocket ring becomes
    one or two moves.
-3. *Then* the router job blends only genuine corners; expect a few hundred
-   moves and sub-second planning.
+3. *Then* the router job blends only genuine corners.
+
+Done as described, plus: a followed path stops at its sharp corners as
+separate plans of one op, and the task-space check times its samples from the
+time law (interpolating sample times had misplaced them while accelerating).
+The job is now 198 motion ops instead of 3240, a pass takes 197 s instead of
+343 s, the app suite's peak memory fell from 5.7 to 2.7 GB, and a
+1 mm circle is followed within 2 µm. Planning still takes about 4 s when a
+program starts, spread over every path; moving it off the frame thread is
+what remains for smooth starts.
 
 **C5. Editor controls.** A G-code panel that highlights the running line and
 links both ways (surface to line, line to moves); feed hold, resume, restart
@@ -172,5 +180,5 @@ then C3 → C4 → C5.
 | C1 | done: router, checks, outline-trace motion, app test | `c82fe76d` |
 | C2 | done as A3 | |
 | C3 | done: 3.1 ms of compute per 10 ms tick after A6 | `29b986cc` |
-| C4 | done: CAM from the plate's faces, generated job, G43 tools and tool changes | |
+| C4 | done: CAM from the plate's faces, generated job, G43 tools and tool changes, exact lowering and arcs | `722a6ff6`, `68dd7392` |
 | C5 | not started | |
