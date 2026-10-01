@@ -430,7 +430,7 @@ class WristBranchSolver implements KinematicsSolver {
   public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
     return request.followPointByPoint(this);
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
-    return [for (_ in 0...6) 0.0];
+    return [twist.linearX, 0.0, 0.0, 0.0, 0.0, 0.0];
 }
 
 class PlanarSolver implements KinematicsSolver {

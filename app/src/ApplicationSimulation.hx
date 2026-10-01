@@ -52,6 +52,7 @@ class ApplicationSimulation {
   var simulatedObjects:Array<{id:String,object:SimObject}> = [];
   var motions:Null<RobotMotionPlayer> = null;
   var gripper:Null<RobotGripPlayer> = null;
+  var cnc:Null<CncProgramPlayer> = null;
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
@@ -111,6 +112,7 @@ class ApplicationSimulation {
     members = [];
     if (motions != null) members.push(motions);
     if (gripper != null) members.push(gripper);
+    if (cnc != null) members.push(cnc);
     if (workforce != null) members.push(workforce);
     for (participant in participants) members.push(participant);
   }
@@ -128,6 +130,7 @@ class ApplicationSimulation {
     var candidateAssemblyParts:Array<AssemblyPart> = [];
     var candidateRuntimes:Array<robotkit.runtime.RobotRuntime> = [];
     var candidateWarnings:Array<String> = [];
+    var candidateCnc:Null<CncProgramPlayer> = null;
     try {
       var models = configuration.robotModels();
       var hasWorkers = false;
@@ -160,14 +163,19 @@ class ApplicationSimulation {
         var id = AssemblyRobot.idFor(assembly);
         if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
+        var robotIndex = candidateRobots.length;
         var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
-          appliedRevision + 1, candidateRobots.length);
+          appliedRevision + 1, robotIndex, session.cncJob == null ? null : CncProgramPlayer.processChannels());
         candidateRobots.push(built.robot);
         candidateRuntimes.push(built.runtime);
         candidateLinks.push([for (link in built.model.links) link.id]);
         candidateRobotModels.push(built.model);
         for (part in built.parts) candidateAssemblyParts.push(part);
         for (warning in built.warnings) candidateWarnings.push(warning);
+        // A bad program fails the rebuild here, before anything live changes.
+        var job = session.cncJob;
+        if (job != null)
+          candidateCnc = new CncProgramPlayer(job, built, candidate, session, createdSpace.session);
       }
       var resolvedMotions = RobotMotionPlayer.resolve(candidateMotions,
         [for (robot in candidateRobots) robot.id()], candidateRobotModels);
@@ -180,7 +188,9 @@ class ApplicationSimulation {
         if (assembly == null) throw "Robot grips need the project's assembly";
         var gripRobot = candidateRobots.length - 1;
         for (event in gripEvents) {
-          var linkIndex = candidateLinks[gripRobot].indexOf(event.link);
+          // A grip names the part that holds (the suction cup); it grips through that part's body.
+          var holder = [for (part in candidateAssemblyParts) if (part.id == "project:" + event.link) part];
+          var linkIndex = holder.length == 1 ? holder[0].linkIndex : candidateLinks[gripRobot].indexOf(event.link);
           if (linkIndex < 0) throw 'Robot grip names unknown link "${event.link}"';
           resolvedGrips.push({time: event.time, robotIndex: gripRobot, linkIndex: linkIndex, grip: event.grip});
         }
@@ -248,6 +258,8 @@ class ApplicationSimulation {
       gripper = resolvedGrips.length == 0 ? null : new RobotGripPlayer(createdSpace.session, candidate,
         candidateRuntimes, candidateObjects, resolvedGrips, resolvedPeriod);
       workforce = candidateWorkforce;
+      if (cnc != null) cnc.dispose();
+      cnc = candidateCnc;
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
@@ -322,6 +334,15 @@ class ApplicationSimulation {
   public function isRunning():Bool return running;
   /** Scene ids of the objects the tool links are holding right now. */
   public function heldObjectIds():Array<String> return gripper == null ? [] : gripper.heldIds();
+
+  /** Why the project's CNC program stopped, or null while it runs or when there is none. */
+  public function cncFailure():Null<String> return cnc == null ? null : cnc.failure;
+
+  /** The project's CNC program player, or null when the project has no CNC job. */
+  public function cncPlayer():Null<CncProgramPlayer> return cnc;
+
+  /** The stock the project's CNC program is cutting, or null when it cuts none. */
+  public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;
   public function humanWorker(id:String):Null<HumanWorker> return workforce == null ? null : workforce.worker(id);
   public function humanSignals(id:String):Null<HumanWorkerSignals>
     return workforce == null ? null : workforce.signals(id);
@@ -410,11 +431,13 @@ class ApplicationSimulation {
       frame.dispose();
     }
     if (presentAssemblyPhysics) for (part in assemblyParts) {
+      // The part's frame on its body's link, then its geometry's centre in that frame.
       var link = robots[part.robotIndex].links[part.linkIndex];
-      var offset = rotateOffset(part.center[0], part.center[1], part.center[2], link.rotation);
+      var pose = AssemblyRobot.compose({position: link.position, rotation: link.rotation}, part.offset);
+      var offset = rotateOffset(part.center[0], part.center[1], part.center[2], pose.rotation);
       orderedEnvironment.push({id:part.id,
-        position:[link.position[0] + offset[0], link.position[1] + offset[1],
-          link.position[2] + offset[2]], rotation:link.rotation});
+        position:[pose.position[0] + offset[0], pose.position[1] + offset[1],
+          pose.position[2] + offset[2]], rotation:pose.rotation});
     }
     return new ApplicationPresentationSnapshot(publication, physics, robots, orderedEnvironment,
       presentationEpoch);
@@ -439,7 +462,9 @@ class ApplicationSimulation {
       retired.dispose();
       retired.scene.setWorkerVisualsVisible(true);
     }
-    workforce = null; motions = null; gripper = null; refreshMembers();
+    workforce = null; motions = null; gripper = null;
+    if (cnc != null) cnc.dispose();
+    cnc = null; refreshMembers();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

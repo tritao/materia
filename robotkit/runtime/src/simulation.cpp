@@ -360,6 +360,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
                 robot_desc->link_shapes[pair.shape_a].link == robot_desc->link_shapes[pair.shape_b].link)
                 throw std::invalid_argument("invalid contact pair");
         }
+        const auto link_hull_count = robot_desc && robot_desc->struct_size >=
+            offsetof(rk_simulation_robot_desc, link_hulls) + sizeof(robot_desc->link_hulls)
+            ? robot_desc->link_hull_count : 0;
+        if (link_hull_count > RK_MAX_LINK_HULLS)
+            throw std::invalid_argument("too many link hulls");
+        for (uint32_t index = 0; index < link_hull_count; ++index) {
+            const auto &hull = robot_desc->link_hulls[index];
+            if (hull.link >= blueprint.link_count || hull.vertex_count < 4 || hull.vertex_count > 64)
+                throw std::invalid_argument("invalid link hull");
+            for (uint32_t coordinate = 0; coordinate < hull.vertex_count * 3; ++coordinate)
+                if (!std::isfinite(hull.vertices[coordinate]))
+                    throw std::invalid_argument("link hull vertex is not finite");
+        }
         // The compound part each link shape becomes, for its contact pairs.
         std::vector<uint32_t> shape_parts(link_shape_count, 0);
         for (uint32_t index = 0; index < blueprint.link_count; ++index) {
@@ -416,6 +429,19 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             };
             constexpr double origin[3] = {0.0, 0.0, 0.0};
             constexpr double identity[4] = {0.0, 0.0, 0.0, 1.0};
+            // A link made of several parts carries one hull per part, already in
+            // the link frame.
+            for (uint32_t hull_index = 0; hull_index < link_hull_count; ++hull_index) {
+                const auto &hull = robot_desc->link_hulls[hull_index];
+                if (hull.link != index) continue;
+                if (children.empty() && has_link_shape) add_child(desc.shape, origin, identity);
+                nksim_shape piece = 0;
+                require_sim(nksim_shape_create_convex(world, hull.vertices, hull.vertex_count * 3, &piece),
+                            "nksim_shape_create_convex(link hull)");
+                link_shapes_.push_back(piece);
+                add_child(piece, origin, identity);
+                has_link_shape = true;
+            }
             for (uint32_t shape_index = 0; shape_index < link_shape_count; ++shape_index) {
                 const auto &source = robot_desc->link_shapes[shape_index];
                 if (source.link != index) continue;
@@ -520,8 +546,12 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
             desc.axis_a[2] = a[2] + q[3]*t[2] + q[0]*t[1] - q[1]*t[0];
             std::copy_n(source.parent_frame_rotation, 4, desc.rotation_a);
             std::copy_n(source.child_frame_rotation, 4, desc.rotation_b);
-            desc.lower_limit = source.lower_limit;
-            desc.upper_limit = source.upper_limit;
+            // The end stops sit beyond the limits by the joint's overtravel.
+            const double overtravel = blueprint.struct_size >=
+                offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint.joint_overtravel)
+                ? blueprint.joint_overtravel[index] : 0.0;
+            desc.lower_limit = source.lower_limit - overtravel;
+            desc.upper_limit = source.upper_limit + overtravel;
             desc.max_force = source.max_effort;
             if (blueprint.struct_size >= offsetof(rk_robot_runtime_blueprint, joint_dynamics) +
                     sizeof(blueprint.joint_dynamics)) {

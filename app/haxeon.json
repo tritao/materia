@@ -23,7 +23,11 @@
 		"stockkit": { "path": "../stockkit" },
 		"camkit": { "path": "../camkit" },
 		"cnckit": { "path": "../cnckit" },
-		"toolpathkit": { "path": "../toolpathkit" }
+		"toolpathkit": { "path": "../toolpathkit" },
+		"toolpathkit-motion": { "path": "../toolpathkit/motion" },
+		"motionkit": { "path": "../motionkit" },
+		"motionkit-robot": { "path": "../motionkit/robot" },
+		"processkit": { "path": "../processkit" }
 	},
 	"native": {
 		"cmake": {

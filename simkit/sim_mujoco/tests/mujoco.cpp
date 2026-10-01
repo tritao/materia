@@ -1728,6 +1728,69 @@ void coupled_prismatic_joints_use_equality_and_convex_collision() {
     nkscene_scene_destroy(scene);
 }
 
+// A part of one machine can start inside another part's hull: a lead screw
+// runs through its nut bracket, whose convex hull fills the bore. Such pairs
+// overlap at rest, so the backend must exclude them like overlapping boxes,
+// or the carriage carrying the bracket drags on the screw and never arrives.
+void convex_hulls_overlapping_at_rest_do_not_collide() {
+    nkscene_scene scene = 0;
+    assert(nkscene_scene_create(&scene) == NKS_OK);
+    nksim_world_desc desc{};
+    desc.struct_size = sizeof(desc);
+    desc.scene = scene;
+    desc.fixed_timestep = 0.01;
+    desc.physics_substeps = 2;
+    nksim_world world = 0;
+    assert(nksim_mujoco_world_create(&desc, &world) == NKSIM_OK);
+    // The screw: a long convex bar along X, fixed in the world.
+    const double screw_vertices[] = {
+        -0.5,-0.02,-0.02, 0.5,-0.02,-0.02, -0.5,0.02,-0.02, 0.5,0.02,-0.02,
+        -0.5,-0.02,0.02, 0.5,-0.02,0.02, -0.5,0.02,0.02, 0.5,0.02,0.02};
+    nksim_shape screw_hull = 0;
+    assert(nksim_shape_create_convex(world, screw_vertices, 24, &screw_hull) == NKSIM_OK);
+    const auto base = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_STATIC, 0.0, screw_hull);
+    // The bracket: a block around the screw, sliding along it.
+    const double bracket_vertices[] = {
+        -0.05,-0.05,-0.05, 0.05,-0.05,-0.05, -0.05,0.05,-0.05, 0.05,0.05,-0.05,
+        -0.05,-0.05,0.05, 0.05,-0.05,0.05, -0.05,0.05,0.05, 0.05,0.05,0.05};
+    nksim_shape bracket_hull = 0;
+    assert(nksim_shape_create_convex(world, bracket_vertices, 24, &bracket_hull) == NKSIM_OK);
+    const auto carriage = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0);
+    const auto bracket = make_body(world, make_node(scene, 0.0), NKSIM_MOTION_DYNAMIC, 1.0, bracket_hull);
+    nksim_joint_desc slide{};
+    slide.struct_size = sizeof(slide);
+    slide.type = NKSIM_JOINT_PRISMATIC;
+    slide.body_a = base;
+    slide.body_b = carriage;
+    slide.axis_a[0] = 1.0;
+    slide.lower_limit = -0.4;
+    slide.upper_limit = 0.4;
+    slide.max_force = 100.0;
+    nksim_joint joint = 0;
+    assert(nksim_joint_create(world, &slide, &joint) == NKSIM_OK);
+    nksim_joint_desc weld{};
+    weld.struct_size = sizeof(weld);
+    weld.type = NKSIM_JOINT_FIXED;
+    weld.body_a = carriage;
+    weld.body_b = bracket;
+    nksim_joint fixed = 0;
+    assert(nksim_joint_create(world, &weld, &fixed) == NKSIM_OK);
+    nksim_joint_target command{};
+    command.struct_size = sizeof(command);
+    command.joint = joint;
+    command.mode = NKSIM_JOINT_TARGET_POSITION;
+    command.target = 0.3;
+    command.max_force = 100.0;
+    assert(nksim_world_set_joint_targets(world, &command, 1) == NKSIM_OK);
+    step_world(world, 200);
+    nksim_joint_state state{};
+    state.struct_size = sizeof(state);
+    assert(nksim_joint_get_state(world, joint, &state) == NKSIM_OK);
+    assert(std::abs(state.position - 0.3) < 0.01);
+    nksim_world_destroy(world);
+    nkscene_scene_destroy(scene);
+}
+
 void assembly_closures_compile_as_equalities() {
     for (const auto closure_type : {NKSIM_JOINT_FIXED, NKSIM_JOINT_REVOLUTE,
                                     NKSIM_JOINT_PRISMATIC, NKSIM_JOINT_SPHERICAL,
@@ -2221,6 +2284,7 @@ int main() {
     body_without_inertials_has_center_of_mass_at_origin();
     applied_force_and_torque_act_on_their_own_axes();
     coupled_prismatic_joints_use_equality_and_convex_collision();
+    convex_hulls_overlapping_at_rest_do_not_collide();
     assembly_closures_compile_as_equalities();
     compound_shape_preserves_an_l_shaped_gap();
     convex_mesh_margin_detects_before_gap_force();

@@ -2,6 +2,13 @@ package motionkit.path;
 
 /** Planar circular fillets bounded by distance to the authored polyline. */
 class CornerBlender {
+  /**
+    Share of a blend tolerance the corner geometry may use. The rest bounds
+    the error of timing the path and lowering it to joint motion, which is
+    checked against the whole tolerance.
+  **/
+  public static inline final GEOMETRY_SHARE = 0.8;
+
   public static function blend(path:GeometricPath, tolerance:Float,
       maxTurnAngleRadians:Float):BlendedGeometry {
     if (path == null || !Math.isFinite(tolerance) || tolerance < 0.0)

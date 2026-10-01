@@ -1675,11 +1675,14 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
             sizeof(blueprint_.observed_limit_tolerance)
         ? blueprint_.observed_limit_tolerance : 0.0;
     const double precision = endpoint_->observed_position_precision();
+    const bool has_overtravel = blueprint_.struct_size >=
+        offsetof(rk_robot_runtime_blueprint, joint_overtravel) + sizeof(blueprint_.joint_overtravel);
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
-        if (next.position[joint] < limits.lower_limit - tolerance -
+        const double margin = tolerance + (has_overtravel ? blueprint_.joint_overtravel[joint] : 0.0);
+        if (next.position[joint] < limits.lower_limit - margin -
                 precision * std::max(1.0, std::abs(limits.lower_limit)) ||
-            next.position[joint] > limits.upper_limit + tolerance +
+            next.position[joint] > limits.upper_limit + margin +
                 precision * std::max(1.0, std::abs(limits.upper_limit))) {
             latch_fault();
             return RK_ERROR_LIMIT;

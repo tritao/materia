@@ -23,6 +23,7 @@ class NativeJointPath {
         sample.set_position(joint, samples.q[index][joint]);
         sample.set_first(joint, samples.qPrime[index][joint]);
         sample.set_second(joint, samples.qDoublePrime[index][joint]);
+        sample.set_second_before(joint, samples.qDoublePrimeBefore[index][joint]);
       }
       native.push(sample);
     }

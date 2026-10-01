@@ -11,6 +11,11 @@ import robotkit.world.FiredProcessEvent;
 import robotkit.world.ProcessEventCodec;
 import robotkit.world.ProcessHoldPolicy;
 import robotkit.world.ProcessChannelDeclaration;
+import robotkit.world.ProcessTimedEvent;
+import robotkit.world.SegmentArrays;
+import runtime.memory.Arena;
+import runtime.memory.NativeSpan;
+import runtime.memory.RawPtr;
 import sys.thread.Mutex;
 
 /**
@@ -42,6 +47,8 @@ class RobotRuntime {
   static final scratchMutex = new Mutex();
   static final snapshotScratch = new rk_robot_snapshot();
   static final eventBatchScratch = new rk_event_record_batch();
+  static final planHeaderScratch = new rk_plan_header();
+  static final jointMapScratch = new Arena(256);
   var disposed:Bool = false;
   @:allow(robotkit.runtime.Simulation)
   var simulation:Null<Simulation>;
@@ -226,6 +233,11 @@ class RobotRuntime {
   public function submitPlan(plan:ExecutionPlanSubmission, sequence:Int):Void {
     ensureLive();
     if (plan == null) throw "Execution plan is required";
+    var arrays = plan.arrays;
+    if (arrays != null) {
+      submitPlanArrays(plan, arrays, sequence);
+      return;
+    }
     var native = new rk_plan_submission();
     native.set_struct_size(rk_plan_submission.size());
     native.set_sequence(Int64.ofInt(sequence));
@@ -236,20 +248,8 @@ class RobotRuntime {
     native.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
     native.set_reserved0(plan.jerkUnchecked ? 1 : 0);
     native.set_event_count(plan.events.length);
-    for (index in 0...plan.events.length) {
-      var authored = plan.events[index];
-      var event = new rk_timed_event();
-      event.set_time_ns(authored.timeNs);
-      for (i in 0...authored.channel.length)
-        event.set_channel(i, authored.channel.charCodeAt(i));
-      event.set_value(ProcessEventCodec.encode(authored.value));
-      event.set_hold_policy(switch authored.holdPolicy {
-        case Keep: RobotKitRuntimeConstants.RK_EVENT_KEEP;
-        case SafeWhileHeld: RobotKitRuntimeConstants.RK_EVENT_SAFE_WHILE_HELD;
-        case RestoreOnResume: RobotKitRuntimeConstants.RK_EVENT_RESTORE_ON_RESUME;
-      });
-      native.set_events(index, event);
-    }
+    for (index in 0...plan.events.length)
+      native.set_events(index, nativeEvent(plan.events[index]));
     native.set_replace_after_plan_id(plan.replaceAfterPlanId);
     native.set_replace_after_time_ns(plan.replaceAfterTimeNs);
     var positions = plan.startPosition.toArray();
@@ -288,6 +288,70 @@ class RobotRuntime {
     native.set_segments(payload);
     check(RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), native),
       "runtime.submitPlan");
+  }
+
+  /**
+    Submits a plan whose segments are native arrays: they reach the runtime
+    in place and are copied once there. Only the plan's header and joint map
+    are marshalled, into storage reused across plans.
+  **/
+  function submitPlanArrays(plan:ExecutionPlanSubmission, arrays:SegmentArrays, sequence:Int):Void {
+    scratchMutex.acquire();
+    try {
+      var header = planHeaderScratch;
+      header.set_struct_size(rk_plan_header.size());
+      header.set_sequence(Int64.ofInt(sequence));
+      header.set_plan_id(plan.planId);
+      header.set_tag(plan.planId);
+      header.set_model_revision(plan.modelRevision);
+      header.set_calibration_revision(plan.calibrationRevision);
+      header.set_required_capabilities(plan.requiredCapabilities);
+      header.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
+      header.set_reserved0(plan.jerkUnchecked ? 1 : 0);
+      header.set_replace_after_plan_id(plan.replaceAfterPlanId);
+      header.set_replace_after_time_ns(plan.replaceAfterTimeNs);
+      var positions = plan.startPosition.toArray(), velocities = plan.startVelocity.toArray(),
+        accelerations = plan.startAcceleration.toArray(),
+        positionTolerances = plan.positionTolerances.toArray(),
+        velocityTolerances = plan.velocityTolerances.toArray(),
+        accelerationTolerances = plan.accelerationTolerances.toArray();
+      for (joint in 0...positions.length) {
+        header.set_start_position(joint, positions[joint]);
+        header.set_start_velocity(joint, velocities[joint]);
+        header.set_start_acceleration(joint, accelerations[joint]);
+        header.set_position_tolerance(joint, positionTolerances[joint]);
+        header.set_velocity_tolerance(joint, velocityTolerances[joint]);
+        header.set_acceleration_tolerance(joint, accelerationTolerances[joint]);
+      }
+      header.set_event_count(plan.events.length);
+      for (index in 0...plan.events.length)
+        header.set_events(index, nativeEvent(plan.events[index]));
+      jointMapScratch.reset();
+      var map:RawPtr<Int> = jointMapScratch.alloc(arrays.jointMap.length);
+      for (joint in 0...arrays.jointMap.length)
+        map.offset(joint).store(arrays.jointMap[joint]);
+      check(RobotKitRuntime.rk_robot_runtime_submit_plan_arrays_span(owner.borrow(), header,
+        arrays.starts, arrays.durations, arrays.degrees, arrays.coefficients,
+        new NativeSpan<Int>(map, arrays.jointMap.length)), "runtime.submitPlan");
+    } catch (error:Dynamic) {
+      scratchMutex.release();
+      throw error;
+    }
+    scratchMutex.release();
+  }
+
+  static function nativeEvent(authored:ProcessTimedEvent):rk_timed_event {
+    var event = new rk_timed_event();
+    event.set_time_ns(authored.timeNs);
+    for (i in 0...authored.channel.length)
+      event.set_channel(i, authored.channel.charCodeAt(i));
+    event.set_value(ProcessEventCodec.encode(authored.value));
+    event.set_hold_policy(switch authored.holdPolicy {
+      case Keep: RobotKitRuntimeConstants.RK_EVENT_KEEP;
+      case SafeWhileHeld: RobotKitRuntimeConstants.RK_EVENT_SAFE_WHILE_HELD;
+      case RestoreOnResume: RobotKitRuntimeConstants.RK_EVENT_RESTORE_ON_RESUME;
+    });
+    return event;
   }
 
   /** Drains output changes produced by the runtime owner clock. */

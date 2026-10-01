@@ -97,10 +97,14 @@ class SimplePathTiming implements PathTimingBackend {
     var trajectory = Trajectory.fromPositionSamples(uniqueTimes, positions);
     var duration = trajectory.durationSeconds();
     return new TimedPath(trajectory, function(distance:Float):Float {
-      if (!Math.isFinite(distance) || distance < path.start() || distance > path.end())
+      // The tolerances of the native time law: a path's length and its samples' last distance
+      // are computed apart, and may differ in their last bits.
+      var scale = Math.max(1.0, Math.abs(distance));
+      if (!Math.isFinite(distance) || distance < path.start() - 1e-12 * scale ||
+          distance > path.end() + 1e-8 * scale)
         throw "Path distance is outside the timed path";
-      if (distance == path.start()) return 0.0;
-      if (distance == path.end()) return duration;
+      if (distance <= path.start()) return 0.0;
+      if (distance >= path.end()) return duration;
       for (profile in profiles)
         if (distance <= profile.span.endS)
           return roundedSeconds(profile.startTime +
@@ -121,7 +125,7 @@ class SimplePathTiming implements PathTimingBackend {
       var first = Math.max(Math.abs(path.qPrime[index][joint]),
         Math.abs(path.qPrime[index + 1][joint]));
       var second = Math.max(Math.abs(path.qDoublePrime[index][joint]),
-        Math.abs(path.qDoublePrime[index + 1][joint]));
+        Math.abs(path.qDoublePrimeBefore[index + 1][joint]));
       qPrime.push(first);
       qDoublePrime.push(second);
       if (first > EPSILON) {
@@ -183,12 +187,24 @@ private class SimpleTimingSpan {
     this.maxAcceleration = maxAcceleration;
   }
 
+  /**
+    The fastest speed this span reaches from `knownSpeed` at either end,
+    accelerating within the budget left at the speed it reaches, the budget
+    the span's profile then uses. Per joint, v² = v0² + 2 L a(v) with
+    a(v) = (A - q'' v²) / (q' + 2 q'' L) solves in closed form.
+  **/
   public function reachableSpeed(knownSpeed:Float):Float {
-    var acceleration = accelerationFor(knownSpeed);
-    if (acceleration >= SimplePathTiming.LARGE_LIMIT)
+    if (accelerationFor(knownSpeed) >= SimplePathTiming.LARGE_LIMIT)
       return speedLimit;
-    return Math.min(speedLimit,
-      Math.sqrt(knownSpeed * knownSpeed + 2.0 * acceleration * length));
+    var known = knownSpeed * knownSpeed, reachable = speedLimit * speedLimit;
+    for (joint in 0...qPrime.length) {
+      var denominator = qPrime[joint] + 2.0 * qDoublePrime[joint] * length;
+      if (denominator <= SimplePathTiming.EPSILON) continue;
+      var squared = (known * denominator + 2.0 * length * maxAcceleration[joint]) /
+        (denominator + 2.0 * length * qDoublePrime[joint]);
+      reachable = Math.min(reachable, Math.max(known, squared));
+    }
+    return Math.sqrt(reachable);
   }
 
   public function accelerationFor(referenceSpeed:Float):Float {
@@ -246,9 +262,10 @@ private class SimpleTimingProfile {
       (2.0 * acceleration);
     var chosenPeak = span.speedLimit;
     if (accelToLimit + decelFromLimit > span.length)
-      chosenPeak = Math.sqrt(Math.max(0.0,
+      // Reachability leaves the faster end speed attainable; this keeps rounding from losing it.
+      chosenPeak = Math.max(Math.max(startSpeed, endSpeed), Math.sqrt(Math.max(0.0,
         (2.0 * acceleration * span.length + startSpeed * startSpeed +
-          endSpeed * endSpeed) * 0.5));
+          endSpeed * endSpeed) * 0.5)));
     peakSpeed = chosenPeak;
     accelerationTime = Math.max(0.0, (peakSpeed - startSpeed) / acceleration);
     decelerationTime = Math.max(0.0, (peakSpeed - endSpeed) / acceleration);

@@ -57,6 +57,15 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(2) var upper:Null<Float>;
 	@:id(3) var velocity:Null<Float>;
 	@:id(4) var effort:Null<Float>;
+	/**
+	 * How far the joint can travel past `lower` and `upper` before it meets its
+	 * end stop, in the joint's units: a machine's limit switch sits beyond its
+	 * soft limit. Motion stays within the limits; a simulation faults only past
+	 * the overtravel. Absent, a simulation picks a small default.
+	 */
+	@:id(5) @:optional var overtravel:Null<Float>;
+	/** Largest acceleration the joint's drive can give, in the joint's units per second squared. */
+	@:id(6) @:optional var acceleration:Null<Float>;
 }
 
 /** Connectors belong to a reusable component definition, not an occurrence. */

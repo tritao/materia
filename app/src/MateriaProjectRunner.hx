@@ -1,11 +1,17 @@
 package app;
 
+import app.CncProgramPlayer.CncJob;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
+
+
 import haxe.Json;
 import haxe.crypto.Sha256;
 import haxe.io.Bytes;
 import haxe.io.Path as ProjectPath;
 import sys.io.AtomicFile;
 import materia.project.SceneArtifact;
+import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.MaterialLibrary;
 import materia.project.MeshMassProperties;
@@ -33,6 +39,9 @@ import sys.thread.Mutex;
 #if !wasm
 import sys.thread.Thread;
 #end
+
+/** A closed triangle mesh whose triangles share vertices, in a part's frame and length unit. */
+typedef IndexedMesh = {positions:Array<Float>, indices:Array<Int>};
 
 /** Resolves a Materia project entrypoint and materializes its generated viewport geometry. */
 class MateriaProjectRunner {
@@ -356,7 +365,10 @@ class MateriaProjectRunner {
     var localCentersByDefinition:Map<String, Array<Float>> = new Map();
     var faceDescriptorsByDefinition:Map<String, String> = new Map();
     var physicalParts:Array<AssemblyPhysicalPart> = [];
+    // The generator's machining target is geometry to compare against, not a part of the scene.
+    var machiningTarget = artifact.machining == null ? null : artifact.machining.target;
     for (component in artifact.parts) {
+      if (component.id == machiningTarget) continue;
       var label = component.name;
       var minimum = [1e300, 1e300, 1e300], maximum = [-1e300, -1e300, -1e300];
       for (vertex in 0...component.vertexCount) for (axis in 0...3) {
@@ -422,7 +434,70 @@ class MateriaProjectRunner {
       assemblyState: runtimeState == null ? null : runtimeState.record(),
       localCentersByDefinition: localCentersByDefinition, faceDescriptorsByDefinition: faceDescriptorsByDefinition,
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
-      recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics};
+      recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
+      cncJob: machiningJob(artifact, records, scale)};
+  }
+
+  /**
+   * The machining job the generator made with its machine, ready to run: meshes in metres in the
+   * stock part's frame and the tool table as tools. Parts the tool may enter (the stock, and those
+   * the job sacrifices) do not collide: the stock simulation cuts and reports what touches them,
+   * where physical contact would only stop the tool going in.
+   */
+  static function machiningJob(artifact:SceneArtifactData, records:Array<SceneObjectData>, scale:Float):Null<CncJob> {
+    var machining = artifact.machining;
+    if (machining == null) return null;
+    function partMesh(id:String):IndexedMesh {
+      var mesh = artifactMesh([for (part in artifact.parts) if (part.id == id) part][0]);
+      return {positions: [for (value in mesh.positions) value * scale], indices: mesh.indices};
+    }
+    var stockMesh:Null<IndexedMesh> = null;
+    var stock = machining.stock;
+    if (stock != null) {
+      var definition = artifact.assemblyDefinition;
+      var occurrence = definition == null ? [] : [for (item in definition.occurrences) if (item.id == stock) item];
+      if (occurrence.length == 1) stockMesh = partMesh(occurrence[0].definition);
+    }
+    var entered = machining.sacrificial == null ? [] : machining.sacrificial.copy();
+    if (stock != null) entered.push(stock);
+    for (id in entered) for (record in records) if (record.id == "project:" + id) record.collisionEnabled = false;
+    var target = machining.target;
+    return {source: machining.program, axes: machining.axes, spindle: machining.spindle,
+      workOffset: machining.workOffset, loop: machining.loop == true,
+      tools: [for (tool in machining.tools) Tool.shaped(tool.number, tool.length, CutterProfile.decode(tool.profile))],
+      stock: stock, stockMesh: stockMesh, target: target == null ? null : partMesh(target),
+      toolPart: machining.toolPart, loadedTool: machining.loadedTool};
+  }
+
+  /** An artifact part's triangles, with vertices at the same place welded into one. */
+  static function artifactMesh(part:SceneArtifactPart):IndexedMesh {
+    var corners:Array<Float> = [];
+    for (index in 0...part.indexCount) {
+      var vertex = part.indices.getInt32(index * 4);
+      for (axis in 0...3) corners.push(part.vertices.getDouble(vertex * 24 + axis * 8));
+    }
+    return welded(corners, part.id);
+  }
+
+  /** Triangle corners (xyz each) as an indexed mesh: corners at the same place become one vertex. */
+  static function welded(corners:Array<Float>, source:String):IndexedMesh {
+    var positions:Array<Float> = [], indices:Array<Int> = [];
+    var byCorner = new Map<String, Int>();
+    for (corner in 0...Std.int(corners.length / 3)) {
+      var x = corners[corner * 3], y = corners[corner * 3 + 1], z = corners[corner * 3 + 2];
+      if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z)) throw 'Mesh $source has a non-finite vertex';
+      var key = '$x,$y,$z';
+      var index = byCorner.get(key);
+      if (index == null) {
+        index = Std.int(positions.length / 3);
+        byCorner.set(key, index);
+        positions.push(x);
+        positions.push(y);
+        positions.push(z);
+      }
+      indices.push(index);
+    }
+    return {positions: positions, indices: indices};
   }
 
   /** Re-evaluate generated occurrence placements for a project-owned configuration. */
@@ -461,7 +536,7 @@ class MateriaProjectRunner {
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
-      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips};
+      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips, cncJob: generated.cncJob};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -608,4 +683,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var robotMotions:Array<RobotMotionTrack>;
   /** Vacuum commands that go with the motion: which tool grips or lets go, and when. */
   @:optional var robotGrips:Array<RobotGripEvent>;
+  /** The machining job the project's generator made for its machine, if any. */
+  @:optional var cncJob:CncJob;
 }

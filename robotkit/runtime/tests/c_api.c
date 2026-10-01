@@ -90,6 +90,34 @@ int main(void) {
     assert(full_snapshot.queue_end_time_ns == 1000000000);
     rk_robot_runtime_destroy(plan_runtime);
 
+    /* The same plan from segment arrays, as a MotionKit plan holds them, starting mid-plan. */
+    rk_robot_runtime array_runtime = RK_INVALID_ROBOT_RUNTIME;
+    assert(rk_robot_runtime_create(&blueprint, &array_runtime) == RK_OK);
+    static rk_plan_header header;
+    header.struct_size = sizeof(header);
+    header.sequence = 1;
+    header.plan_id = 100;
+    header.model_revision = blueprint.revision;
+    header.required_capabilities = RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE;
+    header.tag = 7;
+    header.ends_at_rest = 0;
+    const int64_t starts[] = {5000000000};
+    const int64_t durations[] = {1000000000};
+    const int32_t degrees[] = {3};
+    const double coefficients[] = {0.0, 0.0, 0.0, 0.1, 0.0, 0.0};
+    const int32_t joint_map[] = {0};
+    const int32_t bad_map[] = {1};
+    assert(rk_robot_runtime_submit_plan_arrays(array_runtime, &header, starts, durations, degrees,
+        1, coefficients, 5, joint_map, 1) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_robot_runtime_submit_plan_arrays(array_runtime, &header, starts, durations, degrees,
+        1, coefficients, 6, bad_map, 1) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_robot_runtime_submit_plan_arrays(array_runtime, &header, starts, durations, degrees,
+        1, coefficients, 6, joint_map, 1) == RK_OK);
+    assert(rk_robot_runtime_snapshot_full(array_runtime, &full_snapshot) == RK_OK);
+    assert(full_snapshot.active_plan_id == 100);
+    assert(full_snapshot.queue_end_time_ns == 1000000000);
+    rk_robot_runtime_destroy(array_runtime);
+
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);
     command.sequence = 1;

@@ -11,6 +11,11 @@ import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.tool.ToolLibrary;
+import toolpathkit.tool.Tool;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.path.ToolpathFrame;
+import toolpathkit.path.ArcFitting;
+import toolpathkit.setup.SetupStock;
 
 class ToolpathKitTests {
   static function main():Void {
@@ -76,7 +81,65 @@ class ToolpathKitTests {
     if (placedViolations.length != 1 || placedViolations[0].axis != 0 ||
         placedViolations[0].provenance.operationIndex != 7)
       throw "travel check must place work geometry and preserve provenance";
+    // Travel is checked at the controlled point: G43 lifts it by the active length.
+    var measured = new ToolLibrary();
+    measured.set(new Tool(3, 0.04, 0.006));
+    var lifted = new ToolpathProgram([ToolpathOp.ToolChange(3, Provenance.cam(8)),
+      ToolpathOp.ToolLengthOffset(3, 0.04, Provenance.cam(8)),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0, 0, -0.03)),
+        0.01, 0, Provenance.cam(8))], measured, [new Setup("1", new Point3(0, 0, 0))]);
+    if (new TravelEnvelope(new Point3(-1, -1, 0), new Point3(1, 1, 1)).check(lifted).length != 0)
+      throw "travel check must lift G43 moves to the gauge line";
+    var frame = ToolpathFrame.of(lifted);
+    for (op in lifted.ops) frame.advance(op);
+    if (frame.toMachine()[2] != 0.04 || frame.tipShift() != 0.0 || frame.toolNumber != 3)
+      throw "frame tracks the tool and its G43 length";
+    // A wrong H length moves the real tip, and stock validation sees it.
+    var shortH = new ToolpathProgram([ToolpathOp.ToolChange(3, Provenance.cam(9)),
+      ToolpathOp.ToolLengthOffset(3, 0.035, Provenance.cam(9)),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0, 0, -0.018)),
+        0.01, 0, Provenance.cam(9))], measured, [new Setup("1", new Point3(0, 0, 0))]);
+    rejected = false;
+    try new Setup("1", new Point3(0, 0, 0), new SetupStock(-1, 1, -1, 1, 0, -0.02, 0.01))
+      .validate(shortH.ops, measured) catch (_:Dynamic) rejected = true;
+    if (!rejected) throw "validation must cut at the physical tip under a wrong H length";
+    var profile = CutterProfile.bullNose(0.006, 0.001, 0.02).withShank(0.005, 0.01)
+      .withHolder(0.02, 0.015);
+    var decoded = CutterProfile.decode(profile.encode());
+    if (Std.string(decoded.segments) != Std.string(profile.segments))
+      throw "cutter profile codec round trip";
+    rejected = false;
+    try CutterProfile.decode([[0.0, 7.0, 0, 0, 1, 0]]) catch (_:Dynamic) rejected = true;
+    if (!rejected) throw "cutter profile codec rejects unknown zones";
+    // Arc fitting: a polygonized circle becomes one arc, a hexagon stays lines,
+    // and an S-curve becomes two arcs turning opposite ways.
+    function polygon(sides:Int, radius:Float, ?centerX:Float = 0.0, ?from:Float = 0.0,
+        ?sweep:Float = 6.283185307179586):Array<Point3>
+      return [for (k in 0...(sides + 1)) new Point3(centerX + radius * Math.cos(from + sweep * k / sides),
+        radius * Math.sin(from + sweep * k / sides), -0.002)];
+    function cuts(points:Array<Point3>, span:Provenance):Array<ToolpathOp>
+      return [for (k in 1...points.length) ToolpathOp.Move(Cut, PathGeometry.Line(points[k - 1], points[k]),
+        0.01, 0.0, span)];
+    var span = Provenance.cam(10);
+    var circle = ArcFitting.fit(cuts(polygon(64, 0.005), span), 0.00002);
+    switch circle {
+      case [Move(Cut, Arc(center, radius, _, sweep), _, _, _)]:
+        if (Math.abs(radius - 0.005) > 1e-12 || Math.abs(Math.abs(sweep) - 2 * Math.PI) > 1e-9 ||
+            center.distanceTo(new Point3(0, 0, -0.002)) > 1e-12)
+          throw "a polygonized circle fits its own circle";
+      case _: throw 'a polygonized circle becomes one arc, got $circle';
+    }
+    if (ArcFitting.fit(cuts(polygon(6, 0.005), span), 0.00002).length != 6)
+      throw "a hexagon is not rounded";
+    var s = polygon(32, 0.005, 0.0, Math.PI, -Math.PI);
+    var second = polygon(32, 0.005, 0.01, Math.PI, Math.PI);
+    var curve = ArcFitting.fit(cuts(s.concat(second.slice(1)), span), 0.00002);
+    switch curve {
+      case [Move(Cut, Arc(_, _, _, first), _, _, _), Move(Cut, Arc(_, _, _, next), _, _, _)]:
+        if (!(first < 0.0 && next > 0.0)) throw "an S-curve turns one way, then the other";
+      case _: throw 'an S-curve becomes two arcs, got ${curve.length} operations';
+    }
     var coverage = ToolpathCoreCoverage.run();
-    Sys.println('ToolpathKit tests passed (${14 + coverage} assertions)');
+    Sys.println('ToolpathKit tests passed (${22 + coverage} assertions)');
   }
 }

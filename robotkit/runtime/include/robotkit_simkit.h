@@ -75,6 +75,17 @@ enum {
 };
 
 enum { RK_MAX_LINK_SHAPES = 256 };
+enum { RK_MAX_LINK_HULLS = 512 };
+
+/**
+ * One convex hull of a link built from several rigid parts, as XYZ vertices in
+ * the link frame; 4..64 vertices.
+ */
+typedef struct rk_simulation_link_hull {
+    uint32_t link;
+    uint32_t vertex_count;
+    double vertices[64 * 3];
+} rk_simulation_link_hull;
 
 /** One primitive collision shape attached to a robot link, posed in the link frame. */
 typedef struct rk_simulation_link_shape {
@@ -180,6 +191,13 @@ typedef struct rk_simulation_robot_desc {
     /** Optional explicit contacts between link shapes. */
     uint32_t contact_pair_count;
     rk_simulation_contact_pair contact_pairs[RK_MAX_CONTACT_PAIRS];
+    /**
+     * Optional convex hulls of links built from several rigid parts, one per
+     * part. A link collides through a compound of its hull or box above, these
+     * hulls, its primitives and its tool pieces.
+     */
+    uint32_t link_hull_count;
+    rk_simulation_link_hull link_hulls[RK_MAX_LINK_HULLS];
 } rk_simulation_robot_desc;
 
 /**

@@ -1,5 +1,6 @@
 package cadbridge;
 
+import materia.assembly.AssemblyBodies;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
@@ -16,16 +17,36 @@ import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
 import cadkit.modeling.AssemblyState;
 
+/**
+ * An assembly as one simulated robot. Parts that fixed joints hold together form one rigid body and
+ * share a link; parts fixed to the world share the root link. Lengths are metres.
+ */
 typedef AssemblySimulationModel = {
   var model:RobotModel;
-  /** Link-order hulls in SI units for Simulation.addRobotAtPose. */
-  var linkCollisionHulls:Array<Null<Array<Float>>>;
+  /** Each part's convex hull, in its link's frame, for Simulation.addRobotAtPose. */
+  var linkHulls:Array<AssemblyLinkHull>;
+  /** Each simulated part's link and its frame within that link. */
+  var partLinks:Map<String, AssemblyPartLink>;
   var closureIds:Array<String>;
   var closures:Array<AssemblySimulationClosure>;
 }
 
+/** One part's collision hull: XYZ triples in the frame of link `link`. */
+typedef AssemblyLinkHull = {
+  var link:Int;
+  var part:String;
+  var vertices:Array<Float>;
+}
+
+/** Where a part rides: link `link`, at `offset` (metres) in the link's frame. */
+typedef AssemblyPartLink = {
+  var link:Int;
+  var offset:AssemblyFrame;
+}
+
 typedef AssemblySimulationClosure = {
   var id:String;
+  /** The links the closure joins. */
   var parent:String;
   var child:String;
   var type:AssemblyJointType;
@@ -54,12 +75,26 @@ typedef AssemblyPhysicalData = {
 /** Converts an assembly's tree joints and physical parts to a RobotKit model. */
 class AssemblySimulationBridge {
   /**
+   * End-stop room past a joint's limits when its assembly states no overtravel: 1 mm for a slide,
+   * 1 degree for a rotary joint. A joint parked on its limit reads noise either side of it, and a
+   * runtime that faulted exactly at the limit would stop the robot before any command.
+   */
+  public static inline final DEFAULT_PRISMATIC_OVERTRAVEL = 0.001;
+  public static final DEFAULT_ROTARY_OVERTRAVEL = Math.PI / 180;
+
+  /**
    * `freeOccurrences` are parts the simulation moves on its own instead of bolting them to the
    * assembly, such as a workpiece; they get no link, and no joint may touch them.
+   *
+   * Each rigid body (`AssemblyBodies`) becomes one link, framed at its root part, with the combined
+   * mass properties of its parts and one collision hull per part; bodies that no joint carries join
+   * the root link. Only moving joints remain joints, so a machine of many bolted parts simulates as
+   * a few links and its real axes. `massOf` may override a part's mass in kilograms (a part given
+   * another material); its inertia scales with it.
    */
   public static function toRobotModel(definition:AssemblyDefinition,
       artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord,
-      ?freeOccurrences:Array<String>):AssemblySimulationModel {
+      ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>):AssemblySimulationModel {
     var free = new Map<String, Bool>();
     if (freeOccurrences != null) for (id in freeOccurrences) free.set(id, true);
     AssemblyDefinitionCodec.validate(definition);
@@ -72,80 +107,125 @@ class AssemblySimulationBridge {
     for (part in artifact.parts) parts.set(part.id, part);
     var definitions = new Map<String, materia.assembly.AssemblyDefinition.AssemblyComponentDefinition>();
     for (component in definition.definitions) definitions.set(component.id, component);
+    for (edge in definition.joints) if (free.exists(edge.parent) || free.exists(edge.child))
+      throw 'Free part is joined by "${edge.id}"; a part the simulation moves on its own cannot be joined';
+    var placement = new AssemblyState(sourceDefinition, savedState);
     var model = new RobotModel(definition.id);
     var root = model.addLink(new Link("assembly-root"));
-    root.mass = 0.001;
-    root.inertiaTensor = [1e-6, 0, 0, 0, 1e-6, 0, 0, 0, 1e-6];
-    var links = new Map<String, Link>();
-    var linkCollisionHulls:Array<Null<Array<Float>>> = [null];
-    for (occurrence in definition.occurrences) {
-      if (free.exists(occurrence.id)) continue;
-      var part = parts.get(occurrence.definition);
-      if (part == null) throw 'Assembly occurrence "${occurrence.id}" has no physical part';
-      if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density) ||
-          part.density <= 0 || part.centerOfMass == null || part.centerOfMass.length != 3 ||
-          part.inertia == null || part.inertia.length != 9)
-        throw 'Assembly occurrence "${occurrence.id}" has invalid mass properties';
-      for (coordinate in part.centerOfMass) if (!Math.isFinite(coordinate))
-        throw 'Assembly occurrence "${occurrence.id}" has a non-finite centre of mass';
-      for (component in part.inertia) if (!Math.isFinite(component))
-        throw 'Assembly occurrence "${occurrence.id}" has a non-finite inertia';
-      var link = model.addLink(new Link(occurrence.id));
-      link.mass = part.volume * part.density * scale * scale * scale;
-      link.centerOfMass = [for (coordinate in part.centerOfMass) coordinate * scale];
-      link.inertiaTensor = [for (component in part.inertia) component * part.density * Math.pow(scale, 5)];
-      links.set(occurrence.id, link);
-      var hull = part.collisionHull;
-      if (hull != null) {
-        if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
-          throw 'Assembly occurrence "${occurrence.id}" has an invalid collision hull';
-        for (coordinate in hull) if (!Math.isFinite(coordinate))
-          throw 'Assembly occurrence "${occurrence.id}" has a non-finite collision hull';
-        linkCollisionHulls.push([for (coordinate in hull) coordinate * scale]);
-      } else linkCollisionHulls.push(null);
+    var links = [root];
+    // Mass, centre of mass (link frame, metres) and inertia (about that centre, link axes) of each
+    // part, per link, combined once every part is placed.
+    var masses:Array<Array<{mass:Float, center:Array<Float>, inertia:Array<Float>}>> = [[
+      {mass: 0.001, center: [0.0, 0.0, 0.0], inertia: [1e-6, 0, 0, 0, 1e-6, 0, 0, 0, 1e-6]}]];
+    var partLinks = new Map<String, AssemblyPartLink>();
+    var offsets = new Map<String, AssemblyFrame>();
+    var linkIndexOfPart = new Map<String, Int>();
+    var linkHulls:Array<AssemblyLinkHull> = [];
+    for (body in AssemblyBodies.of(definition)) {
+      if (free.exists(body.id)) continue;
+      var index = 0;
+      var frame = AssemblyFrames.identity();
+      if (body.joint != null) {
+        index = links.length;
+        links.push(model.addLink(new Link(body.id)));
+        masses.push([]);
+        frame = placement.worldPose(body.id);
+      }
+      var toLink = AssemblyFrames.inverse(frame);
+      for (id in body.occurrences) {
+        var occurrence = [for (item in definition.occurrences) if (item.id == id) item][0];
+        var part = parts.get(occurrence.definition);
+        if (part == null) throw 'Assembly occurrence "$id" has no physical part';
+        if (!Math.isFinite(part.volume) || part.volume <= 0 || !Math.isFinite(part.density) ||
+            part.density <= 0 || part.centerOfMass == null || part.centerOfMass.length != 3 ||
+            part.inertia == null || part.inertia.length != 9)
+          throw 'Assembly occurrence "$id" has invalid mass properties';
+        for (coordinate in part.centerOfMass) if (!Math.isFinite(coordinate))
+          throw 'Assembly occurrence "$id" has a non-finite centre of mass';
+        for (component in part.inertia) if (!Math.isFinite(component))
+          throw 'Assembly occurrence "$id" has a non-finite inertia';
+        // The part's frame in its link's frame; fixed joints keep it constant.
+        var offset = AssemblyFrames.compose(toLink, placement.worldPose(id));
+        offsets.set(id, offset);
+        linkIndexOfPart.set(id, index);
+        partLinks.set(id, {link: index, offset: scaled(offset, scale)});
+        var center = AssemblyFrames.transformPoint(offset, part.centerOfMass[0], part.centerOfMass[1],
+          part.centerOfMass[2]);
+        var baseMass = part.volume * part.density * scale * scale * scale;
+        var chosen = massOf == null ? null : massOf(id);
+        var mass = chosen == null ? baseMass : chosen;
+        if (!Math.isFinite(mass) || mass <= 0) throw 'Assembly occurrence "$id" has an invalid mass';
+        masses[index].push({mass: mass, center: [center.x * scale, center.y * scale, center.z * scale],
+          inertia: rotated(part.inertia, offset, part.density * Math.pow(scale, 5) * mass / baseMass)});
+        var hull = part.collisionHull;
+        if (hull != null) {
+          if (hull.length < 12 || hull.length > 64 * 3 || hull.length % 3 != 0)
+            throw 'Assembly occurrence "$id" has an invalid collision hull';
+          var vertices:Array<Float> = [];
+          for (vertex in 0...Std.int(hull.length / 3)) {
+            var x = hull[vertex * 3], y = hull[vertex * 3 + 1], z = hull[vertex * 3 + 2];
+            if (!Math.isFinite(x) || !Math.isFinite(y) || !Math.isFinite(z))
+              throw 'Assembly occurrence "$id" has a non-finite collision hull';
+            var point = AssemblyFrames.transformPoint(offset, x, y, z);
+            vertices.push(point.x * scale);
+            vertices.push(point.y * scale);
+            vertices.push(point.z * scale);
+          }
+          linkHulls.push({link: index, part: id, vertices: vertices});
+        }
+      }
     }
-    var roots = AssemblyDefinitionCodec.rootOccurrences(definition);
-    var placement = new AssemblyState(sourceDefinition, savedState);
-    for (occurrence in definition.occurrences) if (roots.exists(occurrence.id) && !free.exists(occurrence.id)) {
-      var joint = model.addJoint(new Joint("root-" + occurrence.id, JointType.Fixed,
-        root, links.get(occurrence.id)));
-      setFrame(joint, placement.worldPose(occurrence.id), true, scale);
+    for (index in 0...links.length) combine(links[index], masses[index]);
+    function linkOf(id:String):Link {
+      var index = linkIndexOfPart.get(id);
+      if (index == null) throw 'Assembly occurrence "$id" has no simulated link';
+      return links[index];
+    }
+    function offsetOf(id:String):AssemblyFrame {
+      var offset = offsets.get(id);
+      if (offset == null) throw 'Assembly occurrence "$id" has no simulated link';
+      return offset;
     }
     var closures:Array<String> = [];
     var closureGeometry:Array<AssemblySimulationClosure> = [];
     for (edge in definition.joints) {
-      if (free.exists(edge.parent) || free.exists(edge.child))
-        throw 'Free part is joined by "${edge.id}"; a part the simulation moves on its own cannot be joined';
       if (edge.role == AssemblyJointRole.Closure) {
         closures.push(edge.id);
-        var frame = connector(definitions.get(occurrenceDefinition(definition, edge.parent)),
-          edge.parentConnector);
+        var frame = AssemblyFrames.compose(offsetOf(edge.parent),
+          connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
         var endpoint = AssemblyFrames.transformPoint(frame, edge.axis.x, edge.axis.y, edge.axis.z);
-        closureGeometry.push({id: edge.id, parent: edge.parent, child: edge.child,
-          type: edge.type,
+        closureGeometry.push({id: edge.id, parent: linkOf(edge.parent).id,
+          child: linkOf(edge.child).id, type: edge.type,
           anchorParent: [frame.x * scale, frame.y * scale, frame.z * scale],
           axisParent: [endpoint.x - frame.x, endpoint.y - frame.y, endpoint.z - frame.z]});
         continue;
       }
+      // Fixed joints hold parts inside one body; they are not joints of the robot.
+      if (edge.type == AssemblyJointType.Fixed) continue;
       var kind:JointType = switch (edge.type) {
-        case AssemblyJointType.Fixed: JointType.Fixed;
         case AssemblyJointType.Revolute: JointType.Revolute;
         case AssemblyJointType.Continuous: JointType.Continuous;
         case AssemblyJointType.Prismatic: JointType.Prismatic;
         default: throw 'Unsupported assembly joint type "${edge.type}"';
       };
-      var joint = model.addJoint(new Joint(edge.id, kind, links.get(edge.parent), links.get(edge.child)));
-      var parentFrame = connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector);
-      var initial = edge.type == AssemblyJointType.Fixed ? 0.0 : placement.joint(edge.id);
+      var joint = model.addJoint(new Joint(edge.id, kind, linkOf(edge.parent),
+        linkOf(edge.child)));
+      var parentFrame = AssemblyFrames.compose(offsetOf(edge.parent),
+        connector(definitions.get(occurrenceDefinition(definition, edge.parent)), edge.parentConnector));
+      var initial = placement.joint(edge.id);
       setFrame(joint, AssemblyFrames.compose(parentFrame,
         AssemblyFrames.axisMotion(edge.type, edge.axis, initial)), true, scale);
-      setFrame(joint, connector(definitions.get(occurrenceDefinition(definition, edge.child)), edge.childConnector), false, scale);
+      setFrame(joint, AssemblyFrames.compose(offsetOf(edge.child),
+        connector(definitions.get(occurrenceDefinition(definition, edge.child)), edge.childConnector)), false, scale);
       joint.axis = [edge.axis.x, edge.axis.y, edge.axis.z];
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       joint.limits = new JointLimits(edge.limits.lower == null ? -1e9 : (edge.limits.lower - initial) * factor,
         edge.limits.upper == null ? 1e9 : (edge.limits.upper - initial) * factor,
         edge.limits.velocity == null ? 0 : edge.limits.velocity * factor,
         edge.limits.effort == null ? 0 : edge.limits.effort);
+      if (edge.limits.acceleration != null) joint.limits.maxAcceleration = edge.limits.acceleration * factor;
+      joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
+        edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }
     if (definition.couplings != null) for (coupling in definition.couplings) {
       var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -165,8 +245,45 @@ class AssemblySimulationBridge {
       model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
     }
-    return {model: model, linkCollisionHulls: linkCollisionHulls,
+    return {model: model, linkHulls: linkHulls, partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};
+  }
+
+  /** A frame with its translation scaled to metres. */
+  static function scaled(frame:AssemblyFrame, scale:Float):AssemblyFrame
+    return {x: frame.x * scale, y: frame.y * scale, z: frame.z * scale, qx: frame.qx, qy: frame.qy,
+      qz: frame.qz, qw: frame.qw};
+
+  /** A part's unit-density inertia, scaled by `factor` and turned into its link's axes. */
+  static function rotated(inertia:Array<Float>, offset:AssemblyFrame, factor:Float):Array<Float> {
+    var r = AssemblyFrames.toRotationMatrix(offset);
+    var result = [for (_ in 0...9) 0.0];
+    for (i in 0...3) for (j in 0...3) {
+      var sum = 0.0;
+      for (k in 0...3) for (l in 0...3) sum += r[i * 3 + k] * inertia[k * 3 + l] * r[j * 3 + l];
+      result[i * 3 + j] = sum * factor;
+    }
+    return result;
+  }
+
+  /** Sets a link's mass properties from its parts', with the parallel-axis theorem. */
+  static function combine(link:Link, pieces:Array<{mass:Float, center:Array<Float>, inertia:Array<Float>}>):Void {
+    var mass = 0.0, center = [0.0, 0.0, 0.0];
+    for (piece in pieces) {
+      mass += piece.mass;
+      for (axis in 0...3) center[axis] += piece.mass * piece.center[axis];
+    }
+    for (axis in 0...3) center[axis] /= mass;
+    var inertia = [for (_ in 0...9) 0.0];
+    for (piece in pieces) {
+      var d = [for (axis in 0...3) piece.center[axis] - center[axis]];
+      var squared = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
+      for (i in 0...3) for (j in 0...3)
+        inertia[i * 3 + j] += piece.inertia[i * 3 + j] + piece.mass * ((i == j ? squared : 0.0) - d[i] * d[j]);
+    }
+    link.mass = mass;
+    link.centerOfMass = center;
+    link.inertiaTensor = inertia;
   }
 
   static function occurrenceDefinition(definition:AssemblyDefinition, id:String):String {

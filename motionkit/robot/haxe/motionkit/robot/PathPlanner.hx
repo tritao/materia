@@ -78,7 +78,7 @@ class PathPlanner {
     var options = pathOptions == null ? PathPlanningOptions.exactStopMode() : pathOptions;
     var planningPath = path;
     if (!options.exactStop && options.blendTolerance > 0.0) {
-      var blended = CornerBlender.blend(path, options.blendTolerance * 0.8,
+      var blended = CornerBlender.blend(path, options.blendTolerance * CornerBlender.GEOMETRY_SHARE,
         options.maxBlendTurnAngleRadians);
       planningPath = blended.path;
       diagnostics = blended.diagnostics;

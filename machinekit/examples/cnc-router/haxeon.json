@@ -1,0 +1,18 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-cnc-router-example" },
+	"entry": "CncRouterPreview",
+	"sources": ["CncRouter.hx", "CncRouterPreview.hx", "NemaMountPlate.hx", "MountPlateJob.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../../projectkit" },
+		"cadkit": { "path": "../../../cadkit" },
+		"machinekit": { "path": "../../" },
+		"manufacturingkit": { "path": "../../../manufacturingkit" },
+		"toolpathkit": { "path": "../../../toolpathkit" },
+		"camkit": { "path": "../../../camkit" },
+		"cnckit": { "path": "../../../cnckit" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

@@ -2,7 +2,7 @@
 	"version": 1,
 	"package": { "name": "machinekit-tests" },
 	"entry": "MachineKitSmoke",
-	"sourceRoots": ["src", "../examples", "../examples/robot-arm"],
+	"sourceRoots": ["src", "../examples", "../examples/robot-arm", "../examples/cnc-router"],
 	"dependencies": {
 		"projectkit": { "path": "../../projectkit" },
 		"manufacturingkit": { "path": "../../manufacturingkit" },
@@ -10,7 +10,10 @@
 		"machinekit": { "path": ".." },
 		"machinekit-picking-station-example": { "path": "../examples/picking-station" },
 		"robotkit": { "path": "../../robotkit" },
-		"cadbridge": { "path": "../../robotkit/cadbridge" }
+		"cadbridge": { "path": "../../robotkit/cadbridge" },
+		"toolpathkit": { "path": "../../toolpathkit" },
+		"camkit": { "path": "../../camkit" },
+		"cnckit": { "path": "../../cnckit" }
 	},
 	"target": "host",
 	"outputDir": "build"

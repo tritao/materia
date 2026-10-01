@@ -4,6 +4,7 @@ import motionkit.path.OrientationPolicy;
 import motionkit.path.PosePath;
 import motionkit.path.PosePrimitive;
 import motionkit.path.PoseWaypoint;
+import motionkit.path.PoseDerivatives;
 
 /** Preserves authored primitive geometry when restarting inside a path. */
 class ProcessPathSlice {
@@ -51,4 +52,6 @@ private class SlicedPosePrimitive implements PosePrimitive {
   public function endWaypoint():PoseWaypoint return source.waypointAt(to);
   public function speedLimit():Float return source.speedLimit();
   public function orientationPolicy():OrientationPolicy return source.orientationPolicy();
+  public function derivativesAt(distance:Float):PoseDerivatives
+    return source.derivativesAt(Math.min(source.length(), Math.max(from, from + distance)));
 }

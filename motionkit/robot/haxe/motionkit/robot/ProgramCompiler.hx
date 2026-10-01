@@ -1,6 +1,9 @@
 package motionkit.robot;
 
 import haxe.Int64;
+import motionkit.kinematics.Twist6;
+import motionkit.path.PosePrimitive;
+import motionkit.path.PoseDerivatives;
 import robotkit.model.JointCoupling;
 import motionkit.MotionOptions;
 import motionkit.event.PathEvent;
@@ -34,6 +37,14 @@ import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
 
+/** A joint-space sample of a path: where, on which primitive, and the primitive arriving there. */
+private typedef PathSample = {
+  var distance:Float;
+  var primitive:PosePrimitive;
+  var local:Float;
+  var arriving:Null<{primitive:PosePrimitive, local:Float}>;
+}
+
 /** Lowers an authored program to validated, exact-stop plans. */
 class ProgramCompiler {
   public final solver:KinematicsSolver;
@@ -45,6 +56,9 @@ class ProgramCompiler {
   public final maxJerk:Array<Float>;
   public final startTolerances:StartTolerances;
   public final cartesianResolution:Float;
+  /** The speed scale of the program being compiled. */
+  var speedScale:Float = 1.0;
+
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
   final couplingIndices:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}>;
@@ -131,184 +145,176 @@ class ProgramCompiler {
     this.configurationSelector = configurationSelector;
   }
 
+  /**
+    Plans `program` from `initialQ`. With `firstOp`, ops before it are taken
+    as done and the rest is planned, keeping their op indices; `speedScale`
+    scales every path's speed, within the joint limits as always.
+  **/
   public function compile(program:MotionProgram, initialQ:Array<Float>,
-      firstPlanId:Int64):CompiledProgram {
-    if (program == null || initialQ == null || initialQ.length != solver.jointCount())
-      throw "Program compiler needs a program and complete start position";
-    for (value in initialQ) if (!Math.isFinite(value)) throw "Non-finite program start position";
-    var q = initialQ.copy();
-    var nextId = firstPlanId;
-    var blocks:Array<ProgramBlock> = [];
-    var plans:Array<ExecutionPlan> = [];
-    var indices:Array<Int> = [];
-    var lengths:Array<Float> = [];
-    var distanceMaps:Array<Array<Float>> = [];
-    var timeMaps:Array<Array<Float>> = [];
-    var notes:Array<String> = [];
-    var leadingOutputs:Array<{channel:String, value:EventValue}> = [];
-    var pending:Null<PendingMotion> = null;
-    var currentIndex = -1;
-    var skipNext = false;
+      firstPlanId:Int64, ?firstOp:Int = 0, ?speedScale:Float = 1.0):CompiledProgram {
+    var compilation = begin(program, initialQ, firstPlanId, firstOp, speedScale);
     try {
-      for (index in 0...program.ops.length) {
-        if (skipNext) { skipNext = false; continue; }
-        currentIndex = index;
-        var op = program.ops[index];
-        switch op {
-          case MoveJ(target, options, blend):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1));
-            }
-            noteBlend(blend, index, notes);
-            var goal = resolveTarget(target, q, index);
-            checkJointPosition(goal, index, null);
-            var velocity = effective(maxVelocity, options.maxVelocity);
-            var acceleration = effective(maxAcceleration, options.maxAcceleration);
-            var jerk = effective(maxJerk, options.maxJerk);
-            var generated = Trajectory.generateStateToState(q, zeros(), zeros(), goal,
-              velocity, acceleration, jerk);
-            pending = new PendingMotion(index, q, goal, generated, [], null, null);
-            attachLeadingOutputs(pending, leadingOutputs);
-            q = goal;
-          case MoveL(pose, requestedFrame, feed, blend):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1));
-            }
-            requireFrame(requestedFrame, index);
-            var blended:Null<PosePath> = null;
-            var blendTolerance = 0.0;
-            var blendNextPose:Null<Pose3> = null;
-            switch blend {
-              case ToleranceBlend(metres):
-                blendTolerance = metres;
-                if (index + 1 < program.ops.length) switch program.ops[index + 1] {
-                  case MoveL(nextPose, nextFrame, nextFeed, ExactStop):
-                    if (nextFrame == frameId) {
-                      blended = blendLinear(solver.forward(q), pose, nextPose,
-                        metres, feed, nextFeed);
-                      blendNextPose = nextPose;
-                    }
-                  case _:
-                }
-              case ExactStop:
-            }
-            if (blended != null) {
-              var nextFeed = switch program.ops[index + 1] {
-                case MoveL(_, _, speed, _): speed;
-                case _: feed;
-              };
-              pending = lowerPath(blended, q, Math.max(feed, nextFeed), [], index,
-                [solver.forward(q), pose, cast blendNextPose], blendTolerance);
-              skipNext = true;
-              notes.push('Motion program ops $index and ${index + 1} tolerance blended');
-            } else {
-              noteBlend(blend, index, notes);
-              var start = new PoseWaypoint(solver.forward(q), positionTolerance,
-                orientationTolerance);
-              var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
-              pending = lowerPath(new PosePath(frameId, [new PoseLine(start, end,
-                OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
-            }
-            q = pending.endQ.copy();
-            attachLeadingOutputs(pending, leadingOutputs);
-          case MoveC(via, endPose, requestedFrame, feed, blend):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1));
-            }
-            noteBlend(blend, index, notes);
-            requireFrame(requestedFrame, index);
-            pending = lowerPath(new PosePath(frameId, [new PoseArc(
-              new PoseWaypoint(solver.forward(q), positionTolerance, orientationTolerance),
-              new PoseWaypoint(via, positionTolerance, orientationTolerance),
-              new PoseWaypoint(endPose, positionTolerance, orientationTolerance),
-              OrientationPolicy.Interpolated, feed)]), q, feed, [], index);
-            q = pending.endQ.copy();
-            attachLeadingOutputs(pending, leadingOutputs);
-          case FollowPath(path, requestedFrame, feed, events):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1));
-            }
-            requireFrame(requestedFrame, index);
-            if (path.frameId != frameId)
-              throw 'Motion program op $index path frame does not match $frameId';
-            pending = lowerPath(path, q, feed, events, index);
-            q = pending.endQ.copy();
-            attachLeadingOutputs(pending, leadingOutputs);
-          case SetOutput(channel, value):
-            if (pending == null) leadingOutputs.push({channel:channel, value:value});
-            else pending.events.push(new TimedEvent(
-              Trajectory.nanoseconds(pending.trajectory.durationSeconds()), channel, value));
-          case Dwell(seconds):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
-            }
-            blocks.push(new ProgramBlock(plans, indices,
-              ProgramBarrier.Dwell(seconds), lengths, distanceMaps, timeMaps));
-            plans = []; indices = []; lengths = []; distanceMaps = []; timeMaps = [];
-          case WaitInput(channel, predicate, timeoutSeconds):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
-            }
-            blocks.push(new ProgramBlock(plans, indices,
-              ProgramBarrier.WaitInput(channel, predicate, timeoutSeconds), lengths,
-              distanceMaps, timeMaps));
-            plans = []; indices = []; lengths = []; distanceMaps = []; timeMaps = [];
-        }
-      }
-      if (pending != null) {
-        plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-      }
-      if (leadingOutputs.length > 0)
-        throw 'Motion program op $currentIndex has output changes without following motion';
-      if (plans.length > 0) blocks.push(new ProgramBlock(plans, indices, null, lengths,
-        distanceMaps, timeMaps));
-      return new CompiledProgram(blocks, notes);
+      while (compilation.step()) {}
     } catch (error:Dynamic) {
-      if (pending != null) pending.trajectory.dispose();
-      for (plan in plans) plan.dispose();
-      for (block in blocks) for (plan in block.plans) plan.dispose();
+      compilation.dispose();
+      throw error;
+    }
+    var blocks = compilation.blocks.copy();
+    // The program's end closes its last block, which may hold no plans.
+    if (blocks.length > 0 && blocks[blocks.length - 1].plans.length == 0 &&
+        blocks[blocks.length - 1].barrier == null) blocks.pop();
+    return new CompiledProgram(blocks, compilation.notes);
+  }
+
+  /** Starts planning `program` one op at a time; see `ProgramCompilation`. */
+  public function begin(program:MotionProgram, initialQ:Array<Float>, firstPlanId:Int64,
+      ?firstOp:Int = 0, ?speedScale:Float = 1.0):ProgramCompilation
+    return new ProgramCompilation(this, program, initialQ, firstPlanId, firstOp, speedScale);
+
+  /** Moves the pending motion into the open block as a finished plan. */
+  function retire(c:ProgramCompilation):Void {
+    var pending = c.pending;
+    if (pending == null) return;
+    c.blocks[c.blocks.length - 1].add(finish(pending, c.nextId), pending.opIndex,
+      pathLength(pending), pending.opDistances(), pending.times.copy());
+    c.nextId = Int64.add(c.nextId, Int64.ofInt(1));
+    c.pending = null;
+  }
+
+  /** Closes the open block at a barrier and opens the next. */
+  function barrier(c:ProgramCompilation, barrier:ProgramBarrier):Void {
+    retire(c);
+    c.blocks[c.blocks.length - 1].close(barrier);
+    c.blocks.push(ProgramBlock.open());
+  }
+
+  /** Plans the next op of `c`; at the end, finishes its last plan and block. Returns false once done. */
+  @:allow(motionkit.robot.ProgramCompilation)
+  function advance(c:ProgramCompilation):Bool {
+    if (c.done) return false;
+    var program = c.program;
+    speedScale = c.speedScale;
+    try {
+      if (c.cursor >= program.ops.length) {
+        retire(c);
+        if (c.leadingOutputs.length > 0)
+          throw 'Motion program op ${c.currentIndex} has output changes without following motion';
+        c.blocks[c.blocks.length - 1].close(null);
+        c.done = true;
+        return false;
+      }
+      var index = c.cursor++;
+      if (c.skipNext) { c.skipNext = false; return true; }
+      c.currentIndex = index;
+      var q = c.q;
+      switch program.ops[index] {
+        case MoveJ(target, options, blend):
+          retire(c);
+          noteBlend(blend, index, c.notes);
+          var goal = resolveTarget(target, q, index);
+          checkJointPosition(goal, index, null);
+          var velocity = effective(maxVelocity, options.maxVelocity);
+          var acceleration = effective(maxAcceleration, options.maxAcceleration);
+          var jerk = effective(maxJerk, options.maxJerk);
+          var generated = Trajectory.generateStateToState(q, zeros(), zeros(), goal,
+            velocity, acceleration, jerk);
+          var pending = new PendingMotion(index, q, goal, generated, [], null, null);
+          c.pending = pending;
+          attachLeadingOutputs(pending, c.leadingOutputs);
+          c.q = goal;
+        case MoveL(pose, requestedFrame, feed, blend):
+          retire(c);
+          requireFrame(requestedFrame, index);
+          var blended:Null<PosePath> = null;
+          var blendTolerance = 0.0;
+          var blendNextPose:Null<Pose3> = null;
+          switch blend {
+            case ToleranceBlend(metres):
+              blendTolerance = metres;
+              if (index + 1 < program.ops.length) switch program.ops[index + 1] {
+                case MoveL(nextPose, nextFrame, nextFeed, ExactStop):
+                  if (nextFrame == frameId) {
+                    blended = blendLinear(solver.forward(q), pose, nextPose,
+                      metres, feed, nextFeed);
+                    blendNextPose = nextPose;
+                  }
+                case _:
+              }
+            case ExactStop:
+          }
+          var pending:PendingMotion;
+          if (blended != null) {
+            var nextFeed = switch program.ops[index + 1] {
+              case MoveL(_, _, speed, _): speed;
+              case _: feed;
+            };
+            pending = lowerPath(blended, q, Math.max(feed, nextFeed), [], index,
+              [solver.forward(q), pose, cast blendNextPose], blendTolerance);
+            c.skipNext = true;
+            c.notes.push('Motion program ops $index and ${index + 1} tolerance blended');
+          } else {
+            noteBlend(blend, index, c.notes);
+            var start = new PoseWaypoint(solver.forward(q), positionTolerance,
+              orientationTolerance);
+            var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
+            pending = lowerPath(new PosePath(frameId, [new PoseLine(start, end,
+              OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
+          }
+          c.pending = pending;
+          c.q = pending.endQ.copy();
+          attachLeadingOutputs(pending, c.leadingOutputs);
+        case MoveC(via, endPose, requestedFrame, feed, blend):
+          retire(c);
+          noteBlend(blend, index, c.notes);
+          requireFrame(requestedFrame, index);
+          var pending = lowerPath(new PosePath(frameId, [new PoseArc(
+            new PoseWaypoint(solver.forward(q), positionTolerance, orientationTolerance),
+            new PoseWaypoint(via, positionTolerance, orientationTolerance),
+            new PoseWaypoint(endPose, positionTolerance, orientationTolerance),
+            OrientationPolicy.Interpolated, feed)]), q, feed, [], index);
+          c.pending = pending;
+          c.q = pending.endQ.copy();
+          attachLeadingOutputs(pending, c.leadingOutputs);
+        case FollowPath(path, requestedFrame, feed, events):
+          requireFrame(requestedFrame, index);
+          if (path.frameId != frameId)
+            throw 'Motion program op $index path frame does not match $frameId';
+          // Following a sharp corner exactly means stopping there, so each
+          // stretch between corners is its own plan of this op.
+          var sections = cornerSections(path);
+          for (k in 0...sections.length) {
+            retire(c);
+            var section = sections[k], last = k == sections.length - 1;
+            var end = section.offset + section.path.length();
+            var pending = lowerPath(section.path, c.q, feed, [for (event in events)
+              if (event.distance >= section.offset && (last || event.distance < end))
+                new PathEvent(event.distance - section.offset, event.channel, event.value,
+                  event.leadSeconds, event.holdPolicy)], index);
+            pending.distanceOffset = section.offset;
+            c.pending = pending;
+            c.q = pending.endQ.copy();
+            if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
+          }
+        case SetOutput(channel, value):
+          var pending = c.pending;
+          if (pending == null) c.leadingOutputs.push({channel:channel, value:value});
+          else pending.events.push(new TimedEvent(
+            Trajectory.nanoseconds(pending.trajectory.durationSeconds()), channel, value));
+        case Dwell(seconds):
+          barrier(c, ProgramBarrier.Dwell(seconds));
+        case WaitInput(channel, predicate, timeoutSeconds):
+          barrier(c, ProgramBarrier.WaitInput(channel, predicate, timeoutSeconds));
+      }
+      return true;
+    } catch (error:Dynamic) {
       var message = Std.string(error);
       if (StringTools.startsWith(message, "Motion program op ")) throw error;
-      throw 'Motion program op $currentIndex: $message';
+      throw 'Motion program op ${c.currentIndex}: $message';
     }
   }
 
   static function pathLength(pending:PendingMotion):Float
-    return pending.path == null ? 0.0 : pending.path.length();
+    return pending.path == null ? 0.0 : pending.distanceOffset + pending.path.length();
 
   static function attachLeadingOutputs(pending:PendingMotion,
       leading:Array<{channel:String, value:EventValue}>):Void {
@@ -417,18 +423,14 @@ class ProgramCompiler {
       authoredEvents:Array<PathEvent>, index:Int,
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
-    var distances:Array<Float> = [];
-    var count = Std.int(Math.ceil(path.length() / cartesianResolution));
+    var samples = pathSamples(path);
+    var count = samples.length - 1;
     if (count > 10000) throw 'Motion program op $index exceeds Cartesian sample budget';
+    var distances = [for (sample in samples) sample.distance];
     var positions:Array<Array<Float>> = [];
     var caps:Array<Float> = [];
     var previous = startQ.copy();
-    var pathPoses:Array<Pose3> = [];
-    for (sample in 0...(count + 1)) {
-      var distance = path.length() * sample / count;
-      distances.push(distance);
-      pathPoses.push(path.waypointAt(distance).pose);
-    }
+    var pathPoses = [for (sample in samples) sample.primitive.waypointAt(sample.local).pose];
     var selected:Array<Null<Array<Float>>> = [];
     if (configurationSelector != null)
       for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
@@ -445,24 +447,38 @@ class ProgramCompiler {
         for (joint in 0...startQ.length)
           if (Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
             throw 'Motion program op $index IK discontinuity at path distance $distance';
-        caps.push(Math.min(feed, primitiveSpeedAt(path,
+        caps.push(speedScale * Math.min(feed, primitiveSpeedAt(path,
           (distance + distances[sample-1]) * 0.5)));
       }
       positions.push(solved.copy());
       previous = solved;
     }
+    // Joint derivatives come from each primitive's own geometry through the
+    // differential kinematics, so they are exact whatever the sample spacing.
     var first:Array<Array<Float>> = [];
     var second:Array<Array<Float>> = [];
-    for (sample in 0...positions.length) {
-      var left = sample == 0 ? 0 : sample - 1;
-      var right = sample == count ? count : sample + 1;
-      var ds = distances[right] - distances[left];
-      first.push([for (joint in 0...startQ.length)
-        (positions[right][joint] - positions[left][joint]) / ds]);
+    var secondBefore:Array<Array<Float>> = [];
+    for (k in 0...samples.length) {
+      var sample = samples[k], q = positions[k];
+      var leaving = sample.primitive.derivativesAt(sample.local);
+      var rate = jointRate(q, leaving.linear, leaving.angular);
+      if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}';
+      first.push(rate);
+      second.push(jointCurvature(q, rate, leaving));
+      var arriving = sample.arriving;
+      if (arriving == null) secondBefore.push(second[k]);
+      else {
+        var before = arriving.primitive.derivativesAt(arriving.local);
+        var turn = 0.0;
+        for (axis in 0...3) turn = Math.max(turn, Math.max(
+          Math.abs(before.linear[axis] - leaving.linear[axis]),
+          Math.abs(before.angular[axis] - leaving.angular[axis])));
+        if (turn > 1e-6)
+          throw 'Motion program op $index turns a corner at path distance ${sample.distance}: blend it or stop there';
+        secondBefore.push(jointCurvature(q, rate, before));
+      }
     }
-    for (sample in 0...positions.length)
-      second.push([for (_ in 0...startQ.length) 0.0]);
-    var timed = timing.time(new JointPathSamples(distances, positions, first, second),
+    var timed = timing.time(new JointPathSamples(distances, positions, first, second, secondBefore),
       new PathTimingLimits(maxVelocity, maxAcceleration, caps));
     try {
       var events:Array<TimedEvent> = [];
@@ -622,6 +638,96 @@ class ProgramCompiler {
         throw 'Motion program op $index joint limit $joint$location';
       }
   }
+  /**
+    `path` split at its sharp corners, where one primitive's end tangent is
+    not the next one's start tangent, with each section's distance along it.
+  **/
+  static function cornerSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
+    var sections:Array<{path:PosePath, offset:Float}> = [];
+    var start = 0, offset = 0.0, sectionOffset = 0.0;
+    for (k in 0...path.primitives.length) {
+      var primitive = path.primitives[k];
+      if (k > start) {
+        var before = path.primitives[k - 1];
+        var arriving = before.derivativesAt(before.length()), leaving = primitive.derivativesAt(0.0);
+        var turn = 0.0;
+        for (axis in 0...3) turn = Math.max(turn, Math.max(
+          Math.abs(arriving.linear[axis] - leaving.linear[axis]),
+          Math.abs(arriving.angular[axis] - leaving.angular[axis])));
+        if (turn > 1e-6) {
+          sections.push({path: new PosePath(path.frameId, path.primitives.slice(start, k)), offset: sectionOffset});
+          start = k;
+          sectionOffset = offset;
+        }
+      }
+      offset += primitive.length();
+    }
+    sections.push({path: new PosePath(path.frameId, path.primitives.slice(start)), offset: sectionOffset});
+    if (sections.length == 1) return [{path: path, offset: 0.0}];
+    var authored = path.authoredGeometry;
+    if (authored != null) for (section in sections)
+      section.path.withAuthoredGeometry(authored, path.blendTolerance);
+    return sections;
+  }
+
+  /**
+    Where to sample a path in joint space: every primitive boundary, so that
+    each span lies on one primitive, and inside each primitive at most
+    `cartesianResolution` apart and a quarter radian of turning apart. A
+    boundary sample also names the primitive arriving at it.
+  **/
+  function pathSamples(path:PosePath):Array<PathSample> {
+    var first = path.primitives[0];
+    var samples:Array<PathSample> = [{distance: 0.0, primitive: first, local: 0.0, arriving: null}];
+    var start = 0.0;
+    for (k in 0...path.primitives.length) {
+      var primitive = path.primitives[k], length = primitive.length();
+      var curvature = 0.0;
+      for (at in [0.0, 0.5 * length, length]) {
+        var second = primitive.derivativesAt(at);
+        curvature = Math.max(curvature, Math.sqrt(
+          second.linearSecond[0] * second.linearSecond[0] +
+          second.linearSecond[1] * second.linearSecond[1] +
+          second.linearSecond[2] * second.linearSecond[2]));
+      }
+      var pieces = Std.int(Math.max(1, Math.max(Math.ceil(length / cartesianResolution),
+        Math.ceil(length * curvature / 0.25))));
+      for (piece in 1...(pieces + 1)) {
+        var local = length * piece / pieces;
+        var last = piece == pieces;
+        var next = last && k + 1 < path.primitives.length ? path.primitives[k + 1] : null;
+        samples.push(next == null ?
+          {distance: start + local, primitive: primitive, local: local, arriving: null} :
+          {distance: start + length, primitive: next, local: 0.0,
+            arriving: {primitive: primitive, local: length}});
+      }
+      start += length;
+    }
+    samples[samples.length - 1].distance = path.length();
+    return samples;
+  }
+
+  /** dq/ds for a pose moving at `linear` and `angular` per metre of path, or null at a singularity. */
+  function jointRate(q:Array<Float>, linear:Array<Float>, angular:Array<Float>):Null<Array<Float>>
+    return solver.solveDifferential(q, new Twist6(linear[0], linear[1], linear[2],
+      angular[0], angular[1], angular[2]));
+
+  /**
+    d²q/ds²: how dq/ds changes along the path, from the pose's second
+    derivative and the kinematics' change between nearby configurations.
+    Exact for a Cartesian machine, whose kinematics do not change.
+  **/
+  function jointCurvature(q:Array<Float>, rate:Array<Float>, pose:PoseDerivatives):Array<Float> {
+    var step = 1e-6;
+    function at(sign:Float):Null<Array<Float>>
+      return jointRate([for (joint in 0...q.length) q[joint] + sign * step * rate[joint]],
+        [for (axis in 0...3) pose.linear[axis] + sign * step * pose.linearSecond[axis]],
+        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]]);
+    var ahead = at(1.0), behind = at(-1.0);
+    if (ahead == null || behind == null) return [for (_ in q) 0.0];
+    return [for (joint in 0...q.length) (ahead[joint] - behind[joint]) / (2.0 * step)];
+  }
+
   static function primitiveSpeedAt(path:PosePath, distance:Float):Float {
     var start = 0.0;
     for (primitive in path.primitives) {
@@ -665,7 +771,8 @@ class ProgramCompiler {
   }
 }
 
-private class PendingMotion {
+/** A planned motion waiting for the ops that may still add to it (internal to compilation). */
+class PendingMotion {
   public final opIndex:Int;
   public final startQ:Array<Float>;
   public final endQ:Array<Float>;
@@ -680,6 +787,8 @@ private class PendingMotion {
   public final checkTimes:Array<Float>;
   public final authoredPolyline:Null<Array<Pose3>>;
   public final blendTolerance:Float;
+  /** Where this motion starts along its op's path, when the op is split at corners. */
+  public var distanceOffset:Float = 0.0;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,
@@ -697,4 +806,8 @@ private class PendingMotion {
     this.authoredPolyline = authoredPolyline == null ? null : authoredPolyline.copy();
     this.blendTolerance = blendTolerance;
   }
+
+  /** Path distances along the whole op. */
+  public function opDistances():Array<Float>
+    return [for (distance in distances) distanceOffset + distance];
 }

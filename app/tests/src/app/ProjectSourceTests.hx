@@ -1,5 +1,10 @@
 package app;
 
+import FontCollection;
+import LayoutFrame;
+import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.UiContext;
+import nativekit.ui.theme.Theme;
 import app.MateriaProjectRunner;
 import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
@@ -269,11 +274,12 @@ class ProjectSourceTests {
     rejectsGrips([{time: 2.0, link: "cup", action: "grip"}, {time: 1.0, link: "cup", action: "release"}], "never decrease");
     rejectsGrips([{time: 1.0, link: "cup", action: "squeeze"}], "grip or release");
     rejectsGrips([{time: 1.0, link: "cup", action: "grip", extra: 1}], "Unknown robot grip field");
-    // A free part gets no link; a part that is joined cannot be freed.
-    var whole = AssemblySimulationBridge.toRobotModel(definition, physical).model;
-    var freed = AssemblySimulationBridge.toRobotModel(definition, physical, null, ["workpiece"]).model;
-    check(freed.links.length == whole.links.length - 1 && freed.joints.length == whole.joints.length - 1,
-      "a free part leaves the assembly robot without its link or its root joint");
+    // A free part is not simulated as part of the assembly; a part that is joined cannot be freed.
+    var whole = AssemblySimulationBridge.toRobotModel(definition, physical);
+    var freed = AssemblySimulationBridge.toRobotModel(definition, physical, null, ["workpiece"]);
+    check(whole.partLinks.exists("workpiece") && !freed.partLinks.exists("workpiece") &&
+      freed.model.links[0].mass < whole.model.links[0].mass && freed.model.joints.length == whole.model.joints.length,
+      "a free part leaves the assembly robot without its mass or its link");
     var message = "";
     try AssemblySimulationBridge.toRobotModel(definition, physical, null, ["turret"]) catch (error:Dynamic) message = Std.string(error);
     check(message.indexOf("cannot be joined") >= 0, "a joined part cannot be freed: " + message);
@@ -292,7 +298,7 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips, null, generated.cncJob);
     check(session.robotMotions.length == 6, "opening the arm project installs its motion");
     checkArmHierarchy(session);
     checkArmDrag(session, generated.metresPerUnit);
@@ -377,6 +383,193 @@ class ProjectSourceTests {
     }
     check(again, "the vacuum grips again after a reset");
     Sys.println('robot arm followed its motion track to within $worst rad over ${armSimulation.activeSession().simulationTime()} s');
+  }
+
+  /**
+   * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job, CAM
+   * made from a NEMA 23 motor plate, mills and drills the plate out of the stock in real time, changing
+   * tools on the way: the stock loses exactly the plate's recesses and holes, nothing is cut from the
+   * part, and no rapid or holder touches stock.
+   */
+  static function checkCncRouter(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
+    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the router simulates axes y, x and z");
+    check(model.joints.length == 3 && model.links.length == 4,
+      'the router simulates as four rigid bodies and its three axes, got ${model.links.length} links');
+    for (joint in axes) {
+      var travel = joint.limits.upper - joint.limits.lower;
+      check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
+        'router axis ${joint.id} travel is in metres, got $travel');
+      check(joint.limits.overtravel > 0 && joint.limits.maxAcceleration > 0,
+        'router axis ${joint.id} carries its overtravel and acceleration');
+    }
+    var job = generated.cncJob;
+    check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
+      job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",
+      "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips, null, generated.cncJob);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session),
+      "the router builds in the shared simulation: " + simulation.error);
+    var player = simulation.cncPlayer();
+    if (player == null) throw "the router has no CNC player";
+    function toolPosition():Array<Float> {
+      var tool = [for (pose in simulation.capturePresentationSnapshot().environment) if (pose.id == "project:tool") pose];
+      check(tool.length == 1, "the router publishes its tool pose");
+      return tool[0].position;
+    }
+    simulation.step();
+    var start = toolPosition();
+    var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
+    while (player.passes == 0 && simulation.activeSession().simulationTime() < 600.0 && steps++ < 1000000) {
+      var before = Sys.time();
+      simulation.step();
+      stepping += Sys.time() - before;
+      check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
+      if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
+      if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
+    }
+    // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
+    var changes = tools.join(",");
+    check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
+    var seconds = simulation.activeSession().simulationTime();
+    check(player.passes == 1, 'the router finishes one pass of its program, at $seconds s');
+    // From 54 mm above the stock the 40 mm drill, 10 mm longer than the end mill, goes through the
+    // 20 mm plate and its 1.65 mm point and 0.5 mm more into the spoilboard.
+    check(Math.abs(lowest + 0.06615) < 0.0005, 'the drill goes through the plate, lowest $lowest m');
+    var stock = simulation.machiningStock();
+    if (stock == null) throw "the router cuts no stock";
+    // The plate's recesses: a 38.3 mm pilot recess 6 mm deep, four 10 mm counterbores 5.4 mm deep, and
+    // under them four 5.5 mm clearance holes through the rest of the 20 mm plate.
+    var recesses = Math.PI * (0.01915 * 0.01915 * 0.006 + 4 * 0.005 * 0.005 * 0.0054 +
+      4 * 0.00275 * 0.00275 * (0.020 - 0.0054));
+    check(Math.abs(stock.removed - recesses) < recesses * 0.02,
+      'the stock loses the plate\'s recesses, ${stock.removed} m³ removed against $recesses');
+    check(stock.rapidContacts == 0 && stock.collisions == 0,
+      'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
+    var deviation = stock.deviation();
+    check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');
+    check(deviation.leftover < recesses * 0.02,
+      'only slivers of stock are left on the plate, leftover ${deviation.leftover} m³');
+    check(stock.geometry().triangleCount() > 12, "the machined stock meshes");
+    // The program ends away from where it started; the next pass runs from there.
+    var secondPass = simulation.activeSession().simulationTime() + 5.0;
+    while (simulation.activeSession().simulationTime() < secondPass && steps++ < 1000000) {
+      simulation.step();
+      check(simulation.cncFailure() == null, 'the looping program starts its next pass: ${simulation.cncFailure()}');
+    }
+    session.dispose();
+    Sys.println('cnc router milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
+      '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(recesses * 1e10) / 10}, leftover ' +
+      '${Math.round(deviation.leftover * 1e10) / 10} mm³, gouge ${Math.round(deviation.gouge * 1e10) / 10} mm³; ' +
+      '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick');
+    Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
+      '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; ' +
+      'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms');
+  }
+
+  /**
+   * The router's job answers the operator: it reports the line it runs, stops on a feed hold and
+   * carries on, takes a speed override, and restarts at the drilling with the drill loaded.
+   */
+  static function checkCncControls(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips, null, generated.cncJob);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the router builds: " + simulation.error);
+    var player = simulation.cncPlayer();
+    if (player == null) throw "the router has no CNC player";
+    function run(seconds:Float, ?until:Void->Bool):Bool {
+      var end = simulation.activeSession().simulationTime() + seconds;
+      while (simulation.activeSession().simulationTime() < end) {
+        simulation.step();
+        check(simulation.cncFailure() == null, 'the router keeps running: ${simulation.cncFailure()}');
+        if (until != null && until()) return true;
+      }
+      return until == null;
+    }
+    var lines = player.sourceLines();
+    check(run(20.0, () -> player.currentLine > 0), "the player reports the line it runs");
+    check(StringTools.trim(lines[player.currentLine - 1]).length > 0, "the running line is a line of the program");
+    // The CNC panel, laid out on its own and operated by pointer.
+    var fonts = FontCollection.create();
+    fonts.add("uikit/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
+    var theme = Theme.dark();
+    var ui = new UiContext(null, fonts, theme);
+    var panel = new app.editor.CncPanel();
+    var frame = new LayoutFrame(480.0, 720.0);
+    function submit():RenderNode return ui.submit(panel.build(simulation, theme.tokens), frame);
+    function find(node:RenderNode, key:String):Null<RenderNode> {
+      if (node.styleKey == key) return node;
+      for (child in node.children) {
+        var found = find(child, key);
+        if (found != null) return found;
+      }
+      return null;
+    }
+    function press(target:Null<RenderNode>, label:String):Void {
+      if (target == null) throw 'the CNC panel shows $label';
+      var resolved = target.resolved;
+      if (resolved == null) throw 'the CNC panel lays out $label';
+      var bounds = resolved.clippedViewportBounds();
+      check(bounds.width > 0 && bounds.height > 0, 'the CNC panel shows $label on screen');
+      var x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2;
+      ui.pointerDown(x, y, 0);
+      ui.pointerUp(x, y, 0);
+      submit();
+    }
+    press(find(submit(), "cnc-hold"), "its hold button");
+    check(run(5.0, () -> player.held()), "the panel's hold stops the machine");
+    var heldLine = player.currentLine;
+    run(1.0);
+    check(player.held() && player.currentLine == heldLine, "a held machine stays on its line");
+    press(find(submit(), "cnc-resume"), "its resume button");
+    player.setSpeedOverride(0.5);
+    check(run(5.0, () -> !player.held()), "the panel's resume carries on");
+    // Pick a later line of the listing and restart there from the panel.
+    var rows:Array<RenderNode> = [];
+    function collect(node:RenderNode):Void {
+      var resolved = node.resolved;
+      if (node.styleType == "text" && resolved != null && resolved.clippedViewportBounds().height > 0)
+        rows.push(node);
+      for (child in node.children) collect(child);
+    }
+    var list = find(submit(), "list-content");
+    check(list != null, "the panel lists the program");
+    collect(cast list);
+    check(rows.length > 4, 'the listing shows its lines, ${rows.length}');
+    press(rows[rows.length - 2], "a line of the program");
+    var picked = panel.selectedLine;
+    check(picked > heldLine, 'clicking a line picks it to restart at, line $picked');
+    press(find(submit(), "cnc-restart"), "its restart button");
+    check(run(30.0, () -> player.currentLine >= picked),
+      'the panel restarts the program at the picked line, now line ${player.currentLine}');
+    // Restart where the drill starts work: the first motion after the drill is loaded.
+    var drillChange = -1;
+    for (index in 0...lines.length) if (lines[index].indexOf("T2 M6") >= 0) drillChange = index + 1;
+    check(drillChange > 0, "the program loads the drill");
+    check(player.restartFromLine(drillChange), "the drilling has a line to restart at");
+    check(run(60.0, () -> player.loadedTool == 2 && player.currentLine > drillChange),
+      'a restart at the drilling loads the drill and runs from there, line ${player.currentLine}, tool ${player.loadedTool}');
+    fonts.dispose();
+    session.dispose();
+    Sys.println('cnc controls: held at line $heldLine, restarted at line $picked from the panel, ' +
+      'and at line ${player.currentLine} with tool ${player.loadedTool}');
   }
 
   /** A project named at launch builds in the background: queued at once, opened by tick(). */
@@ -660,12 +853,15 @@ class ProjectSourceTests {
     if (machineDefinition != null) {
       var translated = AssemblySimulationBridge.toRobotModel(machineDefinition,
         machineScene.physical);
+      // Parts share their rigid body's link, so the links carry every part's material-derived mass,
+      // plus the root link's 1 g placeholder.
+      var parts = 0.0, links = 0.0;
       for (occurrence in machineDefinition.occurrences) {
-        var link = [for (item in translated.model.links) if (item.id == occurrence.id) item][0];
         var record = [for (item in machineScene.objects) if (item.id == "project:" + occurrence.id) item][0];
-        check(Math.abs(link.mass - record.mass) < 1e-6,
-          "assembly occurrence link keeps material-derived mass: " + occurrence.id);
+        parts += record.mass;
       }
+      for (link in translated.model.links) links += link.mass;
+      check(Math.abs(links - 0.001 - parts) < 1e-6, 'assembly links keep the parts\' material-derived mass ($links, $parts)');
     }
     var machineSession = new ProjectDocumentSession(null, false);
     var machineWorld = new RobotWorld();
@@ -747,11 +943,15 @@ class ProjectSourceTests {
       machineSimulation.stop();
       var target = machineScene.objects[0];
       var dropX = 0.0, dropY = 0.0, dropTop = Math.NEGATIVE_INFINITY;
+      // Parts ride their rigid body's link, each at its own offset there.
+      var partLinks = AssemblySimulationBridge.toRobotModel(machineDefinition, machineScene.physical).partLinks;
       for (occurrence in machineDefinition.occurrences) {
         var physical = [for (part in machineScene.physical.parts)
           if (part.id == occurrence.definition) part][0];
-        var linkPose = [for (link in restFrame.robots[0].links)
-          if (link.id == occurrence.id) link][0];
+        var placed = partLinks.get(occurrence.id);
+        if (placed == null) continue;
+        var body = restFrame.robots[0].links[placed.link];
+        var linkPose = AssemblyRobot.compose({position: body.position, rotation: body.rotation}, placed.offset);
         var hull = physical.collisionHull;
         if (hull == null) continue;
         var centroidX = 0.0, centroidY = 0.0;
@@ -901,6 +1101,8 @@ class ProjectSourceTests {
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
     checkMates(root);
+    checkCncRouter(root);
+    checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;
   }

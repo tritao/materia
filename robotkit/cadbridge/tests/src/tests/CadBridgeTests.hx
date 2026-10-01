@@ -600,18 +600,62 @@ class CadBridgeTests {
         normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
       }]});
     var translated = AssemblySimulationBridge.toRobotModel(assembly.definition("bridge-test"), parts);
-    check(translated.model.links.length == 3 && translated.model.joints.length == 2,
-      "assembly tree translates to robot links and joints");
-    var slide = translated.model.joints[1];
+    // The world-fixed base joins the root link; the slider is one link carried by its one joint.
+    check(translated.model.links.length == 2 && translated.model.joints.length == 1,
+      "assembly bodies translate to robot links and moving joints");
+    var slide = translated.model.joints[0];
     check(Math.abs(slide.limits.upper - 0.1) < 1e-9 && slide.axis[1] == 1 &&
       Math.abs(translated.model.links[1].mass - 7.85) < 1e-9,
       "assembly limits and material mass convert to SI units");
     check(RobotRuntimeCompiler.validate(translated.model).length == 0,
       "translated assembly is a valid RobotKit runtime model");
-    var hull:Array<Float> = cast translated.linkCollisionHulls[1];
-    check(translated.linkCollisionHulls.length == translated.model.links.length &&
-      hull != null && hull.length <= 64 * 3,
-      "physical-part view supplies bounded hulls to the bridge");
+    check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
+      translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
+      "physical-part view supplies each part's bounded hull on its link");
+    var baseLink = translated.partLinks.get("base"), sliderLink = translated.partLinks.get("slider");
+    check(baseLink != null && sliderLink != null && baseLink.link == 0 && sliderLink.link == 1,
+      "each part knows its link");
+    // A tip bolted to the slider 100 mm along X rides the slider's link: one body, combined mass.
+    var tipped = new AssemblyModel();
+    tipped.add("base");
+    tipped.add("slider");
+    tipped.add("tip");
+    tipped.connector("base", "mount", AssemblyFrames.identity());
+    tipped.connector("slider", "mount", AssemblyFrames.identity());
+    tipped.connector("slider", "tipSeat", AssemblyFrames.translation(100, 0, 0));
+    tipped.connector("tip", "mount", AssemblyFrames.identity());
+    tipped.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    tipped.mate("tip-mount", "fixed", "slider", "tipSeat", "tip", "mount");
+    var withTip = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider", "tip"]) {
+        id: id, name: id, red: 0.5, green: 0.5, blue: 0.5,
+        materialId: "machined-steel", materialDensity: 7850.0,
+        volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
+        vertexCount: 4, indexCount: 0, vertices: vertices,
+        normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
+      }]});
+    var body = AssemblySimulationBridge.toRobotModel(tipped.definition("bridge-tip"), withTip);
+    var link = body.model.links[1];
+    check(body.model.links.length == 2 && body.model.joints.length == 1,
+      "a part fixed to the slider adds no link and no joint");
+    check(Math.abs(link.mass - 15.7) < 1e-9 && Math.abs(link.centerOfMass[0] - 0.05) < 1e-12,
+      'the slider body sums its parts\' masses about their joint centre (${link.mass}, ${link.centerOfMass})');
+    // Each part: 1e10 mm^5 x 7850 kg/m^3 = 0.0785 kg m^2 per axis, plus 7.85 kg at 50 mm off-axis.
+    var own = 1e10 * 7850 * 1e-15;
+    check(Math.abs(link.inertiaTensor[0] - 2 * own) < 1e-9 &&
+      Math.abs(link.inertiaTensor[4] - (2 * own + 2 * 7.85 * 0.05 * 0.05)) < 1e-9,
+      'the slider body inertia follows the parallel-axis theorem (${link.inertiaTensor})');
+    var tip = body.partLinks.get("tip");
+    if (tip == null) throw "the tip has no link";
+    check(Math.abs(tip.offset.x - 0.1) < 1e-12 && tip.link == 1, "the tip rides the slider's link 100 mm out");
+    var tipHull = [for (hull in body.linkHulls) if (hull.part == "tip") hull][0];
+    var xs = [for (index in 0...Std.int(tipHull.vertices.length / 3)) tipHull.vertices[index * 3]];
+    var lowX = xs[0], highX = xs[0];
+    for (x in xs) { lowX = Math.min(lowX, x); highX = Math.max(highX, x); }
+    check(tipHull.link == 1 && Math.abs(lowX - 0.1) < 1e-12 && Math.abs(highX - 0.11) < 1e-12,
+      'the tip\'s hull sits 100 mm out in the slider link\'s frame ($lowX..$highX)');
     var nestedDefinition = assembly.definition("bridge-nested");
     nestedDefinition.occurrences[1].definition = "slider-sub";
     nestedDefinition.occurrences[1].assembly = "slider-sub";
@@ -623,7 +667,7 @@ class CadBridgeTests {
     var nestedModel = AssemblySimulationBridge.toRobotModel(nestedDefinition, parts);
     check(nestedModel.model.links.length == translated.model.links.length &&
       nestedModel.model.joints.length == translated.model.joints.length &&
-      nestedModel.model.links[2].name == "slider/body",
+      nestedModel.model.links[1].name == "slider/body",
       "nested assembly flattens before RobotKit translation");
   }
 

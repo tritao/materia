@@ -60,11 +60,49 @@ typedef SceneArtifactData = {
 	/** Optional editable source document for generated parts. */
 	@:optional var recipeDocument:String;
 	@:optional var recipeDiagnostics:Array<String>;
+	/** A machining job the generator made for its own machine; see SceneArtifactMachining. */
+	@:optional var machining:SceneArtifactMachining;
+}
+
+/**
+ * A machining job the generator made for its own machine, with everything needed to run it (since
+ * version 12). Lengths are metres, whatever the scene's unit.
+ *
+ * The machine's `axes` are three prismatic joints whose positions are machine X, Y and Z, and machine
+ * coordinates name where the spindle's gauge line is: the origin of the `spindle` occurrence, whose
+ * +Z runs up the spindle axis. `workOffset` is G54 in machine coordinates. Each tool in `tools` hangs
+ * `length` below the gauge line and has the shape `profile` (a toolpath cutter profile's `encode`),
+ * so the program's G43 H numbers are the tool numbers. `stock` is the occurrence the tool cuts and
+ * `sacrificial` those it may run into without harm, such as a spoilboard under through holes.
+ * `toolPart` is the occurrence that shows the tool in the spindle, whose shape changes with the tool,
+ * and `loadedTool` the number of the tool in the spindle when the job starts.
+ * `target` names a part of the artifact that no occurrence uses: the finished part, in the stock's
+ * frame, to compare the machined stock with. A looping job starts again when the program ends.
+ */
+typedef SceneArtifactMachining = {
+	var program:String;
+	var axes:Array<String>;
+	var spindle:String;
+	var workOffset:Array<Float>;
+	var tools:Array<SceneArtifactTool>;
+	@:optional var stock:String;
+	@:optional var sacrificial:Array<String>;
+	@:optional var toolPart:String;
+	@:optional var loadedTool:Int;
+	@:optional var target:String;
+	@:optional var loop:Bool;
+}
+
+/** One tool of a machining job's tool table; see SceneArtifactMachining. */
+typedef SceneArtifactTool = {
+	var number:Int;
+	var length:Float;
+	var profile:Array<Array<Float>>;
 }
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 11;
+	public static inline var VERSION:Int = 12;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -88,7 +126,10 @@ class SceneArtifact {
 			throw "Scene artifact assembly metadata is too large";
 		if (recipeDocument.length > 2000000) throw "Scene artifact recipe document is too large";
 		if (recipeDiagnostics.length > 2000000) throw "Scene artifact recipe diagnostics are too large";
-		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4;
+		var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
+		if (machining.length > 8000000) throw "Scene artifact machining job is too large";
+		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
+			+ machining.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -176,6 +217,8 @@ class SceneArtifact {
 		result.blit(offset, recipeDocument, 0, recipeDocument.length); offset += recipeDocument.length;
 		offset = putInt(result, offset, recipeDiagnostics.length);
 		result.blit(offset, recipeDiagnostics, 0, recipeDiagnostics.length); offset += recipeDiagnostics.length;
+		offset = putInt(result, offset, machining.length);
+		result.blit(offset, machining, 0, machining.length); offset += machining.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -221,6 +264,81 @@ class SceneArtifact {
 			if (data.assemblyState != null)
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
+		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
+	}
+
+	static function validateMachining(machining:SceneArtifactMachining, parts:Map<String, Bool>,
+			definition:Null<AssemblyDefinition>):Void {
+		function fail(detail:String):Void throw 'Scene artifact machining job $detail';
+		if (machining.program == null) fail("has no program");
+		if (definition == null) throw "Scene artifact machining job needs the machine's assembly definition";
+		var occurrences = new Map<String, Bool>(), joints = new Map<String, Bool>();
+		for (occurrence in definition.occurrences) occurrences.set(occurrence.id, true);
+		for (joint in definition.joints) joints.set(joint.id, true);
+		if (machining.axes == null || machining.axes.length != 3) fail("needs three axes");
+		for (index in 0...3) {
+			var axis = machining.axes[index];
+			if (!joints.exists(axis) || machining.axes.indexOf(axis) != index) fail('axis "$axis" is not a distinct joint');
+		}
+		if (!occurrences.exists(machining.spindle)) fail('spindle "${machining.spindle}" is not an occurrence');
+		if (machining.stock != null && !occurrences.exists(machining.stock))
+			fail('stock "${machining.stock}" is not an occurrence');
+		if (machining.sacrificial != null) for (id in machining.sacrificial)
+			if (!occurrences.exists(id)) fail('sacrificial part "$id" is not an occurrence');
+		if (machining.toolPart != null && !occurrences.exists(machining.toolPart))
+			fail('tool part "${machining.toolPart}" is not an occurrence');
+		if (machining.workOffset == null || machining.workOffset.length != 3 ||
+				!finite(machining.workOffset[0]) || !finite(machining.workOffset[1]) || !finite(machining.workOffset[2]))
+			fail("needs a finite work offset");
+		if (machining.tools == null || machining.tools.length == 0) fail("needs a tool table");
+		var numbers = new Map<Int, Bool>();
+		for (tool in machining.tools) {
+			if (tool.number <= 0 || numbers.exists(tool.number)) fail('has a duplicate or invalid tool number ${tool.number}');
+			numbers.set(tool.number, true);
+			if (!finite(tool.length) || tool.length <= 0) fail('tool ${tool.number} needs a positive length');
+			if (tool.profile == null || tool.profile.length == 0) fail('tool ${tool.number} has no profile');
+			for (row in tool.profile) {
+				if (row == null) throw 'Scene artifact machining job tool ${tool.number} has an empty profile row';
+				for (value in row) if (!finite(value)) fail('tool ${tool.number} profile is not finite');
+			}
+		}
+		if (machining.loadedTool != null && !numbers.exists(machining.loadedTool))
+			fail('starts with tool ${machining.loadedTool}, which is not in its tool table');
+		if (machining.target != null && !parts.exists(machining.target))
+			fail('target "${machining.target}" is not one of its parts');
+	}
+
+	/** A machining job from its JSON section, typed field by field. */
+	static function decodeMachining(decoded:Dynamic):SceneArtifactMachining {
+		function fail():Dynamic throw "Scene artifact machining job is invalid";
+		function text(value:Dynamic):String return Std.isOfType(value, String) ? value : fail();
+		function number(value:Dynamic):Float
+			return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
+		function list(value:Dynamic):Array<Dynamic> return Std.isOfType(value, Array) ? cast value : fail();
+		var tools:Array<SceneArtifactTool> = [for (tool in list(Reflect.field(decoded, "tools"))) {
+			var toolNumber:Dynamic = Reflect.field(tool, "number");
+			if (!Std.isOfType(toolNumber, Int)) fail();
+			{number: (toolNumber:Int), length: number(Reflect.field(tool, "length")),
+				profile: [for (row in list(Reflect.field(tool, "profile"))) [for (value in list(row)) number(value)]]};
+		}];
+		var machining:SceneArtifactMachining = {program: text(Reflect.field(decoded, "program")),
+			axes: [for (axis in list(Reflect.field(decoded, "axes"))) text(axis)],
+			spindle: text(Reflect.field(decoded, "spindle")),
+			workOffset: [for (value in list(Reflect.field(decoded, "workOffset"))) number(value)],
+			tools: tools};
+		var stock:Dynamic = Reflect.field(decoded, "stock");
+		if (stock != null) machining.stock = text(stock);
+		var sacrificial:Dynamic = Reflect.field(decoded, "sacrificial");
+		if (sacrificial != null) machining.sacrificial = [for (id in list(sacrificial)) text(id)];
+		var toolPart:Dynamic = Reflect.field(decoded, "toolPart");
+		if (toolPart != null) machining.toolPart = text(toolPart);
+		var loadedTool:Dynamic = Reflect.field(decoded, "loadedTool");
+		if (loadedTool != null) machining.loadedTool = Std.isOfType(loadedTool, Int) ? (loadedTool:Int) : fail();
+		var target:Dynamic = Reflect.field(decoded, "target");
+		if (target != null) machining.target = text(target);
+		var loop:Dynamic = Reflect.field(decoded, "loop");
+		if (loop != null) machining.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
+		return machining;
 	}
 
 	static function validatePart(part:SceneArtifactPart, requireEdgeIds:Bool = false):Void {
@@ -308,8 +426,8 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != 10 && version != SceneArtifact.VERSION)
-			throw "Unsupported scene artifact version";
+			version != 8 && version != 9 && version != 10 && version != 11 && version != SceneArtifact.VERSION)
+			throw 'Unsupported scene artifact version $version';
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
 		var count = readInt();
@@ -396,10 +514,19 @@ private class SceneArtifactReader {
 				recipeDiagnostics = cast decoded;
 			}
 		}
+		var machining:Null<SceneArtifactMachining> = null;
+		if (version >= 12) {
+			var machiningLength = readInt();
+			if (machiningLength < 0 || machiningLength > 8000000) throw "Scene artifact machining job is too large";
+			if (machiningLength > 0) {
+				machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readBytes(machiningLength).getString(0, machiningLength)));
+			}
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
-			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument, recipeDiagnostics: recipeDiagnostics};
+			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
+			recipeDiagnostics: recipeDiagnostics, machining: machining};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

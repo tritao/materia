@@ -14,7 +14,8 @@ import robotkit.model.Transmission;
 typedef AssemblyAxisBinding = {
   var id:String;
   var axis:LinearAxis;
-  var motorOccurrenceId:String;
+  /** The link carrying the motor body; fixed parts share one link per rigid body. */
+  var motorLinkId:String;
   var shaftJointId:String;
   var travelJointId:String;
 }
@@ -52,7 +53,7 @@ class MachineKitRobotCompiler {
         if (joint.id == binding.travelJointId) travel = joint;
       }
       if (shaft == null || travel == null || shaft.type != JointType.Continuous ||
-          travel.type != JointType.Prismatic || shaft.parent.id != binding.motorOccurrenceId)
+          travel.type != JointType.Prismatic || shaft.parent.id != binding.motorLinkId)
         throw 'Assembly axis "${binding.id}" has no matching motor shaft and carriage joints';
       var expected = 2.0 * Math.PI /
         (binding.axis.transmission.lead * binding.axis.transmission.direction *

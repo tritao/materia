@@ -8,6 +8,7 @@
 #include <mutex>
 #include <new>
 #include <unordered_map>
+#include <vector>
 
 namespace {
 
@@ -19,7 +20,31 @@ struct Plan {
     motionkit::Trajectory trajectory;
     mk_plan_spec spec;
     mk_validation_report report;
+    // The segments as flat arrays, read in place through mk_plan_segment_*.
+    std::vector<int64_t> starts, durations;
+    std::vector<int32_t> degrees;
+    std::vector<double> coefficients;
 };
+
+void flatten_segments(Plan &plan) {
+    const auto &trajectory = plan.trajectory;
+    const uint32_t count = trajectory.segment_count(), joints = trajectory.joint_count(),
+        stride = MK_MAX_DEGREE + 1;
+    plan.starts.resize(count);
+    plan.durations.resize(count);
+    plan.degrees.resize(count);
+    plan.coefficients.assign(static_cast<size_t>(count) * joints * stride, 0.0);
+    for (uint32_t index = 0; index < count; ++index) {
+        const auto &segment = trajectory.segment(index);
+        plan.starts[index] = segment.t0_ns;
+        plan.durations[index] = segment.duration_ns;
+        plan.degrees[index] = static_cast<int32_t>(segment.degree);
+        for (uint32_t joint = 0; joint < joints; ++joint)
+            for (uint32_t power = 0; power <= segment.degree; ++power)
+                plan.coefficients[(static_cast<size_t>(index) * joints + joint) * stride + power] =
+                    segment.coefficients[joint].value[power];
+    }
+}
 std::unordered_map<uint32_t, std::unique_ptr<Plan>> plans;
 uint32_t next_plan_id = 1;
 
@@ -405,7 +430,8 @@ mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_
         mk_plan_spec normalized{};
         std::memcpy(&normalized, spec, std::min<size_t>(spec->struct_size, sizeof(normalized)));
         normalized.struct_size = sizeof(normalized);
-        auto plan = std::make_unique<Plan>(Plan{*value, normalized, *out_report});
+        auto plan = std::make_unique<Plan>(Plan{*value, normalized, *out_report, {}, {}, {}, {}});
+        flatten_segments(*plan);
         while (next_plan_id == 0 || plans.count(next_plan_id) != 0) ++next_plan_id;
         const uint32_t id = next_plan_id++;
         plans.emplace(id, std::move(plan));
@@ -424,6 +450,42 @@ void MK_CALL mk_plan_destroy(mk_plan_handle plan) {
         plans.erase(plan.id);
     } catch (...) {
     }
+}
+
+size_t MK_CALL mk_plan_segment_array_count(mk_plan_handle plan) {
+    std::lock_guard lock(registry_mutex);
+    const auto *value = get(plan);
+    return value == nullptr ? 0 : value->starts.size();
+}
+
+const int64_t *MK_CALL mk_plan_segment_starts(mk_plan_handle plan) {
+    std::lock_guard lock(registry_mutex);
+    const auto *value = get(plan);
+    return value == nullptr ? nullptr : value->starts.data();
+}
+
+const int64_t *MK_CALL mk_plan_segment_durations(mk_plan_handle plan) {
+    std::lock_guard lock(registry_mutex);
+    const auto *value = get(plan);
+    return value == nullptr ? nullptr : value->durations.data();
+}
+
+const int32_t *MK_CALL mk_plan_segment_degrees(mk_plan_handle plan) {
+    std::lock_guard lock(registry_mutex);
+    const auto *value = get(plan);
+    return value == nullptr ? nullptr : value->degrees.data();
+}
+
+size_t MK_CALL mk_plan_coefficient_array_count(mk_plan_handle plan) {
+    std::lock_guard lock(registry_mutex);
+    const auto *value = get(plan);
+    return value == nullptr ? 0 : value->coefficients.size();
+}
+
+const double *MK_CALL mk_plan_segment_coefficients(mk_plan_handle plan) {
+    std::lock_guard lock(registry_mutex);
+    const auto *value = get(plan);
+    return value == nullptr ? nullptr : value->coefficients.data();
 }
 
 mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info) {

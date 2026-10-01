@@ -6,6 +6,8 @@ import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import RobotArmPreview.RobotArmChecks;
+import CncRouterPreview.CncRouterChecks;
+import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
 import machinekit.assembly.InstancePath;
@@ -2510,6 +2512,29 @@ class MachineKitSmoke {
 		long.close();
 	}
 
+	/** Occurrences sharing one scene definition keep all of their connectors; a clash is refused. */
+	static function assemblyPreviewSharing():Void {
+		function model(frameB:materia.assembly.AssemblyRecord.AssemblyFrame):materia.assembly.AssemblyDefinition {
+			var model = new AssemblyModel("mm");
+			model.add("a");
+			model.connector("a", "shared", Solids.axial(0, 0, 0));
+			model.connector("a", "onlyA", Solids.axial(1, 0, 0));
+			model.add("b");
+			model.connector("b", "shared", frameB);
+			model.connector("b", "onlyB", Solids.axial(2, 0, 0));
+			return model.definition("sharing");
+		}
+		var merged = model(Solids.axial(0, 0, 0));
+		AssemblyPreview.shareDefinitions(merged, ["b" => "a"]);
+		check(merged.definitions.length == 1, "shared occurrences keep one definition");
+		var names = [for (connector in merged.definitions[0].connectors) connector.name];
+		names.sort(Reflect.compare);
+		check(names.join(",") == "onlyA,onlyB,shared", 'shared definition carries every connector, got $names');
+		check([for (occurrence in merged.occurrences) occurrence.definition].join(",") == "a,a", "both occurrences use it");
+		throws(() -> AssemblyPreview.shareDefinitions(model(Solids.axial(0, 0, 5)), ["b" => "a"]),
+			'give connector "shared" different frames');
+	}
+
 	static function main():Void {
 		namedStepperFaces();
 		MachineKitNamingAudit.run();
@@ -2519,6 +2544,8 @@ class MachineKitSmoke {
 		EndEffectorComponentTests.run();
 		EndEffectorExampleChecks.run();
 		RobotArmChecks.run();
+		CncRouterChecks.run();
+		assemblyPreviewSharing();
 		RecipeContractTests.run();
 		componentRecipes();
 		documentRecipes();

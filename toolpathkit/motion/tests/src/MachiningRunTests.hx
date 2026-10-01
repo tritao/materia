@@ -99,7 +99,7 @@ class MachiningRunTests {
         StringTools.startsWith(channel, "cnc.tool_change.") ?
         EventValue.Digital(true) : null,
       function() return runtime.pollEvents());
-    var run = new MachiningRun(new MachiningRecipe(0.01), program, motion);
+    var run = new MachiningRun(new MachiningRecipe(0.01, 0.0, 0.014), program, motion);
     run.start();
     var tick = 0, heldAt = -1.0;
     for (_ in 0...5000) {
@@ -122,8 +122,15 @@ class MachiningRunTests {
     if (motion.sessionState() != SessionState.Held)
       throw "machining feed hold did not reach rest";
     var continuation = run.prepareRestart(target, heldAt);
+    // Up to the clearance first (the restart point is right below), then the
+    // program's tool, then the spindle.
+    switch [continuation.program.ops[0], continuation.program.ops[1]] {
+      case [MotionOp.MoveL(up, _, _, _), MotionOp.WaitInput("cnc.tool_change.3", _, _)]:
+        if (Math.abs(up.z - 0.014) > 1e-12) throw "a restart moves up to the clearance height";
+      case _: throw 'a restart clears the work and reloads its tool first, got ${continuation.program.ops.slice(0, 2)}';
+    }
     var slicedLength = 0.0;
-    for (op in continuation.ops) switch op {
+    for (op in continuation.program.ops) switch op {
       case MotionOp.FollowPath(path, _, _, _):
         slicedLength = path.length(); break;
       case _:
@@ -194,6 +201,55 @@ class MachiningRunTests {
     if (shutdown.ops.length != 4)
       throw "spindle fault shutdown needs spindle and coolant off";
     simulationHarness.dispose();
-    Sys.println("Machining run tests passed (10 assertions)");
+    var full = pocketTicks(1.0), slowed = pocketTicks(0.5);
+    if (!(slowed > full * 1.3))
+      throw 'a 50% speed override set mid-run slows the pocket: $slowed ticks against $full';
+    Sys.println("Machining run tests passed (12 assertions)");
+  }
+
+  /**
+    Ticks a small CAM pocket takes on a fresh gantry when the speed override
+    is set to `override` a little way in, so the rest is planned again.
+  **/
+  static function pocketTicks(override:Float):Int {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(
+      new LinearAxis(23, 10, 200), new LinearAxis(23, 10, 200),
+      new LinearAxis(23, 10, 200), 0.02, 0.08);
+    for (channel in ["spindle.speed", "spindle.direction"])
+      blueprint.runtime.channels.push(new ProcessChannelDeclaration(channel,
+        ProcessEventValue.Analog(0.0)));
+    var harness = new SimulationHarness(0.01);
+    var runtime = harness.simulation.addRobot(blueprint.runtime);
+    var robot = new SimulatedRobot("override-pocket", runtime, blueprint.model.name,
+      [for (link in blueprint.model.links) link.name],
+      [for (joint in blueprint.model.joints) joint.name]);
+    var binding = new MachineBinding("work", "x", "y", "z", 0.02);
+    var contour = new CamContour([
+      new Point3(0.004, 0.004, 0.01), new Point3(0.012, 0.004, 0.01),
+      new Point3(0.012, 0.012, 0.01), new Point3(0.004, 0.012, 0.01)
+    ]);
+    var cam = new CamJob(0.014, 12000).pocket(contour,
+      new Tool(3, 0.0, 0.002), 0.009, 0.01, 0.001).finish(new Setup("1", new Point3(0, 0, 0)));
+    var program:MotionProgram = cast ToolpathMotion.lower(cam, binding).program;
+    var motion = new ManipulatorMotion(robot, new ToolpathMotionBinding(binding, blueprint).compiler,
+      channel -> channel == "spindle.at_speed" || StringTools.startsWith(channel, "cnc.tool_change.") ?
+        EventValue.Digital(true) : null,
+      () -> runtime.pollEvents());
+    motion.run(program);
+    var tick = 0, lastOp = -1;
+    while (tick < 20000 && (motion.running || tick == 0)) {
+      if (tick == 50) motion.setSpeedOverride(override);
+      motion.update(0.01);
+      harness.step(Int64.ofInt(tick++));
+      var op = motion.progress().op;
+      if (op >= 0) {
+        if (op < lastOp) throw "progress runs backwards after a speed override";
+        lastOp = op;
+      }
+    }
+    if (!motion.completed || motion.failure != null)
+      throw 'a pocket under a speed override completes: ${motion.failure}';
+    harness.dispose();
+    return tick;
   }
 }

@@ -141,8 +141,6 @@ class ToolpathProcessTests extends ToolpathTestSupport {
         assembly.mate('$id.mount', "fixed", '${ids[index - 1]}.carriage', "stage",
           '$id.motor', "stage");
       }
-      bindings.push({id: id, axis: axis, motorOccurrenceId: '$id.motor',
-        shaftJointId: '$id.shaft', travelJointId: '$id.travel'});
     }
     var definition = assembly.definition("physical-gantry");
     var vertices = Bytes.alloc(4 * 24);
@@ -160,8 +158,16 @@ class ToolpathProcessTests extends ToolpathTestSupport {
       }
     ]});
     var physical = AssemblySimulationBridge.toRobotModel(definition, parts);
+    for (index in 0...3) {
+      var id = ids[index];
+      var motor = physical.partLinks.get('$id.motor');
+      if (motor == null) throw 'motor $id has no link';
+      bindings.push({id: id, axis: axes[index],
+        motorLinkId: physical.model.links[motor.link].id,
+        shaftJointId: '$id.shaft', travelJointId: '$id.travel'});
+    }
     var mismatched = bindings.copy();
-    mismatched[0] = {id: "x", axis: axes[0], motorOccurrenceId: "wrong.motor",
+    mismatched[0] = {id: "x", axis: axes[0], motorLinkId: "wrong.motor",
       shaftJointId: "x.shaft", travelJointId: "x.travel"};
     var rejected = false;
     try MachineKitRobotCompiler.compileAssemblyAxes(physical.model, mismatched,
@@ -170,16 +176,20 @@ class ToolpathProcessTests extends ToolpathTestSupport {
       "assembly drive attachment rejects a mismatched motor without changing the model");
     var blueprint = MachineKitRobotCompiler.compileAssemblyAxes(physical.model,
       bindings, 0.1, 0.4);
-    check(blueprint.model.links.length == 10 && blueprint.model.actuators.length == 3,
-      "physical gantry keeps part links and attaches three motor actuators");
+    // The root absorbs the grounded X motor; each carriage carries the next axis's motor.
+    check(blueprint.model.links.length == 7 && blueprint.model.actuators.length == 3 &&
+      bindings[1].motorLinkId == "x.carriage" && bindings[2].motorLinkId == "y.carriage",
+      "physical gantry has one link per rigid body and three motor actuators");
     check(blueprint.model.couplings.length == 3,
       "physical gantry keeps its lead-screw joint couplings");
-    var hasTenMillimetreVertex = false;
-    for (value in physical.linkCollisionHulls[1])
-      if (Math.abs(value - 0.01) < 1e-12) hasTenMillimetreVertex = true;
-    check(physical.linkCollisionHulls.length == blueprint.model.links.length &&
-      physical.linkCollisionHulls[0] == null && hasTenMillimetreVertex,
-      "physical assembly passes upstream hulls in link order and SI units");
+    var hasTenMillimetreVertex = false, linksValid = physical.linkHulls.length > 0;
+    for (hull in physical.linkHulls) {
+      if (hull.link < 0 || hull.link >= blueprint.model.links.length) linksValid = false;
+      for (value in hull.vertices)
+        if (Math.abs(value - 0.01) < 1e-12) hasTenMillimetreVertex = true;
+    }
+    check(linksValid && hasTenMillimetreVertex,
+      "physical assembly passes upstream hulls on their links in SI units");
     var cnc = new MotionCncRig("work", "x", "y", "z", 0.08);
     var result = ToolpathTestSupport.compileCnc(ToolpathTestSupport.cncBinding(cnc, blueprint), cnc,
       "G21 G90 G17\nS12000 M3\nG0 X10 Y10\nF600 G1 X20\nG3 X10 Y20 I-10 J0\nM5\nM2\n",
@@ -245,8 +255,9 @@ class ToolpathProcessTests extends ToolpathTestSupport {
     var simulationHarness = new SimulationHarness(0.01);
     var simulation = simulationHarness.simulation;
     var runtime = simulation.addRobotAtPose(blueprint.runtime,
-      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], null, null,
-      physical.linkCollisionHulls);
+      [0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0], null, null, null, null, null,
+      null, null, null, [for (hull in physical.linkHulls)
+        {link: hull.link, vertices: hull.vertices}]);
     var robot = new SimulatedRobot("physical-cnc", runtime, blueprint.model.name,
       [for (link in blueprint.model.links) link.name],
       [for (joint in blueprint.model.joints) joint.name]);

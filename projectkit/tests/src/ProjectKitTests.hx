@@ -153,6 +153,52 @@ class ProjectKitTests {
     }
   }
 
+  /** A machining job travels with its machine and names only what the scene has. */
+  static function machining():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    function part(id:String):materia.project.SceneArtifact.SceneArtifactPart
+      return {id: id, name: id, red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
+        vertices: vertices, normals: normals, indices: indices, faceRanges: []};
+    var frame = AssemblyFrames.identity();
+    function slide(id:String, parent:String, child:String):materia.assembly.AssemblyDefinition.KinematicJoint
+      return {id: id, type: AssemblyJointType.Prismatic, role: AssemblyJointRole.Tree,
+        parent: parent, parentConnector: "pin", child: child, childConnector: "pin",
+        axis: {x: 0.0, y: 0.0, z: 1.0},
+        limits: {lower: -1.0, upper: 1.0, velocity: null, effort: null}, defaultValue: 0.0};
+    var machine:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "machine",
+      lengthUnit: "mm", definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
+      occurrences: [for (id in ["bed", "gantry", "carriage", "spindle"]) {id: id, definition: "body", initialPose: frame}],
+      joints: [slide("y", "bed", "gantry"), slide("x", "gantry", "carriage"), slide("z", "carriage", "spindle")]};
+    var job:materia.project.SceneArtifact.SceneArtifactMachining = {program: "G0 X1\nM2\n",
+      axes: ["x", "y", "z"], spindle: "spindle", workOffset: [0.1, 0.1, -0.05],
+      tools: [{number: 1, length: 0.03, profile: [[0.0, 0.0, 0.0, 0.0, 0.003, 0.0], [0.0, 0.0, 0.003, 0.0, 0.003, 0.02]]}],
+      stock: "bed", sacrificial: ["gantry"], toolPart: "spindle", loadedTool: 1, target: "finished", loop: true};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [part("body"), part("finished")], assemblyDefinition: machine, machining: job};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).machining;
+    if (restored == null) throw "machining job round trip lost the job";
+    check(restored.program == job.program && restored.axes.join(",") == "x,y,z" &&
+      restored.spindle == "spindle" && restored.toolPart == "spindle" && restored.loadedTool == 1 && restored.stock == "bed" && restored.sacrificial[0] == "gantry" &&
+      restored.target == "finished" && restored.loop == true, "machining job round trip");
+    check(restored.tools.length == 1 && restored.tools[0].number == 1 && restored.tools[0].length == 0.03 &&
+      restored.tools[0].profile[1][5] == 0.02, "machining tool table round trip");
+    job.spindle = "missing";
+    rejects(function() SceneArtifact.encode(data), "machining spindle outside the assembly");
+    job.spindle = "spindle"; job.axes = ["x", "x", "z"];
+    rejects(function() SceneArtifact.encode(data), "repeated machining axis");
+    job.axes = ["x", "y", "z"]; job.tools.push(job.tools[0]);
+    rejects(function() SceneArtifact.encode(data), "duplicate machining tool number");
+    job.tools.pop(); job.loadedTool = 2;
+    rejects(function() SceneArtifact.encode(data), "machining job starting with a tool it lacks");
+    job.loadedTool = 1; job.target = "absent";
+    rejects(function() SceneArtifact.encode(data), "machining target outside the scene");
+    job.target = null; data.assemblyDefinition = null;
+    rejects(function() SceneArtifact.encode(data), "machining job without its machine");
+  }
+
   static function legacyScene(version:Int, vertices:Bytes, normals:Bytes, indices:Bytes):Bytes {
     var size = 20 + 8 + 8 + 12 + 12 + (version >= 4 ? 4 : 0) +
       vertices.length + normals.length + indices.length + (version >= 3 ? 4 : 0);
@@ -223,7 +269,7 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene(); bodies();
+    assembly(); frames(); scene(); machining(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

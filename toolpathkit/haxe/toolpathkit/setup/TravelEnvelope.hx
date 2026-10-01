@@ -7,8 +7,9 @@ import toolpathkit.path.Provenance;
 import toolpathkit.path.Point3;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.path.GeometryOffset;
+import toolpathkit.path.ToolpathFrame;
 
-/** Checks authored motion in machine space after applying each program setup. */
+/** Checks the controlled point in machine space: setup origin plus G43 length. */
 class TravelEnvelope {
   public final lower:Point3;
   public final upper:Point3;
@@ -27,14 +28,13 @@ class TravelEnvelope {
   public function check(program:ToolpathProgram):Array<TravelViolation> {
     if (program == null) throw "travel check needs a program";
     var violations:Array<TravelViolation> = [];
-    var origin = program.setups[0].workOrigin;
+    var frame = ToolpathFrame.of(program);
     for (op in program.ops) {
+      frame.advance(op);
       var geometry:PathGeometry = null, span:Provenance = null;
       switch op {
-        case SetSetup(id, _):
-          for (setup in program.setups) if (setup.id == id) origin = setup.workOrigin;
         case Move(_, g, _, _, s):
-          geometry = GeometryOffset.translate(g, [origin.x, origin.y, origin.z]);
+          geometry = GeometryOffset.translate(g, frame.toMachine());
           span = s;
         case MachineMove(_, g, _, _, s):
           geometry = g; span = s;

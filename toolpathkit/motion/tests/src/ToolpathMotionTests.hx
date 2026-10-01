@@ -119,6 +119,7 @@ class ToolpathMotionTests {
       case _: throw "blended path missing";
     }
     Sys.println("ToolpathKit Motion tests passed (9 assertions)");
+    Sys.println('Toolpath accuracy tests passed (${ToolpathAccuracyTests.run()} assertions)');
     MachiningRunTests.run();
     ToolpathScenarioTests.main();
   }
