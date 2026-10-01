@@ -90,6 +90,15 @@ class AnimKitTests {
 		var halfway = instance.readJointMatrices();
 		if (matrixGap(halfway, plain) < 1e-3 || matrixGap(halfway, onlyOverlay) < 1e-3)
 			throw "An overlay at half weight is not between the two poses";
+		// Held at a time, the overlay is the clip at that time however long it has been playing.
+		overlay.setOverlay(walk, 1.0, asset.clipDurations[walk] * 0.4);
+		overlay.advance(1.7);
+		var held = instance.readJointMatrices();
+		var reference = new ClipPlayer(instance);
+		reference.restart(walk);
+		reference.advance(asset.clipDurations[walk] * 0.4);
+		if (matrixGap(held, instance.readJointMatrices()) > 1e-4)
+			throw "A held overlay did not stay at its time";
 		overlay.setOverlay(-1, 1.0);
 		overlay.advance(0.0);
 		if (overlay.overlayAmount() != 0.0)

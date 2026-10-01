@@ -182,6 +182,13 @@ class HumanKitTests {
 		human.advance(0.0);
 		var standing = human.pose.bonePosition(HumanBone.Pelvis)[2];
 		if (standing - last < 0.3) throw 'A full crouch only lowered the pelvis ${standing - last} m';
+		// Posed from the going-down clip, a depth is that fraction of the way down in the pelvis too.
+		human.setCrouch(0.5);
+		human.advance(0.0);
+		var halfway = (standing - human.pose.bonePosition(HumanBone.Pelvis)[2]) / (standing - last);
+		if (Math.abs(halfway - 0.5) > 0.1) throw 'Half a crouch put the pelvis $halfway of the way down';
+		human.setCrouch(0.0);
+		human.advance(0.0);
 		// The planner crouches for a low surface and not for a shelf; the bundled worker, which cannot, refuses the low one.
 		var body = new HumanBody(human);
 		var bench:HumanTargetBox = {center: [0.6, 0.0, 0.55], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};

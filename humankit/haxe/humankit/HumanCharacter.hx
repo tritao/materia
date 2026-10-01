@@ -46,6 +46,8 @@ class HumanCharacter {
 	var lean:Float = 0.0;
 	/** The asset's crouching-in-place clip, or -1 when it has none; see setCrouch. */
 	final crouchClip:Int;
+	/** The going-down clip the crouch is posed from, when the asset has one; else the crouch clip is blended in. */
+	final crouchDown:Null<HumanCrouch>;
 	var crouchDepth:Float = 0.0;
 	/**
 	 * The joint-turn sources each feature applies its turns under (see AnimationInstance.setJointRotation),
@@ -67,7 +69,8 @@ class HumanCharacter {
 		instance = new AnimationInstance(asset);
 		pose = new HumanPose(this.rig, instance.readJointMatrices());
 		player = new ClipPlayer(instance);
-		crouchClip = asset.clipIndex("crouch_idle");
+		crouchDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("crouch_enter"));
+		crouchClip = crouchDown != null ? crouchDown.clip : asset.clipIndex("crouch_idle");
 		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS, pose),
 			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS, pose)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
@@ -168,7 +171,11 @@ class HumanCharacter {
 	public function setCrouch(amount:Float):Void {
 		if (crouchClip < 0) throw "The character has no crouch clip";
 		crouchDepth = Math.max(0.0, Math.min(1.0, amount));
-		player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
+		var down = crouchDown;
+		// Posed from the going-down clip, held at the time where the body is this far down: an authored pose at
+		// every depth. Without one, the crouch clip is blended in at this weight.
+		if (down != null) player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, Math.min(1.0, crouchDepth / 0.3), down.timeFor(crouchDepth));
+		else player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
 	}
 
 	public function crouch():Float
