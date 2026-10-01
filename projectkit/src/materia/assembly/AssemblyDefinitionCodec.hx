@@ -131,9 +131,13 @@ class AssemblyDefinitionCodec {
 				!hasConnector(definitions.get(first.definition), mate.firstConnector) ||
 				!hasConnector(definitions.get(second.definition), mate.secondConnector) ||
 				(value != null && !Math.isFinite(value)) ||
-				((mate.kind == AssemblyMateKind.Distance || mate.kind == AssemblyMateKind.Angle) && value == null) ||
-				(mate.kind == AssemblyMateKind.Distance && value != null && value < 0))
+				((mate.kind == AssemblyMateKind.Distance || mate.kind == AssemblyMateKind.Angle) && value == null))
 				throw 'Assembly mate "${mate == null ? "" : mate.id}" is invalid';
+			// A distance's direction is undefined where the origins meet; an angle between axes lies in [0, π].
+			if (mate.kind == AssemblyMateKind.Distance && value != null && !(value > 0))
+				throw 'Assembly mate "${mate.id}" needs a positive distance (use a coincident mate for zero)';
+			if (mate.kind == AssemblyMateKind.Angle && value != null && !(value >= 0 && value <= Math.PI))
+				throw 'Assembly mate "${mate.id}" needs an angle between 0 and π';
 			mateIds.set(mate.id, true);
 		}
 		var couplings = definition.couplings == null ? [] : definition.couplings;

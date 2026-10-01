@@ -33,6 +33,8 @@ class MateRowsSmoke {
 			};
 			solveAndCheck(kind, value);
 		}
+		// Angles 0 and π are two-row alignments, each settling on its own direction.
+		for (angle in [0.0, Math.PI]) solveAndCheck(AssemblyMateKind.Angle, angle);
 		checkCodec();
 		checkNesting();
 	}
@@ -50,7 +52,11 @@ class MateRowsSmoke {
 		var problem = new KinematicProblem(model).setActiveDofs(dofs).add(new ClosureTask(model, 0, 1e-6, 1e-8));
 		var seed = new KinematicState(model);
 		var solution = LevenbergMarquardt.solve(problem, seed, 200, 1e-3, 1e-8, 100, null, true);
-		check(solution.converged(), '$kind is satisfiable from a generic pose (${solution.status})');
+		check(solution.converged(), '$kind ${value == null ? "" : Std.string(value)} is satisfiable from a generic pose (${solution.status})');
+		if (kind == AssemblyMateKind.Angle && value != null) {
+			// The task reports the miss in radians, the opposite direction included.
+			check(solution.tasks[0].orientationError <= 1e-8, 'the angle $value holds: ${solution.tasks[0].orientationError}');
+		}
 
 		var snapshot = new KinematicSnapshot(model), rows = problem.rowCount(), width = problem.layout().width;
 		var evaluate = (x:Array<Float>) -> {
@@ -100,6 +106,8 @@ class MateRowsSmoke {
 		var invalid:Array<{label:String, change:AssemblyMate->Void}> = [
 			{label: "a distance mate without a value", change: m -> { m.value = null; }},
 			{label: "a negative distance", change: m -> { m.value = -1; }},
+			{label: "a zero distance", change: m -> { m.value = 0; }},
+			{label: "an angle beyond π", change: m -> { m.kind = AssemblyMateKind.Angle; m.value = 4; }},
 			{label: "a missing connector", change: m -> { m.secondConnector = "nowhere"; }},
 			{label: "a mate of a part with itself", change: m -> { m.second = "ground"; }},
 			{label: "a mate id that is also a joint id", change: m -> { m.id = "j0"; }},

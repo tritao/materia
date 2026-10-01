@@ -37,9 +37,9 @@ enum abstract AssemblyMateKind(String) from String to String {
 	var Parallel = "parallel";
 	/** Axes perpendicular. */
 	var Perpendicular = "perpendicular";
-	/** Origins `value` apart (length unit). */
+	/** Origins `value` apart (length unit, positive; zero is `Coincident`). */
 	var Distance = "distance";
-	/** `value` radians between the axes. */
+	/** `value` radians between the axes, in [0, π] (0 and π hold the axes aligned or opposed). */
 	var Angle = "angle";
 	/** B's frame on A's frame. */
 	var Lock = "lock";

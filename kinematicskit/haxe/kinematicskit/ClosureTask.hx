@@ -9,9 +9,11 @@ package kinematicskit;
  * - Cylindrical: the Prismatic rows without the twist (4);
  * - Spherical: `pB − pA` (3);
  * - Planar: `pB − pA` along A's axis, the plane normal, minus the offset value (1), and the axis rows (2);
- * - Parallel: the axis rows (2); Perpendicular: a·b (1); Angle: a·b − cos(value) (1);
- * - Distance: |pB − pA| − value (1).
- * Axis rows accept anti-parallel axes. The residual definitions match
+ * - Parallel: the axis rows (2); Perpendicular: a·b (1);
+ * - Angle: acos(a·b) − value (1), in radians; at 0 or π, where one row cannot hold two axes together (the
+ *   angle is not differentiable there), the axis rows with the sign the angle asks for (2);
+ * - Distance: |pB − pA| − value (1; the value must be positive, since the direction is undefined at 0).
+ * Axis rows accept anti-parallel axes, except for an aligned Angle. The residual definitions match
  * CadKit's `AssemblyLoopSolver`; Jacobians are analytic (exact for the
  * position and fixed-rotation rows, first order in the transverse and axis
  * rows, exact at closure).
@@ -30,6 +32,10 @@ class ClosureTask implements KinematicTask {
   final scratch:Array<Float> = [for (_ in 0...35) 0.0];
   var lastPositionError = 0.0;
   var lastOrientationError = 0.0;
+  /** For an Angle of 0 (+1) or π (−1): the sign B's axis must have along A's; 0 otherwise. */
+  final alignedSign:Float;
+  /** How close to 0 or π (in sin of the angle) an Angle closure becomes an aligned one. */
+  static inline var ALIGNED_ANGLE:Float = 1e-6;
 
   public function new(model:KinematicModel, closure:Int, positionTolerance:Float, angularTolerance:Float) {
     if (model == null || closure < 0 || closure >= model.closureCount()) throw "Closure task requires a closure of the model";
@@ -39,7 +45,9 @@ class ClosureTask implements KinematicTask {
     this.positionTolerance = positionTolerance;
     this.angularTolerance = angularTolerance;
     kind = model.closureKind[closure];
-    rows = switch kind {
+    var value = model.closureValue[closure];
+    alignedSign = kind == ClosureKind.Angle && Math.abs(Math.sin(value)) < ALIGNED_ANGLE ? (Math.cos(value) > 0 ? 1.0 : -1.0) : 0.0;
+    rows = alignedSign != 0 ? 2 : switch kind {
       case ClosureKind.Fixed: 6;
       case ClosureKind.Revolute: 5;
       case ClosureKind.Spherical, ClosureKind.Planar: 3;
@@ -120,16 +128,34 @@ class ClosureTask implements KinematicTask {
         lastPositionError = 0;
         lastOrientationError = axisAngle();
         axisRows(residual, jacobian, r, w, g);
-      case ClosureKind.Perpendicular, ClosureKind.Angle:
-        // a·b against 0 or cos(value); d(a·b) = (a × b)·(ω_A − ω_B) exactly.
+      case ClosureKind.Angle if (alignedSign != 0):
+        lastPositionError = 0;
+        var cosine = s[14] * s[17] + s[15] * s[18] + s[16] * s[19];
+        lastOrientationError = Math.acos(Math.min(1.0, Math.max(-1.0, alignedSign * cosine)));
+        alignedRows(residual, jacobian, r, w, g, alignedSign);
+      case ClosureKind.Perpendicular:
+        // a·b; d(a·b) = (a × b)·(ω_A − ω_B) exactly.
         var ax = s[14], ay = s[15], az = s[16], bx = s[17], by = s[18], bz = s[19];
-        var target = kind == ClosureKind.Angle ? Math.cos(model.closureValue[closure]) : 0.0;
-        var value = ax * bx + ay * by + az * bz - target;
+        var value = ax * bx + ay * by + az * bz;
         var cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
         residual[r] = -g * value;
         for (c in 0...w)
           jacobian[r * w + c] = g * (cx * (jacobianA[3 * w + c] - jacobianB[3 * w + c]) +
             cy * (jacobianA[4 * w + c] - jacobianB[4 * w + c]) + cz * (jacobianA[5 * w + c] - jacobianB[5 * w + c]));
+        lastPositionError = 0;
+        lastOrientationError = Math.abs(value);
+      case ClosureKind.Angle:
+        // θ − value with θ = acos(a·b); dθ = −d(a·b)/sin θ = (a × b)·(ω_B − ω_A)/|a × b|, defined away from 0 and π.
+        var ax = s[14], ay = s[15], az = s[16], bx = s[17], by = s[18], bz = s[19];
+        var cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+        var sine = Math.sqrt(cx * cx + cy * cy + cz * cz);
+        var angle = Math.acos(Math.min(1.0, Math.max(-1.0, ax * bx + ay * by + az * bz)));
+        var value = angle - model.closureValue[closure];
+        residual[r] = -g * value;
+        var inverse = sine > 1e-12 ? 1.0 / sine : 0.0;
+        for (c in 0...w)
+          jacobian[r * w + c] = g * inverse * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
+            cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
         lastPositionError = 0;
         lastOrientationError = Math.abs(value);
       case ClosureKind.Distance:
@@ -205,6 +231,33 @@ class ClosureTask implements KinematicTask {
       for (c in 0...w)
         jacobian[row * w + c] = scale * sign * (cx * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
           cy * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + cz * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
+      row++;
+    }
+  }
+
+  /**
+    B's axis σb pointed along A's axis a (σ = `sign`): the stereographic projection of σb from −a onto the plane
+    across a, `2σ(b·u)/(1 + σ a·b)` for the two directions u across a. Unlike the axis rows it vanishes only at
+    σb = a and grows without bound towards the opposite direction, so a solve cannot settle on the wrong one.
+    Jacobian: the quotient rule on d(b·u) ≈ (b × u)·(ω_B − ω_A) and d(a·b) = (a × b)·(ω_A − ω_B), exact at closure.
+  */
+  function alignedRows(residual:Array<Float>, jacobian:Array<Float>, row:Int, w:Int, scale:Float, sign:Float):Void {
+    var s = scratch;
+    var ax = s[14], ay = s[15], az = s[16], bx = s[17], by = s[18], bz = s[19];
+    var q = Math.max(1e-9, 1 + sign * (ax * bx + ay * by + az * bz));
+    var nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx; // a × b
+    Rotations.perpendicularBasis(ax, ay, az, s, 23);
+    for (k in 0...2) {
+      var ux = s[23 + 3 * k], uy = s[24 + 3 * k], uz = s[25 + 3 * k];
+      var across = bx * ux + by * uy + bz * uz;
+      residual[row] = -scale * 2 * sign * across / q;
+      var cx = by * uz - bz * uy, cy = bz * ux - bx * uz, cz = bx * uy - by * ux;
+      for (c in 0...w) {
+        var wx = jacobianB[3 * w + c] - jacobianA[3 * w + c], wy = jacobianB[4 * w + c] - jacobianA[4 * w + c],
+          wz = jacobianB[5 * w + c] - jacobianA[5 * w + c];
+        var dAcross = cx * wx + cy * wy + cz * wz, dDot = -(nx * wx + ny * wy + nz * wz);
+        jacobian[row * w + c] = scale * 2 * sign * (dAcross / q - across * sign * dDot / (q * q));
+      }
       row++;
     }
   }
