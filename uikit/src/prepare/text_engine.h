@@ -80,6 +80,7 @@ struct PreparedGlyphs {
     uint64_t layout_generation = 0;
     uint64_t line_revision = 0;
     uint64_t publication_key = 0;
+    int32_t source_start = -1;
     int32_t first_line = -1;
     int32_t end_line = -1;
 };

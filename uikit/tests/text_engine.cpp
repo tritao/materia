@@ -598,19 +598,86 @@ int main() {
     if (!long_word.edit_utf8(edit_offset, edit_offset, "a", &edited_rows) ||
         long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
                                             GlyphMode::Alpha) != preceding ||
-        !long_word.prepared_glyphs_current(*preceding) ||
-        long_word.published_glyphs_for_line(long_layout.id, middle + 20, 0, 0, 1,
-                                            GlyphMode::Alpha) != following ||
-        !long_word.prepared_glyphs_current(*following))
+        !long_word.prepared_glyphs_current(*preceding))
         return 130;
     const auto after_insert = long_word.published_glyphs_for_line(
         long_layout.id, middle + 20, 0, 0, 1, GlyphMode::Alpha);
+    const int32_t row_shift = after_insert ? after_insert->source_start - following->source_start : -1;
+    if (!after_insert || (row_shift != 0 && row_shift != 1) ||
+        (row_shift == 0 && after_insert != following) ||
+        (row_shift == 1 && (after_insert == following ||
+                            long_word.prepared_glyphs_current(*following))) ||
+        after_insert->vertices.size() != following->vertices.size() ||
+        after_insert->source_ranges.size() != following->source_ranges.size())
+        return 134;
+    for (size_t i = 0; i < after_insert->source_ranges.size(); ++i)
+        if (after_insert->source_ranges[i].start != following->source_ranges[i].start + row_shift ||
+            after_insert->source_ranges[i].end != following->source_ranges[i].end + row_shift)
+            return 135;
     if (!after_insert || !long_word.edit_utf8(edit_offset, edit_offset + 1, "", &edited_rows) ||
         long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
                                             GlyphMode::Alpha) != preceding ||
         !long_word.prepared_glyphs_current(*preceding) ||
-        !long_word.prepared_glyphs_current(*after_insert))
+        (row_shift != 0 && long_word.prepared_glyphs_current(*after_insert)))
         return 131;
+    const auto after_delete = long_word.published_glyphs_for_line(
+        long_layout.id, middle + 20, 0, 0, 1, GlyphMode::Alpha);
+    if (!after_delete || after_delete->source_start != following->source_start ||
+        !long_word.prepared_glyphs_current(*after_delete))
+        return 136;
+
+    // A wider inserted glyph can move an unchanged suffix row's codepoint range.
+    TextEngine shifted(shared_fonts);
+    std::string words(10000, 'i');
+    TextLayoutResult word_layout;
+    if (!shifted.layout_utf8(words.c_str(), 200.0f, long_options, &word_layout) ||
+        word_layout.lines.size() < 30)
+        return 137;
+    const auto old_word_row = shifted.published_glyphs_for_line(
+        word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha);
+    const std::vector<GlyphColorRange> fixed_colors{{
+        static_cast<int32_t>(word_layout.lines[20].text_offset + 2),
+        static_cast<int32_t>(word_layout.lines[20].text_offset + 4), {255, 0, 0, 255}}};
+    const auto old_colored_row = shifted.published_glyphs_for_line(
+        word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha, {}, fixed_colors);
+    TextLayoutResult shifted_layout;
+    if (!old_word_row || !old_colored_row || !shifted.edit_utf8(2, 2, "w", &shifted_layout) ||
+        shifted_layout.id != word_layout.id)
+        return 138;
+    const auto new_word_row = shifted.published_glyphs_for_line(
+        word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha);
+    const auto new_colored_row = shifted.published_glyphs_for_line(
+        word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha, {}, fixed_colors);
+    const int32_t shifted_delta = static_cast<int32_t>(shifted_layout.lines[20].text_offset) -
+        static_cast<int32_t>(word_layout.lines[20].text_offset);
+    if (!new_word_row || !new_colored_row || new_colored_row == old_colored_row ||
+        shifted_delta == 0 || new_word_row == old_word_row ||
+        new_word_row->source_start != old_word_row->source_start + shifted_delta ||
+        shifted.prepared_glyphs_current(*old_word_row) ||
+        !shifted.prepared_glyphs_current(*new_word_row) ||
+        new_word_row->vertices.size() != old_word_row->vertices.size() ||
+        new_word_row->source_ranges.size() != old_word_row->source_ranges.size())
+        return 139;
+    for (const auto &source : new_colored_row->source_ranges) {
+        const bool in_color_range = source.start >= fixed_colors[0].start &&
+            source.start < fixed_colors[0].end;
+        const auto &vertex = new_colored_row->vertices[source.first_vertex];
+        if ((vertex.green == 0) != in_color_range)
+            return 143;
+    }
+    for (size_t i = 0; i < new_word_row->source_ranges.size(); ++i)
+        if (new_word_row->source_ranges[i].start != old_word_row->source_ranges[i].start + shifted_delta ||
+            new_word_row->source_ranges[i].end != old_word_row->source_ranges[i].end + shifted_delta)
+            return 140;
+    if (!shifted.edit_utf8(2, 3, "", &shifted_layout) ||
+        shifted_layout.id != word_layout.id ||
+        shifted.prepared_glyphs_current(*new_word_row))
+        return 141;
+    const auto restored_word_row = shifted.published_glyphs_for_line(
+        word_layout.id, 20, 0, 0, 1, GlyphMode::Alpha);
+    if (!restored_word_row || restored_word_row->source_start != old_word_row->source_start ||
+        !shifted.prepared_glyphs_current(*restored_word_row))
+        return 142;
 
     // An offset-shifting edit may preserve the same row's source range and
     // pixels (a repeated run), but it must not preserve a different row.

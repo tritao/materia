@@ -686,16 +686,16 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
                 ? current->line_ranges[index] : line.text_range;
             const bool unchanged_text = line.text_range.start >= 0 &&
                 line.text_range.end >= line.text_range.start &&
-                static_cast<std::size_t>(line.text_range.end) <= previous_text.size() &&
+                old_range.start >= 0 && old_range.end >= old_range.start &&
+                line.text_range.end - line.text_range.start == old_range.end - old_range.start &&
+                static_cast<std::size_t>(old_range.end) <= previous_text.size() &&
                 static_cast<std::size_t>(line.text_range.end) <= current->text.size() &&
-                std::memcmp(previous_text.data() + line.text_range.start,
+                std::memcmp(previous_text.data() + old_range.start,
                             current->text.data() + line.text_range.start,
                             static_cast<std::size_t>(line.text_range.end - line.text_range.start)) == 0;
             const bool reusable = index < static_cast<int32_t>(current->line_ranges.size()) &&
                 index < static_cast<int32_t>(current->line_revisions.size()) &&
                 index < static_cast<int32_t>(layout_result.lines.size()) &&
-                line.text_range.start == old_range.start &&
-                line.text_range.end == old_range.end &&
                 unchanged_text &&
                 line.bounds.x == layout_result.lines[index].bounds.x &&
                 line.bounds.y == layout_result.lines[index].bounds.y &&
@@ -928,9 +928,25 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
 
     if (const auto found = state_->published_glyphs.find(key);
         found != state_->published_glyphs.end()) {
-        if (auto cached = found->second.lock())
+        if (auto cached = found->second.lock()) {
+            if (single_line && relevant_ranges.empty() && cached->source_start >= 0 &&
+                cached->source_start != layout->line_ranges[line_index].start &&
+                cached->line_revision == layout->line_revisions[line_index]) {
+                const int32_t delta = layout->line_ranges[line_index].start - cached->source_start;
+                auto rebased = std::make_shared<PreparedGlyphs>(*cached);
+                rebased->source_start += delta;
+                for (auto &source : rebased->source_ranges) {
+                    source.start += delta;
+                    source.end += delta;
+                }
+                if (prepared_glyphs_current(*rebased)) {
+                    state_->published_glyphs[key] = rebased;
+                    return rebased;
+                }
+            }
             if (prepared_glyphs_current(*cached))
                 return cached;
+        }
     }
 
     auto snapshot = std::make_shared<PreparedGlyphs>();
@@ -991,6 +1007,8 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
     output.line_revision = line_index >= 0 && end_line < 0 &&
         static_cast<std::size_t>(line_index) < retained->line_revisions.size()
         ? retained->line_revisions[line_index] : 0;
+    if (output.line_revision)
+        output.source_start = retained->line_ranges[line_index].start;
     if (!state_->font_collection || !state_->font_collection->state_ ||
         !state_->font_collection->state_->fonts)
         return false;
@@ -1036,7 +1054,8 @@ bool TextEngine::prepared_glyphs_current(const PreparedGlyphs &glyphs) const {
     if (glyphs.line_revision != 0) {
         if (glyphs.first_line < 0 || glyphs.end_line != glyphs.first_line + 1 ||
             static_cast<std::size_t>(glyphs.first_line) >= layout->line_revisions.size() ||
-            glyphs.line_revision != layout->line_revisions[glyphs.first_line])
+            glyphs.line_revision != layout->line_revisions[glyphs.first_line] ||
+            glyphs.source_start != layout->line_ranges[glyphs.first_line].start)
             return false;
     } else if (glyphs.layout_generation != skb_layout_get_generation(layout->layout))
         return false;
