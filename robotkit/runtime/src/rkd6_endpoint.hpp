@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits>
 #include "robotkit_runtime.hpp"
 #include "device_wire6.hpp"
 #include "clock_estimator6.hpp"
@@ -41,6 +42,10 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
+    /** STATE6 carries actuator positions as 32-bit floats. */
+    double observed_position_precision() const noexcept override {
+        return std::numeric_limits<float>::epsilon();
+    }
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_EMERGENCY_STOP; }
     bool executes_trajectory_queue() const noexcept override { return true; }
     int32_t diagnostic_code() const noexcept override {

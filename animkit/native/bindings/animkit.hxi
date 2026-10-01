@@ -78,6 +78,12 @@ interface AnimKitNative @target("portable-abi64") @library("animkit_core") {
 	 */
 	extern fn ak_instance_evaluate(instance: ak_instance_handle) -> ak_result;
 	/**
+	 * Samples, blends, and solves inverse kinematics as ak_instance_evaluate does, and updates the joint matrices, but
+	 * does not skin: the deformed positions and normals stay as the last full evaluation left them. For measuring a pose
+	 * (where a hand would be if a limb were released) without paying for geometry nobody will see.
+	 */
+	extern fn ak_instance_evaluate_pose(instance: ak_instance_handle) -> ak_result;
+	/**
 	 * Axis-aligned bounds of every deformed primitive in scene space.
 	 */
 	extern fn ak_instance_get_bounds(instance: ak_instance_handle, out_bounds: ptr<ak_bounds>) -> ak_result;

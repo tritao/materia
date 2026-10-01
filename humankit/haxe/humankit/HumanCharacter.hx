@@ -46,6 +46,8 @@ class HumanCharacter {
 	var lean:Float = 0.0;
 	/** The asset's crouching-in-place clip, or -1 when it has none; see setCrouch. */
 	final crouchClip:Int;
+	/** The going-down clip the crouch is posed from, when the asset has one; else the crouch clip is blended in. */
+	final crouchDown:Null<HumanCrouch>;
 	var crouchDepth:Float = 0.0;
 	/**
 	 * The joint-turn sources each feature applies its turns under (see AnimationInstance.setJointRotation),
@@ -67,7 +69,8 @@ class HumanCharacter {
 		instance = new AnimationInstance(asset);
 		pose = new HumanPose(this.rig, instance.readJointMatrices());
 		player = new ClipPlayer(instance);
-		crouchClip = asset.clipIndex("crouch_idle");
+		crouchDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("crouch_enter"));
+		crouchClip = crouchDown != null ? crouchDown.clip : asset.clipIndex("crouch_idle");
 		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS, pose),
 			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS, pose)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
@@ -162,13 +165,17 @@ class HumanCharacter {
 
 	/**
 	 * Lowers the body toward a crouch, by mixing the asset's crouching clip over the animation: 0 stands, 1 is
-	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay planted. Throws when the
+	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not pinned: one may lift a few centimetres at full depth). Throws when the
 	 * asset has no crouch clip. Takes effect from the next advance, and is meant for a worker standing still.
 	 */
 	public function setCrouch(amount:Float):Void {
 		if (crouchClip < 0) throw "The character has no crouch clip";
 		crouchDepth = Math.max(0.0, Math.min(1.0, amount));
-		player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
+		var down = crouchDown;
+		// Posed from the going-down clip, held at the time where the body is this far down: an authored pose at
+		// every depth. Without one, the crouch clip is blended in at this weight.
+		if (down != null) player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, Math.min(1.0, crouchDepth / 0.3), down.timeFor(crouchDepth));
+		else player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
 	}
 
 	public function crouch():Float
@@ -221,6 +228,17 @@ class HumanCharacter {
 		model.update();
 		pose.update(instance.readJointMatrices());
 		placeAttachments();
+	}
+
+	/**
+	 * Evaluates the pose as it would be now, at the current animation time and with every turn and reach applied, and
+	 * makes `pose` current, without skinning the model or moving attachments. For measuring (what would the shoulder
+	 * do under a lean, where would the hand be if released): nothing a measurement poses reaches the scene, and
+	 * the next `advance` shows the pose as usual.
+	 */
+	public function probe():Void {
+		player.pose(0.0);
+		pose.update(instance.readJointMatrices());
 	}
 
 	/** Nodes whose geometry or world transform changed in the last advance. */

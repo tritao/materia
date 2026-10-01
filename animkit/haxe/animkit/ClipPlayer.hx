@@ -28,6 +28,8 @@ class ClipPlayer {
 	var overlayClip:Int = -1;
 	var overlayTime:Float = 0.0;
 	var overlayWeight:Float = 0.0;
+	/** A time to hold the overlay at instead of letting it run, or null. */
+	var overlayHold:Null<Float> = null;
 
 	public function new(instance:AnimationInstance) {
 		this.instance = instance;
@@ -35,6 +37,10 @@ class ClipPlayer {
 
 	public function currentClip():Int
 		return clip;
+
+	/** Whether a crossfade between clips is still running. */
+	public function fading():Bool
+		return outgoing.length > 0;
 
 	public function currentTime():Float
 		return time;
@@ -90,9 +96,11 @@ class ClipPlayer {
 	/**
 	 * Mixes a clip over everything else at `weight` (0 none, 1 only the overlay), looping on its own clock. A
 	 * negative clip, or a weight of zero, takes it out of the mix; the clock keeps running, so putting the same
-	 * clip back picks up where it would be rather than from its start. Takes effect from the next advance.
+	 * clip back picks up where it would be rather than from its start. With `hold` the overlay does not run but
+	 * stays at that time in the clip, which poses the body part way through a one-way clip. Takes effect from the
+	 * next advance.
 	 */
-	public function setOverlay(index:Int, weight:Float):Void {
+	public function setOverlay(index:Int, weight:Float, ?hold:Float):Void {
 		if (index >= instance.asset.clipNames.length)
 			throw 'Clip index $index is out of range';
 		if (index >= 0 && index != overlayClip) {
@@ -100,6 +108,7 @@ class ClipPlayer {
 			overlayTime = 0.0;
 		}
 		overlayWeight = index < 0 ? 0.0 : Math.max(0.0, Math.min(1.0, weight));
+		overlayHold = hold;
 	}
 
 	public function overlayAmount():Float
@@ -122,7 +131,17 @@ class ClipPlayer {
 	}
 
 	/** Advances playback, updates the instance layers, and evaluates the pose. */
-	public function advance(seconds:Float):Void {
+	public function advance(seconds:Float):Void
+		stepPlayer(seconds, true);
+
+	/**
+	 * Like `advance`, but evaluates the pose only: joint matrices are current and the deformed geometry is not
+	 * touched. For measuring what a pose would be (planning a reach) without paying to skin it.
+	 */
+	public function pose(seconds:Float = 0.0):Void
+		stepPlayer(seconds, false);
+
+	function stepPlayer(seconds:Float, skin:Bool):Void {
 		var step = seconds * speed;
 		time += step;
 		if (outgoing.length > 0) {
@@ -140,8 +159,9 @@ class ClipPlayer {
 			} else
 				instance.setLayer(index + 1, -1, 0.0, 0.0);
 		}
-		if (overlayClip >= 0 && overlayWeight > 0.0) instance.setLayer(OVERLAY_LAYER, overlayClip, overlayTime, overlayWeight);
+		if (overlayClip >= 0 && overlayWeight > 0.0) instance.setLayer(OVERLAY_LAYER, overlayClip, overlayHold == null ? overlayTime : overlayHold, overlayWeight);
 		else instance.setLayer(OVERLAY_LAYER, -1, 0.0, 0.0);
-		instance.evaluate();
+		if (skin) instance.evaluate();
+		else instance.evaluatePose();
 	}
 }

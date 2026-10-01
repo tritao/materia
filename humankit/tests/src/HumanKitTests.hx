@@ -27,6 +27,7 @@ import humankit.HumanLimb;
 import humankit.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.HumanPose;
+import humankit.Naturalness;
 import humankit.HumanPosture;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
@@ -116,6 +117,9 @@ class HumanKitTests {
 		facilityRoute(scene, worker, rig);
 		facilitySurfaces();
 		postureStature();
+		turning(scene, worker, rig);
+		retreating(scene, worker, rig);
+		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -178,13 +182,22 @@ class HumanKitTests {
 		human.advance(0.0);
 		var standing = human.pose.bonePosition(HumanBone.Pelvis)[2];
 		if (standing - last < 0.3) throw 'A full crouch only lowered the pelvis ${standing - last} m';
+		// Posed from the going-down clip, a depth is that fraction of the way down in the pelvis too.
+		human.setCrouch(0.5);
+		human.advance(0.0);
+		var halfway = (standing - human.pose.bonePosition(HumanBone.Pelvis)[2]) / (standing - last);
+		if (Math.abs(halfway - 0.5) > 0.1) throw 'Half a crouch put the pelvis $halfway of the way down';
+		human.setCrouch(0.0);
+		human.advance(0.0);
 		// The planner crouches for a low surface and not for a shelf; the bundled worker, which cannot, refuses the low one.
 		var body = new HumanBody(human);
 		var bench:HumanTargetBox = {center: [0.6, 0.0, 0.55], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
 		var shelf:HumanTargetBox = {center: [0.6, 0.0, 1.15], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
 		var low = new ApproachFor([0.6, 0.0, 0.62], ArmR, 1.0, false, null, bench);
 		var lowJob = new HumanJob(body).add(low);
+		var planStart = Sys.time();
 		lowJob.advance(1.0 / 60.0);
+		Sys.println('PLAN bench approach took ${Math.round((Sys.time() - planStart) * 1000)} ms');
 		if (lowJob.failure() != null) throw 'A bench was not reachable crouched: ${lowJob.failure()}';
 		var high = new ApproachFor([0.6, 0.0, 1.22], ArmR, 1.0, false, null, shelf);
 		var highJob = new HumanJob(body).add(high);
@@ -192,6 +205,12 @@ class HumanKitTests {
 		if (highJob.failure() != null) throw 'A shelf was not reachable: ${highJob.failure()}';
 		if (!(low.crouch >= 0.4) || !(high.crouch <= 0.1))
 			throw 'The planner crouched ${low.crouch} for a bench and ${high.crouch} for a shelf';
+		// A deep top at table height is no reason to crouch: it lowers the shoulder, not forward over the edge.
+		var wide:HumanTargetBox = {center: [0.7, 0.0, 1.01], halfExtents: [0.4, 0.4, 0.05], yaw: 0.0};
+		var deep = new ApproachFor([0.7, 0.0, 1.1], ArmR, 1.0, false, null, wide);
+		var deepJob = new HumanJob(body).add(deep);
+		deepJob.advance(1.0 / 60.0);
+		if (!(deep.crouch <= 0.1)) throw 'The planner crouched ${deep.crouch} for a deep top at table height';
 		body.cancel();
 		human.dispose();
 		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");
@@ -208,6 +227,7 @@ class HumanKitTests {
 		// The checks that name no joints hold on the library character too.
 		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
 		var againRig = HumanoidRig.detect(again);
+		naturalness(scene, again, againRig, "library", 0.1);
 		walking(scene, again, againRig);
 		elbowStaysPut(scene, again, againRig);
 		leaning(scene, again, againRig);
@@ -815,6 +835,113 @@ class HumanKitTests {
 		if (Math.abs(root[0]) > 1e-3 || Math.abs(root[1] - 1.0) > 1e-3)
 			throw "The facility walk does not face along the last lane";
 		human.dispose();
+	}
+
+	/**
+	 * The floor-up measures on motions whose answer is known: standing still has no skate and a mass well inside
+	 * its feet, and a steady walk at the gait's own speed keeps a planted foot where it is. The same measures
+	 * on a whole job are reported by the sim sweeps.
+	 */
+	static function naturalness(scene:Scene, asset:AnimationAsset, rig:HumanoidRig, label:String, slideLimit:Float = 0.08):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Natural");
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (_ in 0...30) body.advance(step);
+		var still = new Naturalness();
+		for (_ in 0...120) {
+			body.advance(step);
+			still.sample(body, step);
+		}
+		if (still.maxSlide > 0.005 || still.minSupportMargin < -0.02)
+			throw 'A worker standing still slid or tipped ($label): ${still.summary()}';
+		var walking = new Naturalness();
+		body.walker.follow([[0.0, 0.0], [20.0, 0.0]], 1.0);
+		for (index in 0...360) {
+			body.advance(step);
+			// Once the body is up to speed: getting there drags a planted foot (see BODY.md), which is not the gait's doing.
+			if (index >= 90) walking.sample(body, step);
+		}
+		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
+			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
+		human.dispose();
+	}
+
+	/**
+	 * Turning on the spot: a character with turn clips steps through a right angle in the clip's own time and ends
+	 * facing where it was asked, with its feet moving less than the root-spin the bundled worker makes of the same turn.
+	 */
+	static function turning(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var turnOf = function(asset:AnimationAsset, rig:HumanoidRig, angle:Float):{seconds:Float, slide:Float, heading:Float, clips:Int} {
+			var human = new HumanCharacter(scene, asset, rig, null, "Turner");
+			var body = new HumanBody(human);
+			var step = 1.0 / 60.0;
+			for (_ in 0...30) body.advance(step);
+			var natural = new Naturalness();
+			var before = body.rootTransform();
+			body.walker.face(Math.atan2(before[1], before[0]) + angle);
+			var seconds = 0.0, clips = 0, last = -1;
+			while (body.walker.isTurning() && seconds < 6.0) {
+				body.advance(step);
+				natural.sample(body, step);
+				seconds += step;
+				var playing = human.player.currentClip();
+				if (playing != last) {
+					clips++;
+					last = playing;
+				}
+			}
+			for (_ in 0...30) body.advance(step);
+			var after = body.rootTransform();
+			var heading = Math.atan2(after[1], after[0]) - Math.atan2(before[1], before[0]);
+			while (heading > Math.PI) heading -= 2.0 * Math.PI;
+			while (heading < -Math.PI) heading += 2.0 * Math.PI;
+			human.dispose();
+			return {seconds: seconds, slide: natural.maxSlide, heading: heading, clips: clips};
+		};
+		var plain = turnOf(bundled, bundledRig, Math.PI / 2.0);
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var quarter = turnOf(asset, rig, Math.PI / 2.0);
+		var half = turnOf(asset, rig, Math.PI);
+		var odd = turnOf(asset, rig, -2.0);
+		Sys.println('TURN bundled 90: ${plain.seconds} s slide ${plain.slide}; library 90: ${quarter.seconds} s slide ${quarter.slide} clips ${quarter.clips}; 180: ${half.seconds} s slide ${half.slide}; -2 rad: ${odd.seconds} s slide ${odd.slide}');
+		if (Math.abs(quarter.heading - Math.PI / 2.0) > 0.02 || Math.abs(half.heading - Math.PI) > 0.02 && Math.abs(half.heading + Math.PI) > 0.02 ||
+			Math.abs(odd.heading + 2.0) > 0.02)
+			throw 'A turn clip left the worker facing the wrong way: ${quarter.heading}, ${half.heading}, ${odd.heading}';
+		if (quarter.clips < 2) throw "A right-angle turn did not play a turn clip";
+		if (quarter.seconds > 3.0) throw 'A right-angle turn took ${quarter.seconds} s';
+	}
+
+	/** A retreat on a character with a backward walk plays it, and its planted feet hold still; without one it slides as before. */
+	static function retreating(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var human = new HumanCharacter(scene, asset, rig, null, "Retreater");
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (_ in 0...30) body.advance(step);
+		if (body.walker.backGait == null) throw "The library character has no backward gait";
+		var natural = new Naturalness();
+		var start = body.rootTransform();
+		body.walker.retreatAlong([[start[12], start[13]], [start[12] - 2.0 * start[0], start[13] - 2.0 * start[1]]], 0.8);
+		if (human.player.currentClip() != asset.clipIndex("walk_bwd")) throw "A retreat did not take the backward walk";
+		var seconds = 0.0;
+		while (body.walker.isWalking() && seconds < 6.0) {
+			body.advance(step);
+			if (seconds > 0.5) natural.sample(body, step);
+			seconds += step;
+		}
+		var end = body.rootTransform();
+		if (Math.abs(Math.sqrt(Math.pow(end[12] - start[12], 2) + Math.pow(end[13] - start[13], 2)) - 2.0) > 0.01 ||
+			Math.abs(end[0] - start[0]) > 1e-6)
+			throw "A backward retreat did not end two metres back, facing the same way";
+		Sys.println('RETREAT planted ${natural.plantedSeconds} s, slide ${natural.maxSlide}');
+		if (natural.plantedSeconds < 0.5 || natural.maxSlide > 0.2) throw 'A backward retreat slid its feet: ${natural.summary()}';
+		human.dispose();
+		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "PlainRetreater");
+		var plainBody = new HumanBody(plain);
+		if (plainBody.walker.backGait != null) throw "The bundled worker claims a backward gait";
+		plain.dispose();
 	}
 
 	/** A posture's lengths grow with the body; its angles, fractions and times do not. */

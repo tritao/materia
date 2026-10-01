@@ -13,6 +13,11 @@ class HumanBody {
 	public final walker:HumanWalker;
 	public final description:HumanDescription;
 	public final posture:HumanPosture;
+	/**
+	 * How far the point a hand holds with (between the wrist and the knuckles) is beyond its wrist, in metres. The
+	 * arm has to bring the wrist this much less far than the point it is reaching for.
+	 */
+	public final palmReach:Float;
 	/** True between a completed pick and its matching place. */
 	public var grip(default, null):Bool = false;
 
@@ -38,6 +43,9 @@ class HumanBody {
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
 		description = HumanDescription.measure(character.pose, character.height());
+		var wristAt = character.pose.bonePosition(HandL), knuckleAt = character.pose.bonePosition(MiddleL);
+		palmReach = wristAt == null || knuckleAt == null ? 0.0 : 0.5 * Math.sqrt(Math.pow(knuckleAt[0] - wristAt[0], 2) +
+			Math.pow(knuckleAt[1] - wristAt[1], 2) + Math.pow(knuckleAt[2] - wristAt[2], 2));
 		this.posture = posture == null ? HumanPosture.forStature(description.stature) : posture;
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
@@ -136,11 +144,11 @@ class HumanBody {
 		var depths:Array<Array<Float>> = [for (_ in 0...HumanHand.FINGERS) []];
 		for (step in 0...steps + 1) {
 			character.setHandCurl(hand, step / steps);
-			character.advance(0.0);
+			character.probe();
 			for (kind in 0...HumanHand.FINGERS) depths[kind].push(fingerDepth(hand, kind));
 		}
 		character.setHandCurls(hand, saved);
-		character.advance(0.0);
+		character.probe();
 		var curls = uniformCurl(0.0);
 		for (kind in 1...HumanHand.FINGERS) {
 			var reached = depths[kind], peak = 0, found = -1;
@@ -180,6 +188,10 @@ class HumanBody {
 	public function setArmsDown(down:Bool):Void
 		armsDown = down;
 
+	/** Whether the body has finished easing to the lean it was asked for. */
+	public function leanReached():Bool
+		return Math.abs(leanGoal - leanNow) < 1e-6;
+
 	/** Whether the body has finished easing to the crouch it was asked for. */
 	public function crouchReached():Bool
 		return Math.abs(crouchGoal - crouchNow) < 1e-6;
@@ -193,14 +205,14 @@ class HumanBody {
 		var savedCrouch = character.crouch(), savedLean = character.spineLean();
 		character.setSpineLean(0.0);
 		character.setCrouch(0.0);
-		character.advance(0.0);
+		character.probe();
 		var upright = character.pose.bonePosition(bone);
 		character.setCrouch(amount);
-		character.advance(0.0);
+		character.probe();
 		var crouched = character.pose.bonePosition(bone);
 		character.setCrouch(savedCrouch);
 		character.setSpineLean(savedLean);
-		character.advance(0.0);
+		character.probe();
 		if (upright == null || crouched == null) return [0.0, 0.0, 0.0];
 		return [crouched[0] - upright[0], crouched[1] - upright[1], crouched[2] - upright[2]];
 	}
@@ -211,26 +223,40 @@ class HumanBody {
 	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
 	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float} {
-		var none = {angle: 0.0, shift: 0.0};
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float, drop:Float} {
+		var none = {angle: 0.0, shift: 0.0, drop: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
 		var saved = character.spineLean(), savedCrouch = character.crouch();
-		var probe = 0.2;
 		if (character.canCrouch()) character.setCrouch(crouch);
 		character.setSpineLean(0.0);
-		character.advance(0.0);
+		character.probe();
 		var upright = character.pose.bonePosition(bone);
-		character.setSpineLean(probe);
-		character.advance(0.0);
-		var leaned = character.pose.bonePosition(bone);
+		var at = function(angle:Float):Null<Array<Float>> {
+			character.setSpineLean(angle);
+			character.probe();
+			return character.pose.bonePosition(bone);
+		};
+		// The forward shift is not linear in the lean, so the probe only gives a first guess: the angle is then
+		// corrected where it is used, and the shift and the drop of the shoulder reported are the measured ones.
+		var probe = 0.2;
+		var leaned = at(probe);
+		var result = none;
+		if (upright != null && leaned != null && leaned[0] - upright[0] > 1e-4) {
+			var angle = Math.min(posture.maxLean, shift * probe / (leaned[0] - upright[0]));
+			for (round in 0...3) {
+				var there = at(angle);
+				if (there == null) break;
+				var made = there[0] - upright[0];
+				result = {angle: angle, shift: made, drop: there[2] - upright[2]};
+				if (Math.abs(made - shift) < 5e-4 || angle >= posture.maxLean - 1e-6 && made < shift) break;
+				angle = Math.min(posture.maxLean, angle * shift / Math.max(1e-4, made));
+			}
+		}
 		character.setSpineLean(saved);
 		if (character.canCrouch()) character.setCrouch(savedCrouch);
-		character.advance(0.0);
-		if (upright == null || leaned == null || leaned[0] - upright[0] < 1e-4) return none;
-		var perRadian = (leaned[0] - upright[0]) / probe;
-		var angle = Math.min(posture.maxLean, shift / perRadian);
-		return {angle: angle, shift: angle * perRadian};
+		character.probe();
+		return result;
 	}
 
 	function moveLean(seconds:Float):Void {
@@ -354,6 +380,14 @@ class HumanBody {
 	 */
 	public function solveReach(hand:HumanLimb, target:Array<Float>, point:Void->Array<Float>,
 			guess:Array<Float>, cap:Float):{goal:Array<Float>, error:Float, failure:Null<String>} {
+		// The guess is the point to be held at; the wrist, which the arm has to bring there, starts a palm's depth short of it.
+		var shoulderAt = character.pose.bonePosition(hand == ArmL ? UpperArmL : UpperArmR);
+		if (shoulderAt != null && palmReach > 0.0) {
+			var from = toWorld(shoulderAt);
+			var gap = distance(from, guess);
+			if (gap > palmReach * 2.0)
+				guess = [for (axis in 0...3) guess[axis] - (guess[axis] - from[axis]) / gap * palmReach];
+		}
 		var failure = reachFailure(hand, guess);
 		if (failure != null) return {goal: guess.copy(), error: Math.POSITIVE_INFINITY, failure: failure};
 		var best = guess.copy(), bestMiss = [0.0, 0.0, 0.0], bestError = Math.POSITIVE_INFINITY;
@@ -361,7 +395,7 @@ class HumanBody {
 		for (attempt in 0...8) {
 			if (reachFailure(hand, goal) == null) {
 				setReachWorld(hand, goal, 1.0);
-				evaluate();
+				evaluate(false);
 				var reached = point();
 				var miss = [for (axis in 0...3) target[axis] - reached[axis]];
 				var error = Math.sqrt(miss[0] * miss[0] + miss[1] * miss[1] + miss[2] * miss[2]);
@@ -398,7 +432,7 @@ class HumanBody {
 		var held = character.pose.bonePosition(bone);
 		if (held == null) return 0.0;
 		character.release(limb);
-		character.advance(0.0);
+		character.probe();
 		var free = character.pose.bonePosition(bone);
 		// The limb's reach is applied again, from its own record of what it is asked to do.
 		evaluate();
@@ -500,10 +534,16 @@ class HumanBody {
 		evaluate();
 	}
 
-	/** Re-evaluates reaches at the current animation time for in-frame IK solving. */
-	public function evaluate():Void {
+	/**
+	 * Re-evaluates reaches at the current animation time for in-frame IK solving. With `present` off the pose is
+	 * only measured (joint matrices current, nothing skinned or shown), for the attempts of a solve that only the
+	 * last of which is to be seen.
+	 */
+	public function evaluate(present:Bool = true):Void {
 		var changed = false;
 		for (control in limbs) if (control.apply(this)) changed = true;
-		if (changed) character.advance(0.0);
+		if (!changed) return;
+		if (present) character.advance(0.0);
+		else character.probe();
 	}
 }

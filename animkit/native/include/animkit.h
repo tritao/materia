@@ -240,6 +240,12 @@ AK_API ak_result AK_CALL ak_instance_set_joint_rotations(ak_instance_handle inst
 AK_API ak_result AK_CALL ak_instance_clear_joint_rotations(ak_instance_handle instance, uint32_t source);
 /** Samples, blends, solves inverse kinematics, and skins the current layers. */
 AK_API ak_result AK_CALL ak_instance_evaluate(ak_instance_handle instance);
+/**
+ * Samples, blends, and solves inverse kinematics as ak_instance_evaluate does, and updates the joint matrices, but
+ * does not skin: the deformed positions and normals stay as the last full evaluation left them. For measuring a pose
+ * (where a hand would be if a limb were released) without paying for geometry nobody will see.
+ */
+AK_API ak_result AK_CALL ak_instance_evaluate_pose(ak_instance_handle instance);
 
 /** Deformed float32 xyz positions in scene space. */
 AK_API ak_result AK_CALL ak_instance_read_positions(ak_instance_handle instance, uint32_t primitive,

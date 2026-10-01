@@ -90,10 +90,33 @@ class AnimKitTests {
 		var halfway = instance.readJointMatrices();
 		if (matrixGap(halfway, plain) < 1e-3 || matrixGap(halfway, onlyOverlay) < 1e-3)
 			throw "An overlay at half weight is not between the two poses";
+		// Held at a time, the overlay is the clip at that time however long it has been playing.
+		overlay.setOverlay(walk, 1.0, asset.clipDurations[walk] * 0.4);
+		overlay.advance(1.7);
+		var held = instance.readJointMatrices();
+		var reference = new ClipPlayer(instance);
+		reference.restart(walk);
+		reference.advance(asset.clipDurations[walk] * 0.4);
+		if (matrixGap(held, instance.readJointMatrices()) > 1e-4)
+			throw "A held overlay did not stay at its time";
 		overlay.setOverlay(-1, 1.0);
 		overlay.advance(0.0);
 		if (overlay.overlayAmount() != 0.0)
 			throw "Removing the overlay left a weight";
+		// Evaluating the pose alone moves the joints but leaves the deformed geometry as the last full evaluation had it.
+		var before = instance.readPositions(0);
+		var matricesBefore = instance.readJointMatrices();
+		overlay.restart(walk);
+		overlay.advance(asset.clipDurations[walk] * 0.3);
+		var skinned = instance.readPositions(0);
+		overlay.pose(asset.clipDurations[walk] * 0.2);
+		if (matrixGap(instance.readJointMatrices(), matricesBefore) < 1e-3)
+			throw "Evaluating a pose did not move the joints";
+		if (instance.readPositions(0).compare(skinned) != 0 || skinned.compare(before) == 0)
+			throw "Evaluating a pose alone skinned the geometry, or the test moved nothing";
+		overlay.advance(0.0);
+		if (instance.readPositions(0).compare(skinned) == 0)
+			throw "A full evaluation after a pose did not skin";
 		// Taking the overlay out and putting it back keeps its clock: it does not start over.
 		overlay.setOverlay(walk, 1.0);
 		overlay.advance(0.2);

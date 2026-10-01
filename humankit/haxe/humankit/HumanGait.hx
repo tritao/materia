@@ -24,7 +24,7 @@ class HumanGait {
 	}
 
 	/** Measures a clip of asset on rig by sampling one cycle. */
-	public static function measure(asset:AnimationAsset, rig:HumanoidRig, clip:Int):HumanGait {
+	public static function measure(asset:AnimationAsset, rig:HumanoidRig, clip:Int, backward:Bool = false):HumanGait {
 		if (clip < 0 || clip >= asset.clipNames.length)
 			throw 'Clip index $clip is out of range';
 		var duration = asset.clipDurations[clip];
@@ -58,7 +58,8 @@ class HumanGait {
 					continue;
 				var before = track[(index + SAMPLES - 1) % SAMPLES], after = track[(index + 1) % SAMPLES];
 				// Backwards past the pelvis is forwards for the body.
-				speeds.push(-(after[0] - before[0]) / (2.0 * step));
+				// (A backward gait is the other way round: the planted foot slides forwards past the pelvis.)
+				speeds.push((backward ? 1.0 : -1.0) * (after[0] - before[0]) / (2.0 * step));
 			}
 		}
 		if (speeds.length == 0)
@@ -66,7 +67,7 @@ class HumanGait {
 		speeds.sort(Reflect.compare);
 		var median = speeds[Std.int(speeds.length / 2)];
 		if (!(median > 0.0))
-			throw 'Clip "${asset.clipNames[clip]}" does not move forwards';
+			throw 'Clip "${asset.clipNames[clip]}" does not move ${backward ? "backwards" : "forwards"}';
 		return new HumanGait(clip, median);
 	}
 }

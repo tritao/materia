@@ -500,7 +500,12 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
         state.effort[mapping.joint] += actuators_[i].effort * mapping.ratio;
     }
     state.trajectory_queue_depth = ack_.segment_capacity - status_.remaining_segments;
-    state.trajectory_active = status_.executing_plan_id != 0 || state.trajectory_queue_depth != 0;
+    // Motion is still to come while segments wait to be sent, or were sent
+    // and end after the device's path clock: the device reports its own
+    // queue only, so a queue it has not received or started yet counts too.
+    state.trajectory_active = status_.executing_plan_id != 0 || state.trajectory_queue_depth != 0 ||
+        !pending_.empty() || (!sent_.empty() &&
+            sent_.back().header.t0_ticks + sent_.back().header.duration_ticks > status_.path_clock_ticks);
     state.trajectory_time_ns = state.trajectory_active
         ? path_time_ns(state_header_.path_clock_ticks) : 0;
     state.active_plan_id = status_.executing_plan_id;

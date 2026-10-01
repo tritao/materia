@@ -118,18 +118,50 @@ does not sweep a hand across the part.
 The Universal Animation Library character (`animkit/assets/quaternius-ual`) is the first that crouches;
 `UniversalSweepTests` runs the rack job on it from half a metre to a shelf.
 
+## The arm brings the wrist
+
+A hand holds with the point between its wrist and its knuckles, a few centimetres past the wrist (`HumanBody.palmReach`,
+measured on the skeleton). The planner used to ask the arm for a comfortable reach to the point itself, so the wrist ended
+that much nearer the shoulder than planned and the elbow folded, and it stood too close to clear an edge it then had to lean over.
+Reaches are now planned to the wrist (`comfort` and `stretch` of the arm, plus the palm), and `solveReach` starts the wrist a palm short of the point.
+That alone cleared the two-hand layouts at a metre that had needed a crouch, and took the elbow gate back to 30 degrees.
+
+## Measuring without showing
+
+The planner measures the body by posing it: the shoulder under a lean, the pelvis at a crouch depth, a fingertip at each curl, the wrist
+if a reach were let go. Those poses go through `HumanCharacter.probe`, which evaluates the pose and the joint matrices only
+(`ak_instance_evaluate_pose`): no skinning, no scene update, no attachments moved. The poses a measurement makes never reach the
+scene, and the next `advance` shows the live pose as usual. A bench approach plans in about a millisecond instead of seven.
+
+## Measuring how natural it looks
+
+`MotionQuality` judges the arms (bend-plane turn, hand speed and acceleration, elbow range). `Naturalness` judges the
+body from the floor up, one sample per tick: how far a planted foot slides (planted is low and slow for three
+samples), where the centre of mass projects against the hull of both feet while both are down, how far a foot goes
+into the floor, and the jerk of the pelvis and wrists. `JobGate` carries both and reports which step of the job a
+finding came from; the sweeps print the worst of each. Baselines: the bundled worker slides a foot at most 0.04 m over
+the rack sweep and keeps its mass 7 cm inside its feet; the library character slides up to 0.23 m where it crouches and turns,
+and 2 cm inside. Where the slide comes from: a steady walk is gait-matched and keeps a planted foot within about 6 cm on both characters
+(the library's walk is as good as the bundled one, 6 cm against 5). The rest, up to 23 cm, is getting up to speed and
+stopping: while the body accelerates the idle pose that is still showing keeps its feet still, so a planted foot is dragged
+by the distance travelled (about half the speed times the ramp, 15 cm), and a crouched worker standing up slides its feet
+about 13 cm. A faster cross-fade cuts the drag but throws the arms (hand speed 3 m/s), so the cure is to lock the planted
+foot in the world with leg IK (the library's legs are chains), or to use start and stop clips; neither is done.
+These are limits to hold, not claims of naturalness: nothing yet compares to a reference motion or
+renders a frame.
+
 ## Known limits
 
-- **Low surfaces on the bundled worker.** At about a metre or lower the lean reaches its limit before the
-  belly clears the surface's edge, leaving it 3 to 4 cm inside for either hand. That worker has no crouch
-  clip, so it cannot do what the library character does here. The layout sweep (`ScenarioSweepTests`)
-  records this as its `CAPPED_CLEARANCE`.
-- **Deep tops on the library character.** The sweep uses 0.4 m tops. With 0.8 m ones (the app's rack and table) the
-  belly must clear an edge 0.4 m short of the part, so the arm is near full stretch and the planner crouches
-  0.4 to 0.6 for a table at standing height, taking a visible lunge. The arm reaches within a millimetre of its
-  limit, a pick can fail by that margin, the elbow can bend under the gate's 30 degrees, and a left-hand
-  run pops once. The bundled worker is unaffected. A planner that leans onto the top instead of
-  clearing it would fix this; it is not done.
+- **Low surfaces on the bundled worker.** It has no crouch clip, so below about a metre it cannot lower itself; it
+  stands clear of the edge and leans, and a surface its arm cannot reach over leaves the belly short (the planner
+  reports it as `shortfall`). With the palm's depth in the stand-off (see "The arm brings the wrist") the 1.0 m
+  tops of the sweeps, one hand or two, are cleared.
+- **Deep tops on the library character.** The sweep uses 0.4 m tops. With 0.8 m ones (the app's rack and table)
+  the belly must clear an edge 0.4 m short of the part, which the library character's arm cannot reach even
+  leaning at the limit: the planner no longer crouches for it (a crouch lowers the shoulder, it does not carry
+  it over the edge), the stance stays short of the edge, and a pick at the middle of the top can miss its reach
+  by a centimetre or two. The bundled worker is unaffected. Bracing a hand on the top and hinging at the hips, so the
+  chest overhangs the edge, would fix this; it is not done.
 - **Crouch is one clip.** Depth is a blend between standing and the clip's full crouch, so a middle depth is
   a mixed pose, not a clip of its own; the planner reaches down to about half a metre, not the floor, and a
   crouched worker does not walk. The clip's feet are not pinned: a foot may lift a few centimetres at full depth.
@@ -144,9 +176,5 @@ The Universal Animation Library character (`animkit/assets/quaternius-ual`) is t
   more: they do not wrap a cylinder or a handle differently, the thumb simply follows the index finger,
   and the fingertips reach only about 7 cm from the palm, so a larger object closes the hand as far as it
   goes and no further.
-- **Two hands at about a metre.** The arms have about 10 cm of horizontal reach left after the drop from the
-  shoulder, and each hand spends some of it sideways, so the worker cannot stand clear of a 0.4 m top without
-  crouching: the belly ends about 17 cm inside the edge (the one-handed case measures 3 to 4 cm). The two-hand
-  sweep holds that height to completing, placing the part and moving without spikes, and to that measured depth.
 - **Both hands and the left hand** share the same code as the right, and the sweep covers a left-hand
   fetch, but two-handed lean and hang are exercised by far fewer scenarios.

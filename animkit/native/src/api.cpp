@@ -370,6 +370,12 @@ ak_result ak_instance_evaluate(ak_instance_handle handle) {
     return instance->evaluate() ? AK_OK : AK_ERROR_INVALID_ARGUMENT;
 }
 
+ak_result ak_instance_evaluate_pose(ak_instance_handle handle) {
+    const auto instance = instances().find(handle.id);
+    if (!instance) return AK_ERROR_INVALID_HANDLE;
+    return instance->evaluate(false) ? AK_OK : AK_ERROR_INVALID_ARGUMENT;
+}
+
 ak_result ak_instance_read_positions(ak_instance_handle handle, uint32_t primitive, uint8_t *data,
     uint32_t *size) {
     const auto instance = instances().find(handle.id);

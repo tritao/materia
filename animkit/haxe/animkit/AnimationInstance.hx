@@ -105,6 +105,10 @@ class AnimationInstance {
 			setLayer(layer, -1, 0.0, 0.0);
 	}
 
+	/** Evaluates the pose and joint matrices only, without skinning; see ak_instance_evaluate_pose. */
+	public function evaluatePose():Void
+		AnimationAsset.check(AnimKitNative.ak_instance_evaluate_pose(handle()), "instance.evaluatePose");
+
 	/** Samples, blends, and skins the current layers. */
 	public function evaluate():Void
 		AnimationAsset.check(AnimKitNative.ak_instance_evaluate(handle()), "instance.evaluate");

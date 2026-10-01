@@ -1,9 +1,13 @@
 package motionkit.robot;
 
-import kinematicskit.LinearAlgebra;
+import kinematicskit.FrameVelocityTask;
+import kinematicskit.KinematicProblem;
+import kinematicskit.SolverWorkspace;
+import kinematicskit.StepLimits;
+import kinematicskit.native.DifferentialIk;
 import kinematicskit.native.NativeQpStep;
 import motionkit.kinematics.Twist6;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.KinematicGroup;
 
 /** One servo tick's answer. */
 class ServoStep {
@@ -28,85 +32,63 @@ class ServoStep {
 
 /**
  * Bounded differential IK for live servoing (jogging, teleoperation): each
- * tick turns a requested tool twist into joint velocities for the next
- * period `dt`. It solves, natively on ProxQP,
+ * tick turns a requested tool twist (at the TCP, in the group's reference
+ * frame) into joint velocities for the next period `dt`. It is
+ * kinematicskit's `DifferentialIk` on the group's tool `FrameVelocityTask`,
+ * natively on ProxQP:
  *
- *   minimize ½‖J·Δ − twist·dt‖² + ½λ²‖Δ‖²
- *   subject to  k·(lower − q) ≤ Δ ≤ k·(upper − q)   and   −v·dt ≤ Δ ≤ v·dt
+ *   minimize ½‖J·Δ − twist·dt‖² + ½λ²‖Δ‖²   subject to `StepLimits`
  *
- * with `J` the tool-centre-point Jacobian in the base frame (as
- * `ManipulatorKinematics.solveDifferential`), the group's position limits
- * (`lower >= upper` means unlimited) and velocity limits (`velocity <= 0`
- * means unlimited, unless `velocityLimits` overrides them), and returns
- * Δ / dt. `limitGain` k in (0, 1] (1 by default) lets a joint cover at most
- * that fraction of its remaining distance to a stop per tick, so it slows
- * into the stop instead of arriving in one tick. The limits hold exactly, so integrating the answer never leaves
- * the joint range. If the QP does not solve, the Haxe damped step is used,
- * clamped into the same bounds, and the answer says so.
+ * with the group's position limits, its velocity limits (`velocityLimits`
+ * overrides them) and, given `previousVelocity`, its acceleration limits
+ * (`accelerationLimits` overrides them), so the step also never approaches a
+ * stop faster than it can brake. `limitGain` and `ramped` are StepLimits'
+ * (a ramped step is a streamed plan chunk). If the QP does not solve, the
+ * damped step clamped into the same bounds is used, and the answer says so.
  *
  * Keep one per arm and reuse it: the QP warm-starts from the previous tick.
  */
 class ManipulatorServo {
-  public final manipulator:Manipulator;
+  public final manipulator:KinematicGroup;
   public final damping:Float;
   final qp:NativeQpStep;
-  final columns:Array<Int>;
+  final problem:KinematicProblem;
+  final task:FrameVelocityTask;
+  final workspace = new SolverWorkspace();
 
-  public function new(manipulator:Manipulator, ?damping:Float = 1e-3) {
+  public function new(manipulator:KinematicGroup, ?damping:Float = 1e-3) {
     if (manipulator == null) throw "Servo requires a manipulator";
     if (!Math.isFinite(damping) || damping < 0.0) throw "Servo damping must be finite and non-negative";
     this.manipulator = manipulator;
     this.damping = damping;
     qp = new NativeQpStep(manipulator.dofCount());
-    columns = [for (i in 0...manipulator.dofCount()) i];
+    task = manipulator.toolVelocityTask();
+    problem = manipulator.problem().add(task);
   }
 
   public function step(q:Array<Float>, twist:Twist6, dt:Float, ?velocityLimits:Array<Float>,
-      ?maxIterations:Int = 1000, ?limitGain:Float = 1.0):ServoStep {
+      ?maxIterations:Int = 1000, ?limitGain:Float = 1.0, ?previousVelocity:Array<Float>,
+      ?accelerationLimits:Array<Float>, ?ramped:Bool = false):ServoStep {
     var n = manipulator.dofCount();
     if (q == null || q.length != n) throw 'Servo requires $n joint values';
     if (twist == null) throw "Servo requires a tool twist";
     if (!(dt > 0.0) || !Math.isFinite(dt)) throw "Servo period must be positive and finite";
-    if (velocityLimits != null && velocityLimits.length != n) throw 'Servo needs $n velocity limits';
-    if (!(limitGain > 0.0) || limitGain > 1.0) throw "Servo limit gain must be in (0, 1]";
-    var jacobian = manipulator.tcpJacobian(q);
-    var requested = twist.toArray();
-    var displacement = [for (value in requested) value * dt];
-    var lower:Array<Float> = [], upper:Array<Float> = [];
-    for (joint in 0...n) {
-      var limits = manipulator.group.limitsOf(joint);
-      var low = Math.NEGATIVE_INFINITY, high = Math.POSITIVE_INFINITY;
-      if (limits.lower < limits.upper) {
-        low = limitGain * (limits.lower - q[joint]);
-        high = limitGain * (limits.upper - q[joint]);
-      }
-      var speed = velocityLimits != null ? velocityLimits[joint] : (limits.velocity > 0.0 ? limits.velocity : Math.POSITIVE_INFINITY);
-      if (!(speed >= 0.0)) throw "Servo velocity limits must be non-negative";
-      low = Math.max(low, -speed * dt);
-      high = Math.min(high, speed * dt);
-      // A joint already outside its range may only move back towards it.
-      if (low > 0.0) low = 0.0;
-      if (high < 0.0) high = 0.0;
-      lower.push(low);
-      upper.push(high);
+    var limits = new StepLimits();
+    limits.limitGain = limitGain;
+    limits.ramped = ramped;
+    limits.velocity = velocityLimits != null ? velocityLimits.copy() : [for (joint in 0...n) {
+      var speed = manipulator.group.limitsOf(joint).velocity;
+      speed > 0.0 ? speed : Math.POSITIVE_INFINITY;
+    }];
+    if (previousVelocity != null) {
+      limits.previousVelocity = previousVelocity.copy();
+      limits.acceleration = accelerationLimits != null ? accelerationLimits.copy()
+        : [for (joint in 0...n) manipulator.group.limitsOf(joint).maxAcceleration];
     }
-
-    var delta:Array<Float> = null;
-    var status = -1, iterations = 0;
-    try {
-      var solved = qp.solve(jacobian, displacement, lower, upper, damping, 1e-9, maxIterations);
-      status = solved.status;
-      iterations = solved.iterations;
-      if (solved.solved()) delta = solved.step;
-    } catch (_:Dynamic) {}
-    var fallback = delta == null;
-    if (fallback) {
-      delta = LinearAlgebra.dampedStep(jacobian, 6, n, columns, displacement, Math.max(damping, 1e-6));
-      if (delta == null) delta = [for (_ in 0...n) 0.0];
-      for (joint in 0...n) delta[joint] = Math.min(Math.max(delta[joint], lower[joint]), upper[joint]);
-    }
-    var limited = [for (joint in 0...n) if (delta[joint] <= lower[joint] + 1e-12 || delta[joint] >= upper[joint] - 1e-12) joint];
-    return new ServoStep([for (value in delta) value / dt], fallback, status, iterations, limited);
+    task.setTwist(twist.toArray(), dt);
+    var solved = DifferentialIk.step(problem, manipulator.stateOf(q), dt, qp, limits, 1.0, damping, workspace,
+      maxIterations);
+    return new ServoStep(solved.velocity, solved.fallback, solved.status, solved.iterations, solved.limited);
   }
 
   public function dispose():Void qp.dispose();

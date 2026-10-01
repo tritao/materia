@@ -9,12 +9,15 @@ class UniversalSweepTests {
     static var character = "quaternius-ual/ual-work.glb";
 
     public static function run():Void {
+        var began = Sys.time();
         var failures:Array<String> = [], report:Array<String> = [], runs = 0;
+        var skate = 0.0, margin = Math.POSITIVE_INFINITY, pelvisJerk = 0.0, wristJerk = 0.0, floor = 0.0;
         for (hand in ["right", "left"]) for (half in [0.2]) for (surface in [0.5, 0.6, 0.7, 0.85, 1.0, 1.06, 1.16]) for (yaw in [0.0, 0.7]) {
             var label = 'universal hand=$hand surface=$surface half=$half yaw=$yaw';
             var scenario = RackScenario.build(true, {hand: hand, surface: surface, yaw: yaw, surfaceHalf: half, character: character});
             var worker = scenario.worker;
             var gate = new JobGate(worker, scenario.session, scenario.limbs(), [scenario.rack, scenario.table]);
+            gate.slideLimit = 0.30;
             var ticks = 0, deepest = 0.0;
             while (!worker.currentJobDone() && ticks++ < 1500) {
                 scenario.tick();
@@ -31,12 +34,20 @@ class UniversalSweepTests {
             gate.check(label, failures);
             if (surface <= 0.6 && deepest < 0.4) failures.push('$label: the worker only crouched ${Math.round(deepest * 100) / 100} for a low surface');
             if (surface >= 1.0 && deepest > 0.35) failures.push('$label: the worker crouched ${Math.round(deepest * 100) / 100} for a surface at standing height');
+            skate = Math.max(skate, gate.naturalness.maxSlide);
+            margin = Math.min(margin, gate.naturalness.minSupportMargin);
+            pelvisJerk = Math.max(pelvisJerk, gate.naturalness.maxPelvisJerk);
+            wristJerk = Math.max(wristJerk, gate.naturalness.maxWristJerk);
+            floor = Math.max(floor, gate.naturalness.floorPenetration);
+            if (gate.naturalness.maxSlide > 0.1) Sys.println('SLIDE $label: ${gate.slideReport()}');
             var worst = gate.worst();
             report.push('$label clearance ${Math.round(gate.clearance * 100) / 100} lean ${Math.round(gate.lean * 100) / 100} crouch ${Math.round(deepest * 100) / 100} turn ${Math.round(worst.turn * 100) / 100} speed ${Math.round(worst.speed * 100) / 100}');
             runs++;
         }
         if (failures.length > 0) Sys.println(report.join("\n"));
         if (failures.length > 0) throw "Universal sweep failures:\n" + failures.join("\n");
+        Sys.println('universal sweep took ${Math.round((Sys.time() - began) * 10) / 10} s for $runs jobs');
+        Sys.println('universal sweep naturalness (worst of $runs): slide ${Math.round(skate * 100) / 100} m, support margin ${Math.round(margin * 100) / 100} m, floor ${Math.round(floor * 100) / 100} m, jerk pelvis ${Math.round(pelvisJerk)} wrist ${Math.round(wristJerk)} m/s3');
         Sys.println('universal sweep: $runs layouts within the gates');
     }
 }

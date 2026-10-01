@@ -9,12 +9,28 @@ package humankit;
  * to place the character; it faces +X like every AnimKit character.
  */
 class HumanWalker {
+	/** How long the body takes to get up to walking speed and to stop. */
 	static inline var FADE_SECONDS:Float = 0.3;
+	/**
+	 * How long the idle and walk clips take to cross-fade. Shorter than the speed ramp: while the body speeds up
+	 * the idle pose keeps its feet still, so the longer the idle shows through the further a planted foot is dragged.
+	 */
+	static inline var BLEND_SECONDS:Float = 0.3;
 
 	public final character:HumanCharacter;
 	public final gait:HumanGait;
 	/** The gait of a walk that carries something, when the character has a clip for it; see setCarrying. */
 	public final carryGait:Null<HumanGait>;
+	/** The gait of walking backwards, when the character has a clip for it; a retreat uses it. */
+	public final backGait:Null<HumanGait>;
+	/** The turn-in-place clips, to the left and to the right, when the character has them; see face. */
+	public final turnLeft:Null<HumanTurn>;
+	public final turnRight:Null<HumanTurn>;
+	/** Whole turns of a clip still to do, and which way (+1 left, -1 right), the one playing, and its clock. */
+	var turnsLeft:Int = 0;
+	var turnSign:Float = 1.0;
+	var turnPlaying:Null<HumanTurn> = null;
+	var turnClock:Float = 0.0;
 	/** The gait the route being walked uses, so a walk does not change clip part way. */
 	var routeGait:HumanGait;
 	var carrying:Bool = false;
@@ -49,6 +65,13 @@ class HumanWalker {
 		routeGait = gait;
 		var carry = character.asset.clipIndex("walk_carry");
 		carryGait = carry < 0 ? null : HumanGait.measure(character.asset, character.rig, carry);
+		var back = character.asset.clipIndex("walk_bwd");
+		backGait = back < 0 ? null : HumanGait.measure(character.asset, character.rig, back, true);
+		var left = HumanTurn.measure(character.asset, character.rig, character.asset.clipIndex("turn90_l"));
+		var right = HumanTurn.measure(character.asset, character.rig, character.asset.clipIndex("turn90_r"));
+		// Each is used for the direction it turns, whatever its name says.
+		turnLeft = left != null && left.angle > 0.0 ? left : right != null && right.angle > 0.0 ? right : null;
+		turnRight = right != null && right.angle < 0.0 ? right : left != null && left.angle < 0.0 ? left : null;
 		this.idleClip = idle;
 		character.player.play(idle, 0.0);
 	}
@@ -81,7 +104,7 @@ class HumanWalker {
 		retreating = false;
 		var carryWalk = carryGait;
 		routeGait = carrying && carryWalk != null ? carryWalk : gait;
-		character.player.play(routeGait.clip, FADE_SECONDS);
+		character.player.play(routeGait.clip, BLEND_SECONDS);
 	}
 
 	/**
@@ -107,7 +130,10 @@ class HumanWalker {
 		continueAlong(route, metresPerSecond);
 		preserveHeading = true;
 		retreating = true;
-		character.player.play(idleClip, FADE_SECONDS);
+		// Backwards on the character's own backward walk, or else sliding in the idle pose.
+		var backWalk = backGait;
+		if (backWalk != null) routeGait = backWalk;
+		character.player.play(backWalk != null ? backWalk.clip : idleClip, BLEND_SECONDS);
 	}
 
 	/** Sets the starting floor pose before a job begins. */
@@ -132,6 +158,8 @@ class HumanWalker {
 		velocity = 0.0;
 		walking = false;
 		facing = null;
+		turnsLeft = 0;
+		turnPlaying = null;
 		preserveHeading = false;
 		retreating = false;
 		this.x = x;
@@ -141,20 +169,48 @@ class HumanWalker {
 	}
 
 	/** Turns in place at turnRate, including after a route has ended. */
-	public function face(angle:Float):Void
-		facing = wrap(angle);
+	public function face(angle:Float):Void {
+		var target = wrap(angle);
+		if (facing != null && turnsLeft > 0 && Math.abs(wrap(target - facing)) < 0.01) return;
+		facing = target;
+		planTurnClips();
+	}
+
+	/**
+	 * A turn of about a right angle or more, standing still, is taken in steps of the character's turn clip, which
+	 * steps the feet round, and what is left over (under about 45 degrees) by turning the root as before.
+	 */
+	function planTurnClips():Void {
+		turnsLeft = 0;
+		turnPlaying = null;
+		var target = facing;
+		if (walking || target == null) return;
+		var delta = wrap(target - heading);
+		var clip = delta > 0.0 ? turnLeft : turnRight;
+		if (clip == null) return;
+		var steps = Std.int(Math.min(2.0, Math.floor(Math.abs(delta) / Math.abs(clip.angle) + 0.33)));
+		if (steps < 1) return;
+		turnsLeft = steps;
+		turnSign = delta > 0.0 ? 1.0 : -1.0;
+	}
 
 	public function isTurning():Bool
-		return facing != null;
+		return facing != null || turnsLeft > 0;
+
+	/** Whether the character stands still with its walk faded out: not walking, not turning, not mid-crossfade. */
+	public function settled():Bool
+		return !walking && facing == null && turnsLeft == 0 && !character.player.fading();
 
 	/** Stops where the character stands and idles. */
 	public function stop():Void {
 		facing = null;
+		turnsLeft = 0;
+		turnPlaying = null;
 		if (!walking)
 			return;
 		walking = false;
 		velocity = 0.0;
-		character.player.play(idleClip, FADE_SECONDS);
+		character.player.play(idleClip, BLEND_SECONDS);
 	}
 
 	public function isWalking():Bool
@@ -190,6 +246,8 @@ class HumanWalker {
 				var limit = turnRate * seconds;
 				heading = wrap(heading + Math.max(-limit, Math.min(limit, turn)));
 			}
+		} else if (turnsLeft > 0) {
+			advanceTurnClip(seconds);
 		} else if (facing != null) {
 			var target = facing;
 			var turn = wrap(target - heading);
@@ -200,8 +258,32 @@ class HumanWalker {
 			} else
 				heading = wrap(heading + (turn > 0.0 ? limit : -limit));
 		}
-		character.player.speed = walking && !retreating ? velocity / routeGait.naturalSpeed : 1.0;
+		character.player.speed = walking && (!retreating || backGait != null) ? velocity / routeGait.naturalSpeed : 1.0;
 		character.advance(seconds);
+	}
+
+	/**
+	 * Plays the turn clip for one step and, when its turn is done, turns the root by the same angle while
+	 * the idle pose takes over, which is that pose turned the same way: nothing moves but the root.
+	 */
+	function advanceTurnClip(seconds:Float):Void {
+		var clip = turnSign > 0.0 ? turnLeft : turnRight;
+		if (clip == null) {
+			turnsLeft = 0;
+			return;
+		}
+		if (turnPlaying == null) {
+			turnPlaying = clip;
+			turnClock = 0.0;
+			if (character.player.currentClip() == clip.clip) character.player.restart(clip.clip, false);
+			else character.player.play(clip.clip, 0.15, false);
+		}
+		turnClock += seconds;
+		if (turnClock < clip.seconds) return;
+		heading = wrap(heading + clip.angle);
+		turnsLeft--;
+		turnPlaying = null;
+		if (turnsLeft == 0) character.player.restart(idleClip);
 	}
 
 	/** The character root: standing at the walker's position, turned to its heading. */

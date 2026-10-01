@@ -200,6 +200,8 @@ interface KinematicsSolver {
   function sampleCandidates(target:Pose3, maxCount:Int, tolerance:IkTolerance):Array<Array<Float>>;
   /** Joint velocity for a tool twist at q (least squares, damped). */
   function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>;
+  // One configuration per path sample; each solver searches its own way (K6d).
+  function solvePath(request:PathRequest):Array<Null<Array<Float>>>;
 }
 ```
 
@@ -209,8 +211,8 @@ interface KinematicsSolver {
 - `sampleCandidates` replaces any promise of "all solutions". Redundant arms
   return samples.
 - **Backends:**
-  - an adapter over RobotKit's existing damped least-squares
-    `Manipulator.solveIkForTcp` (in `motionkit.robot`), built by Lane B or §P0;
+  - an adapter over RobotKit's `KinematicGroup.solve` (in `motionkit.robot`),
+    built by Lane B or §P0;
   - OPW analytic IK, native (Lane C).
 
   Callers depend on the interface only.
@@ -322,11 +324,13 @@ this file.
 - **P0.3 — Kinematics interface.**
   - `motionkit.kinematics`: `KinematicsSolver`, `IkTolerance`, `Pose3`,
     `Twist6` per C4.
-  - `motionkit.robot.ManipulatorKinematics`: an adapter over RobotKit
-    `Manipulator` (forward via `tcpPose`, `solvePose` via `solveIkForTcp`,
+  - `motionkit.robot.ManipulatorKinematics`: an adapter over a RobotKit
+    `KinematicGroup` (forward via `tcpPose`, `solvePose` via `solve`,
     `solveDifferential` via the chain Jacobian with damped least squares, and
     `sampleCandidates` from a deterministic seeded grid of seeds, deduplicated
-    by joint distance).
+    by joint distance). Its `solvePath` follows a plain arm point by point and
+    resolves a redundant group (a 7-axis arm's swivel, a cell's external
+    axes) with `RedundancyResolver`.
   - Tests:
     - forward/solve round-trip on the existing 6R wall-finishing arm fixture;
     - deterministic candidate sampling (same inputs give identical output);

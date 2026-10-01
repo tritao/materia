@@ -3,19 +3,37 @@ package motionkit.robot;
 import kinematicskit.LinearAlgebra;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.IKResult;
+import robotkit.manipulation.IkOptions;
+import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 
-/** KinematicsSolver adapter over RobotKit's deterministic DLS manipulator. */
+/**
+ * KinematicsSolver adapter over RobotKit's deterministic DLS manipulator.
+ *
+ * A redundant arm (`Manipulator.redundant`, e.g. 7-axis) is handled through
+ * its swivel angle: `solvePose` keeps the seed's swivel as a preference, so
+ * the elbow does not drift with each solve; `sampleCandidates` sweeps the
+ * swivel around the circle on each IK branch it finds; and `solvePath`
+ * chooses the swivel (or a cell's external-axis values) along a whole path
+ * with `RedundancyResolver`.
+ */
 class ManipulatorKinematics implements KinematicsSolver {
-  public final manipulator:Manipulator;
+  /** The group solved: an arm (`Manipulator`), or an arm with external axes and a work frame. */
+  public final manipulator:KinematicGroup;
+  /**
+   * A posture the solves draw the arm towards (`q` order): with external
+   * axes, the arm stays comfortable and they bring the work to it.
+   */
+  public var preferredPosture:Null<Array<Float>> = null;
   public final differentialDamping:Float;
 
-  public function new(manipulator:Manipulator, ?differentialDamping:Float = 1e-6) {
+  public function new(manipulator:KinematicGroup, ?differentialDamping:Float = 1e-6) {
     if (manipulator == null) throw "Manipulator kinematics requires a manipulator";
     if (!Math.isFinite(differentialDamping) || differentialDamping <= 0.0)
       throw "Differential IK damping must be finite and positive";
@@ -30,9 +48,14 @@ class ManipulatorKinematics implements KinematicsSolver {
   public function solvePose(target:Pose3, seed:Array<Float>,
       tolerance:IkTolerance):Null<Array<Float>> {
     requireTolerance(tolerance);
-    var result = manipulator.solveIkForTcp(toTransform(target), seed,
-      tolerance.position, tolerance.orientation, tolerance.maxIterations,
-      tolerance.damping);
+    if (manipulator.redundant() && seed != null) {
+      var swivel = manipulator.swivelAngle(seed);
+      if (Math.isFinite(swivel)) {
+        var kept = solveAtSwivel(toTransform(target), seed, swivel, false, tolerance);
+        if (kept.converged) return kept.q.copy();
+      }
+    }
+    var result = manipulator.solve(toTransform(target), seed, options(tolerance));
     return result.converged ? result.q.copy() : null;
   }
 
@@ -49,6 +72,9 @@ class ManipulatorKinematics implements KinematicsSolver {
       if (combinationCount > 4096 / 3) { combinationCount = 4096; break; }
       combinationCount *= 3;
     }
+    // A redundant arm finds a few IK branches this way, then sweeps each around its swivel.
+    var redundant = manipulator.redundant();
+    var branchLimit = redundant ? Std.int(Math.max(1, Math.min(4, maxCount))) : maxCount;
     var attemptLimit = Math.min(combinationCount, Math.max(32, maxCount * 32));
     for (attempt in 0...Std.int(attemptLimit)) {
       var code = attempt;
@@ -68,10 +94,54 @@ class ManipulatorKinematics implements KinematicsSolver {
       if (solved == null || containsNear(candidates, solved, tolerance.candidateSeparation))
         continue;
       candidates.push(solved);
-      if (candidates.length >= maxCount) break;
+      if (candidates.length >= branchLimit) break;
+    }
+    return redundant ? sweepSwivel(target, candidates, maxCount, tolerance) : candidates;
+  }
+
+  /** Each branch solved at evenly spaced swivel angles, stepping from its own, each solve seeded by the last. */
+  function sweepSwivel(target:Pose3, branches:Array<Array<Float>>, maxCount:Int,
+      tolerance:IkTolerance):Array<Array<Float>> {
+    var candidates = branches.copy();
+    if (branches.length == 0) return candidates;
+    var steps = Std.int(Math.max(4, Math.floor(maxCount / branches.length)));
+    var goal = toTransform(target);
+    for (branch in branches) {
+      var start = manipulator.swivelAngle(branch);
+      if (!Math.isFinite(start)) continue;
+      for (direction in [1.0, -1.0]) {
+        var seed = branch;
+        for (step in 1...Std.int(steps / 2) + 1) {
+          if (candidates.length >= maxCount) return candidates;
+          var angle = start + direction * 2.0 * Math.PI * step / steps;
+          var solved = solveAtSwivel(goal, seed, angle, true, tolerance);
+          if (!solved.converged) break;
+          seed = solved.q;
+          if (!containsNear(candidates, solved.q, tolerance.candidateSeparation)) candidates.push(solved.q.copy());
+        }
+      }
     }
     return candidates;
   }
+
+  /**
+   * The path: a redundant arm (7-axis) chooses its swivel along it, a group
+   * with external axes their values, both through `RedundancyResolver`; a
+   * plain arm follows point by point, each sample seeded by the last.
+   */
+  public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
+    var parameterization = redundancy();
+    if (parameterization == null) return request.followPointByPoint(this);
+    return new RedundancyResolver(parameterization).solvePath(this, request);
+  }
+
+  /** How the group's redundancy is named, if it has any: its swivel, else its external axes. */
+  public function redundancy():Null<RedundancyParameterization> {
+    if (manipulator.redundant()) return new SwivelParameterization(manipulator);
+    for (value in manipulator.external) if (value) return new ExternalAxesParameterization(manipulator);
+    return null;
+  }
+
 
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>> {
     if (q == null || q.length != jointCount())
@@ -82,6 +152,16 @@ class ManipulatorKinematics implements KinematicsSolver {
     return LinearAlgebra.dampedStep(jacobian, 6, n, [for (joint in 0...n) joint], twist.toArray(),
       differentialDamping);
   }
+
+  function options(tolerance:IkTolerance):IkOptions {
+    var result = new IkOptions(tolerance.position, tolerance.orientation, tolerance.maxIterations, tolerance.damping);
+    var posture = preferredPosture;
+    if (posture != null) result.preferring(posture);
+    return result;
+  }
+
+  function solveAtSwivel(goal:Transform3, seed:Array<Float>, angle:Float, exact:Bool, tolerance:IkTolerance):IKResult
+    return manipulator.solve(goal, seed, options(tolerance).atSwivel(angle, exact));
 
   static function requireTolerance(tolerance:IkTolerance):Void {
     if (tolerance == null) throw "IK tolerance is required";
