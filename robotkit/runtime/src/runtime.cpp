@@ -539,6 +539,12 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         control_.trajectory = std::move(candidate);
         control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
+        // A plan takes over every joint, as a trajectory chunk does: targets
+        // set before it must not come back when it ends, or the robot would
+        // return to where it stood before the plan.
+        std::fill_n(control_.active, RK_MAX_JOINTS, false);
+        std::fill_n(control_.reference_initialized, RK_MAX_JOINTS, false);
+        std::fill_n(control_.velocity_expiry_ns, RK_MAX_JOINTS, uint64_t{0});
         std::fill_n(velocity_anchor_pending_, blueprint_.joint_count, false);
         control_.plan_just_submitted = was_idle;
         if (was_idle) control_.trajectory_time_ns = 0;
@@ -603,6 +609,7 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     out_snapshot.queue_end_time_ns = state_.queue_end_time_ns;
     out_snapshot.sensor_count = state_.sensor_count;
     std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
+    std::copy_n(commanded_position_, state_.joint_count, out_snapshot.setpoint_position);
     return RK_OK;
 }
 
@@ -670,10 +677,15 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         std::lock_guard queue_lock(queue_mutex_);
         commands.swap(commands_);
     }
+    bool device_running = false;
+    uint64_t device_path_time_ns = 0;
     {
         std::lock_guard state_lock(state_mutex_);
         state_backup_ = state_;
         state_backup_valid_ = true;
+        // A device that executes the queue reports its own path clock.
+        device_running = endpoint_->executes_trajectory_queue() && state_.trajectory_active != 0;
+        device_path_time_ns = state_.trajectory_time_ns;
     }
     control_backup_ = control_;
     std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
@@ -698,7 +710,17 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             control_.plan_just_submitted = false;
         } else if (!control_.stop_ramp_active && !control_.hold_requested &&
                    !control_.resume_requested) {
-            time_ns += static_cast<double>(period_ns);
+            // The runtime's copy of a device's queue follows the device: it
+            // starts the queue after a link and clock delay, so a copy that
+            // ran on the owner clock alone would retire knots the device has
+            // not executed (and take an append for a new plan). The device
+            // reports its queue running from submission (path time 0 until it
+            // starts); once it has finished, or failed, the copy runs out on
+            // the owner clock.
+            if (device_running)
+                time_ns = std::max(time_ns, static_cast<double>(device_path_time_ns));
+            else
+                time_ns += static_cast<double>(period_ns);
         } else if (control_.stop_ramp_active || control_.hold_requested) {
             // Path-following stop. A joint moves at rate * v and accelerates
             // at rate' * v + rate^2 * a, where v and a belong to the queued
@@ -1193,9 +1215,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         return RK_ERROR_LIMIT;
                     }
                 }
+                if (control_.diagnostic_code == RK_FAULT_COMMAND_EXPIRED)
+                    control_.diagnostic_code = 0;
                 for (uint32_t target_index = 0; target_index < value.target_count; ++target_index) {
                     const auto &target = value.targets[target_index];
                     const auto joint = target.joint;
+                    control_.velocity_expiry_ns[joint] =
+                        target.mode == RK_TARGET_VELOCITY ? value.expires_at_ns : 0;
                     if (target.mode == RK_TARGET_POSITION &&
                         (!control_.active[joint] || control_.targets[joint].mode != RK_TARGET_POSITION)) {
                         control_.position_reference[joint] = current.position[joint];
@@ -1441,6 +1467,26 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             auto target = control_.targets[joint];
             if (target.mode == RK_TARGET_VELOCITY && target.max_rate > 0.0)
                 target.target = std::clamp(target.target, -target.max_rate, target.max_rate);
+            const uint64_t expiry = control_.velocity_expiry_ns[joint];
+            // Deadlines are on the source clock, so they are checked against
+            // the latest sample: the clock the host reads its deadline from.
+            if (target.mode == RK_TARGET_VELOCITY && expiry != 0 &&
+                current.source_timestamp_ns >= expiry) {
+                // A lapsed velocity target: brake to zero within the joint's
+                // acceleration limit, then hold an exact zero.
+                const double acceleration = blueprint_.joints[joint].max_acceleration;
+                const double step = acceleration > 0.0 && std::isfinite(period_seconds)
+                    ? acceleration * period_seconds : std::numeric_limits<double>::infinity();
+                const double speed = std::max(0.0, std::abs(target.target) - step);
+                target.target = std::copysign(speed, target.target);
+                control_.targets[joint].target = target.target;
+                if (speed == 0.0) {
+                    control_.targets[joint].target = 0.0;
+                    target.target = 0.0;
+                    control_.velocity_expiry_ns[joint] = 0;
+                }
+                control_.diagnostic_code = RK_FAULT_COMMAND_EXPIRED;
+            }
             if (target.mode == RK_TARGET_POSITION) {
                 if (!control_.reference_initialized[joint]) {
                     control_.position_reference[joint] = current.position[joint];
@@ -1500,20 +1546,25 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     }
     refresh_trajectory_progress();
     std::lock_guard state_lock(state_mutex_);
-    state_.trajectory_queue_depth = queued_knot_count(control_.trajectory);
-    state_.trajectory_active = control_.trajectory_active ? 1u : 0u;
-    state_.trajectory_time_ns = control_.trajectory_active ? control_.trajectory_time_ns : 0;
-    state_.trajectory_duration_ns = control_.trajectory_active && !control_.trajectory.empty()
-        ? control_.trajectory.back().point.time_from_start_ns : 0;
-    state_.trajectory_tag = control_.trajectory_tag;
-    state_.trajectory_tag_time_ns = control_.trajectory_tag_time_ns;
-    state_.queue_end_time_ns = state_.trajectory_duration_ns;
-    state_.active_plan_id = control_.trajectory_active ? control_.active_plan_id : 0;
-    const uint64_t lead = blueprint_.commit_lead_ns != 0 ? blueprint_.commit_lead_ns :
-        static_cast<uint64_t>(std::max<int64_t>(0, period_.count())) * 2;
-    state_.committed_until_ns = control_.trajectory_active
-        ? (control_.trajectory_time_ns > UINT64_MAX - lead ? UINT64_MAX :
-            control_.trajectory_time_ns + lead) : 0;
+    // A device that executes the queue reports its own progress in every
+    // sample; the runtime's copy must not stand in for it between samples
+    // (a missed sample would publish the copy's view of the device's queue).
+    if (!endpoint_->executes_trajectory_queue()) {
+        state_.trajectory_queue_depth = queued_knot_count(control_.trajectory);
+        state_.trajectory_active = control_.trajectory_active ? 1u : 0u;
+        state_.trajectory_time_ns = control_.trajectory_active ? control_.trajectory_time_ns : 0;
+        state_.trajectory_duration_ns = control_.trajectory_active && !control_.trajectory.empty()
+            ? control_.trajectory.back().point.time_from_start_ns : 0;
+        state_.trajectory_tag = control_.trajectory_tag;
+        state_.trajectory_tag_time_ns = control_.trajectory_tag_time_ns;
+        state_.queue_end_time_ns = state_.trajectory_duration_ns;
+        state_.active_plan_id = control_.trajectory_active ? control_.active_plan_id : 0;
+        const uint64_t lead = blueprint_.commit_lead_ns != 0 ? blueprint_.commit_lead_ns :
+            static_cast<uint64_t>(std::max<int64_t>(0, period_.count())) * 2;
+        state_.committed_until_ns = control_.trajectory_active
+            ? (control_.trajectory_time_ns > UINT64_MAX - lead ? UINT64_MAX :
+                control_.trajectory_time_ns + lead) : 0;
+    }
     if (lifecycle_command && final_kind == RK_COMMAND_EMERGENCY_STOP) {
         state_.mode = RK_ROBOT_MODE_FAULT;
         state_.safety = RK_SAFETY_EMERGENCY_STOP;
@@ -1623,10 +1674,13 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         offsetof(rk_robot_runtime_blueprint, observed_limit_tolerance) +
             sizeof(blueprint_.observed_limit_tolerance)
         ? blueprint_.observed_limit_tolerance : 0.0;
+    const double precision = endpoint_->observed_position_precision();
     for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
         const auto &limits = blueprint_.joints[joint];
-        if (next.position[joint] < limits.lower_limit - tolerance ||
-            next.position[joint] > limits.upper_limit + tolerance) {
+        if (next.position[joint] < limits.lower_limit - tolerance -
+                precision * std::max(1.0, std::abs(limits.lower_limit)) ||
+            next.position[joint] > limits.upper_limit + tolerance +
+                precision * std::max(1.0, std::abs(limits.upper_limit))) {
             latch_fault();
             return RK_ERROR_LIMIT;
         }

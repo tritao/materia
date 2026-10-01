@@ -149,7 +149,7 @@ void Instance::replaceJointRotations(uint32_t source, const std::vector<JointRot
     for (const JointRotation &turn : turns) setJointRotation(turn);
 }
 
-bool Instance::evaluate() {
+bool Instance::evaluate(bool skin) {
     const auto &skeleton = *asset_->skeleton;
     ozz::animation::BlendingJob::Layer blend_layers[kMaxLayers];
     int active = 0;
@@ -215,7 +215,8 @@ bool Instance::evaluate() {
     if (!local_to_model.Run()) return false;
     if (!solveIk()) valid = false;
     for (size_t joint = 0; joint < models_.size(); ++joint) scene_models_[joint] = toMatrix(import_ * models_[joint]);
-    for (size_t primitive = 0; primitive < outputs_.size(); ++primitive) skinPrimitive(primitive);
+    if (skin)
+        for (size_t primitive = 0; primitive < outputs_.size(); ++primitive) skinPrimitive(primitive);
     return valid;
 }
 

@@ -54,3 +54,16 @@ else()
     target_compile_options(kinematicskit_core PRIVATE -Wall -Wextra -ffp-contract=off)
 endif()
 add_library(kinematicskit::core ALIAS kinematicskit_core)
+
+# coal (collision and distance; see THIRD_PARTY.md) is vendored for the
+# collision work. Until the C ABI uses it, only a standalone build compiles
+# it, with a smoke test, so the vendored build keeps working.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/coal/materia/CMakeLists.txt")
+        message(FATAL_ERROR "Initialize kinematicskit/native/vendor/coal submodule")
+    endif()
+    add_subdirectory(vendor/coal/materia coal)
+    add_executable(kk_coal_smoke tests/cpp/coal_smoke.cpp)
+    target_link_libraries(kk_coal_smoke PRIVATE coal::core)
+    add_test(NAME kk_coal_smoke COMMAND kk_coal_smoke)
+endif()

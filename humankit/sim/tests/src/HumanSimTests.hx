@@ -37,6 +37,7 @@ class HumanSimTests {
         PacedStepTests.run();
         WorkerResetTests.run();
         PlaceWithdrawTests.run();
+        UniversalSweepTests.run();
         TorsoClearanceTests.run();
         MotionQualityTests.run();
         ScenarioSweepTests.run();

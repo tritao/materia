@@ -63,6 +63,28 @@ class RigMapping {
 		return mapping;
 	}
 
+	/** Quaternius's Universal Animation Library character, whose joints are Blender "DEF-" deformation bones. */
+	public static function universal():RigMapping {
+		var joints:Map<String, String> = [
+			HumanBone.Pelvis => "DEF-hips", HumanBone.Spine => "DEF-spine.001", HumanBone.Spine2 => "DEF-spine.002",
+			HumanBone.Chest => "DEF-spine.003", HumanBone.Neck => "DEF-neck", HumanBone.Head => "DEF-head"
+		];
+		for (side in ["L", "R"]) {
+			joints.set('shoulder.$side', 'DEF-shoulder.$side');
+			joints.set('upper_arm.$side', 'DEF-upper_arm.$side');
+			joints.set('forearm.$side', 'DEF-forearm.$side');
+			joints.set('hand.$side', 'DEF-hand.$side');
+			joints.set('index1.$side', 'DEF-f_index.01.$side');
+			joints.set('middle1.$side', 'DEF-f_middle.01.$side');
+			joints.set('pinky1.$side', 'DEF-f_pinky.01.$side');
+			joints.set('thigh.$side', 'DEF-thigh.$side');
+			joints.set('shin.$side', 'DEF-shin.$side');
+			joints.set('foot.$side', 'DEF-foot.$side');
+			joints.set('toe.$side', 'DEF-toe.$side');
+		}
+		return new RigMapping("universal", joints);
+	}
+
 	/** Mixamo exports, with or without the "mixamorig:" namespace. */
 	public static function mixamo():RigMapping {
 		var joints:Map<String, String> = [
@@ -88,7 +110,7 @@ class RigMapping {
 	}
 
 	public static function presets():Array<RigMapping>
-		return [quaternius(), mixamo()];
+		return [quaternius(), mixamo(), universal()];
 
 	/** Drops a namespace prefix such as "mixamorig:". */
 	public static function localName(joint:String):String

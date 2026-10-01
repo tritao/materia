@@ -11,6 +11,7 @@ class ScenarioSweepTests {
 
     public static function run():Void {
         var worstClearance = Math.POSITIVE_INFINITY, worstTurn = 0.0, worstSpeed = 0.0, worstAccel = 0.0, runs = 0;
+        var skate = 0.0, margin = Math.POSITIVE_INFINITY, pelvisJerk = 0.0, wristJerk = 0.0;
         var failures:Array<String> = [];
         for (hand in hands) for (surface in surfaces) for (yaw in yaws) {
             var label = 'hand=$hand surface=$surface yaw=$yaw';
@@ -36,9 +37,14 @@ class ScenarioSweepTests {
             worstSpeed = Math.max(worstSpeed, worst.speed);
             worstAccel = Math.max(worstAccel, worst.accel);
             worstClearance = Math.min(worstClearance, gate.clearance);
+            skate = Math.max(skate, gate.naturalness.maxSlide);
+            margin = Math.min(margin, gate.naturalness.minSupportMargin);
+            pelvisJerk = Math.max(pelvisJerk, gate.naturalness.maxPelvisJerk);
+            wristJerk = Math.max(wristJerk, gate.naturalness.maxWristJerk);
             runs++;
         }
         if (failures.length > 0) throw "Scenario sweep failures:\n" + failures.join("\n");
+        Sys.println('scenario sweep naturalness (worst of $runs): slide ${r(skate)} m, support margin ${r(margin)} m, jerk pelvis ${Math.round(pelvisJerk)} wrist ${Math.round(wristJerk)} m/s3');
         Sys.println('scenario sweep: $runs layouts, worst belly clearance ${r(worstClearance)} m, plane turn ${r(worstTurn)} rad/s, hand ${r(worstSpeed)} m/s ${r(worstAccel)} m/s2');
     }
 

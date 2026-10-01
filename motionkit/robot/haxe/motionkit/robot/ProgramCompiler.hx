@@ -8,8 +8,8 @@ import motionkit.event.TimedEvent;
 import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
-import motionkit.robot.OpwKinematics;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.CornerBlender;
 import motionkit.path.ArcSegment;
@@ -30,7 +30,6 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import motionkit.robot.OpwKinematics;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
@@ -128,23 +127,8 @@ class ProgramCompiler {
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
     if (configurationSelector != null && configurationSelector.solver != solver)
       throw "Program compiler selector must use its kinematics solver";
-    if (configurationSelector != null) {
-      this.configurationSelector = configurationSelector;
-    // Haxeon currently misidentifies an OPW object through this interface as
-    // KinematicsSolver when Std.isOfType checks its concrete class.
-    } else if (Reflect.field(solver, "nativePathSample") != null) {
-      var arm:OpwKinematics = cast solver;
-      var lower:Array<Float> = [], upper:Array<Float> = [];
-      for (joint in 0...count) {
-        var bounds = arm.manipulator.group.limitsOf(joint);
-        lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
-        upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
-      }
-      this.configurationSelector = new PathConfigurationSelector(solver,
-        lower, upper, this.perJointMaxJump, maxVelocity);
-    } else {
-      this.configurationSelector = null;
-    }
+    // An explicit selector forces the generic sampled search; otherwise each solver searches its own way.
+    this.configurationSelector = configurationSelector;
   }
 
   public function compile(program:MotionProgram, initialQ:Array<Float>,
@@ -343,8 +327,8 @@ class ProgramCompiler {
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), startTolerances.position, startTolerances.velocity,
         startTolerances.acceleration, pending.events);
-      if (pending.path != null) checkTaskSpace(plan, pending.path, pending.distances,
-        pending.times, pending.opIndex, pending.authoredPolyline,
+      if (pending.path != null) checkTaskSpace(plan, pending.path, pending.checkDistances,
+        pending.checkTimes, pending.opIndex, pending.authoredPolyline,
         pending.blendTolerance, pending.taskSampleDistances);
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
@@ -445,13 +429,15 @@ class ProgramCompiler {
       distances.push(distance);
       pathPoses.push(path.waypointAt(distance).pose);
     }
-    var selected = configurationSelector == null ? null :
-      configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance);
+    var selected:Array<Null<Array<Float>>> = [];
+    if (configurationSelector != null)
+      for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
+    else
+      selected = solver.solvePath(new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity,
+        48));
     for (sample in 0...(count + 1)) {
       var distance = distances[sample];
-      var desired = pathPoses[sample];
-      var solved = selected != null ? selected[sample] :
-        (sample == 0 ? startQ.copy() : solver.solvePose(desired, previous, ikTolerance));
+      var solved = selected[sample];
       if (solved == null || solved.length != startQ.length)
         throw 'Motion program op $index unreachable pose at path distance $distance';
       checkJointPosition(solved, index, distance);
@@ -487,6 +473,13 @@ class ProgramCompiler {
           event.value, event.holdPolicy));
       }
       var timeMap = [for (distance in distances) timed.distanceToTime(distance)];
+      // The task-space check inspects the path between samples too. Time the inspected distances exactly:
+      // interpolating between sample times is wrong where the path speed changes fast, e.g. braking to rest
+      // over the last sample interval, where distance goes with the square of time.
+      var checkSamples = authoredPolyline == null ? distances.length * 2 - 1 :
+        Std.int(Math.max(distances.length * 2 - 1, Math.ceil(path.length() / (blendTolerance / 8.0)) + 1));
+      var checkDistances = [for (sample in 0...checkSamples) path.length() * sample / (checkSamples - 1)];
+      var checkTimes = [for (distance in checkDistances) timed.distanceToTime(distance)];
       var timeSteps = Std.int(Math.max(1,
         Math.ceil(timed.trajectory.durationSeconds() / 0.001)));
       var taskSampleDistances:Array<Float> = [];
@@ -520,7 +513,7 @@ class ProgramCompiler {
       timed.releaseDistanceMap();
       return new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
         path, distances, timeMap, authoredPolyline, blendTolerance,
-        taskSampleDistances);
+        taskSampleDistances, checkDistances, checkTimes);
     } catch (error:Dynamic) {
       timed.releaseDistanceMap();
       timed.trajectory.dispose();
@@ -528,17 +521,15 @@ class ProgramCompiler {
     }
   }
 
+  /** `checkDistances` along the path, each at its exact `checkTimes`, then the trajectory clock at 1 ms. */
   function checkTaskSpace(plan:ExecutionPlan, path:PosePath,
-      distances:Array<Float>, times:Array<Float>, index:Int,
+      checkDistances:Array<Float>, checkTimes:Array<Float>, index:Int,
       authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float,
       taskSampleDistances:Array<Float>):Void {
     var worst = 0.0, worstTime = 0.0;
     var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
       positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
     var failure:Null<String> = null;
-    var samples = authoredPolyline == null ? distances.length * 2 - 1 :
-      Std.int(Math.max(distances.length * 2 - 1,
-        Math.ceil(path.length() / (blendTolerance / 8.0)) + 1));
     function inspect(distance:Float, time:Float):Void {
       var desired = path.waypointAt(distance);
       var actual = solver.forward(plan.evaluate(time).positions);
@@ -558,15 +549,7 @@ class ProgramCompiler {
           angle > desired.orientationTolerance + 1e-9)
         failure = 'Motion program op $index task-space tolerance exceeded at path distance $distance (position $error / $allowed, orientation $angle / ${desired.orientationTolerance})';
     }
-    for (sample in 0...samples) {
-      var distance = path.length() * sample / (samples - 1);
-      var left = 0;
-      while (left + 1 < distances.length - 1 && distances[left + 1] < distance)
-        left++;
-      var fraction = (distance - distances[left]) /
-        (distances[left + 1] - distances[left]);
-      inspect(distance, times[left] + fraction * (times[left + 1] - times[left]));
-    }
+    for (sample in 0...checkDistances.length) inspect(checkDistances[sample], checkTimes[sample]);
     // Cover the trajectory clock as well as the authored path geometry.
     var timeSteps = taskSampleDistances.length - 1;
     for (sample in 0...(timeSteps + 1)) {
@@ -692,6 +675,9 @@ private class PendingMotion {
   public final distances:Array<Float>;
   public final times:Array<Float>;
   public final taskSampleDistances:Array<Float>;
+  /** Path distances the task-space check inspects, and their exact times. */
+  public final checkDistances:Array<Float>;
+  public final checkTimes:Array<Float>;
   public final authoredPolyline:Null<Array<Pose3>>;
   public final blendTolerance:Float;
 
@@ -699,13 +685,15 @@ private class PendingMotion {
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,
       distances:Null<Array<Float>>, ?times:Array<Float>,
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
-      ?taskSampleDistances:Array<Float>) {
+      ?taskSampleDistances:Array<Float>, ?checkDistances:Array<Float>, ?checkTimes:Array<Float>) {
     this.opIndex = opIndex; this.startQ = startQ.copy(); this.endQ = endQ.copy();
     this.trajectory = trajectory; this.events = events;
     this.path = path;
     this.distances = distances == null ? [] : distances;
     this.times = times == null ? [] : times;
     this.taskSampleDistances = taskSampleDistances == null ? [] : taskSampleDistances;
+    this.checkDistances = checkDistances == null ? [] : checkDistances;
+    this.checkTimes = checkTimes == null ? [] : checkTimes;
     this.authoredPolyline = authoredPolyline == null ? null : authoredPolyline.copy();
     this.blendTolerance = blendTolerance;
   }

@@ -1,5 +1,6 @@
 package tests;
 
+import robotkit.manipulation.IkOptions;
 import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
@@ -107,7 +108,7 @@ class KinematicsTests {
       // from its last known joint state; a fixed cold-start seed can land in a
       // different (still valid) solution branch of this redundant-looking wrist.
       var seed = [for (i in 0...6) qTrue[i] + (rng.next() - 0.5) * 0.2];
-      var result = fixture.arm.solveIk(target, seed, 1e-4, 1e-3, 100, 0.02);
+      var result = fixture.arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 100, 0.02).flange());
       check(result.converged, 'IK converges for seeded reachable target $trial');
       check(result.positionError < 1e-4, 'IK position error is within tolerance for target $trial');
       check(result.orientationError < 1e-3, 'IK orientation error is within tolerance for target $trial');
@@ -124,7 +125,7 @@ class KinematicsTests {
     var group = fixture.arm.group;
     var unreachable = new Transform3(new Vec3(100.0, 100.0, 100.0), Quat.identity());
     var seed = [for (_ in 0...6) 0.0];
-    var result = fixture.arm.solveIk(unreachable, seed, 1e-4, 1e-3, 25, 0.02);
+    var result = fixture.arm.solve(unreachable, seed, new IkOptions(1e-4, 1e-3, 25, 0.02).flange());
     check(!result.converged, "IK reports non-convergence for an unreachable target instead of throwing");
     check(result.iterations == 25, "IK non-convergence result reports the iteration budget it used");
     check(result.q.length == 6, "IK non-convergence result still returns a full joint vector");
@@ -197,7 +198,7 @@ class KinematicsTests {
     check(approx(pose.translation.x, 0.5 * Math.cos(a1) + 0.5 * Math.cos(a2) + 0.5 * Math.cos(a3), 1e-12) &&
       approx(pose.translation.y, 0.5 * Math.sin(a1) + 0.5 * Math.sin(a2) + 0.5 * Math.sin(a3), 1e-12),
       "the follower turns by -0.5 x its leader in the arm's FK");
-    var result = arm.solveIk(pose, [0.1, 0.5], 1e-9, 1e-9, 200, 0.01);
+    var result = arm.solve(pose, [0.1, 0.5], new IkOptions(1e-9, 1e-9, 200, 0.01).flange());
     check(result.converged && approx(result.q[1], 0.8, 1e-6), "IK through the coupling recovers the leader angle");
     check(arm.toJointTargets(q).length == 2, "joint targets go to the leaders; the runtime moves followers");
   }
@@ -209,7 +210,7 @@ class KinematicsTests {
     var seed = [0.3, -0.8, 1.1, -0.5, 0.4, 0.2];
     var target = new Transform3(new Vec3(2.0, 0.9, 0.35), Quat.fromAxisAngle(new Vec3(0.0, 1.0, 0.0), Math.PI * 0.5));
     check(arm.baseMotion() == RootMotion.Fixed, "a robot without base flags has a fixed base");
-    var fixed = arm.solveIkWithBase(target, seed, Transform3.identity());
+    var fixed = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
     var fixedBase:Null<Transform3> = fixed.rootPose;
     check(!fixed.converged && fixedBase != null && (cast fixedBase:Transform3).translation.norm() == 0.0,
       "from a fixed base the far target is out of reach and the base stays put");
@@ -217,7 +218,7 @@ class KinematicsTests {
     fixture.model.mobileBase = new RobotMobileConfiguration(RobotDriveConfiguration.Differential("left", "right", 0.1, 0.5),
       1.0, 1.0);
     check(arm.baseMotion() == RootMotion.Planar, "a mobile-base robot moves on the floor");
-    var driven = arm.solveIkWithBase(target, seed, Transform3.identity());
+    var driven = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
     check(driven.converged && driven.rootPose != null, 'a mobile base drives so the arm reaches (${driven.status})');
     var base:Transform3 = cast driven.rootPose;
     check(Math.abs(base.translation.z) < 1e-12 && Math.abs(base.rotation.x) < 1e-12 && Math.abs(base.rotation.y) < 1e-12,
@@ -229,7 +230,7 @@ class KinematicsTests {
     fixture.model.mobileBase = null;
     fixture.model.floatingBase = true;
     check(arm.baseMotion() == RootMotion.Floating, "a floating-base robot moves freely");
-    var floating = arm.solveIkWithBase(target, seed, Transform3.identity());
+    var floating = arm.solve(target, seed, new IkOptions(1e-4, 1e-3, 200).movingBase(Transform3.identity()));
     var floatingBase = floating.rootPose;
     check(floating.converged && floatingBase != null &&
       floatingBase.compose(arm.tcpPose(floating.q)).translation.sub(target.translation).norm() < 1e-4,

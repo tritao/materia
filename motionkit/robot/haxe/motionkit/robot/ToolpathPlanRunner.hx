@@ -1,5 +1,6 @@
 package motionkit.robot;
 
+import robotkit.manipulation.IkOptions;
 import haxe.Int64;
 import motionkit.MotionOptions;
 import motionkit.kinematics.IkTolerance;
@@ -80,8 +81,7 @@ class ToolpathPlanRunner implements robotkit.skill.ToolpathPlanRunner {
     processSpans = [];
     for (index in 0...toolpath.points.length) {
       var point = toolpath.points[index];
-      var ik = manipulator.solveIkForTcp(point.work_T_tcp, previous,
-        positionTolerance, orientationTolerance, ikMaxIterations, ikDamping);
+      var ik = manipulator.solve(point.work_T_tcp, previous, new IkOptions(positionTolerance, orientationTolerance, ikMaxIterations, ikDamping));
       if (!ik.converged) throw "Toolpath waypoint is unreachable";
       var jump = 0.0;
       for (joint in 0...previous.length)

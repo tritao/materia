@@ -68,6 +68,15 @@ public:
     /** Returns true when sample() supplies the endpoint's observed safety state. */
     virtual bool reports_safety_state() const noexcept { return false; }
 
+    /**
+     * Relative precision of the positions sample() reports: 0 for full double
+     * precision, the float epsilon for a link that carries 32-bit floats. A
+     * joint resting exactly on a limit may read that far past it, so the
+     * runtime's observed-limit check allows it on top of the blueprint's
+     * tolerance.
+     */
+    virtual double observed_position_precision() const noexcept { return 0.0; }
+
     /** Initial endpoint safety state, used before the first state sample. */
     virtual rk_safety_state initial_safety_state() const noexcept { return RK_SAFETY_READY; }
 
@@ -202,6 +211,8 @@ private:
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
+        /** Source-clock time a velocity target lapses (0: never); see rk_robot_command.expires_at_ns. */
+        uint64_t velocity_expiry_ns[RK_MAX_JOINTS]{};
         std::deque<RuntimeTrajectoryPoint> trajectory;
         std::deque<QueuedEvent> events;
         rk_event_value channel_values[RK_MAX_PROCESS_CHANNELS]{};

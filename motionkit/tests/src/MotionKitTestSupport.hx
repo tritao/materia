@@ -135,6 +135,70 @@ class MotionKitTestSupport {
       arm: new Manipulator(model, links[0].id, flange.id)};
   }
 
+  /** A 7-axis arm with alternating Z/Y axes (the layout of common collaborative arms), limits ±2.9 rad. */
+  public function buildSevenAxisArmFixture():{model:RobotModel, arm:Manipulator} {
+    var model = new RobotModel("motionkit-seven-axis-arm");
+    var links = [for (i in 0...8) model.addLink(new Link(i == 0 ? "base" : 'link-$i'))];
+    var offsets = [0.0, 0.34, 0.0, 0.4, 0.0, 0.4, 0.0];
+    for (joint in 0...7) {
+      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
+      value.parentFramePosition = [0.0, 0.0, offsets[joint]];
+      value.axis = joint % 2 == 0 ? [0.0, 0.0, 1.0] : [0.0, 1.0, 0.0];
+      value.limits.lower = -2.9;
+      value.limits.upper = 2.9;
+      value.limits.velocity = 2.0;
+      value.limits.maxAcceleration = 4.0;
+    }
+    var flange = model.addFrame(new Frame("flange", links[7]));
+    flange.position = [0.0, 0.0, 0.126];
+    return {model: model, arm: new Manipulator(model, links[0].id, flange.id)};
+  }
+
+  /**
+   * A workcell: the contract 6-axis arm (joints ±π) on a 2 m rail along X,
+   * and a turntable positioner beside it carrying the workpiece ("work"
+   * frame), placed so the arm cannot reach round its far side.
+   * Joints in model order: rail, the arm's six, the turntable.
+   */
+  public function buildWorkcellFixture():{model:RobotModel, group:robotkit.manipulation.KinematicGroup} {
+    var model = new RobotModel("motionkit-workcell");
+    var floor = model.addLink(new Link("floor"));
+    var carriage = model.addLink(new Link("carriage"));
+    var rail = model.addJoint(new Joint("rail", JointType.Prismatic, floor, carriage));
+    rail.axis = [1.0, 0.0, 0.0];
+    rail.limits.lower = 0.0;
+    rail.limits.upper = 2.0;
+    var links = [carriage].concat([for (name in ["shoulder", "upper-arm", "forearm", "wrist-1", "wrist-2", "wrist-3"])
+      model.addLink(new Link(name))]);
+    var offsets = [[0.0, 0.0, 0.089159], [0.0, 0.13585, 0.0], [0.0, -0.1197, 0.425], [0.0, 0.0, 0.39225],
+      [0.0, 0.10915, 0.0], [0.0, 0.0, 0.09465]];
+    var axes = [[0.0, 0.0, 1.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]];
+    for (joint in 0...6) {
+      var value = model.addJoint(new Joint('joint-$joint', JointType.Revolute, links[joint], links[joint + 1]));
+      value.parentFramePosition = offsets[joint];
+      value.axis = axes[joint];
+      value.limits.lower = -Math.PI;
+      value.limits.upper = Math.PI;
+    }
+    var flange = model.addFrame(new Frame("flange", links[6]));
+    flange.position = [0.0, 0.0823, 0.0];
+    var table = model.addLink(new Link("table"));
+    var turntable = model.addJoint(new Joint("turntable", JointType.Revolute, floor, table));
+    // Two turns either way: a positioner turns the workpiece round and round.
+    turntable.parentFramePosition = [0.75, 0.75, 0.1];
+    turntable.axis = [0.0, 0.0, 1.0];
+    turntable.limits.lower = -4.0 * Math.PI;
+    turntable.limits.upper = 4.0 * Math.PI;
+    var work = model.addFrame(new Frame("work", table));
+    work.position = [0.0, 0.0, 0.05];
+    for (joint in model.joints) {
+      joint.limits.velocity = 1.0;
+      joint.limits.maxAcceleration = 2.0;
+    }
+    return {model: model, group: new robotkit.manipulation.KinematicGroup(model, floor.id, flange.id, work.id,
+      null, null, [rail.id])};
+  }
+
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
     var x = to.qw * -from.qx + to.qx * from.qw + to.qy * -from.qz - to.qz * -from.qy;
     var y = to.qw * -from.qy - to.qx * -from.qz + to.qy * from.qw + to.qz * -from.qx;
@@ -363,6 +427,8 @@ class WristBranchSolver implements KinematicsSolver {
   public function sampleCandidates(target:Pose3, maxCount:Int,
       tolerance:IkTolerance):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
+  public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
+    return request.followPointByPoint(this);
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
     return [for (_ in 0...6) 0.0];
 }
@@ -380,6 +446,8 @@ class PlanarSolver implements KinematicsSolver {
   public function sampleCandidates(target:Pose3, maxCount:Int,
       tolerance:IkTolerance):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
+  public function solvePath(request:motionkit.kinematics.PathRequest):Array<Null<Array<Float>>>
+    return request.followPointByPoint(this);
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
     return [twist.linearX, twist.linearY, 0.0, 0.0, 0.0, 0.0];
 }
@@ -407,7 +475,7 @@ class SessionTransitionRobot implements Robot {
       value.trajectoryQueueDepth, value.trajectoryActive, value.trajectoryTimeNs,
       value.trajectoryDurationNs, value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId, value.committedUntilNs,
-      value.queueEndTimeNs);
+      value.queueEndTimeNs, value.setpointPositions.toArray());
   }
   public function sensors():Array<SensorFrame> return inner.sensors();
   public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent>
@@ -585,7 +653,8 @@ class FaultingArmRobot extends SimulatedRobot {
       value.trajectoryQueueDepth, value.trajectoryActive,
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs, value.sessionState,
-      value.activePlanId, value.committedUntilNs, value.queueEndTimeNs);
+      value.activePlanId, value.committedUntilNs, value.queueEndTimeNs,
+      value.setpointPositions.toArray());
   }
 }
 

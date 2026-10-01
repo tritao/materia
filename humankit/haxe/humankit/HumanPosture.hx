@@ -23,6 +23,13 @@ class HumanPosture {
 	 */
 	public var stretch:Float = 0.91;
 
+	/**
+	 * Reach held back from the stretch when a stance is planned, in metres: the shoulder is measured at one moment
+	 * and the grasp point is not exactly the planned one, so a stance planned to the stretch would sometimes be a
+	 * little past what the arm can reach.
+	 */
+	public var reachSlack:Float = 0.03;
+
 	/** With two hands on one object, how far each hand's grasp point sits to its own side of the object's centre, in metres. */
 	public var handSpread:Float = 0.08;
 
@@ -70,6 +77,15 @@ class HumanPosture {
 	 * and the IK blend is not linear in position, so its real peak is about twice this.
 	 */
 	public var blendSpeed:Float = 1.0;
+
+	// Crouching.
+
+	/** How fast the body lowers into a crouch and rises out of it, in full crouches per second. */
+	public var crouchRate:Float = 0.8;
+	/** How many depths between standing and the full crouch the planner tries, counting both. */
+	public var crouchLevels:Int = 11;
+	/** The lean a worker will put up with before it bends its knees instead, in radians. */
+	public var comfortLean:Float = 0.5;
 
 	// Withdrawing from a placed part.
 
