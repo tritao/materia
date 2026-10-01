@@ -652,3 +652,15 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   evaluation are arguments, rows go through a `SketchRowWriter`, buffers
   belong to the part solver. Same tests pass unchanged; benchmark within
   noise (bracket edit 0.9 ms; connected 1000-point drag 12.3 ms undiagnosed).
+
+### Item 5a: prismatic closures hold their twist (2026-10-01)
+
+- Correction to C3.5's note: the MuJoCo backend already models a prismatic
+  closure exactly (an auxiliary body with a slide joint, welded to the
+  child), so it was the kinematic solver that disagreed. `ClosureTask`
+  Prismatic gains a fifth row, the relative rotation's component along the
+  axis (dφ·a ≈ a·(ω_B − ω_A) near closure); `AssemblyState` checks a
+  prismatic closure's full relative rotation, as for fixed.
+- `ClosureKindsSmoke`: the slider guide as a prismatic closure shows
+  `redundant(guide)-3` (its twist row is zero in a plane) and its rows match
+  central differences.

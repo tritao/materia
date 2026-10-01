@@ -5,7 +5,10 @@ package kinematicskit;
  * tolerance, so a residual of 1 is "exactly at tolerance"):
  * - Fixed: `pB − pA` (3) and the rotation vector of `A⁻¹B` in A (3);
  * - Revolute: `pB − pA` (3) and B's axis in the plane perpendicular to A's (2);
- * - Prismatic: `pB − pA` across A's axis (2) and the axis rows (2).
+ * - Prismatic: `pB − pA` across A's axis (2), the axis rows (2) and the twist about the axis (1);
+ * - Cylindrical: the Prismatic rows without the twist (4);
+ * - Spherical: `pB − pA` (3);
+ * - Planar: `pB − pA` along A's axis, the plane normal (1), and the axis rows (2).
  * Axis rows accept anti-parallel axes. The residual definitions match
  * CadKit's `AssemblyLoopSolver`; Jacobians are analytic (exact for the
  * position and fixed-rotation rows, first order in the transverse and axis
@@ -38,7 +41,8 @@ class ClosureTask implements KinematicTask {
       case ClosureKind.Fixed: 6;
       case ClosureKind.Revolute: 5;
       case ClosureKind.Spherical, ClosureKind.Planar: 3;
-      default: 4; // Prismatic, Cylindrical
+      case ClosureKind.Prismatic: 5;
+      default: 4; // Cylindrical
     };
   }
 
@@ -108,7 +112,7 @@ class ClosureTask implements KinematicTask {
         lastPositionError = Math.abs(along);
         lastOrientationError = axisAngle();
         axisRows(residual, jacobian, r, w, g);
-      default: // Prismatic, Cylindrical
+      default: // Prismatic (with its twist row below), Cylindrical
         var ax = s[14], ay = s[15], az = s[16];
         var along = dx * ax + dy * ay + dz * az;
         Rotations.perpendicularBasis(ax, ay, az, s, 23);
@@ -131,6 +135,17 @@ class ClosureTask implements KinematicTask {
         lastPositionError = Math.sqrt(squared);
         lastOrientationError = axisAngle();
         axisRows(residual, jacobian, r, w, g);
+        if (kind == ClosureKind.Prismatic) {
+          // Twist about the axis: the relative rotation's component along it, dφ·a ≈ a·(ω_B − ω_A) near closure.
+          Rotations.relativeRotationVector(s, 0, s, 7, s, 20);
+          var twist = s[20] * model.closureAxis[c3] + s[21] * model.closureAxis[c3 + 1] + s[22] * model.closureAxis[c3 + 2];
+          lastOrientationError = Math.max(lastOrientationError, Math.abs(twist));
+          var row = r + 2;
+          residual[row] = -g * twist;
+          for (c in 0...w)
+            jacobian[row * w + c] = g * (ax * (jacobianB[3 * w + c] - jacobianA[3 * w + c]) +
+              ay * (jacobianB[4 * w + c] - jacobianA[4 * w + c]) + az * (jacobianB[5 * w + c] - jacobianA[5 * w + c]));
+        }
     }
   }
 

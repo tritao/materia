@@ -188,7 +188,7 @@ class AssemblyState {
 			// A spherical closure leaves orientation free.
 			if (joint.type == AssemblyJointType.Spherical) axisDot = 1;
 			var rotation = 0.0;
-			if (joint.type == AssemblyJointType.Fixed) {
+			if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
 				var dot = first.qx * second.qx + first.qy * second.qy + first.qz * second.qz + first.qw * second.qw;
 				rotation = 1 - Math.abs(dot);
 			}
@@ -207,7 +207,7 @@ class AssemblyState {
 				tolerance = 1e-6 / LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
 			if (residual.position > tolerance)
 				throw 'Assembly joint "${residual.joint}" has separated connectors';
-			if (joint.type == AssemblyJointType.Fixed) {
+			if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
 				if (residual.rotation > 1e-5)
 					throw 'Assembly fixed joint "${residual.joint}" has misaligned frames';
 			} else if (residual.axis > 1e-5)

@@ -6,8 +6,7 @@ package kinematicskit;
  * with free sliding along it (Prismatic), a shared point only (Spherical),
  * a shared axis line with free sliding and turning (Cylindrical), or B's
  * origin on A's plane with parallel normals (Planar; the axis is A's normal).
- * Prismatic has the same rows as Cylindrical today: it does not hold the
- * twist about its axis.
+ * Prismatic is Cylindrical plus a row holding the twist about the axis.
  */
 enum abstract ClosureKind(Int) {
   var Fixed = 0;

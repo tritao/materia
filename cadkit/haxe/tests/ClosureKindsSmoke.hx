@@ -31,6 +31,9 @@ class ClosureKindsSmoke {
 				null, null, true)]);
 		slider.joints[0].driven = true;
 		solveAndCheck("cylindrical slider", slider, "redundant(guide)-2");
+		// The same guide as a prismatic closure also holds the twist about the axis: one more row, zero in a plane.
+		for (joint in slider.joints) if (joint.id == "guide") joint.type = AssemblyJointType.Prismatic;
+		solveAndCheck("prismatic slider", slider, "redundant(guide)-3");
 
 		// A three-link leg whose foot stands flat on a raised floor: a planar closure.
 		var ground:AssemblyComponentDefinition = {id: "ground",
