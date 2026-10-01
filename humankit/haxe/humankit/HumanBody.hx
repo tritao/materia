@@ -433,6 +433,7 @@ class HumanBody {
 		limbs[limb].release(character);
 
 	public function setCarry(hands:Array<HumanLimb>):Void {
+		walker.setCarrying(hands.length > 0);
 		for (control in limbs) if (control.mode == Carry && hands.indexOf(control.limb) < 0) clearReach(control.limb);
 		for (hand in hands) {
 			var control = limbs[hand];
@@ -459,6 +460,7 @@ class HumanBody {
 
 	public function cancel():Void {
 		walker.stop();
+		walker.setCarrying(false);
 		grip = false;
 		for (hand in [ArmL, ArmR]) setHeldPoint(hand, null);
 		for (control in limbs) control.release(character);

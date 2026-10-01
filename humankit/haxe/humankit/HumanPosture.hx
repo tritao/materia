@@ -78,7 +78,7 @@ class HumanPosture {
 	/** How many depths between standing and the full crouch the planner tries, counting both. */
 	public var crouchLevels:Int = 11;
 	/** The lean a worker will put up with before it bends its knees instead, in radians. */
-	public var comfortLean:Float = 0.35;
+	public var comfortLean:Float = 0.5;
 
 	// Withdrawing from a placed part.
 

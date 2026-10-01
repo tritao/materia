@@ -122,7 +122,10 @@ The bundled Quaternius worker (`animkit/assets/quaternius/worker.glb`) is the de
 Animation Library character (`animkit/assets/quaternius-ual/ual-standard.glb`, CC0, 46 clips) is also
 supported: its rig matches the `universal` preset, its legs are real chains, and it has a crouch clip, so it
 reaches surfaces from half a metre up (see `BODY.md`). Pick it in the editor with the worker's "Character
-asset" property.
+asset" property: `ual-standard.glb` is the free pack's 46 clips, `ual-work.glb` adds the purchased library's
+clips for a worker (carrying walk, turns, crouch enter and exit, kneeling, counters, pushing, sitting). Where each
+clip came from is in `animkit/assets/quaternius-ual/PROVENANCE.md`. A character with a `Walk_Carry_Loop` clip
+walks with it while its hands carry something (`HumanWalker.setCarrying`, set by `HumanBody.setCarry`).
 
 ## Document jobs
 

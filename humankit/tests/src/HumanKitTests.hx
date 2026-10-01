@@ -51,6 +51,7 @@ import robotkit.mobile.Footprint;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.Path;
 import sys.FileSystem;
+import sys.io.File;
 
 class HumanKitTests {
 	static function main():Void {
@@ -105,6 +106,7 @@ class HumanKitTests {
 		bodyView(scene, human);
 		human.dispose();
 		universalCharacter(scene, worker, rig);
+		universalLibrary(scene);
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
@@ -210,6 +212,70 @@ class HumanKitTests {
 		elbowStaysPut(scene, again, againRig);
 		leaning(scene, again, againRig);
 		facilityRoute(scene, again, againRig);
+	}
+
+	/**
+	 * The library the runtime loads: the free pack's clips and the extracted ones, each listed in clips.json with
+	 * where it came from. Every listed clip must be there at its length and stand on the floor at the height the
+	 * free clips do, which is how a mistake in the retargeting (a hip height out by centimetres, a flipped limb)
+	 * shows.
+	 */
+	static function universalLibrary(scene:Scene):Void {
+		var directory = assetDir() + "/quaternius-ual";
+		var asset = AnimationAsset.load(directory + "/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var manifest:Dynamic = haxe.Json.parse(File.getContent(directory + "/clips.json"));
+		var clips:Array<Dynamic> = Reflect.field(manifest, "clips");
+		var human = new HumanCharacter(scene, asset, rig, null, "Library");
+		var extracted = 0;
+		var standing = function(name:String):{pelvis:Float, foot:Float} {
+			human.player.restart(asset.clipIndex(name), true);
+			human.advance(0.0);
+			var low = 9.0, pelvis = 0.0;
+			for (step in 0...10) {
+				human.advance(step == 0 ? 0.0 : asset.clipDurations[asset.clipIndex(name)] / 10.0);
+				low = Math.min(low, Math.min(human.pose.bonePosition(HumanBone.FootL)[2], human.pose.bonePosition(HumanBone.FootR)[2]));
+				pelvis += human.pose.bonePosition(HumanBone.Pelvis)[2] / 10.0;
+			}
+			return {pelvis: pelvis, foot: low};
+		};
+		var reference = standing("Idle_Loop");
+		for (clip in clips) {
+			var name:String = Reflect.field(clip, "name");
+			var index = asset.clipIndex(name);
+			if (index < 0) throw 'The library lacks the clip "$name" its manifest lists';
+			if (Reflect.field(clip, "file") == null) continue;
+			extracted++;
+			var length:Float = Reflect.field(clip, "length_seconds");
+			if (Math.abs(asset.clipDurations[index] - length) > 0.05)
+				throw 'Clip "$name" is ${asset.clipDurations[index]} s, not the $length s it came with';
+			if (Reflect.field(clip, "license") != "CC0" || Reflect.field(clip, "source") == null || Reflect.field(clip, "sha256") == null || Reflect.field(clip, "library") == null)
+				throw 'Clip "$name" does not say where it came from';
+			// The upright clips share a pelvis height with the free ones, and a tired slouch (knees bent) keeps its feet down.
+			if (name == "Idle_Tired_Loop" && Math.abs(standing(name).foot - reference.foot) > 0.05) throw 'The tired idle has its feet off the floor';
+			if (["Idle_FoldArms_Loop", "Idle_Lantern_Loop", "Idle_TalkingPhone_Loop", "Idle_LookAround_Loop", "Walk_Bwd_Loop", "Walk_L_Loop", "Walk_R_Loop"].indexOf(name) >= 0) {
+				var measured = standing(name);
+				if (Math.abs(measured.pelvis - reference.pelvis) > 0.06 || Math.abs(measured.foot - reference.foot) > 0.05)
+					throw 'Standing clip "$name" has its pelvis at ${measured.pelvis} and a foot at ${measured.foot}, not near ${reference.pelvis} and ${reference.foot}';
+			}
+		}
+		if (extracted < 25) throw 'Only $extracted extracted clips are in the library';
+		var carrying = standing("Walk_Carry_Loop");
+		if (Math.abs(carrying.foot - reference.foot) > 0.06 || carrying.pelvis < 0.6 || carrying.pelvis > reference.pelvis + 0.05)
+			throw 'The carrying walk has its pelvis at ${carrying.pelvis} and a foot at ${carrying.foot}';
+		human.dispose();
+		// A body that carries walks with the carrying gait, and one that does not with the ordinary walk.
+		var again = new HumanCharacter(scene, asset, rig, null, "Carrier");
+		var body = new HumanBody(again);
+		if (body.walker.carryGait == null || !(body.walker.carryGait.naturalSpeed > 0.5 && body.walker.carryGait.naturalSpeed < 2.5))
+			throw "The library character has no usable carrying gait";
+		body.setCarry([ArmR]);
+		body.walker.follow([[0.0, 0.0], [2.0, 0.0]], 1.0);
+		if (again.player.currentClip() != asset.clipIndex("walk_carry")) throw "A body carrying a part did not take the carrying walk";
+		body.setCarry([]);
+		body.walker.follow([[0.0, 0.0], [2.0, 0.0]], 1.0);
+		if (again.player.currentClip() != body.walker.gait.clip) throw "A body carrying nothing did not take the ordinary walk";
+		again.dispose();
 	}
 
 	static function jobSpecs(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {

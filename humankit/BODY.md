@@ -124,6 +124,12 @@ The Universal Animation Library character (`animkit/assets/quaternius-ual`) is t
   belly clears the surface's edge, leaving it 3 to 4 cm inside for either hand. That worker has no crouch
   clip, so it cannot do what the library character does here. The layout sweep (`ScenarioSweepTests`)
   records this as its `CAPPED_CLEARANCE`.
+- **Deep tops on the library character.** The sweep uses 0.4 m tops. With 0.8 m ones (the app's rack and table) the
+  belly must clear an edge 0.4 m short of the part, so the arm is near full stretch and the planner crouches
+  0.4 to 0.6 for a table at standing height, taking a visible lunge. The arm reaches within a millimetre of its
+  limit, a pick can fail by that margin, the elbow can bend under the gate's 30 degrees, and a left-hand
+  run pops once. The bundled worker is unaffected. A planner that leans onto the top instead of
+  clearing it would fix this; it is not done.
 - **Crouch is one clip.** Depth is a blend between standing and the clip's full crouch, so a middle depth is
   a mixed pose, not a clip of its own; the planner reaches down to about half a metre, not the floor, and a
   crouched worker does not walk. The clip's feet are not pinned: a foot may lift a few centimetres at full depth.
