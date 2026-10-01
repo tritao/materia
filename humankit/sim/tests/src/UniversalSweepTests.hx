@@ -39,6 +39,7 @@ class UniversalSweepTests {
             pelvisJerk = Math.max(pelvisJerk, gate.naturalness.maxPelvisJerk);
             wristJerk = Math.max(wristJerk, gate.naturalness.maxWristJerk);
             floor = Math.max(floor, gate.naturalness.floorPenetration);
+            if (gate.naturalness.maxSlide > 0.1) Sys.println('SLIDE $label: ${gate.slideReport()}');
             var worst = gate.worst();
             report.push('$label clearance ${Math.round(gate.clearance * 100) / 100} lean ${Math.round(gate.lean * 100) / 100} crouch ${Math.round(deepest * 100) / 100} turn ${Math.round(worst.turn * 100) / 100} speed ${Math.round(worst.speed * 100) / 100}');
             runs++;

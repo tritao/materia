@@ -43,6 +43,8 @@ class JobGate {
     var gripped:Bool = false;
     /** The document step that was running at each sample, so a finding can say where in the job it happened. */
     final steps:Array<Int> = [];
+    /** What the worker was doing at each sample: approach, pick, place, walk, ... and whether it was crouched or walking. */
+    final phases:Array<String> = [];
 
     /** `limbs` are the hands that do the work: one for a one-handed job, both for a two-handed one. */
     public function new(worker:HumanWorker, session:SimSession, limbs:Array<HumanLimb>, surfaces:Array<HumanTargetBox>) {
@@ -51,6 +53,10 @@ class JobGate {
         this.limbs = limbs;
         this.surfaces = surfaces;
     }
+
+    /** What the worker was doing at a sample, for a report. */
+    public function phaseAt(sample:Int):String
+        return sample >= 1 && sample <= phases.length ? phases[sample - 1] : "?";
 
     /** The document step running at a sample (1-based, as `MotionQuality` counts), or -1. */
     public function stepAt(sample:Int):Int
@@ -62,6 +68,7 @@ class JobGate {
         naturalness.sample(body, session.fixedTimestep());
         var step = worker.currentStep();
         steps.push(step == null ? -1 : step);
+        phases.push(worker.currentActionLabel() + (body.walker.isWalking() ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched" : "") + (body.walker.isTurning() ? "+turning" : ""));
         lean = Math.max(lean, body.character.spineLean());
         if (body.grip) gripped = true;
         // Only while reaching for the part, or holding it to place it: walking back past a surface after
@@ -105,6 +112,10 @@ class JobGate {
         if (clearance < allowed)
             failures.push('$label: the belly stood ${r(-clearance)} m inside a surface (lean ${r(lean)} rad${capped ? ", at its limit" : ""})');
     }
+
+    /** Where the worst foot slide happened, for a report: the phase when the foot was planted and when it slid furthest. */
+    public function slideReport():String
+        return 'slide ${r(naturalness.maxSlide)} m, planted at sample ${naturalness.maxSlideFrom} (${phaseAt(naturalness.maxSlideFrom)}), furthest at ${naturalness.maxSlideAt} (${phaseAt(naturalness.maxSlideAt)})';
 
     /** The worst of each arm measure over both arms, for a one-line report. */
     public function worst():{turn:Float, speed:Float, accel:Float} {

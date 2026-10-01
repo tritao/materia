@@ -27,6 +27,8 @@ class ApproachFor extends HumanActionBase {
 	/** How far the upper body leans over the surface at the stand, in radians, once the worker has arrived. */
 	public var lean(default, null):Float = 0.0;
 	var postureIssued:Bool = false;
+	/** The walk to the stand, held back while the body stands up from a crouch. */
+	var waiting:Null<Array<Array<Float>>> = null;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
 	final targetProvider:Null<Void->Array<Float>>;
@@ -90,9 +92,15 @@ class ApproachFor extends HumanActionBase {
 		var standX = target[0] - chosen.ux * chosen.standDistance + chosen.uy * chosen.lateral;
 		var standY = target[1] - chosen.uy * chosen.standDistance - chosen.ux * chosen.lateral;
 		faceAngle = Math.atan2(chosen.uy, chosen.ux);
-		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005)
-			worker.walker.continueAlong([[root[12], root[13]], [standX, standY]], speed);
-		else {
+		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005) {
+			var route = [[root[12], root[13]], [standX, standY]];
+			// A crouched body does not walk: it stands up first, and the walk starts when it has.
+			if (worker.crouchAmount() > 1e-3 || !worker.crouchReached()) {
+				worker.setCrouch(0.0);
+				waiting = route;
+			} else
+				worker.walker.continueAlong(route, speed);
+		} else {
 			worker.walker.face(faceAngle);
 			turnIssued = true;
 		}
@@ -184,7 +192,12 @@ class ApproachFor extends HumanActionBase {
 	}
 
 	override public function advance(seconds:Float):Void {
-		if (!done && !turnIssued && !worker.walker.isWalking()) {
+		var route = waiting;
+		if (route != null && worker.crouchAmount() <= 1e-3) {
+			waiting = null;
+			worker.walker.continueAlong(route, speed);
+		}
+		if (!done && waiting == null && !turnIssued && !worker.walker.isWalking()) {
 			worker.walker.face(faceAngle);
 			turnIssued = true;
 		}

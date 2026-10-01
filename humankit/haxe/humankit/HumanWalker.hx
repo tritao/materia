@@ -9,7 +9,13 @@ package humankit;
  * to place the character; it faces +X like every AnimKit character.
  */
 class HumanWalker {
+	/** How long the body takes to get up to walking speed and to stop. */
 	static inline var FADE_SECONDS:Float = 0.3;
+	/**
+	 * How long the idle and walk clips take to cross-fade. Shorter than the speed ramp: while the body speeds up
+	 * the idle pose keeps its feet still, so the longer the idle shows through the further a planted foot is dragged.
+	 */
+	static inline var BLEND_SECONDS:Float = 0.3;
 
 	public final character:HumanCharacter;
 	public final gait:HumanGait;
@@ -98,7 +104,7 @@ class HumanWalker {
 		retreating = false;
 		var carryWalk = carryGait;
 		routeGait = carrying && carryWalk != null ? carryWalk : gait;
-		character.player.play(routeGait.clip, FADE_SECONDS);
+		character.player.play(routeGait.clip, BLEND_SECONDS);
 	}
 
 	/**
@@ -127,7 +133,7 @@ class HumanWalker {
 		// Backwards on the character's own backward walk, or else sliding in the idle pose.
 		var backWalk = backGait;
 		if (backWalk != null) routeGait = backWalk;
-		character.player.play(backWalk != null ? backWalk.clip : idleClip, FADE_SECONDS);
+		character.player.play(backWalk != null ? backWalk.clip : idleClip, BLEND_SECONDS);
 	}
 
 	/** Sets the starting floor pose before a job begins. */
@@ -204,7 +210,7 @@ class HumanWalker {
 			return;
 		walking = false;
 		velocity = 0.0;
-		character.player.play(idleClip, FADE_SECONDS);
+		character.player.play(idleClip, BLEND_SECONDS);
 	}
 
 	public function isWalking():Bool

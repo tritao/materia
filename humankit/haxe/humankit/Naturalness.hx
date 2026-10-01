@@ -27,6 +27,9 @@ class Naturalness {
 
 	/** The furthest a foot moved from where it was planted while it stayed planted, in metres. */
 	public var maxSlide(default, null):Float = 0.0;
+	/** The sample at which that furthest slide was reached, and the one at which that foot was planted. */
+	public var maxSlideAt(default, null):Int = -1;
+	public var maxSlideFrom(default, null):Int = -1;
 	/** The slide of every plant added up, in metres, and the seconds a foot was planted. */
 	public var slideTotal(default, null):Float = 0.0;
 	public var plantedSeconds(default, null):Float = 0.0;
@@ -43,6 +46,7 @@ class Naturalness {
 	var lastFoot:Array<Null<Array<Float>>> = [null, null];
 	var lowFor:Array<Int> = [0, 0];
 	var plantedAt:Array<Null<Array<Float>>> = [null, null];
+	var plantedSample:Array<Int> = [0, 0];
 	var slideNow:Array<Float> = [0.0, 0.0];
 	final history:Array<Array<Array<Float>>> = [[], [], []];
 	var tick:Int = 0;
@@ -72,6 +76,7 @@ class Naturalness {
 				lowFor[side] = low && speed < PLANTED_SPEED ? lowFor[side] + 1 : 0;
 				if (lowFor[side] >= PLANTED_SAMPLES) {
 					plantedAt[side] = world;
+					plantedSample[side] = samples;
 					slideNow[side] = 0.0;
 				}
 			} else if (!low || speed > UNPLANTED_SPEED) {
@@ -81,7 +86,11 @@ class Naturalness {
 			} else {
 				var origin = plantedAt[side];
 				slideNow[side] = Math.sqrt(Math.pow(world[0] - origin[0], 2) + Math.pow(world[1] - origin[1], 2));
-				maxSlide = Math.max(maxSlide, slideNow[side]);
+				if (slideNow[side] > maxSlide) {
+					maxSlide = slideNow[side];
+					maxSlideAt = samples;
+					maxSlideFrom = plantedSample[side];
+				}
 			}
 			planted[side] = plantedAt[side] != null;
 			if (planted[side]) plantedSeconds += seconds;
