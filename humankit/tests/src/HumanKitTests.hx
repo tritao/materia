@@ -120,6 +120,7 @@ class HumanKitTests {
 		turning(scene, worker, rig);
 		retreating(scene, worker, rig);
 		holdingFeet(scene);
+		kneeling(scene);
 		footKeepsItsPitch(scene);
 		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
@@ -218,6 +219,7 @@ class HumanKitTests {
 		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");
 		var plainBody = new HumanBody(plain);
 		if (plain.canCrouch() || plainBody.canCrouch()) throw "The bundled worker has no crouch clip but claims to crouch";
+		if (plain.canKneel() || plainBody.canKneel()) throw "The bundled worker has no kneeling clip but claims to kneel";
 		plainBody.setCrouch(1.0);
 		plainBody.advance(0.1);
 		if (plainBody.crouchAmount() != 0.0) throw "A body that cannot crouch crouched";
@@ -1001,6 +1003,41 @@ class HumanKitTests {
 		human.dispose();
 		if (!(swing[0] > 15.0) || !(swing[1] < 3.0))
 			throw 'Keeping the foot\'s rotation did not hold its pitch: it swung ${swing[0]} degrees loose and ${swing[1]} kept';
+	}
+
+	/** On the full library, a top too low for a crouch is taken from a knee; one a crouch reaches is not. */
+	static function kneeling(scene:Scene):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var human = new HumanCharacter(scene, asset, rig, null, "Kneeler");
+		var body = new HumanBody(human);
+		if (!body.canKneel()) throw "The full library character cannot kneel";
+		var plan = function(z:Float, top:Float):ApproachFor {
+			var box:HumanTargetBox = {center: [0.6, 0.0, top - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
+			var approach = new ApproachFor([0.6, 0.0, z], ArmR, 1.0, false, null, box);
+			var job = new HumanJob(body).add(approach);
+			job.advance(1.0 / 60.0);
+			if (job.failure() != null) throw 'A target at $z m was not reachable: ${job.failure()}';
+			body.cancel();
+			return approach;
+		};
+		var floor = plan(0.34, 0.3);
+		if (!(floor.kneel >= 0.5) || floor.crouch != 0.0)
+			throw 'The planner did not kneel for a top 0.3 m high: kneel ${floor.kneel}, crouch ${floor.crouch}';
+		var bench = plan(0.62, 0.6);
+		if (bench.kneel != 0.0 || !(bench.crouch > 0.3)) throw 'The planner knelt for a bench a crouch reaches: kneel ${bench.kneel}, crouch ${bench.crouch}';
+		var tooLow = new HumanJob(body).add(new ApproachFor([0.6, 0.0, 0.05], ArmR));
+		tooLow.advance(1.0 / 60.0);
+		if (tooLow.failure() == null || tooLow.failure().indexOf("even kneeling") < 0)
+			throw 'A point on the floor did not say it is out of reach kneeling: ${tooLow.failure()}';
+		// A kneel stands back up: the body is not left kneeling when it walks.
+		body.setKneel(1.0);
+		for (_ in 0...200) body.advance(1.0 / 60.0);
+		if (body.kneelAmount() < 0.99) throw "The body did not kneel when asked";
+		body.setKneel(0.0);
+		for (_ in 0...200) body.advance(1.0 / 60.0);
+		if (body.kneelAmount() != 0.0 || human.kneel() != 0.0) throw "The body did not stand up from a kneel";
+		human.dispose();
 	}
 
 	/** A posture's lengths grow with the body; its angles, fractions and times do not. */

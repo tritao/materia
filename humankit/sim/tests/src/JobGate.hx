@@ -66,7 +66,7 @@ class JobGate {
         naturalness.sample(body, session.fixedTimestep());
         var step = worker.currentStep();
         steps.push(step == null ? -1 : step);
-        phases.push(worker.currentActionLabel() + (body.walker.isWalking() ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched" : "") + (body.walker.isTurning() ? "+turning" : ""));
+        phases.push(worker.currentActionLabel() + (body.walker.isWalking() ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched" : "") + (body.kneelAmount() > 0.02 ? "+kneeling" : "") + (body.walker.isTurning() ? "+turning" : ""));
         lean = Math.max(lean, body.character.spineLean());
         if (body.grip) gripped = true;
         // Only while reaching for the part, or holding it to place it: walking back past a surface after
@@ -89,11 +89,11 @@ class JobGate {
         for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
             var arm = quality.arm(side), name = side == MotionQuality.RIGHT ? "right" : "left";
             if (arm.planeTurnRate > MotionQualityTests.MAX_PLANE_TURN)
-                failures.push('$label: the $name elbow turned its bend plane at ${r(arm.planeTurnRate)} rad/s at sample ${arm.planeTurnAt}');
+                failures.push('$label: the $name elbow turned its bend plane at ${r(arm.planeTurnRate)} rad/s at sample ${arm.planeTurnAt} (${phaseAt(arm.planeTurnAt)})');
             if (arm.maxHandSpeed > MotionQualityTests.MAX_HAND_SPEED)
-                failures.push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt}');
+                failures.push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt} (${phaseAt(arm.handSpeedAt)})');
             if (arm.maxHandAcceleration > MotionQualityTests.MAX_HAND_ACCELERATION)
-                failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt}');
+                failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt} (${phaseAt(arm.handAccelerationAt)})');
             if (!posture) continue;
             if (arm.elbowAboveShoulder > 0.0) failures.push('$label: the $name elbow rose ${r(arm.elbowAboveShoulder)} m above the shoulder');
             if (arm.minElbowAngle < elbowLimit)

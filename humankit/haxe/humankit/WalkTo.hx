@@ -66,8 +66,9 @@ class WalkTo extends HumanActionBase {
 			return;
 		}
 		// A crouched body does not walk: it stands up first, and the walk starts when it has.
-		if (worker.crouchAmount() > 1e-3 || !worker.crouchReached()) {
+		if (worker.downAmount() > 1e-3 || !worker.downReached()) {
 			worker.setCrouch(0.0);
+			worker.setKneel(0.0);
 			waiting = route;
 			return;
 		}
@@ -82,7 +83,7 @@ class WalkTo extends HumanActionBase {
 
 	override public function advance(seconds:Float):Void {
 		var route = waiting;
-		if (route != null && worker.crouchAmount() <= 1e-3) begin(route);
+		if (route != null && worker.downAmount() <= 1e-3) begin(route);
 	}
 
 	override public function isDone():Bool

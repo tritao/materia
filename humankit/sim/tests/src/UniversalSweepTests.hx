@@ -12,17 +12,18 @@ class UniversalSweepTests {
         var began = Sys.time();
         var failures:Array<String> = [], report:Array<String> = [], runs = 0;
         var tilt = 0.0, footJerk = 0.0, skate = 0.0, margin = Math.POSITIVE_INFINITY, pelvisJerk = 0.0, wristJerk = 0.0, floor = 0.0;
-        for (hand in ["right", "left"]) for (half in [0.2]) for (surface in [0.5, 0.6, 0.7, 0.85, 1.0, 1.06, 1.16]) for (yaw in [0.0, 0.7]) {
+        for (hand in ["right", "left"]) for (half in [0.2]) for (surface in [0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1.0, 1.06, 1.16]) for (yaw in [0.0, 0.7]) {
             var label = 'universal hand=$hand surface=$surface half=$half yaw=$yaw';
             var scenario = RackScenario.build(true, {hand: hand, surface: surface, yaw: yaw, surfaceHalf: half, character: character});
             var worker = scenario.worker;
             var gate = new JobGate(worker, scenario.session, scenario.limbs(), [scenario.rack, scenario.table]);
             gate.slideLimit = 0.15;
-            var ticks = 0, deepest = 0.0;
+            var ticks = 0, deepest = 0.0, kneeled = 0.0;
             while (!worker.currentJobDone() && ticks++ < 1500) {
                 scenario.tick();
                 gate.sample();
                 deepest = Math.max(deepest, worker.body.crouchAmount());
+                kneeled = Math.max(kneeled, worker.body.kneelAmount());
             }
             if (!worker.currentJobDone()) { failures.push('$label: the job did not finish'); continue; }
             if (worker.currentJobFailure() != null) { failures.push('$label: the job failed: ${worker.currentJobFailure()}'); continue; }
@@ -32,7 +33,7 @@ class UniversalSweepTests {
             if (miss > 0.05 || Math.abs(rest[2] - scenario.placePoint[2]) > 0.03)
                 failures.push('$label: the part came to rest ${Math.round(miss * 1000) / 1000} m off the place point, at height ${rest[2]}');
             gate.check(label, failures);
-            if (surface <= 0.6 && deepest < 0.4) failures.push('$label: the worker only crouched ${Math.round(deepest * 100) / 100} for a low surface');
+            if (surface <= 0.6 && Math.max(deepest, kneeled) < 0.4) failures.push('$label: the worker only crouched ${Math.round(deepest * 100) / 100} for a low surface');
             if (surface >= 1.0 && deepest > 0.35) failures.push('$label: the worker crouched ${Math.round(deepest * 100) / 100} for a surface at standing height');
             skate = Math.max(skate, gate.naturalness.maxSlide);
             margin = Math.min(margin, gate.naturalness.minSupportMargin);
@@ -43,7 +44,7 @@ class UniversalSweepTests {
             tilt = Math.max(tilt, gate.naturalness.maxFootTilt);
             if (gate.naturalness.maxSlide > 0.1) Sys.println('SLIDE $label: ${gate.slideReport()}');
             var worst = gate.worst();
-            report.push('$label clearance ${Math.round(gate.clearance * 100) / 100} lean ${Math.round(gate.lean * 100) / 100} crouch ${Math.round(deepest * 100) / 100} turn ${Math.round(worst.turn * 100) / 100} speed ${Math.round(worst.speed * 100) / 100}');
+            report.push('$label clearance ${Math.round(gate.clearance * 100) / 100} lean ${Math.round(gate.lean * 100) / 100} crouch ${Math.round(deepest * 100) / 100} kneel ${Math.round(kneeled * 100) / 100} turn ${Math.round(worst.turn * 100) / 100} speed ${Math.round(worst.speed * 100) / 100}');
             runs++;
         }
         if (failures.length > 0) Sys.println(report.join("\n"));

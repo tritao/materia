@@ -30,7 +30,11 @@ class HumanCrouch {
 		return times[low] + (times[high] - times[low]) * (position - low);
 	}
 
-	public static function measure(asset:AnimationAsset, rig:HumanoidRig, clip:Int):Null<HumanCrouch> {
+	/**
+	 * Measures a clip of going down. With `toLowest` the clip is taken only as far as the pelvis gets lowest, which is
+	 * for a clip that goes down, does something, and comes back up: its descent is the going-down part.
+	 */
+	public static function measure(asset:AnimationAsset, rig:HumanoidRig, clip:Int, toLowest:Bool = false):Null<HumanCrouch> {
 		if (clip < 0 || clip >= asset.clipNames.length) return null;
 		var duration = asset.clipDurations[clip];
 		var instance = new AnimationInstance(asset);
@@ -49,14 +53,16 @@ class HumanCrouch {
 			heights.push(pelvis[2]);
 		}
 		instance.dispose();
-		var drop = heights[0] - heights[SAMPLES - 1];
+		var last = SAMPLES - 1;
+		if (toLowest) for (sample in 0...SAMPLES) if (heights[sample] < heights[last]) last = sample;
+		var drop = heights[0] - heights[last];
 		if (drop < LEAST_DROP) return null;
 		// For each depth, the first moment the pelvis has dropped that far, so a clip that dips and rises still has a monotone map.
 		var times:Array<Float> = [];
 		for (level in 0...SAMPLES) {
 			var depth = level / (SAMPLES - 1);
-			var found = SAMPLES - 1;
-			for (sample in 0...SAMPLES)
+			var found = last;
+			for (sample in 0...last + 1)
 				if ((heights[0] - heights[sample]) / drop >= depth - 1e-9) { found = sample; break; }
 			times.push(duration * found / (SAMPLES - 1));
 		}

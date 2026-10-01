@@ -49,6 +49,9 @@ class HumanCharacter {
 	/** The going-down clip the crouch is posed from, when the asset has one; else the crouch clip is blended in. */
 	final crouchDown:Null<HumanCrouch>;
 	var crouchDepth:Float = 0.0;
+	/** The going-down part of a kneeling clip, when the asset has one; a kneel is posed from it as a crouch is from the crouch clip. */
+	final kneelDown:Null<HumanCrouch>;
+	var kneelDepth:Float = 0.0;
 	/**
 	 * The joint-turn sources each feature applies its turns under (see AnimationInstance.setJointRotation),
 	 * so features that turn the same joint compose instead of overwriting one another. A feature added
@@ -71,6 +74,7 @@ class HumanCharacter {
 		player = new ClipPlayer(instance);
 		crouchDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("crouch_enter"));
 		crouchClip = crouchDown != null ? crouchDown.clip : asset.clipIndex("crouch_idle");
+		kneelDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("pickup_kneeling"), true);
 		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS, pose),
 			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS, pose)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
@@ -179,21 +183,67 @@ class HumanCharacter {
 
 	/**
 	 * Lowers the body toward a crouch, by mixing the asset's crouching clip over the animation: 0 stands, 1 is
-	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not pinned: one may lift a few centimetres at full depth). Throws when the
-	 * asset has no crouch clip. Takes effect from the next advance, and is meant for a worker standing still.
+	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not
+	 * pinned: one may lift a few centimetres at full depth). Throws when the asset has no crouch clip. A crouch takes the
+	 * place of a kneel, as a kneel does of a crouch. Takes effect from the next advance, and is meant for a worker standing still.
 	 */
 	public function setCrouch(amount:Float):Void {
 		if (crouchClip < 0) throw "The character has no crouch clip";
 		crouchDepth = Math.max(0.0, Math.min(1.0, amount));
+		if (crouchDepth > 0.0) kneelDepth = 0.0;
+		applyDown();
+	}
+
+	/**
+	 * The overlay that shows the way down the body is in: a kneel if there is one, else a crouch, else none. Posed from the
+	 * going-down clip, held at the time where the body is this far down, which is an authored pose at every depth;
+	 * without a going-down clip the crouch clip is blended in at its depth as the weight.
+	 */
+	function applyDown():Void {
+		var kneeling = kneelDown;
+		if (kneeling != null && kneelDepth > 0.0) {
+			player.setOverlay(kneeling.clip, Math.min(1.0, kneelDepth / 0.3), kneeling.timeFor(kneelDepth));
+			return;
+		}
+		if (crouchDepth <= 0.0 || crouchClip < 0) {
+			player.setOverlay(-1, 0.0);
+			return;
+		}
 		var down = crouchDown;
-		// Posed from the going-down clip, held at the time where the body is this far down: an authored pose at
-		// every depth. Without one, the crouch clip is blended in at this weight.
-		if (down != null) player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, Math.min(1.0, crouchDepth / 0.3), down.timeFor(crouchDepth));
-		else player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
+		if (down != null) player.setOverlay(crouchClip, Math.min(1.0, crouchDepth / 0.3), down.timeFor(crouchDepth));
+		else player.setOverlay(crouchClip, crouchDepth);
 	}
 
 	public function crouch():Float
 		return crouchDepth;
+
+	/** Whether the asset has a kneeling clip to lower the body further with than a crouch can. */
+	public function canKneel():Bool
+		return kneelDown != null;
+
+	/**
+	 * Lowers the body onto a knee, with the arm reaching down, by holding the going-down part of the asset's kneeling clip
+	 * at the point where the pelvis is that fraction of the way down: 0 stands, 1 is the lowest the clip goes. It takes the
+	 * place of a crouch (the two are different ways down, not stages of one), so asking for a kneel stands the crouch back up
+	 * and the other way round. Throws when the asset has no kneeling clip.
+	 */
+	public function setKneel(amount:Float):Void {
+		if (kneelDown == null) throw "The character has no kneeling clip";
+		kneelDepth = Math.max(0.0, Math.min(1.0, amount));
+		if (kneelDepth > 0.0) crouchDepth = 0.0;
+		applyDown();
+	}
+
+	public function kneel():Float
+		return kneelDepth;
+
+	/** Sets how far down the body is in both ways at once (a kneel, if any, wins); for measuring and putting back. */
+	public function setDown(crouchAmount:Float, kneelAmount:Float):Void {
+		crouchDepth = crouchClip < 0 ? 0.0 : Math.max(0.0, Math.min(1.0, crouchAmount));
+		kneelDepth = kneelDown == null ? 0.0 : Math.max(0.0, Math.min(1.0, kneelAmount));
+		if (kneelDepth > 0.0) crouchDepth = 0.0;
+		applyDown();
+	}
 
 	/**
 	 * Curls each finger of a hand on its own: values are indexed HumanHand.THUMB to PINKY, each 0 open to

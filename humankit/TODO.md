@@ -29,8 +29,9 @@ as scene objects, jobs as versioned JSON). These come after it.
 - A dedicated backward gait for short retreats; the current backward retreat
   keeps the heading and idle pose while translating away from the part. The
   library has `Walk_Bwd_Loop` (extracted, not wired).
-- Kneeling and floor-level picks. Crouching works (`BODY.md`), to about half a
-  metre; `PickUp_Kneeling` is extracted but not wired.
+- Floor-level picks below 0.3 m. Crouching (to about half a metre) and kneeling
+  (to 0.3 m) work (`BODY.md`); a point on the floor needs a stoop or a deeper reach
+  than the kneeling clip has.
 - Turns in place use the root rotating over the idle pose, so the feet slide;
   `Turn90_L/R` are extracted but not wired, and root-motion (`_RM`) clips need
   support in the walker.

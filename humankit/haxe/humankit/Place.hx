@@ -136,6 +136,7 @@ class Place extends HumanActionBase {
 			// The part is down; straighten up as the hands withdraw.
 			worker.setLean(0.0);
 			worker.setCrouch(0.0);
+			worker.setKneel(0.0);
 			worker.setArmsDown(false);
 			stage = 2;
 			elapsed = 0.0;

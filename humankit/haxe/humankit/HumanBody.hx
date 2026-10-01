@@ -38,6 +38,8 @@ class HumanBody {
 	final canLockFeet:Bool;
 	var crouchGoal:Float = 0.0;
 	var crouchNow:Float = 0.0;
+	var kneelGoal:Float = 0.0;
+	var kneelNow:Float = 0.0;
 	/** Where the bones planning reads stand when the body is upright and at rest, in model space. */
 	final standing:Map<String, Array<Float>> = new Map();
 
@@ -54,7 +56,7 @@ class HumanBody {
 		canLockFeet = character.legsAreChains();
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
-		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis]) {
+		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis, HumanBone.ShinL, HumanBone.ShinR, HumanBone.FootL, HumanBone.FootR]) {
 			var position = character.pose.bonePosition(bone);
 			if (position != null) standing.set(bone, position.copy());
 		}
@@ -201,25 +203,58 @@ class HumanBody {
 	public function crouchReached():Bool
 		return Math.abs(crouchGoal - crouchNow) < 1e-6;
 
+	/** Whether the character can kneel: its asset has a kneeling clip to lower the body onto a knee with. */
+	public function canKneel():Bool
+		return character.canKneel();
+
+	/**
+	 * Where the body is asked to kneel (0 stands, 1 the lowest the kneeling clip goes); it eases there. A kneel and a crouch are
+	 * different ways down, so a body kneels only from standing: ask for a crouch of nothing first.
+	 */
+	public function setKneel(amount:Float):Void
+		kneelGoal = character.canKneel() ? Math.max(0.0, Math.min(1.0, amount)) : 0.0;
+
+	/** How far the body is into its kneel now. */
+	public function kneelAmount():Float
+		return kneelNow;
+
+	public function kneelReached():Bool
+		return Math.abs(kneelGoal - kneelNow) < 1e-6;
+
+	/** Whether the body has finished easing to the crouch and the kneel it was asked for. */
+	public function downReached():Bool
+		return crouchReached() && kneelReached();
+
+	/** How far down, in either way, the body is now: 0 standing. */
+	public function downAmount():Float
+		return Math.max(crouchNow, kneelNow);
+
 	/**
 	 * How far a bone sits from where it stands upright when the body crouches `amount`, in model space.
 	 * Measured on the skeleton at the current animation time, with no lean; the pose is left as it was.
 	 */
-	public function crouchShift(bone:HumanBone, amount:Float):Array<Float> {
-		if (amount <= 0.0 || !character.canCrouch()) return [0.0, 0.0, 0.0];
-		var savedCrouch = character.crouch(), savedLean = character.spineLean();
+	public function crouchShift(bone:HumanBone, amount:Float):Array<Float>
+		return downShift(bone, amount, 0.0);
+
+	/** The same for a kneel: how far a bone sits from standing when the body kneels `amount`. */
+	public function kneelShift(bone:HumanBone, amount:Float):Array<Float>
+		return downShift(bone, 0.0, amount);
+
+	function downShift(bone:HumanBone, crouchAmount:Float, kneelAmount:Float):Array<Float> {
+		if ((crouchAmount <= 0.0 && kneelAmount <= 0.0) || (!character.canCrouch() && !character.canKneel())) return [0.0, 0.0, 0.0];
+		var savedCrouch = character.crouch(), savedKneel = character.kneel(), savedLean = character.spineLean();
 		character.setSpineLean(0.0);
-		character.setCrouch(0.0);
+		character.setDown(0.0, 0.0);
 		character.probe();
 		var upright = character.pose.bonePosition(bone);
-		character.setCrouch(amount);
+		character.setDown(crouchAmount, kneelAmount);
 		character.probe();
-		var crouched = character.pose.bonePosition(bone);
-		character.setCrouch(savedCrouch);
+		var down = character.pose.bonePosition(bone);
+		character.setDown(savedCrouch, savedKneel);
 		character.setSpineLean(savedLean);
 		character.probe();
-		if (upright == null || crouched == null) return [0.0, 0.0, 0.0];
-		return [crouched[0] - upright[0], crouched[1] - upright[1], crouched[2] - upright[2]];
+		if (upright == null || down == null) return [0.0, 0.0, 0.0];
+		return [down[0] - upright[0], down[1] - upright[1], down[2] - upright[2]];
 	}
 
 	/**
@@ -228,12 +263,12 @@ class HumanBody {
 	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
 	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float, drop:Float} {
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0, kneel:Float = 0.0):{angle:Float, shift:Float, drop:Float} {
 		var none = {angle: 0.0, shift: 0.0, drop: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
-		var saved = character.spineLean(), savedCrouch = character.crouch();
-		if (character.canCrouch()) character.setCrouch(crouch);
+		var saved = character.spineLean(), savedCrouch = character.crouch(), savedKneel = character.kneel();
+		character.setDown(crouch, kneel);
 		character.setSpineLean(0.0);
 		character.probe();
 		var upright = character.pose.bonePosition(bone);
@@ -259,7 +294,7 @@ class HumanBody {
 			}
 		}
 		character.setSpineLean(saved);
-		if (character.canCrouch()) character.setCrouch(savedCrouch);
+		character.setDown(savedCrouch, savedKneel);
 		character.probe();
 		return result;
 	}
@@ -278,7 +313,8 @@ class HumanBody {
 	 */
 	function holdFeet(seconds:Float):Void {
 		if (!canLockFeet || !posture.lockFeet) return;
-		var share = walker.stanceShare();
+		// A kneel puts a foot behind the body and a knee on the floor, which a foot held where it stood would fight.
+		var share = kneelNow > 0.01 || kneelGoal > 0.0 ? 0.0 : walker.stanceShare();
 		var wanted = Math.max(0.0, Math.min(1.0, (share - posture.lockFrom) / posture.lockSpan));
 		wanted = wanted * wanted * (3.0 - 2.0 * wanted);
 		var step = seconds / posture.lockSeconds;
@@ -303,6 +339,12 @@ class HumanBody {
 			}
 			setReachWorld(legs[side], anchor, footLock);
 		}
+	}
+
+	function moveKneel(seconds:Float):Void {
+		var step = posture.kneelRate * seconds;
+		kneelNow = Math.abs(kneelGoal - kneelNow) <= step ? kneelGoal : kneelNow + (kneelGoal > kneelNow ? step : -step);
+		if (character.canKneel() && Math.abs(character.kneel() - kneelNow) > 1e-9) character.setKneel(kneelNow);
 	}
 
 	function moveCrouch(seconds:Float):Void {
@@ -553,7 +595,9 @@ class HumanBody {
 		footAnchors[1] = null;
 		crouchGoal = 0.0;
 		crouchNow = 0.0;
-		if (character.canCrouch()) character.setCrouch(0.0);
+		kneelGoal = 0.0;
+		kneelNow = 0.0;
+		character.setDown(0.0, 0.0);
 	}
 
 	/**
@@ -569,10 +613,11 @@ class HumanBody {
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
 		// A lean swings an unused arm back with the torso, so while the body leans a free arm is held hanging.
-		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || crouchNow > 0.02 || armsDown, posture.hangSeconds);
+		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || crouchNow > 0.02 || kneelNow > 0.02 || armsDown, posture.hangSeconds);
 		moveFingers(seconds);
 		moveLean(seconds);
 		moveCrouch(seconds);
+		moveKneel(seconds);
 		walker.advance(seconds);
 		holdFeet(seconds);
 		evaluate();

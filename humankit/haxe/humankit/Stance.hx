@@ -6,6 +6,8 @@ typedef Stance = {
 	var failure:Null<String>;
 	/** How deep a crouch, 0 upright to 1 the full crouch. */
 	var crouch:Float;
+	/** How deep a kneel, 0 upright to 1 the lowest; a stance is a crouch or a kneel, not both. */
+	var kneel:Float;
 	var lean:Float;
 	/** How far back from the point, along the line to it, the shoulder's root stands. */
 	var standDistance:Float;

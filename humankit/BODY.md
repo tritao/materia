@@ -115,6 +115,15 @@ has only the standing stance, as before. The body lowers once the worker has arr
 does not walk. While a worker walks up to a surface its free arms are held down (`setArmsDown`) so a swing
 does not sweep a hand across the part.
 
+Below what a crouch reaches the worker kneels. `PickUp_Kneeling` goes down, picks up and comes back, so its descent (to where the pelvis
+is lowest) is measured and held like the crouch clip: depth is the fraction of the pelvis drop, and the arm reaches down as the clip's
+does (`HumanCharacter.setKneel`, `HumanBody.setKneel`). A kneel and a crouch are different ways down, not stages of one, so the planner tries
+standing, then crouches, and kneels only when the crouch is not comfortable and the kneel is easier (`discomfort`: short of the edge, past
+comfortable reach, past a comfortable lean). A body that is down puts its knees and thighs at the height of a low top, so the stance also
+keeps them behind the edge wherever they cross the slab's thickness (`legRadius`, `slabMargin`). Kneeling is slower than crouching
+(`kneelRate`), the foot hold is off for it (a foot held where it stood would fight the knee on the floor), and `ReleaseLimb` and `WalkTo`
+wait for the body to be up. On the library sweep it reaches tops from 0.3 m; a point at 0.2 m is out of reach.
+
 The Universal Animation Library character (`animkit/assets/quaternius-ual`) is the first that crouches;
 `UniversalSweepTests` runs the rack job on it from half a metre to a shelf.
 
@@ -176,7 +185,7 @@ renders a frame.
   by a centimetre or two. The bundled worker is unaffected. Bracing a hand on the top and hinging at the hips, so the
   chest overhangs the edge, would fix this; it is not done.
 - **Crouch is one clip.** Depth is a blend between standing and the clip's full crouch, so a middle depth is
-  a mixed pose, not a clip of its own; the planner reaches down to about half a metre, not the floor, and a
+  a mixed pose, not a clip of its own; the planner reaches down to about half a metre crouched and 0.3 m kneeling, not the floor, and a
   crouched worker does not walk. The clip's feet are not pinned: a foot may lift a few centimetres at full depth.
 - **Curls are tuned on the bundled hand.** The library character's relaxed idle hand starts partly curled, so
   a full curl overshoots toward a tight fist and a grip of a thin part cannot open the fingers further than
