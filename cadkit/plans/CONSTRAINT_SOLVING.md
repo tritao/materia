@@ -638,3 +638,17 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   list is now filled in the constructor, `JacobianCheck` refuses a residual
   with no rows, and the angle-row mutation check fails again as it should.
   The analytic Jacobians themselves still pass on every kind.
+
+### Pre-C4 cleanup 4: `SketchSolver` split by concern (2026-10-01)
+
+- `SketchLayout` (variables, constraints, validation, scale, starting pose),
+  `SketchEquations` (each kind's residual and analytic rows, generated from
+  the old code so the formulas are unchanged), `SketchPartition` (parts,
+  references, RCM ordering, local indices), `SketchPartSolver` (LM + polish
+  over a part, owning the envelope and scratch buffers), `SketchPartDiagnosis`
+  (diagnosis, structural row graph, witness pose), `SketchSolveCache` (part
+  keys and values); `SketchSolver` only orchestrates (~190 lines, was ~990).
+- The hidden mode state is gone: constraint subsets and shape-only
+  evaluation are arguments, rows go through a `SketchRowWriter`, buffers
+  belong to the part solver. Same tests pass unchanged; benchmark within
+  noise (bracket edit 0.9 ms; connected 1000-point drag 12.3 ms undiagnosed).
