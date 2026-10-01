@@ -10,6 +10,7 @@ import NativeKitEvents.NativeKitEventSubscription;
 class NativeInputAdapter {
 	final context:UiContext;
 	final source:Handle;
+	/** Surface source for accessibility and transactional text edits. */
 	final accessibilitySource:Handle;
 	final cursor:NativeCursorController;
 	final window:WindowHandle;
@@ -125,7 +126,7 @@ class NativeInputAdapter {
 			case TextInput(eventSource, codepoint) if (matches(eventSource)):
 				context.text(UiEventKind.TextInput, fromCodepoint(codepoint), codepoint);
 				true;
-			case TextEdit(eventSource, edit) if (matches(eventSource)):
+			case TextEdit(eventSource, edit) if (eventSource == accessibilitySource):
 				context.text(UiEventKind.TextEdit, edit.text, edit);
 				true;
 			case AccessibilityAction(eventSource, nodeId, action, value, selectionStart,

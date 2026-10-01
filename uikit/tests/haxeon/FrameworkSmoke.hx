@@ -1221,7 +1221,8 @@ class FrameworkSmoke {
 			editSeen = event.data != null && event.text == "compose";
 		});
 		var source = new Handle(17);
-		var input = new NativeInputAdapter(context, source);
+		var surface = new Handle(19);
+		var input = new NativeInputAdapter(context, source, surface);
 		var eventRuntime = NativeKitRuntime.start();
 		var eventPump = eventRuntime.events;
 		var pumpEvents = 0;
@@ -1283,7 +1284,9 @@ class FrameworkSmoke {
 			return 16;
 		var edit = new NativeKitTextEdit(TextEditAction.Compose, "compose", 0, 0,
 			0, 0, 0, 7);
-		if (!input.consume(TextEdit(source, edit)) || !editSeen)
+		if (input.consume(TextEdit(source, edit)) || editSeen ||
+			input.consume(TextEdit(new Handle(20), edit)) || editSeen ||
+			!input.consume(TextEdit(surface, edit)) || !editSeen)
 			return 17;
 		if (!input.consume(PointerEnter(source, false)) || hoverLeaves == 0)
 			return 18;
