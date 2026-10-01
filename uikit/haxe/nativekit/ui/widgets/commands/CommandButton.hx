@@ -60,7 +60,9 @@ class CommandButton implements View {
 		}, key);
 		button.variant = variant;
 		button.leadingIcon = leadingIcon;
-		if (displayLabel != null)
+		// An icon-only button takes the command's name; visible text names the button itself, so what a user
+		// reads is what assistive technology announces (WCAG 2.5.3, label in name).
+		if (displayLabel != null && displayLabel.length == 0)
 			button.accessibilityLabel = command.label;
 		button.enabled = command.isEnabled(actualContext);
 		button.selected = command.isChecked(actualContext);

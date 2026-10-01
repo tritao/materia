@@ -772,7 +772,7 @@ class SceneEditingTests {
     var session = new ProjectDocumentSession();
     var rate = new PropertyBinding(property(session.sensors.properties(), "rate"), session.sensors.context());
     var mountXProperty = [for (property in session.sensors.properties())
-      if (StringTools.endsWith(property.id, ":position-0")) property][0];
+      if (StringTools.endsWith(property.id, ":position-x")) property][0];
     var mountX = new PropertyBinding(mountXProperty, session.sensors.context());
     check(rate.apply(PropertyValue.Float(20.0)) == PropertyEditResult.Applied,
       "sensor workflow edits acquisition rate");
@@ -1222,7 +1222,7 @@ class SceneEditingTests {
         "perspective picking after framing");
       var originalTarget = camera.targetX;
       var originalRevision = tree.revision();
-      var x = new PropertyBinding(property(scene.properties(), "position-0"), scene.context());
+      var x = new PropertyBinding(property(scene.properties(), "position-x"), scene.context());
       check(x.apply(PropertyValue.Float(-2.5)) == PropertyEditResult.Applied, "position edit accepted");
       near(scene.info("box").localTransform().element(12), -2.5, "selected object moved");
       near(scene.info("tower").localTransform().element(12), 1.1, "other object unchanged");
@@ -1233,7 +1233,7 @@ class SceneEditingTests {
       check(scene.document.isDirty && scene.document.canUndo, "edit recorded in document");
 
       scene.select("tower");
-      var towerX = new PropertyBinding(property(scene.properties(), "position-0"), scene.context());
+      var towerX = new PropertyBinding(property(scene.properties(), "position-x"), scene.context());
       towerX.apply(PropertyValue.Float(2.0));
       check(scene.document.history.undoCount == 2, "different objects do not coalesce edits");
       scene.document.undo();

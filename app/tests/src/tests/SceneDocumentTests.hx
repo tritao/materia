@@ -32,7 +32,7 @@ class SceneDocumentTests {
   }
   static function edit(session:ProjectDocumentSession, value:Float):Void {
     session.scene.select("box");
-    new PropertyBinding(property(session.scene.properties(), "position-0"), session.scene.context()).apply(PropertyValue.Float(value));
+    new PropertyBinding(property(session.scene.properties(), "position-x"), session.scene.context()).apply(PropertyValue.Float(value));
   }
 
   public static function run():Void {

@@ -341,7 +341,7 @@ class HumanWorkerKind implements ObjectKindProvider {
   static function workerProperties(scene:EditorScene, id:String, prefix:String,
       fields:Array<PropertyDescriptor>):Array<PropertyDescriptor> {
     var all = ScenePropertyProvider.common(scene, id, prefix, fields);
-    return [for (field in all) if (field.id == prefix + "position-0" || field.id == prefix + "position-1" ||
+    return [for (field in all) if (field.id == prefix + "position-x" || field.id == prefix + "position-y" ||
       field.id == prefix + "visible" || field.id == prefix + "name" || fields.indexOf(field) >= 0) field];
   }
 

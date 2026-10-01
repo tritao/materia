@@ -103,7 +103,9 @@ import nativekit.ui.widgets.collections.TreeRootMetadata;
 import nativekit.ui.widgets.collections.TreeView;
 import nativekit.ui.widgets.collections.TreeViewModel;
 import FontCollection;
+import cadkit.CadKitError;
 import cadkit.parametric.ParametricError;
+import cadkit.parametric.RecomputeError;
 import bimkit.BimDocument;
 import robotkit.world.RemoteRobot;
 import robotkit.world.RobotWorld;
@@ -1754,11 +1756,19 @@ class ReferenceEditorApp implements DesktopUiApplication {
     return new Text(label, null, appearance.theme.tokens.textSecondary, TextStyleOverride.text(11.0, 0.8));
   }
 
+  /**
+   * Runs an edit that may fail on its CAD document: a rejected parameter, a feature that does not recompute, or
+   * a kernel error (in the browser, also a kit with no web build). The failure is logged and the edit dropped.
+   */
   function runSceneEdit(label:String, action:Void->Bool):Void {
     try {
       action();
     } catch (error:ParametricError) {
       log(label + ": " + error.message);
+    } catch (error:RecomputeError) {
+      log(label + ": " + error.toString());
+    } catch (error:CadKitError) {
+      log(label + ": " + error.toString());
     }
     commands.refresh();
   }

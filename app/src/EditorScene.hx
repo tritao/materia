@@ -2265,7 +2265,7 @@ class EditorScene {
     settings.category = "Transform";
     settings.unit = "m";
     settings.step = 0.1;
-    return new PropertyDescriptor(prefix + "position-" + axis, axis == 0 ? "Position X" : "Position Y",
+    return new PropertyDescriptor(prefix + (axis == 0 ? "position-x" : "position-y"), axis == 0 ? "Position X" : "Position Y",
       PropertyType.Float, function(_) return PropertyValue.Float(axis == 0 ? requiredObject(id).x : requiredObject(id).y),
       function(_, value) {
         switch (value) {

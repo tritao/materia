@@ -30,6 +30,9 @@ class Select<T> implements View {
 	public var onChange:T->Void;
 	public var hasChangeHandler(default, null):Bool;
 
+	/** The control's accessible name; without one it is named by the selected option. */
+	public var accessibilityLabel:Null<String> = null;
+
 	public function new(key:String, options:Array<SelectOption<T>>, value:T,
 			?onChange:T->Void, ?style:LayoutStyle) {
 		if (key == null || key.length == 0)
@@ -186,7 +189,7 @@ class Select<T> implements View {
 			SelectionIndicator.chevron(context, triggerNode, "trigger-indicator",
 				enabled ? context.theme.text : context.theme.disabledText, isOpen);
 			var triggerSemantics:Semantics = cast triggerNode.semantics;
-			triggerSemantics.label = selectedLabel;
+			triggerSemantics.label = accessibilityLabel == null ? selectedLabel : accessibilityLabel;
 			triggerSemantics.value = selectedLabel;
 			triggerSemantics.states |= AccessibilityState.HasPopup;
 			if (isOpen)

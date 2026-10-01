@@ -23,6 +23,11 @@ class TourFailure(Exception):
     pass
 
 
+# nativekit.ui.semantics.AccessibilityRole values, by the names WAI-ARIA gives those roles.
+ROLES = {"button": 1, "checkbox": 2, "radio": 3, "text": 4, "textbox": 5, "link": 6, "slider": 11, "dialog": 13,
+         "menu": 14, "menuitem": 16, "tablist": 17, "tab": 18, "switch": 20, "combobox": 22, "treeitem": 31}
+
+
 class Editor:
     def __init__(self, page, timeout):
         self.page = page
@@ -59,11 +64,14 @@ class Editor:
                 return json.loads(line[prefix + len("materia-report "):])
         raise TourFailure("the editor printed no report")
 
-    def widget(self, report, label=None, key=None):
+    def widget(self, report, label=None, key=None, role=None):
+        """A visible control by accessible role and name, as a user finds it, or by style key."""
+        role_id = None if role is None else ROLES[role]
         matches = [w for w in report["widgets"]
-                   if (label is None or w.get("label") == label) and (key is None or w.get("key") == key)]
+                   if (label is None or w.get("label") == label) and (key is None or w.get("key") == key)
+                   and (role_id is None or w.get("role") == role_id)]
         if not matches:
-            raise TourFailure(f"no visible widget with label={label!r} key={key!r}")
+            raise TourFailure(f"no visible widget with role={role!r} label={label!r} key={key!r}")
         # The innermost match is the control itself rather than a container sharing its label.
         return min(matches, key=lambda w: w["width"] * w["height"])
 
@@ -72,10 +80,10 @@ class Editor:
             "type": kind, "x": x, "y": y, "button": "none" if kind == "mouseMoved" else "left",
             "buttons": buttons, "clickCount": 0 if kind == "mouseMoved" else 1})
 
-    def click(self, label=None, key=None):
-        target = self.widget(self.report(), label, key)
+    def click(self, label=None, key=None, role=None):
+        target = self.widget(self.report(), label, key, role)
         if not target.get("enabled", True):
-            raise TourFailure(f"widget label={label!r} key={key!r} is disabled")
+            raise TourFailure(f"widget role={role!r} label={label!r} key={key!r} is disabled")
         x, y = target["x"] + target["width"] / 2, target["y"] + target["height"] / 2
         self.mouse("mouseMoved", x, y)
         self.mouse("mousePressed", x, y, 1)
@@ -112,45 +120,56 @@ def tour(editor):
     check(start["mode"] == "design", "the editor opens in Design mode")
 
     print("empty scene")
-    editor.click(key="start-empty-scene")
+    editor.click(role="button", label="Empty scene")
     empty = editor.report()
     check(len(empty["objects"]) == 0, "an empty scene has no objects")
     check(not enabled(empty, "editor.undo"), "nothing to undo in a new scene")
 
     print("add rectangles")
     for count in (1, 2):
-        editor.click(key="hierarchy-add")
+        editor.click(role="button", label="Add")
         check(any(w.get("label") == "Add rectangle" for w in editor.report()["widgets"]), "the Add menu lists rectangles")
-        editor.click(label="Add rectangle")
+        editor.click(role="menuitem", label="Add rectangle")
         added = editor.report()
         check(len(added["objects"]) == count, f"the scene has {count} object(s)")
         check(added["selected"] == added["objects"][-1]["id"], "the new rectangle is selected")
     check(enabled(added, "editor.undo"), "adding can be undone")
 
     print("undo and redo")
-    editor.click(key="toolbar-undo")
+    editor.click(role="button", label="Undo")
     undone = editor.report()
     check(len(undone["objects"]) == 1, "undo removes the second rectangle")
     check(enabled(undone, "editor.redo"), "the removal can be redone")
-    editor.click(key="toolbar-redo")
+    editor.click(role="button", label="Redo")
     check(len(editor.report()["objects"]) == 2, "redo restores it")
 
     print("inspector")
     selected = editor.report()["selected"]
-    # Property editors are keyed editor:<object>:<group>:<property>; position-0 is X.
-    editor.click(key=f"editor:{selected}:object:position-0")
+    editor.click(role="textbox", label="Position X (m)")
     editor.key("a", "KeyA", 65, modifiers=2)
     editor.type_text("1.5")
     editor.key("Enter", "Enter", 13, text="\r")
     moved = next(o for o in editor.report()["objects"] if o["id"] == selected)
     check(abs(moved["x"] - 1.5) < 1e-6, "editing Position X moves the rectangle")
+    check(editor.widget(editor.report(), role="textbox", label="Position X (m)")["value"] == "1.5",
+          "the field shows the new position")
 
     print("delete")
-    editor.click(key="scene-delete")
+    editor.click(role="button", label="Delete")
     check(len(editor.report()["objects"]) == 1, "delete removes the selected rectangle")
 
+    print("unavailable kit")
+    # CadKit has no browser build: the host throws haxeon.wasm.HostError, which the editor reports and survives.
+    before = len(editor.report()["objects"])
+    editor.click(role="button", label="Add")
+    editor.click(role="menuitem", label="Add mounting plate")
+    after = editor.report()
+    check(len(after["objects"]) == before, "a mounting plate needs CadKit, which the browser build lacks")
+    check(any("not available in this build" in line for line in after["state"]["recentLog"]),
+          "the editor logs why and keeps running")
+
     print("3D view")
-    editor.click(label="3D")
+    editor.click(role="tab", label="3D")
     check(editor.report()["state"]["perspective"] is not None, "the 3D view is open")
 
     print("simulation")

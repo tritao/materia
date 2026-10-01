@@ -84,7 +84,7 @@ class MainWeb {
   /**
    * Prints one `materia-report` line of JSON to the page's console: the editor's mode, scene objects, command
    * availability and diagnostic state, and every visible widget with a style key or accessibility label, with its
-   * bounds in CSS pixels. Browser tests (`web/tools/tour.py`) find controls through it and check each step.
+   * accessibility role (nativekit.ui.semantics.AccessibilityRole) and value and its bounds in CSS pixels. Browser tests (`web/tools/tour.py`) find controls through it and check each step.
    */
   @:expose public static function report():Int {
     var app = editor;
@@ -124,13 +124,17 @@ class MainWeb {
 
   static function collectWidgets(node:nativekit.ui.core.RenderNode, into:Array<Dynamic>):Void {
     var resolved = node.resolved, semantics = node.semantics;
-    var label:Null<String> = null;
-    if (semantics != null) label = semantics.label;
+    var label:Null<String> = null, value:Null<String> = null, role:Null<Int> = null;
+    if (semantics != null) {
+      label = semantics.label;
+      value = semantics.value;
+      role = semantics.role;
+    }
     if (resolved != null && (node.styleKey != null || label != null)) {
       var bounds = resolved.clippedViewportBounds();
       if (bounds.width > 0 && bounds.height > 0)
-        into.push({key: node.styleKey, label: label, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
-          enabled: node.enabled});
+        into.push({key: node.styleKey, label: label, role: role, value: value, x: bounds.x, y: bounds.y,
+          width: bounds.width, height: bounds.height, enabled: node.enabled});
     }
     for (child in node.children) collectWidgets(child, into);
   }

@@ -88,7 +88,8 @@ const fs = require("fs");
 const [guestPath, exportsPath] = process.argv.slice(2);
 const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render"]);
 const module = new WebAssembly.Module(fs.readFileSync(guestPath));
-const names = new Set(["_main", "_nk_last_error", "_nkgpu_last_error", "_nkui_haxeon_memory_contract_status",
+// haxeon-host.js allocates with malloc/free to hand the guest a host error message (haxeon.wasm.HostError).
+const names = new Set(["_main", "_malloc", "_free", "_nk_last_error", "_nkgpu_last_error", "_nkui_haxeon_memory_contract_status",
   "_nkui_haxeon_memory_contract_version", "_nkui_haxeon_memory_contract_page_size",
   "_nkui_haxeon_memory_contract_host_base", "_nkui_haxeon_memory_contract_host_limit",
   "_nkui_haxeon_memory_contract_guest_base", "_nkui_haxeon_memory_contract_guest_limit",

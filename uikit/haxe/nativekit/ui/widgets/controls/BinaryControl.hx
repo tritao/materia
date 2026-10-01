@@ -31,6 +31,9 @@ import nativekit.ui.theme.TextRole;
 class BinaryControl implements View {
 	public final key:String;
 	public final label:String;
+
+	/** Names the control for assistive technology when its visible label is elsewhere, as in a property row. */
+	public var accessibilityLabel:Null<String> = null;
 	public var checked:Bool;
 	public var enabled:Bool;
 	public var onChange:Null<Bool->Void>;
@@ -73,7 +76,8 @@ class BinaryControl implements View {
 			node.computedStyle = computed;
 			node.focusable = enabled;
 			node.enabled = enabled;
-			var semantics = new Semantics(toggle ? AccessibilityRole.Switch : AccessibilityRole.Checkbox, label,
+			var semantics = new Semantics(toggle ? AccessibilityRole.Switch : AccessibilityRole.Checkbox,
+				accessibilityLabel == null ? label : accessibilityLabel,
 				checked ? "true" : "false");
 			semantics.actions = toggle ? AccessibilityAction.Toggle : AccessibilityAction.Activate;
 			if (checked)

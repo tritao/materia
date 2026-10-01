@@ -143,6 +143,10 @@ class PropertyEditor implements View {
 		applyValue(context, descriptor, parsed);
 	}
 
+	/** The row's visible label, which also names its control for assistive technology. */
+	public static function accessibleName(descriptor:PropertyDescriptor):String
+		return descriptor.unit == null ? descriptor.label : descriptor.label + " (" + descriptor.unit + ")";
+
 	function errorFor(id:String):Null<String>
 		return errors.get(id);
 
@@ -196,6 +200,7 @@ class PropertyEditor implements View {
 					applyValue(context, descriptor, PropertyValue.Bool(next));
 				});
 				checkbox.enabled = writable;
+				checkbox.accessibilityLabel = accessibleName(descriptor);
 				result = checkbox;
 			case PropertyType.Enum:
 				var selected = descriptor.options.length == 0 ? "" : descriptor.options[0].key;
@@ -213,6 +218,7 @@ class PropertyEditor implements View {
 					applyValue(context, descriptor, PropertyValue.Enum(next));
 				}, selectStyle);
 				select.enabled = writable;
+				select.accessibilityLabel = accessibleName(descriptor);
 				result = select;
 			case PropertyType.Int | PropertyType.Float:
 				result = numericEditor(context, descriptor, value, editorKey, writable);
@@ -249,6 +255,7 @@ class PropertyEditor implements View {
 				applyValue(context, descriptor, PropertyValue.Enum(next));
 		});
 		select.enabled = writable;
+		select.accessibilityLabel = accessibleName(descriptor);
 		return select;
 	}
 
@@ -265,7 +272,7 @@ class PropertyEditor implements View {
 		var sliderStyle = new LayoutStyle();
 		sliderStyle.width = LayoutAxis.grow();
 		var step = descriptor.step == null ? 0.01 : descriptor.step;
-		var slider = new Slider(editorKey + ":slider", descriptor.label, number,
+		var slider = new Slider(editorKey + ":slider", accessibleName(descriptor), number,
 			descriptor.minimum, descriptor.maximum, step, function(next) {
 				if (descriptor.type == PropertyType.Int)
 					applyValue(context, descriptor, PropertyValue.Int(Std.int(next)));
@@ -294,6 +301,7 @@ class PropertyEditor implements View {
 		}, fieldStyle);
 		field.classes = ["property-input"];
 		field.enabled = writable;
+		field.label = accessibleName(descriptor);
 		field.placeholder = isMixed(value) ? "Mixed" : null;
 		field.onSubmit = function(next) {
 			commitText(context, descriptor, next);
@@ -362,8 +370,7 @@ private class PropertyEditorRowContent implements View {
 		rowStyle.childAlignY = LayoutAlignmentY.Center;
 		rowStyle.childGap = 8.0;
 		var children:Array<KeyedView> = [
-			new KeyedView("label", new Text(descriptor.unit == null ? descriptor.label :
-				descriptor.label + " (" + descriptor.unit + ")", labelStyle)),
+			new KeyedView("label", new Text(PropertyEditor.accessibleName(descriptor), labelStyle)),
 			new KeyedView("value", owner.editorView(context, descriptor, value))
 		];
 		// Like a revert arrow: offered only while the value differs from its default.

@@ -612,7 +612,7 @@ class SensorConfiguration {
       [for (link in owner.links) new PropertyOption(link.id, link.name)], "Mount"));
     var frame=sensor.frame;
     if(frame!=null) {
-      for(axis in 0...3) result.push(number(sensor,"position-"+axis,"Mount "+["X","Y","Z"][axis],
+      for(axis in 0...3) result.push(number(sensor,"position-"+["x","y","z"][axis],"Mount "+["X","Y","Z"][axis],
         function() return frame.position[axis], function(value) { frame.position[axis] = value; },
         -1000000.0,1000000.0,"m",0.01));
       for(axis in 0...4) result.push(number(sensor,"rotation-"+axis,"Rotation "+["X","Y","Z","W"][axis],

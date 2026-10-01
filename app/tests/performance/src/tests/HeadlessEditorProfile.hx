@@ -218,7 +218,7 @@ class HeadlessEditorProfile {
       submit(editor, frame, frames, "property-visible", cycle, visibleInput);
       action(actions, "property-visible", cycle);
 
-      var positionKey = propertyEditorKey(editor, "position-0");
+      var positionKey = propertyEditorKey(editor, "position-x");
       var positionInput = measuredClick(editor, positionKey, "property-position");
       editor.ui.key(UiEventKind.KeyDown, UiKey.A, UiModifier.Control);
       editor.ui.text(UiEventKind.TextInput, Std.string(0.1 + cycle * 0.01));
