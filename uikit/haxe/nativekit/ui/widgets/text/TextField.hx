@@ -54,6 +54,8 @@ class TextField implements View {
 	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
 	/** Backgrounds and underlines in absolute document codepoint coordinates. */
 	public var decorationProvider:Null<(Int, Int)->Array<TextDecoration>>;
+	/** Increment when state captured by presentation providers changes. */
+	public var presentationRevision:Int = 0;
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
@@ -148,8 +150,7 @@ class TextField implements View {
 					editor.scrollToEnd();
 			}
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
-			editor.layout.colorRangeProvider = colorRangeProvider;
-			editor.layout.decorationProvider = decorationProvider;
+			editor.configurePresentation(colorRangeProvider, decorationProvider, presentationRevision);
 
 			var flags = context.interactionStates.get(id);
 			flags = StyleStateUtil.withState(flags, StyleState.Disabled, !enabled);

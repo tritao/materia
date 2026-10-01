@@ -316,6 +316,30 @@ class FrameworkSmoke {
 			throw "decoration transaction measurement";
 		list.dispose();
 		canvas.reset();
+		var paintCalls = 0;
+		var provider = function(start:Int, end:Int):Array<TextDecoration> {
+			paintCalls++;
+			return [wavy];
+		};
+		var measurementVersion = editor.renderContent.getVersion();
+		editor.configurePresentation(null, provider, 1);
+		var geometry = new ResolvedLayoutItem(1, 1, 0.0, 0.0, 200.0, 100.0,
+			new Rect(0.0, 0.0, 200.0, 100.0), new Rect(0.0, 0.0, 200.0, 100.0), Transform2D.identity(), 0.0);
+		var painted = editor.renderContent.paint(geometry);
+		var decoratedCommands = painted.info().commandCount;
+		editor.renderContent.paint(geometry);
+		if (paintCalls != 1) throw "unchanged presentation did not retain its display list";
+		editor.configurePresentation(null, provider, 2);
+		editor.renderContent.paint(geometry);
+		if (paintCalls != 2 || editor.renderContent.getVersion() != measurementVersion)
+			throw "presentation revision did not repaint independently of measurement";
+		editor.configurePresentation(null, provider, 2);
+		editor.renderContent.paint(geometry);
+		if (paintCalls != 2) throw "unchanged presentation revision repainted";
+		editor.configurePresentation(null, null, 3);
+		if (editor.renderContent.paint(geometry).info().commandCount >= decoratedCommands ||
+			editor.renderContent.getVersion() != measurementVersion || editor.layout.measure().height != before.height)
+			throw "cleared presentation retained decoration commands or changed measurement";
 		if (!editor.replace(0, 0, "zz"))
 			throw "decoration edit application";
 		var moved = new TextDecoration(3, 7, color, Underline).rectangles(editor.layout, 0.0, 100.0);

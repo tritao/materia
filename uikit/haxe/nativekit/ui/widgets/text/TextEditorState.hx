@@ -3,6 +3,7 @@ package nativekit.ui.widgets.text;
 import nativekit.ffi.NativeKitTypes.TextEditAction;
 import FontCollection;
 import Color;
+import TextColorRange;
 import LayoutMeasureConstraints;
 import LayoutMeasureResult;
 import LayoutMeasuredContent;
@@ -39,6 +40,7 @@ class TextEditorState {
 	public var draggingSelection:Bool;
 	public final layout:TextEditorLayout;
 	public final renderContent:LayoutRenderableContent;
+	var presentationRevision:Int = -1;
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
@@ -140,6 +142,18 @@ class TextEditorState {
 	}
 
 	/** Uses a caller-owned document as the source of truth for this editor. */
+	/** Presentation callbacks may change without text or measurement changing. */
+	public function configurePresentation(foreground:Null<(Int, Int)->Array<TextColorRange>>,
+			decorations:Null<(Int, Int)->Array<TextDecoration>>, revision:Int):Void {
+		ensureLive();
+		if (revision != presentationRevision || foreground != layout.colorRangeProvider ||
+			decorations != layout.decorationProvider)
+			renderContent.invalidatePaint();
+		layout.colorRangeProvider = foreground;
+		layout.decorationProvider = decorations;
+		presentationRevision = revision;
+	}
+
 	public function syncDocument(document:TextDocument):Bool {
 		ensureLive();
 		if (document == null)
