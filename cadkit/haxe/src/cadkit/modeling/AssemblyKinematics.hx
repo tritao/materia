@@ -10,6 +10,7 @@ import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
 import materia.assembly.AssemblyDefinition.AssemblyJointType;
+import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /**
@@ -27,8 +28,11 @@ class AssemblyKinematics {
     this.model = model;
   }
 
-  /** `definition` must already be flattened (see `AssemblyDefinitionFlattener`). */
-  public static function compile(definition:AssemblyDefinition):AssemblyKinematics {
+  /**
+   * `definition` must already be flattened (see `AssemblyDefinitionFlattener`). With `withMates`, its mates
+   * become closures too (only the mate solver wants them: they place parts, so loop solves ignore them).
+   */
+  public static function compile(definition:AssemblyDefinition, withMates:Bool = false):AssemblyKinematics {
     var builder = new KinematicModelBuilder();
     var components = new Map<String, AssemblyComponentDefinition>();
     for (component in definition.definitions) components.set(component.id, component);
@@ -84,6 +88,22 @@ class AssemblyKinematics {
       var axis = joint.axis == null ? null : new Vector3(joint.axis.x, joint.axis.y, joint.axis.z);
       builder.addClosure(joint.id, kind, frameIndexIn(builder, joint.parent, joint.parentConnector),
         frameIndexIn(builder, joint.child, joint.childConnector), axis, joint.closureTolerance);
+    }
+    if (withMates && definition.mates != null) for (mate in definition.mates) {
+      var kind = switch mate.kind {
+        case AssemblyMateKind.Coincident: ClosureKind.Spherical;
+        case AssemblyMateKind.Coaxial: ClosureKind.Cylindrical;
+        case AssemblyMateKind.Planar: ClosureKind.Planar;
+        case AssemblyMateKind.Parallel: ClosureKind.Parallel;
+        case AssemblyMateKind.Perpendicular: ClosureKind.Perpendicular;
+        case AssemblyMateKind.Distance: ClosureKind.Distance;
+        case AssemblyMateKind.Angle: ClosureKind.Angle;
+        case AssemblyMateKind.Lock: ClosureKind.Fixed;
+        default: throw 'Unsupported assembly mate kind "${mate.kind}"';
+      };
+      builder.addClosure(mate.id, kind, frameIndexIn(builder, mate.first, mate.firstConnector),
+        frameIndexIn(builder, mate.second, mate.secondConnector), new Vector3(mate.axis.x, mate.axis.y, mate.axis.z), null,
+        mate.value == null ? 0.0 : mate.value);
     }
     return new AssemblyKinematics(builder.build());
   }

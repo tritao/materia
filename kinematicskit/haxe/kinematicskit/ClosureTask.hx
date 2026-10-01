@@ -8,7 +8,9 @@ package kinematicskit;
  * - Prismatic: `pB − pA` across A's axis (2), the axis rows (2) and the twist about the axis (1);
  * - Cylindrical: the Prismatic rows without the twist (4);
  * - Spherical: `pB − pA` (3);
- * - Planar: `pB − pA` along A's axis, the plane normal (1), and the axis rows (2).
+ * - Planar: `pB − pA` along A's axis, the plane normal, minus the offset value (1), and the axis rows (2);
+ * - Parallel: the axis rows (2); Perpendicular: a·b (1); Angle: a·b − cos(value) (1);
+ * - Distance: |pB − pA| − value (1).
  * Axis rows accept anti-parallel axes. The residual definitions match
  * CadKit's `AssemblyLoopSolver`; Jacobians are analytic (exact for the
  * position and fixed-rotation rows, first order in the transverse and axis
@@ -41,6 +43,8 @@ class ClosureTask implements KinematicTask {
       case ClosureKind.Fixed: 6;
       case ClosureKind.Revolute: 5;
       case ClosureKind.Spherical, ClosureKind.Planar: 3;
+      case ClosureKind.Parallel: 2;
+      case ClosureKind.Perpendicular, ClosureKind.Distance, ClosureKind.Angle: 1;
       case ClosureKind.Prismatic: 5;
       default: 4; // Cylindrical
     };
@@ -100,7 +104,7 @@ class ClosureTask implements KinematicTask {
       case ClosureKind.Planar:
         // B's origin on A's plane: d·a, with d(d·a) = a·(v_B − v_A) + (a × d)·ω_A exactly.
         var ax = s[14], ay = s[15], az = s[16];
-        var along = dx * ax + dy * ay + dz * az;
+        var along = dx * ax + dy * ay + dz * az - model.closureValue[closure];
         var cx = ay * dz - az * dy, cy = az * dx - ax * dz, cz = ax * dy - ay * dx;
         residual[r] = -p * along;
         for (c in 0...w) {
@@ -112,6 +116,33 @@ class ClosureTask implements KinematicTask {
         lastPositionError = Math.abs(along);
         lastOrientationError = axisAngle();
         axisRows(residual, jacobian, r, w, g);
+      case ClosureKind.Parallel:
+        lastPositionError = 0;
+        lastOrientationError = axisAngle();
+        axisRows(residual, jacobian, r, w, g);
+      case ClosureKind.Perpendicular, ClosureKind.Angle:
+        // a·b against 0 or cos(value); d(a·b) = (a × b)·(ω_A − ω_B) exactly.
+        var ax = s[14], ay = s[15], az = s[16], bx = s[17], by = s[18], bz = s[19];
+        var target = kind == ClosureKind.Angle ? Math.cos(model.closureValue[closure]) : 0.0;
+        var value = ax * bx + ay * by + az * bz - target;
+        var cx = ay * bz - az * by, cy = az * bx - ax * bz, cz = ax * by - ay * bx;
+        residual[r] = -g * value;
+        for (c in 0...w)
+          jacobian[r * w + c] = g * (cx * (jacobianA[3 * w + c] - jacobianB[3 * w + c]) +
+            cy * (jacobianA[4 * w + c] - jacobianB[4 * w + c]) + cz * (jacobianA[5 * w + c] - jacobianB[5 * w + c]));
+        lastPositionError = 0;
+        lastOrientationError = Math.abs(value);
+      case ClosureKind.Distance:
+        // |d| − value; d|d| = d̂·(v_B − v_A), undefined only when the origins meet.
+        var length = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        var value = length - model.closureValue[closure];
+        residual[r] = -p * value;
+        var ux = length > 0 ? dx / length : 0.0, uy = length > 0 ? dy / length : 0.0, uz = length > 0 ? dz / length : 0.0;
+        for (c in 0...w)
+          jacobian[r * w + c] = p * (ux * (jacobianB[c] - jacobianA[c]) + uy * (jacobianB[w + c] - jacobianA[w + c]) +
+            uz * (jacobianB[2 * w + c] - jacobianA[2 * w + c]));
+        lastPositionError = Math.abs(value);
+        lastOrientationError = 0;
       default: // Prismatic (with its twist row below), Cylindrical
         var ax = s[14], ay = s[15], az = s[16];
         var along = dx * ax + dy * ay + dz * az;

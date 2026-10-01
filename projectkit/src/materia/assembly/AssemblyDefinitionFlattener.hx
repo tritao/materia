@@ -5,6 +5,7 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyExposedConnector;
 import materia.assembly.AssemblyDefinition.AssemblyJointCoupling;
+import materia.assembly.AssemblyDefinition.AssemblyMate;
 import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
 import materia.assembly.AssemblyDefinition.AssemblyRootPose;
@@ -82,14 +83,14 @@ class AssemblyDefinitionFlattener {
 		flat.couplings = [];
 		var active = new Map<String, Bool>();
 		var rootMembers = expand("", AssemblyFrames.identity(), source.definitions, source.occurrences, source.joints,
-			source.couplings, library, flat, active);
+			source.couplings, source.mates, library, flat, active);
 		exposed(source.exposedConnectors, rootMembers, source.id);
 		for (entry in source.assemblies) {
 			var unused:AssemblyDefinition = {schemaVersion: source.schemaVersion, id: entry.id,
 				definitions: [], occurrences: [], joints: [], couplings: []};
 			active.set(entry.id, true);
 			var members = expand("", AssemblyFrames.identity(), entry.definitions, entry.occurrences, entry.joints,
-				entry.couplings, library, unused, active);
+				entry.couplings, entry.mates, library, unused, active);
 			active.remove(entry.id);
 			exposed(entry.exposedConnectors, members, entry.id);
 			AssemblyDefinitionCodec.validate(unused);
@@ -99,7 +100,7 @@ class AssemblyDefinitionFlattener {
 
 	static function expand(prefix:String, pose:AssemblyFrame, definitions:Array<AssemblyComponentDefinition>,
 			occurrences:Array<AssemblyComponentOccurrence>, joints:Array<KinematicJoint>, couplings:Array<AssemblyJointCoupling>,
-			library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>):Map<String, FlatMember> {
+			mates:Null<Array<AssemblyMate>>, library:Map<String, AssemblySubdefinition>, flat:AssemblyDefinition, active:Map<String, Bool>):Map<String, FlatMember> {
 		if (definitions == null || occurrences == null || joints == null) throw "Nested assembly has missing members or joints";
 		var localDefinitions = new Map<String, AssemblyComponentDefinition>();
 		var emittedDefinitions = new Map<String, Bool>();
@@ -132,7 +133,7 @@ class AssemblyDefinitionFlattener {
 				if (nested == null) throw 'Assembly "$path" references a missing nested definition';
 				active.set(nested.id, true);
 				var children = expand(path, worldPose, nested.definitions, nested.occurrences, nested.joints,
-					nested.couplings, library, flat, active);
+					nested.couplings, nested.mates, library, flat, active);
 				active.remove(nested.id);
 				connectors = exposed(nested.exposedConnectors, children, path);
 			} else {
@@ -142,7 +143,9 @@ class AssemblyDefinitionFlattener {
 					flat.definitions.push({id: scoped(prefix, component.id), connectors: component.connectors});
 					emittedDefinitions.set(component.id, true);
 				}
-				flat.occurrences.push({id: path, definition: scoped(prefix, occurrence.definition), initialPose: worldPose});
+				var flatOccurrence:AssemblyComponentOccurrence = {id: path, definition: scoped(prefix, occurrence.definition), initialPose: worldPose};
+				if (occurrence.grounded == true) flatOccurrence.grounded = true;
+				flat.occurrences.push(flatOccurrence);
 				for (connector in component.connectors)
 					connectors.set(connector.name, {occurrence: path, connector: connector.name});
 			}
@@ -162,6 +165,15 @@ class AssemblyDefinitionFlattener {
 		if (couplings != null) for (coupling in couplings)
 			flat.couplings.push({id: scoped(prefix, coupling.id), source: scoped(prefix, coupling.source),
 				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset});
+		if (mates != null) for (mate in mates) {
+			var first = endpoint(members, mate.first, mate.firstConnector, prefix);
+			var second = endpoint(members, mate.second, mate.secondConnector, prefix);
+			var expanded:AssemblyMate = {id: scoped(prefix, mate.id), kind: mate.kind, first: first.occurrence,
+				firstConnector: first.connector, second: second.occurrence, secondConnector: second.connector, axis: mate.axis};
+			if (mate.value != null) expanded.value = mate.value;
+			if (flat.mates == null) flat.mates = [];
+			flat.mates.push(expanded);
+		}
 		return members;
 	}
 

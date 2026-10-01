@@ -682,3 +682,35 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   `assembly_closures_compile_as_equalities` covers all six types; simkit
   ctest 58/58 (one uinput test skipped). The app compiles; an end-to-end
   simulation with the new kinds needs the app's native libraries rebuilt.
+
+### C4.1–C4.2 — Mate schema; mates as closure rows (2026-10-01)
+
+- Decision change: mates compile to kinematicskit closures instead of a
+  separate `MateTask` (a closure already is a frame-frame equality with
+  analytic rows, diagnosis and FD tests). Coincident → Spherical, coaxial →
+  Cylindrical, lock → Fixed, planar → Planar (now with an offset `value`);
+  new closure kinds Parallel (2 rows), Perpendicular and Angle (a·b against 0
+  or cos value; d(a·b) = (a × b)·(ω_A − ω_B) exactly) and Distance
+  (|d| − value, exact). `KinematicModel.closureValue` carries the values.
+  `AssemblyKinematics.compile(definition, withMates)` adds mates only for the
+  mate solver, so loop solves and drags never see them.
+- Schema: `AssemblyMateKind`, `AssemblyMate` (two occurrence connectors, an
+  axis in each connector frame, optional value) on definitions and nested
+  assemblies; `AssemblyComponentOccurrence.grounded` (what mates never move,
+  for C4.3). The flattener scopes and resolves mates like joints (and emits
+  the field only when there are mates); the codec validates ids (distinct
+  from joints), kinds, connectors, values (distance/angle need one; distance
+  ≥ 0).
+- **Found:** kinematicskit's LM damps Marquardt-style (λ·diag JᵀJ). For an
+  under-determined problem, which a mate on a free part always is, JᵀJ is
+  rank-deficient and a column with a small gradient gets a huge step that the
+  step clamp then shrinks to nothing: a single distance mate over six free
+  coordinates stalled. New opt-in `levenberg` mode damps λ·max(diag)·I (the
+  minimum-norm step); existing callers are unchanged, the mate solver will
+  opt in.
+- `MateRowsSmoke`: every mate kind solved over a six-joint chain (three
+  slides, three hinges) and checked against central differences at the
+  solution; codec round trip and rejections; nested scoping.
+- **haxeon:** `Reflect.deleteField` on a typed record (fixed layout) returned
+  false and left the field; fixed in haxeon's runtime (see its commit), which
+  the codec rejection test relies on.
