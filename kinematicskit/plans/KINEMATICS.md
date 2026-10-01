@@ -368,6 +368,58 @@ and per-task residuals / limit hits; commit through an undoable editor
 command. For a design-mode assembly the commit updates `AssemblyState`
 coordinates; for a running robot the target goes through MotionKit.
 
+## K6 — Consolidation after Lane D (2026-10-01)
+
+Lane D added working pieces as separate special cases. K6 folds them into
+one structure before collision checking (which should plug into one group
+and one solver, not four IK paths).
+
+- **KK-D15 — One kinematic group.** RobotKit's `KinematicGroup` is the
+  joints from a root link to a tool frame, plus optionally the joints to a
+  work frame (a positioner). Poses are in the work frame when there is one,
+  else in the root (base) link's frame. It names its external axes (damped),
+  its redundancy (`ArmSwivel`) and its base motion (K5). `Manipulator` is
+  the fixed-base, no-work-frame case (a subclass keeping its constructor).
+  IK has one entry point, `solve(target, seed, options)`. `IkOptions`
+  carries the tolerances, the TCP or flange target, the method (tracking,
+  reaching, prioritized), a swivel goal, a preferred posture and a moving
+  base. `solveIk`, `solveIkForTcp`, `solveIkAtSwivel`, `solveIkWithBase` and
+  `CoordinatedGroup` go.
+- **KK-D16 — Prioritized solves are exact.** `PrioritizedSolver`
+  (pure Haxe, so the editor and the browser keep IK) solves each iteration
+  as an equality-constrained least-squares step. Hard tasks are equalities,
+  soft tasks (posture, swivel preference, DOF damping) are the objective,
+  and limits are an active set. This replaces the two-pass posture solve.
+  It revises KK-D3 for this one solver: priorities are exact equalities,
+  not weights. A ProxQP twin in the native core is added only if speed
+  calls for it.
+- **KK-D17 — Step limits live in the kit.** The servo's per-tick bounds
+  (position, velocity, acceleration, braking, ramped chunks) become a
+  kinematicskit `StepLimits`, used by `DifferentialIk` with a
+  `FrameVelocityTask`. `ManipulatorServo` keeps only its API.
+- **KK-D18 — Solvers own their path search.** MotionKit's `PathSolver`
+  interface (`solvePath`) is implemented by OPW (native selection), by
+  redundant groups (the redundancy lattice) and by a generic sampling
+  selector. `ProgramCompiler` asks the solver; it no longer switches on its
+  type.
+- **KK-D19 — One redundancy resolver.** `RedundancyParameterization` names
+  the motion left after the tool pose: the swivel of a 7R arm, the values
+  of a cell's external axes, later a mobile base's pose. Each can report
+  its values for `q` and solve at given values. `RedundancyResolver` runs
+  D3's pipeline over any of them: grow a lattice along the path, select the
+  cheapest route (Descartes), smooth, re-solve exactly.
+
+Steps, each its own commit with all suites green:
+- K6a: `KinematicGroup` + `IkOptions`; migrate callers; `Manipulator`
+  subclass; `CoordinatedGroup` deleted.
+- K6b: `PrioritizedSolver`; the group's preferred-posture solve uses it.
+- K6c: `StepLimits` + `FrameVelocityTask`; `ManipulatorServo` on
+  `DifferentialIk`.
+- K6d: `PathSolver`; `PathConfigurationSelector` becomes the generic
+  sampler.
+- K6e: `RedundancyParameterization` (swivel, external axes) +
+  `RedundancyResolver`; D3 and D6 paths both go through it.
+
 ## Progress log
 
 ### K0 — Compiled model and snapshot (2026-09-30)
@@ -797,3 +849,27 @@ coordinates; for a running robot the target goes through MotionKit.
   needed budget a solve now converges; one step fewer is still the limit.
   The robot-arm motion check, MotionKit (6746), ToolpathKit (2975),
   cadbridge (129) and RobotKit (4785) are unchanged by it.
+
+### K6a — One kinematic group (2026-10-01)
+
+- RobotKit's `KinematicGroup` merges `Manipulator` and `CoordinatedGroup`.
+  Every pose, Jacobian and IK target is in its reference frame: the work
+  frame when there is one, else the root link's.
+  - Jacobians are J_tool − J_reference, rotated into the reference frame.
+    For a fixed base the reference term is zero, so nothing changes there.
+  - The tool task targets the reference frame through
+    `FrameTask.relativeTo` when there is a work frame. Without one, the root
+    link's pose turns the target into a world target once, as before.
+- `Manipulator` is now a small subclass: the fixed-base, no-work-frame case.
+  It keeps `baseLink` and `withTool`.
+- One entry point: `solve(target, seed, IkOptions)`.
+  - `IkOptions` carries the tolerances, tracking (DLS) or reaching (LM),
+    `flange()`, `atSwivel(angle, exact)`, `preferring(posture)` and
+    `movingBase(rootPose)`.
+  - `solveIk`, `solveIkForTcp`, `solveIkAtSwivel`, `solveIkWithBase`,
+    `CoordinatedGroup` and MotionKit's `CoordinatedKinematics` are gone.
+- `ManipulatorKinematics` adapts any group and carries an optional preferred
+  posture; the D6 test runs through it.
+- The default swivel and `redundant()` count the arm's DOFs, not the
+  external axes.
+- The preferred-posture solve still has two passes; K6b replaces them.

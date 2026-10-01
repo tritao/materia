@@ -1,5 +1,6 @@
 package tests;
 
+import robotkit.manipulation.IkOptions;
 import haxe.Int64;
 import robotkit.model.RobotModel;
 import robotkit.model.Link;
@@ -65,7 +66,7 @@ class ToolTests {
     var qTrue = [0.3, -0.6, 0.9, -0.4, 0.5, -0.2];
     var target = manipulator.tcpPose(qTrue);
     var seed = [for (i in 0...6) qTrue[i] + 0.05];
-    var result = manipulator.solveIkForTcp(target, seed, 1e-4, 1e-3, 100, 0.02);
+    var result = manipulator.solve(target, seed, new IkOptions(1e-4, 1e-3, 100, 0.02));
     check(result.converged, "IK to a TCP target converges");
     var achieved = manipulator.tcpPose(result.q);
     check(approx(achieved.translation.x, target.translation.x, 1e-3) &&

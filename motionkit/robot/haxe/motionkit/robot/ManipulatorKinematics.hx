@@ -5,7 +5,9 @@ import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
-import robotkit.manipulation.Manipulator;
+import robotkit.manipulation.IKResult;
+import robotkit.manipulation.IkOptions;
+import robotkit.manipulation.KinematicGroup;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
@@ -21,10 +23,16 @@ import robotkit.spatial.Vec3;
  * swivel along a chosen path and re-solves it exactly there.
  */
 class ManipulatorKinematics implements KinematicsSolver {
-  public final manipulator:Manipulator;
+  /** The group solved: an arm (`Manipulator`), or an arm with external axes and a work frame. */
+  public final manipulator:KinematicGroup;
+  /**
+   * A posture the solves draw the arm towards (`q` order): with external
+   * axes, the arm stays comfortable and they bring the work to it.
+   */
+  public var preferredPosture:Null<Array<Float>> = null;
   public final differentialDamping:Float;
 
-  public function new(manipulator:Manipulator, ?differentialDamping:Float = 1e-6) {
+  public function new(manipulator:KinematicGroup, ?differentialDamping:Float = 1e-6) {
     if (manipulator == null) throw "Manipulator kinematics requires a manipulator";
     if (!Math.isFinite(differentialDamping) || differentialDamping <= 0.0)
       throw "Differential IK damping must be finite and positive";
@@ -42,14 +50,11 @@ class ManipulatorKinematics implements KinematicsSolver {
     if (manipulator.redundant() && seed != null) {
       var swivel = manipulator.swivelAngle(seed);
       if (Math.isFinite(swivel)) {
-        var kept = manipulator.solveIkAtSwivel(toTransform(target), seed, swivel, true, tolerance.position,
-          tolerance.orientation, 1e-4, tolerance.maxIterations, tolerance.damping);
+        var kept = solveAtSwivel(toTransform(target), seed, swivel, false, tolerance);
         if (kept.converged) return kept.q.copy();
       }
     }
-    var result = manipulator.solveIkForTcp(toTransform(target), seed,
-      tolerance.position, tolerance.orientation, tolerance.maxIterations,
-      tolerance.damping);
+    var result = manipulator.solve(toTransform(target), seed, options(tolerance));
     return result.converged ? result.q.copy() : null;
   }
 
@@ -108,8 +113,7 @@ class ManipulatorKinematics implements KinematicsSolver {
         for (step in 1...Std.int(steps / 2) + 1) {
           if (candidates.length >= maxCount) return candidates;
           var angle = start + direction * 2.0 * Math.PI * step / steps;
-          var solved = manipulator.solveIkAtSwivel(goal, seed, angle, false, tolerance.position,
-            tolerance.orientation, 1e-4, tolerance.maxIterations, tolerance.damping);
+          var solved = solveAtSwivel(goal, seed, angle, true, tolerance);
           if (!solved.converged) break;
           seed = solved.q;
           if (!containsNear(candidates, solved.q, tolerance.candidateSeparation)) candidates.push(solved.q.copy());
@@ -142,11 +146,9 @@ class ManipulatorKinematics implements KinematicsSolver {
       var swivel = manipulator.swivelAngle(seed);
       if (!Math.isFinite(swivel)) continue;
       var angle = swivel + order * step;
-      var solved = manipulator.solveIkAtSwivel(goal, seed, angle, false, tolerance.position, tolerance.orientation,
-        1e-4, tolerance.maxIterations, tolerance.damping);
+      var solved = solveAtSwivel(goal, seed, angle, true, tolerance);
       if (!solved.converged && order == 0)
-        solved = manipulator.solveIkAtSwivel(goal, seed, angle, true, tolerance.position, tolerance.orientation,
-          1e-4, tolerance.maxIterations, tolerance.damping);
+        solved = solveAtSwivel(goal, seed, angle, false, tolerance);
       if (!solved.converged) continue;
       var reached = manipulator.swivelAngle(solved.q);
       if (!Math.isFinite(reached)) continue;
@@ -200,8 +202,7 @@ class ManipulatorKinematics implements KinematicsSolver {
     var refined = [chosen[0].copy()];
     for (i in 1...chosen.length) {
       var seed = refined[i - 1];
-      var solved = manipulator.solveIkAtSwivel(toTransform(poses[i]), seed, smoothed[i], false, tolerance.position,
-        tolerance.orientation, 1e-4, tolerance.maxIterations, tolerance.damping);
+      var solved = solveAtSwivel(toTransform(poses[i]), seed, smoothed[i], true, tolerance);
       if (!solved.converged) return null;
       for (joint in 0...solved.q.length) if (Math.abs(solved.q[joint] - seed[joint]) > maxJump[joint]) return null;
       refined.push(solved.q.copy());
@@ -218,6 +219,16 @@ class ManipulatorKinematics implements KinematicsSolver {
     return LinearAlgebra.dampedStep(jacobian, 6, n, [for (joint in 0...n) joint], twist.toArray(),
       differentialDamping);
   }
+
+  function options(tolerance:IkTolerance):IkOptions {
+    var result = new IkOptions(tolerance.position, tolerance.orientation, tolerance.maxIterations, tolerance.damping);
+    var posture = preferredPosture;
+    if (posture != null) result.preferring(posture);
+    return result;
+  }
+
+  function solveAtSwivel(goal:Transform3, seed:Array<Float>, angle:Float, exact:Bool, tolerance:IkTolerance):IKResult
+    return manipulator.solve(goal, seed, options(tolerance).atSwivel(angle, exact));
 
   static function requireTolerance(tolerance:IkTolerance):Void {
     if (tolerance == null) throw "IK tolerance is required";

@@ -49,7 +49,6 @@ import motionkit.path.PoseArc;
 import motionkit.path.PoseWaypoint;
 import motionkit.path.OrientationPolicy;
 import motionkit.robot.ToolpathPosePath;
-import motionkit.robot.CoordinatedKinematics;
 import robotkit.process.Toolpath;
 import robotkit.process.ToolpathPoint;
 import robotkit.spatial.Transform3;
@@ -201,7 +200,7 @@ class ProgramTests extends MotionKitTestSupport {
     var swivel = arm.swivelAngle(start);
     check(Math.isFinite(swivel), 'the swivel is defined at the start ($swivel)');
     var pose = arm.tcpPose(start);
-    var turned = arm.solveIkAtSwivel(pose, start, swivel + 0.5);
+    var turned = arm.solve(pose, start, new robotkit.manipulation.IkOptions().atSwivel(swivel + 0.5));
     check(turned.converged, "the same tool pose solves at another swivel");
     near(arm.swivelAngle(turned.q), swivel + 0.5, "the arm turns to the asked swivel", 1e-3);
     var reached = arm.tcpPose(turned.q).translation;
@@ -278,14 +277,14 @@ class ProgramTests extends MotionKitTestSupport {
     var cell = fixture.group;
     check(cell.dofCount() == 8, 'the group holds the rail, the arm and the turntable (${cell.dofCount()})');
     check(cell.external[0] && !cell.external[1] && cell.external[7], "the rail and the turntable are external axes");
-    var solver = new CoordinatedKinematics(cell, 1e-8);
+    var solver = new ManipulatorKinematics(cell, 1e-8);
     var tolerance = new IkTolerance();
     // Rail in front of the table, arm reaching forward with the tool pointing down.
     var start = [0.75, 1.57, -1.2, 1.6, -1.97, -1.57, 0.0, 0.0];
     var here = solver.forward(start);
 
     // The relative Jacobian is the derivative of the tool pose in the work frame.
-    var jacobian = cell.relativeJacobian(start);
+    var jacobian = cell.tcpJacobian(start);
     var eps = 1e-6;
     for (column in [0, 2, 7]) {
       var plus = start.copy(); plus[column] += eps;
@@ -310,7 +309,7 @@ class ProgramTests extends MotionKitTestSupport {
     check(options.length > 0, "the circle's first point is reachable");
     var entry = options[0];
     for (option in options) if (Math.abs(option[7]) < Math.abs(entry[7])) entry = option;
-    cell.preferredPosture = entry;
+    solver.preferredPosture = entry;
     for (k in 0...32) lines.push(new PoseLine(new PoseWaypoint(points[k], 0.0005, 0.005),
       new PoseWaypoint(points[k + 1], 0.0005, 0.005), OrientationPolicy.Interpolated, 0.1, 0.1));
     var path = new PosePath("work", lines);

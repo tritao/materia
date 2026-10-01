@@ -160,7 +160,7 @@ class MotionKitTestSupport {
    * frame), placed so the arm cannot reach round its far side.
    * Joints in model order: rail, the arm's six, the turntable.
    */
-  public function buildWorkcellFixture():{model:RobotModel, group:robotkit.manipulation.CoordinatedGroup} {
+  public function buildWorkcellFixture():{model:RobotModel, group:robotkit.manipulation.KinematicGroup} {
     var model = new RobotModel("motionkit-workcell");
     var floor = model.addLink(new Link("floor"));
     var carriage = model.addLink(new Link("carriage"));
@@ -195,8 +195,8 @@ class MotionKitTestSupport {
       joint.limits.velocity = 1.0;
       joint.limits.maxAcceleration = 2.0;
     }
-    return {model: model, group: new robotkit.manipulation.CoordinatedGroup(model, floor.id, flange.id, work.id,
-      null, [rail.id])};
+    return {model: model, group: new robotkit.manipulation.KinematicGroup(model, floor.id, flange.id, work.id,
+      null, null, [rail.id])};
   }
 
   public function poseRotationDelta(from:Pose3, to:Pose3, scale:Float):Array<Float> {
