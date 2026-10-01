@@ -8,7 +8,7 @@
 
 namespace robotkit::device_wire6 {
 
-inline constexpr std::uint8_t PROTOCOL_VERSION = 10;
+inline constexpr std::uint8_t PROTOCOL_VERSION = 11;
 inline constexpr std::uint8_t MAX_ACTUATORS = 64;
 
 enum class MessageType6 : std::uint8_t {
@@ -1041,7 +1041,7 @@ inline bool decode(std::span<const std::uint8_t> input, Commit6 &value) {
     return true;
 }
 
-inline constexpr std::size_t QueueStatus6_SIZE = 44;
+inline constexpr std::size_t QueueStatus6_SIZE = 56;
 struct QueueStatus6 {
     static constexpr std::size_t SIZE = QueueStatus6_SIZE;
     std::uint64_t queue_revision{};
@@ -1054,6 +1054,8 @@ struct QueueStatus6 {
     std::uint16_t remaining_events{};
     std::uint8_t underflow{};
     std::uint8_t fault{};
+    std::uint64_t received_until_ticks{};
+    std::uint32_t received_bytes{};
 };
 
 inline bool encode(const QueueStatus6 &value, std::span<std::uint8_t> out) {
@@ -1113,6 +1115,20 @@ inline bool encode(const QueueStatus6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_underflow >> 0);
     const std::uint8_t bits_fault = static_cast<std::uint8_t>(value.fault);
     out[offset++] = static_cast<std::uint8_t>(bits_fault >> 0);
+    const std::uint64_t bits_received_until_ticks = static_cast<std::uint64_t>(value.received_until_ticks);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 56);
+    const std::uint32_t bits_received_bytes = static_cast<std::uint32_t>(value.received_bytes);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 0);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 8);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 16);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 24);
     return true;
 }
 
@@ -1183,6 +1199,22 @@ inline bool decode(std::span<const std::uint8_t> input, QueueStatus6 &value) {
     std::uint8_t bits_fault = 0;
     bits_fault |= static_cast<std::uint8_t>(input[offset++]) << 0;
     value.fault = bits_fault;
+    std::uint64_t bits_received_until_ticks = 0;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
+    value.received_until_ticks = bits_received_until_ticks;
+    std::uint32_t bits_received_bytes = 0;
+    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 0;
+    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 8;
+    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 16;
+    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    value.received_bytes = bits_received_bytes;
     return true;
 }
 

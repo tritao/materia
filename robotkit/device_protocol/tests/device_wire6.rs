@@ -14,7 +14,7 @@ fn frame_sync_slides_across_a_bad_marker() {
 
 #[test]
 fn rkd6_records_round_trip() {
-    let begin = SessionBegin6 { session: 7, protocol_version: 10, model_fingerprint: [3; 16],
+    let begin = SessionBegin6 { session: 7, protocol_version: 11, model_fingerprint: [3; 16],
         actuator_count: 2, max_degree: 5, step_tick_hz: 40_000,
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
@@ -63,7 +63,7 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
     let mut limits = [0.0; 64];
     limits[0] = 2.0;
     limits[1] = 4.0;
-    let begin = SessionBegin6 { session: 7, protocol_version: 10,
+    let begin = SessionBegin6 { session: 7, protocol_version: 11,
         model_fingerprint: [3; 16], actuator_count: 2, max_degree: 5,
         step_tick_hz: 40_000, max_acceleration: 4.0,
         actuator_max_acceleration: limits, steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
@@ -107,7 +107,7 @@ fn shared_frame_vectors() {
             .collect();
         let (kind, payload) = decode_frame6(&bytes).unwrap();
         let expected = match name { "time_sync_request" => 3, "hold" => 8, "stop" => 11,
-            "session_begin6_v10" => 1, "digital_event" => 16,
+            "session_begin6_v11" => 1, "digital_event" => 16,
             _ => panic!("unknown vector") };
         assert_eq!(kind, expected);
         let mut encoded = [0; MAX_FRAME_SIZE];

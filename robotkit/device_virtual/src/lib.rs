@@ -28,6 +28,8 @@ pub struct VirtualDevice {
     host_ns: u64,
     last_publish_ns: u64,
     outbox: VecDeque<Vec<u8>>,
+    /// Bytes received since the session began, wrapping, as the status reports them.
+    received_bytes: u32,
 }
 
 impl VirtualDevice {
@@ -68,6 +70,7 @@ impl VirtualDevice {
             host_ns: 0,
             last_publish_ns: 0,
             outbox: VecDeque::new(),
+            received_bytes: 0,
         })
     }
 
@@ -80,6 +83,8 @@ impl VirtualDevice {
     }
 
     pub fn feed(&mut self, frame: &[u8]) -> bool {
+        // Every byte off the line counts, valid or not: the host measures what is in flight by it.
+        self.received_bytes = self.received_bytes.wrapping_add(frame.len() as u32);
         let Ok((kind, payload)) = decode_frame6(frame) else {
             return false;
         };
@@ -164,6 +169,8 @@ impl VirtualDevice {
                     self.events = Some(DeviceEvents::new(&begin));
                     self.final_safe_applied = false;
                     self.session = begin.session;
+                    // The count starts after the frame that begins the session, as the host's does.
+                    self.received_bytes = 0;
                     self.channel_kind = begin.channel_kind;
                     ack.status = 1;
                 }
@@ -352,6 +359,8 @@ impl VirtualDevice {
                 |events| events.remaining_capacity() as u16),
             underflow: core.underflow() as u8,
             fault,
+            received_until_ticks: core.received_until(),
+            received_bytes: self.received_bytes,
         };
         let mut bytes = [0; QueueStatus6::SIZE];
         status.encode(&mut bytes).unwrap();

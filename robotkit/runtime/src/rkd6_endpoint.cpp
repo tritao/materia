@@ -163,6 +163,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
 bool Rkd6Endpoint::send_record(std::uint8_t kind, std::span<const std::uint8_t> payload) {
     std::vector<std::uint8_t> frame;
     if (!device_frame6::encode(kind, payload, frame) || !transport_->send(frame)) return false;
+    sent_bytes_ += static_cast<std::uint32_t>(frame.size());
     // Ten bits a byte on the line; frames queue behind each other.
     link_free_at_ns_ = std::max(link_free_at_ns_, now_ns_) + static_cast<std::uint64_t>(
         std::ceil(10.0L * frame.size() * 1e9L / std::max(1u, transport_->baud())));
@@ -231,12 +232,9 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     if (plan.replace_after_plan_id && replace_ticks < committed_until_ticks_)
         return RK_ERROR_INVALID_STATE;
     if (plan.replace_after_plan_id) {
-        const auto received_until = sent_.empty() ? 0 :
-            sent_.back().header.t0_ticks + sent_.back().header.duration_ticks;
-        // A reported commit proves that its segment boundary reached the
-        // device. Transport send completion alone does not prove reception.
-        if (replace_ticks > received_until ||
-            replace_ticks > status_.committed_until_ticks ||
+        // The device must hold the boundary segment, as its status reports; that a
+        // segment was sent does not prove it arrived.
+        if (!has_status_ || replace_ticks > status_.received_until_ticks ||
             std::none_of(sent_.begin(), sent_.end(), [&](const auto &segment) {
                 return segment.header.t0_ticks + segment.header.duration_ticks == replace_ticks;
             })) return RK_ERROR_INVALID_STATE;
@@ -448,6 +446,8 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     reply.device_rx_ticks, reply.device_tx_ticks);
         } else if (decoded.kind == 14) {
             if (device_wire6::decode(decoded.payload, status_)) {
+                has_status_ = true;
+                status_at_ns_ = transport_->received_at_ns() ? transport_->received_at_ns() : owner_now_ns;
                 queue_revision_mismatch_ = status_.queue_revision > revision_ ||
                     (revision_ != 0 && status_.queue_revision < revision_ &&
                      status_.path_clock_ticks >= revision_boundary_ticks_);
@@ -481,10 +481,22 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
 }
 
 std::uint64_t Rkd6Endpoint::link_drain_ns() const noexcept {
-    if (const auto bytes = transport_->queued_output_bytes())
+    const auto line_ns = [&](std::uint64_t bytes) {
         return static_cast<std::uint64_t>(std::ceil(
-            10.0L * *bytes * 1e9L / std::max(1u, transport_->baud())));
-    return link_free_at_ns_ > now_ns_ ? link_free_at_ns_ - now_ns_ : 0;
+            10.0L * bytes * 1e9L / std::max(1u, transport_->baud())));
+    };
+    // What the host knows it handed the line, and what the transport still holds.
+    auto drain = link_free_at_ns_ > now_ns_ ? link_free_at_ns_ - now_ns_ : 0;
+    if (const auto bytes = transport_->queued_output_bytes()) drain = std::max(drain, line_ns(*bytes));
+    // What the device has not received, by its last status, which covers buffers no host
+    // count sees (a USB adapter's), less the line time since and the link's latency.
+    if (has_status_) {
+        const std::uint32_t unreceived = sent_bytes_ - status_.received_bytes;
+        const auto since = (now_ns_ > status_at_ns_ ? now_ns_ - status_at_ns_ : 0) + link_latency_ns_;
+        const auto pending = line_ns(unreceived);
+        if (pending > since) drain = std::max(drain, pending - since);
+    }
+    return drain;
 }
 
 std::uint64_t Rkd6Endpoint::commit_margin_ns() const noexcept {
