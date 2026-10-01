@@ -54,3 +54,7 @@
 [submodule "kinematicskit/native/vendor/proxsuite"]
 	path = kinematicskit/native/vendor/proxsuite
 	url = https://github.com/Simple-Robotics/proxsuite.git
+[submodule "kinematicskit/native/vendor/coal"]
+	path = kinematicskit/native/vendor/coal
+	url = https://github.com/tritao/coal.git
+	branch = materia
