@@ -6,7 +6,11 @@ import haxe.Int64;
 enum RobotCommand {
   /**
    * One atomic set of position, velocity, and/or effort targets.
-   * expiryNs must remain null/zero until runtime deadline enforcement is available.
+   * `expiryNs` (null/zero: none) is a deadline on the robot's source clock
+   * (`RobotSnapshot.sourceTimestampNs`): after it, the batch's velocity
+   * targets lapse and those joints brake to zero within their acceleration
+   * limits. In-process robots enforce it in the runtime; remote ones reject
+   * it until host and robot clocks are mapped.
    */
   JointTargets(targets:Array<JointTarget>, expiryNs:Null<Int64>);
   /** Append bounded polynomial segments to a runtime-owned queue. */

@@ -514,7 +514,9 @@ typedef struct rk_plan_submission {
 /** Non-latched runtime diagnostic; safety remains READY. */
 enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
     RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
-    RK_FAULT_QUEUE_REVISION_MISMATCH = 6 };
+    RK_FAULT_QUEUE_REVISION_MISMATCH = 6,
+    /** A velocity target outlived its command's expires_at_ns; the joint brakes to zero. */
+    RK_FAULT_COMMAND_EXPIRED = 7 };
 
 typedef uint32_t rk_session_state;
 enum {
@@ -540,6 +542,15 @@ typedef struct rk_robot_command {
      * RK_MAX_SERVO_JOINTS so the command stays small to copy.
      */
     rk_joint_servo servos[RK_MAX_SERVO_JOINTS];
+    /**
+     * JOINT_TARGETS only; zero means none. The time, on the robot's source
+     * clock (rk_robot_state.source_timestamp_ns), after which this batch's
+     * velocity targets lapse: once the latest sample reaches it, each such
+     * joint brakes to zero within its max_acceleration (at once without one)
+     * and holds zero, and the snapshot reports RK_FAULT_COMMAND_EXPIRED. A later target for the joint replaces
+     * the deadline. Position, effort and servo targets hold their value.
+     */
+    uint64_t expires_at_ns;
 } rk_robot_command;
 
 /** Mutable native state used internally while a runtime publishes a snapshot. */
@@ -603,6 +614,12 @@ typedef struct rk_robot_snapshot {
     uint64_t active_plan_id;
     uint64_t committed_until_ns;
     uint64_t queue_end_time_ns;
+    /**
+     * Where the runtime holds each joint and anchors the next plan: the last
+     * commanded position (after velocity control, the observed resting
+     * position). A plan submitted while idle must start here.
+     */
+    double setpoint_position[RK_MAX_JOINTS];
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */

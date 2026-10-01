@@ -6,9 +6,11 @@ import animkit.AnimationInstance;
 /**
  * One hand's fingers, each curled between open (0) and a fist (1). A finger is each child of the
  * wrist and the single-child chain below it, found from the skeleton so any humanoid rig works. Every
- * joint turns about its own local X axis, negatively, which brings the fingertip toward the palm on
- * both hands of the rigs HumanKit maps. The turns ride on the animation, so fingers keep whatever
- * their clip did and only add the curl.
+ * joint of a finger turns about one of its own local axes: negative X on the Quaternius and Mixamo
+ * rigs, which brings the fingertip toward the palm on both hands, and for any other rig the axis that
+ * does, found by turning the knuckle each way in the rest pose and keeping the turn that closes the
+ * finger most. The turns ride on the animation, so fingers keep whatever their clip did and only add
+ * the curl.
  */
 class HumanHand {
 	/** The fingers, in the order curls are given. */
@@ -27,7 +29,7 @@ class HumanHand {
 	/** The joint-turn source the curl is applied under, so it never overwrites another feature's turns. */
 	final source:Int;
 	/** Each finger's kind, its curling joints with the largest turn of each, and its last joint (the tip). */
-	final fingers:Array<{kind:Int, segments:Array<{joint:Int, angle:Float}>, tip:Int}> = [];
+	final fingers:Array<{kind:Int, segments:Array<{joint:Int, angle:Float}>, tip:Int, axis:Array<Float>}> = [];
 	/** How curled each finger is now (by kind), or -1 before the first curl. */
 	final curls:Array<Float> = [for (_ in 0...FINGERS) -1.0];
 	/** How curled the hand is now on average, or -1 before the first curl. */
@@ -40,7 +42,7 @@ class HumanHand {
 
 	/** The fingers below a rig's wrist bone, or null when the skeleton has none. */
 	public static function find(asset:AnimationAsset, rig:HumanoidRig, instance:AnimationInstance, wrist:HumanBone,
-			source:Int):Null<HumanHand> {
+			source:Int, ?pose:HumanPose):Null<HumanHand> {
 		var root = rig.joint(wrist);
 		if (root < 0) return null;
 		var hand = new HumanHand(instance, source);
@@ -62,9 +64,55 @@ class HumanHand {
 				var angle = index < angles.length ? angles[index] : angles[angles.length - 1] * 0.7;
 				curling.push({joint: chain[index], angle: angle});
 			}
-			hand.fingers.push({kind: kind, segments: curling, tip: chain[chain.length - 1]});
+			hand.fingers.push({kind: kind, segments: curling, tip: chain[chain.length - 1], axis: [-1.0, 0.0, 0.0]});
 		}
-		return hand.fingers.length == 0 ? null : hand;
+		if (hand.fingers.length == 0) return null;
+		if (pose != null && rig.mapping.name != "quaternius" && rig.mapping.name != "mixamo") hand.findCurlAxes(pose, wrist);
+		return hand;
+	}
+
+	/**
+	 * Finds, for each finger, the local axis its joints turn about to close it, by turning its knuckle both ways
+	 * about each axis in the rest pose and keeping the turn that moves the tip furthest toward the palm's face.
+	 * (Distance to the wrist cannot tell the way: a straight finger bent any way gets nearer.) The fingers of one
+	 * hand are probed one at a time, and the turns are taken out again.
+	 */
+	function findCurlAxes(pose:HumanPose, wrist:HumanBone):Void {
+		var probe = 0.5, sine = Math.sin(probe * 0.5), cosine = Math.cos(probe * 0.5);
+		var sideSign = wrist == HumanBone.HandL ? 1.0 : -1.0;
+		instance.clearLayers();
+		instance.evaluate();
+		pose.update(instance.readJointMatrices());
+		var frame = pose.boneFrame(wrist);
+		if (frame == null) return;
+		var normal = [sideSign * frame[8], sideSign * frame[9], sideSign * frame[10]];
+		for (finger in fingers) {
+			instance.clearJointRotations(source);
+			instance.evaluate();
+			var at = tipAt(finger.tip), best = -1e9, chosen = finger.axis;
+			for (axis in 0...3) for (sign in [-1.0, 1.0]) {
+				var turn = [0.0, 0.0, 0.0, cosine];
+				turn[axis] = sign * sine;
+				instance.setJointRotations(source, [finger.segments[0].joint], [turn], [1.0]);
+				instance.evaluate();
+				var moved = tipAt(finger.tip);
+				var toward = (moved[0] - at[0]) * normal[0] + (moved[1] - at[1]) * normal[1] + (moved[2] - at[2]) * normal[2];
+				if (toward > best) {
+					best = toward;
+					chosen = [for (index in 0...3) index == axis ? sign : 0.0];
+				}
+			}
+			finger.axis.resize(0);
+			for (value in chosen) finger.axis.push(value);
+		}
+		instance.clearJointRotations(source);
+		instance.evaluate();
+		pose.update(instance.readJointMatrices());
+	}
+
+	function tipAt(joint:Int):Array<Float> {
+		var matrices = instance.readJointMatrices(), base = joint * 64;
+		return [matrices.getFloat(base + 48), matrices.getFloat(base + 52), matrices.getFloat(base + 56)];
 	}
 
 	/** Which finger a joint name belongs to, or -1. */
@@ -134,7 +182,8 @@ class HumanHand {
 			var turn = segment.angle * clamped[finger.kind];
 			if (turn < 1e-4) continue;
 			joints.push(segment.joint);
-			rotations.push([-Math.sin(turn * 0.5), 0.0, 0.0, Math.cos(turn * 0.5)]);
+			var sine = Math.sin(turn * 0.5);
+			rotations.push([finger.axis[0] * sine, finger.axis[1] * sine, finger.axis[2] * sine, Math.cos(turn * 0.5)]);
 			weights.push(1.0);
 		}
 		// One call replaces the whole hand's turns.

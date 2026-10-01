@@ -3,6 +3,7 @@ package motionkit.robot;
 import motionkit.axis.MotionAxis;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 
@@ -77,6 +78,9 @@ class AxisKinematics implements KinematicsSolver {
     }
     return result;
   }
+
+  /** Logical axes have one solution per pose: the path follows point by point. */
+  public function solvePath(request:PathRequest):Array<Null<Array<Float>>> return request.followPointByPoint(this);
 
   public function sampleCandidates(target:Pose3, maxCount:Int,
       tolerance:IkTolerance):Array<Array<Float>> {

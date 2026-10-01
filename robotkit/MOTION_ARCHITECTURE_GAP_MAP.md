@@ -36,7 +36,7 @@ to rename, formalize, or replace.
 | `ExecutionPlan` (§6.4) | Missing | Nothing carries revisions, validation, required capabilities |
 | Positioning pipeline (§7A) | Partial | Trapezoidal, rest-to-rest; jerk not enforced; no Ruckig |
 | Path-preserving pipeline (§7B) | Partial | Gantry XYZ only; arm toolpaths use a separate stop-at-every-point timer |
-| Live servo (§7C) | Partial | Jog splicing exists; no differential IK, no deadlines |
+| Live servo (§7C) | Partial | `ServoSession` (twist → QP step → velocity targets with runtime-enforced deadlines, or streamed plan chunks on plan-executing devices), in-process only |
 | Lookahead / blending (§8) | Partial | Junction-velocity lookahead with exact-stop/blend |
 | Kinematics (§9) | Partial | One DLS IK, no solver interface, no multi-solution selection |
 | Collision checking (§9) | Missing on the planning side | Only MuJoCo contacts in simulation |
@@ -197,9 +197,13 @@ TOPP-RA and conservative segment timing are missing.
 
 - `MotionSystem.jog` with `JogProfile` splices a new jog into the runtime
   queue a few periods ahead. If the splice is late, it falls back to stopping.
-- There is no differential IK or twist command, and no command deadlines:
-  robotd rejects a nonzero `expiryNs` with "absolute deadlines require clock
-  synchronization" (`robotd/src/RobotServer.hx:396`).
+- Update (Lane D, D5a/D5b): MotionKit's `ServoSession` servos tool twists
+  through a differential-IK QP step to joint velocity targets. The runtime
+  enforces `JointTargets.expiryNs` for in-process robots: a lapsed velocity
+  target brakes to zero within the joint's acceleration limit. The deadline
+  is on the robot's source clock. robotd still rejects a nonzero `expiryNs`
+  with "absolute deadlines require clock synchronization"
+  (`robotd/src/RobotServer.hx`).
 
 **Lookahead and horizons (§8) — Partial.**
 
@@ -378,8 +382,10 @@ belongs in the RKD6 design, not after it.
   - sensor stale-sequence rejection;
   - soft speed and acceleration caps for mobile bases.
 
-  Not present: deadline enforcement on joint targets, and staleness checks in
-  `ToolpathExecutor`/`FinishSurface`.
+  Deadlines on velocity joint targets are enforced in the runtime (Lane D,
+  D5b), but only for in-process robots, not over robotd.
+
+  Not present: staleness checks in `ToolpathExecutor`/`FinishSurface`.
 
 ## 11. What this changes in the plan's sequence (§35, §36)
 

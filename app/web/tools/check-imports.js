@@ -6,7 +6,9 @@
 
 const fs = require("fs");
 
-const valueTypes = {0x7f: "i32", 0x7e: "i64", 0x7d: "f32", 0x7c: "f64", 0x7b: "v128", 0x70: "funcref", 0x6f: "externref"};
+const valueTypes = {0x7f: "i32", 0x7e: "i64", 0x7d: "f32", 0x7c: "f64", 0x7b: "v128", 0x78: "i8", 0x77: "i16"};
+const heapTypes = {0x73: "nofunc", 0x72: "noextern", 0x71: "none", 0x70: "func", 0x6f: "extern", 0x6e: "any", 0x6d: "eq",
+  0x6c: "i31", 0x6b: "struct", 0x6a: "array", 0x69: "exn", 0x74: "noexn"};
 
 function readModule(path) {
   const bytes = fs.readFileSync(path);
@@ -31,17 +33,54 @@ function readModule(path) {
     u32();
     if (flags & 1) u32();
   };
+  // A heap type is an abstract type byte or a non-negative type index (s33).
+  const heapType = () => {
+    if (heapTypes[bytes[offset]] !== undefined) return heapTypes[bytes[offset++]];
+    return String(u32());
+  };
+  const valueType = () => {
+    const code = bytes[offset++];
+    if (valueTypes[code]) return valueTypes[code];
+    if (code === 0x64 || code === 0x63) return `(ref ${code === 0x63 ? "null " : ""}${heapType()})`;
+    if (heapTypes[code]) return `${heapTypes[code]}ref`;
+    throw new Error(`${path}: unsupported value type ${code}`);
+  };
+  // One type-section entry: a function, struct or array type, optionally declared as a subtype.
+  const subtype = () => {
+    if (bytes[offset] === 0x50 || bytes[offset] === 0x4f) {
+      offset++;
+      for (let n = u32(); n > 0; n--) u32();
+    }
+    const form = bytes[offset++];
+    if (form === 0x60) {
+      const parameters = [], results = [];
+      for (let n = u32(); n > 0; n--) parameters.push(valueType());
+      for (let n = u32(); n > 0; n--) results.push(valueType());
+      return `(${parameters.join(",")})->(${results.join(",")})`;
+    }
+    if (form === 0x5f) {
+      for (let n = u32(); n > 0; n--) {
+        valueType();
+        offset++;
+      }
+      return "struct";
+    }
+    if (form === 0x5e) {
+      valueType();
+      offset++;
+      return "array";
+    }
+    throw new Error(`${path}: unsupported type form ${form}`);
+  };
   const types = [], functionTypes = [], imports = [], exports = [];
   while (offset < bytes.length) {
     const id = bytes[offset++], size = u32(), end = offset + size;
     if (id === 1) {
       for (let count = u32(); count > 0; count--) {
-        if (bytes[offset] !== 0x60) throw new Error(`${path}: unsupported type form ${bytes[offset]}`);
-        offset++;
-        const parameters = [], results = [];
-        for (let n = u32(); n > 0; n--) parameters.push(valueTypes[bytes[offset++]] || "?");
-        for (let n = u32(); n > 0; n--) results.push(valueTypes[bytes[offset++]] || "?");
-        types.push(`(${parameters.join(",")})->(${results.join(",")})`);
+        if (bytes[offset] === 0x4e) {
+          offset++;
+          for (let n = u32(); n > 0; n--) types.push(subtype());
+        } else types.push(subtype());
       }
     } else if (id === 2) {
       for (let count = u32(); count > 0; count--) {

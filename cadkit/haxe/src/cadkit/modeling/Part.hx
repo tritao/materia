@@ -179,6 +179,14 @@ class Part extends Model {
 	}
 
 	/** Subtract borrowed tools, preserving this part and every tool. */
+	/**
+		This part with every face, edge and vertex name prefixed by `tag:` (plans/TOPOLOGICAL_NAMING.md): name the bodies
+		a part is built from (`plate`, `bore`) so their faces keep telling apart, and stay findable, as parameters change.
+	**/
+	public function named(tag:String):Part {
+		return new Part(shape.stamped(tag, []));
+	}
+
 	public function subtractAll(tools:Array<Part>):Part {
 		if (tools.length == 0) return new Part(shape.cloneShape());
 		var tool = Part.fuseAll(tools);

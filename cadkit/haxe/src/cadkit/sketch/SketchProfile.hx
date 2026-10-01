@@ -187,7 +187,10 @@ class SketchProfile {
 				for (candidate in 0...boundaries.length)
 					if (boundaries[candidate].parent == index && boundaries[candidate].depth % 2 == 1)
 						holes.push(curves[candidate]);
-				var face = Sketch.face(curves[index], holes, plane);
+				// Edges are named by their entities (makeCurve); a region by the entities of its outer loop.
+				var regionIds = boundaries[index].entityIds.copy();
+				regionIds.sort(Reflect.compare);
+				var face = Sketch.named(Sketch.face(curves[index], holes, plane), "r." + regionIds.join("+"));
 				if (result == null) {
 					result = face;
 				} else {
@@ -218,13 +221,13 @@ class SketchProfile {
 			var entity = boundary.circle;
 			var center = solved.point(entity.first);
 			var localPlane = new Plane(world(plane, center), plane.xDirection, plane.normal);
-			return Curve.circle(solved.radius(entity.id), localPlane);
+			return Curve.named(Curve.circle(solved.radius(entity.id), localPlane), "e." + entity.id);
 		}
 		var parts:Array<Curve> = [];
 		try {
 			for (segment in boundary.segments) {
 				if (segment.entity.kind == "line") {
-					parts.push(Curve.line(world(plane, segment.start), world(plane, segment.end)));
+					parts.push(Curve.named(Curve.line(world(plane, segment.start), world(plane, segment.end)), "e." + segment.entity.id));
 					continue;
 				}
 				var entity = segment.entity;
@@ -236,8 +239,8 @@ class SketchProfile {
 					startAngle = entity.endAngle;
 					delta = -delta;
 				}
-				parts.push(Curve.arc(world(plane, segment.start), world(plane, arcPoint(center, radius, startAngle + delta / 2)),
-					world(plane, segment.end)));
+				parts.push(Curve.named(Curve.arc(world(plane, segment.start), world(plane, arcPoint(center, radius, startAngle + delta / 2)),
+					world(plane, segment.end)), "e." + entity.id));
 			}
 			var wire = Curve.wire(parts);
 			for (part in parts)

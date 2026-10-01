@@ -7,6 +7,8 @@ class WalkTo extends HumanActionBase {
 	final path:Null<Array<Array<Float>>>;
 	final pointProvider:Null<Void->Array<Float>>;
 	final preserveFacing:Bool;
+	/** The route to start once the body has stood up from a crouch; null when walking or not yet planned. */
+	var waiting:Null<Array<Array<Float>>> = null;
 
 	/** Resolve a destination from the worker's pose when this action starts. */
 	public static function deferred(pointProvider:Void->Array<Float>, speed:Float,
@@ -63,10 +65,26 @@ class WalkTo extends HumanActionBase {
 			done = true;
 			return;
 		}
+		// A crouched body does not walk: it stands up first, and the walk starts when it has.
+		if (worker.crouchAmount() > 1e-3 || !worker.crouchReached()) {
+			worker.setCrouch(0.0);
+			waiting = route;
+			return;
+		}
+		begin(route);
+	}
+
+	function begin(route:Array<Array<Float>>):Void {
+		waiting = null;
 		if (preserveFacing) worker.walker.retreatAlong(route, speed);
 		else worker.walker.continueAlong(route, speed);
 	}
 
+	override public function advance(seconds:Float):Void {
+		var route = waiting;
+		if (route != null && worker.crouchAmount() <= 1e-3) begin(route);
+	}
+
 	override public function isDone():Bool
-		return done || (worker != null && !worker.walker.isWalking());
+		return done || (worker != null && waiting == null && !worker.walker.isWalking());
 }

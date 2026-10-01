@@ -145,14 +145,16 @@ class RobotFlange extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var boss = Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight);
-		var body = Solids.union([Part.cylinderSpan(flangeDiameter / 2, -thickness, 0), boss]);
+		var boss = Solids.named(Part.cylinderSpan(pilotDiameter / 2, 0, pilotHeight), "pilot");
+		var body = Solids.union([Solids.named(Part.cylinderSpan(flangeDiameter / 2, -thickness, 0), "flange"), boss]);
 		if (detail == Envelope) return body;
 		var screw = mountScrewPart(10);
 		var pin = pinPoint();
-		var tools = [Part.cylinderSpan(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y)];
+		var tools = [Solids.named(Part.cylinderSpan(pinDiameter / 2, -thickness - 0.1, 0.1, pin.x, pin.y), "pin")];
+		var bolt = 1;
 		for (point in boltPattern())
-			tools.push(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -thickness - 0.1, 0.1, point.x, point.y));
+			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, -thickness - 0.1, 0.1, point.x, point.y),
+				"bolt" + bolt++));
 		return Solids.cut(body, tools);
 	}
 
@@ -175,12 +177,14 @@ class RobotFlange extends MachineComponent {
 			throw "Robot flange mounting cutout must be deeper than the pilot recess";
 		var screw = mountScrewPart(10);
 		var pin = pinPoint();
+		// Named like the flange's own bodies, so the faces a cutout leaves in a mating part stay distinguishable.
 		var tools = [
-			Part.cylinderSpan((pilotDiameter + pilotClearance) / 2, -0.1, pilotRecessDepth(pilotClearance)),
-			Part.cylinderSpan((pinDiameter + pilotClearance) / 2, -0.1, depth + 0.1, pin.x, pin.y),
+			Solids.named(Part.cylinderSpan((pilotDiameter + pilotClearance) / 2, -0.1, pilotRecessDepth(pilotClearance)), "pilot"),
+			Solids.named(Part.cylinderSpan((pinDiameter + pilotClearance) / 2, -0.1, depth + 0.1, pin.x, pin.y), "pin"),
 		];
+		var bolt = 1;
 		for (point in boltPattern())
-			tools.push(Part.cylinderSpan(screw.clearanceDiameter(fit) / 2, -0.1, depth + 0.1, point.x, point.y));
+			tools.push(Solids.named(Part.cylinderSpan(screw.clearanceDiameter(fit) / 2, -0.1, depth + 0.1, point.x, point.y), "bolt" + bolt++));
 		return Solids.union(tools);
 	}
 

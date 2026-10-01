@@ -12,8 +12,8 @@ import nativekit.ui.host.UiHostSession.UiHostLifecycle;
 import nativekit.ui.theme.Theme;
 
 /**
- * Browser entry point for the reference editor. The page calls `configure`, then `main` once, then `frame` from
- * each requestAnimationFrame tick; the editor itself is the one `Main.open` hosts on the desktop.
+ * Browser entry point for the reference editor. The page calls the exposed `configure`, then `main` once, then
+ * `frame` from each requestAnimationFrame tick; the editor itself is the one `Main.open` hosts on the desktop.
  */
 class MainWeb {
   static var width = 1280;
@@ -23,7 +23,7 @@ class MainWeb {
   static var editor:Null<ReferenceEditorApp>;
 
   /** Sets the initial canvas size in CSS pixels and the theme (0 = light, 1 = dark) before `main`. */
-  public static function configure(canvasWidth:Int, canvasHeight:Int, theme:Int):Int {
+  @:expose public static function configure(canvasWidth:Int, canvasHeight:Int, theme:Int):Int {
     if (session != null || canvasWidth <= 0 || canvasHeight <= 0) return 1;
     width = canvasWidth;
     height = canvasHeight;
@@ -31,7 +31,7 @@ class MainWeb {
     return 0;
   }
 
-  public static function main():Int {
+  @:expose public static function main():Int {
     try {
       var options = new BrowserUiHostOptions();
       options.title = "Materia";
@@ -59,7 +59,7 @@ class MainWeb {
   }
 
   /** Advances the host and the editor; returns 1 while running, 0 once stopped, and a negative value on failure. */
-  public static function frame(time:Float):Int {
+  @:expose public static function frame(time:Float):Int {
     var active = session;
     if (active == null) return 0;
     try {

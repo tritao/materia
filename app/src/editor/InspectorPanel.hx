@@ -103,14 +103,52 @@ class InspectorPanel {
       rows.push(new KeyedView("sketch-edit-action",
         sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
     }
+    // An edit waiting for the user to say which element a reference means (TN7).
+    var pending = scene.pendingReferenceChoice();
+    if (pending != null) {
+      rows.push(new KeyedView("pending-choice-status", new Text(pending.message)));
+      for (candidate in 0...pending.candidates.length)
+        rows.push(new KeyedView("pending-choice-" + candidate, new Button("Use " + pending.candidates[candidate], null, function() {
+          app.runSceneEdit("Could not apply the edit", function() app.scene.resolvePendingReferenceChoice(candidate));
+          app.commands.refresh();
+        }, "pending-choice-" + candidate)));
+      rows.push(new KeyedView("pending-choice-cancel", new Button("Keep the previous model", null, function() {
+        app.scene.cancelPendingReferenceChoice();
+        app.commands.refresh();
+      }, "pending-choice-cancel")));
+    }
+    // References that need a look (TN5): what each lost, with a button per element it could mean now.
+    var referenceIssues = scene.selectedReferenceIssues();
+    for (issue in referenceIssues) {
+      var key = "reference-" + issue.index;
+      rows.push(new KeyedView(key + "-status", new Text(issue.message)));
+      for (candidate in 0...issue.candidates.length) {
+        var referenceIndex = issue.index;
+        rows.push(new KeyedView(key + "-candidate-" + candidate, new Button("Use " + issue.candidates[candidate], null, function() {
+          app.runSceneEdit("Could not repair reference", function() app.scene.repairSelectedReference(referenceIndex, candidate));
+          app.commands.refresh();
+        }, "repair-reference-" + referenceIndex + "-" + candidate)));
+      }
+      if (issue.pickable) {
+        var pickedIndex = issue.index;
+        rows.push(new KeyedView(key + "-picked", new Button("Use the selected " + issue.kind, null, function() {
+          app.runSceneEdit("Could not repair reference", function() app.scene.repairSelectedReferenceWithPick(pickedIndex));
+          app.commands.refresh();
+        }, "repair-reference-" + pickedIndex + "-picked")));
+      }
+    }
     var supportStatus = scene.selectedSketchSupportStatus();
     if (supportStatus != null) {
-      rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
+      if (referenceIssues.length == 0)
+        rows.push(new KeyedView("sketch-support-status", new Text(supportStatus)));
       if (scene.canRepairSelectedSketchSupportFace())
         rows.push(new KeyedView("repair-sketch-support",
           sceneAction("repair-sketch-support-face", "scene.repair-sketch-support-face",
             "Repair support face", IconName.Inspect)));
     }
+    var pickedLabel = scene.selectedElementLabel();
+    if (pickedLabel != null)
+      rows.push(new KeyedView("picked-element", new Text(pickedLabel)));
     if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
       new Text(scene.selectedCadEdgeIndex>=0?"Selected edge "+(scene.selectedCadEdgeIndex+1):
         scene.selectedCadFaceIndex<0?"Click a CAD face or edge to select it":

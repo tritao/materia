@@ -1849,6 +1849,166 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
     }
 }
 
+void plan_end_does_not_restore_earlier_targets(const rk_robot_runtime_blueprint &blueprint) {
+    // Position targets place the robot, then a plan moves it on. When the
+    // plan ends the robot must stay at the plan's end, not return to the
+    // targets it held before.
+    auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+    robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 0;
+    auto placed = velocity_batch(1, {{0, 0.0}, {1, 0.0}});
+    placed.targets[0].mode = RK_TARGET_POSITION;
+    placed.targets[0].target = 0.2;
+    placed.targets[1].mode = RK_TARGET_POSITION;
+    placed.targets[1].target = -0.2;
+    assert(runtime.submit(placed) == RK_OK);
+    apply_cycle(runtime, timestamp);
+    rk_plan_submission plan{};
+    plan.struct_size = sizeof(plan);
+    plan.sequence = 2;
+    plan.plan_id = 1;
+    plan.model_revision = blueprint.revision;
+    plan.calibration_revision = blueprint.calibration_revision;
+    plan.start_position[0] = 0.2;
+    plan.start_position[1] = -0.2;
+    plan.ends_at_rest = 1;
+    plan.segments = sampled_batch([](double t) { return 0.2 + 2.0 * t; }, 100'000'000, 10'000'000, 1);
+    assert(runtime.submit_plan(plan) == RK_OK);
+    rk_robot_state state{};
+    for (int cycle = 0; cycle < 40; ++cycle) {
+        assert(runtime.apply_pending_commands() == RK_OK);
+        assert(runtime.publish_sample(timestamp += 10'000'000) == RK_OK);
+        state.struct_size = sizeof(state);
+        assert(runtime.snapshot(state) == RK_OK);
+    }
+    assert(std::abs(state.position[0] - 0.4) < 1e-9);
+    assert(std::abs(state.position[1] + 0.4) < 1e-9);
+    assert(state.trajectory_active == 0);
+    // The snapshot names where the next plan must start.
+    rk_robot_snapshot snapshot{};
+    snapshot.struct_size = sizeof(snapshot);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(std::abs(snapshot.setpoint_position[0] - 0.4) < 1e-9);
+    assert(std::abs(snapshot.setpoint_position[1] + 0.4) < 1e-9);
+}
+
+// Reports joint 0 at its upper limit as a 32-bit float would carry it.
+class SinglePrecisionEndpoint final : public robotkit::RobotEndpoint {
+public:
+    explicit SinglePrecisionEndpoint(double limit, bool declares) : limit_(limit), declares_(declares) {}
+    rk_result apply(const rk_robot_command &) override { return RK_OK; }
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.source_timestamp_ns = timestamp_ns;
+        state.joint_count = 2;
+        state.position[0] = static_cast<double>(static_cast<float>(limit_));
+        return RK_OK;
+    }
+    double observed_position_precision() const noexcept override {
+        return declares_ ? std::numeric_limits<float>::epsilon() : 0.0;
+    }
+private:
+    double limit_;
+    bool declares_;
+};
+
+void single_precision_reading_at_a_limit_is_not_a_fault(const rk_robot_runtime_blueprint &blueprint) {
+    // 1.2 as a float is 1.2000000477: past the limit unless the endpoint's precision is allowed for.
+    auto limited = blueprint;
+    limited.joints[0].upper_limit = 1.2;
+    for (bool declares : {true, false}) {
+        auto endpoint = std::make_shared<SinglePrecisionEndpoint>(1.2, declares);
+        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+        const auto result = runtime.publish_sample(10'000'000);
+        assert(declares ? result == RK_OK : result == RK_ERROR_LIMIT);
+    }
+}
+
+void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
+    // Joint 0 brakes at 2 rad/s^2; joint 1 has no acceleration limit.
+    auto limited = blueprint;
+    limited.joints[0].max_acceleration = 2.0;
+    limited.joints[1].max_acceleration = 0.0;
+    auto endpoint = std::make_shared<EchoEndpoint>(limited.joint_count);
+    robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+    uint64_t timestamp = 10'000'000;
+    assert(runtime.publish_sample(timestamp) == RK_OK);
+    auto emitted = [&](uint32_t joint) {
+        const auto &command = endpoint->last_command;
+        for (uint32_t index = 0; index < command.target_count; ++index)
+            if (command.targets[index].joint == joint) {
+                assert(command.targets[index].mode == RK_TARGET_VELOCITY);
+                return command.targets[index].target;
+            }
+        assert(false && "joint target missing");
+        return 0.0;
+    };
+    auto cycle = [&] {
+        assert(runtime.apply_pending_commands() == RK_OK);
+        assert(runtime.publish_sample(timestamp += 10'000'000) == RK_OK);
+    };
+    auto fault_code = [&] {
+        rk_robot_snapshot snapshot{};
+        snapshot.struct_size = sizeof(snapshot);
+        assert(runtime.snapshot_full(snapshot) == RK_OK);
+        assert(snapshot.safety == RK_SAFETY_READY);
+        return snapshot.fault_code;
+    };
+
+    // Lapses 50 ms after the sample it was sent against, then brakes 0.02 per period.
+    auto streamed = velocity_batch(1, {{0, 1.0}, {1, 0.5}});
+    streamed.expires_at_ns = timestamp + 50'000'000;
+    assert(runtime.submit(streamed) == RK_OK);
+    int running = 0;
+    for (;;) {
+        cycle();
+        if (emitted(0) != 1.0) break;
+        assert(emitted(1) == 0.5 && fault_code() == 0);
+        ++running;
+        assert(running < 10);
+    }
+    assert(running == 5);
+    assert(std::abs(emitted(0) - 0.98) < 1e-12 && emitted(1) == 0.0);
+    assert(fault_code() == RK_FAULT_COMMAND_EXPIRED);
+    double previous = emitted(0);
+    int braking = 1;
+    while (emitted(0) != 0.0) {
+        cycle();
+        assert(previous - emitted(0) <= 0.02 + 1e-12 && emitted(0) >= 0.0);
+        previous = emitted(0);
+        ++braking;
+        assert(braking < 100);
+    }
+    assert(braking == 50);
+    for (int hold = 0; hold < 20; ++hold) {
+        cycle();
+        assert(emitted(0) == 0.0 && emitted(1) == 0.0);
+    }
+
+    // A batch without a deadline runs on and clears the diagnostic.
+    assert(runtime.submit(velocity_batch(2, {{0, -0.3}})) == RK_OK);
+    for (int held = 0; held < 100; ++held) {
+        cycle();
+        assert(emitted(0) == -0.3);
+    }
+    assert(fault_code() == 0);
+
+    // A deadline already past lapses at once; a later target replaces a lapsed one.
+    auto late = velocity_batch(3, {{0, -0.8}});
+    late.expires_at_ns = timestamp - 1;
+    assert(runtime.submit(late) == RK_OK);
+    cycle();
+    assert(std::abs(emitted(0) + 0.78) < 1e-12);
+    auto renewed = velocity_batch(4, {{0, 0.4}});
+    renewed.expires_at_ns = timestamp + 1'000'000'000;
+    assert(runtime.submit(renewed) == RK_OK);
+    for (int held = 0; held < 20; ++held) {
+        cycle();
+        assert(emitted(0) == 0.4);
+    }
+    assert(fault_code() == 0);
+}
+
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
@@ -1882,6 +2042,9 @@ int main() {
     trajectory_stop_counts_trajectory_braking(blueprint);
     stop_beyond_queued_path_ramps_within_limits(blueprint);
     stop_ramp_stays_within_travel(blueprint);
+    expired_velocity_targets_brake_within_limits(blueprint);
+    plan_end_does_not_restore_earlier_targets(blueprint);
+    single_precision_reading_at_a_limit_is_not_a_fault(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
     trajectory_chunk_speed_is_limited(blueprint);

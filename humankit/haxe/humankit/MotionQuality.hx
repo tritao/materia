@@ -18,6 +18,8 @@ typedef ArmQuality = {
 	var planeTurnAt:Int;
 	var handSpeedAt:Int;
 	var handAccelerationAt:Int;
+	/** The sample index at which the elbow bent sharpest. */
+	var minElbowAt:Int;
 }
 
 /**
@@ -43,7 +45,7 @@ class MotionQuality {
 	static function fresh():ArmQuality
 		return {planeTurnRate: 0.0, elbowAboveShoulder: Math.NEGATIVE_INFINITY, minElbowAngle: 180.0,
 			maxHandSpeed: 0.0, maxHandAcceleration: 0.0, handAheadOfChest: Math.POSITIVE_INFINITY,
-			planeTurnAt: -1, handSpeedAt: -1, handAccelerationAt: -1};
+			planeTurnAt: -1, handSpeedAt: -1, handAccelerationAt: -1, minElbowAt: -1};
 
 	public function arm(side:Int):ArmQuality
 		return arms[side];
@@ -63,7 +65,10 @@ class MotionQuality {
 			var upper = Mat4.subtract(shoulder, elbow), lower = Mat4.subtract(hand, elbow);
 			var cosine = Mat4.dot(upper, lower) / Math.max(1e-9, length(upper) * length(lower));
 			var angle = Math.acos(Math.max(-1.0, Math.min(1.0, cosine))) * 180.0 / Math.PI;
-			result.minElbowAngle = Math.min(result.minElbowAngle, angle);
+			if (angle < result.minElbowAngle) {
+				result.minElbowAngle = angle;
+				result.minElbowAt = samples;
+			}
 			result.elbowAboveShoulder = Math.max(result.elbowAboveShoulder, elbow[2] - shoulder[2]);
 			if (chest != null) result.handAheadOfChest = Math.min(result.handAheadOfChest, hand[0] - chest[0]);
 

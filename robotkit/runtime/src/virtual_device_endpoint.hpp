@@ -53,6 +53,9 @@ public:
     rk_result apply(const rk_robot_command &command) override;
     rk_result sample(std::uint64_t timestamp_ns, rk_robot_state &state) override;
     bool reports_safety_state() const noexcept override { return true; }
+    double observed_position_precision() const noexcept override {
+        return inner_->observed_position_precision();
+    }
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_READY; }
     bool executes_trajectory_queue() const noexcept override { return true; }
     int32_t diagnostic_code() const noexcept override;

@@ -34,6 +34,13 @@ class RobotSnapshot {
   public final activePlanId:Int64;
   public final committedUntilNs:Int64;
   public final queueEndTimeNs:Int64;
+  /**
+   * Where the robot holds each joint and anchors the next plan: the last
+   * commanded position, which a measured position may miss by a step or a
+   * following error. A plan started while idle begins here. Equals
+   * `positions` where the source does not report it.
+   */
+  public final setpointPositions:ImmutableFloatArray;
 
   /** Compatibility alias; new code should name the clock explicitly. */
   public var timestampNs(get, never):Int64;
@@ -61,7 +68,8 @@ class RobotSnapshot {
     ?sessionState:Int = 0,
     ?activePlanId:Int64,
     ?committedUntilNs:Int64,
-    ?queueEndTimeNs:Int64
+    ?queueEndTimeNs:Int64,
+    ?setpointPositions:Array<Float>
   ) {
     this.id = id;
     this.sourceSequence = sourceSequence;
@@ -90,6 +98,7 @@ class RobotSnapshot {
     this.activePlanId = activePlanId == null ? Int64.ofInt(0) : activePlanId;
     this.committedUntilNs = committedUntilNs == null ? Int64.ofInt(0) : committedUntilNs;
     this.queueEndTimeNs = queueEndTimeNs == null ? Int64.ofInt(0) : queueEndTimeNs;
+    this.setpointPositions = new ImmutableFloatArray(setpointPositions == null ? positions : setpointPositions);
   }
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;

@@ -36,6 +36,18 @@ class Sketch extends Model {
 		}
 	}
 
+	/** `sketch`, a single face, with that face named `id` (a sketch region). Takes ownership of `sketch`. */
+	public static function named(sketch:Sketch, id:String):Sketch {
+		try {
+			var result = new Sketch(sketch.shape.withElementNames(CadKit.ShapeKind.Face, [id]), sketch.plane);
+			sketch.close();
+			return result;
+		} catch (error:Dynamic) {
+			sketch.close();
+			throw error;
+		}
+	}
+
 	public static function face(outer:Curve, ?holes:Array<Curve>, ?plane:Plane):Sketch {
 		if (holes == null)
 			holes = [];
@@ -98,7 +110,7 @@ class Sketch extends Model {
 	public static function circle(radius:Float, ?plane:Plane):Sketch {
 		if (plane == null)
 			plane = Plane.XY();
-		var curve = Curve.circle(radius, plane);
+		var curve = Curve.named(Curve.circle(radius, plane), "circle");
 		try {
 			var result = face(curve, [], plane);
 			curve.close();
@@ -124,10 +136,10 @@ class Sketch extends Model {
 		var edges:Array<Curve> = [];
 		var wire:Null<Curve> = null;
 		try {
-			edges.push(Curve.line(plane.toWorld(new Vector(-c, -r)), plane.toWorld(new Vector(c, -r))));
-			edges.push(Curve.arc(plane.toWorld(new Vector(c, -r)), plane.toWorld(new Vector(c + r, 0)), plane.toWorld(new Vector(c, r))));
-			edges.push(Curve.line(plane.toWorld(new Vector(c, r)), plane.toWorld(new Vector(-c, r))));
-			edges.push(Curve.arc(plane.toWorld(new Vector(-c, r)), plane.toWorld(new Vector(-c - r, 0)), plane.toWorld(new Vector(-c, -r))));
+			edges.push(Curve.named(Curve.line(plane.toWorld(new Vector(-c, -r)), plane.toWorld(new Vector(c, -r))), "slot.bottom"));
+			edges.push(Curve.named(Curve.arc(plane.toWorld(new Vector(c, -r)), plane.toWorld(new Vector(c + r, 0)), plane.toWorld(new Vector(c, r))), "slot.right"));
+			edges.push(Curve.named(Curve.line(plane.toWorld(new Vector(c, r)), plane.toWorld(new Vector(-c, r))), "slot.top"));
+			edges.push(Curve.named(Curve.arc(plane.toWorld(new Vector(-c, r)), plane.toWorld(new Vector(-c - r, 0)), plane.toWorld(new Vector(-c, -r))), "slot.left"));
 			wire = Curve.wire(edges);
 			var result = face(wire, [], plane);
 			wire.close();

@@ -130,6 +130,19 @@ out to be wrong.
   for the kit. Pinocchio does not replace the kit: the kit must run in Haxe
   without native code (editor, CAD design mode) and handles CAD closures and
   couplings.
+- **KK-D20 — coal for collision and distance (2026-10-01).** Signed
+  distance with closest points (what distance constraints need), triangle
+  meshes, height fields and octrees, scenes that change at runtime, and
+  Pinocchio/TSID's own collision layer (KK-D14). MuJoCo can answer
+  convex-shape distance queries (mink's collision limit uses
+  `mj_geomDistance`), but it treats every mesh as its convex hull and needs a
+  compiled simulator model per scene, which does not fit non-convex,
+  changing construction scenes. FCL is coal's predecessor. Vendored from
+  our fork `tritao/coal` (branch `materia`): the core only, Eigen only, no
+  Boost or assimp (see `native/THIRD_PARTY.md`). It lives behind the
+  kinematicskit-native C ABI like ProxQP, so it is native-only; the browser
+  build does not get collision checks unless coal is compiled to
+  WebAssembly.
 - **KK-D9 — Out of scope:** collision (a validator interface outside the
   kit), time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
@@ -367,6 +380,58 @@ Select a frame, drag a target gizmo, solve with the preview API, show a ghost
 and per-task residuals / limit hits; commit through an undoable editor
 command. For a design-mode assembly the commit updates `AssemblyState`
 coordinates; for a running robot the target goes through MotionKit.
+
+## K6 — Consolidation after Lane D (2026-10-01)
+
+Lane D added working pieces as separate special cases. K6 folds them into
+one structure before collision checking (which should plug into one group
+and one solver, not four IK paths).
+
+- **KK-D15 — One kinematic group.** RobotKit's `KinematicGroup` is the
+  joints from a root link to a tool frame, plus optionally the joints to a
+  work frame (a positioner). Poses are in the work frame when there is one,
+  else in the root (base) link's frame. It names its external axes (damped),
+  its redundancy (`ArmSwivel`) and its base motion (K5). `Manipulator` is
+  the fixed-base, no-work-frame case (a subclass keeping its constructor).
+  IK has one entry point, `solve(target, seed, options)`. `IkOptions`
+  carries the tolerances, the TCP or flange target, the method (tracking,
+  reaching, prioritized), a swivel goal, a preferred posture and a moving
+  base. `solveIk`, `solveIkForTcp`, `solveIkAtSwivel`, `solveIkWithBase` and
+  `CoordinatedGroup` go.
+- **KK-D16 — Prioritized solves are exact.** `PrioritizedSolver`
+  (pure Haxe, so the editor and the browser keep IK) solves each iteration
+  as an equality-constrained least-squares step. Hard tasks are equalities,
+  soft tasks (posture, swivel preference, DOF damping) are the objective,
+  and limits are an active set. This replaces the two-pass posture solve.
+  It revises KK-D3 for this one solver: priorities are exact equalities,
+  not weights. A ProxQP twin in the native core is added only if speed
+  calls for it.
+- **KK-D17 — Step limits live in the kit.** The servo's per-tick bounds
+  (position, velocity, acceleration, braking, ramped chunks) become a
+  kinematicskit `StepLimits`, used by `DifferentialIk` with a
+  `FrameVelocityTask`. `ManipulatorServo` keeps only its API.
+- **KK-D18 — Solvers own their path search.** MotionKit's `PathSolver`
+  interface (`solvePath`) is implemented by OPW (native selection), by
+  redundant groups (the redundancy lattice) and by a generic sampling
+  selector. `ProgramCompiler` asks the solver; it no longer switches on its
+  type.
+- **KK-D19 — One redundancy resolver.** `RedundancyParameterization` names
+  the motion left after the tool pose: the swivel of a 7R arm, the values
+  of a cell's external axes, later a mobile base's pose. Each can report
+  its values for `q` and solve at given values. `RedundancyResolver` runs
+  D3's pipeline over any of them: grow a lattice along the path, select the
+  cheapest route (Descartes), smooth, re-solve exactly.
+
+Steps, each its own commit with all suites green:
+- K6a: `KinematicGroup` + `IkOptions`; migrate callers; `Manipulator`
+  subclass; `CoordinatedGroup` deleted.
+- K6b: `PrioritizedSolver`; the group's preferred-posture solve uses it.
+- K6c: `StepLimits` + `FrameVelocityTask`; `ManipulatorServo` on
+  `DifferentialIk`.
+- K6d: `PathSolver`; `PathConfigurationSelector` becomes the generic
+  sampler.
+- K6e: `RedundancyParameterization` (swivel, external axes) +
+  `RedundancyResolver`; D3 and D6 paths both go through it.
 
 ## Progress log
 
@@ -797,3 +862,118 @@ coordinates; for a running robot the target goes through MotionKit.
   needed budget a solve now converges; one step fewer is still the limit.
   The robot-arm motion check, MotionKit (6746), ToolpathKit (2975),
   cadbridge (129) and RobotKit (4785) are unchanged by it.
+
+### K6a — One kinematic group (2026-10-01)
+
+- RobotKit's `KinematicGroup` merges `Manipulator` and `CoordinatedGroup`.
+  Every pose, Jacobian and IK target is in its reference frame: the work
+  frame when there is one, else the root link's.
+  - Jacobians are J_tool − J_reference, rotated into the reference frame.
+    For a fixed base the reference term is zero, so nothing changes there.
+  - The tool task targets the reference frame through
+    `FrameTask.relativeTo` when there is a work frame. Without one, the root
+    link's pose turns the target into a world target once, as before.
+- `Manipulator` is now a small subclass: the fixed-base, no-work-frame case.
+  It keeps `baseLink` and `withTool`.
+- One entry point: `solve(target, seed, IkOptions)`.
+  - `IkOptions` carries the tolerances, tracking (DLS) or reaching (LM),
+    `flange()`, `atSwivel(angle, exact)`, `preferring(posture)` and
+    `movingBase(rootPose)`.
+  - `solveIk`, `solveIkForTcp`, `solveIkAtSwivel`, `solveIkWithBase`,
+    `CoordinatedGroup` and MotionKit's `CoordinatedKinematics` are gone.
+- `ManipulatorKinematics` adapts any group and carries an optional preferred
+  posture; the D6 test runs through it.
+- The default swivel and `redundant()` count the arm's DOFs, not the
+  external axes.
+- The preferred-posture solve still has two passes; K6b replaces them.
+
+### K6b — Prioritized solver; one-pass posture solves (2026-10-01)
+
+- `PrioritizedSolver` (pure Haxe) solves each iteration as an
+  equality-constrained least-squares step:
+  - hard rows are equalities;
+  - soft rows plus λ² damping form the objective;
+  - the KKT system is regularized by 1e-10 on the constraint block, so
+    singular hard rows still solve;
+  - limits are an active set: pin the violators, re-solve the rest.
+- It converges once the hard tasks are met and the step has settled.
+- `KinematicGroup` uses it whenever a posture is preferred
+  (`IkMethod.Prioritized`), replacing the draw-then-polish two passes.
+  Tracking without a posture stays on DLS (KK-D11).
+- Test: on the 7-axis fixture, a preferred posture is another exact solution
+  of the same tool pose. The solver slides along the self-motion to it
+  (within 1e-3) with the tool exact (< 1e-9), while plain DLS stays more
+  than 0.1 away. A posture beyond a limit leaves the joint on the limit,
+  with the tool still exact.
+- My first test preferred a posture the pose cannot reach. Only one DOF is
+  free at a fixed tool pose, so nearly no improvement is possible there,
+  whatever the solver does.
+
+### K6c — Step limits and the tool's twist task live in the kit (2026-10-01)
+
+- `StepLimits` (pure Haxe) bounds one differential step per layout column:
+  - configuration, with the limit gain;
+  - velocity;
+  - with the previous velocity: acceleration, and a braking bound that is
+    discrete (or ramped, for streamed plan chunks).
+  - Where bounds conflict, position and braking win.
+  - Each side of a DOF bounds itself, so one-sided limits work as before.
+- `FrameVelocityTask` asks a frame point to move at a twist for one step,
+  optionally relative to another body (as `FrameTask.relativeTo`).
+- `DifferentialIk.step(problem, state, dt, qp, ?limits:StepLimits, …)`
+  replaces the velocity-limit arrays and gain. It returns `fallback` (the
+  QP did not solve: the damped step clamped into the same bounds) and the
+  `limited` columns. `StepLimits.ofVelocity` covers the mink-style calls.
+- `KinematicGroup` exposes `problem()`, `stateOf(q)` and
+  `toolVelocityTask()`. `ManipulatorServo` keeps its API but is now a thin
+  call to `DifferentialIk` on the group's tool twist task; its bound code
+  moved into `StepLimits`.
+- The mink oracle (with `KK_MINK_PYTHON`) gives the same numbers as before:
+  position targets agree to 8e-9 rad/s.
+
+### K6d/K6e — Solvers own their path search; one redundancy resolver (2026-10-01)
+
+- `KinematicsSolver.solvePath(PathRequest)`: each solver searches paths its
+  own way, and `ProgramCompiler` asks it. The OPW and redundant-arm type
+  switches are gone; a selector passed explicitly still forces the generic
+  sampled search.
+  - OPW: its analytic branches through native selection.
+  - `ManipulatorKinematics`: `RedundancyResolver` for a redundant group,
+    else point by point (`PathRequest.followPointByPoint`).
+  - Logical axes and test solvers: point by point.
+- `PathConfigurationSelector` is the generic engine: sampled candidates and
+  Descartes `select`. Its `nativeRequest`/`readResult` are shared with OPW.
+- `RedundancyParameterization` names the redundancy. It can report its
+  values for `q`, solve at given values, solve near the seed's, give
+  lattice rates per metre, say which values wrap, and give a cost factor
+  per DOF.
+  - `SwivelParameterization`: a 7-axis arm, at 5 rad per metre.
+  - `ExternalAxesParameterization`: the values of a cell's external axes,
+    solved with `IkOptions.holding` (held DOFs leave the solve). External
+    axes cost a tenth of the arm.
+- `RedundancyResolver`:
+  - A beam search over the lattice: candidates continue held or moved one
+    step per value. Each new configuration gets its cheapest cost from the
+    start over all previous candidates within `maxJump`. The 48 cheapest,
+    one per cell, go on, and the route is traced back.
+  - Then the redundancy is smoothed (Gaussian, values reflected through
+    each end) and re-solved exactly.
+  - D3's 7-axis path and D6's cell now both go through it.
+- Found while doing it:
+  - D3's original lattice kept held continuations first. Once a sample had
+    48 candidates it stopped spreading, so the redundancy could only drift
+    a couple of steps. The beam search keeps the cheapest candidates
+    instead, whichever way they move.
+  - D6 on the resolver: the turntable turns from the first sample, while
+    the arm moves less than a tenth as much (0.33 rad against 6.2 rad).
+    The worst joint step is 0.008 rad per 2.5 mm.
+  - A one-sided smoothing window at the path's start bent a steady trend
+    there (0.503 mm off). Reflecting through the end fixed it.
+  - MotionKit timing: stretching carried each stage's start speed through
+    the recurrence. Where the path speed nearly stops mid-path that drifted
+    negative (-7e-8), and the law was rejected. `retime_stages` now aims
+    every stage at its exact target end speed from the speed actually
+    reached. Rounding is then corrected stage by stage instead of
+    accumulating. `soften_stages` uses it too.
+- Lattice steps are rates per metre of path, no longer per sample (the D3
+  debt).

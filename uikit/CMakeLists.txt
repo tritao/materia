@@ -755,7 +755,10 @@ if(NK_BUILD_EXAMPLES)
                     "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/nativekit_ui_haxeon_guest.wasm"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${CMAKE_CURRENT_SOURCE_DIR}/examples/ui_haxeon/web_shell.html"
-                    "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/nativekit_ui_haxeon.html")
+                    "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/nativekit_ui_haxeon.html"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${NKUI_HAXEON_DIR}/stdlib/haxeon/wasm/haxeon-host.js"
+                    "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/haxeon-host.js")
             if(NOT NKUI_HAXEON_BUNDLE_FONTS)
                 list(APPEND NKUI_HAXEON_ASSET_COMMANDS
                     COMMAND ${CMAKE_COMMAND} -E rm -f
@@ -785,6 +788,7 @@ if(NK_BUILD_EXAMPLES)
                     nativekit_ui_haxeon_fonts
                     ${NKUI_HAXEON_FONT_ASSET_PATHS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/examples/ui_haxeon/web_shell.html"
+                    "${NKUI_HAXEON_DIR}/stdlib/haxeon/wasm/haxeon-host.js"
                 COMMENT "Copying NativeKit Haxeon browser host")
             add_dependencies(nativekit_ui_haxeon nativekit_ui_haxeon_assets)
         endif()

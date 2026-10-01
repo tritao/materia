@@ -592,6 +592,81 @@ CADKIT_API cad_result cad_mesh_copy_indices(
     uint32_t* output,
     uint32_t capacity);
 
+/* Topological names (plans/TOPOLOGICAL_NAMING.md). Every face, edge and
+ * vertex of a shape has a name that survives parametric edits. Lists of names
+ * are newline-separated UTF-8, one per subshape in cad_shape_subshape_at
+ * order; faces, edges, vertices and solids have names. Names are opaque text; the scheme version changes whenever a rule
+ * change would rename an element. */
+CADKIT_API cad_result cad_naming_scheme_version(uint32_t* out_version CADKIT_HXI_OUT);
+
+/* The names of the shape's faces, edges or vertices. The byte capacity is
+ * both the query result and the input capacity in bytes. */
+CADKIT_API cad_result cad_shape_copy_element_names_bytes(
+    cad_shape shape,
+    cad_shape_kind kind,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* A copy of the shape whose faces, edges or vertices are named by `names`,
+ * one line per subshape (an empty line keeps the current name). Each line is
+ * an identifier, escaped into a name. An edge or vertex name holds where the
+ * faces cannot name it: boundary and wire edges, and their vertices. */
+CADKIT_API cad_result cad_shape_seed_names(
+    cad_shape shape,
+    cad_shape_kind kind,
+    const char* names CADKIT_HXI_UTF8,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+/* A copy of the shape whose names that no input has are prefixed by `tag:`:
+ * the elements created from the inputs, as opposed to carried through. */
+CADKIT_API cad_result cad_shape_stamp_names(
+    cad_shape shape,
+    const char* tag CADKIT_HXI_UTF8,
+    const cad_shape_ref* inputs CADKIT_HXI_IN_ARRAY(input_count), uint32_t input_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+/* How well a stored name matches a candidate name. A relative is the same
+ * name once split pieces, ordinals and input slots are set aside. */
+typedef enum cad_name_match_grade {
+    CAD_NAME_MATCH_NONE = 0,
+    CAD_NAME_MATCH_RELATIVE = 1,
+    CAD_NAME_MATCH_WEAK = 2,     /* equal, but the name is weak: only geometry can confirm it */
+    CAD_NAME_MATCH_EXACT = 3
+} cad_name_match_grade;
+
+/* How the stored name `reference` matches each of `candidates`
+ * (newline-separated), as one 16-byte little-endian record per candidate:
+ * uint32 grade (cad_name_match_grade), uint32 reserved (0), double overlap
+ * (for relatives: the Jaccard index of their split pieces, 1 when neither is
+ * split). Text only, so it works on names without their shape. */
+CADKIT_API cad_result cad_element_name_match_bytes(
+    const char* reference CADKIT_HXI_UTF8,
+    const char* candidates CADKIT_HXI_UTF8,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* The tag that created the named element (the feature `f7` in
+ * `f7:fillet(...)`), or empty when the name has none. */
+CADKIT_API cad_result cad_element_name_tag_bytes(
+    const char* name CADKIT_HXI_UTF8,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* Other names of merged faces or solids, as lines "index<TAB>alias": a
+ * reference to any of them finds the merged element. */
+CADKIT_API cad_result cad_shape_copy_element_aliases_bytes(
+    cad_shape shape,
+    cad_shape_kind kind,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* A name in words for people ("f3 › edge between top and right"), with
+ * tags kept before a "›". For display only: never store or parse it. */
+CADKIT_API cad_result cad_element_name_label_bytes(
+    const char* name CADKIT_HXI_UTF8,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
 /* Haxeon-facing byte copies keep each mesh stream bulk-oriented. The byte
  * capacity is both the query result and the input capacity in bytes. */
 CADKIT_API cad_result cad_mesh_copy_vertices_bytes(

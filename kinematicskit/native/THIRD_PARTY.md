@@ -20,3 +20,30 @@
 Updating: bump the submodule to a new tag, update the version macros in
 `src/proxsuite_config/proxsuite/config.hpp` and this file, then rerun
 `native/tests` (the QP parity and optimality tests).
+
+## coal (collision and distance)
+
+- Source: our fork https://github.com/tritao/coal, branch `materia`, pinned
+  submodule at `vendor/coal`. Based on upstream coal-library/coal tag v3.0.4
+  (commit f0fecd0a); the branch adds one commit (f92f288b).
+- Licence: BSD 3-Clause (upstream `vendor/coal/LICENSE`; coal descends from
+  FCL and hpp-fcl).
+- Use: the collision and distance core (shapes, GJK/EPA, bounding-volume
+  trees, broad phase, height fields) built as a static library by
+  `vendor/coal/materia/CMakeLists.txt` (target `coal::core`), Eigen only.
+  The branch removes Boost from the core headers (pi from `EIGEN_PI`, an
+  unused `boost/function` include dropped); `materia/include` stands in for
+  the `config.hh`/`deprecated.hh`/`warning.hh` coal's CMake would generate.
+- Not used: mesh-file loading (`mesh_loader`: assimp, Boost.Filesystem),
+  serialization (Boost.Serialization), octrees (octomap), logging
+  (Boost.Log), the Python bindings, coal's own CMake and its `cmake`
+  submodule (jrl-cmakemodules), which stays uninitialized. Meshes are built
+  from triangle arrays.
+- Checked: a standalone build of `native/` compiles it and runs
+  `tests/cpp/coal_smoke.cpp`; its dependency records list no Boost or
+  assimp header.
+
+Updating: rebase the `materia` branch onto a new upstream tag, rerun the
+Boost check (`grep -rn boost include src` outside mesh_loader, serialization
+and python), update the version macros in `materia/include/coal/config.hh`,
+bump the submodule and this file, and rerun the smoke test.

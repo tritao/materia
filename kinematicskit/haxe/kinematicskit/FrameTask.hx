@@ -15,6 +15,12 @@ package kinematicskit;
  * `Axis(u)` aligns the frame's local axis `u` with the target's, leaving
  * rotation about it free.
  *
+ * With `relativeTo(reference, offset)` the target is expressed in a frame
+ * on another body (e.g. a workpiece on a positioner): the task holds the
+ * frame at that pose relative to the reference, both bodies free to move.
+ * Its rows are then J_body − J_reference, the reference's taken at the
+ * target point (exact for position), so the solver may move either side.
+ *
  * Position and orientation errors stay separate (straight-line position
  * error, per-part masks and tolerances). A different error formulation
  * (e.g. mink's SE(3) logarithm) belongs in its own task type, not a mode.
@@ -40,6 +46,12 @@ class FrameTask implements KinematicTask {
   /** Current pose (0..6), a rotated axis (7..9), rotation vector (10..12), basis (13..18), second axis (19..21). */
   final scratch:Array<Float> = [for (_ in 0...22) 0.0];
   final pointJacobian:Array<Float> = [];
+  final referenceJacobian:Array<Float> = [];
+  /** Body the target is relative to (-1: the world), and reference_T_frame on it. */
+  var referenceBody = -1;
+  final referenceFlat:Array<Float> = [for (_ in 0...7) 0.0];
+  /** The target in world coordinates for this evaluation (0..6), the reference pose (7..13). */
+  final goal:Array<Float> = [for (_ in 0...14) 0.0];
   var lastPositionError = 0.0;
   var lastOrientationError = 0.0;
 
@@ -76,6 +88,26 @@ class FrameTask implements KinematicTask {
       positionAxes, orientation, model.frameIds[frame]);
   }
 
+  /**
+   * Expresses the target relative to the frame `reference · referenceOffset`
+   * instead of the world. Returns this task.
+   */
+  public function relativeTo(model:KinematicModel, reference:Int, ?referenceOffset:Transform):FrameTask {
+    if (reference < 0 || reference >= model.bodyCount()) throw "Frame task reference must be a body of the model";
+    referenceBody = reference;
+    FlatTransform.write(referenceOffset == null ? Transform.identity()
+      : Transform.checked(referenceOffset, "Frame task reference offset"), referenceFlat, 0);
+    return this;
+  }
+
+  /** The frame's pose relative to the reference (the world pose without one) in an evaluated snapshot. */
+  public function relativePose(snapshot:KinematicSnapshot):Transform {
+    var pose = currentPose(snapshot);
+    if (referenceBody < 0) return pose;
+    snapshot.attachedPoseInto(referenceBody, referenceFlat, 0, goal, 7);
+    return FlatTransform.read(goal, 7).inverse().compose(pose);
+  }
+
   /** Moves the target, e.g. while an editor gizmo is dragged; takes effect at the next `evaluate`. */
   public function setTarget(target:Transform):Void
     FlatTransform.write(Transform.checked(target, "Frame task target"), targetFlat, 0);
@@ -102,6 +134,17 @@ class FrameTask implements KinematicTask {
     if (pointJacobian.length < 6 * w) pointJacobian.resize(6 * w);
     snapshot.attachedPoseInto(body, offsetFlat, 0, scratch, 0);
     snapshot.pointJacobianColumns(body, scratch[0], scratch[1], scratch[2], layout, pointJacobian);
+    // The target in world coordinates; relative to a moving reference, the relative velocity's rows.
+    var targetFlat = this.targetFlat;
+    if (referenceBody >= 0) {
+      snapshot.attachedPoseInto(referenceBody, referenceFlat, 0, goal, 7);
+      FlatTransform.compose(goal, 7, this.targetFlat, 0, goal, 0);
+      targetFlat = goal;
+      if (referenceJacobian.length < 6 * w) referenceJacobian.resize(6 * w);
+      // The residual is target − frame, so the reference moves the target point itself.
+      snapshot.pointJacobianColumns(referenceBody, goal[0], goal[1], goal[2], layout, referenceJacobian);
+      for (i in 0...6 * w) pointJacobian[i] -= referenceJacobian[i];
+    }
     var ex = targetFlat[0] - scratch[0], ey = targetFlat[1] - scratch[1], ez = targetFlat[2] - scratch[2];
     var r = row;
     if (positionAxes == ALL_AXES) {

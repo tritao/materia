@@ -461,6 +461,12 @@ class CadPlateWorkflowTests {
       check(scene.selectAtRay(0, 0, 1, 0, 0, -1) == id &&
         scene.treeSelectionKey() == id + ":feature:3" && scene.canRepairSelectedSketchSupportFace(),
         "picking a replacement face keeps the target sketch selected for repair");
+      // TN9: the generic list offers the pick for any reference of the right kind, and names it in words.
+      var pickIssues = scene.selectedReferenceIssues();
+      check(pickIssues.length == 1 && pickIssues[0].pickable && pickIssues[0].kind == "face",
+        "the picked face can repair the broken reference: " + Std.string(pickIssues));
+      var picked = scene.selectedElementLabel();
+      check(picked != null && picked.indexOf("\u203A") > 0, "the picked face reads as words: " + picked);
       step = "repair the support face";
       check(scene.repairSelectedSketchSupportFace() && reference.isResolved(),
         "repair rebinds the sketch to the explicit face selection");
@@ -492,6 +498,212 @@ class CadPlateWorkflowTests {
       throw "support-face repair workflow failed at " + step + ": " + Std.string(error);
     }
     scene.dispose();
+  }
+
+  /**
+    A document that loads with a sketch whose support face was split (plans/TOPOLOGICAL_NAMING.md, TN5): the inspector
+    lists the two pieces, choosing one repairs the sketch, and project undo/redo restore and reapply the choice.
+  */
+  static function splitSupportRepairWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "build a plate that a slot will split";
+    try {
+      check(scene.createCadPart(), "create an editable part for split-face repair");
+      var id = scene.selectedId;
+      var session = scene.cadSession(id);
+      var slot:Null<cadkit.parametric.features.TransformFeature> = null;
+      var sketchIndex = -1;
+      session.perform(function(owner) {
+        var d = owner.document;
+        var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
+        var tool = d.add(new cadkit.parametric.features.TransformFeature(d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
+          -50, -10, -5));
+        slot = tool;
+        var body = d.add(new cadkit.parametric.features.BooleanFeature(plate, tool, cadkit.parametric.features.BooleanOperation.Cut));
+        d.recompute();
+        var shape = body.currentShape();
+        var names = shape.elementNames(CadKit.ShapeKind.Face);
+        var top = names.indexOf("f" + plate.id.toInt() + ":box.+z");
+        var face = shape.subshape(CadKit.ShapeKind.Face, top);
+        var sketch = d.add(new ConstrainedSketchFeature(square(), body, null, cadkit.modeling.Vector.X(), 0, false, face));
+        face.close();
+        d.recompute();
+        sketchIndex = d.featureCount() - 1;
+      });
+      var feature:ConstrainedSketchFeature = cast session.document.featureAt(sketchIndex);
+      var reference:TopologyReference = feature.supportFaceReference;
+      check(reference.isResolved(), "the sketch sits on the plate's top face");
+
+      step = "load it with the slot across the plate";
+      // As a document saved before its support was split would load: the reference stays broken, with its candidates.
+      var moving:cadkit.parametric.features.TransformFeature = cast slot;
+      session.perform(function(owner) {
+        moving.x.set(28);
+        try owner.document.recompute() catch (_:Dynamic) {}
+      });
+      check(reference.state == ReferenceState.Ambiguous, "the split support face is ambiguous");
+      check(scene.selectTreeKey(id + ":feature:" + sketchIndex), "select the broken sketch");
+      var issues = scene.selectedReferenceIssues();
+      check(issues.length == 1 && issues[0].broken && issues[0].candidates.length == 2 &&
+        issues[0].message.indexOf("2 elements") >= 0, "the inspector lists the two pieces: " + Std.string(issues));
+      // TN9: candidates read as words, the feature tags as the features.
+      check(issues[0].candidates[0].indexOf("box ") == 0 && issues[0].candidates[0].indexOf("top (piece)") > 0,
+        "candidates name their feature and role: " + issues[0].candidates[0]);
+
+      step = "choose the right-hand piece";
+      var candidates = reference.candidates();
+      var right = candidates[0].x > candidates[1].x ? 0 : 1;
+      check(scene.repairSelectedReference(0, right), "repair the reference with the chosen piece");
+      check(reference.isResolved() && reference.currentShape().center().get_x() > 30, "the sketch now sits on the chosen piece");
+      check(scene.selectedReferenceIssues().length == 0, "nothing is left to repair");
+
+      step = "undo and redo the repair";
+      check(scene.document.undo() && reference.state == ReferenceState.Ambiguous, "project undo restores the broken reference");
+      check(scene.document.redo() && reference.isResolved() && reference.currentShape().center().get_x() > 30,
+        "project redo reapplies the choice");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "split-face repair workflow failed at " + step + ": " + Std.string(error);
+    }
+    scene.dispose();
+  }
+
+  /**
+    An edit that splits the face a sketch sits on (plans/TOPOLOGICAL_NAMING.md, TN7): it stops and asks which piece the
+    sketch means; cancelling keeps the previous model, choosing applies the edit with that piece, and undo/redo work.
+  */
+  static function splitDuringEditWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "build a plate with a slot beside it";
+    try {
+      check(scene.createCadPart(), "create an editable part for an edit that splits a face");
+      var id = scene.selectedId;
+      var session = scene.cadSession(id);
+      var slotId = -1;
+      var sketchIndex = -1;
+      session.perform(function(owner) {
+        var d = owner.document;
+        var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
+        var tool = d.add(new cadkit.parametric.features.TransformFeature(d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
+          -50, -10, -5));
+        slotId = tool.id.toInt();
+        var body = d.add(new cadkit.parametric.features.BooleanFeature(plate, tool, cadkit.parametric.features.BooleanOperation.Cut));
+        d.recompute();
+        var shape = body.currentShape();
+        var top = shape.elementNames(CadKit.ShapeKind.Face).indexOf("f" + plate.id.toInt() + ":box.+z");
+        var face = shape.subshape(CadKit.ShapeKind.Face, top);
+        var sketch:ConstrainedSketchFeature = d.add(new ConstrainedSketchFeature(square(), body, null, cadkit.modeling.Vector.X(), 0, false, face));
+        face.close();
+        d.recompute();
+        sketchIndex = d.featureCount() - 1;
+      });
+      var feature:ConstrainedSketchFeature = cast session.document.featureAt(sketchIndex);
+      var reference:TopologyReference = feature.supportFaceReference;
+      check(reference.isResolved() && scene.pendingReferenceChoice() == null, "the sketch sits on the top face");
+
+      step = "move the slot across the plate";
+      var failed = false;
+      try scene.setCadFeatureParameter(id, slotId, "transform.x", 28) catch (_:Dynamic) failed = true;
+      var asked = scene.pendingReferenceChoice();
+      check(failed && asked != null, "the edit stops and asks which piece the sketch means");
+      var pending:{message:String, candidates:Array<String>} = cast asked;
+      check(pending.candidates.length == 2 && pending.message.indexOf("2 elements") >= 0,
+        "it offers the two pieces: " + Std.string(pending));
+
+      step = "cancel the edit";
+      scene.cancelPendingReferenceChoice();
+      var slot = session.document.featureById(slotId);
+      check(scene.pendingReferenceChoice() == null && slot.parameter("transform.x").value == -50 && reference.isResolved(),
+        "cancelling keeps the previous model");
+
+      step = "make the edit again and choose the right-hand piece";
+      try scene.setCadFeatureParameter(id, slotId, "transform.x", 28) catch (_:Dynamic) {}
+      check(scene.pendingReferenceChoice() != null, "the edit asks again");
+      var choices = reference.candidates();
+      check(choices.length == 2, "the reference holds both pieces");
+      var right = choices[0].x > choices[1].x ? 0 : 1;
+      check(scene.resolvePendingReferenceChoice(right), "apply the edit with the chosen piece");
+      check(session.document.featureById(slotId).parameter("transform.x").value == 28 && reference.isResolved() &&
+        reference.currentShape().center().get_x() > 30, "the slot moved and the sketch sits on the right-hand piece");
+
+      step = "undo and redo the edit";
+      check(scene.document.undo() && session.document.featureById(slotId).parameter("transform.x").value == -50 &&
+        reference.isResolved() && reference.currentShape().center().get_x() < 31 && reference.currentShape().center().get_x() > 29,
+        "undo puts the slot and the sketch's face back");
+      check(scene.document.redo() && reference.isResolved() && reference.currentShape().center().get_x() > 30,
+        "redo moves the slot and keeps the chosen piece");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "split-during-edit workflow failed at " + step + ": " + Std.string(error);
+    }
+    scene.dispose();
+  }
+
+  /** A broken fillet edge is repaired by picking an edge in the viewport (plans/TOPOLOGICAL_NAMING.md, TN9). */
+  static function edgePickRepairWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "fillet one edge of a box";
+    try {
+      check(scene.createCadPart(), "create an editable part for edge repair");
+      var id = scene.selectedId;
+      var session = scene.cadSession(id);
+      var filletIndex = -1;
+      var boxId = -1;
+      session.perform(function(owner) {
+        var d = owner.document;
+        var box = d.add(new cadkit.parametric.features.BoxFeature(30, 20, 10));
+        d.recompute();
+        boxId = box.id.toInt();
+        var shape = box.currentShape();
+        var rim = shape.elementNames(CadKit.ShapeKind.Edge).indexOf('E(f$boxId:box.+x|f$boxId:box.+z)');
+        var edge = new cadkit.Edge(shape.subshape(CadKit.ShapeKind.Edge, rim));
+        var fillet:cadkit.parametric.features.FilletFeature = d.add(new cadkit.parametric.features.FilletFeature(box, 1, [edge]));
+        edge.close();
+        d.setOutput(fillet);
+        d.recompute();
+        filletIndex = d.featureCount() - 1;
+      });
+      var fillet:cadkit.parametric.features.FilletFeature = cast session.document.featureAt(filletIndex);
+      var reference:TopologyReference = fillet.edgeReferences[0];
+      check(reference.isResolved(), "the fillet's edge resolves");
+
+      step = "break the edge reference and pick a replacement";
+      // As a saved reference whose edge is gone would load.
+      var broken = TopologyFingerprint.fromData(CadKit.ShapeKind.Edge, CadKit.SurfaceKind.Unknown, CadKit.CurveKind.Line,
+        1e9, 1e9, 1e9, 0, 1, 0, 1, true, "f99:gone");
+      reference.restore(null, broken, ReferenceState.Unresolved);
+      check(scene.selectTreeKey(id + ":feature:" + filletIndex), "select the fillet");
+      var output = session.document.outputFeatureOrNull().currentShape();
+      var wanted = 'E(f$boxId:box.+y|f$boxId:box.+z)';
+      var pickedEdge = output.elementNames(CadKit.ShapeKind.Edge).indexOf(wanted);
+      check(pickedEdge >= 0, "the untouched top/back edge is on the output");
+      @:privateAccess scene.selection.selectedCadEdgeIndex = pickedEdge;
+      var issues = scene.selectedReferenceIssues();
+      check(issues.length == 1 && issues[0].kind == "edge" && issues[0].pickable, "the picked edge can repair it: " + Std.string(issues));
+      check(scene.selectedElementLabel().indexOf("box ") == 0 && scene.selectedElementLabel().indexOf("edge between back and top") > 0,
+        "the pick reads as words: " + scene.selectedElementLabel());
+
+      step = "repair with the picked edge";
+      check(scene.repairSelectedReferenceWithPick(0) && reference.isResolved() && reference.fingerprintData().name == wanted,
+        "the fillet now rounds the picked edge");
+      check(scene.document.undo() && reference.state == ReferenceState.Unresolved, "undo restores the broken edge");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "edge-pick repair workflow failed at " + step + ": " + Std.string(error);
+    }
+    scene.dispose();
+  }
+
+  static function square():cadkit.sketch.ConstrainedSketch {
+    var sketch = new cadkit.sketch.ConstrainedSketch();
+    var corners = [[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0]];
+    for (index in 0...4) {
+      sketch.addPoint(new cadkit.sketch.SketchPoint("p" + index, corners[index][0], corners[index][1]));
+      sketch.addConstraint(SketchConstraint.fixed("fixed" + index, "p" + index));
+    }
+    for (index in 0...4)
+      sketch.addEntity(cadkit.sketch.SketchEntity.line("edge" + index, "p" + index, "p" + ((index + 1) % 4)));
+    return sketch;
   }
 
   static function verticalFilletWorkflow():Void {
@@ -976,6 +1188,9 @@ class CadPlateWorkflowTests {
       sketchExtrusionWorkflow();
       faceSketchPocketWorkflow();
       supportFaceRepairWorkflow();
+      splitSupportRepairWorkflow();
+      splitDuringEditWorkflow();
+      edgePickRepairWorkflow();
       verticalFilletWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();

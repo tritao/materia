@@ -114,19 +114,19 @@ class DeepGrooveBearing extends MachineComponent {
 		var c = spec.chamfer, section = ro - ri;
 		var a = ri + 0.3 * section, o = ro - 0.3 * section;
 		var e = shielded ? Math.min(0.5, 0.06 * b) : 0.2 * b;
-		var rings = Part.revolve([
+		var rings = Solids.named(Part.revolve([
 			{r: ri + c, z: 0}, {r: a, z: 0}, {r: a, z: e}, {r: o, z: e}, {r: o, z: 0},
 			{r: ro - c, z: 0}, {r: ro, z: c}, {r: ro, z: b - c}, {r: ro - c, z: b},
 			{r: o, z: b}, {r: o, z: b - e}, {r: a, z: b - e}, {r: a, z: b},
 			{r: ri + c, z: b}, {r: ri, z: b - c}, {r: ri, z: c},
-		]);
+		]), "rings");
 		if (!shielded) return rings;
 		// The enclosed raceway approximates the unmodelled ball and cage space while
 		// retaining one connected solid for preview and downstream shape consumers.
 		var start = Math.max(e + 0.1, 0.15 * b);
-		var cavity = Part.revolve([
+		var cavity = Solids.named(Part.revolve([
 			{r: a, z: start}, {r: o, z: start}, {r: o, z: b - start}, {r: a, z: b - start}
-		]);
+		]), "cavity");
 		return Solids.cut(rings, [cavity]);
 	}
 

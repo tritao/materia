@@ -1397,6 +1397,19 @@ class Document {
 		return evaluateNamed(parameter, visiting, cached).value;
 	}
 
+	/** Every topology reference that needs a person's decision: ambiguous, unresolved or deleted (TN5). */
+	public function brokenReferences():Array<TopologyReference> {
+		var broken:Array<TopologyReference> = [];
+		for (feature in features)
+			for (index in 0...feature.topologyReferenceCount()) {
+				var reference = feature.topologyReferenceAt(index);
+				if (reference.state == ReferenceState.Ambiguous || reference.state == ReferenceState.Unresolved
+					|| reference.state == ReferenceState.Deleted)
+					broken.push(reference);
+			}
+		return broken;
+	}
+
 	public function featureCount():Int {
 		return features.length;
 	}
@@ -1466,6 +1479,20 @@ class Document {
 			throw failure;
 	}
 
+	/** `result` with what `feature` created tagged by its id (plans/TOPOLOGICAL_NAMING.md, TN-D5). */
+	static function stampNames(feature:Feature, result:EvaluationResult, context:EvaluationContext):EvaluationResult {
+		var inputs:Array<Shape> = [];
+		try {
+			for (dependency in feature.dependencyFeatures())
+				if (dependency.active)
+					inputs.push(context.shape(dependency));
+			return result.stamped("f" + feature.id.toInt(), inputs);
+		} catch (error:Dynamic) {
+			result.dispose();
+			throw error;
+		}
+	}
+
 	public function recompute():Void {
 		ensureOpen();
 		var started = Sys.time();
@@ -1509,7 +1536,7 @@ class Document {
 					continue;
 
 				evaluatedFeatureCount++;
-				var result:EvaluationResult = feature.evaluate(context);
+				var result:EvaluationResult = stampNames(feature, feature.evaluate(context), context);
 				stagedFeatures.push(feature);
 				stagedResults.push(result);
 				stagedByFeature.set(feature.id.toInt(), result);
@@ -1522,7 +1549,7 @@ class Document {
 				var updates = feature.prepareTopologyRemaps(stagedByFeature);
 				for (update in updates) {
 					stagedTopologyUpdates.push(update);
-					preparedRemapReport.add(update.state);
+					preparedRemapReport.add(update.state, update.method);
 				}
 			}
 			for (feature in stagedFeatures) {

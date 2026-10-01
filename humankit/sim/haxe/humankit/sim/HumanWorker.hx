@@ -14,6 +14,8 @@ import humankit.HumanJobTargets;
 import humankit.HumanLimb;
 import humankit.Pick;
 import humankit.Place;
+import humankit.ReleaseLimb;
+import humankit.WalkTo;
 import nativekit.sim.SimFrame;
 import nativekit.sim.MotionType;
 import nativekit.sim.SimActor;
@@ -227,6 +229,19 @@ class HumanWorker {
 			}
 		}
 		return worst;
+	}
+
+	/** What the job is doing now, in a word, for reports: the running action's kind, or "idle". */
+	public function currentActionLabel():String {
+		var action = job == null ? null : job.currentAction();
+		if (action == null) return "idle";
+		if (Std.isOfType(action, ApproachFor)) return "approach";
+		if (Std.isOfType(action, Pick)) return "pick";
+		if (Std.isOfType(action, Place)) return "place";
+		if (Std.isOfType(action, WalkTo)) return "walk";
+		if (Std.isOfType(action, ReleaseLimb)) return "release";
+		if (Std.isOfType(action, Wait)) return "wait";
+		return "action";
 	}
 
 	/** Zero-based document step currently running, or null for an empty or finished job. */

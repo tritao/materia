@@ -38,6 +38,8 @@ class RobotSnapshot {
   public final activePlanId:Int64;
   public final committedUntilNs:Int64;
   public final queueEndTimeNs:Int64;
+  /** Where the runtime holds each joint and anchors the next plan (the last commanded position). */
+  public final setpoint:ImmutableFloatArray;
 
   /** Compatibility alias; source time is the runtime's primary observation clock. */
   public var timestampNs(get, never):Int64;
@@ -51,7 +53,7 @@ class RobotSnapshot {
       ?trajectoryTag:Int64, ?trajectoryTagTimeNs:Int64,
       ?modelRevision:Int64, ?calibrationRevision:Int64,
       ?sessionState:Int, ?activePlanId:Int64,
-      ?committedUntilNs:Int64, ?queueEndTimeNs:Int64) {
+      ?committedUntilNs:Int64, ?queueEndTimeNs:Int64, ?setpoint:Array<Float>) {
     this.robotId = robotId;
     this.modelRevision = modelRevision == null ? Int64.ofInt(0) : modelRevision;
     this.calibrationRevision = calibrationRevision == null ? Int64.ofInt(0) : calibrationRevision;
@@ -80,6 +82,7 @@ class RobotSnapshot {
     this.activePlanId = activePlanId == null ? Int64.ofInt(0) : activePlanId;
     this.committedUntilNs = committedUntilNs == null ? Int64.ofInt(0) : committedUntilNs;
     this.queueEndTimeNs = queueEndTimeNs == null ? Int64.ofInt(0) : queueEndTimeNs;
+    this.setpoint = new ImmutableFloatArray(setpoint == null ? q : setpoint);
   }
 
   /** Converts the native ABI value while leaving the semantic robot ID unset. */
@@ -88,8 +91,10 @@ class RobotSnapshot {
     var positions:Array<Float> = [];
     var velocities:Array<Float> = [];
     var efforts:Array<Float> = [];
+    var setpoint:Array<Float> = [];
     var count = value.get_joint_count();
     for (index in 0...count) {
+      setpoint.push(value.get_setpoint_position(index));
       positions.push(value.get_position(index));
       velocities.push(value.get_velocity(index));
       efforts.push(value.get_effort(index));
@@ -121,7 +126,7 @@ class RobotSnapshot {
       value.get_trajectory_tag(), value.get_trajectory_tag_time_ns(),
       value.get_revision(), value.get_calibration_revision(),
       value.get_session_state(), value.get_active_plan_id(),
-      value.get_committed_until_ns(), value.get_queue_end_time_ns());
+      value.get_committed_until_ns(), value.get_queue_end_time_ns(), setpoint);
   }
 
   /** Returns an immutable copy associated with a caller-provided robot ID. */
@@ -130,7 +135,7 @@ class RobotSnapshot {
       q.toArray(), dq.toArray(), effort.toArray(), receivedTimestampNs, sensors.toArray(),
       trajectoryQueueDepth, trajectoryActive, trajectoryTimeNs, trajectoryDurationNs,
       trajectoryTag, trajectoryTagTimeNs, modelRevision, calibrationRevision,
-      sessionState, activePlanId, committedUntilNs, queueEndTimeNs);
+      sessionState, activePlanId, committedUntilNs, queueEndTimeNs, setpoint.toArray());
 
   inline function get_timestampNs():Int64 return sourceTimestampNs;
 }

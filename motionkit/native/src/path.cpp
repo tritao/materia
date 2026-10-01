@@ -362,25 +362,64 @@ mk_timing_binding binding_for_stage(const std::vector<mk_path_sample> &path,
     return binding;
 }
 
-bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
+// Nanosecond rounding perturbs the last constant-acceleration stage's exit
+// speed, and re-deriving every stage's acceleration (stretching, softening)
+// accumulates that error over thousands of stages. Enforce an authored rest
+// boundary exactly; the path-distance change stays below the quantization
+// error, which is checked.
+bool settle_at_rest(std::vector<mk_time_stage> &stages) {
+    auto &last = stages.back();
+    const double duration = static_cast<double>(last.duration_ns) * 1e-9;
+    const double old_end = end_s(last);
+    last.acceleration = -last.speed / duration;
+    return std::abs(end_s(last) - old_end) <= 1e-8 * std::max(1.0, std::abs(old_end));
+}
+
+// Rebuilds the stages over their own distances, from `start_speed`, each
+// constant-acceleration stage aimed at its target end speed from the speed
+// the previous one actually reached. Durations round down to whole
+// nanoseconds, so each stage ends at or just above its target, never below
+// zero, and the rounding of one stage is corrected by the next instead of
+// accumulating over thousands of stages.
+bool retime_stages(std::vector<mk_time_stage> &stages, double start_speed,
+                   const std::vector<double> &end_speeds) {
+    std::vector<double> starts, distances;
+    starts.reserve(stages.size());
+    distances.reserve(stages.size());
+    for (const auto &stage : stages) {
+        starts.push_back(stage.start_s);
+        distances.push_back(end_s(stage) - stage.start_s);
+    }
     int64_t start_ns = 0;
-    double speed = stages.front().speed / factor;
-    for (auto &stage : stages) {
-        const double distance = end_s(stage) - stage.start_s;
-        const double scaled = std::floor(static_cast<double>(stage.duration_ns) * factor);
-        if (!std::isfinite(scaled) || scaled < 1.0 ||
-            scaled > static_cast<double>(INT64_MAX - start_ns)) return false;
-        const int64_t duration_ns = static_cast<int64_t>(scaled);
-        const double duration = static_cast<double>(duration_ns) * 1e-9;
+    double speed = std::max(0.0, start_speed);
+    for (size_t i = 0; i < stages.size(); ++i) {
+        auto &stage = stages[i];
+        const double distance = distances[i];
+        const double seconds = 2.0 * distance / (speed + std::max(0.0, end_speeds[i]));
+        if (!(distance > 0.0) || !std::isfinite(seconds) || seconds <= 0.0 ||
+            seconds > static_cast<double>(INT64_MAX - start_ns) * 1e-9) return false;
+        const int64_t duration_ns = std::max<int64_t>(1,
+            static_cast<int64_t>(std::floor(seconds * 1e9)));
+        const double rounded = static_cast<double>(duration_ns) * 1e-9;
         stage.start_ns = start_ns;
         stage.duration_ns = duration_ns;
-        stage.acceleration = 2.0 * (distance - speed * duration) /
-            (duration * duration);
+        stage.start_s = starts[i];
         stage.speed = speed;
-        speed += stage.acceleration * duration;
+        stage.acceleration = 2.0 * (distance - speed * rounded) / (rounded * rounded);
+        speed += stage.acceleration * rounded;
         start_ns += duration_ns;
     }
     return true;
+}
+
+// Slows the whole law down uniformly by `factor`: every speed divided by it.
+bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
+    if (stages.empty() || !(factor > 0.0)) return false;
+    std::vector<double> ends;
+    ends.reserve(stages.size());
+    for (const auto &stage : stages)
+        ends.push_back(stage_speed(stage, stage.start_ns + stage.duration_ns) / factor);
+    return retime_stages(stages, stages.front().speed / factor, ends);
 }
 
 // A collocation peak can exceed a joint bound after quintic lowering. Reduce
@@ -419,25 +458,8 @@ bool soften_stages(std::vector<mk_time_stage> &stages, double peak_time,
         }
     }
     if (!changed) return false;
-    int64_t start_ns = 0;
-    double speed = speeds.front();
-    for (size_t i = 0; i < stages.size(); ++i) {
-        auto &stage = stages[i];
-        const double distance = positions[i + 1] - positions[i];
-        const double seconds = 2.0 * distance / (speed + speeds[i + 1]);
-        if (!std::isfinite(seconds) || seconds <= 0.0 ||
-            seconds > static_cast<double>(INT64_MAX - start_ns) * 1e-9) return false;
-        const int64_t duration_ns = std::max<int64_t>(1,
-            static_cast<int64_t>(std::floor(seconds * 1e9)));
-        const double rounded = static_cast<double>(duration_ns) * 1e-9;
-        stage.start_ns = start_ns;
-        stage.duration_ns = duration_ns;
-        stage.speed = speed;
-        stage.acceleration = 2.0 * (distance - speed * rounded) / (rounded * rounded);
-        speed += stage.acceleration * rounded;
-        start_ns += duration_ns;
-    }
-    return true;
+    return retime_stages(stages, speeds.front(),
+        std::vector<double>(speeds.begin() + 1, speeds.end()));
 }
 
 } // namespace
@@ -684,20 +706,8 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             speed += path_acceleration * rounded;
             start_ns += duration_ns;
         }
-        if (end_speed == 0.0 && !stages.empty()) {
-            // Nanosecond rounding perturbs the last constant-acceleration
-            // stage's computed exit speed. Enforce the authored rest boundary
-            // exactly; the resulting path-distance change is below the
-            // nanosecond quantization error and is checked before lowering.
-            auto &last = stages.back();
-            const double duration = static_cast<double>(last.duration_ns) * 1e-9;
-            const double corrected = -last.speed / duration;
-            const double old_end = end_s(last);
-            last.acceleration = corrected;
-            if (std::abs(end_s(last) - old_end) > 1e-8 *
-                    std::max(1.0, std::abs(old_end)))
-                return MK_ERROR_GENERATION;
-        }
+        if (end_speed == 0.0 && !stages.empty() && !settle_at_rest(stages))
+            return MK_ERROR_GENERATION;
         mk_time_law_handle created{};
         bool accepted = false;
         for (int attempt = 0; attempt < 24; ++attempt) {
@@ -745,11 +755,15 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
             // speed, so report infeasibility instead of returning a law with
             // a different boundary contract.
             if (start_speed > 0.0 || end_speed > 0.0) return MK_ERROR_GENERATION;
+            // Both boundaries are at rest here (checked above).
             if (stages.size() > 1000 &&
                 acceleration_check.status == MK_CHECK_FAILED && attempt < 20 &&
-                soften_stages(stages, acceleration_check.time_seconds, factor * 1.002))
+                soften_stages(stages, acceleration_check.time_seconds, factor * 1.002)) {
+                if (!settle_at_rest(stages)) return MK_ERROR_GENERATION;
                 continue;
-            if (!stretch_stages(stages, factor * 1.002)) return MK_ERROR_GENERATION;
+            }
+            if (!stretch_stages(stages, factor * 1.002) || !settle_at_rest(stages))
+                return MK_ERROR_GENERATION;
         }
         if (!accepted) return MK_ERROR_GENERATION;
         {

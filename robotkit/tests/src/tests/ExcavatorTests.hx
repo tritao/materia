@@ -1,5 +1,6 @@
 package tests;
 
+import robotkit.manipulation.IkOptions;
 import haxe.Int64;
 import motionkit.robot.ToolpathPlanRunner;
 import robotkit.model.RobotModel;
@@ -138,7 +139,7 @@ class ExcavatorTests {
     var current = seed;
     for (sample in samples) {
       var target = DigCyclePlanner.poseAt(sample.x, sample.y, sample.z, sample.pitch);
-      var result = fixture.arm.solveIk(target, current, 1e-4, 1e-3, 300, 0.02);
+      var result = fixture.arm.solve(target, current, new IkOptions(1e-4, 1e-3, 300, 0.02).flange());
       check(result.converged, 'Excavator IK converges for manifold target ($sample.x, $sample.y, $sample.z, pitch=$sample.pitch)');
       var achieved = fixture.arm.forwardKinematics(result.q);
       check(approx(achieved.translation.x, target.translation.x, 1e-3) &&

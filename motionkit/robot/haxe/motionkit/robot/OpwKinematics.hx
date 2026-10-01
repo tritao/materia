@@ -3,6 +3,7 @@ package motionkit.robot;
 import MotionKitNative;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import robotkit.manipulation.Manipulator;
@@ -176,6 +177,29 @@ class OpwKinematics implements KinematicsSolver {
 
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
     return differential.solveDifferential(q, twist);
+
+  /**
+   * The path across the arm's analytic branches: every sample's OPW
+   * solutions and the cheapest continuous route through them, in one native
+   * call (`mk_select_opw_configurations`).
+   */
+  public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
+    var lower:Array<Float> = [], upper:Array<Float> = [];
+    for (joint in 0...jointCount()) {
+      var bounds = manipulator.group.limitsOf(joint);
+      lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
+      upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
+    }
+    var selector = new PathConfigurationSelector(this, lower, upper, request.maxJump, request.velocity, null, 1,
+      request.maxCandidates);
+    var samples = [for (index in 0...request.poses.length) nativePathSample(request.distances[index],
+      request.poses[index])];
+    var selected = MotionKitNative.mk_select_opw_configurations(selector.nativeRequest(), native, samples,
+      request.startQ);
+    var result:Array<Null<Array<Float>>> = [];
+    for (q in selector.readResult(selected.status, selected.out_sequence)) result.push(q);
+    return result;
+  }
 
   public function nativeParameters():mk_opw_parameters return native;
 

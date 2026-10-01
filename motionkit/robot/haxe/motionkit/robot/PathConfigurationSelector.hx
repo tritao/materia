@@ -4,10 +4,17 @@ import MotionKitNative;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
 import motionkit.kinematics.Pose3;
-import motionkit.robot.OpwKinematics;
 
-/** Chooses one continuous joint configuration per Cartesian path sample. */
+/**
+ * Chooses one continuous joint configuration per Cartesian path sample: the
+ * cheapest route (joint motion weighed by 1/velocity, jumps above `maxJump`
+ * infeasible) through candidate sets, by Descartes in one native call.
+ * Solvers run it from their own `solvePath`: OPW on its analytic branches,
+ * `RedundancyResolver` on a redundancy lattice, `selectPoses` on sampled
+ * candidates.
+ */
 class PathConfigurationSelector {
+
   public final solver:KinematicsSolver;
   public final lower:Array<Float>;
   public final upper:Array<Float>;
@@ -46,28 +53,20 @@ class PathConfigurationSelector {
     this.maxCandidates = maxCandidates;
   }
 
-  /** Samples all poses, then crosses the native ABI once for the whole path. */
+  /**
+   * The generic path search: each sample's `sampleCandidates`, then the
+   * cheapest continuous route through them (sample 0 pinned to `startQ`).
+   * Solvers with a better search of their own use it through `select`.
+   */
   public function selectPoses(distances:Array<Float>, poses:Array<Pose3>,
       startQ:Array<Float>, tolerance:IkTolerance):Array<Array<Float>> {
     if (distances == null || poses == null || distances.length != poses.length ||
         distances.length == 0 || startQ == null || startQ.length != solver.jointCount() ||
         tolerance == null)
       throw "Configuration selector needs aligned path samples and start joints";
-    // Match the OPW capability through the interface until Haxeon restores
-    // concrete-class checks on interface-typed values.
-    if (Reflect.field(solver, "nativePathSample") != null) {
-      var opw:OpwKinematics = cast solver;
-      var nativeSamples:Array<mk_opw_path_sample> = [];
-      for (index in 0...poses.length)
-        nativeSamples.push(opw.nativePathSample(distances[index], poses[index]));
-      var selected = MotionKitNative.mk_select_opw_configurations(
-        nativeRequest(), opw.nativeParameters(), nativeSamples, startQ);
-      return readResult(selected.status, selected.out_sequence);
-    }
     var candidates:Array<Array<Array<Float>>> = [];
     for (index in 0...poses.length)
-      candidates.push(index == 0 ? [startQ.copy()] :
-        solver.sampleCandidates(poses[index], maxCandidates, tolerance));
+      candidates.push(index == 0 ? [startQ.copy()] : solver.sampleCandidates(poses[index], maxCandidates, tolerance));
     return select(distances, candidates);
   }
 
@@ -105,7 +104,8 @@ class PathConfigurationSelector {
     return readResult(result.status, result.out_sequence);
   }
 
-  function nativeRequest():mk_configuration_request {
+  /** The native request for these limits and weights (OPW's analytic selection takes it too). */
+  public function nativeRequest():mk_configuration_request {
     var request = new mk_configuration_request();
     request.set_struct_size(mk_configuration_request.size());
     request.set_joint_count(solver.jointCount());
@@ -121,7 +121,8 @@ class PathConfigurationSelector {
     return request;
   }
 
-  function readResult(status:Int,
+  /** The selected configurations, or the native diagnostic thrown. */
+  public function readResult(status:Int,
       sequence:Array<mk_configuration_solution>):Array<Array<Float>> {
     if (status != MotionKitNativeConstants.MK_OK) {
       var message = "";

@@ -52,8 +52,8 @@ class ReachabilityChecker {
     for (index in 0...toolpath.points.length) {
       var point = toolpath.points[index];
       var target = base_T_work.compose(point.work_T_tcp);
-      var ik = manipulator.solveIkForTcp(target, seedQ, positionTolerance, orientationTolerance,
-        maxIterations, damping);
+      var ik = manipulator.solve(target, seedQ, new IkOptions(positionTolerance, orientationTolerance,
+        maxIterations, damping));
       lastQ = ik.q;
       var clear = ik.converged && (toolClearance == null || (reachableCount == 0 && !checkApproach
         ? toolClearance.isClear(manipulator.forwardKinematics(ik.q))

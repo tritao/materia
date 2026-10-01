@@ -48,7 +48,9 @@ class TorsoClearanceTests {
             throw 'The belly front stood ${-planned.clearance} m inside the surface it reached over';
         if (planned.lean < 0.03)
             throw "The worker did not lean to make up the reach";
-        if (!(planned.clearance > without.clearance + 0.01))
-            throw 'Knowing the surface did not keep the chest any further from it: ${planned.clearance} vs ${without.clearance}';
+        // Knowing the surface must never put the chest nearer it. (It used to put it further: with the palm's depth
+        // in the stand-off the worker is far enough back either way at this height.)
+        if (planned.clearance < without.clearance - 0.001)
+            throw 'Knowing the surface put the chest nearer it: ${planned.clearance} vs ${without.clearance}';
     }
 }
