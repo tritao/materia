@@ -1730,7 +1730,8 @@ void coupled_prismatic_joints_use_equality_and_convex_collision() {
 
 void assembly_closures_compile_as_equalities() {
     for (const auto closure_type : {NKSIM_JOINT_FIXED, NKSIM_JOINT_REVOLUTE,
-                                    NKSIM_JOINT_PRISMATIC}) {
+                                    NKSIM_JOINT_PRISMATIC, NKSIM_JOINT_SPHERICAL,
+                                    NKSIM_JOINT_CYLINDRICAL, NKSIM_JOINT_PLANAR}) {
         nkscene_scene scene = 0;
         assert(nkscene_scene_create(&scene) == NKS_OK);
         nksim_world_desc desc{};

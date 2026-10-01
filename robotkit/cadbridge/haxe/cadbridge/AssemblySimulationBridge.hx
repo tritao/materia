@@ -117,8 +117,6 @@ class AssemblySimulationBridge {
       if (free.exists(edge.parent) || free.exists(edge.child))
         throw 'Free part is joined by "${edge.id}"; a part the simulation moves on its own cannot be joined';
       if (edge.role == AssemblyJointRole.Closure) {
-        if (AssemblyDefinitionCodec.closureOnlyType(edge.type))
-          throw 'Simulation does not support ${edge.type} closures yet ("${edge.id}")';
         closures.push(edge.id);
         var frame = connector(definitions.get(occurrenceDefinition(definition, edge.parent)),
           edge.parentConnector);

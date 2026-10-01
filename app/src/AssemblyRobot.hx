@@ -123,6 +123,12 @@ class AssemblyRobot {
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_REVOLUTE;
         case materia.assembly.AssemblyDefinition.AssemblyJointType.Prismatic:
           RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PRISMATIC;
+        case materia.assembly.AssemblyDefinition.AssemblyJointType.Spherical:
+          RobotKitRuntimeConstants.RK_RUNTIME_JOINT_SPHERICAL;
+        case materia.assembly.AssemblyDefinition.AssemblyJointType.Cylindrical:
+          RobotKitRuntimeConstants.RK_RUNTIME_JOINT_CYLINDRICAL;
+        case materia.assembly.AssemblyDefinition.AssemblyJointType.Planar:
+          RobotKitRuntimeConstants.RK_RUNTIME_JOINT_PLANAR;
         default: throw 'Unknown assembly closure "${closure.id}" type';
       }
       var parent = -1, child = -1;

@@ -664,3 +664,21 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
 - `ClosureKindsSmoke`: the slider guide as a prismatic closure shows
   `redundant(guide)-3` (its twist row is zero in a plane) and its rows match
   central differences.
+
+### Item 5b: MuJoCo mappings for spherical, cylindrical and planar closures (2026-10-01)
+
+- simkit: `NKSIM_JOINT_SPHERICAL/CYLINDRICAL/PLANAR` (closures only; tree
+  joints still accept fixed/revolute/prismatic). The MuJoCo backend extends
+  the prismatic pattern: an auxiliary body under body_a at body_b's relative
+  pose carries the free motion and is welded to body_b — cylindrical: slide
+  + hinge along the axis at the anchor; planar: two in-plane slides + a hinge
+  about the normal at the anchor. Spherical is one connect at the anchor.
+- RobotKit runtime: matching `RK_RUNTIME_JOINT_*` constants (values equal
+  simkit's; the runtime passes closure types through); bindings regenerated
+  with `tools/check-hxi.sh`. The app maps the assembly types; the cadbridge
+  no longer refuses them.
+- Built simkit with MuJoCo in the worktree (submodule cloned from the shared
+  checkout at the pin; `_deps` copied, `FETCHCONTENT_FULLY_DISCONNECTED=ON`).
+  `assembly_closures_compile_as_equalities` covers all six types; simkit
+  ctest 58/58 (one uinput test skipped). The app compiles; an end-to-end
+  simulation with the new kinds needs the app's native libraries rebuilt.
