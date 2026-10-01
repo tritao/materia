@@ -3,6 +3,7 @@ package app;
 import app.MateriaProjectRunner;
 import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
+import app.MatePickTool;
 import cadkit.modeling.AssemblyState;
 import app.ApplicationSimulation;
 import robotkit.world.RobotWorld;
@@ -427,6 +428,43 @@ class ProjectSourceTests {
     check(session.removeAssemblyMate(lift), "the conflicting mate can be removed");
     check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'removing it settles the mates: ${session.assemblyMateStatus()}');
     check(seat != shaft, "mates get distinct ids");
+    checkMatePick(manifest, generated);
+  }
+
+  /**
+   * The two-pick mate tool (plan C4.5c): a face that cannot take the mate and a second pick on the same part
+   * are refused without losing the first pick; the second face on another part adds the mate. The mate then
+   * shows on the part's inspector, and clearing it removes the mate (undoably).
+   */
+  static function checkMatePick(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+    var descriptors = generated.faceDescriptorsByDefinition;
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+      generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
+      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, descriptors);
+    check(session.canMateFaces(), "a project with described faces can be mated");
+    var top = describedFace(descriptors, "plate", "plane", 1), side = describedFace(descriptors, "pin", "axis", 0);
+    var base = describedFace(descriptors, "pin", "plane", -1), bottom = describedFace(descriptors, "plate", "plane", -1);
+    var tool = new MatePickTool(session, AssemblyMateKind.Planar);
+    tool.pick("project:pin", side);
+    check(tool.message.indexOf("cannot use") >= 0, 'a cylinder is refused for a planar mate: ${tool.message}');
+    tool.pick(null, -1);
+    check(tool.message == "Pick a face of an assembly part", 'a click on nothing asks again: ${tool.message}');
+    tool.pick("project:plate", top);
+    tool.pick("project:plate", bottom);
+    check(tool.message == "Pick a face of another part" && !tool.finished, 'a second face on the same part is refused: ${tool.message}');
+    tool.pick("project:pin", base);
+    var mateId = tool.mateId;
+    check(tool.finished && mateId != null && session.assemblyMates.mates.length == 1,
+      'the second face adds the mate: ${tool.message}');
+    check(tool.message == "Mates: 3 degrees of freedom free", 'the tool reports the result: ${tool.message}');
+
+    session.scene.select("project:pin");
+    var row = [for (property in session.scene.properties()) if (property.id == "assembly-mate:" + mateId) property];
+    check(row.length == 1, "the pin's inspector lists its mate");
+    var result = new PropertyBinding(row[0], session.scene.context()).apply(PropertyValue.Bool(false));
+    check(session.assemblyMates.mates.length == 0, 'clearing the mate removes it ($result)');
+    check(session.document.undo() && session.assemblyMates.mates.length == 1, "and undo brings it back");
   }
 
   /** The index of the described face of `feature` on `component`, for planes the one whose normal's z has `normalZ`'s sign. */

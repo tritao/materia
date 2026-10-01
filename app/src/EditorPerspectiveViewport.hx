@@ -62,6 +62,9 @@ class EditorPerspectiveViewport implements View {
   var assemblyDrag:Null<SceneAssemblyDrag> = null;
   var assemblyDragPlane:Array<Float> = [0.0, 0.0, 0.0, 0.0, 0.0, 1.0];
   var assemblyDragRevision:Int = 0;
+  /** The face mate being picked (see `MatePickTool`), or null. */
+  var matePick:Null<MatePickTool> = null;
+  var matePickRevision:Int = 0;
   var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
   var gridSnapEnabled:Bool = false;
   var gridStep:Float = app.editor.EditorGrid.STEP;
@@ -105,7 +108,7 @@ class EditorPerspectiveViewport implements View {
   /** Revision key for state that changes the retained viewport presentation. */
   public function presentationKey():String
     return scene.visualRevision + ":" + camera.revision + ":" + lightingRevision + ":" + sketchDragRevision + ":" +
-      assemblyDragRevision + ":" +
+      assemblyDragRevision + ":" + matePickRevision + ":" +
       hoverRevision + ":" + gridVisible + ":" + gridStep + ":" + sampleCountRequested;
 
   public function setLightingPreset(preset:Int):Void {
@@ -276,7 +279,31 @@ class EditorPerspectiveViewport implements View {
   }
   public function editingEnabled():Bool return !simulationActive;
 
-  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null;
+  public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||
+    matePick != null;
+
+  /** Starts picking two faces for a mate: the next clicks on faces go to `tool` until it finishes or is cancelled. */
+  public function beginMatePick(tool:MatePickTool):Void {
+    matePick = tool;
+    matePickRevision++;
+    host.requestFrame();
+  }
+
+  /** The face mate being picked, or null. */
+  public function activeMatePick():Null<MatePickTool> return matePick;
+
+  /** What the mate tool asks for, or what it did; null when no mate is being picked. */
+  public function matePickMessage():Null<String> return matePick == null ? null : matePick.message;
+
+  /** Hands a clicked face to the mate tool; it ends once the mate is added. */
+  function pickMateFace(sceneId:Null<String>, faceIndex:Int):Void {
+    var tool = matePick;
+    if (tool == null) return;
+    tool.pick(sceneId, faceIndex);
+    if (tool.finished) matePick = null;
+    matePickRevision++;
+    host.requestFrame();
+  }
 
   /** While a jointed part is dragged, why it is or is not following the cursor; null otherwise. */
   public function assemblyDragMessage():Null<String> return assemblyDrag == null ? null : assemblyDrag.message();
@@ -296,6 +323,11 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function cancelDrag():Null<PerspectivePointer> {
+    if (matePick != null && navigationPointer == null) {
+      matePick = null;
+      matePickRevision++;
+      return null;
+    }
     if (objectDrag != null) {
       objectDrag.cancel(); objectDrag = null;
     } else if (assemblyDrag != null) {
@@ -676,6 +708,11 @@ class EditorPerspectiveViewport implements View {
     node.on(UiEventKind.PointerDown, function(event:UiEvent) {
       if (event.button != 0 && event.button != 2) return;
       updateHover(event.localX, event.localY);
+      if (event.button == 0 && matePick != null) {
+        pickMateFace(hoveredObjectId, hoveredFaceIndex);
+        event.preventDefault(); event.stopPropagation();
+        return;
+      }
       if (event.button == 0 && editingEnabled() && scene.hasActiveSketchEdit()) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point == null) return;
@@ -779,6 +816,13 @@ class EditorPerspectiveViewport implements View {
         sketchDragRevision++;
         navigationPointer = null; navigationMode = 0;
         event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
+      if (event.key == UiKey.Escape && matePick != null && navigationPointer == null) {
+        matePick = null;
+        matePickRevision++;
+        event.preventDefault(); event.stopPropagation();
+        host.requestFrame();
         return;
       }
       if (event.key == UiKey.Escape && assemblyDrag != null) {

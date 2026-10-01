@@ -944,3 +944,24 @@ Steps:
     kept, then removed.
 - Limits: root-scope occurrences only (not parts inside nested assemblies);
   faces only, not edges.
+
+**c (done).** The two-pick mate tool:
+- `app/MatePickTool` takes the clicked faces.
+  - It refuses at once a face whose feature cannot take the mate, a click
+    on nothing, and a second face on the same part; the first pick is kept
+    so the user can pick again.
+  - After the second face it adds the mate and reports the mate status.
+- The perspective viewport routes left clicks on faces to the tool while it
+  is active (`beginMatePick`). The viewport toolbar shows its prompt, and
+  Escape cancels.
+- Commands `assembly.mate-{planar,coaxial,parallel,perpendicular}` are in
+  the viewport context menu, enabled when the project has described faces.
+- The inspector lists the selected part's mates as checked rows under
+  "Mates"; clearing one removes the mate (undoable).
+- Two haxeon fixes found on the way:
+  - `ad78d26c`: a switch value's case may end in an `if` without `else`.
+  - `d11c48fb`: a source file is only the module its package declaration
+    names. A package-scoped root was also reached as a plain root, which
+    loaded `Runner.hx` twice when a type was written as `Runner.Scene`.
+- Tests: `ProjectSourceTests.checkMatePick` (refusals, completion,
+  inspector removal and undo).

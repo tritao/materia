@@ -14,6 +14,7 @@ import app.editor.InspectorPanel;
 import app.editor.ProjectUiExtension;
 import app.editor.EditorDocumentCommands;
 import app.editor.SceneObjectCommands;
+import app.editor.AssemblyCommands;
 import app.editor.SceneViewCommands;
 import app.editor.SimulationCommands;
 import app.editor.ExampleCatalog;
@@ -761,6 +762,10 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "scene.duplicate",
         "scene.delete",
         "scene.frame-selected",
+        "assembly.mate-planar",
+        "assembly.mate-coaxial",
+        "assembly.mate-parallel",
+        "assembly.mate-perpendicular",
         "scene.toggle-grid",
         "scene.toggle-grid-snap",
         "scene.grid-spacing-0.1",
@@ -1640,6 +1645,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
     controls.push(new KeyedView("options", options));
     // While a jointed part is dragged, say whether it follows the cursor and why not.
     var dragMessage = perspectiveViewport == null ? null : perspectiveViewport.assemblyDragMessage();
+    var mateMessage = perspectiveViewport == null ? null : perspectiveViewport.matePickMessage();
+    if (mateMessage != null) dragMessage = mateMessage;
     if (dragMessage != null)
       controls.push(new KeyedView("assembly-drag-status", new Text(dragMessage, null,
         appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
@@ -1796,6 +1803,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     commands.register(new Command("editor.settings", "Editor Settings...", openSettings,
       new Shortcut(UiKey.Comma, UiModifier.Control), function() return !documents.blocked()));
     SceneViewCommands.install(this);
+    AssemblyCommands.install(this);
     SimulationCommands.install(this);
     commands.register(new Command("start.show", "Show Start page", showStartPage));
     commands.register(new Command("console.copy-all", "Copy console output", function() {

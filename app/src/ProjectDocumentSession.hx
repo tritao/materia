@@ -419,6 +419,22 @@ class ProjectDocumentSession {
       function() setMates(before, beforeResult, null)));
   }
 
+  /** The feature face `faceIndex` of part `sceneId` offers a mate (from the project's face descriptors), or null. */
+  public function assemblyFaceFeature(sceneId:String, faceIndex:Int):Null<cadkit.parametric.GeometricConnectors.GeometricFeatureKind> {
+    var definition = projectAssemblyDefinition;
+    if (definition == null) return null;
+    var occurrence = try mateOccurrence(definition, sceneId) catch (_:Dynamic) null;
+    if (occurrence == null) return null;
+    return ProjectAssemblyMates.describedFeature(assemblyFaceDescriptors.get(occurrence.definition), faceIndex);
+  }
+
+  /** Whether faces of this project's parts can be mated (it has an assembly and described faces). */
+  public function canMateFaces():Bool {
+    if (projectAssemblyDefinition == null || assemblyRuntime == null) return false;
+    for (_ in assemblyFaceDescriptors.keys()) return true;
+    return false;
+  }
+
   /** A one-line account of the mates for the status bar, or null when there are none. */
   public function assemblyMateStatus():Null<String> {
     var problem = assemblyMateProblem;
@@ -505,7 +521,27 @@ class ProjectDocumentSession {
       result.push(assemblyJointProperty(joint.id, joint.type, joint.limits,
         joint.type == AssemblyJointType.Prismatic ? assemblyMetresPerUnit : 1.0));
     }
+    for (mate in assemblyMates.mates) if (mate.first == occurrenceId || mate.second == occurrenceId)
+      result.push(assemblyMateProperty(mate));
     return result;
+  }
+
+  /** A mate on the selected part, as a checked box: clearing it removes the mate (one undoable edit). */
+  function assemblyMateProperty(mate:AssemblyMate):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.category = "Mates";
+    options.recordHistory = false;
+    var label = mate.kind + ": " + mate.first + "." + mate.firstConnector + " ↔ " + mate.second + "." + mate.secondConnector;
+    var id = mate.id;
+    return new PropertyDescriptor("assembly-mate:" + id, label, PropertyType.Bool,
+      function(_) {
+        for (current in assemblyMates.mates) if (current.id == id) return PropertyValue.Bool(true);
+        return PropertyValue.Bool(false);
+      },
+      function(_, value) switch (value) {
+        case PropertyValue.Bool(keep): if (!keep) removeAssemblyMate(id);
+        default: throw "A mate's setting must be boolean";
+      }, options);
   }
 
   function assemblyDependentProperty(jointId:String):PropertyDescriptor {

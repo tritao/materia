@@ -4,6 +4,7 @@ import cadkit.modeling.AssemblyMateSolver;
 import cadkit.parametric.GeometricConnectors;
 import cadkit.parametric.GeometricConnectors.GeometricCandidates;
 import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
+import cadkit.parametric.GeometricConnectors.GeometricFeatureKind;
 import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
@@ -112,6 +113,24 @@ class ProjectAssemblyMates {
 		var next = connectors.copy();
 		next.push({component: component, connector: connector});
 		return {name: name, overlay: new ProjectAssemblyMates(next, mates)};
+	}
+
+	/** The feature face `faceIndex` offers a mate, from its component's `descriptors`; null when it offers none. */
+	public static function describedFeature(descriptors:Null<String>, faceIndex:Int):Null<GeometricFeatureKind> {
+		if (descriptors == null) return null;
+		var records:Array<Dynamic> = haxe.Json.parse(descriptors);
+		for (record in records) if (Reflect.field(record, "index") == faceIndex) {
+			var feature:String = Reflect.field(record, "feature");
+			return switch feature {
+				case "plane": GeometricFeatureKind.Plane;
+				case "axis": GeometricFeatureKind.Axis;
+				case "sphere": GeometricFeatureKind.Sphere;
+				case "circle": GeometricFeatureKind.Circle;
+				case "line": GeometricFeatureKind.Line;
+				default: null;
+			};
+		}
+		return null;
 	}
 
 	public function withMate(mate:AssemblyMate):ProjectAssemblyMates {
