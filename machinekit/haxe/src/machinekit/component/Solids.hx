@@ -20,6 +20,23 @@ class Solids {
 		}
 	}
 
+	/**
+		`part` with its faces, edges and vertices named under `tag` (`body`, `shaft`, `bolt2`), closing `part`. Name the
+		bodies of a recipe whose faces users may pick, so a mate on them follows the face as parameters change
+		(cadkit/plans/TOPOLOGICAL_NAMING.md). Use names that mean the same body for every parameter value, never an index
+		that shifts when an optional body comes or goes.
+	**/
+	public static function named(part:Part, tag:String):Part {
+		try {
+			var result = part.named(tag);
+			part.close();
+			return result;
+		} catch (error:Dynamic) {
+			part.close();
+			throw error;
+		}
+	}
+
 	/** Fuse all parts and close each input. */
 	public static function union(parts:Array<Part>):Part {
 		var result:Part = null;

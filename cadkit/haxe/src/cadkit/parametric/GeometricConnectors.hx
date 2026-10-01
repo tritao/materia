@@ -1,6 +1,7 @@
 package cadkit.parametric;
 
 import CadKit;
+import cadkit.ElementNames;
 import cadkit.Shape;
 import haxe.Json;
 import haxeon.wire.JsonWire;
@@ -227,7 +228,13 @@ class GeometricConnectors {
 	public static function frameAmong(candidates:GeometricCandidates, connector:GeometricConnector):AssemblyFrame {
 		var list = candidates.among(connector.fingerprint.kind);
 		var resolution = TopologyResolver.resolveAmong([for (candidate in list) candidate.fingerprint], connector.fingerprint);
-		var found = resolution.state == ReferenceState.Resolved ? resolution.index : matchByProperties(list, connector);
+		// A connector with a strong name is found by it (or reported); matching by kind, direction and radius is for
+		// connectors without one, where it can only guess among look-alikes (plans/TOPOLOGICAL_NAMING.md, TN4).
+		var name = connector.fingerprint.name;
+		var named = name != null && ElementNames.match(name, [name])[0] >= ElementNames.EXACT;
+		var found = resolution.state == ReferenceState.Resolved ? resolution.index
+			: named ? (resolution.state == ReferenceState.Ambiguous ? AMBIGUOUS : -1)
+			: matchByProperties(list, connector);
 		if (found == AMBIGUOUS) throw new GeometricConnectorError("ambiguous", connector.name, "several faces or edges match it");
 		if (found < 0) throw new GeometricConnectorError("unresolved", connector.name, "its face or edge is no longer in the geometry");
 		var feature = list[found].feature;

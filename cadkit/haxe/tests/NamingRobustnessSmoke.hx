@@ -74,8 +74,8 @@ class NamingRobustnessSmoke {
 		"pattern fillet boss 1 rim | spacing" => CORRECT,
 		"pattern fillet boss 1 rim | count" => CORRECT,
 		"part connector on bore B | control" => CORRECT,
-		"part connector on bore B | widen" => REPORTED,
-		"part connector on bore B | move bore" => REPORTED,
+		"part connector on bore B | widen" => CORRECT,
+		"part connector on bore B | move bore" => CORRECT,
 		"sketch-made side face | control" => CORRECT,
 		"sketch-made side face | move line" => CORRECT,
 		"sketch-made side face | redraw line" => CORRECT,
@@ -237,15 +237,22 @@ class NamingRobustnessSmoke {
 	}
 
 	static function boredPlate(width:Float, fraction:Float):Shape {
-		var plate = Part.box(width, 40, 10, Min, Min, Min);
-		var first = Part.cylinderSpan(4, -1, 11, width * 0.25, 20);
-		var second = Part.cylinderSpan(4, -1, 11, width * fraction, 20);
+		// Built as a recipe would be, naming its bodies (TN4).
+		var plate = namedPart(Part.box(width, 40, 10, Min, Min, Min), "plate");
+		var first = namedPart(Part.cylinderSpan(4, -1, 11, width * 0.25, 20), "bore.a");
+		var second = namedPart(Part.cylinderSpan(4, -1, 11, width * fraction, 20), "bore.b");
 		var bored = plate.subtractAll([first, second]);
 		var result = bored.shape.cloneShape();
 		bored.close();
 		plate.close();
 		first.close();
 		second.close();
+		return result;
+	}
+
+	static function namedPart(part:Part, tag:String):Part {
+		var result = part.named(tag);
+		part.close();
 		return result;
 	}
 

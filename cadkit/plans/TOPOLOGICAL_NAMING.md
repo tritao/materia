@@ -669,3 +669,47 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
     native UI submodules.
   - `nativekit` (31 MB, no vendor libraries) is now populated in the
     worktree for MachineKit's suite, which passes.
+
+### 2026-10-01 — TN4 done: parts and connectors
+
+- Rebased onto `constraint-solving` 06cd2079 (C4.5b, C4.5c) with no
+  conflicts. The worktree's haxeon moved to the new pin `d11c48fb`.
+- **TN0 now: 25 correct, 2 reported, 0 wrong.** The part connector on one of
+  two equal bores is now found after widening the plate and after moving the
+  bore. Left reported, both rightly: the split top face and the split
+  sketch line.
+- `Part.named(tag)` (modeling) and `Solids.named(part, tag)` (MachineKit,
+  consuming) prefix every name of a body. Recipes should name the bodies
+  whose faces users pick. The names must mean the same body for every
+  parameter value, never a shifting index (see the doc comment).
+- **Automatic positional names for recipe bodies were considered and
+  rejected.** If an optional body comes or goes, every later index shifts
+  and a name would silently point at a different body. As weak names they
+  would add nothing over `@slot`.
+- **Geometric connectors:** a connector whose stored name is strong is found
+  by that name or reported. The relaxed kind/direction/radius match now
+  runs only for connectors without a strong name (legacy or unnamed
+  shapes), where it can only guess among look-alikes.
+- **Names in connector records:** names ride in the fingerprint record
+  (TN3), so the connector reference format stays
+  `cadkit.geometric-connector/1` with one additive field. That is a
+  deviation from the planned `/2`: older readers simply ignore it.
+  `describeFaces` and `captureDescribed` carry names the same way (tested in
+  `NamingSmoke`), so the editor's data-only mate matching is name-first
+  through `TopologyResolver.resolveAmong`.
+- **MachineKit:**
+  - `NemaStepper` names its bodies `body`, `bolt1..4` (like its connectors),
+    `pilot` and `shaft`.
+  - `MachineKitSmoke.namedStepperFaces` captures a connector on
+    `shaft:cyl.side` of a NEMA 17 and finds it on a NEMA 23, whose shaft is
+    thicker, so only the name can find it.
+  - Other recipes are unnamed for now. They keep authored connectors
+    (TN-D14) and fall back to geometry.
+- **Not done:** the editor end-to-end check ("a mate made in the editor
+  survives a recipe parameter edit") was not run. The app suites need the
+  native UI submodules. The mechanism under it (descriptors with names →
+  `resolveAmong`) is tested.
+- **Found on the way:** a haxeon incremental-build failure ("IR
+  verification failed for $equality…: Unknown IR call") after a one-line
+  test edit. A clean build passes. The reproducer is kept in
+  `../materia-worktrees/haxeon-incremental-repro/` (cache, source, notes).

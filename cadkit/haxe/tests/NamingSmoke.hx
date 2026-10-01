@@ -18,6 +18,9 @@ class NamingSmoke {
 		var line = Shape.fromOwnedHandle(CadKit.lineChecked(cadkit.Geometry.vec3(0, 0, 0), cadkit.Geometry.vec3(1, 0, 0)));
 		var named = line.withElementNames(CadKit.ShapeKind.Edge, ["rectangle edge"]);
 		check(named.elementName(CadKit.ShapeKind.Edge, 0) == "rectangle%20edge", "seeded ids are escaped");
+		// Face descriptors (what an editor without the B-rep matches mates on) carry the names.
+		var descriptors = cadkit.parametric.GeometricConnectors.describeFaces(stamped);
+		check(descriptors.indexOf('"name":"f3:box.+z"') >= 0, "face descriptors carry names");
 		for (shape in [named, line, again, moved, stamped, box])
 			shape.close();
 	}
