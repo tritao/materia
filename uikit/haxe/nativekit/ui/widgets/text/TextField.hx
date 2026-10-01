@@ -62,6 +62,8 @@ class TextField implements View {
 	public var onSelectionChange:Null<TextSelection->Void>;
 	/** Additional owner-controlled selections; the primary stays in selectionProvider. */
 	public var additionalSelectionProvider:Null<Void->Array<TextSelection>>;
+	/** Handles navigation of all selections when additional carets are present. */
+	public var onNavigationIntent:Null<(TextNavigationIntent, TextEditorLayout)->Bool>;
 	/** Return true after applying an operation to the controlled document. */
 	public var onEditIntent:Null<TextEditIntent->Bool>;
 	/** Optional aggregate selected text for clipboard copy/cut. */
@@ -104,6 +106,7 @@ class TextField implements View {
 		this.selectionProvider = null;
 		this.onSelectionChange = null;
 		this.additionalSelectionProvider = null;
+		this.onNavigationIntent = null;
 		this.onEditIntent = null;
 		this.selectionTextProvider = null;
 		this.label = label;
@@ -537,6 +540,33 @@ class TextField implements View {
 				#else
 					(event.modifiers & UiModifier.Control) != 0;
 				#end
+				if (additionalSelections.length > 0 && onNavigationIntent != null) {
+					var navigation:Null<TextNavigationIntent> = switch (event.key) {
+						case UiKey.Left: wordNavigation ? Word(-1, extend, macWordNavigation) : Character(-1, extend);
+						case UiKey.Right: wordNavigation ? Word(1, extend, macWordNavigation) : Character(1, extend);
+						case UiKey.Up: wordNavigation ? Paragraph(-1, extend, macWordNavigation) :
+							multiline ? VisualLine(-1, extend) : null;
+						case UiKey.Down: wordNavigation ? Paragraph(1, extend, macWordNavigation) :
+							multiline ? VisualLine(1, extend) : null;
+						case UiKey.Home: LineBoundary(false, extend);
+						case UiKey.End: LineBoundary(true, extend);
+						case _: null;
+					};
+					#if (mac || ios)
+					if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Up)
+						navigation = DocumentBoundary(false, extend);
+					else if ((event.modifiers & UiModifier.Super) != 0 && event.key == UiKey.Down)
+						navigation = DocumentBoundary(true, extend);
+					#end
+					if (command && (event.key == UiKey.Home || event.key == UiKey.End))
+						navigation = DocumentBoundary(event.key == UiKey.End, extend);
+					if (navigation != null && onNavigationIntent(navigation, editor.layout)) {
+						refresh();
+						editor.resetCaretBlink(Sys.time());
+						event.preventDefault();
+						return;
+					}
+				}
 				if (!readOnly) {
 					var consumed = event.key == UiKey.Backspace ? delegateEdit(DeleteBackward) :
 						event.key == UiKey.Delete ? delegateEdit(DeleteForward) :
