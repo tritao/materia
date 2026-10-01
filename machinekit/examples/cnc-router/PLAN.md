@@ -139,6 +139,20 @@ the old caps). Rapid and holder contacts now ignore overlaps below 1e-12 m³,
 numeric grazing at rapids that end beside the stock, and the tick at a
 rapid-to-cut boundary counts as the cut.
 
+Plans no longer stop where the path doesn't turn. The lowering ended a path
+at every zero-tolerance move (every rapid) and every feed change, so the
+rapid down to the stock and the plunge after it, or two plunges in a row,
+were separate plans that each ended at rest. Moves now join one path until a
+barrier, each primitive keeping its own speed (the time law caps speed at the
+slower side of a feed change), and the compiler stops only at sharp corners,
+planning one stretch between them a step so a long path doesn't delay the
+plans before it. A pass is 132 plans instead of 199 and takes 196.3 s
+instead of 198.4 s. The rest of the cycle is the programmed feeds: of 204 s
+of plans, rings at 20 mm/s take 63 s, drilling at 2 mm/s 49 s, plunges at
+5 mm/s 31 s and rapids at 80 mm/s 61 s. The 116 remaining stops are 90°
+corners. Blending them within the program's 0.01 mm G64 P would save almost
+nothing; a larger tolerance for rapids in open air would save a few seconds.
+
 **C5. Editor controls** (done). A G-code panel that highlights the running
 line; feed hold, resume, restart from a line and a speed override. What it
 took:

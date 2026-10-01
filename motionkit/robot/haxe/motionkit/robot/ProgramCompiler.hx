@@ -207,6 +207,10 @@ class ProgramCompiler {
     var program = c.program;
     var speedScale = c.speedScale;
     try {
+      if (c.sectionIndex < c.sections.length) {
+        lowerSection(c);
+        return true;
+      }
       if (c.cursor >= program.ops.length) {
         retire(c);
         if (c.leadingOutputs.length > 0)
@@ -292,21 +296,12 @@ class ProgramCompiler {
           if (path.frameId != frameId)
             throw 'Motion program op $index path frame does not match $frameId';
           // Following a sharp corner exactly means stopping there, so each
-          // stretch between corners is its own plan of this op.
-          var sections = cornerSections(path);
-          for (k in 0...sections.length) {
-            retire(c);
-            var section = sections[k], last = k == sections.length - 1;
-            var end = section.offset + section.path.length();
-            var pending = lowerPath(speedScale, section.path, c.q, feed, [for (event in events)
-              if (event.distance >= section.offset && (last || event.distance < end))
-                new PathEvent(event.distance - section.offset, event.channel, event.value,
-                  event.leadSeconds, event.holdPolicy)], index);
-            pending.distanceOffset = section.offset;
-            c.pending = pending;
-            c.q = pending.endQ.copy();
-            if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
-          }
+          // stretch between corners is its own plan of this op, one a step.
+          c.sections = cornerSections(path);
+          c.sectionIndex = 0;
+          c.sectionFeed = feed;
+          c.sectionEvents = events;
+          lowerSection(c);
         case SetOutput(channel, value):
           var pending = c.pending;
           if (pending == null) c.leadingOutputs.push({channel:channel, value:value});
@@ -322,6 +317,27 @@ class ProgramCompiler {
       var message = Std.string(error);
       if (StringTools.startsWith(message, "Motion program op ")) throw error;
       throw 'Motion program op ${c.currentIndex}: $message';
+    }
+  }
+
+  /** Plans the next stretch of the current path op. */
+  function lowerSection(c:ProgramCompilation):Void {
+    retire(c);
+    var k = c.sectionIndex++;
+    var section = c.sections[k], last = k == c.sections.length - 1;
+    var end = section.offset + section.path.length();
+    var pending = lowerPath(c.speedScale, section.path, c.q, c.sectionFeed, [for (event in c.sectionEvents)
+      if (event.distance >= section.offset && (last || event.distance < end))
+        new PathEvent(event.distance - section.offset, event.channel, event.value,
+          event.leadSeconds, event.holdPolicy)], c.currentIndex);
+    pending.distanceOffset = section.offset;
+    c.pending = pending;
+    c.q = pending.endQ.copy();
+    if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
+    if (last) {
+      c.sections = [];
+      c.sectionIndex = 0;
+      c.sectionEvents = [];
     }
   }
 

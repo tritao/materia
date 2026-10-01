@@ -2,6 +2,8 @@ package motionkit.robot;
 
 import haxe.Int64;
 import motionkit.event.EventValue;
+import motionkit.event.PathEvent;
+import motionkit.path.PosePath;
 import motionkit.program.MotionProgram;
 
 /**
@@ -27,6 +29,11 @@ class ProgramCompilation {
   var skipNext:Bool = false;
   var pending:Null<ProgramCompiler.PendingMotion> = null;
   var leadingOutputs:Array<{channel:String, value:EventValue}> = [];
+  /** The current path op's stretches between sharp corners, planned one a step. */
+  var sections:Array<{path:PosePath, offset:Float}> = [];
+  var sectionIndex:Int = 0;
+  var sectionFeed:Float = 0.0;
+  var sectionEvents:Array<PathEvent> = [];
 
   public function new(compiler:ProgramCompiler, program:MotionProgram, initialQ:Array<Float>,
       firstPlanId:Int64, firstOp:Int, speedScale:Float, sink:ProgramSink) {
@@ -45,7 +52,7 @@ class ProgramCompilation {
     this.sink = sink;
   }
 
-  /** Plans the next op. Returns false once the whole program is planned. */
+  /** Plans the next op, or the next stretch of a path op. Returns false once the whole program is planned. */
   public function step():Bool return compiler.advance(this);
 
   /** The id the next plan will take. */

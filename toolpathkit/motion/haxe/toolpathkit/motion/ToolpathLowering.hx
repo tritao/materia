@@ -39,9 +39,9 @@ class ToolpathLowering {
   var pending:Array<PathPrimitive> = [];
   var pendingSpans:Array<Provenance> = [];
   var pendingTolerances:Array<Float> = [];
+  var pendingSpeeds:Array<Float> = [];
   var pendingEvents:Array<PendingOutputEvent> = [];
   var queuedEvents:Array<PendingOutputEvent> = [];
-  var pendingFeed:Float = 0.0;
   var pendingBlend:Float = 0.0;
   var spindleOn:Bool = false;
 
@@ -53,9 +53,9 @@ class ToolpathLowering {
     motionOps = [];
     sourceMap = new ToolpathSourceMap();
     diagnostics = [];
-    pending = []; pendingSpans = []; pendingTolerances = [];
+    pending = []; pendingSpans = []; pendingTolerances = []; pendingSpeeds = [];
     pendingEvents = []; queuedEvents = []; spindleOn = false;
-    pendingFeed = 0.0; pendingBlend = 0.0;
+    pendingBlend = 0.0;
     for (op in ops) switch op {
       case SetSetup(_, _):
         flush();
@@ -107,31 +107,38 @@ class ToolpathLowering {
     return new ToolpathLoweringResult(program, sourceMap, diagnostics.copy());
   }
 
+  /**
+    Moves join one path until a barrier: the path keeps each move's speed,
+    rounds the corners its tolerances allow, and stops at the others when it
+    is planned, so a move that carries straight on, at another speed or
+    exactly, does not stop.
+  **/
   function addMove(geometry:PathPrimitive, speed:Float, blend:Float,
       span:Provenance):Void {
     if (!Math.isFinite(blend) || blend < 0.0)
       throw "toolpath move needs a nonnegative finite tolerance";
-    if (pending.length > 0 &&
-        (Math.min(blend, pendingTolerances[pendingTolerances.length - 1]) == 0.0 ||
-        Math.abs(speed - pendingFeed) > 1e-12)) flush();
     pending.push(geometry); pendingSpans.push(span);
-    pendingTolerances.push(blend);
+    pendingTolerances.push(blend); pendingSpeeds.push(speed);
     if (pending.length == 1 && queuedEvents.length > 0) {
       pendingEvents = [for (event in queuedEvents) {
         boundary:0, channel:event.channel, value:event.value, span:event.span
       }];
       queuedEvents = [];
     }
-    pendingFeed = speed; pendingBlend = Math.max(pendingBlend, blend);
-    if (blend == 0.0) flush();
+    pendingBlend = Math.max(pendingBlend, blend);
   }
 
   function flush():Void {
     if (pending.length == 0) return;
-    if (pending.length > 1 && pendingBlend > 0.0) {
-      var authored = new GeometricPath(pending);
-      var corners = [for (i in 0...(pending.length - 1))
+    // A blend between moves of different speeds would take one move's speed,
+    // so only corners between moves of one speed are rounded.
+    var corners = [for (i in 0...(pending.length - 1))
+      pendingSpeeds[i] != pendingSpeeds[i + 1] ? 0.0 :
         Math.min(pendingTolerances[i], pendingTolerances[i + 1]) * CornerBlender.GEOMETRY_SHARE];
+    var rounded = false;
+    for (corner in corners) if (corner > 0.0) rounded = true;
+    if (rounded) {
+      var authored = new GeometricPath(pending);
       var blended = CornerBlender.blendPerCorner(authored, corners,
         machine.maxBlendTurnAngleRadians);
       var spans = [for (index in blended.sourcePrimitiveIndices)
@@ -141,22 +148,24 @@ class ToolpathLowering {
         diagnostics.push(new ToolpathDiagnostic( "CNC_EXACT_STOP",
           pendingSpans[index], blended.diagnostics[warning]));
       }
-      emitPath(blended.path.primitives, spans, pendingFeed, authored,
-        pendingBlend, blended.sourcePrimitiveIndices);
-    } else for (index in 0...pending.length)
-      emitPath([pending[index]], [pendingSpans[index]], pendingFeed,
-        null, 0.0, [index]);
-    pending = []; pendingSpans = []; pendingTolerances = [];
+      emitPath(blended.path.primitives, spans, [for (index in blended.sourcePrimitiveIndices)
+        pendingSpeeds[index]], authored, pendingBlend, blended.sourcePrimitiveIndices);
+    } else
+      emitPath(pending, pendingSpans, pendingSpeeds, null, 0.0, [for (index in 0...pending.length) index]);
+    pending = []; pendingSpans = []; pendingTolerances = []; pendingSpeeds = [];
     pendingEvents = [];
     pendingBlend = 0.0;
   }
 
   function emitPath(geometry:Array<PathPrimitive>, spans:Array<Provenance>,
-      speed:Float, ?authored:GeometricPath, ?blend:Float = 0.0,
+      speeds:Array<Float>, ?authored:GeometricPath, ?blend:Float = 0.0,
       ?sourceIndices:Array<Int>):Void {
-    var primitives:Array<PosePrimitive> = [for (primitive in geometry)
-      new ToolpathPosePrimitive(primitive, speed, machine.positionTolerance,
+    var primitives:Array<PosePrimitive> = [for (index in 0...geometry.length)
+      new ToolpathPosePrimitive(geometry[index], speeds[index], machine.positionTolerance,
         machine.orientationTolerance)];
+    // Each primitive holds its own speed; the op's feed only bounds them.
+    var speed = 0.0;
+    for (value in speeds) speed = Math.max(speed, value);
     var events:Array<PathEvent> = [];
     for (event in pendingEvents) {
       var eventDistance = 0.0;

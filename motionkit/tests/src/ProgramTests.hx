@@ -26,6 +26,7 @@ import motionkit.kinematics.Twist6;
 import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
+import motionkit.robot.ProgramBlocks;
 import motionkit.robot.ProgramCompiler;
 import motionkit.robot.ProgramPlanner;
 import motionkit.robot.StartTolerances;
@@ -313,6 +314,22 @@ class ProgramTests extends MotionKitTestSupport {
     reference.releaseDistanceMap();
     reference.trajectory.dispose();
     linearPlan.dispose();
+    // A path that turns back stops at its corner: two plans, planned a step each, so a long path
+    // does not hold up the plans before it.
+    var cornerPath = new PosePath("work", [
+      new PoseLine(new PoseWaypoint(new Pose3(0.0), 0.005, 0.02),
+        new PoseWaypoint(new Pose3(0.1), 0.005, 0.02), OrientationPolicy.Fixed, 0.1, 0.1),
+      new PoseLine(new PoseWaypoint(new Pose3(0.1), 0.005, 0.02),
+        new PoseWaypoint(new Pose3(0.05), 0.005, 0.02), OrientationPolicy.Fixed, 0.1, 0.1)]);
+    var cornerBlocks = new ProgramBlocks();
+    var stepping = linearCompiler.begin(new MotionProgram([MotionOp.FollowPath(cornerPath, "work", 0.1, [])]),
+      [0.0, 0.0, 0.0, 0.0, 0.1, 0.0], Int64.ofInt(503), 0, 1.0, cornerBlocks);
+    var delivered:Array<Int> = [];
+    while (stepping.step()) delivered.push(cornerBlocks.blocks[0].plans.length);
+    check(delivered.join(",") == "0,1" && cornerBlocks.done && cornerBlocks.blocks[0].plans.length == 2,
+      'a path is planned one stretch between corners a step, got $delivered');
+    stepping.dispose();
+    cornerBlocks.dispose();
     var bounded = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
     bounded.position(0, -0.1, 0.05);
     var boundedCompiler = new ProgramCompiler(linearSolver, bounded, "work", velocity,

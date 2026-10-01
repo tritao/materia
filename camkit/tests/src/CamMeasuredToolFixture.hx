@@ -84,7 +84,8 @@ class CamMeasuredToolFixture {
         if (!Math.isNaN(previousEnd) && Math.abs(start - previousEnd) > 1e-12)
           continuous = false;
         previousEnd = path.poseAt(path.length()).z;
-        ends.push(previousEnd);
+        // Moves between barriers share a path, so each move ends at a primitive's end.
+        for (primitive in path.primitives) ends.push(primitive.waypointAt(primitive.length()).pose.z);
       case _:
     }
     check(continuous, "tool changes keep the spindle continuous in machine space");
@@ -113,21 +114,31 @@ class CamMeasuredToolFixture {
       case _:
     }
 
-    // Blending lets a contour's cutting moves run as one path instead of stopping at every vertex.
+    // Blending lets a contour's cutting moves run on instead of stopping at every vertex: the
+    // machine stops only at the sharp corners left in its paths.
     function paths(blend:Float):{count:Int, gcode:String} {
       var blended = new CamJob(0.005, 10000, new Point3(0.002, 0.002, 0.05), blend)
         .pocket(contour, mill, -0.002, 0.005, 0.0008, 0.001, 0.001).finish();
       var lowered = CamTestLowering.lower(blended, machine);
       var motion = lowered.program;
       if (motion == null) throw 'blended pocket lowers: ${lowered.diagnostics}';
-      return {count: [for (op in motion.ops) switch op {
-        case MotionOp.FollowPath(_, _, _, _): 1;
-        case _: 0;
-      }].filter(n -> n == 1).length, gcode: machine.export(blended, CamTestSetup.standard())};
+      var corners = 0;
+      for (op in motion.ops) switch op {
+        case MotionOp.FollowPath(path, _, _, _):
+          for (k in 1...path.primitives.length) {
+            var before = path.primitives[k - 1];
+            var arriving = before.derivativesAt(before.length()).linear;
+            var leaving = path.primitives[k].derivativesAt(0.0).linear;
+            if (Math.abs(arriving[0] - leaving[0]) + Math.abs(arriving[1] - leaving[1]) +
+                Math.abs(arriving[2] - leaving[2]) > 1e-6) corners++;
+          }
+        case _:
+      }
+      return {count: corners, gcode: machine.export(blended, CamTestSetup.standard())};
     }
     var exact = paths(0.0), smooth = paths(0.00001);
     check(smooth.count < exact.count,
-      'a blended pocket runs as fewer paths: ${smooth.count} against ${exact.count}');
+      'a blended pocket stops at fewer corners: ${smooth.count} against ${exact.count}');
     check(smooth.gcode.indexOf("G64 P0.01") >= 0 && exact.gcode.indexOf("G64") < 0,
       "the blend tolerance reaches the G-code as G64 P");
   }
