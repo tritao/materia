@@ -99,7 +99,8 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
 
 - Lane C: C4 (`KinematicsSolver` + OPW); C5 (configuration selection), for
   D3.
-- Collision checking (a future plan), for D4.
+- Collision checking (`kinematicskit/plans/COLLISION.md`), for D4: it is
+  that plan's C4.
 - Lane A: the virtual device, for realistic servo-latency tests in D5.
 - Pinocchio (optional, later): better Jacobians and derivatives. Not
   required to start.

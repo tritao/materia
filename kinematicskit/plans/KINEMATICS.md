@@ -142,9 +142,10 @@ out to be wrong.
   Boost or assimp (see `native/THIRD_PARTY.md`). It lives behind the
   kinematicskit-native C ABI like ProxQP, so it is native-only; the browser
   build does not get collision checks unless coal is compiled to
-  WebAssembly.
-- **KK-D9 — Out of scope:** collision (a validator interface outside the
-  kit), time parameterization and trajectories (MotionKit), dynamics,
+  WebAssembly. The plan built on it is `COLLISION.md`.
+- **KK-D9 — Out of scope:** collision geometry sources and collision
+  validation (MotionKit); the collision world itself moved into the kit
+  (`COLLISION.md` CL-D1, 2026-10-01), time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
   specialist `KinematicsSolver` in MotionKit).
 
