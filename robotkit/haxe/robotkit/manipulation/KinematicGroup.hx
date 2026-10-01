@@ -281,8 +281,18 @@ class KinematicGroup {
     if (o.swivel != null && !Math.isFinite(o.swivel)) throw "Swivel angle must be finite";
     if (o.rootPose != null) return solveWithBase(target, start, o);
     for (i in 0...n) state.q[dofs[i]] = start[i];
+    // Held DOFs sit at their values and leave the solve.
+    var excluded = [for (_ in 0...n) false];
+    if (o.held != null) {
+      var held:Array<Int> = o.held, values:Array<Float> = o.heldValues;
+      for (k in 0...held.length) {
+        if (held[k] < 0 || held[k] >= n || !Math.isFinite(values[k])) throw "Held DOFs must be group DOFs with finite values";
+        excluded[held[k]] = true;
+        state.q[dofs[held[k]]] = values[k];
+      }
+    }
     snapshot.evaluate(state);
-    var problem = limitedProblem();
+    var problem = limitedProblem(excluded);
     problem.add(toolTask(RobotKinematics.toTransform(target), o));
     if (hasExternal()) problem.add(new DofDampingTask(model, damping));
     if (o.swivel != null) problem.add(swivelTask(o.swivel, o.swivelTolerance, !o.swivelExact));
@@ -400,9 +410,10 @@ class KinematicGroup {
     return new SwivelTask(model, swivelBodies[0], swivelPoints[0], swivelBodies[1], swivelPoints[1], swivelBodies[2],
       swivelPoints[2], target, tolerance, swivelReference, soft, "swivel");
 
-  /** A problem over the group's DOFs within their limits. */
-  function limitedProblem():KinematicProblem {
-    var problem = new KinematicProblem(model).setActiveDofs(dofs);
+  /** A problem over the group's DOFs (but `excluded` ones) within their limits. */
+  function limitedProblem(?excluded:Array<Bool>):KinematicProblem {
+    var problem = new KinematicProblem(model)
+      .setActiveDofs(excluded == null ? dofs : [for (i in 0...dofs.length) if (!excluded[i]) dofs[i]]);
     for (i in 0...dofs.length) {
       var limits = group.limitsOf(i);
       if (limits.lower < limits.upper) problem.setLimits(dofs[i], limits.lower, limits.upper);

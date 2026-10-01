@@ -1,6 +1,6 @@
 package motionkit.kinematics;
 
-/** Transport-neutral forward, inverse and differential kinematics contract. */
+/** Transport-neutral forward, inverse, differential and path kinematics contract. */
 interface KinematicsSolver {
   function jointCount():Int;
   function forward(q:Array<Float>):Pose3;
@@ -9,4 +9,12 @@ interface KinematicsSolver {
   function sampleCandidates(target:Pose3, maxCount:Int,
     tolerance:IkTolerance):Array<Array<Float>>;
   function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>;
+  /**
+   * One configuration per sample of a path (see `PathRequest`): each solver
+   * searches the way that suits it (an analytic arm across its branches, a
+   * redundant group across its redundancy, a plain one point by point).
+   * Null for a sample that cannot be reached; a search that finds no route
+   * may throw its diagnostic instead.
+   */
+  function solvePath(request:PathRequest):Array<Null<Array<Float>>>;
 }

@@ -200,6 +200,8 @@ interface KinematicsSolver {
   function sampleCandidates(target:Pose3, maxCount:Int, tolerance:IkTolerance):Array<Array<Float>>;
   /** Joint velocity for a tool twist at q (least squares, damped). */
   function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>;
+  // One configuration per path sample; each solver searches its own way (K6d).
+  function solvePath(request:PathRequest):Array<Null<Array<Float>>>;
 }
 ```
 
@@ -326,7 +328,9 @@ this file.
     `KinematicGroup` (forward via `tcpPose`, `solvePose` via `solve`,
     `solveDifferential` via the chain Jacobian with damped least squares, and
     `sampleCandidates` from a deterministic seeded grid of seeds, deduplicated
-    by joint distance).
+    by joint distance). Its `solvePath` follows a plain arm point by point and
+    resolves a redundant group (a 7-axis arm's swivel, a cell's external
+    axes) with `RedundancyResolver`.
   - Tests:
     - forward/solve round-trip on the existing 6R wall-finishing arm fixture;
     - deterministic candidate sampling (same inputs give identical output);

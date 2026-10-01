@@ -332,7 +332,8 @@ class ProgramTests extends MotionKitTestSupport {
       for (j in 1...7) armMoved = Math.max(armMoved, Math.abs(q[j] - first[j]));
     }
     check(turned > Math.PI, 'the positioner turns the workpiece round ($turned rad)');
-    check(armMoved < 0.2, 'the arm stays near its posture while the work turns ($armMoved rad)');
+    // The search weighs external-axis motion at a tenth of the arm's: the work turns, the arm barely moves.
+    check(armMoved < 0.1 * turned, 'the arm moves far less than the turntable ($armMoved rad against $turned)');
 
     // One plan drives every joint of the cell on one clock.
     var harness = new SimulationHarness(0.01);

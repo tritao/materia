@@ -917,3 +917,50 @@ Steps, each its own commit with all suites green:
   moved into `StepLimits`.
 - The mink oracle (with `KK_MINK_PYTHON`) gives the same numbers as before:
   position targets agree to 8e-9 rad/s.
+
+### K6d/K6e — Solvers own their path search; one redundancy resolver (2026-10-01)
+
+- `KinematicsSolver.solvePath(PathRequest)`: each solver searches paths its
+  own way, and `ProgramCompiler` asks it. The OPW and redundant-arm type
+  switches are gone; a selector passed explicitly still forces the generic
+  sampled search.
+  - OPW: its analytic branches through native selection.
+  - `ManipulatorKinematics`: `RedundancyResolver` for a redundant group,
+    else point by point (`PathRequest.followPointByPoint`).
+  - Logical axes and test solvers: point by point.
+- `PathConfigurationSelector` is the generic engine: sampled candidates and
+  Descartes `select`. Its `nativeRequest`/`readResult` are shared with OPW.
+- `RedundancyParameterization` names the redundancy. It can report its
+  values for `q`, solve at given values, solve near the seed's, give
+  lattice rates per metre, say which values wrap, and give a cost factor
+  per DOF.
+  - `SwivelParameterization`: a 7-axis arm, at 5 rad per metre.
+  - `ExternalAxesParameterization`: the values of a cell's external axes,
+    solved with `IkOptions.holding` (held DOFs leave the solve). External
+    axes cost a tenth of the arm.
+- `RedundancyResolver`:
+  - A beam search over the lattice: candidates continue held or moved one
+    step per value. Each new configuration gets its cheapest cost from the
+    start over all previous candidates within `maxJump`. The 48 cheapest,
+    one per cell, go on, and the route is traced back.
+  - Then the redundancy is smoothed (Gaussian, values reflected through
+    each end) and re-solved exactly.
+  - D3's 7-axis path and D6's cell now both go through it.
+- Found while doing it:
+  - D3's original lattice kept held continuations first. Once a sample had
+    48 candidates it stopped spreading, so the redundancy could only drift
+    a couple of steps. The beam search keeps the cheapest candidates
+    instead, whichever way they move.
+  - D6 on the resolver: the turntable turns from the first sample, while
+    the arm moves less than a tenth as much (0.33 rad against 6.2 rad).
+    The worst joint step is 0.008 rad per 2.5 mm.
+  - A one-sided smoothing window at the path's start bent a steady trend
+    there (0.503 mm off). Reflecting through the end fixed it.
+  - MotionKit timing: stretching carried each stage's start speed through
+    the recurrence. Where the path speed nearly stops mid-path that drifted
+    negative (-7e-8), and the law was rejected. `retime_stages` now aims
+    every stage at its exact target end speed from the speed actually
+    reached. Rounding is then corrected stage by stage instead of
+    accumulating. `soften_stages` uses it too.
+- Lattice steps are rates per metre of path, no longer per sample (the D3
+  debt).

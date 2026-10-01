@@ -51,6 +51,9 @@ class IkOptions {
   public var rootPose:Null<Transform3> = null;
   /** With `rootPose`: how much the base's motion costs against the arm's (> 0 lets the arm go first). */
   public var baseCost:Float = 0.1;
+  /** Group DOFs (`q` indices) held at `heldValues` while the rest solve, e.g. a positioner at a chosen angle. */
+  public var held:Null<Array<Int>> = null;
+  public var heldValues:Null<Array<Float>> = null;
 
   public function new(?positionTolerance:Float = 1e-4, ?orientationTolerance:Float = 1e-3, ?maxIterations:Int = 100,
       ?damping:Float = 0.02) {
@@ -94,6 +97,15 @@ class IkOptions {
     return this;
   }
 
+  /** Holds the group DOFs `indices` (in `q` order) at `values` while the rest solve. Returns this. */
+  public function holding(indices:Array<Int>, values:Array<Float>):IkOptions {
+    if (indices == null || values == null || indices.length != values.length)
+      throw "Held DOFs need one value each";
+    held = indices.copy();
+    heldValues = values.copy();
+    return this;
+  }
+
   public function copy():IkOptions {
     var result = new IkOptions(positionTolerance, orientationTolerance, maxIterations, damping);
     result.method = method;
@@ -105,6 +117,8 @@ class IkOptions {
     result.postureWeight = postureWeight;
     result.rootPose = rootPose;
     result.baseCost = baseCost;
+    result.held = held == null ? null : held.copy();
+    result.heldValues = heldValues == null ? null : heldValues.copy();
     return result;
   }
 }

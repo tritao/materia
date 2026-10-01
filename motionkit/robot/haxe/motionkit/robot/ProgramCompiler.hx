@@ -8,8 +8,8 @@ import motionkit.event.TimedEvent;
 import motionkit.event.EventValue;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
-import motionkit.robot.OpwKinematics;
 import motionkit.path.OrientationPolicy;
 import motionkit.path.CornerBlender;
 import motionkit.path.ArcSegment;
@@ -30,7 +30,6 @@ import motionkit.program.Blend;
 import motionkit.program.MotionOp;
 import motionkit.program.MotionProgram;
 import motionkit.program.MoveTarget;
-import motionkit.robot.OpwKinematics;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
@@ -128,33 +127,8 @@ class ProgramCompiler {
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
     if (configurationSelector != null && configurationSelector.solver != solver)
       throw "Program compiler selector must use its kinematics solver";
-    if (configurationSelector != null) {
-      this.configurationSelector = configurationSelector;
-    } else if (Std.isOfType(solver, OpwKinematics)) {
-      var arm:OpwKinematics = cast solver;
-      var lower:Array<Float> = [], upper:Array<Float> = [];
-      for (joint in 0...count) {
-        var bounds = arm.manipulator.group.limitsOf(joint);
-        lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
-        upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
-      }
-      this.configurationSelector = new PathConfigurationSelector(solver,
-        lower, upper, this.perJointMaxJump, maxVelocity);
-    } else if (Std.isOfType(solver, ManipulatorKinematics) &&
-        (cast solver:ManipulatorKinematics).manipulator.redundant()) {
-      // A redundant arm's swivel is chosen along the whole path, not drifted into point by point.
-      var arm:ManipulatorKinematics = cast solver;
-      var lower:Array<Float> = [], upper:Array<Float> = [];
-      for (joint in 0...count) {
-        var bounds = arm.manipulator.group.limitsOf(joint);
-        lower.push(bounds.lower < bounds.upper ? bounds.lower : -1e6);
-        upper.push(bounds.lower < bounds.upper ? bounds.upper : 1e6);
-      }
-      this.configurationSelector = new PathConfigurationSelector(solver,
-        lower, upper, this.perJointMaxJump, maxVelocity, null, 1, 48);
-    } else {
-      this.configurationSelector = null;
-    }
+    // An explicit selector forces the generic sampled search; otherwise each solver searches its own way.
+    this.configurationSelector = configurationSelector;
   }
 
   public function compile(program:MotionProgram, initialQ:Array<Float>,
@@ -455,13 +429,15 @@ class ProgramCompiler {
       distances.push(distance);
       pathPoses.push(path.waypointAt(distance).pose);
     }
-    var selected = configurationSelector == null ? null :
-      configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance);
+    var selected:Array<Null<Array<Float>>> = [];
+    if (configurationSelector != null)
+      for (q in configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance)) selected.push(q);
+    else
+      selected = solver.solvePath(new PathRequest(distances, pathPoses, startQ, ikTolerance, perJointMaxJump, maxVelocity,
+        48));
     for (sample in 0...(count + 1)) {
       var distance = distances[sample];
-      var desired = pathPoses[sample];
-      var solved = selected != null ? selected[sample] :
-        (sample == 0 ? startQ.copy() : solver.solvePose(desired, previous, ikTolerance));
+      var solved = selected[sample];
       if (solved == null || solved.length != startQ.length)
         throw 'Motion program op $index unreachable pose at path distance $distance';
       checkJointPosition(solved, index, distance);

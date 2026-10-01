@@ -3,6 +3,7 @@ package motionkit.robot;
 import kinematicskit.LinearAlgebra;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import robotkit.manipulation.IKResult;
@@ -18,9 +19,9 @@ import robotkit.spatial.Vec3;
  * A redundant arm (`Manipulator.redundant`, e.g. 7-axis) is handled through
  * its swivel angle: `solvePose` keeps the seed's swivel as a preference, so
  * the elbow does not drift with each solve; `sampleCandidates` sweeps the
- * swivel around the circle on each IK branch it finds; `continueCandidates`
- * grows a path's candidates sample by sample; and `refinePath` smooths the
- * swivel along a chosen path and re-solves it exactly there.
+ * swivel around the circle on each IK branch it finds; and `solvePath`
+ * chooses the swivel (or a cell's external-axis values) along a whole path
+ * with `RedundancyResolver`.
  */
 class ManipulatorKinematics implements KinematicsSolver {
   /** The group solved: an arm (`Manipulator`), or an arm with external axes and a work frame. */
@@ -124,91 +125,23 @@ class ManipulatorKinematics implements KinematicsSolver {
   }
 
   /**
-   * A redundant arm's candidates at the next path sample, grown from the
-   * previous sample's: each continues at its own swivel, and at `step`
-   * radians either side, so the swivel can drift gradually along the path.
-   * Where a joint limit blocks its own swivel, a candidate continues with
-   * the swivel as a preference instead, letting the limit bend it. One
-   * candidate is kept per `step`-wide swivel bin (the one continuing the
-   * lowest-numbered previous candidate), at most `maxCount`, nearest the
-   * previous swivels first. Every continuous swivel path at that resolution
-   * is then in the graph the path search walks.
+   * The path: a redundant arm (7-axis) chooses its swivel along it, a group
+   * with external axes their values, both through `RedundancyResolver`; a
+   * plain arm follows point by point, each sample seeded by the last.
    */
-  public function continueCandidates(target:Pose3, previous:Array<Array<Float>>, maxCount:Int, step:Float,
-      tolerance:IkTolerance):Array<Array<Float>> {
-    requireTolerance(tolerance);
-    if (!manipulator.redundant()) throw "Continuing candidates needs a redundant arm";
-    if (!(step > 0.0)) throw "Swivel step must be positive";
-    var goal = toTransform(target);
-    var bins = new Map<Int, Bool>();
-    var found:Array<{q:Array<Float>, order:Int}> = [];
-    for (order in [0, 1, -1]) for (seed in previous) {
-      var swivel = manipulator.swivelAngle(seed);
-      if (!Math.isFinite(swivel)) continue;
-      var angle = swivel + order * step;
-      var solved = solveAtSwivel(goal, seed, angle, true, tolerance);
-      if (!solved.converged && order == 0)
-        solved = solveAtSwivel(goal, seed, angle, false, tolerance);
-      if (!solved.converged) continue;
-      var reached = manipulator.swivelAngle(solved.q);
-      if (!Math.isFinite(reached)) continue;
-      var bin = Math.round(reached / step);
-      if (bins.exists(bin) || containsNear([for (entry in found) entry.q], solved.q, tolerance.candidateSeparation))
-        continue;
-      bins.set(bin, true);
-      found.push({q: solved.q.copy(), order: order == 0 ? 0 : 1});
-    }
-    // Continuations at their own swivel first, then the neighbours, up to the cap.
-    var kept = [for (entry in found) if (entry.order == 0) entry.q];
-    for (entry in found) if (entry.order != 0 && kept.length < maxCount) kept.push(entry.q);
-    return kept.length > maxCount ? kept.slice(0, maxCount) : kept;
+  public function solvePath(request:PathRequest):Array<Null<Array<Float>>> {
+    var parameterization = redundancy();
+    if (parameterization == null) return request.followPointByPoint(this);
+    return new RedundancyResolver(parameterization).solvePath(this, request);
   }
 
-  /**
-   * Smooths the swivel of a chosen joint path and re-solves every sample
-   * exactly at the smoothed angle, each seeded by the previous one. The
-   * swivel is averaged over `radius` samples either side (a Gaussian of
-   * half that width), with the first sample pinned. Returns null, leaving the
-   * path as chosen, where the swivel is undefined, a sample does not solve,
-   * or a joint would move more than `maxJump` between samples.
-   */
-  public function refinePath(poses:Array<Pose3>, chosen:Array<Array<Float>>, radius:Int, maxJump:Array<Float>,
-      tolerance:IkTolerance):Null<Array<Array<Float>>> {
-    requireTolerance(tolerance);
-    if (!manipulator.redundant() || chosen.length < 3 || radius < 1) return null;
-    var swivel:Array<Float> = [];
-    for (q in chosen) {
-      var angle = manipulator.swivelAngle(q);
-      if (!Math.isFinite(angle)) return null;
-      // Unwrapped, so smoothing never averages across the ±π seam.
-      if (swivel.length > 0) {
-        var last = swivel[swivel.length - 1];
-        while (angle - last > Math.PI) angle -= 2.0 * Math.PI;
-        while (angle - last < -Math.PI) angle += 2.0 * Math.PI;
-      }
-      swivel.push(angle);
-    }
-    var sigma = radius / 2.0;
-    var smoothed = [swivel[0]];
-    for (i in 1...swivel.length) {
-      var sum = 0.0, weights = 0.0;
-      for (j in Std.int(Math.max(0, i - radius))...Std.int(Math.min(swivel.length, i + radius + 1))) {
-        var w = Math.exp(-0.5 * Math.pow((j - i) / sigma, 2));
-        sum += w * swivel[j];
-        weights += w;
-      }
-      smoothed.push(sum / weights);
-    }
-    var refined = [chosen[0].copy()];
-    for (i in 1...chosen.length) {
-      var seed = refined[i - 1];
-      var solved = solveAtSwivel(toTransform(poses[i]), seed, smoothed[i], true, tolerance);
-      if (!solved.converged) return null;
-      for (joint in 0...solved.q.length) if (Math.abs(solved.q[joint] - seed[joint]) > maxJump[joint]) return null;
-      refined.push(solved.q.copy());
-    }
-    return refined;
+  /** How the group's redundancy is named, if it has any: its swivel, else its external axes. */
+  public function redundancy():Null<RedundancyParameterization> {
+    if (manipulator.redundant()) return new SwivelParameterization(manipulator);
+    for (value in manipulator.external) if (value) return new ExternalAxesParameterization(manipulator);
+    return null;
   }
+
 
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>> {
     if (q == null || q.length != jointCount())

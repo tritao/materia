@@ -375,25 +375,51 @@ bool settle_at_rest(std::vector<mk_time_stage> &stages) {
     return std::abs(end_s(last) - old_end) <= 1e-8 * std::max(1.0, std::abs(old_end));
 }
 
-bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
+// Rebuilds the stages over their own distances, from `start_speed`, each
+// constant-acceleration stage aimed at its target end speed from the speed
+// the previous one actually reached. Durations round down to whole
+// nanoseconds, so each stage ends at or just above its target, never below
+// zero, and the rounding of one stage is corrected by the next instead of
+// accumulating over thousands of stages.
+bool retime_stages(std::vector<mk_time_stage> &stages, double start_speed,
+                   const std::vector<double> &end_speeds) {
+    std::vector<double> starts, distances;
+    starts.reserve(stages.size());
+    distances.reserve(stages.size());
+    for (const auto &stage : stages) {
+        starts.push_back(stage.start_s);
+        distances.push_back(end_s(stage) - stage.start_s);
+    }
     int64_t start_ns = 0;
-    double speed = stages.front().speed / factor;
-    for (auto &stage : stages) {
-        const double distance = end_s(stage) - stage.start_s;
-        const double scaled = std::floor(static_cast<double>(stage.duration_ns) * factor);
-        if (!std::isfinite(scaled) || scaled < 1.0 ||
-            scaled > static_cast<double>(INT64_MAX - start_ns)) return false;
-        const int64_t duration_ns = static_cast<int64_t>(scaled);
-        const double duration = static_cast<double>(duration_ns) * 1e-9;
+    double speed = std::max(0.0, start_speed);
+    for (size_t i = 0; i < stages.size(); ++i) {
+        auto &stage = stages[i];
+        const double distance = distances[i];
+        const double seconds = 2.0 * distance / (speed + std::max(0.0, end_speeds[i]));
+        if (!(distance > 0.0) || !std::isfinite(seconds) || seconds <= 0.0 ||
+            seconds > static_cast<double>(INT64_MAX - start_ns) * 1e-9) return false;
+        const int64_t duration_ns = std::max<int64_t>(1,
+            static_cast<int64_t>(std::floor(seconds * 1e9)));
+        const double rounded = static_cast<double>(duration_ns) * 1e-9;
         stage.start_ns = start_ns;
         stage.duration_ns = duration_ns;
-        stage.acceleration = 2.0 * (distance - speed * duration) /
-            (duration * duration);
+        stage.start_s = starts[i];
         stage.speed = speed;
-        speed += stage.acceleration * duration;
+        stage.acceleration = 2.0 * (distance - speed * rounded) / (rounded * rounded);
+        speed += stage.acceleration * rounded;
         start_ns += duration_ns;
     }
     return true;
+}
+
+// Slows the whole law down uniformly by `factor`: every speed divided by it.
+bool stretch_stages(std::vector<mk_time_stage> &stages, double factor) {
+    if (stages.empty() || !(factor > 0.0)) return false;
+    std::vector<double> ends;
+    ends.reserve(stages.size());
+    for (const auto &stage : stages)
+        ends.push_back(stage_speed(stage, stage.start_ns + stage.duration_ns) / factor);
+    return retime_stages(stages, stages.front().speed / factor, ends);
 }
 
 // A collocation peak can exceed a joint bound after quintic lowering. Reduce
@@ -432,25 +458,8 @@ bool soften_stages(std::vector<mk_time_stage> &stages, double peak_time,
         }
     }
     if (!changed) return false;
-    int64_t start_ns = 0;
-    double speed = speeds.front();
-    for (size_t i = 0; i < stages.size(); ++i) {
-        auto &stage = stages[i];
-        const double distance = positions[i + 1] - positions[i];
-        const double seconds = 2.0 * distance / (speed + speeds[i + 1]);
-        if (!std::isfinite(seconds) || seconds <= 0.0 ||
-            seconds > static_cast<double>(INT64_MAX - start_ns) * 1e-9) return false;
-        const int64_t duration_ns = std::max<int64_t>(1,
-            static_cast<int64_t>(std::floor(seconds * 1e9)));
-        const double rounded = static_cast<double>(duration_ns) * 1e-9;
-        stage.start_ns = start_ns;
-        stage.duration_ns = duration_ns;
-        stage.speed = speed;
-        stage.acceleration = 2.0 * (distance - speed * rounded) / (rounded * rounded);
-        speed += stage.acceleration * rounded;
-        start_ns += duration_ns;
-    }
-    return true;
+    return retime_stages(stages, speeds.front(),
+        std::vector<double>(speeds.begin() + 1, speeds.end()));
 }
 
 } // namespace

@@ -20,6 +20,7 @@ import motionkit.event.PathEvent;
 import motionkit.event.TimedEvent;
 import motionkit.kinematics.IkTolerance;
 import motionkit.kinematics.KinematicsSolver;
+import motionkit.kinematics.PathRequest;
 import motionkit.kinematics.Pose3;
 import motionkit.kinematics.Twist6;
 import kinematicskit.LinearAlgebra;
@@ -239,15 +240,15 @@ class KinematicsTests extends MotionKitTestSupport {
     near(solver.parameters.a1, 0.1, "OPW extracts a1", 1e-9);
     near(solver.parameters.a2, -0.135, "OPW extracts a2", 1e-9);
     near(solver.parameters.c1, 0.615, "OPW extracts c1", 1e-9);
-    // Recognised through the interface, so the compiler picks its analytic path selector.
+    // Through the interface: type tests work, and the solver runs its own (analytic) path search.
     {
       var general:KinematicsSolver = solver;
       check(Std.isOfType(general, OpwKinematics) && !Std.isOfType(general, ManipulatorKinematics),
         "an OPW solver is recognised through the KinematicsSolver interface");
-      var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
-      var compiler = new ProgramCompiler(general, limits, "work", [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
-        [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02));
-      check(compiler.configurationSelector != null, "the compiler selects OPW configurations along paths");
+      var q0 = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
+      var path = general.solvePath(new PathRequest([0.0], [general.forward(q0)], q0, new IkTolerance(),
+        [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]));
+      check(path.length == 1, "an OPW solver searches its own paths through the interface");
     }
     var q = [0.2, -0.3, 0.4, 0.5, -0.6, 0.7];
     var reference = new ManipulatorKinematics(manipulator).forward(q);
@@ -265,20 +266,14 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     check(found, "OPW analytic candidates include the authored joint pose");
     var next = q.copy(); next[0] += 0.04;
-    var selector = new PathConfigurationSelector(solver,
-      [for (_ in 0...6) -2.0 * Math.PI],
-      [for (_ in 0...6) 2.0 * Math.PI],
-      [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]);
-    var chosen = selector.selectPoses([0.0, 0.04],
-      [solver.forward(q), solver.forward(next)], q, new IkTolerance());
-    near(chosen[1][0], next[0],
-      "Descartes samples OPW branches natively across a path", 1e-6);
+    var chosen = solver.solvePath(new PathRequest([0.0, 0.04], [solver.forward(q), solver.forward(next)], q,
+      new IkTolerance(), [for (_ in 0...6) 0.5], [for (_ in 0...6) 1.0]));
+    var second:Array<Float> = chosen[1];
+    near(second[0], next[0], "Descartes samples OPW branches natively across a path", 1e-6);
     var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(0));
     var compiler = new ProgramCompiler(solver, limits, "work",
       [for (_ in 0...6) 2.0], [for (_ in 0...6) 4.0],
       [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02));
-    check(compiler.configurationSelector != null,
-      "analytic arm programs use Descartes configuration selection");
     var program = new MotionProgram([MotionOp.MoveL(solver.forward(next),
       "work", 0.1, Blend.ExactStop)]);
     var compiled = compiler.compile(program, q, Int64.ofInt(901));
