@@ -330,11 +330,15 @@ class NamingRobustnessSmoke {
 				}
 				if (matches != 1)
 					throw 'NamingRobustnessSmoke: the oracle of "$row" matches $matches elements';
-				record(row, CORRECT, Std.string(reference.state), seconds);
+				record(row, CORRECT, Std.string(reference.state) + " by " + (reference.resolvedBy() : String), seconds);
 			}
 			return;
 		}
-		record(row, REPORTED, Std.string(reference.state), seconds);
+		var candidates = reference.candidates();
+		record(row, REPORTED, Std.string(reference.state) + (candidates.length > 0 ? ' between ${candidates.length} candidates' : ""), seconds);
+		// A face split in two is ambiguous between its two pieces, which a repair UI offers.
+		if (row.indexOf("slot across") >= 0 && (reference.state != ReferenceState.Ambiguous || candidates.length != 2))
+			throw 'NamingRobustnessSmoke: "$row" should be ambiguous between two pieces (${reference.state}, $candidates)';
 	}
 
 	static function record(row:String, outcome:String, detail:String, seconds:Float):Void

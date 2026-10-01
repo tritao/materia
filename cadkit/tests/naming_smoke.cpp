@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <set>
 #include <string>
 #include <vector>
@@ -357,23 +358,47 @@ void check_operations() {
 }
 
 
-std::vector<double> scores(const char* reference, const char* candidates) {
+struct Match {
+    std::uint32_t grade;
+    double overlap;
+};
+
+std::vector<Match> matches(const char* reference, const char* candidates) {
     std::uint32_t capacity = 0;
     cad_element_name_match_bytes(reference, candidates, nullptr, &capacity);
-    std::vector<double> result(capacity / sizeof(double));
-    assert(cad_element_name_match_bytes(reference, candidates, reinterpret_cast<std::uint8_t*>(result.data()), &capacity) == CAD_OK);
+    std::vector<std::uint8_t> bytes(capacity);
+    assert(cad_element_name_match_bytes(reference, candidates, bytes.data(), &capacity) == CAD_OK);
+    std::vector<Match> result;
+    for (std::size_t offset = 0; offset < bytes.size(); offset += 16) {
+        Match match{};
+        std::memcpy(&match.grade, bytes.data() + offset, 4);
+        std::memcpy(&match.overlap, bytes.data() + offset + 8, 8);
+        result.push_back(match);
+    }
+    return result;
+}
+
+std::string tag(const char* name) {
+    std::uint32_t capacity = 0;
+    cad_element_name_tag_bytes(name, nullptr, &capacity);
+    std::string result(capacity, '\0');
+    assert(cad_element_name_tag_bytes(name, reinterpret_cast<std::uint8_t*>(result.data()), &capacity) == CAD_OK);
     return result;
 }
 
 // Matching is text only: exact, exact but weak, relatives graded by their split pieces, none.
 void check_matching() {
-    const auto graded = scores("f1:box.+z", "f1:box.+z\nf1:box.+z{f3:box.-x}\nf1:box.+x\nface#2");
-    assert(graded.size() == 4 && graded[0] == 3.0 && graded[1] == 1.0 && graded[2] == 0.0 && graded[3] == 0.0);
-    assert(scores("face#2", "face#2").front() == 2.0);
-    const auto pieces = scores("f1:box.+z{f2:cyl.side,f3:box.-x}", "f1:box.+z{f1:box.-x,f2:cyl.side,f3:box.-x}\nf1:box.+z{f1:box.+x,f3:box.+x}");
-    assert(pieces[0] > pieces[1] && pieces[1] >= 1.0);
-    assert(scores("E(f1:box.+x|f1:box.+z)", "E(f1:box.+x|f1:box.+z{f3:box.+x})").front() == 1.0);
-    assert(scores("x", "").empty());
+    const auto graded = matches("f1:box.+z", "f1:box.+z\nf1:box.+z{f3:box.-x}\nf1:box.+x\nface#2");
+    assert(graded.size() == 4 && graded[0].grade == CAD_NAME_MATCH_EXACT && graded[1].grade == CAD_NAME_MATCH_RELATIVE &&
+           graded[1].overlap == 0.0 && graded[2].grade == CAD_NAME_MATCH_NONE && graded[3].grade == CAD_NAME_MATCH_NONE);
+    assert(matches("face#2", "face#2").front().grade == CAD_NAME_MATCH_WEAK);
+    const auto pieces = matches("f1:box.+z{f2:cyl.side,f3:box.-x}",
+                                "f1:box.+z{f1:box.-x,f2:cyl.side,f3:box.-x}\nf1:box.+z{f1:box.+x,f3:box.+x}");
+    assert(pieces[0].overlap > pieces[1].overlap && pieces[1].grade == CAD_NAME_MATCH_RELATIVE);
+    assert(matches("E(f1:box.+x|f1:box.+z)", "E(f1:box.+x|f1:box.+z{f3:box.+x})").front().grade == CAD_NAME_MATCH_RELATIVE);
+    assert(matches("x", "").empty());
+    assert(tag("f7:fillet(E(f1:box.+x|f1:box.+z))") == "f7" && tag("f4:i1:f2:cyl.top") == "f4" && tag("box.+z").empty() &&
+           tag("E(f1:box.+x|f1:box.+z)").empty());
 }
 
 }  // namespace

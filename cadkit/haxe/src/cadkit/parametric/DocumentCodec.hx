@@ -220,8 +220,6 @@ class DocumentCodec {
 		return Json.stringify({
 			format: FORMAT,
 			version: VERSION,
-			// The rules that produced the names in topology records (plans/TOPOLOGICAL_NAMING.md, TN-D13).
-			namingScheme: cadkit.Shape.namingScheme(),
 			lengthUnit: document.lengthUnit,
 			documentId: document.id.value,
 			implicitOutput: document.implicitOutputEnabled,
@@ -949,6 +947,21 @@ class DocumentCodec {
 			optionalSupportFaceFingerprint(record));
 	}
 
+	/**
+		A record's name, if today's naming rules made it. A name from other rules could equal a different element's
+		name now, so it is dropped: the reference resolves by geometry and takes its current name (TN-D13).
+	*/
+	private static function currentName(record:Dynamic):Null<String> {
+		var name = optionalString(record, "name");
+		var scheme:Dynamic = Reflect.field(record, "naming");
+		if (name == null || scheme == null)
+			return null;
+		var schemeValue:Float = cast scheme;
+		if (Std.int(schemeValue) != cadkit.Shape.namingScheme())
+			return null;
+		return name;
+	}
+
 	private static function optionalString(record:Dynamic, name:String):Null<String> {
 		var value:Dynamic = Reflect.field(record, name);
 		if (value == null)
@@ -1281,8 +1294,11 @@ class DocumentCodec {
 		};
 		// Where an edge's position was taken; records without one (before version 10) used its first vertex.
 		if (fingerprint.kind == CadKit.ShapeKind.Edge) Reflect.setField(record, "anchor", fingerprint.midpoint ? "midpoint" : "start");
-		// The element's topological name, since version 11 (plans/TOPOLOGICAL_NAMING.md).
-		if (fingerprint.name != null) Reflect.setField(record, "name", fingerprint.name);
+		// The element's topological name (since version 11) and the naming rules that made it (TN-D13).
+		if (fingerprint.name != null) {
+			Reflect.setField(record, "name", fingerprint.name);
+			Reflect.setField(record, "naming", cadkit.Shape.namingScheme());
+		}
 		return record;
 	}
 
@@ -1290,7 +1306,7 @@ class DocumentCodec {
 		return TopologyFingerprint.fromData(kind, surfaceKind(stringField(record, "surface")), curveKind(stringField(record, "curve")),
 			numberField(record, "x"), numberField(record, "y"), numberField(record, "z"), numberField(record, "dx"), numberField(record, "dy"),
 			numberField(record, "dz"), numberField(record, "measure"), Reflect.field(record, "anchor") == "midpoint",
-			optionalString(record, "name"));
+			currentName(record));
 	}
 
 	private static function encodeVector(value:Vector):Dynamic {

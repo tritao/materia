@@ -176,11 +176,22 @@ ElementMapPtr seed(const TopoDS_Shape& shape, const ElementMap& names, ElementKi
 ElementMapPtr stamp(const TopoDS_Shape& shape, const ElementMap& names, const std::string& tag,
                     const std::vector<NamedShape>& inputs);
 
-// How well a stored name matches a candidate (TN-D9, TN-D10): 3 exact,
-// 2 exact but weak, 1 + 0.99 * overlap for a relative (the same name once
-// split suffixes, ordinals and input slots are removed; overlap is the
-// Jaccard index of their split suffixes, 1 when neither has any), 0 none.
-double match_score(const std::string& reference, const std::string& candidate);
+// How well a stored name matches a candidate (TN-D9, TN-D10). A relative is
+// the same name once split suffixes, ordinals and input slots are set aside;
+// its overlap is the Jaccard index of the two names' split-suffix items (1
+// when neither has any). Values match cad_name_match_grade.
+enum class MatchGrade : std::uint32_t { None = 0, Relative = 1, Weak = 2, Exact = 3 };
+
+struct NameMatch {
+    MatchGrade grade;
+    double overlap;
+};
+
+NameMatch match_name(const std::string& reference, const std::string& candidate);
+
+// The tag that created the element (`f7` in `f7:fillet(...)`): the leading
+// `tag:` of its name, or "" when it has none.
+std::string creator_tag(const std::string& name);
 
 // The final names of `kind`, newline-separated.
 std::string joined_names(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind);

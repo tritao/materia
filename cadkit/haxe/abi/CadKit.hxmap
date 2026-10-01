@@ -23,7 +23,8 @@
     "cad_physical_properties": "FullPhysicalProperties",
     "cad_mesh_options": "MeshOptions",
     "cad_mesh_face_range": "MeshFaceRange",
-    "cad_resource_counts": "ResourceCounts"
+    "cad_resource_counts": "ResourceCounts",
+    "cad_name_match_grade": "NameMatchGrade"
   },
   "enumValueNames": {
     "cad_shape_kind": {
@@ -62,6 +63,12 @@
       "CAD_HISTORY_GENERATED": "Generated",
       "CAD_HISTORY_MODIFIED": "Modified",
       "CAD_HISTORY_DELETED": "Deleted"
+    },
+    "cad_name_match_grade": {
+      "CAD_NAME_MATCH_NONE": "None",
+      "CAD_NAME_MATCH_RELATIVE": "Relative",
+      "CAD_NAME_MATCH_WEAK": "Weak",
+      "CAD_NAME_MATCH_EXACT": "Exact"
     }
   },
   "resultPolicies": {

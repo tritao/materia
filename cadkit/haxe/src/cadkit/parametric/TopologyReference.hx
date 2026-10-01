@@ -3,7 +3,7 @@ package cadkit.parametric;
 import CadKit;
 import cadkit.Edge;
 import cadkit.Face;
-import cadkit.Operation;
+import cadkit.ElementNames;
 import cadkit.Shape;
 import cadkit.Vertex;
 import cadkit.parametric.Feature;
@@ -11,6 +11,7 @@ import cadkit.parametric.ParametricError;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReferenceUpdate;
+import cadkit.parametric.TopologyResolution.ResolutionMethod;
 
 /** A document-owned topology selection that can be remapped after recompute. */
 class TopologyReference {
@@ -25,6 +26,8 @@ class TopologyReference {
 	private var fingerprint:TopologyFingerprint;
 	private var fallbackAmbiguous:Bool;
 	private var stateGenerationValue:Int;
+	private var resolvedByValue:ResolutionMethod;
+	private var candidatesValue:Array<Int>;
 
 	public function new(
 		feature:Feature,
@@ -54,6 +57,8 @@ class TopologyReference {
 		this.state = current == null ? ReferenceState.Unresolved : ReferenceState.Resolved;
 		this.fallbackAmbiguous = false;
 		this.stateGenerationValue = 0;
+		this.resolvedByValue = current == null ? ResolutionMethod.NotFound : ResolutionMethod.Identity;
+		this.candidatesValue = [];
 		feature.registerTopologyReference(this);
 	}
 
@@ -149,38 +154,38 @@ class TopologyReference {
 		state = nextState;
 	}
 
-	/** Resolve against a staged or committed shape, recording failure state. */
-	public function resolveFor(result:Shape, ?operation:Operation):Shape {
+	/**
+		Resolve against a staged or committed shape, recording failure state. Operation history plays no part: it only
+		relates one evaluation's inputs to its outputs, so across recomputes the element is found by its name, then its
+		geometry (plans/TOPOLOGICAL_NAMING.md, TN-D2).
+	*/
+	public function resolveFor(result:Shape):Shape {
 		if (state == ReferenceState.Closed)
 			throw new ParametricError("closed topology references cannot be resolved");
-
-		// Operation history only relates one evaluation's inputs to its outputs; across recomputes the element is
-		// found by its name, then its geometry (plans/TOPOLOGICAL_NAMING.md, TN-D2). `operation` is unused.
-		var resolved = findFallback(result);
-		if (resolved != null)
-			return resolved;
-		if (fallbackSelection != null)
-			return fallbackSelection.resolve(result)[0];
+		var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
+		fallbackAmbiguous = resolution.state == ReferenceState.Ambiguous;
+		resolvedByValue = resolution.method;
+		candidatesValue = resolution.candidates.copy();
+		if (resolution.state == ReferenceState.Resolved)
+			return result.subshape(kind, resolution.index);
+		if (fallbackSelection != null) {
+			var selected = fallbackSelection.resolve(result)[0];
+			resolvedByValue = ResolutionMethod.Selection;
+			return selected;
+		}
 		if (fallbackAmbiguous) {
 			markAmbiguous();
-			throw new ParametricError(
-				"topology reference is Ambiguous", ReferenceState.Ambiguous);
-		}
-		if (current != null) {
-			markUnresolved();
-			throw new ParametricError(
-				"topology reference could not be matched with sufficient confidence", ReferenceState.Unresolved);
-		}
-		if (state == ReferenceState.Deleted)
-			throw new ParametricError("topology reference is Deleted", ReferenceState.Deleted);
-		if (state == ReferenceState.Ambiguous)
 			throw new ParametricError("topology reference is Ambiguous", ReferenceState.Ambiguous);
+		}
+		if (creatorRemoved()) {
+			markDeleted();
+			throw new ParametricError("topology reference is Deleted: the feature that made it is gone", ReferenceState.Deleted);
+		}
 		markUnresolved();
-		throw new ParametricError(
-			"topology reference is Unresolved", ReferenceState.Unresolved);
+		throw new ParametricError("topology reference could not be matched with sufficient confidence", ReferenceState.Unresolved);
 	}
 
-	public function prepareRemap(result:Null<Shape>, operation:Null<Operation>):TopologyReferenceUpdate {
+	public function prepareRemap(result:Null<Shape>):TopologyReferenceUpdate {
 		if (state == ReferenceState.Closed)
 			return new TopologyReferenceUpdate(this, null, fingerprint, state, fallbackAmbiguous, true);
 
@@ -188,19 +193,25 @@ class TopologyReference {
 		var nextState:ReferenceState = ReferenceState.Unresolved;
 		var nextFingerprint = fingerprint;
 		var nextAmbiguous = false;
+		var method:ResolutionMethod = ResolutionMethod.NotFound;
+		var candidates:Array<Int> = [];
 		try {
-			if (next == null && nextState != ReferenceState.Deleted && nextState != ReferenceState.Ambiguous && result != null) {
+			if (result != null) {
 				var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
-				if (resolution.state == ReferenceState.Resolved)
+				if (resolution.state == ReferenceState.Resolved) {
 					next = result.subshape(kind, resolution.index);
-				else if (resolution.state == ReferenceState.Ambiguous)
+					method = resolution.method;
+				} else if (resolution.state == ReferenceState.Ambiguous) {
 					nextAmbiguous = true;
+					candidates = resolution.candidates;
+				}
 
 				if (next == null && fallbackSelection != null) {
 					try {
 						var selected = fallbackSelection.resolve(result);
 						if (selected.length > 0) {
 							next = selected[0];
+							method = ResolutionMethod.Selection;
 							for (index in 1...selected.length)
 								selected[index].close();
 						}
@@ -218,15 +229,47 @@ class TopologyReference {
 			if (next != null) {
 				nextFingerprint = TopologyFingerprint.capture(next);
 				nextState = ReferenceState.Remapped;
-			} else if (nextState != ReferenceState.Deleted && nextState != ReferenceState.Ambiguous) {
-				nextState = nextAmbiguous ? ReferenceState.Ambiguous : ReferenceState.Unresolved;
+				candidates = [];
+			} else {
+				nextState = nextAmbiguous ? ReferenceState.Ambiguous
+					: creatorRemoved() ? ReferenceState.Deleted : ReferenceState.Unresolved;
 			}
-			return new TopologyReferenceUpdate(this, next, nextFingerprint, nextState, nextAmbiguous);
+			return new TopologyReferenceUpdate(this, next, nextFingerprint, nextState, nextAmbiguous, false, method, candidates);
 		} catch (error:Dynamic) {
 			if (next != null)
 				next.close();
 			throw error;
 		}
+	}
+
+	/** How the last resolution found the element (`NotFound` when it did not). */
+	public function resolvedBy():ResolutionMethod
+		return resolvedByValue;
+
+	/**
+		When ambiguous: the indices, among the producer's subshapes of this kind, of the elements it could not choose
+		between (for a repair UI to offer). Empty otherwise.
+	*/
+	public function candidates():Array<Int>
+		return candidatesValue.copy();
+
+	/**
+		Whether the feature whose tag starts the element's name no longer exists or is suppressed: the element was not
+		lost by an edit, its maker was removed (`Deleted` rather than `Unresolved`).
+	*/
+	function creatorRemoved():Bool {
+		var name = fingerprint.name;
+		var owner = feature.document;
+		if (name == null || owner == null)
+			return false;
+		var tag = ElementNames.creatorTag(name);
+		if (tag.length < 2 || tag.charAt(0) != "f")
+			return false;
+		var id = Std.parseInt(tag.substr(1));
+		if (id == null || Std.string(id) != tag.substr(1))
+			return false;
+		var creator = owner.featureById(id);
+		return creator == null || !creator.active;
 	}
 
 	/** Publish a prepared remap without native calls; the document retires the old shape afterward. */
@@ -243,6 +286,8 @@ class TopologyReference {
 		current = update.current;
 		fingerprint = update.fingerprint;
 		fallbackAmbiguous = update.fallbackAmbiguous;
+		resolvedByValue = update.method;
+		candidatesValue = update.candidates.copy();
 		if (state != update.state)
 			stateGenerationValue++;
 		state = update.state;
@@ -250,7 +295,7 @@ class TopologyReference {
 	}
 
 	public function remap():ReferenceState {
-		var update = prepareRemap(remapFeature.currentShape(), remapFeature.provenance);
+		var update = prepareRemap(remapFeature.currentShape());
 		var previous = current;
 		publishRemap(update);
 		if (previous != null)
@@ -265,18 +310,6 @@ class TopologyReference {
 			current.close();
 		current = null;
 		state = ReferenceState.Closed;
-	}
-
-	private function findFallback(result:Shape):Null<Shape> {
-		fallbackAmbiguous = false;
-		var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
-		if (resolution.state == ReferenceState.Ambiguous) {
-			fallbackAmbiguous = true;
-			return null;
-		}
-		if (resolution.state != ReferenceState.Resolved)
-			return null;
-		return result.subshape(kind, resolution.index);
 	}
 
 	private function markUnresolved():Void {

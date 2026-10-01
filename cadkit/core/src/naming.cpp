@@ -568,17 +568,27 @@ std::string relative_form(const std::string& name, std::set<std::string>& items)
 
 }  // namespace
 
-double match_score(const std::string& reference, const std::string& candidate) {
-    if (reference == candidate) return is_weak(reference) ? 2.0 : 3.0;
+NameMatch match_name(const std::string& reference, const std::string& candidate) {
+    if (reference == candidate) return {is_weak(reference) ? MatchGrade::Weak : MatchGrade::Exact, 1.0};
     std::set<std::string> referenceItems, candidateItems;
-    if (relative_form(reference, referenceItems) != relative_form(candidate, candidateItems)) return 0.0;
+    if (relative_form(reference, referenceItems) != relative_form(candidate, candidateItems)) return {MatchGrade::None, 0.0};
     std::set<std::string> both, either;
     std::set_intersection(referenceItems.begin(), referenceItems.end(), candidateItems.begin(), candidateItems.end(),
                           std::inserter(both, both.begin()));
     std::set_union(referenceItems.begin(), referenceItems.end(), candidateItems.begin(), candidateItems.end(),
                    std::inserter(either, either.begin()));
     const double overlap = either.empty() ? 1.0 : static_cast<double>(both.size()) / static_cast<double>(either.size());
-    return 1.0 + 0.99 * overlap;
+    return {MatchGrade::Relative, overlap};
+}
+
+std::string creator_tag(const std::string& name) {
+    for (std::size_t i = 0; i < name.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(name[i]);
+        if (c == ':') return name.substr(0, i);
+        const bool atom = std::isalnum(c) || c == '_' || c == '.' || c == '+' || c == '-' || c == '%';
+        if (!atom) return "";
+    }
+    return "";
 }
 
 std::string joined_names(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind) {

@@ -95,6 +95,7 @@
 #include <vector>
 
 #include "naming.hpp"
+#include "naming_adapters.hpp"
 
 namespace {
 
@@ -577,69 +578,6 @@ cad_result collect_operation_history(
     const TopoDS_Shape& first,
     const TopoDS_Shape* second,
     OperationData& out_data);
-
-// Per-operation naming adapters (plans/TOPOLOGICAL_NAMING.md, TN2).
-
-// Extrude and revolve: each profile edge sweeps a side face and each vertex a
-// lateral edge; the caps come only from FirstShape/LastShape. The profile is
-// copied, so nothing passes through unchanged.
-template <typename Sweep>
-naming::ElementMapPtr sweep_names(const naming::NamedShape& profile, Sweep& sweep) {
-    naming::LambdaHistory history;
-    history.on_deleted = [](const TopoDS_Shape&) { return true; };
-    history.on_generated = [&](const TopoDS_Shape& source, std::size_t) {
-        naming::Generated result;
-        const auto type = source.ShapeType();
-        if (type == TopAbs_EDGE)
-            for (const auto& face : naming::shapes_of(sweep.Generated(source))) result.emplace_back(face, "side");
-        if (type == TopAbs_VERTEX)
-            for (const auto& edge : naming::shapes_of(sweep.Generated(source))) result.emplace_back(edge, "lateral");
-        if (type == TopAbs_FACE || type == TopAbs_EDGE || type == TopAbs_VERTEX) {
-            const auto first = sweep.FirstShape(source);
-            const auto last = sweep.LastShape(source);
-            if (!first.IsNull()) result.emplace_back(first, "start");
-            if (!last.IsNull() && !last.IsSame(first)) result.emplace_back(last, "end");
-        }
-        return result;
-    };
-    return naming::propagate({profile}, &history, sweep.Shape());
-}
-
-naming::ElementMapPtr operation_names(const naming::NamedShape& profile, BRepPrimAPI_MakePrism& sweep) {
-    return sweep_names(profile, sweep);
-}
-
-naming::ElementMapPtr operation_names(const naming::NamedShape& profile, BRepPrimAPI_MakeRevol& sweep) {
-    return sweep_names(profile, sweep);
-}
-
-// Fillet and chamfer: blend faces from edges, corner faces from vertices, and
-// trimmed (possibly split) faces from the faces they touch.
-template <typename Finish>
-naming::ElementMapPtr finish_names(const naming::NamedShape& source, Finish& finish, const char* role) {
-    naming::LambdaHistory history;
-    history.on_modified = [&](const TopoDS_Shape& shape) {
-        return shape.ShapeType() == TopAbs_FACE ? naming::shapes_of(finish.Modified(shape)) : std::vector<TopoDS_Shape>{};
-    };
-    history.on_deleted = [&](const TopoDS_Shape& shape) { return finish.IsDeleted(shape); };
-    history.on_generated = [&](const TopoDS_Shape& shape, std::size_t) {
-        naming::Generated result;
-        const auto type = shape.ShapeType();
-        if (type != TopAbs_EDGE && type != TopAbs_VERTEX) return result;
-        for (const auto& face : naming::shapes_of(finish.Generated(shape)))
-            if (face.ShapeType() == TopAbs_FACE) result.emplace_back(face, type == TopAbs_EDGE ? role : "corner");
-        return result;
-    };
-    return naming::propagate({source}, &history, finish.Shape());
-}
-
-naming::ElementMapPtr operation_names(const naming::NamedShape& source, BRepFilletAPI_MakeFillet& finish) {
-    return finish_names(source, finish, "fillet");
-}
-
-naming::ElementMapPtr operation_names(const naming::NamedShape& source, BRepFilletAPI_MakeChamfer& finish) {
-    return finish_names(source, finish, "chamfer");
-}
 
 cad_result make_extruded_shape(
     cad_shape handle,
@@ -3835,18 +3773,7 @@ static cad_result do_cad_loft(const cad_shape_ref* wires, uint32_t count, uint8_
         }
         loft.Build();
         if (record) for (const auto& source : sources) collect_operation_history(loft, source, nullptr, *record);
-        // Side faces are named by the first section's edges; the caps come from no single element.
-        naming::LambdaHistory naming_history;
-        naming_history.on_deleted = [](const TopoDS_Shape&) { return true; };
-        naming_history.on_generated = [&](const TopoDS_Shape& source, std::size_t slot) {
-            naming::Generated result;
-            if (slot != 0 || source.ShapeType() != TopAbs_EDGE) return result;
-            for (const auto& face : naming::shapes_of(loft.Generated(source)))
-                if (face.ShapeType() == TopAbs_FACE) result.emplace_back(face, "side");
-            return result;
-        };
-        auto propagated = naming::propagate(named, &naming_history, loft.Shape());
-        names = naming::with_face_roles(loft.Shape(), *propagated, {{loft.FirstShape(), "start"}, {loft.LastShape(), "end"}});
+        names = naming::loft_names(named, loft);
         return loft.Shape();
     }, &names);
 }
@@ -3864,28 +3791,7 @@ static cad_result do_cad_sweep(cad_shape profile, cad_shape spine, cad_shape* ou
         auto path = model_wire(spine);
         BRepOffsetAPI_MakePipe pipe(path, section);
         if (record) collect_operation_history(pipe, section, &path, *record);
-        // A side face per (profile edge, spine edge); the one-argument Generated lumps them.
-        naming::ShapeIndex sectionEdges, spineEdges;
-        TopExp::MapShapes(section, TopAbs_EDGE, sectionEdges);
-        TopExp::MapShapes(path, TopAbs_EDGE, spineEdges);
-        naming::LambdaHistory naming_history;
-        naming_history.on_deleted = [](const TopoDS_Shape&) { return true; };
-        naming_history.on_generated = [&](const TopoDS_Shape& source, std::size_t slot) {
-            naming::Generated result;
-            if (source.ShapeType() == TopAbs_EDGE) {
-                const auto& others = slot == 0 ? spineEdges : sectionEdges;
-                for (int i = 1; i <= others.Extent(); ++i) {
-                    const auto face = slot == 0 ? pipe.Generated(others(i), source) : pipe.Generated(source, others(i));
-                    if (!face.IsNull() && face.ShapeType() == TopAbs_FACE) result.emplace_back(face, "side");
-                }
-            }
-            if (slot == 0 && source.ShapeType() == TopAbs_FACE) {
-                result.emplace_back(pipe.FirstShape(), "start");
-                result.emplace_back(pipe.LastShape(), "end");
-            }
-            return result;
-        };
-        names = naming::propagate({model_named(profile), model_named(spine)}, &naming_history, pipe.Shape());
+        names = naming::pipe_names(model_named(profile), model_named(spine), pipe);
         return pipe.Shape();
     }, &names);
 }
@@ -3903,16 +3809,7 @@ static cad_result do_cad_wire_offset(cad_shape wire, double distance, cad_shape*
         BRepOffsetAPI_MakeOffset offset(source, GeomAbs_Arc);
         offset.Perform(distance);
         if (record) collect_operation_history(offset, source, nullptr, *record);
-        naming::LambdaHistory naming_history;
-        naming_history.on_deleted = [](const TopoDS_Shape&) { return true; };
-        naming_history.on_generated = [&](const TopoDS_Shape& edge, std::size_t) {
-            naming::Generated result;
-            if (edge.ShapeType() != TopAbs_EDGE) return result;
-            for (const auto& target : naming::shapes_of(offset.Generated(edge)))
-                if (target.ShapeType() == TopAbs_EDGE) result.emplace_back(target, "offset");
-            return result;
-        };
-        names = naming::propagate({model_named(wire)}, &naming_history, offset.Shape());
+        names = naming::offset_names(model_named(wire), offset);
         return offset.Shape();
     }, &names);
 }
@@ -3940,17 +3837,7 @@ static cad_result do_cad_shell(cad_shape solid, const cad_shape_ref* faces, uint
         BRepOffsetAPI_MakeThickSolid shell;
         shell.MakeThickSolidByJoin(source, removed, thickness, 1e-7);
         if (record) collect_operation_history(shell, source, nullptr, *record);
-        // Kept faces keep their names; each face's offset copy is `inner(face)`.
-        naming::LambdaHistory naming_history;
-        naming_history.on_modified = [&](const TopoDS_Shape& shape) { return naming::shapes_of(shell.Modified(shape)); };
-        naming_history.on_deleted = [&](const TopoDS_Shape& shape) { return shell.IsDeleted(shape); };
-        naming_history.on_generated = [&](const TopoDS_Shape& shape, std::size_t) {
-            naming::Generated result;
-            for (const auto& target : naming::shapes_of(shell.Generated(shape)))
-                if (target.ShapeType() == TopAbs_FACE) result.emplace_back(target, shape.ShapeType() == TopAbs_FACE ? "inner" : "wall");
-            return result;
-        };
-        names = naming::propagate({model_named(solid)}, &naming_history, shell.Shape());
+        names = naming::shell_names(model_named(solid), shell);
         return shell.Shape();
     }, &names);
 }
@@ -4055,15 +3942,39 @@ extern "C" CADKIT_API cad_result cad_element_name_match_bytes(
     return model_guard([&]() {
         require_model(reference != nullptr && candidates != nullptr && byte_capacity != nullptr,
                       "reference, candidates and byte_capacity must not be null");
-        std::vector<double> scores;
-        if (candidates[0] != 0)
-            for (const auto& candidate : split_lines(candidates)) scores.push_back(naming::match_score(reference, candidate));
-        const auto required = static_cast<uint32_t>(scores.size() * sizeof(double));
+        // One 16-byte record per candidate: uint32 grade, uint32 reserved, double overlap.
+        std::vector<uint8_t> records;
+        if (candidates[0] != 0) {
+            for (const auto& candidate : split_lines(candidates)) {
+                const auto match = naming::match_name(reference, candidate);
+                const uint32_t grade = static_cast<uint32_t>(match.grade), reserved = 0;
+                uint8_t record[16];
+                std::memcpy(record, &grade, 4);
+                std::memcpy(record + 4, &reserved, 4);
+                std::memcpy(record + 8, &match.overlap, 8);
+                records.insert(records.end(), record, record + 16);
+            }
+        }
+        const auto required = static_cast<uint32_t>(records.size());
         const auto capacity = *byte_capacity;
         *byte_capacity = required;
         if (capacity < required || (required != 0 && output == nullptr))
-            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "score output buffer is too small");
-        if (required != 0) std::memcpy(output, scores.data(), required);
+            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "match output buffer is too small");
+        if (required != 0) std::memcpy(output, records.data(), required);
+        return CAD_OK;
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_element_name_tag_bytes(const char* name, uint8_t* output, uint32_t* byte_capacity) {
+    return model_guard([&]() {
+        require_model(name != nullptr && byte_capacity != nullptr, "name and byte_capacity must not be null");
+        const auto tag = naming::creator_tag(name);
+        const auto required = static_cast<uint32_t>(tag.size());
+        const auto capacity = *byte_capacity;
+        *byte_capacity = required;
+        if (capacity < required || (required != 0 && output == nullptr))
+            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "tag output buffer is too small");
+        if (required != 0) std::memcpy(output, tag.data(), required);
         return CAD_OK;
     });
 }

@@ -106,7 +106,7 @@ class ConstrainedSketchFeature extends Feature {
 			return FaceWorkplane.resolve(supportShape, supportSelection, supportXDirection,
 				supportOffset, supportFlipped);
 		}
-		var face = supportFaceReference.resolveFor(supportShape, support.provenance);
+		var face = supportFaceReference.resolveFor(supportShape);
 		try {
 			var result = FaceWorkplane.fromFace(face, supportXDirection, supportOffset, supportFlipped);
 			face.close();
@@ -421,8 +421,7 @@ class ConstrainedSketchFeature extends Feature {
 		var plane = authored.plane;
 		if (support != null) {
 			if (supportFaceReference != null) {
-				var selectedFace = supportFaceReference.resolveFor(
-					context.shape(support), context.operation(support));
+				var selectedFace = supportFaceReference.resolveFor(context.shape(support));
 				try {
 					plane = FaceWorkplane.fromFace(selectedFace, supportXDirection, supportOffset, supportFlipped);
 					selectedFace.close();

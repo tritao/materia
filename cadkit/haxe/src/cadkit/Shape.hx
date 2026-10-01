@@ -7,10 +7,17 @@ import cadkit.Geometry;
 class Shape {
 	private var native:CadKit.OwnedShapeHandle;
 	private var meshCache:Array<{linearDeflection:Float, angularDeflection:Float, mesh:Mesh}>;
+	/** A shape never changes, so its names are read across the ABI once per kind. */
+	private var faceNames:Null<Array<String>>;
+	private var edgeNames:Null<Array<String>>;
+	private var vertexNames:Null<Array<String>>;
 
 	private function new(native:CadKit.OwnedShapeHandle) {
 		this.native = native;
 		meshCache = [];
+		faceNames = null;
+		edgeNames = null;
+		vertexNames = null;
 	}
 
 	public static function fromOwnedHandle(native:CadKit.OwnedShapeHandle):Shape {
@@ -102,10 +109,23 @@ class Shape {
 		(plans/TOPOLOGICAL_NAMING.md). Names are opaque text that survives parametric edits.
 	**/
 	public function elementNames(kind:CadKit.ShapeKind):Array<String> {
-		if (subshapeCount(kind) == 0)
-			return [];
-		var bytes = CadKit.shapeCopyElementNamesBytesChecked(native.borrow(), kind);
-		return bytes.getString(0, bytes.length).split("\n");
+		var cached = kind == CadKit.ShapeKind.Face ? faceNames : kind == CadKit.ShapeKind.Edge ? edgeNames
+			: kind == CadKit.ShapeKind.Vertex ? vertexNames : null;
+		if (cached == null) {
+			if (subshapeCount(kind) == 0) {
+				cached = [];
+			} else {
+				var bytes = CadKit.shapeCopyElementNamesBytesChecked(native.borrow(), kind);
+				cached = bytes.getString(0, bytes.length).split("\n");
+			}
+			if (kind == CadKit.ShapeKind.Face)
+				faceNames = cached;
+			else if (kind == CadKit.ShapeKind.Edge)
+				edgeNames = cached;
+			else if (kind == CadKit.ShapeKind.Vertex)
+				vertexNames = cached;
+		}
+		return cached.copy();
 	}
 
 	public function elementName(kind:CadKit.ShapeKind, index:Int):String {

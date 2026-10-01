@@ -1536,7 +1536,7 @@ class Document {
 				var updates = feature.prepareTopologyRemaps(stagedByFeature);
 				for (update in updates) {
 					stagedTopologyUpdates.push(update);
-					preparedRemapReport.add(update.state);
+					preparedRemapReport.add(update.state, update.method);
 				}
 			}
 			for (feature in stagedFeatures) {

@@ -231,7 +231,7 @@ class GeometricConnectors {
 		// A connector with a strong name is found by it (or reported); matching by kind, direction and radius is for
 		// connectors without one, where it can only guess among look-alikes (plans/TOPOLOGICAL_NAMING.md, TN4).
 		var name = connector.fingerprint.name;
-		var named = name != null && ElementNames.match(name, [name])[0] >= ElementNames.EXACT;
+		var named = name != null && ElementNames.isStrong(name);
 		var found = resolution.state == ReferenceState.Resolved ? resolution.index
 			: named ? (resolution.state == ReferenceState.Ambiguous ? AMBIGUOUS : -1)
 			: matchByProperties(list, connector);

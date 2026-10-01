@@ -713,3 +713,58 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
   verification failed for $equality…: Unknown IR call") after a one-line
   test edit. A clean build passes. The reproducer is kept in
   `../materia-worktrees/haxeon-incremental-repro/` (cache, source, notes).
+
+### 2026-10-01 — TN4.5 done: hardening before the repair UI
+
+Review after TN4: the architecture held, so eight changes were made
+before TN5 builds on it.
+
+1. **Resolution says how and between what.** `TopologyResolution` carries
+   `method` (`ResolutionMethod`: name, relative, identity, geometry,
+   selection, not found) and, when ambiguous, `candidates` (indices, best
+   first). `TopologyReference.resolvedBy()` and `candidates()` keep the last
+   result. `TopologyRemapReport` counts `byName`, `byRelative`,
+   `byIdentity`, `byGeometry`, `bySelection`. TN0 prints the method for
+   every row: edits resolve by name; the redrawn line and the legacy
+   document by geometry; the split face is ambiguous between exactly its
+   two pieces (asserted).
+2. **The naming scheme guards loading.** Each stored name now carries the
+   scheme that made it (`naming` next to `name` in the fingerprint record;
+   the document-root field is gone). A name from other rules, or with no
+   scheme, is dropped on load. The reference then resolves by geometry and
+   re-captures, so a renamed rule can never make an old name match a
+   different element. Tested in `NamingSmoke`.
+3. **Every built-in feature names every face strongly and uniquely.**
+   `NamingFeaturesSmoke` covers 26 feature types: primitives, booleans,
+   template-sketch extrusions, revolve, loft, sweep, shell, pocket, the
+   three hole styles, patterns, grid, mirror, rotation and tool
+   collections. Only the counterbore failed: its bore and recess cylinders
+   collided as `cyl.side@0/@1`. `HoleFeature` now names its bodies `bore`,
+   `counterbore` and `countersink`.
+4. **Names are cached per shape** in Haxe (`Shape.elementNames`; shapes
+   are immutable), so resolving many references against one shape copies
+   its names across the ABI once.
+5. **Dead history plumbing removed:** the `Operation` parameters of
+   `resolveFor` and `prepareRemap`, and `EvaluationContext.operation` and
+   its staged operations (no remaining users).
+6. **`Deleted` means something again:** an element whose name's creator
+   tag is a feature the document no longer has, or that is suppressed. A
+   lost element of a feature that still exists stays `Unresolved`. The core
+   reads the tag (`cad_element_name_tag_bytes`, `ElementNames.creatorTag`),
+   so Haxe still does not parse names.
+7. **Typed match records.** `cad_element_name_match_bytes` returns one
+   16-byte record per candidate (`cad_name_match_grade`, reserved,
+   overlap), exposed as `ElementMatch`. This replaces the double that
+   encoded the grade.
+8. **Adapters in their own file:** `core/src/naming_adapters.hpp`,
+   including the loft, sweep, wire-offset and shell adapters that were
+   inline lambdas.
+
+Gotcha: `CadKit.NameMatchGrade` has `None` and `Relative` values, which
+haxeon resolves ahead of unqualified `ResolutionMethod` values. That is why
+the "not found" method is `NotFound`, and why `ResolutionMethod` values are
+always written qualified.
+
+Results: TN0 is still 25 / 2 / 0. All suites pass: the core naming, core
+and modeling smokes, the full CadKit Haxe smoke, MachineKit (clean build),
+and the app compile.

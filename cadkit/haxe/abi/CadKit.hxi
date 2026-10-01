@@ -16,6 +16,12 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 		CAD_HISTORY_MODIFIED = 1;
 		CAD_HISTORY_DELETED = 2;
 	}
+	enum cad_name_match_grade : c_int {
+		CAD_NAME_MATCH_NONE = 0;
+		CAD_NAME_MATCH_RELATIVE = 1;
+		CAD_NAME_MATCH_WEAK = 2;
+		CAD_NAME_MATCH_EXACT = 3;
+	}
 	enum cad_result : c_int {
 		CAD_OK = 0;
 		CAD_ERROR_INVALID_HANDLE = 1;
@@ -60,6 +66,7 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_edge_position_at(edge: cad_shape, parameter: f64, out_position: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_edge_tangent_at(edge: cad_shape, parameter: f64, out_tangent: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_element_name_match_bytes(reference: utf8, candidates: utf8, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
+	extern fn cad_element_name_tag_bytes(name: utf8, output: nullable<ptr<u8>> @out_buffer("byte_capacity"), byte_capacity: ptr<u32> @inout) -> cad_result;
 	extern fn cad_face_area(face: cad_shape, out_area: ptr<f64> @out) -> cad_result;
 	extern fn cad_face_axis(face: cad_shape, out_axis: ptr<cad_axis> @out) -> cad_result;
 	extern fn cad_face_center(face: cad_shape, out_center: ptr<cad_vec3> @out) -> cad_result;

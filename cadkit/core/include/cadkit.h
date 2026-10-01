@@ -625,14 +625,30 @@ CADKIT_API cad_result cad_shape_stamp_names(
     const cad_shape_ref* inputs CADKIT_HXI_IN_ARRAY(input_count), uint32_t input_count,
     cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
 
-/* How well the stored name `reference` matches each of `candidates`
- * (newline-separated), as one little-endian double per candidate: 3 exact,
- * 2 exact but weak, between 1 and 2 for the same name once split pieces,
- * ordinals and input slots are set aside (higher when the split pieces agree
- * more), 0 none. Text only, so it works on names without their shape. */
+/* How well a stored name matches a candidate name. A relative is the same
+ * name once split pieces, ordinals and input slots are set aside. */
+typedef enum cad_name_match_grade {
+    CAD_NAME_MATCH_NONE = 0,
+    CAD_NAME_MATCH_RELATIVE = 1,
+    CAD_NAME_MATCH_WEAK = 2,     /* equal, but the name is weak: only geometry can confirm it */
+    CAD_NAME_MATCH_EXACT = 3
+} cad_name_match_grade;
+
+/* How the stored name `reference` matches each of `candidates`
+ * (newline-separated), as one 16-byte little-endian record per candidate:
+ * uint32 grade (cad_name_match_grade), uint32 reserved (0), double overlap
+ * (for relatives: the Jaccard index of their split pieces, 1 when neither is
+ * split). Text only, so it works on names without their shape. */
 CADKIT_API cad_result cad_element_name_match_bytes(
     const char* reference CADKIT_HXI_UTF8,
     const char* candidates CADKIT_HXI_UTF8,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* The tag that created the named element (the feature `f7` in
+ * `f7:fillet(...)`), or empty when the name has none. */
+CADKIT_API cad_result cad_element_name_tag_bytes(
+    const char* name CADKIT_HXI_UTF8,
     uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
     uint32_t* byte_capacity CADKIT_HXI_INOUT);
 
