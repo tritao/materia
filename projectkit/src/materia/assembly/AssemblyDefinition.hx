@@ -58,6 +58,12 @@ enum abstract AssemblyJointRole(String) from String to String {
 	@:id(10) var defaultValue:Float;
 	/** Maximum closure position residual in the assembly length unit. */
 	@:id(11) @:optional var closureTolerance:Float;
+	/**
+		An input of the mechanism (a motor, a cylinder): its coordinate is set, never solved. The other movable tree
+		joints on a closure loop are dependent and follow it (see `AssemblyState.dependentJoints`). Only movable tree
+		joints that are not coupling targets can be driven.
+	*/
+	@:id(12) @:optional var driven:Bool;
 }
 
 /** Target coordinate = source coordinate × ratio + offset. */

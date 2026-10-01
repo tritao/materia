@@ -26,6 +26,7 @@ import humankit.HumanLimb;
 import humankit.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.HumanPose;
+import humankit.HumanPosture;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
 import humankit.Mat4;
@@ -110,6 +111,7 @@ class HumanKitTests {
 		grasping(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
 		facilitySurfaces();
+		postureStature();
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -658,7 +660,23 @@ class HumanKitTests {
 		human.dispose();
 	}
 
-	/** Rack-relative slots resolve in facility space and jobs use routed lanes. */
+	/** A posture's lengths grow with the body; its angles, fractions and times do not. */
+	static function postureStature():Void {
+		var standard = HumanPosture.standard(), same = HumanPosture.forStature(HumanPosture.REFERENCE_STATURE);
+		if (same.bellyFront != standard.bellyFront || same.carryOffset[0] != standard.carryOffset[0])
+			throw "The reference stature changed the posture";
+		var tall = HumanPosture.forStature(HumanPosture.REFERENCE_STATURE * 1.5);
+		if (Math.abs(tall.bellyFront - standard.bellyFront * 1.5) > 1e-12 || Math.abs(tall.carryOffset[2] - standard.carryOffset[2] * 1.5) > 1e-12 ||
+			Math.abs(tall.blendSpeed - standard.blendSpeed * 1.5) > 1e-12)
+			throw "A taller body's posture lengths did not grow with it";
+		if (tall.maxLean != standard.maxLean || tall.stretch != standard.stretch || tall.comfort != standard.comfort || tall.edgeGap != standard.edgeGap ||
+			tall.hangSeconds != standard.hangSeconds)
+			throw "A taller body's posture angles, fractions or times changed";
+		var rejected = false;
+		try HumanPosture.forStature(0.0) catch (_:Dynamic) rejected = true;
+		if (!rejected) throw "A posture for no stature was accepted";
+	}
+
 	/** A facility's surfaces and slot items become boxes in its frame, turned with their owners. */
 	static function facilitySurfaces():Void {
 		var facility = new Facility("surfaces", "Surfaces");
@@ -672,6 +690,7 @@ class HumanKitTests {
 		facility.addRack(rack);
 		facility.addStation(table);
 		facility.addStation(bare);
+		facility.addLane(new Lane("rack-table", "rack", "table", new Path([rack.pose, new Pose2(3, 1), table.pose], "map"), 1, 1));
 		var targets = new FacilityTargets(facility);
 		var top = targets.surfaceBox("rack");
 		if (top == null || distance(top.center, [2.0, 1.1, 1.05]) > 1e-9 || Math.abs(top.yaw - (Math.PI / 2 + 0.25)) > 1e-9 ||
@@ -689,8 +708,16 @@ class HumanKitTests {
 		var threw = false;
 		try targets.surfaceBox("missing") catch (_:Dynamic) threw = true;
 		if (!threw) throw "An unknown station was accepted";
+		// With no place point given, the part is set down on the station's surface, at its middle and resting on it.
+		var place:Place = cast FacilityJobs.fetch(facility, "rack", "B3").deliver("table").orderedActions()[4];
+		if (distance(place.target, [4.65, 1.0, 1.03]) > 1e-9)
+			throw 'The part was not set down on the station surface: ${place.target}';
+		var undescribed = false;
+		try FacilityJobs.fetch(facility, "rack", "B3").deliver("bare") catch (_:Dynamic) undescribed = true;
+		if (!undescribed) throw "A delivery with no place point and no station surface was accepted";
 	}
 
+	/** Rack-relative slots resolve in facility space and jobs use routed lanes. */
 	static function facilityTargets(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var facility = new Facility("fetch", "Fetch facility");
 		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));

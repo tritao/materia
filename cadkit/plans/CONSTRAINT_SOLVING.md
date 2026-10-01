@@ -517,3 +517,53 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
 - The editor has no sketch drag yet (C5 adds soft drag targets); when it
   does, it should solve with `diagnose = false` while dragging and normally
   on release.
+
+### C3.1 — Driven joints; dependents derived from the loops (2026-10-01)
+
+- `KinematicJoint.driven` (optional, wire id 12): an input of the mechanism.
+  Only movable tree joints that are not coupling targets can be driven
+  (codec rejects the rest); the flattener and `AssemblyDocuments` (a boolean
+  relationship property) carry it. `AssemblyModel.drive(id)` sets it.
+- `AssemblyState.dependentJoints()`: every movable tree joint on the tree path
+  between a closure's two occurrences (below their lowest common ancestor)
+  that is neither driven nor a coupling target, in definition order.
+  `solveClosures()` and `AssemblyDrag` use it when given no explicit list.
+- Excavator: its three hinges are driven and `buildState` derives the rest.
+  **Found:** its old hand-written list spelled the cylinder joints
+  `boom-cylinder-…` while they are named `Boom-cylinder-…`, and was filtered
+  by name, so the six cylinder coordinates were silently never dependent
+  (their loops closed only because the authored pose was exact). The derived
+  list has all eight; the invariance fixture had copied the same list and now
+  derives it too.
+- App: with no saved choice the session starts from the derived dependents;
+  a saved list (older projects, or an explicit choice, including an empty
+  one) still overrides, and the scene record saves the list only when it
+  differs from what the definition derives, so later source changes apply.
+  The inspector toggle is unchanged. (The plan said drop the scene field;
+  keeping it as an override is less disruptive and costs nothing.) The app
+  compiles; its native tests were not run (none exercise this path).
+- Also fixed on main's current haxeon pin: haxeon now decodes `\x`
+  escapes (3d205e9e), so projectkit's three `indexOf("\x00")` checks became
+  NUL string constants, which HashLink rejects ("HashLink String cannot
+  contain NUL"), breaking every build that includes projectkit. They had
+  never worked (they looked for the text "x00"); `AssemblyCodec.containsNul`
+  checks by character code.
+
+### C3.2 — Closure diagnosis; unclosable loops are conflicting (2026-10-01)
+
+- `AssemblyLoopSolveResult.report`: the closure rows (already divided by
+  their tolerances) at the final state, diagnosed over the dependent columns
+  by `ConstraintDiagnosis.diagnoseSparse` at `SPARSE_TOLERANCE`, owners =
+  closure IDs. A planar four-bar's revolute closure shows
+  `redundant(pin)-3` (its out-of-plane rows); the excavator's four closures
+  are all consistent-redundant, none conflicting.
+- Status: kinematicskit's LM calls a stop stationary only below
+  1e-10 (1 + ‖J‖‖r‖), and a large-residual (unclosable) loop approaches its
+  least-squares pose only linearly, so it ran out of iterations. The
+  unclosable four-bar ends with ‖Jᵀr‖/‖J‖‖r‖ ≈ 1.15e-6; unfinished solves sit
+  at 0.1–0.9. CadKit now reports an iteration-limit stop with that ratio
+  ≤ 1e-4 as `conflicting` (kinematicskit's own status, which RobotKit uses,
+  is unchanged).
+- The invariance suite's `KNOWN` list is now empty.
+- Not done here: the inspector does not show the report yet (the API
+  carries it); the assembly witness check is C3.3.

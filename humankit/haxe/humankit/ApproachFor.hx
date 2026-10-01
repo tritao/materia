@@ -15,6 +15,12 @@ class ApproachFor extends HumanActionBase {
 	public final limb:HumanLimb;
 	public final speed:Float;
 	public final bothHands:Bool;
+	/**
+	 * How far short of the surface's edge the belly ends, in metres, once the lean and the stretch are spent:
+	 * zero when the stance clears it. A surface low or deep enough to need a crouch leaves this above zero,
+	 * since the worker does not crouch; the job still runs, with the belly over the edge by about this much.
+	 */
+	public var shortfall(default, null):Float = 0.0;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
 	final targetProvider:Null<Void->Array<Float>>;
@@ -40,7 +46,11 @@ class ApproachFor extends HumanActionBase {
 		if (shoulder == null) { fail("The rig lacks an arm"); return; }
 		var root = worker.rootTransform();
 		var length = worker.description.upperArm + worker.description.forearm;
-		var comfortable = worker.posture.comfort * length, farthest = worker.posture.stretch * length;
+		// With two hands the stance is centred on the object, so each shoulder stays a little to the side of
+		// its hand's grasp point. That sideways gap takes its share of the arm, leaving less for the reach
+		// ahead and below; measuring only those would stand the worker further out than the arm reaches.
+		var sideways = bothHands ? Math.abs(Math.abs(shoulder[1]) - worker.posture.handSpread) : 0.0;
+		var comfortable = inPlane(worker.posture.comfort * length, sideways), farthest = inPlane(worker.posture.stretch * length, sideways);
 		var rise = target[2] - (root[14] + shoulder[2]);
 		// A point is out of reach only beyond what the arm will stretch to, not beyond the comfortable reach.
 		if (rise >= farthest) {
@@ -78,6 +88,7 @@ class ApproachFor extends HumanActionBase {
 					var aheadMost = Math.sqrt(farthest * farthest - rise * rise);
 					standDistance += Math.min(required - standDistance, Math.max(0.0, aheadMost - ahead));
 				}
+				shortfall = Math.max(0.0, required - standDistance);
 			}
 		}
 		worker.setLean(lean);
@@ -91,6 +102,10 @@ class ApproachFor extends HumanActionBase {
 			turnIssued = true;
 		}
 	}
+
+	/** What is left of a reach of `radius` once `sideways` of it is spent off to one side. */
+	static function inPlane(radius:Float, sideways:Float):Float
+		return radius > sideways ? Math.sqrt(radius * radius - sideways * sideways) : 0.0;
 
 	/**
 	 * How far back from `point` along (-ux, -uy) the surface's footprint runs: the walk from the

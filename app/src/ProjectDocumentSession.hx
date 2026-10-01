@@ -269,8 +269,9 @@ class ProjectDocumentSession {
       else
         generated.recipeDocument = reconciled.text;
     }
-    var dependentJoints = project.assemblyDependentJoints == null ? [] : project.assemblyDependentJoints.copy();
-    validateAssemblyDependentJoints(generated.assemblyDefinition, dependentJoints);
+    // Null means no saved choice (derive from the definition); an empty list is an explicit choice of none.
+    var dependentJoints = project.assemblyDependentJoints == null ? null : project.assemblyDependentJoints.copy();
+    if (dependentJoints != null) validateAssemblyDependentJoints(generated.assemblyDefinition, dependentJoints);
     var stateRecord = generated.assemblyState;
     if (project.assemblyState != null) {
       if (generated.assemblyDefinition == null)
@@ -343,7 +344,8 @@ class ProjectDocumentSession {
       projectAssemblyState = null;
       return;
     }
-    var dependencies = dependentJointIds == null ? [] : dependentJointIds;
+    // Without a saved choice, the joints the definition's driven inputs leave dependent; a saved list overrides.
+    var dependencies = dependentJointIds == null ? state.dependentJoints() : dependentJointIds;
     validateAssemblyDependentJoints(definition, dependencies);
     for (id in dependencies) assemblyDependentJoints.set(id, true);
     for (occurrence in definition.occurrences) assemblyOccurrenceIds.set("project:" + occurrence.id, true);
@@ -773,8 +775,15 @@ class ProjectDocumentSession {
     return {record: {version: 1, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,
-      assemblyDependentJoints: projectAssemblyDefinition == null ? null : assemblyDependentJointIds()},
+      assemblyDependentJoints: savedDependentJoints()},
       authored: authored};
+  }
+
+  /** The dependent joints to save: null when they are what the definition derives, so later source changes apply. */
+  function savedDependentJoints():Null<Array<String>> {
+    if (projectAssemblyDefinition == null || assemblyRuntime == null) return null;
+    var chosen = assemblyDependentJointIds();
+    return chosen.join(",") == assemblyRuntime.dependentJoints().join(",") ? null : chosen;
   }
 
   function assemblyDependentJointIds():Array<String> {

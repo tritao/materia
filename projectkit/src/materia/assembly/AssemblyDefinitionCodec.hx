@@ -102,6 +102,7 @@ class AssemblyDefinitionCodec {
 				(joint.type == AssemblyJointType.Fixed && joint.defaultValue != 0) ||
 				(joint.closureTolerance != null && (joint.role != AssemblyJointRole.Closure ||
 					!Math.isFinite(joint.closureTolerance) || joint.closureTolerance < 0)) ||
+				(joint.driven == true && (joint.role != AssemblyJointRole.Tree || !hasCoordinate(joint.type))) ||
 				!validLimits(joint.limits, joint.defaultValue))
 				throw "Assembly definition has an invalid joint";
 			joints.set(joint.id, true);
@@ -128,6 +129,8 @@ class AssemblyDefinitionCodec {
 				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
 				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset))
 				throw "Assembly has an invalid coupled joint";
+			if (movable.get(coupling.target).driven == true)
+				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';
 			names.set(coupling.id, true);
 			targets.set(coupling.target, true);
 			sourceByTarget.set(coupling.target, coupling.source);
@@ -243,5 +246,5 @@ class AssemblyDefinitionCodec {
 
 	static function validText(value:Null<String>):Bool
 		return value != null && value.length > 0 && value.length <= 4096 &&
-			StringTools.trim(value).length > 0 && value.indexOf("\x00") < 0;
+			StringTools.trim(value).length > 0 && !AssemblyCodec.containsNul(value);
 }

@@ -19,6 +19,12 @@ class HumanActionBase implements HumanAction {
 	public function failure():Null<String>
 		return error;
 
+	/** Eases 0 to 1 with no jerk at either end. */
+	static function smooth(t:Float):Float {
+		var clamped = Math.max(0.0, Math.min(1.0, t));
+		return clamped * clamped * (3.0 - 2.0 * clamped);
+	}
+
 	function fail(message:String):Void {
 		error = message;
 		done = true;

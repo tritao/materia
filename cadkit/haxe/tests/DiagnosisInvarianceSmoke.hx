@@ -37,10 +37,7 @@ private typedef AssemblyFixture = {
 	remove its entry and a regression cannot hide.
 */
 class DiagnosisInvarianceSmoke {
-	static final KNOWN:Array<String> = [
-		// An unclosable loop ends at a stationary residual but is reported as out of iterations (C3).
-		"four-bar-impossible/expected",
-	];
+	static final KNOWN:Array<String> = [];
 
 	public static function run():Void {
 		var failures:Array<String> = [];
@@ -323,12 +320,9 @@ class DiagnosisInvarianceSmoke {
 		return definition;
 	}
 
-	static function excavatorDependent():Array<String> {
-		var candidates = ["link-one-hinge", "link-two-hinge", "boom-cylinder-hinge", "boom-cylinder-slide", "stick-cylinder-hinge",
-			"stick-cylinder-slide", "bucket-cylinder-hinge", "bucket-cylinder-slide"];
-		var tree = [for (joint in ProceduralExcavatorAssembly.buildDefinition().joints) if (joint.role == AssemblyJointRole.Tree) joint.id];
-		return [for (id in candidates) if (tree.indexOf(id) >= 0) id];
-	}
+	/** Derived from the driven hinges (a hand-written list here once missed the cylinders by spelling). */
+	static function excavatorDependent():Array<String>
+		return new AssemblyState(ProceduralExcavatorAssembly.buildDefinition()).dependentJoints();
 
 	/**
 		Scales every length (connector and root positions, prismatic

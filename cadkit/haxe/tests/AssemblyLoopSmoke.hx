@@ -38,6 +38,8 @@ class AssemblyLoopSmoke {
 		check(blocked.status == "limit-blocked", 'a limit in the way reports limit-blocked (${blocked.status})');
 		check(limited.joint("rocker") == 1.9, "a limit-blocked solve leaves the state untouched");
 
+		checkDrivers();
+		checkReports();
 		throws(() -> fourBar.solveClosures(["pin"]), "a closure joint cannot be a dependent coordinate");
 		throws(() -> fourBar.solveClosures(["coupler", "coupler"]), "dependent coordinates must be distinct");
 	}
@@ -86,6 +88,69 @@ class AssemblyLoopSmoke {
 			joint("j2", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "l1", "b", "l2", "a", -0.8),
 			joint("j3", AssemblyJointType.Revolute, AssemblyJointRole.Tree, "l2", "b", "l3", "a", 0.6),
 			joint("weld", AssemblyJointType.Fixed, AssemblyJointRole.Closure, "l3", "b", "ground", "b", 0.0)]);
+	}
+
+	/** Closure solves carry a diagnosis: planar loops built from 3D closures show consistent redundant rows. */
+	static function checkReports():Void {
+		var driven = fourBarDefinition(2200, null, null, 1.4);
+		driven.joints[0].driven = true;
+		var closed = new AssemblyState(driven).solveClosures();
+		check(closed.report != null && groups(closed.report) == "redundant(pin)-3",
+			'a planar four-bar has three out-of-plane closure rows, satisfied: ${groups(closed.report)}');
+		var impossible = fourBarDefinition(5000, null, null, 1.4);
+		impossible.joints[0].driven = true;
+		var failed = new AssemblyState(impossible).solveClosures();
+		check(failed.status == "conflicting" && failed.report != null && failed.report.conflictingOwners().join(",") == "pin",
+			'an unclosable four-bar is conflicting at its pin: ${failed.status} ${groups(failed.report)}');
+		var excavator = new AssemblyState(ProceduralExcavatorAssembly.buildDefinition()).solveClosures();
+		check(excavator.converged && excavator.report != null && excavator.report.conflictingOwners().length == 0
+			&& excavator.report.redundantOwners().length == 4,
+			'the excavator\'s four closures are consistent and redundant only by design: ${groups(excavator.report)}');
+	}
+
+	static function groups(report:Null<cadkit.solve.ConstraintDiagnosis.DiagnosisReport>):String
+		return report == null ? "none" : [for (group in report.dependencyGroups) group.toString()].join(" ");
+
+	/** Driven joints are inputs; the dependent coordinates of every loop are derived from them. */
+	static function checkDrivers():Void {
+		var free = new AssemblyState(fourBarDefinition(2200, null, null, 1.4));
+		check(free.dependentJoints().join(",") == "crank,coupler,rocker", 'with nothing driven, every loop joint is dependent: ${free.dependentJoints()}');
+
+		var driven = fourBarDefinition(2200, null, null, 1.4);
+		driven.joints[0].driven = true;
+		var fourBar = new AssemblyState(driven);
+		check(fourBar.dependentJoints().join(",") == "coupler,rocker", 'a driven crank leaves coupler and rocker: ${fourBar.dependentJoints()}');
+		var result = fourBar.solveClosures();
+		check(result.converged && result.degreesOfFreedom == 0 && fourBar.joint("crank") == 0.6,
+			"the derived dependents close the four-bar without moving the driver");
+
+		var slider = sliderCrankDefinition();
+		slider.joints[0].driven = true;
+		check(new AssemblyState(slider).dependentJoints().join(",") == "rod,slide", "a driven crank leaves the rod and the slide");
+
+		var excavator = new AssemblyState(ProceduralExcavatorAssembly.buildDefinition());
+		// The old hand-written list spelled these "boom-cylinder-…" and was filtered by name, so the cylinders were
+		// silently never dependent; deriving them from the loops cannot miss one.
+		check(excavator.dependentJoints().join(",") == "link-one-hinge,link-two-hinge,Boom-cylinder-hinge,Boom-cylinder-slide,"
+			+ "Stick-cylinder-hinge,Stick-cylinder-slide,Bucket-cylinder-hinge,Bucket-cylinder-slide",
+			'the excavator derives its links and cylinders from its driven hinges: ${excavator.dependentJoints()}');
+
+		var decoded = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(driven));
+		check(decoded.joints[0].driven == true && decoded.joints[1].driven != true, "the codec keeps which joints are driven");
+		var document = new cadkit.parametric.Document();
+		var fromDocument = cadkit.parametric.AssemblyDocuments.toDefinition(cadkit.parametric.AssemblyDocuments.fromDefinition(document, driven));
+		// Documents return joints sorted by id.
+		var drivenIds = [for (joint in fromDocument.joints) if (joint.driven == true) joint.id];
+		check(drivenIds.join(",") == "crank", 'assembly documents keep which joints are driven: $drivenIds');
+		document.close();
+
+		var closureDriven = fourBarDefinition(2200, null, null, 1.4);
+		closureDriven.joints[3].driven = true;
+		throws(() -> AssemblyDefinitionCodec.validate(closureDriven), "a closure cannot be driven");
+		var coupledDriven = fourBarDefinition(2200, null, null, 1.4);
+		coupledDriven.couplings = [{id: "gear", source: "crank", target: "rocker", ratio: 1, offset: 0.8}];
+		coupledDriven.joints[2].driven = true;
+		throws(() -> AssemblyDefinitionCodec.validate(coupledDriven), "a coupling target cannot be driven");
 	}
 
 	static function check(value:Bool, label:String):Void {

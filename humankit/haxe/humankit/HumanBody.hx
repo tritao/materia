@@ -33,8 +33,8 @@ class HumanBody {
 		this.walker = walker == null ? new HumanWalker(character) : walker;
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
-		this.posture = posture == null ? HumanPosture.standard() : posture;
 		description = HumanDescription.measure(character.pose, character.height());
+		this.posture = posture == null ? HumanPosture.forStature(description.stature) : posture;
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
 		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis]) {
@@ -218,12 +218,35 @@ class HumanBody {
 
 	public function setReachWorld(limb:HumanLimb, target:Array<Float>, weight:Float,
 			?pole:Array<Float>):Void
-		limbs[limb].reach(target, false, weight, pole);
+		limbs[limb].reach(target, ReachSpace.World, weight, pole);
 
 	/** Legacy model-space reach target used by HumanReachTask. */
 	public function setReachModel(limb:HumanLimb, target:Array<Float>, weight:Float,
 			?pole:Array<Float>):Void
-		limbs[limb].reach(target, true, weight, pole);
+		limbs[limb].reach(target, ReachSpace.Model, weight, pole);
+
+	/**
+	 * Reaches for a point given as an offset from the chest (model-space axes), so the target moves with the
+	 * torso: it keeps its place against the shoulder as the body leans, straightens, and walks.
+	 */
+	public function setReachChest(limb:HumanLimb, offset:Array<Float>, weight:Float, ?pole:Array<Float>):Void
+		limbs[limb].reach(offset, ReachSpace.Torso, weight, pole);
+
+	/** Where the chest is, in model space (the pelvis on a rig without one). */
+	public function chestPosition():Array<Float> {
+		var chest = character.pose.bonePosition(Chest);
+		if (chest == null) chest = character.pose.bonePosition(Pelvis);
+		if (chest == null) throw "The character has no chest or pelvis";
+		return chest;
+	}
+
+	/** A limb's reach target in model space, whichever frame it was given in. */
+	public function reachTargetModel(control:LimbControl):Array<Float> {
+		if (control.space == ReachSpace.World) return toModel(control.target);
+		if (control.space == ReachSpace.Model) return control.target.copy();
+		var chest = chestPosition();
+		return [for (axis in 0...3) chest[axis] + control.target[axis]];
+	}
 
 	public function reachWeight(limb:HumanLimb):Float
 		return limbs[limb].weight;
@@ -307,13 +330,45 @@ class HumanBody {
 	static function distance(a:Array<Float>, b:Array<Float>):Float
 		return Math.sqrt(Math.pow(a[0] - b[0], 2) + Math.pow(a[1] - b[1], 2) + Math.pow(a[2] - b[2], 2));
 
+	/**
+	 * How far a limb's wrist would travel, in metres, if its reach were let go now: the distance from where
+	 * the IK holds it to where its animation puts it. The pose is left as it was.
+	 */
+	public function travelToAnimation(limb:HumanLimb):Float {
+		var bone = limb == ArmL ? HumanBone.HandL : limb == ArmR ? HumanBone.HandR : null;
+		if (bone == null) return 0.0;
+		var held = character.pose.bonePosition(bone);
+		if (held == null) return 0.0;
+		character.release(limb);
+		character.advance(0.0);
+		var free = character.pose.bonePosition(bone);
+		// The limb's reach is applied again, from its own record of what it is asked to do.
+		evaluate();
+		return free == null ? 0.0 : distance(held, free);
+	}
+
+	/** Where a hand's wrist is in the world now. */
+	public function wristWorld(limb:HumanLimb):Array<Float> {
+		var wrist = character.pose.bonePosition(limb == ArmL ? HandL : HandR);
+		if (wrist == null) throw "The character has no hand bone";
+		return toWorld(wrist);
+	}
+
+	/**
+	 * How long a reach takes to blend in from the animation or out to it, given how far the wrist has to go: at
+	 * least `minimum`, and longer when the distance would otherwise push the wrist past the posture's blend speed.
+	 * Easing peaks at half as much again as the average speed, hence the factor.
+	 */
+	public function blendSeconds(distance:Float, minimum:Float):Float
+		return Math.max(minimum, 1.5 * distance / posture.blendSpeed);
+
 	public function reachPole(limb:HumanLimb):Null<Array<Float>>
 		return limbs[limb].pole;
 
 	public function reachTargetWorld(limb:HumanLimb):Null<Array<Float>> {
 		var control = limbs[limb];
 		if (control.mode != Reach) return null;
-		return control.modelSpace ? toWorld(control.target) : control.target.copy();
+		return control.space == ReachSpace.World ? control.target.copy() : toWorld(reachTargetModel(control));
 	}
 
 	public function clearReach(limb:HumanLimb):Void
@@ -335,9 +390,7 @@ class HumanBody {
 
 	/** Current carry target in model space, tied to the animated chest. */
 	public function carryTargetModel(limb:HumanLimb):Array<Float> {
-		var chest = character.pose.bonePosition(Chest);
-		if (chest == null) chest = character.pose.bonePosition(Pelvis);
-		if (chest == null) throw "The character has no chest or pelvis";
+		var chest = chestPosition();
 		var side = limb == ArmL ? 1.0 : -1.0;
 		return [chest[0] + posture.carryOffset[0], chest[1] + side * posture.carryOffset[1],
 			chest[2] + posture.carryOffset[2]];

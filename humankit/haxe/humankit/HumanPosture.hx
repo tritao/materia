@@ -2,11 +2,15 @@ package humankit;
 
 /**
  * Every tuning number behind how a worker holds and moves its body, in one place. The values are in
- * metres and radians, tuned on the bundled 1.7 m worker rig; build a body with a modified copy to
- * change how it carries itself. Nothing here is a fact about a rig's bones, which HumanKit reads from
+ * metres and radians, tuned on the bundled worker rig (`REFERENCE_STATURE` tall); a body built without a
+ * posture scales the lengths to its own stature (`forStature`), and one built with a modified copy carries
+ * itself as that copy says. Nothing here is a fact about a rig's bones, which HumanKit reads from
  * the skeleton or measures instead.
  */
 class HumanPosture {
+	/** The height of the bundled worker rig the lengths below were tuned on, as its bounds measure it, in metres. */
+	public static inline var REFERENCE_STATURE = 1.834;
+
 	// Reaching.
 
 	/** The fraction of arm length (shoulder to wrist) a standing reach uses; the palm adds no reliable length. */
@@ -17,7 +21,10 @@ class HumanPosture {
 	 * How much of the arm's length a worker will stretch to keep clear of a surface's edge, once the lean is
 	 * spent: more than the comfortable reach, and short of the limit the solver refuses at.
 	 */
-	public var stretch:Float = 0.92;
+	public var stretch:Float = 0.91;
+
+	/** With two hands on one object, how far each hand's grasp point sits to its own side of the object's centre, in metres. */
+	public var handSpread:Float = 0.08;
 
 	// Carrying.
 
@@ -57,6 +64,13 @@ class HumanPosture {
 	public var bellyFront:Float = 0.12;
 	public var edgeGap:Float = 0.03;
 
+	/**
+	 * How fast, in metres per second, a wrist is allowed to go at the peak of the easing as a reach blends in from
+	 * the animation or out to it, working from the straight-line distance it has to cover. The wrist follows an arc
+	 * and the IK blend is not linear in position, so its real peak is about twice this.
+	 */
+	public var blendSpeed:Float = 1.0;
+
 	// Withdrawing from a placed part.
 
 	/** How far the wrists pull back toward the body, and how far they lift. */
@@ -70,4 +84,24 @@ class HumanPosture {
 	/** The tuning the bundled worker rig was set up with. */
 	public static function standard():HumanPosture
 		return new HumanPosture();
+
+	/**
+	 * The tuning for a body of `stature` metres: every length, and the speed the wrist may go at, grows with
+	 * the body. Angles, fractions of the arm's length, curls and times do not depend on size and are kept.
+	 * `edgeGap` is also kept: it is the clearance left to a surface, which is not a matter of the worker's size.
+	 */
+	public static function forStature(stature:Float):HumanPosture {
+		if (!(stature > 0.0)) throw "A posture needs a positive stature";
+		var posture = new HumanPosture(), k = stature / REFERENCE_STATURE;
+		posture.handSpread *= k;
+		posture.carryOffset = [for (value in posture.carryOffset) value * k];
+		posture.hangForward *= k;
+		posture.hangOutward *= k;
+		posture.bellyFront *= k;
+		posture.blendSpeed *= k;
+		posture.withdraw *= k;
+		posture.lift *= k;
+		posture.minAhead *= k;
+		return posture;
+	}
 }

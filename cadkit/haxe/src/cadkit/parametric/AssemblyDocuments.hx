@@ -193,6 +193,11 @@ class AssemblyDocuments {
 				defaultValue: number(relationship, "defaultValue")};
 			var tolerance = relationship.property(PREFIX + "closureTolerance");
 			if (tolerance != null) joint.closureTolerance = cast tolerance.value;
+			var driven = relationship.property(PREFIX + "driven");
+			if (driven != null) {
+				var flag:Bool = cast driven.value;
+				if (flag) joint.driven = true;
+			}
 			scope.joints.push(joint);
 		}
 		for (relationship in document.allRelationships()) if (relationship.typeName == COUPLING) {
@@ -288,6 +293,8 @@ class AssemblyDocuments {
 			if (joint.closureTolerance != null)
 				relationship.setProperty(TypedProperty.quantity(PREFIX + "closureTolerance",
 					QuantityKind.Scalar, joint.closureTolerance, "1"));
+			if (joint.driven == true)
+				relationship.setProperty(TypedProperty.boolean(PREFIX + "driven", true));
 			children.set(joint.id, members.get(joint.child));
 		}
 		if (couplings != null) for (coupling in couplings) {

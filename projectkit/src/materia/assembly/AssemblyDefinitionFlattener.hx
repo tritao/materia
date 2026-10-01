@@ -156,6 +156,7 @@ class AssemblyDefinitionFlattener {
 				childConnector: child.connector, axis: joint.axis, limits: joint.limits,
 				defaultValue: joint.defaultValue};
 			if (joint.closureTolerance != null) expanded.closureTolerance = joint.closureTolerance;
+			if (joint.driven == true) expanded.driven = true;
 			flat.joints.push(expanded);
 		}
 		if (couplings != null) for (coupling in couplings)
@@ -189,5 +190,5 @@ class AssemblyDefinitionFlattener {
 
 	/** Public connector labels may be paths; only occurrence and definition IDs are local segments. */
 	static function validExposedName(name:String):Bool
-		return name != null && StringTools.trim(name).length > 0 && name.indexOf("\x00") < 0;
+		return name != null && StringTools.trim(name).length > 0 && !AssemblyCodec.containsNul(name);
 }
