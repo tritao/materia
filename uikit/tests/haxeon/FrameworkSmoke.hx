@@ -31,6 +31,7 @@ import Transform2D;
 import TextLayout;
 import TextDirection;
 import TextStyle;
+import TextColorRange;
 import TextWrap;
 import NativeKitEventValue;
 import NativeKitEventValue.NativeKitTextEdit;
@@ -240,6 +241,45 @@ import nativekit.ui.host.UiApplication;
 import nativekit.ui.host.UiHostPendingResources;
 
 class FrameworkSmoke {
+	static function foregroundRangesValid(fonts:FontCollection):Bool {
+		var value = new StringBuf();
+		for (_ in 0...150)
+			value.add("é🙂x\n");
+		var editor = new TextEditorState(fonts, value.toString());
+		editor.updateLayout(200.0);
+		var measured = editor.layout.measure();
+		var calls = 0;
+		var requestedEnd = 0;
+		var tint = new Color(1.0, 0.0, 0.0);
+		editor.layout.colorRangeProvider = function(start, end) {
+			calls++;
+			requestedEnd = end;
+			return [new TextColorRange(0, 600, tint)];
+		};
+		var canvas = new Canvas();
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		if (calls != 1 || requestedEnd <= 0 || requestedEnd >= 600)
+			return false;
+		tint = new Color(0.0, 1.0, 0.0);
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		var afterColors = editor.layout.measure();
+		if (calls != 2 || measured.width != afterColors.width || measured.height != afterColors.height)
+			return false;
+		editor.layout.colorRangeProvider = function(start, end) {
+			return [new TextColorRange(0, 3, tint), new TextColorRange(2, 4, tint)];
+		};
+		var rejected = false;
+		try {
+			editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		} catch (_:String) {
+			rejected = true;
+		}
+		editor.layout.colorRangeProvider = null;
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, 20.0);
+		editor.dispose();
+		return rejected;
+	}
+
 	static function main():Int {
 		if (!hostFrameLifecycleValid())
 			return 270;
@@ -263,6 +303,8 @@ class FrameworkSmoke {
 			return 2;
 		var fonts = FontCollection.create();
 		fonts.add(fontPath);
+		if (!foregroundRangesValid(fonts))
+			return 308;
 		if (!hostRuntimeLifecycleValid(fonts))
 			return 272;
 		var rtlLayout = TextLayout.create(fonts, "א", 80.0, null,

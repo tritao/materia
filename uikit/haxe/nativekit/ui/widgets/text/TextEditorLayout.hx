@@ -9,6 +9,7 @@ import ParagraphStyle;
 import Rect;
 import TextLayout;
 import TextStyle;
+import TextColorRange;
 import nativekit.editorkit.TextDocument;
 
 /** Retained layouts for bounded groups of paragraphs in one editor document. */
@@ -19,6 +20,11 @@ class TextEditorLayout {
 	public final textStyle:TextStyle;
 	public final paragraphStyle:ParagraphStyle;
 	public var paragraphCount(get, never):Int;
+	/** Supplies sorted, disjoint absolute codepoint ranges for one visible chunk.
+	 * Ranges may extend beyond the requested chunk and are clipped to it.
+	 * The provider is queried at paint time, so text edits can refresh styles.
+	 */
+	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
 
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
@@ -40,6 +46,7 @@ class TextEditorLayout {
 		this.fonts = fonts;
 		this.textStyle = copyTextStyle(textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
+		colorRangeProvider = null;
 		paragraphs = [];
 		rangeGeometryCache = [];
 		offsets = null;
@@ -144,6 +151,7 @@ class TextEditorLayout {
 				var textChanged = record.text != paragraphText;
 				if (textChanged || record.layout.width != nextWidth || styleChanged) {
 					record.layout.update(paragraphText, nextWidth, textStyle, paragraphStyle);
+					record.renderRanges = null;
 					record.text = paragraphText;
 				}
 			} else {
@@ -248,6 +256,7 @@ class TextEditorLayout {
 						TextLayout.create(fonts, paragraphText, width, textStyle, paragraphStyle));
 				else if (record.text != paragraphText) {
 					record.layout.update(paragraphText, width, textStyle, paragraphStyle);
+					record.renderRanges = null;
 					record.text = paragraphText;
 				}
 				usedDirty.push(record);
@@ -321,6 +330,7 @@ class TextEditorLayout {
 					TextLayout.create(fonts, chunkText, width, textStyle, paragraphStyle));
 			else if (record.text != chunkText) {
 				record.layout.update(chunkText, width, textStyle, paragraphStyle);
+				record.renderRanges = null;
 				record.text = chunkText;
 			}
 			used.push(record);
@@ -402,8 +412,43 @@ class TextEditorLayout {
 					record.layout.setColor(color);
 					record.renderColor = color;
 				}
+				applyForegroundRanges(record);
 				canvas.drawText(record.layout, 0.0, record.y);
 			}
+		}
+	}
+
+	function applyForegroundRanges(record:TextEditorParagraphRecord):Void {
+		var ranges:Array<TextColorRange> = [];
+		if (colorRangeProvider != null) {
+			var supplied = colorRangeProvider(record.start, record.end);
+			if (supplied == null)
+				throw "Text foreground provider returned null";
+			var previousEnd = 0;
+			for (range in supplied) {
+				if (range == null || range.start < previousEnd)
+					throw "Text foreground ranges must be sorted and disjoint";
+				previousEnd = range.end;
+				var start = Std.int(Math.max(range.start, record.start));
+				var end = Std.int(Math.min(range.end, record.end));
+				if (start < end)
+					ranges.push(new TextColorRange(start - record.start, end - record.start, range.color));
+			}
+		}
+		var previous = record.renderRanges;
+		var changed = previous == null || previous.length != ranges.length;
+		if (!changed && previous != null)
+			for (index in 0...ranges.length) {
+				var before = previous[index];
+				var after = ranges[index];
+				if (before.start != after.start || before.end != after.end ||
+					before.color.red != after.color.red || before.color.green != after.color.green ||
+					before.color.blue != after.color.blue || before.color.alpha != after.color.alpha)
+					changed = true;
+			}
+		if (changed) {
+			record.layout.setColorRanges(ranges);
+			record.renderRanges = ranges;
 		}
 	}
 
@@ -742,6 +787,7 @@ class TextEditorParagraphRecord {
 	public var y:Float;
 	public var height:Float;
 	public var renderColor:Null<Color>;
+	public var renderRanges:Null<Array<TextColorRange>>;
 	public final layout:TextLayout;
 
 	public function new(text:String, layout:TextLayout) {
@@ -752,6 +798,7 @@ class TextEditorParagraphRecord {
 		y = 0.0;
 		height = 0.0;
 		renderColor = null;
+		renderRanges = null;
 	}
 }
 

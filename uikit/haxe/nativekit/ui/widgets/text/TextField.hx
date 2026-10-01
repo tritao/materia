@@ -13,6 +13,7 @@ import ParagraphStyle;
 import Rect;
 import ResolvedLayoutItem;
 import TextStyle;
+import TextColorRange;
 import Transform2D;
 import nativekit.ui.core.BuildContext;
 import nativekit.ui.core.Key;
@@ -49,6 +50,8 @@ class TextField implements View {
 	public final style:LayoutStyle;
 	public final textStyle:Null<TextStyle>;
 	public final textColor:Null<Color>;
+	/** Sorted, disjoint absolute codepoint foreground ranges for a visible chunk. */
+	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
@@ -82,6 +85,7 @@ class TextField implements View {
 		this.onEdit = onEdit;
 		this.document = document;
 		this.onSubmit = null;
+		this.colorRangeProvider = null;
 		this.label = label;
 		this.placeholder = null;
 		this.multiline = multiline;
@@ -141,6 +145,7 @@ class TextField implements View {
 					editor.scrollToEnd();
 			}
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
+			editor.layout.colorRangeProvider = colorRangeProvider;
 
 			var flags = context.interactionStates.get(id);
 			flags = StyleStateUtil.withState(flags, StyleState.Disabled, !enabled);
@@ -205,7 +210,7 @@ class TextField implements View {
 				placeholder.length > 0;
 			// Single-line fields use the text node so their full value and theme
 			// foreground update together as the editor content changes.
-			var useTextNode = showsPlaceholder || !multiline;
+			var useTextNode = showsPlaceholder || (!multiline && colorRangeProvider == null);
 			var textNode = new RenderNode(context.id("text"),
 				useTextNode ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
 			if (showsPlaceholder)
