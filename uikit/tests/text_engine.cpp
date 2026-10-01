@@ -570,6 +570,37 @@ int main() {
         long_word.published_glyphs_for_lines(long_layout.id, 0, long_layout.lines.size() + 1, 0, 0, 1, GlyphMode::Alpha))
         return 127;
 
+    // An equal-length edit in one wrapped row retains glyph snapshots for
+    // rows whose text range and placement stayed unchanged.
+    const auto preceding = long_word.published_glyphs_for_line(
+        long_layout.id, middle - 20, 0, 0, 1, GlyphMode::Alpha);
+    const auto following = long_word.published_glyphs_for_line(
+        long_layout.id, middle + 20, 0, 0, 1, GlyphMode::Alpha);
+    const auto before_edit_stats = long_word.stats();
+    TextLayoutResult edited_rows;
+    const int32_t edit_offset = static_cast<int32_t>(middle_line.text_offset + 4);
+    if (!preceding || !following ||
+        !long_word.edit_utf8(edit_offset, edit_offset + 1, "e", &edited_rows) ||
+        long_word.stats().incremental_ascii_edits != before_edit_stats.incremental_ascii_edits + 1 ||
+        edited_rows.lines.size() != long_layout.lines.size())
+        return 128;
+    const bool before_reused = long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
+                                            GlyphMode::Alpha) == preceding;
+    const bool after_reused = long_word.published_glyphs_for_line(long_layout.id, middle + 20, 0, 0, 1,
+                                            GlyphMode::Alpha) == following;
+    const bool changed_rebuilt = long_word.published_glyphs_for_line(long_layout.id, middle, 0, 0, 1,
+                                            GlyphMode::Alpha) != middle_glyphs;
+    if (!before_reused || !after_reused || !changed_rebuilt ||
+        !long_word.prepared_glyphs_current(*preceding) ||
+        !long_word.prepared_glyphs_current(*following) ||
+        long_word.prepared_glyphs_current(*middle_glyphs))
+        return 129;
+    if (!long_word.edit_utf8(edit_offset, edit_offset, "a", &edited_rows) ||
+        long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
+                                            GlyphMode::Alpha) == preceding ||
+        long_word.prepared_glyphs_current(*preceding))
+        return 130;
+
 
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;
 }

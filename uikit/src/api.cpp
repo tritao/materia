@@ -103,6 +103,7 @@ struct ResourceSlot {
     std::unique_ptr<nkui::SurfaceProducer> surface;
     nk_graphics_image graphics_image{};
     std::map<std::tuple<int32_t, uint32_t, uint32_t>, std::shared_ptr<nkui::PreparedGlyphs>> visible_text_glyphs;
+    std::map<std::pair<int32_t, uint32_t>, std::shared_ptr<const nkui::PreparedGlyphs>> visible_line_glyphs;
     nkui::PreparedGlyphs text_glyphs;
     std::unordered_map<int32_t, nkui::PreparedGlyphs> scaled_text_glyphs;
     nkui_color text_color{1.0f, 1.0f, 1.0f, 1.0f};
@@ -1343,10 +1344,61 @@ std::shared_ptr<nkui::PreparedGlyphs> prepare_visible_text(
     }
     auto glyphs = found->second;
     if (!layout.text->prepared_glyphs_current(*glyphs)) {
-        if (!layout.text->prepare_glyphs_for_lines(lines.first, lines.second, 0, 0, scale,
-                                                   nkui::GlyphMode::Alpha, *glyphs))
-            return {};
-        tint_text_glyphs(*glyphs, layout.text_color, layout.text_color_ranges);
+        if (lines.second - lines.first <= 1) {
+            layout.visible_line_glyphs.clear();
+            if (!layout.text->prepare_glyphs_for_lines(lines.first, lines.second, 0, 0, scale,
+                                                       nkui::GlyphMode::Alpha, *glyphs))
+                return {};
+            tint_text_glyphs(*glyphs, layout.text_color, layout.text_color_ranges);
+            return glyphs;
+        }
+        *glyphs = {};
+        glyphs->layout_id = layout.text->active_layout_id();
+        glyphs->layout_generation = layout.text->layout_generation();
+        glyphs->first_line = static_cast<int32_t>(lines.first);
+        glyphs->end_line = static_cast<int32_t>(lines.second);
+        glyphs->pixel_scale = scale;
+        glyphs->mode = nkui::GlyphMode::Alpha;
+        std::map<std::pair<int32_t, uint32_t>, std::shared_ptr<const nkui::PreparedGlyphs>> retained_rows;
+        bool complete = true;
+        for (uint32_t index = lines.first; index < lines.second; ++index) {
+            auto row = layout.text->published_glyphs_for_line(
+                glyphs->layout_id, index, 0, 0, scale, nkui::GlyphMode::Alpha,
+                glyph_tint_from_color(layout.text_color), layout.text_color_ranges);
+            if (!row) {
+                complete = false;
+                break;
+            }
+            retained_rows[{scale_key, index}] = row;
+            const auto bounds = layout.text->line_bounds(index);
+            const uint32_t vertex_base = static_cast<uint32_t>(glyphs->vertices.size());
+            const uint32_t index_base = static_cast<uint32_t>(glyphs->indices.size());
+            for (auto vertex : row->vertices) {
+                vertex.x += bounds.x * scale;
+                vertex.y += bounds.y * scale;
+                glyphs->vertices.push_back(vertex);
+            }
+            for (uint32_t vertex_index : row->indices)
+                glyphs->indices.push_back(vertex_index + vertex_base);
+            for (auto batch : row->batches) {
+                batch.first_vertex += vertex_base;
+                batch.first_index += index_base;
+                glyphs->batches.push_back(batch);
+            }
+            for (auto source : row->source_ranges) {
+                source.first_vertex += vertex_base;
+                glyphs->source_ranges.push_back(source);
+            }
+        }
+        // Keep only the viewport's rows alive across the next edit. The
+        // engine's row revision rejects changed geometry, colors and atlases.
+        layout.visible_line_glyphs = std::move(retained_rows);
+        if (!complete || !layout.text->prepared_glyphs_current(*glyphs)) {
+            if (!layout.text->prepare_glyphs_for_lines(lines.first, lines.second, 0, 0, scale,
+                                                       nkui::GlyphMode::Alpha, *glyphs))
+                return {};
+            tint_text_glyphs(*glyphs, layout.text_color, layout.text_color_ranges);
+        }
     }
     return glyphs;
 }
@@ -1524,6 +1576,7 @@ void release_resource_slot(ResourceSlot &slot) {
     slot.text_glyphs = {};
     slot.scaled_text_glyphs.clear();
     slot.visible_text_glyphs.clear();
+    slot.visible_line_glyphs.clear();
     slot.text_color = {1.0f, 1.0f, 1.0f, 1.0f};
     slot.text_color_ranges.clear();
     slot.text_content_revision = 1;
@@ -2477,6 +2530,7 @@ extern "C" nkui_result nkui_text_layout_update(nkui_resource layout, const char 
     slot->text_glyphs = {};
     slot->scaled_text_glyphs.clear();
     slot->visible_text_glyphs.clear();
+    slot->visible_line_glyphs.clear();
     slot->text->prune_layout_cache({shaped.id}, 1);
     return NKUI_OK;
 }
@@ -2494,6 +2548,7 @@ extern "C" nkui_result nkui_text_layout_set_text(nkui_resource layout, const cha
     slot->text_glyphs = {};
     slot->scaled_text_glyphs.clear();
     slot->visible_text_glyphs.clear();
+    slot->visible_line_glyphs.clear();
     slot->text->prune_layout_cache({shaped.id}, 1);
     return NKUI_OK;
 }

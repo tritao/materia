@@ -78,6 +78,8 @@ struct PreparedGlyphs {
     GlyphMode mode = GlyphMode::Alpha;
     TextLayoutId layout_id = 0;
     uint64_t layout_generation = 0;
+    uint64_t line_revision = 0;
+    uint64_t publication_key = 0;
     int32_t first_line = -1;
     int32_t end_line = -1;
 };
@@ -231,6 +233,7 @@ class TextEngine {
                         PreparedGlyphs &output);
     /** Conservative visual-line range intersecting local vertical bounds. */
     std::pair<uint32_t, uint32_t> visible_lines(float min_y, float max_y) const;
+    TextRect line_bounds(uint32_t index) const;
     /** Logical line rectangles intersecting a codepoint and vertical range. */
     std::vector<TextRect> line_rects(int32_t start, int32_t end, float min_y,
                                      float max_y) const;
@@ -248,7 +251,7 @@ class TextEngine {
     /**
      * Returns an immutable glyph snapshot for one layout or one of its lines.
      *
-     * Snapshots are shared: repeated requests with the same layout generation,
+     * Snapshots are shared: repeated requests with the same layout or row revision,
      * geometry, scale, mode and colors return the same object, and a snapshot stays
      * valid after later preparation passes. That makes them safe to bind into an
      * owned resource set that outlives the frame that produced it, without

@@ -42,6 +42,7 @@ struct TextEngine::State {
         uint64_t last_used = 0;
         TextLayoutResult result{};
         std::vector<skb_range_t> line_ranges;
+        std::vector<uint64_t> line_revisions;
         std::vector<float> prefix_bottoms;
         std::vector<float> suffix_tops;
     };
@@ -55,6 +56,7 @@ struct TextEngine::State {
     TextLayoutId next_layout_id = 1;
     TextLayoutId active_layout_id = 0;
     uint64_t layout_use_sequence = 0;
+    uint64_t line_revision_sequence = 0;
     std::unordered_map<TextLayoutId, std::unique_ptr<RetainedLayout>> layouts;
     // Intrinsic (unwrapped) measurements by text and style. Layout asks for every text node on every frame, and shaping
     // a paragraph to answer is most of the cost of a layout in which nothing changed. Invalidated with the fonts.
@@ -629,6 +631,7 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
         const std::size_t start = offsets[static_cast<std::size_t>(line.text_range.start)];
         const std::size_t end = offsets[static_cast<std::size_t>(line.text_range.end)];
         retained->line_ranges.push_back(line.text_range);
+        retained->line_revisions.push_back(++state_->line_revision_sequence);
         const float top = std::min(line.bounds.y, line.culling_bounds.y);
         const float bottom = std::max(line.bounds.y + line.bounds.height,
                                        line.culling_bounds.y + line.culling_bounds.height);
@@ -672,12 +675,31 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
         auto &layout_result = current->result;
         const skb_rect2_t bounds = skb_layout_get_bounds(current->layout);
         layout_result.bounds = {bounds.x, bounds.y, bounds.width, bounds.height};
+        const int32_t line_count = skb_layout_get_lines_count(current->layout);
+        const skb_layout_line_t *lines = skb_layout_get_lines(current->layout);
+        std::vector<uint64_t> next_line_revisions;
+        next_line_revisions.reserve(static_cast<std::size_t>(line_count));
+        const bool same_length = static_cast<std::size_t>(end - start) ==
+                                 std::strlen(replacement);
+        for (int32_t index = 0; index < line_count; ++index) {
+            const auto &line = lines[index];
+            const bool reusable = same_length && index < static_cast<int32_t>(current->line_ranges.size()) &&
+                index < static_cast<int32_t>(current->line_revisions.size()) &&
+                line.text_range.start == current->line_ranges[index].start &&
+                line.text_range.end == current->line_ranges[index].end &&
+                (line.text_range.end < start || line.text_range.start > end) &&
+                line.bounds.x == layout_result.lines[index].bounds.x &&
+                line.bounds.y == layout_result.lines[index].bounds.y &&
+                line.bounds.width == layout_result.lines[index].bounds.width &&
+                line.bounds.height == layout_result.lines[index].bounds.height;
+            next_line_revisions.push_back(reusable ? current->line_revisions[index]
+                : ++state_->line_revision_sequence);
+        }
+        current->line_revisions = std::move(next_line_revisions);
         layout_result.lines.clear();
         current->line_ranges.clear();
         current->prefix_bottoms.clear();
         current->suffix_tops.clear();
-        const int32_t line_count = skb_layout_get_lines_count(current->layout);
-        const skb_layout_line_t *lines = skb_layout_get_lines(current->layout);
         layout_result.lines.reserve(static_cast<std::size_t>(line_count));
         current->line_ranges.reserve(static_cast<std::size_t>(line_count));
         for (int32_t index = 0; index < line_count; ++index) {
@@ -780,6 +802,12 @@ std::vector<TextRect> TextEngine::line_rects(int32_t start, int32_t end, float m
     return rectangles;
 }
 
+TextRect TextEngine::line_bounds(uint32_t index) const {
+    const auto *layout = active_layout(*state_);
+    return layout && index < layout->result.lines.size()
+        ? layout->result.lines[index].bounds : TextRect{};
+}
+
 bool TextEngine::prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x,
                                           float origin_y, float pixel_scale, GlyphMode mode,
                                           PreparedGlyphs &output) {
@@ -854,7 +882,10 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     const auto mix = [&key](uint64_t value) {
         key ^= value + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
     };
-    mix(skb_layout_get_generation(layout->layout));
+    const bool single_line = line_index >= 0 && end_line < 0 &&
+        static_cast<std::size_t>(line_index) < layout->line_revisions.size();
+    mix(single_line ? layout->line_revisions[line_index]
+                    : skb_layout_get_generation(layout->layout));
     mix(font_collection_generation());
     mix(scale_key);
     mix(static_cast<uint64_t>(mode));
@@ -889,7 +920,8 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     if (const auto found = state_->published_glyphs.find(key);
         found != state_->published_glyphs.end()) {
         if (auto cached = found->second.lock())
-            return cached;
+            if (prepared_glyphs_current(*cached))
+                return cached;
     }
 
     auto snapshot = std::make_shared<PreparedGlyphs>();
@@ -907,6 +939,7 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
 
     /* Color only the newly built snapshot, before publishing it. */
     apply_glyph_colors(*snapshot, tint, relevant_ranges);
+    snapshot->publication_key = key;
 
     /* Weak entries keep live snapshots shared and let the rest expire. */
     if (state_->published_glyphs.size() >= 256) {
@@ -946,6 +979,9 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
     output.first_line = line_index;
     output.end_line = end_line < 0 ? line_index + 1 : end_line;
     output.layout_generation = skb_layout_get_generation(retained->layout);
+    output.line_revision = line_index >= 0 && end_line < 0 &&
+        static_cast<std::size_t>(line_index) < retained->line_revisions.size()
+        ? retained->line_revisions[line_index] : 0;
     if (!state_->font_collection || !state_->font_collection->state_ ||
         !state_->font_collection->state_->fonts)
         return false;
@@ -986,8 +1022,14 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
 
 bool TextEngine::prepared_glyphs_current(const PreparedGlyphs &glyphs) const {
     const auto *layout = find_layout(*state_, glyphs.layout_id);
-    if (!state_->atlas || !layout ||
-        glyphs.layout_generation != skb_layout_get_generation(layout->layout))
+    if (!state_->atlas || !layout)
+        return false;
+    if (glyphs.line_revision != 0) {
+        if (glyphs.first_line < 0 || glyphs.end_line != glyphs.first_line + 1 ||
+            static_cast<std::size_t>(glyphs.first_line) >= layout->line_revisions.size() ||
+            glyphs.line_revision != layout->line_revisions[glyphs.first_line])
+            return false;
+    } else if (glyphs.layout_generation != skb_layout_get_generation(layout->layout))
         return false;
     const int count = skb_image_atlas_get_texture_count(state_->atlas);
     for (const auto &batch : glyphs.batches) {

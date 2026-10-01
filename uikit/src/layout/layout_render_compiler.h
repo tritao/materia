@@ -72,7 +72,6 @@ class LayoutRenderFrame {
     std::unique_ptr<TextEngine> text_engine_;
     TextEngine *text_engine_source_ = nullptr;
     std::vector<std::shared_ptr<PreparedPath>> paths_;
-    std::vector<std::unique_ptr<PreparedGlyphs>> glyphs_;
 };
 
 /** Compiles NativeKit-owned layout output into the backend-neutral render plan. */
