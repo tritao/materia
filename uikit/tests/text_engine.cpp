@@ -31,6 +31,35 @@ int main() {
         shared_glyphs.vertices.empty())
         return 50;
 
+    // Edit offsets are codepoints, including when the replaced UTF-8 spans
+    // multiple bytes. The result must share fresh-layout caret geometry.
+    {
+        TextEngine edited(shared_fonts);
+        TextEngine fresh(shared_fonts);
+        if (!edited.layout_utf8("aé🙂b", 80.0f, 16.0f))
+            return 103;
+        const auto matches_fresh = [&](const char *value, int32_t count) {
+            if (!fresh.layout_utf8(value, 80.0f, 16.0f) || edited.text_count() != count ||
+                edited.bounds().height != fresh.bounds().height)
+                return false;
+            for (int32_t offset = 0; offset <= count; ++offset) {
+                const auto actual = edited.caret({offset, 0});
+                const auto expected = fresh.caret({offset, 0});
+                if (actual.x != expected.x || actual.y != expected.y)
+                    return false;
+            }
+            return true;
+        };
+        if (!edited.edit_utf8(1, 3, "z", nullptr) || !matches_fresh("azb", 3) ||
+            !edited.edit_utf8(2, 2, "🙂", nullptr) || !matches_fresh("az🙂b", 4) ||
+            !edited.edit_utf8(2, 3, "", nullptr) || !matches_fresh("azb", 3))
+            return 104;
+        const auto stable = edited.active_layout_id();
+        if (edited.edit_utf8(4, 5, "x", nullptr) || edited.active_layout_id() != stable ||
+            !matches_fresh("azb", 3))
+            return 105;
+    }
+
     // An unsupported character must not move its insertion caret to the line origin.
     TextEngine unsupported(shared_fonts);
     if (!unsupported.layout_utf8("abc🙂def", 200.0f, 16.0f))
