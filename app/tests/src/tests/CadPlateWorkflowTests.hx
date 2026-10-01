@@ -74,6 +74,29 @@ class CadPlateWorkflowTests {
       default: -1.0;
     };
     near(shown, Math.abs(measuredHeight), "and shows the measured height");
+
+    // Soft drag (plan C5.3): with the height measured, dragging the top corner stretches the rectangle.
+    var before = scene.sketchDraftSolution();
+    if (before == null) throw "the draft has no solution";
+    var top = before.point("p2"), bottom = before.point("p1");
+    check(scene.sketchDraftPointNear(top[0] + 0.01, top[1], 0.1) == "p2", "a press near a corner finds it");
+    check(scene.beginSketchDraftPointDrag("p2"), "the corner can be dragged");
+    check(scene.dragSketchDraftPoint(top[0] + 3, top[1] + 4), "the drag solves");
+    var dragging = scene.sketchDraftSolution();
+    if (dragging == null) throw "the drag has no solution";
+    near(dragging.y("p2"), top[1] + 4, "the corner rises with the cursor");
+    near(dragging.x("p2"), top[0], "but stays on its vertical edge");
+    near(dragging.y("p1"), bottom[1], "the bottom corner stays put");
+    scene.endSketchDraftPointDrag(false);
+    var restored = scene.sketchDraftSolution();
+    if (restored == null) throw "the cancelled drag left no solution";
+    near(restored.y("p2"), top[1], "a cancelled drag restores the draft");
+    check(scene.beginSketchDraftPointDrag("p2") && scene.dragSketchDraftPoint(top[0], top[1] + 4), "drag again");
+    scene.endSketchDraftPointDrag(true);
+    var kept = scene.sketchDraftSnapshot();
+    if (kept == null) throw "the kept drag left no draft";
+    near([for (point in kept.points()) if (point.id == "p2") point.y][0], top[1] + 4, "a finished drag becomes the draft");
+
     check(toggle(scene, "Reference height (measured)", false) == PropertyEditResult.Applied, "and driving again");
     check(scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0, 'which fixes the rectangle again: ${scene.sketchEditSummary()}');
   }

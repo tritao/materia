@@ -66,6 +66,8 @@ class EditorPerspectiveViewport implements View {
   var matePick:Null<MatePickTool> = null;
   var matePickRevision:Int = 0;
   var sketchRectangleDrag:Null<PerspectiveSketchRectangleDrag> = null;
+  /** A sketch draft point is being dragged (navigation mode 6). */
+  var sketchPointDragging:Bool = false;
   var gridSnapEnabled:Bool = false;
   var gridStep:Float = app.editor.EditorGrid.STEP;
   var gridVisible:Bool = true;
@@ -280,7 +282,7 @@ class EditorPerspectiveViewport implements View {
   public function editingEnabled():Bool return !simulationActive;
 
   public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||
-    matePick != null;
+    matePick != null || sketchPointDragging;
 
   /** Starts picking two faces for a mate: the next clicks on faces go to `tool` until it finishes or is cancelled. */
   public function beginMatePick(tool:MatePickTool):Void {
@@ -309,6 +311,10 @@ class EditorPerspectiveViewport implements View {
   public function assemblyDragMessage():Null<String> return assemblyDrag == null ? null : assemblyDrag.message();
 
   public function commitDrag():Null<PerspectivePointer> {
+    if (sketchPointDragging) {
+      endSketchPointDrag(true);
+      return releaseNavigation();
+    }
     if (objectDrag != null) {
       objectDrag.commit(); objectDrag = null;
     } else if (assemblyDrag != null) {
@@ -323,6 +329,10 @@ class EditorPerspectiveViewport implements View {
   }
 
   public function cancelDrag():Null<PerspectivePointer> {
+    if (sketchPointDragging) {
+      endSketchPointDrag(false);
+      return releaseNavigation();
+    }
     if (matePick != null && navigationPointer == null) {
       matePick = null;
       matePickRevision++;
@@ -691,6 +701,15 @@ class EditorPerspectiveViewport implements View {
     }
   }
 
+  /** How close (screen pixels) a press must land to a sketch point to drag it. */
+  static inline var SKETCH_GRAB_PIXELS:Float = 8.0;
+
+  function endSketchPointDrag(keep:Bool):Void {
+    sketchPointDragging = false;
+    scene.endSketchDraftPointDrag(keep);
+    sketchDragRevision++;
+  }
+
   /** Sketch geometry its constraints still leave free to move. */
   static final FREE_SKETCH_COLOR = Color.rgba(0.36, 0.72, 1.0, 0.98);
 
@@ -728,6 +747,19 @@ class EditorPerspectiveViewport implements View {
       if (event.button == 0 && editingEnabled() && scene.hasActiveSketchEdit()) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point == null) return;
+        // A press on a sketch point drags it (its constraints hold); elsewhere it draws a rectangle.
+        var aside = sketchPlanePoint(event.localX + SKETCH_GRAB_PIXELS, event.localY);
+        var radius = aside == null ? 0.0 : Math.sqrt((aside.x - point.x) * (aside.x - point.x) + (aside.y - point.y) * (aside.y - point.y));
+        var grabbed = scene.sketchDraftPointNear(point.x, point.y, radius);
+        if (grabbed != null && scene.beginSketchDraftPointDrag(grabbed)) {
+          sketchPointDragging = true;
+          sketchDragRevision++;
+          navigationPointer = event.pointerId;
+          navigationMode = 6;
+          pointerX = event.x; pointerY = event.y;
+          event.capturePointer(); event.preventDefault(); event.stopPropagation();
+          return;
+        }
         sketchRectangleDrag = new PerspectiveSketchRectangleDrag(point.x, point.y);
         sketchDragRevision++;
         navigationPointer = event.pointerId;
@@ -768,6 +800,13 @@ class EditorPerspectiveViewport implements View {
       else if (objectDrag != null) objectDrag.update(camera, event.localX, event.localY,
         Math.max(1, renderedWidth), Math.max(1, renderedHeight));
       else if (navigationMode == 5 && assemblyDrag != null) updateAssemblyDrag(event.localX, event.localY);
+      else if (navigationMode == 6 && sketchPointDragging) {
+        var point = sketchPlanePoint(event.localX, event.localY);
+        if (point != null && scene.dragSketchDraftPoint(point.x, point.y)) {
+          sketchDragRevision++;
+          host.requestFrame();
+        }
+      }
       else if (navigationMode == 4 && sketchDrag != null) {
         var point = sketchPlanePoint(event.localX, event.localY);
         if (point != null) {
@@ -793,6 +832,8 @@ class EditorPerspectiveViewport implements View {
       if (navigationMode == 3 && objectDrag != null) {
         if (event.kind == UiEventKind.PointerUp) objectDrag.commit(); else objectDrag.cancel();
         objectDrag = null;
+      } else if (navigationMode == 6 && sketchPointDragging) {
+        endSketchPointDrag(event.kind == UiEventKind.PointerUp);
       } else if (navigationMode == 5 && assemblyDrag != null) {
         if (event.kind == UiEventKind.PointerUp) assemblyDrag.commit(); else assemblyDrag.cancel();
         assemblyDrag = null;
@@ -828,6 +869,13 @@ class EditorPerspectiveViewport implements View {
         sketchDragRevision++;
         navigationPointer = null; navigationMode = 0;
         event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        return;
+      }
+      if (event.key == UiKey.Escape && sketchPointDragging) {
+        endSketchPointDrag(false);
+        navigationPointer = null; navigationMode = 0;
+        event.releasePointer(); event.preventDefault(); event.stopPropagation();
+        host.requestFrame();
         return;
       }
       if (event.key == UiKey.Escape && matePick != null && navigationPointer == null) {

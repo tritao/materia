@@ -64,6 +64,73 @@ class SketchPartSolver {
 		return {x: x, set: current, norm: currentNorm, iterations: iterations};
 	}
 
+	/**
+		Pulls the part towards drag `targets` (sketch-wide variables and the values the user drags them to) while its
+		constraints hold, for a soft drag (plan C5.3). Each iteration takes a tangent step and projects it back:
+		- the step is Gauss-Newton on the constraint rows plus a light target row `weight · (x − target)` per dragged
+		  variable, so it keeps the linearized constraints and moves along them towards the targets;
+		- along it, the placement is solved back onto the constraints at fractions 1 and ½, and at the minimum of the
+		  parabola through those and the start, and the nearest to the targets is kept.
+		The line search matters: on a curved constraint with the target out of reach (a fixed length dragged beyond
+		its circle) the tangent step overshoots by the ratio of the distances, which damping alone corrects only
+		linearly. A penalty without projection would crawl, as the curvature outweighs a light pull.
+		Returns a placement on the constraints, as near the targets as they allow.
+	*/
+	public function pull(start:Array<Float>, part:SketchPart, targets:Array<{variable:Int, value:Float}>, weight:Float):Array<Float> {
+		partition.order(part);
+		var tolerance = layout.solveTolerance;
+		var distance = (x:Array<Float>) -> {
+			var sum = 0.0;
+			for (target in targets) sum += (x[target.variable] - target.value) * (x[target.variable] - target.value);
+			return sum;
+		};
+		var settled = solve(start, part, false, true);
+		var x = settled.x, current = settled.set, currentDistance = distance(x);
+		for (_ in 0...layout.sketch.settings.maxIterations) {
+			layout.checkCancelled();
+			if (currentDistance <= tolerance * tolerance) break;
+			var full = dampedStep(x, current, weight * weight * 1e-6, part, false, targets, weight);
+			if (full == null) break;
+			var base = x;
+			var along = (fraction:Float) -> {
+				var trial = [for (i in 0...base.length) base[i] + fraction * (full[i] - base[i])];
+				var projected = solve(trial, part, false, true);
+				return projected.norm <= tolerance ? {x: projected.x, set: projected.set, distance: distance(projected.x)} : null;
+			};
+			var best:Null<{x:Array<Float>, set:SketchResidualSet, distance:Float}> = null;
+			var consider = (candidate:Null<{x:Array<Float>, set:SketchResidualSet, distance:Float}>) -> {
+				if (candidate != null && candidate.distance < currentDistance && (best == null || candidate.distance < best.distance))
+					best = candidate;
+			};
+			var whole = along(1), half = along(0.5);
+			consider(whole);
+			consider(half);
+			if (whole != null && half != null) {
+				// The parabola through (0, d0), (½, d½), (1, d1) has its minimum at -b / 2a.
+				var curvature = 2 * (whole.distance - 2 * half.distance + currentDistance);
+				var slope = whole.distance - currentDistance - curvature;
+				if (curvature > 0) {
+					var fraction = -slope / (2 * curvature);
+					if (fraction > 0 && fraction < 2 && Math.abs(fraction - 0.5) > 1e-3 && Math.abs(fraction - 1) > 1e-3)
+						consider(along(fraction));
+				}
+			}
+			var fraction = 0.25;
+			while (best == null && fraction > 1e-3) {
+				consider(along(fraction));
+				fraction *= 0.5;
+			}
+			var chosen = best;
+			if (chosen == null) break;
+			var gained = currentDistance - chosen.distance;
+			x = chosen.x;
+			current = chosen.set;
+			currentDistance = chosen.distance;
+			if (gained <= 1e-12 * Math.max(currentDistance, tolerance * tolerance)) break;
+		}
+		return x;
+	}
+
 	/** Jᵀr over a part: zero at a stationary point of its residual. */
 	public function gradient(x:Array<Float>, part:SketchPart, set:SketchResidualSet):Array<Float> {
 		var jacobian = rows(x, part, set.values.length);
@@ -76,7 +143,8 @@ class SketchPartSolver {
 	}
 
 	/** One damped step on a part; null when the damped matrix is not positive definite. */
-	function dampedStep(x:Array<Float>, current:SketchResidualSet, damping:Float, part:SketchPart, shapeOnly:Bool):Null<Array<Float>> {
+	function dampedStep(x:Array<Float>, current:SketchResidualSet, damping:Float, part:SketchPart, shapeOnly:Bool,
+			?targets:Array<{variable:Int, value:Float}>, weight:Float = 0):Null<Array<Float>> {
 		var k = part.variables.length, jacobian = rows(x, part, current.values.length, shapeOnly);
 		// envelope[row][column - first[row]] for first[row] <= column <= row, in RCM order; kept per part, zeroed here.
 		if (part.envelope.length != k) part.envelope = EnvelopeCholesky.zero(part.first);
@@ -107,6 +175,15 @@ class SketchPartSolver {
 				}
 			}
 		}
+		// Drag target rows touch one variable each: they add to the diagonal and the gradient only.
+		if (targets != null)
+			for (target in targets) {
+				if (partition.partOf(target.variable) != part.id) continue;
+				var position = part.position[partition.localIndex(target.variable)];
+				var residual = weight * (x[target.variable] - target.value) / layout.normalizationScale;
+				gradient[position] += weight * residual;
+				envelope[position][position - part.first[position]] += weight * weight;
+			}
 		for (row in 0...k)
 			envelope[row][row - part.first[row]] += damping;
 		if (!EnvelopeCholesky.factor(envelope, part.first)) return null;

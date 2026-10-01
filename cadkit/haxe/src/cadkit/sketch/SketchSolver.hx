@@ -19,8 +19,14 @@ class SketchSolver {
 	final equations:SketchEquations;
 	final seed:Null<SolvedSketch>;
 	final diagnoseParts:Bool;
+	/** Points being dragged and where to (soft drag targets, plan C5.3); null for a plain solve. */
+	final targets:Null<Map<String, Array<Float>>>;
+	/** How lightly a drag target pulls against the constraints (see `SketchPartSolver.pull`). */
+	static inline var DRAG_WEIGHT:Float = 1e-3;
 
-	function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool) {
+	function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool,
+			?targets:Map<String, Array<Float>>) {
+		this.targets = targets;
 		layout = new SketchLayout(sketch, cancellationCheck);
 		equations = new SketchEquations(layout);
 		this.seed = seed;
@@ -32,8 +38,8 @@ class SketchSolver {
 		previous diagnosis (`SolveDiagnostic.diagnosed` is then false).
 	*/
 	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null,
-		cancellationCheck:Null<Void->Bool> = null, diagnose:Bool = true):SolvedSketch {
-		return new SketchSolver(sketch, seed, cancellationCheck, diagnose).run();
+		cancellationCheck:Null<Void->Bool> = null, diagnose:Bool = true, ?targets:Map<String, Array<Float>>):SolvedSketch {
+		return new SketchSolver(sketch, seed, cancellationCheck, diagnose, targets).run();
 	}
 
 	/**
@@ -80,6 +86,18 @@ class SketchSolver {
 		equations.fixTangentBranches(x);
 		var partition = new SketchPartition(layout);
 		var solver = new SketchPartSolver(layout, equations, partition);
+		// Drag targets by variable; a dragged point no constraint touches simply goes there.
+		var targetVariables:Array<{variable:Int, value:Float}> = [];
+		var dragged = targets;
+		if (dragged != null)
+			for (id => target in dragged) {
+				var index = layout.pointIndex.get(id);
+				if (index == null || target.length != 2) throw layout.invalid("a drag target names a missing point", [id]);
+				for (axis in 0...2) {
+					targetVariables.push({variable: index + axis, value: target[axis]});
+					if (partition.partOf(index + axis) < 0) x[index + axis] = target[axis];
+				}
+			}
 		var diagnosis = new SketchPartDiagnosis(layout, equations, partition, solver);
 		var tolerance = layout.solveTolerance;
 
@@ -99,7 +117,8 @@ class SketchSolver {
 				part.ordered = true;
 			}
 			// Unchanged constraints, fixed positions and settings, seeded from its own solution: already solved.
-			var cached = previous == null ? null : previous.get(key);
+			var partTargets = [for (target in targetVariables) if (partition.partOf(target.variable) == part.id) target];
+			var cached = previous == null || partTargets.length > 0 ? null : previous.get(key);
 			if (cached != null && SketchSolveCache.sameValues(cached.values, values)) {
 				reports.push(cached.report);
 				for (variable in cached.free) free.push(variable);
@@ -108,7 +127,9 @@ class SketchSolver {
 				if (known != null) structures.set(key, known);
 				continue;
 			}
-			var solved = solver.solve(x, part, false, seed != null);
+			// A dragged part is pulled towards its targets, then solved exactly from there.
+			if (partTargets.length > 0) x = solver.pull(x, part, partTargets, DRAG_WEIGHT);
+			var solved = solver.solve(x, part, false, seed != null || partTargets.length > 0);
 			x = solved.x;
 			iterations = iterations > solved.iterations ? iterations : solved.iterations;
 			if (!diagnoseParts && known != null && solved.norm <= tolerance) {

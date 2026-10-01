@@ -1098,3 +1098,42 @@ Steps:
   - `CadPlateWorkflowTests.checkReferenceDimension`: a reference height
     frees one degree of freedom, shows the measured value read-only, and
     fixes the rectangle again when driving.
+
+### C5.3 — Soft drag in sketches (2026-10-01)
+
+- `ConstrainedSketch.drag(targets, seed)` is one drag step. Each dragged
+  point comes as close to its target as the constraints allow, and every
+  constraint still holds. It is not diagnosed, and the authored sketch is
+  unchanged. A dragged point no constraint touches goes straight to its
+  target.
+- `SketchPartSolver.pull` runs per dragged part. Each iteration takes a
+  tangent step and projects it back:
+  - the step is Gauss-Newton on the constraint rows plus a light target row
+    (weight 1e-3, one per dragged variable, on the envelope's diagonal);
+  - the result is solved back onto the constraints at fractions 1 and ½,
+    and at the minimum of the parabola through those and the start;
+  - the placement nearest the targets is kept.
+
+  The normal solve then finishes the part.
+- Two simpler versions failed the swinging-arm test (a fixed-length line
+  dragged towards a cursor at twice its reach):
+  - a pure penalty pull crawled (9° short), because a curved constraint's
+    curvature outweighs a light pull;
+  - projection with damping alone lagged by a constant 2.6°, because the
+    tangent step overshoots by the distance ratio and damping corrects that
+    only linearly.
+
+  The line search lands on the cursor's direction to 1e-10.
+- `SketchSession.dragPreview`, `commitDrag` (the solved positions become
+  the authored points, then a diagnosed solve) and `cancelDrag`.
+- Editor:
+  - the scene gets `beginSketchDraftPointDrag`, `dragSketchDraftPoint`,
+    `endSketchDraftPointDrag(keep)` and `sketchDraftPointNear`;
+  - in a sketch draft, a press within 8 px of a point drags it (viewport
+    navigation mode 6), elsewhere it still draws a rectangle;
+  - release keeps the result, and Escape or cancel restores the draft.
+- Tests:
+  - `SketchDragSmoke`: a stretchable rectangle's corner rises with the
+    cursor and stays on its edge; a fixed rectangle does not move; the arm
+    swings round in four steps; a loose point follows; release diagnoses.
+  - `CadPlateWorkflowTests`: drag, cancel and keep on the editor's draft.

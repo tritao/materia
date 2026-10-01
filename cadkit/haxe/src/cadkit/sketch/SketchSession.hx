@@ -43,6 +43,39 @@ class SketchSession {
 		return solveDraft();
 	}
 
+	/**
+		One step of a soft drag (see `ConstrainedSketch.drag`): the solution with `targets` pulled as close as the
+		constraints allow, not diagnosed, the authored draft unchanged. False (and the solution kept) when the
+		draft does not solve.
+	*/
+	public function dragPreview(targets:Map<String, Array<Float>>):Bool {
+		try {
+			var candidate = authored.drag(targets, solution == null ? lastValidSolution : solution);
+			solution = candidate;
+			diagnostic = candidate.diagnostic;
+			return true;
+		} catch (error:SketchSolveError) {
+			return false;
+		}
+	}
+
+	/** Ends a drag: the dragged points' solved positions become their authored ones, and the draft is solved again. */
+	public function commitDrag():Bool {
+		var dragged = solution;
+		if (dragged == null) return solveDraft();
+		var candidate = authored.copy();
+		for (point in authored.points()) {
+			var at = dragged.point(point.id);
+			candidate.replacePoint(new SketchPoint(point.id, at[0], at[1]));
+		}
+		authored = candidate;
+		return solveDraft();
+	}
+
+	/** Abandons a drag: the authored draft is solved again from where it was. */
+	public function cancelDrag():Bool
+		return solveDraft();
+
 	/** Build a profile only when the current draft has a valid current solution. */
 	public function buildProfile():Sketch {
 		if (solution == null)

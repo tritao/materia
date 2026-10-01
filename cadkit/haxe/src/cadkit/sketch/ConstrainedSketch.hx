@@ -111,4 +111,16 @@ class ConstrainedSketch {
 		committed = candidate;
 		return candidate;
 	}
+
+	/**
+		One step of a soft drag (plan C5.3): the solution with each point in `targets` (sketch coordinates) pulled
+		as close to its target as the constraints allow, which all still hold. Seeded from `seed` (the previous step;
+		the last solution by default) and not diagnosed, as a drag should be; solve normally on release. The
+		authored points are unchanged: write the solution back to keep the dragged shape.
+	*/
+	public function drag(targets:Map<String, Array<Float>>, ?seed:SolvedSketch, ?cancellationCheck:Void->Bool):SolvedSketch {
+		var candidate = SketchSolver.solve(this, seed == null ? committed : seed, cancellationCheck, false, targets);
+		committed = candidate;
+		return candidate;
+	}
 }

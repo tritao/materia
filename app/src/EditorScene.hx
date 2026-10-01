@@ -158,6 +158,8 @@ class EditorScene {
   function get_selectedFeatureKey():Null<String> return selection.selectedFeatureKey;
   final sketchController:SketchEditController;
   var activeSketchEdit(get, set):Null<CadSketchEditSession>;
+  /** The draft point being dragged, or null. */
+  var sketchPointDrag:Null<String> = null;
   function get_activeSketchEdit():Null<CadSketchEditSession> return sketchController.activeSketchEdit;
   function set_activeSketchEdit(value:Null<CadSketchEditSession>):Null<CadSketchEditSession> return sketchController.activeSketchEdit = value;
   var activeSketchObjectId(get, set):Null<String>;
@@ -510,6 +512,60 @@ class EditorScene {
   public function canAddSketchDraftRectangle():Bool return sketchController.canAddRectangle();
 
   public function addSketchDraftRectangle():Bool return sketchController.addRectangle(this);
+
+  /**
+   * Starts dragging sketch point `pointId` of the active draft (plan C5.3); false when there is no draft or no
+   * such point. `dragSketchDraftPoint` previews, `endSketchDraftPointDrag` keeps the result or restores the draft.
+   */
+  public function beginSketchDraftPointDrag(pointId:String):Bool {
+    var draft = activeSketchEdit;
+    if (draft == null) return false;
+    for (point in draft.sketch.snapshot().points()) if (point.id == pointId) {
+      sketchPointDrag = pointId;
+      return true;
+    }
+    return false;
+  }
+
+  /** Pulls the dragged sketch point towards (x, y) on the sketch plane, as far as the draft's constraints allow. */
+  public function dragSketchDraftPoint(x:Float, y:Float):Bool {
+    var draft = activeSketchEdit, pointId = sketchPointDrag;
+    if (draft == null || pointId == null || !Math.isFinite(x) || !Math.isFinite(y)) return false;
+    var moved = draft.sketch.dragPreview([pointId => [x, y]]);
+    sketchDraftRevision = sketchDraftRevision + 1;
+    refreshSelectionRevision();
+    return moved;
+  }
+
+  /** Ends a sketch point drag: `keep` makes the dragged shape the draft's, otherwise the draft is restored. */
+  public function endSketchDraftPointDrag(keep:Bool):Void {
+    var draft = activeSketchEdit;
+    if (sketchPointDrag == null) return;
+    sketchPointDrag = null;
+    if (draft != null) {
+      if (keep) draft.sketch.commitDrag(); else draft.sketch.cancelDrag();
+    }
+    sketchDraftRevision = sketchDraftRevision + 1;
+    refreshSelectionRevision();
+  }
+
+  /** The draft point nearest (x, y) on the sketch plane within `radius`, from the current solution; null if none. */
+  public function sketchDraftPointNear(x:Float, y:Float, radius:Float):Null<String> {
+    var sketch = sketchController.snapshot();
+    if (sketch == null) return null;
+    var solution = sketchController.solution();
+    var best:Null<String> = null, bestDistance = radius;
+    for (point in sketch.points()) {
+      var at = [point.x, point.y];
+      if (solution != null) try at = solution.point(point.id) catch (_:Dynamic) {}
+      var d = Math.sqrt((at[0] - x) * (at[0] - x) + (at[1] - y) * (at[1] - y));
+      if (d <= bestDistance) {
+        best = point.id;
+        bestDistance = d;
+      }
+    }
+    return best;
+  }
 
   public function addSketchDraftRectangleBetween(startX:Float, startY:Float,
       endX:Float, endY:Float):Bool
