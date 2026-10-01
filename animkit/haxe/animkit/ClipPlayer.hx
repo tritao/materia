@@ -131,7 +131,17 @@ class ClipPlayer {
 	}
 
 	/** Advances playback, updates the instance layers, and evaluates the pose. */
-	public function advance(seconds:Float):Void {
+	public function advance(seconds:Float):Void
+		stepPlayer(seconds, true);
+
+	/**
+	 * Like `advance`, but evaluates the pose only: joint matrices are current and the deformed geometry is not
+	 * touched. For measuring what a pose would be (planning a reach) without paying to skin it.
+	 */
+	public function pose(seconds:Float = 0.0):Void
+		stepPlayer(seconds, false);
+
+	function stepPlayer(seconds:Float, skin:Bool):Void {
 		var step = seconds * speed;
 		time += step;
 		if (outgoing.length > 0) {
@@ -151,6 +161,7 @@ class ClipPlayer {
 		}
 		if (overlayClip >= 0 && overlayWeight > 0.0) instance.setLayer(OVERLAY_LAYER, overlayClip, overlayHold == null ? overlayTime : overlayHold, overlayWeight);
 		else instance.setLayer(OVERLAY_LAYER, -1, 0.0, 0.0);
-		instance.evaluate();
+		if (skin) instance.evaluate();
+		else instance.evaluatePose();
 	}
 }

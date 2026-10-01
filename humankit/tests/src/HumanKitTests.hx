@@ -195,7 +195,9 @@ class HumanKitTests {
 		var shelf:HumanTargetBox = {center: [0.6, 0.0, 1.15], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
 		var low = new ApproachFor([0.6, 0.0, 0.62], ArmR, 1.0, false, null, bench);
 		var lowJob = new HumanJob(body).add(low);
+		var planStart = Sys.time();
 		lowJob.advance(1.0 / 60.0);
+		Sys.println('PLAN bench approach took ${Math.round((Sys.time() - planStart) * 1000)} ms');
 		if (lowJob.failure() != null) throw 'A bench was not reachable crouched: ${lowJob.failure()}';
 		var high = new ApproachFor([0.6, 0.0, 1.22], ArmR, 1.0, false, null, shelf);
 		var highJob = new HumanJob(body).add(high);

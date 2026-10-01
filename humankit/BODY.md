@@ -118,6 +118,13 @@ does not sweep a hand across the part.
 The Universal Animation Library character (`animkit/assets/quaternius-ual`) is the first that crouches;
 `UniversalSweepTests` runs the rack job on it from half a metre to a shelf.
 
+## Measuring without showing
+
+The planner measures the body by posing it: the shoulder under a lean, the pelvis at a crouch depth, a fingertip at each curl, the wrist
+if a reach were let go. Those poses go through `HumanCharacter.probe`, which evaluates the pose and the joint matrices only
+(`ak_instance_evaluate_pose`): no skinning, no scene update, no attachments moved. The poses a measurement makes never reach the
+scene, and the next `advance` shows the live pose as usual. A bench approach plans in about a millisecond instead of seven.
+
 ## Measuring how natural it looks
 
 `MotionQuality` judges the arms (bend-plane turn, hand speed and acceleration, elbow range). `Naturalness` judges the

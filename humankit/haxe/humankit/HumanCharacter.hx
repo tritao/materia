@@ -230,6 +230,17 @@ class HumanCharacter {
 		placeAttachments();
 	}
 
+	/**
+	 * Evaluates the pose as it would be now, at the current animation time and with every turn and reach applied, and
+	 * makes `pose` current, without skinning the model or moving attachments. For measuring (what would the shoulder
+	 * do under a lean, where would the hand be if released): nothing a measurement poses reaches the scene, and
+	 * the next `advance` shows the pose as usual.
+	 */
+	public function probe():Void {
+		player.pose(0.0);
+		pose.update(instance.readJointMatrices());
+	}
+
 	/** Nodes whose geometry or world transform changed in the last advance. */
 	public function changedNodes():Array<NodeId> {
 		var nodes = [model.root].concat(model.primitiveNodes);

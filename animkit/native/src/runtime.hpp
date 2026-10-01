@@ -66,7 +66,8 @@ public:
     bool validChain(int32_t start, int32_t mid, int32_t end) const;
 
     /** Returns false when a layer names a missing clip. */
-    bool evaluate();
+    /** Poses the instance; with `skin` off the joint matrices are updated and the deformed streams are left as they were. */
+    bool evaluate(bool skin = true);
 
     const float *jointMatrix(int joint) const { return scene_models_[joint].data(); }
     const std::vector<float> &positions(size_t primitive) const { return outputs_[primitive].positions; }

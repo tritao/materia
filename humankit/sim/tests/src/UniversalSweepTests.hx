@@ -9,6 +9,7 @@ class UniversalSweepTests {
     static var character = "quaternius-ual/ual-work.glb";
 
     public static function run():Void {
+        var began = Sys.time();
         var failures:Array<String> = [], report:Array<String> = [], runs = 0;
         var skate = 0.0, margin = Math.POSITIVE_INFINITY, pelvisJerk = 0.0, wristJerk = 0.0, floor = 0.0;
         for (hand in ["right", "left"]) for (half in [0.2]) for (surface in [0.5, 0.6, 0.7, 0.85, 1.0, 1.06, 1.16]) for (yaw in [0.0, 0.7]) {
@@ -44,6 +45,7 @@ class UniversalSweepTests {
         }
         if (failures.length > 0) Sys.println(report.join("\n"));
         if (failures.length > 0) throw "Universal sweep failures:\n" + failures.join("\n");
+        Sys.println('universal sweep took ${Math.round((Sys.time() - began) * 10) / 10} s for $runs jobs');
         Sys.println('universal sweep naturalness (worst of $runs): slide ${Math.round(skate * 100) / 100} m, support margin ${Math.round(margin * 100) / 100} m, floor ${Math.round(floor * 100) / 100} m, jerk pelvis ${Math.round(pelvisJerk)} wrist ${Math.round(wristJerk)} m/s3');
         Sys.println('universal sweep: $runs layouts within the gates');
     }

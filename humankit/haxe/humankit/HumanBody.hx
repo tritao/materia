@@ -136,11 +136,11 @@ class HumanBody {
 		var depths:Array<Array<Float>> = [for (_ in 0...HumanHand.FINGERS) []];
 		for (step in 0...steps + 1) {
 			character.setHandCurl(hand, step / steps);
-			character.advance(0.0);
+			character.probe();
 			for (kind in 0...HumanHand.FINGERS) depths[kind].push(fingerDepth(hand, kind));
 		}
 		character.setHandCurls(hand, saved);
-		character.advance(0.0);
+		character.probe();
 		var curls = uniformCurl(0.0);
 		for (kind in 1...HumanHand.FINGERS) {
 			var reached = depths[kind], peak = 0, found = -1;
@@ -197,14 +197,14 @@ class HumanBody {
 		var savedCrouch = character.crouch(), savedLean = character.spineLean();
 		character.setSpineLean(0.0);
 		character.setCrouch(0.0);
-		character.advance(0.0);
+		character.probe();
 		var upright = character.pose.bonePosition(bone);
 		character.setCrouch(amount);
-		character.advance(0.0);
+		character.probe();
 		var crouched = character.pose.bonePosition(bone);
 		character.setCrouch(savedCrouch);
 		character.setSpineLean(savedLean);
-		character.advance(0.0);
+		character.probe();
 		if (upright == null || crouched == null) return [0.0, 0.0, 0.0];
 		return [crouched[0] - upright[0], crouched[1] - upright[1], crouched[2] - upright[2]];
 	}
@@ -222,11 +222,11 @@ class HumanBody {
 		var saved = character.spineLean(), savedCrouch = character.crouch();
 		if (character.canCrouch()) character.setCrouch(crouch);
 		character.setSpineLean(0.0);
-		character.advance(0.0);
+		character.probe();
 		var upright = character.pose.bonePosition(bone);
 		var at = function(angle:Float):Null<Array<Float>> {
 			character.setSpineLean(angle);
-			character.advance(0.0);
+			character.probe();
 			return character.pose.bonePosition(bone);
 		};
 		// The forward shift is not linear in the lean, so the probe only gives a first guess: the angle is then
@@ -247,7 +247,7 @@ class HumanBody {
 		}
 		character.setSpineLean(saved);
 		if (character.canCrouch()) character.setCrouch(savedCrouch);
-		character.advance(0.0);
+		character.probe();
 		return result;
 	}
 
@@ -379,7 +379,7 @@ class HumanBody {
 		for (attempt in 0...8) {
 			if (reachFailure(hand, goal) == null) {
 				setReachWorld(hand, goal, 1.0);
-				evaluate();
+				evaluate(false);
 				var reached = point();
 				var miss = [for (axis in 0...3) target[axis] - reached[axis]];
 				var error = Math.sqrt(miss[0] * miss[0] + miss[1] * miss[1] + miss[2] * miss[2]);
@@ -416,7 +416,7 @@ class HumanBody {
 		var held = character.pose.bonePosition(bone);
 		if (held == null) return 0.0;
 		character.release(limb);
-		character.advance(0.0);
+		character.probe();
 		var free = character.pose.bonePosition(bone);
 		// The limb's reach is applied again, from its own record of what it is asked to do.
 		evaluate();
@@ -518,10 +518,16 @@ class HumanBody {
 		evaluate();
 	}
 
-	/** Re-evaluates reaches at the current animation time for in-frame IK solving. */
-	public function evaluate():Void {
+	/**
+	 * Re-evaluates reaches at the current animation time for in-frame IK solving. With `present` off the pose is
+	 * only measured (joint matrices current, nothing skinned or shown), for the attempts of a solve that only the
+	 * last of which is to be seen.
+	 */
+	public function evaluate(present:Bool = true):Void {
 		var changed = false;
 		for (control in limbs) if (control.apply(this)) changed = true;
-		if (changed) character.advance(0.0);
+		if (!changed) return;
+		if (present) character.advance(0.0);
+		else character.probe();
 	}
 }
