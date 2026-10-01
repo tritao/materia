@@ -257,8 +257,7 @@ private:
         double position_reference[RK_MAX_JOINTS]{};
         bool active[RK_MAX_JOINTS]{};
         bool reference_initialized[RK_MAX_JOINTS]{};
-        std::deque<RuntimeTrajectoryPoint> trajectory;
-        std::deque<QueuedEvent> events;
+        std::deque<QueuedEvent> events; ///< The trajectory queue itself is `trajectory_`.
         rk_event_value channel_values[RK_MAX_PROCESS_CHANNELS]{};
         rk_event_value last_fired_values[RK_MAX_PROCESS_CHANNELS]{};
         rk_event_hold_policy channel_hold_policies[RK_MAX_PROCESS_CHANNELS]{};
@@ -326,22 +325,52 @@ private:
     /** The control state at the start of the world tick, without its trajectory queue. */
     ControlState control_backup_{};
     /**
-      How this tick changed the trajectory queue, so a discarded tick undoes it
-      without copying the queue: knots only leave the front and join the back.
+      The trajectory queue. Knots leave its front as the clock passes them and
+      join its back as plans arrive; reads are open, and every change is
+      journalled so a discarded world tick is undone in the size of its changes
+      rather than by copying the queue. It cannot be copied, so it is kept out
+      of the control state the tick backs up.
     **/
-    struct TrajectoryJournal {
-        std::vector<RuntimeTrajectoryPoint> removed; ///< Knots of the tick's start taken from the front, in order.
-        std::optional<RuntimeTrajectoryPoint> end_marker; ///< The starting end marker an append replaced.
-        std::size_t originals = 0; ///< Knots of the tick's start still at the front.
-        std::size_t appended = 0; ///< Knots added this tick, at the back.
+    class TrajectoryQueue {
+    public:
+        using Knots = std::deque<RuntimeTrajectoryPoint>;
+        TrajectoryQueue() = default;
+        TrajectoryQueue(const TrajectoryQueue &) = delete;
+        TrajectoryQueue &operator=(const TrajectoryQueue &) = delete;
+
+        const Knots &knots() const noexcept { return knots_; }
+        bool empty() const noexcept { return knots_.empty(); }
+        std::size_t size() const noexcept { return knots_.size(); }
+        const RuntimeTrajectoryPoint &front() const { return knots_.front(); }
+        const RuntimeTrajectoryPoint &back() const { return knots_.back(); }
+        const RuntimeTrajectoryPoint &operator[](std::size_t index) const { return knots_[index]; }
+        Knots::const_iterator begin() const noexcept { return knots_.begin(); }
+        Knots::const_iterator end() const noexcept { return knots_.end(); }
+        Knots::const_reverse_iterator rbegin() const noexcept { return knots_.rbegin(); }
+        Knots::const_reverse_iterator rend() const noexcept { return knots_.rend(); }
+
+        void pop_front();
+        void clear();
+        /** Appends knots ending in their own end marker, which replaces the queue's. */
+        void append(std::vector<RuntimeTrajectoryPoint> &&added);
+        void replace(Knots &&knots);
+        /** Starts a world tick: its changes can be undone until the next one starts. */
+        void begin_tick();
+        /** Undoes the changes since `begin_tick`. */
+        void undo_tick();
+        /** Empties the queue and forgets the journal. */
+        void reset();
+
+    private:
+        Knots knots_;
+        std::vector<RuntimeTrajectoryPoint> removed_; ///< Knots of the tick's start taken from the front, in order.
+        std::optional<RuntimeTrajectoryPoint> end_marker_; ///< The starting end marker an append replaced.
+        std::size_t originals_ = 0; ///< Knots of the tick's start still at the front.
+        std::size_t appended_ = 0; ///< Knots added this tick, at the back.
     };
-    TrajectoryJournal trajectory_journal_;
-    void pop_trajectory_front();
-    void clear_trajectory();
-    /** Clears the trajectory through the journal, then every other control field. */
+    TrajectoryQueue trajectory_;
+    /** Clears the trajectory queue, then every control field. */
     void reset_control();
-    void append_trajectory(std::vector<RuntimeTrajectoryPoint> &&added);
-    void replace_trajectory(std::deque<RuntimeTrajectoryPoint> &&queue);
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};
     double commanded_position_backup_[RK_MAX_JOINTS]{};

@@ -373,7 +373,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             control_.stop_ramp_active)
             return RK_ERROR_INVALID_STATE;
         // Read in place: an append validates and adds only its own segments.
-        const auto &queue = control_.trajectory;
+        const auto &queue = trajectory_.knots();
         auto candidate_events = control_.events;
         const bool replace = plan.replace_after_plan_id != 0;
         uint64_t base_time = 0;
@@ -558,8 +558,8 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             if (submitted != RK_OK) return submitted;
         }
         const bool was_idle = !control_.trajectory_active;
-        if (replace) replace_trajectory(std::move(replaced));
-        append_trajectory(std::move(added));
+        if (replace) trajectory_.replace(std::move(replaced));
+        trajectory_.append(std::move(added));
         control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
         std::fill_n(velocity_anchor_pending_, blueprint_.joint_count, false);
@@ -570,9 +570,9 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         control_.active_plan_id = replace ? control_.active_plan_id : plan.plan_id;
         control_.diagnostic_code = 0;
         state_.trajectory_active = 1;
-        state_.trajectory_queue_depth = queued_knot_count(control_.trajectory);
+        state_.trajectory_queue_depth = queued_knot_count(trajectory_.knots());
         state_.trajectory_time_ns = control_.trajectory_time_ns;
-        state_.trajectory_duration_ns = control_.trajectory.back().point.time_from_start_ns;
+        state_.trajectory_duration_ns = trajectory_.back().point.time_from_start_ns;
         state_.queue_end_time_ns = state_.trajectory_duration_ns;
         state_.committed_until_ns = committed;
         state_.active_plan_id = control_.active_plan_id;
@@ -700,13 +700,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         state_backup_ = state_;
         state_backup_valid_ = true;
     }
-    // The queue is journalled rather than copied: knots only leave its front and
-    // join its back, so a discarded tick is undone in the size of its changes.
-    auto queue = std::move(control_.trajectory);
     control_backup_ = control_;
-    control_.trajectory = std::move(queue);
-    trajectory_journal_ = {};
-    trajectory_journal_.originals = control_.trajectory.size();
+    trajectory_.begin_tick();
     std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
     std::copy_n(velocity_anchor_pending_, RK_MAX_JOINTS,
         velocity_anchor_pending_backup_);
@@ -719,7 +714,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     double stop_crossing_rate = 0.0;
     double stop_after_crossing_seconds = 0.0;
     double stop_path_velocities[RK_MAX_TRAJECTORY_JOINTS]{};
-    if (control_.trajectory_active && !control_.trajectory.empty()) {
+    if (control_.trajectory_active && !trajectory_.empty()) {
         const auto period_count = period_.count();
         const auto period_ns = period_count > 0 ? static_cast<uint64_t>(period_count) : 0;
         const double period_seconds = static_cast<double>(period_ns) / 1'000'000'000.0;
@@ -740,8 +735,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             constexpr int substeps = 16;
             const double step_seconds = period_seconds / substeps;
             const double end_ns =
-                static_cast<double>(control_.trajectory.back().point.time_from_start_ns);
-            const auto region = path_region(control_.trajectory,
+                static_cast<double>(trajectory_.back().point.time_from_start_ns);
+            const auto region = path_region(trajectory_.knots(),
                 control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
             double rate = control_.trajectory_rate;
             for (int step = 0; step < substeps && rate > 0.0; ++step) {
@@ -820,7 +815,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             // path's own acceleration is charged before increasing its rate.
             constexpr int substeps = 16;
             const double step_seconds = period_seconds / substeps;
-            const auto region = path_region(control_.trajectory,
+            const auto region = path_region(trajectory_.knots(),
                 control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
             double rate = control_.trajectory_rate;
             for (int step = 0; step < substeps; ++step) {
@@ -903,9 +898,9 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
     bool controlled_stop = false;
     auto refresh_trajectory_progress = [&]() {
-        if (control_.trajectory.empty()) return;
-        const auto *selected = &control_.trajectory.front();
-        for (const auto &candidate : control_.trajectory) {
+        if (trajectory_.empty()) return;
+        const auto *selected = &trajectory_.front();
+        for (const auto &candidate : trajectory_) {
             if (candidate.point.time_from_start_ns > control_.trajectory_time_ns)
                 break;
             selected = &candidate;
@@ -913,7 +908,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         // The selected point identifies the chunk; the reported time is the
         // trajectory clock itself, clamped to the queued end.
         const auto selected_time = std::min(control_.trajectory_time_ns,
-            control_.trajectory.back().point.time_from_start_ns);
+            trajectory_.back().point.time_from_start_ns);
         control_.trajectory_tag = selected->tag;
         control_.active_plan_id = selected->plan_id;
         control_.trajectory_tag_time_ns = selected_time >= selected->chunk_base_time_ns
@@ -957,7 +952,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         control_.stop_ramp_time_ns = 0;
         std::copy_n(positions, blueprint_.joint_count, control_.stop_ramp_positions);
         std::copy_n(velocities, blueprint_.joint_count, control_.stop_ramp_velocities);
-        clear_trajectory();
+        trajectory_.clear();
         control_.trajectory_history_valid = false;
         control_.trajectory_time_ns = 0;
         control_.trajectory_active = false;
@@ -972,7 +967,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         // would jump back to full trajectory speed.
         if (control_.stop_ramp_active)
             return true;
-        if (!control_.trajectory_active || control_.trajectory.empty()) {
+        if (!control_.trajectory_active || trajectory_.empty()) {
             reset_control();
             return false;
         }
@@ -987,7 +982,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         }
         if (has_acceleration_limits) {
             if (control_.trajectory_rate <= 0.0) {
-                clear_trajectory();
+                trajectory_.clear();
                 control_.trajectory_history_valid = false;
                 control_.trajectory_active = false;
                 control_.hold_requested = false;
@@ -1002,13 +997,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         } else {
             double positions[RK_MAX_TRAJECTORY_JOINTS]{};
             double velocities[RK_MAX_TRAJECTORY_JOINTS]{};
-            const RuntimeTrajectoryPoint *active = &control_.trajectory.front();
-            for (const auto &knot : control_.trajectory) {
+            const RuntimeTrajectoryPoint *active = &trajectory_.front();
+            for (const auto &knot : trajectory_) {
                 if (knot.point.time_from_start_ns > control_.trajectory_time_ns) break;
                 active = &knot;
             }
             evaluate_knot(*active, control_.trajectory_time_ns, positions);
-            const auto region = path_region(control_.trajectory,
+            const auto region = path_region(trajectory_.knots(),
                 control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
             mk_path_derivative_estimate estimate{};
             if (motionkit::estimate_path_derivatives(region,
@@ -1097,14 +1092,14 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
             if (value.kind == RK_COMMAND_ABORT) {
                 safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
-                if (control_.trajectory_active && !control_.trajectory.empty()) {
+                if (control_.trajectory_active && !trajectory_.empty()) {
                     refresh_trajectory_progress();
                     double positions[RK_MAX_TRAJECTORY_JOINTS]{};
                     double velocities[RK_MAX_TRAJECTORY_JOINTS]{};
-                    const auto region = path_region(control_.trajectory,
+                    const auto region = path_region(trajectory_.knots(),
                         control_.trajectory_history_valid ? &control_.trajectory_history : nullptr);
-                    const RuntimeTrajectoryPoint *active = &control_.trajectory.front();
-                    for (const auto &knot : control_.trajectory) {
+                    const RuntimeTrajectoryPoint *active = &trajectory_.front();
+                    for (const auto &knot : trajectory_) {
                         if (knot.point.time_from_start_ns > control_.trajectory_time_ns) break;
                         active = &knot;
                     }
@@ -1115,8 +1110,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                             velocities[joint] = control_.trajectory_rate * estimate.velocity[joint];
                     bool would_pass_final_knot = false;
-                    if (control_.trajectory.back().plan_id != 0 &&
-                        control_.trajectory.back().ends_at_rest) {
+                    if (trajectory_.back().plan_id != 0 &&
+                        trajectory_.back().ends_at_rest) {
                         double ramp_duration = 2.0 * std::chrono::duration<double>(period_).count();
                         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
                             const double acceleration = blueprint_.joints[joint].max_acceleration;
@@ -1128,7 +1123,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                             const double finish = positions[joint] +
                                 0.5 * ramp_duration * velocities[joint];
                             const double final_knot =
-                                control_.trajectory.back().point.positions[joint];
+                                trajectory_.back().point.positions[joint];
                             if ((velocities[joint] > 0.0 && finish > final_knot + 1e-12) ||
                                 (velocities[joint] < 0.0 && finish < final_knot - 1e-12))
                                 would_pass_final_knot = true;
@@ -1155,7 +1150,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
 
             if (value.kind == RK_COMMAND_HOLD) {
-                if (!control_.trajectory_active || control_.trajectory.empty() ||
+                if (!control_.trajectory_active || trajectory_.empty() ||
                     control_.stop_ramp_active)
                     return RK_ERROR_INVALID_STATE;
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
@@ -1172,7 +1167,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             }
 
             if (value.kind == RK_COMMAND_RESUME) {
-                if (!control_.trajectory_active || control_.trajectory.empty() ||
+                if (!control_.trajectory_active || trajectory_.empty() ||
                     !control_.hold_requested || control_.stop_ramp_active)
                     return RK_ERROR_INVALID_STATE;
                 if (endpoint_->executes_trajectory_queue()) {
@@ -1196,9 +1191,9 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 // target control. This preserves independent drive/arm
                 // updates without appending a new move behind old motion.
                 const bool replace_active_motion = control_.trajectory_active ||
-                    !control_.trajectory.empty() || control_.stop_ramp_active;
+                    !trajectory_.empty() || control_.stop_ramp_active;
                 if (replace_active_motion) {
-                    clear_trajectory();
+                    trajectory_.clear();
                     control_.trajectory_history_valid = false;
                     control_.trajectory_time_ns = 0;
                     control_.trajectory_active = false;
@@ -1255,7 +1250,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     return RK_ERROR_UNSUPPORTED;
                 const uint64_t tag = queued.segments->tag;
                 const auto &segments = queued.segments->segments;
-                const auto &queue = control_.trajectory;
+                const auto &queue = trajectory_.knots();
                 const auto base_time = queue.empty()
                     ? uint64_t{0} : queue.back().point.time_from_start_ns;
                 std::vector<RuntimeTrajectoryPoint> added;
@@ -1293,7 +1288,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     return RK_ERROR_LIMIT;
                 }
                 if (checked != RK_OK) return checked;
-                append_trajectory(std::move(added));
+                trajectory_.append(std::move(added));
                 // While a path-following stop runs, a chunk only extends the
                 // path the stop may use; the stop keeps its current rate and
                 // still ends at rest. Resuming means waiting for the stop to
@@ -1364,7 +1359,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     };
 
     const bool device_plan_cycle = endpoint_->executes_trajectory_queue() &&
-        (!control_.trajectory.empty() || control_.trajectory_active || control_.stop_ramp_active);
+        (!trajectory_.empty() || control_.trajectory_active || control_.stop_ramp_active);
     rk_robot_command output{};
     output.struct_size = sizeof(output);
     output.timestamp_ns = has_command ? final_timestamp_ns : 0;
@@ -1372,16 +1367,16 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         final_kind != RK_COMMAND_RESUME) {
         output.kind = final_kind == RK_COMMAND_ABORT ? RK_COMMAND_STOP : final_kind;
         output.target_count = 0;
-    } else if (!control_.trajectory.empty()) {
-        auto point = control_.trajectory.front().point;
-        while (control_.trajectory.size() > 1 &&
-               control_.trajectory[1].point.time_from_start_ns <= control_.trajectory_time_ns) {
-            control_.trajectory_history = control_.trajectory.front();
+    } else if (!trajectory_.empty()) {
+        auto point = trajectory_.front().point;
+        while (trajectory_.size() > 1 &&
+               trajectory_[1].point.time_from_start_ns <= control_.trajectory_time_ns) {
+            control_.trajectory_history = trajectory_.front();
             control_.trajectory_history_valid = true;
-            pop_trajectory_front();
+            trajectory_.pop_front();
         }
-        point = control_.trajectory.front().point;
-        evaluate_knot(control_.trajectory.front(), control_.trajectory_time_ns,
+        point = trajectory_.front().point;
+        evaluate_knot(trajectory_.front(), control_.trajectory_time_ns,
             point.positions);
         output.kind = RK_COMMAND_JOINT_TARGETS;
         output.target_count = point.joint_count;
@@ -1393,14 +1388,14 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             output.targets[joint].max_effort = 0.0;
         }
         const bool queue_exhausted =
-            control_.trajectory_time_ns >= control_.trajectory.back().point.time_from_start_ns;
+            control_.trajectory_time_ns >= trajectory_.back().point.time_from_start_ns;
         if (queue_exhausted || trajectory_stop_completed) {
             // Report the chunk and time where motion actually ended; a stop
             // can finish inside an earlier chunk than the last one queued.
             refresh_trajectory_progress();
             const bool declared_continuation = queue_exhausted &&
-                !control_.trajectory.back().ends_at_rest &&
-                control_.trajectory.back().plan_id != 0;
+                !trajectory_.back().ends_at_rest &&
+                trajectory_.back().plan_id != 0;
             const bool ramp_at_end = queue_exhausted && !trajectory_stop_completed &&
                 declared_continuation;
             if (ramp_at_end) {
@@ -1417,8 +1412,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     // Its preceding segment supplies the executed terminal
                     // velocity: analytic for smooth plans, chord for linear.
                     const RuntimeTrajectoryPoint *terminal_segment = nullptr;
-                    for (auto it = control_.trajectory.rbegin();
-                         it != control_.trajectory.rend(); ++it)
+                    for (auto it = trajectory_.rbegin();
+                         it != trajectory_.rend(); ++it)
                         if (it->has_segment) {
                             terminal_segment = &*it;
                             break;
@@ -1444,7 +1439,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     static_cast<uint64_t>(stop_after_crossing_seconds * 1'000'000'000.0));
                 write_stop_ramp_targets(output);
             } else {
-                clear_trajectory();
+                trajectory_.clear();
                 control_.trajectory_history_valid = false;
                 control_.trajectory_time_ns = 0;
                 control_.trajectory_active = false;
@@ -1531,11 +1526,11 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
     }
     refresh_trajectory_progress();
     std::lock_guard state_lock(state_mutex_);
-    state_.trajectory_queue_depth = queued_knot_count(control_.trajectory);
+    state_.trajectory_queue_depth = queued_knot_count(trajectory_.knots());
     state_.trajectory_active = control_.trajectory_active ? 1u : 0u;
     state_.trajectory_time_ns = control_.trajectory_active ? control_.trajectory_time_ns : 0;
-    state_.trajectory_duration_ns = control_.trajectory_active && !control_.trajectory.empty()
-        ? control_.trajectory.back().point.time_from_start_ns : 0;
+    state_.trajectory_duration_ns = control_.trajectory_active && !trajectory_.empty()
+        ? trajectory_.back().point.time_from_start_ns : 0;
     state_.trajectory_tag = control_.trajectory_tag;
     state_.trajectory_tag_time_ns = control_.trajectory_tag_time_ns;
     state_.queue_end_time_ns = state_.trajectory_duration_ns;
@@ -1684,7 +1679,7 @@ rk_result RobotRuntime::publish_sample_impl(uint64_t timestamp_ns,
         // After velocity control stops, use its observed resting position as
         // the next plan anchor. Position-controlled and untouched joints keep
         // their commanded anchor despite small observation offsets.
-        if (!control_.trajectory_active && control_.trajectory.empty() &&
+        if (!control_.trajectory_active && trajectory_.empty() &&
             !control_.stop_ramp_active)
             for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                 if (!control_.active[joint] && velocity_anchor_pending_[joint])
@@ -1699,51 +1694,67 @@ void RobotRuntime::set_externally_driven(bool value) noexcept {
     externally_driven_ = value;
 }
 
-void RobotRuntime::pop_trajectory_front() {
-    auto &queue = control_.trajectory;
-    if (trajectory_journal_.originals > 0) {
-        trajectory_journal_.removed.push_back(std::move(queue.front()));
-        --trajectory_journal_.originals;
+void RobotRuntime::TrajectoryQueue::pop_front() {
+    if (originals_ > 0) {
+        removed_.push_back(std::move(knots_.front()));
+        --originals_;
     } else {
-        --trajectory_journal_.appended;
+        --appended_;
     }
-    queue.pop_front();
+    knots_.pop_front();
 }
 
-void RobotRuntime::clear_trajectory() {
-    auto &queue = control_.trajectory;
-    for (std::size_t index = 0; index < trajectory_journal_.originals; ++index)
-        trajectory_journal_.removed.push_back(std::move(queue[index]));
-    trajectory_journal_.originals = 0;
-    trajectory_journal_.appended = 0;
-    queue.clear();
+void RobotRuntime::TrajectoryQueue::clear() {
+    for (std::size_t index = 0; index < originals_; ++index)
+        removed_.push_back(std::move(knots_[index]));
+    originals_ = 0;
+    appended_ = 0;
+    knots_.clear();
+}
+
+void RobotRuntime::TrajectoryQueue::append(std::vector<RuntimeTrajectoryPoint> &&added) {
+    if (!knots_.empty() && !knots_.back().has_segment) {
+        if (appended_ > 0) {
+            --appended_;
+        } else {
+            end_marker_ = std::move(knots_.back());
+            --originals_;
+        }
+        knots_.pop_back();
+    }
+    for (auto &knot : added) knots_.push_back(std::move(knot));
+    appended_ += added.size();
+}
+
+void RobotRuntime::TrajectoryQueue::replace(Knots &&knots) {
+    clear();
+    knots_ = std::move(knots);
+    appended_ = knots_.size();
+}
+
+void RobotRuntime::TrajectoryQueue::begin_tick() {
+    removed_.clear();
+    end_marker_.reset();
+    originals_ = knots_.size();
+    appended_ = 0;
+}
+
+void RobotRuntime::TrajectoryQueue::undo_tick() {
+    for (std::size_t added = 0; added < appended_; ++added) knots_.pop_back();
+    if (end_marker_) knots_.push_back(std::move(*end_marker_));
+    for (auto it = removed_.rbegin(); it != removed_.rend(); ++it)
+        knots_.push_front(std::move(*it));
+    begin_tick();
+}
+
+void RobotRuntime::TrajectoryQueue::reset() {
+    knots_.clear();
+    begin_tick();
 }
 
 void RobotRuntime::reset_control() {
-    clear_trajectory();
+    trajectory_.clear();
     control_ = {};
-}
-
-void RobotRuntime::append_trajectory(std::vector<RuntimeTrajectoryPoint> &&added) {
-    auto &queue = control_.trajectory;
-    // The knots replace the queue's end marker with their own.
-    if (!queue.empty() && !queue.back().has_segment) {
-        if (trajectory_journal_.appended > 0) {
-            --trajectory_journal_.appended;
-        } else {
-            trajectory_journal_.end_marker = std::move(queue.back());
-            --trajectory_journal_.originals;
-        }
-        queue.pop_back();
-    }
-    for (auto &knot : added) queue.push_back(std::move(knot));
-    trajectory_journal_.appended += added.size();
-}
-
-void RobotRuntime::replace_trajectory(std::deque<RuntimeTrajectoryPoint> &&queue) {
-    clear_trajectory();
-    control_.trajectory = std::move(queue);
-    trajectory_journal_.appended = control_.trajectory.size();
 }
 
 void RobotRuntime::discard_pending_commands() noexcept {
@@ -1752,17 +1763,8 @@ void RobotRuntime::discard_pending_commands() noexcept {
     std::lock_guard state_lock(state_mutex_);
     if (state_backup_valid_) {
         state_ = state_backup_;
-        auto queue = std::move(control_.trajectory);
-        for (std::size_t added = 0; added < trajectory_journal_.appended; ++added)
-            queue.pop_back();
-        if (trajectory_journal_.end_marker)
-            queue.push_back(std::move(*trajectory_journal_.end_marker));
-        for (auto it = trajectory_journal_.removed.rbegin();
-             it != trajectory_journal_.removed.rend(); ++it)
-            queue.push_front(std::move(*it));
+        trajectory_.undo_tick();
         control_ = control_backup_;
-        control_.trajectory = std::move(queue);
-        trajectory_journal_ = {};
         std::copy_n(commanded_position_backup_, RK_MAX_JOINTS, commanded_position_);
         std::copy_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS,
             velocity_anchor_pending_);
@@ -1801,7 +1803,7 @@ void RobotRuntime::reset_state() noexcept {
     std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
     std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);
     control_backup_ = {};
-    trajectory_journal_ = {};
+    trajectory_.reset();
     state_backup_valid_ = false;
 }
 
