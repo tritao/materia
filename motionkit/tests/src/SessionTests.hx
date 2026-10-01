@@ -142,7 +142,16 @@ class SessionTests extends MotionKitTestSupport {
     check(runtime.snapshot().trajectoryActive,
       "abort replacement test starts with a running native trajectory");
 
+    function submittedPlans():Int {
+      var count = 0;
+      for (command in recording.commands) switch command {
+        case ExecutionPlan(_): count++;
+        case _:
+      }
+      return count;
+    }
     machine.abort();
+    var plansAtAbort = submittedPlans();
     check(machine.isMoving(), "normal abort remains moving while the runtime stops");
     var replacementTargets = [new AxisTarget("x", 0.01)];
     check(machine.moveAxes(replacementTargets, options) == null,
@@ -164,13 +173,8 @@ class SessionTests extends MotionKitTestSupport {
     }
     check(machine.isMoving(), "deferred replacement remains visible at runtime rest");
     var settledPosition = robot.snapshot().positions.get(0);
-    var planCount = 0;
-    for (command in recording.commands) switch command {
-      case ExecutionPlan(_): planCount++;
-      case _:
-    }
-    check(planCount == 1,
-      "replacement plan is not submitted before the runtime reports rest");
+    check(submittedPlans() == plansAtAbort,
+      "no plan, the replacement or more of the aborted move, is submitted before the runtime reports rest");
 
     machine.update();
     var replacement = machine.trajectory();
@@ -220,7 +224,7 @@ class SessionTests extends MotionKitTestSupport {
       "deferred move sends no plan before rest");
     abortRig.settleStop();
     check(abortRig.machine.sessionState() == Running &&
-      abortRig.robot.planCount() == planCount + 1,
+      abortRig.robot.planCount() > planCount,
       "stopping + rest starts the deferred plan");
     abortRig.dispose();
 

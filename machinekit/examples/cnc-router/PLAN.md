@@ -153,6 +153,31 @@ of plans, rings at 20 mm/s take 63 s, drilling at 2 mm/s 49 s, plunges at
 corners. Blending them within the program's 0.01 mm G64 P would save almost
 nothing; a larger tolerance for rapids in open air would save a few seconds.
 
+Frame time, measured per update with GC counters: the 190–350 ms "slowest
+updates" seen inside the full suite were not collections (pauses were
+2–5 ms, the heap 6–33 MB) and did not reproduce; they track the machine's
+load from other work. What did repeat, about 45 times a pass, were 9–28 ms
+motion updates: each refill submitted two seconds of motion at once, and the
+runtime copied and re-validated its whole queue on every submission (about
+10 µs per queued point). The runtime now validates and appends only the new
+segments and the junction they make, and the stream submits one chunk a
+tick, a tenth of a second (a quarter second to start), so the robot's
+per-segment checks spread evenly. Motion updates over 8 ms went from 45 to
+none apart from collector pauses. Small chunks exposed three faults in the
+RKD6 device path, which large chunks had mostly dodged by timing: each
+continuation's boundary was mapped afresh through the clock, which moves
+when a time sync refines it (continuations now start on the device tick
+where the queued path ends); each continuation opened a new queue revision,
+which made the device drop segments still waiting to be sent under the old
+one (an append now adds segments to the current revision); and the host
+sent segments as fast as the device had room, so commits queued behind them
+on the serial line and arrived late (segments now go only while the line
+clears within an owner period). The virtual serial link also added its
+latency once per frame instead of pipelining it. Left: the stock re-contour takes 11 ms (up to
+49 ms) every fifth tick, the largest remaining frame cost, and the runtime
+still copies its queue (0.2 ms at 1300 points) every cycle so a world tick
+can roll back.
+
 **C5. Editor controls** (done). A G-code panel that highlights the running
 line; feed hold, resume, restart from a line and a speed override. What it
 took:

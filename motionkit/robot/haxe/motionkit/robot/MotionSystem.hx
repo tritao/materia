@@ -603,7 +603,7 @@ class MotionSystem {
     var jerkUnchecked = pathJerkUnchecked.exists(trajectoryValue) &&
       pathJerkUnchecked.get(trajectoryValue) == true;
     try {
-      stream.fill(session, false,
+      stream.fill(session,
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
           calibrationRevision, jerkUnchecked),

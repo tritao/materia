@@ -148,49 +148,57 @@ class TrajectoryStream {
 
   /** Seconds of motion a stream keeps submitted ahead of the robot. */
   public static inline final BUFFER_SECONDS = 2.0;
+  /**
+    Seconds of motion one call adds at most. The robot checks every segment it
+    takes, so topping the buffer up a little a tick keeps that cost even
+    instead of a burst when a plan starts or the buffer runs low.
+  **/
+  public static inline final CHUNK_SECONDS = 0.1;
+  /** Seconds of motion always submitted ahead of the robot, however long its ticks. */
+  public static inline final MIN_LEAD_SECONDS = 0.25;
 
   /**
-    Submits the segments starting within `BUFFER_SECONDS` of the robot's
-    progress, so a robot holds a bounded window of motion whatever the
-    transport, within the room left in its queue.
+    Keeps a bounded window of motion submitted ahead of the robot, whatever
+    the transport and within the room left in its queue: one submission a
+    call, of `CHUNK_SECONDS` or as much as brings the robot's lead to
+    `MIN_LEAD_SECONDS`, until `BUFFER_SECONDS` is ahead.
   **/
-  public function fill(session:MotionSession, reserveStaged:Bool,
+  public function fill(session:MotionSession,
       build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
       describeFailure:Int -> Int -> Dynamic -> String):Void {
-    var stagedSegments = 0;
     var total = segments.count();
-    while (nextSegment < total && chunkEndSeconds - elapsedSeconds < BUFFER_SECONDS) {
-      // A submission is bounded only by the room left in the runtime's queue.
-      var available = RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS -
-        robot.snapshot().trajectoryQueueDepth - (reserveStaged ? stagedSegments : 0);
-      var room = Std.int(Math.min(available, total - nextSegment));
-      if (room < 1) return;
-      var horizonNs = Trajectory.nanoseconds(Math.max(elapsedSeconds, chunkEndSeconds) + BUFFER_SECONDS);
-      var count = 1;
-      while (count < room && Int64.compare(segments.startNs(nextSegment + count), horizonNs) < 0)
-        count++;
-      var first = nextSegment;
-      var last = first + count;
-      var startNs = segments.startNs(first);
-      var endNs = Int64.add(segments.startNs(last - 1), segments.durationNs(last - 1));
-      var tag = programTags ? nextProgramTag : nextMotionTag;
-      if (programTags) nextProgramTag = Int64.add(nextProgramTag, Int64.ofInt(1));
-      var submission = build(first, last, tag, startNs, endNs);
-      try submit(session, RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic)
-        throw describeFailure(first, last, error);
-      if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
-      var startSeconds = Int64.toFloat(startNs) * 1e-9;
-      references.set(Int64.toStr(tag), startSeconds);
-      submitted = true;
-      nextSegment = last;
-      stagedSegments += count;
-      chunkStartSeconds = startSeconds;
-      chunkEndSeconds = Int64.toFloat(endNs) * 1e-9;
-      if (last == total) {
-        finalTag = tag;
-        finalEndSeconds = chunkEndSeconds;
-        finalDurationNs = Int64.sub(endNs, startNs);
-      }
+    var ahead = chunkEndSeconds - elapsedSeconds;
+    if (nextSegment >= total || ahead >= BUFFER_SECONDS) return;
+    // A submission is bounded only by the room left in the runtime's queue.
+    var available = RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS -
+      robot.snapshot().trajectoryQueueDepth;
+    var room = Std.int(Math.min(available, total - nextSegment));
+    if (room < 1) return;
+    var horizonNs = Trajectory.nanoseconds(Math.max(elapsedSeconds, chunkEndSeconds) +
+      Math.max(CHUNK_SECONDS, MIN_LEAD_SECONDS - ahead));
+    var count = 1;
+    while (count < room && Int64.compare(segments.startNs(nextSegment + count), horizonNs) < 0)
+      count++;
+    var first = nextSegment;
+    var last = first + count;
+    var startNs = segments.startNs(first);
+    var endNs = Int64.add(segments.startNs(last - 1), segments.durationNs(last - 1));
+    var tag = programTags ? nextProgramTag : nextMotionTag;
+    if (programTags) nextProgramTag = Int64.add(nextProgramTag, Int64.ofInt(1));
+    var submission = build(first, last, tag, startNs, endNs);
+    try submit(session, RobotCommand.ExecutionPlan(submission)) catch (error:Dynamic)
+      throw describeFailure(first, last, error);
+    if (!programTags) nextMotionTag = Int64.add(nextMotionTag, Int64.ofInt(1));
+    var startSeconds = Int64.toFloat(startNs) * 1e-9;
+    references.set(Int64.toStr(tag), startSeconds);
+    submitted = true;
+    nextSegment = last;
+    chunkStartSeconds = startSeconds;
+    chunkEndSeconds = Int64.toFloat(endNs) * 1e-9;
+    if (last == total) {
+      finalTag = tag;
+      finalEndSeconds = chunkEndSeconds;
+      finalDurationNs = Int64.sub(endNs, startNs);
     }
   }
 
