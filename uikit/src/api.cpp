@@ -1344,6 +1344,12 @@ std::shared_ptr<nkui::PreparedGlyphs> prepare_visible_text(
     }
     auto glyphs = found->second;
     if (!layout.text->prepared_glyphs_current(*glyphs)) {
+        // A sealed frame may still own the previous viewport. Rebuild into a
+        // fresh buffer instead of changing glyphs that its render thread reads.
+        if (found->second.use_count() > 2) {
+            glyphs = std::make_shared<nkui::PreparedGlyphs>();
+            found->second = glyphs;
+        }
         if (lines.second - lines.first <= 1) {
             layout.visible_line_glyphs.clear();
             if (!layout.text->prepare_glyphs_for_lines(lines.first, lines.second, 0, 0, scale,
@@ -3422,18 +3428,11 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
     std::vector<std::shared_ptr<nkui::PreparedTexture>> prepared_images;
     std::vector<nkui::TextEngine *> text_engines;
     std::vector<std::shared_ptr<nkui::TextEngine>> text_engine_owners;
-    std::vector<std::shared_ptr<nkui::PreparedGlyphs>> prepared_text_owners;
-    std::vector<std::pair<ResourceSlot *, nkui::PreparedGlyphs *>> prepared_texts;
     struct OwnedTextBind {
         nkui::ResourceId id{};
-        nkui::TextEngine *engine = nullptr;
-        float pixel_scale = 1.0f;
-        nkui::GlyphMode mode = nkui::GlyphMode::Alpha;
+        ResourceSlot *layout = nullptr;
+        std::shared_ptr<nkui::PreparedGlyphs> glyphs;
         uint64_t content_generation = 0;
-        nkui_color color{1.0f, 1.0f, 1.0f, 1.0f};
-        std::vector<nkui::GlyphColorRange> color_ranges;
-        uint32_t first_line = 0;
-        uint32_t end_line = 0;
     };
     std::vector<OwnedTextBind> owned_text_binds;
     uint16_t prepared_slot = 1;
@@ -3593,30 +3592,20 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                 auto viewport_glyphs = prepare_visible_text(*layout, command, transform,
                                                             *frame_info, pass.target_descriptor, raster_scale_key, raster_scale);
                 valid = viewport_glyphs != nullptr;
-                auto *glyphs = viewport_glyphs.get();
-                if (valid)
-                    prepared_text_owners.push_back(std::move(viewport_glyphs));
                 if (!valid)
                     break;
-                if (valid)
-                    prepared_texts.push_back({layout, glyphs});
+                auto *glyphs = viewport_glyphs.get();
                 const nkui::ResourceId prepared_id =
                     nkui::make_resource_id(nkui::ResourceKind::TextLayout, 0x0FFE, prepared_slot++);
-                valid = frame_resources.bind_text(prepared_id, *glyphs,
-                                                  (static_cast<uint64_t>(source_resource) << 32) ^
-                                                      layout->text->layout_generation() ^
-                                                      (layout->text->font_collection_generation() +
-                                                       layout->text_content_revision * UINT64_C(0x9e3779b97f4a7c15)));
+                const uint64_t content_generation =
+                    (static_cast<uint64_t>(source_resource) << 32) ^
+                    layout->text->layout_generation() ^
+                    (layout->text->font_collection_generation() +
+                     layout->text_content_revision * UINT64_C(0x9e3779b97f4a7c15));
+                valid = frame_resources.bind_text(prepared_id, *glyphs, content_generation);
                 if (valid)
-                    owned_text_binds.push_back({prepared_id, layout->text.get(), raster_scale,
-                                                nkui::GlyphMode::Alpha,
-                                                (static_cast<uint64_t>(source_resource) << 32) ^
-                                                    layout->text->layout_generation() ^
-                                                    (layout->text->font_collection_generation() +
-                                                       layout->text_content_revision * UINT64_C(0x9e3779b97f4a7c15)),
-                                                layout->text_color, layout->text_color_ranges,
-                                                static_cast<uint32_t>(glyphs->first_line),
-                                                static_cast<uint32_t>(glyphs->end_line)});
+                    owned_text_binds.push_back({prepared_id, layout, std::move(viewport_glyphs),
+                                                content_generation});
                 command.resource = prepared_id;
                 // Skribidi's pixel scale changes atlas raster density while
                 // preserving layout geometry. Keep the draw origin in layout
@@ -3686,30 +3675,34 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
     }
     if (!valid)
         return NKUI_ERROR_INVALID_HANDLE;
-    for (size_t pass = 0; pass < prepared_texts.size() && valid; ++pass) {
-        auto &[layout, glyphs] = prepared_texts[pass];
-        if (!layout->text->prepared_glyphs_current(*glyphs)) {
-            valid = layout->text->prepare_glyphs_for_lines(glyphs->first_line, glyphs->end_line,
-                glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale, glyphs->mode, *glyphs);
-            if (valid)
-                tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
+    for (auto &bind : owned_text_binds) {
+        if (!bind.layout->text->prepared_glyphs_current(*bind.glyphs)) {
+            // Atlas preparation elsewhere in this frame can retire an earlier
+            // snapshot. Rebuild privately, leaving any sealed frame immutable.
+            auto refreshed = std::make_shared<nkui::PreparedGlyphs>();
+            const auto &old = *bind.glyphs;
+            valid = bind.layout->text->prepare_glyphs_for_lines(
+                old.first_line, old.end_line, old.origin_x, old.origin_y,
+                old.pixel_scale, old.mode, *refreshed);
+            if (!valid)
+                break;
+            tint_text_glyphs(*refreshed, bind.layout->text_color,
+                             bind.layout->text_color_ranges);
+            bind.glyphs = std::move(refreshed);
+            valid = frame_resources.bind_text(bind.id, *bind.glyphs,
+                                              bind.content_generation);
+            if (!valid)
+                break;
         }
     }
     if (!valid)
         return NKUI_ERROR_RENDERING;
-    /*
-     * Text is published after the final preparation pass so the owned set can
-     * share an immutable snapshot instead of copying glyph buffers.
-     */
+    // The viewport is already a shared prepared buffer. Sealing it here avoids
+    // republishing every visible row into a second complete glyph buffer.
     for (const auto &bind : owned_text_binds) {
         if (!sealable)
             break;
-        auto snapshot = bind.engine->published_glyphs_for_lines(bind.engine->active_layout_id(),
-                                                      bind.first_line, bind.end_line, 0.0f, 0.0f,
-                                                      bind.pixel_scale, bind.mode,
-                                                      glyph_tint_from_color(bind.color), bind.color_ranges);
-        if (!snapshot ||
-            !owned_resources.bind_text(bind.id, std::move(snapshot), bind.content_generation))
+        if (!owned_resources.bind_text(bind.id, bind.glyphs, bind.content_generation))
             sealable = false;
     }
     if (!sealable && threaded)
