@@ -13,6 +13,11 @@ class HumanBody {
 	public final walker:HumanWalker;
 	public final description:HumanDescription;
 	public final posture:HumanPosture;
+	/**
+	 * How far the point a hand holds with (between the wrist and the knuckles) is beyond its wrist, in metres. The
+	 * arm has to bring the wrist this much less far than the point it is reaching for.
+	 */
+	public final palmReach:Float;
 	/** True between a completed pick and its matching place. */
 	public var grip(default, null):Bool = false;
 
@@ -38,6 +43,9 @@ class HumanBody {
 		if (this.walker.character != character)
 			throw "A human body needs its character's walker";
 		description = HumanDescription.measure(character.pose, character.height());
+		var wristAt = character.pose.bonePosition(HandL), knuckleAt = character.pose.bonePosition(MiddleL);
+		palmReach = wristAt == null || knuckleAt == null ? 0.0 : 0.5 * Math.sqrt(Math.pow(knuckleAt[0] - wristAt[0], 2) +
+			Math.pow(knuckleAt[1] - wristAt[1], 2) + Math.pow(knuckleAt[2] - wristAt[2], 2));
 		this.posture = posture == null ? HumanPosture.forStature(description.stature) : posture;
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
@@ -372,6 +380,14 @@ class HumanBody {
 	 */
 	public function solveReach(hand:HumanLimb, target:Array<Float>, point:Void->Array<Float>,
 			guess:Array<Float>, cap:Float):{goal:Array<Float>, error:Float, failure:Null<String>} {
+		// The guess is the point to be held at; the wrist, which the arm has to bring there, starts a palm's depth short of it.
+		var shoulderAt = character.pose.bonePosition(hand == ArmL ? UpperArmL : UpperArmR);
+		if (shoulderAt != null && palmReach > 0.0) {
+			var from = toWorld(shoulderAt);
+			var gap = distance(from, guess);
+			if (gap > palmReach * 2.0)
+				guess = [for (axis in 0...3) guess[axis] - (guess[axis] - from[axis]) / gap * palmReach];
+		}
 		var failure = reachFailure(hand, guess);
 		if (failure != null) return {goal: guess.copy(), error: Math.POSITIVE_INFINITY, failure: failure};
 		var best = guess.copy(), bestMiss = [0.0, 0.0, 0.0], bestError = Math.POSITIVE_INFINITY;

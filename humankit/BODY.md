@@ -118,6 +118,14 @@ does not sweep a hand across the part.
 The Universal Animation Library character (`animkit/assets/quaternius-ual`) is the first that crouches;
 `UniversalSweepTests` runs the rack job on it from half a metre to a shelf.
 
+## The arm brings the wrist
+
+A hand holds with the point between its wrist and its knuckles, a few centimetres past the wrist (`HumanBody.palmReach`,
+measured on the skeleton). The planner used to ask the arm for a comfortable reach to the point itself, so the wrist ended
+that much nearer the shoulder than planned and the elbow folded, and it stood too close to clear an edge it then had to lean over.
+Reaches are now planned to the wrist (`comfort` and `stretch` of the arm, plus the palm), and `solveReach` starts the wrist a palm short of the point.
+That alone cleared the two-hand layouts at a metre that had needed a crouch, and took the elbow gate back to 30 degrees.
+
 ## Measuring without showing
 
 The planner measures the body by posing it: the shoulder under a lean, the pelvis at a crouch depth, a fingertip at each curl, the wrist
@@ -138,10 +146,10 @@ renders a frame.
 
 ## Known limits
 
-- **Low surfaces on the bundled worker.** At about a metre or lower the lean reaches its limit before the
-  belly clears the surface's edge, leaving it 3 to 4 cm inside for either hand. That worker has no crouch
-  clip, so it cannot do what the library character does here. The layout sweep (`ScenarioSweepTests`)
-  records this as its `CAPPED_CLEARANCE`.
+- **Low surfaces on the bundled worker.** It has no crouch clip, so below about a metre it cannot lower itself; it
+  stands clear of the edge and leans, and a surface its arm cannot reach over leaves the belly short (the planner
+  reports it as `shortfall`). With the palm's depth in the stand-off (see "The arm brings the wrist") the 1.0 m
+  tops of the sweeps, one hand or two, are cleared.
 - **Deep tops on the library character.** The sweep uses 0.4 m tops. With 0.8 m ones (the app's rack and table)
   the belly must clear an edge 0.4 m short of the part, which the library character's arm cannot reach even
   leaning at the limit: the planner no longer crouches for it (a crouch lowers the shoulder, it does not carry
@@ -162,9 +170,5 @@ renders a frame.
   more: they do not wrap a cylinder or a handle differently, the thumb simply follows the index finger,
   and the fingertips reach only about 7 cm from the palm, so a larger object closes the hand as far as it
   goes and no further.
-- **Two hands at about a metre.** The arms have about 10 cm of horizontal reach left after the drop from the
-  shoulder, and each hand spends some of it sideways, so the worker cannot stand clear of a 0.4 m top without
-  crouching: the belly ends about 17 cm inside the edge (the one-handed case measures 3 to 4 cm). The two-hand
-  sweep holds that height to completing, placing the part and moving without spikes, and to that measured depth.
 - **Both hands and the left hand** share the same code as the right, and the sweep covers a left-hand
   fetch, but two-handed lean and hang are exercised by far fewer scenarios.

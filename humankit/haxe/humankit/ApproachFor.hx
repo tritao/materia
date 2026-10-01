@@ -119,7 +119,9 @@ class ApproachFor extends HumanActionBase {
 		// its hand's grasp point. That sideways gap takes its share of the arm, leaving less for the reach
 		// ahead and below; measuring only those would stand the worker further out than the arm reaches.
 		var sideways = bothHands ? Math.abs(Math.abs(shoulder[1]) - worker.posture.handSpread) : 0.0;
-		var comfortable = inPlane(worker.posture.comfort * length, sideways), farthest = inPlane(worker.posture.stretch * length, sideways);
+		// The arm brings the wrist; the point being reached for is the palm's, a little beyond it.
+		var comfortable = inPlane(worker.posture.comfort * length + worker.palmReach, sideways);
+		var farthest = inPlane(worker.posture.stretch * length + worker.palmReach, sideways);
 		var rise = target[2] - (root[14] + shoulder[2]);
 		var stance:Stance = {failure: null, crouch: depth, lean: 0.0, standDistance: 0.0, shortfall: 0.0, ux: 0.0, uy: 0.0,
 			lateral: 0.0, comfortable: -rise <= comfortable};
