@@ -1431,8 +1431,11 @@ void Simulation::cleanup() noexcept {
     Lock lock(session_);
     const auto world = stopped_world();
     if (world != 0) {
+        // One model recompile for the whole robot, not one per joint and body.
+        const bool batched = nksim_world_begin_topology_update(world) == NKSIM_OK;
         for (const auto joint : joints_) nksim_joint_destroy(world, joint);
         for (const auto body : bodies_) nksim_body_destroy(world, body);
+        if (batched) nksim_world_end_topology_update(world);
         for (const auto shape : link_shapes_) nksim_shape_destroy(world, shape);
         if (shape_ != 0) nksim_shape_destroy(world, shape_);
         nkscene_transaction transaction = 0;

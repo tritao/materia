@@ -488,7 +488,11 @@ public:
         }
         found->second.state = state;
         found->second.state.backend_body = id;
-        mj_forward(model, data);
+        // Derived quantities are recomputed once, by whichever read or step
+        // needs them next, not once per written body: a world driving many
+        // kinematic bodies each tick would otherwise run a full forward pass
+        // (collision included) per body.
+        derived_stale = true;
         return NKSIM_OK;
     }
 
@@ -765,12 +769,14 @@ public:
         // and so read_contacts() sees contacts recomputed from the final,
         // exact kinematic placement above rather than the last substep's.
         mj_forward(model, data);
+        derived_stale = false;
         std::fill(data->xfrc_applied, data->xfrc_applied + model->nbody * 6, 0.0);
         return NKSIM_OK;
     }
 
     nksim_result read_body_states(nksim::BackendBodyState *states,
                                   std::uint32_t count) override {
+        refresh_derived();
         if (count != 0 && !states)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         for (std::uint32_t index = 0; index < count; ++index) {
@@ -808,12 +814,13 @@ public:
         data->qvel[model->jnt_dofadr[joint_id]] = velocity;
         found->second.state.position = position;
         found->second.state.velocity = velocity;
-        mj_forward(model, data);
+        derived_stale = true;
         return NKSIM_OK;
     }
 
     nksim_result read_joint_states(nksim::BackendJointState *states,
                                    std::uint32_t count) override {
+        refresh_derived();
         if (count != 0 && !states)
             return NKSIM_ERROR_INVALID_ARGUMENT;
         for (std::uint32_t index = 0; index < count; ++index) {
@@ -838,6 +845,7 @@ public:
     nksim_result read_contacts(std::vector<nksim::BackendContact> &out) override {
         out.clear();
         if (!model || !data) return NKSIM_OK;
+        refresh_derived();
         std::unordered_set<std::uint64_t> reported_pairs;
         const auto pair_key = [](int first, int second) {
             const auto low = static_cast<std::uint32_t>(std::min(first, second));
@@ -1189,6 +1197,7 @@ private:
                 if (detection > 0.0) proximity_candidates.push_back({first, second, detection});
             }
         }
+        derived_stale = false;
         apply_joint_targets();
         mj_forward(model, data);
         return NKSIM_OK;
@@ -1699,6 +1708,13 @@ private:
         }
     }
 
+    /** Brings derived quantities (positions, contacts, bias forces) up to date with queued state writes. */
+    void refresh_derived() {
+        if (!derived_stale || !model || !data) return;
+        mj_forward(model, data);
+        derived_stale = false;
+    }
+
     void set_free_body_state(int body_id, const nksim::BackendBodyState &state) {
         const auto joint_id = model->body_jntadr[body_id];
         const auto qpos = model->jnt_qposadr[joint_id];
@@ -1733,6 +1749,7 @@ private:
     // distributes each dof's desired acceleration through the whole
     // articulated system's inertia, not just its own row.
     void apply_joint_targets() {
+        refresh_derived();
         if (model->nu > 0)
             std::fill(data->ctrl, data->ctrl + model->nu, 0.0);
         const auto nv = static_cast<std::size_t>(model->nv);
@@ -1890,6 +1907,7 @@ private:
     std::uint64_t saved_next_body = 1;
     std::uint64_t saved_next_joint = 1;
     bool topology_update = false;
+    bool derived_stale = false;
 };
 
 std::unique_ptr<nksim::PhysicsBackend> make_backend() {
