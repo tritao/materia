@@ -14,9 +14,20 @@ import materia.project.SceneArtifact;
 class MobileBasePreview {
 	public static inline var ASSEMBLY_ID:String = "mobile-base";
 
-	/** Geometry, joints and initial pose of the base; parts with equal designations share geometry. */
-	public static function base():Bytes
-		return SceneArtifact.encode(AssemblyPreview.scene(new MobileBase(), ASSEMBLY_ID));
+	/**
+	 * Geometry, joints and initial pose of the base (parts with equal designations share geometry), and
+	 * its drive: the wheel joints, with the wheel radius and track measured from the assembly.
+	 */
+	public static function base():Bytes {
+		var robot = new MobileBase();
+		var scene = AssemblyPreview.scene(robot, ASSEMBLY_ID);
+		scene.mobileBase = {leftWheel: "wheel_l", rightWheel: "wheel_r",
+			wheelRadius: robot.wheel.radius / 1000, trackWidth: robot.trackWidth() / 1000,
+			maxLinearSpeed: MobileBase.MAX_LINEAR_SPEED, maxAngularSpeed: MobileBase.MAX_ANGULAR_SPEED,
+			maxLinearAcceleration: MobileBase.MAX_LINEAR_ACCELERATION, maxAngularAcceleration: MobileBase.MAX_ANGULAR_ACCELERATION,
+			footprintLength: MobileBase.LENGTH / 1000, footprintWidth: MobileBase.WIDTH / 1000};
+		return SceneArtifact.encode(scene);
+	}
 }
 
 /** Geometry builds, the base stands on its wheels and casters, the wheels roll, and nothing collides. */
@@ -52,6 +63,14 @@ class MobileBaseChecks {
 		near(robot.trackWidth(), 300, "track width", 1e-9);
 		near(state.worldConnector("wheelLeft", "centre").y, -state.worldConnector("wheelRight", "centre").y,
 			"the wheels are symmetric about the centre line", 1e-9);
+		var drive = scene.mobileBase;
+		if (drive == null) throw "Mobile base preview should declare its drive";
+		near(drive.wheelRadius, robot.wheel.radius / 1000, "declared wheel radius", 1e-12);
+		near(drive.trackWidth, 0.3, "declared track width", 1e-12);
+		// The wheels' top speed covers the drive's: straight, and turning in place.
+		if (!(MobileBase.MAX_LINEAR_SPEED / drive.wheelRadius <= MobileBase.WHEEL_SPEED &&
+				MobileBase.MAX_ANGULAR_SPEED * drive.trackWidth / 2 / drive.wheelRadius <= MobileBase.WHEEL_SPEED))
+			throw "Mobile base speed limits ask more of the wheels than their joints allow";
 		var scan = state.worldConnector("lidar", "scan");
 		near(scan.z, MobileBase.DECK_Z + MobileBase.DECK_THICKNESS + LidarPuck.SCAN_HEIGHT, "lidar scan height", 1e-9);
 

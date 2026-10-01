@@ -4,6 +4,7 @@ import RobotKitRuntime;
 import cadbridge.AssemblySimulationBridge;
 import materia.assembly.AssemblyDefinition;
 import materia.project.MaterialLibrary;
+import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
@@ -37,15 +38,21 @@ class AssemblyRobot {
   public final parts:Array<AssemblyPart>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
   public final warnings:Array<String>;
+  /**
+   * The drive of a wheeled assembly, which takes body twists; its wheels roll the chassis over the
+   * floor in the simulation. Null for an assembly fixed to the world.
+   */
+  public final mobile:Null<MobileBase>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, warnings:Array<String>) {
+      parts:Array<AssemblyPart>, warnings:Array<String>, mobile:Null<MobileBase>) {
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
     this.blueprint = blueprint;
     this.parts = parts;
     this.warnings = warnings;
+    this.mobile = mobile;
   }
 
   /** The simulated part with scene id `id` (`project:<occurrence>`). */
@@ -141,7 +148,7 @@ class AssemblyRobot {
       masses.set(occurrence.id, chosenMass);
     }
     var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id));
+      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id), session.mobileBase);
     // Link collision geometry is installed with generated-part hulls in the
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
@@ -190,6 +197,15 @@ class AssemblyRobot {
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);
+    // A wheeled assembly's chassis rolls by the wheel rates the robot applies each tick, whoever commands them.
+    var mobile:Null<MobileBase> = null;
+    if (converted.model.mobileBase != null) {
+      mobile = MobileBase.fromBlueprint(robot, blueprint);
+      var odometry = mobile.driveModel.createOdometry();
+      if (odometry == null) throw "Only differential-drive assemblies can drive in the simulation";
+      candidate.setDifferentialDrive(robotIndex, odometry.leftWheelJoint, odometry.rightWheelJoint,
+        odometry.wheelRadius, odometry.trackWidth, odometry.leftDirection, odometry.rightDirection);
+    }
     for (occurrence in assembly.occurrences) {
       if (free.exists(occurrence.id)) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);
@@ -199,6 +215,6 @@ class AssemblyRobot {
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings);
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings, mobile);
   }
 }

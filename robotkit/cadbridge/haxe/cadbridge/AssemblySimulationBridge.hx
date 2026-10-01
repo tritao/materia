@@ -15,6 +15,9 @@ import robotkit.model.Joint;
 import robotkit.model.JointType;
 import robotkit.model.JointLimits;
 import robotkit.model.JointCoupling;
+import robotkit.model.RobotDriveConfiguration;
+import robotkit.model.RobotMobileConfiguration;
+import materia.project.SceneArtifact.SceneArtifactMobileBase;
 import cadkit.modeling.AssemblyState;
 
 /**
@@ -91,10 +94,14 @@ class AssemblySimulationBridge {
    * the root link. Only moving joints remain joints, so a machine of many bolted parts simulates as
    * a few links and its real axes. `massOf` may override a part's mass in kilograms (a part given
    * another material); its inertia scales with it.
+   *
+   * With `mobileBase` the assembly is a wheeled robot: its root link, in the assembly frame, is the
+   * chassis that the drive rolls over the floor, and the named wheel joints drive it.
    */
   public static function toRobotModel(definition:AssemblyDefinition,
       artifact:AssemblyPhysicalData, ?savedState:AssemblyStateRecord,
-      ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>):AssemblySimulationModel {
+      ?freeOccurrences:Array<String>, ?massOf:String->Null<Float>,
+      ?mobileBase:SceneArtifactMobileBase):AssemblySimulationModel {
     var free = new Map<String, Bool>();
     if (freeOccurrences != null) for (id in freeOccurrences) free.set(id, true);
     AssemblyDefinitionCodec.validate(definition);
@@ -244,6 +251,17 @@ class AssemblySimulationBridge {
         placement.joint(coupling.target)) * followerScale;
       model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
+    }
+    if (mobileBase != null) {
+      for (wheel in [mobileBase.leftWheel, mobileBase.rightWheel])
+        if ([for (joint in model.joints) if (joint.id == wheel) joint].length != 1)
+          throw 'Mobile base wheel "$wheel" is not a moving joint of the assembly';
+      model.mobileBase = new RobotMobileConfiguration(
+        RobotDriveConfiguration.Differential(mobileBase.leftWheel, mobileBase.rightWheel,
+          mobileBase.wheelRadius, mobileBase.trackWidth),
+        mobileBase.maxLinearSpeed, mobileBase.maxAngularSpeed,
+        mobileBase.maxLinearAcceleration, mobileBase.maxAngularAcceleration,
+        mobileBase.footprintLength, mobileBase.footprintWidth);
     }
     return {model: model, linkHulls: linkHulls, partLinks: partLinks,
       closureIds: closures, closures: closureGeometry};

@@ -62,6 +62,29 @@ typedef SceneArtifactData = {
 	@:optional var recipeDiagnostics:Array<String>;
 	/** A machining job the generator made for its own machine; see SceneArtifactMachining. */
 	@:optional var machining:SceneArtifactMachining;
+	/** The assembly is a wheeled robot that drives on the floor; see SceneArtifactMobileBase. */
+	@:optional var mobileBase:SceneArtifactMobileBase;
+}
+
+/**
+ * The assembly is a differential-drive robot that rolls on the floor (since version 13). Its root body
+ * is the chassis, driven over the floor plane in the assembly frame: +X forward, +Z up, the origin on
+ * the floor between the wheels' contacts. `leftWheel` and `rightWheel` are its wheel joints (+Y side
+ * first), each turning about its own axle; the simulation reads each one's rolling direction from
+ * its axis. Lengths are metres, speeds m/s and rad/s, accelerations m/s² and rad/s², whatever the
+ * scene's unit. `footprintLength`/`footprintWidth` are the chassis outline, centred on the origin.
+ */
+typedef SceneArtifactMobileBase = {
+	var leftWheel:String;
+	var rightWheel:String;
+	var wheelRadius:Float;
+	var trackWidth:Float;
+	var maxLinearSpeed:Float;
+	var maxAngularSpeed:Float;
+	var maxLinearAcceleration:Float;
+	var maxAngularAcceleration:Float;
+	@:optional var footprintLength:Float;
+	@:optional var footprintWidth:Float;
 }
 
 /**
@@ -102,7 +125,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 12;
+	public static inline var VERSION:Int = 13;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -128,8 +151,9 @@ class SceneArtifact {
 		if (recipeDiagnostics.length > 2000000) throw "Scene artifact recipe diagnostics are too large";
 		var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
 		if (machining.length > 8000000) throw "Scene artifact machining job is too large";
+		var mobileBase = data.mobileBase == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mobileBase));
 		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -219,6 +243,8 @@ class SceneArtifact {
 		result.blit(offset, recipeDiagnostics, 0, recipeDiagnostics.length); offset += recipeDiagnostics.length;
 		offset = putInt(result, offset, machining.length);
 		result.blit(offset, machining, 0, machining.length); offset += machining.length;
+		offset = putInt(result, offset, mobileBase.length);
+		result.blit(offset, mobileBase, 0, mobileBase.length); offset += mobileBase.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -265,6 +291,48 @@ class SceneArtifact {
 				AssemblyDefinitionCodec.validateState(assemblyDefinition, data.assemblyState);
 		}
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
+		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
+	}
+
+	static function validateMobileBase(base:SceneArtifactMobileBase, definition:Null<AssemblyDefinition>):Void {
+		function fail(detail:String):Void throw 'Scene artifact mobile base $detail';
+		if (definition == null) fail("needs the robot's assembly definition");
+		var flat = AssemblyDefinitionFlattener.flatten(definition);
+		for (wheel in [base.leftWheel, base.rightWheel]) {
+			var joint = [for (joint in flat.joints) if (joint.id == wheel) joint];
+			if (joint.length != 1) fail('wheel "$wheel" is not a joint');
+			var type = Std.string(joint[0].type);
+			if (type != "continuous" && type != "revolute") fail('wheel "$wheel" is a $type joint, not a rotary one');
+		}
+		if (base.leftWheel == base.rightWheel) fail("needs two different wheels");
+		for (value in [base.wheelRadius, base.trackWidth, base.maxLinearSpeed, base.maxAngularSpeed,
+				base.maxLinearAcceleration, base.maxAngularAcceleration])
+			if (!finite(value) || value <= 0) fail("needs positive dimensions and limits");
+		if ((base.footprintLength == null) != (base.footprintWidth == null)) fail("needs both footprint sides or neither");
+		if (base.footprintLength != null) {
+			var length:Float = cast base.footprintLength, width:Float = cast base.footprintWidth;
+			if (!finite(length) || length <= 0 || !finite(width) || width <= 0) fail("needs a positive footprint");
+		}
+	}
+
+	/** A mobile base from its JSON section, typed field by field. */
+	static function decodeMobileBase(decoded:Dynamic):SceneArtifactMobileBase {
+		function fail():Dynamic throw "Scene artifact mobile base is invalid";
+		function text(name:String):String {
+			var value:Dynamic = Reflect.field(decoded, name);
+			return Std.isOfType(value, String) ? value : fail();
+		}
+		function number(name:String):Float {
+			var value:Dynamic = Reflect.field(decoded, name);
+			return Std.isOfType(value, Float) || Std.isOfType(value, Int) ? (value:Float) : fail();
+		}
+		var base:SceneArtifactMobileBase = {leftWheel: text("leftWheel"), rightWheel: text("rightWheel"),
+			wheelRadius: number("wheelRadius"), trackWidth: number("trackWidth"),
+			maxLinearSpeed: number("maxLinearSpeed"), maxAngularSpeed: number("maxAngularSpeed"),
+			maxLinearAcceleration: number("maxLinearAcceleration"), maxAngularAcceleration: number("maxAngularAcceleration")};
+		if (Reflect.field(decoded, "footprintLength") != null) base.footprintLength = number("footprintLength");
+		if (Reflect.field(decoded, "footprintWidth") != null) base.footprintWidth = number("footprintWidth");
+		return base;
 	}
 
 	static function validateMachining(machining:SceneArtifactMachining, parts:Map<String, Bool>,
@@ -426,7 +494,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != 10 && version != 11 && version != SceneArtifact.VERSION)
+			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != SceneArtifact.VERSION)
 			throw 'Unsupported scene artifact version $version';
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -522,11 +590,18 @@ private class SceneArtifactReader {
 				machining = @:privateAccess SceneArtifact.decodeMachining(haxe.Json.parse(readBytes(machiningLength).getString(0, machiningLength)));
 			}
 		}
+		var mobileBase:Null<SceneArtifactMobileBase> = null;
+		if (version >= 13) {
+			var mobileLength = readInt();
+			if (mobileLength < 0 || mobileLength > 100000) throw "Scene artifact mobile base is too large";
+			if (mobileLength > 0)
+				mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readBytes(mobileLength).getString(0, mobileLength)));
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
-			recipeDiagnostics: recipeDiagnostics, machining: machining};
+			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

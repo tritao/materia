@@ -53,6 +53,8 @@ class ApplicationSimulation {
   var motions:Null<RobotMotionPlayer> = null;
   var gripper:Null<RobotGripPlayer> = null;
   var cnc:Null<CncProgramPlayer> = null;
+  /** The project's wheeled assembly's drive, when it has one. */
+  var mobile:Null<robotkit.mobile.MobileBase> = null;
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
@@ -131,6 +133,7 @@ class ApplicationSimulation {
     var candidateRuntimes:Array<robotkit.runtime.RobotRuntime> = [];
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
+    var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
     try {
       var models = configuration.robotModels();
       var hasWorkers = false;
@@ -172,6 +175,7 @@ class ApplicationSimulation {
         candidateRobotModels.push(built.model);
         for (part in built.parts) candidateAssemblyParts.push(part);
         for (warning in built.warnings) candidateWarnings.push(warning);
+        candidateMobile = built.mobile;
         // A bad program fails the rebuild here, before anything live changes.
         var job = session.cncJob;
         if (job != null)
@@ -260,6 +264,7 @@ class ApplicationSimulation {
       workforce = candidateWorkforce;
       if (cnc != null) cnc.dispose();
       cnc = candidateCnc;
+      mobile = candidateMobile;
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
@@ -343,6 +348,8 @@ class ApplicationSimulation {
 
   /** The project's CNC program player, or null when the project has no CNC job. */
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
+  /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
+  public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
 
   /** The stock the project's CNC program is cutting, or null when it cuts none. */
   public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;
@@ -467,7 +474,7 @@ class ApplicationSimulation {
     }
     workforce = null; motions = null; gripper = null;
     if (cnc != null) cnc.dispose();
-    cnc = null; refreshMembers();
+    cnc = null; mobile = null; refreshMembers();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

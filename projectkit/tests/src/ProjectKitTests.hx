@@ -153,6 +153,58 @@ class ProjectKitTests {
     }
   }
 
+  /** A mobile base names its robot's wheel joints and carries positive dimensions and limits. */
+  static function mobileBase():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    var frame = AssemblyFrames.identity();
+    function wheel(id:String, child:String, type:AssemblyJointType):materia.assembly.AssemblyDefinition.KinematicJoint
+      return {id: id, type: type, role: AssemblyJointRole.Tree, parent: "chassis", parentConnector: "pin",
+        child: child, childConnector: "pin", axis: {x: 0.0, y: 1.0, z: 0.0},
+        limits: {lower: null, upper: null, velocity: 10.0, effort: 1.0}, defaultValue: 0.0};
+    var robot:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "robot",
+      lengthUnit: "mm", definitions: [{id: "body", connectors: [{name: "pin", frame: frame}]}],
+      occurrences: [for (id in ["chassis", "left", "right", "mast"]) {id: id, definition: "body", initialPose: frame}],
+      joints: [wheel("wheel_l", "left", AssemblyJointType.Continuous), wheel("wheel_r", "right", AssemblyJointType.Continuous),
+        wheel("lift", "mast", AssemblyJointType.Prismatic)]};
+    var base:materia.project.SceneArtifact.SceneArtifactMobileBase = {leftWheel: "wheel_l", rightWheel: "wheel_r",
+      wheelRadius: 0.075, trackWidth: 0.3, maxLinearSpeed: 0.8, maxAngularSpeed: 2.0,
+      maxLinearAcceleration: 0.5, maxAngularAcceleration: 1.5, footprintLength: 0.6, footprintWidth: 0.44};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [{id: "body", name: "body", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
+        vertices: vertices, normals: normals, indices: indices, faceRanges: []}],
+      assemblyDefinition: robot, mobileBase: base};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).mobileBase;
+    if (restored == null) throw "mobile base round trip lost the base";
+    check(restored.leftWheel == "wheel_l" && restored.rightWheel == "wheel_r" && restored.wheelRadius == 0.075 &&
+      restored.trackWidth == 0.3 && restored.maxAngularAcceleration == 1.5 && restored.footprintWidth == 0.44,
+      "mobile base round trip");
+    // A version 12 scene is the same bytes without the trailing mobile-base section.
+    data.mobileBase = null;
+    var plain = SceneArtifact.encode(data);
+    var older = Bytes.alloc(plain.length - 4);
+    older.blit(0, plain, 0, older.length);
+    older.setInt32(4, 12);
+    var read = SceneArtifact.decode(older);
+    var readDefinition:AssemblyDefinition = cast read.assemblyDefinition;
+    check(read.mobileBase == null && readDefinition.id == "robot", "scene version 12 reader");
+    data.mobileBase = base;
+    base.rightWheel = "lift";
+    rejects(function() SceneArtifact.encode(data), "mobile base wheel on a sliding joint");
+    base.rightWheel = "wheel_l";
+    rejects(function() SceneArtifact.encode(data), "mobile base with one wheel twice");
+    base.rightWheel = "missing";
+    rejects(function() SceneArtifact.encode(data), "mobile base wheel outside the assembly");
+    base.rightWheel = "wheel_r"; base.trackWidth = 0;
+    rejects(function() SceneArtifact.encode(data), "mobile base without a track");
+    base.trackWidth = 0.3; base.footprintWidth = null;
+    rejects(function() SceneArtifact.encode(data), "mobile base footprint with one side");
+    base.footprintWidth = 0.44; data.assemblyDefinition = null;
+    rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
+  }
+
   /** A machining job travels with its machine and names only what the scene has. */
   static function machining():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
@@ -269,7 +321,7 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene(); machining(); bodies();
+    assembly(); frames(); scene(); machining(); mobileBase(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

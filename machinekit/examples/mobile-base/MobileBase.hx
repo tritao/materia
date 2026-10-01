@@ -221,6 +221,11 @@ class MobileBase extends MachineAssembly {
 	/** Wheel speed limit in rad/s (about 0.9 m/s) and the stepper's holding torque in N·m. */
 	public static inline var WHEEL_SPEED:Float = 12;
 	public static inline var WHEEL_TORQUE:Float = 1.2;
+	/** Drive limits: m/s, rad/s, m/s², rad/s². */
+	public static inline var MAX_LINEAR_SPEED:Float = 0.8;
+	public static inline var MAX_ANGULAR_SPEED:Float = 2.0;
+	public static inline var MAX_LINEAR_ACCELERATION:Float = 0.5;
+	public static inline var MAX_ANGULAR_ACCELERATION:Float = 1.5;
 
 	public final motor:NemaStepper;
 	public final wheel:DriveWheel;

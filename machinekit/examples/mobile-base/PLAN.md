@@ -44,19 +44,31 @@ derives each wheel's forward direction from its joint axis in the base frame
 (forward is a spin about +Y; a wheel whose axis is not lateral is rejected) and
 applies it in `DifferentialDrive.targets`, `DifferentialOdometry`, the drive
 plant and the native `rk_simulation_set_differential_drive`, so CAD joints stay
-mechanical truth and imported URDF/MJCF bases work either way. Then a manifest `mobileBase` key names the robot
-subtree and its drive wheels; radius and track width are measured from the
-assembly. `AssemblySimulationBridge` makes that subtree's root body the robot
-root with `RobotModel.mobileBase` set and the rest of the assembly static
-environment, placed at the designed pose. Test: a commanded `Twist2` turns the
-wheels as `DifferentialDrive` says, the chassis follows the arc in the
-presentation snapshot, odometry agrees with simulation truth.
+mechanical truth and imported URDF/MJCF bases work either way.
 
-**M3. Missions.** A manifest `mobileMission` (looping goals or stations)
+The drive travels in the scene artifact (format 13, a `mobileBase` section),
+not the manifest, for the reason C4 moved the machining job there: the
+generator measures wheel radius and track from the CAD, so nothing is typed
+twice. `AssemblySimulationBridge` turns it into `RobotModel.mobileBase`, with
+the assembly's root link as the chassis (the assembly frame is the robot's
+floor frame), and `AssemblyRobot` couples the wheels to that chassis in the
+simulation and exposes the `MobileBase` drive view. The session gained
+`openGeneratedProject` so a new generated field is wired once. Tests: the
+CadBridge suite drives the real example (directions, chassis link, wheel
+rates, odometry); the project-source suite opens it as a project on both
+backends and checks a straight run and an in-place turn.
+
+The robot/environment split moves to M3, where the room first appears: until
+then the whole assembly is the robot.
+
+**M3. Missions.** A `mobileMission` (looping goals or stations)
 played by an app `MobileMissionPlayer`: `Navigator` plans with A* and follows
 with pure pursuit, commanding `MobileBase` each tick. The occupancy grid is
 rasterized from the environment parts' footprints and inflated by the chassis
-outline in `Costmap2`, so nothing is authored by hand. A small room with
+outline in `Costmap2`, so nothing is authored by hand. The scene becomes an
+assembly that includes the robot (`include("robot", ...)`) beside its room;
+the drive section names that robot subtree, whose root body becomes the moving
+chassis while every other world-fixed body stays put. A small room with
 shelves and a dock around the robot. Test: every goal reached, no inflated
 cell entered, the mission loops.
 
@@ -91,4 +103,4 @@ M7 are stretch goals.
 | --- | --- | --- |
 | M0 | done | c6e9da67 |
 | M1 | done | c6e9da67, 512baf40 (plates own the layout, mates throughout) |
-| M2 | in progress | wheel directions from joint axes in RobotKit (this commit); bridge next |
+| M2 | done | c2d81b4f (wheel directions), drive in the scene artifact + bridge + app (next commit) |

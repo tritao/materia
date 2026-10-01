@@ -285,6 +285,88 @@ class ProjectSourceTests {
     check(message.indexOf("cannot be joined") >= 0, "a joined part cannot be freed: " + message);
   }
 
+  /**
+   * The mobile base opens as a wheeled robot on both backends: a commanded twist rolls its chassis and
+   * every part on it over the floor, the wheels spin their own ways, and wheel odometry agrees.
+   */
+  static function checkMobileBase(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var drive = generated.mobileBase;
+    if (drive == null) throw "the mobile base project should declare its drive";
+    var wheelRadius:Float = (cast drive:materia.project.SceneArtifact.SceneArtifactMobileBase).wheelRadius;
+    function pose(simulation:ApplicationSimulation, id:String):{position:Array<Float>, rotation:Array<Float>} {
+      for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id)
+        return {position: entry.position, rotation: entry.rotation};
+      throw 'mobile base has no simulated pose for $id';
+    }
+    function yaw(rotation:Array<Float>):Float
+      return Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+        1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      check(session.mobileBase != null, "opening the mobile base project installs its drive");
+      var world = new RobotWorld();
+      var simulation = new ApplicationSimulation(world);
+      simulation.setBackend(backend);
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        'mobile base builds on the $label backend: ${simulation.error}');
+      var base = simulation.mobileBase();
+      if (base == null) throw 'mobile base has no drive on the $label backend';
+      var id = "assembly:" + (cast generated.assemblyDefinition:AssemblyDefinition).id;
+      var odometry = base.driveModel.createOdometry();
+      function step(seconds:Float):Void {
+        var until = simulation.activeSession().simulationTime() + seconds - 1e-9;
+        while (simulation.activeSession().simulationTime() < until) {
+          simulation.step();
+          var observed = world.snapshot().robot(id);
+          if (observed == null) throw "mobile base is missing from the world snapshot";
+          odometry.update(observed);
+        }
+      }
+      step(0.1);
+      var startPlate = pose(simulation, "project:basePlate"), startLidar = pose(simulation, "project:lidar");
+      // One second straight ahead at 0.4 m/s.
+      base.command(new robotkit.mobile.Twist2(0.4, 0.0));
+      var t0 = simulation.activeSession().simulationTime();
+      step(1.0);
+      var travelled = simulation.activeSession().simulationTime() - t0;
+      var plate = pose(simulation, "project:basePlate"), lidar = pose(simulation, "project:lidar");
+      var dx = plate.position[0] - startPlate.position[0];
+      check(Math.abs(dx - 0.4 * travelled) < 0.02 && Math.abs(plate.position[1] - startPlate.position[1]) < 1e-3 &&
+        Math.abs(plate.position[2] - startPlate.position[2]) < 1e-3,
+        '$label: the chassis rolls 0.4 m/s straight ahead, moved ${dx} m in ${travelled} s');
+      check(Math.abs(lidar.position[0] - startLidar.position[0] - dx) < 1e-3 &&
+        Math.abs(lidar.position[2] - startLidar.position[2]) < 1e-3, '$label: the lidar rides the chassis');
+      var observed = world.snapshot().robot(id);
+      if (observed == null) throw "mobile base is missing from the world snapshot";
+      var wheelRate = 0.4 / wheelRadius;
+      check(Math.abs(observed.velocities.get(0) - wheelRate) < 0.05 * wheelRate &&
+        Math.abs(observed.velocities.get(1) + wheelRate) < 0.05 * wheelRate,
+        '$label: the wheels spin at v / r, the right one negative (${observed.velocities.get(0)}, ${observed.velocities.get(1)})');
+      // Half a second turning in place at 1 rad/s.
+      var startYaw = yaw(plate.rotation);
+      base.command(new robotkit.mobile.Twist2(0.0, 1.0));
+      t0 = simulation.activeSession().simulationTime();
+      step(0.5);
+      var turned = simulation.activeSession().simulationTime() - t0;
+      var spun = pose(simulation, "project:basePlate");
+      check(Math.abs(yaw(spun.rotation) - startYaw - turned) < 0.05 &&
+        Math.abs(spun.position[0] - plate.position[0]) < 1e-3,
+        '$label: the chassis turns in place counter-clockwise, ${yaw(spun.rotation) - startYaw} rad in ${turned} s');
+      base.stop();
+      step(0.1);
+      var estimate = odometry.current();
+      check(Math.abs(estimate.x - dx) < 0.02 && Math.abs(estimate.yaw - (yaw(spun.rotation) - startYaw)) < 0.05,
+        '$label: wheel odometry follows the chassis (${estimate.x} m, ${estimate.yaw} rad)');
+      Sys.println('mobile base ($label): ${Math.round(dx * 1000)} mm in ${Math.round(travelled * 100) / 100} s, ' +
+        'turned ${Math.round((yaw(spun.rotation) - startYaw) * 1000) / 1000} rad, odometry ${Math.round(estimate.x * 1000)} mm');
+      simulation.clear();
+    }
+  }
+
   /** The arm example opens with its shipped motion and the simulation follows it. */
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
@@ -1109,6 +1191,7 @@ class ProjectSourceTests {
     checkRobotArm(root);
     checkMates(root);
     checkCncRouter(root);
+    checkMobileBase(root);
     checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;

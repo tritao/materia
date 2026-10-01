@@ -128,11 +128,7 @@ class ExampleCatalog {
       case Project(projectPath): projectPath;
       default: throw "Only project examples finish from a build";
     };
-    app.session.openGeneratedScene(generated.objects, path, generated.assembly,
-      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-      generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
-          generated.faceDescriptorsByDefinition, generated.cncJob);
+    app.session.openGeneratedProject(generated, path);
     app.documentChanged();
     showModel(app);
     app.log((entry.id == LAUNCH_PROJECT_ID ? "Opened project: " : "Opened example: ") + entry.title);

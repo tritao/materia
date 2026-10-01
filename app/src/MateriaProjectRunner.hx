@@ -435,7 +435,7 @@ class MateriaProjectRunner {
       localCentersByDefinition: localCentersByDefinition, faceDescriptorsByDefinition: faceDescriptorsByDefinition,
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics,
-      cncJob: machiningJob(artifact, records, scale)};
+      cncJob: machiningJob(artifact, records, scale), mobileBase: artifact.mobileBase};
   }
 
   /**
@@ -536,7 +536,8 @@ class MateriaProjectRunner {
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
       faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
-      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips, cncJob: generated.cncJob};
+      robotMotions: generated.robotMotions, robotGrips: generated.robotGrips, cncJob: generated.cncJob,
+      mobileBase: generated.mobileBase};
   }
 
   static function addOccurrenceRecord(records:Array<SceneObjectData>, component:SceneArtifactPart,
@@ -685,4 +686,6 @@ typedef GeneratedAssemblyScene = {
   @:optional var robotGrips:Array<RobotGripEvent>;
   /** The machining job the project's generator made for its machine, if any. */
   @:optional var cncJob:CncJob;
+  /** The assembly is a wheeled robot driving on the floor, when the generator says so. */
+  @:optional var mobileBase:materia.project.SceneArtifact.SceneArtifactMobileBase;
 }
