@@ -251,8 +251,13 @@ class TextField implements View {
 				textNode.layout.text = placeholder;
 			else if (useTextNode)
 				textNode.layout.text = editor.layoutText();
-			else
+			else {
+				// Clay orders absolute paint layers independently of flow content.
+				// Keep glyphs above decoration/selection layers, while a separate
+				// measurement-only node supplies their shared intrinsic size.
+				textNodeStyle.positioning = LayoutPositioning.Absolute;
 				textNode.layout.intrinsicContent = editor.renderContent;
+			}
 			var textNodeTextStyle = new TextStyle(editor.textStyle.fontSize,
 				editor.textStyle.font, editor.textStyle.letterSpacing);
 			var fontSource = computed.source(StyleProperty.FontSize);
@@ -272,6 +277,15 @@ class TextField implements View {
 				editor.setRenderColor(textNodeColor);
 			}
 			editorContent.add(textNode);
+			if (!useTextNode) {
+				var measureStyle = new LayoutStyle();
+				measureStyle.width = LayoutAxis.grow();
+				measureStyle.height = LayoutAxis.grow();
+				var measureNode = new RenderNode(context.id("editor-measure"), LayoutVisualKind.Custom, measureStyle);
+				measureNode.hitTestSelf = false;
+				measureNode.layout.intrinsicContent = editor.renderMeasurement;
+				editorContent.add(measureNode);
+			}
 			if (editor.focused) {
 				var paintStyle = new LayoutStyle();
 				paintStyle.width = LayoutAxis.grow();

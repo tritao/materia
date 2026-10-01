@@ -45,7 +45,8 @@ class TextEditorState {
 	public final paragraphStyle:ParagraphStyle;
 	/** Cached conversions between document code points, UTF-8 bytes and UTF-16 units. */
 	var offsets:TextDocument;
-	final renderMeasurement:LayoutMeasuredContent;
+	/** Measurement-only provider for widgets that place painting in separate layers. */
+	public final renderMeasurement:LayoutMeasuredContent;
 	var renderColor:Color;
 	var lastLayoutWidth:Float;
 	var lastLayoutRevision:Int;
