@@ -52,6 +52,8 @@ class TextField implements View {
 	public final textColor:Null<Color>;
 	/** Sorted, disjoint absolute codepoint foreground ranges for a visible chunk. */
 	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
+	/** Backgrounds and underlines in absolute document codepoint coordinates. */
+	public var decorationProvider:Null<(Int, Int)->Array<TextDecoration>>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
@@ -86,6 +88,7 @@ class TextField implements View {
 		this.document = document;
 		this.onSubmit = null;
 		this.colorRangeProvider = null;
+		this.decorationProvider = null;
 		this.label = label;
 		this.placeholder = null;
 		this.multiline = multiline;
@@ -146,6 +149,7 @@ class TextField implements View {
 			}
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
 			editor.layout.colorRangeProvider = colorRangeProvider;
+			editor.layout.decorationProvider = decorationProvider;
 
 			var flags = context.interactionStates.get(id);
 			flags = StyleStateUtil.withState(flags, StyleState.Disabled, !enabled);
@@ -189,6 +193,27 @@ class TextField implements View {
 			editorContentStyle.clipVertical = multiline;
 			var editorContent = new RenderNode(context.id("editor-content"),
 				LayoutVisualKind.Box, editorContentStyle);
+			if (decorationProvider != null) {
+				var backgroundStyle = new LayoutStyle();
+				backgroundStyle.width = LayoutAxis.grow();
+				backgroundStyle.height = LayoutAxis.grow();
+				backgroundStyle.positioning = LayoutPositioning.Absolute;
+				backgroundStyle.zIndex = 0;
+				var backgroundNode = new RenderNode(context.id("editor-background"),
+					LayoutVisualKind.Custom, backgroundStyle);
+				backgroundNode.hitTestSelf = false;
+				backgroundNode.onPaint(function(canvas, geometry) {
+					if (!editor.isDisposed()) {
+						var visible = geometry.visibleLocalBounds();
+						canvas.translate(0.0, -editor.scrollOffsetY);
+						editor.layout.paintDecorations(canvas, true,
+							editor.scrollOffsetY + visible.y,
+							editor.scrollOffsetY + visible.y + visible.height,
+							visible.x, visible.x + visible.width);
+					}
+				});
+				editorContent.add(backgroundNode);
+			}
 			// Unfocused, unselected fields need only their text node. State changes
 			// invalidate the frame before selection or caret decoration is painted.
 			if (editor.selectionStart != editor.selectionEnd) {
@@ -210,7 +235,7 @@ class TextField implements View {
 				placeholder.length > 0;
 			// Single-line fields use the text node so their full value and theme
 			// foreground update together as the editor content changes.
-			var useTextNode = showsPlaceholder || (!multiline && colorRangeProvider == null);
+			var useTextNode = showsPlaceholder || (!multiline && colorRangeProvider == null && decorationProvider == null);
 			var textNode = new RenderNode(context.id("text"),
 				useTextNode ? LayoutVisualKind.Text : LayoutVisualKind.Custom, textNodeStyle);
 			if (showsPlaceholder)

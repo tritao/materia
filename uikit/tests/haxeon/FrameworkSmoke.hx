@@ -5,6 +5,7 @@ import Canvas;
 import DisplayList;
 import CompositeMode;
 import FontCollection;
+import FontFamily;
 import GradientStop;
 import Image;
 import ImageFormat;
@@ -32,6 +33,8 @@ import TextLayout;
 import TextDirection;
 import TextStyle;
 import TextColorRange;
+import nativekit.ui.widgets.text.TextDecoration;
+import nativekit.ui.widgets.text.TextDecorationKind;
 import TextWrap;
 import NativeKitEventValue;
 import NativeKitEventValue.NativeKitTextEdit;
@@ -280,6 +283,65 @@ class FrameworkSmoke {
 		return rejected;
 	}
 
+	static function decorationRangesValid(fonts:FontCollection):Bool {
+		var emojiPath = Sys.getEnv("NKUI_TEST_EMOJI_FONT_PATH");
+		var textPath = Sys.getEnv("NKUI_TEST_FONT_PATH");
+		if (emojiPath == null || textPath == null)
+			throw "Decoration tests require text and emoji fonts";
+		var decorationFonts = FontCollection.create();
+		decorationFonts.add(textPath);
+		decorationFonts.add(emojiPath, FontFamily.Emoji);
+		var editor = new TextEditorState(decorationFonts, "abc🙂def\nxyz");
+		editor.updateLayout(200.0);
+		var before = editor.layout.measure();
+		var color = new Color(0.85, 0.2, 0.2);
+		var background = new TextDecoration(1, 5, color, Background);
+		var rects = background.rectangles(editor.layout, 0.0, 100.0);
+		if (rects.length == 0 || rects[0].x <= 0.0 || rects[0].width <= 0.0)
+			throw "decoration range geometry: count=" + rects.length + (rects.length == 0 ? "" : " x=" + rects[0].x + " width=" + rects[0].width);
+		var line = new TextDecoration(0, 0, color, WholeLineBackground);
+		var lineRects = line.rectangles(editor.layout, 0.0, 100.0);
+		if (lineRects.length != 1 || lineRects[0].x != 0.0 || lineRects[0].width != 200.0)
+			throw "whole-line geometry";
+		var underline = new TextDecoration(1, 5, color, Underline);
+		var wavy = new TextDecoration(1, 5, color, WavyUnderline);
+		var canvas = new Canvas();
+		background.paint(canvas, rects, 0.0, 20.0);
+		line.paint(canvas, lineRects, 0.0, 20.0);
+		underline.paint(canvas, rects, 0.0, 20.0);
+		wavy.paint(canvas, rects, 0.0, 20.0);
+		var list = DisplayList.create();
+		canvas.update(list);
+		if (list.info().commandCount <= 0 || editor.layout.measure().height != before.height)
+			throw "decoration transaction measurement";
+		list.dispose();
+		canvas.reset();
+		if (!editor.replace(0, 0, "zz"))
+			throw "decoration edit application";
+		var moved = new TextDecoration(3, 7, color, Underline).rectangles(editor.layout, 0.0, 100.0);
+		if (moved.length == 0 || moved[0].x <= rects[0].x)
+			throw "decoration geometry after edit";
+		editor.dispose();
+		var value = new StringBuf();
+		for (_ in 0...150)
+			value.add("abc\n");
+		var layered = new TextEditorState(decorationFonts, value.toString());
+		layered.updateLayout(200.0);
+		var calls = 0;
+		layered.layout.decorationProvider = function(start, end) {
+			calls++;
+			layered.layout.decorationProvider = null;
+			return [new TextDecoration(start, start, color, WholeLineBackground)];
+		};
+		layered.layout.paintDecorations(canvas, true, 0.0, layered.layout.measure().height,
+			0.0, 200.0);
+		canvas.reset();
+		layered.dispose();
+		decorationFonts.dispose();
+		if (calls != 3) throw "provider snapshot calls: " + calls;
+		return true;
+	}
+
 	static function main():Int {
 		if (!hostFrameLifecycleValid())
 			return 270;
@@ -305,6 +367,8 @@ class FrameworkSmoke {
 		fonts.add(fontPath);
 		if (!foregroundRangesValid(fonts))
 			return 308;
+		if (!decorationRangesValid(fonts))
+			return 309;
 		if (!hostRuntimeLifecycleValid(fonts))
 			return 272;
 		var rtlLayout = TextLayout.create(fonts, "א", 80.0, null,

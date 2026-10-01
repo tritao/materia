@@ -25,6 +25,7 @@ class TextEditorLayout {
 	 * The provider is queried at paint time, so text edits can refresh styles.
 	 */
 	public var colorRangeProvider:Null<(Int, Int)->Array<TextColorRange>>;
+	public var decorationProvider:Null<(Int, Int)->Array<TextDecoration>>;
 
 	final fonts:FontCollection;
 	var paragraphs:Array<TextEditorParagraphRecord>;
@@ -47,6 +48,7 @@ class TextEditorLayout {
 		this.textStyle = copyTextStyle(textStyle);
 		this.paragraphStyle = copyParagraphStyle(paragraphStyle);
 		colorRangeProvider = null;
+		decorationProvider = null;
 		paragraphs = [];
 		rangeGeometryCache = [];
 		offsets = null;
@@ -386,10 +388,13 @@ class TextEditorLayout {
 
 	/** Paints retained paragraphs intersecting the visible document range. */
 	public function paint(canvas:Canvas, color:Color, minY:Float = 0.0,
-			maxY:Float = 1.0e30):Void {
+			maxY:Float = 1.0e30, minX:Float = 0.0, maxX:Float = 1.0e30,
+			includeBackground:Bool = true):Void {
 		ensureLive();
 		if (canvas == null || color == null)
 			throw "Editor layout paint arguments are invalid";
+		if (includeBackground)
+			paintDecorations(canvas, true, minY, maxY, minX, maxX);
 		var low = 0;
 		var high = paragraphs.length;
 		while (low < high) {
@@ -414,6 +419,53 @@ class TextEditorLayout {
 				}
 				applyForegroundRanges(record);
 				canvas.drawText(record.layout, 0.0, record.y);
+			}
+		}
+		paintDecorations(canvas, false, minY, maxY, minX, maxX);
+	}
+
+	/** Paints one decoration layer using cached measured range geometry. */
+	public function paintDecorations(canvas:Canvas, behindText:Bool, minY:Float, maxY:Float,
+			minX:Float, maxX:Float):Void {
+		ensureLive();
+		// Keep one provider for this layer even if a callback replaces the widget's provider.
+		var provider = decorationProvider;
+		if (provider == null)
+			return;
+		var low = 0;
+		var high = paragraphs.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			var candidate = paragraphs[middle];
+			if (candidate.y + candidate.height <= minY)
+				low = middle + 1;
+			else
+				high = middle;
+		}
+		for (index in low...paragraphs.length) {
+			var record = paragraphs[index];
+			if (record.y + record.height <= minY)
+				continue;
+			if (record.y >= maxY)
+				break;
+			var values = provider(record.start, record.end);
+			if (values == null)
+				throw "Text decoration provider returned null";
+			for (value in values) {
+				if (value == null || value.end > offsets.codepointCount)
+					throw "Text decoration is outside the document";
+				var isBackground = value.kind == Background || value.kind == WholeLineBackground;
+				if (isBackground != behindText)
+					continue;
+				if (value.start == value.end) {
+					if (value.start < record.start || value.start > record.end ||
+						(value.start == record.end && record.end < offsets.codepointCount))
+						continue;
+				} else if (value.end <= record.start || value.start >= record.end)
+					continue;
+				var rects = value.rectangles(this, Math.max(minY, record.y),
+					Math.min(maxY, record.y + record.height));
+				value.paint(canvas, rects, minX, maxX);
 			}
 		}
 	}

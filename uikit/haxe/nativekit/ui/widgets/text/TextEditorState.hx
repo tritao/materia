@@ -96,7 +96,7 @@ class TextEditorState {
 			var visible = geometry.visibleLocalBounds();
 			canvas.translate(0.0, -scrollOffsetY);
 			layout.paint(canvas, renderColor, scrollOffsetY + visible.y,
-				scrollOffsetY + visible.y + visible.height);
+				scrollOffsetY + visible.y + visible.height, visible.x, visible.x + visible.width, false);
 		});
 		lastLayoutWidth = 1.0;
 		lastLayoutRevision = offsets.revision;
