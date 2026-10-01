@@ -145,6 +145,12 @@ The belly is a hinge's pivot, so it stays behind the edge while the chest goes o
 height) now runs: the rendered frames show it bowed over the rack and the table, with the head low, which is the extreme of what the
 arm can reach. Reaching across needs the body to stay bent until the part is down, so `ReleaseLimb` waits for it to straighten.
 
+## Two hands
+
+Two hands reach with both arms, so the stance suits the shoulder that is further back (an idle pose that twists a little, as the library's does
+by about 18 degrees, puts the left shoulder 12 cm ahead of the right; planned for the left, the right arm overreached and a pick failed), and the body faces
+the point with its shoulders square (the root is turned by the idle pose's twist, `HumanBody.standingTwist`, and the shoulders planned where that puts them).
+
 ## Holding the feet
 
 While the idle pose shows (standing, and the cross-fade into and out of a walk) a character whose legs are IK chains holds

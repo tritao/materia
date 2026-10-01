@@ -17,6 +17,8 @@ enum ExampleKind {
   Script(reference:String);
   /** The saved rack-to-table worker document, started in realtime. */
   WorkerRackToTable;
+  /** The worker gallery: one lane for each case the worker is built for, run side by side in realtime. */
+  WorkerGallery;
 }
 
 typedef ExampleEntry = {
@@ -55,7 +57,11 @@ class ExampleCatalog {
     {id: "worker-rack-to-table", title: "Worker moves a rack",
       description: ["A walking human worker in a", "running physics simulation"],
       tag: "Simulation · starts running",
-      kind: WorkerRackToTable}
+      kind: WorkerRackToTable},
+    {id: "worker-gallery", title: "Worker gallery",
+      description: ["Six workers side by side: bending,", "crouching, kneeling, turning, two hands"],
+      tag: "Simulation · starts running",
+      kind: WorkerGallery}
   ];
 
   /** Id of the entry built for a project named on the command line; it is not part of `entries`. */
@@ -89,12 +95,13 @@ class ExampleCatalog {
   static function isAvailable(entry:ExampleEntry):Bool return switch (entry.kind) {
     case Project(path): FileSystem.exists(path);
     case Script(reference): SetupScriptRegistry.references().indexOf(reference) >= 0;
-    case WorkerRackToTable: workerAssetExists();
+    case WorkerRackToTable: workerAssetExists("app/examples/worker-rack-to-table.materia");
+    case WorkerGallery: workerAssetExists("app/examples/worker-gallery.materia");
   };
 
-  static function workerAssetExists():Bool {
+  static function workerAssetExists(document:String):Bool {
     try {
-      return FileSystem.exists(WorkerAssetPath.resolve("app/examples/worker-rack-to-table.materia"));
+      return FileSystem.exists(WorkerAssetPath.resolve(document));
     } catch (_:Dynamic) {
       return false;
     }
@@ -144,6 +151,10 @@ class ExampleCatalog {
         showModel(app);
       case WorkerRackToTable:
         app.enableWorkerDemo(0, true);
+        app.enterSimulationMode();
+        showModel(app);
+      case WorkerGallery:
+        app.enableWorkerDemo(0, true, ReferenceEditorApp.WORKER_GALLERY);
         app.enterSimulationMode();
         showModel(app);
     }

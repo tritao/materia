@@ -31,6 +31,8 @@ class ApproachFor extends HumanActionBase {
 	/** How far it bends at the hips on top of that, for a surface too deep to reach across by leaning alone. */
 	public var hinge(default, null):Float = 0.0;
 	var postureIssued:Bool = false;
+	/** The arm whose shoulder the stance is planned for: the action's own, or for two hands the one further back. */
+	var planLimb:HumanLimb = ArmR;
 	/** The walk to the stand, held back while the body stands up from a crouch. */
 	var waiting:Null<Array<Array<Float>>> = null;
 	var faceAngle:Float = 0.0;
@@ -57,6 +59,17 @@ class ApproachFor extends HumanActionBase {
 		var bone = limb == ArmL ? UpperArmL : UpperArmR;
 		var shoulder = worker.standingBone(bone);
 		if (shoulder == null) { fail("The rig lacks an arm"); return; }
+		// Two hands reach with both arms: the stance has to suit the shoulder that is further back, which on a body whose idle
+		// pose twists a little is the farther one from the point, not the one of the limb the action was given.
+		if (bothHands) {
+			var otherBone = limb == ArmL ? UpperArmR : UpperArmL;
+			var other = worker.standingBone(otherBone);
+			if (other != null && other[0] < shoulder[0]) {
+				bone = otherBone;
+				shoulder = other;
+			}
+		}
+		planLimb = bone == UpperArmL ? ArmL : ArmR;
 		var bellyBone = worker.standingBone(Spine) != null ? Spine : Pelvis;
 		var belly = worker.standingBone(bellyBone);
 		var root = worker.rootTransform();
@@ -126,7 +139,7 @@ class ApproachFor extends HumanActionBase {
 		worker.setArmsDown(support != null);
 		var standX = target[0] - chosen.ux * chosen.standDistance + chosen.uy * chosen.lateral;
 		var standY = target[1] - chosen.uy * chosen.standDistance - chosen.ux * chosen.lateral;
-		faceAngle = Math.atan2(chosen.uy, chosen.ux);
+		faceAngle = Math.atan2(chosen.uy, chosen.ux) - (bothHands ? worker.standingTwist() : 0.0);
 		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005) {
 			var route = [[root[12], root[13]], [standX, standY]];
 			// A crouched body does not walk: it stands up first, and the walk starts when it has.
@@ -150,6 +163,12 @@ class ApproachFor extends HumanActionBase {
 			bellyStanding:Null<Array<Float>>, root:Array<Float>, kneeling:Bool = false):Stance {
 		var drop = kneeling ? worker.kneelShift(bone, depth) : worker.crouchShift(bone, depth);
 		var shoulder = [standing[0] + drop[0], standing[1] + drop[1], standing[2] + drop[2]];
+		// Two hands face the point with the shoulders square, which turns the body by the idle pose's twist, so the shoulder is
+		// planned where that puts it.
+		if (bothHands && worker.standingTwist() != 0.0) {
+			var square = -worker.standingTwist(), c = Math.cos(square), s = Math.sin(square);
+			shoulder = [shoulder[0] * c - shoulder[1] * s, shoulder[0] * s + shoulder[1] * c, shoulder[2]];
+		}
 		var length = worker.description.upperArm + worker.description.forearm;
 		// With two hands the stance is centred on the object, so each shoulder stays a little to the side of
 		// its hand's grasp point. That sideways gap takes its share of the arm, leaving less for the reach
@@ -217,7 +236,7 @@ class ApproachFor extends HumanActionBase {
 				// Standing back from the edge leaves the shoulder short of the point: lean to make it up. The lean
 				// carries the shoulder forward and also lowers it, both as measured, and the arm then stretches
 				// past its comfortable reach, but no further from the shoulder where it ends up than the posture allows.
-				var made = kneeling ? worker.leanFor(limb, required - stance.standDistance, 0.0, depth) : worker.leanFor(limb, required - stance.standDistance, depth);
+				var made = kneeling ? worker.leanFor(planLimb, required - stance.standDistance, 0.0, depth) : worker.leanFor(planLimb, required - stance.standDistance, depth);
 				stance.lean = made.angle;
 				var riseAfter = rise - made.drop;
 				if (Math.abs(riseAfter) >= farthest) {
@@ -229,7 +248,7 @@ class ApproachFor extends HumanActionBase {
 				stance.shortfall = Math.max(0.0, required - stance.standDistance);
 				// A top too deep to reach across by leaning: bend at the hips as well, which carries the shoulder further.
 				if (stance.shortfall > 0.01 && worker.posture.maxHinge > 0.0 && depth <= 0.0) {
-					var bent = worker.hingeFor(limb, stance.shortfall, kneeling ? 0.0 : depth, kneeling ? depth : 0.0, made.angle);
+					var bent = worker.hingeFor(planLimb, stance.shortfall, kneeling ? 0.0 : depth, kneeling ? depth : 0.0, made.angle);
 					stance.hinge = bent.angle;
 					var riseBent = riseAfter - bent.drop;
 					if (Math.abs(riseBent) < farthest) {

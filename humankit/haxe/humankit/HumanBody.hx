@@ -610,6 +610,17 @@ class HumanBody {
 		return left == null || right == null ? 0.0 : Math.atan2(left[1] - right[1], left[0] - right[0]);
 	}
 
+	/**
+	 * How far the idle pose's shoulders are twisted from square to the way the body faces, in radians (positive: the left shoulder
+	 * further back). A body that faces a table with its shoulders square needs its root turned by the opposite.
+	 */
+	public function standingTwist():Float {
+		var twist = standingTurn - Math.PI * 0.5;
+		while (twist > Math.PI) twist -= 2.0 * Math.PI;
+		while (twist < -Math.PI) twist += 2.0 * Math.PI;
+		return Math.abs(twist) < 0.05 ? 0.0 : twist;
+	}
+
 	/** How far the body is turned in model space from standing at rest (a turn clip turns it so), in radians. */
 	public function bodyTurn():Float {
 		var turn = shoulderTurn() - standingTurn;
