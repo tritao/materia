@@ -24,14 +24,27 @@ top plate, modelled rigid), both with recipes, named faces and smoke checks.
 
 **M1. The robot, geometry and joints.** `MobileBase` is a `MachineAssembly`:
 an aluminium base plate with wheel slots, two NEMA 23 steppers on brackets
-driving 150 mm wheels directly on `continuous` joints `wheel_l`/`wheel_r`,
-front and rear casters, a battery, an upper deck on four tube posts and a
-lidar on the front of the deck. The robot drives along +X with its axles
-along Y, on the floor at z = 0. Checks: wheels and casters touch the floor,
-track width and wheel radius come from the assembly, no interference, the
-wheel joints turn the wheels about their axles. Start-page entry.
+driving 150 mm wheels directly, front and rear casters, a battery, an upper
+deck on four tube posts and a lidar on the front of the deck. The robot
+drives along +X with its axles along Y, on the floor at z = 0.
 
-**M2. Project → mobile robot.** A manifest `mobileBase` key names the robot
+The plates own the layout: a `ChassisPlate` takes named seats (a connector
+frame plus the holes its fasteners need), and every part mates to a seat
+through its own connector. Each wheel's bore mates to its motor's shaft on a
+`continuous` joint (`wheel_l`, `wheel_r`) about that shaft, which points
+outward, so the joints read like the motors' encoders: positive rolls the left
+wheel forward and the right one back. (An earlier cut laid parts out by world
+pose with derived connectors; it hid the part interfaces and let a changed
+bracket or shaft silently leave the wheel behind.) Checks: wheels and casters
+touch the floor, track width measured from the solved assembly, each wheel
+turns about its own shaft, no interference. Start-page entry.
+
+**M2. Project → mobile robot.** First RobotKit: the differential drive
+derives each wheel's forward direction from its joint axis in the base frame
+(forward is a spin about +Y; a wheel whose axis is not lateral is rejected) and
+applies it in `DifferentialDrive.targets`, `DifferentialOdometry`, the drive
+plant and the native `rk_simulation_set_differential_drive`, so CAD joints stay
+mechanical truth and imported URDF/MJCF bases work either way. Then a manifest `mobileBase` key names the robot
 subtree and its drive wheels; radius and track width are measured from the
 assembly. `AssemblySimulationBridge` makes that subtree's root body the robot
 root with `RobotModel.mobileBase` set and the rest of the assembly static

@@ -5,9 +5,11 @@ base plate, two NEMA 23 steppers driving 150 mm wheels directly (continuous
 joints `wheel_l`, `wheel_r`), swivel casters front and rear, a battery, an
 upper deck on tube posts and a planar lidar.
 
-- `MobileBase.hx` — the assembly (`PosedAssembly`) and its example-only parts.
+- `MobileBase.hx` — the assembly and its example-only parts; plates own the
+  layout as named seats that every part mates to.
 - `MobileBasePreview.hx` — the project entrypoint and `MobileBaseChecks`
-  (floor contact, track width, wheel rotation sense, no interference), run by
+  (floor contact, track width, each wheel turning about its shaft, no
+  interference), run by
   the MachineKit smoke suite.
 - `PLAN.md` — where this example is going: driving, missions, lidar, arm.
 

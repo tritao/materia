@@ -55,21 +55,26 @@ class MobileBaseChecks {
 		var scan = state.worldConnector("lidar", "scan");
 		near(scan.z, MobileBase.DECK_Z + MobileBase.DECK_THICKNESS + LidarPuck.SCAN_HEIGHT, "lidar scan height", 1e-9);
 
-		// A positive wheel angle turns each wheel about +Y, which rolls the base forward along +X:
-		// the wheel's local +X (world -X at zero) swings up to +Z at a quarter turn.
-		for (joint in ["wheel_l", "wheel_r"]) {
-			var id = joint == "wheel_l" ? "wheelLeft" : "wheelRight";
-			for (angle in [0.0, Math.PI / 2, 2.0]) {
-				state.setJoint(joint, angle);
+		// Each wheel joint turns its wheel about its own motor's shaft, which points outward. Spinning
+		// about +Y rolls a wheel forward, so a positive speed drives the left wheel forward and the right one back.
+		for (side in [{joint: "wheel_l", wheel: "wheelLeft", motor: "motorLeft", forward: 1},
+				{joint: "wheel_r", wheel: "wheelRight", motor: "motorRight", forward: -1}]) {
+			var shaft = AssemblyFrames.transformVector(state.worldConnector(side.motor, "shaftAxis"), 0, 1, 0);
+			near(shaft.y, side.forward, '${side.joint} shaft points outward', 1e-9);
+			var start = AssemblyFrames.transformVector(state.worldPose(side.wheel), 1, 0, 0);
+			for (angle in [Math.PI / 2, 2.0]) {
+				state.setJoint(side.joint, angle);
 				state.forwardKinematics();
-				var pose = state.worldPose(id);
-				var x = AssemblyFrames.transformVector(pose, 1, 0, 0);
-				var side = id == "wheelLeft" ? 1 : -1;
-				near(x.x, -side * Math.cos(angle), '$joint at $angle: local x, world x', 1e-9);
-				near(x.z, side * Math.sin(angle), '$joint at $angle: local x, world z', 1e-9);
-				near(state.worldConnector(id, "centre").z, robot.wheel.radius, '$joint at $angle keeps its axle', 1e-9);
+				var turned = AssemblyFrames.transformVector(state.worldPose(side.wheel), 1, 0, 0);
+				// Rodrigues: start turned by `angle` about the shaft (start is perpendicular to it).
+				var cross = {x: shaft.y * start.z - shaft.z * start.y, y: shaft.z * start.x - shaft.x * start.z,
+					z: shaft.x * start.y - shaft.y * start.x};
+				near(turned.x, Math.cos(angle) * start.x + Math.sin(angle) * cross.x, '${side.joint} at $angle, x', 1e-9);
+				near(turned.y, Math.cos(angle) * start.y + Math.sin(angle) * cross.y, '${side.joint} at $angle, y', 1e-9);
+				near(turned.z, Math.cos(angle) * start.z + Math.sin(angle) * cross.z, '${side.joint} at $angle, z', 1e-9);
+				near(state.worldConnector(side.wheel, "centre").z, robot.wheel.radius, '${side.joint} at $angle keeps its axle', 1e-9);
 			}
-			state.setJoint(joint, 0);
+			state.setJoint(side.joint, 0);
 		}
 
 		// No two members intersect, with the wheels at rest and turned.
