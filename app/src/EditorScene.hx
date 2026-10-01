@@ -98,6 +98,8 @@ class EditorScene {
   final stockSimulations:Map<String, StockSimulationSession> = new Map();
   /** Geometry given to objects by setRuntimeGeometry, which the scene owns. */
   final ownedRuntimeGeometry:Map<String, Geometry> = new Map();
+  /** Child nodes showing parts of objects' runtime geometry, by object then part. */
+  final runtimeParts:Map<String, Array<Null<{node:NodeId, geometry:Geometry}>>> = new Map();
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
@@ -2238,6 +2240,72 @@ class EditorScene {
     publish([runtime.node], false, changes);
   }
 
+  /**
+    Shows object `id` as `count` parts, such as the chunks of stock a simulated machine is cutting:
+    the parts in `changed` (part index to geometry) are replaced and the rest kept, so only what
+    changed is uploaded. Each part is a child node in the object's frame that picks as the object,
+    whose own geometry is hidden meanwhile. View state, like `setRuntimeGeometry`.
+  **/
+  public function setRuntimeGeometryParts(id:String, count:Int, changed:Map<Int, GeometryData>):Void {
+    var runtime = runtimeFor(id);
+    var parts = runtimeParts.get(id);
+    if (parts == null || parts.length != count) {
+      if (parts != null) releaseRuntimeParts(id);
+      setRuntimeGeometry(id, new GeometryData());
+      parts = [for (_ in 0...count) null];
+      runtimeParts.set(id, parts);
+    }
+    var updated:Array<NodeId> = [];
+    var created:Array<{index:Int, node:NodeId, geometry:Geometry}> = [];
+    var transaction:Null<Transaction> = null;
+    try {
+      for (index in changed.keys()) {
+        if (index < 0 || index >= count) throw 'Runtime geometry part $index of $count';
+        var data = changed.get(index);
+        var part = parts[index];
+        if (part != null) {
+          scene.setGeometryData(part.geometry, data);
+          updated.push(part.node);
+          continue;
+        }
+        var open = transaction == null ? scene.beginTransaction() : transaction;
+        transaction = open;
+        var geometry = scene.createGeometry();
+        created.push({index: index, node: open.createNode(), geometry: geometry});
+        scene.setGeometryData(geometry, data);
+        var node = created[created.length - 1].node;
+        open.setName(node, '$id part $index');
+        open.setParent(node, runtime.node);
+        open.setGeometry(node, geometry);
+        open.setMaterial(node, runtime.material);
+      }
+    } catch (error:Dynamic) {
+      if (transaction != null) transaction.dispose();
+      for (part in created) part.geometry.dispose();
+      throw error;
+    }
+    var changes:Null<ChangeSet> = transaction == null ? null : transaction.commitWithChanges();
+    for (part in created) {
+      parts[part.index] = {node: part.node, geometry: part.geometry};
+      bridge.mapNode(part.node, id);
+      updated.push(part.node);
+    }
+    publish(updated, false, changes);
+  }
+
+  function releaseRuntimeParts(id:String):Void {
+    var parts = runtimeParts.get(id);
+    if (parts == null) return;
+    runtimeParts.remove(id);
+    var transaction = scene.beginTransaction();
+    for (part in parts) if (part != null) {
+      bridge.unmapNode(part.node);
+      transaction.destroyNode(part.node);
+    }
+    transaction.commit();
+    for (part in parts) if (part != null) part.geometry.dispose();
+  }
+
   /** Releases simulations whose objects are gone or are no longer simulations. */
   function pruneStockSimulations():Void {
     for (id in [for (key in stockSimulations.keys()) key]) {
@@ -2351,6 +2419,8 @@ class EditorScene {
     for (session in stockSimulations) session.dispose();
     for (geometry in ownedRuntimeGeometry) geometry.dispose();
     ownedRuntimeGeometry.clear();
+    for (parts in runtimeParts) for (part in parts) if (part != null) part.geometry.dispose();
+    runtimeParts.clear();
     stockSimulations.clear();
     if (pendingRenderChanges != null) pendingRenderChanges.dispose();
     pendingRenderChanges = null;

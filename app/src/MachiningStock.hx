@@ -8,7 +8,8 @@ import stockkit.CutMove;
 import stockkit.Stock;
 import stockkit.StockColoring;
 import stockkit.StockLattice;
-import stockkit.StockPreview;
+import stockkit.StockMesh;
+import stockkit.StockPreviewWorker;
 import toolpathkit.path.MoveKind;
 import toolpathkit.path.PathGeometry;
 import toolpathkit.path.Point3;
@@ -46,7 +47,10 @@ class MachiningStock {
 	public final stock:Stock;
 	/** The finished part on the same lattice, when the job has one. */
 	public final target:Null<Stock>;
-	final preview:StockPreview;
+	/** Contours the stock on its own thread, from snapshots, as it is cut. */
+	final preview:StockPreviewWorker;
+	/** Each chunk's latest mesh, row by row, as refreshes have delivered them. */
+	var chunkMeshes:Array<Null<StockMesh>> = [];
 	/** The tool in the spindle; nothing cuts until one is loaded. */
 	var tool:Null<Tool> = null;
 	final simulation:Simulation;
@@ -82,14 +86,14 @@ class MachiningStock {
 				stockMesh.positions[index] - center[index % 3]], stockMesh.indices);
 		if (targetMesh == null) {
 			target = null;
-			preview = new StockPreview(stock, BySource(_ -> CUT, UNTOUCHED));
+			preview = new StockPreviewWorker(stock, BySource(_ -> CUT, UNTOUCHED));
 		} else {
 			// The target is given in the stock part's frame; the stock lives shifted to its centre.
 			var positions = [for (index in 0...targetMesh.positions.length)
 				targetMesh.positions[index] - center[index % 3]];
 			var finished = Stock.fromTriangles(lattice, positions, targetMesh.indices);
 			target = finished;
-			preview = new StockPreview(stock, ByDeviation(finished, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
+			preview = new StockPreviewWorker(stock, ByDeviation(finished, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
 		}
 		var axis = spindleAxis();
 		if (axis[2] < 1 - 1e-6)
@@ -126,26 +130,61 @@ class MachiningStock {
 		collisions += report.collisions(CONTACT_VOLUME).length;
 	}
 
-	/** Whether the stock changed since the last `geometry()`. */
+	/** Whether the stock changed since the last refresh started. */
 	public function hasChanged():Bool return changed;
 
-	/** The stock as it is now: only chunks that changed are contoured again. */
-	public function geometry():GeometryData {
-		preview.update();
+	/** Starts contouring the stock as it is now, unless a refresh is under way; returns whether it started. */
+	public function refreshPreview():Bool {
+		if (!preview.refresh()) return false;
 		changed = false;
+		return true;
+	}
+
+	/**
+	 * The chunks finished refreshes rebuilt, as geometry by chunk index, or null when none finished.
+	 * `previewChunks` is how many chunks the stock shows as.
+	 */
+	public function takePreview():Null<Map<Int, GeometryData>> {
+		var updates = preview.take();
+		if (updates.length == 0) return null;
+		var changedChunks:Map<Int, GeometryData> = new Map();
+		for (update in updates) {
+			if (chunkMeshes.length != update.chunksX * update.chunksY)
+				chunkMeshes = [for (_ in 0...update.chunksX * update.chunksY) null];
+			for (k in 0...update.chunks.length) {
+				chunkMeshes[update.chunks[k]] = update.meshes[k];
+				changedChunks.set(update.chunks[k], meshGeometry([update.meshes[k]]));
+			}
+		}
+		return changedChunks;
+	}
+
+	public function previewChunks():Int return chunkMeshes.length;
+
+	/** The whole stock as it is now, as one mesh: waits for its contouring. */
+	public function geometry():GeometryData {
+		preview.wait();
+		refreshPreview();
+		preview.wait();
+		takePreview();
+		return meshGeometry([for (mesh in chunkMeshes) if (mesh != null) mesh]);
+	}
+
+	function meshGeometry(meshes:Array<StockMesh>):GeometryData {
 		var vertices = 0, triangles = 0;
-		for (mesh in preview.meshes) if (mesh != null) {
+		for (mesh in meshes) {
 			vertices += mesh.vertexCount;
 			triangles += mesh.triangleCount;
 		}
 		var positions = Bytes.alloc(vertices * 12), normals = Bytes.alloc(vertices * 12);
 		var colors = Bytes.alloc(vertices * 4), indices = Bytes.alloc(triangles * 12);
 		var vertexBase = 0, indexBase = 0;
-		for (mesh in preview.meshes) if (mesh != null) {
+		for (mesh in meshes) {
 			positions.blit(vertexBase * 12, mesh.positions, 0, mesh.vertexCount * 12);
 			normals.blit(vertexBase * 12, mesh.normals, 0, mesh.vertexCount * 12);
 			colors.blit(vertexBase * 4, mesh.colors, 0, mesh.vertexCount * 4);
-			for (index in 0...mesh.triangleCount * 3)
+			if (vertexBase == 0) indices.blit(indexBase * 4, mesh.indices, 0, mesh.triangleCount * 12);
+			else for (index in 0...mesh.triangleCount * 3)
 				indices.setInt32((indexBase + index) * 4, mesh.indices.getInt32(index * 4) + vertexBase);
 			vertexBase += mesh.vertexCount;
 			indexBase += mesh.triangleCount * 3;
@@ -201,6 +240,8 @@ class MachiningStock {
 	}
 
 	public function dispose():Void {
+		// The worker reads the target while it contours: stop it first.
+		preview.dispose();
 		stock.dispose();
 		if (target != null) target.dispose();
 	}

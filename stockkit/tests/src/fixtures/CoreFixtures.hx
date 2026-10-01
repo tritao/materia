@@ -15,6 +15,7 @@ import stockkit.Stock;
 import stockkit.StockAxis;
 import stockkit.StockLattice;
 import stockkit.StockPreview;
+import stockkit.StockPreviewWorker;
 import stockkit.StockTimeline;
 
 /**
@@ -121,6 +122,30 @@ class CoreFixtures {
       if (rgba != expected) coloured = false;
     }
     Assert.check(coloured, "preview colours surfaces by operation");
+    // A worker contours the same meshes on its own thread, from snapshots, rebuilding only what changed.
+    var worker = new StockPreviewWorker(stock, BySource(opColor, 0xC0C0C0FF), 2);
+    function sameMeshes(update:StockPreviewUpdate):Bool {
+      for (k in 0...update.chunks.length) {
+        var a = update.meshes[k], b = preview.meshes[update.chunks[k]];
+        if (b == null || a.triangleCount != b.triangleCount || a.vertexCount != b.vertexCount ||
+            a.positions.compare(b.positions) != 0 || a.colors.compare(b.colors) != 0)
+          return false;
+      }
+      return true;
+    }
+    Assert.check(worker.refresh() && !worker.refresh(), "a worker runs one refresh at a time");
+    worker.wait();
+    var first = worker.take();
+    Assert.check(first.length == 1 && first[0].chunks.length == preview.chunksX * preview.chunksY &&
+      sameMeshes(first[0]), "the worker's first refresh meshes every chunk as the preview does");
+    timeline.seek(moves.length - 1);
+    var expected = preview.update();
+    Assert.check(worker.refresh(), "an idle worker starts the next refresh");
+    worker.wait();
+    var second = worker.take();
+    Assert.check(second.length == 1 && second[0].chunks.join(",") == expected.join(",") && sameMeshes(second[0]),
+      'the worker rebuilds only the chunks that changed (${second.length == 1 ? second[0].chunks.length : -1} of ${expected.length})');
+    worker.dispose();
     timeline.dispose();
     stock.dispose();
   }

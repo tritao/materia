@@ -173,10 +173,26 @@ one (an append now adds segments to the current revision); and the host
 sent segments as fast as the device had room, so commits queued behind them
 on the serial line and arrived late (segments now go only while the line
 clears within an owner period). The virtual serial link also added its
-latency once per frame instead of pipelining it. Left: the stock re-contour takes 11 ms (up to
-49 ms) every fifth tick, the largest remaining frame cost, and the runtime
-still copies its queue (0.2 ms at 1300 points) every cycle so a world tick
-can roll back.
+latency once per frame instead of pipelining it.
+
+Then the rest of the frame. Each chunk of submitted motion now records the
+clock mapping it was compiled with, so appends, replacements (speed
+overrides, jogs) and commits all map host path time to exactly the device
+ticks its segments carry, however time syncs have moved the estimate since;
+a replacement after a resync had been refused. The serial throttle's budget
+comes from the commit rule (a commit due is seen up to a period late, waits
+for the line and crosses it within its margin), and the line's backlog comes
+from the transport when it can tell (`TIOCOUTQ` on a serial port). The
+runtime journals its trajectory queue instead of copying it every cycle for
+rollback. The stock is contoured on a worker (`StockPreviewWorker`): each
+refresh hands it a snapshot, which shares tiles until the next cut changes
+them, and the scene shows the stock as one child node per chunk
+(`setRuntimeGeometryParts`), so only rebuilt chunks upload and nothing is
+concatenated. Meshing went from about 15 ms every fifth tick to 0.04 ms a
+tick, and a simulated tick from about 2 ms to 0.34 ms. What is left of the
+frame is the collector: about one collection every 27 ticks of 1.5 ms on an
+18 MB heap; 7 of 19,600 steps took 12-26 ms, each with a collection. The
+68 ms pause seen earlier is the first step, on the heap left by loading.
 
 **C5. Editor controls** (done). A G-code panel that highlights the running
 line; feed hold, resume, restart from a line and a speed override. What it
