@@ -97,6 +97,48 @@ class Shape {
 		return new VertexCollection(this);
 	}
 
+	/**
+		The topological names of this shape's faces, edges or vertices, indexed like `subshape(kind, index)`
+		(plans/TOPOLOGICAL_NAMING.md). Names are opaque text that survives parametric edits.
+	**/
+	public function elementNames(kind:CadKit.ShapeKind):Array<String> {
+		if (subshapeCount(kind) == 0)
+			return [];
+		var bytes = CadKit.shapeCopyElementNamesBytesChecked(native.borrow(), kind);
+		return bytes.getString(0, bytes.length).split("\n");
+	}
+
+	public function elementName(kind:CadKit.ShapeKind, index:Int):String {
+		var names = elementNames(kind);
+		if (index < 0 || index >= names.length)
+			throw "element index is out of range";
+		return names[index];
+	}
+
+	/**
+		A copy whose faces, edges or vertices are named by `ids` (one per subshape; "" keeps the current name).
+		Each id is escaped into a name. Edge and vertex names hold where faces cannot name them: boundary and
+		wire edges and their vertices.
+	**/
+	public function withElementNames(kind:CadKit.ShapeKind, ids:Array<String>):Shape {
+		return new Shape(CadKit.shapeSeedNamesChecked(native.borrow(), kind, ids.join("\n")));
+	}
+
+	/** A copy whose names that no input has are prefixed by `tag:`: what was created from the inputs. */
+	public function stamped(tag:String, inputs:Array<Shape>):Shape {
+		var refs:Array<CadKit.ShapeRef> = [];
+		for (input in inputs) {
+			var ref = new CadKit.ShapeRef();
+			ref.set_shape(input.borrowHandle());
+			refs.push(ref);
+		}
+		return new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs));
+	}
+
+	public static function namingScheme():Int {
+		return CadKit.namingSchemeVersionChecked();
+	}
+
 	public function sameAs(other:Shape):Bool {
 		return CadKit.shapeIsSameChecked(native.borrow(), other.native.borrow()) != 0;
 	}

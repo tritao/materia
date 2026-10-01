@@ -510,3 +510,37 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
 - Timing: 62 ms in all edited recomputes together; the slowest rows are the
   connector rows (~12 ms, three boolean builds each). This is the
   pre-naming reference for TN2's budget.
+
+### 2026-10-01 — TN1 done: element maps in the core
+
+- `core/src/naming.{hpp,cpp}`: `ElementMap`, which holds face names and
+  tracked edge and vertex names. Derived names are computed once with
+  `call_once`, and the maps are shared by clones.
+  - Rules 1, 2, 6 and 7 live in `propagate` over a `History`
+    (`AlgorithmHistory` wraps any OCCT `Modified`/`IsDeleted` algorithm).
+    Splits still fall to weak names until TN2.
+  - Also there: `restrict_to`, `seed`, `stamp` and the weak `index_names`.
+  - `SharedCurveHistory` matches a copied edge by its underlying curve, for
+    wire and face building, which has no history.
+- `ShapeEntry` and `OperationData` carry names. A shape from an operation
+  without an adapter gets weak `face#k` names the first time they are asked
+  for (`copy_named_shape`), so every shape is named (TN-D12).
+- Named so far: box, cylinder, sphere; clone, translate, rotate, mirror,
+  place (plain and `_operation`); compound (`@slot` on collisions); subshape
+  extraction (boundary edges frozen); polyline (`seg.k`, `pt.k`); wire and
+  planar face (edge names carried; the face stays weak until seeded).
+- ABI: `cad_naming_scheme_version`, `cad_shape_copy_element_names_bytes`
+  (newline-separated), `cad_shape_seed_names` (ids, escaped by the core),
+  and `cad_shape_stamp_names`. `cad_shape_find_element` is still TN3's job.
+  Haxe: `Shape.elementNames`, `elementName`, `withElementNames`, `stamped`,
+  `namingScheme`.
+- Tests: `tests/naming_smoke.cpp` (golden box and cylinder names, moves keep
+  names, extraction, collisions, stamping, seeds through wire and face) and
+  `haxe/tests/NamingSmoke.hx` (the same across the ABI). The full Haxe smoke
+  and the TN0 suite are unchanged, as expected: nothing resolves by name yet.
+- Deviations from the plan:
+  - Box faces are named from their outward normals, not from
+    `BRepPrimAPI_MakeBox`'s accessors. That is equally independent of order
+    and avoids mapping OCCT's Left/Front/... to axes.
+  - Names are plain `std::string`; interning waits for the TN2 benchmark.
+  - Names sort bytewise, so `+` comes before `-`: `E(box.+z|box.-x)`.

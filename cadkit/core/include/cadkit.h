@@ -592,6 +592,39 @@ CADKIT_API cad_result cad_mesh_copy_indices(
     uint32_t* output,
     uint32_t capacity);
 
+/* Topological names (plans/TOPOLOGICAL_NAMING.md). Every face, edge and
+ * vertex of a shape has a name that survives parametric edits. Lists of names
+ * are newline-separated UTF-8, one per subshape in cad_shape_subshape_at
+ * order. Names are opaque text; the scheme version changes whenever a rule
+ * change would rename an element. */
+CADKIT_API cad_result cad_naming_scheme_version(uint32_t* out_version CADKIT_HXI_OUT);
+
+/* The names of the shape's faces, edges or vertices. The byte capacity is
+ * both the query result and the input capacity in bytes. */
+CADKIT_API cad_result cad_shape_copy_element_names_bytes(
+    cad_shape shape,
+    cad_shape_kind kind,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* A copy of the shape whose faces, edges or vertices are named by `names`,
+ * one line per subshape (an empty line keeps the current name). Each line is
+ * an identifier, escaped into a name. An edge or vertex name holds where the
+ * faces cannot name it: boundary and wire edges, and their vertices. */
+CADKIT_API cad_result cad_shape_seed_names(
+    cad_shape shape,
+    cad_shape_kind kind,
+    const char* names CADKIT_HXI_UTF8,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
+/* A copy of the shape whose names that no input has are prefixed by `tag:`:
+ * the elements created from the inputs, as opposed to carried through. */
+CADKIT_API cad_result cad_shape_stamp_names(
+    cad_shape shape,
+    const char* tag CADKIT_HXI_UTF8,
+    const cad_shape_ref* inputs CADKIT_HXI_IN_ARRAY(input_count), uint32_t input_count,
+    cad_shape* out_shape CADKIT_HXI_OUT CADKIT_HXI_OWNED);
+
 /* Haxeon-facing byte copies keep each mesh stream bulk-oriented. The byte
  * capacity is both the query result and the input capacity in bytes. */
 CADKIT_API cad_result cad_mesh_copy_vertices_bytes(

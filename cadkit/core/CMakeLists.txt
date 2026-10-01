@@ -6,6 +6,7 @@ endif()
 
 add_library(cadkit-core ${CADKIT_CORE_LIBRARY_TYPE}
     src/cadkit.cpp
+    src/naming.cpp
 )
 
 if(CADKIT_BUILD_SHARED)
