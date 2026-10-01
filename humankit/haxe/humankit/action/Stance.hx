@@ -1,6 +1,6 @@
 package humankit.action;
 
-/** Where a worker stands and how it holds its body to reach a point: what ApproachFor weighs between. */
+/** Where a worker stands and how it holds its body to reach a point: what StancePlanner weighs between. */
 typedef Stance = {
 	/** Why this depth cannot reach the point, or null when it can. */
 	var failure:Null<String>;
@@ -21,4 +21,6 @@ typedef Stance = {
 	var lateral:Float;
 	/** Whether the point is no further below the shoulder than the arm comfortably reaches. */
 	var comfortable:Bool;
+	/** Whether the reach ends within `reachMargin` of the arm's limit: possible, but only just. */
+	var tight:Bool;
 }

@@ -188,6 +188,12 @@ so it is not done; the two-clip turn now starts its second clip in the tick the 
 
 ## Standing at a surface
 
+Where to stand and how to hold the body is `action/StancePlanner`; `ApproachFor` is only the action that walks there, turns and then lowers and leans.
+The planner proposes stances (standing, ever deeper crouches, ever deeper kneels, with the lean and hinge each needs) and ranks them with one measure,
+`discomfort`: shortfall to the edge, a point outside comfortable reach, a reach that ends within `reachMargin` of the arm's limit (a stretch),
+lean past comfort, and hinge. The body's own state is split the same way: `PostureState` holds the lean, hinge, crouch and kneel goals and eases
+them, `FootHold` holds the feet while the idle pose shows, and `HumanBody` composes them with the limbs.
+
 The planner stands the worker square to the edge it works at, not along the line it walked up (the nearest of the four directions the box's
 edges face), and it measures the belly's distance to that edge along the line the belly travels, a shoulder's width to the side of the
 target's, since a belly line that is not square to an edge meets it at a different distance (a few centimetres, which once put a belly 2

@@ -67,6 +67,9 @@ class HumanPosture {
 	public var hingeWithCrouch:Bool = true;
 	/** What a stance's hip hinge costs in the planner's comparison of stances, per radian: a hinge is the last resort, after a deeper crouch. */
 	public var hingeDiscomfort:Float = 0.25;
+	/** How near the arm's limit a reach may end before the planner counts it a stretch, in metres, and what a stretch costs in the comparison of stances. */
+	public var reachMargin:Float = 0.02;
+	public var tightDiscomfort:Float = 0.1;
 	public var leanRate:Float = 0.9;
 	/** How long an arm that is not reaching or carrying takes to settle into hanging (and back) while the body leans, and where it hangs under the shoulder. */
 	public var hangSeconds:Float = 0.5;
@@ -142,6 +145,7 @@ class HumanPosture {
 		posture.hangOutward *= k;
 		posture.bellyFront *= k;
 		posture.bellyHalfHeight *= k;
+		posture.reachMargin *= k;
 		posture.bellyOverhangMargin *= k;
 		posture.blendSpeed *= k;
 		posture.withdraw *= k;
