@@ -92,6 +92,20 @@ class InspectorPanel {
       rows.push(new KeyedView("sketch-edit-action",
         sceneAction("edit-selected-sketch", "scene.edit-sketch", "Edit sketch", IconName.Inspect)));
     }
+    // An edit waiting for the user to say which element a reference means (TN7).
+    var pending = scene.pendingReferenceChoice();
+    if (pending != null) {
+      rows.push(new KeyedView("pending-choice-status", new Text(pending.message)));
+      for (candidate in 0...pending.candidates.length)
+        rows.push(new KeyedView("pending-choice-" + candidate, new Button("Use " + pending.candidates[candidate], null, function() {
+          app.runSceneEdit("Could not apply the edit", function() app.scene.resolvePendingReferenceChoice(candidate));
+          app.commands.refresh();
+        }, "pending-choice-" + candidate)));
+      rows.push(new KeyedView("pending-choice-cancel", new Button("Keep the previous model", null, function() {
+        app.scene.cancelPendingReferenceChoice();
+        app.commands.refresh();
+      }, "pending-choice-cancel")));
+    }
     // References that need a look (TN5): what each lost, with a button per element it could mean now.
     var referenceIssues = scene.selectedReferenceIssues();
     for (issue in referenceIssues) {

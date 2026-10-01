@@ -816,3 +816,41 @@ and the app compile.
   `CADKIT_OCCT_DIR=… haxeon/scripts/haxeon run --project
   app/tests/cad-plate/haxeon.json` (CAD only) or `app/tests/haxeon.json`
   (all).
+
+## Follow-up stages (agreed 2026-10-01 after TN5)
+
+- **TN7:** offer the choice at edit time.
+- **TN8:** name the bodies of MachineKit recipes.
+- **TN9:** the smaller gaps: merge aliases, picking edges to repair edge
+  references, solid names, readable labels.
+
+TN6 (STEP names) stays optional and last.
+
+### 2026-10-01 — TN7 done: choosing while editing
+
+- **How an edit becomes a choice.** Every editor CAD edit goes through
+  `EditorScene.applyCadEdit`, which now wraps its redo (`offeringChoice`).
+  If the edit fails and leaves a reference *newly* ambiguous with
+  candidates (references already broken before the edit don't count), the
+  scene keeps a `PendingReferenceChoice`: the edit's redo and undo, the
+  reference (feature id and index), its identity before the edit, the
+  candidates, and a message ("Edit transform.x makes the sketch's support
+  face match 2 elements. Choose the one it means.").
+- **Inspector:** shows the pending message, one "Use <candidate>" button
+  per candidate, and "Keep the previous model".
+- **Choosing:** `resolvePendingReferenceChoice(k)` clears what the failed
+  attempt left (the edit's undo), then applies the edit as one undoable
+  operation. Its redo runs the edit; where the reference is ambiguous it
+  retargets it to the candidate and recomputes. Its undo runs the edit's
+  undo, then puts the reference back to its identity before the edit.
+  Project undo and redo restore and reapply both the edit and the choice.
+- **Cancelling:** `cancelPendingReferenceChoice()` runs the edit's undo and
+  republishes, so the previous model stays.
+- New generic edit `setCadFeatureParameter(id, featureId, parameter,
+  value)`, which drove the test.
+- **Test:** `CadPlateWorkflowTests.splitDuringEditWorkflow` moves a slot
+  across a plate under a sketch. The edit stops with two candidates;
+  cancel keeps slot x = −50 and a resolved sketch; the second attempt plus
+  "choose the right-hand piece" applies x = 28 with the sketch on that
+  piece; undo puts back both the slot and the original face; redo
+  reapplies both.

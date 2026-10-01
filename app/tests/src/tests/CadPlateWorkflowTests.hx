@@ -508,6 +508,77 @@ class CadPlateWorkflowTests {
     scene.dispose();
   }
 
+  /**
+    An edit that splits the face a sketch sits on (plans/TOPOLOGICAL_NAMING.md, TN7): it stops and asks which piece the
+    sketch means; cancelling keeps the previous model, choosing applies the edit with that piece, and undo/redo work.
+  */
+  static function splitDuringEditWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "build a plate with a slot beside it";
+    try {
+      check(scene.createCadPart(), "create an editable part for an edit that splits a face");
+      var id = scene.selectedId;
+      var session = scene.cadSession(id);
+      var slotId = -1;
+      var sketchIndex = -1;
+      session.perform(function(owner) {
+        var d = owner.document;
+        var plate = d.add(new cadkit.parametric.features.BoxFeature(60, 40, 10));
+        var tool = d.add(new cadkit.parametric.features.TransformFeature(d.add(new cadkit.parametric.features.BoxFeature(4, 60, 30)),
+          -50, -10, -5));
+        slotId = tool.id.toInt();
+        var body = d.add(new cadkit.parametric.features.BooleanFeature(plate, tool, cadkit.parametric.features.BooleanOperation.Cut));
+        d.recompute();
+        var shape = body.currentShape();
+        var top = shape.elementNames(CadKit.ShapeKind.Face).indexOf("f" + plate.id.toInt() + ":box.+z");
+        var face = shape.subshape(CadKit.ShapeKind.Face, top);
+        var sketch:ConstrainedSketchFeature = d.add(new ConstrainedSketchFeature(square(), body, null, cadkit.modeling.Vector.X(), 0, false, face));
+        face.close();
+        d.recompute();
+        sketchIndex = d.featureCount() - 1;
+      });
+      var feature:ConstrainedSketchFeature = cast session.document.featureAt(sketchIndex);
+      var reference:TopologyReference = feature.supportFaceReference;
+      check(reference.isResolved() && scene.pendingReferenceChoice() == null, "the sketch sits on the top face");
+
+      step = "move the slot across the plate";
+      var failed = false;
+      try scene.setCadFeatureParameter(id, slotId, "transform.x", 28) catch (_:Dynamic) failed = true;
+      var asked = scene.pendingReferenceChoice();
+      check(failed && asked != null, "the edit stops and asks which piece the sketch means");
+      var pending:{message:String, candidates:Array<String>} = cast asked;
+      check(pending.candidates.length == 2 && pending.message.indexOf("2 elements") >= 0,
+        "it offers the two pieces: " + Std.string(pending));
+
+      step = "cancel the edit";
+      scene.cancelPendingReferenceChoice();
+      var slot = session.document.featureById(slotId);
+      check(scene.pendingReferenceChoice() == null && slot.parameter("transform.x").value == -50 && reference.isResolved(),
+        "cancelling keeps the previous model");
+
+      step = "make the edit again and choose the right-hand piece";
+      try scene.setCadFeatureParameter(id, slotId, "transform.x", 28) catch (_:Dynamic) {}
+      check(scene.pendingReferenceChoice() != null, "the edit asks again");
+      var choices = reference.candidates();
+      check(choices.length == 2, "the reference holds both pieces");
+      var right = choices[0].x > choices[1].x ? 0 : 1;
+      check(scene.resolvePendingReferenceChoice(right), "apply the edit with the chosen piece");
+      check(session.document.featureById(slotId).parameter("transform.x").value == 28 && reference.isResolved() &&
+        reference.currentShape().center().get_x() > 30, "the slot moved and the sketch sits on the right-hand piece");
+
+      step = "undo and redo the edit";
+      check(scene.document.undo() && session.document.featureById(slotId).parameter("transform.x").value == -50 &&
+        reference.isResolved() && reference.currentShape().center().get_x() < 31 && reference.currentShape().center().get_x() > 29,
+        "undo puts the slot and the sketch's face back");
+      check(scene.document.redo() && reference.isResolved() && reference.currentShape().center().get_x() > 30,
+        "redo moves the slot and keeps the chosen piece");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "split-during-edit workflow failed at " + step + ": " + Std.string(error);
+    }
+    scene.dispose();
+  }
+
   static function square():cadkit.sketch.ConstrainedSketch {
     var sketch = new cadkit.sketch.ConstrainedSketch();
     var corners = [[-2.0, -2.0], [2.0, -2.0], [2.0, 2.0], [-2.0, 2.0]];
@@ -1003,6 +1074,7 @@ class CadPlateWorkflowTests {
       faceSketchPocketWorkflow();
       supportFaceRepairWorkflow();
       splitSupportRepairWorkflow();
+      splitDuringEditWorkflow();
       verticalFilletWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();

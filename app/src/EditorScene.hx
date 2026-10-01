@@ -78,6 +78,35 @@ typedef CadReferenceIssue = {
   var broken:Bool;
 }
 
+/**
+  An edit that stopped because it made a reference ambiguous (a face it split, an element it repeated), kept so the
+  user can say which element the reference means and apply the edit with that choice (plans/TOPOLOGICAL_NAMING.md, TN7).
+*/
+class PendingReferenceChoice {
+  public final id:String;
+  public final label:String;
+  public final redo:CadDocumentSession->Void;
+  public final undo:CadDocumentSession->Void;
+  public final featureId:Int;
+  public final referenceIndex:Int;
+  public final before:TopologyFingerprint;
+  public final candidates:Array<TopologyFingerprint>;
+  public final message:String;
+
+  public function new(id:String, label:String, redo:CadDocumentSession->Void, undo:CadDocumentSession->Void, featureId:Int,
+      referenceIndex:Int, before:TopologyFingerprint, candidates:Array<TopologyFingerprint>, message:String) {
+    this.id = id;
+    this.label = label;
+    this.redo = redo;
+    this.undo = undo;
+    this.featureId = featureId;
+    this.referenceIndex = referenceIndex;
+    this.before = before;
+    this.candidates = candidates;
+    this.message = message;
+  }
+}
+
 class EditorScene {
   static function sameFinish(left:Null<Appearance>, right:Null<Appearance>):Bool {
     return Appearances.same(left, right);
@@ -92,6 +121,7 @@ class EditorScene {
   static var nextVisualRevision:Int = 0;
   static var nextEnvironmentRevision:Int = 0;
   public final document:EditorDocument;
+  var pendingChoice:Null<PendingReferenceChoice> = null;
   final presentation:ScenePresentation;
   var bridge(get, set):SceneBridge;
   function get_bridge():SceneBridge return presentation.bridge;
@@ -1062,9 +1092,109 @@ class EditorScene {
 
   function applyCadEdit(id:String, label:String, redo:CadDocumentSession->Void,
       undo:CadDocumentSession->Void):Bool {
+    pendingChoice = null;
     return document.apply(new EditOperation(label,
-      function() runCadEdit(id, redo, undo),
+      function() runCadEdit(id, offeringChoice(id, label, redo, undo), undo),
       function() runCadEdit(id, undo, redo)));
+  }
+
+  /** `redo`, which on failure keeps a pending choice when it made a reference newly ambiguous (TN7). */
+  function offeringChoice(id:String, label:String, redo:CadDocumentSession->Void,
+      undo:CadDocumentSession->Void):CadDocumentSession->Void {
+    return function(owner:CadDocumentSession) {
+      var brokenBefore = owner.document.brokenReferences();
+      try {
+        redo(owner);
+      } catch (error:Dynamic) {
+        for (reference in owner.document.brokenReferences()) {
+          if (reference.state != ReferenceState.Ambiguous || reference.candidates().length == 0 ||
+              brokenBefore.indexOf(reference) >= 0)
+            continue;
+          var feature = reference.feature;
+          var index = -1;
+          for (candidate in 0...feature.topologyReferenceCount())
+            if (feature.topologyReferenceAt(candidate) == reference)
+              index = candidate;
+          var what = referenceLabel(feature, reference, index);
+          pendingChoice = new PendingReferenceChoice(id, label, redo, undo, feature.id.toInt(), index,
+            reference.fingerprintData(), reference.candidates(),
+            '$label makes ${what.charAt(0).toLowerCase() + what.substr(1)} match ${reference.candidates().length} elements. Choose the one it means.');
+          break;
+        }
+        throw error;
+      }
+    };
+  }
+
+  /** The edit waiting for the user to say which element a reference means, as a message and candidate descriptions. */
+  public function pendingReferenceChoice():Null<{message:String, candidates:Array<String>}> {
+    var choice = pendingChoice;
+    if (choice == null)
+      return null;
+    return {message: choice.message, candidates: [for (candidate in choice.candidates) candidate.describe()]};
+  }
+
+  /** Apply the pending edit with its reference pointed at candidate `candidate`, as one undoable edit. */
+  public function resolvePendingReferenceChoice(candidate:Int):Bool {
+    var choice = pendingChoice;
+    if (choice == null || candidate < 0 || candidate >= choice.candidates.length)
+      return false;
+    pendingChoice = null;
+    var replacement = choice.candidates[candidate];
+    function referenceIn(owner:CadDocumentSession):TopologyReference {
+      var feature = owner.document.featureById(choice.featureId);
+      if (feature == null || choice.referenceIndex < 0 || choice.referenceIndex >= feature.topologyReferenceCount())
+        throw "the edited feature is no longer available";
+      return feature.topologyReferenceAt(choice.referenceIndex);
+    }
+    // Clear what the failed attempt left behind, then apply the edit, retargeting the reference where it is ambiguous.
+    try requireCadSession(choice.id).perform(choice.undo) catch (_:Dynamic) {}
+    return applyCadEdit(choice.id, choice.label, function(owner) {
+      try {
+        choice.redo(owner);
+      } catch (error:Dynamic) {
+        var reference = referenceIn(owner);
+        if (reference.state != ReferenceState.Ambiguous)
+          throw error;
+        reference.retarget(replacement);
+        owner.document.recompute();
+      }
+    }, function(owner) {
+      choice.undo(owner);
+      cadkit.parametric.TopologyReferenceChange.apply(referenceIn(owner), choice.before, ReferenceState.Remapped);
+    });
+  }
+
+  /** Drop the pending choice, putting back what the failed edit left behind. */
+  public function cancelPendingReferenceChoice():Void {
+    var choice = pendingChoice;
+    pendingChoice = null;
+    if (choice == null)
+      return;
+    try {
+      requireCadSession(choice.id).perform(choice.undo);
+      syncCadSession(choice.id);
+    } catch (_:Dynamic) {}
+  }
+
+  /** Set any feature's named parameter (`slot.x`, `box.width`) as one undoable edit. */
+  public function setCadFeatureParameter(id:String, featureId:Int, parameter:String, value:Float):Void {
+    var session = requireCadSession(id);
+    var feature = session.document.featureById(featureId);
+    if (feature == null)
+      throw "the feature is no longer available";
+    var previous = feature.parameter(parameter).value;
+    if (value == previous)
+      return;
+    if (!Math.isFinite(value))
+      throw "Feature parameters must be finite";
+    applyCadEdit(id, "Edit " + parameter, function(owner) {
+      owner.document.featureById(featureId).parameter(parameter).set(value);
+      owner.document.recompute();
+    }, function(owner) {
+      owner.document.featureById(featureId).parameter(parameter).set(previous);
+      owner.document.recompute();
+    });
   }
 
   function runCadEdit(id:String, edit:CadDocumentSession->Void,
