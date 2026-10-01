@@ -1749,7 +1749,13 @@ private:
     // distributes each dof's desired acceleration through the whole
     // articulated system's inertia, not just its own row.
     void apply_joint_targets() {
-        refresh_derived();
+        // Only a driven joint reads the mass matrix and bias forces, so a world of kinematic bodies and no driven
+        // joints never pays for a forward pass here.
+        for (const auto joint_id : joint_order)
+            if (joints.at(joint_id).target_mode != 0) {
+                refresh_derived();
+                break;
+            }
         if (model->nu > 0)
             std::fill(data->ctrl, data->ctrl + model->nu, 0.0);
         const auto nv = static_cast<std::size_t>(model->nv);
