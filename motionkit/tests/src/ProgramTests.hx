@@ -27,6 +27,7 @@ import motionkit.robot.ManipulatorKinematics;
 import motionkit.robot.OpwKinematics;
 import motionkit.robot.AxisKinematics;
 import motionkit.robot.ProgramCompiler;
+import motionkit.robot.ProgramPlanner;
 import motionkit.robot.StartTolerances;
 import motionkit.robot.PathConfigurationSelector;
 import motionkit.robot.ManipulatorMotion;
@@ -372,6 +373,63 @@ class ProgramTests extends MotionKitTestSupport {
       shallowCheck.value <= 0.001 + 1e-9 && shallowCheck.limit == 0.001,
       "150 degree authored corner is checked against its tolerance");
     shallow.dispose();
+  }
+
+  /**
+    A ProgramPlanner plans on a worker thread what a synchronous compile
+    plans, stays its lookahead ahead of the plans started, and cancels
+    cleanly while it waits.
+  **/
+  public function testProgramPlanner():Void {
+    var fixture = buildContractArmFixture();
+    var solver = new ManipulatorKinematics(new Manipulator(fixture.model, fixture.chain), 1e-8);
+    var limits = new ValidationLimits(6, Int64.ofInt(1), Int64.ofInt(1));
+    for (joint in 0...6) limits.jerk(joint, 20.0);
+    var compiler = new ProgramCompiler(solver, limits, "work", [for (_ in 0...6) 2.0],
+      [for (_ in 0...6) 4.0], [for (_ in 0...6) 20.0], StartTolerances.uniform(6, 0.02, 0.02, 0.02));
+    var start = [0.2, -0.4, 0.6, 0.1, 0.4, -0.2];
+    var ops:Array<MotionOp> = [];
+    for (index in 0...6) {
+      var goal = start.copy();
+      goal[0] += index % 2 == 0 ? 0.05 : 0.0;
+      ops.push(MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop));
+      if (index == 2) ops.push(MotionOp.Dwell(0.1));
+    }
+    var program = new MotionProgram(ops);
+    var compiled = compiler.compile(program, start, Int64.ofInt(300));
+    var planner = new ProgramPlanner(compiler, program, start, Int64.ofInt(300), 0, 1.0, 1e9);
+    while (!planner.blocks.done && planner.failure == null) planner.waitForMore();
+    var planned = planner.blocks.finishedBlocks();
+    var same = planner.failure == null && planned.length == compiled.blocks.length;
+    if (same) for (index in 0...planned.length) {
+      var expected = compiled.blocks[index].plans, actual = planned[index].plans;
+      same = same && actual.length == expected.length &&
+        Std.string(planned[index].barrier) == Std.string(compiled.blocks[index].barrier);
+      if (same) for (plan in 0...actual.length)
+        same = same && Math.abs(actual[plan].durationSeconds - expected[plan].durationSeconds) < 1e-12 &&
+          Int64.compare(actual[plan].planId, expected[plan].planId) == 0;
+    }
+    check(same && Int64.compare(planner.nextPlanId, Int64.ofInt(306)) == 0,
+      "the planner's worker plans the blocks a synchronous compile plans");
+    planner.dispose();
+    compiled.dispose();
+
+    // With almost no lookahead, the worker delivers one plan beyond those started, then waits.
+    var paced = new ProgramPlanner(compiler, program, start, Int64.ofInt(400), 0, 1.0, 1e-6);
+    paced.waitForMore();
+    Sys.sleep(0.2);
+    paced.poll();
+    check(paced.blocks.blocks[0].plans.length == 1 && !paced.isStopped(),
+      "the planner waits once its lookahead is planned");
+    paced.started(1);
+    while (paced.blocks.blocks[0].plans.length < 2) paced.waitForMore();
+    check(paced.blocks.blocks[0].plans.length == 2, "starting a plan lets the planner plan the next");
+    var delivered = paced.blocks.blocks[0].plans.copy();
+    paced.dispose();
+    var waited = 0;
+    while (!paced.isStopped() && waited++ < 200) Sys.sleep(0.01);
+    check(paced.isStopped() && delivered[0].isClosed() && delivered[1].isClosed(),
+      "disposing a waiting planner stops its worker and disposes its plans");
   }
 
   public function testManipulatorMotion():Void {

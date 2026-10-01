@@ -56,6 +56,12 @@ enum {
     MK_ERROR_GENERATION = -6
 };
 
+/*
+ * Threads: any function may be called from any thread. A trajectory, path, or time law is used by
+ * one thread at a time; a plan is immutable and may be read from several threads at once, and
+ * destroying it waits for no other thread's planning or validation.
+ */
+
 /** Opaque registry identity; only MotionKit may interpret id. */
 typedef struct mk_trajectory_handle { uint32_t id; } mk_trajectory_handle
     MK_HANDLE MK_HANDLE_DESTROY(mk_trajectory_destroy);

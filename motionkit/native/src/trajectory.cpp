@@ -13,7 +13,7 @@
 namespace {
 
 std::mutex registry_mutex;
-std::unordered_map<uint32_t, std::unique_ptr<motionkit::Trajectory>> trajectories;
+std::unordered_map<uint32_t, std::shared_ptr<motionkit::Trajectory>> trajectories;
 uint32_t next_id = 1;
 
 struct Plan {
@@ -45,12 +45,17 @@ void flatten_segments(Plan &plan) {
                     segment.coefficients[joint].value[power];
     }
 }
-std::unordered_map<uint32_t, std::unique_ptr<Plan>> plans;
+std::unordered_map<uint32_t, std::shared_ptr<const Plan>> plans;
 uint32_t next_plan_id = 1;
 
-motionkit::Trajectory *get(mk_trajectory_handle handle) {
+// The registry lock guards only these maps: a handle's object is shared out of
+// them, so work on it (validation, evaluation) runs without the lock, and a
+// destroy while another thread uses an object frees it when that use ends.
+// Each trajectory is used by one thread at a time; plans are immutable.
+std::shared_ptr<motionkit::Trajectory> find(mk_trajectory_handle handle) {
+    std::lock_guard lock(registry_mutex);
     const auto found = trajectories.find(handle.id);
-    return found == trajectories.end() ? nullptr : found->second.get();
+    return found == trajectories.end() ? nullptr : found->second;
 }
 
 mk_result register_trajectory(std::unique_ptr<motionkit::Trajectory> trajectory,
@@ -121,9 +126,10 @@ bool valid_plan_spec(const mk_plan_spec &spec, const mk_limits &limits,
     return true;
 }
 
-Plan *get(mk_plan_handle handle) {
+std::shared_ptr<const Plan> find(mk_plan_handle handle) {
+    std::lock_guard lock(registry_mutex);
     const auto found = plans.find(handle.id);
-    return found == plans.end() ? nullptr : found->second.get();
+    return found == plans.end() ? nullptr : found->second;
 }
 
 } // namespace
@@ -148,8 +154,14 @@ mk_result MK_CALL mk_trajectory_create(uint32_t joint_count,
 
 void MK_CALL mk_trajectory_destroy(mk_trajectory_handle trajectory) {
     try {
-        std::lock_guard lock(registry_mutex);
-        trajectories.erase(trajectory.id);
+        std::shared_ptr<motionkit::Trajectory> released;
+        {
+            std::lock_guard lock(registry_mutex);
+            const auto found = trajectories.find(trajectory.id);
+            if (found == trajectories.end()) return;
+            released = std::move(found->second);
+            trajectories.erase(found);
+        }
     } catch (...) {
     }
 }
@@ -158,8 +170,7 @@ mk_result MK_CALL mk_trajectory_append_segment(mk_trajectory_handle trajectory,
                                                 const mk_segment *segment) {
     if (segment == nullptr) return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         return value->append(*segment) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
     } catch (const std::bad_alloc &) {
@@ -174,8 +185,7 @@ mk_result MK_CALL mk_trajectory_evaluate(mk_trajectory_handle trajectory,
     if (out_state == nullptr || out_state->struct_size < sizeof(mk_trajectory_state))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         return value->evaluate(time_ns, *out_state) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
     } catch (...) {
@@ -190,8 +200,7 @@ mk_result MK_CALL mk_trajectory_estimate_path_derivatives(
         time_ns < 0 || window_ns > static_cast<uint64_t>(INT64_MAX))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         std::vector<mk_segment> segments;
         segments.reserve(value->segment_count());
@@ -210,8 +219,7 @@ mk_result MK_CALL mk_trajectory_duration_ns(mk_trajectory_handle trajectory,
                                              int64_t *out_duration_ns) {
     if (out_duration_ns == nullptr) return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         *out_duration_ns = value->duration_ns();
         return MK_OK;
@@ -224,8 +232,7 @@ mk_result MK_CALL mk_trajectory_joint_count(mk_trajectory_handle trajectory,
                                              uint32_t *out_joint_count) {
     if (out_joint_count == nullptr) return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         *out_joint_count = value->joint_count();
         return MK_OK;
@@ -238,8 +245,7 @@ mk_result MK_CALL mk_trajectory_segment_count(mk_trajectory_handle trajectory,
                                                uint32_t *out_segment_count) {
     if (out_segment_count == nullptr) return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         *out_segment_count = value->segment_count();
         return MK_OK;
@@ -253,8 +259,7 @@ mk_result MK_CALL mk_trajectory_get_segment(mk_trajectory_handle trajectory,
     if (out_segment == nullptr || out_segment->struct_size < sizeof(*out_segment))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         if (index >= value->segment_count()) return MK_ERROR_INVALID_ARGUMENT;
         *out_segment = value->segment(index);
@@ -269,8 +274,7 @@ mk_result MK_CALL mk_trajectory_boundary_continuity(mk_trajectory_handle traject
     if (out_continuity == nullptr || out_continuity->struct_size < sizeof(mk_continuity))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         if (value->segment_count() < 2 || boundary_index >= value->segment_count() - 1)
             return MK_ERROR_INVALID_ARGUMENT;
@@ -368,8 +372,7 @@ mk_result MK_CALL mk_validate(mk_trajectory_handle trajectory, const mk_limits *
         out_report->struct_size < sizeof(mk_validation_report))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         return motionkit::validate(*value, *limits, *out_report);
     } catch (const std::bad_alloc &) {
@@ -409,8 +412,7 @@ mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_
         return MK_ERROR_INVALID_ARGUMENT;
     out_plan->id = 0;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(trajectory);
+        const auto value = find(trajectory);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         if (!valid_plan_spec(*spec, *limits, value->joint_count()))
             return MK_ERROR_INVALID_ARGUMENT;
@@ -426,12 +428,13 @@ mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_
         if (result != MK_OK) return result;
         for (const auto &check : out_report->checks)
             if (check.status == MK_CHECK_FAILED) return MK_ERROR_LIMIT;
-        if (plans.size() >= UINT32_MAX - 1) return MK_ERROR_OUT_OF_MEMORY;
         mk_plan_spec normalized{};
         std::memcpy(&normalized, spec, std::min<size_t>(spec->struct_size, sizeof(normalized)));
         normalized.struct_size = sizeof(normalized);
         auto plan = std::make_unique<Plan>(Plan{*value, normalized, *out_report, {}, {}, {}, {}});
         flatten_segments(*plan);
+        std::lock_guard lock(registry_mutex);
+        if (plans.size() >= UINT32_MAX - 1) return MK_ERROR_OUT_OF_MEMORY;
         while (next_plan_id == 0 || plans.count(next_plan_id) != 0) ++next_plan_id;
         const uint32_t id = next_plan_id++;
         plans.emplace(id, std::move(plan));
@@ -446,45 +449,45 @@ mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory, const mk_plan_
 
 void MK_CALL mk_plan_destroy(mk_plan_handle plan) {
     try {
-        std::lock_guard lock(registry_mutex);
-        plans.erase(plan.id);
+        std::shared_ptr<const Plan> released;
+        {
+            std::lock_guard lock(registry_mutex);
+            const auto found = plans.find(plan.id);
+            if (found == plans.end()) return;
+            released = std::move(found->second);
+            plans.erase(found);
+        }
     } catch (...) {
     }
 }
 
 size_t MK_CALL mk_plan_segment_array_count(mk_plan_handle plan) {
-    std::lock_guard lock(registry_mutex);
-    const auto *value = get(plan);
+    const auto value = find(plan);
     return value == nullptr ? 0 : value->starts.size();
 }
 
 const int64_t *MK_CALL mk_plan_segment_starts(mk_plan_handle plan) {
-    std::lock_guard lock(registry_mutex);
-    const auto *value = get(plan);
+    const auto value = find(plan);
     return value == nullptr ? nullptr : value->starts.data();
 }
 
 const int64_t *MK_CALL mk_plan_segment_durations(mk_plan_handle plan) {
-    std::lock_guard lock(registry_mutex);
-    const auto *value = get(plan);
+    const auto value = find(plan);
     return value == nullptr ? nullptr : value->durations.data();
 }
 
 const int32_t *MK_CALL mk_plan_segment_degrees(mk_plan_handle plan) {
-    std::lock_guard lock(registry_mutex);
-    const auto *value = get(plan);
+    const auto value = find(plan);
     return value == nullptr ? nullptr : value->degrees.data();
 }
 
 size_t MK_CALL mk_plan_coefficient_array_count(mk_plan_handle plan) {
-    std::lock_guard lock(registry_mutex);
-    const auto *value = get(plan);
+    const auto value = find(plan);
     return value == nullptr ? 0 : value->coefficients.size();
 }
 
 const double *MK_CALL mk_plan_segment_coefficients(mk_plan_handle plan) {
-    std::lock_guard lock(registry_mutex);
-    const auto *value = get(plan);
+    const auto value = find(plan);
     return value == nullptr ? nullptr : value->coefficients.data();
 }
 
@@ -492,8 +495,7 @@ mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info) 
     if (out_info == nullptr || out_info->struct_size < offsetof(mk_plan_info, event_count))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(plan);
+        const auto value = find(plan);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         mk_plan_info info{};
         info.struct_size = sizeof(info);
@@ -517,8 +519,7 @@ mk_result MK_CALL mk_plan_get_event(mk_plan_handle plan, uint32_t index,
     mk_timed_event *out_event) {
     if (out_event == nullptr) return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(plan);
+        const auto value = find(plan);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         if (index >= value->spec.event_count) return MK_ERROR_INVALID_ARGUMENT;
         *out_event = value->spec.events[index];
@@ -533,8 +534,7 @@ mk_result MK_CALL mk_plan_get_start_state(mk_plan_handle plan,
     if (out_start_state == nullptr || out_start_state->struct_size < sizeof(mk_start_state))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(plan);
+        const auto value = find(plan);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         *out_start_state = value->spec.start_state;
         return MK_OK;
@@ -548,8 +548,7 @@ mk_result MK_CALL mk_plan_get_report(mk_plan_handle plan,
     if (out_report == nullptr || out_report->struct_size < sizeof(mk_validation_report))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(plan);
+        const auto value = find(plan);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         *out_report = value->report;
         return MK_OK;
@@ -563,8 +562,7 @@ mk_result MK_CALL mk_plan_evaluate(mk_plan_handle plan, int64_t time_ns,
     if (out_state == nullptr || out_state->struct_size < sizeof(mk_trajectory_state))
         return MK_ERROR_INVALID_ARGUMENT;
     try {
-        std::lock_guard lock(registry_mutex);
-        const auto *value = get(plan);
+        const auto value = find(plan);
         if (value == nullptr) return MK_ERROR_INVALID_HANDLE;
         return value->trajectory.evaluate(time_ns, *out_state) ? MK_OK : MK_ERROR_INVALID_ARGUMENT;
     } catch (...) {

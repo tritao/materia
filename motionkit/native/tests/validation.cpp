@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstring>
+#include <atomic>
+#include <thread>
 
 namespace {
 
@@ -334,6 +336,55 @@ void task_space_slot_writer() {
 
 } // namespace
 
+/*
+ * Plans are shared across threads: one thread evaluates a plan while another creates and destroys
+ * plans, and destroying a plan another thread holds waits for no lock held during validation.
+ */
+void plans_across_threads() {
+    const auto trajectory = cubic();
+    mk_limits limits{};
+    limits.struct_size = sizeof(limits);
+    limits.joint_count = 1;
+    limits.max_velocity[0] = 0.8;
+    limits.max_acceleration[0] = 4.0;
+    mk_plan_spec spec{};
+    spec.struct_size = sizeof(spec);
+    spec.plan_id = 1;
+    spec.required_capabilities = MK_CAP_TIMED_TRAJECTORY;
+    spec.planning_authority = MK_AUTHORITY_MATERIA;
+    spec.start_state.struct_size = sizeof(spec.start_state);
+    spec.start_state.joint_count = 1;
+    mk_validation_report report{};
+    report.struct_size = sizeof(report);
+    mk_plan_handle evaluated{};
+    assert(mk_plan_create(trajectory, &spec, &limits, &evaluated, &report) == MK_OK);
+    std::atomic<bool> done{false};
+    std::atomic<int> failures{0};
+    std::thread planner([&] {
+        for (int index = 0; index < 200; ++index) {
+            mk_validation_report own{};
+            own.struct_size = sizeof(own);
+            mk_plan_handle plan{};
+            if (mk_plan_create(trajectory, &spec, &limits, &plan, &own) != MK_OK ||
+                mk_plan_segment_array_count(plan) != 1) ++failures;
+            mk_plan_destroy(plan);
+        }
+        done = true;
+    });
+    int evaluations = 0;
+    while (!done || evaluations == 0) {
+        mk_trajectory_state state{};
+        state.struct_size = sizeof(state);
+        if (mk_plan_evaluate(evaluated, 500'000'000, &state) != MK_OK) ++failures;
+        else near(state.position[0], 1.5 * 0.25 - 0.125);
+        ++evaluations;
+    }
+    planner.join();
+    assert(failures == 0);
+    mk_plan_destroy(evaluated);
+    mk_trajectory_destroy(trajectory);
+}
+
 int main() {
     velocity_extremum_and_plan_rejection();
     position_extremum_between_samples();
@@ -343,4 +394,5 @@ int main() {
     zero_origin_real_overshoot_fails();
     nonfinite_extrema_rejected();
     task_space_slot_writer();
+    plans_across_threads();
 }
