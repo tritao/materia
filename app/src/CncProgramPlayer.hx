@@ -418,6 +418,8 @@ class CncProgramPlayer implements SessionMember {
 			stock = null;
 			stockShownAt = Math.NEGATIVE_INFINITY;
 		}
+		// The fresh stock shows as the raw part until its first contour arrives.
+		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
 	}
 
 	/**
@@ -442,9 +444,12 @@ class CncProgramPlayer implements SessionMember {
 		meshingSeconds += Sys.time() - clock;
 	}
 
+	/** Stops cutting and gives the stock and tool parts their own geometry back. */
 	public function dispose():Void {
 		if (stock != null) stock.dispose();
 		stock = null;
+		for (id in [stockObject, toolObject]) if (id != null) project.scene.clearRuntimeGeometry(id);
+		shownTool = -1;
 	}
 
 	/**

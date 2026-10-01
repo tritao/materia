@@ -189,14 +189,23 @@ class MachiningStock {
 			vertexBase += mesh.vertexCount;
 			indexBase += mesh.triangleCount * 3;
 		}
-		var lattice = stock.lattice;
 		var geometry = new GeometryData();
 		geometry.addStream(1, 2, positions, vertices, 12);
 		geometry.addStream(2, 2, normals, vertices, 12);
 		geometry.addStream(6, 4, colors, vertices, 4);
 		geometry.setIndexBuffer(indices, triangles * 3);
-		geometry.setBounds(lattice.x(0), lattice.y(0), lattice.z(0), lattice.x(lattice.countX - 1),
-			lattice.y(lattice.countY - 1), lattice.z(lattice.countZ - 1));
+		// Bounds of the meshes' own vertices, so a chunk culls as itself.
+		if (vertices > 0) {
+			var low = [Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY];
+			var high = [Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY, Math.NEGATIVE_INFINITY];
+			for (vertex in 0...vertices)
+				for (axis in 0...3) {
+					var value = positions.getFloat(vertex * 12 + axis * 4);
+					if (value < low[axis]) low[axis] = value;
+					if (value > high[axis]) high[axis] = value;
+				}
+			geometry.setBounds(low[0], low[1], low[2], high[0], high[1], high[2]);
+		}
 		return geometry;
 	}
 
