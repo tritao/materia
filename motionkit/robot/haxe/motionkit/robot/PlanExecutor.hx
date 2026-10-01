@@ -10,7 +10,7 @@ import robotkit.world.ProcessTimedEvent;
 import robotkit.world.Robot;
 import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
-import robotkit.world.TrajectorySegment;
+import robotkit.world.SegmentArrays;
 
 /** Submits a validated plan in bounded chunks and tracks its owner-clock progress. */
 class PlanExecutor {
@@ -21,8 +21,8 @@ class PlanExecutor {
   public final session:MotionSession;
   final ownsSession:Bool;
   var plan:Null<ExecutionPlan>;
-  var planSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
-    coefficients:Array<Array<Float>>}> = [];
+  /** The active plan's segments, read in place over the robot's joints. */
+  var planArrays:Null<SegmentArrays> = null;
   var planEvents:Array<TimedEvent> = [];
   var fixedPositions:Array<Float> = [];
   final stream:TrajectoryStream;
@@ -50,15 +50,19 @@ class PlanExecutor {
     if (plan == null || this.plan != null) throw "PlanExecutor needs one inactive validated plan";
     if (plan.evaluate(0.0).positions.length != jointIndices.length)
       throw "PlanExecutor plan and robot joint map disagree";
-    planSegments = plan.segments();
     planEvents = plan.events;
     fixedPositions = robot.snapshot().positions.toArray();
+    if (ExecutionPlan.COEFFICIENT_STRIDE != SegmentArrays.STRIDE)
+      throw "MotionKit and RobotKit disagree on the segment coefficient layout";
+    var arrays = new SegmentArrays(plan.segmentStarts(), plan.segmentDurations(),
+      plan.segmentDegrees(), plan.segmentCoefficients(), jointIndices, fixedPositions);
+    planArrays = arrays;
     this.plan = plan;
     this.endsAtRest = endsAtRest;
     jerkUnchecked = plan.report.checks[MotionKitNativeConstants.MK_CHECK_JERK].status ==
       MotionKitNativeConstants.MK_CHECK_UNCHECKED;
     completed = false;
-    stream.begin(planSegments, plan.durationSeconds);
+    stream.beginSegments(new TrajectoryStream.NativeStreamSegments(arrays), plan.durationSeconds);
     deferredRefill = false;
     if (session.state == Idle) session.begin();
     fill();
@@ -93,6 +97,7 @@ class PlanExecutor {
       stream.markCompleted();
       completed = true;
       plan = null;
+      planArrays = null;
       if (ownsSession) session.completed();
       return;
     }
@@ -130,6 +135,7 @@ class PlanExecutor {
 
   public function clear():Void {
     plan = null;
+    planArrays = null;
     stream.clear();
     completed = false;
     deferredRefill = false;
@@ -145,7 +151,7 @@ class PlanExecutor {
     stream.fill(session, fixedPositions.length, true, buildChunk,
       (first, last, error) -> {
         var snapshot = robot.snapshot();
-        return 'plan chunk [$first,$last] of ${planSegments.length}, '
+        return 'plan chunk [$first,$last] of ${planArrays == null ? 0 : planArrays.count()}, '
           + 'events=$lastChunkEvents, jerkUnchecked=$jerkUnchecked, safety=${snapshot.safety}, '
           + 'active=${snapshot.trajectoryActive}, queue=${snapshot.trajectoryQueueDepth}: $error';
       });
@@ -155,26 +161,10 @@ class PlanExecutor {
 
   function buildChunk(first:Int, last:Int, tag:Int64, startNs:Int64,
       endNs:Int64):ExecutionPlanSubmission {
-    var active = plan;
-    if (active == null) throw "PlanExecutor needs an active plan";
-    return stream.programSubmission(active, first, last, tag, startNs, endNs,
-      fixedPositions, expanded, expandSegments, chunkEvents, endsAtRest,
-      jerkUnchecked);
-  }
-
-  function expandSegments(first:Int, last:Int, startNs:Int64):Array<TrajectorySegment> {
-    var payload:Array<TrajectorySegment> = [];
-    for (index in first...last) {
-      var segment = planSegments[index];
-      var degree = segment.coefficients[0].length;
-      var coefficients = [for (joint in 0...fixedPositions.length)
-        [for (power in 0...degree) power == 0 ? fixedPositions[joint] : 0.0]];
-      for (joint in 0...jointIndices.length)
-        coefficients[jointIndices[joint]] = segment.coefficients[joint].copy();
-      payload.push(new TrajectorySegment(Int64.sub(segment.timeFromStartNs, startNs),
-        segment.durationNs, coefficients));
-    }
-    return payload;
+    var active = plan, arrays = planArrays;
+    if (active == null || arrays == null) throw "PlanExecutor needs an active plan";
+    return stream.programSubmission(active, arrays, first, last, tag, startNs, endNs,
+      expanded, chunkEvents, endsAtRest, jerkUnchecked);
   }
 
   function chunkEvents(startNs:Int64, endNs:Int64,

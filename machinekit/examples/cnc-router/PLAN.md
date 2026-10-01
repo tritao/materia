@@ -104,9 +104,19 @@ separate plans of one op, and the task-space check times its samples from the
 time law (interpolating sample times had misplaced them while accelerating).
 The job is now 198 motion ops instead of 3240, a pass takes 197 s instead of
 343 s, the app suite's peak memory fell from 5.7 to 2.7 GB, and a
-1 mm circle is followed within 2 µm. Planning still takes about 4 s when a
-program starts, spread over every path; moving it off the frame thread is
-what remains for smooth starts.
+1 mm circle is followed within 2 µm.
+
+Program start no longer waits for planning: ops are planned incrementally,
+about a second of motion ahead of the machine within a few milliseconds a
+frame, so a program starts after planning its first move (42 ms). Plans stay in
+native memory: MotionKit exposes a plan's segments as arrays it owns, haxeon's
+`NativeSpan` reads them in place, and RobotKit's
+`rk_robot_runtime_submit_plan_arrays` takes them through a `_span` FFI wrapper
+and copies them once, so no segment is marshalled through Haxe. All the
+planning for a pass is now 2.1 s instead of 4.1 s (creating plans 0.27 s
+instead of 2.2 s), the slowest frame 67 ms instead of 290 ms, and motion 0.2
+ms a tick. Most of what is left is the time law (1.2 s) and the task-space
+check (0.6 s).
 
 **C5. Editor controls** (done). A G-code panel that highlights the running
 line; feed hold, resume, restart from a line and a speed override. What it

@@ -1,6 +1,7 @@
 #ifndef MOTIONKIT_H
 #define MOTIONKIT_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__clang__)
@@ -10,6 +11,7 @@
 #define MK_HANDLE_DESTROY(symbol) __attribute__((annotate("hxi:handle_destroy")))
 #define MK_IN_ARRAY(count) __attribute__((annotate("hxi:in_array")))
 #define MK_OUT_ARRAY(count) __attribute__((annotate("hxi:out_array")))
+#define MK_RETURNS_SPAN(count) __attribute__((annotate("hxi:returns_span")))
 #define MK_STRUCT_SIZE __attribute__((annotate("hxi:struct_size")))
 #else
 #define MK_OUT
@@ -18,6 +20,7 @@
 #define MK_HANDLE_DESTROY(symbol)
 #define MK_IN_ARRAY(count)
 #define MK_OUT_ARRAY(count)
+#define MK_RETURNS_SPAN(count)
 #define MK_STRUCT_SIZE
 #endif
 
@@ -39,7 +42,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 13, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 14, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_PLAN_EVENTS = 256, MK_EVENT_CHANNEL_BYTES = 48, MK_EVENT_COMMAND_BYTES = 48,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
@@ -441,6 +444,22 @@ MK_API mk_result MK_CALL mk_plan_create(mk_trajectory_handle trajectory,
     mk_plan_handle *out_plan MK_OUT MK_OWNED, mk_validation_report *out_report);
 MK_API void MK_CALL mk_plan_destroy(mk_plan_handle plan);
 MK_API mk_result MK_CALL mk_plan_get_info(mk_plan_handle plan, mk_plan_info *out_info);
+/*
+ * A plan's segments as arrays the plan owns, read in place: valid until the plan is destroyed, and
+ * empty (NULL, count zero) for an invalid handle. Segment i starts at starts[i] from the plan's
+ * start, lasts durations[i], has degree degrees[i], and has joint j's coefficient of power p at
+ * coefficients[(i * joint_count + j) * (MK_MAX_DEGREE + 1) + p], zero above its degree.
+ */
+MK_API size_t MK_CALL mk_plan_segment_array_count(mk_plan_handle plan);
+MK_API const int64_t *MK_CALL mk_plan_segment_starts(mk_plan_handle plan)
+    MK_RETURNS_SPAN(mk_plan_segment_array_count);
+MK_API const int64_t *MK_CALL mk_plan_segment_durations(mk_plan_handle plan)
+    MK_RETURNS_SPAN(mk_plan_segment_array_count);
+MK_API const int32_t *MK_CALL mk_plan_segment_degrees(mk_plan_handle plan)
+    MK_RETURNS_SPAN(mk_plan_segment_array_count);
+MK_API size_t MK_CALL mk_plan_coefficient_array_count(mk_plan_handle plan);
+MK_API const double *MK_CALL mk_plan_segment_coefficients(mk_plan_handle plan)
+    MK_RETURNS_SPAN(mk_plan_coefficient_array_count);
 MK_API mk_result MK_CALL mk_plan_get_event(mk_plan_handle plan, uint32_t index,
     mk_timed_event *out_event);
 MK_API mk_result MK_CALL mk_plan_get_start_state(mk_plan_handle plan,

@@ -342,7 +342,7 @@ class CncProgramPlayer implements SessionMember {
 
 	public function resume():Void motion.resume();
 
-	/** Sets the speed of every move, from 5% to 200% of the program's; it takes effect from the next move. */
+	/** Sets the speed of every move, from 5% to 200% of the program's; it takes effect from motion not yet planned, about a second ahead. */
 	public function setSpeedOverride(scale:Float):Void {
 		motion.setSpeedOverride(scale);
 		speedOverride = scale;

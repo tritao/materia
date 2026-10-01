@@ -518,6 +518,32 @@ typedef struct rk_plan_submission {
     rk_timed_event events[RK_MAX_PLAN_EVENTS];
 } rk_plan_submission;
 
+/**
+ * An rk_plan_submission without its segments, for rk_robot_runtime_submit_plan_arrays. Each field
+ * means what it does there; tag is the segment chunk's tag. All fields are required.
+ */
+typedef struct rk_plan_header {
+    uint32_t struct_size RK_STRUCT_SIZE;
+    uint32_t required_capabilities;
+    uint64_t sequence;
+    uint64_t plan_id;
+    uint64_t model_revision;
+    uint64_t calibration_revision;
+    uint64_t replace_after_plan_id;
+    uint64_t replace_after_time_ns;
+    uint64_t tag;
+    uint32_t reserved0; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
+    uint32_t ends_at_rest;
+    double start_position[RK_MAX_TRAJECTORY_JOINTS];
+    double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
+    double start_acceleration[RK_MAX_TRAJECTORY_JOINTS];
+    double position_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS];
+    uint32_t event_count;
+    rk_timed_event events[RK_MAX_PLAN_EVENTS];
+} rk_plan_header;
+
 /** Non-latched runtime diagnostic; safety remains READY. */
 enum { RK_FAULT_TRAJECTORY_UNDERFLOW = 2, RK_FAULT_RAMP_LIMIT = 3,
     RK_FAULT_CLOCK_SYNC_LOST = 4, RK_FAULT_DUAL_DRIVE_SKEW = 5,
@@ -741,6 +767,21 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(
  */
 RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(
     rk_robot_runtime runtime, const rk_plan_submission *plan);
+/**
+ * Submits a plan as rk_robot_runtime_submit_plan does, with its segments read from arrays, such as
+ * a MotionKit plan's, and copied once. Segment i starts at starts_ns[i] - starts_ns[0] in the plan,
+ * lasts durations_ns[i], and has degree degrees[i]. The plan's joints are the source joints:
+ * source joint j drives robot joint joint_map[j] with coefficient p at
+ * coefficients[(i * source_joint_count + j) * 6 + p], and a robot joint no source joint drives
+ * holds header->start_position. coefficient_count must be segment_count * source_joint_count * 6.
+ */
+RK_API rk_result RK_CALL rk_robot_runtime_submit_plan_arrays(rk_robot_runtime runtime,
+    const rk_plan_header *header,
+    const int64_t *starts_ns RK_IN_ARRAY(segment_count),
+    const int64_t *durations_ns RK_IN_ARRAY(segment_count),
+    const int32_t *degrees RK_IN_ARRAY(segment_count), uint32_t segment_count,
+    const double *coefficients RK_IN_ARRAY(coefficient_count), uint32_t coefficient_count,
+    const int32_t *joint_map RK_IN_ARRAY(source_joint_count), uint32_t source_joint_count);
 /** Drains process-output changes. An overflow flag means earlier records were lost. */
 RK_API rk_result RK_CALL rk_robot_runtime_poll_events(
     rk_robot_runtime runtime, rk_event_record_batch *out_batch);

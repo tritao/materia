@@ -17,24 +17,30 @@ class ExecutionPlanSubmission {
   public final accelerationTolerances:ImmutableFloatArray;
   public final endsAtRest:Bool;
   public final jerkUnchecked:Bool;
-  public final segments:Array<TrajectorySegment>;
+  /** The payload, copied out of `arrays` on first use when the plan came as arrays. */
+  public var segments(get, never):Array<TrajectorySegment>;
+  /** The payload as native arrays an in-process runtime reads in place, or null. */
+  public final arrays:Null<SegmentArrays>;
+  var storedSegments:Null<Array<TrajectorySegment>>;
   public final events:Array<ProcessTimedEvent>;
   public final replaceAfterPlanId:Int64;
   public final replaceAfterTimeNs:Int64;
 
   public function new(planId:Int64, modelRevision:Int64, calibrationRevision:Int64,
       requiredCapabilities:Int, startPosition:Array<Float>, startVelocity:Array<Float>,
-      startAcceleration:Array<Float>, segments:Array<TrajectorySegment>,
+      startAcceleration:Array<Float>, segments:Null<Array<TrajectorySegment>>,
       ?replaceAfterPlanId:Int64, ?replaceAfterTimeNs:Int64,
       ?positionTolerances:Array<Float>, ?velocityTolerances:Array<Float>,
       ?accelerationTolerances:Array<Float>, ?endsAtRest:Bool = true,
-      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false) {
+      ?events:Array<ProcessTimedEvent>, ?jerkUnchecked:Bool = false, ?arrays:SegmentArrays) {
+    var payloadJoints = arrays != null ? arrays.robotJointCount() :
+      segments == null || segments.length == 0 ? -1 : segments[0].jointCount;
     if (planId == null || Int64.compare(planId, Int64.ofInt(0)) <= 0 ||
         startPosition == null || startVelocity == null || startAcceleration == null ||
-        segments == null || segments.length == 0 ||
+        (arrays == null) == (segments == null) ||
         startPosition.length != startVelocity.length ||
         startPosition.length != startAcceleration.length ||
-        segments[0].jointCount != startPosition.length)
+        payloadJoints != startPosition.length)
       throw "Invalid execution plan submission";
     this.planId = planId;
     this.modelRevision = modelRevision;
@@ -69,15 +75,40 @@ class ExecutionPlanSubmission {
     this.accelerationTolerances = new ImmutableFloatArray(aTol);
     this.endsAtRest = endsAtRest;
     this.jerkUnchecked = jerkUnchecked;
-    this.segments = [for (segment in segments) segment.copy()];
+    this.arrays = arrays;
+    storedSegments = segments == null ? null : [for (segment in segments) segment.copy()];
     this.replaceAfterPlanId = replaceAfterPlanId == null ? Int64.ofInt(0) : replaceAfterPlanId;
     this.replaceAfterTimeNs = replaceAfterTimeNs == null ? Int64.ofInt(0) : replaceAfterTimeNs;
+  }
+
+  /**
+    A plan whose payload is native segment arrays, read in place by an
+    in-process runtime and copied out for any other robot.
+  **/
+  public static function ofArrays(planId:Int64, modelRevision:Int64, calibrationRevision:Int64,
+      requiredCapabilities:Int, startPosition:Array<Float>, startVelocity:Array<Float>,
+      startAcceleration:Array<Float>, arrays:SegmentArrays, positionTolerances:Array<Float>,
+      velocityTolerances:Array<Float>, accelerationTolerances:Array<Float>, endsAtRest:Bool,
+      events:Array<ProcessTimedEvent>, jerkUnchecked:Bool):ExecutionPlanSubmission
+    return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
+      requiredCapabilities, startPosition, startVelocity, startAcceleration, null, null, null,
+      positionTolerances, velocityTolerances, accelerationTolerances, endsAtRest, events,
+      jerkUnchecked, arrays);
+
+  function get_segments():Array<TrajectorySegment> {
+    var stored = storedSegments;
+    if (stored != null) return stored;
+    var source = arrays;
+    if (source == null) throw "Execution plan submission has no payload";
+    var copied = source.segments();
+    storedSegments = copied;
+    return copied;
   }
 
   public function copy():ExecutionPlanSubmission
     return new ExecutionPlanSubmission(planId, modelRevision, calibrationRevision,
       requiredCapabilities, startPosition.toArray(), startVelocity.toArray(),
-      startAcceleration.toArray(), segments, replaceAfterPlanId, replaceAfterTimeNs,
-      positionTolerances.toArray(), velocityTolerances.toArray(),
-      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked);
+      startAcceleration.toArray(), arrays == null ? segments : null, replaceAfterPlanId,
+      replaceAfterTimeNs, positionTolerances.toArray(), velocityTolerances.toArray(),
+      accelerationTolerances.toArray(), endsAtRest, events, jerkUnchecked, arrays);
 }

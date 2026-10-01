@@ -12,10 +12,51 @@ import robotkit.world.RobotCommand;
 import robotkit.world.RobotSnapshot;
 import robotkit.world.StopMode;
 import robotkit.world.ProcessTimedEvent;
+import robotkit.world.SegmentArrays;
 import robotkit.world.TrajectorySegment;
 
 private typedef StreamSegment = {timeFromStartNs:Int64, durationNs:Int64,
   coefficients:Array<Array<Float>>};
+
+/** The segments a stream submits: their timing, and each one's degree and coefficients. */
+interface StreamSegments {
+  function count():Int;
+  function jointCount():Int;
+  function startNs(index:Int):Int64;
+  function durationNs(index:Int):Int64;
+  function degree(index:Int):Int;
+  function coefficient(index:Int, joint:Int, power:Int):Float;
+}
+
+/** Segments held as Haxe values, such as a trajectory's. */
+class ArrayStreamSegments implements StreamSegments {
+  final segments:Array<StreamSegment>;
+
+  public function new(segments:Array<StreamSegment>) this.segments = segments;
+
+  public function count():Int return segments.length;
+  public function jointCount():Int return segments.length == 0 ? 0 : segments[0].coefficients.length;
+  public function startNs(index:Int):Int64 return segments[index].timeFromStartNs;
+  public function durationNs(index:Int):Int64 return segments[index].durationNs;
+  public function degree(index:Int):Int return segments[index].coefficients[0].length - 1;
+  public function coefficient(index:Int, joint:Int, power:Int):Float
+    return segments[index].coefficients[joint][power];
+}
+
+/** A plan's segments read in place from native arrays, over the robot's joints. */
+class NativeStreamSegments implements StreamSegments {
+  public final arrays:SegmentArrays;
+
+  public function new(arrays:SegmentArrays) this.arrays = arrays;
+
+  public function count():Int return arrays.count();
+  public function jointCount():Int return arrays.robotJointCount();
+  public function startNs(index:Int):Int64 return arrays.starts.get(index);
+  public function durationNs(index:Int):Int64 return arrays.durations.get(index);
+  public function degree(index:Int):Int return arrays.degrees.get(index);
+  public function coefficient(index:Int, joint:Int, power:Int):Float
+    return arrays.coefficient(index, joint, power);
+}
 
 /** Bounded owner-clock stream shared by machine motion and validated programs. */
 class TrajectoryStream {
@@ -30,7 +71,7 @@ class TrajectoryStream {
   public var finalTag(default, null):Int64 = Int64.ofInt(0);
   public var finalEndSeconds(default, null):Float = 0.0;
   public var finalDurationNs(default, null):Int64 = Int64.ofInt(0);
-  var segments:Array<StreamSegment> = [];
+  var segments:StreamSegments = new ArrayStreamSegments([]);
   var durationSeconds:Float = 0.0;
   var references:Map<String, Float> = new Map();
   var nextMotionTag:Int64 = Int64.ofInt(1);
@@ -41,7 +82,10 @@ class TrajectoryStream {
     this.programTags = programTags;
   }
 
-  public function begin(segments:Array<StreamSegment>, durationSeconds:Float):Void {
+  public function begin(segments:Array<StreamSegment>, durationSeconds:Float):Void
+    beginSegments(new ArrayStreamSegments(segments), durationSeconds);
+
+  public function beginSegments(segments:StreamSegments, durationSeconds:Float):Void {
     this.segments = segments;
     this.durationSeconds = durationSeconds;
     elapsedSeconds = 0.0;
@@ -107,18 +151,18 @@ class TrajectoryStream {
       build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
       describeFailure:Int -> Int -> Dynamic -> String):Void {
     var stagedSegments = 0;
-    while (nextSegment < segments.length && chunkEndSeconds - elapsedSeconds < 2.0) {
+    var total = segments.count();
+    while (nextSegment < total && chunkEndSeconds - elapsedSeconds < 2.0) {
       var available = 4096 - robot.snapshot().trajectoryQueueDepth -
         (reserveStaged ? stagedSegments : 0);
       var coefficientLimit = Std.int(Math.floor(4096.0 / (jointCount * 6.0)));
       var count = Std.int(Math.min(coefficientLimit, Math.min(128,
-        Math.min(available, segments.length - nextSegment))));
+        Math.min(available, total - nextSegment))));
       if (count < 1) return;
       var first = nextSegment;
       var last = first + count;
-      var startNs = segments[first].timeFromStartNs;
-      var endNs = Int64.add(segments[last - 1].timeFromStartNs,
-        segments[last - 1].durationNs);
+      var startNs = segments.startNs(first);
+      var endNs = Int64.add(segments.startNs(last - 1), segments.durationNs(last - 1));
       var tag = programTags ? nextProgramTag : nextMotionTag;
       if (programTags) nextProgramTag = Int64.add(nextProgramTag, Int64.ofInt(1));
       var submission = build(first, last, tag, startNs, endNs);
@@ -132,7 +176,7 @@ class TrajectoryStream {
       stagedSegments += count;
       chunkStartSeconds = startSeconds;
       chunkEndSeconds = Int64.toFloat(endNs) * 1e-9;
-      if (last == segments.length) {
+      if (last == total) {
         finalTag = tag;
         finalEndSeconds = chunkEndSeconds;
         finalDurationNs = Int64.sub(endNs, startNs);
@@ -145,25 +189,22 @@ class TrajectoryStream {
       jerkUnchecked:Bool):ExecutionPlanSubmission {
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var payload:Array<TrajectorySegment> = [];
-    for (index in first...last) {
-      var segment = segments[index];
-      payload.push(new TrajectorySegment(Int64.sub(segment.timeFromStartNs, startNs),
-        segment.durationNs, segment.coefficients));
-    }
+    for (index in first...last)
+      payload.push(new TrajectorySegment(Int64.sub(segments.startNs(index), startNs),
+        segments.durationNs(index), [for (joint in 0...segments.jointCount())
+          [for (power in 0...segments.degree(index) + 1) segments.coefficient(index, joint, power)]]));
     var state = trajectory.evaluate(startSeconds);
     var velocity = state.velocities;
     var acceleration = state.accelerations;
-    if (segments[first].coefficients[0].length == 2) {
+    if (segments.degree(first) == 1) {
       velocity = [for (_ in state.positions) 0.0];
-      if (first > 0) {
-        var previous = segments[first - 1];
+      if (first > 0)
         for (joint in 0...velocity.length)
-          velocity[joint] = previous.coefficients[joint][1];
-      }
+          velocity[joint] = segments.coefficient(first - 1, joint, 1);
       acceleration = [for (_ in state.positions) 0.0];
     }
     var accelerationTolerance = [for (_ in state.positions) 0.0];
-    if (jerkUnchecked && segments[first].coefficients[0].length != 2) {
+    if (jerkUnchecked && segments.degree(first) != 1) {
       var previousAcceleration = first == 0 ?
         [for (_ in state.positions) 0.0] :
         trajectory.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations;
@@ -173,20 +214,22 @@ class TrajectoryStream {
     }
     return new ExecutionPlanSubmission(tag, modelRevision, calibrationRevision, 1,
       state.positions, velocity, acceleration, payload, null, null, null, null,
-      accelerationTolerance, last == segments.length, null, jerkUnchecked);
+      accelerationTolerance, last == segments.count(), null, jerkUnchecked);
   }
 
-  /** Build a program chunk after the caller expands joints and selects events. */
-  public function programSubmission(plan:ExecutionPlan, first:Int, last:Int,
-      tag:Int64, startNs:Int64, endNs:Int64, fixedPositions:Array<Float>,
-      expand:Array<Float> -> Array<Float> -> Array<Float>,
-      expandSegments:Int -> Int -> Int64 -> Array<TrajectorySegment>,
+  /**
+    Build a program chunk over the robot's joints from the plan's segment
+    arrays, which go to the robot in place, after the caller selects events.
+  **/
+  public function programSubmission(plan:ExecutionPlan, arrays:SegmentArrays, first:Int,
+      last:Int, tag:Int64, startNs:Int64, endNs:Int64, expand:Array<Float> -> Array<Float> -> Array<Float>,
       selectEvents:Int64 -> Int64 -> Bool -> Array<ProcessTimedEvent>,
       endsAtRest:Bool, jerkUnchecked:Bool):ExecutionPlanSubmission {
     var startSeconds = Int64.toFloat(startNs) * 1e-9;
     var state = plan.evaluate(startSeconds);
-    var payload = expandSegments(first, last, startNs);
-    var events = selectEvents(startNs, endNs, last == segments.length);
+    var chunk = arrays.slice(first, last);
+    var events = selectEvents(startNs, endNs, last == segments.count());
+    var fixedPositions = arrays.heldPositions;
     var positions = expand(state.positions, fixedPositions);
     var zero = [for (_ in fixedPositions) 0.0];
     var startVelocity = expand(first == 0 ? plan.copyStartVelocities() :
@@ -194,12 +237,10 @@ class TrajectoryStream {
     var startAcceleration = expand(first == 0 ? plan.copyStartAccelerations() :
       state.accelerations, zero);
     // Linear chunks promise the preceding chord at a continuation anchor.
-    if (segments[first].coefficients[0].length == 2) {
-      startVelocity = zero.copy();
+    if (chunk.degrees.get(0) == 1) {
       startAcceleration = zero.copy();
-      if (first > 0)
-        startVelocity = expand([for (coefficients in segments[first - 1].coefficients)
-          coefficients[1]], zero);
+      startVelocity = first == 0 ? zero.copy() :
+        [for (joint in 0...fixedPositions.length) arrays.coefficient(first - 1, joint, 1)];
     }
     var tolerance = [for (_ in fixedPositions) 0.02];
     var pTol = expand(first == 0 ? plan.copyPositionTolerances() :
@@ -210,12 +251,11 @@ class TrajectoryStream {
       [for (_ in state.positions) 0.02], tolerance);
     if (!jerkUnchecked && first > 0)
       aTol = [for (_ in fixedPositions) 1e-6];
-    if (payload[0].coefficients[0].length > 2) {
+    if (chunk.degrees.get(0) > 1) {
       var precedingAcceleration = first == 0 ? zero : expand(
         plan.evaluate(Math.max(0.0, startSeconds - 1e-9)).accelerations, zero);
       for (joint in 0...fixedPositions.length) {
-        var coefficients = payload[0].coefficients[joint];
-        var polynomialAcceleration = 2.0 * coefficients[2];
+        var polynomialAcceleration = 2.0 * chunk.coefficient(0, joint, 2);
         if (jerkUnchecked || first == 0) {
           aTol[joint] = Math.max(aTol[joint],
             Math.abs(polynomialAcceleration - startAcceleration[joint]) + 1e-5);
@@ -225,10 +265,9 @@ class TrajectoryStream {
         startAcceleration[joint] = polynomialAcceleration;
       }
     }
-    return new ExecutionPlanSubmission(tag, plan.modelRevision,
+    return ExecutionPlanSubmission.ofArrays(tag, plan.modelRevision,
       plan.calibrationRevision, 1, positions, startVelocity, startAcceleration,
-      payload, null, null, pTol, vTol, aTol,
-      last == segments.length && endsAtRest, events, jerkUnchecked);
+      chunk, pTol, vTol, aTol, last == segments.count() && endsAtRest, events, jerkUnchecked);
   }
 
   public function finishedMotion(observation:RobotSnapshot):Bool {
@@ -249,7 +288,7 @@ class TrajectoryStream {
       !observation.trajectoryActive && observation.trajectoryQueueDepth == 0;
 
   public function shouldRefill(dt:Float, fixedTimestepSeconds:Float):Bool {
-    if (nextSegment >= segments.length) return false;
+    if (nextSegment >= segments.count()) return false;
     var lead = Math.max(2.0, Math.max(fixedTimestepSeconds, dt) * 2.0);
     if (chunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
     if (elapsedSeconds <= 1e-9) return false;
@@ -260,7 +299,7 @@ class TrajectoryStream {
   /** Record a smooth replacement already accepted by the runtime. */
   public function recordReplacement(tag:Int64):Void {
     submitted = true;
-    nextSegment = segments.length;
+    nextSegment = segments.count();
     chunkStartSeconds = 0.0;
     chunkEndSeconds = durationSeconds;
     finalTag = tag;

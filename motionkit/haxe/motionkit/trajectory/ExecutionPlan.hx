@@ -5,9 +5,15 @@ import haxe.Int64;
 import motionkit.event.TimedEvent;
 import motionkit.event.EventValue;
 import motionkit.event.HoldPolicy;
+import runtime.memory.NativeSpan;
+import runtime.memory.NativeSpanOwner;
 
-/** Validated, immutable native trajectory with explicit start-state assumptions. */
-class ExecutionPlan {
+/**
+  Validated, immutable native trajectory with explicit start-state
+  assumptions. Its segments stay in native memory: the `segment*` spans read
+  them in place while the plan is alive, and `segments()` copies them out.
+**/
+class ExecutionPlan implements NativeSpanOwner {
   final owner:Ownedmk_plan_handle;
   var disposed:Bool = false;
   public final report:ValidationReport;
@@ -20,10 +26,9 @@ class ExecutionPlan {
   public final requiredCapabilities:Int64;
   public final planningAuthority:Int;
   public final durationSeconds:Float;
+  public final jointCount:Int;
   final storedEvents:Array<TimedEvent>;
   public var events(get, never):Array<TimedEvent>;
-  final storedSegments:Array<{timeFromStartNs:Int64, durationNs:Int64,
-    coefficients:Array<Array<Float>>}>;
   final storedStartPositions:Array<Float>;
   final storedStartVelocities:Array<Float>;
   final storedStartAccelerations:Array<Float>;
@@ -32,12 +37,11 @@ class ExecutionPlan {
   final storedAccelerationTolerances:Array<Float>;
 
   private function new(owner:Ownedmk_plan_handle, report:ValidationReport,
-      trajectory:Trajectory, positions:Array<Float>, velocities:Array<Float>,
+      positions:Array<Float>, velocities:Array<Float>,
       accelerations:Array<Float>, pTol:Array<Float>, vTol:Array<Float>,
       aTol:Array<Float>) {
     this.owner = owner;
     this.report = report;
-    storedSegments = trajectory.segments();
     storedStartPositions = positions.copy(); storedStartVelocities = velocities.copy();
     storedStartAccelerations = accelerations.copy();
     storedPositionTolerances = pTol.copy(); storedVelocityTolerances = vTol.copy();
@@ -52,6 +56,7 @@ class ExecutionPlan {
     requiredCapabilities = info.get_required_capabilities();
     planningAuthority = info.get_planning_authority();
     durationSeconds = Int64.toFloat(info.get_duration_ns()) * 1e-9;
+    jointCount = info.get_joint_count();
     storedEvents = [];
     for (index in 0...info.get_event_count()) {
       var nativeEvent = new mk_timed_event();
@@ -90,14 +95,44 @@ class ExecutionPlan {
 
   function get_events():Array<TimedEvent> return storedEvents.copy();
 
-  /** Copies the native-validated payload so callers cannot change this plan. */
+  /** Coefficients stored per joint and segment in `segmentCoefficients`: degree zero through five. */
+  public static inline final COEFFICIENT_STRIDE = MotionKitNativeConstants.MK_MAX_DEGREE + 1;
+
+  public function isClosed():Bool return disposed;
+
+  /** Each segment's start, in nanoseconds from the plan's start. */
+  public function segmentStarts():NativeSpan<Int64>
+    return MotionKitNative.mk_plan_segment_starts(live()).ownedBy(this);
+
+  public function segmentDurations():NativeSpan<Int64>
+    return MotionKitNative.mk_plan_segment_durations(live()).ownedBy(this);
+
+  public function segmentDegrees():NativeSpan<Int>
+    return MotionKitNative.mk_plan_segment_degrees(live()).ownedBy(this);
+
+  /**
+    Joint `j`'s coefficient of power `p` in segment `i` is at
+    `(i * jointCount + j) * COEFFICIENT_STRIDE + p`, zero above the segment's degree.
+  **/
+  public function segmentCoefficients():NativeSpan<Float>
+    return MotionKitNative.mk_plan_segment_coefficients(live()).ownedBy(this);
+
+  /** Copies the segments out of native memory. */
   public function segments():Array<{timeFromStartNs:Int64, durationNs:Int64,
       coefficients:Array<Array<Float>>}> {
-    return [for (segment in storedSegments) {
-      timeFromStartNs: segment.timeFromStartNs,
-      durationNs: segment.durationNs,
-      coefficients: [for (joint in segment.coefficients) joint.copy()]
+    var starts = segmentStarts(), durations = segmentDurations(), degrees = segmentDegrees(),
+      coefficients = segmentCoefficients();
+    return [for (index in 0...starts.length()) {
+      timeFromStartNs: starts.get(index),
+      durationNs: durations.get(index),
+      coefficients: [for (joint in 0...jointCount) [for (power in 0...degrees.get(index) + 1)
+        coefficients.get((index * jointCount + joint) * COEFFICIENT_STRIDE + power)]]
     }];
+  }
+
+  function live():mk_plan_handle {
+    if (disposed) throw "Native plan has been disposed";
+    return owner.borrow();
   }
 
   public function copyStartPositions():Array<Float> return storedStartPositions.copy();
@@ -183,7 +218,7 @@ class ExecutionPlan {
       throw new PlanLimitError(new ValidationReport(nativeReport));
     check(created.status, "plan.create");
     return new ExecutionPlan(created.out_plan, new ValidationReport(nativeReport),
-      trajectory, positions, velocities, accelerations, positionTolerances,
+      positions, velocities, accelerations, positionTolerances,
       velocityTolerances, accelerationTolerances);
   }
 

@@ -85,7 +85,20 @@ void velocity_extremum_and_plan_rejection() {
     stored_report.struct_size = sizeof(stored_report);
     assert(mk_plan_get_report(plan, &stored_report) == MK_OK);
     assert(stored_report.checks[MK_CHECK_VELOCITY].status == MK_CHECK_PASSED);
+    // The plan's segments read in place, until it is destroyed.
+    assert(mk_plan_segment_array_count(plan) == 1);
+    assert(mk_plan_segment_starts(plan)[0] == 0);
+    assert(mk_plan_segment_durations(plan)[0] == 1'000'000'000);
+    assert(mk_plan_segment_degrees(plan)[0] == 3);
+    assert(mk_plan_coefficient_array_count(plan) == MK_MAX_DEGREE + 1);
+    const double *coefficients = mk_plan_segment_coefficients(plan);
+    near(coefficients[2], 1.5);
+    near(coefficients[3], -1.0);
+    near(coefficients[0], 0.0);
+    near(coefficients[MK_MAX_DEGREE], 0.0);
     mk_plan_destroy(plan);
+    assert(mk_plan_segment_array_count(plan) == 0 && mk_plan_segment_starts(plan) == nullptr);
+    assert(mk_plan_coefficient_array_count(plan) == 0 && mk_plan_segment_coefficients(plan) == nullptr);
     spec.required_capabilities |= MK_CAP_EVENTS;
     spec.event_count = 1;
     spec.events[0].time_ns = 0;

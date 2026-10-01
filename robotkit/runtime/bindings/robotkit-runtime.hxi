@@ -381,6 +381,15 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_submit_plan(runtime: rk_robot_runtime, plan: ptr<const<rk_plan_submission>>) -> rk_result;
 	/**
+	 * Submits a plan as rk_robot_runtime_submit_plan does, with its segments read from arrays, such as
+	 * a MotionKit plan's, and copied once. Segment i starts at starts_ns[i] - starts_ns[0] in the plan,
+	 * lasts durations_ns[i], and has degree degrees[i]. The plan's joints are the source joints:
+	 * source joint j drives robot joint joint_map[j] with coefficient p at
+	 * coefficients[(i * source_joint_count + j) * 6 + p], and a robot joint no source joint drives
+	 * holds header->start_position. coefficient_count must be segment_count * source_joint_count * 6.
+	 */
+	extern fn rk_robot_runtime_submit_plan_arrays(runtime: rk_robot_runtime, header: ptr<const<rk_plan_header>>, starts_ns: ptr<const<i64>> @in_array("segment_count"), durations_ns: ptr<const<i64>> @in_array("segment_count"), degrees: ptr<const<i32>> @in_array("segment_count"), segment_count: u32, coefficients: ptr<const<f64>> @in_array("coefficient_count"), coefficient_count: u32, joint_map: ptr<const<i32>> @in_array("source_joint_count"), source_joint_count: u32) -> rk_result;
+	/**
 	 * Submits a bounded polynomial segment chunk to the runtime queue.
 	 */
 	extern fn rk_robot_runtime_submit_segments(runtime: rk_robot_runtime, command: ptr<const<rk_robot_command>>, chunk: ptr<const<rk_trajectory_segment_chunk>>) -> rk_result;
@@ -471,6 +480,34 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		 * < Optional effort limit; zero means backend default.
 		 */
 		max_effort: f64 @offset(24);
+	}
+	/**
+	 * An rk_plan_submission without its segments, for rk_robot_runtime_submit_plan_arrays. Each field
+	 * means what it does there; tag is the segment chunk's tag. All fields are required.
+	 */
+	struct rk_plan_header @layout(37968, 8) {
+		struct_size: u32 @offset(0) @struct_size;
+		required_capabilities: u32 @offset(4);
+		sequence: u64 @offset(8);
+		plan_id: u64 @offset(16);
+		model_revision: u64 @offset(24);
+		calibration_revision: u64 @offset(32);
+		replace_after_plan_id: u64 @offset(40);
+		replace_after_time_ns: u64 @offset(48);
+		tag: u64 @offset(56);
+		/**
+		 * < RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked.
+		 */
+		reserved0: u32 @offset(64);
+		ends_at_rest: u32 @offset(68);
+		start_position: array<f64, 64> @offset(72);
+		start_velocity: array<f64, 64> @offset(584);
+		start_acceleration: array<f64, 64> @offset(1096);
+		position_tolerance: array<f64, 64> @offset(1608);
+		velocity_tolerance: array<f64, 64> @offset(2120);
+		acceleration_tolerance: array<f64, 64> @offset(2632);
+		event_count: u32 @offset(3144);
+		events: array<rk_timed_event, 256> @offset(3152);
 	}
 	/**
 	 * Bounded plan. Replacement time is in the active plan's trajectory clock.

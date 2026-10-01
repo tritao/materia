@@ -9,7 +9,12 @@ import robotkit.world.FiredProcessEvent;
 import robotkit.world.Robot;
 import motionkit.robot.SessionState;
 
-/** Runs compiled manipulator blocks and evaluates host-side barriers. */
+/**
+  Runs manipulator programs and evaluates host-side barriers. A program is
+  planned as it runs: about `LOOKAHEAD_SECONDS` of motion ahead of the
+  machine, a little each update, so starting a long program does not wait for
+  all of it to be planned.
+**/
 class ManipulatorMotion {
   public final robot:Robot;
   public final compiler:ProgramCompiler;
@@ -21,7 +26,11 @@ class ManipulatorMotion {
   final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
   final executor:PlanExecutor;
   public final jointIndices:Array<Int>;
-  var compiled:Null<CompiledProgram>;
+  /** Seconds of planned motion kept ahead of the machine. */
+  public static inline final LOOKAHEAD_SECONDS = 1.0;
+  /** Planning time an update may spend getting ahead, in seconds; running short waits for no budget. */
+  public static inline final PLANNING_BUDGET_SECONDS = 0.004;
+  var compiled:Null<ProgramCompilation>;
   var blockIndex:Int = 0;
   var planIndex:Int = 0;
   var barrierElapsed:Float = 0.0;
@@ -33,9 +42,6 @@ class ManipulatorMotion {
   var lastCommandedQ:Null<Array<Float>> = null;
   /** Speed of every path, as a fraction of its programmed speed. */
   public var speedOverride(default, null):Float = 1.0;
-  var program:Null<MotionProgram> = null;
-  var programStart:Null<Array<Float>> = null;
-  var retimePending = false;
 
   public function new(robot:Robot, compiler:ProgramCompiler,
       input:String -> Null<EventValue>,
@@ -84,14 +90,14 @@ class ManipulatorMotion {
     blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false;
     try {
       var positions = robot.snapshot().positions;
-      this.program = program;
-      programStart = lastCommandedQ == null
+      compiled = compiler.begin(program, lastCommandedQ == null
         ? [for (index in jointIndices) positions.get(index)]
-        : lastCommandedQ.copy();
-      retimePending = false;
-      compiled = compiler.compile(program, programStart, nextPlanId, 0, speedOverride);
-      for (block in compiled.blocks) nextPlanId = Int64.add(nextPlanId,
-        Int64.ofInt(block.plans.length));
+        : lastCommandedQ.copy(), nextPlanId, 0, speedOverride);
+      // Plan up to the first motion or barrier now, so a program that cannot
+      // start fails here, before the session begins.
+      var first:ProgramCompilation = cast compiled;
+      while (!first.done && first.blocks.length == 1 && first.blocks[0].plans.length == 0)
+        planMore(first);
       session.begin();
       advance(0.0);
     } catch (error:Dynamic) { fail(Std.string(error), false); }
@@ -121,20 +127,22 @@ class ManipulatorMotion {
       if (session.isHolding()) return;
       if (executor.completed && planStarted) { planIndex++; planStarted = false; }
       advance(dtSeconds);
+      var planning = compiled;
+      if (planning != null && running) planAhead(planning);
     } catch (error:Dynamic) { fail(Std.string(error), !session.isFaulted()); }
   }
 
   /**
     Sets the speed override, between 5% and 200% of the programmed speed. A
-    running program takes it from its next op: what is left is planned again
-    at the new speed, within the joint limits, without stopping.
+    running program takes it from the motion it has not planned yet, about
+    `LOOKAHEAD_SECONDS` ahead, within the joint limits and without stopping.
   **/
   public function setSpeedOverride(scale:Float):Void {
     if (!Math.isFinite(scale) || scale < 0.05 || scale > 2.0)
       throw "Speed override must be between 0.05 and 2";
-    if (scale == speedOverride) return;
     speedOverride = scale;
-    if (running) retimePending = true;
+    var planning = compiled;
+    if (planning != null) planning.speedScale = scale;
   }
 
   public function hold():Void if (running) executor.hold();
@@ -190,11 +198,15 @@ class ManipulatorMotion {
       var block = source.blocks[blockIndex];
       if (planIndex < block.plans.length) {
         if (!planStarted) {
-          if (retimePending && retime()) block = source.blocks[blockIndex];
           executor.start(block.plans[planIndex], true);
           planStarted = true;
         }
         return;
+      }
+      // The machine caught up with planning: plan until there is more to run.
+      if (!block.complete) {
+        planMore(source);
+        continue;
       }
       if (block.barrier != null) {
         var ready = switch block.barrier {
@@ -230,46 +242,30 @@ class ManipulatorMotion {
     }
   }
 
+  /** Plans the next op; false once the program is planned. */
+  @:access(motionkit.robot.ProgramCompiler)
+  function planMore(source:ProgramCompilation):Bool {
+    var planned = source.step();
+    nextPlanId = source.nextPlanId();
+    return planned;
+  }
+
   /**
-    Plans the rest of the program again at the current speed override, from
-    the plan about to start, when it begins a new op (a split op's later
-    sections wait for its end). Returns whether the plans changed.
+    Plans ahead while less than `LOOKAHEAD_SECONDS` of motion waits beyond the
+    plan executing, within `PLANNING_BUDGET_SECONDS` of this update.
   **/
-  function retime():Bool {
-    var source = compiled, authored = program;
-    if (source == null || authored == null) return false;
-    var block = source.blocks[blockIndex];
-    var op = block.opIndices[planIndex];
-    var previous:Null<ExecutionPlan> = null, previousOp = -1;
-    if (planIndex > 0) {
-      previous = block.plans[planIndex - 1];
-      previousOp = block.opIndices[planIndex - 1];
-    } else for (earlier in 0...blockIndex) {
-      var plans = source.blocks[earlier].plans;
-      if (plans.length > 0) previous = plans[plans.length - 1];
+  function planAhead(source:ProgramCompilation):Void {
+    var started = Sys.time();
+    while (!source.done && Sys.time() - started < PLANNING_BUDGET_SECONDS) {
+      var ahead = 0.0;
+      for (index in blockIndex...source.blocks.length) {
+        var plans = source.blocks[index].plans;
+        for (plan in (index == blockIndex ? planIndex + 1 : 0)...plans.length)
+          ahead += plans[plan].durationSeconds;
+      }
+      if (ahead >= LOOKAHEAD_SECONDS) return;
+      planMore(source);
     }
-    if (previousOp == op) return false;
-    var start = previous == null ? programStart : previous.evaluate(previous.durationSeconds).positions;
-    if (start == null) return false;
-    // Ops between the last plan and this one already ran with it, or follow
-    // the barrier just passed.
-    var firstOp = planIndex > 0 ? op : blockIndex > 0 ? source.blocks[blockIndex - 1].barrierOpIndex + 1 : 0;
-    var fresh = compiler.compile(authored, start, nextPlanId, firstOp, speedOverride);
-    for (freshBlock in fresh.blocks) nextPlanId = Int64.add(nextPlanId, Int64.ofInt(freshBlock.plans.length));
-    for (index in planIndex...block.plans.length) block.plans[index].dispose();
-    for (later in (blockIndex + 1)...source.blocks.length)
-      for (plan in source.blocks[later].plans) plan.dispose();
-    var head = fresh.blocks.length > 0 ? fresh.blocks[0] : new ProgramBlock([], [], null);
-    var merged = new ProgramBlock(block.plans.slice(0, planIndex).concat(head.plans),
-      block.opIndices.slice(0, planIndex).concat(head.opIndices), head.barrier,
-      block.pathLengths.slice(0, planIndex).concat(head.pathLengths),
-      block.pathDistances.slice(0, planIndex).concat(head.pathDistances),
-      block.pathTimes.slice(0, planIndex).concat(head.pathTimes), head.barrierOpIndex);
-    source.blocks.splice(blockIndex, source.blocks.length - blockIndex);
-    source.blocks.push(merged);
-    for (index in 1...fresh.blocks.length) source.blocks.push(fresh.blocks[index]);
-    retimePending = false;
-    return true;
   }
 
   function hasPlan():Bool {
