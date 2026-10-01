@@ -403,7 +403,9 @@ class ProjectSourceTests {
     check(seated != null && seated.converged && seated.report.degreesOfFreedom == 3,
       'a planar mate leaves the pin three freedoms: ${session.assemblyMateStatus()}');
     var shaft = session.addAssemblyFaceMate(AssemblyMateKind.Coaxial, "project:plate", bore, "project:pin", side);
-    check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'the pin may only turn: ${session.assemblyMateStatus()}');
+    check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free (pin)", 'the pin may only turn: ${session.assemblyMateStatus()}');
+    check(session.assemblyPartStillFree("project:pin") && !session.assemblyPartStillFree("project:plate"),
+      "the pin is still free to move, the grounded plate is not");
     expectPin(session, 30, 20, 10, "the pin stands in the bore");
 
     check(session.document.undo(), "the coaxial mate undoes");
@@ -418,7 +420,7 @@ class ProjectSourceTests {
     var reopened = new ProjectDocumentSession(null, false);
     reopened.open(output);
     check(reopened.assemblyMates.mates.length == 2, "the mates survive a save and reopen");
-    check(reopened.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'and place the pin again: ${reopened.assemblyMateStatus()}');
+    check(reopened.assemblyMateStatus() == "Mates: 1 degrees of freedom free (pin)", 'and place the pin again: ${reopened.assemblyMateStatus()}');
     expectPin(reopened, 30, 20, 10, "the reopened pin stands in the bore");
     FileSystem.deleteFile(output);
 
@@ -427,7 +429,7 @@ class ProjectSourceTests {
     check(status != null && StringTools.startsWith(status, "Mates conflict"), 'a contradicting mate is a conflict: $status');
     expectPin(session, 30, 20, 10, "a conflicting mate leaves the placement");
     check(session.removeAssemblyMate(lift), "the conflicting mate can be removed");
-    check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'removing it settles the mates: ${session.assemblyMateStatus()}');
+    check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free (pin)", 'removing it settles the mates: ${session.assemblyMateStatus()}');
     check(seat != shaft, "mates get distinct ids");
     checkMatePick(manifest, generated);
     checkMateJoint(manifest, generated);
@@ -508,7 +510,7 @@ class ProjectSourceTests {
     var mateId = tool.mateId;
     check(tool.finished && mateId != null && session.assemblyMates.mates.length == 1,
       'the second face adds the mate: ${tool.message}');
-    check(tool.message == "Mates: 3 degrees of freedom free", 'the tool reports the result: ${tool.message}');
+    check(tool.message == "Mates: 3 degrees of freedom free (pin)", 'the tool reports the result: ${tool.message}');
 
     session.scene.select("project:pin");
     var row = [for (property in session.scene.properties()) if (property.id == "assembly-mate:" + mateId) property];

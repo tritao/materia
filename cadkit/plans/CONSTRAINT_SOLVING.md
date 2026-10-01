@@ -1027,3 +1027,41 @@ Steps:
     joint; with the coaxial mate a revolute joint plate→pin; the pin keeps
     its place and turns on the joint; joint and coordinate survive save and
     reopen; undo restores the mates.
+
+### C5.1 — "Still free" geometry (2026-10-01)
+
+- `ConstraintDiagnosis.freedom(rows, variables)` gives each variable's
+  freedom, 1 − P_ii, for the projector onto the rows' span (after the
+  diagnosis's equilibration). 0 means the rows fix the variable; above
+  `FREE_TOLERANCE` (1e-6), some motion the rows allow moves it.
+  - It reuses the sparse path's Cholesky factor of the Gram matrix (with
+    dependent rows dropped). Takahashi's selected inversion gives (JJᵀ)⁻¹
+    on the factor's envelope in O(rows · width²), and two rows that share a
+    variable always lie in that envelope.
+  - A first version did one forward solve per variable and made chained
+    1000-point sketches 6× slower; the selected inversion restores the
+    timings.
+  - When the kept rows already fix every touched variable it returns zeros
+    without the inverse. Near a degenerate pose, where Gram accuracy goes as
+    κ², it uses a dense Gram-Schmidt basis instead.
+- **Sketches.** Each part computes its free variables when diagnosed, at
+  the same pose as its report (the witness pose when degenerate), and
+  caches them with the part; a drag reuses them. `SolvedSketch.freePoints`
+  and `freeEntities` include points no constraint touches. The editor's
+  sketch overlay draws free geometry in blue and constrained geometry in
+  amber.
+- **Assemblies.** `AssemblyMateSolveResult.movable` lists occurrences with a
+  free column, through their free root's block or a movable joint on their
+  chain. The mate status names them ("1 degrees of freedom free (pin)"), and
+  the inspector says "Still free to move under its mates".
+- **Found by the new agreement checks (now 200 random sketches, plus random
+  row subsets for freedom):** the sparse diagnosis could keep a dependent
+  row whose Gram pivot rounding put just above t², claiming rank 9 for 8
+  variables. Fixes:
+  - independent rows cannot outnumber the variables they touch (otherwise
+    the dense QR decides);
+  - pivots in (t², 100 t²] are ambiguous and go to the dense QR.
+- Tests: `SketchFreedomSmoke` (rectangle with and without its height, a
+  circle with a free radius, an unconstrained point, a drag);
+  `DiagnosisAgreementSmoke` (envelope vs dense freedom); mate `movable`;
+  the editor's `assemblyPartStillFree`.

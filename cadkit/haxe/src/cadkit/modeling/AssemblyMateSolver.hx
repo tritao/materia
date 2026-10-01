@@ -38,6 +38,8 @@ class AssemblyMateSolveResult {
 		that both hold one axis, which is how such pairs are meant to be used.
 	*/
 	public final implied:Array<String>;
+	/** Occurrences the mates still let move (a free root, or a part on a movable joint that is still free), when converged. */
+	public final movable:Array<String>;
 	/** Occurrences the solve could move as whole parts, in definition order. */
 	public final freeRoots:Array<String>;
 	/** Solved poses of the free roots and coordinates of the joints the mates reached. */
@@ -45,7 +47,7 @@ class AssemblyMateSolveResult {
 	public final jointCoordinates:Array<AssemblyJointCoordinate>;
 
 	public function new(status:String, converged:Bool, iterations:Int, unsatisfied:Array<String>, message:String,
-			report:DiagnosisReport, degenerate:Bool, implied:Array<String>, freeRoots:Array<String>, rootPoses:Array<AssemblyRootPose>,
+			report:DiagnosisReport, degenerate:Bool, implied:Array<String>, movable:Array<String>, freeRoots:Array<String>, rootPoses:Array<AssemblyRootPose>,
 			jointCoordinates:Array<AssemblyJointCoordinate>) {
 		this.status = status;
 		this.converged = converged;
@@ -55,6 +57,7 @@ class AssemblyMateSolveResult {
 		this.report = report;
 		this.degenerate = degenerate;
 		this.implied = implied;
+		this.movable = movable;
 		this.freeRoots = freeRoots;
 		this.rootPoses = rootPoses;
 		this.jointCoordinates = jointCoordinates;
@@ -154,9 +157,10 @@ class AssemblyMateSolver {
 			case "limit-blocked": "joint limits stop the mates from closing";
 			default: "the mate solve ran out of iterations while still improving";
 		};
+		var movable = outcome.status == "converged" && report.degreesOfFreedom > 0 ? movableOccurrences(setup, solution.state) : [];
 		var placed = setup.placement(solution.state);
 		return new AssemblyMateSolveResult(outcome.status, solution.converged(), solution.iterations, solution.unsatisfied(), message,
-			report, outcome.degenerate, implied, freeRoots, placed.rootPoses, placed.jointCoordinates);
+			report, outcome.degenerate, implied, movable, freeRoots, placed.rootPoses, placed.jointCoordinates);
 	}
 
 	/**
@@ -220,6 +224,29 @@ class AssemblyMateSolver {
 			jointCoordinates: coordinates, rootPoses: poses};
 		AssemblyDefinitionCodec.validateState(definition, record);
 		return record;
+	}
+
+	/** The occurrences a still-free column moves: through a free root's block, or a free joint on their chain. */
+	static function movableOccurrences(setup:AssemblyMateSetup, state:KinematicState):Array<String> {
+		var freedom = AssemblyClosureDiagnosis.columnFreedom(setup.problem, state, setup.scale);
+		var layout = setup.problem.layout(), kinematics = setup.kinematics, model = kinematics.model;
+		var freeColumn = (column:Int) -> freedom[column] > ConstraintDiagnosis.FREE_TOLERANCE;
+		var result:Array<String> = [];
+		for (occurrence in setup.flat.occurrences) {
+			var body = kinematics.body(occurrence.id), moves = false;
+			var block = layout.blockOfRoot[model.bodyRoot[body]];
+			if (block >= 0) {
+				var firstColumn = layout.rootColumns[block];
+				for (k in 0...kinematicskit.JacobianLayout.columnsFor(layout.rootModes[block])) if (freeColumn(firstColumn + k)) moves = true;
+			}
+			for (joint in model.bodyChain[body]) {
+				var dof = model.jointDof[joint];
+				var column = dof < 0 ? -1 : layout.columnOfDof[dof];
+				if (column >= 0 && freeColumn(column)) moves = true;
+			}
+			if (moves) result.push(occurrence.id);
+		}
+		return result;
 	}
 
 	/** The k-th witness nudge: `AssemblySolve.WITNESS_STEP` times one of 1, 0.6, 0.8, cycling. */

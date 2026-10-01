@@ -15,4 +15,6 @@ typedef PartStructure = {
 	var rows:Null<RowStructure>;
 	var report:DiagnosisReport;
 	var degenerate:Bool;
+	/** The part's variables (sketch-wide indices) that its constraints left free at the last diagnosis. */
+	var free:Array<Int>;
 }

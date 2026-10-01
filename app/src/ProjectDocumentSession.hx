@@ -534,6 +534,12 @@ class ProjectDocumentSession {
     return false;
   }
 
+  /** Whether the mates still let part `sceneId` move (see `AssemblyMateSolveResult.movable`). */
+  public function assemblyPartStillFree(sceneId:String):Bool {
+    var result = assemblyMateResult;
+    return result != null && StringTools.startsWith(sceneId, "project:") && result.movable.indexOf(sceneId.substr(8)) >= 0;
+  }
+
   /** A one-line account of the mates for the status bar, or null when there are none. */
   public function assemblyMateStatus():Null<String> {
     var problem = assemblyMateProblem;
@@ -546,7 +552,8 @@ class ProjectDocumentSession {
       return conflicting.length > 0 ? "Mates conflict: " + conflicting.join(", ") : "Mates: " + result.message;
     }
     var redundant = result.implied;
-    var free = report.degreesOfFreedom == 0 ? "fully placed" : report.degreesOfFreedom + " degrees of freedom free";
+    var free = report.degreesOfFreedom == 0 ? "fully placed"
+      : report.degreesOfFreedom + " degrees of freedom free" + (result.movable.length > 0 ? " (" + result.movable.join(", ") + ")" : "");
     return "Mates: " + free + (redundant.length > 0 ? "; redundant: " + redundant.join(", ") : "") +
       (result.degenerate ? " (singular placement)" : "");
   }

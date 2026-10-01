@@ -599,9 +599,12 @@ class EditorPerspectiveViewport implements View {
       }
       pointValues.set(point.id, value);
     }
-    var path = new PathBuilder();
-    var hasLine = false;
+    // Geometry the constraints still leave free is drawn apart (blue) from constrained geometry (amber).
+    var fixedPath = new PathBuilder(), freePath = new PathBuilder();
+    var hasLine = false, hasFree = false;
     for (entity in sketch.entities()) {
+      var free = solution != null && solution.freeEntities.indexOf(entity.id) >= 0;
+      var path = free ? freePath : fixedPath;
       var center = pointValues.get(entity.first);
       if (entity.kind == "line") {
         if (entity.second == null || center == null)
@@ -614,7 +617,7 @@ class EditorPerspectiveViewport implements View {
         if (a == null || b == null)
           continue;
         path.moveTo(a.x, a.y).lineTo(b.x, b.y);
-        hasLine = true;
+        if (free) hasFree = true; else hasLine = true;
       } else if ((entity.kind == "circle" || entity.kind == "arc") && center != null) {
         var radius = entity.radius;
         if (solution != null) {
@@ -649,9 +652,12 @@ class EditorPerspectiveViewport implements View {
           }
           prior = point;
         }
-        hasLine = hasLine || started;
+        if (started) {
+          if (free) hasFree = true; else hasLine = true;
+        }
       }
     }
+    var path = fixedPath;
     var active = sketchRectangleDrag;
     if (active != null) {
       var minX = Math.min(active.startX, active.currentX);
@@ -673,14 +679,20 @@ class EditorPerspectiveViewport implements View {
       hasLine = true;
     }
     if (hasLine)
-      canvas.strokeTransient(path.build(), Color.rgba(1.0, 0.82, 0.22, 0.98), 2.0);
-    for (point in pointValues) {
+      canvas.strokeTransient(fixedPath.build(), Color.rgba(1.0, 0.82, 0.22, 0.98), 2.0);
+    if (hasFree)
+      canvas.strokeTransient(freePath.build(), FREE_SKETCH_COLOR, 2.0);
+    for (id => point in pointValues) {
       var projected = projectSketchPoint(plane, point[0], point[1], width, height);
+      var free = solution != null && solution.freePoints.indexOf(id) >= 0;
       if (projected != null)
         canvas.fillRect(new Rect(projected.x - 3, projected.y - 3, 6, 6),
-          Color.rgba(1.0, 0.88, 0.42, 1.0));
+          free ? FREE_SKETCH_COLOR : Color.rgba(1.0, 0.88, 0.42, 1.0));
     }
   }
+
+  /** Sketch geometry its constraints still leave free to move. */
+  static final FREE_SKETCH_COLOR = Color.rgba(0.36, 0.72, 1.0, 0.98);
 
   function projectSketchPoint(plane:Plane, x:Float, y:Float,
       width:Float, height:Float):Null<PerspectiveScreenPoint> {

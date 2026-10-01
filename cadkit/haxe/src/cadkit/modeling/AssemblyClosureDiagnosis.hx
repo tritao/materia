@@ -51,6 +51,16 @@ class AssemblyClosureDiagnosis {
 		return implied;
 	}
 
+	/**
+		How free each of the problem's columns is (see `ConstraintDiagnosis.freedom`), with the columns scaled to
+		their characteristic range as the diagnosis's rows are: a column above `ConstraintDiagnosis.FREE_TOLERANCE`
+		is a motion the rows still allow.
+	*/
+	public static function columnFreedom(problem:KinematicProblem, state:KinematicState, scale:Float):Array<Float> {
+		var system = rows(problem, state, scale);
+		return ConstraintDiagnosis.freedom(system.rows, system.width);
+	}
+
 	static function rows(problem:KinematicProblem, state:KinematicState, scale:Float):{rows:Array<{index:Array<Int>, value:Array<Float>}>,
 			width:Int, owners:Array<String>, residual:Array<Float>} {
 		var model = problem.model, layout = problem.layout(), width = layout.width, rows = problem.rowCount();

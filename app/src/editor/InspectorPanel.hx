@@ -75,6 +75,9 @@ class InspectorPanel {
       // When the part's mates leave it one turn or slide, offer the joint they amount to.
       var mateJoint = session.assemblyMateJoint(selected.id);
       var mateJointType = mateJoint == null ? null : mateJoint.type;
+      if (session.assemblyPartStillFree(selected.id))
+        rows.push(new KeyedView("mate-freedom", new Text("Still free to move under its mates", null,
+          appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
       if (mateJointType != null)
         rows.push(new KeyedView("convert-mates-to-joint", sceneAction("convert-mates-to-joint", "assembly.convert-to-joint",
           "Make " + mateJointType + " joint", IconName.Plus)));

@@ -118,6 +118,22 @@ typedef DiagnosisInput = {
 	4. a group is redundant when all its rows are within tolerance, otherwise
 	   conflicting.
 */
+/** What `sparseFactor` leaves: dependent rows and their circuits, and the factor itself for `freedom`. */
+private typedef SparseFactor = {
+	var circuits:Array<Array<Int>>;
+	var dropped:Array<Bool>;
+	var nearDegenerate:Bool;
+	/** The equilibrated rows, in their original order. */
+	var rows:Array<{index:Array<Int>, value:Array<Float>}>;
+	/** L of the kept rows' Gram matrix, by factored position (dropped rows are identity rows). */
+	var envelope:Array<Array<Float>>;
+	var first:Array<Int>;
+	/** Each original row's factored position. */
+	var position:Array<Int>;
+	/** Whether each factored position was dropped as dependent. */
+	var droppedInOrder:Array<Bool>;
+}
+
 class ConstraintDiagnosis {
 	/**
 		Thresholds, in one place (sketches and assembly closures both use these defaults):
@@ -203,6 +219,8 @@ class ConstraintDiagnosis {
 
 	/** Below this rank tolerance a Gram pivot cannot be told from rounding, so only clear independence is decided here. */
 	public static inline var SPARSE_TOLERANCE:Float = DEFAULT_RANK_TOLERANCE;
+	/** Gram pivots in (t², `AMBIGUOUS_BAND` t²] are left to the dense QR. */
+	static inline var AMBIGUOUS_BAND:Float = 100;
 	/** A pivot that proves independence whatever the tolerance. */
 	static inline var INDEPENDENT_PIVOT:Float = 1e-8;
 
@@ -212,29 +230,17 @@ class ConstraintDiagnosis {
 		and which rows were dropped; null when a pivot is ambiguous.
 	*/
 	static function sparseFactor(source:Array<{index:Array<Int>, value:Array<Float>}>, tolerance:Float,
-			?structure:RowStructure):Null<{circuits:Array<Array<Int>>, dropped:Array<Bool>, nearDegenerate:Bool}> {
-		// Dependent at or below t², independent above it; near-degenerate below (1e3 t)², as the dense flag.
+			?structure:RowStructure):Null<SparseFactor> {
+		// Dependent at or below t², independent above `AMBIGUOUS_BAND` t² (a Gram pivot carries rounding of order
+		// ε·κ², so a dependent row's can land just above t²; between the two the dense QR decides); near-degenerate
+		// below (1e3 t)², as the dense flag.
 		var decides = tolerance >= SPARSE_TOLERANCE;
 		var dependentPivot = decides ? tolerance * tolerance : -1.0;
-		var keptPivot = decides ? tolerance * tolerance : INDEPENDENT_PIVOT;
+		var keptPivot = decides ? AMBIGUOUS_BAND * tolerance * tolerance : INDEPENDENT_PIVOT;
 		var nearPivot = decides ? 1e6 * tolerance * tolerance : 0.0;
 		var nearDegenerate = false;
 		var m = source.length;
-		// Equilibrate as `factor` does (rows, columns, rows), so a variable in small units is not a dependency.
-		var rows = [for (row in source) {index: row.index, value: row.value.copy()}];
-		normalizeRows(rows);
-		var columnNorm = new Map<Int, Float>();
-		for (row in rows)
-			for (e in 0...row.index.length) {
-				var old = columnNorm.get(row.index[e]);
-				columnNorm.set(row.index[e], (old == null ? 0 : old) + row.value[e] * row.value[e]);
-			}
-		for (row in rows)
-			for (e in 0...row.index.length) {
-				var norm = columnNorm.get(row.index[e]);
-				if (norm != null && norm > 0) row.value[e] /= Math.sqrt(norm);
-			}
-		var scale = normalizeRows(rows);
+		var equilibrated = equilibrate(source), rows = equilibrated.rows, scale = equilibrated.scale;
 		if (structure == null) structure = rowGraph(rows);
 		var neighbours = structure.neighbours, ordering = structure, first = structure.first;
 		var original = [for (_ in 0...m) 0];
@@ -273,6 +279,13 @@ class ConstraintDiagnosis {
 			} else
 				return null;
 		}
+		// Independent rows cannot outnumber the variables they touch: if they seem to, a pivot was misjudged.
+		var touched = new Map<Int, Bool>(), keptCount = 0;
+		for (row in source) for (variable in row.index) touched.set(variable, true);
+		for (flag in dropped) if (!flag) keptCount++;
+		var touchedCount = 0;
+		for (_ in touched.keys()) touchedCount++;
+		if (keptCount > touchedCount) return null;
 		// A dropped row's factor row y solves L y = G[kept, row]; Lᵀ c = y gives its coefficients over earlier kept rows.
 		var circuits:Array<Array<Int>> = [];
 		for (index in 0...droppedRows.length) {
@@ -298,7 +311,154 @@ class ConstraintDiagnosis {
 					circuit.push(original[q]);
 			circuits.push(circuit);
 		}
-		return {circuits: circuits, dropped: [for (row in 0...m) dropped[ordering.position[row]]], nearDegenerate: nearDegenerate};
+		return {circuits: circuits, dropped: [for (row in 0...m) dropped[ordering.position[row]]], nearDegenerate: nearDegenerate,
+			rows: rows, envelope: envelope, first: first, position: ordering.position, droppedInOrder: dropped};
+	}
+
+	/**
+		How free each variable is: 1 − P_ii for the projector P onto the rows' span (after the diagnosis's
+		equilibration), so 0 for a variable the rows fix and up to 1 for one they do not touch. A variable is
+		still free when its value exceeds `FREE_TOLERANCE`: some motion the rows allow moves it.
+
+		With G = LLᵀ the Gram matrix of the independent rows (dependent rows dropped as in `diagnoseSparse`),
+		P_ii = Σ v_p v_q (G⁻¹)_pq over the rows p, q that touch variable i. Two such rows share a variable, so the
+		entry lies in the factor's envelope, where Takahashi's equations give G⁻¹ (a selected inversion) in
+		O(rows · envelope width²): the cost of the factor, not of a solve per variable.
+	*/
+	public static function freedom(rows:Array<{index:Array<Int>, value:Array<Float>}>, variables:Int, ?rankTolerance:Float,
+			?structure:RowStructure):Array<Float> {
+		var tolerance = rankTolerance == null ? DEFAULT_RANK_TOLERANCE : rankTolerance;
+		if (rows.length == 0) return [for (_ in 0...variables) 1.0];
+		var factored = sparseFactor(rows, Math.max(tolerance, SPARSE_TOLERANCE), structure);
+		// Near a degenerate pose the Gram matrix squares a poor conditioning: there, only the dense basis is accurate.
+		if (factored == null || factored.nearDegenerate) return denseFreedom(rows, variables, tolerance);
+		var m = rows.length, envelope = factored.envelope, first = factored.first, position = factored.position;
+		var dropped = factored.droppedInOrder;
+		var kept = 0;
+		for (p in 0...m) if (!dropped[p]) kept++;
+		var result = [for (_ in 0...variables) 1.0];
+		var touched = [for (_ in 0...variables) false];
+		for (row in factored.rows) for (variable in row.index) touched[variable] = true;
+		// As many independent rows as touched variables: they fix every one of them.
+		var touchedCount = 0;
+		for (flag in touched) if (flag) touchedCount++;
+		if (kept >= touchedCount) {
+			for (variable in 0...variables) if (touched[variable]) result[variable] = 0;
+			return result;
+		}
+		var inverse = selectedInverse(envelope, first, dropped);
+		var columns:Array<Array<{position:Int, value:Float}>> = [for (_ in 0...variables) []];
+		for (row in 0...m) {
+			var entries = factored.rows[row], p = position[row];
+			if (dropped[p]) continue;
+			for (e in 0...entries.index.length) columns[entries.index[e]].push({position: p, value: entries.value[e]});
+		}
+		for (variable in 0...variables) {
+			var column = columns[variable];
+			if (column.length == 0) {
+				if (touched[variable]) result[variable] = 1;
+				continue;
+			}
+			var projected = 0.0;
+			for (a in column) for (b in column) {
+				var high = a.position > b.position ? a.position : b.position, low = a.position > b.position ? b.position : a.position;
+				projected += a.value * b.value * inverse[high][low - first[high]];
+			}
+			result[variable] = Math.max(0, 1 - projected);
+		}
+		return result;
+	}
+
+	/**
+		The entries of (LLᵀ)⁻¹ inside L's envelope (same shape: row p, columns first[p]..p), by Takahashi's
+		equations on L = L̃Δ with L̃ unit lower: column i, from the last up, is Z_ki = −Σ_{q>i} L̃_qi Z_qk for the rows
+		k > i whose envelope reaches i, and Z_ii = 1/Δ_i² − Σ_{q>i} L̃_qi Z_qi. A dropped row is an identity row.
+	*/
+	static function selectedInverse(envelope:Array<Array<Float>>, first:Array<Int>, dropped:Array<Bool>):Array<Array<Float>> {
+		var m = envelope.length;
+		var z = [for (p in 0...m) [for (_ in first[p]...p + 1) 0.0]];
+		// The rows below each column inside the envelope, and L̃ there.
+		var below:Array<Array<Int>> = [for (_ in 0...m) []];
+		for (p in 0...m) for (k in first[p]...p) below[k].push(p);
+		var diagonal = [for (p in 0...m) envelope[p][p - first[p]]];
+		var entry = (high:Int, low:Int) -> z[high][low - first[high]];
+		var i = m - 1;
+		while (i >= 0) {
+			if (dropped[i]) {
+				z[i][i - first[i]] = 1;
+				i--;
+				continue;
+			}
+			var rowsBelow = below[i];
+			var unit = [for (q in rowsBelow) envelope[q][i - first[q]] / diagonal[i]];
+			for (k in rowsBelow) {
+				var sum = 0.0;
+				for (index in 0...rowsBelow.length) {
+					var q = rowsBelow[index], factor = unit[index];
+					if (factor == 0) continue;
+					sum += factor * (q > k ? entry(q, k) : entry(k, q));
+				}
+				z[k][i - first[k]] = -sum;
+			}
+			var diagonalSum = 0.0;
+			for (index in 0...rowsBelow.length) {
+				var factor = unit[index];
+				if (factor != 0) diagonalSum += factor * z[rowsBelow[index]][i - first[rowsBelow[index]]];
+			}
+			z[i][i - first[i]] = 1 / (diagonal[i] * diagonal[i]) - diagonalSum;
+			i--;
+		}
+		return z;
+	}
+
+	/** A variable is still free when its `freedom` exceeds this. */
+	public static inline var FREE_TOLERANCE:Float = 1e-6;
+
+	/** `freedom` by modified Gram-Schmidt over dense rows, when the sparse factor cannot decide a pivot. */
+	static function denseFreedom(source:Array<{index:Array<Int>, value:Array<Float>}>, variables:Int, tolerance:Float):Array<Float> {
+		var rows = equilibrate(source).rows;
+		var basis:Array<Array<Float>> = [];
+		for (row in rows) {
+			var v = [for (_ in 0...variables) 0.0];
+			for (e in 0...row.index.length) v[row.index[e]] += row.value[e];
+			for (pass in 0...2)
+				for (b in basis) {
+					var d = 0.0;
+					for (i in 0...variables) d += v[i] * b[i];
+					for (i in 0...variables) v[i] -= d * b[i];
+				}
+			var norm = 0.0;
+			for (value in v) norm += value * value;
+			norm = Math.sqrt(norm);
+			if (norm > tolerance) basis.push([for (value in v) value / norm]);
+		}
+		return [for (i in 0...variables) {
+			var projected = 0.0;
+			for (b in basis) projected += b[i] * b[i];
+			Math.max(0, 1 - projected);
+		}];
+	}
+
+	/**
+		The rows equilibrated as `factor` does (rows, columns, rows), so a variable in small units is not a
+		dependency; `scale` is each row's norm before the last normalization (0 for an empty row).
+	*/
+	static function equilibrate(source:Array<{index:Array<Int>, value:Array<Float>}>):{rows:Array<{index:Array<Int>, value:Array<Float>}>,
+			scale:Array<Float>} {
+		var rows = [for (row in source) {index: row.index, value: row.value.copy()}];
+		normalizeRows(rows);
+		var columnNorm = new Map<Int, Float>();
+		for (row in rows)
+			for (e in 0...row.index.length) {
+				var old = columnNorm.get(row.index[e]);
+				columnNorm.set(row.index[e], (old == null ? 0 : old) + row.value[e] * row.value[e]);
+			}
+		for (row in rows)
+			for (e in 0...row.index.length) {
+				var norm = columnNorm.get(row.index[e]);
+				if (norm != null && norm > 0) row.value[e] /= Math.sqrt(norm);
+			}
+		return {rows: rows, scale: normalizeRows(rows)};
 	}
 
 	/** Rows are adjacent when they share a variable; ordered by reverse Cuthill-McKee. */

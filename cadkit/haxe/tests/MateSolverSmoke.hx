@@ -22,6 +22,7 @@ class MateSolverSmoke {
 		check(result.converged && result.freeRoots.join(",") == "motor", 'the motor is placed (${result.status}: ${result.message})');
 		check(result.report.degreesOfFreedom == 1, 'planar + coaxial leave one turn free: ${result.report.degreesOfFreedom}');
 		check(result.implied.length == 0, 'planar + coaxial overlap on the axis but neither is implied: ${result.implied}');
+		check(result.movable.join(",") == "motor", 'the motor can still turn, the grounded bracket cannot: ${result.movable}');
 		var placed = new AssemblyState(AssemblyMateSolver.place(seated, result));
 		var flange = placed.worldConnector("motor", "flange"), axis = placed.worldConnector("motor", "axis");
 		near(flange.z, 100, "the flange sits on the face");
@@ -36,6 +37,7 @@ class MateSolverSmoke {
 		var locked = motorOnBracket([mate("weld", AssemblyMateKind.Lock)]);
 		var lockResult = AssemblyMateSolver.solve(locked);
 		check(lockResult.converged && lockResult.report.degreesOfFreedom == 0, 'a lock places the motor fully (${lockResult.status})');
+		check(lockResult.movable.length == 0, "a locked motor cannot move");
 		var lockedState = new AssemblyState(locked, lockResult.state(locked));
 		var face = lockedState.worldConnector("bracket", "face"), welded = lockedState.worldConnector("motor", "flange");
 		near(welded.x, face.x, "the locked flange is on the face (x)");

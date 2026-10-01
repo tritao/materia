@@ -8,12 +8,19 @@ class SolvedSketch {
 	public final partCache:Map<String, CachedPart>;
 	/** Part structures (orderings, last diagnosis) by structure, reused by solves of the same structure (see `PartStructure`). */
 	public final structures:Map<String, PartStructure>;
+	/** Points the constraints leave free to move (one or both coordinates), for "still free" display. */
+	public final freePoints:Array<String>;
+	/** Entities with a free point or radius. */
+	public final freeEntities:Array<String>;
 
 	public function new(coordinates:Map<String, Array<Float>>, radii:Map<String, Float>, diagnostic:SolveDiagnostic,
-			?partCache:Map<String, CachedPart>, ?structures:Map<String, PartStructure>) {
+			?partCache:Map<String, CachedPart>, ?structures:Map<String, PartStructure>, ?freePoints:Array<String>,
+			?freeEntities:Array<String>) {
 		this.coordinates = coordinates; this.radii = radii; this.diagnostic = diagnostic;
 		this.partCache = partCache == null ? new Map() : partCache;
 		this.structures = structures == null ? new Map() : structures;
+		this.freePoints = freePoints == null ? [] : freePoints;
+		this.freeEntities = freeEntities == null ? [] : freeEntities;
 	}
 
 	public function x(id:String):Float return point(id)[0];

@@ -85,7 +85,7 @@ class SketchSolver {
 
 		var iterations = 0, failed = false, stationary = true, degenerate = false, diagnosed = true;
 		var conflictingIds:Array<String> = [], failingIds:Array<String> = [];
-		var reports:Array<DiagnosisReport> = [];
+		var reports:Array<DiagnosisReport> = [], free:Array<Int> = [];
 		var cache = new Map<String, CachedPart>(), structures = new Map<String, PartStructure>();
 		var previous = seed == null ? null : seed.partCache, previousStructures = seed == null ? null : seed.structures;
 		for (part in partition.parts) {
@@ -102,6 +102,7 @@ class SketchSolver {
 			var cached = previous == null ? null : previous.get(key);
 			if (cached != null && SketchSolveCache.sameValues(cached.values, values)) {
 				reports.push(cached.report);
+				for (variable in cached.free) free.push(variable);
 				if (cached.degenerate) degenerate = true;
 				cache.set(key, cached);
 				if (known != null) structures.set(key, known);
@@ -113,14 +114,15 @@ class SketchSolver {
 			if (!diagnoseParts && known != null && solved.norm <= tolerance) {
 				// Dragging: report the last diagnosis; the solve on release checks this part again.
 				reports.push(known.report);
+				for (variable in known.free) free.push(variable);
 				if (known.degenerate) degenerate = true;
 				diagnosed = false;
 				structures.set(key, {position: part.position, first: part.first, rows: known.rows, report: known.report,
-					degenerate: known.degenerate});
+					degenerate: known.degenerate, free: known.free});
 				continue;
 			}
 			var rows = known != null && known.rows != null ? known.rows : diagnosis.structuralRows(part, solved.set.values.length);
-			var report = diagnosis.diagnose(x, part, solved.set, rows), partDegenerate = false;
+			var report = diagnosis.diagnose(x, part, solved.set, rows), partDegenerate = false, diagnosedAt = x;
 			if (solved.norm > tolerance) {
 				failed = true;
 				var limit = Math.max(layout.sketch.settings.rankTolerance, tolerance * 10) * (1 + solved.norm);
@@ -136,13 +138,18 @@ class SketchSolver {
 					if (generic.rank > report.rank) {
 						report = generic;
 						partDegenerate = true;
+						diagnosedAt = witness;
 					}
 				}
 			}
 			if (partDegenerate) degenerate = true;
+			// What still moves, at the pose whose rank the report gives.
+			var partFree = diagnosis.freeVariables(diagnosedAt, part, solved.set, partDegenerate ? null : rows);
+			for (variable in partFree) free.push(variable);
 			if (solved.norm <= tolerance)
-				cache.set(key, {values: values, report: report, degenerate: partDegenerate});
-			structures.set(key, {position: part.position, first: part.first, rows: rows, report: report, degenerate: partDegenerate});
+				cache.set(key, {values: values, report: report, degenerate: partDegenerate, free: partFree});
+			structures.set(key, {position: part.position, first: part.first, rows: rows, report: report, degenerate: partDegenerate,
+				free: partFree});
 			reports.push(report);
 		}
 
@@ -170,7 +177,22 @@ class SketchSolver {
 		var radii:Map<String, Float> = new Map();
 		for (entity in layout.sketch.entities())
 			if (layout.radiusIndex.exists(entity.id)) { var i:Int = cast layout.radiusIndex.get(entity.id); radii.set(entity.id, x[i]); }
-		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures);
+		// Free: what a part's constraints leave free, and every variable no constraint touches.
+		var isFree = [for (_ in 0...layout.variableCount) true];
+		for (part in partition.parts) for (variable in part.variables) isFree[variable] = false;
+		for (variable in free) isFree[variable] = true;
+		var freePoints = [for (point in layout.sketch.points()) {
+			var i:Int = cast layout.pointIndex.get(point.id);
+			if (isFree[i] || isFree[i + 1]) point.id;
+		}];
+		var freeEntities:Array<String> = [];
+		for (entity in layout.sketch.entities()) {
+			var moves = freePoints.indexOf(entity.first) >= 0 || (entity.second != null && freePoints.indexOf(entity.second) >= 0);
+			var r = layout.radiusIndex.get(entity.id);
+			if (r != null && isFree[r]) moves = true;
+			if (moves) freeEntities.push(entity.id);
+		}
+		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures, freePoints, freeEntities);
 	}
 
 	static function failingOwners(set:SketchResidualSet, tolerance:Float):Array<String> {
