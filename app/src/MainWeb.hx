@@ -102,6 +102,8 @@ class MainWeb {
       Sys.println("materia-report " + haxe.Json.stringify({
         mode: app.mode.id,
         simulationRunning: app.simulation.isRunning(),
+        simulationActive: app.simulation.isActive(),
+        simulationError: app.simulation.error,
         objects: [for (record in app.scene.records()) {id: record.id, label: record.label, type: record.type, x: record.x, y: record.y}],
         selected: app.scene.selectedId,
         commands: [for (id in REPORTED_COMMANDS) {id: id, enabled: commandEnabled(app, id)}],

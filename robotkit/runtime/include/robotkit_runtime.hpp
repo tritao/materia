@@ -271,6 +271,10 @@ private:
     bool externally_driven_ = false;
     uint64_t last_command_sequence_ = 0;
     rk_robot_state state_backup_{};
+    // apply_pending_commands' working copies, kept off the stack (about 17 KiB each); guarded by owner_mutex_.
+    rk_robot_state owner_state_{};
+    rk_robot_state owner_target_state_{};
+    rk_robot_command owner_output_{};
     ControlState control_{};
     std::deque<rk_event_record> event_records_;
     bool event_records_overflow_ = false;

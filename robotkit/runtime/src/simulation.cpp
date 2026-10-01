@@ -242,6 +242,10 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
     if (robot_desc && robot_desc->struct_size >=
         offsetof(rk_simulation_robot_desc, virtual_device_actuator_count) &&
         robot_desc->virtual_device_enabled) {
+#if !defined(RK_HAS_VIRTUAL_DEVICE)
+        // Built without the simulated board (RK_BUILD_VIRTUAL_DEVICE).
+        return RK_ERROR_UNSUPPORTED;
+#else
         VirtualDeviceConfig6 config;
         config.device_tick_hz = robot_desc->virtual_device_tick_hz;
         config.step_tick_hz = robot_desc->virtual_device_step_tick_hz;
@@ -285,6 +289,7 @@ rk_result Simulation::add_robot(const rk_robot_runtime_blueprint &blueprint,
         }
         virtual_endpoint = VirtualDeviceEndpoint::create(blueprint, config);
         if (!virtual_endpoint) return RK_ERROR_INVALID_ARGUMENT;
+#endif
     }
     try {
         auto binding = std::shared_ptr<SimulationRobot>(new SimulationRobot(*this));

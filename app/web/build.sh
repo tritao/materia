@@ -86,7 +86,8 @@ exports="$build_dir/exports.json"
 node - "$guest" "$exports" <<'NODE'
 const fs = require("fs");
 const [guestPath, exportsPath] = process.argv.slice(2);
-const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render"]);
+const linked = new Set(["nativekit", "nativekit_gpu", "nativekit_ui", "nativekit_scene", "nativekit_scene_render",
+  "nativekit_sim_core", "nativekit_sim_mujoco", "robotkit_runtime"]);
 const module = new WebAssembly.Module(fs.readFileSync(guestPath));
 // haxeon-host.js allocates with malloc/free to hand the guest a host error message (haxeon.wasm.HostError).
 const names = new Set(["_main", "_malloc", "_free", "_nk_last_error", "_nkgpu_last_error", "_nkui_haxeon_memory_contract_status",
@@ -98,10 +99,26 @@ for (const entry of WebAssembly.Module.imports(module))
   if (entry.kind === "function" && linked.has(entry.module)) names.add("_" + entry.name);
 fs.writeFileSync(exportsPath, JSON.stringify([...names].sort()));
 NODE
+# MuJoCo and RobotKit fetch dependencies with FetchContent. Reuse sources desktop SimKit and RobotKit builds already
+# fetched (this checkout's or, from a worktree, the main checkout's), or MATERIA_WEB_DEPS; otherwise CMake downloads
+# them. The first directory holding a dependency wins.
+deps_args=()
+declare -A deps_seen=()
+main_checkout=$(cd "$(git -C "$materia_dir" rev-parse --git-common-dir)/.." && pwd)
+for deps_dir in "${MATERIA_WEB_DEPS:-}" "$materia_dir"/{simkit,robotkit}/build/_deps "$main_checkout"/{simkit,robotkit}/build/_deps; do
+	[[ -n "$deps_dir" && -d "$deps_dir" ]] || continue
+	for source in "$deps_dir"/*-src; do
+		[[ -d "$source" ]] || continue
+		name=$(basename "$source" -src)
+		[[ -z "${deps_seen[$name]:-}" ]] || continue
+		deps_seen[$name]=1
+		deps_args+=("-DFETCHCONTENT_SOURCE_DIR_${name^^}=$source")
+	done
+done
 source "$emsdk_dir/emsdk_env.sh" >/dev/null 2>&1
 emcmake cmake -S "$app_dir/web" -B "$build_dir/host" -G Ninja -DCMAKE_BUILD_TYPE="$build_type" \
 	-DMATERIA_WEB_GUEST_WASM="$guest" -DMATERIA_WEB_EXPORTS_FILE="$exports" \
-	-DNK_WASM_HOST_HEAP_LIMIT="$host_limit" -DMATERIA_WEB_GUEST_MEMORY_LIMIT="$memory_size" >/dev/null
+	-DNK_WASM_HOST_HEAP_LIMIT="$host_limit" -DMATERIA_WEB_GUEST_MEMORY_LIMIT="$memory_size" "${deps_args[@]}" >/dev/null
 cmake --build "$build_dir/host" --target materia_web
 # Instantiation stops at the first mismatched import; report them all here.
 node "$app_dir/web/tools/check-imports.js" "$guest" "$build_dir/host/materia_web.wasm" "$build_dir/host/materia_web.js"

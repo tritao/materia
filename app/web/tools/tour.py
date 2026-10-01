@@ -114,7 +114,7 @@ def enabled(report, command):
 
 
 def tour(editor):
-    """The steps a user takes most: start a scene, add and edit objects, undo, look in 3D."""
+    """The steps a user takes most: start a scene, add and edit objects, undo, look in 3D, simulate."""
     print("start")
     start = editor.report()
     check(start["mode"] == "design", "the editor opens in Design mode")
@@ -173,11 +173,17 @@ def tour(editor):
     check(editor.report()["state"]["perspective"] is not None, "the 3D view is open")
 
     print("simulation")
-    # The browser build has no physics engine yet; Play must be off rather than stop the editor.
-    final = editor.report()
-    check(not enabled(final, "sim.play"), "Play is disabled without a physics engine")
-    check(not editor.widget(final, key="toolbar-sim-play")["enabled"], "the Play button shows it")
-
+    # SimKit, MuJoCo and RobotKit run in the page, single-threaded: the editor steps the session each frame.
+    editor.click(role="button", label="Play")
+    playing = editor.report()
+    check(playing["simulationError"] is None, f"the simulation builds: {playing['simulationError']}")
+    check(playing["simulationActive"] and playing["simulationRunning"], "Play starts the simulation")
+    editor.settle(60)
+    check(editor.report()["simulationRunning"], "the simulation keeps running")
+    editor.click(role="button", label="Stop")
+    stopped = editor.report()
+    check(not stopped["simulationRunning"], "Stop ends the simulation")
+    check(stopped["mode"] == "design", "and returns to Design mode")
 
 def main():
     parser = argparse.ArgumentParser()
@@ -189,7 +195,11 @@ def main():
     options = parser.parse_args()
 
     target = wait_for_page(options.debug_port, options.page_url, 30)
-    page = Page(WebSocket(target["webSocketDebuggerUrl"]))
+    socket = WebSocket(target["webSocketDebuggerUrl"])
+    # The first report can take many seconds: Json.stringify's wasm-gc reflection is slow until the browser
+    # optimizes it.
+    socket.socket.settimeout(90)
+    page = Page(socket)
     page.command("Runtime.enable")
     page.command("Page.enable")
     editor = Editor(page, options.timeout)

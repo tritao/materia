@@ -58,3 +58,6 @@
 	path = kinematicskit/native/vendor/coal
 	url = https://github.com/tritao/coal.git
 	branch = materia
+[submodule "motionkit/native/vendor/eigen"]
+	path = motionkit/native/vendor/eigen
+	url = https://gitlab.com/libeigen/eigen.git

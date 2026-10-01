@@ -27,6 +27,34 @@ foreach(MK_RUCKIG_SOURCE IN LISTS MK_RUCKIG_SOURCES)
     endif()
 endforeach()
 
+# Eigen is vendored (header-only, pinned to 3.4.0) so every platform, the browser included, builds against the same
+# copy. A generated package config makes each find_package(Eigen3) in the build, TOPP-RA's too, resolve to it.
+set(MK_EIGEN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/eigen")
+if(NOT EXISTS "${MK_EIGEN_DIR}/Eigen/Core")
+    message(FATAL_ERROR "Initialize motionkit/native/vendor/eigen submodule")
+endif()
+set(MK_EIGEN_CONFIG_DIR "${CMAKE_CURRENT_BINARY_DIR}/eigen3")
+file(WRITE "${MK_EIGEN_CONFIG_DIR}/Eigen3Config.cmake" "\
+if(NOT TARGET Eigen3::Eigen)
+    add_library(Eigen3::Eigen INTERFACE IMPORTED GLOBAL)
+    set_target_properties(Eigen3::Eigen PROPERTIES INTERFACE_INCLUDE_DIRECTORIES \"${MK_EIGEN_DIR}\")
+endif()
+set(EIGEN3_INCLUDE_DIR \"${MK_EIGEN_DIR}\")
+set(EIGEN3_INCLUDE_DIRS \"${MK_EIGEN_DIR}\")
+")
+file(WRITE "${MK_EIGEN_CONFIG_DIR}/Eigen3ConfigVersion.cmake" "\
+set(PACKAGE_VERSION 3.4.0)
+if(PACKAGE_FIND_VERSION VERSION_GREATER PACKAGE_VERSION OR PACKAGE_FIND_VERSION_MAJOR GREATER 3)
+    set(PACKAGE_VERSION_COMPATIBLE FALSE)
+else()
+    set(PACKAGE_VERSION_COMPATIBLE TRUE)
+    if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
+        set(PACKAGE_VERSION_EXACT TRUE)
+    endif()
+endif()
+")
+set(Eigen3_DIR "${MK_EIGEN_CONFIG_DIR}" CACHE PATH "MotionKit's vendored Eigen" FORCE)
+
 # TOPP-RA's Seidel solver is the only optimizer compiled for path timing.
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/toppra/cpp/CMakeLists.txt")
     message(FATAL_ERROR "Initialize motionkit/native/vendor/toppra submodule")
@@ -63,7 +91,10 @@ set(MK_DESCARTES_INCLUDE "${CMAKE_CURRENT_SOURCE_DIR}/vendor/descartes_light/des
 if(NOT EXISTS "${MK_DESCARTES_INCLUDE}/descartes_light/solvers/ladder_graph/ladder_graph_solver.h")
     message(FATAL_ERROR "Initialize motionkit/native/vendor/descartes_light submodule")
 endif()
-find_package(OpenMP QUIET COMPONENTS CXX)
+# Emscripten's OpenMP needs threads, which the browser build does not use.
+if(NOT EMSCRIPTEN)
+    find_package(OpenMP QUIET COMPONENTS CXX)
+endif()
 add_library(motionkit_descartes_core STATIC src/descartes_instantiations.cpp)
 set_target_properties(motionkit_descartes_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_compile_features(motionkit_descartes_core PUBLIC cxx_std_17)

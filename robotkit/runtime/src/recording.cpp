@@ -147,6 +147,10 @@ rk_result rk_recording_writer_create(const char* path, uint64_t capacity,
     rk_recording_compression compression, rk_recording_writer_handle* out) {
   if (!path || !*path || !capacity || !out || compression > RK_RECORDING_COMPRESSION_LZ4)
     return RK_ERROR_INVALID_ARGUMENT;
+#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
+  // The writer runs on its own thread, which a build without threads cannot start.
+  return RK_ERROR_UNSUPPORTED;
+#endif
   try {
     std::string marker = std::string(path) + ".incomplete";
     { std::ofstream pending(marker, std::ios::trunc); if (!pending) return RK_ERROR_BACKEND; pending << "incomplete\n"; }

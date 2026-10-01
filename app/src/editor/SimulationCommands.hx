@@ -11,9 +11,7 @@ import nativekit.ui.core.UiModifier;
 class SimulationCommands {
   public static function install(app:ReferenceEditorApp):Void {
     var simulation = app.simulation;
-    // The browser build has no physics engine until nativekit_sim_mujoco gets a web build (app/web/README.md);
-    // calling into its missing imports would stop the editor.
-    function available():Bool return #if wasm false #else !app.documents.blocked() #end;
+    function available():Bool return !app.documents.blocked();
     function rebuild():Bool {
       if (simulation.rebuild(app.sensors, app.scene, app.session)) {
         app.log("Shared simulation configuration applied");

@@ -42,6 +42,10 @@ endif()
 
 add_library(nativekit_sim_mujoco ${NK_LIBRARY_TYPE}
     src/mujoco_backend.cpp)
+# Large structs belong on the heap: worker threads may have only 512 KiB of stack (macOS) and the browser 1 MiB.
+if(NOT MSVC)
+    target_compile_options(nativekit_sim_mujoco PRIVATE -Wframe-larger-than=65536)
+endif()
 add_library(NativeKit::sim_mujoco ALIAS nativekit_sim_mujoco)
 
 target_compile_features(nativekit_sim_mujoco PRIVATE cxx_std_20)
@@ -55,7 +59,7 @@ target_include_directories(nativekit_sim_mujoco
 target_link_libraries(nativekit_sim_mujoco
     PUBLIC NativeKit::sim_core
     PRIVATE ${NK_MUJOCO_TARGET})
-if(UNIX AND NOT APPLE)
+if(UNIX AND NOT APPLE AND NOT NK_LIBRARY_TYPE STREQUAL "STATIC")
     # The vendored MuJoCo archive is implementation detail of this plugin.
     # Localize its public C API and reject unresolved backend dependencies.
     target_link_options(nativekit_sim_mujoco PRIVATE
@@ -107,11 +111,15 @@ if(NK_BUILD_TESTS)
     target_link_libraries(nativekit_sim_mujoco_benchmark PRIVATE NativeKit::sim_mujoco)
 endif()
 
-install(TARGETS nativekit_sim_mujoco EXPORT NativeKitTargets
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# A static backend would export the vendored MuJoCo archive it links, which is not installed; the browser host
+# links it statically and installs nothing, so only a shared backend installs.
+if(NOT NK_LIBRARY_TYPE STREQUAL "STATIC")
+    install(TARGETS nativekit_sim_mujoco EXPORT NativeKitTargets
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+endif()
 
 # These tests use assert for setup calls as well as checks. Keep them active in Release.
 get_property(_assert_test_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
