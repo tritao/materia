@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <utility>
 
 #include "layout/layout_types.h"
 
@@ -77,6 +78,8 @@ struct PreparedGlyphs {
     GlyphMode mode = GlyphMode::Alpha;
     TextLayoutId layout_id = 0;
     uint64_t layout_generation = 0;
+    int32_t first_line = -1;
+    int32_t end_line = -1;
 };
 
 /** Opaque white is the default foreground color. */
@@ -221,6 +224,14 @@ class TextEngine {
     bool has_layout(TextLayoutId id) const;
     bool prepare_glyphs(float origin_x, float origin_y, float pixel_scale, GlyphMode mode,
                         PreparedGlyphs &output);
+    /** Conservative visual-line range intersecting local vertical bounds. */
+    std::pair<uint32_t, uint32_t> visible_lines(float min_y, float max_y) const;
+    bool prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x, float origin_y,
+                                  float pixel_scale, GlyphMode mode, PreparedGlyphs &output);
+    std::shared_ptr<const PreparedGlyphs> published_glyphs_for_lines(
+        TextLayoutId id, uint32_t first, uint32_t end, float origin_x, float origin_y,
+        float pixel_scale, GlyphMode mode, GlyphTint tint = {},
+        const std::vector<GlyphColorRange> &ranges = {});
     bool prepare_glyphs_for_line(uint32_t line_index, float origin_x, float origin_y,
                                  float pixel_scale, GlyphMode mode, PreparedGlyphs &output);
     bool prepare_glyphs_for_line(TextLayoutId id, uint32_t line_index, float origin_x,
@@ -279,10 +290,10 @@ class TextEngine {
                                                          float origin_x, float origin_y,
                                                          float pixel_scale, GlyphMode mode,
                                                          GlyphTint tint,
-                                                         const std::vector<GlyphColorRange> &ranges);
+                                                         const std::vector<GlyphColorRange> &ranges, int32_t end_line = -1);
     bool prepare_glyphs_internal(TextLayoutId id, float origin_x, float origin_y, float pixel_scale,
                                  GlyphMode mode, PreparedGlyphs &output, int32_t line_start,
-                                 int32_t line_end, float line_x, float line_y);
+                                 int32_t line_end, float line_x, float line_y, int32_t line_index = -1, int32_t end_line = -1);
 
     State *state_ = nullptr;
 };

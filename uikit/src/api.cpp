@@ -37,6 +37,8 @@
 #include <limits>
 #include <string>
 #include <unordered_map>
+#include <map>
+#include <tuple>
 #include <vector>
 
 static_assert(sizeof(nkui_command_header) == sizeof(nkui::CommandHeader));
@@ -100,6 +102,7 @@ struct ResourceSlot {
     std::shared_ptr<nkui::TextEngine> text;
     std::unique_ptr<nkui::SurfaceProducer> surface;
     nk_graphics_image graphics_image{};
+    std::map<std::tuple<int32_t, uint32_t, uint32_t>, std::shared_ptr<nkui::PreparedGlyphs>> visible_text_glyphs;
     nkui::PreparedGlyphs text_glyphs;
     std::unordered_map<int32_t, nkui::PreparedGlyphs> scaled_text_glyphs;
     nkui_color text_color{1.0f, 1.0f, 1.0f, 1.0f};
@@ -1306,6 +1309,48 @@ std::array<float, 6> device_transform(const std::array<float, 6> &transform, flo
     return result;
 }
 
+// Retain bounded viewport snapshots without mutating an earlier command's range.
+std::shared_ptr<nkui::PreparedGlyphs> prepare_visible_text(
+    ResourceSlot &layout, const nkui::RenderCommand &command,
+    const std::array<float, 6> &transform, const nkui_frame_info &frame,
+    const nkui::RenderTargetDescriptor &target, int32_t scale_key, float scale) {
+    float min_y = -INFINITY, max_y = INFINITY;
+    // Rotated/skewed text keeps the full preparation path. Axis-aligned text
+    // can map the framebuffer/scissor bounds back to its local vertical range.
+    if (transform[1] == 0 && transform[2] == 0 && transform[3] != 0 &&
+        target.origin_x == 0.0f && target.origin_y == 0.0f) {
+        float top = 0;
+        float bottom = target.height > 0 ? static_cast<float>(target.height)
+                                         : static_cast<float>(frame.framebuffer_height);
+        if (command.has_scissor) {
+            top = std::max(top, command.scissor_y);
+            bottom = std::min(bottom, command.scissor_y + command.scissor_height);
+        }
+        if (bottom < top)
+            bottom = top;
+        const float a = (top - transform[5]) / transform[3] - command.y;
+        const float b = (bottom - transform[5]) / transform[3] - command.y;
+        min_y = std::min(a, b);
+        max_y = std::max(a, b);
+    }
+    const auto lines = layout.text->visible_lines(min_y, max_y);
+    const auto key = std::make_tuple(scale_key, lines.first, lines.second);
+    auto found = layout.visible_text_glyphs.find(key);
+    if (found == layout.visible_text_glyphs.end()) {
+        if (layout.visible_text_glyphs.size() >= 16)
+            layout.visible_text_glyphs.clear();
+        found = layout.visible_text_glyphs.emplace(key, std::make_shared<nkui::PreparedGlyphs>()).first;
+    }
+    auto glyphs = found->second;
+    if (!layout.text->prepared_glyphs_current(*glyphs)) {
+        if (!layout.text->prepare_glyphs_for_lines(lines.first, lines.second, 0, 0, scale,
+                                                   nkui::GlyphMode::Alpha, *glyphs))
+            return {};
+        tint_text_glyphs(*glyphs, layout.text_color, layout.text_color_ranges);
+    }
+    return glyphs;
+}
+
 // Reserve the first transient slot for the offscreen frame root. Compositor and
 // layout compilation start their per-frame allocations after it when this root
 // is active, so backdrop frames do not grow the target pool by one permanent ID.
@@ -1478,6 +1523,7 @@ void release_resource_slot(ResourceSlot &slot) {
     slot.text.reset();
     slot.text_glyphs = {};
     slot.scaled_text_glyphs.clear();
+    slot.visible_text_glyphs.clear();
     slot.text_color = {1.0f, 1.0f, 1.0f, 1.0f};
     slot.text_color_ranges.clear();
     slot.text_content_revision = 1;
@@ -2430,6 +2476,7 @@ extern "C" nkui_result nkui_text_layout_update(nkui_resource layout, const char 
     ++slot->text_content_revision;
     slot->text_glyphs = {};
     slot->scaled_text_glyphs.clear();
+    slot->visible_text_glyphs.clear();
     slot->text->prune_layout_cache({shaped.id}, 1);
     return NKUI_OK;
 }
@@ -2446,6 +2493,7 @@ extern "C" nkui_result nkui_text_layout_set_text(nkui_resource layout, const cha
     ++slot->text_content_revision;
     slot->text_glyphs = {};
     slot->scaled_text_glyphs.clear();
+    slot->visible_text_glyphs.clear();
     slot->text->prune_layout_cache({shaped.id}, 1);
     return NKUI_OK;
 }
@@ -2477,6 +2525,7 @@ extern "C" nkui_result nkui_text_layout_set_color_ranges(nkui_resource layout,
         return NKUI_OK;
     ++slot->text_content_revision;
     slot->text_color_ranges = std::move(colors);
+    slot->visible_text_glyphs.clear();
     tint_text_glyphs(slot->text_glyphs, slot->text_color, slot->text_color_ranges);
     for (auto &[_, glyphs] : slot->scaled_text_glyphs)
         tint_text_glyphs(glyphs, slot->text_color, slot->text_color_ranges);
@@ -2495,6 +2544,7 @@ extern "C" nkui_result nkui_text_layout_set_color(nkui_resource layout, nkui_col
         return NKUI_OK;
     ++slot->text_content_revision;
     slot->text_color = color;
+    slot->visible_text_glyphs.clear();
     tint_text_glyphs(slot->text_glyphs, color, slot->text_color_ranges);
     for (auto &[_, glyphs] : slot->scaled_text_glyphs)
         tint_text_glyphs(glyphs, color, slot->text_color_ranges);
@@ -3263,7 +3313,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
     std::vector<std::shared_ptr<nkui::PreparedTexture>> prepared_images;
     std::vector<nkui::TextEngine *> text_engines;
     std::vector<std::shared_ptr<nkui::TextEngine>> text_engine_owners;
-    std::vector<std::pair<nkui::TextEngine *, nkui::PreparedGlyphs *>> prepared_texts;
+    std::vector<std::shared_ptr<nkui::PreparedGlyphs>> prepared_text_owners;
+    std::vector<std::pair<ResourceSlot *, nkui::PreparedGlyphs *>> prepared_texts;
     struct OwnedTextBind {
         nkui::ResourceId id{};
         nkui::TextEngine *engine = nullptr;
@@ -3272,6 +3323,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
         uint64_t content_generation = 0;
         nkui_color color{1.0f, 1.0f, 1.0f, 1.0f};
         std::vector<nkui::GlyphColorRange> color_ranges;
+        uint32_t first_line = 0;
+        uint32_t end_line = 0;
     };
     std::vector<OwnedTextBind> owned_text_binds;
     uint16_t prepared_slot = 1;
@@ -3428,41 +3481,16 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                     1, static_cast<int32_t>(std::round(requested_scale * raster_scale_precision)));
                 const float raster_scale =
                     static_cast<float>(raster_scale_key) / raster_scale_precision;
-                nkui::PreparedGlyphs *glyphs = nullptr;
-                if (raster_scale_key == raster_scale_precision) {
-                    glyphs = &layout->text_glyphs;
-                    if (!layout->text->prepared_glyphs_current(*glyphs)) {
-                        valid = layout->text->prepare_glyphs(0.0f, 0.0f, raster_scale,
-                                                             nkui::GlyphMode::Alpha, *glyphs);
-                        if (valid)
-                            tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
-                    }
-                } else {
-                    auto found = layout->scaled_text_glyphs.find(raster_scale_key);
-                    if (found == layout->scaled_text_glyphs.end()) {
-                        nkui::PreparedGlyphs prepared;
-                        valid = layout->text->prepare_glyphs(0.0f, 0.0f, raster_scale,
-                                                             nkui::GlyphMode::Alpha, prepared);
-                        if (valid)
-                            tint_text_glyphs(prepared, layout->text_color, layout->text_color_ranges);
-                        if (!valid)
-                            break;
-                        found = layout->scaled_text_glyphs
-                                    .emplace(raster_scale_key, std::move(prepared))
-                                    .first;
-                    }
-                    glyphs = &found->second;
-                    if (valid && !layout->text->prepared_glyphs_current(*glyphs)) {
-                        valid = layout->text->prepare_glyphs(0.0f, 0.0f, raster_scale,
-                                                             nkui::GlyphMode::Alpha, *glyphs);
-                        if (valid)
-                            tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
-                    }
-                }
+                auto viewport_glyphs = prepare_visible_text(*layout, command, transform,
+                                                            *frame_info, pass.target_descriptor, raster_scale_key, raster_scale);
+                valid = viewport_glyphs != nullptr;
+                auto *glyphs = viewport_glyphs.get();
+                if (valid)
+                    prepared_text_owners.push_back(std::move(viewport_glyphs));
                 if (!valid)
                     break;
                 if (valid)
-                    prepared_texts.push_back({layout->text.get(), glyphs});
+                    prepared_texts.push_back({layout, glyphs});
                 const nkui::ResourceId prepared_id =
                     nkui::make_resource_id(nkui::ResourceKind::TextLayout, 0x0FFE, prepared_slot++);
                 valid = frame_resources.bind_text(prepared_id, *glyphs,
@@ -3477,7 +3505,9 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                                                     layout->text->layout_generation() ^
                                                     (layout->text->font_collection_generation() +
                                                        layout->text_content_revision * UINT64_C(0x9e3779b97f4a7c15)),
-                                                layout->text_color, layout->text_color_ranges});
+                                                layout->text_color, layout->text_color_ranges,
+                                                static_cast<uint32_t>(glyphs->first_line),
+                                                static_cast<uint32_t>(glyphs->end_line)});
                 command.resource = prepared_id;
                 // Skribidi's pixel scale changes atlas raster density while
                 // preserving layout geometry. Keep the draw origin in layout
@@ -3548,10 +3578,13 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
     if (!valid)
         return NKUI_ERROR_INVALID_HANDLE;
     for (size_t pass = 0; pass < prepared_texts.size() && valid; ++pass) {
-        auto &[engine, glyphs] = prepared_texts[pass];
-        if (!engine->prepared_glyphs_current(*glyphs))
-            valid = engine->prepare_glyphs(glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale,
-                                           glyphs->mode, *glyphs);
+        auto &[layout, glyphs] = prepared_texts[pass];
+        if (!layout->text->prepared_glyphs_current(*glyphs)) {
+            valid = layout->text->prepare_glyphs_for_lines(glyphs->first_line, glyphs->end_line,
+                glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale, glyphs->mode, *glyphs);
+            if (valid)
+                tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
+        }
     }
     if (!valid)
         return NKUI_ERROR_RENDERING;
@@ -3562,7 +3595,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
     for (const auto &bind : owned_text_binds) {
         if (!sealable)
             break;
-        auto snapshot = bind.engine->published_glyphs(bind.engine->active_layout_id(), 0.0f, 0.0f,
+        auto snapshot = bind.engine->published_glyphs_for_lines(bind.engine->active_layout_id(),
+                                                      bind.first_line, bind.end_line, 0.0f, 0.0f,
                                                       bind.pixel_scale, bind.mode,
                                                       glyph_tint_from_color(bind.color), bind.color_ranges);
         if (!snapshot ||
@@ -3820,7 +3854,8 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
     std::vector<std::shared_ptr<nkui::PreparedTexture>> custom_images;
     std::vector<nkui::TextEngine *> text_engines;
     std::vector<std::shared_ptr<nkui::TextEngine>> text_engine_owners;
-    std::vector<std::pair<nkui::TextEngine *, nkui::PreparedGlyphs *>> prepared_texts;
+    std::vector<std::shared_ptr<nkui::PreparedGlyphs>> prepared_text_owners;
+    std::vector<std::pair<ResourceSlot *, nkui::PreparedGlyphs *>> prepared_texts;
     uint32_t prepared_slot = 1;
     bool valid = true;
     const char *invalid_reason = "a frame resource could not be prepared";
@@ -4004,40 +4039,15 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     1, static_cast<int32_t>(std::round(requested_scale * raster_scale_precision)));
                 const float raster_scale =
                     static_cast<float>(raster_scale_key) / raster_scale_precision;
-                nkui::PreparedGlyphs *glyphs = nullptr;
-                if (raster_scale_key == raster_scale_precision) {
-                    glyphs = &layout->text_glyphs;
-                    if (!layout->text->prepared_glyphs_current(*glyphs)) {
-                        valid = layout->text->prepare_glyphs(0.0f, 0.0f, raster_scale,
-                                                             nkui::GlyphMode::Alpha, *glyphs);
-                        if (valid)
-                            tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
-                    }
-                } else {
-                    auto found = layout->scaled_text_glyphs.find(raster_scale_key);
-                    if (found == layout->scaled_text_glyphs.end()) {
-                        nkui::PreparedGlyphs prepared;
-                        valid = layout->text->prepare_glyphs(0.0f, 0.0f, raster_scale,
-                                                             nkui::GlyphMode::Alpha, prepared);
-                        if (valid)
-                            tint_text_glyphs(prepared, layout->text_color, layout->text_color_ranges);
-                        if (!valid)
-                            break;
-                        found = layout->scaled_text_glyphs
-                                    .emplace(raster_scale_key, std::move(prepared))
-                                    .first;
-                    }
-                    glyphs = &found->second;
-                    if (valid && !layout->text->prepared_glyphs_current(*glyphs)) {
-                        valid = layout->text->prepare_glyphs(0.0f, 0.0f, raster_scale,
-                                                             nkui::GlyphMode::Alpha, *glyphs);
-                        if (valid)
-                            tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
-                    }
-                }
+                auto viewport_glyphs = prepare_visible_text(*layout, command, command.transform,
+                                                            *frame_info, pass.target_descriptor, raster_scale_key, raster_scale);
+                valid = viewport_glyphs != nullptr;
+                auto *glyphs = viewport_glyphs.get();
+                if (valid)
+                    prepared_text_owners.push_back(std::move(viewport_glyphs));
                 if (!valid)
                     break;
-                prepared_texts.push_back({layout->text.get(), glyphs});
+                prepared_texts.push_back({layout, glyphs});
                 const auto prepared_id = nkui::make_resource_id(
                     nkui::ResourceKind::TextLayout, 0x0FFD, static_cast<uint16_t>(prepared_slot++));
                 frame_stage = "custom glyph batch: bind glyphs";
@@ -4047,8 +4057,9 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                                                       (layout->text->font_collection_generation() +
                                                        layout->text_content_revision * UINT64_C(0x9e3779b97f4a7c15)));
                 if (valid) {
-                    auto snapshot = layout->text->published_glyphs(
-                        layout->text->active_layout_id(), 0.0f, 0.0f, raster_scale,
+                    auto snapshot = layout->text->published_glyphs_for_lines(
+                        layout->text->active_layout_id(), glyphs->first_line, glyphs->end_line,
+                        0.0f, 0.0f, raster_scale,
                         nkui::GlyphMode::Alpha, glyph_tint_from_color(layout->text_color), layout->text_color_ranges);
                     if (!snapshot ||
                         !owned_resources.bind_text(prepared_id, std::move(snapshot),
@@ -4119,11 +4130,14 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                      frame_stage);
         return NKUI_ERROR_INVALID_HANDLE;
     }
-    for (auto &[engine, glyphs] : prepared_texts)
-        if (!engine->prepared_glyphs_current(*glyphs) &&
-            !engine->prepare_glyphs(glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale,
-                                    glyphs->mode, *glyphs))
-            return NKUI_ERROR_RENDERING;
+    for (auto &[layout, glyphs] : prepared_texts) {
+        if (!layout->text->prepared_glyphs_current(*glyphs)) {
+            if (!layout->text->prepare_glyphs_for_lines(glyphs->first_line, glyphs->end_line,
+                    glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale, glyphs->mode, *glyphs))
+                return NKUI_ERROR_RENDERING;
+            tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
+        }
+    }
     auto *session_text_engine = session_state->frame.text_engine();
     if (!sealable && threaded)
         return NKUI_ERROR_RENDERING;

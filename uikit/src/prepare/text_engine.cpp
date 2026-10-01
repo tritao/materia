@@ -42,6 +42,8 @@ struct TextEngine::State {
         uint64_t last_used = 0;
         TextLayoutResult result{};
         std::vector<skb_range_t> line_ranges;
+        std::vector<float> prefix_bottoms;
+        std::vector<float> suffix_tops;
     };
 
     std::shared_ptr<FontCollection> font_collection;
@@ -587,11 +589,19 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
         const std::size_t start = offsets[static_cast<std::size_t>(line.text_range.start)];
         const std::size_t end = offsets[static_cast<std::size_t>(line.text_range.end)];
         retained->line_ranges.push_back(line.text_range);
+        const float top = std::min(line.bounds.y, line.culling_bounds.y);
+        const float bottom = std::max(line.bounds.y + line.bounds.height,
+                                       line.culling_bounds.y + line.culling_bounds.height);
+        retained->prefix_bottoms.push_back(index == 0 ? bottom
+            : std::max(bottom, retained->prefix_bottoms.back()));
+        retained->suffix_tops.push_back(top);
         layout_result.lines.push_back(
             {start,
              end - start,
              {line.bounds.x, line.bounds.y, line.bounds.width, line.bounds.height}});
     }
+    for (int32_t i = lines_count - 2; i >= 0; --i)
+        retained->suffix_tops[i] = std::min(retained->suffix_tops[i], retained->suffix_tops[i + 1]);
     retained->result = std::move(layout_result);
     state_->active_layout_id = layout_id;
     if (result)
@@ -639,6 +649,40 @@ bool TextEngine::prepare_glyphs(float origin_x, float origin_y, float pixel_scal
                                    output, -1, -1, 0.0f, 0.0f);
 }
 
+std::pair<uint32_t, uint32_t> TextEngine::visible_lines(float min_y, float max_y) const {
+    const auto *layout = active_layout(*state_);
+    if (!layout || max_y <= min_y)
+        return {0, 0};
+    const auto first = std::upper_bound(layout->prefix_bottoms.begin(),
+                                         layout->prefix_bottoms.end(), min_y);
+    const auto end = std::lower_bound(layout->suffix_tops.begin(),
+                                       layout->suffix_tops.end(), max_y);
+    const auto begin_index = static_cast<uint32_t>(first - layout->prefix_bottoms.begin());
+    return {begin_index, std::max(begin_index,
+        static_cast<uint32_t>(end - layout->suffix_tops.begin()))};
+}
+
+bool TextEngine::prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x,
+                                          float origin_y, float pixel_scale, GlyphMode mode,
+                                          PreparedGlyphs &output) {
+    const auto *layout = active_layout(*state_);
+    if (!layout || first > end || end > layout->result.lines.size())
+        return false;
+    return prepare_glyphs_internal(state_->active_layout_id, origin_x, origin_y, pixel_scale,
+                                    mode, output, -1, -1, 0, 0,
+                                    static_cast<int32_t>(first), static_cast<int32_t>(end));
+}
+
+std::shared_ptr<const PreparedGlyphs> TextEngine::published_glyphs_for_lines(
+    TextLayoutId id, uint32_t first, uint32_t end, float origin_x, float origin_y,
+    float pixel_scale, GlyphMode mode, GlyphTint tint, const std::vector<GlyphColorRange> &ranges) {
+    const auto *layout = find_layout(*state_, id);
+    if (!layout || first > end || end > layout->result.lines.size())
+        return {};
+    return publish_glyphs(id, static_cast<int32_t>(first), origin_x, origin_y,
+                          pixel_scale, mode, tint, ranges, static_cast<int32_t>(end));
+}
+
 bool TextEngine::prepare_glyphs_for_line(uint32_t line_index, float origin_x, float origin_y,
                                          float pixel_scale, GlyphMode mode,
                                          PreparedGlyphs &output) {
@@ -656,7 +700,7 @@ bool TextEngine::prepare_glyphs_for_line(TextLayoutId id, uint32_t line_index, f
     const auto &line = layout->result.lines[line_index];
     const auto range = layout->line_ranges[line_index];
     return prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode, output, range.start,
-                                   range.end, line.bounds.x, line.bounds.y);
+                                   range.end, line.bounds.x, line.bounds.y, static_cast<int32_t>(line_index));
 }
 
 std::shared_ptr<const PreparedGlyphs> TextEngine::published_glyphs(TextLayoutId id, float origin_x,
@@ -679,11 +723,11 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
                                                                  int32_t line_index, float origin_x,
                                                                  float origin_y, float pixel_scale,
                                                                  GlyphMode mode, GlyphTint tint,
-                                                                   const std::vector<GlyphColorRange> &ranges) {
+                                                                   const std::vector<GlyphColorRange> &ranges, int32_t end_line) {
     const auto *layout = find_layout(*state_, id);
     if (!layout || pixel_scale <= 0.0f || !valid_glyph_color_ranges(ranges))
         return {};
-    if (line_index >= 0 && static_cast<std::size_t>(line_index) >= layout->result.lines.size())
+    if (line_index >= 0 && end_line < 0 && static_cast<std::size_t>(line_index) >= layout->result.lines.size())
         return {};
 
     const uint32_t scale_key =
@@ -697,6 +741,7 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     mix(scale_key);
     mix(static_cast<uint64_t>(mode));
     mix(static_cast<uint64_t>(line_index + 1));
+    mix(static_cast<uint64_t>(end_line + 1));
     mix(static_cast<uint64_t>(std::llround(static_cast<double>(origin_x) * 64.0)));
     mix(static_cast<uint64_t>(std::llround(static_cast<double>(origin_y) * 64.0)));
     mix(static_cast<uint64_t>(tint.red) << 24 | static_cast<uint64_t>(tint.green) << 16 |
@@ -705,7 +750,11 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     std::vector<GlyphColorRange> relevant_ranges;
     for (auto range : ranges) {
         if (line_index >= 0) {
-            const auto line = layout->line_ranges[line_index];
+            if (end_line == line_index)
+                continue;
+            const skb_range_t line = end_line < 0 ? layout->line_ranges[line_index]
+                : skb_range_t{layout->line_ranges[line_index].start,
+                              layout->line_ranges[end_line - 1].end};
             range.start = std::max(range.start, line.start);
             range.end = std::min(range.end, line.end);
             if (range.start >= range.end)
@@ -729,7 +778,9 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     if (!snapshot)
         return {};
     const bool prepared =
-        line_index < 0 ? prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode,
+        end_line >= 0 ? prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode,
+                                                *snapshot, -1, -1, 0, 0, line_index, end_line)
+        : line_index < 0 ? prepare_glyphs_internal(id, origin_x, origin_y, pixel_scale, mode,
                                                  *snapshot, -1, -1, 0.0f, 0.0f)
                        : prepare_glyphs_for_line(id, static_cast<uint32_t>(line_index), origin_x,
                                                  origin_y, pixel_scale, mode, *snapshot);
@@ -756,7 +807,7 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
 bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float origin_y,
                                          float pixel_scale, GlyphMode mode, PreparedGlyphs &output,
                                          int32_t line_start, int32_t line_end, float line_x,
-                                         float line_y) {
+                                         float line_y, int32_t line_index, int32_t end_line) {
     const auto *retained = find_layout(*state_, id);
     if (!retained || pixel_scale <= 0.0f)
         return false;
@@ -774,12 +825,17 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
     output.pixel_scale = pixel_scale;
     output.mode = mode;
     output.layout_id = id;
+    output.first_line = line_index;
+    output.end_line = end_line < 0 ? line_index + 1 : end_line;
     output.layout_generation = skb_layout_get_generation(retained->layout);
     if (!state_->font_collection || !state_->font_collection->state_ ||
         !state_->font_collection->state_->fonts)
         return false;
-    if (!skb_layout_prepare_glyphs(retained->layout, state_->atlas, state_->temporary,
-                                   state_->rasterizer, pixel_scale, raster_mode(mode)))
+    const skb_range_t lines = line_index < 0
+        ? skb_range_t{0, skb_layout_get_lines_count(retained->layout)}
+        : skb_range_t{line_index, end_line < 0 ? line_index + 1 : end_line};
+    if (!skb_layout_prepare_glyphs_range(retained->layout, lines, state_->atlas, state_->temporary,
+                                         state_->rasterizer, pixel_scale, raster_mode(mode)))
         return false;
     if (std::getenv("NKUI_DEBUG_GLYPHS") && retained->options.font_size == 18.0f) {
         const uint32_t *text = skb_layout_get_text(retained->layout);
@@ -804,7 +860,7 @@ bool TextEngine::prepare_glyphs_internal(TextLayoutId id, float origin_x, float 
                               &output,
                               line_start,
                               line_end};
-    if (!skb_layout_iterate_render_glyphs(retained->layout, append_render_glyph, &render))
+    if (!skb_layout_iterate_render_glyphs_range(retained->layout, lines, append_render_glyph, &render))
         return false;
     state_->prepared_batch_count += output.batches.size();
     return true;

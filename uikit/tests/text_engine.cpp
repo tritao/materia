@@ -1,6 +1,8 @@
 #include "prepare/text_engine.h"
 
 #include <cstring>
+#include <cmath>
+#include <string>
 #include <vector>
 
 #ifndef NKUI_TEST_FONT_PATH
@@ -444,6 +446,50 @@ int main() {
     }
     if (!saw_supplementary || !saw_rtl)
         return 69;
+
+    // Publishing a middle visual line of a long wrapped paragraph must
+    // contain only that line, with its origin normalized for line drawing.
+    TextEngine long_word(shared_fonts);
+    const std::string long_text(1024 * 1024, 'a');
+    TextLayoutOptions long_options;
+    long_options.font_size = 16.0f;
+    TextLayoutResult long_layout;
+    if (!long_word.layout_utf8(long_text.c_str(), 200.0f, long_options, &long_layout) ||
+        long_layout.lines.size() < 1000)
+        return 120;
+    const uint32_t middle = static_cast<uint32_t>(long_layout.lines.size() / 2);
+    const auto middle_glyphs = long_word.published_glyphs_for_line(
+        long_layout.id, middle, 0, 0, 1, GlyphMode::Alpha);
+    if (!middle_glyphs || middle_glyphs->vertices.empty() ||
+        middle_glyphs->vertices.size() > 400)
+        return 121;
+    for (const auto &vertex : middle_glyphs->vertices)
+        if (vertex.x < -20 || vertex.x > 220 || vertex.y < -30 || vertex.y > 50)
+            return 122;
+    if (long_word.published_glyphs_for_line(long_layout.id, middle, 0, 0, 1,
+                                           GlyphMode::Alpha) != middle_glyphs)
+        return 123;
+    const auto &middle_line = long_layout.lines[middle];
+    const auto visible = long_word.visible_lines(middle_line.bounds.y,
+        middle_line.bounds.y + middle_line.bounds.height);
+    if (visible.first > middle || visible.second <= middle ||
+        visible.second - visible.first > 5)
+        return 124;
+    const auto viewport = long_word.published_glyphs_for_lines(long_layout.id,
+        middle, middle + 1, 0, 0, 1, GlyphMode::Alpha);
+    if (!viewport || viewport->vertices.size() != middle_glyphs->vertices.size())
+        return 125;
+    for (size_t i = 0; i < viewport->vertices.size(); ++i)
+        if (std::abs(viewport->vertices[i].y - middle_glyphs->vertices[i].y - middle_line.bounds.y) > .1f ||
+            viewport->vertices[i].red != middle_glyphs->vertices[i].red)
+            return 126;
+    const auto empty = long_word.published_glyphs_for_lines(long_layout.id,
+        middle, middle, 0, 0, 1, GlyphMode::Alpha);
+    if (!empty || !empty->vertices.empty() ||
+        long_word.published_glyphs_for_lines(long_layout.id, middle + 1, middle, 0, 0, 1, GlyphMode::Alpha) ||
+        long_word.published_glyphs_for_lines(long_layout.id, 0, long_layout.lines.size() + 1, 0, 0, 1, GlyphMode::Alpha))
+        return 127;
+
 
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;
 }

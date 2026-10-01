@@ -253,6 +253,11 @@ class TextEditorLayout {
 						if (candidate != null && !containsRecord(usedDirty, candidate))
 							record = candidate;
 					}
+				// Ordinary edits keep paragraph indexes stable. Update the retained
+				// native layout rather than creating a new atlas for each keystroke.
+				if (record == null && index < previous.length &&
+					!containsRecord(usedDirty, previous[index]))
+					record = previous[index];
 				if (record == null)
 					record = new TextEditorParagraphRecord(paragraphText,
 						TextLayout.create(fonts, paragraphText, width, textStyle, paragraphStyle));

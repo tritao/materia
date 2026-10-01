@@ -829,6 +829,45 @@ int main(int argc, char **argv) {
         nkui_display_list_destroy(long_list);
         nkui_resource_destroy(long_text);
     }
+    if (!result && ready) {
+        // Scrolling a wrapped paragraph must publish the requested middle
+        // visual lines, with their original positions and retained atlas.
+        const std::string wrapped_word(100000, 'a');
+        nkui_resource wrapped_text{};
+        nkui_display_list wrapped_list{};
+        nkui_text_style style{sizeof(style), NKUI_FONT_FAMILY_DEFAULT, 18.0f, 0.0f};
+        nkui_paragraph_style paragraph{sizeof(paragraph), 0.0f, NKUI_TEXT_WRAP_WORD_CHARACTER,
+                                       NKUI_TEXT_ALIGN_START, NKUI_TEXT_DIRECTION_AUTO};
+        if (nkui_text_layout_create_styled(fonts, wrapped_word.c_str(), 200.0f, &style,
+                                           &paragraph, &wrapped_text) != NKUI_OK ||
+            nkui_display_list_create(&wrapped_list) != NKUI_OK) {
+            result = 27;
+        } else {
+            const nkui_frame_info frame{sizeof(frame), static_cast<float>(width),
+                static_cast<float>(height), width, height, 1.0f};
+            for (float y : {0.0f, -5000.0f}) {
+                const nkui_draw_rect_command draw{{NKUI_COMMAND_DRAW_TEXT_LAYOUT,
+                    NKUI_COMMAND_VERSION, sizeof(draw)}, wrapped_text, 0.0f, y, 0.0f, 0.0f};
+                if (nkui_display_list_submit(wrapped_list,
+                        reinterpret_cast<const uint8_t*>(&draw), sizeof(draw)) != NKUI_OK ||
+                    nkui_renderer_render_frame(renderer, wrapped_list, surface, &frame) != NKUI_OK) {
+                    result = 28;
+                    break;
+                }
+                std::vector<uint8_t> pixels(static_cast<size_t>(width) * height * 4);
+                glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+                size_t bright = 0;
+                for (size_t index = 0; index < pixels.size(); index += 4)
+                    bright += pixels[index] > 80 && pixels[index + 1] > 80 && pixels[index + 2] > 80;
+                if (bright < 100) {
+                    result = 29;
+                    break;
+                }
+            }
+        }
+        nkui_display_list_destroy(wrapped_list);
+        nkui_resource_destroy(wrapped_text);
+    }
     if (nkui_renderer_destroy(renderer) != NKUI_OK)
         result = 9;
     else if (nkui_renderer_destroy(renderer) != NKUI_ERROR_INVALID_HANDLE)
