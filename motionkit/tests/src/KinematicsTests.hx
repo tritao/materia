@@ -446,16 +446,20 @@ class KinematicsTests extends MotionKitTestSupport {
     for (_ in 0...260) harness.step(Int64.ofInt(++tick));
     for (j in 0...6) near(positions()[j], start[j], '$label: the arm reaches its start (joint $j)', 2.0 * quantumStart);
 
-    var session = new ServoSession(robot, arm, 0.01, 1e-3, 1e-4, new ServoPlanOptions(model, calibration));
+    var lead = 0.04;
+    var session = new ServoSession(robot, arm, 0.01, 1e-3, 1e-4, new ServoPlanOptions(model, calibration, lead));
     var ms = Int64.ofInt(1000000);
     var accel = 4.0, dt = 0.01;
     // Joint motion is judged from the measured positions: second differences bound the acceleration.
     var quantum = virtual ? 2e-4 : 1e-9;
     var trace:Array<Array<Float>> = [positions()];
+    // Source time of each traced sample: a device may report the same sample on two ticks.
+    var stamps:Array<Float> = [Int64.toFloat(robot.snapshot().sourceTimestampNs) * 1e-9];
     var sequence = 0;
     function advance():Void {
       harness.step(Int64.ofInt(++tick));
       trace.push(positions());
+      stamps.push(Int64.toFloat(robot.snapshot().sourceTimestampNs) * 1e-9);
     }
     function tickOnce(refresh:Null<motionkit.kinematics.Twist6>) {
       if (refresh != null) check(session.command(refresh, ++sequence, session.nowNs() + ms * 100) == null, '$label: a fresh command is accepted');
@@ -463,10 +467,17 @@ class KinematicsTests extends MotionKitTestSupport {
       advance();
       return result;
     }
+    // Second differences over distinct samples, on the samples' own clock.
     function worstAcceleration(from:Int):Float {
+      var distinct = [for (i in from...trace.length) if (i == from || stamps[i] > stamps[i - 1]) i];
       var worst = 0.0;
-      for (i in (from + 2)...trace.length) for (j in 0...6)
-        worst = Math.max(worst, Math.abs(trace[i][j] - 2.0 * trace[i - 1][j] + trace[i - 2][j]) / (dt * dt));
+      for (k in 2...distinct.length) {
+        var a = distinct[k - 2], b = distinct[k - 1], c = distinct[k];
+        var h1 = stamps[b] - stamps[a], h2 = stamps[c] - stamps[b];
+        for (j in 0...6)
+          worst = Math.max(worst, Math.abs(2.0 * ((trace[c][j] - trace[b][j]) / h2 - (trace[b][j] - trace[a][j]) / h1) /
+            (h1 + h2)));
+      }
       return worst;
     }
     function worstSpeed(from:Int):Float {
@@ -510,7 +521,7 @@ class KinematicsTests extends MotionKitTestSupport {
     }
     check(rested, '$label: a stopped servo comes to rest');
     // Braking starts at the end of the queue, one lead ahead.
-    check(ticks * dt <= peak / accel + 0.04 + 0.03, '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)');
+    check(ticks * dt <= peak / accel + lead + 0.03, '$label: braking takes about v/a (${ticks * dt} s for $peak rad/s)');
     check(worstAcceleration(first) <= slack, '$label: braking stays within the acceleration limits (${worstAcceleration(first)})');
     for (_ in 0...10) advance();
     check(still(9), '$label: the arm stays at rest');
@@ -539,7 +550,7 @@ class KinematicsTests extends MotionKitTestSupport {
       if (stoppedAt < 0 && still(1)) stoppedAt = trace.length - 2;
     }
     var stopSeconds = (stoppedAt - stalledAt) * dt;
-    check(stoppedAt >= 0 && stopSeconds <= 0.04 + moving / accel + 0.04,
+    check(stoppedAt >= 0 && stopSeconds <= lead + moving / accel + 0.04,
       '$label: a stalled host leaves the arm stopping within the lead plus v/a ($stopSeconds s)');
     check(still(40), '$label: the stalled arm stays at rest');
     // The runtime reports the underflow and stays ready; a device latches its stop as a fault.

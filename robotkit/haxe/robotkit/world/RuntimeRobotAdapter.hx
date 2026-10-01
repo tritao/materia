@@ -78,7 +78,7 @@ class RuntimeRobotAdapter implements Robot {
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId,
-      value.committedUntilNs, value.queueEndTimeNs);
+      value.committedUntilNs, value.queueEndTimeNs, value.setpoint.toArray());
   }
 
   public function fault():Null<RobotFault> {

@@ -158,16 +158,15 @@ class ServoSession {
   function updatePlan(snapshot:robotkit.world.RobotSnapshot):ServoTick {
     var plan:ServoPlan = this.plan;
     var active = snapshot.trajectoryActive;
-    // The stream drained: it ended at rest, or ran dry and the robot braked it. A device starts a new
-    // queue after a delay and reports no motion until then, so only a stream seen running can drain.
-    if (plan.streaming && active) plan.markRunning();
-    if (plan.streaming && plan.running && !active) plan.clear();
+    // The stream drained: it ended at rest, or ran dry and the robot braked it.
+    if (plan.streaming && !active) plan.clear();
     if (!plan.streaming) {
       if (!live || active) {
         commanded = [for (_ in indices) 0.0];
         return new ServoTick(commanded.copy(), !live, !live && !active, null);
       }
-      plan.begin([for (j in 0...snapshot.positions.length) snapshot.positions.get(j)]);
+      // Start where the robot holds its joints, which is where it anchors a new plan.
+      plan.begin([for (j in 0...snapshot.setpointPositions.length) snapshot.setpointPositions.get(j)]);
     }
     if (plan.endedAtRest) return new ServoTick(commanded.copy(), !live, false, null);
     var periodNs = Int64.fromFloat(Math.round(controlPeriod * 1e9));

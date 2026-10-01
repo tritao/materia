@@ -424,7 +424,7 @@ class RobotRuntime {
       native.trajectoryTag, native.trajectoryTagTimeNs,
       native.modelRevision, native.calibrationRevision,
       native.sessionState, native.activePlanId,
-      native.committedUntilNs, native.queueEndTimeNs);
+      native.committedUntilNs, native.queueEndTimeNs, native.setpoint.toArray());
   }
 
   /**

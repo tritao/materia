@@ -808,7 +808,7 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	/**
 	 * Immutable published runtime snapshot; native handles never enter this ABI.
 	 */
-	struct rk_robot_snapshot @layout(16912, 8) {
+	struct rk_robot_snapshot @layout(21008, 8) {
 		/**
 		 * < Set to sizeof this struct.
 		 */
@@ -913,6 +913,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		active_plan_id: u64 @offset(16888);
 		committed_until_ns: u64 @offset(16896);
 		queue_end_time_ns: u64 @offset(16904);
+		/**
+		 * Where the runtime holds each joint and anchors the next plan: the last
+		 * commanded position (after velocity control, the observed resting
+		 * position). A plan submitted while idle must start here.
+		 */
+		setpoint_position: array<f64, 512> @offset(16912);
 	}
 	/**
 	 * Mutable native state used internally while a runtime publishes a snapshot.

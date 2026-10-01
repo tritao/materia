@@ -611,6 +611,12 @@ typedef struct rk_robot_snapshot {
     uint64_t active_plan_id;
     uint64_t committed_until_ns;
     uint64_t queue_end_time_ns;
+    /**
+     * Where the runtime holds each joint and anchors the next plan: the last
+     * commanded position (after velocity control, the observed resting
+     * position). A plan submitted while idle must start here.
+     */
+    double setpoint_position[RK_MAX_JOINTS];
 } rk_robot_snapshot;
 
 /** Static control capabilities reported by a RobotRuntime endpoint. */

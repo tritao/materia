@@ -266,3 +266,23 @@ MuJoCo) is the design reference. It is **not** a runtime dependency.
       start time and clock mapping.
     - Candidate selection over external-axis redundancy (D3-style lattice)
       instead of continuation with a posture preference.
+- 2026-10-01 — **D5c workarounds replaced, and three device-path bugs fixed.**
+  - The snapshot publishes the runtime's setpoint (`setpoint_position`, the
+    anchor of the next plan). Streams start there exactly, so the 1e-3
+    start tolerance is gone.
+  - The RKD6 endpoint counts segments still waiting to be sent, or sent but
+    not yet started, as active. "Not active" now means drained, so the
+    "seen running" heuristic is gone.
+  - The runtime's copy of a device-executed queue followed the owner clock.
+    It ran ahead of the device by the start delay, retired knots the device
+    had not executed, and took appends for new plans. It now follows the
+    device's reported path time while the device runs the queue.
+  - Between samples, the runtime overwrote the device-owned progress fields
+    with its own copy's. A missed sample then published the copy's view.
+    The runtime no longer writes them for device-executed queues.
+  - STATE6 carries positions as 32-bit floats, so a joint resting exactly
+    on a limit read 5e-8 past it and latched a fault. Endpoints now declare
+    their position precision, which the observed-limit check allows for.
+  - The servo test measures acceleration on the device's own sample
+    timestamps, skipping repeated samples. A repeated sample had produced a
+    false spike.

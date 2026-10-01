@@ -39,8 +39,6 @@ class ServoPlanOptions {
  */
 class ServoPlan {
   static var nextId:Int64 = Int64.ofInt(0x40000000);
-  /** How far (rad or m) a stream's measured start may be from the robot's held setpoint. */
-  static inline var STARTING_TOLERANCE = 1e-3;
 
   public final options:ServoPlanOptions;
   final jointCount:Int;
@@ -49,8 +47,6 @@ class ServoPlan {
   public final accelerationLimits:Array<Float>;
   /** True while the queue holds this stream's chunks. */
   public var streaming(default, null) = false;
-  /** True once the robot has been seen executing the stream. */
-  public var running(default, null) = false;
   /** True once the stream's last chunk ended at rest. */
   public var endedAtRest(default, null) = false;
   /** End of the queue on the plan clock, and every joint's state there. */
@@ -75,7 +71,7 @@ class ServoPlan {
     endAcceleration = [for (_ in 0...jointCount) 0.0];
   }
 
-  /** Starts a new stream from rest at `positions` (every joint). */
+  /** Starts a new stream from rest at `positions` (every joint): the robot's setpoint, where a new plan anchors. */
   public function begin(positions:Array<Float>):Void {
     for (j in 0...jointCount) {
       endPosition[j] = positions[j];
@@ -84,7 +80,6 @@ class ServoPlan {
     }
     endNs = Int64.ofInt(0);
     streaming = false;
-    running = false;
     endedAtRest = false;
   }
 
@@ -104,13 +99,11 @@ class ServoPlan {
     var coefficients = [for (j in 0...jointCount) [endPosition[j], endVelocity[j], 0.5 * (target[j] - endVelocity[j]) / t]];
     var accelerationTolerance = [for (j in 0...jointCount) Math.abs(2.0 * coefficients[j][2] - endAcceleration[j]) + 1e-5];
     var tight = [for (_ in 0...jointCount) 1e-6];
-    // A stream starts from the measured positions, which may sit a quantization step off the held setpoint.
-    var positionTolerance = streaming ? tight : [for (_ in 0...jointCount) STARTING_TOLERANCE];
     nextId = nextId + Int64.ofInt(1);
     return new ExecutionPlanSubmission(nextId, options.modelRevision, options.calibrationRevision,
       RobotKitRuntimeConstants.RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE, endPosition.copy(), endVelocity.copy(),
       endAcceleration.copy(), [new TrajectorySegment(Int64.ofInt(0), durationNs, coefficients)], null, null,
-      positionTolerance, tight, accelerationTolerance, endsAtRest, null, true);
+      tight, tight, accelerationTolerance, endsAtRest, null, true);
   }
 
   /** Records a chunk the robot accepted: the queue now ends where it does. */
@@ -129,12 +122,9 @@ class ServoPlan {
     endedAtRest = plan.endsAtRest;
   }
 
-  public function markRunning():Void running = true;
-
   /** Forgets the stream: its queue drained (at rest, or run dry and braked by the robot). */
   public function clear():Void {
     streaming = false;
-    running = false;
     endedAtRest = false;
   }
 }

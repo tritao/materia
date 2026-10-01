@@ -471,7 +471,7 @@ class SessionTransitionRobot implements Robot {
       value.trajectoryQueueDepth, value.trajectoryActive, value.trajectoryTimeNs,
       value.trajectoryDurationNs, value.trajectoryTag, value.trajectoryTagTimeNs,
       value.sessionState, value.activePlanId, value.committedUntilNs,
-      value.queueEndTimeNs);
+      value.queueEndTimeNs, value.setpointPositions.toArray());
   }
   public function sensors():Array<SensorFrame> return inner.sensors();
   public function events(afterOrdinal:Int64, max:Int):Array<robotkit.world.RobotEvent>
@@ -649,7 +649,8 @@ class FaultingArmRobot extends SimulatedRobot {
       value.trajectoryQueueDepth, value.trajectoryActive,
       value.trajectoryTimeNs, value.trajectoryDurationNs,
       value.trajectoryTag, value.trajectoryTagTimeNs, value.sessionState,
-      value.activePlanId, value.committedUntilNs, value.queueEndTimeNs);
+      value.activePlanId, value.committedUntilNs, value.queueEndTimeNs,
+      value.setpointPositions.toArray());
   }
 }
 

@@ -1884,6 +1884,44 @@ void plan_end_does_not_restore_earlier_targets(const rk_robot_runtime_blueprint 
     assert(std::abs(state.position[0] - 0.4) < 1e-9);
     assert(std::abs(state.position[1] + 0.4) < 1e-9);
     assert(state.trajectory_active == 0);
+    // The snapshot names where the next plan must start.
+    rk_robot_snapshot snapshot{};
+    snapshot.struct_size = sizeof(snapshot);
+    assert(runtime.snapshot_full(snapshot) == RK_OK);
+    assert(std::abs(snapshot.setpoint_position[0] - 0.4) < 1e-9);
+    assert(std::abs(snapshot.setpoint_position[1] + 0.4) < 1e-9);
+}
+
+// Reports joint 0 at its upper limit as a 32-bit float would carry it.
+class SinglePrecisionEndpoint final : public robotkit::RobotEndpoint {
+public:
+    explicit SinglePrecisionEndpoint(double limit, bool declares) : limit_(limit), declares_(declares) {}
+    rk_result apply(const rk_robot_command &) override { return RK_OK; }
+    rk_result sample(uint64_t timestamp_ns, rk_robot_state &state) override {
+        state.struct_size = sizeof(state);
+        state.source_timestamp_ns = timestamp_ns;
+        state.joint_count = 2;
+        state.position[0] = static_cast<double>(static_cast<float>(limit_));
+        return RK_OK;
+    }
+    double observed_position_precision() const noexcept override {
+        return declares_ ? std::numeric_limits<float>::epsilon() : 0.0;
+    }
+private:
+    double limit_;
+    bool declares_;
+};
+
+void single_precision_reading_at_a_limit_is_not_a_fault(const rk_robot_runtime_blueprint &blueprint) {
+    // 1.2 as a float is 1.2000000477: past the limit unless the endpoint's precision is allowed for.
+    auto limited = blueprint;
+    limited.joints[0].upper_limit = 1.2;
+    for (bool declares : {true, false}) {
+        auto endpoint = std::make_shared<SinglePrecisionEndpoint>(1.2, declares);
+        robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
+        const auto result = runtime.publish_sample(10'000'000);
+        assert(declares ? result == RK_OK : result == RK_ERROR_LIMIT);
+    }
 }
 
 void expired_velocity_targets_brake_within_limits(const rk_robot_runtime_blueprint &blueprint) {
@@ -2006,6 +2044,7 @@ int main() {
     stop_ramp_stays_within_travel(blueprint);
     expired_velocity_targets_brake_within_limits(blueprint);
     plan_end_does_not_restore_earlier_targets(blueprint);
+    single_precision_reading_at_a_limit_is_not_a_fault(blueprint);
     faulted_batch_skips_commands_before_reset(blueprint);
     invalid_trajectory_chunk_is_atomic(blueprint);
     trajectory_chunk_speed_is_limited(blueprint);
