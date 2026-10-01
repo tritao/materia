@@ -16,6 +16,7 @@ import materia.assembly.AssemblyDefinitionFlattener;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import cadkit.modeling.AssemblySolve.AssemblySolveOptions;
+import cadkit.modeling.AssemblySolve.AssemblySolveSettings;
 
 typedef AssemblyMateSolveOptions = AssemblySolveOptions;
 
@@ -77,41 +78,55 @@ class AssemblyMateSolveResult {
 	problem is usually under-determined: mates rarely fix everything), then
 	diagnosed: the report's degrees of freedom are what the mates leave free.
 */
+/**
+	What a mate solve works on (see `AssemblyMateSolver.setup`): the flattened definition and its kinematics, the
+	problem of every mate and closure over what may move, the seed state, and the solve settings.
+*/
+class AssemblyMateSetup {
+	public final flat:AssemblyDefinition;
+	public final kinematics:AssemblyKinematics;
+	/** Mates and closures as equalities, over the reached joints and the free roots. */
+	public final problem:KinematicProblem;
+	/** The movable joint coordinates (model DOF indices). */
+	public final dofs:Array<Int>;
+	/** Root occurrences the solve moves as rigid bodies. */
+	public final freeRoots:Array<String>;
+	public final seed:KinematicState;
+	public final settings:AssemblySolveSettings;
+	/** The assembly's characteristic length (see `AssemblySolve.scale`). */
+	public final scale:Float;
+
+	public function new(flat:AssemblyDefinition, kinematics:AssemblyKinematics, problem:KinematicProblem, dofs:Array<Int>,
+			freeRoots:Array<String>, seed:KinematicState, settings:AssemblySolveSettings, scale:Float) {
+		this.flat = flat;
+		this.kinematics = kinematics;
+		this.problem = problem;
+		this.dofs = dofs;
+		this.freeRoots = freeRoots;
+		this.seed = seed;
+		this.settings = settings;
+		this.scale = scale;
+	}
+
+	/** The free root poses and movable coordinates of `state`, as a solve reports them. */
+	public function placement(state:KinematicState):{rootPoses:Array<AssemblyRootPose>, jointCoordinates:Array<AssemblyJointCoordinate>} {
+		var model = kinematics.model;
+		return {
+			rootPoses: [for (id in freeRoots) {occurrence: id, pose: AssemblyKinematics.toFrame(state.rootPose(kinematics.body(id)))}],
+			jointCoordinates: [for (dof in dofs) {joint: model.dofId(dof), value: state.q[dof]}]
+		};
+	}
+}
+
 class AssemblyMateSolver {
 	public static function solve(definition:AssemblyDefinition, ?state:AssemblyStateRecord,
 			?options:AssemblyMateSolveOptions):AssemblyMateSolveResult {
-		AssemblyDefinitionCodec.validate(definition);
-		if (state != null) AssemblyDefinitionCodec.validateState(definition, state);
-		var flat = AssemblyDefinitionFlattener.flatten(definition);
-		var flatState = state == null ? null : AssemblyDefinitionFlattener.flattenState(definition, state);
-		var kinematics = AssemblyKinematics.compile(flat, true), model = kinematics.model;
-		var settings = AssemblySolve.settings(flat.lengthUnit, options);
-
-		// What may move: free roots as rigid bodies, and the joints between mated occurrences and their roots.
-		var roots = AssemblyDefinitionCodec.rootOccurrences(flat);
-		var rootIds = [for (occurrence in flat.occurrences) if (roots.exists(occurrence.id)) occurrence];
-		var grounded = [for (occurrence in rootIds) if (occurrence.grounded == true) occurrence.id];
-		if (grounded.length == 0 && rootIds.length > 0) grounded.push(rootIds[0].id);
-		var freeRoots = [for (occurrence in rootIds) if (grounded.indexOf(occurrence.id) < 0) occurrence.id];
-		var dofs = reachedDofs(flat, model);
-
-		var seed = new KinematicState(model);
-		if (flatState != null) {
-			for (coordinate in flatState.jointCoordinates) {
-				var dof = model.dofIndex(coordinate.joint);
-				if (dof >= 0) seed.q[dof] = coordinate.value;
-			}
-			for (root in flatState.rootPoses) seed.setRootPose(kinematics.body(root.occurrence), AssemblyKinematics.fromFrame(root.pose));
-		}
-		var problem = new KinematicProblem(model).setActiveDofs(dofs);
-		for (id in freeRoots) problem.setRootMotion(kinematics.body(id), RootMotion.Floating);
-		for (closure in 0...model.closureCount())
-			problem.add(new ClosureTask(model, closure, settings.positionTolerance, settings.angularTolerance));
-
-		var scale = AssemblySolve.scale(flat);
+		var setup = setup(definition, state, options);
+		var problem = setup.problem, kinematics = setup.kinematics, model = kinematics.model;
+		var dofs = setup.dofs, freeRoots = setup.freeRoots, scale = setup.scale;
 		// Mates are usually under-determined, hence Levenberg's damping. A witness placement: nudge everything the
 		// mates move (by a fixed uneven pattern, so the nudges do not cancel) and place the parts again.
-		var outcome = AssemblySolve.run(problem, seed, settings, scale, true, (solved, sign) -> {
+		var outcome = AssemblySolve.run(problem, setup.seed, setup.settings, scale, true, (solved, sign) -> {
 			var nudged = solved.copy(), k = 0;
 			for (dof in dofs) {
 				nudged.q[dof] += sign * nudge(k++) * (model.dofIsAngular(dof) ? 1 : scale);
@@ -139,10 +154,72 @@ class AssemblyMateSolver {
 			case "limit-blocked": "joint limits stop the mates from closing";
 			default: "the mate solve ran out of iterations while still improving";
 		};
-		var rootPoses = [for (id in freeRoots) {occurrence: id, pose: AssemblyKinematics.toFrame(solution.state.rootPose(kinematics.body(id)))}];
-		var coordinates = [for (dof in dofs) {joint: model.dofId(dof), value: solution.state.q[dof]}];
+		var placed = setup.placement(solution.state);
 		return new AssemblyMateSolveResult(outcome.status, solution.converged(), solution.iterations, solution.unsatisfied(), message,
-			report, outcome.degenerate, implied, freeRoots, rootPoses, coordinates);
+			report, outcome.degenerate, implied, freeRoots, placed.rootPoses, placed.jointCoordinates);
+	}
+
+	/**
+		The problem a mate solve or drag works on. Every root occurrence except the grounded ones (or, when none is
+		grounded, the first root) is a free rigid body; the movable joints between a mated occurrence and its root
+		that are neither driven nor coupled may move too.
+	*/
+	public static function setup(definition:AssemblyDefinition, ?state:AssemblyStateRecord, ?options:AssemblyMateSolveOptions):AssemblyMateSetup {
+		AssemblyDefinitionCodec.validate(definition);
+		if (state != null) AssemblyDefinitionCodec.validateState(definition, state);
+		var flat = AssemblyDefinitionFlattener.flatten(definition);
+		var flatState = state == null ? null : AssemblyDefinitionFlattener.flattenState(definition, state);
+		var kinematics = AssemblyKinematics.compile(flat, true), model = kinematics.model;
+		var settings = AssemblySolve.settings(flat.lengthUnit, options);
+		var roots = AssemblyDefinitionCodec.rootOccurrences(flat);
+		var rootIds = [for (occurrence in flat.occurrences) if (roots.exists(occurrence.id)) occurrence];
+		var grounded = [for (occurrence in rootIds) if (occurrence.grounded == true) occurrence.id];
+		if (grounded.length == 0 && rootIds.length > 0) grounded.push(rootIds[0].id);
+		var freeRoots = [for (occurrence in rootIds) if (grounded.indexOf(occurrence.id) < 0) occurrence.id];
+		var dofs = reachedDofs(flat, model);
+		var seed = new KinematicState(model);
+		if (flatState != null) {
+			for (coordinate in flatState.jointCoordinates) {
+				var dof = model.dofIndex(coordinate.joint);
+				if (dof >= 0) seed.q[dof] = coordinate.value;
+			}
+			for (root in flatState.rootPoses) seed.setRootPose(kinematics.body(root.occurrence), AssemblyKinematics.fromFrame(root.pose));
+		}
+		var problem = new KinematicProblem(model).setActiveDofs(dofs);
+		for (id in freeRoots) problem.setRootMotion(kinematics.body(id), RootMotion.Floating);
+		for (closure in 0...model.closureCount())
+			problem.add(new ClosureTask(model, closure, settings.positionTolerance, settings.angularTolerance));
+		return new AssemblyMateSetup(flat, kinematics, problem, dofs, freeRoots, seed, settings, AssemblySolve.scale(flat));
+	}
+
+	/**
+		`state` with `rootPoses` and `jointCoordinates` written over it: a solve's or drag's placement as a
+		configuration of `definition` that keeps every coordinate the mates did not move.
+	*/
+	public static function merge(definition:AssemblyDefinition, state:AssemblyStateRecord, rootPoses:Array<AssemblyRootPose>,
+			jointCoordinates:Array<AssemblyJointCoordinate>):AssemblyStateRecord {
+		var coordinates = [for (coordinate in state.jointCoordinates) {joint: coordinate.joint, value: coordinate.value}];
+		for (solved in jointCoordinates) {
+			var found = false;
+			for (coordinate in coordinates) if (coordinate.joint == solved.joint) {
+				coordinate.value = solved.value;
+				found = true;
+			}
+			if (!found) coordinates.push({joint: solved.joint, value: solved.value});
+		}
+		var poses = [for (root in state.rootPoses) {occurrence: root.occurrence, pose: root.pose}];
+		for (solved in rootPoses) {
+			var found = false;
+			for (root in poses) if (root.occurrence == solved.occurrence) {
+				root.pose = solved.pose;
+				found = true;
+			}
+			if (!found) poses.push({occurrence: solved.occurrence, pose: solved.pose});
+		}
+		var record:AssemblyStateRecord = {schemaVersion: state.schemaVersion, definition: state.definition,
+			jointCoordinates: coordinates, rootPoses: poses};
+		AssemblyDefinitionCodec.validateState(definition, record);
+		return record;
 	}
 
 	/** The k-th witness nudge: `AssemblySolve.WITNESS_STEP` times one of 1, 0.6, 0.8, cycling. */

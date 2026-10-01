@@ -965,3 +965,32 @@ Steps:
     loaded `Runner.hx` twice when a type was written as `Runner.Scene`.
 - Tests: `ProjectSourceTests.checkMatePick` (refusals, completion,
   inspector removal and undo).
+
+**d (done).** Dragging under mates:
+- `cadkit.modeling.AssemblyMateDrag` drags a point of a mated part. Each
+  update makes two Levenberg-Marquardt solves from the previous preview:
+  1. The mates and closures at their tolerance-scaled weight, plus a pull
+     of the grabbed point toward the target with weight 1 (rows in length
+     units), which finds the nearest placement the mates allow. A seated
+     pin pulled sideways turns about its axis.
+  2. The mates and closures alone, so the preview satisfies them exactly.
+
+  The result reports whether the point is on target, to a thousandth of
+  the assembly scale, or held ("Held by its mates N mm from the cursor").
+- A first pull weight of `1/scale` was too light: Levenberg-Marquardt
+  judged the problem stationary and stopped 19 mm short.
+- `AssemblyMateSolver.setup` (the movable coordinates and the mate and
+  closure problem) is shared by the solve and the drag;
+  `AssemblyMateSolver.merge` folds a placement into an existing state (the
+  editor overlay now uses it).
+- In the editor, `beginAssemblyDrag` uses `ProjectMateDrag` for a part
+  that has mates and the existing IK drag otherwise. Previews go through
+  `previewAssemblyPoses`; a commit is one undoable edit.
+- Tests:
+  - `MateSolverSmoke.checkDrag`: the seated motor turns about its shaft
+    and stays seated; pulled off the face it is held; the commit equals the
+    preview; the grounded bracket refuses.
+  - `ProjectSourceTests.checkMateDrag`: the pin dragged around the bore
+    follows and stays in it; undo and redo; the grounded plate refuses.
+- Limit: for definitions with nested assemblies the drag and solve report
+  flattened ids, and `merge` refuses them (as `place` already did).

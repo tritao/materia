@@ -166,33 +166,7 @@ class ProjectAssemblyMates {
 	public function solve(generated:AssemblyDefinition, state:AssemblyStateRecord):{result:AssemblyMateSolveResult, state:AssemblyStateRecord} {
 		var definition = effective(generated);
 		var result = AssemblyMateSolver.solve(definition, state);
-		return {result: result, state: merged(generated, state, result)};
-	}
-
-	/** `state` with the solve's root poses and joint coordinates written over it. */
-	static function merged(generated:AssemblyDefinition, state:AssemblyStateRecord, result:AssemblyMateSolveResult):AssemblyStateRecord {
-		var coordinates = [for (coordinate in state.jointCoordinates) {joint: coordinate.joint, value: coordinate.value}];
-		for (solved in result.jointCoordinates) {
-			var found = false;
-			for (coordinate in coordinates) if (coordinate.joint == solved.joint) {
-				coordinate.value = solved.value;
-				found = true;
-			}
-			if (!found) coordinates.push({joint: solved.joint, value: solved.value});
-		}
-		var poses = [for (root in state.rootPoses) {occurrence: root.occurrence, pose: root.pose}];
-		for (solved in result.rootPoses) {
-			var found = false;
-			for (root in poses) if (root.occurrence == solved.occurrence) {
-				root.pose = solved.pose;
-				found = true;
-			}
-			if (!found) poses.push({occurrence: solved.occurrence, pose: solved.pose});
-		}
-		var record:AssemblyStateRecord = {schemaVersion: state.schemaVersion, definition: state.definition,
-			jointCoordinates: coordinates, rootPoses: poses};
-		AssemblyDefinitionCodec.validateState(generated, record);
-		return record;
+		return {result: result, state: AssemblyMateSolver.merge(generated, state, result.rootPoses, result.jointCoordinates)};
 	}
 
 	/** Whether a remaining mate names `added` (on any occurrence of its component). */

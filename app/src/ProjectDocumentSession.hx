@@ -32,6 +32,7 @@ import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
 import cadkit.modeling.AssemblyDrag;
+import cadkit.modeling.AssemblyMateDrag;
 import cadkit.modeling.AssemblyMateSolver.AssemblyMateSolveResult;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
 import materia.assembly.AssemblyDefinition.AssemblyMateKind;
@@ -616,6 +617,14 @@ class ProjectDocumentSession {
     var pose = state.worldPose(occurrence);
     var local = AssemblyFrames.transformPoint(AssemblyFrames.inverse(pose),
       worldPoint[0] / unit, worldPoint[1] / unit, worldPoint[2] / unit);
+    // A part with mates moves as they allow (and holds them); otherwise its joints carry it.
+    var mated = false;
+    for (mate in assemblyMates.mates) if (mate.first == occurrence || mate.second == occurrence) mated = true;
+    if (mated) {
+      var mateDrag = try new AssemblyMateDrag(assemblyMates.effective(definition), state.record(), occurrence,
+        new kinematicskit.Vector3(local.x, local.y, local.z)) catch (_:Dynamic) null;
+      if (mateDrag != null) return new ProjectMateDrag(this, mateDrag, state.record(), unit);
+    }
     var drag = try new AssemblyDrag(state, occurrence, null, assemblyDependentJointIds(), false,
       new kinematicskit.Vector3(local.x, local.y, local.z)) catch (_:Dynamic) null;
     if (drag == null) return null;
@@ -623,7 +632,12 @@ class ProjectDocumentSession {
   }
 
   @:allow(app.ProjectAssemblyDrag)
-  function previewAssemblyDrag(drag:AssemblyDrag):Void {
+  function previewAssemblyDrag(drag:AssemblyDrag):Void
+    previewAssemblyPoses(drag.previewPose);
+
+  /** Shows each occurrence at `poseOf(occurrence)` without recording history (a drag's preview). */
+  @:allow(app.ProjectMateDrag)
+  function previewAssemblyPoses(poseOf:String->AssemblyFrame):Void {
     var definition = projectAssemblyDefinition;
     var centers = assemblyLocalCentersByDefinition;
     if (definition == null || centers == null) throw "Assembly placement data is unavailable";
@@ -632,7 +646,7 @@ class ProjectDocumentSession {
       var center = centers.get(occurrence.definition);
       if (center == null || center.length != 3)
         throw 'Assembly component "${occurrence.definition}" has no local preview center';
-      var pose = drag.previewPose(occurrence.id);
+      var pose = poseOf(occurrence.id);
       var world = AssemblyFrames.transformPoint(pose, center[0], center[1], center[2]);
       transforms.push({id: "project:" + occurrence.id, x: world.x * assemblyMetresPerUnit,
         y: world.y * assemblyMetresPerUnit, z: world.z * assemblyMetresPerUnit,
@@ -642,6 +656,7 @@ class ProjectDocumentSession {
   }
 
   @:allow(app.ProjectAssemblyDrag)
+  @:allow(app.ProjectMateDrag)
   function finishAssemblyDrag(label:String, before:AssemblyStateRecord, after:Null<AssemblyStateRecord>):Bool {
     if (after == null || sameAssemblyState(before, after)) {
       applyAssemblyStateRecord(before);

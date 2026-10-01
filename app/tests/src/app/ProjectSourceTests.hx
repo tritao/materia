@@ -411,6 +411,7 @@ class ProjectSourceTests {
       "undo removes the mate and its face connectors");
     check(session.document.redo(), "and redoes");
     expectPin(session, 30, 20, 10, "redo seats the pin again");
+    checkMateDrag(session, generated.metresPerUnit);
 
     var output = "/tmp/materia-pin-plate-mates-" + Sys.getPid() + ".materia.json";
     session.save(output);
@@ -465,6 +466,40 @@ class ProjectSourceTests {
     var result = new PropertyBinding(row[0], session.scene.context()).apply(PropertyValue.Bool(false));
     check(session.assemblyMates.mates.length == 0, 'clearing the mate removes it ($result)');
     check(session.document.undo() && session.assemblyMates.mates.length == 1, "and undo brings it back");
+  }
+
+  /**
+   * Dragging a mated part (plan C4.5d): a point on the seated pin's side pulled around the bore turns the pin,
+   * which stays in the bore; the drag commits as one undoable edit. A part without mates and joints still
+   * cannot be dragged.
+   */
+  static function checkMateDrag(session:ProjectDocumentSession, metresPerUnit:Float):Void {
+    var definition = session.projectAssemblyDefinition, record = session.projectAssemblyState;
+    check(definition != null && record != null, "the mated assembly has a state");
+    var pose = new AssemblyState(definition, record).worldPose("pin");
+    var grab = materia.assembly.AssemblyFrames.transformPoint(pose, 5, 0, 15);
+    var drag = session.beginAssemblyDrag("project:pin", [grab.x * metresPerUnit, grab.y * metresPerUnit, grab.z * metresPerUnit]);
+    check(drag != null, "a mated pin can be dragged");
+    var dx = grab.x - 30, dy = grab.y - 20, turn = 0.8;
+    var target = [30 + dx * Math.cos(turn) - dy * Math.sin(turn), 20 + dx * Math.sin(turn) + dy * Math.cos(turn), grab.z];
+    var steps = 4;
+    for (step in 1...steps + 1) {
+      var angle = turn * step / steps;
+      drag.update((30 + dx * Math.cos(angle) - dy * Math.sin(angle)) * metresPerUnit,
+        (20 + dx * Math.sin(angle) + dy * Math.cos(angle)) * metresPerUnit, grab.z * metresPerUnit);
+    }
+    check(drag.following(), 'pulled around the bore, the pin follows: ${drag.message()}');
+    check(drag.commit(), "the drag commits");
+    expectPin(session, 30, 20, 10, "the dragged pin stays in the bore");
+    var turned = new AssemblyState(definition, session.projectAssemblyState).worldPose("pin");
+    var moved = materia.assembly.AssemblyFrames.transformPoint(turned, 5, 0, 15);
+    check(Math.abs(moved.x - target[0]) < 0.5 && Math.abs(moved.y - target[1]) < 0.5,
+      'the grabbed point went round to the cursor: ${moved.x}, ${moved.y} for ${target[0]}, ${target[1]}');
+    check(session.document.undo(), "the drag undoes");
+    var back = new AssemblyState(definition, session.projectAssemblyState).worldPose("pin");
+    check(Math.abs(back.qz - pose.qz) < 1e-9 && Math.abs(back.qw - pose.qw) < 1e-9, "undo turns the pin back");
+    check(session.document.redo(), "and redoes");
+    check(session.beginAssemblyDrag("project:plate", [0.03, 0.02, 0.01]) == null, "the grounded plate is not dragged");
   }
 
   /** The index of the described face of `feature` on `component`, for planes the one whose normal's z has `normalZ`'s sign. */

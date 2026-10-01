@@ -1,3 +1,4 @@
+import cadkit.modeling.AssemblyMateDrag;
 import cadkit.modeling.AssemblyMateSolver;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyDefinition;
@@ -26,6 +27,7 @@ class MateSolverSmoke {
 		near(axis.y, -20, "the shaft is on the bore's axis (y)");
 
 		checkDocuments(seated);
+		checkDrag(AssemblyMateSolver.place(seated, result));
 
 		// Locked: fully placed, exactly on the target frame.
 		var locked = motorOnBracket([mate("weld", AssemblyMateKind.Lock)]);
@@ -83,6 +85,36 @@ class MateSolverSmoke {
 					child: "fore", childConnector: "root", axis: {x: 0, y: 0, z: 1}, limits: free, defaultValue: Math.PI}],
 			mates: [{id: "reach", kind: AssemblyMateKind.Distance, first: "base", firstConnector: "point", second: "fore",
 				secondConnector: "tip", axis: {x: 0, y: 0, z: 1}, value: 140}]};
+	}
+
+	/**
+		Dragging a mated part (plan C4.5d): a point on the seated motor's flange pulled sideways turns the motor about
+		its shaft and it stays seated; pulled straight up, the mates hold it; a grounded part is not dragged.
+	*/
+	static function checkDrag(placed:AssemblyDefinition):Void {
+		var start = new AssemblyState(placed).record();
+		var drag = new AssemblyMateDrag(placed, start, "motor", new kinematicskit.Vector3(50, 0, 0));
+		var grabbed = drag.grabbedPoint();
+		var dx = grabbed.x - 40, dy = grabbed.y + 20;
+		near(Math.sqrt(dx * dx + dy * dy), 50, "the grabbed point is 50 mm from the shaft");
+		var turn = 0.5, cosine = Math.cos(turn), sine = Math.sin(turn);
+		var target = new kinematicskit.Vector3(40 + dx * cosine - dy * sine, -20 + dx * sine + dy * cosine, grabbed.z);
+		var result = drag.drag(target);
+		check(result.following, 'pulled around the shaft, the motor follows: ${result.message}');
+		var flange = drag.previewPose("motor");
+		near(flange.x, 40, "it stays on the shaft (x)");
+		near(flange.y, -20, "it stays on the shaft (y)");
+		near(flange.z, 100, "it stays on the face");
+		var up = drag.drag(new kinematicskit.Vector3(target.x, target.y, target.z + 50));
+		check(!up.following && StringTools.startsWith(up.message, "Held by its mates"), 'pulled off the face, it is held: ${up.message}');
+		near(drag.previewPose("motor").z, 100, "and stays on the face");
+		var committed = new AssemblyState(placed, drag.commit()).worldPose("motor");
+		near(committed.x, flange.x, "the committed state is the preview (x)");
+		near(Math.abs(committed.qz * flange.qz + committed.qw * flange.qw + committed.qx * flange.qx + committed.qy * flange.qy), 1,
+			"the committed state is the preview (turn)");
+		var refused = false;
+		try new AssemblyMateDrag(placed, start, "bracket", new kinematicskit.Vector3(0, 0, 0)) catch (_:Dynamic) refused = true;
+		check(refused, "the grounded bracket is not dragged");
 	}
 
 	/** Mates and grounded occurrences survive assembly documents and a document save and reload. */
