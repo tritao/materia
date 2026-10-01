@@ -2498,6 +2498,24 @@ extern "C" nkui_result nkui_text_layout_set_text(nkui_resource layout, const cha
     return NKUI_OK;
 }
 
+extern "C" nkui_result nkui_text_layout_edit(nkui_resource layout, int32_t start, int32_t end,
+                                               const char *replacement) {
+    std::lock_guard<std::mutex> lock(resources_mutex);
+    auto *slot = resolve(layout, nkui::ResourceKind::TextLayout);
+    if (!slot || !slot->text || slot->text_width <= 0.0f)
+        return NKUI_ERROR_INVALID_HANDLE;
+    nkui::TextLayoutResult shaped;
+    if (!slot->text->edit_utf8(start, end, replacement ? replacement : "", &shaped))
+        return NKUI_ERROR_INVALID_ARGUMENT;
+    slot->text_color_ranges.clear();
+    ++slot->text_content_revision;
+    slot->text_glyphs = {};
+    slot->scaled_text_glyphs.clear();
+    slot->visible_text_glyphs.clear();
+    slot->text->prune_layout_cache({shaped.id}, 1);
+    return NKUI_OK;
+}
+
 extern "C" nkui_result nkui_text_layout_set_color_ranges(nkui_resource layout,
     const nkui_text_color_range *ranges, uint32_t count) {
     if ((!ranges && count) || count > 1048576)

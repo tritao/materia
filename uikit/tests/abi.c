@@ -97,6 +97,10 @@ int main(void) {
         nkui_text_layout_set_text(empty_layout, NULL) != NKUI_OK ||
         nkui_text_layout_update(empty_layout, NULL, 120.0f, &text_style, &paragraph_style) !=
             NKUI_OK ||
+        nkui_text_layout_edit(empty_layout, 0, 0, "é") != NKUI_OK ||
+        nkui_text_layout_edit(empty_layout, 1, 1, "🙂") != NKUI_OK ||
+        nkui_text_layout_edit(empty_layout, 0, 1, "") != NKUI_OK ||
+        nkui_text_layout_edit(empty_layout, 2, 3, "x") != NKUI_ERROR_INVALID_ARGUMENT ||
         nkui_resource_destroy(empty_layout) != NKUI_OK)
         return 21;
     nkui_text_style invalid_text_style = text_style;

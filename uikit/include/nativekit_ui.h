@@ -912,6 +912,13 @@ NKUI_API nkui_result nkui_text_layout_update(nkui_resource layout,
                                              const nkui_text_style *text_style,
                                              const nkui_paragraph_style *paragraph_style);
 
+/** Replaces a half-open codepoint range using the layout's current width and style.
+ * The replacement is UTF-8; null represents an empty string. Invalid ranges leave
+ * the layout unchanged. Rendering and geometry use the resulting layout together.
+ */
+NKUI_API nkui_result nkui_text_layout_edit(nkui_resource layout, int32_t start, int32_t end,
+                                           const char *replacement NKUI_NULLABLE_UTF8);
+
 /** Re-shapes an existing layout with new UTF-8 text while retaining its handle and style; null text
  * is empty. */
 NKUI_API nkui_result nkui_text_layout_set_text(nkui_resource layout,

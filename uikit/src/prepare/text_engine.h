@@ -220,6 +220,9 @@ class TextEngine {
     bool layout_utf8(const char *text, float width, const TextLayoutOptions &options);
     bool layout_utf8(const char *text, float width, const TextLayoutOptions &options,
                      TextLayoutResult *result);
+    /** Replaces a codepoint range in the active layout, retaining its style and width. */
+    bool edit_utf8(int32_t start, int32_t end, const char *replacement,
+                   TextLayoutResult *result);
     void prune_layout_cache(const std::vector<TextLayoutId> &retained_ids, std::size_t max_entries);
     bool has_layout(TextLayoutId id) const;
     bool prepare_glyphs(float origin_x, float origin_y, float pixel_scale, GlyphMode mode,

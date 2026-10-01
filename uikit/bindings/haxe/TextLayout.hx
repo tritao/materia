@@ -89,6 +89,15 @@ class TextLayout extends NativeKitUIResource {
 		paragraphStyle.direction = ownedParagraphStyle.direction;
 	}
 
+	/** Applies a codepoint replacement to the retained layout. */
+	public function edit(start:Int, end:Int, replacement:String, nextText:String):Void {
+		if (start < 0 || end < start || replacement == null || nextText == null)
+			throw "Text layout edit arguments are invalid";
+		UiResult.check(NativeKitUI.nkui_text_layout_edit(nativeHandle(), start, end, replacement),
+			"textLayout.edit");
+		text = nextText;
+	}
+
 	static function copyTextStyle(style:TextStyle):TextStyle
 		return new TextStyle(style.fontSize, style.font, style.letterSpacing);
 

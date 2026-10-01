@@ -866,6 +866,12 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 */
 	extern fn nkui_text_layout_create_styled(fonts: nkui_resource, text: nullable<utf8>, width: f32, text_style: ptr<const<nkui_text_style>>, paragraph_style: ptr<const<nkui_paragraph_style>>, out_layout: ptr<nkui_resource> @out) -> nkui_result;
 	/**
+	 * Replaces a half-open codepoint range using the layout's current width and style.
+	 * The replacement is UTF-8; null represents an empty string. Invalid ranges leave
+	 * the layout unchanged. Rendering and geometry use the resulting layout together.
+	 */
+	extern fn nkui_text_layout_edit(layout: nkui_resource, start: i32, end: i32, replacement: nullable<utf8>) -> nkui_result;
+	/**
 	 * Returns the visual rectangles covered by a code-point selection.
 	 *
 	 * Query the required buffer size by passing NULL. On NKUI_OK, `inout_bytes` is

@@ -932,6 +932,8 @@ interface NativeKitUI @target("portable-abi32") @library("nativekit_ui") @depend
 	 * Re-shapes an existing layout while retaining its native resource handle; null text is empty.
 	 */
 	extern fn nkui_text_layout_update(layout: nkui_resource, text: nullable<utf8>, width: f32, text_style: ptr<const<nkui_text_style>>, paragraph_style: ptr<const<nkui_paragraph_style>>) -> nkui_result;
+	/** Replaces a half-open codepoint range in a retained text layout. */
+	extern fn nkui_text_layout_edit(layout: nkui_resource, start: i32, end: i32, replacement: nullable<utf8>) -> nkui_result;
 	/**
 	 * Returns a half-open insertion-offset range for the word under a hit-tested position.
 	 */

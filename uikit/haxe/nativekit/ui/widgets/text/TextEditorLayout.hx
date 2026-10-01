@@ -262,7 +262,16 @@ class TextEditorLayout {
 					record = new TextEditorParagraphRecord(paragraphText,
 						TextLayout.create(fonts, paragraphText, width, textStyle, paragraphStyle));
 				else if (record.text != paragraphText) {
-					record.layout.update(paragraphText, width, textStyle, paragraphStyle);
+					var editDelta = (newEnd - newStart) - (oldEnd - oldStart);
+					var canEdit = index < previous.length && record == previous[index] &&
+						record.start == range.start && record.end + editDelta == range.end &&
+						oldStart >= record.start && oldEnd <= record.end &&
+						newStart >= range.start && newEnd <= range.end;
+					if (canEdit)
+						record.layout.edit(oldStart - record.start, oldEnd - record.start,
+							nextOffsets.sliceCodepoints(newStart, newEnd), paragraphText);
+					else
+						record.layout.update(paragraphText, width, textStyle, paragraphStyle);
 					record.renderRanges = null;
 					record.text = paragraphText;
 				}

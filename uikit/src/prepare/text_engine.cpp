@@ -611,6 +611,22 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
     return true;
 }
 
+bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
+                           TextLayoutResult *result) {
+    const auto *current = active_layout(*state_);
+    if (!current || start < 0 || end < start || !replacement)
+        return false;
+    const auto offsets = utf8_codepoint_offsets(current->text.c_str());
+    if (static_cast<std::size_t>(end) >= offsets.size())
+        return false;
+    std::string edited;
+    edited.reserve(current->text.size() + std::strlen(replacement));
+    edited.append(current->text, 0, offsets[static_cast<std::size_t>(start)]);
+    edited.append(replacement);
+    edited.append(current->text, offsets[static_cast<std::size_t>(end)], std::string::npos);
+    return layout_utf8(edited.c_str(), current->width, current->options, result);
+}
+
 void TextEngine::prune_layout_cache(const std::vector<TextLayoutId> &retained_ids,
                                     std::size_t max_entries) {
     const uint64_t font_generation = state_->font_collection->generation();
