@@ -54,6 +54,7 @@ class Pick extends HumanActionBase {
 			worker.setCarry(hands);
 			// The grasp is made; stand up straight to carry.
 			worker.setLean(0.0);
+			worker.setHinge(0.0);
 			worker.setCrouch(0.0);
 			worker.setKneel(0.0);
 			worker.setArmsDown(false);

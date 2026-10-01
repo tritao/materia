@@ -44,6 +44,7 @@ class HumanCharacter {
 	/** The left and right hands' fingers; null for a rig without them. */
 	final hands:Array<Null<HumanHand>>;
 	var lean:Float = 0.0;
+	var hinge:Float = 0.0;
 	/** The asset's crouching-in-place clip, or -1 when it has none; see setCrouch. */
 	final crouchClip:Int;
 	/** The going-down clip the crouch is posed from, when the asset has one; else the crouch clip is blended in. */
@@ -60,6 +61,7 @@ class HumanCharacter {
 	static inline var LEAN:Int = 1;
 	static inline var LEFT_FINGERS:Int = 2;
 	static inline var RIGHT_FINGERS:Int = 3;
+	static inline var HINGE:Int = 4;
 	public var root(get, never):NodeId;
 
 	final scene:Scene;
@@ -163,6 +165,22 @@ class HumanCharacter {
 
 	public function spineLean():Float
 		return lean;
+
+	/**
+	 * Bends the body forward at the hips by angle radians (0 upright), on top of the animation and of any lean: the whole trunk
+	 * pitches about the lowest spine joint, so the shoulders travel far forward and down, as when someone bends over a table to
+	 * reach across it. A rig without that joint ignores it. Takes effect from the next advance.
+	 */
+	public function setSpineHinge(angle:Float):Void {
+		if (Math.abs(angle - hinge) < 1e-5) return;
+		hinge = angle;
+		var joint = rig.joint(HumanBone.Spine);
+		if (joint < 0 || Math.abs(angle) < 1e-5) instance.clearJointRotations(HINGE);
+		else instance.setJointRotations(HINGE, [joint], [[Math.sin(angle * 0.5), 0.0, 0.0, Math.cos(angle * 0.5)]], [1.0]);
+	}
+
+	public function spineHinge():Float
+		return hinge;
 
 	/**
 	 * Whether the legs are IK chains (thigh, shin and foot one below the other), so a foot can be held where it is.

@@ -9,6 +9,8 @@ typedef Stance = {
 	/** How deep a kneel, 0 upright to 1 the lowest; a stance is a crouch or a kneel, not both. */
 	var kneel:Float;
 	var lean:Float;
+	/** How far the body bends at the hips on top of the lean, in radians. */
+	var hinge:Float;
 	/** How far back from the point, along the line to it, the shoulder's root stands. */
 	var standDistance:Float;
 	/** How far short of clearing the surface's edge the belly falls once the lean and the stretch are spent. */

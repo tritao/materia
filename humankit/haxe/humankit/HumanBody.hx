@@ -30,6 +30,8 @@ class HumanBody {
 	final wasHolding:Array<Bool> = [false, false, false, false];
 	var leanGoal:Float = 0.0;
 	var leanNow:Float = 0.0;
+	var hingeGoal:Float = 0.0;
+	var hingeNow:Float = 0.0;
 	/** Whether free arms are held down at the sides, as when walking up to a surface they must not sweep over. */
 	var armsDown:Bool = false;
 	/** Where each foot is held in the world (left, right), or null; and how strongly it is held. */
@@ -40,6 +42,8 @@ class HumanBody {
 	var crouchNow:Float = 0.0;
 	var kneelGoal:Float = 0.0;
 	var kneelNow:Float = 0.0;
+	/** The turn of the line between the shoulders when the body stands at rest, in radians; see bodyTurn. */
+	var standingTurn:Float = 0.0;
 	/** Where the bones planning reads stand when the body is upright and at rest, in model space. */
 	final standing:Map<String, Array<Float>> = new Map();
 
@@ -56,6 +60,9 @@ class HumanBody {
 		canLockFeet = character.legsAreChains();
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
+		// Standing at rest is the idle pose: its shoulder line is what a turn is measured from.
+		character.probe();
+		standingTurn = shoulderTurn();
 		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis, HumanBone.ShinL, HumanBone.ShinR, HumanBone.FootL, HumanBone.FootR]) {
 			var position = character.pose.bonePosition(bone);
 			if (position != null) standing.set(bone, position.copy());
@@ -197,7 +204,11 @@ class HumanBody {
 
 	/** Whether the body has finished easing to the lean it was asked for. */
 	public function leanReached():Bool
-		return Math.abs(leanGoal - leanNow) < 1e-6;
+		return Math.abs(leanGoal - leanNow) < 1e-6 && Math.abs(hingeGoal - hingeNow) < 1e-6;
+
+	/** Where the body is asked to bend at the hips, on top of its lean; it eases there. Zero stands straight. */
+	public function setHinge(angle:Float):Void
+		hingeGoal = Math.max(0.0, Math.min(posture.maxHinge, angle));
 
 	/** Whether the body has finished easing to the crouch it was asked for. */
 	public function crouchReached():Bool
@@ -263,40 +274,60 @@ class HumanBody {
 	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
 	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0, kneel:Float = 0.0):{angle:Float, shift:Float, drop:Float} {
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0, kneel:Float = 0.0):{angle:Float, shift:Float, drop:Float}
+		return pitchFor(hand, shift, crouch, kneel, false, 0.0);
+
+	/**
+	 * The same for bending at the hips, on top of a lean already planned (`lean`): the hinge that carries the shoulder `shift`
+	 * metres further forward than that lean does, and the shift and drop it delivers, up to the posture's maximum hinge.
+	 */
+	public function hingeFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, lean:Float):{angle:Float, shift:Float, drop:Float}
+		return pitchFor(hand, shift, crouch, kneel, true, lean);
+
+	function pitchFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, hinging:Bool, base:Float):{angle:Float, shift:Float, drop:Float} {
 		var none = {angle: 0.0, shift: 0.0, drop: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
-		var saved = character.spineLean(), savedCrouch = character.crouch(), savedKneel = character.kneel();
+		var saved = character.spineLean(), savedHinge = character.spineHinge(), savedCrouch = character.crouch(), savedKneel = character.kneel();
+		var limit = hinging ? posture.maxHinge : posture.maxLean;
 		character.setDown(crouch, kneel);
-		character.setSpineLean(0.0);
+		character.setSpineLean(hinging ? base : 0.0);
+		character.setSpineHinge(0.0);
 		character.probe();
 		var upright = character.pose.bonePosition(bone);
 		var at = function(angle:Float):Null<Array<Float>> {
-			character.setSpineLean(angle);
+			if (hinging) character.setSpineHinge(angle);
+			else character.setSpineLean(angle);
 			character.probe();
 			return character.pose.bonePosition(bone);
 		};
-		// The forward shift is not linear in the lean, so the probe only gives a first guess: the angle is then
+		// The forward shift is not linear in the angle, so the probe only gives a first guess: the angle is then
 		// corrected where it is used, and the shift and the drop of the shoulder reported are the measured ones.
 		var probe = 0.2;
 		var leaned = at(probe);
 		var result = none;
 		if (upright != null && leaned != null && leaned[0] - upright[0] > 1e-4) {
-			var angle = Math.min(posture.maxLean, shift * probe / (leaned[0] - upright[0]));
+			var angle = Math.min(limit, shift * probe / (leaned[0] - upright[0]));
 			for (round in 0...3) {
 				var there = at(angle);
 				if (there == null) break;
 				var made = there[0] - upright[0];
 				result = {angle: angle, shift: made, drop: there[2] - upright[2]};
-				if (Math.abs(made - shift) < 5e-4 || angle >= posture.maxLean - 1e-6 && made < shift) break;
-				angle = Math.min(posture.maxLean, angle * shift / Math.max(1e-4, made));
+				if (Math.abs(made - shift) < 5e-4 || angle >= limit - 1e-6 && made < shift) break;
+				angle = Math.min(limit, angle * shift / Math.max(1e-4, made));
 			}
 		}
 		character.setSpineLean(saved);
+		character.setSpineHinge(savedHinge);
 		character.setDown(savedCrouch, savedKneel);
 		character.probe();
 		return result;
+	}
+
+	function moveHinge(seconds:Float):Void {
+		var step = posture.leanRate * seconds;
+		hingeNow = Math.abs(hingeGoal - hingeNow) <= step ? hingeGoal : hingeNow + (hingeGoal > hingeNow ? step : -step);
+		character.setSpineHinge(hingeNow);
 	}
 
 	function moveLean(seconds:Float):Void {
@@ -567,8 +598,24 @@ class HumanBody {
 	public function carryTargetModel(limb:HumanLimb):Array<Float> {
 		var chest = chestPosition();
 		var side = limb == ArmL ? 1.0 : -1.0;
-		return [chest[0] + posture.carryOffset[0], chest[1] + side * posture.carryOffset[1],
-			chest[2] + posture.carryOffset[2]];
+		// A load is held in front of the body, which a turn clip turns in model space without moving the root: the offset turns
+		// with it, or the hands would stay where the root faces and jump to the body when the root takes up the turn.
+		var turn = walker.turningByClip() ? bodyTurn() : 0.0, c = Math.cos(turn), s = Math.sin(turn);
+		var ahead = posture.carryOffset[0], across = side * posture.carryOffset[1];
+		return [chest[0] + ahead * c - across * s, chest[1] + ahead * s + across * c, chest[2] + posture.carryOffset[2]];
+	}
+
+	function shoulderTurn():Float {
+		var left = character.pose.bonePosition(UpperArmL), right = character.pose.bonePosition(UpperArmR);
+		return left == null || right == null ? 0.0 : Math.atan2(left[1] - right[1], left[0] - right[0]);
+	}
+
+	/** How far the body is turned in model space from standing at rest (a turn clip turns it so), in radians. */
+	public function bodyTurn():Float {
+		var turn = shoulderTurn() - standingTurn;
+		while (turn > Math.PI) turn -= 2.0 * Math.PI;
+		while (turn < -Math.PI) turn += 2.0 * Math.PI;
+		return turn;
 	}
 
 	public function setGrip(held:Bool):Void
@@ -588,6 +635,9 @@ class HumanBody {
 		}
 		leanGoal = 0.0;
 		leanNow = 0.0;
+		hingeGoal = 0.0;
+		hingeNow = 0.0;
+		character.setSpineHinge(0.0);
 		character.setSpineLean(0.0);
 		armsDown = false;
 		footLock = 0.0;
@@ -613,9 +663,10 @@ class HumanBody {
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
 		// A lean swings an unused arm back with the torso, so while the body leans a free arm is held hanging.
-		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || crouchNow > 0.02 || kneelNow > 0.02 || armsDown, posture.hangSeconds);
+		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || hingeNow > 0.02 || hingeGoal > 0.02 || crouchNow > 0.02 || kneelNow > 0.02 || armsDown, posture.hangSeconds);
 		moveFingers(seconds);
 		moveLean(seconds);
+		moveHinge(seconds);
 		moveCrouch(seconds);
 		moveKneel(seconds);
 		walker.advance(seconds);

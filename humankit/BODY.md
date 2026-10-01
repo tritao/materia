@@ -135,6 +135,16 @@ that much nearer the shoulder than planned and the elbow folded, and it stood to
 Reaches are now planned to the wrist (`comfort` and `stretch` of the arm, plus the palm), and `solveReach` starts the wrist a palm short of the point.
 That alone cleared the two-hand layouts at a metre that had needed a crouch, and took the elbow gate back to 30 degrees.
 
+## Bending over a deep top
+
+A lean pitches the upper spine, which carries the shoulder forward by only about 7 cm even at its limit (0.7 rad). To reach the middle
+of a top 0.8 m deep with the belly clear of its near edge the worker also bends at the hips: `setSpineHinge` pitches the whole
+trunk about the lowest spine joint, so the shoulders travel far forward and down. The planner (`ApproachFor`, standing only) uses the
+lean first and the hinge, up to `maxHinge`, for what the lean leaves short (`HumanBody.hingeFor` measures it as the lean is measured).
+The belly is a hinge's pivot, so it stays behind the edge while the chest goes over. The library character's default demo (0.8 m tops at table
+height) now runs: the rendered frames show it bowed over the rack and the table, with the head low, which is the extreme of what the
+arm can reach. Reaching across needs the body to stay bent until the part is down, so `ReleaseLimb` waits for it to straighten.
+
 ## Holding the feet
 
 While the idle pose shows (standing, and the cross-fade into and out of a walk) a character whose legs are IK chains holds
@@ -178,12 +188,10 @@ renders a frame.
   stands clear of the edge and leans, and a surface its arm cannot reach over leaves the belly short (the planner
   reports it as `shortfall`). With the palm's depth in the stand-off (see "The arm brings the wrist") the 1.0 m
   tops of the sweeps, one hand or two, are cleared.
-- **Deep tops on the library character.** The sweep uses 0.4 m tops. With 0.8 m ones (the app's rack and table)
-  the belly must clear an edge 0.4 m short of the part, which the library character's arm cannot reach even
-  leaning at the limit: the planner no longer crouches for it (a crouch lowers the shoulder, it does not carry
-  it over the edge), the stance stays short of the edge, and a pick at the middle of the top can miss its reach
-  by a centimetre or two. The bundled worker is unaffected. Bracing a hand on the top and hinging at the hips, so the
-  chest overhangs the edge, would fix this; it is not done.
+- **Deep tops, low down.** A top 0.8 m deep (the app's rack and table) is reached across by bending at the hips, from table height
+  up (see "Bending over a deep top"). Below about 0.85 m a deep top still fails a gate (an elbow plane turns 7.6 to 7.9 rad/s
+  against 6.5 while crouched or kneeling), so the sweep holds deep tops to table height and above. A hinge is not used with a crouch or
+  a kneel: together they flip an arm.
 - **Crouch is one clip.** Depth is a blend between standing and the clip's full crouch, so a middle depth is
   a mixed pose, not a clip of its own; the planner reaches down to about half a metre crouched and 0.3 m kneeling, not the floor, and a
   crouched worker does not walk. The clip's feet are not pinned: a foot may lift a few centimetres at full depth.

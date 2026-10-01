@@ -214,6 +214,8 @@ class HumanKitTests {
 		var deepJob = new HumanJob(body).add(deep);
 		deepJob.advance(1.0 / 60.0);
 		if (!(deep.crouch <= 0.1)) throw 'The planner crouched ${deep.crouch} for a deep top at table height';
+		if (deepJob.failure() != null) throw 'A deep top at table height was not reachable: ${deepJob.failure()}';
+		if (!(deep.hinge > 0.05)) throw 'The planner did not bend at the hips to reach across a deep top: hinge ${deep.hinge}, lean ${deep.lean}';
 		body.cancel();
 		human.dispose();
 		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");

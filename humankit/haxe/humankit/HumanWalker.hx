@@ -197,6 +197,10 @@ class HumanWalker {
 	public function isTurning():Bool
 		return facing != null || turnsLeft > 0;
 
+	/** Whether a turn clip is turning the body in model space right now (the root takes the turn up when it ends). */
+	public function turningByClip():Bool
+		return turnPlaying != null;
+
 	/**
 	 * How much of the pose showing is the idle one, whose feet are on the floor: 1 standing, 0 in a steady walk, and
 	 * in between while the walk fades in or out. A planted foot is held in the world while this is high.

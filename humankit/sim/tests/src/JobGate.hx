@@ -39,6 +39,7 @@ class JobGate {
     final limbs:Array<HumanLimb>;
     /** Whether the hand has held something yet: reaching before that is a pick, and after letting go a retreat. */
     var gripped:Bool = false;
+    var lastHeading:Null<Float> = null;
     /** The document step that was running at each sample, so a finding can say where in the job it happened. */
     final steps:Array<Int> = [];
     /** What the worker was doing at each sample: approach, pick, place, walk, ... and whether it was crouched or walking. */
@@ -62,6 +63,11 @@ class JobGate {
 
     public function sample():Void {
         var body = worker.body, pose = body.character.pose;
+        // A turn clip turns the body in model space and the root takes the turn up at its end, a jump of the whole pose
+        // in the model's frame that is no motion of the arms; the root turning by more than a procedural turn can in one tick marks it.
+        var root = body.rootTransform(), heading = Math.atan2(root[1], root[0]);
+        if (lastHeading != null && Math.abs(Math.atan2(Math.sin(heading - lastHeading), Math.cos(heading - lastHeading))) > 0.3) quality.breakContinuity();
+        lastHeading = heading;
         quality.sample(pose, session.fixedTimestep());
         naturalness.sample(body, session.fixedTimestep());
         var step = worker.currentStep();

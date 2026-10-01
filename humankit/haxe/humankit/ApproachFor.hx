@@ -28,6 +28,8 @@ class ApproachFor extends HumanActionBase {
 	public var kneel(default, null):Float = 0.0;
 	/** How far the upper body leans over the surface at the stand, in radians, once the worker has arrived. */
 	public var lean(default, null):Float = 0.0;
+	/** How far it bends at the hips on top of that, for a surface too deep to reach across by leaning alone. */
+	public var hinge(default, null):Float = 0.0;
 	var postureIssued:Bool = false;
 	/** The walk to the stand, held back while the body stands up from a crouch. */
 	var waiting:Null<Array<Array<Float>>> = null;
@@ -66,6 +68,9 @@ class ApproachFor extends HumanActionBase {
 		var levels = worker.canCrouch() ? Std.int(Math.max(1.0, worker.posture.crouchLevels)) : 1;
 		var chosen:Null<Stance> = null;
 		var failure:Null<String> = null;
+		// Whether the point is within comfortable reach below the shoulder standing: then no way down helps, and a surface that
+		// is merely deep is a matter of bending over it, not of kneeling.
+		var reachesStanding = false;
 		for (step in 0...levels) {
 			var depth = levels > 1 ? step / (levels - 1) : 0.0;
 			var stance = stanceAt(worker, bone, bellyBone, depth, shoulder, belly, root);
@@ -76,7 +81,10 @@ class ApproachFor extends HumanActionBase {
 			if (chosen == null || stance.shortfall < chosen.shortfall - 0.01 ||
 				(Math.abs(stance.shortfall - chosen.shortfall) <= 0.01 && stance.lean < chosen.lean - 0.01))
 				chosen = stance;
-			if (step == 0 && stance.comfortable) break;
+			if (step == 0 && stance.comfortable) {
+				reachesStanding = true;
+				break;
+			}
 			if (stance.shortfall <= 0.01 && stance.lean <= worker.posture.comfortLean && stance.comfortable) {
 				chosen = stance;
 				break;
@@ -85,7 +93,7 @@ class ApproachFor extends HumanActionBase {
 		// A point lower than a crouch reaches comfortably is taken from a knee instead, if that is comfortable and the
 		// crouch was not (or reached nothing).
 		var easy = function(stance:Stance):Bool return stance.shortfall <= 0.01 && stance.lean <= worker.posture.comfortLean && stance.comfortable;
-		if (worker.canKneel() && (chosen == null || !easy(chosen))) {
+		if (worker.canKneel() && (chosen == null || (!easy(chosen) && !reachesStanding))) {
 			var kneeling:Null<Stance> = null;
 			for (step in 1...levels) {
 				var stance = stanceAt(worker, bone, bellyBone, step / (levels - 1), shoulder, belly, root, true);
@@ -102,7 +110,8 @@ class ApproachFor extends HumanActionBase {
 			// past a comfortable lean.
 			var discomfort = function(stance:Stance):Float
 				return stance.shortfall * 4.0 + (stance.comfortable ? 0.0 : 0.15) + Math.max(0.0, stance.lean - worker.posture.comfortLean);
-			if (kneeling != null && (chosen == null || discomfort(kneeling) < discomfort(chosen) - 0.02)) chosen = kneeling;
+			// A crouch is kept unless the kneel is clearly the easier way: people crouch for a bench and kneel for the floor.
+			if (kneeling != null && (chosen == null || discomfort(kneeling) < discomfort(chosen) - 0.25)) chosen = kneeling;
 		}
 		if (chosen == null) {
 			fail(failure == null ? "Target is out of reach" : failure);
@@ -112,6 +121,7 @@ class ApproachFor extends HumanActionBase {
 		crouch = chosen.crouch;
 		kneel = chosen.kneel;
 		lean = chosen.lean;
+		hinge = chosen.hinge;
 		worker.setLean(lean);
 		worker.setArmsDown(support != null);
 		var standX = target[0] - chosen.ux * chosen.standDistance + chosen.uy * chosen.lateral;
@@ -149,7 +159,7 @@ class ApproachFor extends HumanActionBase {
 		var comfortable = inPlane(worker.posture.comfort * length + worker.palmReach, sideways);
 		var farthest = inPlane(worker.posture.stretch * length + worker.palmReach, sideways);
 		var rise = target[2] - (root[14] + shoulder[2]);
-		var stance:Stance = {failure: null, crouch: kneeling ? 0.0 : depth, kneel: kneeling ? depth : 0.0, lean: 0.0, standDistance: 0.0, shortfall: 0.0, ux: 0.0, uy: 0.0,
+		var stance:Stance = {failure: null, crouch: kneeling ? 0.0 : depth, kneel: kneeling ? depth : 0.0, lean: 0.0, hinge: 0.0, standDistance: 0.0, shortfall: 0.0, ux: 0.0, uy: 0.0,
 			lateral: 0.0, comfortable: -rise <= comfortable};
 		// A point is out of reach only beyond what the arm will stretch to, not beyond the comfortable reach.
 		if (rise >= farthest) {
@@ -217,6 +227,17 @@ class ApproachFor extends HumanActionBase {
 				var reachMost = shoulder[0] + made.shift + Math.sqrt(farthest * farthest - riseAfter * riseAfter) - worker.posture.reachSlack;
 				stance.standDistance = Math.max(stance.standDistance, Math.min(required, reachMost));
 				stance.shortfall = Math.max(0.0, required - stance.standDistance);
+				// A top too deep to reach across by leaning: bend at the hips as well, which carries the shoulder further.
+				if (stance.shortfall > 0.01 && worker.posture.maxHinge > 0.0 && depth <= 0.0) {
+					var bent = worker.hingeFor(limb, stance.shortfall, kneeling ? 0.0 : depth, kneeling ? depth : 0.0, made.angle);
+					stance.hinge = bent.angle;
+					var riseBent = riseAfter - bent.drop;
+					if (Math.abs(riseBent) < farthest) {
+						var reachBent = shoulder[0] + made.shift + bent.shift + Math.sqrt(farthest * farthest - riseBent * riseBent) - worker.posture.reachSlack;
+						stance.standDistance = Math.max(stance.standDistance, Math.min(required, reachBent));
+						stance.shortfall = Math.max(0.0, required - stance.standDistance);
+					}
+				}
 			}
 		}
 		return stance;
@@ -256,6 +277,7 @@ class ApproachFor extends HumanActionBase {
 		// way there, and the reach waits until it has: a shoulder still on its way would put the point out of reach.
 		if (!done && turnIssued && !postureIssued && !worker.walker.isTurning()) {
 			postureIssued = true;
+			worker.setHinge(hinge);
 			worker.setCrouch(crouch);
 			worker.setKneel(kneel);
 		}

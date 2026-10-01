@@ -61,6 +61,8 @@ class HumanPosture {
 
 	/** The furthest the upper body leans into a reach, in radians, and how fast it leans. */
 	public var maxLean:Float = 0.7;
+	/** The furthest the body bends forward at the hips, on top of the lean, in radians; used when the lean is not enough to reach across. */
+	public var maxHinge:Float = 0.8;
 	public var leanRate:Float = 0.9;
 	/** How long an arm that is not reaching or carrying takes to settle into hanging (and back) while the body leans, and where it hangs under the shoulder. */
 	public var hangSeconds:Float = 0.5;
