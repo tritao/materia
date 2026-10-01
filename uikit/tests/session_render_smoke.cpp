@@ -754,6 +754,15 @@ int main() {
                     static_cast<unsigned long long>(repeated_rows.raster_cache_hits - first_rows.raster_cache_hits),
                     static_cast<unsigned long long>(edited_rows.raster_cache_hits - repeated_rows.raster_cache_hits),
                     static_cast<unsigned long long>(edited_rows.raster_cache_misses - repeated_rows.raster_cache_misses));
+                std::printf("wrapped row draws: first=%llu repeat=%llu edited=%llu\n",
+                    static_cast<unsigned long long>(first_rows.gpu_draw_calls - before_rows.gpu_draw_calls),
+                    static_cast<unsigned long long>(repeated_rows.gpu_draw_calls - first_rows.gpu_draw_calls),
+                    static_cast<unsigned long long>(edited_rows.gpu_draw_calls - repeated_rows.gpu_draw_calls));
+                if (edited_rows.gpu_draw_calls - repeated_rows.gpu_draw_calls >=
+                        first_rows.gpu_draw_calls - before_rows.gpu_draw_calls ||
+                    edited_rows.gpu_draw_calls - repeated_rows.gpu_draw_calls <=
+                        repeated_rows.gpu_draw_calls - first_rows.gpu_draw_calls)
+                    result = 49;
                 if (first_rows.raster_cache_misses < before_rows.raster_cache_misses + 2 ||
                     repeated_rows.raster_cache_hits < first_rows.raster_cache_hits + 2 ||
                     edited_rows.raster_cache_hits < repeated_rows.raster_cache_hits + 2 ||
