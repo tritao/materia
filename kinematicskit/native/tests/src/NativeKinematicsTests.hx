@@ -12,6 +12,7 @@ import kinematicskit.KinematicProblem;
 import kinematicskit.LinearAlgebra;
 import kinematicskit.PostureTask;
 import kinematicskit.SolverWorkspace;
+import kinematicskit.StepLimits;
 import kinematicskit.SwivelTask;
 import kinematicskit.RootMotion;
 import kinematicskit.RootDampingTask;
@@ -179,7 +180,7 @@ class NativeKinematicsTests {
     var workspace = new SolverWorkspace();
     var dt = 0.01, legal = true, why = "";
     for (_ in 0...steps) {
-      var step = DifferentialIk.step(problem, state, dt, qp, velocityLimits, 0.5, 1e-3, workspace);
+      var step = DifferentialIk.step(problem, state, dt, qp, StepLimits.ofVelocity(velocityLimits), 0.5, 1e-3, workspace);
       if (!(step.status == KinematicsKitNativeConstants.KK_QP_SOLVED)) { legal = false; why = 'status ${step.status}'; }
       for (column in 0...problem.layout().width) {
         var dof = problem.layout().dofs[column];
@@ -217,7 +218,7 @@ class NativeKinematicsTests {
     var qp = new NativeQpStep(7);
     var gaps:Array<Float> = [];
     for (_ in 0...60) {
-      var step = DifferentialIk.step(tight, state, 0.01, qp, speeds, 0.5, 1e-3, null, 0.5);
+      var step = DifferentialIk.step(tight, state, 0.01, qp, StepLimits.ofVelocity(speeds, 0.5), 0.5, 1e-3);
       for (column in 0...7) state.q[tight.layout().dofs[column]] += step.velocity[column] * 0.01;
       gaps.push(state.q[3] - (-0.8));
     }
@@ -335,7 +336,7 @@ class NativeKinematicsTests {
       var posture = [0.0, 0.5, 0.0, -1.0, 0.0, 0.5, 0.0];
       var problem = new KinematicProblem(model).add(task).add(new PostureTask(model, posture, 0.05));
       var qp = new NativeQpStep(7);
-      var ours = DifferentialIk.step(problem, new KinematicState(model, q), dt, qp, c.velocity, gain, lambda).velocity;
+      var ours = DifferentialIk.step(problem, new KinematicState(model, q), dt, qp, StepLimits.ofVelocity(c.velocity), gain, lambda).velocity;
       qp.dispose();
       var request = {mjcf: Mjcf.write(model), q: q, dt: dt, damping: lambda * lambda, site: "flange",
         target_position: [nearby.x, nearby.y, nearby.z], target_wxyz: [nearby.qw, nearby.qx, nearby.qy, nearby.qz],
@@ -386,7 +387,7 @@ class NativeKinematicsTests {
     var qp = new NativeQpStep(width);
     var dt = 0.02, legal = true;
     for (_ in 0...1000) {
-      var step = DifferentialIk.step(problem, state, dt, qp, limits, 0.5, 1e-3);
+      var step = DifferentialIk.step(problem, state, dt, qp, StepLimits.ofVelocity(limits), 0.5, 1e-3);
       for (c in 0...width) if (Math.abs(step.velocity[c]) > limits[c] + 1e-9) legal = false;
       SolverSupport.applyStep(problem, state, step.velocity, dt);
       for (dof in 0...3) if (state.q[dof] < -2.8 - 1e-12 || state.q[dof] > 2.8 + 1e-12) legal = false;

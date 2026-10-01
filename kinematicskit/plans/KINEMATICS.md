@@ -895,3 +895,25 @@ Steps, each its own commit with all suites green:
 - My first test preferred a posture the pose cannot reach. Only one DOF is
   free at a fixed tool pose, so nearly no improvement is possible there,
   whatever the solver does.
+
+### K6c — Step limits and the tool's twist task live in the kit (2026-10-01)
+
+- `StepLimits` (pure Haxe) bounds one differential step per layout column:
+  - configuration, with the limit gain;
+  - velocity;
+  - with the previous velocity: acceleration, and a braking bound that is
+    discrete (or ramped, for streamed plan chunks).
+  - Where bounds conflict, position and braking win.
+  - Each side of a DOF bounds itself, so one-sided limits work as before.
+- `FrameVelocityTask` asks a frame point to move at a twist for one step,
+  optionally relative to another body (as `FrameTask.relativeTo`).
+- `DifferentialIk.step(problem, state, dt, qp, ?limits:StepLimits, …)`
+  replaces the velocity-limit arrays and gain. It returns `fallback` (the
+  QP did not solve: the damped step clamped into the same bounds) and the
+  `limited` columns. `StepLimits.ofVelocity` covers the mink-style calls.
+- `KinematicGroup` exposes `problem()`, `stateOf(q)` and
+  `toolVelocityTask()`. `ManipulatorServo` keeps its API but is now a thin
+  call to `DifferentialIk` on the group's tool twist task; its bound code
+  moved into `StepLimits`.
+- The mink oracle (with `KK_MINK_PYTHON`) gives the same numbers as before:
+  position targets agree to 8e-9 rad/s.

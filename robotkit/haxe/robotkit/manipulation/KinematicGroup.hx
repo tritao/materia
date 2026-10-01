@@ -3,6 +3,7 @@ package robotkit.manipulation;
 import kinematicskit.DampedLeastSquares;
 import kinematicskit.DofDampingTask;
 import kinematicskit.FrameTask;
+import kinematicskit.FrameVelocityTask;
 import kinematicskit.JacobianLayout;
 import kinematicskit.KinematicModel;
 import kinematicskit.KinematicProblem;
@@ -307,6 +308,28 @@ class KinematicGroup {
       return new IKResult(false, start.copy(), Math.POSITIVE_INFINITY, Math.POSITIVE_INFINITY, 0,
         KinematicStatus.NumericalFailure);
     }
+  }
+
+  /**
+   * A problem over the group's DOFs within their limits, columns in `q`
+   * order: for differential steps (`kinematicskit.native.DifferentialIk`) and
+   * other solves the group's own `solve` does not cover.
+   */
+  public function problem():KinematicProblem return limitedProblem();
+
+  /** A model state holding `q` on the group's DOFs (the rest at their defaults). */
+  public function stateOf(q:Array<Float>):KinematicState {
+    if (q == null || q.length != dofs.length)
+      throw 'Kinematic group requires ${dofs.length} joint values, got ${q == null ? 0 : q.length}';
+    var result = new KinematicState(model);
+    for (i in 0...dofs.length) result.q[dofs[i]] = q[i];
+    return result;
+  }
+
+  /** The tool centre point's twist task, in the reference frame (`FrameVelocityTask.setTwist` sets it). */
+  public function toolVelocityTask():FrameVelocityTask {
+    var task = FrameVelocityTask.atFrame(model, flangeFrameIndex, RobotKinematics.toTransform(flangeTTcp));
+    return workFrame == null ? task.relativeTo(model, rootBody) : task.relativeTo(model, referenceBody, referenceOffset);
   }
 
   /** Position targets for every group DOF's driving joint, indexed by its compiled RobotModel position. */
