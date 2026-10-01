@@ -714,3 +714,23 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
 - **haxeon:** `Reflect.deleteField` on a typed record (fixed layout) returned
   false and left the field; fixed in haxeon's runtime (see its commit), which
   the codec rejection test relies on.
+
+### C4.3 — `AssemblyMateSolver` (2026-10-01)
+
+- Free parts: every root occurrence except the grounded ones (or the first
+  root when none is) is a floating rigid body; the movable, non-driven,
+  non-coupled joints between a mated occurrence and its root may move too.
+  Mates and joint closures are solved together by LM in Levenberg mode, then
+  diagnosed by `AssemblyClosureDiagnosis` (shared with the loop solver now):
+  the report's degrees of freedom are what the mates leave free.
+- Output: `AssemblyMateSolveResult.state(definition)` (root poses + reached
+  coordinates) for a configuration, or `AssemblyMateSolver.place` to bake
+  the placement into initial poses and joint defaults (non-nested only).
+- kinematicskit: `setActiveDofs([])` is allowed (a problem may move only
+  roots).
+- `MateSolverSmoke`: planar + coaxial seats a motor leaving one turn free;
+  a lock places it fully on its target; contradicting planar offsets are
+  `conflicting` naming both; a repeated mate is redundant; a coincident mate
+  turns a grounded arm's joint to reach a fixture; `place` round-trips.
+- haxeon bumped to cc2d0d3c (`Reflect.deleteField` on typed records; haxeon
+  suite 353/353). Not pushed yet: push haxeon before the parent.

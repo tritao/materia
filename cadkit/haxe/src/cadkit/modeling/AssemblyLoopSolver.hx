@@ -134,7 +134,7 @@ class AssemblyLoopSolver {
 			positionResidual = Math.max(positionResidual, task.positionError);
 			angularResidual = Math.max(angularResidual, task.orientationError);
 		}
-		var closures = diagnoseClosures(problem, solution.state);
+		var closures = {report: AssemblyClosureDiagnosis.diagnose(problem, solution.state)};
 		if (solution.converged()) {
 			var report = closures.report, degenerate = false;
 			if (report.rank < report.variables && report.dependencyGroups.length > 0) {
@@ -146,7 +146,7 @@ class AssemblyLoopSolver {
 					for (dof in driven) seed.q[dof] += sign * WITNESS_STEP * (model.dofIsAngular(dof) ? 1 : assemblyScale(state));
 					var witness = LevenbergMarquardt.solve(problem, seed, maxIterations, initialDamping, rankTolerance, assemblyScale(state));
 					if (!witness.converged()) continue;
-					var generic = diagnoseClosures(problem, witness.state).report;
+					var generic = AssemblyClosureDiagnosis.diagnose(problem, witness.state);
 					if (generic.rank > report.rank) {
 						report = generic;
 						degenerate = true;
@@ -172,27 +172,6 @@ class AssemblyLoopSolver {
 		};
 		return new AssemblyLoopSolveResult(status, false, solution.residualNorm, positionResidual, angularResidual,
 			solution.freeDofs, solution.iterations, solution.unsatisfied(), message, closures.report);
-	}
-
-	/** The closure rows at `state` (divided by their tolerances, so |r| <= 1 is satisfied) diagnosed over the problem's columns. */
-	static function diagnoseClosures(problem:KinematicProblem, state:KinematicState):{report:DiagnosisReport} {
-		var model = problem.model, width = problem.layout().width, rows = problem.rowCount();
-		var residual = [for (_ in 0...rows) 0.0], jacobian = [for (_ in 0...rows * width) 0.0];
-		problem.evaluate(state, new KinematicSnapshot(model), residual, jacobian);
-		var owners:Array<String> = [];
-		for (task in problem.tasks) {
-			var id = Std.isOfType(task, ClosureTask) ? model.closureIds[(cast task : ClosureTask).closure] : "task";
-			for (_ in 0...task.rowCount()) owners.push(id);
-		}
-		var sparse = [for (row in 0...rows) {
-			var index:Array<Int> = [], value:Array<Float> = [];
-			for (column in 0...width) {
-				var entry = jacobian[row * width + column];
-				if (entry != 0) { index.push(column); value.push(entry); }
-			}
-			{index: index, value: value};
-		}];
-		return {report: ConstraintDiagnosis.diagnoseSparse(sparse, width, owners, residual, ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE)};
 	}
 
 	static function assemblyScale(state:AssemblyState):Float {

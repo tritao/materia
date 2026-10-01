@@ -70,6 +70,7 @@ class HaxeonSmoke {
 		AssemblyLoopSmoke.run();
 		ClosureKindsSmoke.run();
 		MateRowsSmoke.run();
+		MateSolverSmoke.run();
 		AssemblyDragSmoke.run();
 		PlacementFramesSmoke.run();
 		JacobianCheckSmoke.run();
