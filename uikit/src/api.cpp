@@ -38,6 +38,7 @@
 #include <limits>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <map>
 #include <tuple>
 #include <vector>
@@ -4045,6 +4046,35 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
     std::vector<std::shared_ptr<nkui::TextEngine>> text_engine_owners;
     std::vector<std::shared_ptr<nkui::PreparedGlyphs>> prepared_text_owners;
     std::vector<std::pair<ResourceSlot *, nkui::PreparedGlyphs *>> prepared_texts;
+    struct SessionRowBind {
+        nkui::ResourceId id{};
+        ResourceSlot *layout = nullptr;
+        std::shared_ptr<const nkui::PreparedGlyphs> glyphs;
+        uint32_t line_index = 0;
+        float pixel_scale = 1.0f;
+        uint64_t content_generation = 0;
+    };
+    std::vector<SessionRowBind> session_row_binds;
+    std::vector<nkui::RenderPass> session_row_rasters;
+    std::vector<nkui::RenderDependency> session_row_dependencies;
+    std::unordered_set<uint32_t> occupied_row_targets;
+    for (const auto &existing_pass : plan.passes) {
+        occupied_row_targets.insert(existing_pass.target.value);
+        for (const auto &existing_command : existing_pass.commands)
+            if (existing_command.kind == nkui::RenderCommandKind::CompositeTarget)
+                occupied_row_targets.insert(existing_command.resource.value);
+    }
+    uint32_t next_row_target_slot = UINT16_MAX;
+    const auto allocate_row_target = [&]() -> nkui::ResourceId {
+        while (next_row_target_slot >= 0x8000u) {
+            const auto candidate = nkui::make_resource_id(
+                nkui::ResourceKind::RenderTarget, 1,
+                static_cast<uint16_t>(next_row_target_slot--));
+            if (occupied_row_targets.insert(candidate.value).second)
+                return candidate;
+        }
+        return {};
+    };
     uint32_t prepared_slot = 1;
     bool valid = true;
     const char *invalid_reason = "a frame resource could not be prepared";
@@ -4095,7 +4125,8 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
         }
         // Commands whose path has nothing to draw are removed from the pass once it has been walked.
         std::vector<size_t> dropped_commands;
-        for (auto &command : pass.commands) {
+        for (size_t command_index = 0; command_index < pass.commands.size(); ++command_index) {
+            auto &command = pass.commands[command_index];
             if (!command.custom_payload)
                 continue;
             if (command.kind == nkui::RenderCommandKind::Path ||
@@ -4153,7 +4184,7 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                                      static_cast<double>(tessellation[4]),
                                      static_cast<double>(tessellation[5]));
                     }
-                    dropped_commands.push_back(static_cast<size_t>(&command - pass.commands.data()));
+                    dropped_commands.push_back(command_index);
                     continue;
                 }
                 auto *prepared_path = prepared.get();
@@ -4228,6 +4259,109 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     1, static_cast<int32_t>(std::round(requested_scale * raster_scale_precision)));
                 const float raster_scale =
                     static_cast<float>(raster_scale_key) / raster_scale_precision;
+                const auto visible = visible_text_line_range(*layout, command, command.transform,
+                                                               *frame_info, pass.target_descriptor);
+                const uint32_t row_count = visible.second - visible.first;
+                // Small single-line paragraphs use the same row cache. Keep
+                // very long unwrapped lines on the direct single-row path.
+                if ((row_count > 1 || (row_count == 1 && layout->text->text_count() <= 2048)) &&
+                    row_count <=
+                    std::numeric_limits<uint16_t>::max() - prepared_slot + 1) {
+                    std::vector<nkui::RenderCommand> row_commands;
+                    row_commands.reserve(row_count);
+                    for (uint32_t row_index = visible.first; row_index < visible.second; ++row_index) {
+                        auto row = layout->text->published_glyphs_for_line(
+                            layout->text->active_layout_id(), row_index, 0, 0, raster_scale,
+                            nkui::GlyphMode::Alpha, glyph_tint_from_color(layout->text_color),
+                            layout->text_color_ranges);
+                        if (!row) {
+                            valid = false;
+                            invalid_reason = "a visible text row could not be prepared";
+                            break;
+                        }
+                        auto row_command = command;
+                        const auto bounds = layout->text->line_bounds(row_index);
+                        row_command.resource = nkui::make_resource_id(
+                            nkui::ResourceKind::TextLayout, 0x0FFD,
+                            static_cast<uint16_t>(prepared_slot++));
+                        const auto glyph_id = row_command.resource;
+                        row_command.x += bounds.x * raster_scale;
+                        row_command.y += bounds.y * raster_scale;
+                        row_command.width = bounds.width;
+                        row_command.height = bounds.height;
+                        row_command.content_generation =
+                            (static_cast<uint64_t>(source_resource) << 32) ^ row->publication_key;
+                        row_command.custom_payload = false;
+                        valid = frame_resources.bind_text(row_command.resource, *row,
+                                                          row_command.content_generation);
+                        if (valid && !owned_resources.bind_text(row_command.resource, row,
+                                                                 row_command.content_generation))
+                            sealable = false;
+                        if (!valid)
+                            break;
+                        if (row_count <= 96 && command.transform[1] == 0.0f &&
+                            command.transform[2] == 0.0f && command.transform[0] > 0.0f &&
+                            command.transform[3] > 0.0f && !row->vertices.empty()) {
+                            float min_y = INFINITY, max_y = -INFINITY;
+                            for (const auto &vertex : row->vertices) {
+                                min_y = std::min(min_y, vertex.y);
+                                max_y = std::max(max_y, vertex.y);
+                            }
+                            const double top_value = std::floor(
+                                (min_y + row_command.y) * command.transform[3] +
+                                command.transform[5] - 2.0f);
+                            const double bottom_value = std::ceil(
+                                (max_y + row_command.y) * command.transform[3] +
+                                command.transform[5] + 2.0f);
+                            const int target_width = pass.target_descriptor.width > 0
+                                ? pass.target_descriptor.width : frame_info->framebuffer_width;
+                            if (std::isfinite(top_value) && std::isfinite(bottom_value) &&
+                                top_value >= INT32_MIN && bottom_value <= INT32_MAX &&
+                                bottom_value > top_value &&
+                                bottom_value - top_value <= INT32_MAX && target_width > 0) {
+                                const int top = static_cast<int>(top_value);
+                                const int height = static_cast<int>(bottom_value - top_value);
+                                const auto target = allocate_row_target();
+                                if (target.value) {
+                                    nkui::RenderPass raster;
+                                    raster.kind = nkui::RenderPassKind::Raster;
+                                    raster.target = target;
+                                    raster.target_descriptor.width = target_width;
+                                    raster.target_descriptor.height = height;
+                                    raster.cache_key = row_command.content_generation;
+                                    auto raster_command = row_command;
+                                    raster_command.transform[5] -= static_cast<float>(top);
+                                    raster_command.has_scissor = false;
+                                    raster_command.opacity = 1.0f;
+                                    raster.commands.push_back(std::move(raster_command));
+                                    session_row_rasters.push_back(std::move(raster));
+                                    session_row_dependencies.push_back({target, pass.target});
+                                    row_command.kind = nkui::RenderCommandKind::CompositeTarget;
+                                    row_command.resource = target;
+                                    row_command.x = 0.0f;
+                                    row_command.y = static_cast<float>(top);
+                                    row_command.width = static_cast<float>(target_width);
+                                    row_command.height = static_cast<float>(height);
+                                    row_command.transform = {1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f};
+                                }
+                            }
+                        }
+                        session_row_binds.push_back({glyph_id, layout, std::move(row),
+                                                     row_index, raster_scale,
+                                                     row_command.content_generation});
+                        row_commands.push_back(std::move(row_command));
+                    }
+                    if (!valid)
+                        break;
+                    retain_text_engine(layout->text, text_engines, text_engine_owners);
+                    command = std::move(row_commands.front());
+                    pass.commands.insert(pass.commands.begin() + command_index + 1,
+                                         std::make_move_iterator(row_commands.begin() + 1),
+                                         std::make_move_iterator(row_commands.end()));
+                    renderer_slot->stats.render_plan_commands += row_count - 1;
+                    command_index += row_count - 1;
+                    continue;
+                }
                 auto viewport_glyphs = prepare_visible_text(*layout, command, command.transform,
                                                             *frame_info, pass.target_descriptor, raster_scale_key, raster_scale);
                 valid = viewport_glyphs != nullptr;
@@ -4314,6 +4448,11 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
         if (!valid)
             break;
     }
+    for (auto &row_pass : session_row_rasters)
+        plan.passes.push_back(std::move(row_pass));
+    plan.dependencies.insert(plan.dependencies.end(), session_row_dependencies.begin(),
+                             session_row_dependencies.end());
+    renderer_slot->stats.render_plan_commands += session_row_rasters.size();
     if (!valid) {
         std::fprintf(stderr, "UIKit render rejected the frame: %s (last step: %s)\n", invalid_reason,
                      frame_stage);
@@ -4325,6 +4464,22 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                     glyphs->origin_x, glyphs->origin_y, glyphs->pixel_scale, glyphs->mode, *glyphs))
                 return NKUI_ERROR_RENDERING;
             tint_text_glyphs(*glyphs, layout->text_color, layout->text_color_ranges);
+        }
+    }
+    for (auto &bind : session_row_binds) {
+        if (!bind.layout->text->prepared_glyphs_current(*bind.glyphs)) {
+            bind.glyphs = bind.layout->text->published_glyphs_for_line(
+                bind.layout->text->active_layout_id(), bind.line_index, 0, 0,
+                bind.pixel_scale, nkui::GlyphMode::Alpha,
+                glyph_tint_from_color(bind.layout->text_color),
+                bind.layout->text_color_ranges);
+            if (!bind.glyphs ||
+                !frame_resources.bind_text(bind.id, *bind.glyphs,
+                                           bind.content_generation))
+                return NKUI_ERROR_RENDERING;
+            if (!owned_resources.bind_text(bind.id, bind.glyphs,
+                                           bind.content_generation))
+                sealable = false;
         }
     }
     auto *session_text_engine = session_state->frame.text_engine();

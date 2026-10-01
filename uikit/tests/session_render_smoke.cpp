@@ -540,7 +540,7 @@ int main() {
          * and verify that capacity pressure evicts entries without allowing
          * unbounded GPU memory growth. */
         if (!result) {
-            constexpr int pressure_frames = 20;
+            constexpr int pressure_frames = 160;
             for (int pressure = 0; pressure < pressure_frames && !result; ++pressure) {
                 const auto pressure_commands =
                     make_custom_commands(20.0f + static_cast<float>(pressure), 20.0f);
@@ -558,7 +558,7 @@ int main() {
                      custom_cache_scaled.raster_cache_misses + pressure_frames ||
                  custom_cache_pressure.custom_paint_nodes <
                      custom_cache_scaled.custom_paint_nodes + pressure_frames ||
-                 custom_cache_pressure.raster_cache_entries > 16 ||
+                 custom_cache_pressure.raster_cache_entries > 128 ||
                  custom_cache_pressure.raster_cache_bytes > 64u * 1024u * 1024u)) {
                 std::fprintf(stderr,
                              "raster cache pressure exceeded its bounds: misses=%llu entries=%llu "
@@ -714,6 +714,55 @@ int main() {
             if (!blue_pixels || stale_pixels)
                 result = 46;
         }
+        // A wrapped custom-paint layout must cache each visible text row. An
+        // edit in its first row should miss that row while other rows hit.
+        nkui_resource wrapped_rows{};
+        if (!result) {
+            const std::string word(512, 'a');
+            nkui_text_style row_style{sizeof(row_style), NKUI_FONT_FAMILY_DEFAULT, 18.0f, 0.0f};
+            nkui_paragraph_style row_paragraph{sizeof(row_paragraph), 0.0f,
+                NKUI_TEXT_WRAP_WORD_CHARACTER, NKUI_TEXT_ALIGN_START, NKUI_TEXT_DIRECTION_AUTO};
+            if (nkui_text_layout_create_styled(fonts, word.c_str(), 140.0f, &row_style,
+                                               &row_paragraph, &wrapped_rows) != NKUI_OK)
+                result = 47;
+        }
+        if (!result) {
+            std::vector<uint8_t> row_commands;
+            append_bytes(row_commands,
+                nkui_transform_command{{NKUI_COMMAND_SET_TRANSFORM, NKUI_COMMAND_VERSION,
+                                        sizeof(nkui_transform_command)},
+                                       {1.0f, 0.0f, 0.0f, 1.0f, 8.0f, 4.0f}});
+            append_bytes(row_commands,
+                nkui_draw_rect_command{{NKUI_COMMAND_DRAW_TEXT_LAYOUT, NKUI_COMMAND_VERSION,
+                                        sizeof(nkui_draw_rect_command)},
+                                       wrapped_rows, 0.0f, 0.0f, 0.0f, 0.0f});
+            nkui_renderer_stats before_rows{}, first_rows{}, repeated_rows{}, edited_rows{};
+            if (nkui_display_list_submit(text_list, row_commands.data(),
+                                         static_cast<uint32_t>(row_commands.size())) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &before_rows) != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &first_rows) != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &repeated_rows) != NKUI_OK ||
+                nkui_text_layout_edit(wrapped_rows, 4, 5, "e") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &edited_rows) != NKUI_OK) {
+                result = 48;
+            } else {
+                std::printf("wrapped row raster cache: first misses=%llu, repeat hits=%llu, edited hits=%llu misses=%llu\n",
+                    static_cast<unsigned long long>(first_rows.raster_cache_misses - before_rows.raster_cache_misses),
+                    static_cast<unsigned long long>(repeated_rows.raster_cache_hits - first_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(edited_rows.raster_cache_hits - repeated_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(edited_rows.raster_cache_misses - repeated_rows.raster_cache_misses));
+                if (first_rows.raster_cache_misses < before_rows.raster_cache_misses + 2 ||
+                    repeated_rows.raster_cache_hits < first_rows.raster_cache_hits + 2 ||
+                    edited_rows.raster_cache_hits < repeated_rows.raster_cache_hits + 2 ||
+                    edited_rows.raster_cache_misses != repeated_rows.raster_cache_misses + 2)
+                    result = 48;
+            }
+        }
+        if (wrapped_rows.id)
+            nkui_resource_destroy(wrapped_rows);
         nkui_layout_session_clear_custom_paints(session);
         nkui_display_list_destroy(text_list);
         nkui_resource_destroy(text_layout);

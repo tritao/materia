@@ -709,6 +709,9 @@ bool create_target(UiRendererImpl::State &state, UiRendererImpl::State::Target &
 }
 
 constexpr size_t kMaxCachedEffectTargets = 16;
+// A text viewport can contain dozens of independently cached visual rows.
+// Raster entries still share the bounded byte budget below.
+constexpr size_t kMaxCachedRasterTargets = 128;
 constexpr uint64_t kMaxCachedEffectBytes = 64u * 1024u * 1024u;
 
 uint64_t effect_target_bytes(const UiRendererImpl::State::Target &target) {
@@ -814,7 +817,7 @@ bool make_raster_cache_room(UiRendererImpl::State &state, int width, int height)
     const uint64_t bytes = width_value * height_value * 4u;
     if (bytes > kMaxCachedEffectBytes)
         return false;
-    while (state.raster_cache.size() >= kMaxCachedEffectTargets) {
+    while (state.raster_cache.size() >= kMaxCachedRasterTargets) {
         auto victim = state.raster_cache.end();
         for (auto iterator = state.raster_cache.begin(); iterator != state.raster_cache.end();
              ++iterator) {
