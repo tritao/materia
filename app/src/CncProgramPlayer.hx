@@ -320,13 +320,20 @@ class CncProgramPlayer implements SessionMember {
 		if (newStock != null) {
 			if (stock == null) stock = newStock();
 			clock = Sys.time();
-			// The tool moved on the last tick under the move commanded before it, so the segment it
-			// just cut belongs to that move; the move under way now labels the next segment.
-			stock.follow(commandedKind, commandedOp, commandedProvenance);
 			var kind = provenance == null ? null : kindByLine.get(provenance.line);
-			commandedKind = kind == null ? MoveKind.Rapid : kind;
+			var now = kind == null ? MoveKind.Rapid : kind;
+			var nowProvenance = provenance == null ? new Provenance(0, 0, 0) : provenance;
+			// The tool moved on the last tick under the move commanded before it, so the segment it
+			// just cut belongs to that move; the move under way now labels the next segment. A tick
+			// that runs from a rapid into a cutting move cut under the cutting move: the rapid's part
+			// of it is at most one tick, and a rapid that does enter the stock cuts on the ticks after.
+			if (commandedKind == MoveKind.Rapid && now != MoveKind.Rapid)
+				stock.follow(now, at.op, nowProvenance);
+			else
+				stock.follow(commandedKind, commandedOp, commandedProvenance);
+			commandedKind = now;
 			commandedOp = at.op;
-			commandedProvenance = provenance == null ? new Provenance(0, 0, 0) : provenance;
+			commandedProvenance = nowProvenance;
 			cuttingSeconds += Sys.time() - clock;
 		}
 	}

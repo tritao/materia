@@ -35,6 +35,11 @@ class MachiningStock {
 	static inline final GOUGE = 0xD04040FF;
 	/** Deviation below this counts as on target, in metres. */
 	static inline final TOLERANCE = 0.00002;
+	/**
+	 * Contact below this volume (cubic metres, a thousandth of a cubic millimetre) is the ray stock's
+	 * numerical grazing where a move ends at a surface, not a rapid or holder entering the stock.
+	 */
+	static inline final CONTACT_VOLUME = 1e-12;
 	/** Tool motion shorter than this since the last cut is left for the next one, in metres. */
 	static inline final MIN_SEGMENT = 1e-6;
 
@@ -117,8 +122,8 @@ class MachiningStock {
 		var volume = report.removedVolume();
 		if (volume > 0) changed = true;
 		removed += volume;
-		rapidContacts += report.rapidContacts().length;
-		collisions += report.collisions().length;
+		rapidContacts += report.rapidContacts(CONTACT_VOLUME).length;
+		collisions += report.collisions(CONTACT_VOLUME).length;
 	}
 
 	/** Whether the stock changed since the last `geometry()`. */
