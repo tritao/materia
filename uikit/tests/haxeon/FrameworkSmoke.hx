@@ -630,6 +630,23 @@ class FrameworkSmoke {
 		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
 		context.key(UiEventKind.KeyDown, UiKey.Right, UiModifier.Shift);
 		if (controlledSelection.anchor != 0 || controlledSelection.focus != 1) return 343;
+		editDelivered = false;
+		controlledField.onEditIntent = function(intent) {
+			switch intent {
+				case Insert(text):
+					controlledDocument.replace(0, controlledDocument.codepointCount, text + "!");
+					controlledSelection = new TextSelection(controlledDocument.codepointCount, controlledDocument.codepointCount);
+					return true;
+				case _: return false;
+			}
+		};
+		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		context.text(UiEventKind.TextInput, "🙂");
+		if (controlledDocument.text != "🙂!" || editDelivered || controlledEditor.selectionFocus != 2)
+			return 344;
+		context.key(UiEventKind.KeyDown, UiKey.Backspace);
+		if (controlledDocument.text != "🙂" || !editDelivered || controlledSelection.focus != 1)
+			return 345;
 		var sharedArea = TextArea.withDocument("shared-document-area",
 			new TextDocument("multiline"));
 		if (!sharedArea.multiline)

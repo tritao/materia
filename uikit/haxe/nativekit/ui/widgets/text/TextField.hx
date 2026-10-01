@@ -60,6 +60,12 @@ class TextField implements View {
 	public var selectionProvider:Null<Void->TextSelection>;
 	/** Reports widget selection after edit callbacks have synchronized a caller-owned document. */
 	public var onSelectionChange:Null<TextSelection->Void>;
+	/** Additional owner-controlled selections; the primary stays in selectionProvider. */
+	public var additionalSelectionProvider:Null<Void->Array<TextSelection>>;
+	/** Return true after applying an operation to the controlled document. */
+	public var onEditIntent:Null<TextEditIntent->Bool>;
+	/** Optional aggregate selected text for clipboard copy/cut. */
+	public var selectionTextProvider:Null<Void->Null<String>>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
@@ -97,6 +103,9 @@ class TextField implements View {
 		this.decorationProvider = null;
 		this.selectionProvider = null;
 		this.onSelectionChange = null;
+		this.additionalSelectionProvider = null;
+		this.onEditIntent = null;
+		this.selectionTextProvider = null;
 		this.label = label;
 		this.placeholder = null;
 		this.multiline = multiline;
@@ -157,6 +166,13 @@ class TextField implements View {
 			}
 			if (selectionProvider != null)
 				editor.setAnchoredSelection(selectionProvider());
+			var additionalSelections = additionalSelectionProvider == null ? [] : additionalSelectionProvider();
+			var hasAdditionalCaret = false;
+			for (selection in additionalSelections) {
+				if (selection.anchor == selection.focus) hasAdditionalCaret = true;
+				if (selection.anchor > editor.documentLength() || selection.focus > editor.documentLength())
+					throw "Additional selection is outside the document";
+			}
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
 			editor.configurePresentation(colorRangeProvider, decorationProvider, presentationRevision);
 
@@ -225,7 +241,7 @@ class TextField implements View {
 			}
 			// Unfocused, unselected fields need only their text node. State changes
 			// invalidate the frame before selection or caret decoration is painted.
-			if (editor.selectionStart != editor.selectionEnd) {
+			if (editor.selectionStart != editor.selectionEnd || additionalSelections.length > 0) {
 				var selectionStyle = new LayoutStyle();
 				selectionStyle.width = LayoutAxis.grow();
 				selectionStyle.height = LayoutAxis.grow();
@@ -236,7 +252,7 @@ class TextField implements View {
 				selectionNode.hitTestSelf = false;
 				selectionNode.onPaint(function(canvas, _) {
 					if (!editor.isDisposed())
-						paintSelection(canvas, editor, context.textInput.isOwner(id), context.theme);
+						paintSelection(canvas, editor, context.textInput.isOwner(id), context.theme, additionalSelections);
 				});
 				editorContent.add(selectionNode);
 			}
@@ -299,9 +315,9 @@ class TextField implements View {
 					if (!editor.isDisposed()) {
 						var now = Sys.time();
 						var active = context.textInput.isOwner(id);
-						if (active && !readOnly && editor.selectionStart == editor.selectionEnd)
+						if (active && !readOnly && (editor.selectionStart == editor.selectionEnd || hasAdditionalCaret))
 							context.textInput.requestCaretFrameAt(editor.nextCaretBlinkTime(now));
-						paintEditorDecorations(canvas, editor, active, context.theme, now, !readOnly);
+						paintEditorDecorations(canvas, editor, active, context.theme, now, !readOnly, additionalSelections);
 					}
 				});
 				editorContent.add(paintNode);
@@ -328,6 +344,27 @@ class TextField implements View {
 			var updateState = function() {
 				publishSelection();
 				refreshState();
+			};
+			var delegateEdit = function(intent:TextEditIntent):Bool {
+				var handler = onEditIntent;
+				if (handler == null || !handler(intent)) return false;
+				if (document != null) editor.syncDocument(document);
+				else editor.syncExternal(value);
+				if (selectionProvider != null) editor.setAnchoredSelection(selectionProvider());
+				editor.resetCaretBlink(Sys.time());
+				updateState();
+				return true;
+			};
+			var copyCurrentSelection = function():Bool {
+				if (selectionTextProvider != null) {
+					var selectedText = selectionTextProvider();
+					if (selectedText == null) return false;
+					context.clipboard.writeText(selectedText);
+				} else {
+					if (editor.selectionStart == editor.selectionEnd) return false;
+					copySelection(context.clipboard, editor);
+				}
+				return true;
 			};
 			var publishTextChange = function(previousRevision:Int) {
 				if (document == null || onChange != null)
@@ -500,6 +537,12 @@ class TextField implements View {
 				#else
 					(event.modifiers & UiModifier.Control) != 0;
 				#end
+				if (!readOnly) {
+					var consumed = event.key == UiKey.Backspace ? delegateEdit(DeleteBackward) :
+						event.key == UiKey.Delete ? delegateEdit(DeleteForward) :
+						event.key == UiKey.Enter && multiline ? delegateEdit(Insert("\n")) : false;
+					if (consumed) { event.preventDefault(); return; }
+				}
 				var handled = true;
 				var changed = false;
 				var textEdited = false;
@@ -507,9 +550,10 @@ class TextField implements View {
 				if (command && event.key == UiKey.A)
 					changed = editor.selectAll();
 				else if (command && event.key == UiKey.C)
-					copySelection(context.clipboard, editor);
+					copyCurrentSelection();
 				else if (command && event.key == UiKey.X) {
-					copySelection(context.clipboard, editor);
+					copyCurrentSelection();
+					if (!readOnly && delegateEdit(Insert(""))) { event.preventDefault(); return; }
 					if (!readOnly) {
 						changed = editor.replace(editor.selectionStart, editor.selectionEnd, "");
 						textEdited = true;
@@ -521,6 +565,7 @@ class TextField implements View {
 						context.clipboard.readText(function(pasted) {
 							if (editor.isDisposed() || !editor.focused)
 								return;
+							if (delegateEdit(Paste(pasted))) return;
 							var beforePaste = editor.documentRevision();
 							if (editor.insert(pasted)) {
 								editor.resetCaretBlink(Sys.time());
@@ -604,6 +649,7 @@ class TextField implements View {
 				});
 
 			node.on(UiEventKind.TextInput, function(event) {
+				if (enabled && !readOnly && delegateEdit(Insert(event.text))) return;
 				var previousRevision = editor.documentRevision();
 				if (enabled && !readOnly && editor.insert(event.text)) {
 					editor.resetCaretBlink(Sys.time());
@@ -669,9 +715,13 @@ class TextField implements View {
 	}
 
 	static function paintSelection(canvas:Canvas, editor:TextEditorState,
-			active:Bool, theme:nativekit.ui.theme.Theme):Void {
+			active:Bool, theme:nativekit.ui.theme.Theme, additional:Array<TextSelection>):Void {
+		canvas.translate(0.0, -editor.scrollOffsetY);
+		for (selection in additional)
+			for (rect in editor.layout.selectionRects(new TextPosition(selection.anchor, selection.anchorAffinity),
+				new TextPosition(selection.focus, selection.focusAffinity)))
+				canvas.fillRectIfPositive(rect, active ? theme.textSelection : theme.textSelectionInactive);
 		if (editor.selectionStart != editor.selectionEnd) {
-			canvas.translate(0.0, -editor.scrollOffsetY);
 			for (rect in editor.layout.selectionRects(editor.anchorPosition(), editor.focusPosition()))
 				canvas.fillRectIfPositive(rect, active ? theme.textSelection : theme.textSelectionInactive);
 		}
@@ -679,7 +729,7 @@ class TextField implements View {
 
 	static function paintEditorDecorations(canvas:Canvas, editor:TextEditorState,
 			active:Bool, theme:nativekit.ui.theme.Theme, timeSeconds:Float,
-			showCaret:Bool = true):Void {
+			showCaret:Bool = true, ?additional:Array<TextSelection>):Void {
 		if (editor.scrollOffsetY != 0.0)
 			canvas.translate(0.0, -editor.scrollOffsetY);
 		if (active && editor.compositionStart >= 0 && editor.compositionStart != editor.compositionEnd) {
@@ -687,6 +737,14 @@ class TextField implements View {
 				canvas.fillRectIfPositive(new Rect(rect.x, rect.y + rect.height - 1.0, rect.width, 1.0),
 					Color.rgba(0.95, 0.75, 0.24, 1.0));
 		}
+		if (showCaret && active && additional != null && editor.isCaretVisible(timeSeconds))
+			for (selection in additional) if (selection.anchor == selection.focus) {
+				var caret = editor.layout.caret(new TextPosition(selection.focus, selection.focusAffinity));
+				var topX = caret.x + caret.ascender * caret.slope;
+				var bottomX = caret.x + caret.descender * caret.slope;
+				canvas.fillRectIfPositive(new Rect(Math.min(topX, bottomX), caret.y + Math.min(caret.ascender, caret.descender),
+					Math.max(1.0, absolute(bottomX - topX)), Math.max(1.0, absolute(caret.descender - caret.ascender))), theme.textCaret);
+			}
 		if (showCaret && active && editor.selectionStart == editor.selectionEnd &&
 				editor.isCaretVisible(timeSeconds)) {
 			var caret = editor.layout.caret(editor.focusPosition());
