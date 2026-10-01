@@ -19,8 +19,14 @@ class SketchSolver {
 	final equations:SketchEquations;
 	final seed:Null<SolvedSketch>;
 	final diagnoseParts:Bool;
+	/** Points being dragged and where to (soft drag targets, plan C5.3); null for a plain solve. */
+	final targets:Null<Map<String, Array<Float>>>;
+	/** How lightly a drag target pulls against the constraints (see `SketchPartSolver.pull`). */
+	static inline var DRAG_WEIGHT:Float = 1e-3;
 
-	function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool) {
+	function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool,
+			?targets:Map<String, Array<Float>>) {
+		this.targets = targets;
 		layout = new SketchLayout(sketch, cancellationCheck);
 		equations = new SketchEquations(layout);
 		this.seed = seed;
@@ -32,8 +38,8 @@ class SketchSolver {
 		previous diagnosis (`SolveDiagnostic.diagnosed` is then false).
 	*/
 	public static function solve(sketch:ConstrainedSketch, seed:Null<SolvedSketch> = null,
-		cancellationCheck:Null<Void->Bool> = null, diagnose:Bool = true):SolvedSketch {
-		return new SketchSolver(sketch, seed, cancellationCheck, diagnose).run();
+		cancellationCheck:Null<Void->Bool> = null, diagnose:Bool = true, ?targets:Map<String, Array<Float>>):SolvedSketch {
+		return new SketchSolver(sketch, seed, cancellationCheck, diagnose, targets).run();
 	}
 
 	/**
@@ -80,12 +86,24 @@ class SketchSolver {
 		equations.fixTangentBranches(x);
 		var partition = new SketchPartition(layout);
 		var solver = new SketchPartSolver(layout, equations, partition);
+		// Drag targets by variable; a dragged point no constraint touches simply goes there.
+		var targetVariables:Array<{variable:Int, value:Float}> = [];
+		var dragged = targets;
+		if (dragged != null)
+			for (id => target in dragged) {
+				var index = layout.pointIndex.get(id);
+				if (index == null || target.length != 2) throw layout.invalid("a drag target names a missing point", [id]);
+				for (axis in 0...2) {
+					targetVariables.push({variable: index + axis, value: target[axis]});
+					if (partition.partOf(index + axis) < 0) x[index + axis] = target[axis];
+				}
+			}
 		var diagnosis = new SketchPartDiagnosis(layout, equations, partition, solver);
 		var tolerance = layout.solveTolerance;
 
 		var iterations = 0, failed = false, stationary = true, degenerate = false, diagnosed = true;
 		var conflictingIds:Array<String> = [], failingIds:Array<String> = [];
-		var reports:Array<DiagnosisReport> = [];
+		var reports:Array<DiagnosisReport> = [], free:Array<Int> = [];
 		var cache = new Map<String, CachedPart>(), structures = new Map<String, PartStructure>();
 		var previous = seed == null ? null : seed.partCache, previousStructures = seed == null ? null : seed.structures;
 		for (part in partition.parts) {
@@ -99,28 +117,33 @@ class SketchSolver {
 				part.ordered = true;
 			}
 			// Unchanged constraints, fixed positions and settings, seeded from its own solution: already solved.
-			var cached = previous == null ? null : previous.get(key);
+			var partTargets = [for (target in targetVariables) if (partition.partOf(target.variable) == part.id) target];
+			var cached = previous == null || partTargets.length > 0 ? null : previous.get(key);
 			if (cached != null && SketchSolveCache.sameValues(cached.values, values)) {
 				reports.push(cached.report);
+				for (variable in cached.free) free.push(variable);
 				if (cached.degenerate) degenerate = true;
 				cache.set(key, cached);
 				if (known != null) structures.set(key, known);
 				continue;
 			}
-			var solved = solver.solve(x, part, false, seed != null);
+			// A dragged part is pulled towards its targets, then solved exactly from there.
+			if (partTargets.length > 0) x = solver.pull(x, part, partTargets, DRAG_WEIGHT);
+			var solved = solver.solve(x, part, false, seed != null || partTargets.length > 0);
 			x = solved.x;
 			iterations = iterations > solved.iterations ? iterations : solved.iterations;
 			if (!diagnoseParts && known != null && solved.norm <= tolerance) {
 				// Dragging: report the last diagnosis; the solve on release checks this part again.
 				reports.push(known.report);
+				for (variable in known.free) free.push(variable);
 				if (known.degenerate) degenerate = true;
 				diagnosed = false;
 				structures.set(key, {position: part.position, first: part.first, rows: known.rows, report: known.report,
-					degenerate: known.degenerate});
+					degenerate: known.degenerate, free: known.free});
 				continue;
 			}
 			var rows = known != null && known.rows != null ? known.rows : diagnosis.structuralRows(part, solved.set.values.length);
-			var report = diagnosis.diagnose(x, part, solved.set, rows), partDegenerate = false;
+			var report = diagnosis.diagnose(x, part, solved.set, rows), partDegenerate = false, diagnosedAt = x;
 			if (solved.norm > tolerance) {
 				failed = true;
 				var limit = Math.max(layout.sketch.settings.rankTolerance, tolerance * 10) * (1 + solved.norm);
@@ -136,13 +159,18 @@ class SketchSolver {
 					if (generic.rank > report.rank) {
 						report = generic;
 						partDegenerate = true;
+						diagnosedAt = witness;
 					}
 				}
 			}
 			if (partDegenerate) degenerate = true;
+			// What still moves, at the pose whose rank the report gives.
+			var partFree = diagnosis.freeVariables(diagnosedAt, part, solved.set, partDegenerate ? null : rows);
+			for (variable in partFree) free.push(variable);
 			if (solved.norm <= tolerance)
-				cache.set(key, {values: values, report: report, degenerate: partDegenerate});
-			structures.set(key, {position: part.position, first: part.first, rows: rows, report: report, degenerate: partDegenerate});
+				cache.set(key, {values: values, report: report, degenerate: partDegenerate, free: partFree});
+			structures.set(key, {position: part.position, first: part.first, rows: rows, report: report, degenerate: partDegenerate,
+				free: partFree});
 			reports.push(report);
 		}
 
@@ -170,7 +198,59 @@ class SketchSolver {
 		var radii:Map<String, Float> = new Map();
 		for (entity in layout.sketch.entities())
 			if (layout.radiusIndex.exists(entity.id)) { var i:Int = cast layout.radiusIndex.get(entity.id); radii.set(entity.id, x[i]); }
-		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures);
+		// Free: what a part's constraints leave free, and every variable no constraint touches.
+		var isFree = [for (_ in 0...layout.variableCount) true];
+		for (part in partition.parts) for (variable in part.variables) isFree[variable] = false;
+		for (variable in free) isFree[variable] = true;
+		var freePoints = [for (point in layout.sketch.points()) {
+			var i:Int = cast layout.pointIndex.get(point.id);
+			if (isFree[i] || isFree[i + 1]) point.id;
+		}];
+		var freeEntities:Array<String> = [];
+		for (entity in layout.sketch.entities()) {
+			var moves = freePoints.indexOf(entity.first) >= 0 || (entity.second != null && freePoints.indexOf(entity.second) >= 0);
+			var r = layout.radiusIndex.get(entity.id);
+			if (r != null && isFree[r]) moves = true;
+			if (moves) freeEntities.push(entity.id);
+		}
+		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures, freePoints, freeEntities,
+			measureReferences(coordinates, radii));
+	}
+
+	/**
+		The reference dimensions measured on the solved geometry, as their driving rows define them: the distance
+		between two points, a circle's radius, and the signed angle from the first line's direction to the second's.
+	*/
+	function measureReferences(coordinates:Map<String, Array<Float>>, radii:Map<String, Float>):Map<String, Float> {
+		var result = new Map<String, Float>();
+		var direction = (id:String, owner:String) -> {
+			var entity = layout.entities.get(id);
+			if (entity == null || entity.kind != "line" || entity.second == null)
+				throw layout.invalid("an angle measures two lines", [owner]);
+			var a = coordinates.get(entity.first), b = coordinates.get(entity.second);
+			if (a == null || b == null) throw layout.invalid("a reference dimension names a missing point", [owner]);
+			return [b[0] - a[0], b[1] - a[1]];
+		};
+		for (constraint in layout.referenceList) {
+			switch constraint.kind {
+				case "distance":
+					var a = coordinates.get(constraint.first), second = constraint.second;
+					var b = second == null ? null : coordinates.get(second);
+					if (a == null || b == null) throw layout.invalid("a distance measures two points", [constraint.id]);
+					result.set(constraint.id, Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1])));
+				case "radius":
+					var r = radii.get(constraint.first);
+					if (r == null) throw layout.invalid("a radius measures a circle or arc", [constraint.id]);
+					result.set(constraint.id, r);
+				case "angle":
+					var second = constraint.second;
+					if (second == null) throw layout.invalid("an angle measures two lines", [constraint.id]);
+					var u = direction(constraint.first, constraint.id), v = direction(second, constraint.id);
+					result.set(constraint.id, Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]));
+				default:
+			}
+		}
+		return result;
 	}
 
 	static function failingOwners(set:SketchResidualSet, tolerance:Float):Array<String> {

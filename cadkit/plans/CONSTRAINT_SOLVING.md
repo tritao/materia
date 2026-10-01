@@ -682,3 +682,458 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   `assembly_closures_compile_as_equalities` covers all six types; simkit
   ctest 58/58 (one uinput test skipped). The app compiles; an end-to-end
   simulation with the new kinds needs the app's native libraries rebuilt.
+
+### C4.1–C4.2 — Mate schema; mates as closure rows (2026-10-01)
+
+- Decision change: mates compile to kinematicskit closures instead of a
+  separate `MateTask` (a closure already is a frame-frame equality with
+  analytic rows, diagnosis and FD tests). Coincident → Spherical, coaxial →
+  Cylindrical, lock → Fixed, planar → Planar (now with an offset `value`);
+  new closure kinds Parallel (2 rows), Perpendicular and Angle (a·b against 0
+  or cos value; d(a·b) = (a × b)·(ω_A − ω_B) exactly) and Distance
+  (|d| − value, exact). `KinematicModel.closureValue` carries the values.
+  `AssemblyKinematics.compile(definition, withMates)` adds mates only for the
+  mate solver, so loop solves and drags never see them.
+- Schema: `AssemblyMateKind`, `AssemblyMate` (two occurrence connectors, an
+  axis in each connector frame, optional value) on definitions and nested
+  assemblies; `AssemblyComponentOccurrence.grounded` (what mates never move,
+  for C4.3). The flattener scopes and resolves mates like joints (and emits
+  the field only when there are mates); the codec validates ids (distinct
+  from joints), kinds, connectors, values (distance/angle need one; distance
+  ≥ 0).
+- **Found:** kinematicskit's LM damps Marquardt-style (λ·diag JᵀJ). For an
+  under-determined problem, which a mate on a free part always is, JᵀJ is
+  rank-deficient and a column with a small gradient gets a huge step that the
+  step clamp then shrinks to nothing: a single distance mate over six free
+  coordinates stalled. New opt-in `levenberg` mode damps λ·max(diag)·I (the
+  minimum-norm step); existing callers are unchanged, the mate solver will
+  opt in.
+- `MateRowsSmoke`: every mate kind solved over a six-joint chain (three
+  slides, three hinges) and checked against central differences at the
+  solution; codec round trip and rejections; nested scoping.
+- **haxeon:** `Reflect.deleteField` on a typed record (fixed layout) returned
+  false and left the field; fixed in haxeon's runtime (see its commit), which
+  the codec rejection test relies on.
+
+### C4.3 — `AssemblyMateSolver` (2026-10-01)
+
+- Free parts: every root occurrence except the grounded ones (or the first
+  root when none is) is a floating rigid body; the movable, non-driven,
+  non-coupled joints between a mated occurrence and its root may move too.
+  Mates and joint closures are solved together by LM in Levenberg mode, then
+  diagnosed by `AssemblyClosureDiagnosis` (shared with the loop solver now):
+  the report's degrees of freedom are what the mates leave free.
+- Output: `AssemblyMateSolveResult.state(definition)` (root poses + reached
+  coordinates) for a configuration, or `AssemblyMateSolver.place` to bake
+  the placement into initial poses and joint defaults (non-nested only).
+- kinematicskit: `setActiveDofs([])` is allowed (a problem may move only
+  roots).
+- `MateSolverSmoke`: planar + coaxial seats a motor leaving one turn free;
+  a lock places it fully on its target; contradicting planar offsets are
+  `conflicting` naming both; a repeated mate is redundant; a coincident mate
+  turns a grounded arm's joint to reach a fixture; `place` round-trips.
+- haxeon bumped to cc2d0d3c (`Reflect.deleteField` on typed records; haxeon
+  suite 353/353). Not pushed yet: push haxeon before the parent.
+
+### C4.1b — Mates in assembly documents (2026-10-01)
+
+- `AssemblyDocuments` stores mates as `cadkit.mate` relationships between the
+  two occurrence elements (kind, connectors, axis, optional value; scoped
+  like couplings, sorted by id on read) and `grounded` as an occurrence
+  property; removing an assembly removes its mates with its relationships.
+- `MateSolverSmoke` round-trips the motor assembly through documents and a
+  `DocumentCodec` save/reload and solves it again (one degree of freedom).
+
+### C4.4 — Mates on faces and edges: geometric connectors (2026-10-01)
+
+- Design change from the plan: a mate still names connectors. A component's
+  definition can also carry **geometric connectors**
+  (`cadkit.parametric.GeometricConnectors`): a face or edge kept as a
+  topology fingerprint plus its direction and radius, framed again from the
+  current geometry whenever it is needed. The solver, the codec, the
+  flattener and the MuJoCo export see ordinary connectors.
+  `PersistentReference` holds no topology, and `TopologyReference` needs an
+  owning `Feature`, which a registry-evaluated definition does not have.
+- Frames (`frameOf`), with z along the feature:
+  - planar face: at its centroid, z the outward normal;
+  - axial face (cylinder, cone, sphere, torus): on the axis nearest the
+    centroid;
+  - circular edge: at its center;
+  - straight edge: at its midpoint.
+
+  x is the world axis least aligned with z. `flip` reverses z. An axis has
+  no sign of its own, so it keeps the sign it had when captured.
+- Resolution:
+  1. Exact fingerprint (`TopologyResolver`).
+  2. After an edit moved or resized the feature: the *one* face or edge with
+     the same surface or curve kind, direction and radius.
+  3. Several matches → `Ambiguous`; none → `Unresolved`.
+
+  A fingerprint is exact by design, and a definition has no operation
+  history to remap through.
+- Native: `cad_face_axis` and `cad_edge_axis` (struct `cad_axis`, projected
+  as `CadKit.GeometricAxis` because `Axis` clashes with
+  `cadkit.modeling.Axis`), read from `BRepAdaptor`; the core smoke tests
+  both.
+- Documents: the connectors live on the CadKit `Definition` (property
+  `cadkit.assembly.geometricConnectors`).
+  - `AssemblyDocuments.toDefinition` appends them, framed from each
+    occurrence's evaluated geometry. Occurrences of one component must
+    agree (`assembly.instance-dependent-connector`); a lost face is
+    `assembly.unresolved-connector`.
+  - `fromDefinition` strips them from stored records, so frames never go
+    stale.
+  - In memory, `GeometricConnectors.apply` frames them into an
+    `AssemblyDefinition` before solving.
+- `GeometricConnectorSmoke`:
+  - the frame of each feature kind;
+  - a pin mated to a plate's top face and bore: solved in memory, from a
+    document, and after a save and reload;
+  - widening the plate moves the bore and the pin follows;
+  - a second bore of the same radius → ambiguous;
+  - a connector on a face the part lacks → reported.
+
+### Post-C4.4 review: fixes and refactors (2026-10-01)
+
+1. **Angle and distance mates are regular** (`f1dccb2f`).
+   - The angle row is `acos(a·b) − value`, in radians.
+   - At 0 or π, a single row cannot express alignment (that is two
+     constraints, and the angle is not differentiable there). So those
+     values compile to stereographic alignment rows
+     `2σ(b·u)/(1 + σ a·b)`, which vanish only in the requested direction.
+   - Validation refuses a zero distance (use coincident) and angles outside
+     [0, π].
+2. **One assembly-solve core** (`AssemblySolve`) for `AssemblyLoopSolver`
+   and `AssemblyMateSolver`. It holds:
+   - one options type and tolerance policy (1 µm, 1e-6 rad, 200
+     iterations);
+   - one assembly scale (the diagonal of the occurrence origins plus the
+     connectors' reach);
+   - the LM call, the status names, and the witness check for degenerate
+     poses.
+
+   The loop solver's witness nudges the driven joints; the mate solver's
+   nudges everything the mates move. The mate result now reports
+   `degenerate`. The unused `finiteDifferenceStep` option is gone.
+3. **Negligible Jacobian entries are dropped before diagnosis**
+   (`AssemblyClosureDiagnosis`). An entry is dropped when moving its
+   variable over its characteristic range (a radian, or the assembly scale)
+   changes the tolerance-scaled row by less than 1e-6. Without this, the
+   diagnosis's row equilibration blew roundoff up into a unit row, and a
+   singular pose looked regular. Test: a folded two-link arm whose tip is
+   at its mated distance from a point on its own line is reported as a
+   degenerate placement with one degree of freedom.
+5. **A connector's x and the mates it takes come from its feature.**
+   - `cad_axis` gained the geometry's own reference direction, and
+     `cad_face_axis` now also covers planes. A connector's x is that
+     reference; only a straight edge, which has none, falls back to the world
+     axis least aligned with z.
+   - Each connector records its feature: `plane`, `axis`, `sphere`,
+     `circle` or `line`.
+   - `GeometricConnectors.compatible` refuses mates that ask a feature for
+     something it does not define:
+     - a point (coincident, distance): only a sphere's or circle's center;
+     - an axis line (coaxial): an axis, a circle or a line;
+     - a plane (planar): a planar face or a circle's plane;
+     - a direction (parallel, perpendicular, angle): anything but a sphere;
+     - a whole frame (lock): only a circle.
+
+     A planar face's centroid moves as the face grows, which is why it is not
+     a point.
+   - Checked when an assembly is written to a document and again when it is
+     reframed.
+6. **Geometric connectors live in the assembly record.**
+   - `AssemblyConnector.reference` is an opaque string. projectkit only
+     validates it as text, so the codec, the flattener and the solvers
+     handle these connectors by name like any other.
+   - `frame` holds the last resolved frame.
+   - `GeometricConnectors.reframe(definition, geometry)` /
+     `AssemblyDocuments.reframe(root)` is the one explicit step that frames
+     them again from geometry. `toDefinition` is pure again: no geometry
+     evaluation, and it returns the last frames.
+   - Gone: the CadKit `Definition` property, the stripping of connectors
+     from stored records, and the requirement to call `apply` before
+     validation.
+   - Errors carry codes: `unresolved`, `ambiguous`, `instance-dependent`,
+     `incompatible-mate`; documents prefix them with `assembly.`.
+7. **Edge fingerprints are anchored at the midpoint** (document version 10).
+   - A first-vertex anchor depends on the edge's orientation and, for a
+     closed edge, on where its seam vertex lies.
+   - Fingerprint records carry `anchor`; edge records from older documents
+     (no anchor) keep matching by their first vertex.
+   - MachineKit's recovery of pre-v9 defaults compared against
+     `DocumentCodec.VERSION`, so any version bump would have misfired. It
+     now compares against a pinned constant, 9.
+
+### C4.5 — Editor: mates (2026-10-01, in progress)
+
+What the editor has: project parts arrive as meshes in the scene artifact,
+with no B-rep. The assembly definition is generated by the project process,
+and the editor never edits or saves it. Assembly editing today means
+dragging an occurrence (`AssemblyDrag` over the dependent joints) and
+setting joint coordinates in the inspector. There is no mate, connector or
+joint authoring, no two-pick tool, and no diagnosis display.
+
+Design:
+- **Face data in the artifact.** The project process, which has the B-rep,
+  describes each face's feature, frame data and fingerprint. The editor
+  captures and reframes geometric connectors from that data alone.
+- **Mates as an editor-owned overlay.** Mates and the connectors they
+  create live in the project scene record next to `assemblyState`. The
+  effective definition is the generated one plus the overlay, re-applied
+  after every project rebuild. (Writing them back into the project's
+  recipe document is a later option.)
+
+Steps:
+- **a.** Face descriptors and data-only matching.
+- **b.** Session mates: solve, undo, save, diagnosis status.
+- **c.** The two-pick mate tool.
+- **d.** Dragging parts under their mates (a soft target in the mate solve).
+- **e.** Convert to joint.
+
+**a (done).** Face descriptors and data-only matching:
+- `GeometricConnectors.describeFaces(shape)` writes JSON per face: index,
+  feature, origin, direction, reference, radius, signed, fingerprint.
+- `SceneArtifactPart.faceDescriptors` carries it (scene artifact version
+  11); the MachineKit and CadKit example producers fill it.
+- `GeometricCandidates` holds the faces and edges a connector may be found
+  on, built from a Shape or from descriptors, and capture, framing and
+  `reframe` all go through it. `captureDescribed` captures from
+  descriptors.
+- Matching is data-only:
+  - `TopologyFingerprint.scoreAgainst` compares two fingerprints, and
+    `score(Shape)` is now that applied to the candidate's capture, so there
+    is one scoring rule;
+  - `TopologyResolver.resolveAmong` resolves over fingerprints under the
+    same ambiguity policy.
+- Test: a bore captured from descriptors frames like one captured from the
+  shape, and an assembly reframed from the widened plate's descriptors
+  seats the pin at the new bore.
+
+**b (done).** Session mates:
+- `app/ProjectAssemblyMates` is an immutable overlay of face connectors
+  (per component) and mates.
+  - `effective(generated)` lays it over the generated definition and checks
+    the mates against their features.
+  - `reframe` frames the connectors again from the rebuilt artifact's
+    descriptors.
+  - `faceConnector` captures (or reuses) "face<index>" from the descriptors.
+  - `solve` places the parts and merges the result into the current state,
+    so the coordinates the mates don't reach keep their values.
+- `ProjectDocumentSession`:
+  - `addAssemblyFaceMate` / `addAssemblyConnectorMate` /
+    `removeAssemblyMate` are undoable edits that swap the overlay and the
+    state.
+  - A mate that cannot hold is kept, the placement is left as it was, and
+    the conflict is reported.
+  - On open, rebuild and recipe refresh, `installAssemblyRuntime` reframes
+    and re-solves (`layMates`); a lost face becomes `assemblyMateProblem`.
+  - `assemblyMateStatus()` feeds the status bar (shown in red for a
+    conflict or a problem).
+  - The overlay is saved as `ProjectSceneRecord.assemblyMates`.
+- `AssemblyMateSolveResult.implied` lists the mates that add nothing (the
+  rank is unchanged without them). That is what the status calls redundant.
+  `report.redundantOwners()` also lists overlapping mates, such as the
+  usual planar-plus-coaxial pair, which share the axis rows on purpose.
+- Fixture `app/tests/fixtures/pin-plate` (a grounded plate with a bore, and
+  a free pin). `ProjectSourceTests.checkMates` covers:
+  - planar: 3 degrees of freedom; plus coaxial: 1, with the pin at
+    (30, 20, 10);
+  - undo/redo, and save and reopen;
+  - a contradicting planar offset reported as a conflict with the placement
+    kept, then removed.
+- Limits: root-scope occurrences only (not parts inside nested assemblies);
+  faces only, not edges.
+
+**c (done).** The two-pick mate tool:
+- `app/MatePickTool` takes the clicked faces.
+  - It refuses at once a face whose feature cannot take the mate, a click
+    on nothing, and a second face on the same part; the first pick is kept
+    so the user can pick again.
+  - After the second face it adds the mate and reports the mate status.
+- The perspective viewport routes left clicks on faces to the tool while it
+  is active (`beginMatePick`). The viewport toolbar shows its prompt, and
+  Escape cancels.
+- Commands `assembly.mate-{planar,coaxial,parallel,perpendicular}` are in
+  the viewport context menu, enabled when the project has described faces.
+- The inspector lists the selected part's mates as checked rows under
+  "Mates"; clearing one removes the mate (undoable).
+- Two haxeon fixes found on the way:
+  - `ad78d26c`: a switch value's case may end in an `if` without `else`.
+  - `d11c48fb`: a source file is only the module its package declaration
+    names. A package-scoped root was also reached as a plain root, which
+    loaded `Runner.hx` twice when a type was written as `Runner.Scene`.
+- Tests: `ProjectSourceTests.checkMatePick` (refusals, completion,
+  inspector removal and undo).
+
+**d (done).** Dragging under mates:
+- `cadkit.modeling.AssemblyMateDrag` drags a point of a mated part. Each
+  update makes two Levenberg-Marquardt solves from the previous preview:
+  1. The mates and closures at their tolerance-scaled weight, plus a pull
+     of the grabbed point toward the target with weight 1 (rows in length
+     units), which finds the nearest placement the mates allow. A seated
+     pin pulled sideways turns about its axis.
+  2. The mates and closures alone, so the preview satisfies them exactly.
+
+  The result reports whether the point is on target, to a thousandth of
+  the assembly scale, or held ("Held by its mates N mm from the cursor").
+- A first pull weight of `1/scale` was too light: Levenberg-Marquardt
+  judged the problem stationary and stopped 19 mm short.
+- `AssemblyMateSolver.setup` (the movable coordinates and the mate and
+  closure problem) is shared by the solve and the drag;
+  `AssemblyMateSolver.merge` folds a placement into an existing state (the
+  editor overlay now uses it).
+- In the editor, `beginAssemblyDrag` uses `ProjectMateDrag` for a part
+  that has mates and the existing IK drag otherwise. Previews go through
+  `previewAssemblyPoses`; a commit is one undoable edit.
+- Tests:
+  - `MateSolverSmoke.checkDrag`: the seated motor turns about its shaft
+    and stays seated; pulled off the face it is held; the commit equals the
+    preview; the grounded bracket refuses.
+  - `ProjectSourceTests.checkMateDrag`: the pin dragged around the bore
+    follows and stays in it; undo and redo; the grounded plate refuses.
+- Limit: for definitions with nested assemblies the drag and solve report
+  flattened ids, and `merge` refuses them (as `place` already did).
+
+**e (done).** Convert to joint:
+- `cadkit.modeling.AssemblyMateJoints.infer` is for a free root mated to one
+  other part. It takes the null space of its mates' rows over the part's six
+  rigid-body columns: the eigenvectors of JᵀJ by Jacobi rotations, with the
+  translation columns scaled by the assembly scale.
+  - One free motion: a pure slide makes a prismatic joint along it; a turn
+    with no pitch makes a revolute joint through `o + ω×v/|ω|²`.
+  - Otherwise none, with the reason: fixed, several motions, a screw motion,
+    mated to more than one part, or already on a joint.
+- `convert` builds the tree joint (coordinate 0 at the current placement)
+  and its two connectors, `<joint>-parent` and `<joint>-child`, z along the
+  axis.
+- In the editor the overlay gains joints (`withJoint` swaps out the mates it
+  replaces; pruning keeps connectors that a joint names). The session's
+  runtime definition is now the generated definition plus the overlay.
+  - `overlayDefinition` reframes and lays the overlay before a saved state
+    is decoded, on open and on recipe refresh.
+  - Mate edits keep the definition in step with the overlay.
+  - `convertMatesToJoint` is one undoable edit that changes the structure
+    (the hierarchy rebuilds); the converted part then moves, drags and
+    simulates on its joint.
+  - Command `assembly.convert-to-joint`, plus an inspector button "Make
+    revolute joint" when the selected part's mates make one.
+- haxeon `3de4d97a`: a try body may be a bare `return`.
+- Tests:
+  - `MateSolverSmoke.checkJoints`: planar + coaxial → revolute that keeps
+    the placement and turns about the shaft; coaxial + parallel x axes →
+    prismatic along z; coaxial alone → none ("2 motions").
+  - `ProjectSourceTests.checkMateJoint`: a single planar mate makes no
+    joint; with the coaxial mate a revolute joint plate→pin; the pin keeps
+    its place and turns on the joint; joint and coordinate survive save and
+    reopen; undo restores the mates.
+
+### C5.1 — "Still free" geometry (2026-10-01)
+
+- `ConstraintDiagnosis.freedom(rows, variables)` gives each variable's
+  freedom, 1 − P_ii, for the projector onto the rows' span (after the
+  diagnosis's equilibration). 0 means the rows fix the variable; above
+  `FREE_TOLERANCE` (1e-6), some motion the rows allow moves it.
+  - It reuses the sparse path's Cholesky factor of the Gram matrix (with
+    dependent rows dropped). Takahashi's selected inversion gives (JJᵀ)⁻¹
+    on the factor's envelope in O(rows · width²), and two rows that share a
+    variable always lie in that envelope.
+  - A first version did one forward solve per variable and made chained
+    1000-point sketches 6× slower; the selected inversion restores the
+    timings.
+  - When the kept rows already fix every touched variable it returns zeros
+    without the inverse. Near a degenerate pose, where Gram accuracy goes as
+    κ², it uses a dense Gram-Schmidt basis instead.
+- **Sketches.** Each part computes its free variables when diagnosed, at
+  the same pose as its report (the witness pose when degenerate), and
+  caches them with the part; a drag reuses them. `SolvedSketch.freePoints`
+  and `freeEntities` include points no constraint touches. The editor's
+  sketch overlay draws free geometry in blue and constrained geometry in
+  amber.
+- **Assemblies.** `AssemblyMateSolveResult.movable` lists occurrences with a
+  free column, through their free root's block or a movable joint on their
+  chain. The mate status names them ("1 degrees of freedom free (pin)"), and
+  the inspector says "Still free to move under its mates".
+- **Found by the new agreement checks (now 200 random sketches, plus random
+  row subsets for freedom):** the sparse diagnosis could keep a dependent
+  row whose Gram pivot rounding put just above t², claiming rank 9 for 8
+  variables. Fixes:
+  - independent rows cannot outnumber the variables they touch (otherwise
+    the dense QR decides);
+  - pivots in (t², 100 t²] are ambiguous and go to the dense QR.
+- Tests: `SketchFreedomSmoke` (rectangle with and without its height, a
+  circle with a free radius, an unconstrained point, a drag);
+  `DiagnosisAgreementSmoke` (envelope vs dense freedom); mate `movable`;
+  the editor's `assemblyPartStillFree`.
+
+### C5.2 — Reference (measured) dimensions (2026-10-01)
+
+- `SketchConstraint.reference` marks a distance, radius or angle as
+  measured, not driving; `asReference(flag)` and `withValue(value)` change
+  one property and keep the rest.
+- The sketch layout keeps reference constraints out of the solve, the
+  partition and the diagnosis (`referenceList`), and validation refuses
+  other kinds.
+- After the solve, `SolvedSketch.measured(id)` gives the value as the
+  driving rows define it: point-to-point distance, the solved radius, and
+  the signed angle `atan2(u×v, u·v)` from the first line to the second.
+- A reference never over-constrains. A rectangle with a reference diagonal
+  stays "fully-constrained", not redundant.
+- `ConstrainedSketchFeature` makes no parameter for a reference, so turning
+  a driving dimension into a reference retires its parameter (undoable).
+  `DocumentCodec` and the editor's `SketchDraftCodec` store `"reference":
+  true`.
+- Three places rebuilt constraints with `SketchConstraint.raw` and dropped
+  the flag: the feature's solve candidate, its parameter sync, and the
+  editor's dimension edit. They use `withValue` now; this showed up as a
+  reference angle of 0 becoming driving and the solve failing.
+- Editor: a reference dimension shows its measured value read-only
+  ("Reference <id>"), and every dimension has a "Reference <id> (measured)"
+  toggle. Made driving again, it takes its measured value, so the sketch
+  does not jump.
+- Tests:
+  - `SketchReferenceSmoke`: measured diagonal, angle and radius; a width
+    edit updates the diagonal; kinds refused; no parameter; undo; save and
+    reload.
+  - `CadPlateWorkflowTests.checkReferenceDimension`: a reference height
+    frees one degree of freedom, shows the measured value read-only, and
+    fixes the rectangle again when driving.
+
+### C5.3 — Soft drag in sketches (2026-10-01)
+
+- `ConstrainedSketch.drag(targets, seed)` is one drag step. Each dragged
+  point comes as close to its target as the constraints allow, and every
+  constraint still holds. It is not diagnosed, and the authored sketch is
+  unchanged. A dragged point no constraint touches goes straight to its
+  target.
+- `SketchPartSolver.pull` runs per dragged part. Each iteration takes a
+  tangent step and projects it back:
+  - the step is Gauss-Newton on the constraint rows plus a light target row
+    (weight 1e-3, one per dragged variable, on the envelope's diagonal);
+  - the result is solved back onto the constraints at fractions 1 and ½,
+    and at the minimum of the parabola through those and the start;
+  - the placement nearest the targets is kept.
+
+  The normal solve then finishes the part.
+- Two simpler versions failed the swinging-arm test (a fixed-length line
+  dragged towards a cursor at twice its reach):
+  - a pure penalty pull crawled (9° short), because a curved constraint's
+    curvature outweighs a light pull;
+  - projection with damping alone lagged by a constant 2.6°, because the
+    tangent step overshoots by the distance ratio and damping corrects that
+    only linearly.
+
+  The line search lands on the cursor's direction to 1e-10.
+- `SketchSession.dragPreview`, `commitDrag` (the solved positions become
+  the authored points, then a diagnosed solve) and `cancelDrag`.
+- Editor:
+  - the scene gets `beginSketchDraftPointDrag`, `dragSketchDraftPoint`,
+    `endSketchDraftPointDrag(keep)` and `sketchDraftPointNear`;
+  - in a sketch draft, a press within 8 px of a point drags it (viewport
+    navigation mode 6), elsewhere it still draws a rectangle;
+  - release keeps the result, and Escape or cancel restores the draft.
+- Tests:
+  - `SketchDragSmoke`: a stretchable rectangle's corner rises with the
+    cursor and stays on its edge; a fixed rectangle does not move; the arm
+    swings round in four steps; a loose point follows; release diagnoses.
+  - `CadPlateWorkflowTests`: drag, cancel and keep on the editor's draft.

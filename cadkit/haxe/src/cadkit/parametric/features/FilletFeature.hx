@@ -111,8 +111,7 @@ class FilletFeature extends Feature {
 			var selected:Array<Edge> = [];
 			try {
 				for (reference in edgeReferences)
-					selected.push(new Edge(reference.resolveFor(
-						sourceShape, context.operation(source))));
+					selected.push(new Edge(reference.resolveFor(sourceShape)));
 				operation = sourceShape.filletEdgesOperation(selected, radius.value);
 			} catch (error:Dynamic) {
 				for (edge in selected)

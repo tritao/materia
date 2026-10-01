@@ -23,6 +23,7 @@ class ProceduralExcavatorPreview {
 					vertices: mesh.vertices, normals: mesh.normals, indices: mesh.indices,
 					edgeSegments: mesh.edgeSegments,
 					edgeIds: mesh.edgeIds,
+					faceDescriptors: cadkit.parametric.GeometricConnectors.describeFaces(component.part.shape),
 					faceRanges: [for (range in mesh.faceRanges) {
 						faceIndex: range.faceIndex, firstIndex: range.firstIndex, indexCount: range.indexCount
 					}]

@@ -74,9 +74,9 @@ class LinearBearing extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
-			var outer = Part.cylinderSpan(outerDiameter / 2, 0, length);
+			var outer = Solids.named(Part.cylinderSpan(outerDiameter / 2, 0, length), "body");
 			tracked.push(outer);
-			var bore = Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1);
+			var bore = Solids.named(Part.cylinderSpan(boreDiameter / 2, -0.1, length + 0.1), "bore");
 			tracked.push(bore);
 			var envelope = Solids.cut(outer, [bore]);
 			tracked.push(envelope);
@@ -88,9 +88,9 @@ class LinearBearing extends MachineComponent {
 			var rimDepth = Math.min(0.2, outerDiameter * 0.02);
 			var rimOuter = outerDiameter / 2 + 0.05;
 			var rimInner = outerDiameter / 2 - rimDepth;
-			var frontRim = annulus(rimOuter, rimInner, 0, rimWidth);
+			var frontRim = Solids.named(annulus(rimOuter, rimInner, 0, rimWidth), "rim.front");
 			tracked.push(frontRim);
-			var backRim = annulus(rimOuter, rimInner, length - rimWidth, length);
+			var backRim = Solids.named(annulus(rimOuter, rimInner, length - rimWidth, length), "rim.back");
 			tracked.push(backRim);
 			var rims = [frontRim, backRim];
 			var detailed = Solids.cut(envelope, rims);
@@ -100,9 +100,9 @@ class LinearBearing extends MachineComponent {
 			var sealInner = boreDiameter / 2 + Math.min(0.6, (outerDiameter - boreDiameter) * 0.2);
 			var sealOuter = Math.min(outerDiameter / 2 - 0.5, sealInner + 0.8);
 			if (sealOuter > sealInner) {
-				var frontSeal = annulus(sealOuter, sealInner, -0.05, sealWidth);
+				var frontSeal = Solids.named(annulus(sealOuter, sealInner, -0.05, sealWidth), "seal.front");
 				tracked.push(frontSeal);
-				var backSeal = annulus(sealOuter, sealInner, length - sealWidth, length + 0.05);
+				var backSeal = Solids.named(annulus(sealOuter, sealInner, length - sealWidth, length + 0.05), "seal.back");
 				tracked.push(backSeal);
 				var seals = [frontSeal, backSeal];
 				detailed = Solids.cut(detailed, seals);
@@ -115,9 +115,9 @@ class LinearBearing extends MachineComponent {
 	static function annulus(outerRadius:Float, innerRadius:Float, z0:Float, z1:Float):Part {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
-			var outer = Part.cylinderSpan(outerRadius, z0, z1);
+			var outer = Solids.named(Part.cylinderSpan(outerRadius, z0, z1), "outer");
 			tracked.push(outer);
-			var inner = Part.cylinderSpan(innerRadius, z0 - 0.05, z1 + 0.05);
+			var inner = Solids.named(Part.cylinderSpan(innerRadius, z0 - 0.05, z1 + 0.05), "inner");
 			tracked.push(inner);
 			var result = Solids.cut(outer, [inner]);
 			tracked.push(result);

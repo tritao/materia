@@ -129,15 +129,16 @@ class PillowBlock extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var base = Part.box(length, baseHeight, baseWidth, Align.Center, Align.Min, Align.Center);
+		var base = Solids.named(Part.box(length, baseHeight, baseWidth, Align.Center, Align.Min, Align.Center), "base");
 		var barrelRadius = overallHeight - shaftHeight;
-		var barrel = Part.cylinderSpan(barrelRadius, -baseWidth / 2, baseWidth / 2, 0, shaftHeight);
+		var barrel = Solids.named(Part.cylinderSpan(barrelRadius, -baseWidth / 2, baseWidth / 2, 0, shaftHeight), "barrel");
 		var body = Solids.union([base, barrel]);
-		var boreTool = Part.cylinderSpan(bearing.outside / 2, -baseWidth / 2 - 0.1, baseWidth / 2 + 0.1, 0, shaftHeight);
+		var boreTool = Solids.named(Part.cylinderSpan(bearing.outside / 2, -baseWidth / 2 - 0.1, baseWidth / 2 + 0.1, 0, shaftHeight), "bore");
 		if (detail == Envelope) return Solids.cut(body, [boreTool]);
 		var tools = [boreTool];
+		var bolt = 1;
 		for (x in [-boltSpacing / 2, boltSpacing / 2])
-			tools.push(Part.cylinderAlongY(mountHoleDiameter / 2, -0.1, baseHeight + 0.1, x, 0));
+			tools.push(Solids.named(Part.cylinderAlongY(mountHoleDiameter / 2, -0.1, baseHeight + 0.1, x, 0), "bolt" + bolt++));
 		return Solids.cut(body, tools);
 	}
 

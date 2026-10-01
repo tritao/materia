@@ -12,4 +12,6 @@ typedef CachedPart = {
 	var values:Array<Float>;
 	var report:DiagnosisReport;
 	var degenerate:Bool;
+	/** The part's variables (sketch-wide indices) that its constraints leave free. */
+	var free:Array<Int>;
 }

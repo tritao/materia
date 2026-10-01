@@ -22,6 +22,9 @@ import machinekit.component.ToolSpec;
 
 /** CadKit evaluator registration for editable MachineKit single-part recipes. */
 class MachineKitRecipes {
+	/** Document version since which edited defaults are recorded explicitly (older ones are recovered). */
+	static inline var EDITED_DEFAULTS_VERSION:Int = 9;
+
 	static var evaluators:Map<String, MachineKitRecipeEvaluator> = [];
 	static var components:Map<String, {key:String, component:MachineComponent}> = [];
 	static var watchedDocuments:Map<String, Bool> = [];
@@ -246,7 +249,7 @@ class MachineKitRecipes {
 							diagnostics.push('Saved input "${input.name}" on "${entry.id}" is no longer valid: ${Std.string(error)}');
 							continue;
 						}
-						var legacyEdit = savedVersion < DocumentCodec.VERSION
+						var legacyEdit = savedVersion < EDITED_DEFAULTS_VERSION
 							&& Std.string(normalized) != Std.string(input.defaultValue);
 						if (legacyEdit && !reportedLegacyDefaults) {
 							diagnostics.push('Saved defaults were recovered from a pre-v9 project; re-save this project to record edited defaults explicitly');

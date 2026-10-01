@@ -144,7 +144,7 @@ class Feature {
 	public function remapTopologyReferences():TopologyRemapReport {
 		var report = new TopologyRemapReport();
 		for (reference in topologyReferences)
-			report.add(reference.remap());
+			report.add(reference.remap(), reference.resolvedBy());
 		return report;
 	}
 
@@ -155,8 +155,7 @@ class Feature {
 			for (reference in topologyReferences) {
 				var producer = reference.remapTargetFeature();
 				var result = staged.get(producer.id.toInt());
-				updates.push(reference.prepareRemap(result == null ? producer.currentShape() : result.shape,
-					result == null ? producer.provenance : result.operation));
+				updates.push(reference.prepareRemap(result == null ? producer.currentShape() : result.shape));
 			}
 			return updates;
 		} catch (error:Dynamic) {
@@ -172,7 +171,7 @@ class Feature {
 		for (index in 0...topologyReferences.length) {
 			var reference = topologyReferences[index];
 			if (previous[index] != reference.stateGeneration())
-				report.add(reference.state);
+				report.add(reference.state, reference.resolvedBy());
 		}
 		return report;
 	}

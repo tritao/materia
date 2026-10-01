@@ -104,7 +104,8 @@ class HoleFeature extends Feature {
 		var span = projectedSpan(targetShape, plane.normal);
 		var margin = Math.max(1e-7 * Math.max(1, span), 1e-7);
 		var boreLength = mode == "blind" ? depth.value + margin : span + 2 * margin;
-		var bore = cylinderAt(plane, diameter.value / 2, boreLength, margin);
+		// Each body is named, so the bore and its recess keep separate face names (plans/TOPOLOGICAL_NAMING.md).
+		var bore = Shape.instance(cylinderAt(plane, diameter.value / 2, boreLength, margin), "bore");
 		if (style == "plain")
 			return EvaluationResult.fromShape(bore);
 		if (style == "countersink") {
@@ -118,7 +119,7 @@ class HoleFeature extends Feature {
 				throwInvalidCountersink(bore, "countersink dimensions must define a recess shallower than the hole");
 			var sink:Null<Shape> = null;
 			try {
-				sink = countersinkAt(plane, diameter.value / 2, recessDiameter.value / 2, sinkDepth, margin);
+				sink = Shape.instance(countersinkAt(plane, diameter.value / 2, recessDiameter.value / 2, sinkDepth, margin), "countersink");
 				var result = bore.fuse(sink);
 				bore.close();
 				sink.close();
@@ -132,7 +133,7 @@ class HoleFeature extends Feature {
 		}
 		var recess:Null<Shape> = null;
 		try {
-			recess = cylinderAt(plane, recessDiameter.value / 2, recessDepth.value + margin, margin);
+			recess = Shape.instance(cylinderAt(plane, recessDiameter.value / 2, recessDepth.value + margin, margin), "counterbore");
 			var result = bore.fuse(recess);
 			bore.close();
 			recess.close();

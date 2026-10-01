@@ -3,6 +3,7 @@ package materia.assembly;
 import haxe.Json;
 import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyComponentOccurrence;
 import materia.assembly.AssemblyDefinition.AssemblyJointLimits;
@@ -71,6 +72,9 @@ class AssemblyDefinitionCodec {
 					throw 'Component definition "${component.id}" has an invalid or duplicate connector';
 				names.set(connector.name, true);
 				AssemblyCodec.validateFrame(connector.frame);
+				var reference = connector.reference;
+				if (reference != null && (reference.length == 0 || reference.length > 4096))
+					throw 'Connector "${connector.name}" of "${component.id}" has an invalid reference';
 			}
 			definitions.set(component.id, component);
 		}
@@ -120,6 +124,25 @@ class AssemblyDefinitionCodec {
 			}
 		}
 		validateTree(occurrences, incoming);
+		var mates = definition.mates == null ? [] : definition.mates;
+		var mateIds = new Map<String, Bool>();
+		for (mate in mates) {
+			var first = mate == null ? null : occurrences.get(mate.first), second = mate == null ? null : occurrences.get(mate.second);
+			var value:Null<Float> = mate == null ? null : mate.value;
+			if (mate == null || !validText(mate.id) || mateIds.exists(mate.id) || joints.exists(mate.id) || !validMateKind(mate.kind) ||
+				first == null || second == null || mate.first == mate.second || !validAxis(mate.axis) ||
+				!hasConnector(definitions.get(first.definition), mate.firstConnector) ||
+				!hasConnector(definitions.get(second.definition), mate.secondConnector) ||
+				(value != null && !Math.isFinite(value)) ||
+				((mate.kind == AssemblyMateKind.Distance || mate.kind == AssemblyMateKind.Angle) && value == null))
+				throw 'Assembly mate "${mate == null ? "" : mate.id}" is invalid';
+			// A distance's direction is undefined where the origins meet; an angle between axes lies in [0, π].
+			if (mate.kind == AssemblyMateKind.Distance && value != null && !(value > 0))
+				throw 'Assembly mate "${mate.id}" needs a positive distance (use a coincident mate for zero)';
+			if (mate.kind == AssemblyMateKind.Angle && value != null && !(value >= 0 && value <= Math.PI))
+				throw 'Assembly mate "${mate.id}" needs an angle between 0 and π';
+			mateIds.set(mate.id, true);
+		}
 		var couplings = definition.couplings == null ? [] : definition.couplings;
 		if (couplings.length > 4000) throw "Assembly has too many coupled joints";
 		var targets = new Map<String, Bool>(), names = new Map<String, Bool>();
@@ -230,6 +253,11 @@ class AssemblyDefinitionCodec {
 	/** Joint types a closure can have but a tree joint cannot (they have more than one coordinate). */
 	public static function closureOnlyType(type:AssemblyJointType):Bool
 		return type == AssemblyJointType.Spherical || type == AssemblyJointType.Cylindrical || type == AssemblyJointType.Planar;
+
+	static function validMateKind(kind:AssemblyMateKind):Bool
+		return kind == AssemblyMateKind.Coincident || kind == AssemblyMateKind.Coaxial || kind == AssemblyMateKind.Planar ||
+			kind == AssemblyMateKind.Parallel || kind == AssemblyMateKind.Perpendicular || kind == AssemblyMateKind.Distance ||
+			kind == AssemblyMateKind.Angle || kind == AssemblyMateKind.Lock;
 
 	static function validAxis(axis:AssemblyVector):Bool {
 		if (axis == null || !Math.isFinite(axis.x) || !Math.isFinite(axis.y) || !Math.isFinite(axis.z)) return false;

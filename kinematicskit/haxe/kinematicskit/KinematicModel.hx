@@ -61,6 +61,7 @@ class KinematicModel {
   public final closureFrameB:Array<Int>;
   public final closureAxis:Array<Float>;
   public final closureTolerance:Array<Null<Float>>;
+  public final closureValue:Array<Float>;
 
   final bodyIndexById = new Map<String, Int>();
   final jointIndexById = new Map<String, Int>();
@@ -104,6 +105,7 @@ class KinematicModel {
     this.closureFrameB = parts.closureFrameB;
     this.closureAxis = parts.closureAxis;
     this.closureTolerance = parts.closureTolerance;
+    this.closureValue = parts.closureValue;
     for (i in 0...bodyIds.length) bodyIndexById.set(bodyIds[i], i);
     for (i in 0...jointIds.length) jointIndexById.set(jointIds[i], i);
     for (i in 0...frameIds.length) frameIndexById.set(frameIds[i], i);

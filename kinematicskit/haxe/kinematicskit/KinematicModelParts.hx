@@ -39,6 +39,8 @@ class KinematicModelParts {
   var closureFrameB:Array<Int>;
   var closureAxis:Array<Float>;
   var closureTolerance:Array<Null<Float>>;
+  /** Planar offset, distance or angle of each closure (0 when the kind has none). */
+  var closureValue:Array<Float>;
 
   function new() {}
 }

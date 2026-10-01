@@ -107,12 +107,13 @@ class SocketHeadCapScrew extends MachineComponent {
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
-		var head = Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight);
-		var shank = Part.cylinderSpan(diameter / 2, -length, 0);
+		var head = Solids.named(Part.cylinderSpan(spec.headDiameter / 2, 0, spec.headHeight), "head");
+		var shank = Solids.named(Part.cylinderSpan(diameter / 2, -length, 0), "shank");
 		var body = Solids.union([head, shank]);
 		if (detail == Envelope) return body;
 		var top = spec.headHeight;
-		var socket = Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), top - spec.socketDepth, top + 0.1);
+		var socket = Solids.named(Part.prism(cadkit.modeling.Polygon.regular(6, spec.socketSize), top - spec.socketDepth, top + 0.1),
+			"socket");
 		return Solids.cut(body, [socket]);
 	}
 

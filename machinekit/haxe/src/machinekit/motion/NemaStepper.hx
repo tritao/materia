@@ -136,8 +136,8 @@ class NemaStepper extends MachineComponent {
 			var half = variant.bodyFace / 2;
 			var parts:Array<Part> = [];
 			if (detail == Envelope) {
-				var body = Part.prism([new Vector(-half, -half), new Vector(half, -half),
-					new Vector(half, half), new Vector(-half, half)], -bodyLength, 0);
+				var body = Solids.named(Part.prism([new Vector(-half, -half), new Vector(half, -half),
+					new Vector(half, half), new Vector(-half, half)], -bodyLength, 0), "body");
 				tracked.push(body);
 				parts.push(body);
 			} else {
@@ -146,12 +146,16 @@ class NemaStepper extends MachineComponent {
 					new Vector(half, -half + c), new Vector(half, half - c), new Vector(half - c, half),
 					new Vector(-half + c, half), new Vector(-half, half - c), new Vector(-half, -half + c)],
 					-bodyLength, 0);
+				body = Solids.named(body, "body");
 				tracked.push(body);
 				var screw = mountScrew(10);
 				var holeDiameter = variant.tappedMount ? screw.spec.tapDrill : screw.clearanceDiameter(Medium);
 				var tools:Array<Part> = [];
+				var bolt = 1;
 				for (point in boltPattern()) {
-					var tool = Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y);
+					// Bolt holes are named like the `bolt<k>` connectors: the pattern always has the same four.
+					var tool = Solids.named(Part.cylinderSpan(holeDiameter / 2, -variant.mountHoleDepth, 0.1, point.x, point.y),
+						"bolt" + bolt++);
 					tracked.push(tool);
 					tools.push(tool);
 				}
@@ -159,8 +163,8 @@ class NemaStepper extends MachineComponent {
 				tracked.push(body);
 				parts.push(body);
 			}
-			var pilot = Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight);
-			var shaft = Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength);
+			var pilot = Solids.named(Part.cylinderSpan(spec.pilotDiameter / 2, 0, variant.pilotHeight), "pilot");
+			var shaft = Solids.named(Part.cylinderSpan(variant.shaftDiameter / 2, 0, variant.shaftLength), "shaft");
 			tracked.push(pilot);
 			tracked.push(shaft);
 			parts.push(pilot);
@@ -178,8 +182,10 @@ class NemaStepper extends MachineComponent {
 	public function mountingCutout(thickness:Float, pilotClearance:Float = 0.2, fit:ClearanceFit = Medium):Part {
 		if (!(thickness > 0)) throw "Motor mounting plate needs a positive thickness";
 		var radius = mountScrew(10).clearanceDiameter(fit) / 2;
-		var tools = [Part.cylinderSpan((spec.pilotDiameter + pilotClearance) / 2, 0, thickness)];
-		for (point in boltPattern()) tools.push(Part.cylinderSpan(radius, 0, thickness, point.x, point.y));
+		// Named like the motor's own bodies, so the faces a cutout leaves in a mating plate stay distinguishable.
+		var tools = [Solids.named(Part.cylinderSpan((spec.pilotDiameter + pilotClearance) / 2, 0, thickness), "pilot")];
+		var bolt = 1;
+		for (point in boltPattern()) tools.push(Solids.named(Part.cylinderSpan(radius, 0, thickness, point.x, point.y), "bolt" + bolt++));
 		return Solids.union(tools);
 	}
 

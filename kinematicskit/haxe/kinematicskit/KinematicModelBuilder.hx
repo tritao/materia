@@ -93,10 +93,11 @@ class KinematicModelBuilder {
    * A loop closure between two frames. Closures are never tree edges: forward
    * kinematics ignores them, and solvers treat them as equality tasks. `axis`
    * is expressed in both frames (Revolute/Prismatic); `tolerance` is the
-   * authored position tolerance, if any.
+   * authored position tolerance, if any; `value` is the planar offset,
+   * distance or angle the kind needs.
    */
   public function addClosure(id:String, kind:ClosureKind, frameA:Int, frameB:Int, ?axis:Vector3,
-      ?tolerance:Float):Int {
+      ?tolerance:Float, value:Float = 0):Int {
     requireId(id, "Kinematic closure");
     if (closureIndexById.exists(id)) throw 'Kinematic closure "$id" is declared more than once';
     if (frameA < 0 || frameA >= frames.length || frameB < 0 || frameB >= frames.length)
@@ -106,11 +107,13 @@ class KinematicModelBuilder {
       var norm = Math.sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
       if (!Math.isFinite(norm) || norm < 1e-9) throw 'Kinematic closure "$id" has a zero or non-finite axis';
       ax = axis.x / norm; ay = axis.y / norm; az = axis.z / norm;
-    } else if (kind != ClosureKind.Fixed) throw 'Kinematic closure "$id" needs an axis';
+    } else if (kind != ClosureKind.Fixed && kind != ClosureKind.Spherical && kind != ClosureKind.Distance)
+      throw 'Kinematic closure "$id" needs an axis';
+    if (!Math.isFinite(value)) throw 'Kinematic closure "$id" value must be finite';
     if (tolerance != null && (!Math.isFinite(tolerance) || tolerance <= 0.0))
       throw 'Kinematic closure "$id" tolerance must be finite and positive';
     closureIndexById.set(id, closures.length);
-    closures.push(new ClosureSpec(id, kind, frameA, frameB, ax, ay, az, tolerance));
+    closures.push(new ClosureSpec(id, kind, frameA, frameB, ax, ay, az, tolerance, value));
     return closures.length - 1;
   }
 
@@ -284,6 +287,7 @@ class KinematicModelBuilder {
     parts.closureFrameB = [for (closure in closures) closure.frameB];
     parts.closureAxis = closureAxes();
     parts.closureTolerance = [for (closure in closures) closure.tolerance];
+    parts.closureValue = [for (closure in closures) closure.value];
     return new KinematicModel(parts);
   }
 
@@ -386,9 +390,11 @@ private class ClosureSpec {
   public final ay:Float;
   public final az:Float;
   public final tolerance:Null<Float>;
+  public final value:Float;
 
   public function new(id:String, kind:ClosureKind, frameA:Int, frameB:Int, ax:Float, ay:Float, az:Float,
-      tolerance:Null<Float>) {
+      tolerance:Null<Float>, value:Float) {
+    this.value = value;
     this.id = id;
     this.kind = kind;
     this.frameA = frameA;

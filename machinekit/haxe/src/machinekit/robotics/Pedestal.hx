@@ -175,21 +175,23 @@ class Pedestal extends MachineComponent {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
 			var parts:Array<Part> = [];
-			var base = Part.cylinderSpan(baseDiameter / 2, 0, baseThickness);
+			var base = Solids.named(Part.cylinderSpan(baseDiameter / 2, 0, baseThickness), "base");
 			tracked.push(base);
-			var column = Part.cylinderSpan(columnDiameter / 2, 0, height);
+			var column = Solids.named(Part.cylinderSpan(columnDiameter / 2, 0, height), "column");
 			tracked.push(column);
 			parts.push(base);
 			parts.push(column);
+			var footIndex = 1;
 			if (levelingFootDiameter > 0)
 				for (point in floorBoltPattern()) {
-					var foot = Part.cylinderSpan(levelingFootDiameter / 2, -levelingFootHeight, 0, point.x, point.y);
+					var foot = Solids.named(Part.cylinderSpan(levelingFootDiameter / 2, -levelingFootHeight, 0, point.x, point.y),
+						"foot" + footIndex++);
 					tracked.push(foot);
 					parts.push(foot);
 				}
 			if (gussetHeight > 0)
 				for (i in 0...gussetCount) {
-					var support = gusset(2 * Math.PI * (i + 0.5) / gussetCount);
+					var support = Solids.named(gusset(2 * Math.PI * (i + 0.5) / gussetCount), "gusset" + (i + 1));
 					tracked.push(support);
 					parts.push(support);
 				}
@@ -199,19 +201,21 @@ class Pedestal extends MachineComponent {
 			var screw = floorMountScrewPart(10);
 			var anchorStart = -levelingFootHeight - 0.1;
 			var tools:Array<Part> = [];
+			var anchor = 1;
 			for (point in floorBoltPattern()) {
-				var tool = Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y);
+				var tool = Solids.named(Part.cylinderSpan(screw.clearanceDiameter(Medium) / 2, anchorStart, baseThickness + 0.1, point.x, point.y),
+					"anchor" + anchor++);
 				tracked.push(tool);
 				tools.push(tool);
 			}
 			if (cablePathDiameter > 0) {
-				var cable = Part.cylinderSpan(cablePathDiameter / 2, -0.1, height + 0.1);
+				var cable = Solids.named(Part.cylinderSpan(cablePathDiameter / 2, -0.1, height + 0.1), "cable");
 				tracked.push(cable);
 				tools.push(cable);
 			}
 			// The cutout is built in the mated part's frame (face at z=0, material toward +Z); the
 			// `top` connector turns it over (x kept, y and z reversed) onto the top face.
-			var topCut = flange.mountingCutout(topCutDepth);
+			var topCut = Solids.named(flange.mountingCutout(topCutDepth), "top");
 			tracked.push(topCut);
 			var placedTopCut = topCut.placed(new Location(new Plane(new Vector(0, 0, height), Vector.X(), Vector.Z().scale(-1))));
 			topCut.close();

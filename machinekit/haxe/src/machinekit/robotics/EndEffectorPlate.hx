@@ -82,15 +82,17 @@ class EndEffectorPlate extends MachineComponent {
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var ownedParts:Array<Part> = [];
 		return Solids.building(ownedParts, tracked -> {
-			var body = Part.cylinderSpan(diameter / 2, 0, thickness);
+			var body = Solids.named(Part.cylinderSpan(diameter / 2, 0, thickness), "body");
 			tracked.push(body);
 			if (detail == Envelope) return body;
 			var toolScrew = SocketHeadCapScrew.metric(toolMountScrew, 10);
-			var flangeTool = flange.mountingCutout(thickness);
+			var flangeTool = Solids.named(flange.mountingCutout(thickness), "flange");
 			var tools = [flangeTool];
 			tracked.push(flangeTool);
+			var bolt = 1;
 			for (point in toolBoltPattern()) {
-				var tool = Part.cylinderSpan(toolScrew.clearanceDiameter(Medium) / 2, -0.1, thickness + 0.1, point.x, point.y);
+				var tool = Solids.named(Part.cylinderSpan(toolScrew.clearanceDiameter(Medium) / 2, -0.1, thickness + 0.1, point.x, point.y),
+					"toolbolt" + bolt++);
 				tracked.push(tool);
 				tools.push(tool);
 			}

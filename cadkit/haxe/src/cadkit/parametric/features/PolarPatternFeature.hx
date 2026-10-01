@@ -67,7 +67,7 @@ class PolarPatternFeature extends Feature {
 				var placement = Location.translation(rotatedRadial);
 				if (orientInstances)
 					placement = placement.compose(Location.rotation(axis, angle));
-				copies.push(placement.apply(context.shape(source)));
+				copies.push(Shape.instance(placement.apply(context.shape(source)), "i" + index));
 			}
 			var result = EvaluationResult.fromShape(Shape.fromOwnedHandle(CadKit.compoundChecked(Model.refs(copies))));
 			for (copy in copies)

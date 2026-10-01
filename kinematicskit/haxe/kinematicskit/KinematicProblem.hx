@@ -30,9 +30,12 @@ class KinematicProblem {
     return this;
   }
 
-  /** Restricts the solve to these DOFs, in this order (the order solvers use for their columns). */
+  /**
+   * Restricts the solve to these DOFs, in this order (the order solvers use for their columns). It may be empty
+   * when only moving roots (see `setRootMotion`) are to be solved.
+   */
   public function setActiveDofs(dofs:Array<Int>):KinematicProblem {
-    if (dofs == null || dofs.length == 0) throw "Kinematic problem needs at least one active DOF";
+    if (dofs == null) throw "Kinematic problem needs a list of active DOFs";
     var seen = new Map<Int, Bool>();
     for (dof in dofs) {
       if (dof < 0 || dof >= model.dofCount()) throw 'Kinematic problem DOF $dof is not part of the model';

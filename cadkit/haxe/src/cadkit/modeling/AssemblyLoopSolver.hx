@@ -5,22 +5,11 @@ import materia.assembly.AssemblyDefinition.AssemblyJointType;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import kinematicskit.ClosureTask;
 import kinematicskit.KinematicProblem;
-import kinematicskit.KinematicStatus;
-import kinematicskit.LevenbergMarquardt;
-import kinematicskit.KinematicSnapshot;
-import kinematicskit.KinematicState;
 import cadkit.solve.ConstraintDiagnosis;
-import materia.units.LengthUnit;
+import cadkit.modeling.AssemblySolve.AssemblySolveOptions;
 
-/** Tolerances and iteration settings for joint-coordinate loop solving. */
-typedef AssemblyLoopSolveOptions = {
-	@:optional var positionTolerance:Float;
-	@:optional var angularTolerance:Float;
-	@:optional var maxIterations:Int;
-	@:optional var initialDamping:Float;
-	@:optional var rankTolerance:Float;
-	@:optional var finiteDifferenceStep:Float;
-}
+/** Tolerances and iteration settings for joint-coordinate loop solving (see `AssemblySolveOptions`). */
+typedef AssemblyLoopSolveOptions = AssemblySolveOptions;
 
 /** Outcome of solving a set of assembly closure joints. */
 class AssemblyLoopSolveResult {
@@ -71,39 +60,17 @@ class AssemblyLoopSolveResult {
 	`kinematicskit.LevenbergMarquardt` on closure tasks with analytic Jacobians.
 */
 class AssemblyLoopSolver {
-	static inline var DEFAULT_POSITION_TOLERANCE:Float = 1e-3;
-	static inline var DEFAULT_ANGULAR_TOLERANCE:Float = 1e-5;
-	static inline var DEFAULT_MAX_ITERATIONS:Int = 100;
-	static inline var DEFAULT_DAMPING:Float = 1e-3;
-	static inline var DEFAULT_RANK_TOLERANCE:Float = 1e-8;
-	static inline var DEFAULT_FINITE_DIFFERENCE_STEP:Float = 1e-6;
-	/** How far driven joints move for the witness pose: radians, or this share of the assembly size. */
-	static inline var WITNESS_STEP:Float = 1e-3;
-
 	/**
 		Adjusts only the named tree-joint coordinates. The supplied state is
 		updated when all closure residuals meet tolerance; on failure it is left
-		at its original configuration. `finiteDifferenceStep` is validated but
-		unused: Jacobians are analytic.
+		at its original configuration.
 	*/
 	public static function solve(state:AssemblyState, dependentJointIds:Array<String>,
 		?options:AssemblyLoopSolveOptions):AssemblyLoopSolveResult {
 		if (state == null) throw "Assembly loop solve needs a state";
 		if (dependentJointIds == null || dependentJointIds.length == 0)
 			throw "Assembly loop solve needs at least one dependent tree joint";
-		var metresPerUnit = LengthUnit.metresPerUnit(state.definition.lengthUnit == null
-			? "mm" : state.definition.lengthUnit);
-		var positionTolerance = option(options, "positionTolerance",
-			DEFAULT_POSITION_TOLERANCE * 0.001 / metresPerUnit);
-		var angularTolerance = option(options, "angularTolerance", DEFAULT_ANGULAR_TOLERANCE);
-		var maxIterations = intOption(options, "maxIterations", DEFAULT_MAX_ITERATIONS);
-		var initialDamping = option(options, "initialDamping", DEFAULT_DAMPING);
-		var rankTolerance = option(options, "rankTolerance", DEFAULT_RANK_TOLERANCE);
-		var finiteDifferenceStep = option(options, "finiteDifferenceStep",
-			DEFAULT_FINITE_DIFFERENCE_STEP * 0.001 / metresPerUnit);
-		validateOptions(positionTolerance, angularTolerance, maxIterations, initialDamping,
-			rankTolerance, finiteDifferenceStep);
-
+		var settings = AssemblySolve.settings(state.definition.lengthUnit, options);
 		var kinematics = state.kinematicModel();
 		var model = kinematics.model;
 		if (model.closureCount() == 0) throw "Assembly loop solve needs at least one closure joint";
@@ -125,106 +92,37 @@ class AssemblyLoopSolver {
 
 		var problem = new KinematicProblem(model).setActiveDofs(dofs);
 		for (closure in 0...model.closureCount())
-			problem.add(new ClosureTask(model, closure, positionTolerance, angularTolerance));
-		var solution = LevenbergMarquardt.solve(problem, state.kinematicSeed(), maxIterations, initialDamping,
-			rankTolerance, assemblyScale(state));
+			problem.add(new ClosureTask(model, closure, settings.positionTolerance, settings.angularTolerance));
+		var scale = AssemblySolve.scale(state.definition);
+		// A witness pose of the same mechanism: nudge the inputs (the driven joints), close the loops again.
+		var driven = [for (joint in state.definition.joints) if (joint.driven == true && model.dofIndex(joint.id) >= 0) model.dofIndex(joint.id)];
+		var outcome = AssemblySolve.run(problem, state.kinematicSeed(), settings, scale, false, (solved, sign) -> {
+			if (driven.length == 0) return null;
+			var seed = solved.copy();
+			for (dof in driven) seed.q[dof] += sign * AssemblySolve.WITNESS_STEP * (model.dofIsAngular(dof) ? 1 : scale);
+			return seed;
+		});
+		var solution = outcome.solution;
 
 		var positionResidual = 0.0, angularResidual = 0.0;
 		for (task in solution.tasks) {
 			positionResidual = Math.max(positionResidual, task.positionError);
 			angularResidual = Math.max(angularResidual, task.orientationError);
 		}
-		var closures = diagnoseClosures(problem, solution.state);
-		if (solution.converged()) {
-			var report = closures.report, degenerate = false;
-			if (report.rank < report.variables && report.dependencyGroups.length > 0) {
-				// Compare with a nearby pose of the same mechanism: nudge the inputs, close the loops again.
-				var driven = [for (joint in state.definition.joints) if (joint.driven == true && model.dofIndex(joint.id) >= 0) model.dofIndex(joint.id)];
-				for (sign in [1.0, -1.0]) {
-					if (driven.length == 0) break;
-					var seed = solution.state.copy();
-					for (dof in driven) seed.q[dof] += sign * WITNESS_STEP * (model.dofIsAngular(dof) ? 1 : assemblyScale(state));
-					var witness = LevenbergMarquardt.solve(problem, seed, maxIterations, initialDamping, rankTolerance, assemblyScale(state));
-					if (!witness.converged()) continue;
-					var generic = diagnoseClosures(problem, witness.state).report;
-					if (generic.rank > report.rank) {
-						report = generic;
-						degenerate = true;
-					}
-					break;
-				}
-			}
+		if (outcome.status == "converged") {
 			for (dof in dofs) state.setJoint(model.dofId(dof), solution.state.q[dof]);
 			return new AssemblyLoopSolveResult("converged", true, solution.residualNorm, positionResidual,
 				angularResidual, solution.freeDofs, solution.iterations, [],
-				degenerate ? "assembly closures converged at a degenerate pose" : "assembly closures converged", report, degenerate);
+				outcome.degenerate ? "assembly closures converged at a degenerate pose" : "assembly closures converged",
+				outcome.report, outcome.degenerate);
 		}
-		var status = switch solution.status {
-			case KinematicStatus.LimitBlocked: "limit-blocked";
-			case KinematicStatus.Conflicting: "conflicting";
-			default: "nonconvergent";
-		};
-		var message = switch status {
+		var message = switch outcome.status {
 			case "limit-blocked": "joint limits blocked further motion before the closure tolerances were met";
 			case "conflicting":
 				"closure residuals stopped at a locally stationary configuration; this does not prove global inconsistency";
 			default: "assembly loop solve exhausted its iteration limit while a local descent direction remained";
 		};
-		return new AssemblyLoopSolveResult(status, false, solution.residualNorm, positionResidual, angularResidual,
-			solution.freeDofs, solution.iterations, solution.unsatisfied(), message, closures.report);
-	}
-
-	/** The closure rows at `state` (divided by their tolerances, so |r| <= 1 is satisfied) diagnosed over the problem's columns. */
-	static function diagnoseClosures(problem:KinematicProblem, state:KinematicState):{report:DiagnosisReport} {
-		var model = problem.model, width = problem.layout().width, rows = problem.rowCount();
-		var residual = [for (_ in 0...rows) 0.0], jacobian = [for (_ in 0...rows * width) 0.0];
-		problem.evaluate(state, new KinematicSnapshot(model), residual, jacobian);
-		var owners:Array<String> = [];
-		for (task in problem.tasks) {
-			var id = Std.isOfType(task, ClosureTask) ? model.closureIds[(cast task : ClosureTask).closure] : "task";
-			for (_ in 0...task.rowCount()) owners.push(id);
-		}
-		var sparse = [for (row in 0...rows) {
-			var index:Array<Int> = [], value:Array<Float> = [];
-			for (column in 0...width) {
-				var entry = jacobian[row * width + column];
-				if (entry != 0) { index.push(column); value.push(entry); }
-			}
-			{index: index, value: value};
-		}];
-		return {report: ConstraintDiagnosis.diagnoseSparse(sparse, width, owners, residual, ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE)};
-	}
-
-	static function assemblyScale(state:AssemblyState):Float {
-		var minX = 1e300, minY = 1e300, minZ = 1e300;
-		var maxX = -1e300, maxY = -1e300, maxZ = -1e300;
-		for (occurrence in state.definition.occurrences) {
-			var pose = state.worldPose(occurrence.id);
-			minX = Math.min(minX, pose.x); minY = Math.min(minY, pose.y); minZ = Math.min(minZ, pose.z);
-			maxX = Math.max(maxX, pose.x); maxY = Math.max(maxY, pose.y); maxZ = Math.max(maxZ, pose.z);
-		}
-		return Math.max(1, Math.sqrt((maxX - minX) * (maxX - minX) + (maxY - minY) * (maxY - minY) +
-			(maxZ - minZ) * (maxZ - minZ)));
-	}
-
-	static function option(options:Null<AssemblyLoopSolveOptions>, name:String, fallback:Float):Float {
-		if (options == null) return fallback;
-		var value:Dynamic = Reflect.field(options, name);
-		return value == null ? fallback : cast value;
-	}
-
-	static function intOption(options:Null<AssemblyLoopSolveOptions>, name:String, fallback:Int):Int {
-		if (options == null) return fallback;
-		var value:Dynamic = Reflect.field(options, name);
-		return value == null ? fallback : cast value;
-	}
-
-	static function validateOptions(positionTolerance:Float, angularTolerance:Float, maxIterations:Int,
-		initialDamping:Float, rankTolerance:Float, finiteDifferenceStep:Float):Void {
-		if (!Math.isFinite(positionTolerance) || positionTolerance <= 0 || !Math.isFinite(angularTolerance) ||
-			angularTolerance <= 0 || maxIterations <= 0 || !Math.isFinite(initialDamping) || initialDamping <= 0 ||
-			!Math.isFinite(rankTolerance) || rankTolerance <= 0 || !Math.isFinite(finiteDifferenceStep) ||
-			finiteDifferenceStep <= 0)
-			throw "Assembly loop solver settings must be finite and positive";
+		return new AssemblyLoopSolveResult(outcome.status, false, solution.residualNorm, positionResidual, angularResidual,
+			solution.freeDofs, solution.iterations, solution.unsatisfied(), message, outcome.report);
 	}
 }

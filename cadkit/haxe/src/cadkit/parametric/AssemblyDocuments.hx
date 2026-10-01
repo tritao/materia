@@ -12,12 +12,15 @@ import materia.assembly.AssemblyDefinition.AssemblyVector;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.assembly.AssemblyDefinition.AssemblyMate;
+import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
 
 private class AssemblyDocumentScope {
 	public final definitions:Array<AssemblyComponentDefinition> = [];
 	public final occurrences:Array<AssemblyComponentOccurrence> = [];
 	public final joints:Array<KinematicJoint> = [];
 	public final couplings:Array<AssemblyJointCoupling> = [];
+	public final mates:Array<AssemblyMate> = [];
 	public var hasCouplings:Bool = false;
 }
 
@@ -44,11 +47,14 @@ class AssemblyDocumentDiagnostic {
 class AssemblyDocuments {
 	public static inline var JOINT:String = "cadkit.joint";
 	public static inline var COUPLING:String = "cadkit.coupling";
+	public static inline var MATE:String = "cadkit.mate";
 	static inline var PREFIX:String = "cadkit.assembly.";
 
 	public static function fromDefinition(document:Document, definition:AssemblyDefinition,
 			?resolve:AssemblyDefinitionResolver):Element {
 		AssemblyDefinitionCodec.validate(definition);
+		try GeometricConnectors.checkMates(definition) catch (error:GeometricConnectorError)
+			throw new AssemblyDocumentDiagnostic("assembly." + error.code, error.connector, error.message);
 		var ownTransaction = !document.hasActiveTransaction();
 		var transaction = ownTransaction ? document.beginTransaction() : null;
 		try {
@@ -92,9 +98,9 @@ class AssemblyDocuments {
 			scopes.set(nested.id, writeScope(document, root, nested.id, holder, nested.definitions,
 				nested.occurrences, nested.couplings, nested.exposedConnectors, resolve, scopePaths.get(nested.id)));
 		}
-		writeJoints(document, root, "", definition.joints, definition.couplings, rootMembers);
+		writeJoints(document, root, "", definition.joints, definition.couplings, rootMembers, definition.mates);
 		if (definition.assemblies != null) for (nested in definition.assemblies)
-			writeJoints(document, root, nested.id, nested.joints, nested.couplings, scopes.get(nested.id));
+			writeJoints(document, root, nested.id, nested.joints, nested.couplings, scopes.get(nested.id), nested.mates);
 		return root;
 	}
 
@@ -129,6 +135,7 @@ class AssemblyDocuments {
 		rootScope.hasCouplings = bool(root, "hasCouplings");
 		scopes.set("", rootScope);
 		var subdefinitions:Array<AssemblySubdefinition> = [];
+		var nestedScopes:Array<{nested:AssemblySubdefinition, scope:AssemblyDocumentScope}> = [];
 		for (element in document.allElements()) if (belongsTo(element, root) && read(element, "kind") == "subdefinition") {
 			var scope = read(element, "scope");
 			if (scopes.exists(scope)) throw 'Duplicate assembly scope "$scope"';
@@ -138,6 +145,7 @@ class AssemblyDocuments {
 			var nested:AssemblySubdefinition = {id: scope, definitions: data.definitions,
 				occurrences: data.occurrences, joints: data.joints};
 			if (data.hasCouplings || data.couplings.length > 0) nested.couplings = data.couplings;
+			nestedScopes.push({nested: nested, scope: data});
 			var exposure = readOrNull(element, "exposed");
 			if (exposure != null) nested.exposedConnectors = decodeExposed(exposure);
 			subdefinitions.push(nested);
@@ -168,6 +176,7 @@ class AssemblyDocuments {
 						decodeFrame(read(element, "initialPose"))};
 				var assembly = readOrNull(element, "assembly");
 				if (assembly != null) occurrence.assembly = assembly;
+				if (readOrNull(element, "grounded") == "true") occurrence.grounded = true;
 				scope.occurrences.push(occurrence);
 				byElement.set(element.id.value, {scope: scopeName, id: occurrence.id});
 			}
@@ -216,9 +225,30 @@ class AssemblyDocuments {
 				target: drivingJoint(scope.joints, target.id), ratio: number(relationship, "ratio"),
 				offset: number(relationship, "offset")});
 		}
+		for (relationship in document.allRelationships()) if (relationship.typeName == MATE) {
+			var first = byElement.get(relationship.source.elementId.value);
+			var second = byElement.get(relationship.target.elementId.value);
+			if (first == null || second == null) {
+				if (readRelationshipOrNull(relationship, "owner") == root.id.value)
+					throw new AssemblyDocumentDiagnostic("assembly.missing-mate-endpoint",
+						readRelationship(relationship, "id"), "Mate endpoint is missing");
+				continue;
+			}
+			var scopeName = readRelationship(relationship, "scope"), scope = scopes.get(scopeName);
+			if (scope == null) throw 'Unknown mate scope "$scopeName"';
+			if (first.scope != scopeName || second.scope != scopeName) throw "Mate crosses assembly scopes";
+			var mate:AssemblyMate = {id: readRelationship(relationship, "id"), kind: cast readRelationship(relationship, "kind"),
+				first: first.id, firstConnector: readRelationship(relationship, "firstConnector"), second: second.id,
+				secondConnector: readRelationship(relationship, "secondConnector"), axis: readAxis(relationship)};
+			var value = optionalNumber(relationship, "value");
+			if (value != null) mate.value = value;
+			scope.mates.push(mate);
+		}
+		for (entry in nestedScopes) if (entry.scope.mates.length > 0) entry.nested.mates = entry.scope.mates;
 		var definition:AssemblyDefinition = {schemaVersion: integer(root, "schemaVersion"), id: read(root, "id"),
 			definitions: rootScope.definitions, occurrences: rootScope.occurrences, joints: rootScope.joints};
 		if (rootScope.hasCouplings || rootScope.couplings.length > 0) definition.couplings = rootScope.couplings;
+		if (rootScope.mates.length > 0) definition.mates = rootScope.mates;
 		if (bool(root, "hasAssemblies") || subdefinitions.length > 0) definition.assemblies = subdefinitions;
 		var unit = readOrNull(root, "lengthUnit");
 		if (unit != null) definition.lengthUnit = unit;
@@ -229,6 +259,40 @@ class AssemblyDocuments {
 		subdefinitions.sort((a, b) -> Reflect.compare(a.id, b.id));
 		AssemblyDefinitionCodec.validate(definition);
 		return definition;
+	}
+
+	/**
+		`toDefinition(root)` with its geometric connectors (see `GeometricConnectors`) framed again from the
+		current geometry of each component's occurrences, and its mates checked against them. Throws
+		`AssemblyDocumentDiagnostic` ("assembly." + the `GeometricConnectorError` code) when a connector's face
+		or edge is lost or ambiguous, occurrences of one component place it differently, or a mate asks it for
+		what it does not define.
+	*/
+	public static function reframe(root:Element):AssemblyDefinition {
+		var definition = toDefinition(root);
+		var document = root.document;
+		var instances = new Map<String, Array<InstanceElement>>();
+		for (element in document.allElements())
+			if (belongsTo(element, root) && element.kind == "instance" && read(element, "kind") == "occurrence" &&
+				readOrNull(element, "assembly") == null) {
+				var key = read(element, "scope") + "/" + read(element, "definition");
+				var list = instances.get(key);
+				if (list == null) {
+					list = [];
+					instances.set(key, list);
+				}
+				list.push(cast element);
+			}
+		try {
+			return GeometricConnectors.reframe(definition, (scope, component) -> {
+				var list = instances.get(scope + "/" + component);
+				if (list == null) return [];
+				return [for (instance in list) GeometricConnectors.GeometricCandidates.ofShape(document.definitionOutput(instance,
+					document.definition(instance.definitionId).primaryGeometryOutput().name))];
+			});
+		} catch (error:GeometricConnectorError) {
+			throw new AssemblyDocumentDiagnostic("assembly." + error.code, error.connector, error.message);
+		}
 	}
 
 	static function writeScope(document:Document, root:Element, scope:String, holder:Element,
@@ -267,13 +331,14 @@ class AssemblyDocuments {
 			put(element, "id", occurrence.id); put(element, "definition", occurrence.definition);
 			if (component != null) put(element, "record", JsonWire.encode(component));
 			if (occurrence.assembly != null) put(element, "assembly", occurrence.assembly);
+			if (occurrence.grounded == true) put(element, "grounded", "true");
 			members.set(occurrence.id, element);
 		}
 		return members;
 	}
 
 	static function writeJoints(document:Document, root:Element, scope:String, joints:Array<KinematicJoint>,
-			couplings:Array<AssemblyJointCoupling>, members:Map<String, Element>):Void {
+			couplings:Array<AssemblyJointCoupling>, members:Map<String, Element>, ?mates:Array<AssemblyMate>):Void {
 		var children = new Map<String, Element>();
 		for (joint in joints) {
 			var relationship = document.createRelationship(JOINT, reference(document, members.get(joint.parent)),
@@ -304,6 +369,19 @@ class AssemblyDocuments {
 			putRelationship(relationship, "scope", scope); putRelationship(relationship, "id", coupling.id);
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "ratio", QuantityKind.Scalar, coupling.ratio, "1"));
 			relationship.setProperty(TypedProperty.quantity(PREFIX + "offset", QuantityKind.Scalar, coupling.offset, "1"));
+		}
+		if (mates != null) for (mate in mates) {
+			var relationship = document.createRelationship(MATE, reference(document, members.get(mate.first)),
+				reference(document, members.get(mate.second)));
+			putRelationship(relationship, "owner", root.id.value);
+			putRelationship(relationship, "scope", scope); putRelationship(relationship, "id", mate.id);
+			putRelationship(relationship, "kind", mate.kind);
+			putRelationship(relationship, "firstConnector", mate.firstConnector);
+			putRelationship(relationship, "secondConnector", mate.secondConnector);
+			quantity(relationship, "axisX", mate.axis.x);
+			quantity(relationship, "axisY", mate.axis.y);
+			quantity(relationship, "axisZ", mate.axis.z);
+			if (mate.value != null) quantity(relationship, "value", mate.value);
 		}
 	}
 
@@ -353,6 +431,7 @@ class AssemblyDocuments {
 		scope.occurrences.sort((a, b) -> Reflect.compare(a.id, b.id));
 		scope.joints.sort((a, b) -> Reflect.compare(a.id, b.id));
 		scope.couplings.sort((a, b) -> Reflect.compare(a.id, b.id));
+		scope.mates.sort((a, b) -> Reflect.compare(a.id, b.id));
 	}
 
 	static function put(element:Element, name:String, value:String):Void

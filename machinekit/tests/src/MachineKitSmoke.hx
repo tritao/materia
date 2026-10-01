@@ -1,3 +1,4 @@
+import CadKit;
 import cadkit.modeling.AssemblyModel;
 import cadkit.modeling.Location;
 import cadkit.modeling.Part;
@@ -636,7 +637,7 @@ class MachineKitSmoke {
 		check(bom.quantity("608-2Z") == 1 && bom.quantity("6000-2Z") == 1,
 			"document BOM groups recipe instances by values");
 		var saved = DocumentCodec.encode(document);
-		check(DocumentCodec.VERSION == 9, "document version 9");
+		check(DocumentCodec.VERSION == 11, "document version 11");
 		var loaded = DocumentCodec.decode(saved);
 		check(MachineKitDocuments.bom(loaded).lines().length == 2, "recipe BOM survives save and reload");
 		loaded.close();
@@ -2493,7 +2494,25 @@ class MachineKitSmoke {
 		}
 	}
 
+	/** A recipe that names its bodies (cadkit/plans/TOPOLOGICAL_NAMING.md, TN4): a face picked on it follows edits. */
+	static function namedStepperFaces():Void {
+		var short = NemaStepper.frame(17).geometry();
+		var faces = short.shape.elementNames(CadKit.ShapeKind.Face);
+		check(faces.indexOf("shaft:cyl.side") >= 0 && faces.indexOf("bolt1:cyl.side") >= 0 && faces.indexOf("pilot:cyl.side") >= 0,
+			"stepper faces are named by body: " + faces.join(", "));
+		var shaft = faces.indexOf("shaft:cyl.side");
+		var connector = cadkit.parametric.GeometricConnectors.capture("shaft", short.shape, CadKit.ShapeKind.Face, shaft);
+		var long = NemaStepper.frame(23).geometry(); // a thicker shaft: only its name finds it
+		var frame = cadkit.parametric.GeometricConnectors.frame(long.shape, connector);
+		near(frame.x, 0, "a connector on the shaft is found on a NEMA 23");
+		near(frame.y, 0, "a connector on the shaft is found on a NEMA 23");
+		short.close();
+		long.close();
+	}
+
 	static function main():Void {
+		namedStepperFaces();
+		MachineKitNamingAudit.run();
 		MachineAssemblyDescriptionTests.run();
 		EndEffectorTests.run();
 		EndEffectorSetTests.run();

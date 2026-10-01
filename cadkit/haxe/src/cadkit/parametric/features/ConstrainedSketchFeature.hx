@@ -80,7 +80,7 @@ class ConstrainedSketchFeature extends Feature {
 		pendingSupportFaceFingerprint = savedSupportFaceFingerprint;
 		supportFaceReference = null;
 		for (constraint in authored.constraints())
-			if (isDimensional(constraint.kind)) {
+			if (isDimensional(constraint.kind) && !constraint.reference) {
 				dimensionSlots.set(constraint.id, new Parameter(this, "constraint." + constraint.id,
 					toCanonicalDimension(authored, constraint.kind, constraint.value),
 					constraint.kind == "angle" ? -1e300 : 0, false, 1e300,
@@ -106,7 +106,7 @@ class ConstrainedSketchFeature extends Feature {
 			return FaceWorkplane.resolve(supportShape, supportSelection, supportXDirection,
 				supportOffset, supportFlipped);
 		}
-		var face = supportFaceReference.resolveFor(supportShape, support.provenance);
+		var face = supportFaceReference.resolveFor(supportShape);
 		try {
 			var result = FaceWorkplane.fromFace(face, supportXDirection, supportOffset, supportFlipped);
 			face.close();
@@ -252,8 +252,9 @@ class ConstrainedSketchFeature extends Feature {
 
 	private function reconcileDimensionSlots(next:ConstrainedSketch):Void {
 		var required:Map<String, SketchConstraint> = new Map();
+		// Reference dimensions are measured, not parameters.
 		for (constraint in next.constraints())
-			if (isDimensional(constraint.kind))
+			if (isDimensional(constraint.kind) && !constraint.reference)
 				required.set(constraint.id, constraint);
 
 		var removedIds:Array<String> = [];
@@ -360,9 +361,7 @@ class ConstrainedSketchFeature extends Feature {
 				continue;
 			for (constraint in authored.constraints()) {
 				if (constraint.id == id) {
-					authored.replaceConstraint(SketchConstraint.raw(constraint.id, constraint.kind, constraint.first,
-						constraint.second, constraint.third,
-						fromCanonicalDimension(authored, constraint.kind, parameter.value)));
+					authored.replaceConstraint(constraint.withValue(fromCanonicalDimension(authored, constraint.kind, parameter.value)));
 					return;
 				}
 			}
@@ -421,8 +420,7 @@ class ConstrainedSketchFeature extends Feature {
 		var plane = authored.plane;
 		if (support != null) {
 			if (supportFaceReference != null) {
-				var selectedFace = supportFaceReference.resolveFor(
-					context.shape(support), context.operation(support));
+				var selectedFace = supportFaceReference.resolveFor(context.shape(support));
 				try {
 					plane = FaceWorkplane.fromFace(selectedFace, supportXDirection, supportOffset, supportFlipped);
 					selectedFace.close();
@@ -445,8 +443,7 @@ class ConstrainedSketchFeature extends Feature {
 		for (constraint in authored.constraints()) {
 			var slot = dimensionSlots.get(constraint.id);
 			var value = slot == null ? constraint.value : fromCanonicalDimension(authored, constraint.kind, slot.value);
-			candidate.addConstraint(SketchConstraint.raw(constraint.id, constraint.kind, constraint.first, constraint.second,
-				constraint.third, value));
+			candidate.addConstraint(constraint.withValue(value));
 		}
 		var solved:SolvedSketch;
 		var solveStarted = Sys.time();

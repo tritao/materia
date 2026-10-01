@@ -354,6 +354,7 @@ class MateriaProjectRunner {
     var boundsByDefinition:Map<String, {minimum:Array<Float>, maximum:Array<Float>}> = new Map();
     var geometryKeyByDefinition:Map<String, String> = new Map();
     var localCentersByDefinition:Map<String, Array<Float>> = new Map();
+    var faceDescriptorsByDefinition:Map<String, String> = new Map();
     var physicalParts:Array<AssemblyPhysicalPart> = [];
     for (component in artifact.parts) {
       var label = component.name;
@@ -368,6 +369,8 @@ class MateriaProjectRunner {
       var geometryKey = "materia.artifact-part/1:" + artifactHash + ":" + component.id;
       geometryBySnapshot.set(geometryKey, geometry);
       boundsByDefinition.set(component.id, {minimum: minimum, maximum: maximum});
+      var faces = component.faceDescriptors;
+      if (faces != null) faceDescriptorsByDefinition.set(component.id, faces);
       geometryKeyByDefinition.set(component.id, geometryKey);
       localCentersByDefinition.set(component.id, [
         (minimum[0] + maximum[0]) * 0.5,
@@ -417,7 +420,7 @@ class MateriaProjectRunner {
       geometryBySnapshot: geometryBySnapshot,
       assemblyDefinition: artifact.assemblyDefinition,
       assemblyState: runtimeState == null ? null : runtimeState.record(),
-      localCentersByDefinition: localCentersByDefinition,
+      localCentersByDefinition: localCentersByDefinition, faceDescriptorsByDefinition: faceDescriptorsByDefinition,
       metresPerUnit: scale, physical: {metresPerUnit: scale, parts: physicalParts},
       recipeDocument: artifact.recipeDocument, recipeDiagnostics: artifact.recipeDiagnostics};
   }
@@ -456,7 +459,7 @@ class MateriaProjectRunner {
     return {objects: objects, assembly: legacySnapshot(definition, state),
       geometryBySnapshot: generated.geometryBySnapshot, assemblyDefinition: definition,
       assemblyState: state.record(), localCentersByDefinition: generated.localCentersByDefinition,
-      metresPerUnit: generated.metresPerUnit, physical: generated.physical,
+      faceDescriptorsByDefinition: generated.faceDescriptorsByDefinition, metresPerUnit: generated.metresPerUnit, physical: generated.physical,
       recipeDocument: generated.recipeDocument, recipeDiagnostics: generated.recipeDiagnostics,
       robotMotions: generated.robotMotions, robotGrips: generated.robotGrips};
   }
@@ -595,6 +598,8 @@ typedef GeneratedAssemblyScene = {
   var assemblyDefinition:Null<AssemblyDefinition>;
   var assemblyState:Null<AssemblyStateRecord>;
   var localCentersByDefinition:Map<String, Array<Float>>;
+  /** What each definition's faces offer a mate (`GeometricConnectors.describeFaces`), when the project wrote it. */
+  @:optional var faceDescriptorsByDefinition:Map<String, String>;
   var metresPerUnit:Float;
   var physical:AssemblyPhysicalData;
   var recipeDocument:Null<String>;

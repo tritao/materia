@@ -7,10 +7,23 @@ import cadkit.Geometry;
 class Shape {
 	private var native:CadKit.OwnedShapeHandle;
 	private var meshCache:Array<{linearDeflection:Float, angularDeflection:Float, mesh:Mesh}>;
+	/** A shape never changes, so its names are read across the ABI once per kind. */
+	private var faceNames:Null<Array<String>>;
+	private var edgeNames:Null<Array<String>>;
+	private var vertexNames:Null<Array<String>>;
+	private var solidNames:Null<Array<String>>;
+	private var faceAliases:Null<Array<Array<String>>>;
+	private var solidAliases:Null<Array<Array<String>>>;
 
 	private function new(native:CadKit.OwnedShapeHandle) {
 		this.native = native;
 		meshCache = [];
+		faceNames = null;
+		edgeNames = null;
+		vertexNames = null;
+		solidNames = null;
+		faceAliases = null;
+		solidAliases = null;
 	}
 
 	public static function fromOwnedHandle(native:CadKit.OwnedShapeHandle):Shape {
@@ -97,6 +110,113 @@ class Shape {
 		return new VertexCollection(this);
 	}
 
+	/**
+		The topological names of this shape's faces, edges or vertices, indexed like `subshape(kind, index)`
+		(plans/TOPOLOGICAL_NAMING.md). Names are opaque text that survives parametric edits.
+	**/
+	public function elementNames(kind:CadKit.ShapeKind):Array<String> {
+		var cached = kind == CadKit.ShapeKind.Face ? faceNames : kind == CadKit.ShapeKind.Edge ? edgeNames
+			: kind == CadKit.ShapeKind.Vertex ? vertexNames : kind == CadKit.ShapeKind.Solid ? solidNames : null;
+		if (cached == null) {
+			if (subshapeCount(kind) == 0) {
+				cached = [];
+			} else {
+				var bytes = CadKit.shapeCopyElementNamesBytesChecked(native.borrow(), kind);
+				cached = bytes.getString(0, bytes.length).split("\n");
+			}
+			if (kind == CadKit.ShapeKind.Face)
+				faceNames = cached;
+			else if (kind == CadKit.ShapeKind.Edge)
+				edgeNames = cached;
+			else if (kind == CadKit.ShapeKind.Vertex)
+				vertexNames = cached;
+			else if (kind == CadKit.ShapeKind.Solid)
+				solidNames = cached;
+		}
+		return cached.copy();
+	}
+
+	public function elementName(kind:CadKit.ShapeKind, index:Int):String {
+		var names = elementNames(kind);
+		if (index < 0 || index >= names.length)
+			throw "element index is out of range";
+		return names[index];
+	}
+
+	/**
+		Other names each face or solid also answers to, indexed like `elementNames`: a merge keeps the smallest name
+		and the others as aliases. Edges and vertices have none.
+	**/
+	public function elementAliases(kind:CadKit.ShapeKind):Array<Array<String>> {
+		var cached = kind == CadKit.ShapeKind.Face ? faceAliases : kind == CadKit.ShapeKind.Solid ? solidAliases : null;
+		if (cached == null) {
+			cached = readAliases(kind);
+			if (kind == CadKit.ShapeKind.Face)
+				faceAliases = cached;
+			else if (kind == CadKit.ShapeKind.Solid)
+				solidAliases = cached;
+		}
+		var known:Array<Array<String>> = cast cached;
+		return [for (aliases in known) aliases.copy()];
+	}
+
+	function readAliases(kind:CadKit.ShapeKind):Array<Array<String>> {
+		var result:Array<Array<String>> = [for (_ in 0...subshapeCount(kind)) []];
+		if (kind != CadKit.ShapeKind.Face && kind != CadKit.ShapeKind.Solid)
+			return result;
+		var bytes = CadKit.shapeCopyElementAliasesBytesChecked(native.borrow(), kind);
+		if (bytes.length == 0)
+			return result;
+		for (line in bytes.getString(0, bytes.length).split("\n")) {
+			var tab = line.indexOf("\t");
+			if (tab <= 0)
+				continue;
+			var index = Std.parseInt(line.substr(0, tab));
+			if (index != null && index >= 0 && index < result.length)
+				result[index].push(line.substr(tab + 1));
+		}
+		return result;
+	}
+
+	/**
+		A copy whose faces, edges or vertices are named by `ids` (one per subshape; "" keeps the current name).
+		Each id is escaped into a name. Edge and vertex names hold where faces cannot name them: boundary and
+		wire edges and their vertices.
+	**/
+	public function withElementNames(kind:CadKit.ShapeKind, ids:Array<String>):Shape {
+		return new Shape(CadKit.shapeSeedNamesChecked(native.borrow(), kind, ids.join("\n")));
+	}
+
+	/** A copy whose names that no input has are prefixed by `tag:`: what was created from the inputs. */
+	public function stamped(tag:String, inputs:Array<Shape>):Shape {
+		var refs:Array<CadKit.ShapeRef> = [];
+		for (input in inputs) {
+			var ref = new CadKit.ShapeRef();
+			ref.set_shape(input.borrowHandle());
+			refs.push(ref);
+		}
+		return new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs));
+	}
+
+	/**
+		`copy` with every name prefixed by `tag:`, for one instance among copies of a shape (a pattern's `i2.0`, a
+		mirror's `m`), so the copies stay distinguishable. Takes ownership of `copy`.
+	**/
+	public static function instance(copy:Shape, tag:String):Shape {
+		try {
+			var result = copy.stamped(tag, []);
+			copy.close();
+			return result;
+		} catch (error:Dynamic) {
+			copy.close();
+			throw error;
+		}
+	}
+
+	public static function namingScheme():Int {
+		return CadKit.namingSchemeVersionChecked();
+	}
+
 	public function sameAs(other:Shape):Bool {
 		return CadKit.shapeIsSameChecked(native.borrow(), other.native.borrow()) != 0;
 	}
@@ -115,6 +235,16 @@ class Shape {
 
 	public function faceNormal():CadKit.Vec3 {
 		return CadKit.faceNormalChecked(native.borrow());
+	}
+
+	/** The axis of a cylindrical, conical, spherical, toroidal or revolved face (throws for other surfaces). */
+	public function faceAxis():CadKit.GeometricAxis {
+		return CadKit.faceAxisChecked(native.borrow());
+	}
+
+	/** The center, normal and radius of a circular edge (throws for other curves). */
+	public function edgeAxis():CadKit.GeometricAxis {
+		return CadKit.edgeAxisChecked(native.borrow());
 	}
 
 	public function curveKind():CadKit.CurveKind {

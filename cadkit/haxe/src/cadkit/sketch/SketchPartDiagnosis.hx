@@ -30,6 +30,16 @@ class SketchPartDiagnosis {
 	}
 
 	/**
+		The part's variables (sketch-wide indices) its constraints leave free at `at` (see
+		`ConstraintDiagnosis.freedom`): what still moves the part's geometry.
+	*/
+	public function freeVariables(at:Array<Float>, part:SketchPart, set:SketchResidualSet, ?rows:RowStructure):Array<Int> {
+		var local = [for (row in solver.rows(at, part, set.values.length)) partition.localEntries(row, part)];
+		var freedom = ConstraintDiagnosis.freedom(local, part.variables.length, layout.sketch.settings.rankTolerance, rows);
+		return [for (index in 0...part.variables.length) if (freedom[index] > ConstraintDiagnosis.FREE_TOLERANCE) part.variables[index]];
+	}
+
+	/**
 		The part's diagnosis row graph from what its constraints reference (a
 		superset of any pose's nonzeros), ordered once and reusable while its
 		structure stands. Null if the row count does not match `rows`.

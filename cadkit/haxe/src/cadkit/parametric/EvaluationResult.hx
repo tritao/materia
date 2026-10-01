@@ -28,6 +28,17 @@ class EvaluationResult {
 		ownsResources = false;
 	}
 
+	/**
+		This result with its names stamped `tag:` where no input has them (plans/TOPOLOGICAL_NAMING.md, TN-D5): what
+		the feature created, as opposed to carried through. This result's shape is released; its operation moves over.
+	*/
+	public function stamped(tag:String, inputs:Array<Shape>):EvaluationResult {
+		var tagged = shape.stamped(tag, inputs);
+		ownsResources = false;
+		shape.close();
+		return new EvaluationResult(tagged, operation);
+	}
+
 	public static function fromShape(shape:Shape):EvaluationResult {
 		return new EvaluationResult(shape, null);
 	}

@@ -1,0 +1,18 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Pin and plate (mate fixture)",
+	"defaultEntrypoint": "viewport",
+	"build": {
+		"system": "haxeon",
+		"manifest": "haxeon.json"
+	},
+	"entrypoints": {
+		"viewport": {
+			"kind": "cad-preview",
+			"module": "PinPlatePreview",
+			"function": "preview",
+			"cache": { "inputs": ["PinPlatePreview.hx"] }
+		}
+	}
+}

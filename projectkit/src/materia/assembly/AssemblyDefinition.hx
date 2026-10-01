@@ -21,6 +21,30 @@ enum abstract AssemblyJointRole(String) from String to String {
 	var Closure = "closure";
 }
 
+/**
+	How a mate places its second connector frame B against its first, A, with
+	a = A's axis and b = B's axis (the mate's `axis`, in each connector frame)
+	and d = B's origin − A's origin. Mates position parts; joints move them.
+*/
+enum abstract AssemblyMateKind(String) from String to String {
+	/** B's origin on A's origin. */
+	var Coincident = "coincident";
+	/** B's origin on A's axis line, axes parallel. */
+	var Coaxial = "coaxial";
+	/** B's origin on A's plane (normal a), offset by `value` along a; normals parallel. */
+	var Planar = "planar";
+	/** Axes parallel (either direction). */
+	var Parallel = "parallel";
+	/** Axes perpendicular. */
+	var Perpendicular = "perpendicular";
+	/** Origins `value` apart (length unit, positive; zero is `Coincident`). */
+	var Distance = "distance";
+	/** `value` radians between the axes, in [0, π] (0 and π hold the axes aligned or opposed). */
+	var Angle = "angle";
+	/** B's frame on A's frame. */
+	var Lock = "lock";
+}
+
 @:wire typedef AssemblyVector = {
 	@:id(1) var x:Float;
 	@:id(2) var y:Float;
@@ -48,6 +72,22 @@ enum abstract AssemblyJointRole(String) from String to String {
 	@:id(3) var initialPose:AssemblyFrame;
 	/** References an entry in AssemblyDefinition.assemblies. */
 	@:id(4) @:optional var assembly:String;
+	/** Mates never move it (see `AssemblyMateSolver`). */
+	@:id(5) @:optional var grounded:Bool;
+}
+
+/** A placement relation between two occurrence connectors (see `AssemblyMateKind`). */
+@:wire typedef AssemblyMate = {
+	@:id(1) var id:String;
+	@:id(2) var kind:AssemblyMateKind;
+	@:id(3) var first:String;
+	@:id(4) var firstConnector:String;
+	@:id(5) var second:String;
+	@:id(6) var secondConnector:String;
+	/** Unit axis, expressed in each connector frame. */
+	@:id(7) var axis:AssemblyVector;
+	/** Planar offset or distance (length unit), or angle (radians). */
+	@:id(8) @:optional var value:Float;
 }
 
 /** A persistent kinematic edge or closure. The axis is unit length in the parent connector frame. */
@@ -96,6 +136,7 @@ enum abstract AssemblyJointRole(String) from String to String {
 	@:id(4) var joints:Array<KinematicJoint>;
 	@:id(5) @:optional var couplings:Array<AssemblyJointCoupling>;
 	@:id(6) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
+	@:id(7) @:optional var mates:Array<AssemblyMate>;
 }
 
 /**
@@ -114,6 +155,7 @@ enum abstract AssemblyJointRole(String) from String to String {
 	@:id(7) @:optional var couplings:Array<AssemblyJointCoupling>;
 	@:id(8) @:optional var assemblies:Array<AssemblySubdefinition>;
 	@:id(9) @:optional var exposedConnectors:Array<AssemblyExposedConnector>;
+	@:id(10) @:optional var mates:Array<AssemblyMate>;
 }
 
 @:wire typedef AssemblyJointCoordinate = {

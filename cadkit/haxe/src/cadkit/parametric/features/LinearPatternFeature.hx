@@ -61,7 +61,8 @@ class LinearPatternFeature extends Feature {
 				for (index in 0...firstCount) {
 					var firstOffset = (index - (firstCount - 1) / 2) * spacing.value;
 					var translation = direction.scale(firstOffset).add(otherDirection.scale(secondOffset));
-					copies.push(context.shape(source).translate(translation.native()));
+					copies.push(Shape.instance(context.shape(source).translate(translation.native()),
+						otherCount > 1 ? "i" + index + "." + other : "i" + index));
 				}
 			}
 			var result = EvaluationResult.fromShape(Shape.fromOwnedHandle(CadKit.compoundChecked(Model.refs(copies))));

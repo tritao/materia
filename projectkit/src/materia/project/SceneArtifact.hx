@@ -40,6 +40,12 @@ typedef SceneArtifactPart = {
 	@:optional var edgeSegments:Bytes;
 	@:optional var edgeIds:Bytes;
 	var faceRanges:Array<SceneArtifactFaceRange>;
+	/**
+		What each B-rep face offers an assembly mate, from the producer's geometry kernel (CadKit's
+		`GeometricConnectors.describeFaces`): opaque here, indexed like `faceRanges.faceIndex`. Lets an editor
+		without the B-rep author mates on faces (since version 11).
+	*/
+	@:optional var faceDescriptors:String;
 }
 
 typedef SceneArtifactData = {
@@ -58,7 +64,7 @@ typedef SceneArtifactData = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 10;
+	public static inline var VERSION:Int = 11;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -69,7 +75,7 @@ class SceneArtifact {
 		var unit = data.lengthUnit == null ? LengthUnit.fromScale(data.metresPerUnit) : data.lengthUnit;
 		var unitText = Bytes.ofString(unit);
 		var names:Array<{id:Bytes, name:Bytes, finish:Bytes, materialId:Bytes, materialSpec:Bytes,
-			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>}> = [];
+			density:Float, volume:Float, center:Array<Float>, inertia:Array<Float>, faces:Bytes}> = [];
 		var assembly = data.assembly == null ? Bytes.alloc(0) : Bytes.ofString(AssemblyCodec.encode(data.assembly));
 		var assemblyDefinition = data.assemblyDefinition == null ? Bytes.alloc(0)
 			: Bytes.ofString(AssemblyDefinitionCodec.encode(data.assemblyDefinition));
@@ -95,15 +101,17 @@ class SceneArtifact {
 			var materialSpec = Bytes.ofString(spec);
 			var density = part.materialDensity == null ? MaterialLibrary.require(idValue).physical.density : part.materialDensity;
 			var meshProperties = MeshMassProperties.compute(part.vertices, part.indices);
+			var faceDescriptors = part.faceDescriptors;
+			var faces = faceDescriptors == null ? Bytes.alloc(0) : Bytes.ofString(faceDescriptors);
 			names.push({id: id, name: name, finish: finish, materialId: materialId,
-				materialSpec: materialSpec, density: density,
+				materialSpec: materialSpec, density: density, faces: faces,
 				volume: part.volume == null ? meshProperties.volume : part.volume,
 				center: part.centerOfMass == null ? meshProperties.centerOfMass : part.centerOfMass,
 				inertia: part.inertia == null ? meshProperties.inertia : part.inertia});
 			length += 168 + finish.length + materialId.length + materialSpec.length + id.length + name.length + part.vertices.length + part.normals.length
 				+ part.indices.length + (part.edgeSegments == null ? 0 : part.edgeSegments.length)
 				+ (part.edgeIds == null ? 0 : part.edgeIds.length)
-				+ part.faceRanges.length * 12;
+				+ part.faceRanges.length * 12 + 4 + faces.length;
 			if (length > MAX_BYTES) throw "Scene artifact exceeds the 150 MB limit";
 		}
 		var result = Bytes.alloc(length), offset = 0;
@@ -155,6 +163,8 @@ class SceneArtifact {
 				offset = putInt(result, offset, range.firstIndex);
 				offset = putInt(result, offset, range.indexCount);
 			}
+			offset = putInt(result, offset, text.faces.length);
+			result.blit(offset, text.faces, 0, text.faces.length); offset += text.faces.length;
 		}
 		offset = putInt(result, offset, assembly.length);
 		result.blit(offset, assembly, 0, assembly.length); offset += assembly.length;
@@ -298,7 +308,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != SceneArtifact.VERSION)
+			version != 8 && version != 9 && version != 10 && version != SceneArtifact.VERSION)
 			throw "Unsupported scene artifact version";
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -333,12 +343,14 @@ private class SceneArtifactReader {
 			var faceRanges:Array<SceneArtifactFaceRange> = [];
 			for (_ in 0...rangeCount)
 				faceRanges.push({faceIndex: readInt(), firstIndex: readInt(), indexCount: readInt()});
+			var faceDescriptors = version >= 11 ? readOpaqueText(16000000, 'part "$id" face descriptors') : "";
 			var part:SceneArtifactPart = {id: id, name: name, red: red, green: green, blue: blue,
 				appearance: appearance, materialId: materialId, materialDensity: density, materialSpec: materialSpec,
 				volume: volume, centerOfMass: center, inertia: inertia,
 				vertexCount: vertexCount, indexCount: indexCount, vertices: vertices, normals: normals,
 				indices: indices, edgeSegments: edgeSegments, edgeIds: edgeIds,
 				faceRanges: faceRanges};
+			if (faceDescriptors.length > 0) part.faceDescriptors = faceDescriptors;
 			@:privateAccess SceneArtifact.validatePart(part, version >= 5);
 			parts.push(part);
 		}
@@ -390,6 +402,13 @@ private class SceneArtifactReader {
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument, recipeDiagnostics: recipeDiagnostics};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
+	}
+
+	/** A length-prefixed text that may be empty, up to `limit` bytes. */
+	function readOpaqueText(limit:Int, what:String):String {
+		var length = readInt();
+		if (length < 0 || length > limit) throw 'Scene artifact $what are too large';
+		return length == 0 ? "" : readBytes(length).getString(0, length);
 	}
 
 	function readText():String {

@@ -8,10 +8,29 @@ class SketchConstraint {
 	public final second:Null<String>;
 	public final third:Null<String>;
 	public final value:Float;
+	/**
+		A reference (measured) dimension: a distance, radius or angle that is not solved for, only measured after
+		the solve (`SolvedSketch.measured`); `value` is then ignored. It never over-constrains a sketch.
+	*/
+	public final reference:Bool;
 
-	private function new(id:String, kind:String, first:String, second:Null<String>, third:Null<String>, value:Float) {
+	private function new(id:String, kind:String, first:String, second:Null<String>, third:Null<String>, value:Float,
+			reference:Bool = false) {
 		this.id = id; this.kind = kind; this.first = first; this.second = second; this.third = third; this.value = value;
+		this.reference = reference;
 	}
+
+	/** This constraint with another value (a dimension edit); everything else, its reference flag included, stays. */
+	public function withValue(value:Float):SketchConstraint
+		return new SketchConstraint(id, kind, first, second, third, value, reference);
+
+	/** This constraint as a reference (measured) dimension, or back as a driving one. */
+	public function asReference(reference:Bool = true):SketchConstraint
+		return new SketchConstraint(id, kind, first, second, third, value, reference);
+
+	/** Distances, radii and angles: the kinds that have a value to drive or to measure. */
+	public static function isDimension(kind:String):Bool
+		return kind == "distance" || kind == "radius" || kind == "angle";
 	public static function raw(id:String, kind:String, first:String, second:Null<String>, third:Null<String>, value:Float):SketchConstraint
 		return new SketchConstraint(id, kind, first, second, third, value);
 

@@ -27,7 +27,7 @@ class LevenbergMarquardt {
 
   public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
       ?initialDamping:Float = 1e-3, ?rankTolerance:Float = 1e-8, ?translationScale:Float = 1.0,
-      ?workspace:SolverWorkspace):KinematicSolution {
+      ?workspace:SolverWorkspace, ?levenberg:Bool = false):KinematicSolution {
     if (problem == null || seed == null || seed.model != problem.model)
       throw "Levenberg-Marquardt requires a problem and a seed state of its model";
     if (maxIterations <= 0 || !(initialDamping > 0.0) || !Math.isFinite(initialDamping) ||
@@ -62,7 +62,15 @@ class LevenbergMarquardt {
       // The residual and Jacobian always describe the last accepted state here.
       for (k in 0...rows) for (j in 0...count) scaled[k * count + j] = jacobian[k * count + j] * scales[j];
       LinearAlgebra.normalEquationsDense(scaled, rows, count, residual, normal, rhs);
-      for (j in 0...count) normal[j * count + j] += damping * Math.max(normal[j * count + j], 1e-12);
+      if (levenberg) {
+        // λ · max(diag) · I: the minimum-norm step when JᵀJ is rank-deficient (an under-determined problem,
+        // such as a mate on a free part). Marquardt's λ · diag gives a column with a small gradient a huge step,
+        // which the step clamp then shrinks to almost nothing, and the solve stalls.
+        var largest = 1e-12;
+        for (j in 0...count) largest = Math.max(largest, normal[j * count + j]);
+        for (j in 0...count) normal[j * count + j] += damping * largest;
+      } else
+        for (j in 0...count) normal[j * count + j] += damping * Math.max(normal[j * count + j], 1e-12);
       if (!LinearAlgebra.solveInPlace(normal, rhs, count, delta, 1e-30)) {
         damping = Math.min(1e16, damping * 10);
         if (damping >= 1e16) { exhausted = true; break; }

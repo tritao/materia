@@ -13,7 +13,10 @@ class SketchLayout {
 	public final radiusIndex:Map<String, Int> = new Map();
 	public final points:Map<String, SketchPoint> = new Map();
 	public final entities:Map<String, SketchEntity> = new Map();
+	/** The driving constraints, solved for. */
 	public final constraintList:Array<SketchConstraint>;
+	/** The reference (measured) dimensions, evaluated after the solve and left out of it and its diagnosis. */
+	public final referenceList:Array<SketchConstraint>;
 	/** Every constraint index, ascending. */
 	public final allConstraints:Array<Int>;
 	/** Each variable's name (point id with #x/#y, entity id with #r), so a part's key pins its variable order. */
@@ -27,7 +30,8 @@ class SketchLayout {
 	public function new(sketch:ConstrainedSketch, cancellationCheck:Null<Void->Bool>) {
 		this.sketch = sketch;
 		this.cancellationCheck = cancellationCheck;
-		constraintList = sketch.constraints();
+		constraintList = [for (constraint in sketch.constraints()) if (!constraint.reference) constraint];
+		referenceList = [for (constraint in sketch.constraints()) if (constraint.reference) constraint];
 		allConstraints = [for (index in 0...constraintList.length) index];
 		solveTolerance = sketch.settings.tolerance;
 		for (point in sketch.points()) {
@@ -84,6 +88,9 @@ class SketchLayout {
 			if ((constraint.kind == "distance" || constraint.kind == "radius") && constraint.value <= 0)
 				throw invalid("distance and radius constraints must be positive", [constraint.id]);
 		}
+		for (constraint in referenceList)
+			if (!SketchConstraint.isDimension(constraint.kind))
+				throw invalid("only distances, radii and angles can be reference dimensions", [constraint.id]);
 	}
 
 	/** The authored pose: point x/y pairs, then radii. */

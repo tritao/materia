@@ -120,7 +120,7 @@ class ProjectKitTests {
       metresPerUnit: 0.001, parts: [{id: "part", name: "Part", red: 0.2,
         green: 0.3, blue: 0.4, appearance: Appearances.machinedSteel(),
         vertexCount: 4, indexCount: 12, vertices: vertices, normals: normals,
-        indices: indices, faceRanges: []}], recipeDocument: "cube", recipeDiagnostics: ["ok"]};
+        indices: indices, faceRanges: [], faceDescriptors: "[{\"index\":0}]"}], recipeDocument: "cube", recipeDiagnostics: ["ok"]};
     var encoded = SceneArtifact.encode(data);
     check(encoded.getInt32(4) == SceneArtifact.VERSION, "current scene version");
     var restored = SceneArtifact.decode(encoded);
@@ -128,6 +128,7 @@ class ProjectKitTests {
     var appearance = restored.parts[0].appearance;
     check(appearance != null && appearance.finish == "machined-steel", "scene appearance round trip");
     check(restored.recipeDocument == "cube", "scene source round trip");
+    check(restored.parts[0].faceDescriptors == "[{\"index\":0}]", "scene face descriptors round trip");
     var diagnostics = restored.recipeDiagnostics;
     check(diagnostics != null && diagnostics[0] == "ok", "scene diagnostics round trip");
     var truncated = Bytes.alloc(10);

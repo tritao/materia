@@ -14,10 +14,17 @@ import cadkit.solve.ConstraintDiagnosis;
 */
 class DiagnosisAgreementSmoke {
 	static var seed = 424242;
+	/** A separate stream for row subsets, so the sketches stay the ones the sparse/dense comparison has always drawn. */
+	static var subsetSeed = 777;
+
+	static function subsetRandom():Float {
+		subsetSeed = (subsetSeed * 1103515245 + 12345) & 0x7fffffff;
+		return subsetSeed / 0x7fffffff;
+	}
 
 	public static function run():Void {
-		var compared = 0, withGroups = 0;
-		for (trial in 0...40) {
+		var compared = 0, withGroups = 0, freed = 0;
+		for (trial in 0...200) {
 			var sketch = randomSketch(trial);
 			var probe = SketchSolver.probe(sketch);
 			var poses = [probe.variables];
@@ -43,9 +50,22 @@ class DiagnosisAgreementSmoke {
 						+ 'dense rank ${dense.rank} ${groups(dense)} unsatisfied ${dense.unsatisfied}';
 				compared++;
 				if (dense.dependencyGroups.length > 0) withGroups++;
+				// What is still free agrees with a dense Gram-Schmidt, on all rows and on a random subset (which frees geometry).
+				var subset = [for (row in sparseRows) if (subsetRandom() < 0.7) row];
+				for (system in [sparseRows, subset]) {
+					var fast = ConstraintDiagnosis.freedom(system, variables);
+					var reference:Array<Float> = @:privateAccess ConstraintDiagnosis.denseFreedom(system, variables, ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE);
+					for (column in 0...variables) {
+						var a = fast[column] > ConstraintDiagnosis.FREE_TOLERANCE, b = reference[column] > ConstraintDiagnosis.FREE_TOLERANCE;
+						if (a != b || Math.abs(fast[column] - reference[column]) > 1e-6)
+							throw 'trial $trial: variable $column freedom ${fast[column]} (envelope) vs ${reference[column]} (dense)';
+					}
+					for (value in reference) if (value > ConstraintDiagnosis.FREE_TOLERANCE) { freed++; break; }
+				}
 			}
 		}
 		if (withGroups < 10) throw 'too few random systems had dependencies to compare ($withGroups of $compared)';
+		if (freed < 20) throw 'too few random systems left geometry free to compare freedom ($freed)';
 	}
 
 	static function groups(report:DiagnosisReport):String

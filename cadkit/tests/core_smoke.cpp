@@ -554,6 +554,61 @@ int main() {
     assert_close(bounds.max.x, 5.0);
     assert_close(bounds.max.y, 5.0);
     assert_close(bounds.max.z, 20.0);
+    {
+        // The side face reports the cylinder's axis; its circular edges their centers; planes and lines refuse.
+        std::uint32_t cylinder_faces = 0;
+        assert(cad_shape_subshape_count(cylinder, CAD_SHAPE_FACE, &cylinder_faces) == CAD_OK);
+        bool found_side = false, found_cap = false;
+        for (std::uint32_t index = 0; index < cylinder_faces; ++index) {
+            cad_shape face = 0;
+            assert(cad_shape_subshape_at(cylinder, CAD_SHAPE_FACE, index, &face) == CAD_OK);
+            cad_surface_kind kind = CAD_SURFACE_UNKNOWN;
+            assert(cad_face_surface_kind(face, &kind) == CAD_OK);
+            cad_axis axis{};
+            if (kind == CAD_SURFACE_CYLINDER) {
+                assert(cad_face_axis(face, &axis) == CAD_OK);
+                assert_close(axis.origin.x, 0.0);
+                assert_close(axis.origin.y, 0.0);
+                assert_close(std::abs(axis.direction.z), 1.0);
+                assert_close(axis.radius, 5.0);
+                assert_close(axis.reference.x * axis.direction.x + axis.reference.y * axis.direction.y +
+                    axis.reference.z * axis.direction.z, 0.0);
+                found_side = true;
+            } else {
+                // A cap is a plane: its frame's axis is its normal, its radius zero.
+                assert(cad_face_axis(face, &axis) == CAD_OK);
+                assert_close(std::abs(axis.direction.z), 1.0);
+                assert_close(axis.radius, 0.0);
+                assert_close(axis.reference.z, 0.0);
+                found_cap = true;
+            }
+            cad_shape_destroy(face);
+        }
+        assert(found_side && found_cap);
+        std::uint32_t cylinder_edges = 0;
+        assert(cad_shape_subshape_count(cylinder, CAD_SHAPE_EDGE, &cylinder_edges) == CAD_OK);
+        bool found_circle = false, found_seam = false;
+        for (std::uint32_t index = 0; index < cylinder_edges; ++index) {
+            cad_shape edge = 0;
+            assert(cad_shape_subshape_at(cylinder, CAD_SHAPE_EDGE, index, &edge) == CAD_OK);
+            cad_curve_kind kind = CAD_CURVE_UNKNOWN;
+            assert(cad_edge_curve_kind(edge, &kind) == CAD_OK);
+            cad_axis axis{};
+            if (kind == CAD_CURVE_CIRCLE) {
+                assert(cad_edge_axis(edge, &axis) == CAD_OK);
+                assert_close(axis.origin.x, 0.0);
+                assert_close(axis.origin.y, 0.0);
+                assert(std::abs(axis.origin.z) < 1e-9 || std::abs(axis.origin.z - 20.0) < 1e-9);
+                assert_close(axis.radius, 5.0);
+                found_circle = true;
+            } else {
+                assert(cad_edge_axis(edge, &axis) == CAD_ERROR_INVALID_ARGUMENT);
+                found_seam = true;
+            }
+            cad_shape_destroy(edge);
+        }
+        assert(found_circle && found_seam);
+    }
     cad_mesh coarse_cylinder = 0;
     cad_mesh fine_cylinder = 0;
     const cad_mesh_options coarse_options{0.5, 0.75};

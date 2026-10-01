@@ -14,6 +14,12 @@ package materia.assembly;
 @:wire typedef AssemblyConnector = {
 	@:id(1) var name:String;
 	@:id(2) var frame:AssemblyFrame;
+	/**
+		Set when the frame is derived from the component's geometry by the application that owns it (CadKit's
+		geometric connectors: a face or edge to find again). Opaque here: `frame` is the last frame it resolved
+		to, and stays valid for every consumer that does not re-derive it.
+	*/
+	@:id(3) @:optional var reference:String;
 }
 
 typedef AssemblyInstance = {

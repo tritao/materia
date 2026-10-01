@@ -60,7 +60,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 9;
+	public static inline var VERSION:Int = 11;
 	static final migrations:Map<String, (Document, Int)->Void> = [];
 
 	/** Register a domain-owned migration without coupling the codec to that domain. */
@@ -866,18 +866,20 @@ class DocumentCodec {
 			});
 		for (constraint in sketch.constraints()) {
 			var value = constraint.value;
-			if (constraint.kind == "distance" || constraint.kind == "radius")
+			if (!constraint.reference && (constraint.kind == "distance" || constraint.kind == "radius"))
 				value = UnitConversion.fromCanonical(feature.dimension(constraint.id).value, ParameterKind.Length, sketch.units);
-			else if (constraint.kind == "angle")
+			else if (!constraint.reference && constraint.kind == "angle")
 				value = feature.dimension(constraint.id).value;
-			constraints.push({
+			var record:Dynamic = {
 				id: constraint.id,
 				kind: constraint.kind,
 				first: constraint.first,
 				second: constraint.second,
 				third: constraint.third,
 				value: value
-			});
+			};
+			if (constraint.reference) Reflect.setField(record, "reference", true);
+			constraints.push(record);
 		}
 		return {
 			id: feature.id.toInt(),
@@ -933,9 +935,12 @@ class DocumentCodec {
 			sketch.addEntity(entity);
 		}
 		var constraintRecords:Array<Dynamic> = cast requiredField(record, "constraints");
-		for (value in constraintRecords)
-			sketch.addConstraint(SketchConstraint.raw(stringField(value, "id"), stringField(value, "kind"), stringField(value, "first"),
-				optionalString(value, "second"), optionalString(value, "third"), numberField(value, "value")));
+		for (value in constraintRecords) {
+			var constraint = SketchConstraint.raw(stringField(value, "id"), stringField(value, "kind"), stringField(value, "first"),
+				optionalString(value, "second"), optionalString(value, "third"), numberField(value, "value"));
+			var reference:Null<Bool> = Reflect.field(value, "reference");
+			sketch.addConstraint(reference == true ? constraint.asReference() : constraint);
+		}
 		var supportValue:Dynamic = Reflect.field(record, "support");
 		if (supportValue == null)
 			return new ConstrainedSketchFeature(sketch);
@@ -945,6 +950,21 @@ class DocumentCodec {
 			supportSelection, decodeVector(requiredField(record, "supportXDirection")),
 			numberField(record, "supportOffset"), boolField(record, "supportFlipped"), null,
 			optionalSupportFaceFingerprint(record));
+	}
+
+	/**
+		A record's name, if today's naming rules made it. A name from other rules could equal a different element's
+		name now, so it is dropped: the reference resolves by geometry and takes its current name (TN-D13).
+	*/
+	private static function currentName(record:Dynamic):Null<String> {
+		var name = optionalString(record, "name");
+		var scheme:Dynamic = Reflect.field(record, "naming");
+		if (name == null || scheme == null)
+			return null;
+		var schemeValue:Float = cast scheme;
+		if (Std.int(schemeValue) != cadkit.Shape.namingScheme())
+			return null;
+		return name;
 	}
 
 	private static function optionalString(record:Dynamic, name:String):Null<String> {
@@ -1263,10 +1283,10 @@ class DocumentCodec {
 		return result;
 	}
 
-	private static function encodeFingerprint(fingerprint:Null<TopologyFingerprint>):Dynamic {
+	public static function encodeFingerprint(fingerprint:Null<TopologyFingerprint>):Dynamic {
 		if (fingerprint == null)
 			return null;
-		return {
+		var record:Dynamic = {
 			surface: surfaceKindName(fingerprint.surfaceKind),
 			curve: curveKindName(fingerprint.curveKind),
 			x: fingerprint.x,
@@ -1277,12 +1297,21 @@ class DocumentCodec {
 			dz: fingerprint.dz,
 			measure: fingerprint.measure
 		};
+		// Where an edge's position was taken; records without one (before version 10) used its first vertex.
+		if (fingerprint.kind == CadKit.ShapeKind.Edge) Reflect.setField(record, "anchor", fingerprint.midpoint ? "midpoint" : "start");
+		// The element's topological name (since version 11) and the naming rules that made it (TN-D13).
+		if (fingerprint.name != null) {
+			Reflect.setField(record, "name", fingerprint.name);
+			Reflect.setField(record, "naming", cadkit.Shape.namingScheme());
+		}
+		return record;
 	}
 
-	private static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
+	public static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
 		return TopologyFingerprint.fromData(kind, surfaceKind(stringField(record, "surface")), curveKind(stringField(record, "curve")),
 			numberField(record, "x"), numberField(record, "y"), numberField(record, "z"), numberField(record, "dx"), numberField(record, "dy"),
-			numberField(record, "dz"), numberField(record, "measure"));
+			numberField(record, "dz"), numberField(record, "measure"), Reflect.field(record, "anchor") == "midpoint",
+			currentName(record));
 	}
 
 	private static function encodeVector(value:Vector):Dynamic {
