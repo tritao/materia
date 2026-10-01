@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"package": { "name": "machinekit-mobile-base-example" },
+	"entry": "MobileBasePreview",
+	"sources": ["MobileBase.hx", "MobileBasePreview.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../../projectkit" },
+		"cadkit": { "path": "../../../cadkit" },
+		"machinekit": { "path": "../../" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}
