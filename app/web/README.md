@@ -6,8 +6,9 @@ share one linear memory:
 - **Guest**, `materia_guest.wasm`: the editor itself, compiled by Haxeon from
   `app.MainWeb` (see [Guest target](#guest-target)).
 - **Host**, `materia_web.{js,wasm}`: an Emscripten executable linking NativeKit,
-  UIKit and SceneKit. It provides WebGL2, input, fonts and the C functions the
-  guest imports.
+  UIKit, SceneKit, SimKit with MuJoCo, RobotKit's runtime and, when given OCCT,
+  CadKit. It provides WebGL2, input, fonts and the C functions the guest
+  imports.
 
 `materia.js` loads both, checks that they agree on the
 [memory contract](../../nativekit/docs/wasm-host-memory.md), and drives
@@ -20,6 +21,36 @@ share one linear memory:
 ./app/web/build.sh                      # about 2 minutes from clean
 python3 -m http.server --directory app/build/web/site 8080
 ```
+
+### CadKit and OCCT
+
+CadKit links when `MATERIA_WEB_OCCT_DIR` names an Emscripten install of the
+pinned OCCT source (`cadkit/third_party/occt`); without it CadKit stays
+unavailable. OCCT takes long to build, so build it once into a shared prefix,
+with the toolkits CadKit uses, static, and with `-fwasm-exceptions` like the
+rest of the host. `-UOCC_CONVERT_SIGNALS` drops OCCT's conversion of signals to
+exceptions, which the browser has no signals for: it puts a `setjmp` inside
+every guarded `try`, and LLVM emits invalid Wasm for that mix under Wasm
+exceptions (V8: "br_table: label arity inconsistent").
+
+```sh
+source nativekit/.tools/emsdk/emsdk_env.sh
+emcmake cmake -S cadkit/third_party/occt -B <build> -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=<prefix> \
+  "-DCMAKE_CXX_FLAGS=-fwasm-exceptions -UOCC_CONVERT_SIGNALS" \
+  "-DCMAKE_C_FLAGS=-fwasm-exceptions -UOCC_CONVERT_SIGNALS" \
+  -DBUILD_LIBRARY_TYPE=Static -DUSE_FREETYPE=OFF -DUSE_OPENGL=OFF -DUSE_GLES2=OFF \
+  -DUSE_XLIB=OFF -DUSE_TK=OFF -DUSE_TCL=OFF -DUSE_TBB=OFF -DBUILD_DOC_Overview=OFF \
+  -DBUILD_RESOURCES=OFF -DBUILD_MODULE_ApplicationFramework=OFF \
+  -DBUILD_MODULE_DataExchange=OFF -DBUILD_MODULE_Draw=OFF \
+  -DBUILD_MODULE_Visualization=OFF -DBUILD_MODULE_FoundationClasses=OFF \
+  -DBUILD_MODULE_ModelingData=OFF -DBUILD_MODULE_ModelingAlgorithms=OFF \
+  "-DBUILD_ADDITIONAL_TOOLKITS=TKBO;TKDE;TKDESTEP;TKFillet;TKOffset;TKMesh;TKPrim;TKTopAlgo;TKXSBase"
+ninja -C <build> -j8 && cmake --install <build>
+MATERIA_WEB_OCCT_DIR=<prefix> ./app/web/build.sh
+```
+
+The toolkit list is the one `cadkit/CMakeLists.txt` builds for the desktop.
 
 `app/web/test.sh` opens the page in headless Chrome and checks that the editor
 starts and draws. `--click X,Y` clicks after startup and `--screenshot PATH`
@@ -68,13 +99,13 @@ and startup (under half a second to the first frame) were about the same.
 The editor shell, docking, inspector, console and the 3D viewport all work,
 and so does editing primitive objects. The following do not work yet:
 
-- **Kits with no browser build:** CadKit (OCCT), SimKit and MuJoCo, RobotKit's
-  runtime, AnimKit and StockKit. The page gives their imports stubs that throw,
-  and the JavaScript exception unwinds through the guest uncaught, so a feature
-  that calls one stops the editor; `window.materia.unavailable` lists them. The
-  simulation commands (Play, Step, Reset) are disabled in the browser build for
-  that reason until MuJoCo has a web build.
+- **Kits with no browser build:** AnimKit, StockKit, and CadKit unless built
+  with OCCT (see [CadKit and OCCT](#cadkit-and-occt)). The page gives their
+  imports stubs that throw `haxeon.wasm.HostError`, which the editor catches
+  and logs; `window.materia.unavailable` lists them.
 - **Opening projects:** this compiles and runs child processes, which the browser
   cannot start.
 - **Files:** they live in an in-memory filesystem for the session.
-- **Threads:** project loads and workspace saves run on the UI thread.
+- **Threads:** project loads and workspace saves run on the UI thread, and the
+  simulation steps on it each frame. RobotKit's self-driven runtimes and
+  recordings, and its serial and simulated-board devices, are not built.

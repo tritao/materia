@@ -6,7 +6,10 @@ import nativekit.ffi.NativeKitTypes;
 import NativeKitEventValue;
 import haxe.io.Bytes;
 
-/** Native desktop file chooser; this document format currently uses local files. */
+/**
+ * The native file chooser. Documents are files the editor reads and writes by path: a desktop chooser gives a local
+ * path, and in the browser a picked file or save target is kept in the editor's own storage (BrowserFiles).
+ */
 class SceneFileDialogs {
   final host:DesktopUiHostContext;
   var request:Null<haxe.Int64> = null;
@@ -46,6 +49,12 @@ class SceneFileDialogs {
         case Resources(_, _, result, accepted, items):
           if (result != Result.Ok) { complete(null, "The file chooser failed: " + Std.string(result)); return; }
           if (!accepted || items.length == 0) { complete(null, null); return; }
+          #if wasm
+          if (!StringTools.startsWith(items[0].uri, "file://")) {
+            browserFile(save, items[0], suggestedName, complete);
+            return;
+          }
+          #end
           var path:String;
           try path = localPath(items[0].uri)
           catch (failure:Dynamic) { complete(null, Std.string(failure)); return; }
@@ -54,6 +63,41 @@ class SceneFileDialogs {
       }
     });
   }
+
+  #if wasm
+  /**
+   * A browser chooser gives a picked file (a blob: URL) or a save target (a retained file handle or a download), not
+   * a path. The document becomes /files/<name> in the editor's storage: a picked file is read into it first, and a
+   * save target is linked to it, so the writes the editor makes there reach the user's file.
+   */
+  function browserFile(save:Bool, item:NativeKitResource, suggestedName:Null<String>,
+      complete:Null<String>->Null<String>->Void):Void {
+    var path = BrowserFiles.pathFor(item.displayName != null ? item.displayName : suggestedName);
+    if (save) {
+      BrowserFiles.link(path, item.uri);
+      complete(path, null);
+      return;
+    }
+    var resource = new Resource();
+    resource.set_struct_size(Resource.size());
+    resource.set_flags(ResourceFlags.Readable);
+    resource.set_uri(item.uri);
+    if (item.displayName != null) resource.set_display_name(item.displayName);
+    var id = NativeKit.nk_resource_load_async_checked(resource);
+    request = id;
+    host.events.requests.track(id, function(event) {
+      request = null;
+      switch (event) {
+        case Raw(kind, _, _, result, _, _, data) if (kind == EventKind.ResourceDataComplete):
+          if (result != Result.Ok) { complete(null, "Could not read the chosen file: " + Std.string(result)); return; }
+          try BrowserFiles.store(path, data)
+          catch (failure:Dynamic) { complete(null, Std.string(failure)); return; }
+          complete(path, null);
+        default: complete(null, "Unexpected file read response");
+      }
+    });
+  }
+  #end
 
   public function dispose():Void {
     var id = request;

@@ -587,9 +587,9 @@ class EditorPerspectiveViewport implements View {
         var direction=rotateVector(rotation,[Math.cos(angle),Math.sin(angle),0.0]);
         var hit=camera.project(origin[0]+direction[0]*values[index],origin[1]+direction[1]*values[index],
           origin[2]+direction[2]*values[index],width,height);
-        if(hit!=null){path.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);visibleRays++;}}
-      // Every ray can project to nothing (behind the camera, clipped, or a range that is not finite yet);
-      // stroking the empty path would hand the renderer nothing to draw.
+        if(hit!=null&&(hit.x!=mount.x||hit.y!=mount.y)){path.moveTo(mount.x,mount.y).lineTo(hit.x,hit.y);visibleRays++;}}
+      // Every ray can project to nothing (behind the camera, clipped, or a range that is not finite yet) or have
+      // no length (a zero range before the first scan); stroking such a path would hand the renderer nothing.
       if(visibleRays>0)canvas.strokeTransient(path.build(),Color.rgba(0.25,0.8,1.0,0.55),1.0);
     }
     }

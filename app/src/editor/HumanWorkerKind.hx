@@ -327,13 +327,16 @@ class HumanWorkerKind implements ObjectKindProvider {
           scene.setWorkerData(id, copy(current(scene,id), HumanJobSpec.parse(haxe.Json.stringify(raw)).toJson()));
         default: throw "Loop requires a boolean";
       }, loop));
-    var stepSelect = settings("Job"); stepSelect.minimum = 0; stepSelect.maximum = Math.max(0,spec.steps.length-1);
-    result.push(new PropertyDescriptor(prefix+"worker-step-index", "Selected step", PropertyType.Int,
-      function(_) { var stored = selectedStep.get(id); return PropertyValue.Int(stored == null ? 0 : stored); },
-      function(_, value) switch value {
-        case PropertyValue.Int(index): selectStep(id,index);
-        default: throw "Step index requires a number";
-      }, stepSelect));
+    // Choosing among steps needs at least two; a slider over one value has no range.
+    if (spec.steps.length > 1) {
+      var stepSelect = settings("Job"); stepSelect.minimum = 0; stepSelect.maximum = spec.steps.length-1;
+      result.push(new PropertyDescriptor(prefix+"worker-step-index", "Selected step", PropertyType.Int,
+        function(_) { var stored = selectedStep.get(id); return PropertyValue.Int(stored == null ? 0 : stored); },
+        function(_, value) switch value {
+          case PropertyValue.Int(index): selectStep(id,index);
+          default: throw "Step index requires a number";
+        }, stepSelect));
+    }
     for (index in 0...spec.steps.length) appendStepProperties(result, scene, id, prefix, index, spec.steps[index]);
     return workerProperties(scene, id, prefix, result);
   }

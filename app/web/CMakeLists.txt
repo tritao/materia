@@ -62,6 +62,26 @@ set(RK_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(RK_BUILD_SIMKIT ON CACHE BOOL "" FORCE)
 add_subdirectory("${MATERIA_SOURCE_ROOT}/robotkit" robotkit)
 
+# AnimKit (ozz-animation, glTF import) and StockKit (stock removal). StockKit's worker pool runs every job on the
+# calling thread in a build without threads.
+set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(AK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/animkit/native" animkit)
+set(SK_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+add_subdirectory("${MATERIA_SOURCE_ROOT}/stockkit/core" stockkit)
+
+# CadKit, when given an Emscripten install of the pinned OCCT source (static, built with -fwasm-exceptions like
+# everything here). Without one CadKit stays unavailable and the guest's calls throw haxeon.wasm.HostError.
+set(MATERIA_WEB_OCCT_DIR "" CACHE PATH "Prefix of an Emscripten install of CadKit's pinned OCCT")
+if(MATERIA_WEB_OCCT_DIR)
+    # Emscripten confines find_package to its sysroot, so name the package directory itself.
+    set(OpenCASCADE_DIR "${MATERIA_WEB_OCCT_DIR}/lib/cmake/opencascade" CACHE PATH "" FORCE)
+    set(CADKIT_OCCT_DIR "${MATERIA_WEB_OCCT_DIR}" CACHE PATH "" FORCE)
+    set(CADKIT_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+    set(CADKIT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    add_subdirectory("${MATERIA_SOURCE_ROOT}/cadkit" cadkit)
+endif()
+
 # The host heap ends where the guest's managed heap begins; the guest owns the
 # rest of the fixed-size memory. Values are byte offsets, multiples of 64 KiB.
 set(MATERIA_WEB_GUEST_MEMORY_LIMIT 805306368 CACHE STRING "Total linear memory in bytes")
@@ -81,7 +101,11 @@ add_executable(materia_web
 target_include_directories(materia_web PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 target_link_libraries(materia_web PRIVATE
     NativeKit::nativekit NativeKit::gpu NativeKit::ui NativeKit::scene NativeKit::scene_render
-    NativeKit::sim_core NativeKit::sim_mujoco RobotKit::runtime NativeKit::wasm_host_allocator)
+    NativeKit::sim_core NativeKit::sim_mujoco RobotKit::runtime animkit_core stockkit::core
+    NativeKit::wasm_host_allocator)
+if(MATERIA_WEB_OCCT_DIR)
+    target_link_libraries(materia_web PRIVATE cadkit::core)
+endif()
 target_link_options(materia_web PRIVATE
     "-sINITIAL_MEMORY=${MATERIA_WEB_GUEST_MEMORY_LIMIT}"
     "-sALLOW_MEMORY_GROWTH=0"
@@ -96,3 +120,9 @@ target_link_options(materia_web PRIVATE
     "-sSTACK_SIZE=1MB"
     "-sSTACK_OVERFLOW_CHECK=1")
 set_property(TARGET materia_web APPEND PROPERTY LINK_DEPENDS "${MATERIA_WEB_EXPORTS_FILE}")
+# Files the kits open by path, embedded into the in-memory filesystem where desktop builds find them relative to the
+# working directory (the filesystem root here): AnimKit's default worker model.
+foreach(asset animkit/assets/quaternius/worker.glb)
+    target_link_options(materia_web PRIVATE "--embed-file=${MATERIA_SOURCE_ROOT}/${asset}@/${asset}")
+    set_property(TARGET materia_web APPEND PROPERTY LINK_DEPENDS "${MATERIA_SOURCE_ROOT}/${asset}")
+endforeach()

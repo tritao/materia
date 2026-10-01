@@ -1,0 +1,32 @@
+// The browser page's file storage for the editor guest (app.BrowserFiles): the files it kept from earlier
+// sessions, and every change to mirror from now on. materia.js implements these on the Emscripten module, which
+// haxeon-host.js consults for guest imports; it keeps the files in the origin private file system (OPFS).
+interface MateriaWebFiles @target("portable-abi32") @library("materia_web_files") {
+	/**
+	 * Entries kept from earlier sessions, parents before children.
+	 */
+	extern fn materia_files_restore_count() -> u32;
+	/**
+	 * Entry `index`'s absolute path in UTF-8; a null `data` asks for the size. Returns 0 for a directory, 1 for a
+	 * file, and -1 for an index out of range.
+	 */
+	extern fn materia_files_restore_path(index: u32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+	/**
+	 * A file entry's content; a null `data` asks for the size. Returns 0, or -1 for an index out of range.
+	 */
+	extern fn materia_files_restore_content(index: u32, data: nullable<ptr<u8>> @out_buffer("size"), size: ptr<u32> @inout) -> i32;
+	/**
+	 * Releases what restoring held; the page keeps nothing after this.
+	 */
+	extern fn materia_files_restore_done() -> void;
+	extern fn materia_files_directory_created(path: utf8) -> void;
+	extern fn materia_files_file_written(path: utf8, content: ptr<const<u8>> @in_array("length"), length: u32) -> void;
+	/**
+	 * A file, or an empty directory.
+	 */
+	extern fn materia_files_removed(path: utf8) -> void;
+	/**
+	 * Moves a file or a directory tree.
+	 */
+	extern fn materia_files_renamed(path: utf8, new_path: utf8) -> void;
+}

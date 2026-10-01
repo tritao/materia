@@ -33,6 +33,10 @@ class MainWeb {
 
   @:expose public static function main():Int {
     try {
+      #if wasm
+      // Files from earlier sessions first: the editor reads its settings and workspace while it starts.
+      BrowserFiles.start();
+      #end
       var options = new BrowserUiHostOptions();
       options.title = "Materia";
       options.width = width;
@@ -99,6 +103,10 @@ class MainWeb {
       } catch (error:Dynamic) {
         stateError = Std.string(error);
       }
+      var stored:Array<String> = [];
+      #if wasm
+      stored = storedFiles("/");
+      #end
       Sys.println("materia-report " + haxe.Json.stringify({
         mode: app.mode.id,
         simulationRunning: app.simulation.isRunning(),
@@ -109,6 +117,7 @@ class MainWeb {
         commands: [for (id in REPORTED_COMMANDS) {id: id, enabled: commandEnabled(app, id)}],
         state: state,
         stateError: stateError,
+        files: stored,
         widgets: widgets
       }));
       return 0;
@@ -117,6 +126,21 @@ class MainWeb {
       return 2;
     }
   }
+
+  #if wasm
+  /** Every file below `directory` in the guest's filesystem, which BrowserFiles keeps across page loads. */
+  static function storedFiles(directory:String):Array<String> {
+    var result:Array<String> = [];
+    var names = runtime.MemoryFileSystem.readDirectory(directory);
+    if (names == null) return result;
+    for (name in names) {
+      var path = (directory == "/" ? "" : directory) + "/" + name;
+      if (runtime.MemoryFileSystem.isDirectory(path)) result = result.concat(storedFiles(path));
+      else result.push(path);
+    }
+    return result;
+  }
+  #end
 
   static function commandEnabled(app:ReferenceEditorApp, id:String):Bool {
     var command = app.commands.get(id);
