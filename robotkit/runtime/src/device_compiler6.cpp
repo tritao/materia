@@ -76,7 +76,7 @@ CompiledDevicePlan6 compile_device_segments6(
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
-    std::span<const DeviceActuator6> layout) {
+    std::span<const DeviceActuator6> layout, std::uint64_t anchor_ticks) {
     if (!clock.may_commit()) return failure("clock_sync_lost");
     if (segments.empty() || plan_id == 0 || blueprint.joint_count == 0 ||
         blueprint.joint_count > device_wire6::MAX_ACTUATORS ||
@@ -131,7 +131,15 @@ CompiledDevicePlan6 compile_device_segments6(
         segments = lowered;
     }
     const auto resolution_ns = (1'000'000'000ULL + step_tick_hz - 1) / step_tick_hz;
-    const auto base_ticks = clock.map_host_ns(host_plan_start_ns);
+    // A continuation starts on the device tick where the queued path ends. Mapping its
+    // start afresh would move it whenever a time sync refined the clock in between.
+    const auto mapped_start_ticks = clock.map_host_ns(host_plan_start_ns);
+    const std::int64_t tick_shift = anchor_ticks == 0 ? 0 :
+        static_cast<std::int64_t>(anchor_ticks) - static_cast<std::int64_t>(mapped_start_ticks);
+    auto device_ticks = [&](std::uint64_t host_ns) {
+        return static_cast<std::uint64_t>(static_cast<std::int64_t>(clock.map_host_ns(host_ns)) + tick_shift);
+    };
+    const auto base_ticks = device_ticks(host_plan_start_ns);
     CompiledDevicePlan6 result;
     result.segments.reserve(segments.size());
     mk_trajectory_handle validation{};
@@ -175,8 +183,8 @@ CompiledDevicePlan6 compile_device_segments6(
         }
         expected_ns += source.duration_ns;
         const auto host_start = host_plan_start_ns + source.time_from_start_ns;
-        const auto start_ticks = clock.map_host_ns(host_start);
-        const auto end_ticks = clock.map_host_ns(host_plan_start_ns + expected_ns);
+        const auto start_ticks = device_ticks(host_start);
+        const auto end_ticks = device_ticks(host_plan_start_ns + expected_ns);
         if (end_ticks <= start_ticks || start_ticks < base_ticks)
             return reject("device tick mapping collapsed segment");
         const auto duration_ticks = end_ticks - start_ticks;

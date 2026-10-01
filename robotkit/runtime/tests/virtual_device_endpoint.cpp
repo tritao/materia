@@ -16,7 +16,7 @@ struct RunResult {
 };
 
 RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = false,
-    bool hold = false) {
+    bool hold = false, bool append = false) {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -39,7 +39,7 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
     robotkit::PlanRequest plan{};
     plan.plan_id = 8;
     plan.sequence = 1;
-    plan.ends_at_rest = 1;
+    plan.ends_at_rest = append ? 0 : 1;
     plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
@@ -70,8 +70,23 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
         assert(endpoint->submit_device_plan(next, 1'000'000'000, 120'000'000,
             1'020'000'000, blueprint) == RK_OK);
     }
-    const auto end_ns = replace ? 2'220'000'000ULL : hold ? 1'420'000'000ULL : 1'220'000'000ULL;
-    for (std::uint64_t now = replace ? 190'000'000 : 130'000'000;
+    if (append) {
+        // Time syncs refine the clock before the continuation arrives; it must still
+        // start exactly where the queued path ends on the device.
+        for (std::uint64_t now = 130'000'000; now <= 380'000'000; now += 10'000'000)
+            assert(endpoint->sample(now, state) == RK_OK);
+        auto next = plan;
+        next.plan_id = 10;
+        next.ends_at_rest = 1;
+        next.start_position[0] = 0.5;
+        next.start_velocity[0] = 0.5;
+        next.segments.segments[0].coefficients[0].value[0] = 0.5;
+        assert(endpoint->submit_device_plan(next, 1'000'000'000, 390'000'000,
+            290'000'000, blueprint) == RK_OK);
+    }
+    const auto end_ns = replace || append ? 2'220'000'000ULL :
+        hold ? 1'420'000'000ULL : 1'220'000'000ULL;
+    for (std::uint64_t now = replace ? 190'000'000 : append ? 390'000'000 : 130'000'000;
          now <= end_ns; now += 10'000'000) {
         if (cut && now == 330'000'000) endpoint->cut_link(true);
         if (hold && (now == 330'000'000 || now == 530'000'000)) {
@@ -517,6 +532,9 @@ int main() {
     const auto disturbed = run(config);
     assert(std::abs(disturbed.position - 0.5) <= 0.00101);
     assert(disturbed.state.safety == RK_SAFETY_READY);
+    const auto appended = run(config, false, false, false, true);
+    assert(std::abs(appended.position - 1.0) <= 0.00101);
+    assert(appended.state.safety == RK_SAFETY_READY);
     assert(disturbed.steps == run(config).steps);
     const auto interrupted = run(VirtualDeviceConfig6{.fingerprint = config.fingerprint,
         .steps_per_unit = config.steps_per_unit, .clock_bound_ns = config.clock_bound_ns}, true);

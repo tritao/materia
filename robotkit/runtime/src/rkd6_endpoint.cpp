@@ -162,7 +162,11 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
 
 bool Rkd6Endpoint::send_record(std::uint8_t kind, std::span<const std::uint8_t> payload) {
     std::vector<std::uint8_t> frame;
-    return device_frame6::encode(kind, payload, frame) && transport_->send(frame);
+    if (!device_frame6::encode(kind, payload, frame) || !transport_->send(frame)) return false;
+    // Ten bits a byte on the line; frames queue behind each other.
+    link_free_at_ns_ = std::max(link_free_at_ns_, now_ns_) + static_cast<std::uint64_t>(
+        std::ceil(10.0L * frame.size() * 1e9L / std::max(1u, transport_->baud())));
+    return true;
 }
 
 bool Rkd6Endpoint::send_segment(const DeviceSegment6 &segment) {
@@ -188,6 +192,7 @@ bool Rkd6Endpoint::send_commit(std::uint64_t through_ticks) {
 rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     std::uint64_t base_time_ns, std::uint64_t owner_now_ns,
     std::uint64_t committed_through_ns, const rk_robot_runtime_blueprint &blueprint) {
+    now_ns_ = std::max(now_ns_, owner_now_ns);
     if (!clock_.may_commit()) return RK_ERROR_INVALID_STATE;
     if (base_time_ns == 0 && plan.replace_after_plan_id == 0 &&
         status_.executing_plan_id == 0 &&
@@ -214,7 +219,14 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         epoch_set_ = true;
     }
     if (host_epoch_ns_ > UINT64_MAX - base_time_ns) return RK_ERROR_LIMIT;
-    const auto replace_ticks = clock_.map_host_ns(host_epoch_ns_ + base_time_ns);
+    // An append continues from the device tick where the queued path ends: a time
+    // sync since that path was compiled would move a freshly mapped boundary off it.
+    const DeviceSegment6 *queued_end = !pending_.empty() ? &pending_.back() :
+        !sent_.empty() ? &sent_.back() : nullptr;
+    const std::uint64_t anchor_ticks = plan.replace_after_plan_id == 0 && base_time_ns != 0 &&
+        queued_end != nullptr ? queued_end->header.t0_ticks + queued_end->header.duration_ticks : 0;
+    const auto replace_ticks = anchor_ticks != 0 ? anchor_ticks :
+        clock_.map_host_ns(host_epoch_ns_ + base_time_ns);
     if (plan.replace_after_plan_id && replace_ticks < committed_until_ticks_)
         return RK_ERROR_INVALID_STATE;
     if (plan.replace_after_plan_id) {
@@ -231,7 +243,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     auto compiled = compile_device_segments6(
         std::span(plan.segments.segments), plan.plan_id,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
-        ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_);
+        ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_,
+        anchor_ticks);
     if (!compiled.ok) return RK_ERROR_LIMIT;
     const auto event_count = static_cast<std::uint32_t>(plan.events.size());
     if (event_count > ack_.event_capacity)
@@ -289,50 +302,55 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
             static_cast<unsigned long long>(required_baud), required_depth);
         return RK_ERROR_LIMIT;
     }
-    device_wire6::QueueBegin6 begin{};
-    begin.queue_revision = ++revision_;
-    revision_boundary_ticks_ = replace_ticks;
-    begin.replace_after_ticks = replace_ticks;
-    begin.actuator_count = ack_.actuator_count;
-    for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
-        const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
-        begin.expected_position[i] = static_cast<float>(mapping.ratio *
-            (plan.start_position[mapping.joint] - mapping.offset));
-        begin.expected_velocity[i] = static_cast<float>(mapping.ratio * plan.start_velocity[mapping.joint]);
-    }
-    // A continuation starts at the previous wire polynomial's endpoint.
-    // Re-evaluate that f32 polynomial exactly as the device does: converting
-    // an independently rounded joint anchor can exceed its 1e-4 actuator
-    // check even when both chunks meet the target-error bound.
-    auto anchor_from = [&](const auto &segments) {
-        for (const auto &segment : segments) {
-            if (segment.header.t0_ticks + segment.header.duration_ticks != replace_ticks)
-                continue;
-            const auto tau = static_cast<float>(segment.header.duration_ticks) /
-                static_cast<float>(ack_.device_tick_hz);
-            const auto degree = static_cast<std::size_t>(segment.header.degree);
-            for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
-                const auto &row = segment.coefficients[i];
-                const float c[]{row.c0, row.c1, row.c2, row.c3, row.c4, row.c5};
-                float position = c[degree];
-                for (std::size_t k = degree; k-- > 0;)
-                    position = position * tau + c[k];
-                float velocity = 0.0f;
-                if (degree != 0) {
-                    velocity = static_cast<float>(degree) * c[degree];
-                    for (std::size_t k = degree; k-- > 1;)
-                        velocity = velocity * tau + static_cast<float>(k) * c[k];
-                }
-                begin.expected_position[i] = position;
-                begin.expected_velocity[i] = segment.header.ends_at_rest ? 0.0f : velocity;
-            }
-            return true;
+    // A queue begin opens a revision at a replacement boundary, or a fresh queue. An
+    // append is more segments of the current revision: a new revision would make
+    // the device drop segments still waiting to be sent under the old one.
+    if (anchor_ticks == 0) {
+        device_wire6::QueueBegin6 begin{};
+        begin.queue_revision = ++revision_;
+        revision_boundary_ticks_ = replace_ticks;
+        begin.replace_after_ticks = replace_ticks;
+        begin.actuator_count = ack_.actuator_count;
+        for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
+            const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
+            begin.expected_position[i] = static_cast<float>(mapping.ratio *
+                (plan.start_position[mapping.joint] - mapping.offset));
+            begin.expected_velocity[i] = static_cast<float>(mapping.ratio * plan.start_velocity[mapping.joint]);
         }
-        return false;
-    };
-    if (!anchor_from(sent_)) anchor_from(pending_);
-    std::array<std::uint8_t, device_wire6::QueueBegin6::SIZE> body{};
-    if (!device_wire6::encode(begin, body) || !send_record(5, body)) return RK_ERROR_BACKEND;
+        // A continuation starts at the previous wire polynomial's endpoint.
+        // Re-evaluate that f32 polynomial exactly as the device does: converting
+        // an independently rounded joint anchor can exceed its 1e-4 actuator
+        // check even when both chunks meet the target-error bound.
+        auto anchor_from = [&](const auto &segments) {
+            for (const auto &segment : segments) {
+                if (segment.header.t0_ticks + segment.header.duration_ticks != replace_ticks)
+                    continue;
+                const auto tau = static_cast<float>(segment.header.duration_ticks) /
+                    static_cast<float>(ack_.device_tick_hz);
+                const auto degree = static_cast<std::size_t>(segment.header.degree);
+                for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
+                    const auto &row = segment.coefficients[i];
+                    const float c[]{row.c0, row.c1, row.c2, row.c3, row.c4, row.c5};
+                    float position = c[degree];
+                    for (std::size_t k = degree; k-- > 0;)
+                        position = position * tau + c[k];
+                    float velocity = 0.0f;
+                    if (degree != 0) {
+                        velocity = static_cast<float>(degree) * c[degree];
+                        for (std::size_t k = degree; k-- > 1;)
+                            velocity = velocity * tau + static_cast<float>(k) * c[k];
+                    }
+                    begin.expected_position[i] = position;
+                    begin.expected_velocity[i] = segment.header.ends_at_rest ? 0.0f : velocity;
+                }
+                return true;
+            }
+            return false;
+        };
+        if (!anchor_from(sent_)) anchor_from(pending_);
+        std::array<std::uint8_t, device_wire6::QueueBegin6::SIZE> body{};
+        if (!device_wire6::encode(begin, body) || !send_record(5, body)) return RK_ERROR_BACKEND;
+    }
     for (auto &event : wire_events) {
         event.queue_revision = revision_;
         std::array<std::uint8_t, device_wire6::Event6::SIZE> event_body{};
@@ -373,7 +391,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
     });
     std::size_t available = ack_.segment_capacity > occupied ? ack_.segment_capacity - occupied : 0;
-    while (available > 0 && !pending_.empty()) {
+    while (available > 0 && !pending_.empty() && link_has_room()) {
         if (!send_segment(pending_.front())) return RK_ERROR_BACKEND;
         sent_.push_back(std::move(pending_.front()));
         pending_.pop_front();
@@ -458,7 +476,7 @@ void Rkd6Endpoint::pump_queue() {
         return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
     });
     auto available = ack_.segment_capacity > occupied ? ack_.segment_capacity - occupied : 0;
-    while (available > 0 && !pending_.empty()) {
+    while (available > 0 && !pending_.empty() && link_has_room()) {
         if (!send_segment(pending_.front())) return;
         sent_.push_back(std::move(pending_.front()));
         pending_.pop_front();
@@ -476,6 +494,7 @@ void Rkd6Endpoint::pump_queue() {
 }
 
 rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state) {
+    now_ns_ = std::max(now_ns_, timestamp_ns);
     if (clock_.sync_due(timestamp_ns, 100'000'000)) {
         device_wire6::TimeSyncRequest request{timestamp_ns};
         std::array<std::uint8_t, request.SIZE> body{};

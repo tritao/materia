@@ -68,6 +68,8 @@ private:
     bool send_commit(std::uint64_t through_ticks);
     void poll_frames(std::uint64_t owner_now_ns);
     void pump_queue();
+    /** Whether the line clears within an owner period, so a commit sent next never waits long behind segments. */
+    bool link_has_room() const noexcept { return link_free_at_ns_ <= now_ns_ + owner_period_ns_; }
 
     std::unique_ptr<Rkd6Transport> transport_;
     device_wire6::SessionAck6 ack_{};
@@ -77,6 +79,9 @@ private:
     double target_error_;
     std::uint64_t link_latency_ns_;
     std::uint64_t owner_period_ns_ = 10'000'000;
+    /** The owner time last seen, and when the line finishes sending what was given to it. */
+    std::uint64_t now_ns_ = 0;
+    std::uint64_t link_free_at_ns_ = 0;
     std::uint64_t host_epoch_ns_ = 0;
     std::uint64_t device_epoch_ticks_ = 0;
     bool epoch_set_ = false;

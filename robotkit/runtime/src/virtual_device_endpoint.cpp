@@ -77,13 +77,16 @@ public:
             drain_device(true);
             return true;
         }
-        auto delay = delay_ns(frame.size());
-        // The simulated UART retries a damaged frame after another packet time.
-        // This keeps the frame transport reliable under sampled line errors.
+        // The line sends one frame at a time; the simulated UART retries a damaged
+        // frame after another packet time, keeping the transport reliable under
+        // sampled line errors.
+        auto transmit = transmit_ns(frame.size());
         for (unsigned tries = 0; tries < 16 && disturbed(); ++tries)
-            delay += delay_ns(frame.size());
-        host_tx_ready_ns_ = std::max(now_ns_, host_tx_ready_ns_) + delay;
-        pending_host_.push_back({host_tx_ready_ns_,
+            transmit += transmit_ns(frame.size()) + config_.latency_ns;
+        host_tx_ready_ns_ = std::max(now_ns_, host_tx_ready_ns_) + transmit;
+        // A serial line delivers in order, whatever the jitter.
+        host_delivered_ns_ = std::max({host_tx_ready_ns_ + latency_ns(), now_ns_ + 1, host_delivered_ns_});
+        pending_host_.push_back({host_delivered_ns_,
             std::vector<std::uint8_t>(frame.begin(), frame.end())});
         std::stable_sort(pending_host_.begin(), pending_host_.end(),
             [](const Packet &a, const Packet &b) { return a.at_ns < b.at_ns; });
@@ -119,14 +122,17 @@ private:
         const auto value = std::generate_canonical<double, 53>(random_);
         return value < config_.frame_drop_rate + config_.corruption_rate;
     }
-    std::uint64_t delay_ns(std::size_t frame_size) {
-        const auto tx = static_cast<std::uint64_t>(std::ceil(
+    std::uint64_t transmit_ns(std::size_t frame_size) const {
+        return static_cast<std::uint64_t>(std::ceil(
             10.0L * frame_size * 1e9L / std::max(1u, config_.baud)));
+    }
+    /** Latency after a frame leaves the line: frames pipeline it, so it is not serialized. */
+    std::uint64_t latency_ns() {
         const auto magnitude = config_.jitter_ns;
         const auto jitter = magnitude == 0 ? 0 : static_cast<std::int64_t>(
             random_() % (2 * magnitude + 1)) - static_cast<std::int64_t>(magnitude);
-        const auto base = static_cast<std::int64_t>(config_.latency_ns + tx);
-        return static_cast<std::uint64_t>(std::max<std::int64_t>(1, base + jitter));
+        return static_cast<std::uint64_t>(std::max<std::int64_t>(0,
+            static_cast<std::int64_t>(config_.latency_ns) + jitter));
     }
     void drain_device(bool session) {
         std::array<std::uint8_t, device_frame6::MAX_FRAME_SIZE> buffer{};
@@ -137,13 +143,13 @@ private:
             if (!device_frame6::decode(std::span(buffer.data(), size), decoded)) continue;
             std::uint64_t at = now_ns_;
             if (!session || decoded.kind != 2) {
-                at += delay_ns(size);
+                auto transmit = transmit_ns(size);
                 for (unsigned tries = 0; tries < 16 && disturbed(); ++tries)
-                    at += delay_ns(size);
-            }
-            if (!session || decoded.kind != 2) {
-                at = std::max(now_ns_, device_tx_ready_ns_) + (at - now_ns_);
-                device_tx_ready_ns_ = at;
+                    transmit += transmit_ns(size) + config_.latency_ns;
+                device_tx_ready_ns_ = std::max(now_ns_, device_tx_ready_ns_) + transmit;
+                device_delivered_ns_ = std::max({device_tx_ready_ns_ + latency_ns(), now_ns_ + 1,
+                    device_delivered_ns_});
+                at = device_delivered_ns_;
             }
             pending_device_.push_back({at, std::vector<std::uint8_t>(buffer.begin(), buffer.begin() + size)});
         }
@@ -159,6 +165,8 @@ private:
     std::uint64_t received_at_ns_ = 0;
     std::uint64_t host_tx_ready_ns_ = 0;
     std::uint64_t device_tx_ready_ns_ = 0;
+    std::uint64_t host_delivered_ns_ = 0;
+    std::uint64_t device_delivered_ns_ = 0;
     std::deque<Packet> pending_host_;
     std::deque<Packet> pending_device_;
 };

@@ -218,12 +218,18 @@ int main() {
     replacement.segments.segments[0].coefficients[0].value[0] = 0.5;
     assert(endpoint->submit_device_plan(replacement, 1'000'000'000,
         100'400'000, 1'020'000'000, blueprint) == RK_OK);
-    assert(observed->queue_begin_frames == 2 && observed->segment_frames == 2);
+    // The boundary goes at once; the segment waits until the line clears within an
+    // owner period, so a commit never queues behind a backlog of segments.
+    assert(observed->queue_begin_frames == 2 && observed->segment_frames == 1);
     status.queue_revision = 2;
     status.path_clock_ticks = endpoint->committed_until_ticks() + 2'000'000;
     status.remaining_segments = 4;
     observed->push(14, status);
     assert(endpoint->sample(150'000'000, state) == RK_OK);
+    assert(observed->segment_frames == 2);
+    // The next status retires the segment the device has since run past.
+    observed->push(14, status);
+    assert(endpoint->sample(150'200'000, state) == RK_OK);
     assert(endpoint->bookkeeping_counts().first == 0);
     assert(endpoint->bookkeeping_counts().second == 1);
     observed->jump_ticks = 10'000;
