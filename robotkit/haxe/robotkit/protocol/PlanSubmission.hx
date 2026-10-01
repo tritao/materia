@@ -1,5 +1,7 @@
 package robotkit.protocol;
 
+import RobotKitRuntime;
+
 import haxe.Int64;
 import robotkit.world.ExecutionPlanSubmission;
 import robotkit.world.TrajectorySegment;
@@ -66,7 +68,8 @@ class PlanSubmission {
   }
 
   public function toWorld():ExecutionPlanSubmission {
-    if (segments == null || segments.length == 0 || segments.length > 128)
+    if (segments == null || segments.length == 0 ||
+        segments.length > RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS)
       throw "Plan segment count is invalid";
     var converted:Array<TrajectorySegment> = [];
     for (segment in segments) {

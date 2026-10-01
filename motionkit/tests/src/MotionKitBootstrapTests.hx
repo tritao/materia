@@ -49,6 +49,7 @@ class MotionKitBootstrapTests {
     programTests.testRedundantArmPaths();
     programTests.testCoordinatedExternalAxes();
     programTests.testProgramStartTolerances();
+    programTests.testProgramPlanner();
     kinematicsTests.testPathConfigurationSelector();
     kinematicsTests.testAxisKinematics();
     kinematicsTests.testManipulatorServo();

@@ -57,7 +57,6 @@ class ProgramCompiler {
   public final startTolerances:StartTolerances;
   public final cartesianResolution:Float;
   /** The speed scale of the program being compiled. */
-  var speedScale:Float = 1.0;
 
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
@@ -152,40 +151,37 @@ class ProgramCompiler {
   **/
   public function compile(program:MotionProgram, initialQ:Array<Float>,
       firstPlanId:Int64, ?firstOp:Int = 0, ?speedScale:Float = 1.0):CompiledProgram {
-    var compilation = begin(program, initialQ, firstPlanId, firstOp, speedScale);
+    var blocks = new ProgramBlocks();
+    var compilation = begin(program, initialQ, firstPlanId, firstOp, speedScale, blocks);
     try {
       while (compilation.step()) {}
     } catch (error:Dynamic) {
       compilation.dispose();
+      blocks.dispose();
       throw error;
     }
-    var blocks = compilation.blocks.copy();
-    // The program's end closes its last block, which may hold no plans.
-    if (blocks.length > 0 && blocks[blocks.length - 1].plans.length == 0 &&
-        blocks[blocks.length - 1].barrier == null) blocks.pop();
-    return new CompiledProgram(blocks, compilation.notes);
+    return new CompiledProgram(blocks.finishedBlocks(), blocks.notes);
   }
 
-  /** Starts planning `program` one op at a time; see `ProgramCompilation`. */
+  /** Starts planning `program` one op at a time into `sink`; see `ProgramCompilation`. */
   public function begin(program:MotionProgram, initialQ:Array<Float>, firstPlanId:Int64,
-      ?firstOp:Int = 0, ?speedScale:Float = 1.0):ProgramCompilation
-    return new ProgramCompilation(this, program, initialQ, firstPlanId, firstOp, speedScale);
+      firstOp:Int, speedScale:Float, sink:ProgramSink):ProgramCompilation
+    return new ProgramCompilation(this, program, initialQ, firstPlanId, firstOp, speedScale, sink);
 
-  /** Moves the pending motion into the open block as a finished plan. */
+  /** Finishes the pending motion as a plan and delivers it. */
   function retire(c:ProgramCompilation):Void {
     var pending = c.pending;
     if (pending == null) return;
-    c.blocks[c.blocks.length - 1].add(finish(pending, c.nextId), pending.opIndex,
+    c.sink.plan(finish(pending, c.nextId), pending.opIndex,
       pathLength(pending), pending.opDistances(), pending.times.copy());
     c.nextId = Int64.add(c.nextId, Int64.ofInt(1));
     c.pending = null;
   }
 
-  /** Closes the open block at a barrier and opens the next. */
+  /** Ends the current block at a barrier. */
   function barrier(c:ProgramCompilation, barrier:ProgramBarrier):Void {
     retire(c);
-    c.blocks[c.blocks.length - 1].close(barrier);
-    c.blocks.push(ProgramBlock.open());
+    c.sink.barrier(barrier);
   }
 
   /** Plans the next op of `c`; at the end, finishes its last plan and block. Returns false once done. */
@@ -193,14 +189,18 @@ class ProgramCompiler {
   function advance(c:ProgramCompilation):Bool {
     if (c.done) return false;
     var program = c.program;
-    speedScale = c.speedScale;
+    var speedScale = c.speedScale;
     try {
+      if (c.sectionIndex < c.sections.length) {
+        lowerSection(c);
+        return true;
+      }
       if (c.cursor >= program.ops.length) {
         retire(c);
         if (c.leadingOutputs.length > 0)
           throw 'Motion program op ${c.currentIndex} has output changes without following motion';
-        c.blocks[c.blocks.length - 1].close(null);
         c.done = true;
+        c.sink.finish(c.nextId);
         return false;
       }
       var index = c.cursor++;
@@ -210,7 +210,7 @@ class ProgramCompiler {
       switch program.ops[index] {
         case MoveJ(target, options, blend):
           retire(c);
-          noteBlend(blend, index, c.notes);
+          noteBlend(blend, index, c.sink);
           var goal = resolveTarget(target, q, index);
           checkJointPosition(goal, index, null);
           var velocity = effective(maxVelocity, options.maxVelocity);
@@ -248,16 +248,16 @@ class ProgramCompiler {
               case MoveL(_, _, speed, _): speed;
               case _: feed;
             };
-            pending = lowerPath(blended, q, Math.max(feed, nextFeed), [], index,
+            pending = lowerPath(speedScale, blended, q, Math.max(feed, nextFeed), [], index,
               [solver.forward(q), pose, cast blendNextPose], blendTolerance);
             c.skipNext = true;
-            c.notes.push('Motion program ops $index and ${index + 1} tolerance blended');
+            c.sink.note('Motion program ops $index and ${index + 1} tolerance blended');
           } else {
-            noteBlend(blend, index, c.notes);
+            noteBlend(blend, index, c.sink);
             var start = new PoseWaypoint(solver.forward(q), positionTolerance,
               orientationTolerance);
             var end = new PoseWaypoint(pose, positionTolerance, orientationTolerance);
-            pending = lowerPath(new PosePath(frameId, [new PoseLine(start, end,
+            pending = lowerPath(speedScale, new PosePath(frameId, [new PoseLine(start, end,
               OrientationPolicy.Interpolated, 0.1, feed)]), q, feed, [], index);
           }
           c.pending = pending;
@@ -265,9 +265,9 @@ class ProgramCompiler {
           attachLeadingOutputs(pending, c.leadingOutputs);
         case MoveC(via, endPose, requestedFrame, feed, blend):
           retire(c);
-          noteBlend(blend, index, c.notes);
+          noteBlend(blend, index, c.sink);
           requireFrame(requestedFrame, index);
-          var pending = lowerPath(new PosePath(frameId, [new PoseArc(
+          var pending = lowerPath(speedScale, new PosePath(frameId, [new PoseArc(
             new PoseWaypoint(solver.forward(q), positionTolerance, orientationTolerance),
             new PoseWaypoint(via, positionTolerance, orientationTolerance),
             new PoseWaypoint(endPose, positionTolerance, orientationTolerance),
@@ -280,21 +280,12 @@ class ProgramCompiler {
           if (path.frameId != frameId)
             throw 'Motion program op $index path frame does not match $frameId';
           // Following a sharp corner exactly means stopping there, so each
-          // stretch between corners is its own plan of this op.
-          var sections = cornerSections(path);
-          for (k in 0...sections.length) {
-            retire(c);
-            var section = sections[k], last = k == sections.length - 1;
-            var end = section.offset + section.path.length();
-            var pending = lowerPath(section.path, c.q, feed, [for (event in events)
-              if (event.distance >= section.offset && (last || event.distance < end))
-                new PathEvent(event.distance - section.offset, event.channel, event.value,
-                  event.leadSeconds, event.holdPolicy)], index);
-            pending.distanceOffset = section.offset;
-            c.pending = pending;
-            c.q = pending.endQ.copy();
-            if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
-          }
+          // stretch between corners is its own plan of this op, one a step.
+          c.sections = cornerSections(path);
+          c.sectionIndex = 0;
+          c.sectionFeed = feed;
+          c.sectionEvents = events;
+          lowerSection(c);
         case SetOutput(channel, value):
           var pending = c.pending;
           if (pending == null) c.leadingOutputs.push({channel:channel, value:value});
@@ -310,6 +301,27 @@ class ProgramCompiler {
       var message = Std.string(error);
       if (StringTools.startsWith(message, "Motion program op ")) throw error;
       throw 'Motion program op ${c.currentIndex}: $message';
+    }
+  }
+
+  /** Plans the next stretch of the current path op. */
+  function lowerSection(c:ProgramCompilation):Void {
+    retire(c);
+    var k = c.sectionIndex++;
+    var section = c.sections[k], last = k == c.sections.length - 1;
+    var end = section.offset + section.path.length();
+    var pending = lowerPath(c.speedScale, section.path, c.q, c.sectionFeed, [for (event in c.sectionEvents)
+      if (event.distance >= section.offset && (last || event.distance < end))
+        new PathEvent(event.distance - section.offset, event.channel, event.value,
+          event.leadSeconds, event.holdPolicy)], c.currentIndex);
+    pending.distanceOffset = section.offset;
+    c.pending = pending;
+    c.q = pending.endQ.copy();
+    if (k == 0) attachLeadingOutputs(pending, c.leadingOutputs);
+    if (last) {
+      c.sections = [];
+      c.sectionIndex = 0;
+      c.sectionEvents = [];
     }
   }
 
@@ -419,7 +431,7 @@ class ProgramCompiler {
       orientation.qx, orientation.qy, orientation.qz, orientation.qw),
       positionTolerance, orientationTolerance);
 
-  function lowerPath(path:PosePath, startQ:Array<Float>, feed:Float,
+  function lowerPath(speedScale:Float, path:PosePath, startQ:Array<Float>, feed:Float,
       authoredEvents:Array<PathEvent>, index:Int,
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
@@ -763,9 +775,9 @@ class ProgramCompiler {
   function zeros():Array<Float> return [for (_ in 0...solver.jointCount()) 0.0];
   static function effective(machine:Array<Float>, requested:Float):Array<Float>
     return [for (limit in machine) requested > 0.0 ? Math.min(limit, requested) : limit];
-  static function noteBlend(blend:Blend, index:Int, notes:Array<String>):Void {
+  static function noteBlend(blend:Blend, index:Int, sink:ProgramSink):Void {
     switch blend {
-      case ToleranceBlend(_): notes.push('Motion program op $index tolerance blend uses exact stop');
+      case ToleranceBlend(_): sink.note('Motion program op $index tolerance blend uses exact stop');
       case ExactStop:
     }
   }

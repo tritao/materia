@@ -1,4 +1,4 @@
-#include "robotkit_runtime.h"
+#include "robotkit_runtime.hpp"
 
 #include <cassert>
 #include <cstddef>
@@ -64,15 +64,14 @@ int main() {
     trajectory_command.kind = 5;
     assert(rk_robot_command_validate(&trajectory_command) == RK_ERROR_INVALID_ARGUMENT);
     trajectory_command.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
-    rk_trajectory_segment_chunk trajectory{};
-    trajectory.struct_size = sizeof(trajectory);
-    trajectory.segment_count = 1;
+    robotkit::SegmentBatch trajectory{};
+    trajectory.segments.resize(1);
     trajectory.segments[0].duration_ns = 10'000'000;
     trajectory.segments[0].degree = 1;
     trajectory.segments[0].joint_count = 2;
     trajectory.segments[0].coefficients[0].value[1] = 10.0;
     trajectory.segments[0].coefficients[1].value[1] = -10.0;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
+    assert(robotkit::validate_segments_for_blueprint(trajectory, blueprint) == RK_OK);
     blueprint.coupling_count = 1;
     blueprint.couplings[0] = {0, 1, -2.0, 0.1};
     assert(rk_robot_runtime_blueprint_validate(&blueprint) == RK_OK);
@@ -84,54 +83,61 @@ int main() {
     command.targets[1].target = -0.3;
     trajectory.segments[0].coefficients[1].value[0] = 0.1;
     trajectory.segments[0].coefficients[1].value[1] = -20.0;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
+    assert(robotkit::validate_segments_for_blueprint(trajectory, blueprint) == RK_OK);
     trajectory.segments[0].coefficients[1].value[1] = -10.0;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_segments_for_blueprint(trajectory, blueprint) == RK_ERROR_INVALID_ARGUMENT);
     trajectory.segments[0].coefficients[1].value[1] = -20.0;
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 1;
     plan.start_position[0] = 0.2;
     plan.start_position[1] = -0.3;
     plan.segments = trajectory;
-    assert(rk_plan_submission_validate_for_blueprint(&plan, &blueprint) == RK_OK);
+    assert(robotkit::validate_plan_for_blueprint(plan, blueprint) == RK_OK);
     plan.start_position[1] = -0.2;
-    assert(rk_plan_submission_validate_for_blueprint(&plan, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_plan_for_blueprint(plan, blueprint) == RK_ERROR_INVALID_ARGUMENT);
     blueprint.coupling_count = 0;
     trajectory.segments[0].time_from_start_ns = 1;
-    assert(rk_trajectory_segment_chunk_validate(&trajectory) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_segments(trajectory) == RK_ERROR_INVALID_ARGUMENT);
     trajectory.segments[0].time_from_start_ns = 0;
     trajectory.segments[0].joint_count = 1;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_segments_for_blueprint(trajectory, blueprint) == RK_ERROR_INVALID_ARGUMENT);
 
-    rk_trajectory_segment_chunk segments{};
-    segments.struct_size = sizeof(segments);
-    segments.segment_count = 1;
+    robotkit::SegmentBatch segments{};
+    segments.segments.resize(1);
     segments.segments[0].duration_ns = 10000000;
     segments.segments[0].degree = 1;
     segments.segments[0].joint_count = 2;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&segments, &blueprint) == RK_OK);
+    assert(robotkit::validate_segments_for_blueprint(segments, blueprint) == RK_OK);
     segments.segments[0].duration_ns = 0;
-    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_segments(segments) == RK_ERROR_INVALID_ARGUMENT);
     segments.segments[0].duration_ns = 10000000;
     segments.segments[0].coefficients[0].value[1] = NAN;
-    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_segments(segments) == RK_ERROR_INVALID_ARGUMENT);
     segments.segments[0].coefficients[0].value[1] = 0.0;
-    segments.segment_count = 2;
+    segments.segments.resize(2);
     segments.segments[1] = segments.segments[0];
-    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    assert(robotkit::validate_segments(segments) == RK_ERROR_INVALID_ARGUMENT);
     segments.segments[1].time_from_start_ns = 10000000;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&segments, &blueprint) == RK_OK);
-    segments.segment_count = 11;
-    for (uint32_t index = 0; index < segments.segment_count; ++index) {
+    assert(robotkit::validate_segments_for_blueprint(segments, blueprint) == RK_OK);
+    segments.segments.resize(11);
+    for (uint32_t index = 0; index < segments.segments.size(); ++index) {
         auto &segment = segments.segments[index];
         segment.time_from_start_ns = index;
         segment.duration_ns = 1;
         segment.degree = 5;
         segment.joint_count = 64;
     }
-    assert(rk_trajectory_segment_chunk_validate(&segments) == RK_ERROR_INVALID_ARGUMENT);
+    // No per-batch coefficient budget: only what the runtime queue holds bounds a batch.
+    assert(robotkit::validate_segments(segments) == RK_OK);
+    segments.segments.resize(RK_MAX_TRAJECTORY_QUEUE_POINTS + 1);
+    for (uint32_t index = 0; index < segments.segments.size(); ++index) {
+        auto &segment = segments.segments[index];
+        segment.time_from_start_ns = index;
+        segment.duration_ns = 1;
+        segment.joint_count = 64;
+    }
+    assert(robotkit::validate_segments(segments) == RK_ERROR_INVALID_ARGUMENT);
 
     rk_robot_state state{};
     state.struct_size = sizeof(state);

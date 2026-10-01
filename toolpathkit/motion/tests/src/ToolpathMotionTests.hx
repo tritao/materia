@@ -91,6 +91,31 @@ class ToolpathMotionTests {
     ]), [0.0, 0.0, 0.0], Int64.ofInt(1));
     if (compiled.blocks.length == 0) throw "robot binding produced no plans";
     compiled.dispose();
+    // A rapid down that carries straight on as a slower plunge is one motion; the exact
+    // corner after it is where the machine stops.
+    var entryOps = [
+      ToolpathOp.Move(Rapid, PathGeometry.Line(new Point3(0, 0, 0.012), new Point3(0, 0, 0.006)),
+        0.0, 0.0, Provenance.cam(9)),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0.006), new Point3(0, 0, 0.002)),
+        0.002, 0.0, Provenance.cam(10)),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0.002), new Point3(0.01, 0, 0.002)),
+        0.01, 0.0, Provenance.cam(11))
+    ];
+    var entry:motionkit.program.MotionProgram = cast ToolpathMotion.lower(pathProgram(entryOps),
+      robotBinding.machine).program;
+    if (entry == null || entry.ops.length != 1) throw "moves without a barrier must lower to one path";
+    switch entry.ops[0] {
+      case MotionOp.FollowPath(path, _, feed, _):
+        var speeds = [for (primitive in path.primitives) primitive.speedLimit()];
+        if (speeds.join(",") != "0.08,0.002,0.01" || feed != 0.08)
+          throw 'each move keeps its own speed, got $speeds under $feed';
+      case _: throw "entry path missing";
+    }
+    var entryPlans = robotBinding.compile(pathProgram(entryOps), [0.0, 0.0, 0.012], Int64.ofInt(1));
+    var planCount = 0;
+    for (block in entryPlans.blocks) planCount += block.plans.length;
+    entryPlans.dispose();
+    if (planCount != 2) throw 'the plunge must follow the rapid without stopping, got $planCount plans';
     var corners = CornerBlender.blendPerCorner(GeometricPath.lines([
       new PathPoint(0.0, 0.0), new PathPoint(0.01, 0.0),
       new PathPoint(0.01, 0.01), new PathPoint(0.02, 0.01)
@@ -118,7 +143,7 @@ class ToolpathMotionTests {
           throw "coolant must be a position-tied path event";
       case _: throw "blended path missing";
     }
-    Sys.println("ToolpathKit Motion tests passed (9 assertions)");
+    Sys.println("ToolpathKit Motion tests passed (12 assertions)");
     Sys.println('Toolpath accuracy tests passed (${ToolpathAccuracyTests.run()} assertions)');
     MachiningRunTests.run();
     ToolpathScenarioTests.main();

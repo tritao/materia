@@ -1,4 +1,4 @@
-#include "robotkit_runtime.h"
+#include "robotkit_runtime.hpp"
 
 #include <cmath>
 #include <algorithm>
@@ -270,115 +270,6 @@ rk_result RK_CALL rk_robot_command_validate_for_blueprint(
     return RK_OK;
 }
 
-rk_result RK_CALL rk_trajectory_segment_chunk_validate(const rk_trajectory_segment_chunk *chunk) {
-    if (!has_full_struct(chunk) || chunk->segment_count == 0 ||
-        chunk->segment_count > RK_MAX_TRAJECTORY_SEGMENTS)
-        return RK_ERROR_INVALID_ARGUMENT;
-    uint64_t expected_start = 0;
-    uint32_t coefficients = 0;
-    const uint32_t joint_count = chunk->segments[0].joint_count;
-    for (uint32_t index = 0; index < chunk->segment_count; ++index) {
-        const auto &segment = chunk->segments[index];
-        if (segment.joint_count == 0 || segment.joint_count > RK_MAX_TRAJECTORY_JOINTS ||
-            segment.joint_count != joint_count || segment.degree > 5 ||
-            segment.duration_ns == 0 || segment.time_from_start_ns != expected_start ||
-            segment.duration_ns > UINT64_MAX - expected_start)
-            return RK_ERROR_INVALID_ARGUMENT;
-        expected_start += segment.duration_ns;
-        coefficients += segment.joint_count * (segment.degree + 1);
-        if (coefficients > RK_MAX_TRAJECTORY_COEFFICIENTS)
-            return RK_ERROR_INVALID_ARGUMENT;
-        for (uint32_t joint = 0; joint < joint_count; ++joint)
-            for (uint32_t degree = 0; degree <= segment.degree; ++degree)
-                if (!is_finite(segment.coefficients[joint].value[degree]))
-                    return RK_ERROR_INVALID_ARGUMENT;
-    }
-    return RK_OK;
-}
-
-rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
-    const rk_trajectory_segment_chunk *chunk, const rk_robot_runtime_blueprint *blueprint) {
-    if (rk_robot_runtime_blueprint_validate(blueprint) != RK_OK ||
-        rk_trajectory_segment_chunk_validate(chunk) != RK_OK ||
-        blueprint->joint_count > RK_MAX_TRAJECTORY_JOINTS ||
-        chunk->segments[0].joint_count != blueprint->joint_count)
-        return RK_ERROR_INVALID_ARGUMENT;
-    if (has_couplings(blueprint))
-        for (uint32_t s = 0; s < chunk->segment_count; ++s) {
-            const auto &segment = chunk->segments[s];
-            for (uint32_t i = 0; i < blueprint->coupling_count; ++i) {
-                const auto &c = blueprint->couplings[i];
-                for (uint32_t degree = 0; degree <= segment.degree; ++degree) {
-                    const double expected = c.ratio * segment.coefficients[c.leader].value[degree] +
-                        (degree == 0 ? c.offset : 0.0);
-                    if (std::abs(segment.coefficients[c.follower].value[degree] - expected) > 1e-6)
-                        return RK_ERROR_INVALID_ARGUMENT;
-                }
-            }
-        }
-    return RK_OK;
-}
-
-rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
-    const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint) {
-    constexpr auto old_full_size = offsetof(rk_plan_submission, event_count) +
-        sizeof(uint32_t);
-    if (!plan || plan->struct_size < offsetof(rk_plan_submission, position_tolerance) ||
-        (plan->struct_size > offsetof(rk_plan_submission, position_tolerance) &&
-         plan->struct_size < offsetof(rk_plan_submission, ends_at_rest)) ||
-        (plan->struct_size > offsetof(rk_plan_submission, ends_at_rest) &&
-         plan->struct_size < old_full_size) ||
-        (plan->struct_size > old_full_size &&
-         plan->struct_size < sizeof(*plan)) ||
-        plan->sequence == 0 || plan->plan_id == 0 ||
-        (plan->reserved0 & ~RK_PLAN_JERK_UNCHECKED) != 0 ||
-        rk_trajectory_segment_chunk_validate_for_blueprint(&plan->segments, blueprint) != RK_OK ||
-        (plan->replace_after_plan_id == 0 && plan->replace_after_time_ns != 0) ||
-        (plan->replace_after_plan_id != 0 && plan->replace_after_time_ns == 0))
-        return RK_ERROR_INVALID_ARGUMENT;
-    for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
-        if (!is_finite(plan->start_position[joint]) ||
-            !is_finite(plan->start_velocity[joint]) ||
-            !is_finite(plan->start_acceleration[joint]))
-            return RK_ERROR_INVALID_ARGUMENT;
-    if (!coupled_values(blueprint, plan->start_position, 1e-6, true) ||
-        !coupled_values(blueprint, plan->start_velocity, 1e-6, false) ||
-        !coupled_values(blueprint, plan->start_acceleration, 1e-6, false))
-        return RK_ERROR_INVALID_ARGUMENT;
-    if (plan->struct_size >= offsetof(rk_plan_submission, ends_at_rest))
-        for (uint32_t joint = 0; joint < blueprint->joint_count; ++joint)
-            if (!is_finite(plan->position_tolerance[joint]) ||
-                !is_finite(plan->velocity_tolerance[joint]) ||
-                !is_finite(plan->acceleration_tolerance[joint]) ||
-                plan->position_tolerance[joint] < 0.0 ||
-                plan->velocity_tolerance[joint] < 0.0 ||
-                plan->acceleration_tolerance[joint] < 0.0)
-                return RK_ERROR_INVALID_ARGUMENT;
-    if (plan->struct_size >= old_full_size && plan->ends_at_rest > 1)
-        return RK_ERROR_INVALID_ARGUMENT;
-    if (plan->struct_size >= sizeof(*plan)) {
-        if (plan->event_count > RK_MAX_PLAN_EVENTS) return RK_ERROR_INVALID_ARGUMENT;
-        if (plan->event_count > 0 &&
-            (plan->required_capabilities & RK_PLAN_CAPABILITY_EVENTS) == 0)
-            return RK_ERROR_INVALID_ARGUMENT;
-        uint64_t previous = 0;
-        for (uint32_t i = 0; i < plan->event_count; ++i) {
-            const auto &event = plan->events[i];
-            if (!valid_event_id(event.channel, sizeof(event.channel)) ||
-                !valid_event_value(event.value) || event.hold_policy > RK_EVENT_RESTORE_ON_RESUME ||
-                (i != 0 && event.time_ns < previous)) return RK_ERROR_INVALID_ARGUMENT;
-            previous = event.time_ns;
-            bool declared = false;
-            if (blueprint->struct_size >= sizeof(*blueprint))
-                for (uint32_t j = 0; j < blueprint->channel_count; ++j)
-                    if (std::strcmp(event.channel, blueprint->channels[j].id) == 0 &&
-                        event.value.kind == blueprint->channels[j].kind) declared = true;
-            if (!declared) return RK_ERROR_INVALID_ARGUMENT;
-        }
-    }
-    return RK_OK;
-}
-
 rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state) {
     if (!has_full_struct(state) || state->joint_count > RK_MAX_JOINTS)
         return RK_ERROR_INVALID_ARGUMENT;
@@ -427,3 +318,92 @@ rk_result RK_CALL rk_robot_capabilities_validate(const rk_robot_capabilities *ca
 }
 
 } // extern "C"
+
+namespace robotkit {
+
+rk_result validate_segments(const SegmentBatch &batch) {
+    const auto &segments = batch.segments;
+    if (segments.empty() || segments.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS)
+        return RK_ERROR_INVALID_ARGUMENT;
+    uint64_t expected_start = 0;
+    const uint32_t joint_count = segments[0].joint_count;
+    for (const auto &segment : segments) {
+        if (segment.joint_count == 0 || segment.joint_count > RK_MAX_TRAJECTORY_JOINTS ||
+            segment.joint_count != joint_count || segment.degree > 5 ||
+            segment.duration_ns == 0 || segment.time_from_start_ns != expected_start ||
+            segment.duration_ns > UINT64_MAX - expected_start)
+            return RK_ERROR_INVALID_ARGUMENT;
+        expected_start += segment.duration_ns;
+        for (uint32_t joint = 0; joint < joint_count; ++joint)
+            for (uint32_t degree = 0; degree <= segment.degree; ++degree)
+                if (!is_finite(segment.coefficients[joint].value[degree]))
+                    return RK_ERROR_INVALID_ARGUMENT;
+    }
+    return RK_OK;
+}
+
+rk_result validate_segments_for_blueprint(const SegmentBatch &batch,
+    const rk_robot_runtime_blueprint &blueprint) {
+    if (rk_robot_runtime_blueprint_validate(&blueprint) != RK_OK ||
+        validate_segments(batch) != RK_OK ||
+        blueprint.joint_count > RK_MAX_TRAJECTORY_JOINTS ||
+        batch.segments[0].joint_count != blueprint.joint_count)
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (has_couplings(&blueprint))
+        for (const auto &segment : batch.segments)
+            for (uint32_t i = 0; i < blueprint.coupling_count; ++i) {
+                const auto &c = blueprint.couplings[i];
+                for (uint32_t degree = 0; degree <= segment.degree; ++degree) {
+                    const double expected = c.ratio * segment.coefficients[c.leader].value[degree] +
+                        (degree == 0 ? c.offset : 0.0);
+                    if (std::abs(segment.coefficients[c.follower].value[degree] - expected) > 1e-6)
+                        return RK_ERROR_INVALID_ARGUMENT;
+                }
+            }
+    return RK_OK;
+}
+
+rk_result validate_plan_for_blueprint(const PlanRequest &plan,
+    const rk_robot_runtime_blueprint &blueprint) {
+    if (plan.sequence == 0 || plan.plan_id == 0 ||
+        (plan.flags & ~RK_PLAN_JERK_UNCHECKED) != 0 ||
+        validate_segments_for_blueprint(plan.segments, blueprint) != RK_OK ||
+        (plan.replace_after_plan_id == 0 && plan.replace_after_time_ns != 0) ||
+        (plan.replace_after_plan_id != 0 && plan.replace_after_time_ns == 0))
+        return RK_ERROR_INVALID_ARGUMENT;
+    for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint)
+        if (!is_finite(plan.start_position[joint]) ||
+            !is_finite(plan.start_velocity[joint]) ||
+            !is_finite(plan.start_acceleration[joint]) ||
+            !is_finite(plan.position_tolerance[joint]) ||
+            !is_finite(plan.velocity_tolerance[joint]) ||
+            !is_finite(plan.acceleration_tolerance[joint]) ||
+            plan.position_tolerance[joint] < 0.0 ||
+            plan.velocity_tolerance[joint] < 0.0 ||
+            plan.acceleration_tolerance[joint] < 0.0)
+            return RK_ERROR_INVALID_ARGUMENT;
+    if (!coupled_values(&blueprint, plan.start_position, 1e-6, true) ||
+        !coupled_values(&blueprint, plan.start_velocity, 1e-6, false) ||
+        !coupled_values(&blueprint, plan.start_acceleration, 1e-6, false))
+        return RK_ERROR_INVALID_ARGUMENT;
+    if (plan.events.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS ||
+        (!plan.events.empty() && (plan.required_capabilities & RK_PLAN_CAPABILITY_EVENTS) == 0))
+        return RK_ERROR_INVALID_ARGUMENT;
+    uint64_t previous = 0;
+    for (std::size_t i = 0; i < plan.events.size(); ++i) {
+        const auto &event = plan.events[i];
+        if (!valid_event_id(event.channel, sizeof(event.channel)) ||
+            !valid_event_value(event.value) || event.hold_policy > RK_EVENT_RESTORE_ON_RESUME ||
+            (i != 0 && event.time_ns < previous)) return RK_ERROR_INVALID_ARGUMENT;
+        previous = event.time_ns;
+        bool declared = false;
+        for (uint32_t j = 0; j < blueprint.channel_count; ++j)
+            if (std::strcmp(event.channel, blueprint.channels[j].id) == 0 &&
+                event.value.kind == blueprint.channels[j].kind) declared = true;
+        if (!declared) return RK_ERROR_INVALID_ARGUMENT;
+    }
+    return RK_OK;
+}
+
+} // namespace robotkit
+

@@ -132,7 +132,6 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_MAX_JOINTS = 512;
 	const RK_MAX_JOINT_COUPLINGS = 512;
 	const RK_MAX_LINKS = 1024;
-	const RK_MAX_PLAN_EVENTS = 256;
 	const RK_MAX_PROCESS_CHANNELS = 32;
 	const RK_MAX_SENSORS = 8;
 	const RK_MAX_SENSOR_VALUES = 64;
@@ -142,21 +141,13 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	const RK_MAX_SERIAL_JOINTS = 64;
 	const RK_MAX_SERVO_JOINTS = 64;
 	/**
-	 * < Maximum used scalar coefficients per segment chunk.
-	 */
-	const RK_MAX_TRAJECTORY_COEFFICIENTS = 4096;
-	/**
-	 * < Maximum joints represented by one trajectory chunk.
+	 * < Maximum joints a trajectory drives.
 	 */
 	const RK_MAX_TRAJECTORY_JOINTS = 64;
 	/**
-	 * < Maximum queued segment-start knots.
+	 * < Maximum queued segment-start knots and events.
 	 */
 	const RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096;
-	/**
-	 * < Maximum polynomial segments per chunk.
-	 */
-	const RK_MAX_TRAJECTORY_SEGMENTS = 128;
 	/**
 	 * < Operation completed successfully.
 	 */
@@ -272,7 +263,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Target joint velocity.
 	 */
 	const RK_TARGET_VELOCITY = 2;
-	extern fn rk_plan_submission_validate_for_blueprint(plan: ptr<const<rk_plan_submission>>, blueprint: ptr<const<rk_robot_runtime_blueprint>>) -> rk_result;
+	/**
+	 * < Coefficients per joint and segment: degree 0 through 5.
+	 */
+	const RK_TRAJECTORY_COEFFICIENT_STRIDE = 6;
 	extern fn rk_recording_reader_destroy(reader: rk_recording_reader_handle) -> void;
 	/**
 	 * Returns RK_ERROR_STALE_STATE at clean end of file.
@@ -391,24 +385,18 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	extern fn rk_robot_runtime_submit(runtime: rk_robot_runtime, command: ptr<const<rk_robot_command>>) -> rk_result;
 	/**
-	 * Atomically validates and accepts a plan or committed-horizon replacement.
-	 * A replacement before committed_until_ns returns RK_ERROR_INVALID_STATE with
-	 * no queue mutation.
+	 * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
+	 * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
+	 * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
+	 * source_joint_count; a robot joint no source joint drives holds header->start_position. Events
+	 * are sorted by path time from the plan's start.
 	 */
-	extern fn rk_robot_runtime_submit_plan(runtime: rk_robot_runtime, plan: ptr<const<rk_plan_submission>>) -> rk_result;
+	extern fn rk_robot_runtime_submit_plan(runtime: rk_robot_runtime, header: ptr<const<rk_plan_header>>, starts_ns: ptr<const<i64>> @in_array("segment_count"), durations_ns: ptr<const<i64>> @in_array("segment_count"), degrees: ptr<const<i32>> @in_array("segment_count"), segment_count: u32, coefficients: ptr<const<f64>> @in_array("coefficient_count"), coefficient_count: u32, joint_map: ptr<const<i32>> @in_array("source_joint_count"), source_joint_count: u32, events: ptr<const<rk_timed_event>> @in_array("event_count"), event_count: u32) -> rk_result;
 	/**
-	 * Submits a plan as rk_robot_runtime_submit_plan does, with its segments read from arrays, such as
-	 * a MotionKit plan's, and copied once. Segment i starts at starts_ns[i] - starts_ns[0] in the plan,
-	 * lasts durations_ns[i], and has degree degrees[i]. The plan's joints are the source joints:
-	 * source joint j drives robot joint joint_map[j] with coefficient p at
-	 * coefficients[(i * source_joint_count + j) * 6 + p], and a robot joint no source joint drives
-	 * holds header->start_position. coefficient_count must be segment_count * source_joint_count * 6.
+	 * Queues segments over every robot joint (joint_count is the blueprint's), tagged with tag.
+	 * The command's kind is RK_COMMAND_TRAJECTORY_SEGMENTS.
 	 */
-	extern fn rk_robot_runtime_submit_plan_arrays(runtime: rk_robot_runtime, header: ptr<const<rk_plan_header>>, starts_ns: ptr<const<i64>> @in_array("segment_count"), durations_ns: ptr<const<i64>> @in_array("segment_count"), degrees: ptr<const<i32>> @in_array("segment_count"), segment_count: u32, coefficients: ptr<const<f64>> @in_array("coefficient_count"), coefficient_count: u32, joint_map: ptr<const<i32>> @in_array("source_joint_count"), source_joint_count: u32) -> rk_result;
-	/**
-	 * Submits a bounded polynomial segment chunk to the runtime queue.
-	 */
-	extern fn rk_robot_runtime_submit_segments(runtime: rk_robot_runtime, command: ptr<const<rk_robot_command>>, chunk: ptr<const<rk_trajectory_segment_chunk>>) -> rk_result;
+	extern fn rk_robot_runtime_submit_segments(runtime: rk_robot_runtime, command: ptr<const<rk_robot_command>>, tag: u64, starts_ns: ptr<const<i64>> @in_array("segment_count"), durations_ns: ptr<const<i64>> @in_array("segment_count"), degrees: ptr<const<i32>> @in_array("segment_count"), segment_count: u32, coefficients: ptr<const<f64>> @in_array("coefficient_count"), coefficient_count: u32) -> rk_result;
 	/**
 	 * Validates an immutable published snapshot and its array counts.
 	 */
@@ -417,11 +405,6 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * Validates a mutable native state value and its array counts.
 	 */
 	extern fn rk_robot_state_validate(state: ptr<const<rk_robot_state>>) -> rk_result;
-	/**
-	 * Validates a bounded polynomial payload and its coefficient budget.
-	 */
-	extern fn rk_trajectory_segment_chunk_validate(chunk: ptr<const<rk_trajectory_segment_chunk>>) -> rk_result;
-	extern fn rk_trajectory_segment_chunk_validate_for_blueprint(chunk: ptr<const<rk_trajectory_segment_chunk>>, blueprint: ptr<const<rk_robot_runtime_blueprint>>) -> rk_result;
 	struct rk_channel_declaration @layout(128, 8) {
 		id: array<c_char, 48> @offset(0);
 		kind: rk_event_kind @offset(48);
@@ -498,38 +481,12 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		max_effort: f64 @offset(24);
 	}
 	/**
-	 * An rk_plan_submission without its segments, for rk_robot_runtime_submit_plan_arrays. Each field
-	 * means what it does there; tag is the segment chunk's tag. All fields are required.
+	 * A plan's identity and start state, submitted with its segments and events by
+	 * rk_robot_runtime_submit_plan. Replacement time is in the active plan's trajectory clock.
 	 */
-	struct rk_plan_header @layout(37968, 8) {
+	struct rk_plan_header @layout(3144, 8) {
 		struct_size: u32 @offset(0) @struct_size;
 		required_capabilities: u32 @offset(4);
-		sequence: u64 @offset(8);
-		plan_id: u64 @offset(16);
-		model_revision: u64 @offset(24);
-		calibration_revision: u64 @offset(32);
-		replace_after_plan_id: u64 @offset(40);
-		replace_after_time_ns: u64 @offset(48);
-		tag: u64 @offset(56);
-		/**
-		 * < RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked.
-		 */
-		reserved0: u32 @offset(64);
-		ends_at_rest: u32 @offset(68);
-		start_position: array<f64, 64> @offset(72);
-		start_velocity: array<f64, 64> @offset(584);
-		start_acceleration: array<f64, 64> @offset(1096);
-		position_tolerance: array<f64, 64> @offset(1608);
-		velocity_tolerance: array<f64, 64> @offset(2120);
-		acceleration_tolerance: array<f64, 64> @offset(2632);
-		event_count: u32 @offset(3144);
-		events: array<rk_timed_event, 256> @offset(3152);
-	}
-	/**
-	 * Bounded plan. Replacement time is in the active plan's trajectory clock.
-	 */
-	struct rk_plan_submission @layout(434264, 8) {
-		struct_size: u32 @offset(0) @struct_size;
 		/**
 		 * < Monotonic runtime command sequence.
 		 */
@@ -540,36 +497,32 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		plan_id: u64 @offset(16);
 		model_revision: u64 @offset(24);
 		calibration_revision: u64 @offset(32);
-		required_capabilities: u32 @offset(40);
-		/**
-		 * < RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked.
-		 */
-		reserved0: u32 @offset(44);
 		/**
 		 * < Zero means append/start, not replace.
 		 */
-		replace_after_plan_id: u64 @offset(48);
-		replace_after_time_ns: u64 @offset(56);
-		start_position: array<f64, 64> @offset(64);
-		start_velocity: array<f64, 64> @offset(576);
-		start_acceleration: array<f64, 64> @offset(1088);
-		segments: rk_trajectory_segment_chunk @offset(1600);
+		replace_after_plan_id: u64 @offset(40);
+		replace_after_time_ns: u64 @offset(48);
+		/**
+		 * < Reported as the trajectory tag while the plan runs.
+		 */
+		tag: u64 @offset(56);
+		/**
+		 * < RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked.
+		 */
+		flags: u32 @offset(64);
+		/**
+		 * < One for a final plan, zero if more motion is expected.
+		 */
+		ends_at_rest: u32 @offset(68);
+		start_position: array<f64, 64> @offset(72);
+		start_velocity: array<f64, 64> @offset(584);
+		start_acceleration: array<f64, 64> @offset(1096);
 		/**
 		 * Per-joint nonnegative start-state tolerances; zero defaults to 1e-6.
 		 */
-		position_tolerance: array<f64, 64> @offset(397904);
-		velocity_tolerance: array<f64, 64> @offset(398416);
-		acceleration_tolerance: array<f64, 64> @offset(398928);
-		/**
-		 * One for a final plan, zero if more motion is expected. Absent means one.
-		 * Full-size C callers must set this explicitly; Haxe defaults to final.
-		 */
-		ends_at_rest: u32 @offset(399440);
-		/**
-		 * < Versioned: absent means no events.
-		 */
-		event_count: u32 @offset(399444);
-		events: array<rk_timed_event, 256> @offset(399448);
+		position_tolerance: array<f64, 64> @offset(1608);
+		velocity_tolerance: array<f64, 64> @offset(2120);
+		acceleration_tolerance: array<f64, 64> @offset(2632);
 	}
 	struct rk_recording_message @layout(160, 8) {
 		struct_size: u32 @offset(0) @struct_size;
@@ -1107,34 +1060,6 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 		channel: array<c_char, 48> @offset(8);
 		value: rk_event_value @offset(56);
 		hold_policy: rk_event_hold_policy @offset(128);
-	}
-	/**
-	 * Coefficients for one joint, in powers of seconds from segment start.
-	 */
-	struct rk_trajectory_coefficients @layout(48, 8) {
-		/**
-		 * < Degree zero through five.
-		 */
-		value: array<f64, 6> @offset(0);
-	}
-	/**
-	 * A polynomial segment whose start time is relative to its chunk.
-	 */
-	struct rk_trajectory_segment @layout(3096, 8) {
-		time_from_start_ns: u64 @offset(0);
-		duration_ns: u64 @offset(8);
-		degree: u32 @offset(16);
-		joint_count: u32 @offset(20);
-		coefficients: array<rk_trajectory_coefficients, 64> @offset(24);
-	}
-	/**
-	 * Bounded polynomial payload; segment starts are contiguous from time zero.
-	 */
-	struct rk_trajectory_segment_chunk @layout(396304, 8) {
-		struct_size: u32 @offset(0) @struct_size;
-		segment_count: u32 @offset(4);
-		segments: array<rk_trajectory_segment, 128> @offset(8);
-		tag: u64 @offset(396296);
 	}
 	/**
 	 * Kind of command batch submitted to a runtime mailbox.

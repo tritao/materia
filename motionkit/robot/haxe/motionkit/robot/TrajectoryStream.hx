@@ -146,19 +146,29 @@ class TrajectoryStream {
       Math.min(durationSeconds, Math.max(0.0, startSeconds + runtimeSeconds)) : 0.0;
   }
 
-  /** Submit enough chunks to keep two seconds of motion on the runtime. */
-  public function fill(session:MotionSession, jointCount:Int, reserveStaged:Bool,
+  /** Seconds of motion a stream keeps submitted ahead of the robot. */
+  public static inline final BUFFER_SECONDS = 2.0;
+
+  /**
+    Submits the segments starting within `BUFFER_SECONDS` of the robot's
+    progress, so a robot holds a bounded window of motion whatever the
+    transport, within the room left in its queue.
+  **/
+  public function fill(session:MotionSession, reserveStaged:Bool,
       build:Int -> Int -> Int64 -> Int64 -> Int64 -> ExecutionPlanSubmission,
       describeFailure:Int -> Int -> Dynamic -> String):Void {
     var stagedSegments = 0;
     var total = segments.count();
-    while (nextSegment < total && chunkEndSeconds - elapsedSeconds < 2.0) {
-      var available = 4096 - robot.snapshot().trajectoryQueueDepth -
-        (reserveStaged ? stagedSegments : 0);
-      var coefficientLimit = Std.int(Math.floor(4096.0 / (jointCount * 6.0)));
-      var count = Std.int(Math.min(coefficientLimit, Math.min(128,
-        Math.min(available, total - nextSegment))));
-      if (count < 1) return;
+    while (nextSegment < total && chunkEndSeconds - elapsedSeconds < BUFFER_SECONDS) {
+      // A submission is bounded only by the room left in the runtime's queue.
+      var available = RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_QUEUE_POINTS -
+        robot.snapshot().trajectoryQueueDepth - (reserveStaged ? stagedSegments : 0);
+      var room = Std.int(Math.min(available, total - nextSegment));
+      if (room < 1) return;
+      var horizonNs = Trajectory.nanoseconds(Math.max(elapsedSeconds, chunkEndSeconds) + BUFFER_SECONDS);
+      var count = 1;
+      while (count < room && Int64.compare(segments.startNs(nextSegment + count), horizonNs) < 0)
+        count++;
       var first = nextSegment;
       var last = first + count;
       var startNs = segments.startNs(first);
@@ -289,7 +299,7 @@ class TrajectoryStream {
 
   public function shouldRefill(dt:Float, fixedTimestepSeconds:Float):Bool {
     if (nextSegment >= segments.count()) return false;
-    var lead = Math.max(2.0, Math.max(fixedTimestepSeconds, dt) * 2.0);
+    var lead = Math.max(BUFFER_SECONDS, Math.max(fixedTimestepSeconds, dt) * 2.0);
     if (chunkEndSeconds - elapsedSeconds <= lead + 1e-9) return true;
     if (elapsedSeconds <= 1e-9) return false;
     var observation = robot.snapshot();
@@ -315,7 +325,6 @@ class TrajectoryStream {
     var payload = [for (segment in planned.segments())
       new TrajectorySegment(segment.timeFromStartNs, segment.durationNs,
         segment.coefficients)];
-    if (payload.length > 128) throw "Smooth replacement exceeds one runtime submission";
     robot.submit(RobotCommand.ExecutionPlan(new ExecutionPlanSubmission(tag,
       modelRevision, calibrationRevision, 1, state.positions, state.velocities,
       state.accelerations, payload, observation.activePlanId, anchorNs)));

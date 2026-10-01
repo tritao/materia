@@ -166,105 +166,111 @@ rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime, const rk_rob
     return value ? value->submit(*command) : RK_ERROR_INVALID_HANDLE;
 }
 
-rk_result RK_CALL rk_robot_runtime_submit_segments(
-    rk_robot_runtime runtime, const rk_robot_command *command,
-    const rk_trajectory_segment_chunk *chunk) {
-    if (!command || !chunk)
-        return RK_ERROR_INVALID_ARGUMENT;
-    const auto value = robotkit::internal::resolve_runtime(runtime);
-    return value ? value->submit_segments(*command, *chunk) : RK_ERROR_INVALID_HANDLE;
-}
-
-rk_result RK_CALL rk_robot_runtime_submit_plan(
-    rk_robot_runtime runtime, const rk_plan_submission *plan) {
-    if (!plan) return RK_ERROR_INVALID_ARGUMENT;
-    const auto value = robotkit::internal::resolve_runtime(runtime);
-    return value ? value->submit_plan(*plan) : RK_ERROR_INVALID_HANDLE;
-}
-
 namespace {
-// The submission assembled from a header and segment arrays: one copy, into storage each
-// thread reuses rather than allocating the large struct per plan.
-rk_result assemble_plan(const rk_plan_header &header, const int64_t *starts_ns,
-    const int64_t *durations_ns, const int32_t *degrees, uint32_t segment_count,
-    const double *coefficients, uint32_t coefficient_count, const int32_t *joint_map,
-    uint32_t source_joint_count, uint32_t robot_joint_count, rk_plan_submission &plan) {
-    constexpr uint32_t stride = 6;
-    if (header.struct_size < sizeof(header) || segment_count == 0 ||
-        segment_count > RK_MAX_TRAJECTORY_SEGMENTS || source_joint_count == 0 ||
-        source_joint_count > robot_joint_count || robot_joint_count > RK_MAX_TRAJECTORY_JOINTS ||
-        !starts_ns || !durations_ns || !degrees || !coefficients || !joint_map ||
+/**
+ * Copies segment arrays into a batch over every robot joint: once, the runtime's one copy.
+ * Source joint j drives robot joint joint_map[j], or joint j without a map; a robot joint
+ * no source joint drives holds its held position.
+ */
+rk_result copy_segments(const int64_t *starts_ns, const int64_t *durations_ns,
+    const int32_t *degrees, uint32_t segment_count, const double *coefficients,
+    uint32_t coefficient_count, const int32_t *joint_map, uint32_t source_joint_count,
+    uint32_t robot_joint_count, const double *held_positions, robotkit::SegmentBatch &batch) {
+    constexpr uint32_t stride = RK_TRAJECTORY_COEFFICIENT_STRIDE;
+    if (segment_count == 0 || segment_count > RK_MAX_TRAJECTORY_QUEUE_POINTS ||
+        source_joint_count == 0 || source_joint_count > robot_joint_count ||
+        robot_joint_count > RK_MAX_TRAJECTORY_JOINTS ||
+        !starts_ns || !durations_ns || !degrees || !coefficients ||
         static_cast<uint64_t>(coefficient_count) !=
-            static_cast<uint64_t>(segment_count) * source_joint_count * stride ||
-        header.event_count > RK_MAX_PLAN_EVENTS)
+            static_cast<uint64_t>(segment_count) * source_joint_count * stride)
         return RK_ERROR_INVALID_ARGUMENT;
+    uint32_t targets[RK_MAX_TRAJECTORY_JOINTS];
     bool driven[RK_MAX_TRAJECTORY_JOINTS]{};
     for (uint32_t joint = 0; joint < source_joint_count; ++joint) {
-        const auto target = joint_map[joint];
-        if (target < 0 || static_cast<uint32_t>(target) >= robot_joint_count || driven[target])
+        const int64_t target = joint_map ? joint_map[joint] : joint;
+        if (target < 0 || target >= robot_joint_count || driven[target])
             return RK_ERROR_INVALID_ARGUMENT;
+        targets[joint] = static_cast<uint32_t>(target);
         driven[target] = true;
     }
-    plan.struct_size = sizeof(plan);
-    plan.sequence = header.sequence;
-    plan.plan_id = header.plan_id;
-    plan.model_revision = header.model_revision;
-    plan.calibration_revision = header.calibration_revision;
-    plan.required_capabilities = header.required_capabilities;
-    plan.reserved0 = header.reserved0;
-    plan.replace_after_plan_id = header.replace_after_plan_id;
-    plan.replace_after_time_ns = header.replace_after_time_ns;
-    std::memcpy(plan.start_position, header.start_position, sizeof(plan.start_position));
-    std::memcpy(plan.start_velocity, header.start_velocity, sizeof(plan.start_velocity));
-    std::memcpy(plan.start_acceleration, header.start_acceleration, sizeof(plan.start_acceleration));
-    std::memcpy(plan.position_tolerance, header.position_tolerance, sizeof(plan.position_tolerance));
-    std::memcpy(plan.velocity_tolerance, header.velocity_tolerance, sizeof(plan.velocity_tolerance));
-    std::memcpy(plan.acceleration_tolerance, header.acceleration_tolerance,
-        sizeof(plan.acceleration_tolerance));
-    plan.ends_at_rest = header.ends_at_rest;
-    plan.event_count = header.event_count;
-    std::memcpy(plan.events, header.events, sizeof(rk_timed_event) * header.event_count);
-    auto &chunk = plan.segments;
-    chunk.struct_size = sizeof(chunk);
-    chunk.segment_count = segment_count;
-    chunk.tag = header.tag;
+    if (source_joint_count < robot_joint_count && !held_positions)
+        return RK_ERROR_INVALID_ARGUMENT;
+    batch.segments.resize(segment_count);
     for (uint32_t index = 0; index < segment_count; ++index) {
         if (starts_ns[index] < starts_ns[0] || durations_ns[index] <= 0 || degrees[index] < 0 ||
             degrees[index] >= static_cast<int32_t>(stride))
             return RK_ERROR_INVALID_ARGUMENT;
-        auto &segment = chunk.segments[index];
+        auto &segment = batch.segments[index];
         segment.time_from_start_ns = static_cast<uint64_t>(starts_ns[index] - starts_ns[0]);
         segment.duration_ns = static_cast<uint64_t>(durations_ns[index]);
         segment.degree = static_cast<uint32_t>(degrees[index]);
         segment.joint_count = robot_joint_count;
-        for (uint32_t joint = 0; joint < robot_joint_count; ++joint) {
-            segment.coefficients[joint] = rk_trajectory_coefficients{};
-            if (!driven[joint]) segment.coefficients[joint].value[0] = header.start_position[joint];
-        }
+        for (uint32_t joint = 0; joint < robot_joint_count; ++joint)
+            if (!driven[joint]) segment.coefficients[joint].value[0] = held_positions[joint];
         const double *source = coefficients + static_cast<size_t>(index) * source_joint_count * stride;
         for (uint32_t joint = 0; joint < source_joint_count; ++joint)
             for (uint32_t power = 0; power <= segment.degree; ++power)
-                segment.coefficients[joint_map[joint]].value[power] = source[joint * stride + power];
+                segment.coefficients[targets[joint]].value[power] = source[joint * stride + power];
     }
     return RK_OK;
 }
 }
 
-rk_result RK_CALL rk_robot_runtime_submit_plan_arrays(rk_robot_runtime runtime,
-    const rk_plan_header *header, const int64_t *starts_ns, const int64_t *durations_ns,
-    const int32_t *degrees, uint32_t segment_count, const double *coefficients,
-    uint32_t coefficient_count, const int32_t *joint_map, uint32_t source_joint_count) {
-    if (!header) return RK_ERROR_INVALID_ARGUMENT;
+rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runtime,
+    const rk_robot_command *command, uint64_t tag, const int64_t *starts_ns,
+    const int64_t *durations_ns, const int32_t *degrees, uint32_t segment_count,
+    const double *coefficients, uint32_t coefficient_count) {
+    if (!command) return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
     if (!value) return RK_ERROR_INVALID_HANDLE;
     try {
-        thread_local std::unique_ptr<rk_plan_submission> plan;
-        if (!plan) plan = std::make_unique<rk_plan_submission>();
-        *plan = rk_plan_submission{};
-        const auto assembled = assemble_plan(*header, starts_ns, durations_ns, degrees,
-            segment_count, coefficients, coefficient_count, joint_map, source_joint_count,
-            value->blueprint().joint_count, *plan);
-        return assembled == RK_OK ? value->submit_plan(*plan) : assembled;
+        robotkit::SegmentBatch batch;
+        batch.tag = tag;
+        const auto joints = value->blueprint().joint_count;
+        const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
+            coefficients, coefficient_count, nullptr, joints, joints, nullptr, batch);
+        return copied == RK_OK ? value->submit_segments(*command, std::move(batch)) : copied;
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
+}
+
+rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
+    const rk_plan_header *header, const int64_t *starts_ns, const int64_t *durations_ns,
+    const int32_t *degrees, uint32_t segment_count, const double *coefficients,
+    uint32_t coefficient_count, const int32_t *joint_map, uint32_t source_joint_count,
+    const rk_timed_event *events, uint32_t event_count) {
+    if (!header || header->struct_size < sizeof(*header) || !joint_map ||
+        header->ends_at_rest > 1 || (event_count > 0 && !events) ||
+        event_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
+        return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    if (!value) return RK_ERROR_INVALID_HANDLE;
+    try {
+        robotkit::PlanRequest plan;
+        plan.sequence = header->sequence;
+        plan.plan_id = header->plan_id;
+        plan.model_revision = header->model_revision;
+        plan.calibration_revision = header->calibration_revision;
+        plan.required_capabilities = header->required_capabilities;
+        plan.flags = header->flags;
+        plan.replace_after_plan_id = header->replace_after_plan_id;
+        plan.replace_after_time_ns = header->replace_after_time_ns;
+        plan.ends_at_rest = header->ends_at_rest != 0;
+        std::copy_n(header->start_position, RK_MAX_TRAJECTORY_JOINTS, plan.start_position);
+        std::copy_n(header->start_velocity, RK_MAX_TRAJECTORY_JOINTS, plan.start_velocity);
+        std::copy_n(header->start_acceleration, RK_MAX_TRAJECTORY_JOINTS, plan.start_acceleration);
+        std::copy_n(header->position_tolerance, RK_MAX_TRAJECTORY_JOINTS, plan.position_tolerance);
+        std::copy_n(header->velocity_tolerance, RK_MAX_TRAJECTORY_JOINTS, plan.velocity_tolerance);
+        std::copy_n(header->acceleration_tolerance, RK_MAX_TRAJECTORY_JOINTS,
+            plan.acceleration_tolerance);
+        plan.segments.tag = header->tag;
+        const auto copied = copy_segments(starts_ns, durations_ns, degrees, segment_count,
+            coefficients, coefficient_count, joint_map, source_joint_count,
+            value->blueprint().joint_count, header->start_position, plan.segments);
+        if (copied != RK_OK) return copied;
+        plan.events.assign(events, events + event_count);
+        return value->submit_plan(plan);
     } catch (const std::bad_alloc &) {
         return RK_ERROR_OUT_OF_MEMORY;
     }

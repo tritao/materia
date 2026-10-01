@@ -272,7 +272,13 @@ class StreamTests extends MotionKitTestSupport {
       [for (index in 0...601) index * 0.01],
       [for (index in 0...601) [0.05 * index / 600.0]]);
     machine.queueTrajectory(trajectory);
-    check(recording.commands.length >= 2,
+    var initialSegments = 0;
+    for (command in recording.commands) switch command {
+      case RobotCommand.ExecutionPlan(plan): initialSegments += plan.segments.length;
+      case _:
+    }
+    // Two seconds of the six-second, 600-segment trajectory, not all of it.
+    check(recording.commands.length >= 1 && initialSegments >= 200 && initialSegments <= 210,
       "long trajectory starts with a bounded native plan window");
     var initialPlanCount = recording.commands.length;
 
@@ -295,8 +301,8 @@ class StreamTests extends MotionKitTestSupport {
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
       case RobotCommand.ExecutionPlan(plan):
-        check(plan.segments.length <= 128,
-          "streamed trajectory plans stay within the native segment limit");
+        check(plan.segments.length <= 210,
+          "streamed trajectory plans hold about two seconds of motion each");
       case Hold | Resume | Abort:
         throw "long trajectory unexpectedly submitted a lifecycle command";
     }

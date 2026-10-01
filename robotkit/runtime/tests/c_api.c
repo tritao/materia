@@ -56,47 +56,23 @@ int main(void) {
     segment_command.struct_size = sizeof(segment_command);
     segment_command.sequence = 1;
     segment_command.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
-    rk_trajectory_segment_chunk segment_chunk = {0};
-    segment_chunk.struct_size = sizeof(segment_chunk);
-    segment_chunk.segment_count = 1;
-    segment_chunk.segments[0].duration_ns = 100000000;
-    segment_chunk.segments[0].degree = 1;
-    segment_chunk.segments[0].joint_count = 1;
-    segment_chunk.segments[0].coefficients[0].value[1] = 0.5;
-    assert(rk_robot_runtime_submit_segments(segment_runtime, &segment_command,
-        &segment_chunk) == RK_OK);
+    const int64_t one_start[] = {0};
+    const int64_t short_duration[] = {100000000};
+    const int32_t linear[] = {1};
+    const double ramp[] = {0.0, 0.5, 0.0, 0.0, 0.0, 0.0};
+    assert(rk_robot_runtime_submit_segments(segment_runtime, &segment_command, 7, one_start,
+        short_duration, linear, 1, ramp, 5) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_robot_runtime_submit_segments(segment_runtime, &segment_command, 7, one_start,
+        short_duration, linear, 1, ramp, 6) == RK_OK);
     rk_robot_runtime_destroy(segment_runtime);
 
+    /* A plan from segment arrays, as a MotionKit plan holds them, starting mid-plan. */
     rk_robot_runtime plan_runtime = RK_INVALID_ROBOT_RUNTIME;
     assert(rk_robot_runtime_create(&blueprint, &plan_runtime) == RK_OK);
-    rk_plan_submission plan = {0};
-    plan.struct_size = sizeof(plan);
-    plan.sequence = 1;
-    plan.plan_id = 99;
-    plan.model_revision = blueprint.revision;
-    plan.required_capabilities = RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE;
-    plan.segments.struct_size = sizeof(plan.segments);
-    plan.segments.segment_count = 1;
-    plan.segments.segments[0].duration_ns = 1000000000;
-    plan.segments.segments[0].degree = 3;
-    plan.segments.segments[0].joint_count = 1;
-    plan.segments.segments[0].coefficients[0].value[3] = 0.1;
-    assert(rk_plan_submission_validate_for_blueprint(&plan, &blueprint) == RK_OK);
-    assert(rk_robot_runtime_submit_plan(plan_runtime, &plan) == RK_OK);
-    full_snapshot.struct_size = sizeof(full_snapshot);
-    assert(rk_robot_runtime_snapshot_full(plan_runtime, &full_snapshot) == RK_OK);
-    assert(full_snapshot.active_plan_id == 99);
-    assert(full_snapshot.session_state == RK_SESSION_EXECUTING);
-    assert(full_snapshot.queue_end_time_ns == 1000000000);
-    rk_robot_runtime_destroy(plan_runtime);
-
-    /* The same plan from segment arrays, as a MotionKit plan holds them, starting mid-plan. */
-    rk_robot_runtime array_runtime = RK_INVALID_ROBOT_RUNTIME;
-    assert(rk_robot_runtime_create(&blueprint, &array_runtime) == RK_OK);
     static rk_plan_header header;
     header.struct_size = sizeof(header);
     header.sequence = 1;
-    header.plan_id = 100;
+    header.plan_id = 99;
     header.model_revision = blueprint.revision;
     header.required_capabilities = RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE;
     header.tag = 7;
@@ -107,16 +83,22 @@ int main(void) {
     const double coefficients[] = {0.0, 0.0, 0.0, 0.1, 0.0, 0.0};
     const int32_t joint_map[] = {0};
     const int32_t bad_map[] = {1};
-    assert(rk_robot_runtime_submit_plan_arrays(array_runtime, &header, starts, durations, degrees,
-        1, coefficients, 5, joint_map, 1) == RK_ERROR_INVALID_ARGUMENT);
-    assert(rk_robot_runtime_submit_plan_arrays(array_runtime, &header, starts, durations, degrees,
-        1, coefficients, 6, bad_map, 1) == RK_ERROR_INVALID_ARGUMENT);
-    assert(rk_robot_runtime_submit_plan_arrays(array_runtime, &header, starts, durations, degrees,
-        1, coefficients, 6, joint_map, 1) == RK_OK);
-    assert(rk_robot_runtime_snapshot_full(array_runtime, &full_snapshot) == RK_OK);
-    assert(full_snapshot.active_plan_id == 100);
+    assert(rk_robot_runtime_submit_plan(plan_runtime, &header, starts, durations, degrees,
+        1, coefficients, 5, joint_map, 1, NULL, 0) == RK_ERROR_INVALID_ARGUMENT);
+    assert(rk_robot_runtime_submit_plan(plan_runtime, &header, starts, durations, degrees,
+        1, coefficients, 6, bad_map, 1, NULL, 0) == RK_ERROR_INVALID_ARGUMENT);
+    header.ends_at_rest = 1; /* The cubic is still moving at its end. */
+    assert(rk_robot_runtime_submit_plan(plan_runtime, &header, starts, durations, degrees,
+        1, coefficients, 6, joint_map, 1, NULL, 0) == RK_ERROR_INVALID_ARGUMENT);
+    header.ends_at_rest = 0;
+    assert(rk_robot_runtime_submit_plan(plan_runtime, &header, starts, durations, degrees,
+        1, coefficients, 6, joint_map, 1, NULL, 0) == RK_OK);
+    full_snapshot.struct_size = sizeof(full_snapshot);
+    assert(rk_robot_runtime_snapshot_full(plan_runtime, &full_snapshot) == RK_OK);
+    assert(full_snapshot.active_plan_id == 99);
+    assert(full_snapshot.session_state == RK_SESSION_EXECUTING);
     assert(full_snapshot.queue_end_time_ns == 1000000000);
-    rk_robot_runtime_destroy(array_runtime);
+    rk_robot_runtime_destroy(plan_runtime);
 
     rk_robot_command command = {0};
     command.struct_size = sizeof(command);
@@ -154,17 +136,11 @@ int main(void) {
     trajectory_command.struct_size = sizeof(trajectory_command);
     trajectory_command.sequence = 2;
     trajectory_command.kind = RK_COMMAND_TRAJECTORY_SEGMENTS;
-    rk_trajectory_segment_chunk trajectory = {0};
-    trajectory.struct_size = sizeof(trajectory);
-    trajectory.segment_count = 1;
-    trajectory.segments[0].duration_ns = 100000000;
-    trajectory.segments[0].degree = 1;
-    trajectory.segments[0].joint_count = 1;
-    trajectory.segments[0].coefficients[0].value[0] = state.position[0];
-    trajectory.segments[0].coefficients[0].value[1] = (0.5 - state.position[0]) * 10.0;
-    assert(rk_trajectory_segment_chunk_validate_for_blueprint(&trajectory, &blueprint) == RK_OK);
+    const double toward_half[] = {state.position[0], (0.5 - state.position[0]) * 10.0,
+        0.0, 0.0, 0.0, 0.0};
     assert(rk_robot_runtime_submit(runtime, &trajectory_command) == RK_ERROR_INVALID_ARGUMENT);
-    assert(rk_robot_runtime_submit_segments(runtime, &trajectory_command, &trajectory) == RK_OK);
+    assert(rk_robot_runtime_submit_segments(runtime, &trajectory_command, 0, one_start,
+        short_duration, linear, 1, toward_half, 6) == RK_OK);
     assert(rk_robot_runtime_start(runtime) == RK_OK);
     nanosleep(&delay, NULL);
     assert(rk_robot_runtime_stop(runtime) == RK_OK);

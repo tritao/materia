@@ -76,14 +76,12 @@ enum {
     RK_MAX_JOINTS = 512, /**< Maximum joints carried by one fixed-size ABI value. */
     RK_MAX_LINKS = 1024,
     RK_MAX_SERIAL_JOINTS = 64, /**< Capacity of the current serial wire protocol. */
-    RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints represented by one trajectory chunk. */
-    RK_MAX_TRAJECTORY_SEGMENTS = 128, /**< Maximum polynomial segments per chunk. */
-    RK_MAX_TRAJECTORY_COEFFICIENTS = 4096, /**< Maximum used scalar coefficients per segment chunk. */
-    RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots. */
+    RK_MAX_TRAJECTORY_JOINTS = 64, /**< Maximum joints a trajectory drives. */
+    RK_TRAJECTORY_COEFFICIENT_STRIDE = 6, /**< Coefficients per joint and segment: degree 0 through 5. */
+    RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots and events. */
     RK_MAX_SENSORS = 8,
     RK_MAX_SENSOR_VALUES = 64,
     RK_MAX_PROCESS_CHANNELS = 32,
-    RK_MAX_PLAN_EVENTS = 256,
     RK_MAX_EVENT_RECORDS = 64,
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
@@ -462,28 +460,6 @@ typedef struct rk_joint_servo {
     double feedforward; /**< Effort added to the feedback terms. */
 } rk_joint_servo;
 
-/** Coefficients for one joint, in powers of seconds from segment start. */
-typedef struct rk_trajectory_coefficients {
-    double value[6]; /**< Degree zero through five. */
-} rk_trajectory_coefficients;
-
-/** A polynomial segment whose start time is relative to its chunk. */
-typedef struct rk_trajectory_segment {
-    uint64_t time_from_start_ns;
-    uint64_t duration_ns;
-    uint32_t degree;
-    uint32_t joint_count;
-    rk_trajectory_coefficients coefficients[RK_MAX_TRAJECTORY_JOINTS];
-} rk_trajectory_segment;
-
-/** Bounded polynomial payload; segment starts are contiguous from time zero. */
-typedef struct rk_trajectory_segment_chunk {
-    uint32_t struct_size RK_STRUCT_SIZE;
-    uint32_t segment_count;
-    rk_trajectory_segment segments[RK_MAX_TRAJECTORY_SEGMENTS];
-    uint64_t tag;
-} rk_trajectory_segment_chunk;
-
 /** Capabilities required by a plan; unknown or reserved bits are unsupported. */
 enum {
     RK_PLAN_CAPABILITY_TRAJECTORY_QUEUE = 1u,
@@ -494,57 +470,29 @@ enum {
 /** Validation property carried from MotionKit's plan report. */
 enum { RK_PLAN_JERK_UNCHECKED = 1u };
 
-/** Bounded plan. Replacement time is in the active plan's trajectory clock. */
-typedef struct rk_plan_submission {
-    uint32_t struct_size RK_STRUCT_SIZE;
-    uint64_t sequence; /**< Monotonic runtime command sequence. */
-    uint64_t plan_id; /**< Nonzero caller-selected identity. */
-    uint64_t model_revision;
-    uint64_t calibration_revision;
-    uint32_t required_capabilities;
-    uint32_t reserved0; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
-    uint64_t replace_after_plan_id; /**< Zero means append/start, not replace. */
-    uint64_t replace_after_time_ns;
-    double start_position[RK_MAX_TRAJECTORY_JOINTS];
-    double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
-    double start_acceleration[RK_MAX_TRAJECTORY_JOINTS];
-    rk_trajectory_segment_chunk segments;
-    /** Per-joint nonnegative start-state tolerances; zero defaults to 1e-6. */
-    double position_tolerance[RK_MAX_TRAJECTORY_JOINTS];
-    double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS];
-    double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS];
-    /** One for a final plan, zero if more motion is expected. Absent means one.
-     * Full-size C callers must set this explicitly; Haxe defaults to final.
-     */
-    uint32_t ends_at_rest;
-    uint32_t event_count; /**< Versioned: absent means no events. */
-    rk_timed_event events[RK_MAX_PLAN_EVENTS];
-} rk_plan_submission;
-
 /**
- * An rk_plan_submission without its segments, for rk_robot_runtime_submit_plan_arrays. Each field
- * means what it does there; tag is the segment chunk's tag. All fields are required.
+ * A plan's identity and start state, submitted with its segments and events by
+ * rk_robot_runtime_submit_plan. Replacement time is in the active plan's trajectory clock.
  */
 typedef struct rk_plan_header {
     uint32_t struct_size RK_STRUCT_SIZE;
     uint32_t required_capabilities;
-    uint64_t sequence;
-    uint64_t plan_id;
+    uint64_t sequence; /**< Monotonic runtime command sequence. */
+    uint64_t plan_id; /**< Nonzero caller-selected identity. */
     uint64_t model_revision;
     uint64_t calibration_revision;
-    uint64_t replace_after_plan_id;
+    uint64_t replace_after_plan_id; /**< Zero means append/start, not replace. */
     uint64_t replace_after_time_ns;
-    uint64_t tag;
-    uint32_t reserved0; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
-    uint32_t ends_at_rest;
+    uint64_t tag; /**< Reported as the trajectory tag while the plan runs. */
+    uint32_t flags; /**< RK_PLAN_JERK_UNCHECKED when jerk validation is unchecked. */
+    uint32_t ends_at_rest; /**< One for a final plan, zero if more motion is expected. */
     double start_position[RK_MAX_TRAJECTORY_JOINTS];
     double start_velocity[RK_MAX_TRAJECTORY_JOINTS];
     double start_acceleration[RK_MAX_TRAJECTORY_JOINTS];
+    /** Per-joint nonnegative start-state tolerances; zero defaults to 1e-6. */
     double position_tolerance[RK_MAX_TRAJECTORY_JOINTS];
     double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS];
     double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS];
-    uint32_t event_count;
-    rk_timed_event events[RK_MAX_PLAN_EVENTS];
 } rk_plan_header;
 
 /** Non-latched runtime diagnostic; safety remains READY. */
@@ -683,13 +631,6 @@ RK_API rk_result RK_CALL rk_robot_command_validate(const rk_robot_command *comma
 /** Validates a command against the joint count in a compiled blueprint. */
 RK_API rk_result RK_CALL rk_robot_command_validate_for_blueprint(
     const rk_robot_command *command, const rk_robot_runtime_blueprint *blueprint);
-/** Validates a bounded polynomial payload and its coefficient budget. */
-RK_API rk_result RK_CALL rk_trajectory_segment_chunk_validate(
-    const rk_trajectory_segment_chunk *chunk);
-RK_API rk_result RK_CALL rk_trajectory_segment_chunk_validate_for_blueprint(
-    const rk_trajectory_segment_chunk *chunk, const rk_robot_runtime_blueprint *blueprint);
-RK_API rk_result RK_CALL rk_plan_submission_validate_for_blueprint(
-    const rk_plan_submission *plan, const rk_robot_runtime_blueprint *blueprint);
 /** Validates a mutable native state value and its array counts. */
 RK_API rk_result RK_CALL rk_robot_state_validate(const rk_robot_state *state);
 /** Validates an immutable published snapshot and its array counts. */
@@ -775,33 +716,40 @@ RK_API rk_result RK_CALL rk_robot_runtime_stop(rk_robot_runtime runtime);
 RK_API rk_result RK_CALL rk_robot_runtime_submit(rk_robot_runtime runtime,
                                            const rk_robot_command *command);
 
-/** Submits a bounded polynomial segment chunk to the runtime queue. */
-RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(
-    rk_robot_runtime runtime, const rk_robot_command *command,
-    const rk_trajectory_segment_chunk *chunk);
+/*
+ * Trajectory segments are passed as arrays, read in place and copied once: segment i starts at
+ * starts_ns[i] - starts_ns[0], lasts durations_ns[i] (positive), and has degree degrees[i]
+ * (0 through 5). Its coefficients, in powers of seconds from its start, are at
+ * coefficients[(i * joint_count + j) * RK_TRAJECTORY_COEFFICIENT_STRIDE + p] for joint j and
+ * power p, zero above its degree. Segments are contiguous.
+ */
 
 /**
- * Atomically validates and accepts a plan or committed-horizon replacement.
- * A replacement before committed_until_ns returns RK_ERROR_INVALID_STATE with
- * no queue mutation.
+ * Queues segments over every robot joint (joint_count is the blueprint's), tagged with tag.
+ * The command's kind is RK_COMMAND_TRAJECTORY_SEGMENTS.
  */
-RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(
-    rk_robot_runtime runtime, const rk_plan_submission *plan);
+RK_API rk_result RK_CALL rk_robot_runtime_submit_segments(rk_robot_runtime runtime,
+    const rk_robot_command *command, uint64_t tag,
+    const int64_t *starts_ns RK_IN_ARRAY(segment_count),
+    const int64_t *durations_ns RK_IN_ARRAY(segment_count),
+    const int32_t *degrees RK_IN_ARRAY(segment_count), uint32_t segment_count,
+    const double *coefficients RK_IN_ARRAY(coefficient_count), uint32_t coefficient_count);
+
 /**
- * Submits a plan as rk_robot_runtime_submit_plan does, with its segments read from arrays, such as
- * a MotionKit plan's, and copied once. Segment i starts at starts_ns[i] - starts_ns[0] in the plan,
- * lasts durations_ns[i], and has degree degrees[i]. The plan's joints are the source joints:
- * source joint j drives robot joint joint_map[j] with coefficient p at
- * coefficients[(i * source_joint_count + j) * 6 + p], and a robot joint no source joint drives
- * holds header->start_position. coefficient_count must be segment_count * source_joint_count * 6.
+ * Atomically validates and accepts a plan or committed-horizon replacement. A replacement before
+ * committed_until_ns returns RK_ERROR_INVALID_STATE with no queue mutation. The segments' joints
+ * are source joints: source joint j drives robot joint joint_map[j], and joint_count is
+ * source_joint_count; a robot joint no source joint drives holds header->start_position. Events
+ * are sorted by path time from the plan's start.
  */
-RK_API rk_result RK_CALL rk_robot_runtime_submit_plan_arrays(rk_robot_runtime runtime,
+RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
     const rk_plan_header *header,
     const int64_t *starts_ns RK_IN_ARRAY(segment_count),
     const int64_t *durations_ns RK_IN_ARRAY(segment_count),
     const int32_t *degrees RK_IN_ARRAY(segment_count), uint32_t segment_count,
     const double *coefficients RK_IN_ARRAY(coefficient_count), uint32_t coefficient_count,
-    const int32_t *joint_map RK_IN_ARRAY(source_joint_count), uint32_t source_joint_count);
+    const int32_t *joint_map RK_IN_ARRAY(source_joint_count), uint32_t source_joint_count,
+    const rk_timed_event *events RK_IN_ARRAY(event_count), uint32_t event_count);
 /** Drains process-output changes. An overflow flag means earlier records were lost. */
 RK_API rk_result RK_CALL rk_robot_runtime_poll_events(
     rk_robot_runtime runtime, rk_event_record_batch *out_batch);

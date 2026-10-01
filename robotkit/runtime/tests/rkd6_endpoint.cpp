@@ -171,12 +171,11 @@ int main() {
     assert(state.effort[0] == 2.0);
     assert(endpoint->sample(100'000'000, state) == RK_OK);
     assert(endpoint->sample(100'200'000, state) == RK_OK);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 8;
     plan.sequence = 1;
     plan.ends_at_rest = 1;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;

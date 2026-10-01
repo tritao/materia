@@ -111,12 +111,47 @@ about a second of motion ahead of the machine within a few milliseconds a
 frame, so a program starts after planning its first move (42 ms). Plans stay in
 native memory: MotionKit exposes a plan's segments as arrays it owns, haxeon's
 `NativeSpan` reads them in place, and RobotKit's
-`rk_robot_runtime_submit_plan_arrays` takes them through a `_span` FFI wrapper
+`rk_robot_runtime_submit_plan` takes them through a `_span` FFI wrapper
 and copies them once, so no segment is marshalled through Haxe. All the
 planning for a pass is now 2.1 s instead of 4.1 s (creating plans 0.27 s
 instead of 2.2 s), the slowest frame 67 ms instead of 290 ms, and motion 0.2
 ms a tick. Most of what is left is the time law (1.2 s) and the task-space
 check (0.6 s).
+
+Planning then moved off the frame thread. `ProgramPlanner` compiles on a
+worker into a `ProgramSink`, paced to stay about a second of motion ahead of
+the plans the machine has started, and the frame only polls it. RobotKit's
+434 KB `rk_plan_submission` became a 3 KB `rk_plan_header` plus segment,
+coefficient, joint map and event arrays of any length
+(`rk_robot_runtime_submit_plan`), so the 128-segment and event caps are gone:
+`TrajectoryStream` submits about two seconds of motion at a time, bounded only
+by the runtime's 4096-point queue. MotionKit's native registries became safe
+to plan from another thread (shared handles, short locks). This found that
+haxeon's `sys.thread.Mutex` had been a no-op, which let the motion and stream
+threads race; haxeon now has real mutexes and `Lock`, and native calls block
+for the GC so a long one on the worker doesn't stall a collection. Program
+start is 54–64 ms of planning, motion 0.11 ms a tick, and the slowest frame
+42–90 ms run alone. A pass takes 198.4 s, of which about one 10 ms tick per
+plan is the runtime holding each plan's start for its first cycle, since
+every plan ends at rest. A runtime bug skipped that cycle when a second chunk
+arrived before it, which had made cycle time depend on chunking (197.3 s with
+the old caps). Rapid and holder contacts now ignore overlaps below 1e-12 m³,
+numeric grazing at rapids that end beside the stock, and the tick at a
+rapid-to-cut boundary counts as the cut.
+
+Plans no longer stop where the path doesn't turn. The lowering ended a path
+at every zero-tolerance move (every rapid) and every feed change, so the
+rapid down to the stock and the plunge after it, or two plunges in a row,
+were separate plans that each ended at rest. Moves now join one path until a
+barrier, each primitive keeping its own speed (the time law caps speed at the
+slower side of a feed change), and the compiler stops only at sharp corners,
+planning one stretch between them a step so a long path doesn't delay the
+plans before it. A pass is 132 plans instead of 199 and takes 196.3 s
+instead of 198.4 s. The rest of the cycle is the programmed feeds: of 204 s
+of plans, rings at 20 mm/s take 63 s, drilling at 2 mm/s 49 s, plunges at
+5 mm/s 31 s and rapids at 80 mm/s 61 s. The 116 remaining stops are 90°
+corners. Blending them within the program's 0.01 mm G64 P would save almost
+nothing; a larger tolerance for rapids in open air would save a few seconds.
 
 **C5. Editor controls** (done). A G-code panel that highlights the running
 line; feed hold, resume, restart from a line and a speed override. What it

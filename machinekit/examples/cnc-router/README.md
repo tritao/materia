@@ -105,9 +105,9 @@ cutter (flutes, shank and collet nut), and the stock part shows the result,
 re-contoured a few times a second. Because the cut follows the simulated
 machine, following error is in the material: the servos lag slightly on the
 pocket circles, which leaves a few hundredths of a millimetre on their walls. A
-pass takes 197 s of machining at about 2 ms of compute per 10 ms tick; motion is
-planned about a second ahead of the machine while it runs, so the program
-starts at once. The stock is coloured against
+pass takes 196 s of machining at about 2 ms of compute per 10 ms tick; motion is
+planned on a worker thread about a second ahead of the machine while it runs,
+so the program starts at once. The stock is coloured against
 the finished plate: green where it is on the part, yellow where stock is left
 on it, red where the cut went into it. Rapids that cut stock and shank or
 holder contact are counted as they happen. Physical collision is off for the

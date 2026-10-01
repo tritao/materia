@@ -14,7 +14,10 @@ import toolpathkit.setup.SetupStock;
 import toolpathkit.path.ToolpathProgram;
 import motionkit.path.ArcSegment;
 import motionkit.path.CircularSegment;
+import motionkit.kinematics.Pose3;
+import motionkit.path.PosePrimitive;
 import motionkit.program.MotionOp;
+import motionkit.program.MotionProgram;
 import sys.io.File;
 
 class CncKitTests {
@@ -27,6 +30,17 @@ class CncKitTests {
       ?tolerance:Float = 1e-9):Void
     check(Math.abs(actual - expected) <= tolerance,
       '$message: expected $expected, got $actual');
+  /** Every lowered path primitive, in program order: moves between barriers share one path. */
+  static function primitives(program:MotionProgram):Array<PosePrimitive> {
+    var result:Array<PosePrimitive> = [];
+    for (op in program.ops) switch op {
+      case MotionOp.FollowPath(path, _, _, _): for (primitive in path.primitives) result.push(primitive);
+      case _:
+    }
+    return result;
+  }
+  static function endOf(primitive:PosePrimitive):Pose3
+    return primitive.waypointAt(primitive.length()).pose;
   static function rejects(machine:CncTestRig, source:String, expected:String):Void {
     var error = "";
     try new CncTestCompiler(machine).compile(source)
@@ -48,19 +62,15 @@ class CncKitTests {
     var source = "G21 G90 G54 G17\nS12000 M3\nG0 X0 Y0 Z10\nF600 G1 Z0\n" +
       "G1 X20\nG1 Y20\nG2 X0 Y20 I-10 J0\nG1 Y0\nM5 M9\nM2\n";
     var program = new CncTestCompiler(machine).compile(source);
-    check(program.ops.length >= 9, "pocket emits motion and spindle operations");
+    check(program.ops.length == 4 && primitives(program).length == 6,
+      "pocket emits the spindle start and one path of its six moves");
     check(switch program.ops[0] {
       case MotionOp.SetOutput("spindle.direction", _): true;
       case _: false;
     }, "spindle starts before first motion");
-    var firstPath = switch program.ops[3] {
-      case MotionOp.FollowPath(path, _, _, _): path;
-      case _: throw "rapid must be a FollowPath";
-    };
-    near(firstPath.poseAt(firstPath.length()).x, 0.1,
-      "G54 applies X offset");
-    near(firstPath.poseAt(firstPath.length()).z, 0.01,
-      "G0 Z mm converts to metres");
+    var rapidEnd = endOf(primitives(program)[0]);
+    near(rapidEnd.x, 0.1, "G54 applies X offset");
+    near(rapidEnd.z, 0.01, "G0 Z mm converts to metres");
     var switchingMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     switchingMachine.controller.setWorkOffset(54, 0.1, 0.0, 0.0);
     switchingMachine.controller.setWorkOffset(55, 0.2, 0.0, 0.0);
@@ -94,26 +104,14 @@ class CncKitTests {
     }
     near(switchedMachineX, 0.21, "G55 adapter applies its setup offset");
     var arcs = 0;
-    for (op in program.ops) switch op {
-      case MotionOp.FollowPath(path, _, _, _):
-        if (path.primitives[0].length() > 0.025) arcs++;
-      case _:
-    }
+    for (primitive in primitives(program)) if (primitive.length() > 0.025) arcs++;
     check(arcs >= 1, "pocket includes an arc path");
 
     var incremental = new CncTestCompiler(machine).compile(
       "G20 G91\nG0 X1\nF60 G1 Y1\nG3 X-1 Y-1 I-1 J0\nM2");
-    var rapid = switch incremental.ops[0] {
-      case MotionOp.FollowPath(path, _, _, _): path;
-      case _: throw "incremental rapid is not a path";
-    };
-    near(rapid.poseAt(rapid.length()).x, 0.0254,
-      "inch incremental rapid converts to metres");
-    var feed = switch incremental.ops[1] {
-      case MotionOp.FollowPath(_, _, speed, _): speed;
-      case _: throw "incremental feed is not a path";
-    };
-    near(feed, 0.0254, "inch feed converts from units/minute to m/s");
+    var incrementalMoves = primitives(incremental);
+    near(endOf(incrementalMoves[0]).x, 0.0254, "inch incremental rapid converts to metres");
+    near(incrementalMoves[1].speedLimit(), 0.0254, "inch feed converts from units/minute to m/s");
     var modal = new CncTestCompiler(machine).compile(
       "G21 G90 G55\nF600 G1 X10\nY10\nG91 X5\nM2");
     var modalEnd = switch modal.ops[modal.ops.length - 1] {
@@ -131,7 +129,9 @@ class CncKitTests {
     check(blended.authoredGeometry != null,
       "G64 retains authored geometry for task-space validation");
     near(blended.blendTolerance, 0.001, "G64 P converts to metres");
-    check(blend.ops.length == 2, "G61 splits the blended path at an exact stop");
+    var exactLine = blended.primitives[blended.primitives.length - 1];
+    check(blend.ops.length == 1 && Math.abs(exactLine.length() - 0.01) < 1e-9,
+      "G61 leaves its corner sharp, where the plan stops");
     var inchBlend = new CncTestCompiler(machine).compile(
       "G64 P0.1 G20 F60 G1 X1\nG1 Y1\nM2");
     var inchPath = switch inchBlend.ops[0] {
@@ -206,11 +206,9 @@ class CncKitTests {
       "machine blend corner limit controls exact stops");
     var circle = new CncTestCompiler(machine).compile(
       "G21 G90 F600 G0 X10 Y0\nG2 X10 Y0 I-10 J0\nM2");
-    var circlePath = switch circle.ops[1] {
-      case MotionOp.FollowPath(path, _, _, _): path;
-      case _: throw "full circle missing";
-    };
-    near(circlePath.length(), 2 * Math.PI * 0.01,
+    var circleMoves = primitives(circle);
+    check(circleMoves.length == 2, "full circle missing");
+    near(circleMoves[1].length(), 2 * Math.PI * 0.01,
       "G2 full circle circumference", 1e-7);
     var arcMachine = new CncTestRig("work", "x", "y", "z", 0.2);
     var cw = new CncTestCompiler(arcMachine).compile(
@@ -757,7 +755,7 @@ class CncKitTests {
       near(low[axis], expectedLow[axis], '$name lower bound $axis');
       near(high[axis], expectedHigh[axis], '$name upper bound $axis');
     }
-    var pathIndex = 0;
+    var loweredMoves = primitives(program), primitiveIndex = 0;
     for (op in result.ops) {
       var geometry = switch op {
         case ToolpathOp.Move(_, g, _, _, _),
@@ -765,20 +763,13 @@ class CncKitTests {
         case _: null;
       };
       if (geometry == null) continue;
-      while (pathIndex < program.ops.length && !switch program.ops[pathIndex] {
-        case MotionOp.FollowPath(_, _, _, _): true;
-        case _: false;
-      }) pathIndex++;
-      check(pathIndex < program.ops.length, '$name lowered path missing');
-      var path = switch program.ops[pathIndex++] {
-        case MotionOp.FollowPath(p, _, _, _): p;
-        case _: throw 'unexpected lowered $name operation';
-      };
+      check(primitiveIndex < loweredMoves.length, '$name lowered move missing');
+      var primitive = loweredMoves[primitiveIndex++];
       var distance = GeometryTools.length(geometry);
-      near(path.length(), distance, '$name lowered path length', 1e-8);
+      near(primitive.length(), distance, '$name lowered move length', 1e-8);
       for (fraction in [0.0, 0.5, 1.0]) {
         var authored = GeometryTools.pointAt(geometry, distance * fraction);
-        var lowered = path.poseAt(path.length() * fraction);
+        var lowered = primitive.waypointAt(primitive.length() * fraction).pose;
         check(Math.abs(authored.x - lowered.x) < 1e-8 &&
           Math.abs(authored.y - lowered.y) < 1e-8 &&
           Math.abs(authored.z - lowered.z) < 1e-8,

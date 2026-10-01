@@ -148,7 +148,7 @@ class PlanExecutor {
 
   function fill():Void {
     if (plan == null) return;
-    stream.fill(session, fixedPositions.length, true, buildChunk,
+    stream.fill(session, true, buildChunk,
       (first, last, error) -> {
         var snapshot = robot.snapshot();
         return 'plan chunk [$first,$last] of ${planArrays == null ? 0 : planArrays.count()}, '

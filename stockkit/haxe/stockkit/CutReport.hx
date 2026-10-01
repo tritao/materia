@@ -18,9 +18,9 @@ class CutReport {
     return total;
   }
 
-  /** Rapid moves that removed material. */
-  public function rapidContacts():Array<MoveOutcome>
-    return [for (outcome in moves) if (outcome.move.rapid && outcome.removed > 0.0) outcome];
+  /** Rapid moves that removed more than `tolerance` of material (cubic metres). */
+  public function rapidContacts(tolerance:Float = 0.0):Array<MoveOutcome>
+    return [for (outcome in moves) if (outcome.move.rapid && outcome.removed > tolerance) outcome];
 
   /** Moves whose shank or holder overlapped more than `tolerance` of stock (cubic metres). */
   public function collisions(tolerance:Float = 0.0):Array<MoveOutcome>

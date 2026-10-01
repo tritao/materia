@@ -533,23 +533,30 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
         return MK_ERROR_INVALID_ARGUMENT;
     out_trajectory->id = 0;
     try {
-        std::lock_guard lock(mutex);
-        const auto p = paths.find(path.id);
-        const auto l = laws.find(law.id);
-        if (p == paths.end() || l == laws.end()) return MK_ERROR_INVALID_HANDLE;
-        if (std::abs(p->second.front().s - l->second.stages.front().start_s) > 1e-10 ||
-            std::abs(p->second.back().s - end_s(l->second.stages.back())) > 1e-8)
+        // Lowering runs on copies, so the lock covers only the lookups.
+        std::vector<mk_path_sample> samples;
+        std::vector<mk_time_stage> stages;
+        {
+            std::lock_guard lock(mutex);
+            const auto p = paths.find(path.id);
+            const auto l = laws.find(law.id);
+            if (p == paths.end() || l == laws.end()) return MK_ERROR_INVALID_HANDLE;
+            samples = p->second;
+            stages = l->second.stages;
+        }
+        if (std::abs(samples.front().s - stages.front().start_s) > 1e-10 ||
+            std::abs(samples.back().s - end_s(stages.back())) > 1e-8)
             return MK_ERROR_INVALID_ARGUMENT;
         mk_trajectory_handle trajectory{};
-        auto result = mk_trajectory_create(p->second.front().joint_count, &trajectory);
+        auto result = mk_trajectory_create(samples.front().joint_count, &trajectory);
         if (result != MK_OK) return result;
-        for (const auto &stage : l->second.stages) {
+        for (const auto &stage : stages) {
             std::vector<int64_t> knots{stage.start_ns,
                 stage.start_ns + stage.duration_ns};
-            for (const auto &sample : p->second) {
+            for (const auto &sample : samples) {
                 if (sample.s <= stage.start_s || sample.s >= end_s(stage)) continue;
                 double seconds = 0.0;
-                if (!inverse_time(l->second.stages, sample.s, seconds)) {
+                if (!inverse_time(stages, sample.s, seconds)) {
                     mk_trajectory_destroy(trajectory);
                     return MK_ERROR_INVALID_ARGUMENT;
                 }
@@ -558,7 +565,7 @@ mk_result MK_CALL mk_path_lower(mk_path_handle path, mk_time_law_handle law,
             std::sort(knots.begin(), knots.end());
             knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
             for (size_t i = 1; i < knots.size(); ++i) {
-                if (!append_interval(p->second, stage, knots[i - 1], knots[i],
+                if (!append_interval(samples, stage, knots[i - 1], knots[i],
                     tolerance, trajectory, 0)) {
                     mk_trajectory_destroy(trajectory);
                     return MK_ERROR_GENERATION;

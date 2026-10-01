@@ -11,9 +11,10 @@ import motionkit.robot.SessionState;
 
 /**
   Runs manipulator programs and evaluates host-side barriers. A program is
-  planned as it runs: about `LOOKAHEAD_SECONDS` of motion ahead of the
-  machine, a little each update, so starting a long program does not wait for
-  all of it to be planned.
+  planned as it runs, on a worker thread about `LOOKAHEAD_SECONDS` of motion
+  ahead of the machine, so neither starting a long program nor running it
+  waits for planning; only if execution catches up with planning does an
+  update wait for the next plan.
 **/
 class ManipulatorMotion {
   public final robot:Robot;
@@ -28,9 +29,9 @@ class ManipulatorMotion {
   public final jointIndices:Array<Int>;
   /** Seconds of planned motion kept ahead of the machine. */
   public static inline final LOOKAHEAD_SECONDS = 1.0;
-  /** Planning time an update may spend getting ahead, in seconds; running short waits for no budget. */
-  public static inline final PLANNING_BUDGET_SECONDS = 0.004;
-  var compiled:Null<ProgramCompilation>;
+  var planner:Null<ProgramPlanner>;
+  /** Plans of the running program started so far. */
+  var startedPlans:Int = 0;
   var blockIndex:Int = 0;
   var planIndex:Int = 0;
   var barrierElapsed:Float = 0.0;
@@ -87,17 +88,16 @@ class ManipulatorMotion {
     }
     if (running) throw "Manipulator program is already running";
     release(); programCompleted = false; failure = null; events = [];
-    blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false;
+    blockIndex = 0; planIndex = 0; barrierElapsed = 0.0; planStarted = false; startedPlans = 0;
     try {
       var positions = robot.snapshot().positions;
-      compiled = compiler.begin(program, lastCommandedQ == null
+      var started = new ProgramPlanner(compiler, program, lastCommandedQ == null
         ? [for (index in jointIndices) positions.get(index)]
-        : lastCommandedQ.copy(), nextPlanId, 0, speedOverride);
-      // Plan up to the first motion or barrier now, so a program that cannot
-      // start fails here, before the session begins.
-      var first:ProgramCompilation = cast compiled;
-      while (!first.done && first.blocks.length == 1 && first.blocks[0].plans.length == 0)
-        planMore(first);
+        : lastCommandedQ.copy(), nextPlanId, 0, speedOverride, LOOKAHEAD_SECONDS);
+      planner = started;
+      // Wait for the first motion or barrier, so a program that cannot start
+      // fails here, before the session begins.
+      while (!started.blocks.hasWork()) waitForPlans(started);
       session.begin();
       advance(0.0);
     } catch (error:Dynamic) { fail(Std.string(error), false); }
@@ -125,10 +125,14 @@ class ManipulatorMotion {
         return;
       }
       if (session.isHolding()) return;
+      var planning = planner;
+      if (planning != null) {
+        planning.poll();
+        var problem = planning.failure;
+        if (problem != null) throw problem;
+      }
       if (executor.completed && planStarted) { planIndex++; planStarted = false; }
       advance(dtSeconds);
-      var planning = compiled;
-      if (planning != null && running) planAhead(planning);
     } catch (error:Dynamic) { fail(Std.string(error), !session.isFaulted()); }
   }
 
@@ -141,8 +145,8 @@ class ManipulatorMotion {
     if (!Math.isFinite(scale) || scale < 0.05 || scale > 2.0)
       throw "Speed override must be between 0.05 and 2";
     speedOverride = scale;
-    var planning = compiled;
-    if (planning != null) planning.speedScale = scale;
+    var planning = planner;
+    if (planning != null) planning.setSpeedScale(scale);
   }
 
   public function hold():Void if (running) executor.hold();
@@ -165,10 +169,10 @@ class ManipulatorMotion {
     return events.copy();
   }
   public function progress():ManipulatorProgress {
-    var source = compiled;
-    if (source == null || blockIndex >= source.blocks.length)
+    var planning = planner;
+    if (planning == null || blockIndex >= planning.blocks.blocks.length)
       return new ManipulatorProgress(blockIndex, -1, 0.0);
-    var block = source.blocks[blockIndex];
+    var block = planning.blocks.blocks[blockIndex];
     var op = planIndex < block.opIndices.length ? block.opIndices[planIndex] : -1;
     var distance = 0.0;
     if (planIndex < block.plans.length) {
@@ -192,20 +196,23 @@ class ManipulatorMotion {
   }
 
   function advance(dt:Float):Void {
-    var source = compiled;
-    if (source == null) return;
+    var planning = planner;
+    if (planning == null) return;
+    var source = planning.blocks;
     while (session.state == Running && blockIndex < source.blocks.length) {
       var block = source.blocks[blockIndex];
       if (planIndex < block.plans.length) {
         if (!planStarted) {
           executor.start(block.plans[planIndex], true);
           planStarted = true;
+          startedPlans++;
+          planning.started(startedPlans);
         }
         return;
       }
-      // The machine caught up with planning: plan until there is more to run.
+      // The machine caught up with planning: wait for the next plan.
       if (!block.complete) {
-        planMore(source);
+        waitForPlans(planning);
         continue;
       }
       if (block.barrier != null) {
@@ -236,42 +243,32 @@ class ManipulatorMotion {
     }
     if (session.state == Running) {
       for (block in source.blocks)
-        for (plan in block.plans)
-          lastCommandedQ = plan.evaluate(plan.durationSeconds).positions;
+        if (block.plans.length > 0) {
+          var last = block.plans[block.plans.length - 1];
+          lastCommandedQ = last.evaluate(last.durationSeconds).positions;
+        }
+      var next = source.nextPlanId;
+      if (next != null) nextPlanId = next;
       programCompleted = true; session.completed(); release();
     }
   }
 
-  /** Plans the next op; false once the program is planned. */
-  @:access(motionkit.robot.ProgramCompiler)
-  function planMore(source:ProgramCompilation):Bool {
-    var planned = source.step();
-    nextPlanId = source.nextPlanId();
-    return planned;
-  }
-
-  /**
-    Plans ahead while less than `LOOKAHEAD_SECONDS` of motion waits beyond the
-    plan executing, within `PLANNING_BUDGET_SECONDS` of this update.
-  **/
-  function planAhead(source:ProgramCompilation):Void {
-    var started = Sys.time();
-    while (!source.done && Sys.time() - started < PLANNING_BUDGET_SECONDS) {
-      var ahead = 0.0;
-      for (index in blockIndex...source.blocks.length) {
-        var plans = source.blocks[index].plans;
-        for (plan in (index == blockIndex ? planIndex + 1 : 0)...plans.length)
-          ahead += plans[plan].durationSeconds;
-      }
-      if (ahead >= LOOKAHEAD_SECONDS) return;
-      planMore(source);
+  /** Waits for the worker to plan more; throws its failure. */
+  function waitForPlans(planning:ProgramPlanner):Void {
+    if (planning.isStopped() && !planning.poll()) {
+      var problem = planning.failure;
+      throw problem != null ? problem : "Program planning stopped before the program was planned";
     }
+    planning.waitForMore();
+    nextPlanId = planning.nextPlanId;
+    var problem = planning.failure;
+    if (problem != null) throw problem;
   }
 
   function hasPlan():Bool {
-    var source = compiled;
-    return source != null && blockIndex < source.blocks.length &&
-      planIndex < source.blocks[blockIndex].plans.length;
+    var planning = planner;
+    return planning != null && blockIndex < planning.blocks.blocks.length &&
+      planIndex < planning.blocks.blocks[blockIndex].plans.length;
   }
   function fail(message:String, stop:Bool):Void {
     if (stop && running && !session.isFaulted()) {
@@ -295,6 +292,11 @@ class ManipulatorMotion {
     }
   }
   function release():Void {
-    if (compiled != null) { compiled.dispose(); compiled = null; }
+    var planning = planner;
+    if (planning != null) {
+      nextPlanId = planning.nextPlanId;
+      planning.dispose();
+      planner = null;
+    }
   }
 }

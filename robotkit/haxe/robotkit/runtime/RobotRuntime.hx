@@ -12,7 +12,7 @@ import robotkit.world.ProcessEventCodec;
 import robotkit.world.ProcessHoldPolicy;
 import robotkit.world.ProcessChannelDeclaration;
 import robotkit.world.ProcessTimedEvent;
-import robotkit.world.SegmentArrays;
+import robotkit.world.TrajectorySegment;
 import runtime.memory.Arena;
 import runtime.memory.NativeSpan;
 import runtime.memory.RawPtr;
@@ -206,138 +206,78 @@ class RobotRuntime {
     command.set_timestamp_ns(timestampNs == null ? haxe.Int64.ofInt(0) : timestampNs);
     command.set_kind(RobotKitRuntimeConstants.RK_COMMAND_TRAJECTORY_SEGMENTS);
     command.set_target_count(0);
-    var payload = new rk_trajectory_segment_chunk();
-    payload.set_struct_size(rk_trajectory_segment_chunk.size());
-    payload.set_segment_count(chunk.segments.length);
-    payload.set_tag(chunk.tag);
-    for (index in 0...chunk.segments.length) {
-      var source = chunk.segments[index];
-      var segment = new rk_trajectory_segment();
-      segment.set_time_from_start_ns(source.timeFromStartNs);
-      segment.set_duration_ns(source.durationNs);
-      segment.set_degree(source.degree);
-      segment.set_joint_count(source.jointCount);
-      for (joint in 0...source.jointCount) {
-        var coefficients = new rk_trajectory_coefficients();
-        for (degree in 0...source.degree + 1)
-          coefficients.set_value(degree, source.coefficients[joint][degree]);
-        segment.set_coefficients(joint, coefficients);
-      }
-      payload.set_segments(index, segment);
-    }
-    check(RobotKitRuntime.rk_robot_runtime_submit_segments(owner.borrow(), command, payload),
+    var arrays = SegmentValues.of(chunk.segments);
+    check(RobotKitRuntime.rk_robot_runtime_submit_segments(owner.borrow(), command, chunk.tag,
+      arrays.starts, arrays.durations, arrays.degrees, arrays.coefficients),
       "runtime.submitTrajectorySegments");
   }
 
-  /** Accepts a plan atomically, including its revision and horizon checks. */
+  /**
+    Accepts a plan atomically, including its revision and horizon checks. A
+    plan carrying native segment arrays reaches the runtime in place and is
+    copied once there; managed segments are flattened into arrays first. Only
+    the small header is marshalled field by field, into storage reused across
+    plans.
+  **/
   public function submitPlan(plan:ExecutionPlanSubmission, sequence:Int):Void {
     ensureLive();
     if (plan == null) throw "Execution plan is required";
-    var arrays = plan.arrays;
-    if (arrays != null) {
-      submitPlanArrays(plan, arrays, sequence);
-      return;
-    }
-    var native = new rk_plan_submission();
-    native.set_struct_size(rk_plan_submission.size());
-    native.set_sequence(Int64.ofInt(sequence));
-    native.set_plan_id(plan.planId);
-    native.set_model_revision(plan.modelRevision);
-    native.set_calibration_revision(plan.calibrationRevision);
-    native.set_required_capabilities(plan.requiredCapabilities);
-    native.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
-    native.set_reserved0(plan.jerkUnchecked ? 1 : 0);
-    native.set_event_count(plan.events.length);
-    for (index in 0...plan.events.length)
-      native.set_events(index, nativeEvent(plan.events[index]));
-    native.set_replace_after_plan_id(plan.replaceAfterPlanId);
-    native.set_replace_after_time_ns(plan.replaceAfterTimeNs);
-    var positions = plan.startPosition.toArray();
-    var velocities = plan.startVelocity.toArray();
-    var accelerations = plan.startAcceleration.toArray();
-    var positionTolerances = plan.positionTolerances.toArray();
-    var velocityTolerances = plan.velocityTolerances.toArray();
-    var accelerationTolerances = plan.accelerationTolerances.toArray();
-    for (joint in 0...positions.length) {
-      native.set_start_position(joint, positions[joint]);
-      native.set_start_velocity(joint, velocities[joint]);
-      native.set_start_acceleration(joint, accelerations[joint]);
-      native.set_position_tolerance(joint, positionTolerances[joint]);
-      native.set_velocity_tolerance(joint, velocityTolerances[joint]);
-      native.set_acceleration_tolerance(joint, accelerationTolerances[joint]);
-    }
-    var payload = new rk_trajectory_segment_chunk();
-    payload.set_struct_size(rk_trajectory_segment_chunk.size());
-    payload.set_segment_count(plan.segments.length);
-    payload.set_tag(plan.planId);
-    for (index in 0...plan.segments.length) {
-      var source = plan.segments[index];
-      var segment = new rk_trajectory_segment();
-      segment.set_time_from_start_ns(source.timeFromStartNs);
-      segment.set_duration_ns(source.durationNs);
-      segment.set_degree(source.degree);
-      segment.set_joint_count(source.jointCount);
-      for (joint in 0...source.jointCount) {
-        var coefficients = new rk_trajectory_coefficients();
-        for (degree in 0...source.degree + 1)
-          coefficients.set_value(degree, source.coefficients[joint][degree]);
-        segment.set_coefficients(joint, coefficients);
-      }
-      payload.set_segments(index, segment);
-    }
-    native.set_segments(payload);
-    check(RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), native),
-      "runtime.submitPlan");
-  }
-
-  /**
-    Submits a plan whose segments are native arrays: they reach the runtime
-    in place and are copied once there. Only the plan's header and joint map
-    are marshalled, into storage reused across plans.
-  **/
-  function submitPlanArrays(plan:ExecutionPlanSubmission, arrays:SegmentArrays, sequence:Int):Void {
+    var events = [for (event in plan.events) nativeEvent(event)];
     scratchMutex.acquire();
     try {
-      var header = planHeaderScratch;
-      header.set_struct_size(rk_plan_header.size());
-      header.set_sequence(Int64.ofInt(sequence));
-      header.set_plan_id(plan.planId);
-      header.set_tag(plan.planId);
-      header.set_model_revision(plan.modelRevision);
-      header.set_calibration_revision(plan.calibrationRevision);
-      header.set_required_capabilities(plan.requiredCapabilities);
-      header.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
-      header.set_reserved0(plan.jerkUnchecked ? 1 : 0);
-      header.set_replace_after_plan_id(plan.replaceAfterPlanId);
-      header.set_replace_after_time_ns(plan.replaceAfterTimeNs);
-      var positions = plan.startPosition.toArray(), velocities = plan.startVelocity.toArray(),
-        accelerations = plan.startAcceleration.toArray(),
-        positionTolerances = plan.positionTolerances.toArray(),
-        velocityTolerances = plan.velocityTolerances.toArray(),
-        accelerationTolerances = plan.accelerationTolerances.toArray();
-      for (joint in 0...positions.length) {
-        header.set_start_position(joint, positions[joint]);
-        header.set_start_velocity(joint, velocities[joint]);
-        header.set_start_acceleration(joint, accelerations[joint]);
-        header.set_position_tolerance(joint, positionTolerances[joint]);
-        header.set_velocity_tolerance(joint, velocityTolerances[joint]);
-        header.set_acceleration_tolerance(joint, accelerationTolerances[joint]);
+      var header = planHeader(plan, sequence);
+      var arrays = plan.arrays;
+      var status = if (arrays != null) {
+        jointMapScratch.reset();
+        var map:RawPtr<Int> = jointMapScratch.alloc(arrays.jointMap.length);
+        for (joint in 0...arrays.jointMap.length)
+          map.offset(joint).store(arrays.jointMap[joint]);
+        RobotKitRuntime.rk_robot_runtime_submit_plan_span(owner.borrow(), header, arrays.starts,
+          arrays.durations, arrays.degrees, arrays.coefficients,
+          new NativeSpan<Int>(map, arrays.jointMap.length), events);
+      } else {
+        var values = SegmentValues.of(plan.segments);
+        RobotKitRuntime.rk_robot_runtime_submit_plan(owner.borrow(), header, values.starts,
+          values.durations, values.degrees, values.coefficients,
+          [for (joint in 0...plan.startPosition.length) joint], events);
       }
-      header.set_event_count(plan.events.length);
-      for (index in 0...plan.events.length)
-        header.set_events(index, nativeEvent(plan.events[index]));
-      jointMapScratch.reset();
-      var map:RawPtr<Int> = jointMapScratch.alloc(arrays.jointMap.length);
-      for (joint in 0...arrays.jointMap.length)
-        map.offset(joint).store(arrays.jointMap[joint]);
-      check(RobotKitRuntime.rk_robot_runtime_submit_plan_arrays_span(owner.borrow(), header,
-        arrays.starts, arrays.durations, arrays.degrees, arrays.coefficients,
-        new NativeSpan<Int>(map, arrays.jointMap.length)), "runtime.submitPlan");
+      check(status, "runtime.submitPlan");
     } catch (error:Dynamic) {
       scratchMutex.release();
       throw error;
     }
     scratchMutex.release();
+  }
+
+  /** The plan's identity and start state, written into the shared header; call under scratchMutex. */
+  static function planHeader(plan:ExecutionPlanSubmission, sequence:Int):rk_plan_header {
+    var header = planHeaderScratch;
+    header.set_struct_size(rk_plan_header.size());
+    header.set_sequence(Int64.ofInt(sequence));
+    header.set_plan_id(plan.planId);
+    header.set_tag(plan.planId);
+    header.set_model_revision(plan.modelRevision);
+    header.set_calibration_revision(plan.calibrationRevision);
+    header.set_required_capabilities(plan.requiredCapabilities);
+    header.set_ends_at_rest(plan.endsAtRest ? 1 : 0);
+    header.set_flags(plan.jerkUnchecked ? RobotKitRuntimeConstants.RK_PLAN_JERK_UNCHECKED : 0);
+    header.set_replace_after_plan_id(plan.replaceAfterPlanId);
+    header.set_replace_after_time_ns(plan.replaceAfterTimeNs);
+    var positions = plan.startPosition.toArray(), velocities = plan.startVelocity.toArray(),
+      accelerations = plan.startAcceleration.toArray(),
+      positionTolerances = plan.positionTolerances.toArray(),
+      velocityTolerances = plan.velocityTolerances.toArray(),
+      accelerationTolerances = plan.accelerationTolerances.toArray();
+    for (joint in 0...RobotKitRuntimeConstants.RK_MAX_TRAJECTORY_JOINTS) {
+      var used = joint < positions.length;
+      header.set_start_position(joint, used ? positions[joint] : 0.0);
+      header.set_start_velocity(joint, used ? velocities[joint] : 0.0);
+      header.set_start_acceleration(joint, used ? accelerations[joint] : 0.0);
+      header.set_position_tolerance(joint, used ? positionTolerances[joint] : 0.0);
+      header.set_velocity_tolerance(joint, used ? velocityTolerances[joint] : 0.0);
+      header.set_acceleration_tolerance(joint, used ? accelerationTolerances[joint] : 0.0);
+    }
+    return header;
   }
 
   static function nativeEvent(authored:ProcessTimedEvent):rk_timed_event {
@@ -578,5 +518,28 @@ class RobotRuntime {
   static function check(status:Int, operation:String):Void {
     if (status != RobotKitRuntimeConstants.RK_OK)
       throw new RobotRuntimeError(status, operation);
+  }
+}
+
+/** Managed segments flattened into the runtime's segment arrays, over every joint they carry. */
+private class SegmentValues {
+  public final starts:Array<Int64> = [];
+  public final durations:Array<Int64> = [];
+  public final degrees:Array<Int> = [];
+  public final coefficients:Array<Float> = [];
+
+  function new() {}
+
+  public static function of(segments:Array<TrajectorySegment>):SegmentValues {
+    var values = new SegmentValues();
+    for (segment in segments) {
+      values.starts.push(segment.timeFromStartNs);
+      values.durations.push(segment.durationNs);
+      values.degrees.push(segment.degree);
+      for (joint in 0...segment.jointCount)
+        for (power in 0...RobotKitRuntimeConstants.RK_TRAJECTORY_COEFFICIENT_STRIDE)
+          values.coefficients.push(power <= segment.degree ? segment.coefficients[joint][power] : 0.0);
+    }
+    return values;
   }
 }

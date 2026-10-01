@@ -16,7 +16,7 @@ float evaluate_f32(const device_wire6::Segment6Coefficients &c,
     return q;
 }
 
-double evaluate_f64(const rk_trajectory_coefficients &c, std::uint8_t degree, double tau) {
+double evaluate_f64(const robotkit::SegmentCoefficients &c, std::uint8_t degree, double tau) {
     double q = c.value[degree];
     for (int k = degree - 1; k >= 0; --k) q = q * tau + c.value[k];
     return q;
@@ -71,7 +71,7 @@ std::array<std::uint8_t, 16> fingerprint_device_layout6(
 }
 
 CompiledDevicePlan6 compile_device_segments6(
-    std::span<const rk_trajectory_segment> segments, std::uint64_t plan_id,
+    std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
     bool ends_at_rest, std::uint64_t host_plan_start_ns,
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
@@ -93,7 +93,7 @@ CompiledDevicePlan6 compile_device_segments6(
             !std::isfinite(actuator.max_rate) || actuator.max_rate < 0)
             return failure("invalid actuator layout");
     const auto original_segments = segments;
-    std::vector<rk_trajectory_segment> lowered;
+    std::vector<robotkit::TrajectorySegment> lowered;
     std::vector<std::size_t> original_index;
     std::vector<std::uint64_t> original_offset;
     if (max_degree == 1) {
