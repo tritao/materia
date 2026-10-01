@@ -304,11 +304,34 @@ class HumanCharacter {
 			default: throw 'Unknown limb $limb';
 		};
 
+	/**
+	 * When set, `advance` leaves the mesh and attachments in the scene as they were and `publish` moves them. A
+	 * simulation that advances many times for each frame it draws sets this and publishes once per frame, rather than
+	 * skinning and uploading a mesh nobody sees.
+	 */
+	public var deferPublish:Bool = false;
+	var publishPending:Bool = false;
+
 	/** Advances the current clip and moves the mesh and attachments to the new pose. */
 	public function advance(seconds:Float):Void {
 		player.advance(seconds);
-		model.update();
 		pose.update(instance.readJointMatrices());
+		if (deferPublish)
+			publishPending = true;
+		else
+			publishScene();
+	}
+
+	/** Moves the mesh and attachments to the pose of the latest `advance`, if a deferred one has not been shown yet. */
+	public function publish():Void {
+		if (!publishPending)
+			return;
+		publishPending = false;
+		publishScene();
+	}
+
+	function publishScene():Void {
+		model.update();
 		placeAttachments();
 	}
 

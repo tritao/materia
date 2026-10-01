@@ -89,6 +89,8 @@ class HumanWorkforce implements SessionMember {
 			var entry = new WorkforceEntry(record.id, character, asset);
 			entries.push(entry);
 			character.advance(0.0);
+			// The simulation ticks many times for each frame drawn; the mesh is published once per frame, in present().
+			character.deferPublish = true;
 			var proxy = HumanBodyProxy.standard(character.pose,
 				HumanDescription.measure(character.pose, character.height()));
 			var rotation = record.rotation == null ? [0.0, 0.0, 0.0, 1.0] : record.rotation;
@@ -128,6 +130,8 @@ class HumanWorkforce implements SessionMember {
 				failed.abort('Invalid worker job: $failure');
 			}
 			var humanId = record.id;
+			// The readings go to a display, not to the job, so twenty a second is plenty.
+			worker.signalTicks = 5;
 			worker.onTick = function(_, signals) signalsById.set(humanId, signals);
 		}
 	}
@@ -156,7 +160,10 @@ class HumanWorkforce implements SessionMember {
 	public function reset():Void {
 		for (entry in entries) {
 			var worker = entry.worker;
-			if (worker != null) worker.reset();
+			if (worker != null) {
+				worker.reset();
+				entry.character.publish();
+			}
 		}
 		// Readings from before the reset describe a worker that is no longer there.
 		signalsById.clear();
@@ -166,6 +173,7 @@ class HumanWorkforce implements SessionMember {
 		for (entry in entries) {
 			var worker = entry.worker;
 			if (worker == null) continue;
+			entry.character.publish();
 			var matrix = worker.body.rootTransform();
 			var transform = Transform.identity();
 			for (index in 0...16) transform.set(index, matrix[index]);
