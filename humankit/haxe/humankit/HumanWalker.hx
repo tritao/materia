@@ -197,6 +197,16 @@ class HumanWalker {
 	public function isTurning():Bool
 		return facing != null || turnsLeft > 0;
 
+	/**
+	 * How much of the pose showing is the idle one, whose feet are on the floor: 1 standing, 0 in a steady walk, and
+	 * in between while the walk fades in or out. A planted foot is held in the world while this is high.
+	 */
+	public function stanceShare():Float {
+		var weight = character.player.fadeWeight();
+		var playing = character.player.currentClip();
+		return playing == idleClip ? weight : (character.player.fading() ? 1.0 - weight : 0.0);
+	}
+
 	/** Whether the character stands still with its walk faded out: not walking, not turning, not mid-crossfade. */
 	public function settled():Bool
 		return !walking && facing == null && turnsLeft == 0 && !character.player.fading();

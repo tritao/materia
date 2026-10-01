@@ -159,6 +159,19 @@ class HumanCharacter {
 	public function spineLean():Float
 		return lean;
 
+	/**
+	 * Whether the legs are IK chains (thigh, shin and foot one below the other), so a foot can be held where it is.
+	 * The bundled worker's feet hang off the body as controls instead, and cannot.
+	 */
+	public function legsAreChains():Bool {
+		for (side in 0...2) {
+			var thigh = rig.joint(side == 0 ? ThighL : ThighR), shin = rig.joint(side == 0 ? ShinL : ShinR), foot = rig.joint(side == 0 ? FootL : FootR);
+			if (thigh < 0 || shin < 0 || foot < 0) return false;
+			if (asset.jointParents[foot] != shin || asset.jointParents[shin] != thigh) return false;
+		}
+		return true;
+	}
+
 	/** Whether the asset has a crouch clip to lower the body with. */
 	public function canCrouch():Bool
 		return crouchClip >= 0;

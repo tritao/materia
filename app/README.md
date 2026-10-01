@@ -440,3 +440,10 @@ catalog is used when no registry is provided.
 The project metadata lives in `haxeon.json`; the UI showcase compiler command
 is the reference for supplying the shared UI and FFI source roots when building
 this app against the repository checkout.
+
+## Judging a job by eye
+
+`python3 app/tools/worker-event-sheet.py --out /tmp/events --crop 700,300,1700,1000` runs the rack-to-table job headless with a trace
+(`--snapshot --worker-demo=rack-to-table --worker-demo-step=N --worker-demo-trace`), reads when each action began, and captures a frame a moment
+after each with its name on the tile, in a contact sheet. `--asset animkit/assets/quaternius-ual/ual-work.glb --surface 0.6` makes a temporary variant
+with the library character and lower tops (the example is put back afterwards). `capture-worker-frames.py` takes frames at moments you choose.

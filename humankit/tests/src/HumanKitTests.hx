@@ -119,6 +119,7 @@ class HumanKitTests {
 		postureStature();
 		turning(scene, worker, rig);
 		retreating(scene, worker, rig);
+		holdingFeet(scene);
 		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -942,6 +943,33 @@ class HumanKitTests {
 		var plainBody = new HumanBody(plain);
 		if (plainBody.walker.backGait != null) throw "The bundled worker claims a backward gait";
 		plain.dispose();
+	}
+
+	/**
+	 * A character whose legs are IK chains holds its planted feet in the world while the idle pose shows, so starting to
+	 * walk does not drag them.
+	 */
+	static function holdingFeet(scene:Scene):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		// How far the left foot, which stays planted as the first step is taken with the right, is dragged along the floor in the first sixth of a second.
+		var dragOf = function(hold:Bool):Float {
+			var human = new HumanCharacter(scene, asset, rig, null, "FootHolder");
+			var posture = HumanPosture.forStature(human.height());
+			posture.lockFeet = hold;
+			var body = new HumanBody(human, null, posture);
+			var step = 1.0 / 60.0;
+			for (_ in 0...30) body.advance(step);
+			var before = body.toWorld(human.pose.bonePosition(HumanBone.FootL));
+			body.walker.follow([[0.0, 0.0], [30.0, 0.0]], 1.0);
+			for (_ in 0...10) body.advance(step);
+			var after = body.toWorld(human.pose.bonePosition(HumanBone.FootL));
+			human.dispose();
+			return Math.sqrt(Math.pow(after[0] - before[0], 2) + Math.pow(after[1] - before[1], 2));
+		};
+		var held = dragOf(true), loose = dragOf(false);
+		if (!(held < 0.03) || !(loose > held + 0.05))
+			throw 'Holding the feet did not stop the drag at the start of a walk: ${held} m held, ${loose} m loose';
 	}
 
 	/** A posture's lengths grow with the body; its angles, fractions and times do not. */

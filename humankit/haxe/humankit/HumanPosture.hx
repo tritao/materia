@@ -78,6 +78,18 @@ class HumanPosture {
 	 */
 	public var blendSpeed:Float = 1.0;
 
+	// Feet.
+
+	/** Whether a planted foot is held where it is in the world, on a character whose legs are IK chains. */
+	public var lockFeet:Bool = true;
+	/** The share of the pose that is the idle one above which the feet are held, and the span over which the hold comes in. */
+	public var lockFrom:Float = 0.15;
+	public var lockSpan:Float = 0.3;
+	/** Seconds the hold takes to come in and go out. */
+	public var lockSeconds:Float = 0.15;
+	/** How far a held foot may be from where the pose wants it, in metres, before the hold lets go. */
+	public var lockReach:Float = 0.3;
+
 	// Crouching.
 
 	/** How fast the body lowers into a crouch and rises out of it, in full crouches per second. */

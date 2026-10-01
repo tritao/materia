@@ -38,6 +38,10 @@ class ClipPlayer {
 	public function currentClip():Int
 		return clip;
 
+	/** How far the current clip has faded in, 0 to 1; one when nothing is fading. */
+	public function fadeWeight():Float
+		return currentWeight();
+
 	/** Whether a crossfade between clips is still running. */
 	public function fading():Bool
 		return outgoing.length > 0;

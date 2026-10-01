@@ -32,6 +32,10 @@ class HumanBody {
 	var leanNow:Float = 0.0;
 	/** Whether free arms are held down at the sides, as when walking up to a surface they must not sweep over. */
 	var armsDown:Bool = false;
+	/** Where each foot is held in the world (left, right), or null; and how strongly it is held. */
+	final footAnchors:Array<Null<Array<Float>>> = [null, null];
+	var footLock:Float = 0.0;
+	final canLockFeet:Bool;
 	var crouchGoal:Float = 0.0;
 	var crouchNow:Float = 0.0;
 	/** Where the bones planning reads stand when the body is upright and at rest, in model space. */
@@ -47,6 +51,7 @@ class HumanBody {
 		palmReach = wristAt == null || knuckleAt == null ? 0.0 : 0.5 * Math.sqrt(Math.pow(knuckleAt[0] - wristAt[0], 2) +
 			Math.pow(knuckleAt[1] - wristAt[1], 2) + Math.pow(knuckleAt[2] - wristAt[2], 2));
 		this.posture = posture == null ? HumanPosture.forStature(description.stature) : posture;
+		canLockFeet = character.legsAreChains();
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
 		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis]) {
@@ -263,6 +268,41 @@ class HumanBody {
 		var step = posture.leanRate * seconds;
 		leanNow = Math.abs(leanGoal - leanNow) <= step ? leanGoal : leanNow + (leanGoal > leanNow ? step : -step);
 		character.setSpineLean(leanNow);
+	}
+
+	/**
+	 * While the idle pose shows (standing, and the fade into and out of a walk), the feet are held where they stand:
+	 * the idle pose keeps its feet still relative to the body, so a body that starts to move drags them, and one that
+	 * lowers or rises slides them. Each foot is reached for at the spot it had when the hold began, with a hold that
+	 * comes in and goes out smoothly; in a steady walk the gait already keeps a planted foot still.
+	 */
+	function holdFeet(seconds:Float):Void {
+		if (!canLockFeet || !posture.lockFeet) return;
+		var share = walker.stanceShare();
+		var wanted = Math.max(0.0, Math.min(1.0, (share - posture.lockFrom) / posture.lockSpan));
+		wanted = wanted * wanted * (3.0 - 2.0 * wanted);
+		var step = seconds / posture.lockSeconds;
+		footLock = Math.abs(wanted - footLock) <= step ? wanted : footLock + (wanted > footLock ? step : -step);
+		var feet = [HumanBone.FootL, HumanBone.FootR], legs = [LegL, LegR];
+		if (footLock <= 1e-4) {
+			for (side in 0...2) if (footAnchors[side] != null) {
+				footAnchors[side] = null;
+				clearReach(legs[side]);
+			}
+			return;
+		}
+		for (side in 0...2) {
+			var foot = character.pose.bonePosition(feet[side]);
+			if (foot == null) continue;
+			var here = toWorld(foot);
+			var anchor = footAnchors[side];
+			// Taken where the foot is now, as the hold begins; let go and taken again if the body has left it too far behind.
+			if (anchor == null || distance(anchor, here) > posture.lockReach + 0.5 * (1.0 - footLock)) {
+				anchor = here;
+				footAnchors[side] = anchor;
+			}
+			setReachWorld(legs[side], anchor, footLock);
+		}
 	}
 
 	function moveCrouch(seconds:Float):Void {
@@ -508,6 +548,9 @@ class HumanBody {
 		leanNow = 0.0;
 		character.setSpineLean(0.0);
 		armsDown = false;
+		footLock = 0.0;
+		footAnchors[0] = null;
+		footAnchors[1] = null;
 		crouchGoal = 0.0;
 		crouchNow = 0.0;
 		if (character.canCrouch()) character.setCrouch(0.0);
@@ -531,6 +574,7 @@ class HumanBody {
 		moveLean(seconds);
 		moveCrouch(seconds);
 		walker.advance(seconds);
+		holdFeet(seconds);
 		evaluate();
 	}
 

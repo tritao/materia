@@ -40,6 +40,8 @@ class Naturalness {
 	/** Largest jerk of the pelvis and of either wrist, in metres per second cubed. */
 	public var maxPelvisJerk(default, null):Float = 0.0;
 	public var maxWristJerk(default, null):Float = 0.0;
+	/** Largest jerk of either ankle: a foot held in the world and let go again must not pop. */
+	public var maxFootJerk(default, null):Float = 0.0;
 	public var samples(default, null):Int = 0;
 
 	var restHeight:Array<Float> = [];
@@ -48,7 +50,7 @@ class Naturalness {
 	var plantedAt:Array<Null<Array<Float>>> = [null, null];
 	var plantedSample:Array<Int> = [0, 0];
 	var slideNow:Array<Float> = [0.0, 0.0];
-	final history:Array<Array<Array<Float>>> = [[], [], []];
+	final history:Array<Array<Array<Float>>> = [[], [], [], [], []];
 	var tick:Int = 0;
 
 	public function new() {}
@@ -110,8 +112,8 @@ class Naturalness {
 		}
 		tick++;
 		if (tick % JERK_STRIDE != 0) return;
-		var tracked = [HumanBone.Pelvis, HumanBone.HandL, HumanBone.HandR];
-		for (index in 0...3) {
+		var tracked = [HumanBone.Pelvis, HumanBone.HandL, HumanBone.HandR, HumanBone.FootL, HumanBone.FootR];
+		for (index in 0...5) {
 			var local = pose.bonePosition(tracked[index]);
 			if (local == null) continue;
 			var series = history[index];
@@ -124,7 +126,8 @@ class Naturalness {
 				k += Math.pow((series[3][axis] - 3.0 * series[2][axis] + 3.0 * series[1][axis] - series[0][axis]) / (step * step * step), 2);
 			k = Math.sqrt(k);
 			if (index == 0) maxPelvisJerk = Math.max(maxPelvisJerk, k);
-			else maxWristJerk = Math.max(maxWristJerk, k);
+			else if (index < 3) maxWristJerk = Math.max(maxWristJerk, k);
+			else maxFootJerk = Math.max(maxFootJerk, k);
 		}
 	}
 
@@ -183,6 +186,6 @@ class Naturalness {
 		var r = function(value:Float, scale:Float):Float return Math.round(value * scale) / scale;
 		return 'slide ${r(maxSlide, 100)} m at most (${r(slideTotal, 100)} m in all over ${r(plantedSeconds, 10)} s planted), support margin '
 			+ (minSupportMargin == Math.POSITIVE_INFINITY ? "n/a" : '${r(minSupportMargin, 100)} m') + ', floor ${r(floorPenetration, 100)} m, jerk pelvis '
-			+ '${Math.round(maxPelvisJerk)} wrist ${Math.round(maxWristJerk)} m/s3';
+			+ '${Math.round(maxPelvisJerk)} wrist ${Math.round(maxWristJerk)} foot ${Math.round(maxFootJerk)} m/s3';
 	}
 }

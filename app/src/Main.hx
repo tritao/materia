@@ -166,7 +166,8 @@ class Main {
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
           arg.indexOf("--character-route=") != 0 && arg.indexOf("--character-facility-route=") != 0 &&
           arg.indexOf("--character-reach=") != 0 && arg.indexOf("--character-reach-clip=") != 0 &&
-          arg != "--worker-demo=rack-to-table" && arg.indexOf("--worker-demo-step=") != 0) {
+          arg != "--worker-demo=rack-to-table" && arg.indexOf("--worker-demo-step=") != 0 &&
+          arg != "--worker-demo-trace") {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
           "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] " +
@@ -175,7 +176,7 @@ class Main {
           "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
           "[--character-route=X,Y;X,Y;... | --character-facility-route=FROM,TO] " +
           "[--character-reach=X,Y,Z [--character-reach-clip=NAME]]] " +
-          "[--worker-demo=rack-to-table [--worker-demo-step=N]] " +
+          "[--worker-demo=rack-to-table [--worker-demo-step=N [--worker-demo-trace]]] " +
           "[--example=ID[,ID...] [--example-settle=SECONDS] [--example-play]]");
         return 2;
       }
@@ -218,12 +219,29 @@ class Main {
         }
       if (args.indexOf("--reset-workspace") >= 0) editor.resetWorkspace();
       if (args.indexOf("--worker-demo=rack-to-table") >= 0) {
-        editor.enableWorkerDemo(workerDemoSteps(args), false);
+        // With --worker-demo-trace the ticks are stepped one at a time and what the worker was doing is kept, so a
+        // tool can pick the moments of a job (arriving, grasping, setting down) without guessing their times.
+        var trace = args.indexOf("--worker-demo-trace") >= 0;
+        var ticks = workerDemoSteps(args);
+        editor.enableWorkerDemo(trace ? 0 : ticks, false);
         var worker = editor.simulation.humanWorker("worker-demo");
+        var timeline:Array<{tick:Int, seconds:Float, step:Null<Int>, action:String, crouch:Float, walking:Bool}> = [];
+        if (trace && worker != null) {
+          var last = "";
+          for (tick in 0...ticks) {
+            if (worker.currentJobDone()) break;
+            editor.simulation.step();
+            var label = worker.currentActionLabel() + "/" + worker.currentStep();
+            if (label == last) continue;
+            last = label;
+            timeline.push({tick: tick, seconds: tick * editor.simulation.timestep, step: worker.currentStep(),
+              action: worker.currentActionLabel(), crouch: worker.body.crouchAmount(), walking: worker.body.walker.isWalking()});
+          }
+        }
         var signals = editor.simulation.humanSignals("worker-demo");
         var environment = editor.simulation.environmentVisualState();
         var part = [for (entry in environment) if (entry.id == "worker-demo-part") entry];
-        Sys.println(haxe.Json.stringify({workerDemo:"rack-to-table", jobDone:worker != null &&
+        Sys.println(haxe.Json.stringify({workerDemo:"rack-to-table", timeline:timeline, jobDone:worker != null &&
           worker.currentJobDone(), jobFailure:worker == null ? "missing worker" : worker.currentJobFailure(),
           part:part.length == 0 ? null : part[0].position,
           zones:signals == null ? [] : signals.zones,

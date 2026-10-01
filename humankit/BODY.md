@@ -126,6 +126,17 @@ that much nearer the shoulder than planned and the elbow folded, and it stood to
 Reaches are now planned to the wrist (`comfort` and `stretch` of the arm, plus the palm), and `solveReach` starts the wrist a palm short of the point.
 That alone cleared the two-hand layouts at a metre that had needed a crouch, and took the elbow gate back to 30 degrees.
 
+## Holding the feet
+
+While the idle pose shows (standing, and the cross-fade into and out of a walk) a character whose legs are IK chains holds
+its feet where they stand: each foot is reached for at the spot it had when the hold began (`HumanBody.holdFeet`), with a hold
+that eases in and out (`lockFrom`, `lockSpan`, `lockSeconds`, `lockReach` in `HumanPosture`). The idle pose keeps its feet still
+relative to the body, so a body that starts to move used to drag them and one that rose from a crouch slid them. The share of
+idle in the pose is `HumanWalker.stanceShare`; in a steady walk the gait already keeps a planted foot still, and the hold is off.
+The bundled worker's feet are controls, not a chain, and are left as they were. On the library sweep it takes the worst foot slide
+from 0.23 m to 0.11 m, at the cost of some more foot jerk (2089 to 2400 m/s3). The foot is not turned with the leg: it
+keeps its animated pose, so a hold that has to bend the leg a long way shows as a tilted foot.
+
 ## Measuring without showing
 
 The planner measures the body by posing it: the shoulder under a lean, the pelvis at a crouch depth, a fingertip at each curl, the wrist
@@ -141,7 +152,7 @@ samples), where the centre of mass projects against the hull of both feet while 
 into the floor, and the jerk of the pelvis and wrists. `JobGate` carries both and reports which step of the job a
 finding came from; the sweeps print the worst of each. Baselines: the bundled worker slides a foot at most 0.04 m over
 the rack sweep and keeps its mass 7 cm inside its feet; the library character slides up to 0.23 m where it crouches and turns,
-and 2 cm inside. Where the slide comes from: a steady walk is gait-matched and keeps a planted foot within about 6 cm on both characters
+and 2 cm inside. Foot slide before the hold (see "Holding the feet"): a steady walk is gait-matched and keeps a planted foot within about 6 cm on both characters
 (the library's walk is as good as the bundled one, 6 cm against 5). The rest, up to 23 cm, is getting up to speed and
 stopping: while the body accelerates the idle pose that is still showing keeps its feet still, so a planted foot is dragged
 by the distance travelled (about half the speed times the ramp, 15 cm), and a crouched worker standing up slides its feet
