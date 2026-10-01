@@ -490,8 +490,10 @@ std::uint64_t Rkd6Endpoint::link_drain_ns() const noexcept {
     if (const auto bytes = transport_->queued_output_bytes()) drain = std::max(drain, line_ns(*bytes));
     // What the device has not received, by its last status, which covers buffers no host
     // count sees (a USB adapter's), less the line time since and the link's latency.
-    if (has_status_) {
-        const std::uint32_t unreceived = sent_bytes_ - status_.received_bytes;
+    // A device count ahead of the host's (wrapped past half the range) means bytes the
+    // host never sent reached it, such as line noise: none of the host's is in flight.
+    const std::uint32_t unreceived = sent_bytes_ - status_.received_bytes;
+    if (has_status_ && unreceived <= 0x7fff'ffffu) {
         const auto since = (now_ns_ > status_at_ns_ ? now_ns_ - status_at_ns_ : 0) + link_latency_ns_;
         const auto pending = line_ns(unreceived);
         if (pending > since) drain = std::max(drain, pending - since);

@@ -135,7 +135,9 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
     assert(endpoint->sample(100'300'000, state) == RK_OK);
     assert(endpoint->submit_device_plan(plan, 0, 100'300'000, 20'000'000, blueprint) == RK_OK);
     assert(observed->queue_begin_frames == 1 && observed->segment_frames == 0);
-    observed->unreceived = 0;
+    // Bytes the host never sent, such as line noise, put the device's count ahead of the
+    // host's; that is no backlog, not one wrapped round to four gigabytes.
+    observed->unreceived = static_cast<std::uint32_t>(-100);
     observed->push(14, status);
     assert(endpoint->sample(100'400'000, state) == RK_OK);
     assert(observed->segment_frames == 1);
