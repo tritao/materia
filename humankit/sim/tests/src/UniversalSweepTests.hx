@@ -25,7 +25,7 @@ class UniversalSweepTests {
             var scenario = RackScenario.build(true, layout);
             var worker = scenario.worker;
             var gate = new JobGate(worker, scenario.session, scenario.limbs(), [scenario.rack, scenario.table]);
-            gate.slideLimit = 0.15;
+            gate.slideLimit = 0.09;
             var ticks = 0, deepest = 0.0, kneeled = 0.0, hinged = 0.0;
             while (!worker.currentJobDone() && ticks++ < 1500) {
                 scenario.tick();

@@ -82,7 +82,12 @@ class JobGate {
         if (!reaching || !(!gripped || body.grip)) return;
         var belly = pose.bonePosition(HumanBone.Spine);
         var front = body.toWorld([belly[0] + BELLY_FRONT, belly[1], belly[2]]);
-        for (surface in surfaces) clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
+        for (surface in surfaces) {
+            // A belly held above the surface's top overhangs it; only one within the surface's height has to stay clear.
+            var posture = body.posture;
+            if (front[2] - posture.bellyHalfHeight > surface.center[2] + surface.halfExtents[2] + posture.slabMargin) continue;
+            clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
+        }
     }
 
     /**

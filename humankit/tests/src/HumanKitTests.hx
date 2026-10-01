@@ -919,6 +919,8 @@ class HumanKitTests {
 		if (still.maxSlide > 0.005 || still.minSupportMargin < -0.02)
 			throw 'A worker standing still slid or tipped ($label): ${still.summary()}';
 		var walking = new Naturalness();
+		// Sampling starts mid-walk, where a foot may be in the air: the floor is the one the worker stood on.
+		walking.standOnTheFloorOf(still);
 		body.walker.follow([[0.0, 0.0], [20.0, 0.0]], 1.0);
 		for (index in 0...360) {
 			body.advance(step);

@@ -164,6 +164,25 @@ restores the orientation the foot had in the animation (`keep_end_rotation` in t
 an ankle to a spot moves the ankle and leaves the foot's pitch alone; without it a leg that bent 30 degrees tilted the foot by as much.
 The foot tilt `Naturalness` reports (44 degrees worst, in a crouch) is the animation's own heel lift, not the hold's.
 
+A walk from standing does not begin at the top of the walk cycle. `HumanGait.startTime` is the phase of the cycle whose fade from idle
+drags a foot least, found by predicting, for each of the cycle's phases, how far a foot standing at idle would slide while the idle pose
+fades into the clip over `HumanWalker`'s blend and the body accelerates (`HumanGait.startSlide`, which models the hold for a
+character that has one, as the hold pins the feet during that fade and the slide is what happens when it lets go). The walk, the
+carrying walk and the backward walk each start at theirs. On the library sweep this took the worst foot slide from 0.13 m to 0.07 m
+(the sweep's gate is now 0.09 m, not 0.15), and the bundled worker's stays at 0.04 m. Matching the idle feet by their positions alone,
+or only the planted foot's, was tried first: it helped one rig and hurt the other, because a foot about to lift is low and slow for its
+first moments and counts as planted, so the prediction has to follow the same rule `Naturalness` uses.
+
+## Standing at a surface
+
+The planner stands the worker square to the edge it works at, not along the line it walked up (the nearest of the four directions the box's
+edges face), and it measures the belly's distance to that edge along the line the belly travels, a shoulder's width to the side of the
+target's, since a belly line that is not square to an edge meets it at a different distance (a few centimetres, which once put a belly 2
+cm inside a bench). A belly held above a surface's top by more than its own height and a margin (`bellyHalfHeight`, `bellyOverhangMargin`)
+overhangs the edge instead of meeting it, which is how a worker kneels over a low shelf; the knees and thighs still stay behind it. The
+gate's belly clearance uses the same rule. `Naturalness.standOnTheFloorOf` takes a run's floor from another run's, for a run that begins
+mid-stride, where the first sample's foot may be in the air.
+
 ## Measuring without showing
 
 The planner measures the body by posing it: the shoulder under a lean, the pelvis at a crouch depth, a fingertip at each curl, the wrist
@@ -179,7 +198,7 @@ samples), where the centre of mass projects against the hull of both feet while 
 into the floor, and the jerk of the pelvis and wrists. `JobGate` carries both and reports which step of the job a
 finding came from; the sweeps print the worst of each. Baselines: the bundled worker slides a foot at most 0.04 m over
 the rack sweep and keeps its mass 7 cm inside its feet; the library character slides up to 0.23 m where it crouches and turns,
-and 2 cm inside. Foot slide before the hold (see "Holding the feet"): a steady walk is gait-matched and keeps a planted foot within about 6 cm on both characters
+and 2 cm inside (with the hold and the walk's start phase, 0.07 m; see "Holding the feet"). Foot slide before the hold: a steady walk is gait-matched and keeps a planted foot within about 6 cm on both characters
 (the library's walk is as good as the bundled one, 6 cm against 5). The rest, up to 23 cm, is getting up to speed and
 stopping: while the body accelerates the idle pose that is still showing keeps its feet still, so a planted foot is dragged
 by the distance travelled (about half the speed times the ramp, 15 cm), and a crouched worker standing up slides its feet

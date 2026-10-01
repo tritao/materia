@@ -46,14 +46,14 @@ class ArmFlipProbe {
                 var footL = worker.body.toWorld(pose.bonePosition(HumanBone.FootL)), footR = worker.body.toWorld(pose.bonePosition(HumanBone.FootR));
                 feetInfo = ' footL=${footL.map(f).join(",")} footR=${footR.map(f).join(",")} lock=${f(worker.body.footHold())} walking=${worker.body.walker.isWalking()} turning=${worker.body.walker.isTurning()} share=${f(worker.body.walker.stanceShare())}';
             }
-            rows.push('$ticks ${worker.currentActionLabel()} crouch=${f(worker.body.crouchAmount())} kneel=${f(worker.body.kneelAmount())} hinge=${f(worker.body.character.spineHinge())} lean=${f(worker.body.character.spineLean())} elbow=${f(angle)}deg reach=${f(len(Mat4.subtract(hand, shoulder)))} handSpeed=${f(handSpeed)} shoulderSpeed=${f(shoulderSpeed)}$feetInfo rate=${f(rate)} normal=${normal == null ? "-" : normal.map(f).join(",")} shoulder=${shoulder.map(f).join(",")} elbowPos=${elbow.map(f).join(",")} hand=${hand.map(f).join(",")}');
+            rows.push('$ticks ${worker.currentActionLabel()} crouch=${f(worker.body.crouchAmount())} kneel=${f(worker.body.kneelAmount())} hinge=${f(worker.body.character.spineHinge())} lean=${f(worker.body.character.spineLean())} elbow=${f(angle)}deg reach=${f(len(Mat4.subtract(hand, shoulder)))} handSpeed=${f(handSpeed)} shoulderSpeed=${f(shoulderSpeed)} clearance=${f(gate.clearance)} root=${f(worker.body.rootTransform()[12])},${f(worker.body.rootTransform()[13])} spineX=${f(pose.bonePosition(HumanBone.Spine)[0])} pelvisX=${f(pose.bonePosition(HumanBone.Pelvis)[0])} reachW=${f(worker.body.reachWeight(humankit.HumanLimb.ArmL))}$feetInfo rate=${f(rate)} normal=${normal == null ? "-" : normal.map(f).join(",")} shoulder=${shoulder.map(f).join(",")} elbowPos=${elbow.map(f).join(",")} hand=${hand.map(f).join(",")}');
         }
         var failures:Array<String> = [];
         gate.check("probe", failures);
         Sys.println('GATE ${spec}: worst plane turn ${f(gate.worst().turn)} rad/s; ' + (failures.length == 0 ? "no failures" : failures.join(" | ")));
         Sys.println('PROBE ${spec}: job done=${worker.currentJobDone()} failure=${worker.currentJobFailure()} worst plane turn ${f(worstRate)} rad/s at row $worstAt of ${rows.length}');
         var centre = parts.length > 4 ? Std.parseInt(parts[4]) - 1 : worstAt;
-        for (row in Std.int(Math.max(0, centre - 60))...Std.int(Math.min(rows.length, centre + 8))) Sys.println(rows[row]);
+        for (row in (Sys.getEnv("PROBE_ALL") != null ? 0 : Std.int(Math.max(0, centre - 60)))...(Sys.getEnv("PROBE_ALL") != null ? rows.length : Std.int(Math.min(rows.length, centre + 8)))) Sys.println(rows[row]);
     }
 
     static function len(v:Array<Float>):Float return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);

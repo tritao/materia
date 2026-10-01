@@ -76,6 +76,10 @@ class HumanPosture {
 	/** How far the front of the belly sits ahead of the abdomen bone, and the gap left to a surface edge. */
 	public var bellyFront:Float = 0.12;
 	public var edgeGap:Float = 0.03;
+	/** How far below the abdomen bone the belly reaches: a belly higher than a surface's top by this much overhangs it without touching it. */
+	public var bellyHalfHeight:Float = 0.12;
+	/** How much higher than that the planner wants the belly before it lets it overhang: leaning lowers the belly a little, and the rule switches a whole edge on or off. */
+	public var bellyOverhangMargin:Float = 0.12;
 
 	/**
 	 * How fast, in metres per second, a wrist is allowed to go at the peak of the easing as a reach blends in from
@@ -137,6 +141,8 @@ class HumanPosture {
 		posture.hangForward *= k;
 		posture.hangOutward *= k;
 		posture.bellyFront *= k;
+		posture.bellyHalfHeight *= k;
+		posture.bellyOverhangMargin *= k;
 		posture.blendSpeed *= k;
 		posture.withdraw *= k;
 		posture.lift *= k;

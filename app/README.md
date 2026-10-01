@@ -453,6 +453,6 @@ with the library character and lower tops (the example is put back afterwards). 
 `./app/run-built.sh --worker-demo=gallery` (or *Worker gallery* on the Start page) opens `app/examples/worker-gallery.materia`: six workers side by side, 6 m apart, each
 with a rack, a table and a part, running a short document job in the one simulation. The lanes are the cases the worker is built for: the bundled
 worker at table height (the rack-to-table demo as it was); the library character bending over 0.8 m deep tops; crouching to a bench at 0.6 m; kneeling to
-a shelf at 0.3 m; using the left hand and turning right round to a table behind it; and using both hands for a long part and then pressing a panel. The file is written
+a shelf at 0.35 m; using the left hand and turning right round to a table behind it; and using both hands for a long part and then pressing a panel. The file is written
 by `app/tools/make-worker-gallery.py` (`--check` says whether it is up to date); `--snapshot --worker-demo=gallery --worker-demo-step=N` runs it headless and prints each
 worker's result and the tick it finished at, and `WorkerGalleryTests` holds all six to finishing with the part on its table.

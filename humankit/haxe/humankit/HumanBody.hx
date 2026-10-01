@@ -274,18 +274,22 @@ class HumanBody {
 	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
 	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0, kneel:Float = 0.0):{angle:Float, shift:Float, drop:Float}
-		return pitchFor(hand, shift, crouch, kneel, false, 0.0);
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0, kneel:Float = 0.0, ?belly:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float}
+		return pitchFor(hand, shift, crouch, kneel, false, 0.0, belly);
 
 	/**
 	 * The same for bending at the hips, on top of a lean already planned (`lean`): the hinge that carries the shoulder `shift`
 	 * metres further forward than that lean does, and the shift and drop it delivers, up to the posture's maximum hinge.
 	 */
-	public function hingeFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, lean:Float):{angle:Float, shift:Float, drop:Float}
-		return pitchFor(hand, shift, crouch, kneel, true, lean);
+	public function hingeFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, lean:Float, ?belly:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float}
+		return pitchFor(hand, shift, crouch, kneel, true, lean, belly);
 
-	function pitchFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, hinging:Bool, base:Float):{angle:Float, shift:Float, drop:Float} {
-		var none = {angle: 0.0, shift: 0.0, drop: 0.0};
+	/**
+	 * `belly` also reports how far that bone is carried forward by the same pitch: the lean takes the belly toward a
+	 * surface along with the shoulder, and a worker who stands back from an edge for the belly has to allow for it.
+	 */
+	function pitchFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, hinging:Bool, base:Float, ?bellyBone:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float} {
+		var none = {angle: 0.0, shift: 0.0, drop: 0.0, belly: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
 		var saved = character.spineLean(), savedHinge = character.spineHinge(), savedCrouch = character.crouch(), savedKneel = character.kneel();
@@ -295,6 +299,7 @@ class HumanBody {
 		character.setSpineHinge(0.0);
 		character.probe();
 		var upright = character.pose.bonePosition(bone);
+		var uprightBelly = bellyBone == null ? null : character.pose.bonePosition(bellyBone);
 		var at = function(angle:Float):Null<Array<Float>> {
 			if (hinging) character.setSpineHinge(angle);
 			else character.setSpineLean(angle);
@@ -312,7 +317,9 @@ class HumanBody {
 				var there = at(angle);
 				if (there == null) break;
 				var made = there[0] - upright[0];
-				result = {angle: angle, shift: made, drop: there[2] - upright[2]};
+				var bellyNow = bellyBone == null ? null : character.pose.bonePosition(bellyBone);
+				result = {angle: angle, shift: made, drop: there[2] - upright[2],
+					belly: bellyNow != null && uprightBelly != null ? bellyNow[0] - uprightBelly[0] : 0.0};
 				if (Math.abs(made - shift) < 5e-4 || angle >= limit - 1e-6 && made < shift) break;
 				angle = Math.min(limit, angle * shift / Math.max(1e-4, made));
 			}

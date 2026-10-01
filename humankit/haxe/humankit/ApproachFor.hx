@@ -197,6 +197,19 @@ class ApproachFor extends HumanActionBase {
 		var distance = Math.sqrt(dx * dx + dy * dy);
 		stance.ux = distance > 1e-8 ? dx / distance : root[0];
 		stance.uy = distance > 1e-8 ? dy / distance : root[1];
+		// A worker at a surface stands square to the edge it works at, not along the line it walked up: the nearest of the four
+		// directions the box's edges face, so the belly and the knees meet the edge head on and the stand-off is the true one.
+		var faced = support;
+		if (faced != null) {
+			var c = Math.cos(faced.yaw), s = Math.sin(faced.yaw);
+			var best = -2.0, bx = stance.ux, by = stance.uy;
+			for (candidate in [[c, s], [-c, -s], [-s, c], [s, -c]]) {
+				var along = candidate[0] * stance.ux + candidate[1] * stance.uy;
+				if (along > best) { best = along; bx = candidate[0]; by = candidate[1]; }
+			}
+			stance.ux = bx;
+			stance.uy = by;
+		}
 		// Stand so the shoulder (model +X forward, +Y left of the root) sits
 		// `ahead` metres behind the target along the facing direction.
 		stance.lateral = bothHands ? 0.0 : shoulder[1];
@@ -207,8 +220,15 @@ class ApproachFor extends HumanActionBase {
 				var shift = kneeling ? worker.kneelShift(bellyBone, depth) : worker.crouchShift(bellyBone, depth);
 				belly = [belly[0] + shift[0], belly[1] + shift[1], belly[2] + shift[2]];
 			}
-			var edge = edgeDistance(support, target, stance.ux, stance.uy);
+			// The belly travels along a line parallel to the facing, a shoulder's width to the side of the target's: where an
+			// edge is not square to the facing, that line meets it at a different distance from the target's own.
+			var edge = edgeDistance(support, [target[0] + stance.uy * stance.lateral, target[1] - stance.ux * stance.lateral], stance.ux, stance.uy);
 			var required = edge + (belly == null ? 0.0 : belly[0]) + worker.posture.bellyFront + worker.posture.edgeGap;
+			// A belly held above the surface's top (a worker kneeling at a low shelf) overhangs the edge instead of meeting it; the
+			// knees and thighs, below, still have to stay behind.
+			var surface = support;
+			if (belly != null && surface != null && root[14] + belly[2] - worker.posture.bellyHalfHeight - worker.posture.bellyOverhangMargin > surface.center[2] + surface.halfExtents[2] + worker.posture.slabMargin)
+				required = 0.0;
 			// A body that is down puts its knees and thighs at about the height of a low top, where they would meet the slab:
 			// the legs have to stay behind the edge wherever they cross the slab's thickness.
 			var slab = support;
@@ -236,7 +256,16 @@ class ApproachFor extends HumanActionBase {
 				// Standing back from the edge leaves the shoulder short of the point: lean to make it up. The lean
 				// carries the shoulder forward and also lowers it, both as measured, and the arm then stretches
 				// past its comfortable reach, but no further from the shoulder where it ends up than the posture allows.
-				var made = kneeling ? worker.leanFor(planLimb, required - stance.standDistance, 0.0, depth) : worker.leanFor(planLimb, required - stance.standDistance, depth);
+				var made = kneeling ? worker.leanFor(planLimb, required - stance.standDistance, 0.0, depth, bellyBone) : worker.leanFor(planLimb, required - stance.standDistance, depth, 0.0, bellyBone);
+				// The lean carries the belly toward the edge along with the shoulder, so the worker stands that much further
+				// back, and leans for the larger gap that leaves; the second round is the correction to the first.
+				var requiredAtRest = required;
+				for (round in 0...2) {
+					if (!(made.belly > 0.002)) break;
+					required = requiredAtRest + made.belly;
+					made = kneeling ? worker.leanFor(planLimb, required - stance.standDistance, 0.0, depth, bellyBone) : worker.leanFor(planLimb, required - stance.standDistance, depth, 0.0, bellyBone);
+				}
+				required = requiredAtRest + made.belly;
 				stance.lean = made.angle;
 				var riseAfter = rise - made.drop;
 				if (Math.abs(riseAfter) >= farthest) {
@@ -248,7 +277,7 @@ class ApproachFor extends HumanActionBase {
 				stance.shortfall = Math.max(0.0, required - stance.standDistance);
 				// A top too deep to reach across by leaning: bend at the hips as well, which carries the shoulder further.
 				if (stance.shortfall > 0.01 && worker.posture.maxHinge > 0.0 && (depth <= 0.0 || worker.posture.hingeWithCrouch)) {
-					var bent = worker.hingeFor(planLimb, stance.shortfall, kneeling ? 0.0 : depth, kneeling ? depth : 0.0, made.angle);
+					var bent = worker.hingeFor(planLimb, stance.shortfall, kneeling ? 0.0 : depth, kneeling ? depth : 0.0, made.angle, bellyBone);
 					stance.hinge = bent.angle;
 					var riseBent = riseAfter - bent.drop;
 					if (Math.abs(riseBent) < farthest) {

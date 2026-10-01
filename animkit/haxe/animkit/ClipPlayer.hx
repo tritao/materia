@@ -59,7 +59,7 @@ class ClipPlayer {
 	}
 
 	/** Starts a clip from its beginning, fading from the current one. Replaying the current clip is a no-op. */
-	public function play(index:Int, fadeSeconds:Float = 0.2, loop:Bool = true):Void {
+	public function play(index:Int, fadeSeconds:Float = 0.2, loop:Bool = true, startSeconds:Float = 0.0):Void {
 		if (index < 0 || index >= instance.asset.clipNames.length)
 			throw 'Clip index $index is out of range';
 		if (index == clip)
@@ -76,7 +76,7 @@ class ClipPlayer {
 			outgoing.resize(0);
 		}
 		clip = index;
-		time = 0.0;
+		time = startSeconds;
 		this.loop = loop;
 	}
 

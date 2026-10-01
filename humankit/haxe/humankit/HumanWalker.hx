@@ -61,12 +61,13 @@ class HumanWalker {
 		var idle = character.asset.clipIndex(idleClip);
 		if (walk < 0 || idle < 0)
 			throw 'The character needs "$walkClip" and "$idleClip" clips';
-		gait = HumanGait.measure(character.asset, character.rig, walk);
+		var holds = character.legsAreChains();
+		gait = HumanGait.measure(character.asset, character.rig, walk, false, idle, holds);
 		routeGait = gait;
 		var carry = character.asset.clipIndex("walk_carry");
-		carryGait = carry < 0 ? null : HumanGait.measure(character.asset, character.rig, carry);
+		carryGait = carry < 0 ? null : HumanGait.measure(character.asset, character.rig, carry, false, idle, holds);
 		var back = character.asset.clipIndex("walk_bwd");
-		backGait = back < 0 ? null : HumanGait.measure(character.asset, character.rig, back, true);
+		backGait = back < 0 ? null : HumanGait.measure(character.asset, character.rig, back, true, idle, holds);
 		var left = HumanTurn.measure(character.asset, character.rig, character.asset.clipIndex("turn90_l"));
 		var right = HumanTurn.measure(character.asset, character.rig, character.asset.clipIndex("turn90_r"));
 		// Each is used for the direction it turns, whatever its name says.
@@ -104,7 +105,7 @@ class HumanWalker {
 		retreating = false;
 		var carryWalk = carryGait;
 		routeGait = carrying && carryWalk != null ? carryWalk : gait;
-		character.player.play(routeGait.clip, BLEND_SECONDS);
+		character.player.play(routeGait.clip, BLEND_SECONDS, true, routeGait.startTime);
 	}
 
 	/**
@@ -133,7 +134,7 @@ class HumanWalker {
 		// Backwards on the character's own backward walk, or else sliding in the idle pose.
 		var backWalk = backGait;
 		if (backWalk != null) routeGait = backWalk;
-		character.player.play(backWalk != null ? backWalk.clip : idleClip, BLEND_SECONDS);
+		character.player.play(backWalk != null ? backWalk.clip : idleClip, BLEND_SECONDS, true, backWalk != null ? backWalk.startTime : 0.0);
 	}
 
 	/** Sets the starting floor pose before a job begins. */

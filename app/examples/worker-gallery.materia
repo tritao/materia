@@ -366,7 +366,7 @@
    "dynamicBody": false,
    "height": 0.4,
    "id": "gallery-3-rack",
-   "label": "Rack, 0.3 m",
+   "label": "Rack, 0.35 m",
    "mass": 1,
    "meshSnapshot": null,
    "rotation": null,
@@ -376,7 +376,7 @@
    "width": 0.4,
    "x": 0.9,
    "y": 17.8,
-   "z": 0.25,
+   "z": 0.3,
    "materialId": "neutral",
    "visualOverrides": {
     "baseColor": [
@@ -393,7 +393,7 @@
    "dynamicBody": false,
    "height": 0.4,
    "id": "gallery-3-table",
-   "label": "Table, 0.3 m",
+   "label": "Table, 0.35 m",
    "mass": 1,
    "meshSnapshot": null,
    "rotation": null,
@@ -403,7 +403,7 @@
    "width": 0.4,
    "x": 2.4,
    "y": 19.8,
-   "z": 0.25,
+   "z": 0.3,
    "materialId": "neutral",
    "visualOverrides": {
     "baseColor": [
@@ -430,7 +430,7 @@
    "width": 0.08,
    "x": 0.9,
    "y": 17.8,
-   "z": 0.34,
+   "z": 0.39,
    "materialId": "neutral",
    "visualOverrides": {
     "baseColor": [

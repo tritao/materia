@@ -27,7 +27,7 @@ LANES = [
     ("Bundled worker, table height", BUNDLED, 1.06, 0.8, "standard"),
     ("Library worker, deep tops: bends over", LIBRARY, 1.06, 0.8, "standard"),
     ("Library worker, bench: crouches", LIBRARY, 0.6, 0.4, "standard"),
-    ("Library worker, low shelf: kneels", LIBRARY, 0.3, 0.4, "standard"),
+    ("Library worker, low shelf: kneels", LIBRARY, 0.35, 0.4, "standard"),
     ("Library worker, left hand: turns round, walks back", LIBRARY, 1.06, 0.4, "turn"),
     ("Library worker, both hands: long part, then a press", LIBRARY, 1.06, 0.4, "both"),
 ]

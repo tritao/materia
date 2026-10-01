@@ -59,6 +59,13 @@ class Naturalness {
 	public function new() {}
 
 	/** Takes one sample of a body whose pose is current; `seconds` is the time since the last. */
+	/**
+	 * Takes the floor under each foot from another run's: a foot's floor height is taken from its first sample, which is only
+	 * right when the run begins with both feet down. A run that begins mid-stride says so by taking it from one that stood.
+	 */
+	public function standOnTheFloorOf(other:Naturalness):Void
+		restHeight = other.restHeight.copy();
+
 	public function sample(body:HumanBody, seconds:Float):Void {
 		samples++;
 		var pose = body.character.pose;
