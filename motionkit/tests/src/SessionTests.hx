@@ -224,7 +224,7 @@ class SessionTests extends MotionKitTestSupport {
       "deferred move sends no plan before rest");
     abortRig.settleStop();
     check(abortRig.machine.sessionState() == Running &&
-      abortRig.robot.planCount() > planCount,
+      abortRig.robot.planCount() == planCount + 1,
       "stopping + rest starts the deferred plan");
     abortRig.dispose();
 
