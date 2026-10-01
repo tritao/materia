@@ -69,7 +69,8 @@ class TopologyFingerprint {
 			kind, surfaceKind, curveKind, x, y, z, dx, dy, dz, measure, midpoint);
 	}
 
-	public static function capture(shape:Shape):TopologyFingerprint {
+	/** `shape`'s fingerprint; an edge's position is its midpoint, or its first vertex when `midpoint` is false (older documents). */
+	public static function capture(shape:Shape, midpoint:Bool = true):TopologyFingerprint {
 		var kind = shape.kind();
 		if (kind == CadKit.ShapeKind.Face) {
 			var surface = shape.surfaceKind();
@@ -89,7 +90,14 @@ class TopologyFingerprint {
 				false);
 		} else if (kind == CadKit.ShapeKind.Edge) {
 			var tangent = shape.tangentAt();
-			var edgeCenter = shape.positionAt(0.5);
+			var edgeCenter:CadKit.Vec3;
+			if (midpoint) {
+				edgeCenter = shape.positionAt(0.5);
+			} else {
+				var endpoint = shape.subshape(CadKit.ShapeKind.Vertex, 0);
+				edgeCenter = endpoint.position();
+				endpoint.close();
+			}
 			return new TopologyFingerprint(
 				kind,
 				CadKit.SurfaceKind.Unknown,
@@ -101,7 +109,7 @@ class TopologyFingerprint {
 				tangent.get_y(),
 				tangent.get_z(),
 				shape.edgeLength(),
-				true);
+				midpoint);
 		} else if (kind == CadKit.ShapeKind.Vertex) {
 			var position = shape.position();
 			return new TopologyFingerprint(
@@ -121,37 +129,50 @@ class TopologyFingerprint {
 		}
 	}
 
+	/** How well `candidate` matches (see `scoreAgainst`); its kind and surface or curve kind are checked before it is measured. */
 	public function score(candidate:Shape):Float {
 		if (candidate.kind() != kind)
 			return -1.0e30;
+		if (kind == CadKit.ShapeKind.Face && candidate.surfaceKind() != surfaceKind)
+			return -1.0e30;
+		if (kind == CadKit.ShapeKind.Edge && candidate.curveKind() != curveKind)
+			return -1.0e30;
+		return scoreAgainst(capture(candidate, midpoint));
+	}
 
-		var distance = Math.pow(distanceTo(candidate), 0.5);
+	/**
+		How well a candidate's fingerprint matches this one: about 1 for the same face, edge or vertex up to
+		numerical noise, -1e30 for anything else (another kind, surface or curve, direction, size or place).
+		Fingerprints alone suffice, so a matcher without the geometry (an editor holding descriptors) agrees
+		with one that has it. Edge positions are compared only between fingerprints with the same anchor.
+	*/
+	public function scoreAgainst(candidate:TopologyFingerprint):Float {
+		if (candidate.kind != kind)
+			return -1.0e30;
+		var offsetX = candidate.x - x, offsetY = candidate.y - y, offsetZ = candidate.z - z;
+		var distance = Math.sqrt(offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ);
 		var positionScale:Float;
 		var normalizedSizeChange = 0.0;
 		var directionAgreement = 1.0;
 		if (kind == CadKit.ShapeKind.Face) {
-			if (candidate.surfaceKind() != surfaceKind)
+			if (candidate.surfaceKind != surfaceKind)
 				return -1.0e30;
 			var referenceSize = Math.pow(measure, 0.5);
-			var candidateSize = Math.pow(candidate.faceArea(), 0.5);
+			var candidateSize = Math.pow(candidate.measure, 0.5);
 			positionScale = Math.max(referenceSize, candidateSize);
 			normalizedSizeChange = relativeSizeChange(referenceSize, candidateSize);
-			var normal = candidate.faceNormal();
-			var dot = dx * normal.get_x() + dy * normal.get_y() + dz * normal.get_z();
+			var dot = dx * candidate.dx + dy * candidate.dy + dz * candidate.dz;
 			if (dot < MinimumDirectionAgreement)
 				return -1.0e30;
 			directionAgreement = dot;
 		} else if (kind == CadKit.ShapeKind.Edge) {
-			if (candidate.curveKind() != curveKind)
+			if (candidate.curveKind != curveKind || candidate.midpoint != midpoint)
 				return -1.0e30;
 			var referenceSize = measure;
-			var candidateSize = candidate.edgeLength();
+			var candidateSize = candidate.measure;
 			positionScale = Math.max(referenceSize, candidateSize);
 			normalizedSizeChange = relativeSizeChange(referenceSize, candidateSize);
-			var tangent = candidate.tangentAt();
-			var tangentDot = dx * tangent.get_x() + dy * tangent.get_y() + dz * tangent.get_z();
-			if (tangentDot < 0.0)
-				tangentDot = -tangentDot;
+			var tangentDot = Math.abs(dx * candidate.dx + dy * candidate.dy + dz * candidate.dz);
 			if (tangentDot < MinimumDirectionAgreement)
 				return -1.0e30;
 			directionAgreement = tangentDot;
@@ -170,27 +191,6 @@ class TopologyFingerprint {
 		if (distance > maximumDistance)
 			return -1.0e30;
 		return directionAgreement - normalizedDistance - normalizedSizeChange;
-	}
-
-	private function distanceTo(candidate:Shape):Float {
-		var point:CadKit.Vec3;
-		if (kind == CadKit.ShapeKind.Face) {
-			point = candidate.center();
-		} else if (kind == CadKit.ShapeKind.Edge && midpoint) {
-			point = candidate.positionAt(0.5);
-		} else if (kind == CadKit.ShapeKind.Edge) {
-			var endpoint = candidate.subshape(CadKit.ShapeKind.Vertex, 0);
-			point = endpoint.position();
-			endpoint.close();
-		} else if (kind == CadKit.ShapeKind.Vertex) {
-			point = candidate.position();
-		} else {
-				return 1.0e30;
-		}
-		var offsetX = point.get_x() - x;
-		var offsetY = point.get_y() - y;
-		var offsetZ = point.get_z() - z;
-		return offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ;
 	}
 
 	private function relativeSizeChange(oldValue:Float, newValue:Float):Float {

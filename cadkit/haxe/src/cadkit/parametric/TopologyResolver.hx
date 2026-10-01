@@ -36,6 +36,33 @@ class TopologyResolver {
 			}
 		}
 
+		return choose(bestIndex, bestScore, secondBestScore);
+	}
+
+	/**
+		`resolve` over candidates' fingerprints instead of their shapes (an editor holding face descriptors but
+		not the B-rep): the index into `candidates` that matches, under the same scoring and ambiguity policy.
+	*/
+	public static function resolveAmong(candidates:Array<TopologyFingerprint>, fingerprint:TopologyFingerprint):TopologyResolution {
+		var bestIndex = -1;
+		var bestScore = InvalidScore;
+		var secondBestScore = InvalidScore;
+		for (index in 0...candidates.length) {
+			var score = fingerprint.scoreAgainst(candidates[index]);
+			if (score <= InvalidScore / 2.0)
+				continue;
+			if (score > bestScore) {
+				secondBestScore = bestScore;
+				bestScore = score;
+				bestIndex = index;
+			} else if (score > secondBestScore) {
+				secondBestScore = score;
+			}
+		}
+		return choose(bestIndex, bestScore, secondBestScore);
+	}
+
+	static function choose(bestIndex:Int, bestScore:Float, secondBestScore:Float):TopologyResolution {
 		if (bestIndex < 0 || bestScore < 0.5)
 			return new TopologyResolution(-1, ReferenceState.Unresolved);
 		if (secondBestScore > InvalidScore / 2.0 && bestScore - secondBestScore <= AmbiguityMargin)

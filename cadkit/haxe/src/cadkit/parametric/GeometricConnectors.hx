@@ -101,6 +101,63 @@ private class GeometricFeature {
 	}
 }
 
+/** One face or edge a connector may be found on: its index among its shape's faces or edges, its feature and fingerprint. */
+private class GeometricCandidate {
+	public final index:Int;
+	public final feature:GeometricFeature;
+	public final fingerprint:TopologyFingerprint;
+
+	public function new(index:Int, feature:GeometricFeature, fingerprint:TopologyFingerprint) {
+		this.index = index;
+		this.feature = feature;
+		this.fingerprint = fingerprint;
+	}
+}
+
+/**
+	The faces and edges of one component's geometry that geometric connectors can be found on: from the
+	B-rep (`ofShape`), or from the descriptors a producer wrote for an editor that holds only meshes
+	(`ofDescriptors`, see `GeometricConnectors.describeFaces`; faces only). Both are matched alike.
+*/
+class GeometricCandidates {
+	final shape:Null<Shape>;
+	final faces:Null<Array<GeometricCandidate>>;
+	var edges:Null<Array<GeometricCandidate>>;
+	var shapeFaces:Null<Array<GeometricCandidate>>;
+
+	function new(shape:Null<Shape>, faces:Null<Array<GeometricCandidate>>) {
+		this.shape = shape;
+		this.faces = faces;
+	}
+
+	/** Candidates measured on `shape` when first needed; the caller keeps owning `shape`. */
+	public static function ofShape(shape:Shape):GeometricCandidates
+		return new GeometricCandidates(shape, null);
+
+	public static function ofDescriptors(descriptors:String):GeometricCandidates
+		return new GeometricCandidates(null, @:privateAccess GeometricConnectors.parseDescriptors(descriptors));
+
+	@:allow(cadkit.parametric.GeometricConnectors)
+	function among(kind:CadKit.ShapeKind):Array<GeometricCandidate> {
+		var descriptorFaces = faces;
+		if (descriptorFaces != null) return kind == CadKit.ShapeKind.Face ? descriptorFaces : [];
+		var source = shape;
+		if (source == null) return [];
+		if (kind == CadKit.ShapeKind.Face) {
+			var known = shapeFaces;
+			if (known != null) return known;
+			var measured = @:privateAccess GeometricConnectors.measure(source, kind);
+			shapeFaces = measured;
+			return measured;
+		}
+		var known = edges;
+		if (known != null) return known;
+		var measured = @:privateAccess GeometricConnectors.measure(source, kind);
+		edges = measured;
+		return measured;
+	}
+}
+
 /** Captures faces and edges as connectors, frames them again from the current geometry, and checks the mates on them. */
 class GeometricConnectors {
 	/** Marks a connector `reference` as CadKit's geometric connector. */
@@ -126,7 +183,10 @@ class GeometricConnectors {
 	}
 
 	/** `geometric` as an assembly connector: framed in `shape`, with the reference that frames it again. */
-	public static function connector(geometric:GeometricConnector, shape:Shape):AssemblyConnector {
+	public static function connector(geometric:GeometricConnector, shape:Shape):AssemblyConnector
+		return {name: geometric.name, frame: frame(shape, geometric), reference: referenceText(geometric)};
+
+	static function referenceText(geometric:GeometricConnector):String {
 		var record:Dynamic = {
 			format: REFERENCE_FORMAT,
 			kind: geometric.fingerprint.kind == CadKit.ShapeKind.Edge ? "edge" : "face",
@@ -136,7 +196,7 @@ class GeometricConnectors {
 			flip: geometric.flip,
 			fingerprint: DocumentCodec.encodeFingerprint(geometric.fingerprint)
 		};
-		return {name: geometric.name, frame: frame(shape, geometric), reference: Json.stringify(record)};
+		return Json.stringify(record);
 	}
 
 	/** The geometric connector behind an assembly connector, or null when it is not one (no reference, or another application's). */
@@ -156,18 +216,58 @@ class GeometricConnectors {
 	}
 
 	/** The connector's frame in `shape`; throws `GeometricConnectorError` when its face or edge is gone or ambiguous. */
-	public static function frame(shape:Shape, connector:GeometricConnector):AssemblyFrame {
-		var kind = connector.fingerprint.kind;
-		var resolution = TopologyResolver.resolve(shape, connector.fingerprint, kind);
-		var index = resolution.state == ReferenceState.Resolved || resolution.state == ReferenceState.Remapped ? resolution.index
-			: matchByProperties(shape, connector);
-		if (index == AMBIGUOUS) throw new GeometricConnectorError("ambiguous", connector.name, "several faces or edges match it");
-		if (index < 0) throw new GeometricConnectorError("unresolved", connector.name, "its face or edge is no longer in the geometry");
-		var feature = describeOwned(shape.subshape(kind, index));
+	public static function frame(shape:Shape, connector:GeometricConnector):AssemblyFrame
+		return frameAmong(GeometricCandidates.ofShape(shape), connector);
+
+	/**
+		The connector's frame among `candidates`: its face or edge found by fingerprint (the same one, up to
+		numerical noise) or, after an edit moved or resized it, as the one candidate with its feature kind,
+		direction and radius. Throws `GeometricConnectorError` when none or several match.
+	*/
+	public static function frameAmong(candidates:GeometricCandidates, connector:GeometricConnector):AssemblyFrame {
+		var list = candidates.among(connector.fingerprint.kind);
+		var resolution = TopologyResolver.resolveAmong([for (candidate in list) candidate.fingerprint], connector.fingerprint);
+		var found = resolution.state == ReferenceState.Resolved ? resolution.index : matchByProperties(list, connector);
+		if (found == AMBIGUOUS) throw new GeometricConnectorError("ambiguous", connector.name, "several faces or edges match it");
+		if (found < 0) throw new GeometricConnectorError("unresolved", connector.name, "its face or edge is no longer in the geometry");
+		var feature = list[found].feature;
 		// An axis or a line has no sign of its own: keep the one captured, so the frame does not turn over.
 		var direction = feature.direction;
 		if (!feature.signed && dot(direction, connector.direction) < 0) direction = negate(direction);
 		return basis(feature.origin, connector.flip ? negate(direction) : direction, feature.reference);
+	}
+
+	/**
+		What each face of `shape` offers a mate, for an editor that holds only its mesh: a JSON list of the
+		faces that have a feature (index, feature, frame data, fingerprint). Read with
+		`GeometricCandidates.ofDescriptors`, captured with `captureDescribed`.
+	*/
+	public static function describeFaces(shape:Shape):String {
+		var records:Array<Dynamic> = [for (candidate in measure(shape, CadKit.ShapeKind.Face)) {
+			var feature = candidate.feature;
+			{
+				index: candidate.index,
+				feature: (feature.kind : String),
+				origin: feature.origin,
+				direction: feature.direction,
+				reference: feature.reference,
+				radius: feature.radius,
+				signed: feature.signed,
+				fingerprint: DocumentCodec.encodeFingerprint(candidate.fingerprint)
+			};
+		}];
+		return Json.stringify(records);
+	}
+
+	/** A connector on face `faceIndex` of a component described by `descriptors` (see `describeFaces`), as an assembly connector. */
+	public static function captureDescribed(name:String, descriptors:String, faceIndex:Int, flip:Bool = false):AssemblyConnector {
+		var candidates = GeometricCandidates.ofDescriptors(descriptors);
+		for (candidate in candidates.among(CadKit.ShapeKind.Face)) if (candidate.index == faceIndex) {
+			var geometric = new GeometricConnector(name, candidate.fingerprint, candidate.feature.kind, candidate.feature.direction,
+				candidate.feature.radius, flip);
+			return {name: name, frame: frameAmong(candidates, geometric), reference: referenceText(geometric)};
+		}
+		throw new GeometricConnectorError("unresolved", name, 'face $faceIndex offers no frame for a mate');
 	}
 
 	/**
@@ -186,12 +286,12 @@ class GeometricConnectors {
 	}
 
 	/**
-		`definition` with every geometric connector framed again from `geometry(scope, component)`: the unplaced
-		shapes of that component's occurrences in that scope ("" for the root, else the subdefinition's id), all of
+		`definition` with every geometric connector framed again from `geometry(scope, component)`: the faces
+		and edges of the unplaced geometry of that component's occurrences in that scope ("" for the root, else the subdefinition's id), all of
 		which must place it alike. A component with no shapes keeps its last frames. The mates are checked against
 		the features they name (see `checkMates`). Throws `GeometricConnectorError`.
 	*/
-	public static function reframe(definition:AssemblyDefinition, geometry:(String, String)->Array<Shape>):AssemblyDefinition {
+	public static function reframe(definition:AssemblyDefinition, geometry:(String, String)->Array<GeometricCandidates>):AssemblyDefinition {
 		var copy:AssemblyDefinition = JsonWire.decode(JsonWire.encode(definition));
 		reframeScope("", copy.definitions, geometry);
 		var nestedScopes = copy.assemblies;
@@ -251,9 +351,10 @@ class GeometricConnectors {
 			default: "a direction";
 		};
 
-	static function reframeScope(scope:String, components:Array<AssemblyComponentDefinition>, geometry:(String, String)->Array<Shape>):Void {
+	static function reframeScope(scope:String, components:Array<AssemblyComponentDefinition>,
+			geometry:(String, String)->Array<GeometricCandidates>):Void {
 		for (component in components) {
-			var shapes:Array<Shape> = [];
+			var shapes:Array<GeometricCandidates> = [];
 			var fetched = false;
 			for (index in 0...component.connectors.length) {
 				var connector = component.connectors[index];
@@ -264,24 +365,13 @@ class GeometricConnectors {
 					fetched = true;
 				}
 				if (shapes.length == 0) continue;
-				var resolved = frame(shapes[0], geometric);
+				var resolved = frameAmong(shapes[0], geometric);
 				for (k in 1...shapes.length)
-					if (!sameFrame(resolved, frame(shapes[k], geometric)))
+					if (!sameFrame(resolved, frameAmong(shapes[k], geometric)))
 						throw new GeometricConnectorError("instance-dependent", connector.name,
 							'occurrences of "${component.id}" place it differently');
 				component.connectors[index] = {name: connector.name, frame: resolved, reference: connector.reference};
 			}
-		}
-	}
-
-	static function describeOwned(subshape:Shape):GeometricFeature {
-		try {
-			var feature = describe(subshape);
-			subshape.close();
-			return feature;
-		} catch (error:Dynamic) {
-			subshape.close();
-			throw error;
 		}
 	}
 
@@ -322,27 +412,46 @@ class GeometricConnectors {
 		throw "A geometric connector needs a face or an edge";
 	}
 
-	/** The one subshape with the connector's feature kind, direction and radius; -1 if none, `AMBIGUOUS` if several. */
-	static function matchByProperties(shape:Shape, connector:GeometricConnector):Int {
-		var kind = connector.fingerprint.kind, found = -1;
-		for (index in 0...shape.subshapeCount(kind)) {
-			var candidate = shape.subshape(kind, index);
-			var matches = false;
-			try {
-				var feature = describe(candidate);
-				if (feature.kind == connector.feature) {
-					var agreement = dot(feature.direction, connector.direction);
-					if (!feature.signed) agreement = Math.abs(agreement);
-					matches = agreement >= DIRECTION_AGREEMENT &&
-						Math.abs(feature.radius - connector.radius) <= RADIUS_TOLERANCE * Math.max(1, connector.radius);
-				}
-			} catch (_:Dynamic) {}
-			candidate.close();
-			if (!matches) continue;
+	/** The one candidate with the connector's feature kind, direction and radius; -1 if none, `AMBIGUOUS` if several. */
+	static function matchByProperties(candidates:Array<GeometricCandidate>, connector:GeometricConnector):Int {
+		var found = -1;
+		for (position in 0...candidates.length) {
+			var feature = candidates[position].feature;
+			if (feature.kind != connector.feature) continue;
+			var agreement = dot(feature.direction, connector.direction);
+			if (!feature.signed) agreement = Math.abs(agreement);
+			if (agreement < DIRECTION_AGREEMENT ||
+				Math.abs(feature.radius - connector.radius) > RADIUS_TOLERANCE * Math.max(1, connector.radius))
+				continue;
 			if (found >= 0) return AMBIGUOUS;
-			found = index;
+			found = position;
 		}
 		return found;
+	}
+
+	/** Every face or edge of `shape` that offers a frame, with its feature and fingerprint. */
+	static function measure(shape:Shape, kind:CadKit.ShapeKind):Array<GeometricCandidate> {
+		var result:Array<GeometricCandidate> = [];
+		for (index in 0...shape.subshapeCount(kind)) {
+			var subshape = shape.subshape(kind, index);
+			try {
+				result.push(new GeometricCandidate(index, describe(subshape), TopologyFingerprint.capture(subshape)));
+			} catch (_:Dynamic) {}
+			subshape.close();
+		}
+		return result;
+	}
+
+	static function parseDescriptors(text:String):Array<GeometricCandidate> {
+		var records:Array<Dynamic> = Json.parse(text);
+		return [for (record in records) {
+			var origin:Array<Float> = Reflect.field(record, "origin"), direction:Array<Float> = Reflect.field(record, "direction");
+			var reference:Null<Array<Float>> = Reflect.field(record, "reference");
+			var radius:Float = Reflect.field(record, "radius"), signed:Bool = Reflect.field(record, "signed") == true;
+			var index:Int = Reflect.field(record, "index"), feature:String = Reflect.field(record, "feature");
+			new GeometricCandidate(index, new GeometricFeature(featureKind(feature), origin, direction, reference, radius, signed),
+				DocumentCodec.decodeFingerprint(Reflect.field(record, "fingerprint"), CadKit.ShapeKind.Face));
+		}];
 	}
 
 	static function featureKind(name:String):GeometricFeatureKind

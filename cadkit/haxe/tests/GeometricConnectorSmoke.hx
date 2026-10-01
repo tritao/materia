@@ -11,6 +11,7 @@ import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.GeometricConnectors;
+import cadkit.parametric.GeometricConnectors.GeometricCandidates;
 import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
 import cadkit.parametric.GeometricConnectors.GeometricFeatureKind;
 import cadkit.parametric.ParameterKind;
@@ -96,9 +97,20 @@ class GeometricConnectorSmoke {
 		withBall.definitions[1].connectors.push(GeometricConnectors.connector(
 			GeometricConnectors.capture("ball", ball, CadKit.ShapeKind.Face, 0), ball));
 		var code = "";
-		try GeometricConnectors.reframe(withBall, (scope, component) -> component == "plate" ? [plateShape] : [pinShape])
+		try GeometricConnectors.reframe(withBall, (scope, component) ->
+			[GeometricCandidates.ofShape(component == "plate" ? plateShape : pinShape)])
 		catch (error:GeometricConnectorError) code = error.code;
 		check(code == "unresolved", 'a connector whose face is gone is reported: "$code"');
+
+		// An editor holding only meshes and face descriptors captures and reframes the same connectors.
+		var described = GeometricConnectors.captureDescribed("bore", GeometricConnectors.describeFaces(plateShape),
+			face(plateShape, CadKit.SurfaceKind.Cylinder, 0));
+		near(described.frame.x, 30, "a bore captured from descriptors is framed like one captured from the shape");
+		var widePlate = plate(90);
+		var fromMeshes = GeometricConnectors.reframe(authored, (scope, component) ->
+			[GeometricCandidates.ofDescriptors(GeometricConnectors.describeFaces(component == "plate" ? widePlate : pinShape))]);
+		expectSeated(fromMeshes, 45, "reframed from descriptors");
+		widePlate.close();
 
 		// A mate that asks a face for what it does not define is refused when authored.
 		var pointOnPlane = pinOnPlate(plateShape, pinShape);

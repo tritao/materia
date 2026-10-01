@@ -287,8 +287,8 @@ class AssemblyDocuments {
 			return GeometricConnectors.reframe(definition, (scope, component) -> {
 				var list = instances.get(scope + "/" + component);
 				if (list == null) return [];
-				return [for (instance in list) document.definitionOutput(instance,
-					document.definition(instance.definitionId).primaryGeometryOutput().name)];
+				return [for (instance in list) GeometricConnectors.GeometricCandidates.ofShape(document.definitionOutput(instance,
+					document.definition(instance.definitionId).primaryGeometryOutput().name))];
 			});
 		} catch (error:GeometricConnectorError) {
 			throw new AssemblyDocumentDiagnostic("assembly." + error.code, error.connector, error.message);
