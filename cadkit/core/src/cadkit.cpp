@@ -578,6 +578,69 @@ cad_result collect_operation_history(
     const TopoDS_Shape* second,
     OperationData& out_data);
 
+// Per-operation naming adapters (plans/TOPOLOGICAL_NAMING.md, TN2).
+
+// Extrude and revolve: each profile edge sweeps a side face and each vertex a
+// lateral edge; the caps come only from FirstShape/LastShape. The profile is
+// copied, so nothing passes through unchanged.
+template <typename Sweep>
+naming::ElementMapPtr sweep_names(const naming::NamedShape& profile, Sweep& sweep) {
+    naming::LambdaHistory history;
+    history.on_deleted = [](const TopoDS_Shape&) { return true; };
+    history.on_generated = [&](const TopoDS_Shape& source, std::size_t) {
+        naming::Generated result;
+        const auto type = source.ShapeType();
+        if (type == TopAbs_EDGE)
+            for (const auto& face : naming::shapes_of(sweep.Generated(source))) result.emplace_back(face, "side");
+        if (type == TopAbs_VERTEX)
+            for (const auto& edge : naming::shapes_of(sweep.Generated(source))) result.emplace_back(edge, "lateral");
+        if (type == TopAbs_FACE || type == TopAbs_EDGE || type == TopAbs_VERTEX) {
+            const auto first = sweep.FirstShape(source);
+            const auto last = sweep.LastShape(source);
+            if (!first.IsNull()) result.emplace_back(first, "start");
+            if (!last.IsNull() && !last.IsSame(first)) result.emplace_back(last, "end");
+        }
+        return result;
+    };
+    return naming::propagate({profile}, &history, sweep.Shape());
+}
+
+naming::ElementMapPtr operation_names(const naming::NamedShape& profile, BRepPrimAPI_MakePrism& sweep) {
+    return sweep_names(profile, sweep);
+}
+
+naming::ElementMapPtr operation_names(const naming::NamedShape& profile, BRepPrimAPI_MakeRevol& sweep) {
+    return sweep_names(profile, sweep);
+}
+
+// Fillet and chamfer: blend faces from edges, corner faces from vertices, and
+// trimmed (possibly split) faces from the faces they touch.
+template <typename Finish>
+naming::ElementMapPtr finish_names(const naming::NamedShape& source, Finish& finish, const char* role) {
+    naming::LambdaHistory history;
+    history.on_modified = [&](const TopoDS_Shape& shape) {
+        return shape.ShapeType() == TopAbs_FACE ? naming::shapes_of(finish.Modified(shape)) : std::vector<TopoDS_Shape>{};
+    };
+    history.on_deleted = [&](const TopoDS_Shape& shape) { return finish.IsDeleted(shape); };
+    history.on_generated = [&](const TopoDS_Shape& shape, std::size_t) {
+        naming::Generated result;
+        const auto type = shape.ShapeType();
+        if (type != TopAbs_EDGE && type != TopAbs_VERTEX) return result;
+        for (const auto& face : naming::shapes_of(finish.Generated(shape)))
+            if (face.ShapeType() == TopAbs_FACE) result.emplace_back(face, type == TopAbs_EDGE ? role : "corner");
+        return result;
+    };
+    return naming::propagate({source}, &history, finish.Shape());
+}
+
+naming::ElementMapPtr operation_names(const naming::NamedShape& source, BRepFilletAPI_MakeFillet& finish) {
+    return finish_names(source, finish, "fillet");
+}
+
+naming::ElementMapPtr operation_names(const naming::NamedShape& source, BRepFilletAPI_MakeChamfer& finish) {
+    return finish_names(source, finish, "chamfer");
+}
+
 cad_result make_extruded_shape(
     cad_shape handle,
     const gp_Vec& delta,
@@ -587,18 +650,19 @@ cad_result make_extruded_shape(
     }
     *out_shape = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         BRepPrimAPI_MakePrism operation(source, delta, true);
         if (operation.Shape().IsNull()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "extrusion produced a null shape");
         }
-        return insert_shape(operation.Shape(), out_shape);
+        return insert_shape(operation.Shape(), out_shape, operation_names(named, operation));
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {
@@ -620,11 +684,12 @@ cad_result make_revolved_shape(
     }
     *out_shape = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         BRepPrimAPI_MakeRevol operation(source, axis, angle, true);
@@ -636,7 +701,7 @@ cad_result make_revolved_shape(
         if (!BRepCheck_Analyzer(operation.Shape()).IsValid()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "revolution produced invalid topology");
         }
-        return insert_shape(operation.Shape(), out_shape);
+        return insert_shape(operation.Shape(), out_shape, operation_names(named, operation));
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {
@@ -657,11 +722,12 @@ cad_result make_extrusion_operation(
     }
     *out_operation = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         BRepPrimAPI_MakePrism operation(source, delta, true);
@@ -671,6 +737,7 @@ cad_result make_extrusion_operation(
 
         OperationData data;
         data.result = operation.Shape();
+        data.result_names = operation_names(named, operation);
         const auto history_result = collect_operation_history(operation, source, nullptr, data);
         if (history_result != CAD_OK) {
             return history_result;
@@ -697,11 +764,12 @@ cad_result make_revolution_operation(
     }
     *out_operation = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         BRepPrimAPI_MakeRevol operation(source, axis, angle, true);
@@ -716,6 +784,7 @@ cad_result make_revolution_operation(
 
         OperationData data;
         data.result = operation.Shape();
+        data.result_names = operation_names(named, operation);
         const auto history_result = collect_operation_history(operation, source, nullptr, data);
         if (history_result != CAD_OK) {
             return history_result;
@@ -839,11 +908,12 @@ cad_result make_edge_finish_shape(
     }
     *out_shape = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         Builder operation(source);
@@ -852,7 +922,7 @@ cad_result make_edge_finish_shape(
         if (configure_result != CAD_OK) {
             return configure_result;
         }
-        return insert_shape(operation.Shape(), out_shape);
+        return insert_shape(operation.Shape(), out_shape, operation_names(named, operation));
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {
@@ -875,11 +945,12 @@ cad_result make_edge_finish_operation(
     }
     *out_operation = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         Builder operation(source);
@@ -891,6 +962,7 @@ cad_result make_edge_finish_operation(
 
         OperationData data;
         data.result = operation.Shape();
+        data.result_names = operation_names(named, operation);
         const auto history_result = collect_operation_history(operation, source, nullptr, data);
         if (history_result != CAD_OK) {
             return history_result;
@@ -920,11 +992,12 @@ cad_result make_selected_edge_finish_shape(
     }
     *out_shape = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         Builder operation(source);
@@ -938,7 +1011,7 @@ cad_result make_selected_edge_finish_shape(
         if (configure_result != CAD_OK) {
             return configure_result;
         }
-        return insert_shape(operation.Shape(), out_shape);
+        return insert_shape(operation.Shape(), out_shape, operation_names(named, operation));
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
     } catch (const std::bad_alloc& error) {
@@ -963,11 +1036,12 @@ cad_result make_selected_edge_finish_operation(
     }
     *out_operation = 0;
 
-    TopoDS_Shape source;
-    const auto copy_result = copy_shape(handle, source);
+    naming::NamedShape named;
+    const auto copy_result = copy_named_shape(handle, named);
     if (copy_result != CAD_OK) {
         return copy_result;
     }
+    const auto& source = named.shape;
 
     try {
         Builder operation(source);
@@ -984,6 +1058,7 @@ cad_result make_selected_edge_finish_operation(
 
         OperationData data;
         data.result = operation.Shape();
+        data.result_names = operation_names(named, operation);
         const auto history_result = collect_operation_history(operation, source, nullptr, data);
         if (history_result != CAD_OK) {
             return history_result;
@@ -1070,16 +1145,18 @@ cad_result evaluate_boolean(
     cad_shape second_handle,
     bool include_history,
     OperationData& out_data) {
-    TopoDS_Shape first;
-    const auto first_result = copy_shape(first_handle, first);
+    naming::NamedShape first_named;
+    const auto first_result = copy_named_shape(first_handle, first_named);
     if (first_result != CAD_OK) {
         return first_result;
     }
-    TopoDS_Shape second;
-    const auto second_result = copy_shape(second_handle, second);
+    naming::NamedShape second_named;
+    const auto second_result = copy_named_shape(second_handle, second_named);
     if (second_result != CAD_OK) {
         return second_result;
     }
+    const auto& first = first_named.shape;
+    const auto& second = second_named.shape;
 
     try {
         Operation operation;
@@ -1090,7 +1167,8 @@ cad_result evaluate_boolean(
         operation.SetArguments(arguments);
         operation.SetTools(tools);
         operation.SetNonDestructive(true);
-        operation.SetToFillHistory(include_history);
+        // Names need the history even when the caller does not (TN-D12).
+        operation.SetToFillHistory(true);
         operation.Build();
         if (!operation.IsDone() || operation.HasErrors()) {
             return fail(CAD_ERROR_OPERATION_FAILED, "OCCT boolean operation failed");
@@ -1108,6 +1186,8 @@ cad_result evaluate_boolean(
         }
 
         out_data.result = operation.Shape();
+        naming::AlgorithmHistory<Operation> naming_history(operation);
+        out_data.result_names = naming::propagate({first_named, second_named}, &naming_history, out_data.result);
         if (include_history) {
             const auto history_result = collect_operation_history(operation, first, &second, out_data);
             if (history_result != CAD_OK) {
@@ -1143,7 +1223,7 @@ cad_result make_boolean_shape(
     if (result != CAD_OK) {
         return result;
     }
-    return insert_shape(std::move(data.result), out_shape);
+    return insert_shape(std::move(data.result), out_shape, std::move(data.result_names));
 }
 
 template <typename Operation>
@@ -3740,19 +3820,34 @@ extern "C" CADKIT_API cad_result cad_shape_valid(cad_shape handle, uint8_t* outp
     });
 }
 static cad_result do_cad_loft(const cad_shape_ref* wires, uint32_t count, uint8_t solid, uint8_t ruled, cad_shape* output, cad_operation* history) {
+    naming::ElementMapPtr names;
     return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
         require_model(wires && count >= 2 && solid <= 1 && ruled <= 1, "loft requires two or more wires and boolean flags");
         BRepOffsetAPI_ThruSections loft(solid != 0, ruled != 0);
         std::vector<TopoDS_Shape> sources;
+        std::vector<naming::NamedShape> named;
         for (uint32_t i = 0; i < count; ++i) {
             auto wire = model_wire(wires[i].shape);
             require_model(!solid || wire.Closed(), "solid loft requires closed wires");
             loft.AddWire(wire); sources.push_back(wire);
+            named.push_back(model_named(wires[i].shape));
         }
         loft.Build();
         if (record) for (const auto& source : sources) collect_operation_history(loft, source, nullptr, *record);
+        // Side faces are named by the first section's edges; the caps come from no single element.
+        naming::LambdaHistory naming_history;
+        naming_history.on_deleted = [](const TopoDS_Shape&) { return true; };
+        naming_history.on_generated = [&](const TopoDS_Shape& source, std::size_t slot) {
+            naming::Generated result;
+            if (slot != 0 || source.ShapeType() != TopAbs_EDGE) return result;
+            for (const auto& face : naming::shapes_of(loft.Generated(source)))
+                if (face.ShapeType() == TopAbs_FACE) result.emplace_back(face, "side");
+            return result;
+        };
+        auto propagated = naming::propagate(named, &naming_history, loft.Shape());
+        names = naming::with_face_roles(loft.Shape(), *propagated, {{loft.FirstShape(), "start"}, {loft.LastShape(), "end"}});
         return loft.Shape();
-    });
+    }, &names);
 }
 extern "C" CADKIT_API cad_result cad_loft(const cad_shape_ref* wires, uint32_t count, uint8_t solid, uint8_t ruled, cad_shape* output) {
     return do_cad_loft(wires, count, solid, ruled, output, nullptr);
@@ -3761,14 +3856,37 @@ extern "C" CADKIT_API cad_result cad_loft_operation(const cad_shape_ref* wires, 
     return do_cad_loft(wires, count, solid, ruled, nullptr, output);
 }
 static cad_result do_cad_sweep(cad_shape profile, cad_shape spine, cad_shape* output, cad_operation* history) {
+    naming::ElementMapPtr names;
     return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
         auto section = model_shape(profile);
         require_model(section.ShapeType() == TopAbs_FACE || section.ShapeType() == TopAbs_WIRE, "sweep profile must be a face or wire");
         auto path = model_wire(spine);
         BRepOffsetAPI_MakePipe pipe(path, section);
         if (record) collect_operation_history(pipe, section, &path, *record);
+        // A side face per (profile edge, spine edge); the one-argument Generated lumps them.
+        naming::ShapeIndex sectionEdges, spineEdges;
+        TopExp::MapShapes(section, TopAbs_EDGE, sectionEdges);
+        TopExp::MapShapes(path, TopAbs_EDGE, spineEdges);
+        naming::LambdaHistory naming_history;
+        naming_history.on_deleted = [](const TopoDS_Shape&) { return true; };
+        naming_history.on_generated = [&](const TopoDS_Shape& source, std::size_t slot) {
+            naming::Generated result;
+            if (source.ShapeType() == TopAbs_EDGE) {
+                const auto& others = slot == 0 ? spineEdges : sectionEdges;
+                for (int i = 1; i <= others.Extent(); ++i) {
+                    const auto face = slot == 0 ? pipe.Generated(others(i), source) : pipe.Generated(source, others(i));
+                    if (!face.IsNull() && face.ShapeType() == TopAbs_FACE) result.emplace_back(face, "side");
+                }
+            }
+            if (slot == 0 && source.ShapeType() == TopAbs_FACE) {
+                result.emplace_back(pipe.FirstShape(), "start");
+                result.emplace_back(pipe.LastShape(), "end");
+            }
+            return result;
+        };
+        names = naming::propagate({model_named(profile), model_named(spine)}, &naming_history, pipe.Shape());
         return pipe.Shape();
-    });
+    }, &names);
 }
 extern "C" CADKIT_API cad_result cad_sweep(cad_shape profile, cad_shape spine, cad_shape* output) {
     return do_cad_sweep(profile, spine, output, nullptr);
@@ -3777,14 +3895,25 @@ extern "C" CADKIT_API cad_result cad_sweep_operation(cad_shape profile, cad_shap
     return do_cad_sweep(profile, spine, nullptr, output);
 }
 static cad_result do_cad_wire_offset(cad_shape wire, double distance, cad_shape* output, cad_operation* history) {
+    naming::ElementMapPtr names;
     return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
         require_model(std::isfinite(distance) && std::abs(distance) > 1e-7, "offset must be finite and nonzero");
         auto source = model_wire(wire);
         BRepOffsetAPI_MakeOffset offset(source, GeomAbs_Arc);
         offset.Perform(distance);
         if (record) collect_operation_history(offset, source, nullptr, *record);
+        naming::LambdaHistory naming_history;
+        naming_history.on_deleted = [](const TopoDS_Shape&) { return true; };
+        naming_history.on_generated = [&](const TopoDS_Shape& edge, std::size_t) {
+            naming::Generated result;
+            if (edge.ShapeType() != TopAbs_EDGE) return result;
+            for (const auto& target : naming::shapes_of(offset.Generated(edge)))
+                if (target.ShapeType() == TopAbs_EDGE) result.emplace_back(target, "offset");
+            return result;
+        };
+        names = naming::propagate({model_named(wire)}, &naming_history, offset.Shape());
         return offset.Shape();
-    });
+    }, &names);
 }
 extern "C" CADKIT_API cad_result cad_wire_offset(cad_shape wire, double distance, cad_shape* output) {
     return do_cad_wire_offset(wire, distance, output, nullptr);
@@ -3793,6 +3922,7 @@ extern "C" CADKIT_API cad_result cad_wire_offset_operation(cad_shape wire, doubl
     return do_cad_wire_offset(wire, distance, nullptr, output);
 }
 static cad_result do_cad_shell(cad_shape solid, const cad_shape_ref* faces, uint32_t count, double thickness, cad_shape* output, cad_operation* history) {
+    naming::ElementMapPtr names;
     return model_record(output, history, [&](OperationData* record) -> TopoDS_Shape {
         require_model(std::isfinite(thickness) && std::abs(thickness) > 1e-7 && faces && count > 0,
                       "shell requires removed faces and finite nonzero thickness");
@@ -3809,8 +3939,19 @@ static cad_result do_cad_shell(cad_shape solid, const cad_shape_ref* faces, uint
         BRepOffsetAPI_MakeThickSolid shell;
         shell.MakeThickSolidByJoin(source, removed, thickness, 1e-7);
         if (record) collect_operation_history(shell, source, nullptr, *record);
+        // Kept faces keep their names; each face's offset copy is `inner(face)`.
+        naming::LambdaHistory naming_history;
+        naming_history.on_modified = [&](const TopoDS_Shape& shape) { return naming::shapes_of(shell.Modified(shape)); };
+        naming_history.on_deleted = [&](const TopoDS_Shape& shape) { return shell.IsDeleted(shape); };
+        naming_history.on_generated = [&](const TopoDS_Shape& shape, std::size_t) {
+            naming::Generated result;
+            for (const auto& target : naming::shapes_of(shell.Generated(shape)))
+                if (target.ShapeType() == TopAbs_FACE) result.emplace_back(target, shape.ShapeType() == TopAbs_FACE ? "inner" : "wall");
+            return result;
+        };
+        names = naming::propagate({model_named(solid)}, &naming_history, shell.Shape());
         return shell.Shape();
-    });
+    }, &names);
 }
 extern "C" CADKIT_API cad_result cad_shell(cad_shape solid, const cad_shape_ref* faces, uint32_t count, double thickness, cad_shape* output) {
     return do_cad_shell(solid, faces, count, thickness, output, nullptr);

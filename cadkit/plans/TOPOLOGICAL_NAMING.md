@@ -544,3 +544,58 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
     and avoids mapping OCCT's Left/Front/... to axes.
   - Names are plain `std::string`; interning waits for the TN2 benchmark.
   - Names sort bytewise, so `+` comes before `-`: `E(box.+z|box.-x)`.
+
+### 2026-10-01 — TN2 done: operation adapters
+
+- `propagate` covers all seven rules:
+  - **Generated elements** are collected across kinds first (an edge
+    sweeps a face) and named `role(sources)`, with sources sorted and
+    deduplicated.
+  - **Splits** name each piece `parent{neighbours bounding only this
+    piece}`, compared by unsuffixed names.
+  - **Merges** keep the smallest name. Aliases are not stored yet; TN3's
+    lookup will need them only if merges show up in practice.
+  - Faces still alike after all that get a weak `~k` by centroid.
+  - `LambdaHistory` lets each adapter be written at its call site, and
+    `with_face_roles` names loft caps.
+- Adapters in `cadkit.cpp`:
+  - booleans (plain variants now always fill history);
+  - extrude and revolve (`side`, `lateral`, and `start`/`end` from
+    `FirstShape`/`LastShape`);
+  - fillet and chamfer (`fillet(E…)`, `chamfer(E…)`, `corner(V…)`;
+    faces split or trimmed);
+  - loft (`side` from section 0, caps `start`/`end`);
+  - sweep (`side(profileEdge,spineEdge)` via two-argument `Generated`,
+    caps from a face profile);
+  - shell (kept faces keep their names, offset faces are `inner(f)`);
+  - wire offset (`offset(e)`).
+- **Completeness:** `naming_smoke.cpp` `check_operations` runs every
+  operation on a fixture and requires every face to have a strong, unique
+  name: cut with a hole, cut with a slot that splits faces, fuse, common,
+  extrude, partial and full revolve, fillet and chamfer on one edge, fillet
+  on all edges (corners), shell, loft and sweep. All pass, so no OCCT
+  history gaps were found and there is nothing to report upstream.
+  `CADKIT_NAMING_VERBOSE=1` prints every name.
+- Golden examples, pinned in the test:
+  - `f1:box.+z{f1:box.-x,f2:cyl.side,f3:box.-x}` and
+    `f1:box.+z{f1:box.+x,f3:box.+x}`: the top face split by a slot, with
+    the hole in the left piece;
+  - `start(r)`, `end(r)`, `side(seg.k)`: an extrusion;
+  - `fillet(E(f1:box.+x|f1:box.+z))`;
+  - `side(f8:seg.1,f9:seg.2)`: a sweep.
+- **Observation:** shelling a box with its top face removed gives the top
+  rim (the wall-thickness ring) the removed face's name, `f1:box.+z`,
+  because OCCT reports it as that face modified. That is reasonable: it is
+  what is left of the top.
+- **Benchmark** (`benchmarks/naming_benchmark.cpp`, target
+  `cadkit-naming-benchmark`, compiles `naming.cpp` directly so OCCT and
+  naming are timed apart). A 200 × 200 plate drilled with 64 holes one
+  boolean at a time, then every top edge filleted (138 faces, 340 edges):
+  - Release: naming is **4.5% of OCCT time**, and derived edge and vertex
+    names 0.2%. Debug: 7.9%.
+  - Edge names are 33 bytes on average, 52 at most.
+
+  The budget (≤ 10%) holds, so TN-D12 stands (no unnamed fast path) and
+  names stay plain strings (no interning).
+- The TN0 suite is unchanged (10 / 17 / 0). References start using names
+  in TN3.

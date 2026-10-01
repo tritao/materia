@@ -12,6 +12,7 @@
 #include <TopoDS_Shape.hxx>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -74,12 +75,48 @@ ElementMapPtr role_names(const TopoDS_Shape& shape,
 ElementMapPtr box_names(const TopoDS_Shape& box);
 
 // History of one operation, as the propagation rules read it.
+// Elements an operation generated from one source element, each with its role
+// (`side`, `fillet`, ...); a generated element is named `role(sources)` (rule 5).
+using Generated = std::vector<std::pair<TopoDS_Shape, std::string>>;
+
 class History {
 public:
     virtual ~History() = default;
     virtual std::vector<TopoDS_Shape> modified(const TopoDS_Shape& source) = 0;
     virtual bool deleted(const TopoDS_Shape& source) = 0;
+    // `slot` is the source's input position, for adapters whose roles depend on it.
+    virtual Generated generated(const TopoDS_Shape& source, std::size_t slot) {
+        (void)source;
+        (void)slot;
+        return {};
+    }
 };
+
+// An adapter written at the operation's call site (TN2's per-operation adapters).
+class LambdaHistory final : public History {
+public:
+    std::function<std::vector<TopoDS_Shape>(const TopoDS_Shape&)> on_modified;
+    std::function<bool(const TopoDS_Shape&)> on_deleted;
+    std::function<Generated(const TopoDS_Shape&, std::size_t)> on_generated;
+
+    std::vector<TopoDS_Shape> modified(const TopoDS_Shape& source) override {
+        return on_modified ? on_modified(source) : std::vector<TopoDS_Shape>{};
+    }
+    bool deleted(const TopoDS_Shape& source) override { return on_deleted ? on_deleted(source) : false; }
+    Generated generated(const TopoDS_Shape& source, std::size_t slot) override {
+        return on_generated ? on_generated(source, slot) : Generated{};
+    }
+};
+
+// The non-null shapes of an OCCT list.
+template <typename List>
+std::vector<TopoDS_Shape> shapes_of(const List& list) {
+    std::vector<TopoDS_Shape> result;
+    for (const auto& shape : list) {
+        if (!shape.IsNull()) result.push_back(shape);
+    }
+    return result;
+}
 
 // History of an OCCT algorithm with the BRepBuilderAPI_MakeShape interface.
 template <typename Algorithm>
@@ -112,10 +149,17 @@ private:
     ShapeIndex result_edges_;
 };
 
-// Names of `result`, carried from `inputs` through `history` (rules 1, 2,
-// 6 and 7: unchanged and one-to-one modified elements keep their names;
-// collisions between inputs get `@slot`; leftovers get weak index names).
+// Names of `result`, carried from `inputs` through `history` (rules 1–7:
+// unchanged and one-to-one modified elements keep their names; split pieces
+// get `parent{faces bounding only this piece}`; merged elements keep the
+// smallest name; generated elements get `role(sources)`; collisions between
+// inputs get `@slot`; leftovers get weak index names).
 ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history, const TopoDS_Shape& result);
+
+// `names` with the given faces named by role where they only had weak names
+// (caps of lofts, which come from no single source element).
+ElementMapPtr with_face_roles(const TopoDS_Shape& shape, const ElementMap& names,
+                              const std::vector<std::pair<TopoDS_Shape, std::string>>& roles);
 
 // The names of `sub`, a subshape of `parent`; its edges and vertices keep
 // the parent's final names as tracked names.

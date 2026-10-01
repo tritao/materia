@@ -3,6 +3,8 @@
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRep_Tool.hxx>
+#include <BRepGProp.hxx>
+#include <GProp_GProps.hxx>
 #include <GeomAbs_SurfaceType.hxx>
 #include <NCollection_IndexedDataMap.hxx>
 #include <NCollection_List.hxx>
@@ -13,6 +15,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 #include <map>
 #include <set>
 #include <stdexcept>
@@ -78,6 +81,12 @@ bool point_before(const gp_Pnt& a, const gp_Pnt& b) {
     if (std::abs(a.X() - b.X()) > tolerance) return a.X() < b.X();
     if (std::abs(a.Y() - b.Y()) > tolerance) return a.Y() < b.Y();
     return a.Z() < b.Z() - tolerance;
+}
+
+gp_Pnt face_centre(const TopoDS_Face& face) {
+    GProp_GProps properties;
+    BRepGProp::SurfaceProperties(face, properties);
+    return properties.CentreOfMass();
 }
 
 gp_Pnt edge_middle(const TopoDS_Edge& edge) {
@@ -295,11 +304,40 @@ std::vector<TopoDS_Shape> SharedCurveHistory::modified(const TopoDS_Shape& sourc
 
 ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history, const TopoDS_Shape& result) {
     auto output = sized_for(result);
+    // Generated elements may differ in kind from their sources (an edge sweeps a face): collect them first.
+    struct Birth {
+        TopoDS_Shape target;
+        std::string role;
+        std::string source;
+    };
+    std::vector<Birth> births;
+    if (history != nullptr) {
+        for (std::size_t slot = 0; slot < inputs.size(); ++slot) {
+            const auto& input = inputs[slot];
+            for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
+                const auto sourceIndex = index_of(input.shape, kind);
+                const auto& names = input.names->names(input.shape, kind);
+                for (int i = 1; i <= sourceIndex.Extent(); ++i) {
+                    for (const auto& target : history->generated(sourceIndex(i), slot))
+                        births.push_back({target.first, target.second, names[static_cast<std::size_t>(i - 1)]});
+                }
+            }
+        }
+    }
     for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
         const auto resultIndex = index_of(result, kind);
-        // (slot, name) candidates per result element.
-        std::vector<std::vector<std::pair<std::size_t, std::string>>> candidates(
-            static_cast<std::size_t>(resultIndex.Extent()));
+        const auto count = static_cast<std::size_t>(resultIndex.Extent());
+        // (slot, name) of the sources each result element continues (rules 1, 2, 4).
+        std::vector<std::vector<std::pair<std::size_t, std::string>>> carried(count);
+        // role -> source names, for generated elements (rule 5).
+        std::vector<std::map<std::string, std::set<std::string>>> generated(count);
+        // Split pieces: (parent name, slot, piece positions) (rule 3).
+        struct Split {
+            std::string parent;
+            std::size_t slot;
+            std::vector<std::size_t> pieces;
+        };
+        std::vector<Split> splits;
         for (std::size_t slot = 0; slot < inputs.size(); ++slot) {
             const auto& input = inputs[slot];
             const auto sourceIndex = index_of(input.shape, kind);
@@ -312,36 +350,129 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
                 if (targets.empty()) {
                     if (history != nullptr && history->deleted(source)) continue;
                     targets.push_back(source);  // unchanged (rule 1)
-                } else if (targets.size() > 1) {
-                    continue;  // splits are TN2's (rule 3); the pieces fall to rule 7 meanwhile
                 }
-                const int position = resultIndex.FindIndex(targets.front());
-                if (position > 0) candidates[static_cast<std::size_t>(position - 1)].emplace_back(slot, name);  // rule 2
+                std::vector<std::size_t> found;
+                for (const auto& target : targets) {
+                    const int position = resultIndex.FindIndex(target);
+                    if (position > 0) found.push_back(static_cast<std::size_t>(position - 1));
+                }
+                std::sort(found.begin(), found.end());
+                found.erase(std::unique(found.begin(), found.end()), found.end());
+                if (found.size() == 1) {
+                    carried[found.front()].emplace_back(slot, name);  // rule 2
+                } else if (found.size() > 1) {
+                    splits.push_back({name, slot, found});
+                }
             }
         }
-        std::vector<std::string> assigned(candidates.size());
-        std::vector<std::size_t> slots(candidates.size(), 0);
-        for (std::size_t i = 0; i < candidates.size(); ++i) {
-            if (candidates[i].empty()) continue;
-            // Several sources: the smallest name stands for them (aliases are TN2's).
-            auto best = std::min_element(candidates[i].begin(), candidates[i].end(),
-                                         [](const auto& a, const auto& b) { return a.second < b.second; });
-            assigned[i] = best->second;
-            slots[i] = best->first;
+        for (const auto& birth : births) {
+            if (birth.target.ShapeType() != occt_kind(kind)) continue;
+            const int position = resultIndex.FindIndex(birth.target);
+            if (position > 0) generated[static_cast<std::size_t>(position - 1)][birth.role].insert(birth.source);
+        }
+        std::vector<std::string> assigned(count);
+        std::vector<std::size_t> slots(count, 0);
+        for (std::size_t i = 0; i < count; ++i) {
+            if (!carried[i].empty()) {
+                // Several sources merged: the smallest name stands for them (rule 4).
+                auto best = std::min_element(carried[i].begin(), carried[i].end(),
+                                             [](const auto& a, const auto& b) { return a.second < b.second; });
+                assigned[i] = best->second;
+                slots[i] = best->first;
+            } else if (!generated[i].empty()) {
+                const auto& role = *generated[i].begin();  // the smallest role
+                assigned[i] = role.first + "(" + join(std::vector<std::string>(role.second.begin(), role.second.end()), ",", true) + ")";
+            }
+        }
+        // Rule 3: pieces of a split face are told apart by the faces that bound only them.
+        if (!splits.empty()) {
+            Adjacency edgeFaces;
+            ShapeIndex faceIndex;
+            if (kind == ElementKind::Face) {
+                TopExp::MapShapesAndUniqueAncestors(result, TopAbs_EDGE, TopAbs_FACE, edgeFaces);
+                faceIndex = resultIndex;
+            }
+            auto neighbours = [&](std::size_t piece) {
+                std::set<std::string> result;
+                for (int e = 1; e <= edgeFaces.Extent(); ++e) {
+                    const auto& faces = edgeFaces(e);
+                    bool touches = false;
+                    for (const auto& face : faces) touches = touches || faceIndex.FindIndex(face) == static_cast<int>(piece + 1);
+                    if (!touches) continue;
+                    for (const auto& face : faces) {
+                        const int other = faceIndex.FindIndex(face);
+                        if (other > 0 && other != static_cast<int>(piece + 1) && !assigned[static_cast<std::size_t>(other - 1)].empty())
+                            result.insert(assigned[static_cast<std::size_t>(other - 1)]);
+                    }
+                }
+                return result;
+            };
+            std::vector<std::string> named(count);
+            for (const auto& split : splits) {
+                std::vector<std::set<std::string>> around;
+                for (auto piece : split.pieces) around.push_back(kind == ElementKind::Face ? neighbours(piece) : std::set<std::string>{});
+                std::set<std::string> common = around.front();
+                for (const auto& set : around) {
+                    std::set<std::string> kept;
+                    std::set_intersection(common.begin(), common.end(), set.begin(), set.end(), std::inserter(kept, kept.begin()));
+                    common = kept;
+                }
+                for (std::size_t k = 0; k < split.pieces.size(); ++k) {
+                    std::vector<std::string> own;
+                    std::set_difference(around[k].begin(), around[k].end(), common.begin(), common.end(), std::back_inserter(own));
+                    const auto piece = split.pieces[k];
+                    if (!assigned[piece].empty() || !named[piece].empty()) continue;  // a carried name wins
+                    named[piece] = split.parent + "{" + join(own, ",", true) + "}";
+                    slots[piece] = split.slot;
+                }
+            }
+            for (std::size_t i = 0; i < count; ++i) {
+                if (!named[i].empty()) assigned[i] = named[i];
+            }
         }
         // Rule 6: one name brought by several inputs.
         std::map<std::string, std::set<std::size_t>> origins;
-        for (std::size_t i = 0; i < assigned.size(); ++i) {
+        for (std::size_t i = 0; i < count; ++i) {
             if (!assigned[i].empty()) origins[assigned[i]].insert(slots[i]);
         }
-        for (std::size_t i = 0; i < assigned.size(); ++i) {
+        for (std::size_t i = 0; i < count; ++i) {
             if (!assigned[i].empty() && origins[assigned[i]].size() > 1) assigned[i] += "@" + std::to_string(slots[i]);
+        }
+        // Pieces still alike (symmetric splits): a weak ordinal by position.
+        if (kind == ElementKind::Face) {
+            std::map<std::string, int> seen;
+            for (const auto& name : assigned) {
+                if (!name.empty()) seen[name]++;
+            }
+            std::vector<std::string> duplicates;
+            for (std::size_t i = 0; i < count; ++i) duplicates.push_back(!assigned[i].empty() && seen[assigned[i]] > 1 ? assigned[i] : "");
+            bool any = false;
+            for (const auto& name : duplicates) any = any || !name.empty();
+            if (any) {
+                std::vector<std::string> numbered = assigned;
+                number_duplicates(numbered, [&](std::size_t i) { return face_centre(TopoDS::Face(resultIndex(static_cast<int>(i) + 1))); });
+                for (std::size_t i = 0; i < count; ++i) {
+                    if (!duplicates[i].empty()) assigned[i] = numbered[i];
+                }
+            }
         }
         auto& target = kind == ElementKind::Face ? output->faces : kind == ElementKind::Edge ? output->edges : output->vertices;
         target = std::move(assigned);
     }
     fill_weak_faces(*output);  // rule 7
     return output;
+}
+
+ElementMapPtr with_face_roles(const TopoDS_Shape& shape, const ElementMap& names,
+                              const std::vector<std::pair<TopoDS_Shape, std::string>>& roles) {
+    auto result = copy_of(names);
+    const auto faceIndex = index_of(shape, ElementKind::Face);
+    for (const auto& role : roles) {
+        const int position = role.first.IsNull() ? 0 : faceIndex.FindIndex(role.first);
+        if (position > 0 && is_weak(result->faces[static_cast<std::size_t>(position - 1)]))
+            result->faces[static_cast<std::size_t>(position - 1)] = role.second;
+    }
+    return result;
 }
 
 ElementMapPtr restrict_to(const TopoDS_Shape& parent, const ElementMap& names, const TopoDS_Shape& sub) {
