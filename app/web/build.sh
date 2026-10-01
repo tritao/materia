@@ -2,7 +2,8 @@
 # Builds the reference editor for the browser into app/build/web/site.
 #
 #   1. Generates the wasm32 FFI interfaces of every native kit.
-#   2. Compiles the editor to a Haxeon wasm32 guest module (entry app.MainWeb).
+#   2. Compiles the editor to a Haxeon guest module (entry app.MainWeb), wasm32 by default or
+#      wasm-gc with MATERIA_WEB_TARGET=wasm-gc.
 #   3. Links the Emscripten host (NativeKit, UIKit, SceneKit) and exports every C
 #      function the guest imports from those libraries.
 #   4. Assembles the page, both modules and the fonts.
@@ -16,6 +17,8 @@ haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 emsdk_dir=${EMSDK_DIR:-"$materia_dir/nativekit/.tools/emsdk"}
 build_dir=${MATERIA_WEB_BUILD_DIR:-"$app_dir/build/web"}
 build_type=${CMAKE_BUILD_TYPE:-Release}
+# wasm32 keeps Haxe values in linear memory; wasm-gc keeps them as Wasm GC objects. The host is the same.
+guest_target=${MATERIA_WEB_TARGET:-wasm32}
 site_dir="$build_dir/site"
 guest="$build_dir/materia_guest.wasm"
 
@@ -42,7 +45,7 @@ mkdir -p "$build_dir" "$site_dir/assets"
 echo "== wasm32 FFI interfaces"
 "$app_dir/web/tools/generate-wasm-hxi.sh" "$build_dir/hxi"
 
-echo "== Haxeon guest"
+echo "== Haxeon $guest_target guest"
 contract="$build_dir/memory_contract.json"
 cat > "$contract" <<JSON
 {
@@ -65,14 +68,18 @@ fi
 mapfile -t guest_arguments < <(python3 "$app_dir/web/tools/guest-arguments.py" "$app_dir/haxeon.json" "$build_dir/hxi")
 (cd "$haxeon_dir" && LD_LIBRARY_PATH="$haxeon_dir/out:$haxeon_dir/.tools/hashlink${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
 	HAXEON_WASM_LEGACY_EXCEPTIONS=1 \
-	"$haxeon_dir/.tools/hashlink/hl" "$compiler" --target=wasm32 --output="$guest" --entry=app.MainWeb \
+	"$haxeon_dir/.tools/hashlink/hl" "$compiler" --target="$guest_target" --output="$guest" --entry=app.MainWeb \
 	--wasm-import-memory --wasm-memory-contract="$contract" \
-	--export=app.MainWeb.configure --export=app.MainWeb.main --export=app.MainWeb.frame \
-	"${guest_arguments[@]}") | grep -E '^compiled|rror' || true
-[[ -f "$guest" && "$guest" -nt "$contract" ]] || { echo "build.sh: the guest did not compile" >&2; exit 1; }
+	"${guest_arguments[@]}") > "$build_dir/guest-compile.log" 2>&1 || true
+grep -E '^compiled' "$build_dir/guest-compile.log" || true
+if [[ ! -f "$guest" || "$guest" -ot "$contract" ]]; then
+	grep -vE '^(loading|compiler|driver) ' "$build_dir/guest-compile.log" | tail -20 >&2
+	echo "build.sh: the guest did not compile; see $build_dir/guest-compile.log" >&2
+	exit 1
+fi
 
 echo "== Emscripten host"
-# Export the guest's imports from the libraries the host links; web/materia.js
+# Export the guest's imports from the libraries the host links; haxeon-host.js
 # gives the guest's remaining imports stubs that throw when called.
 exports="$build_dir/exports.json"
 node - "$guest" "$exports" <<'NODE'
@@ -99,7 +106,7 @@ node "$app_dir/web/tools/check-imports.js" "$guest" "$build_dir/host/materia_web
 
 echo "== Site"
 cp "$build_dir/host/materia_web.js" "$build_dir/host/materia_web.wasm" "$guest" "$site_dir/"
-cp "$app_dir/web/index.html" "$app_dir/web/materia.js" "$site_dir/"
+cp "$app_dir/web/index.html" "$app_dir/web/materia.js" "$haxeon_dir/stdlib/haxeon/wasm/haxeon-host.js" "$site_dir/"
 fonts="$materia_dir/uikit/vendor/skribidi/example/data"
 cp "$fonts/IBMPlexSans-Regular.ttf" "$fonts/NotoEmoji-Regular.ttf" "$site_dir/assets/"
 echo "Built $site_dir"
