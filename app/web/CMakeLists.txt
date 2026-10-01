@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
 # Emscripten host for the browser build of the reference editor. The editor
-# itself is a separate Haxeon wasm32 guest (see build.sh); this executable
+# itself is a separate Haxeon guest module (see build.sh); this executable
 # supplies the browser runtime and the native C ABIs the guest imports, all in
 # one linear memory that the guest shares through the Haxeon memory contract.
 project(materia_web_host VERSION 0.1.0 LANGUAGES C CXX)

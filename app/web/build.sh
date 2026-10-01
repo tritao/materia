@@ -2,8 +2,8 @@
 # Builds the reference editor for the browser into app/build/web/site.
 #
 #   1. Generates the wasm32 FFI interfaces of every native kit.
-#   2. Compiles the editor to a Haxeon guest module (entry app.MainWeb), wasm32 by default or
-#      wasm-gc with MATERIA_WEB_TARGET=wasm-gc.
+#   2. Compiles the editor to a Haxeon guest module (entry app.MainWeb), wasm-gc by default or
+#      wasm32 with MATERIA_WEB_TARGET=wasm32.
 #   3. Links the Emscripten host (NativeKit, UIKit, SceneKit) and exports every C
 #      function the guest imports from those libraries.
 #   4. Assembles the page, both modules and the fonts.
@@ -17,8 +17,9 @@ haxeon_dir=${HAXEON_DIR:-"$materia_dir/haxeon"}
 emsdk_dir=${EMSDK_DIR:-"$materia_dir/nativekit/.tools/emsdk"}
 build_dir=${MATERIA_WEB_BUILD_DIR:-"$app_dir/build/web"}
 build_type=${CMAKE_BUILD_TYPE:-Release}
-# wasm32 keeps Haxe values in linear memory; wasm-gc keeps them as Wasm GC objects. The host is the same.
-guest_target=${MATERIA_WEB_TARGET:-wasm32}
+# wasm-gc keeps Haxe values as Wasm GC objects; wasm32 keeps them in linear memory with Haxeon's own collector
+# and needs no Wasm GC support, at several times the frame cost. The host is the same.
+guest_target=${MATERIA_WEB_TARGET:-wasm-gc}
 site_dir="$build_dir/site"
 guest="$build_dir/materia_guest.wasm"
 
