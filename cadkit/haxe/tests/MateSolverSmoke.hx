@@ -23,6 +23,8 @@ class MateSolverSmoke {
 		near(axis.x, 40, "the shaft is on the bore's axis (x)");
 		near(axis.y, -20, "the shaft is on the bore's axis (y)");
 
+		checkDocuments(seated);
+
 		// Locked: fully placed, exactly on the target frame.
 		var locked = motorOnBracket([mate("weld", AssemblyMateKind.Lock)]);
 		var lockResult = AssemblyMateSolver.solve(locked);
@@ -52,6 +54,22 @@ class MateSolverSmoke {
 		var armState = new AssemblyState(arm, reach.state(arm));
 		var tip = armState.worldConnector("link", "tip"), target = armState.worldConnector("base", "fixture");
 		near(Math.sqrt(Math.pow(tip.x - target.x, 2) + Math.pow(tip.y - target.y, 2)), 0, "the tip is on the fixture point");
+	}
+
+	/** Mates and grounded occurrences survive assembly documents and a document save and reload. */
+	static function checkDocuments(definition:AssemblyDefinition):Void {
+		var document = new cadkit.parametric.Document();
+		var root = cadkit.parametric.AssemblyDocuments.fromDefinition(document, definition);
+		var reloaded = cadkit.parametric.DocumentCodec.decode(cadkit.parametric.DocumentCodec.encode(document), false, false);
+		var back = cadkit.parametric.AssemblyDocuments.toDefinition(reloaded.element(root.id));
+		var mates = back.mates == null ? [] : back.mates;
+		var ids = [for (m in mates) m.id + ":" + m.kind + ":" + m.firstConnector + ">" + m.secondConnector];
+		check(ids.join(",") == "seat:planar:face>flange,shaft:coaxial:bore>axis", 'mates survive documents: $ids');
+		var bracket = [for (o in back.occurrences) if (o.id == "bracket") o][0];
+		check(bracket.grounded == true, "grounded survives documents");
+		check(AssemblyMateSolver.solve(back).report.degreesOfFreedom == 1, "the reloaded assembly solves the same");
+		reloaded.close();
+		document.close();
 	}
 
 	static function mate(id:String, kind:AssemblyMateKind, ?first:String, ?second:String, ?value:Float):AssemblyMate {

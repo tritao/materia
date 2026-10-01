@@ -734,3 +734,12 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   turns a grounded arm's joint to reach a fixture; `place` round-trips.
 - haxeon bumped to cc2d0d3c (`Reflect.deleteField` on typed records; haxeon
   suite 353/353). Not pushed yet: push haxeon before the parent.
+
+### C4.1b — Mates in assembly documents (2026-10-01)
+
+- `AssemblyDocuments` stores mates as `cadkit.mate` relationships between the
+  two occurrence elements (kind, connectors, axis, optional value; scoped
+  like couplings, sorted by id on read) and `grounded` as an occurrence
+  property; removing an assembly removes its mates with its relationships.
+- `MateSolverSmoke` round-trips the motor assembly through documents and a
+  `DocumentCodec` save/reload and solves it again (one degree of freedom).
