@@ -24,7 +24,7 @@ namespace cadkit_naming {
 // Bumped whenever a rule change would rename an element (TN-D13).
 constexpr std::uint32_t kSchemeVersion = 1;
 
-enum class ElementKind { Face, Edge, Vertex };
+enum class ElementKind { Face, Edge, Vertex, Solid };
 
 using ShapeIndex = NCollection_IndexedMap<TopoDS_Shape, TopTools_ShapeMapHasher>;
 
@@ -40,6 +40,17 @@ public:
     std::vector<std::string> faces;
     std::vector<std::string> edges;
     std::vector<std::string> vertices;
+    // Solids are tracked like faces: `solid` for the one body of a shape,
+    // its feature's tag added by stamping, instance tags for copies.
+    std::vector<std::string> solids;
+    // Other names a merged face or solid also answers to (rule 4).
+    std::vector<std::vector<std::string>> face_aliases;
+    std::vector<std::vector<std::string>> solid_aliases;
+
+    // The tracked names of `kind` (faces, solids, or edge/vertex overrides).
+    std::vector<std::string>& tracked(ElementKind kind);
+    // The aliases of faces or solids; edges and vertices have none.
+    const std::vector<std::vector<std::string>>& aliases(ElementKind kind) const;
 
     // The final names of `kind` for `shape` (the shape this map belongs to).
     // Derived names are computed once and cached.
@@ -192,6 +203,11 @@ NameMatch match_name(const std::string& reference, const std::string& candidate)
 // The tag that created the element (`f7` in `f7:fillet(...)`): the leading
 // `tag:` of its name, or "" when it has none.
 std::string creator_tag(const std::string& name);
+
+// A name for people: roles in words, tags kept as `tag › ` (`f3 › top`,
+// `f7 › fillet of edge between f3 › top and f3 › right`), instance tags as
+// copies. Display only: never parse it or store it.
+std::string label(const std::string& name);
 
 // The final names of `kind`, newline-separated.
 std::string joined_names(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind);

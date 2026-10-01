@@ -410,6 +410,12 @@ class CadPlateWorkflowTests {
       check(scene.selectAtRay(0, 0, 1, 0, 0, -1) == id &&
         scene.treeSelectionKey() == id + ":feature:3" && scene.canRepairSelectedSketchSupportFace(),
         "picking a replacement face keeps the target sketch selected for repair");
+      // TN9: the generic list offers the pick for any reference of the right kind, and names it in words.
+      var pickIssues = scene.selectedReferenceIssues();
+      check(pickIssues.length == 1 && pickIssues[0].pickable && pickIssues[0].kind == "face",
+        "the picked face can repair the broken reference: " + Std.string(pickIssues));
+      var picked = scene.selectedElementLabel();
+      check(picked != null && picked.indexOf("\u203A") > 0, "the picked face reads as words: " + picked);
       step = "repair the support face";
       check(scene.repairSelectedSketchSupportFace() && reference.isResolved(),
         "repair rebinds the sketch to the explicit face selection");
@@ -489,6 +495,9 @@ class CadPlateWorkflowTests {
       var issues = scene.selectedReferenceIssues();
       check(issues.length == 1 && issues[0].broken && issues[0].candidates.length == 2 &&
         issues[0].message.indexOf("2 elements") >= 0, "the inspector lists the two pieces: " + Std.string(issues));
+      // TN9: candidates read as words, the feature tags as the features.
+      check(issues[0].candidates[0].indexOf("box ") == 0 && issues[0].candidates[0].indexOf("top (piece)") > 0,
+        "candidates name their feature and role: " + issues[0].candidates[0]);
 
       step = "choose the right-hand piece";
       var candidates = reference.candidates();
@@ -575,6 +584,61 @@ class CadPlateWorkflowTests {
     } catch (error:Dynamic) {
       scene.dispose();
       throw "split-during-edit workflow failed at " + step + ": " + Std.string(error);
+    }
+    scene.dispose();
+  }
+
+  /** A broken fillet edge is repaired by picking an edge in the viewport (plans/TOPOLOGICAL_NAMING.md, TN9). */
+  static function edgePickRepairWorkflow():Void {
+    var scene = new EditorScene([]);
+    var step = "fillet one edge of a box";
+    try {
+      check(scene.createCadPart(), "create an editable part for edge repair");
+      var id = scene.selectedId;
+      var session = scene.cadSession(id);
+      var filletIndex = -1;
+      var boxId = -1;
+      session.perform(function(owner) {
+        var d = owner.document;
+        var box = d.add(new cadkit.parametric.features.BoxFeature(30, 20, 10));
+        d.recompute();
+        boxId = box.id.toInt();
+        var shape = box.currentShape();
+        var rim = shape.elementNames(CadKit.ShapeKind.Edge).indexOf('E(f$boxId:box.+x|f$boxId:box.+z)');
+        var edge = new cadkit.Edge(shape.subshape(CadKit.ShapeKind.Edge, rim));
+        var fillet:cadkit.parametric.features.FilletFeature = d.add(new cadkit.parametric.features.FilletFeature(box, 1, [edge]));
+        edge.close();
+        d.setOutput(fillet);
+        d.recompute();
+        filletIndex = d.featureCount() - 1;
+      });
+      var fillet:cadkit.parametric.features.FilletFeature = cast session.document.featureAt(filletIndex);
+      var reference:TopologyReference = fillet.edgeReferences[0];
+      check(reference.isResolved(), "the fillet's edge resolves");
+
+      step = "break the edge reference and pick a replacement";
+      // As a saved reference whose edge is gone would load.
+      var broken = TopologyFingerprint.fromData(CadKit.ShapeKind.Edge, CadKit.SurfaceKind.Unknown, CadKit.CurveKind.Line,
+        1e9, 1e9, 1e9, 0, 1, 0, 1, true, "f99:gone");
+      reference.restore(null, broken, ReferenceState.Unresolved);
+      check(scene.selectTreeKey(id + ":feature:" + filletIndex), "select the fillet");
+      var output = session.document.outputFeatureOrNull().currentShape();
+      var wanted = 'E(f$boxId:box.+y|f$boxId:box.+z)';
+      var pickedEdge = output.elementNames(CadKit.ShapeKind.Edge).indexOf(wanted);
+      check(pickedEdge >= 0, "the untouched top/back edge is on the output");
+      @:privateAccess scene.selection.selectedCadEdgeIndex = pickedEdge;
+      var issues = scene.selectedReferenceIssues();
+      check(issues.length == 1 && issues[0].kind == "edge" && issues[0].pickable, "the picked edge can repair it: " + Std.string(issues));
+      check(scene.selectedElementLabel().indexOf("box ") == 0 && scene.selectedElementLabel().indexOf("edge between back and top") > 0,
+        "the pick reads as words: " + scene.selectedElementLabel());
+
+      step = "repair with the picked edge";
+      check(scene.repairSelectedReferenceWithPick(0) && reference.isResolved() && reference.fingerprintData().name == wanted,
+        "the fillet now rounds the picked edge");
+      check(scene.document.undo() && reference.state == ReferenceState.Unresolved, "undo restores the broken edge");
+    } catch (error:Dynamic) {
+      scene.dispose();
+      throw "edge-pick repair workflow failed at " + step + ": " + Std.string(error);
     }
     scene.dispose();
   }
@@ -1075,6 +1139,7 @@ class CadPlateWorkflowTests {
       supportFaceRepairWorkflow();
       splitSupportRepairWorkflow();
       splitDuringEditWorkflow();
+      edgePickRepairWorkflow();
       verticalFilletWorkflow();
       stepImportWorkflow();
       sketchDraftWorkflow();

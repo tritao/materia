@@ -11,6 +11,9 @@ class Shape {
 	private var faceNames:Null<Array<String>>;
 	private var edgeNames:Null<Array<String>>;
 	private var vertexNames:Null<Array<String>>;
+	private var solidNames:Null<Array<String>>;
+	private var faceAliases:Null<Array<Array<String>>>;
+	private var solidAliases:Null<Array<Array<String>>>;
 
 	private function new(native:CadKit.OwnedShapeHandle) {
 		this.native = native;
@@ -18,6 +21,9 @@ class Shape {
 		faceNames = null;
 		edgeNames = null;
 		vertexNames = null;
+		solidNames = null;
+		faceAliases = null;
+		solidAliases = null;
 	}
 
 	public static function fromOwnedHandle(native:CadKit.OwnedShapeHandle):Shape {
@@ -110,7 +116,7 @@ class Shape {
 	**/
 	public function elementNames(kind:CadKit.ShapeKind):Array<String> {
 		var cached = kind == CadKit.ShapeKind.Face ? faceNames : kind == CadKit.ShapeKind.Edge ? edgeNames
-			: kind == CadKit.ShapeKind.Vertex ? vertexNames : null;
+			: kind == CadKit.ShapeKind.Vertex ? vertexNames : kind == CadKit.ShapeKind.Solid ? solidNames : null;
 		if (cached == null) {
 			if (subshapeCount(kind) == 0) {
 				cached = [];
@@ -124,6 +130,8 @@ class Shape {
 				edgeNames = cached;
 			else if (kind == CadKit.ShapeKind.Vertex)
 				vertexNames = cached;
+			else if (kind == CadKit.ShapeKind.Solid)
+				solidNames = cached;
 		}
 		return cached.copy();
 	}
@@ -133,6 +141,41 @@ class Shape {
 		if (index < 0 || index >= names.length)
 			throw "element index is out of range";
 		return names[index];
+	}
+
+	/**
+		Other names each face or solid also answers to, indexed like `elementNames`: a merge keeps the smallest name
+		and the others as aliases. Edges and vertices have none.
+	**/
+	public function elementAliases(kind:CadKit.ShapeKind):Array<Array<String>> {
+		var cached = kind == CadKit.ShapeKind.Face ? faceAliases : kind == CadKit.ShapeKind.Solid ? solidAliases : null;
+		if (cached == null) {
+			cached = readAliases(kind);
+			if (kind == CadKit.ShapeKind.Face)
+				faceAliases = cached;
+			else if (kind == CadKit.ShapeKind.Solid)
+				solidAliases = cached;
+		}
+		var known:Array<Array<String>> = cast cached;
+		return [for (aliases in known) aliases.copy()];
+	}
+
+	function readAliases(kind:CadKit.ShapeKind):Array<Array<String>> {
+		var result:Array<Array<String>> = [for (_ in 0...subshapeCount(kind)) []];
+		if (kind != CadKit.ShapeKind.Face && kind != CadKit.ShapeKind.Solid)
+			return result;
+		var bytes = CadKit.shapeCopyElementAliasesBytesChecked(native.borrow(), kind);
+		if (bytes.length == 0)
+			return result;
+		for (line in bytes.getString(0, bytes.length).split("\n")) {
+			var tab = line.indexOf("\t");
+			if (tab <= 0)
+				continue;
+			var index = Std.parseInt(line.substr(0, tab));
+			if (index != null && index >= 0 && index < result.length)
+				result[index].push(line.substr(tab + 1));
+		}
+		return result;
 	}
 
 	/**

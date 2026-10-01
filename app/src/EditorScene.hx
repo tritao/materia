@@ -76,6 +76,10 @@ typedef CadReferenceIssue = {
   var candidates:Array<String>;
   /** False for a warning only: the reference resolved, but by its shape alone. */
   var broken:Bool;
+  /** "face" or "edge": what a replacement must be. */
+  var kind:String;
+  /** Whether the current face or edge pick could replace it (`repairSelectedReferenceWithPick`). */
+  var pickable:Bool;
 }
 
 /**
@@ -685,7 +689,7 @@ class EditorScene {
     for (index in 0...feature.topologyReferenceCount()) {
       var reference = feature.topologyReferenceAt(index);
       var what = referenceLabel(feature, reference, index);
-      var candidates = [for (candidate in reference.candidates()) candidate.describe()];
+      var candidates = [for (candidate in reference.candidates()) candidateText(selectedId, candidate)];
       var message:Null<String> = null;
       var broken = true;
       if (reference.state == ReferenceState.Ambiguous)
@@ -701,7 +705,8 @@ class EditorScene {
         broken = false;
       }
       if (message != null)
-        issues.push({index: index, message: message, candidates: candidates, broken: broken});
+        issues.push({index: index, message: message, candidates: candidates, broken: broken,
+          kind: reference.kind == CadKit.ShapeKind.Edge ? "edge" : "face", pickable: broken && pickedReplacement(index) != null});
     }
     return issues;
   }
@@ -715,15 +720,62 @@ class EditorScene {
 
   /** Point the selected feature's reference `referenceIndex` at its candidate `candidateIndex`, as one undoable edit. */
   public function repairSelectedReference(referenceIndex:Int, candidateIndex:Int):Bool {
-    var id = selectedId;
-    var feature = selectedCadFeature(id);
+    var feature = selectedCadFeature(selectedId);
     if (feature == null || activeSketchEdit != null || referenceIndex < 0 || referenceIndex >= feature.topologyReferenceCount())
       return false;
-    var reference = feature.topologyReferenceAt(referenceIndex);
-    var candidates = reference.candidates();
+    var candidates = feature.topologyReferenceAt(referenceIndex).candidates();
     if (candidateIndex < 0 || candidateIndex >= candidates.length)
       return false;
-    var replacement = candidates[candidateIndex];
+    return applyReferenceRepair(referenceIndex, candidates[candidateIndex]);
+  }
+
+  /** Point the selected feature's reference `referenceIndex` at the face or edge picked in the viewport (TN9). */
+  public function repairSelectedReferenceWithPick(referenceIndex:Int):Bool {
+    var replacement = pickedReplacement(referenceIndex);
+    return replacement != null && applyReferenceRepair(referenceIndex, replacement);
+  }
+
+  /**
+    The picked face or edge as a replacement for reference `referenceIndex`, named as its producer names it: the pick
+    is on the part's output, the reference may point into an earlier feature. Null when the pick is the wrong kind or
+    is not on the producer.
+  */
+  function pickedReplacement(referenceIndex:Int):Null<TopologyFingerprint> {
+    var feature = activeSketchEdit != null ? null : selectedCadFeature(selectedId);
+    if (feature == null || referenceIndex < 0 || referenceIndex >= feature.topologyReferenceCount())
+      return null;
+    var reference = feature.topologyReferenceAt(referenceIndex);
+    var picked:Null<TopologyFingerprint> = null;
+    if (reference.kind == CadKit.ShapeKind.Face)
+      picked = selectedCadFaceFingerprint;
+    else if (reference.kind == CadKit.ShapeKind.Edge && selectedCadEdgeIndex >= 0) {
+      var output = requireCadSession(selectedId).document.outputFeatureOrNull();
+      var shape = output == null ? null : output.currentShape();
+      if (shape != null && selectedCadEdgeIndex < shape.subshapeCount(CadKit.ShapeKind.Edge)) {
+        var edge = shape.subshape(CadKit.ShapeKind.Edge, selectedCadEdgeIndex);
+        picked = TopologyFingerprint.capture(edge);
+        edge.close();
+      }
+    }
+    var producer = reference.remapTargetFeature().currentShape();
+    if (picked == null || producer == null)
+      return null;
+    var resolution = TopologyResolver.resolve(producer, picked, reference.kind);
+    if (resolution.state != ReferenceState.Resolved)
+      return null;
+    var element = producer.subshape(reference.kind, resolution.index);
+    var replacement = TopologyFingerprint.capture(element);
+    element.close();
+    return replacement;
+  }
+
+  /** Retarget the selected feature's reference `referenceIndex` to `replacement`, as one undoable edit. */
+  function applyReferenceRepair(referenceIndex:Int, replacement:TopologyFingerprint):Bool {
+    var id = selectedId;
+    var feature = selectedCadFeature(id);
+    if (feature == null)
+      return false;
+    var reference = feature.topologyReferenceAt(referenceIndex);
     var beforeFingerprint = reference.fingerprintData();
     var beforeState = reference.state;
     var featureId = feature.id.toInt();
@@ -740,6 +792,45 @@ class EditorScene {
       // Undo restores the broken identity and leaves the prior result visible, like the support-face repair.
       cadkit.parametric.TopologyReferenceChange.apply(referenceIn(owner), beforeFingerprint, beforeState);
     });
+  }
+
+  /** A candidate for people: its name in words, then where it is ("box 2 › top (piece) · planar face at …"). */
+  function candidateText(id:String, candidate:TopologyFingerprint):String
+    return candidate.name == null ? candidate.describe() : elementLabel(id, candidate.name) + " \u00B7 " + candidate.describe();
+
+  /** A topological name in words, its feature tags shown as the features ("box 1 › top"; TN9). */
+  public function elementLabel(id:String, name:String):String {
+    var text = cadkit.ElementNames.label(name);
+    var item = object(id);
+    if (item == null || !isCadKind(item.kind))
+      return text;
+    var document = requireCadSession(id).document;
+    var counts:Map<String, Int> = [];
+    for (index in 0...document.featureCount()) {
+      var feature = document.featureAt(index);
+      var type = feature.serializationType();
+      var seen:Null<Int> = counts.get(type);
+      var ordinal:Int = seen == null ? 1 : seen + 1;
+      counts.set(type, ordinal);
+      text = StringTools.replace(text, "f" + feature.id.toInt() + " \u203A ", type + " " + ordinal + " \u203A ");
+    }
+    return text;
+  }
+
+  /** The picked face or edge of the selected part in words, or null when nothing is picked. */
+  public function selectedElementLabel():Null<String> {
+    var item = object(selectedId);
+    if (item == null || !isCadKind(item.kind))
+      return null;
+    var output = requireCadSession(selectedId).document.outputFeatureOrNull();
+    var shape = output == null ? null : output.currentShape();
+    if (shape == null)
+      return null;
+    if (selectedCadEdgeIndex >= 0 && selectedCadEdgeIndex < shape.subshapeCount(CadKit.ShapeKind.Edge))
+      return elementLabel(selectedId, shape.elementName(CadKit.ShapeKind.Edge, selectedCadEdgeIndex));
+    if (selectedCadFaceIndex >= 0 && selectedCadFaceIndex < shape.subshapeCount(CadKit.ShapeKind.Face))
+      return elementLabel(selectedId, shape.elementName(CadKit.ShapeKind.Face, selectedCadFaceIndex));
+    return null;
   }
 
   /** Describe a broken support-face identity on the selected sketch feature. */
@@ -1131,7 +1222,7 @@ class EditorScene {
     var choice = pendingChoice;
     if (choice == null)
       return null;
-    return {message: choice.message, candidates: [for (candidate in choice.candidates) candidate.describe()]};
+    return {message: choice.message, candidates: [for (candidate in choice.candidates) candidateText(choice.id, candidate)]};
   }
 
   /** Apply the pending edit with its reference pointed at candidate `candidate`, as one undoable edit. */

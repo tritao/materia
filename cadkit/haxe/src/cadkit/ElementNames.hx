@@ -36,6 +36,15 @@ class ElementNames {
 	public static function isStrong(name:String):Bool
 		return match(name, [name])[0].grade == EXACT;
 
+	/**
+		`name` in words for people ("f3 › edge between top and right"), with tags kept before a "›" for the caller to
+		replace (a feature's name for `f3`). Display only: never store or parse it.
+	*/
+	public static function label(name:String):String {
+		var bytes = CadKit.elementNameLabelBytesChecked(name);
+		return bytes.length == 0 ? "" : bytes.getString(0, bytes.length);
+	}
+
 	/** The tag that created the named element (`f7` in `f7:fillet(...)`), or "" when it has none. */
 	public static function creatorTag(name:String):String {
 		var bytes = CadKit.elementNameTagBytesChecked(name);

@@ -595,7 +595,7 @@ CADKIT_API cad_result cad_mesh_copy_indices(
 /* Topological names (plans/TOPOLOGICAL_NAMING.md). Every face, edge and
  * vertex of a shape has a name that survives parametric edits. Lists of names
  * are newline-separated UTF-8, one per subshape in cad_shape_subshape_at
- * order. Names are opaque text; the scheme version changes whenever a rule
+ * order; faces, edges, vertices and solids have names. Names are opaque text; the scheme version changes whenever a rule
  * change would rename an element. */
 CADKIT_API cad_result cad_naming_scheme_version(uint32_t* out_version CADKIT_HXI_OUT);
 
@@ -648,6 +648,21 @@ CADKIT_API cad_result cad_element_name_match_bytes(
 /* The tag that created the named element (the feature `f7` in
  * `f7:fillet(...)`), or empty when the name has none. */
 CADKIT_API cad_result cad_element_name_tag_bytes(
+    const char* name CADKIT_HXI_UTF8,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* Other names of merged faces or solids, as lines "index<TAB>alias": a
+ * reference to any of them finds the merged element. */
+CADKIT_API cad_result cad_shape_copy_element_aliases_bytes(
+    cad_shape shape,
+    cad_shape_kind kind,
+    uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
+    uint32_t* byte_capacity CADKIT_HXI_INOUT);
+
+/* A name in words for people ("f3 › edge between top and right"), with
+ * tags kept before a "›". For display only: never store or parse it. */
+CADKIT_API cad_result cad_element_name_label_bytes(
     const char* name CADKIT_HXI_UTF8,
     uint8_t* output CADKIT_HXI_OUT_BUFFER(byte_capacity),
     uint32_t* byte_capacity CADKIT_HXI_INOUT);

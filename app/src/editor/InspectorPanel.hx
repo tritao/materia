@@ -118,6 +118,13 @@ class InspectorPanel {
           app.commands.refresh();
         }, "repair-reference-" + referenceIndex + "-" + candidate)));
       }
+      if (issue.pickable) {
+        var pickedIndex = issue.index;
+        rows.push(new KeyedView(key + "-picked", new Button("Use the selected " + issue.kind, null, function() {
+          app.runSceneEdit("Could not repair reference", function() app.scene.repairSelectedReferenceWithPick(pickedIndex));
+          app.commands.refresh();
+        }, "repair-reference-" + pickedIndex + "-picked")));
+      }
     }
     var supportStatus = scene.selectedSketchSupportStatus();
     if (supportStatus != null) {
@@ -128,6 +135,9 @@ class InspectorPanel {
           sceneAction("repair-sketch-support-face", "scene.repair-sketch-support-face",
             "Repair support face", IconName.Inspect)));
     }
+    var pickedLabel = scene.selectedElementLabel();
+    if (pickedLabel != null)
+      rows.push(new KeyedView("picked-element", new Text(pickedLabel)));
     if(scene.isCadPart(selected.id) && scene.hasCadOutput(selected.id))rows.push(new KeyedView("face-selection",
       new Text(scene.selectedCadEdgeIndex>=0?"Selected edge "+(scene.selectedCadEdgeIndex+1):
         scene.selectedCadFaceIndex<0?"Click a CAD face or edge to select it":

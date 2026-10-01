@@ -3863,6 +3863,7 @@ bool element_kind(cad_shape_kind kind, naming::ElementKind& out_kind) {
     case CAD_SHAPE_FACE: out_kind = naming::ElementKind::Face; return true;
     case CAD_SHAPE_EDGE: out_kind = naming::ElementKind::Edge; return true;
     case CAD_SHAPE_VERTEX: out_kind = naming::ElementKind::Vertex; return true;
+    case CAD_SHAPE_SOLID: out_kind = naming::ElementKind::Solid; return true;
     default: return false;
     }
 }
@@ -3890,7 +3891,7 @@ extern "C" CADKIT_API cad_result cad_shape_copy_element_names_bytes(
     return model_guard([&]() {
         require_model(byte_capacity != nullptr, "byte_capacity must not be null");
         naming::ElementKind element;
-        require_model(element_kind(kind, element), "names exist for faces, edges and vertices");
+        require_model(element_kind(kind, element), "names exist for faces, edges, vertices and solids");
         auto named = model_named(shape);
         const auto text = naming::joined_names(named.shape, *named.names, element);
         require_model(text.size() <= std::numeric_limits<uint32_t>::max(), "names exceed 32-bit range");
@@ -3910,11 +3911,12 @@ extern "C" CADKIT_API cad_result cad_shape_seed_names(
     return model_guard([&]() {
         require_model(out_shape != nullptr && names != nullptr, "names and out_shape must not be null");
         naming::ElementKind element;
-        require_model(element_kind(kind, element), "names exist for faces, edges and vertices");
+        require_model(element_kind(kind, element), "names exist for faces, edges, vertices and solids");
         auto named = model_named(shape);
         auto seeds = split_lines(names);
         naming::ShapeIndex index;
-        TopExp::MapShapes(named.shape, kind == CAD_SHAPE_FACE ? TopAbs_FACE : kind == CAD_SHAPE_EDGE ? TopAbs_EDGE : TopAbs_VERTEX, index);
+        TopExp::MapShapes(named.shape, kind == CAD_SHAPE_FACE ? TopAbs_FACE : kind == CAD_SHAPE_EDGE ? TopAbs_EDGE
+            : kind == CAD_SHAPE_SOLID ? TopAbs_SOLID : TopAbs_VERTEX, index);
         require_model(seeds.size() == static_cast<std::size_t>(index.Extent()) || (index.Extent() == 0 && seeds.size() == 1 && seeds[0].empty()),
                       "seed names must give one line per subshape");
         if (index.Extent() == 0) seeds.clear();
@@ -3976,5 +3978,40 @@ extern "C" CADKIT_API cad_result cad_element_name_tag_bytes(const char* name, ui
             return fail(CAD_ERROR_BUFFER_TOO_SMALL, "tag output buffer is too small");
         if (required != 0) std::memcpy(output, tag.data(), required);
         return CAD_OK;
+    });
+}
+
+namespace {
+cad_result copy_text(const std::string& text, uint8_t* output, uint32_t* byte_capacity) {
+    require_model(text.size() <= std::numeric_limits<uint32_t>::max(), "text exceeds 32-bit range");
+    const auto required = static_cast<uint32_t>(text.size());
+    const auto capacity = *byte_capacity;
+    *byte_capacity = required;
+    if (capacity < required || (required != 0 && output == nullptr))
+        return fail(CAD_ERROR_BUFFER_TOO_SMALL, "text output buffer is too small");
+    if (required != 0) std::memcpy(output, text.data(), required);
+    return CAD_OK;
+}
+}  // namespace
+
+extern "C" CADKIT_API cad_result cad_shape_copy_element_aliases_bytes(
+    cad_shape shape, cad_shape_kind kind, uint8_t* output, uint32_t* byte_capacity) {
+    return model_guard([&]() {
+        require_model(byte_capacity != nullptr, "byte_capacity must not be null");
+        naming::ElementKind element;
+        require_model(element_kind(kind, element), "names exist for faces, edges, vertices and solids");
+        auto named = model_named(shape);
+        std::string text;
+        const auto& aliases = named.names->aliases(element);
+        for (std::size_t index = 0; index < aliases.size(); ++index)
+            for (const auto& alias : aliases[index]) text += std::to_string(index) + "\t" + alias + "\n";
+        return copy_text(text, output, byte_capacity);
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_element_name_label_bytes(const char* name, uint8_t* output, uint32_t* byte_capacity) {
+    return model_guard([&]() {
+        require_model(name != nullptr && byte_capacity != nullptr, "name and byte_capacity must not be null");
+        return copy_text(naming::label(name), output, byte_capacity);
     });
 }

@@ -26,7 +26,8 @@ class TopologyResolver {
 			candidate.close();
 			return score;
 		};
-		var named = fingerprint.name == null ? null : byName(fingerprint.name, shape.elementNames(kind), geometry);
+		var named = fingerprint.name == null ? null
+			: byName(fingerprint.name, shape.elementNames(kind), geometry, shape.elementAliases(kind));
 		if (named != null && named.state != ReferenceState.Ambiguous)
 			return named;
 
@@ -64,7 +65,8 @@ class TopologyResolver {
 		and tied relatives are decided by `geometry` among those candidates only. A weak name the geometry does not
 		confirm falls back; named candidates the geometry cannot separate are ambiguous.
 	*/
-	static function byName(reference:String, names:Array<String>, geometry:Int->Float):Null<TopologyResolution> {
+	static function byName(reference:String, names:Array<String>, geometry:Int->Float,
+			?aliases:Array<Array<String>>):Null<TopologyResolution> {
 		var matches = ElementNames.match(reference, names);
 		var exact:Array<Int> = [], weak:Array<Int> = [], relative:Array<Int> = [];
 		for (index in 0...matches.length) {
@@ -80,6 +82,12 @@ class TopologyResolver {
 			return new TopologyResolution(exact[0], ReferenceState.Resolved, ResolutionMethod.Name);
 		if (exact.length > 1)
 			return named(rank(exact, geometry), ResolutionMethod.Name, exact);
+		// A merged element keeps the names it was made from as aliases.
+		var aliased = aliases == null ? [] : [for (index in 0...aliases.length) if (aliases[index].indexOf(reference) >= 0) index];
+		if (aliased.length == 1)
+			return new TopologyResolution(aliased[0], ReferenceState.Resolved, ResolutionMethod.Name);
+		if (aliased.length > 1)
+			return named(rank(aliased, geometry), ResolutionMethod.Name, aliased);
 		if (weak.length > 0) {
 			var confirmed = rank(weak, geometry);
 			return confirmed.state == ReferenceState.Resolved ? new TopologyResolution(confirmed.index, ReferenceState.Resolved, ResolutionMethod.Name) : null;

@@ -19,6 +19,7 @@
 #include <iterator>
 #include <map>
 #include <set>
+#include <cstdlib>
 #include <stdexcept>
 
 namespace cadkit_naming {
@@ -34,6 +35,8 @@ TopAbs_ShapeEnum occt_kind(ElementKind kind) {
         return TopAbs_EDGE;
     case ElementKind::Vertex:
         return TopAbs_VERTEX;
+    case ElementKind::Solid:
+        return TopAbs_SOLID;
     }
     return TopAbs_SHAPE;
 }
@@ -59,6 +62,9 @@ std::shared_ptr<ElementMap> copy_of(const ElementMap& names) {
     result->faces = names.faces;
     result->edges = names.edges;
     result->vertices = names.vertices;
+    result->solids = names.solids;
+    result->face_aliases = names.face_aliases;
+    result->solid_aliases = names.solid_aliases;
     return result;
 }
 
@@ -67,6 +73,9 @@ std::shared_ptr<ElementMap> sized_for(const TopoDS_Shape& shape) {
     result->faces.assign(static_cast<std::size_t>(index_of(shape, ElementKind::Face).Extent()), std::string());
     result->edges.assign(static_cast<std::size_t>(index_of(shape, ElementKind::Edge).Extent()), std::string());
     result->vertices.assign(static_cast<std::size_t>(index_of(shape, ElementKind::Vertex).Extent()), std::string());
+    result->solids.assign(static_cast<std::size_t>(index_of(shape, ElementKind::Solid).Extent()), std::string());
+    result->face_aliases.assign(result->faces.size(), {});
+    result->solid_aliases.assign(result->solids.size(), {});
     return result;
 }
 
@@ -74,6 +83,12 @@ void fill_weak_faces(ElementMap& names) {
     for (std::size_t i = 0; i < names.faces.size(); ++i) {
         if (names.faces[i].empty()) names.faces[i] = "face#" + std::to_string(i);
     }
+    // The one body of a shape is `solid`; several unnamed ones are told apart only by index.
+    for (std::size_t i = 0; i < names.solids.size(); ++i) {
+        if (names.solids[i].empty()) names.solids[i] = names.solids.size() == 1 ? "solid" : "solid#" + std::to_string(i);
+    }
+    names.face_aliases.resize(names.faces.size());
+    names.solid_aliases.resize(names.solids.size());
 }
 
 // Lexicographic order of points, for the weak ordinals of otherwise identical names.
@@ -84,9 +99,12 @@ bool point_before(const gp_Pnt& a, const gp_Pnt& b) {
     return a.Z() < b.Z() - tolerance;
 }
 
-gp_Pnt face_centre(const TopoDS_Face& face) {
+gp_Pnt centre_of(const TopoDS_Shape& shape) {
     GProp_GProps properties;
-    BRepGProp::SurfaceProperties(face, properties);
+    if (shape.ShapeType() == TopAbs_SOLID)
+        BRepGProp::VolumeProperties(shape, properties);
+    else
+        BRepGProp::SurfaceProperties(shape, properties);
     return properties.CentreOfMass();
 }
 
@@ -157,6 +175,7 @@ bool is_weak(const std::string& name) {
 
 const std::vector<std::string>& ElementMap::names(const TopoDS_Shape& shape, ElementKind kind) const {
     if (kind == ElementKind::Face) return faces;
+    if (kind == ElementKind::Solid) return solids;
     std::call_once(derived_once_, [&]() { derive(shape); });
     return kind == ElementKind::Edge ? derived_edges_ : derived_vertices_;
 }
@@ -241,6 +260,25 @@ void ElementMap::derive(const TopoDS_Shape& shape) const {
     derived_vertices_ = std::move(vertexNames);
 }
 
+std::vector<std::string>& ElementMap::tracked(ElementKind kind) {
+    switch (kind) {
+    case ElementKind::Face:
+        return faces;
+    case ElementKind::Edge:
+        return edges;
+    case ElementKind::Vertex:
+        return vertices;
+    case ElementKind::Solid:
+        return solids;
+    }
+    return faces;
+}
+
+const std::vector<std::vector<std::string>>& ElementMap::aliases(ElementKind kind) const {
+    static const std::vector<std::vector<std::string>> none;
+    return kind == ElementKind::Face ? face_aliases : kind == ElementKind::Solid ? solid_aliases : none;
+}
+
 std::shared_ptr<ElementMap> editable_copy(const ElementMap& names) {
     return copy_of(names);
 }
@@ -315,7 +353,7 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
     if (history != nullptr) {
         for (std::size_t slot = 0; slot < inputs.size(); ++slot) {
             const auto& input = inputs[slot];
-            for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
+            for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex, ElementKind::Solid}) {
                 const auto sourceIndex = index_of(input.shape, kind);
                 const auto& names = input.names->names(input.shape, kind);
                 for (int i = 1; i <= sourceIndex.Extent(); ++i) {
@@ -325,11 +363,15 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             }
         }
     }
-    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
+    // Where each input face went (result face positions), for solids that history does not name.
+    std::vector<std::vector<std::vector<std::size_t>>> faceTargets(inputs.size());
+    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex, ElementKind::Solid}) {
         const auto resultIndex = index_of(result, kind);
         const auto count = static_cast<std::size_t>(resultIndex.Extent());
         // (slot, name) of the sources each result element continues (rules 1, 2, 4).
         std::vector<std::vector<std::pair<std::size_t, std::string>>> carried(count);
+        // The aliases the carried sources bring along (rule 4).
+        std::vector<std::set<std::string>> carriedAliases(count);
         // role -> source names, for generated elements (rule 5).
         std::vector<std::map<std::string, std::set<std::string>>> generated(count);
         // Split pieces: (parent name, slot, piece positions) (rule 3).
@@ -343,6 +385,7 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             const auto& input = inputs[slot];
             const auto sourceIndex = index_of(input.shape, kind);
             const auto& names = input.names->names(input.shape, kind);
+            const auto& sourceAliases = input.names->aliases(kind);
             for (int i = 1; i <= sourceIndex.Extent(); ++i) {
                 const auto& source = sourceIndex(i);
                 const auto& name = names[static_cast<std::size_t>(i - 1)];
@@ -359,8 +402,14 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
                 }
                 std::sort(found.begin(), found.end());
                 found.erase(std::unique(found.begin(), found.end()), found.end());
+                if (kind == ElementKind::Face) {
+                    faceTargets[slot].resize(static_cast<std::size_t>(sourceIndex.Extent()));
+                    faceTargets[slot][static_cast<std::size_t>(i - 1)] = found;
+                }
                 if (found.size() == 1) {
                     carried[found.front()].emplace_back(slot, name);  // rule 2
+                    if (static_cast<std::size_t>(i - 1) < sourceAliases.size())
+                        for (const auto& alias : sourceAliases[static_cast<std::size_t>(i - 1)]) carriedAliases[found.front()].insert(alias);
                 } else if (found.size() > 1) {
                     splits.push_back({name, slot, found});
                 }
@@ -371,15 +420,58 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             const int position = resultIndex.FindIndex(birth.target);
             if (position > 0) generated[static_cast<std::size_t>(position - 1)][birth.role].insert(birth.source);
         }
+        if (kind == ElementKind::Solid) {
+            // A solid history does not name (a fuse builds a new one) is named after the input solids whose faces
+            // it is bounded by: identity follows the boundary.
+            Adjacency resultFaceSolids;
+            TopExp::MapShapesAndUniqueAncestors(result, TopAbs_FACE, TopAbs_SOLID, resultFaceSolids);
+            const auto resultFaces = index_of(result, ElementKind::Face);
+            for (std::size_t slot = 0; slot < inputs.size(); ++slot) {
+                const auto& input = inputs[slot];
+                const auto inputFaces = index_of(input.shape, ElementKind::Face);
+                const auto inputSolids = index_of(input.shape, ElementKind::Solid);
+                const auto& solidNames = input.names->names(input.shape, ElementKind::Solid);
+                Adjacency inputFaceSolids;
+                TopExp::MapShapesAndUniqueAncestors(input.shape, TopAbs_FACE, TopAbs_SOLID, inputFaceSolids);
+                for (std::size_t face = 0; face < faceTargets[slot].size(); ++face) {
+                    const auto& source = inputFaces(static_cast<int>(face) + 1);
+                    if (!inputFaceSolids.Contains(source)) continue;
+                    for (const auto& owner : inputFaceSolids.FindFromKey(source)) {
+                        const auto& name = entry(solidNames, inputSolids.FindIndex(owner));
+                        if (name.empty()) continue;
+                        for (auto target : faceTargets[slot][face]) {
+                            const auto& targetFace = resultFaces(static_cast<int>(target) + 1);
+                            if (!resultFaceSolids.Contains(targetFace)) continue;
+                            for (const auto& body : resultFaceSolids.FindFromKey(targetFace)) {
+                                const int position = resultIndex.FindIndex(body);
+                                if (position > 0 && carried[static_cast<std::size_t>(position - 1)].empty())
+                                    generated[static_cast<std::size_t>(position - 1)]["\x01bounded"].insert(name);
+                            }
+                        }
+                    }
+                }
+            }
+            for (std::size_t i = 0; i < count; ++i) {
+                const auto bounded = generated[i].find("\x01bounded");
+                if (bounded == generated[i].end()) continue;
+                for (const auto& name : bounded->second) carried[i].emplace_back(0, name);
+                generated[i].erase(bounded);
+            }
+        }
         std::vector<std::string> assigned(count);
         std::vector<std::size_t> slots(count, 0);
+        std::vector<std::vector<std::string>> aliases(count);
         for (std::size_t i = 0; i < count; ++i) {
             if (!carried[i].empty()) {
-                // Several sources merged: the smallest name stands for them (rule 4).
+                // Several sources merged: the smallest name stands for them, the others become aliases (rule 4).
                 auto best = std::min_element(carried[i].begin(), carried[i].end(),
                                              [](const auto& a, const auto& b) { return a.second < b.second; });
                 assigned[i] = best->second;
                 slots[i] = best->first;
+                auto others = carriedAliases[i];
+                for (const auto& source : carried[i]) others.insert(source.second);
+                others.erase(assigned[i]);
+                aliases[i].assign(others.begin(), others.end());
             } else if (!generated[i].empty()) {
                 const auto& role = *generated[i].begin();  // the smallest role
                 assigned[i] = role.first + "(" + join(std::vector<std::string>(role.second.begin(), role.second.end()), ",", true) + ")";
@@ -440,7 +532,7 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             if (!assigned[i].empty() && origins[assigned[i]].size() > 1) assigned[i] += "@" + std::to_string(slots[i]);
         }
         // Pieces still alike (symmetric splits): a weak ordinal by position.
-        if (kind == ElementKind::Face) {
+        if (kind == ElementKind::Face || kind == ElementKind::Solid) {
             std::map<std::string, int> seen;
             for (const auto& name : assigned) {
                 if (!name.empty()) seen[name]++;
@@ -451,14 +543,17 @@ ElementMapPtr propagate(const std::vector<NamedShape>& inputs, History* history,
             for (const auto& name : duplicates) any = any || !name.empty();
             if (any) {
                 std::vector<std::string> numbered = assigned;
-                number_duplicates(numbered, [&](std::size_t i) { return face_centre(TopoDS::Face(resultIndex(static_cast<int>(i) + 1))); });
+                number_duplicates(numbered, [&](std::size_t i) { return centre_of(resultIndex(static_cast<int>(i) + 1)); });
                 for (std::size_t i = 0; i < count; ++i) {
                     if (!duplicates[i].empty()) assigned[i] = numbered[i];
                 }
             }
         }
-        auto& target = kind == ElementKind::Face ? output->faces : kind == ElementKind::Edge ? output->edges : output->vertices;
-        target = std::move(assigned);
+        output->tracked(kind) = std::move(assigned);
+        if (kind == ElementKind::Face)
+            output->face_aliases = std::move(aliases);
+        else if (kind == ElementKind::Solid)
+            output->solid_aliases = std::move(aliases);
     }
     fill_weak_faces(*output);  // rule 7
     return output;
@@ -478,13 +573,20 @@ ElementMapPtr with_face_roles(const TopoDS_Shape& shape, const ElementMap& names
 
 ElementMapPtr restrict_to(const TopoDS_Shape& parent, const ElementMap& names, const TopoDS_Shape& sub) {
     auto result = sized_for(sub);
-    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
+    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex, ElementKind::Solid}) {
         const auto parentIndex = index_of(parent, kind);
         const auto subIndex = index_of(sub, kind);
         const auto& parentNames = names.names(parent, kind);
-        auto& target = kind == ElementKind::Face ? result->faces : kind == ElementKind::Edge ? result->edges : result->vertices;
+        const auto& parentAliases = names.aliases(kind);
+        auto& target = result->tracked(kind);
         for (int i = 1; i <= subIndex.Extent(); ++i) {
-            target[static_cast<std::size_t>(i - 1)] = entry(parentNames, parentIndex.FindIndex(subIndex(i)));
+            const int position = parentIndex.FindIndex(subIndex(i));
+            target[static_cast<std::size_t>(i - 1)] = entry(parentNames, position);
+            if (position > 0 && static_cast<std::size_t>(position) <= parentAliases.size()) {
+                auto& aliases = kind == ElementKind::Face ? result->face_aliases : result->solid_aliases;
+                aliases.resize(target.size());
+                aliases[static_cast<std::size_t>(i - 1)] = parentAliases[static_cast<std::size_t>(position - 1)];
+            }
         }
     }
     fill_weak_faces(*result);
@@ -494,7 +596,7 @@ ElementMapPtr restrict_to(const TopoDS_Shape& parent, const ElementMap& names, c
 ElementMapPtr seed(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind,
                    const std::vector<std::string>& seeds) {
     auto result = copy_of(names);
-    auto& target = kind == ElementKind::Face ? result->faces : kind == ElementKind::Edge ? result->edges : result->vertices;
+    auto& target = result->tracked(kind);
     if (seeds.size() != static_cast<std::size_t>(index_of(shape, kind).Extent())) {
         throw std::invalid_argument("seed names must give one entry per subshape");
     }
@@ -513,7 +615,7 @@ ElementMapPtr stamp(const TopoDS_Shape& shape, const ElementMap& names, const st
                     const std::vector<NamedShape>& inputs) {
     auto result = copy_of(names);
     const auto prefix = atom(tag) + ":";
-    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
+    for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex, ElementKind::Solid}) {
         // A split piece, an ordinal or a slot only divides an input's element: it keeps that identity untagged.
         std::set<std::string> known;
         for (const auto& input : inputs) {
@@ -521,12 +623,20 @@ ElementMapPtr stamp(const TopoDS_Shape& shape, const ElementMap& names, const st
                 std::set<std::string> items;
                 known.insert(relative_form(name, items));
             }
+            for (const auto& aliases : input.names->aliases(kind))
+                for (const auto& alias : aliases) {
+                    std::set<std::string> items;
+                    known.insert(relative_form(alias, items));
+                }
         }
-        auto& target = kind == ElementKind::Face ? result->faces : kind == ElementKind::Edge ? result->edges : result->vertices;
-        for (auto& name : target) {
+        auto stampIfNew = [&](std::string& name) {
             std::set<std::string> items;
             if (!name.empty() && known.count(relative_form(name, items)) == 0) name = prefix + name;
-        }
+        };
+        for (auto& name : result->tracked(kind)) stampIfNew(name);
+        if (kind == ElementKind::Face || kind == ElementKind::Solid)
+            for (auto& aliases : kind == ElementKind::Face ? result->face_aliases : result->solid_aliases)
+                for (auto& alias : aliases) stampIfNew(alias);
     }
     (void)shape;
     return result;
@@ -589,6 +699,191 @@ std::string creator_tag(const std::string& name) {
         if (!atom) return "";
     }
     return "";
+}
+
+namespace {
+
+bool atom_char(char c) {
+    return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '.' || c == '+' || c == '-' || c == '%' || c == '#';
+}
+
+std::string unescape(const std::string& text) {
+    std::string result;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '%' && i + 2 < text.size()) {
+            const auto hex = text.substr(i + 1, 2);
+            char* end = nullptr;
+            const long value = std::strtol(hex.c_str(), &end, 16);
+            if (end == hex.c_str() + 2) {
+                result += static_cast<char>(value);
+                i += 2;
+                continue;
+            }
+        }
+        result += text[i];
+    }
+    return result;
+}
+
+std::string counted(const std::string& word, const std::string& index) {
+    char* end = nullptr;
+    const long value = std::strtol(index.c_str(), &end, 10);
+    return word + " " + (end != index.c_str() && *end == 0 ? std::to_string(value + 1) : index);
+}
+
+std::string role_words(const std::string& atom) {
+    static const std::map<std::string, std::string> roles = {
+        {"box.+z", "top"}, {"box.-z", "bottom"}, {"box.+x", "right"}, {"box.-x", "left"}, {"box.+y", "back"},
+        {"box.-y", "front"}, {"cyl.side", "side"}, {"cyl.top", "top"}, {"cyl.bottom", "bottom"}, {"sphere", "surface"},
+        {"face", "face"}, {"solid", "body"}, {"circle", "circle"}, {"start", "start cap"}, {"end", "end cap"}};
+    const auto known = roles.find(atom);
+    if (known != roles.end()) return known->second;
+    const auto hash = atom.find('#');
+    if (hash != std::string::npos) return counted(atom.substr(0, hash), atom.substr(hash + 1));
+    if (atom.rfind("e.", 0) == 0) return "edge " + unescape(atom.substr(2));
+    if (atom.rfind("r.", 0) == 0) return "region";
+    if (atom.rfind("seg.", 0) == 0) return counted("segment", atom.substr(4));
+    if (atom.rfind("pt.", 0) == 0) return counted("point", atom.substr(3));
+    return unescape(atom);
+}
+
+std::string tag_words(const std::string& tag) {
+    if (tag == "m") return "mirror";
+    if (tag.size() > 1 && tag[0] == 'i' && std::isdigit(static_cast<unsigned char>(tag[1]))) {
+        std::string result = "copy ";
+        std::string part;
+        for (std::size_t i = 1; i <= tag.size(); ++i) {
+            if (i == tag.size() || tag[i] == '.') {
+                result += (result.size() > 5 ? "." : "") + std::to_string(std::stol(part) + 1);
+                part.clear();
+            } else {
+                part += tag[i];
+            }
+        }
+        return result;
+    }
+    return unescape(tag);
+}
+
+std::string joined_words(const std::vector<std::string>& parts) {
+    std::string result;
+    for (std::size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) result += i + 1 == parts.size() ? " and " : ", ";
+        result += parts[i];
+    }
+    return result;
+}
+
+// The longest "tag › " prefix every part shares, removed from them: "f3 › top" and "f3 › right" give "f3 › ".
+std::string hoist(std::vector<std::string>& parts) {
+    static const std::string arrow = " \u203A ";
+    if (parts.empty()) return "";
+    std::string common;
+    for (;;) {
+        const auto end = parts[0].find(arrow, common.size());
+        if (end == std::string::npos) break;
+        const auto candidate = parts[0].substr(0, end + arrow.size());
+        bool shared = true;
+        for (const auto& part : parts) shared = shared && part.compare(0, candidate.size(), candidate) == 0;
+        if (!shared) break;
+        common = candidate;
+    }
+    for (auto& part : parts) part = part.substr(common.size());
+    return common;
+}
+
+// A recursive reader of the name grammar (plans/TOPOLOGICAL_NAMING.md), producing words.
+struct LabelReader {
+    const std::string& text;
+    std::size_t at = 0;
+
+    std::string atom() {
+        const auto start = at;
+        while (at < text.size() && atom_char(text[at])) ++at;
+        return text.substr(start, at - start);
+    }
+
+    std::vector<std::string> list(char separator, char close) {
+        std::vector<std::string> items;
+        while (at < text.size() && text[at] != close) {
+            items.push_back(name());
+            if (at < text.size() && text[at] == separator) ++at;
+        }
+        if (at < text.size()) ++at;
+        return items;
+    }
+
+    std::string body() {
+        if (text.compare(at, 2, "E(") == 0 || text.compare(at, 2, "V(") == 0) {
+            const bool edge = text[at] == 'E';
+            at += 2;
+            auto parts = list('|', ')');
+            if (edge && parts.size() == 2 && parts[1] == "seam") return "seam of " + parts[0];
+            if (edge && parts.size() == 2 && parts[1] == "degenerate") return "pole of " + parts[0];
+            const auto shared = hoist(parts);
+            return shared + (edge ? "edge between " : "vertex between ") + joined_words(parts);
+        }
+        const auto role = atom();
+        if (at < text.size() && text[at] == '(') {
+            ++at;
+            const auto args = joined_words(list(',', ')'));
+            if (role == "side") return "side from " + args;
+            if (role == "lateral") return "edge from " + args;
+            if (role == "start") return "start cap";
+            if (role == "end") return "end cap";
+            if (role == "fillet") return "fillet of " + args;
+            if (role == "chamfer") return "chamfer of " + args;
+            if (role == "corner") return "corner at " + args;
+            if (role == "inner") return "inner " + args;
+            if (role == "offset") return "offset of " + args;
+            return unescape(role) + " of " + args;
+        }
+        return role_words(role);
+    }
+
+    std::string name() {
+        std::string prefix;
+        for (;;) {
+            const auto start = at;
+            const auto tag = atom();
+            if (!tag.empty() && at < text.size() && text[at] == ':') {
+                ++at;
+                prefix += tag_words(tag) + " \u203A ";
+                continue;
+            }
+            at = start;
+            break;
+        }
+        auto words = body();
+        while (at < text.size()) {
+            if (text[at] == '{') {
+                int depth = 0;
+                do {
+                    if (text[at] == '{' || text[at] == '(') depth++;
+                    if (text[at] == '}' || text[at] == ')') depth--;
+                    ++at;
+                } while (at < text.size() && depth > 0);
+                words += " (piece)";
+            } else if ((text[at] == '~' || text[at] == '@') && at + 1 < text.size() &&
+                       std::isdigit(static_cast<unsigned char>(text[at + 1]))) {
+                const bool copy = text[at] == '@';
+                ++at;
+                std::string digits;
+                while (at < text.size() && std::isdigit(static_cast<unsigned char>(text[at]))) digits += text[at++];
+                words += copy ? " (copy " + std::to_string(std::stol(digits) + 1) + ")" : " (" + std::to_string(std::stol(digits) + 1) + ")";
+            } else {
+                break;
+            }
+        }
+        return prefix + words;
+    }
+};
+
+}  // namespace
+
+std::string label(const std::string& name) {
+    LabelReader reader{name};
+    return reader.name();
 }
 
 std::string joined_names(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind) {

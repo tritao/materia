@@ -1,4 +1,5 @@
 import CadKit;
+import cadkit.ElementNames;
 import cadkit.Shape;
 
 /** Topological names seen from Haxe (plans/TOPOLOGICAL_NAMING.md, TN1): the core's names cross the ABI intact. */
@@ -21,9 +22,31 @@ class NamingSmoke {
 		// Face descriptors (what an editor without the B-rep matches mates on) carry the names.
 		var descriptors = cadkit.parametric.GeometricConnectors.describeFaces(stamped);
 		check(descriptors.indexOf('"name":"f3:box.+z"') >= 0, "face descriptors carry names");
+		checkSolidsAliasesLabels();
 		checkDeleted();
 		checkScheme();
 		for (shape in [named, line, again, moved, stamped, box])
+			shape.close();
+	}
+
+	/** Bodies are named, a merged face is found by any of its names, and names read as words (TN9). */
+	static function checkSolidsAliasesLabels():Void {
+		var a = Shape.box(10, 20, 30).stamped("a", []);
+		var b = Shape.box(10, 20, 30).stamped("b", []);
+		var fused = a.fuse(b);
+		check(fused.elementNames(CadKit.ShapeKind.Solid).join(",") == "a:solid",
+			"the fused body keeps a's name: " + fused.elementNames(CadKit.ShapeKind.Solid).join(",") + " / "
+			+ fused.elementAliases(CadKit.ShapeKind.Solid).join(","));
+		var top = fused.elementNames(CadKit.ShapeKind.Face).indexOf("a:box.+z");
+		check(top >= 0 && fused.elementAliases(CadKit.ShapeKind.Face)[top].indexOf("b:box.+z") >= 0, "b's name is an alias");
+		var wanted = cadkit.parametric.TopologyFingerprint.fromData(CadKit.ShapeKind.Face, CadKit.SurfaceKind.Plane,
+			CadKit.CurveKind.Unknown, 1e6, 1e6, 1e6, 0, 0, 1, 1, true, "b:box.+z");
+		var found = cadkit.parametric.TopologyResolver.resolve(fused, wanted, CadKit.ShapeKind.Face);
+		check(found.index == top && found.method == cadkit.parametric.TopologyResolution.ResolutionMethod.Name,
+			"a reference to b's top finds the merged face by its alias");
+		check(ElementNames.label("f7:fillet(E(f3:box.+x|f3:box.+z))") == "f7 \u203A fillet of f3 \u203A edge between right and top",
+			"names read as words: " + ElementNames.label("f7:fillet(E(f3:box.+x|f3:box.+z))"));
+		for (shape in [fused, b, a])
 			shape.close();
 	}
 

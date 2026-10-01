@@ -883,3 +883,54 @@ TN6 (STEP names) stays optional and last.
   mirror-image pieces with identical neighbours. They get weak ordinals by
   position, resolved only when the geometry agrees.
 - MachineKit's full script (examples and the robot-arm motion check) passes.
+
+### 2026-10-01 — TN9 done: aliases, solid names, edge-pick repair, labels
+
+- **Merge aliases** (rule 4 completed). When several sources merge into one
+  face or solid, the smallest name stands and the others, plus any aliases
+  the sources carried, become aliases. They are kept through operations,
+  extraction and stamping (stamped by the same rule as names).
+  - Core: `ElementMap::face_aliases` / `solid_aliases`; ABI:
+    `cad_shape_copy_element_aliases_bytes` ("index<TAB>alias" lines).
+  - Haxe: `Shape.elementAliases`, cached per shape like names.
+  - `TopologyResolver` accepts a unique exact alias match as found by name.
+  - Tested: two identical boxes `a` and `b` fused give faces `a:…` with
+    `b:…` aliases, and a reference to `b:box.+z` finds the merged face.
+- **Solids have names**, tracked like faces.
+  - `solid` for a shape's one body (stamped `f<id>:solid`, instance-tagged
+    in patterns); several unnamed bodies get weak `solid#k`.
+  - OCCT's boolean history does not link a fused body to its inputs, so a
+    solid that history leaves unnamed is named after the input solids whose
+    faces bound it ("identity follows the boundary"). The smallest such name
+    stands; the others become aliases.
+  - `cad_shape_copy_element_names_bytes` accepts `CAD_SHAPE_SOLID`.
+  - References to solids (body picking) are not wired yet.
+- **Readable labels.** `naming::label` / `cad_element_name_label_bytes` /
+  `ElementNames.label` read a name as words: roles (`box.+z` → top,
+  `cyl.side` → side), generated faces ("fillet of …", "side from …"),
+  edges ("edge between right and top"), splits ("(piece)"), copies
+  ("copy 2"). Feature tags stay as `f3 › `, and a tag shared by all parts
+  of an edge or vertex is hoisted ("f3 › edge between right and top").
+  `EditorScene.elementLabel` swaps the tags for the features as the tree
+  shows them ("box 2 › top (piece)"). Used for the picked face or edge in
+  the inspector, and for every repair and pending-choice candidate
+  ("box 2 › top (piece) · planar face at (44, 20, 10), 1040 mm²"). Labels
+  are display only; nothing stores or parses them.
+- **Repair by picking, for any reference.** Each reference issue says
+  whether the current pick can replace it (`pickable`; faces through the
+  face pick, edges through the edge pick). The inspector shows "Use the
+  selected face/edge". The pick lies on the part's output while the
+  reference may point into an earlier feature, so it must resolve on the
+  reference's producer, and the reference takes the producer's name for it.
+- **Tests:**
+  - Core: solids, aliases from a real merge, labels.
+  - `NamingSmoke`: alias resolution, labels.
+  - App: candidates read "box N › top (piece)"; a picked face is offered to
+    the broken support reference; `edgePickRepairWorkflow` repairs a broken
+    fillet edge by picking the untouched top/back edge (named
+    `E(f…:box.+y|f…:box.+z)`) and undoes it.
+  - All suites pass: core (naming, core, modeling), the full CadKit Haxe
+    smoke, MachineKit, and all app suites.
+- **Cost:** the core benchmark still reports naming at 4.2–4.6% of OCCT
+  time (release). The TN0 edited-recompute total is 80–96 ms against a
+  release core, as before; a debug core shows more.

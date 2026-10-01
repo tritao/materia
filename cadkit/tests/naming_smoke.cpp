@@ -401,6 +401,51 @@ void check_matching() {
            tag("E(f1:box.+x|f1:box.+z)").empty());
 }
 
+
+std::string bytes_text(cad_result (*copy)(cad_shape, cad_shape_kind, std::uint8_t*, std::uint32_t*), cad_shape shape,
+                       cad_shape_kind kind) {
+    std::uint32_t capacity = 0;
+    copy(shape, kind, nullptr, &capacity);
+    std::string text(capacity, '\0');
+    assert(copy(shape, kind, reinterpret_cast<std::uint8_t*>(text.data()), &capacity) == CAD_OK);
+    return text;
+}
+
+std::string label_of(const char* name) {
+    std::uint32_t capacity = 0;
+    cad_element_name_label_bytes(name, nullptr, &capacity);
+    std::string text(capacity, '\0');
+    assert(cad_element_name_label_bytes(name, reinterpret_cast<std::uint8_t*>(text.data()), &capacity) == CAD_OK);
+    return text;
+}
+
+// Bodies have names; merged elements keep their other names as aliases; names read as words.
+void check_solids_aliases_labels() {
+    auto block = tagged(box(), "a");
+    assert(names(block, CAD_SHAPE_SOLID) == (std::vector<std::string>{"a:solid"}));
+    cad_shape twin = 0, fused = 0, apart = 0, both = 0;
+    assert(cad_box(10, 20, 30, &twin) == CAD_OK);
+    twin = tagged(twin, "b");
+    // Two identical bodies fused: every face is both a's and b's; a's names stand, b's become aliases.
+    assert(cad_fuse(block, twin, &fused) == CAD_OK);
+    assert(contains(name_set(fused, CAD_SHAPE_FACE), "a:box.+z") && names(fused, CAD_SHAPE_SOLID).size() == 1);
+    const auto aliases = bytes_text(cad_shape_copy_element_aliases_bytes, fused, CAD_SHAPE_FACE);
+    assert(aliases.find("\tb:box.+z\n") != std::string::npos);
+    // Bodies kept apart keep their own names.
+    apart = moved(twin, cad_vec3{50, 0, 0});
+    cad_shape_ref refs[2] = {{block}, {apart}};
+    assert(cad_compound(refs, 2, &both) == CAD_OK);
+    assert(name_set(both, CAD_SHAPE_SOLID) == (std::set<std::string>{"a:solid", "b:solid"}));
+    for (auto shape : {both, apart, fused, block}) cad_shape_destroy(shape);
+
+    assert(label_of("f7:fillet(E(f3:box.+x|f3:box.+z))") == "f7 \u203A fillet of f3 \u203A edge between right and top");
+    assert(label_of("E(f3:box.+x|f4:cyl.side)") == "edge between f3 \u203A right and f4 \u203A side");
+    assert(label_of("f4:i1:f2:cyl.top") == "f4 \u203A copy 2 \u203A f2 \u203A top");
+    assert(label_of("f1:box.+z{f1:box.-x,f3:box.-x}") == "f1 \u203A top (piece)");
+    assert(label_of("f2:side(f1:e.rectangle.edge1)") == "f2 \u203A side from f1 \u203A edge rectangle.edge1");
+    assert(label_of("bore:cyl.side@1") == "bore \u203A side (copy 2)");
+}
+
 }  // namespace
 
 int main() {
@@ -412,6 +457,7 @@ int main() {
     check_unadapted();
     check_operations();
     check_matching();
+    check_solids_aliases_labels();
     std::puts("cadkit naming smoke passed");
     return 0;
 }
