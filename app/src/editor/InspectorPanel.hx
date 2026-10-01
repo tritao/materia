@@ -71,6 +71,14 @@ class InspectorPanel {
       if (jointLines.length > 0)
         rows.push(new KeyedView("assembly-joints", textLines("assembly-joint-lines", jointLines)));
     }
+    if (StringTools.startsWith(selected.id, "project:")) {
+      // When the part's mates leave it one turn or slide, offer the joint they amount to.
+      var mateJoint = session.assemblyMateJoint(selected.id);
+      var mateJointType = mateJoint == null ? null : mateJoint.type;
+      if (mateJointType != null)
+        rows.push(new KeyedView("convert-mates-to-joint", sceneAction("convert-mates-to-joint", "assembly.convert-to-joint",
+          "Make " + mateJointType + " joint", IconName.Plus)));
+    }
     if (scene.hasActiveSketchEdit()) {
       var summary = scene.sketchEditSummary();
       if (summary != null)

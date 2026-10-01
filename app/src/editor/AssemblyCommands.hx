@@ -13,6 +13,22 @@ class AssemblyCommands {
 		registerMate(app, "assembly.mate-coaxial", "Mate faces: Coaxial", AssemblyMateKind.Coaxial);
 		registerMate(app, "assembly.mate-parallel", "Mate faces: Parallel", AssemblyMateKind.Parallel);
 		registerMate(app, "assembly.mate-perpendicular", "Mate faces: Perpendicular", AssemblyMateKind.Perpendicular);
+		app.commands.register(new Command("assembly.convert-to-joint", "Make the mates a joint", function() {
+			var id = app.scene.selectedId;
+			if (id == null) return;
+			try {
+				var joint = app.session.convertMatesToJoint(id);
+				app.log("Mates replaced by joint " + joint);
+			} catch (error:Dynamic) {
+				app.log("Could not make a joint: " + Std.string(error));
+			}
+			app.documentChanged();
+		}, null, function() {
+			var id = app.scene.selectedId;
+			if (id == null || !app.canEditObjects()) return false;
+			var joint = app.session.assemblyMateJoint(id);
+			return joint != null && joint.type != null;
+		}));
 	}
 
 	static function registerMate(app:ReferenceEditorApp, id:String, label:String, kind:AssemblyMateKind):Void {

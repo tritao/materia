@@ -766,6 +766,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
         "assembly.mate-coaxial",
         "assembly.mate-parallel",
         "assembly.mate-perpendicular",
+        "assembly.convert-to-joint",
         "scene.toggle-grid",
         "scene.toggle-grid-snap",
         "scene.grid-spacing-0.1",

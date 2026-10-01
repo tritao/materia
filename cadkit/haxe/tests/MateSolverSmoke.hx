@@ -1,4 +1,6 @@
 import cadkit.modeling.AssemblyMateDrag;
+import cadkit.modeling.AssemblyMateJoints;
+import cadkit.modeling.AssemblyMateJoints.AssemblyMateJointConversion;
 import cadkit.modeling.AssemblyMateSolver;
 import cadkit.modeling.AssemblyState;
 import materia.assembly.AssemblyDefinition;
@@ -28,6 +30,7 @@ class MateSolverSmoke {
 
 		checkDocuments(seated);
 		checkDrag(AssemblyMateSolver.place(seated, result));
+		checkJoints(AssemblyMateSolver.place(seated, result));
 
 		// Locked: fully placed, exactly on the target frame.
 		var locked = motorOnBracket([mate("weld", AssemblyMateKind.Lock)]);
@@ -115,6 +118,59 @@ class MateSolverSmoke {
 		var refused = false;
 		try new AssemblyMateDrag(placed, start, "bracket", new kinematicskit.Vector3(0, 0, 0)) catch (_:Dynamic) refused = true;
 		check(refused, "the grounded bracket is not dragged");
+	}
+
+	/**
+		Mates to joints (plan C4.5e): planar + coaxial leave the motor a turn about its shaft, which becomes a
+		revolute joint that keeps the placement at 0 and turns the motor about the shaft; coaxial + parallel x axes
+		leave a slide (prismatic); coaxial alone leaves two motions, which make no joint.
+	*/
+	static function checkJoints(placed:AssemblyDefinition):Void {
+		var start = new AssemblyState(placed).record();
+		var revolute = AssemblyMateJoints.infer(placed, start, "motor");
+		check(revolute.type == AssemblyJointType.Revolute && revolute.parent == "bracket", 'planar + coaxial is a revolute joint: ${revolute.reason}');
+		near(revolute.point[0], 40, "on the shaft (x)");
+		near(revolute.point[1], -20, "on the shaft (y)");
+		near(Math.abs(revolute.axis[2]), 1, "about z");
+		var conversion = AssemblyMateJoints.convert(placed, start, revolute, "hinge");
+		var jointed = withJoint(placed, conversion);
+		var state = new AssemblyState(jointed);
+		var before = new AssemblyState(placed).worldPose("motor"), at = state.worldPose("motor");
+		near(at.x, before.x, "the joint keeps the placement (x)");
+		near(at.y, before.y, "the joint keeps the placement (y)");
+		near(at.z, before.z, "the joint keeps the placement (z)");
+		near(Math.abs(at.qx * before.qx + at.qy * before.qy + at.qz * before.qz + at.qw * before.qw), 1, "and the turn");
+		state.setJoint("hinge", 0.7);
+		var turned = state.worldConnector("motor", "flange");
+		near(turned.x, 40, "turning the joint keeps the flange on the shaft (x)");
+		near(turned.z, 100, "and on the face");
+
+		var sliding = motorOnBracket([mate("shaft", AssemblyMateKind.Coaxial, "bore", "axis"),
+			{id: "square", kind: AssemblyMateKind.Parallel, first: "bracket", firstConnector: "face", second: "motor", secondConnector: "flange",
+				axis: {x: 1, y: 0, z: 0}}]);
+		var slid = AssemblyMateSolver.place(sliding, AssemblyMateSolver.solve(sliding));
+		var prismatic = AssemblyMateJoints.infer(slid, new AssemblyState(slid).record(), "motor");
+		check(prismatic.type == AssemblyJointType.Prismatic, 'coaxial + parallel x axes is a prismatic joint: ${prismatic.reason}');
+		near(Math.abs(prismatic.axis[2]), 1, "along z");
+
+		var loose = motorOnBracket([mate("shaft", AssemblyMateKind.Coaxial, "bore", "axis")]);
+		var looseState = AssemblyMateSolver.place(loose, AssemblyMateSolver.solve(loose));
+		var none = AssemblyMateJoints.infer(looseState, new AssemblyState(looseState).record(), "motor");
+		check(none.type == null && none.reason.indexOf("2 motions") >= 0, 'coaxial alone makes no joint: ${none.reason}');
+	}
+
+	/** `definition` with `conversion`'s joint and connectors, without the mates it replaces. */
+	static function withJoint(definition:AssemblyDefinition, conversion:AssemblyMateJointConversion):AssemblyDefinition {
+		var copy = AssemblyDefinitionCodec.decode(AssemblyDefinitionCodec.encode(definition));
+		for (component in copy.definitions) {
+			if (component.id == conversion.parentComponent) component.connectors.push(conversion.parentConnector);
+			if (component.id == conversion.childComponent) component.connectors.push(conversion.childConnector);
+		}
+		copy.joints.push(conversion.joint);
+		var mates = copy.mates == null ? [] : copy.mates;
+		copy.mates = [for (mate in mates) if (conversion.mates.indexOf(mate.id) < 0) mate];
+		AssemblyDefinitionCodec.validate(copy);
+		return copy;
 	}
 
 	/** Mates and grounded occurrences survive assembly documents and a document save and reload. */

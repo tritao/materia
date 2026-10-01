@@ -430,6 +430,56 @@ class ProjectSourceTests {
     check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'removing it settles the mates: ${session.assemblyMateStatus()}');
     check(seat != shaft, "mates get distinct ids");
     checkMatePick(manifest, generated);
+    checkMateJoint(manifest, generated);
+  }
+
+  /**
+   * Mates to a joint (plan C4.5e): a seated pin's planar and coaxial mates leave it one turn, which becomes a
+   * revolute joint from the plate; the pin keeps its place and turns on the joint; the joint and its coordinate
+   * survive a save and reopen; undo brings the mates back.
+   */
+  static function checkMateJoint(manifest:String, generated:MateriaProjectRunner.GeneratedAssemblyScene):Void {
+    var descriptors = generated.faceDescriptorsByDefinition;
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+      generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
+      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, descriptors);
+    var top = describedFace(descriptors, "plate", "plane", 1), bore = describedFace(descriptors, "plate", "axis", 0);
+    var base = describedFace(descriptors, "pin", "plane", -1), side = describedFace(descriptors, "pin", "axis", 0);
+    session.addAssemblyFaceMate(AssemblyMateKind.Planar, "project:plate", top, "project:pin", base);
+    var single = session.assemblyMateJoint("project:pin");
+    check(single != null && single.type == null, "one planar mate is not a joint");
+    session.addAssemblyFaceMate(AssemblyMateKind.Coaxial, "project:plate", bore, "project:pin", side);
+    var inferred = session.assemblyMateJoint("project:pin");
+    check(inferred != null && inferred.type == materia.assembly.AssemblyDefinition.AssemblyJointType.Revolute,
+      'planar + coaxial make a revolute joint: ${inferred == null ? "none" : inferred.reason}');
+    var generationBefore = session.generation;
+    var jointId = session.convertMatesToJoint("project:pin");
+    var definition = session.projectAssemblyDefinition;
+    check(definition != null && [for (joint in definition.joints) if (joint.id == jointId && joint.parent == "plate" && joint.child == "pin") joint].length == 1,
+      "the joint joins the plate and the pin");
+    check(session.assemblyMates.mates.length == 0 && session.assemblyMates.joints.length == 1, "the joint replaces the mates");
+    check(session.generation != generationBefore, "the assembly's structure changed");
+    expectPin(session, 30, 20, 10, "the jointed pin keeps its place");
+    check(session.setAssemblyJointCoordinate(jointId, 0.5), "the joint turns");
+    expectPin(session, 30, 20, 10, "turning it keeps the pin in the bore");
+
+    var output = "/tmp/materia-pin-plate-joint-" + Sys.getPid() + ".materia.json";
+    session.save(output);
+    var reopened = new ProjectDocumentSession(null, false);
+    reopened.open(output);
+    FileSystem.deleteFile(output);
+    var reopenedDefinition = reopened.projectAssemblyDefinition, reopenedState = reopened.projectAssemblyState;
+    if (reopenedDefinition == null || reopenedState == null) throw "the reopened project has no assembly";
+    check([for (joint in reopenedDefinition.joints) if (joint.id == jointId) joint].length == 1, "the joint survives a save and reopen");
+    var coordinate = [for (value in reopenedState.jointCoordinates) if (value.joint == jointId) value.value];
+    check(coordinate.length == 1 && Math.abs(coordinate[0] - 0.5) < 1e-9, 'and so does its coordinate: $coordinate');
+
+    check(session.document.undo() && session.document.undo(), "the turn and the conversion undo");
+    check(session.assemblyMates.mates.length == 2 && session.assemblyMates.joints.length == 0, "undo brings the mates back");
+    var restored = session.projectAssemblyDefinition;
+    check(restored != null && [for (joint in restored.joints) if (joint.id == jointId) joint].length == 0, "and removes the joint");
+    expectPin(session, 30, 20, 10, "the pin is where the mates put it");
   }
 
   /**

@@ -994,3 +994,36 @@ Steps:
     follows and stays in it; undo and redo; the grounded plate refuses.
 - Limit: for definitions with nested assemblies the drag and solve report
   flattened ids, and `merge` refuses them (as `place` already did).
+
+**e (done).** Convert to joint:
+- `cadkit.modeling.AssemblyMateJoints.infer` is for a free root mated to one
+  other part. It takes the null space of its mates' rows over the part's six
+  rigid-body columns: the eigenvectors of JᵀJ by Jacobi rotations, with the
+  translation columns scaled by the assembly scale.
+  - One free motion: a pure slide makes a prismatic joint along it; a turn
+    with no pitch makes a revolute joint through `o + ω×v/|ω|²`.
+  - Otherwise none, with the reason: fixed, several motions, a screw motion,
+    mated to more than one part, or already on a joint.
+- `convert` builds the tree joint (coordinate 0 at the current placement)
+  and its two connectors, `<joint>-parent` and `<joint>-child`, z along the
+  axis.
+- In the editor the overlay gains joints (`withJoint` swaps out the mates it
+  replaces; pruning keeps connectors that a joint names). The session's
+  runtime definition is now the generated definition plus the overlay.
+  - `overlayDefinition` reframes and lays the overlay before a saved state
+    is decoded, on open and on recipe refresh.
+  - Mate edits keep the definition in step with the overlay.
+  - `convertMatesToJoint` is one undoable edit that changes the structure
+    (the hierarchy rebuilds); the converted part then moves, drags and
+    simulates on its joint.
+  - Command `assembly.convert-to-joint`, plus an inspector button "Make
+    revolute joint" when the selected part's mates make one.
+- haxeon `3de4d97a`: a try body may be a bare `return`.
+- Tests:
+  - `MateSolverSmoke.checkJoints`: planar + coaxial → revolute that keeps
+    the placement and turns about the shaft; coaxial + parallel x axes →
+    prismatic along z; coaxial alone → none ("2 motions").
+  - `ProjectSourceTests.checkMateJoint`: a single planar mate makes no
+    joint; with the coaxial mate a revolute joint plate→pin; the pin keeps
+    its place and turns on the joint; joint and coordinate survive save and
+    reopen; undo restores the mates.

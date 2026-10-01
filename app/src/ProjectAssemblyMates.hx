@@ -9,6 +9,7 @@ import haxeon.wire.JsonWire;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
 import materia.assembly.AssemblyDefinition.AssemblyStateRecord;
+import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyRecord.AssemblyConnector;
 
@@ -22,6 +23,8 @@ import materia.assembly.AssemblyRecord.AssemblyConnector;
 @:wire typedef AssemblyMateOverlayRecord = {
 	@:id(1) var connectors:Array<AssemblyOverlayConnector>;
 	@:id(2) var mates:Array<AssemblyMate>;
+	/** Joints made from mates (see `ProjectAssemblyMates.withJoint`). */
+	@:id(3) @:optional var joints:Array<KinematicJoint>;
 }
 
 /**
@@ -36,10 +39,12 @@ import materia.assembly.AssemblyRecord.AssemblyConnector;
 class ProjectAssemblyMates {
 	public final connectors:Array<AssemblyOverlayConnector>;
 	public final mates:Array<AssemblyMate>;
+	public final joints:Array<KinematicJoint>;
 
-	public function new(?connectors:Array<AssemblyOverlayConnector>, ?mates:Array<AssemblyMate>) {
+	public function new(?connectors:Array<AssemblyOverlayConnector>, ?mates:Array<AssemblyMate>, ?joints:Array<KinematicJoint>) {
 		this.connectors = connectors == null ? [] : connectors.copy();
 		this.mates = mates == null ? [] : mates.copy();
+		this.joints = joints == null ? [] : joints.copy();
 	}
 
 	public static function empty():ProjectAssemblyMates
@@ -48,16 +53,17 @@ class ProjectAssemblyMates {
 	public static function decode(text:Null<String>):ProjectAssemblyMates {
 		if (text == null || text.length == 0) return empty();
 		var record:AssemblyMateOverlayRecord = JsonWire.decode(text);
-		return new ProjectAssemblyMates(record.connectors, record.mates);
+		return new ProjectAssemblyMates(record.connectors, record.mates, record.joints);
 	}
 
 	public function encode():String {
 		var record:AssemblyMateOverlayRecord = {connectors: connectors, mates: mates};
+		if (joints.length > 0) record.joints = joints;
 		return JsonWire.encode(record);
 	}
 
 	public function isEmpty():Bool
-		return mates.length == 0 && connectors.length == 0;
+		return mates.length == 0 && connectors.length == 0 && joints.length == 0;
 
 	/** The generated definition with this overlay's connectors and mates added; validated, with the mates checked against their faces. */
 	public function effective(generated:AssemblyDefinition):AssemblyDefinition {
@@ -73,6 +79,7 @@ class ProjectAssemblyMates {
 			}
 			if (!found) throw 'The project no longer has component "${added.component}"';
 		}
+		for (joint in joints) copy.joints.push(joint);
 		if (mates.length > 0) {
 			var all = copy.mates == null ? [] : copy.mates.copy();
 			for (mate in mates) all.push(mate);
@@ -98,7 +105,7 @@ class ProjectAssemblyMates {
 			for (component in framed.definitions) if (component.id == added.component)
 				for (connector in component.connectors) if (connector.name == added.connector.name)
 					next.push({component: added.component, connector: connector});
-		return new ProjectAssemblyMates(next, mates);
+		return new ProjectAssemblyMates(next, mates, joints);
 	}
 
 	/**
@@ -112,7 +119,7 @@ class ProjectAssemblyMates {
 		var connector = GeometricConnectors.captureDescribed(name, descriptors, faceIndex);
 		var next = connectors.copy();
 		next.push({component: component, connector: connector});
-		return {name: name, overlay: new ProjectAssemblyMates(next, mates)};
+		return {name: name, overlay: new ProjectAssemblyMates(next, mates, joints)};
 	}
 
 	/** The feature face `faceIndex` offers a mate, from its component's `descriptors`; null when it offers none. */
@@ -137,14 +144,28 @@ class ProjectAssemblyMates {
 		for (existing in mates) if (existing.id == mate.id) throw 'A mate named "${mate.id}" already exists';
 		var next = mates.copy();
 		next.push(mate);
-		return new ProjectAssemblyMates(connectors, next);
+		return new ProjectAssemblyMates(connectors, next, joints);
 	}
 
 	/** This overlay without mate `id`, and without the face connectors no remaining mate names. */
 	public function withoutMate(id:String):ProjectAssemblyMates {
 		var next = [for (mate in mates) if (mate.id != id) mate];
 		if (next.length == mates.length) throw 'There is no mate named "$id"';
-		return new ProjectAssemblyMates([for (added in connectors) if (usedBy(added, next)) added], next);
+		return new ProjectAssemblyMates([for (added in connectors) if (usedBy(added, next, joints)) added], next, joints);
+	}
+
+	/**
+		This overlay with `conversion`'s joint (and the connectors it needs) in place of the mates it replaces; the
+		face connectors only those mates named go too.
+	*/
+	public function withJoint(conversion:cadkit.modeling.AssemblyMateJoints.AssemblyMateJointConversion):ProjectAssemblyMates {
+		var remaining = [for (mate in mates) if (conversion.mates.indexOf(mate.id) < 0) mate];
+		var nextJoints = joints.copy();
+		nextJoints.push(conversion.joint);
+		var kept = [for (added in connectors) if (usedBy(added, remaining, nextJoints)) added];
+		kept.push({component: conversion.parentComponent, connector: conversion.parentConnector});
+		kept.push({component: conversion.childComponent, connector: conversion.childConnector});
+		return new ProjectAssemblyMates(kept, remaining, nextJoints);
 	}
 
 	/** A mate id not yet used, from `prefix`. */
@@ -160,19 +181,20 @@ class ProjectAssemblyMates {
 	}
 
 	/**
-		Places the parts by the generated assembly's mates and this overlay's, starting from `state`; the result
-		keeps every coordinate the mates did not move (`merged`).
+		Places the parts by the generated assembly's mates and this overlay's, starting from `state` (a configuration of
+		`effective(generated)`); the result keeps every coordinate the mates did not move.
 	*/
 	public function solve(generated:AssemblyDefinition, state:AssemblyStateRecord):{result:AssemblyMateSolveResult, state:AssemblyStateRecord} {
 		var definition = effective(generated);
 		var result = AssemblyMateSolver.solve(definition, state);
-		return {result: result, state: AssemblyMateSolver.merge(generated, state, result.rootPoses, result.jointCoordinates)};
+		return {result: result, state: AssemblyMateSolver.merge(definition, state, result.rootPoses, result.jointCoordinates)};
 	}
 
-	/** Whether a remaining mate names `added` (on any occurrence of its component). */
-	static function usedBy(added:AssemblyOverlayConnector, remaining:Array<AssemblyMate>):Bool {
-		for (mate in remaining)
-			if (mate.firstConnector == added.connector.name || mate.secondConnector == added.connector.name) return true;
+	/** Whether a remaining mate or joint names `added` (on any occurrence of its component). */
+	static function usedBy(added:AssemblyOverlayConnector, remaining:Array<AssemblyMate>, joints:Array<KinematicJoint>):Bool {
+		var name = added.connector.name;
+		for (mate in remaining) if (mate.firstConnector == name || mate.secondConnector == name) return true;
+		for (joint in joints) if (joint.parentConnector == name || joint.childConnector == name) return true;
 		return false;
 	}
 }
