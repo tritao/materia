@@ -227,8 +227,7 @@ class HumanKitTests {
 		// The checks that name no joints hold on the library character too.
 		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
 		var againRig = HumanoidRig.detect(again);
-		// The library character's ankle rolls heel to toe through a stance, which this reads as a slide of about 15 cm.
-		naturalness(scene, again, againRig, "library", 0.2);
+		naturalness(scene, again, againRig, "library", 0.1);
 		walking(scene, again, againRig);
 		elbowStaysPut(scene, again, againRig);
 		leaning(scene, again, againRig);
@@ -859,7 +858,8 @@ class HumanKitTests {
 		body.walker.follow([[0.0, 0.0], [20.0, 0.0]], 1.0);
 		for (index in 0...360) {
 			body.advance(step);
-			if (index >= 60) walking.sample(body, step);
+			// Once the body is up to speed: getting there drags a planted foot (see BODY.md), which is not the gait's doing.
+			if (index >= 90) walking.sample(body, step);
 		}
 		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
 			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
