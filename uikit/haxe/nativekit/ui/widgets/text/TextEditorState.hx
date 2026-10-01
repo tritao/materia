@@ -370,6 +370,19 @@ class TextEditorState {
 			previousCompositionStart != compositionStart || previousCompositionEnd != compositionEnd;
 	}
 
+	/** Imports an external anchored selection only when its logical value differs. */
+	public function setAnchoredSelection(value:TextSelection):Bool {
+		ensureLive();
+		if (value == null) throw "Anchored selection is required";
+		if (value.anchor == selectionAnchor && value.focus == selectionFocus &&
+			value.anchorAffinity == selectionAnchorAffinity && value.focusAffinity == selectionFocusAffinity)
+			return false;
+		placeCaret(value.anchor, false, value.anchorAffinity);
+		placeCaret(value.focus, true, value.focusAffinity);
+		resetCaretBlink(Sys.time());
+		return true;
+	}
+
 	public function setSelection(start:Int, end:Int, ?focusAffinity:Int = 0):Bool {
 		ensureLive();
 		var count = offsets.codepointCount;

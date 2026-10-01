@@ -56,6 +56,10 @@ class TextField implements View {
 	public var decorationProvider:Null<(Int, Int)->Array<TextDecoration>>;
 	/** Increment when state captured by presentation providers changes. */
 	public var presentationRevision:Int = 0;
+	/** Optional controlled selection, queried on rebuild after shared-document synchronization. */
+	public var selectionProvider:Null<Void->TextSelection>;
+	/** Reports widget selection after edit callbacks have synchronized a caller-owned document. */
+	public var onSelectionChange:Null<TextSelection->Void>;
 	/** Typed selector classes used by composite fields such as ComboBox. */
 	public var classes:Array<String>;
 	public var enabled:Bool;
@@ -91,6 +95,8 @@ class TextField implements View {
 		this.onSubmit = null;
 		this.colorRangeProvider = null;
 		this.decorationProvider = null;
+		this.selectionProvider = null;
+		this.onSelectionChange = null;
 		this.label = label;
 		this.placeholder = null;
 		this.multiline = multiline;
@@ -149,6 +155,8 @@ class TextField implements View {
 				if (editor.tailFollowing)
 					editor.scrollToEnd();
 			}
+			if (selectionProvider != null)
+				editor.setAnchoredSelection(selectionProvider());
 			editor.updateStyle(resolved.textStyle, resolved.paragraphStyle);
 			editor.configurePresentation(colorRangeProvider, decorationProvider, presentationRevision);
 
@@ -286,7 +294,7 @@ class TextField implements View {
 			}
 			node.add(editorContent);
 
-			var updateState = function() {
+			var refreshState = function() {
 				if (document == null || onChange != null)
 					value = editor.layoutText();
 				semantics.setValueProvider(function() return editor.text, editor.documentLength());
@@ -297,13 +305,26 @@ class TextField implements View {
 					editor.ensureCaretVisible(editorContent.resolved.height))
 					refresh();
 			};
+			var publishSelection = function() {
+				var handler = onSelectionChange;
+				if (handler != null)
+					handler(new TextSelection(editor.selectionAnchor, editor.selectionFocus,
+						editor.selectionAnchorAffinity, editor.selectionFocusAffinity));
+			};
+			var updateState = function() {
+				publishSelection();
+				refreshState();
+			};
 			var publishTextChange = function(previousRevision:Int) {
-				updateState();
+				if (document == null || onChange != null)
+					value = editor.layoutText();
 				if (editor.documentRevision() != previousRevision &&
 					editor.lastEditTransaction != null && onEdit != null)
 					onEdit(editor.lastEditTransaction);
 				if (editor.documentRevision() != previousRevision && onChange != null)
 					onChange(value);
+				publishSelection();
+				refreshState();
 			};
 			var publishDiagnostics = function(caretRect:Null<Rect>) {
 				if (onDiagnostics == null)

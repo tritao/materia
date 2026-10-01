@@ -146,6 +146,7 @@ import nativekit.ui.widgets.text.TextEditorHistoryKind;
 import nativekit.ui.widgets.text.TextEditorDiagnostics;
 import nativekit.ui.widgets.text.TextArea;
 import nativekit.ui.widgets.text.TextField;
+import nativekit.ui.widgets.text.TextSelection;
 import nativekit.ui.widgets.text.EditTransaction;
 import nativekit.editorkit.TextDocument;
 import nativekit.ui.widgets.layout.Spacer;
@@ -602,6 +603,33 @@ class FrameworkSmoke {
 		if (sharedEditor.text != "external update" || sharedEditor.selectionEnd >
 			sharedDocument.codepointCount)
 			return 295;
+		var controlledDocument = new TextDocument("a🙂bc");
+		var controlledSelection = new TextSelection(4, 1);
+		var editDelivered = false;
+		var callbackOrdered = true;
+		var controlledField = TextField.withDocument("controlled-selection", controlledDocument,
+			function(_) { editDelivered = true; });
+		controlledField.selectionProvider = function() return controlledSelection;
+		controlledField.onSelectionChange = function(next) {
+			if (controlledDocument.text == "ax" && !editDelivered) callbackOrdered = false;
+			controlledSelection = next;
+		};
+		var controlledRoot = context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		var controlledState:State<TextEditorState> = context.buildContext.existingState(controlledRoot.id);
+		var controlledEditor:TextEditorState = cast controlledState.value;
+		if (controlledEditor.selectionAnchor != 4 || controlledEditor.selectionFocus != 1)
+			return 340;
+		context.focusWidget(controlledRoot.id);
+		context.text(UiEventKind.TextInput, "x");
+		if (controlledDocument.text != "ax" || !callbackOrdered || !editDelivered ||
+			controlledSelection.anchor != 2 || controlledSelection.focus != 2)
+			return 341;
+		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		if (controlledEditor.selectionFocus != 2) return 342;
+		controlledSelection = new TextSelection(0, 0);
+		context.submit(controlledField, new LayoutFrame(256.0, 192.0));
+		context.key(UiEventKind.KeyDown, UiKey.Right, UiModifier.Shift);
+		if (controlledSelection.anchor != 0 || controlledSelection.focus != 1) return 343;
 		var sharedArea = TextArea.withDocument("shared-document-area",
 			new TextDocument("multiline"));
 		if (!sharedArea.multiline)
