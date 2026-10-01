@@ -8,7 +8,7 @@
     "processing_allowance_ns": 2000000,
     "layout": "layout.json",
     "schema_lock": "../../schema/device_wire6.lock.json",
-    "fingerprint": "2ea3ce33ffa7db390793023729efa140",
+    "fingerprint": "637c4a8593abdd0c100f88077688955d",
     "target_error": 1e-06,
     "step_tick_hz": 40000,
     "link_loss_timeout_ns": 500000000,

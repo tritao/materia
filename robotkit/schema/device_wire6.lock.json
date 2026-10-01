@@ -219,10 +219,10 @@
         {
           "length": 1,
           "name": "received_bytes",
-          "type": "u32"
+          "type": "u64"
         }
       ],
-      "size": 56
+      "size": 60
     },
     "Segment6Coefficients": {
       "endian": "little",

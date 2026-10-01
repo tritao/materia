@@ -28,8 +28,8 @@ pub struct VirtualDevice {
     host_ns: u64,
     last_publish_ns: u64,
     outbox: VecDeque<Vec<u8>>,
-    /// Bytes received since the session began, wrapping, as the status reports them.
-    received_bytes: u32,
+    /// Bytes received since the session began, as the status reports them.
+    received_bytes: u64,
 }
 
 impl VirtualDevice {
@@ -84,7 +84,7 @@ impl VirtualDevice {
 
     pub fn feed(&mut self, frame: &[u8]) -> bool {
         // Every byte off the line counts, valid or not: the host measures what is in flight by it.
-        self.received_bytes = self.received_bytes.wrapping_add(frame.len() as u32);
+        self.received_bytes += frame.len() as u64;
         let Ok((kind, payload)) = decode_frame6(frame) else {
             return false;
         };

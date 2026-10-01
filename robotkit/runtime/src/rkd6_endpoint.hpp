@@ -96,8 +96,8 @@ private:
     /** The owner time last seen, and when the line finishes sending what was given to it. */
     std::uint64_t now_ns_ = 0;
     std::uint64_t link_free_at_ns_ = 0;
-    /** Bytes sent since the session began, wrapping; the device's status reports how many arrived. */
-    std::uint32_t sent_bytes_ = 0;
+    /** Bytes sent since the session began; the device's status reports how many arrived. */
+    std::uint64_t sent_bytes_ = 0;
     /** When the last status arrived, and whether one has. */
     std::uint64_t status_at_ns_ = 0;
     bool has_status_ = false;
@@ -129,6 +129,8 @@ private:
         std::int64_t shift_ticks;
     };
     std::vector<ChunkTiming> chunk_timings_;
+    /** Events sent and not yet passed, to resend when a replacement reopens their stretch. */
+    std::vector<device_wire6::Event6> sent_events_;
     /** Device ticks of the queued path at `path_ns`, or 0 when no chunk covers it. */
     std::uint64_t device_ticks_at(std::uint64_t path_ns) const noexcept;
     struct PlanTag {

@@ -1041,7 +1041,7 @@ inline bool decode(std::span<const std::uint8_t> input, Commit6 &value) {
     return true;
 }
 
-inline constexpr std::size_t QueueStatus6_SIZE = 56;
+inline constexpr std::size_t QueueStatus6_SIZE = 60;
 struct QueueStatus6 {
     static constexpr std::size_t SIZE = QueueStatus6_SIZE;
     std::uint64_t queue_revision{};
@@ -1055,7 +1055,7 @@ struct QueueStatus6 {
     std::uint8_t underflow{};
     std::uint8_t fault{};
     std::uint64_t received_until_ticks{};
-    std::uint32_t received_bytes{};
+    std::uint64_t received_bytes{};
 };
 
 inline bool encode(const QueueStatus6 &value, std::span<std::uint8_t> out) {
@@ -1124,11 +1124,15 @@ inline bool encode(const QueueStatus6 &value, std::span<std::uint8_t> out) {
     out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 40);
     out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 48);
     out[offset++] = static_cast<std::uint8_t>(bits_received_until_ticks >> 56);
-    const std::uint32_t bits_received_bytes = static_cast<std::uint32_t>(value.received_bytes);
+    const std::uint64_t bits_received_bytes = static_cast<std::uint64_t>(value.received_bytes);
     out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 0);
     out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 8);
     out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 16);
     out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 24);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 32);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 40);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 48);
+    out[offset++] = static_cast<std::uint8_t>(bits_received_bytes >> 56);
     return true;
 }
 
@@ -1209,11 +1213,15 @@ inline bool decode(std::span<const std::uint8_t> input, QueueStatus6 &value) {
     bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 48;
     bits_received_until_ticks |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.received_until_ticks = bits_received_until_ticks;
-    std::uint32_t bits_received_bytes = 0;
-    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 0;
-    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 8;
-    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 16;
-    bits_received_bytes |= static_cast<std::uint32_t>(input[offset++]) << 24;
+    std::uint64_t bits_received_bytes = 0;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 0;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 8;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 16;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 24;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 32;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 40;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 48;
+    bits_received_bytes |= static_cast<std::uint64_t>(input[offset++]) << 56;
     value.received_bytes = bits_received_bytes;
     return true;
 }

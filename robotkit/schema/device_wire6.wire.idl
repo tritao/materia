@@ -129,8 +129,8 @@ packed QueueStatus6 endian little {
     fault : u8
     # End of the last segment the device holds: the boundaries it has received.
     received_until_ticks : u64
-    # Bytes received since the session began, wrapping: the host's bytes sent less these are in flight.
-    received_bytes : u32
+    # Bytes received since the session began: the host's bytes sent less these are in flight.
+    received_bytes : u64
 }
 
 packed State6Header endian little {

@@ -163,7 +163,7 @@ std::shared_ptr<Rkd6Endpoint> Rkd6Endpoint::attach(std::unique_ptr<Rkd6Transport
 bool Rkd6Endpoint::send_record(std::uint8_t kind, std::span<const std::uint8_t> payload) {
     std::vector<std::uint8_t> frame;
     if (!device_frame6::encode(kind, payload, frame) || !transport_->send(frame)) return false;
-    sent_bytes_ += static_cast<std::uint32_t>(frame.size());
+    sent_bytes_ += frame.size();
     // Ten bits a byte on the line; frames queue behind each other.
     link_free_at_ns_ = std::max(link_free_at_ns_, now_ns_) + static_cast<std::uint64_t>(
         std::ceil(10.0L * frame.size() * 1e9L / std::max(1u, transport_->baud())));
@@ -201,6 +201,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         epoch_set_ = false;
         sent_.clear();
         chunk_timings_.clear();
+        sent_events_.clear();
         next_commit_ = 0;
         committed_until_ticks_ = 0;
     }
@@ -231,13 +232,32 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     const auto compile_clock = clock_.snapshot();
     if (plan.replace_after_plan_id && replace_ticks < committed_until_ticks_)
         return RK_ERROR_INVALID_STATE;
+    // The device begins a revision only at a segment boundary. A replacement inside a
+    // segment begins it at that segment's start and sends the segment again, cut short
+    // at the boundary: its polynomial runs from its own start, so only its length changes.
+    auto revision_ticks = replace_ticks;
+    std::optional<DeviceSegment6> head;
     if (plan.replace_after_plan_id) {
-        // The device must hold the boundary segment, as its status reports; that a
-        // segment was sent does not prove it arrived.
-        if (!has_status_ || replace_ticks > status_.received_until_ticks ||
-            std::none_of(sent_.begin(), sent_.end(), [&](const auto &segment) {
-                return segment.header.t0_ticks + segment.header.duration_ticks == replace_ticks;
-            })) return RK_ERROR_INVALID_STATE;
+        // The device must hold the boundary, as its status reports; that a segment was
+        // sent does not prove it arrived.
+        if (!has_status_ || replace_ticks > status_.received_until_ticks)
+            return RK_ERROR_INVALID_STATE;
+        const auto ends_there = std::any_of(sent_.begin(), sent_.end(), [&](const auto &segment) {
+            return segment.header.t0_ticks + segment.header.duration_ticks == replace_ticks;
+        });
+        if (!ends_there) {
+            const auto within = std::find_if(sent_.begin(), sent_.end(), [&](const auto &segment) {
+                return segment.header.t0_ticks < replace_ticks &&
+                    replace_ticks < segment.header.t0_ticks + segment.header.duration_ticks;
+            });
+            if (within == sent_.end() || within->header.t0_ticks < committed_until_ticks_ ||
+                within->header.t0_ticks < status_.committed_until_ticks)
+                return RK_ERROR_INVALID_STATE;
+            head = *within;
+            head->header.duration_ticks = replace_ticks - within->header.t0_ticks;
+            head->header.ends_at_rest = 0;
+            revision_ticks = within->header.t0_ticks;
+        }
     }
     auto compiled = compile_device_segments6(
         std::span(plan.segments.segments), plan.plan_id,
@@ -307,8 +327,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     if (!append) {
         device_wire6::QueueBegin6 begin{};
         begin.queue_revision = ++revision_;
-        revision_boundary_ticks_ = replace_ticks;
-        begin.replace_after_ticks = replace_ticks;
+        revision_boundary_ticks_ = revision_ticks;
+        begin.replace_after_ticks = revision_ticks;
         begin.actuator_count = ack_.actuator_count;
         for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
             const auto mapping = layout_.empty() ? DeviceActuator6{static_cast<std::uint8_t>(i)} : layout_[i];
@@ -320,11 +340,8 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         // Re-evaluate that f32 polynomial exactly as the device does: converting
         // an independently rounded joint anchor can exceed its 1e-4 actuator
         // check even when both chunks meet the target-error bound.
-        auto anchor_from = [&](const auto &segments) {
-            for (const auto &segment : segments) {
-                if (segment.header.t0_ticks + segment.header.duration_ticks != replace_ticks)
-                    continue;
-                const auto tau = static_cast<float>(segment.header.duration_ticks) /
+        auto state_at = [&](const DeviceSegment6 &segment, std::uint64_t local_ticks) {
+                const auto tau = static_cast<float>(local_ticks) /
                     static_cast<float>(ack_.device_tick_hz);
                 const auto degree = static_cast<std::size_t>(segment.header.degree);
                 for (std::size_t i = 0; i < ack_.actuator_count; ++i) {
@@ -340,15 +357,35 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
                             velocity = velocity * tau + static_cast<float>(k) * c[k];
                     }
                     begin.expected_position[i] = position;
-                    begin.expected_velocity[i] = segment.header.ends_at_rest ? 0.0f : velocity;
+                    begin.expected_velocity[i] = segment.header.ends_at_rest &&
+                        local_ticks == segment.header.duration_ticks ? 0.0f : velocity;
                 }
-                return true;
-            }
+        };
+        auto anchor_from = [&](const auto &segments) {
+            for (const auto &segment : segments)
+                if (segment.header.t0_ticks + segment.header.duration_ticks == revision_ticks) {
+                    state_at(segment, segment.header.duration_ticks);
+                    return true;
+                }
             return false;
         };
-        if (!anchor_from(sent_)) anchor_from(pending_);
+        // The device checks the state where the revision begins: the end of the
+        // segment before it, or the start of the one being cut short.
+        if (!anchor_from(sent_) && !anchor_from(pending_) && head) state_at(*head, 0);
         std::array<std::uint8_t, device_wire6::QueueBegin6::SIZE> body{};
         if (!device_wire6::encode(begin, body) || !send_record(5, body)) return RK_ERROR_BACKEND;
+    }
+    // A revision drops the device's events from its boundary on: send again the ones
+    // the replaced path scheduled before the replacement takes over.
+    if (plan.replace_after_plan_id) {
+        std::vector<device_wire6::Event6> kept;
+        for (const auto &event : sent_events_)
+            if (event.path_ticks < revision_ticks) kept.push_back(event);
+            else if (event.path_ticks < replace_ticks) {
+                kept.push_back(event);
+                wire_events.insert(wire_events.begin(), event);
+            }
+        sent_events_ = std::move(kept);
     }
     for (auto &event : wire_events) {
         event.queue_revision = revision_;
@@ -356,6 +393,11 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         if (!device_wire6::encode(event, event_body) || !send_record(16, event_body))
             return RK_ERROR_BACKEND;
     }
+    for (const auto &event : wire_events)
+        if (std::none_of(sent_events_.begin(), sent_events_.end(), [&](const auto &kept) {
+                return kept.plan_id == event.plan_id && kept.path_ticks == event.path_ticks &&
+                    kept.channel == event.channel;
+            })) sent_events_.push_back(event);
     // A replacement drops the queued chunks from its boundary on.
     if (plan.replace_after_plan_id)
         while (!chunk_timings_.empty() && chunk_timings_.back().host_path_start_ns >= base_time_ns)
@@ -375,13 +417,17 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
                 (previous.end_ticks - previous.start_ticks)));
             previous.end_ticks = replace_ticks;
         }
-        while (!pending_.empty() && pending_.back().header.t0_ticks >= replace_ticks)
+        while (!pending_.empty() && pending_.back().header.t0_ticks >= revision_ticks)
             pending_.pop_back();
-        while (!sent_.empty() && sent_.back().header.t0_ticks >= replace_ticks)
+        while (!sent_.empty() && sent_.back().header.t0_ticks >= revision_ticks)
             sent_.pop_back();
         next_commit_ = std::min(next_commit_, sent_.size());
         for (auto &segment : pending_)
             segment.header.queue_revision = revision_;
+        if (head) {
+            head->header.queue_revision = revision_;
+            pending_.push_back(std::move(*head));
+        }
     }
     const auto plan_start_ticks = compiled.segments.front().header.t0_ticks;
     const auto plan_end_ticks = compiled.segments.back().header.t0_ticks +
@@ -460,6 +506,10 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     sent_.erase(sent_.begin(), sent_.begin() + retired);
                     next_commit_ = next_commit_ > retired ? next_commit_ - retired : 0;
                 }
+                // An event the path has passed can no longer be reopened by a replacement.
+                sent_events_.erase(std::remove_if(sent_events_.begin(), sent_events_.end(),
+                    [&](const auto &event) { return event.path_ticks < status_.path_clock_ticks; }),
+                    sent_events_.end());
                 while (chunk_timings_.size() > 1 &&
                        chunk_timings_[1].device_start_ticks <= status_.path_clock_ticks)
                     chunk_timings_.erase(chunk_timings_.begin());
@@ -482,18 +532,18 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
 
 std::uint64_t Rkd6Endpoint::link_drain_ns() const noexcept {
     const auto line_ns = [&](std::uint64_t bytes) {
-        return static_cast<std::uint64_t>(std::ceil(
-            10.0L * bytes * 1e9L / std::max(1u, transport_->baud())));
+        const auto ns = std::ceil(10.0L * bytes * 1e9L / std::max(1u, transport_->baud()));
+        return ns >= static_cast<long double>(UINT64_MAX) ? UINT64_MAX : static_cast<std::uint64_t>(ns);
     };
     // What the host knows it handed the line, and what the transport still holds.
     auto drain = link_free_at_ns_ > now_ns_ ? link_free_at_ns_ - now_ns_ : 0;
     if (const auto bytes = transport_->queued_output_bytes()) drain = std::max(drain, line_ns(*bytes));
     // What the device has not received, by its last status, which covers buffers no host
     // count sees (a USB adapter's), less the line time since and the link's latency.
-    // A device count ahead of the host's (wrapped past half the range) means bytes the
-    // host never sent reached it, such as line noise: none of the host's is in flight.
-    const std::uint32_t unreceived = sent_bytes_ - status_.received_bytes;
-    if (has_status_ && unreceived <= 0x7fff'ffffu) {
+    // A device count ahead of the host's means bytes the host never sent reached it,
+    // such as line noise: none of the host's is in flight.
+    if (has_status_ && sent_bytes_ > status_.received_bytes) {
+        const auto unreceived = sent_bytes_ - status_.received_bytes;
         const auto since = (now_ns_ > status_at_ns_ ? now_ns_ - status_at_ns_ : 0) + link_latency_ns_;
         const auto pending = line_ns(unreceived);
         if (pending > since) drain = std::max(drain, pending - since);
@@ -522,16 +572,27 @@ bool Rkd6Endpoint::link_has_room(const DeviceSegment6 &segment) const noexcept {
         segment.coefficients.size() * device_wire6::Segment6Coefficients::SIZE;
     const auto frame_ns = static_cast<std::uint64_t>(std::ceil(
         10.0L * bytes * 1e9L / std::max(1u, transport_->baud())));
-    return link_drain_ns() + frame_ns <= segment_backlog_budget_ns();
+    // Compared without adding, so a saturated drain cannot wrap round to room.
+    const auto drain = link_drain_ns(), budget = segment_backlog_budget_ns();
+    return drain <= budget && frame_ns <= budget - drain;
 }
 
 void Rkd6Endpoint::send_due_commit() {
+    const auto margin_ticks = static_cast<std::uint64_t>(commit_margin_ns() *
+        static_cast<double>(ack_.device_tick_hz) / 1e9);
     if (next_commit_ >= sent_.size() ||
-        status_.path_clock_ticks + static_cast<std::uint64_t>(commit_margin_ns() *
-            static_cast<double>(ack_.device_tick_hz) / 1e9) < committed_until_ticks_) return;
-    const auto &segment = sent_.back();
+        status_.path_clock_ticks + margin_ticks < committed_until_ticks_) return;
+    // Commit only as far as two margins ahead of the device: enough that the next
+    // commit, due a margin before this one runs out, arrives in time, while the path
+    // beyond stays open to a replacement.
+    const auto wanted = status_.path_clock_ticks + 2 * margin_ticks;
+    auto chosen = next_commit_;
+    while (chosen + 1 < sent_.size() &&
+           sent_[chosen].header.t0_ticks + sent_[chosen].header.duration_ticks < wanted)
+        ++chosen;
+    const auto &segment = sent_[chosen];
     if (send_commit(segment.header.t0_ticks + segment.header.duration_ticks))
-        next_commit_ = sent_.size();
+        next_commit_ = chosen + 1;
 }
 
 void Rkd6Endpoint::pump_queue() {

@@ -1,5 +1,6 @@
 #include "rkd6_endpoint.hpp"
 #include "device_frame6.hpp"
+#include <optional>
 #include <type_traits>
 #include <cassert>
 #include <deque>
@@ -19,15 +20,16 @@ public:
     bool delay_once = false;
     std::uint64_t jump_ticks = 0;
     /** Bytes received since the session began: this device takes in everything sent at once. */
-    std::uint32_t received_bytes = 0;
-    /** Bytes the device reports it has not received yet, such as ones held in a USB adapter. */
-    std::uint32_t unreceived = 0;
-    unsigned baud() const noexcept override { return 921'600; }
+    std::uint64_t received_bytes = 0;
+    /** What the device reports it has received, when not everything sent; see `received_bytes`. */
+    std::optional<std::uint64_t> reported_received;
+    unsigned line_baud = 921'600;
+    unsigned baud() const noexcept override { return line_baud; }
     template<class T> void push(std::uint8_t kind, const T &value) {
         std::vector<std::uint8_t> payload(T::SIZE);
         if constexpr (std::is_same_v<T, device_wire6::QueueStatus6>) {
             auto reported = value;
-            reported.received_bytes = received_bytes - unreceived;
+            reported.received_bytes = reported_received ? *reported_received : received_bytes;
             assert(device_wire6::encode(reported, payload));
         } else {
             assert(device_wire6::encode(value, payload));
@@ -39,7 +41,7 @@ public:
     bool send(std::span<const std::uint8_t> frame) override {
         device_frame6::Frame decoded{};
         assert(device_frame6::decode(frame, decoded));
-        received_bytes += static_cast<std::uint32_t>(frame.size());
+        received_bytes += frame.size();
         if (decoded.kind == 1) {
             received_bytes = 0;
             device_wire6::SessionBegin6 begin{};
@@ -113,6 +115,7 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
     auto link = std::make_unique<MockLink>();
     auto *observed = link.get();
     observed->fingerprint.fill(7);
+    observed->line_baud = 115'200;
     auto endpoint = Rkd6Endpoint::attach(std::move(link), blueprint, observed->fingerprint,
         77, 1e-6, 500'000, 100'000);
     assert(endpoint);
@@ -130,16 +133,18 @@ void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) 
     plan.segments.segments[0].coefficients[0].value[1] = 0.5;
     device_wire6::QueueStatus6 status{};
     status.remaining_segments = 4;
-    observed->unreceived = 4'000;
-    observed->push(14, status);
-    assert(endpoint->sample(100'300'000, state) == RK_OK);
+    // The device has received nothing since the session began: the queue begin that opens
+    // the plan is still on its way, longer than a commit can wait, so its segment waits.
+    observed->reported_received = 0;
     assert(endpoint->submit_device_plan(plan, 0, 100'300'000, 20'000'000, blueprint) == RK_OK);
-    assert(observed->queue_begin_frames == 1 && observed->segment_frames == 0);
-    // Bytes the host never sent, such as line noise, put the device's count ahead of the
-    // host's; that is no backlog, not one wrapped round to four gigabytes.
-    observed->unreceived = static_cast<std::uint32_t>(-100);
     observed->push(14, status);
-    assert(endpoint->sample(100'400'000, state) == RK_OK);
+    assert(endpoint->sample(100'310'000, state) == RK_OK);
+    assert(observed->queue_begin_frames == 1 && observed->segment_frames == 0);
+    // Once the line has had time to send it, bytes the host never sent, such as line
+    // noise, put the device's count ahead of the host's: that is no backlog.
+    observed->reported_received = observed->received_bytes + 100;
+    observed->push(14, status);
+    assert(endpoint->sample(160'000'000, state) == RK_OK);
     assert(observed->segment_frames == 1);
 }
 

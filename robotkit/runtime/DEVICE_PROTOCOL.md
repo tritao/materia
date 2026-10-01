@@ -111,8 +111,9 @@ Protocol version 11 adds two `QUEUE_STATUS6` fields. `received_until_ticks` is
 the end of the last segment the device holds, so a replacement is accepted only
 at a boundary the device has, as it reports, rather than one a commit implied.
 `received_bytes` counts every byte the device has read since the session began
-(the `SESSION_BEGIN6` frame excluded), wrapping; the host keeps the same count
-of bytes sent, and the difference is what is still in flight, in buffers no host
+(the `SESSION_BEGIN6` frame excluded), in 64 bits so it never wraps; the host
+keeps the same count of bytes sent, and the difference is what is still in
+flight (none when line noise puts the device's count ahead), in buffers no host
 API reports, such as a USB adapter's. The host sends segments only while the
 line would clear within its segment budget: a commit falls due within
 `link latency + 2 × uncertainty + 2 × owner period` of the device's committed
@@ -129,6 +130,16 @@ that path time through that mapping, and commits map the same way, so a time
 sync that refines the estimate between chunks never moves a boundary off the
 queued segments. An append adds segments to the current queue revision; only
 a replacement or a fresh queue opens a new one.
+
+A queue revision begins only at a segment boundary the device holds. A
+replacement inside a segment begins its revision at that segment's start and
+sends the segment again cut short at the boundary (a segment's polynomial runs
+from its own start, so only its length changes), followed by the new plan; it
+also sends again the replaced plan's events in that stretch, since a revision
+drops the device's events from its boundary on. That segment must start at or
+beyond the committed horizon. The host commits only as far as the first held
+segment ending two commit margins beyond the device's path clock, so the path
+beyond stays open to replacement.
 
 Deployment schema v4 implies RKD6 and omits `protocol`. The v3 reader accepts
 only an explicit `rkd6` declaration. Layout fingerprints use the canonical

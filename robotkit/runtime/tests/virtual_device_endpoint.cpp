@@ -308,6 +308,87 @@ void minimal_midstream_replacement() {
     assert(std::abs(state.position[0] - (replacement.start_position[0] + 0.15)) < 1e-4);
 }
 
+void midsegment_replacement_keeps_events() {
+    // A replacement inside a segment the device holds: the endpoint reopens the queue at
+    // that segment's start, sends it again cut short at the boundary, and sends again the
+    // events the replaced plan scheduled in that stretch. The clock drifts, so syncs move
+    // the estimate between the plan and its replacement.
+    rk_robot_runtime_blueprint blueprint{};
+    blueprint.struct_size = sizeof(blueprint);
+    blueprint.joint_count = 1;
+    blueprint.owner_period_ns = 10'000'000;
+    blueprint.joints[0].lower_limit = -10;
+    blueprint.joints[0].upper_limit = 10;
+    blueprint.joints[0].max_velocity = 1;
+    blueprint.joints[0].max_acceleration = 10;
+    blueprint.channel_count = 1;
+    std::strcpy(blueprint.channels[0].id, "sprayer.flow");
+    blueprint.channels[0].kind = RK_EVENT_DIGITAL;
+    blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    VirtualDeviceConfig6 config;
+    config.fingerprint.fill(8);
+    config.steps_per_unit = {1'000};
+    config.clock_bound_ns = 5'000'000;
+    config.drift_ppm = 2'000;
+    auto endpoint = VirtualDeviceEndpoint::create(blueprint, config);
+    assert(endpoint);
+    rk_robot_state state{};
+    endpoint->sample(0, state);
+    for (std::uint64_t now = 2'000'000; now <= 20'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
+        endpoint->sample(now, state);
+    robotkit::PlanRequest plan{};
+    plan.plan_id = 60;
+    plan.sequence = 1;
+    plan.segments.segments.resize(4);
+    for (std::size_t k = 0; k < 4; ++k) {
+        auto &segment = plan.segments.segments[k];
+        segment.time_from_start_ns = k * 250'000'000;
+        segment.duration_ns = 250'000'000;
+        segment.degree = 1;
+        segment.joint_count = 1;
+        segment.coefficients[0].value[0] = 0.125 * k;
+        segment.coefficients[0].value[1] = 0.5;
+    }
+    auto event = [](std::uint64_t time_ns, bool on) {
+        rk_timed_event value{};
+        value.time_ns = time_ns;
+        std::strcpy(value.channel, "sprayer.flow");
+        value.value.kind = RK_EVENT_DIGITAL;
+        value.value.digital = on ? 1 : 0;
+        return value;
+    };
+    plan.events = {event(800'000'000, true), event(950'000'000, false)};
+    assert(endpoint->submit_device_plan(plan, 0, 120'000'000, 20'000'000, blueprint) == RK_OK);
+    for (std::uint64_t now = 130'000'000; now <= 380'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    robotkit::PlanRequest next{};
+    next.plan_id = 61;
+    next.sequence = 2;
+    next.ends_at_rest = 1;
+    next.replace_after_plan_id = 60;
+    next.start_position[0] = 0.4375;
+    next.start_velocity[0] = 0.5;
+    next.segments.segments.resize(1);
+    next.segments.segments[0].duration_ns = 500'000'000;
+    next.segments.segments[0].degree = 1;
+    next.segments.segments[0].joint_count = 1;
+    next.segments.segments[0].coefficients[0].value[0] = 0.4375;
+    next.segments.segments[0].coefficients[0].value[1] = 0.5;
+    next.events = {event(100'000'000, false)};
+    assert(endpoint->submit_device_plan(next, 875'000'000, 390'000'000, 410'000'000,
+        blueprint) == RK_OK);
+    for (std::uint64_t now = 390'000'000; now <= 2'200'000'000; now += 10'000'000)
+        assert(endpoint->sample(now, state) == RK_OK);
+    assert(state.safety == RK_SAFETY_READY);
+    assert(std::abs(endpoint->actuator_positions()[0] - 0.6875) <= 0.00101);
+    const auto events = endpoint->event_log();
+    assert(events.size() == 2 && events[0].plan_id == 60 && events[0].digital == 1 &&
+        events[1].plan_id == 61 && events[1].digital == 0);
+    assert(endpoint->channel_values()[0] == 0.0f);
+}
+
 std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
@@ -507,6 +588,7 @@ int main() {
     const auto held_events = run_event_pair(true, false);
     runtime_hold_rest_resume_fires_final_event();
     run_event_pair(false, true);
+    midsegment_replacement_keeps_events();
     assert(held_events[1].device_ticks > ordinary_events[1].device_ticks);
     VirtualDeviceConfig6 config;
     config.fingerprint.fill(7);

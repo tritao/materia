@@ -48,7 +48,7 @@ fn send<T: Write<u8>>(tx: &mut T, kind: u8, payload: &[u8], frame: &mut [u8; MAX
 }
 
 fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
-    board: &StubBoard, session: u64, received_bytes: u32, frame: &mut [u8; MAX_FRAME_SIZE]) {
+    board: &StubBoard, session: u64, received_bytes: u64, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let fault = match core.stop_reason() {
         None => 0, Some(StopReason::Underflow) => 2,
         Some(StopReason::LinkLost) => 3, Some(StopReason::DualDriveSkew) => 4,
@@ -82,7 +82,7 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
 
 fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
     core: &mut Option<ScheduledCore<ACTUATORS, CAPACITY>>, session: &mut u64,
-    received_bytes: &mut u32, tx: &mut T, frame: &mut [u8; MAX_FRAME_SIZE]) {
+    received_bytes: &mut u64, tx: &mut T, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let Ok((kind, payload)) = decode_frame6(input) else { return; };
     if kind != 1 { if let Some(core) = core.as_mut() { core.note_host_frame(board.ticks); } }
     match kind {
@@ -178,7 +178,7 @@ fn main() -> ! {
     let mut board = StubBoard::new();
     let mut core: Option<ScheduledCore<ACTUATORS, CAPACITY>> = None;
     let mut session = 0u64;
-    let mut received_bytes = 0u32;
+    let mut received_bytes = 0u64;
     let mut last_state = 0u64;
     let mut input = [0u8; MAX_FRAME_SIZE];
     let mut input_len = 0usize;
@@ -198,7 +198,7 @@ fn main() -> ! {
         match rx.read() {
             Ok(byte) => {
                 // Every byte off the line counts, valid or not: the host measures what is in flight by it.
-                received_bytes = received_bytes.wrapping_add(1);
+                received_bytes += 1;
                 if input_len == input.len() {
                     input.copy_within(1..input_len, 0);
                     input_len -= 1;
