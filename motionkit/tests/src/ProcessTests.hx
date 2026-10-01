@@ -430,7 +430,11 @@ class ProcessTests extends MotionKitTestSupport {
     var compiled = compiler.compile(new MotionProgram([
       MotionOp.FollowPath(programPath, "work", 0.05, [])]),
       robot.snapshot().positions.toArray(), Int64.ofInt(700));
-    var programPlan = compiled.blocks[0].plans[0];
+    // The sharp corner is an exact stop: each side of it is its own plan.
+    var programPlans = compiled.blocks[0].plans;
+    check(programPlans.length == 2 && compiled.blocks[0].opIndices.join(",") == "0,0",
+      "a followed path stops at its sharp corner, in two plans of one op");
+    var programPlan = programPlans[programPlans.length - 1];
     var programEnd = programPlan.evaluate(programPlan.durationSeconds).positions;
     var movePathEnd = cornerMove.evaluate(cornerMove.durationSeconds()).positions;
     for (joint in 0...3)

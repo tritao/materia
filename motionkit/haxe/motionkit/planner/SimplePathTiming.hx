@@ -121,7 +121,7 @@ class SimplePathTiming implements PathTimingBackend {
       var first = Math.max(Math.abs(path.qPrime[index][joint]),
         Math.abs(path.qPrime[index + 1][joint]));
       var second = Math.max(Math.abs(path.qDoublePrime[index][joint]),
-        Math.abs(path.qDoublePrime[index + 1][joint]));
+        Math.abs(path.qDoublePrimeBefore[index + 1][joint]));
       qPrime.push(first);
       qDoublePrime.push(second);
       if (first > EPSILON) {

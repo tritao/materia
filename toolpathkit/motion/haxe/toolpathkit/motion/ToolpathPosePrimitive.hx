@@ -6,6 +6,7 @@ import motionkit.path.PathPrimitive;
 import motionkit.path.PathPoint;
 import motionkit.path.PosePrimitive;
 import motionkit.path.PoseWaypoint;
+import motionkit.path.PoseDerivatives;
 
 /** Keeps exact line, arc, helix, or fillet geometry for ProgramCompiler. */
 class ToolpathPosePrimitive implements PosePrimitive {
@@ -30,6 +31,8 @@ class ToolpathPosePrimitive implements PosePrimitive {
   public function endWaypoint():PoseWaypoint return waypoint(geometry.pointAt(geometry.length()));
   public function speedLimit():Float return feed;
   public function orientationPolicy():OrientationPolicy return OrientationPolicy.Fixed;
+  public function derivativesAt(distance:Float):PoseDerivatives
+    return PoseDerivatives.ofGeometry(geometry, distance);
   public function waypointAt(distance:Float):PoseWaypoint
     return waypoint(geometry.pointAt(distance));
 

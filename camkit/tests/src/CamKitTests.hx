@@ -214,6 +214,7 @@ class CamKitTests {
     CamPocketEntryFixture.run(check);
     CamSafeTravelFixture.run(check);
     CamMeasuredToolFixture.run(check);
+    CamArcFixture.run(check);
     CamSetupFixture.run(check);
     Sys.println('CamKit tests passed ($assertions assertions)');
   }

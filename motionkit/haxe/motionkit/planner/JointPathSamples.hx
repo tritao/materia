@@ -5,14 +5,22 @@ class JointPathSamples {
   public final s:Array<Float>;
   public final q:Array<Array<Float>>;
   public final qPrime:Array<Array<Float>>;
+  /** d²q/ds² leaving each sample. */
   public final qDoublePrime:Array<Array<Float>>;
+  /**
+    d²q/ds² arriving at each sample: the same as `qDoublePrime` unless the
+    path's curvature jumps there, as where a line meets an arc.
+  **/
+  public final qDoublePrimeBefore:Array<Array<Float>>;
   public final jointCount:Int;
 
   public function new(s:Array<Float>, q:Array<Array<Float>>,
-      qPrime:Array<Array<Float>>, qDoublePrime:Array<Array<Float>>) {
+      qPrime:Array<Array<Float>>, qDoublePrime:Array<Array<Float>>,
+      ?qDoublePrimeBefore:Array<Array<Float>>) {
+    if (qDoublePrimeBefore == null) qDoublePrimeBefore = qDoublePrime;
     if (s == null || q == null || qPrime == null || qDoublePrime == null ||
         s.length < 2 || q.length != s.length || qPrime.length != s.length ||
-        qDoublePrime.length != s.length)
+        qDoublePrime.length != s.length || qDoublePrimeBefore.length != s.length)
       throw "Joint path needs at least two matching samples";
     if (q[0] == null || q[0].length == 0)
       throw "Joint path needs at least one joint";
@@ -22,7 +30,8 @@ class JointPathSamples {
       if (!Math.isFinite(s[sample]) || (sample > 0 && s[sample] <= previous))
         throw "Joint path positions must be finite and strictly increasing";
       previous = s[sample];
-      for (values in [q[sample], qPrime[sample], qDoublePrime[sample]]) {
+      for (values in [q[sample], qPrime[sample], qDoublePrime[sample],
+          qDoublePrimeBefore[sample]]) {
         if (values == null || values.length != jointCount)
           throw "Joint path sample joint counts must match";
         for (value in values)
@@ -33,6 +42,7 @@ class JointPathSamples {
     this.q = copyRows(q);
     this.qPrime = copyRows(qPrime);
     this.qDoublePrime = copyRows(qDoublePrime);
+    this.qDoublePrimeBefore = copyRows(qDoublePrimeBefore);
   }
 
   public function start():Float return s[0];

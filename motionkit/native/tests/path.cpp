@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <initializer_list>
 #include <vector>
 
 int main() {
@@ -14,6 +15,7 @@ int main() {
         samples[i].position[0] = samples[i].s * samples[i].s;
         samples[i].first[0] = 2.0 * samples[i].s;
         samples[i].second[0] = 2.0;
+        samples[i].second_before[0] = 2.0;
         samples[i].position[1] = samples[i].s;
         samples[i].first[1] = 1.0;
     }
@@ -157,6 +159,8 @@ int main() {
         point.first[1] = half_pi * std::cos(angle);
         point.second[0] = -half_pi * half_pi * std::cos(angle);
         point.second[1] = -half_pi * half_pi * std::sin(angle);
+        point.second_before[0] = point.second[0];
+        point.second_before[1] = point.second[1];
     }
     assert(mk_path_create(circle, 2, &path) == MK_OK);
     mk_time_stage ramp{};
@@ -201,6 +205,39 @@ int main() {
     assert(mk_trajectory_segment_count(tight, &tight_count) == MK_OK);
     assert(tight_count == 1); // A quintic q(s) under linear s(t) is exact.
     mk_trajectory_destroy(tight);
+    mk_time_law_destroy(law);
+    mk_path_destroy(path);
+
+    // A line that turns into a parabola at s = 1: the second derivative jumps
+    // there, and each span keeps its own, so both stay exact.
+    mk_path_sample kinked[3]{};
+    const double kink_position[3] = {0.0, 1.0, 3.0}, kink_first[3] = {1.0, 1.0, 3.0};
+    const double kink_before[3] = {0.0, 0.0, 2.0}, kink_after[3] = {0.0, 2.0, 2.0};
+    for (int i = 0; i < 3; ++i) {
+        kinked[i].struct_size = sizeof(mk_path_sample);
+        kinked[i].joint_count = 1;
+        kinked[i].s = static_cast<double>(i);
+        kinked[i].position[0] = kink_position[i];
+        kinked[i].first[0] = kink_first[i];
+        kinked[i].second[0] = kink_after[i];
+        kinked[i].second_before[0] = kink_before[i];
+    }
+    assert(mk_path_create(kinked, 3, &path) == MK_OK);
+    const double kink_velocity[1] = {1.0}, kink_acceleration[1] = {2.0};
+    mk_trajectory_handle kink_trajectory{};
+    assert(mk_time_path(path, kink_velocity, kink_acceleration, 1, nullptr, 0,
+        0.0, 0.0, 1e-9, &law, &kink_trajectory) == MK_OK);
+    for (double at : {0.5, 1.5, 1.9}) {
+        double seconds = 0.0;
+        assert(mk_path_distance_to_time(law, at, &seconds) == MK_OK);
+        mk_trajectory_state kink_state{};
+        kink_state.struct_size = sizeof(kink_state);
+        assert(mk_trajectory_evaluate(kink_trajectory,
+            static_cast<int64_t>(std::llround(seconds * 1e9)), &kink_state) == MK_OK);
+        const double expected = at <= 1.0 ? at : at + (at - 1.0) * (at - 1.0);
+        assert(std::abs(kink_state.position[0] - expected) < 1e-6);
+    }
+    mk_trajectory_destroy(kink_trajectory);
     mk_time_law_destroy(law);
     mk_path_destroy(path);
 

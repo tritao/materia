@@ -26,6 +26,8 @@ class PoseLine implements PosePrimitive {
   public function endWaypoint():PoseWaypoint return end;
   public function speedLimit():Float return feed;
   public function orientationPolicy():OrientationPolicy return policy;
+  public function derivativesAt(distance:Float):PoseDerivatives
+    return PoseDerivatives.numeric(this, distance);
 
   public function waypointAt(distance:Float):PoseWaypoint {
     if (!Math.isFinite(distance) || distance < 0.0 || distance > pathLength)

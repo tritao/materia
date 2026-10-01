@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-enum { MK_API_VERSION = 12, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
+enum { MK_API_VERSION = 13, MK_MAX_JOINTS = 64, MK_MAX_DEGREE = 5,
     MK_MAX_PLAN_EVENTS = 256, MK_EVENT_CHANNEL_BYTES = 48, MK_EVENT_COMMAND_BYTES = 48,
     MK_MAX_ASSUMPTIONS = 320, MK_ASSUMPTION_LENGTH = 96 };
 typedef int32_t mk_result;
@@ -146,7 +146,12 @@ MK_API mk_result MK_CALL mk_select_opw_configurations(
     const double *start_joints MK_IN_ARRAY(joint_count), uint32_t joint_count,
     mk_configuration_solution *out_sequence MK_OUT_ARRAY(sample_count));
 
-/** Joint path derivatives are with respect to path parameter s. */
+/**
+ * Joint path derivatives are with respect to path parameter s. `second` is the
+ * second derivative leaving the sample and `second_before` the one arriving at
+ * it; they differ where the path's curvature jumps, such as where a line meets
+ * an arc, and are equal elsewhere.
+ */
 typedef struct mk_path_sample {
     uint32_t struct_size MK_STRUCT_SIZE;
     double s;
@@ -154,6 +159,7 @@ typedef struct mk_path_sample {
     double position[MK_MAX_JOINTS];
     double first[MK_MAX_JOINTS];
     double second[MK_MAX_JOINTS];
+    double second_before[MK_MAX_JOINTS];
 } mk_path_sample;
 
 /** s(t) = start_s + speed*tau + acceleration*tau^2/2, tau in seconds. */

@@ -9,6 +9,7 @@ import toolpathkit.path.GeometryOffset;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.ToolpathProgram;
 import toolpathkit.path.Point3;
+import toolpathkit.path.ArcFitting;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.SpindleDirection;
 import toolpathkit.setup.Setup;
@@ -24,6 +25,12 @@ class CamJob {
     stop exactly.
   **/
   public final blendTolerance:Float;
+  /**
+    How far an arc may stray from the cutting lines it replaces, in metres:
+    a circle that the contours polygonized is cut as G2/G3 again (see
+    `ArcFitting`). Zero keeps every line.
+  **/
+  public final arcTolerance:Float;
   var current:Point3;
   var selectedTool:Int = -1;
   /** The G43 length in effect; moves are programmed at the tool tip. */
@@ -38,13 +45,16 @@ class CamJob {
     clear of the work, since the first tool is loaded there.
   **/
   public function new(safeZ:Float, spindleRpm:Float, ?initial:Point3,
-      blendTolerance:Float = 0.0) {
+      blendTolerance:Float = 0.0, arcTolerance:Float = 0.0) {
     if (!Math.isFinite(safeZ) || !Math.isFinite(spindleRpm) ||
         spindleRpm <= 0.0)
       throw "CAM needs finite safe Z and positive spindle RPM";
     if (!Math.isFinite(blendTolerance) || blendTolerance < 0.0)
       throw "CAM blend tolerance must be finite and not negative";
     this.blendTolerance = blendTolerance;
+    if (!Math.isFinite(arcTolerance) || arcTolerance < 0.0)
+      throw "CAM arc tolerance must be finite and not negative";
+    this.arcTolerance = arcTolerance;
     this.safeZ = safeZ;
     this.spindleRpm = spindleRpm;
     current = initial == null ? new Point3(0.0, 0.0, 0.0) : initial;
@@ -307,7 +317,7 @@ class CamJob {
 
   public function finish(?setup:Setup):ToolpathProgram {
     if (ops.length == 0) throw "CAM job has no operations";
-    var result = ops.copy();
+    var result = ArcFitting.fit(ops, arcTolerance);
     var endSpan = Provenance.cam(operationNumber + 1);
     result.push(ToolpathOp.Spindle(Off, 0.0, endSpan));
     result.push(ToolpathOp.End(endSpan));

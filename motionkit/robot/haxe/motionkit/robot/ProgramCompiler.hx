@@ -1,6 +1,9 @@
 package motionkit.robot;
 
 import haxe.Int64;
+import motionkit.kinematics.Twist6;
+import motionkit.path.PosePrimitive;
+import motionkit.path.PoseDerivatives;
 import robotkit.model.JointCoupling;
 import motionkit.MotionOptions;
 import motionkit.event.PathEvent;
@@ -34,6 +37,14 @@ import motionkit.robot.OpwKinematics;
 import motionkit.trajectory.ExecutionPlan;
 import motionkit.trajectory.Trajectory;
 import motionkit.trajectory.ValidationLimits;
+
+/** A joint-space sample of a path: where, on which primitive, and the primitive arriving there. */
+private typedef PathSample = {
+  var distance:Float;
+  var primitive:PosePrimitive;
+  var local:Float;
+  var arriving:Null<{primitive:PosePrimitive, local:Float}>;
+}
 
 /** Lowers an authored program to validated, exact-stop plans. */
 class ProgramCompiler {
@@ -176,7 +187,7 @@ class ProgramCompiler {
               plans.push(finish(pending, nextId));
               indices.push(pending.opIndex);
               lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
+              distanceMaps.push(pending.opDistances());
               timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
@@ -196,7 +207,7 @@ class ProgramCompiler {
               plans.push(finish(pending, nextId));
               indices.push(pending.opIndex);
               lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
+              distanceMaps.push(pending.opDistances());
               timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
@@ -242,7 +253,7 @@ class ProgramCompiler {
               plans.push(finish(pending, nextId));
               indices.push(pending.opIndex);
               lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
+              distanceMaps.push(pending.opDistances());
               timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1));
             }
@@ -256,20 +267,31 @@ class ProgramCompiler {
             q = pending.endQ.copy();
             attachLeadingOutputs(pending, leadingOutputs);
           case FollowPath(path, requestedFrame, feed, events):
-            if (pending != null) {
-              plans.push(finish(pending, nextId));
-              indices.push(pending.opIndex);
-              lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
-              timeMaps.push(pending.times.copy());
-              nextId = Int64.add(nextId, Int64.ofInt(1));
-            }
             requireFrame(requestedFrame, index);
             if (path.frameId != frameId)
               throw 'Motion program op $index path frame does not match $frameId';
-            pending = lowerPath(path, q, feed, events, index);
-            q = pending.endQ.copy();
-            attachLeadingOutputs(pending, leadingOutputs);
+            // Following a sharp corner exactly means stopping there, so each
+            // stretch between corners is its own plan of this op.
+            var sections = cornerSections(path);
+            for (k in 0...sections.length) {
+              if (pending != null) {
+                plans.push(finish(pending, nextId));
+                indices.push(pending.opIndex);
+                lengths.push(pathLength(pending));
+                distanceMaps.push(pending.opDistances());
+                timeMaps.push(pending.times.copy());
+                nextId = Int64.add(nextId, Int64.ofInt(1));
+              }
+              var section = sections[k], last = k == sections.length - 1;
+              var end = section.offset + section.path.length();
+              pending = lowerPath(section.path, q, feed, [for (event in events)
+                if (event.distance >= section.offset && (last || event.distance < end))
+                  new PathEvent(event.distance - section.offset, event.channel, event.value,
+                    event.leadSeconds, event.holdPolicy)], index);
+              pending.distanceOffset = section.offset;
+              q = pending.endQ.copy();
+              if (k == 0) attachLeadingOutputs(pending, leadingOutputs);
+            }
           case SetOutput(channel, value):
             if (pending == null) leadingOutputs.push({channel:channel, value:value});
             else pending.events.push(new TimedEvent(
@@ -279,7 +301,7 @@ class ProgramCompiler {
               plans.push(finish(pending, nextId));
               indices.push(pending.opIndex);
               lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
+              distanceMaps.push(pending.opDistances());
               timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
             }
@@ -291,7 +313,7 @@ class ProgramCompiler {
               plans.push(finish(pending, nextId));
               indices.push(pending.opIndex);
               lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
+              distanceMaps.push(pending.opDistances());
               timeMaps.push(pending.times.copy());
               nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
             }
@@ -305,7 +327,7 @@ class ProgramCompiler {
         plans.push(finish(pending, nextId));
               indices.push(pending.opIndex);
               lengths.push(pathLength(pending));
-              distanceMaps.push(pending.distances.copy());
+              distanceMaps.push(pending.opDistances());
               timeMaps.push(pending.times.copy());
       }
       if (leadingOutputs.length > 0)
@@ -324,7 +346,7 @@ class ProgramCompiler {
   }
 
   static function pathLength(pending:PendingMotion):Float
-    return pending.path == null ? 0.0 : pending.path.length();
+    return pending.path == null ? 0.0 : pending.distanceOffset + pending.path.length();
 
   static function attachLeadingOutputs(pending:PendingMotion,
       leading:Array<{channel:String, value:EventValue}>):Void {
@@ -343,9 +365,9 @@ class ProgramCompiler {
         pending.path == null ? limits : limits.withoutJerk(), id, pending.startQ,
         zeros(), zeros(), startTolerances.position, startTolerances.velocity,
         startTolerances.acceleration, pending.events);
-      if (pending.path != null) checkTaskSpace(plan, pending.path, pending.distances,
-        pending.times, pending.opIndex, pending.authoredPolyline,
-        pending.blendTolerance, pending.taskSampleDistances);
+      if (pending.path != null) checkTaskSpace(plan, pending.path, pending.checkTimes,
+        pending.opIndex, pending.authoredPolyline, pending.blendTolerance,
+        pending.taskSampleDistances);
       pending.trajectory.dispose();
       if (projected != null) projected.dispose();
       return plan;
@@ -433,18 +455,14 @@ class ProgramCompiler {
       authoredEvents:Array<PathEvent>, index:Int,
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0):PendingMotion {
     if (path.length() <= 0.0) throw 'Motion program op $index has zero path length';
-    var distances:Array<Float> = [];
-    var count = Std.int(Math.ceil(path.length() / cartesianResolution));
+    var samples = pathSamples(path);
+    var count = samples.length - 1;
     if (count > 10000) throw 'Motion program op $index exceeds Cartesian sample budget';
+    var distances = [for (sample in samples) sample.distance];
     var positions:Array<Array<Float>> = [];
     var caps:Array<Float> = [];
     var previous = startQ.copy();
-    var pathPoses:Array<Pose3> = [];
-    for (sample in 0...(count + 1)) {
-      var distance = path.length() * sample / count;
-      distances.push(distance);
-      pathPoses.push(path.waypointAt(distance).pose);
-    }
+    var pathPoses = [for (sample in samples) sample.primitive.waypointAt(sample.local).pose];
     var selected = configurationSelector == null ? null :
       configurationSelector.selectPoses(distances, pathPoses, startQ, ikTolerance);
     for (sample in 0...(count + 1)) {
@@ -465,18 +483,32 @@ class ProgramCompiler {
       positions.push(solved.copy());
       previous = solved;
     }
+    // Joint derivatives come from each primitive's own geometry through the
+    // differential kinematics, so they are exact whatever the sample spacing.
     var first:Array<Array<Float>> = [];
     var second:Array<Array<Float>> = [];
-    for (sample in 0...positions.length) {
-      var left = sample == 0 ? 0 : sample - 1;
-      var right = sample == count ? count : sample + 1;
-      var ds = distances[right] - distances[left];
-      first.push([for (joint in 0...startQ.length)
-        (positions[right][joint] - positions[left][joint]) / ds]);
+    var secondBefore:Array<Array<Float>> = [];
+    for (k in 0...samples.length) {
+      var sample = samples[k], q = positions[k];
+      var leaving = sample.primitive.derivativesAt(sample.local);
+      var rate = jointRate(q, leaving.linear, leaving.angular);
+      if (rate == null) throw 'Motion program op $index has no joint velocity along the path at distance ${sample.distance}';
+      first.push(rate);
+      second.push(jointCurvature(q, rate, leaving));
+      var arriving = sample.arriving;
+      if (arriving == null) secondBefore.push(second[k]);
+      else {
+        var before = arriving.primitive.derivativesAt(arriving.local);
+        var turn = 0.0;
+        for (axis in 0...3) turn = Math.max(turn, Math.max(
+          Math.abs(before.linear[axis] - leaving.linear[axis]),
+          Math.abs(before.angular[axis] - leaving.angular[axis])));
+        if (turn > 1e-6)
+          throw 'Motion program op $index turns a corner at path distance ${sample.distance}: blend it or stop there';
+        secondBefore.push(jointCurvature(q, rate, before));
+      }
     }
-    for (sample in 0...positions.length)
-      second.push([for (_ in 0...startQ.length) 0.0]);
-    var timed = timing.time(new JointPathSamples(distances, positions, first, second),
+    var timed = timing.time(new JointPathSamples(distances, positions, first, second, secondBefore),
       new PathTimingLimits(maxVelocity, maxAcceleration, caps));
     try {
       var events:Array<TimedEvent> = [];
@@ -517,10 +549,18 @@ class ProgramCompiler {
           }
         }
       }
+      // Times for the geometry check's evenly spaced distances, from the time
+      // law itself: interpolating the sample times would misplace them
+      // wherever the speed changes.
+      var checkCount = authoredPolyline == null ? distances.length * 2 - 1 :
+        Std.int(Math.max(distances.length * 2 - 1,
+          Math.ceil(path.length() / (blendTolerance / 8.0)) + 1));
+      var checkTimes = [for (sample in 0...checkCount)
+        timed.distanceToTime(path.length() * sample / (checkCount - 1))];
       timed.releaseDistanceMap();
       return new PendingMotion(index, startQ, positions[count], timed.trajectory, events,
         path, distances, timeMap, authoredPolyline, blendTolerance,
-        taskSampleDistances);
+        taskSampleDistances, checkTimes);
     } catch (error:Dynamic) {
       timed.releaseDistanceMap();
       timed.trajectory.dispose();
@@ -528,17 +568,19 @@ class ProgramCompiler {
     }
   }
 
-  function checkTaskSpace(plan:ExecutionPlan, path:PosePath,
-      distances:Array<Float>, times:Array<Float>, index:Int,
-      authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float,
+  /**
+    Checks the plan against the path: at `checkTimes.length` evenly spaced
+    distances, reached at those times, and at every millisecond of the clock,
+    at `taskSampleDistances`.
+  **/
+  function checkTaskSpace(plan:ExecutionPlan, path:PosePath, checkTimes:Array<Float>,
+      index:Int, authoredPolyline:Null<Array<Pose3>>, blendTolerance:Float,
       taskSampleDistances:Array<Float>):Void {
     var worst = 0.0, worstTime = 0.0;
     var tolerance = authoredPolyline == null && path.authoredGeometry == null ?
       positionTolerance : authoredPolyline == null ? path.blendTolerance : blendTolerance;
     var failure:Null<String> = null;
-    var samples = authoredPolyline == null ? distances.length * 2 - 1 :
-      Std.int(Math.max(distances.length * 2 - 1,
-        Math.ceil(path.length() / (blendTolerance / 8.0)) + 1));
+    var samples = checkTimes.length;
     function inspect(distance:Float, time:Float):Void {
       var desired = path.waypointAt(distance);
       var actual = solver.forward(plan.evaluate(time).positions);
@@ -558,15 +600,8 @@ class ProgramCompiler {
           angle > desired.orientationTolerance + 1e-9)
         failure = 'Motion program op $index task-space tolerance exceeded at path distance $distance (position $error / $allowed, orientation $angle / ${desired.orientationTolerance})';
     }
-    for (sample in 0...samples) {
-      var distance = path.length() * sample / (samples - 1);
-      var left = 0;
-      while (left + 1 < distances.length - 1 && distances[left + 1] < distance)
-        left++;
-      var fraction = (distance - distances[left]) /
-        (distances[left + 1] - distances[left]);
-      inspect(distance, times[left] + fraction * (times[left + 1] - times[left]));
-    }
+    for (sample in 0...samples)
+      inspect(path.length() * sample / (samples - 1), checkTimes[sample]);
     // Cover the trajectory clock as well as the authored path geometry.
     var timeSteps = taskSampleDistances.length - 1;
     for (sample in 0...(timeSteps + 1)) {
@@ -639,6 +674,96 @@ class ProgramCompiler {
         throw 'Motion program op $index joint limit $joint$location';
       }
   }
+  /**
+    `path` split at its sharp corners, where one primitive's end tangent is
+    not the next one's start tangent, with each section's distance along it.
+  **/
+  static function cornerSections(path:PosePath):Array<{path:PosePath, offset:Float}> {
+    var sections:Array<{path:PosePath, offset:Float}> = [];
+    var start = 0, offset = 0.0, sectionOffset = 0.0;
+    for (k in 0...path.primitives.length) {
+      var primitive = path.primitives[k];
+      if (k > start) {
+        var before = path.primitives[k - 1];
+        var arriving = before.derivativesAt(before.length()), leaving = primitive.derivativesAt(0.0);
+        var turn = 0.0;
+        for (axis in 0...3) turn = Math.max(turn, Math.max(
+          Math.abs(arriving.linear[axis] - leaving.linear[axis]),
+          Math.abs(arriving.angular[axis] - leaving.angular[axis])));
+        if (turn > 1e-6) {
+          sections.push({path: new PosePath(path.frameId, path.primitives.slice(start, k)), offset: sectionOffset});
+          start = k;
+          sectionOffset = offset;
+        }
+      }
+      offset += primitive.length();
+    }
+    sections.push({path: new PosePath(path.frameId, path.primitives.slice(start)), offset: sectionOffset});
+    if (sections.length == 1) return [{path: path, offset: 0.0}];
+    var authored = path.authoredGeometry;
+    if (authored != null) for (section in sections)
+      section.path.withAuthoredGeometry(authored, path.blendTolerance);
+    return sections;
+  }
+
+  /**
+    Where to sample a path in joint space: every primitive boundary, so that
+    each span lies on one primitive, and inside each primitive at most
+    `cartesianResolution` apart and a quarter radian of turning apart. A
+    boundary sample also names the primitive arriving at it.
+  **/
+  function pathSamples(path:PosePath):Array<PathSample> {
+    var first = path.primitives[0];
+    var samples:Array<PathSample> = [{distance: 0.0, primitive: first, local: 0.0, arriving: null}];
+    var start = 0.0;
+    for (k in 0...path.primitives.length) {
+      var primitive = path.primitives[k], length = primitive.length();
+      var curvature = 0.0;
+      for (at in [0.0, 0.5 * length, length]) {
+        var second = primitive.derivativesAt(at);
+        curvature = Math.max(curvature, Math.sqrt(
+          second.linearSecond[0] * second.linearSecond[0] +
+          second.linearSecond[1] * second.linearSecond[1] +
+          second.linearSecond[2] * second.linearSecond[2]));
+      }
+      var pieces = Std.int(Math.max(1, Math.max(Math.ceil(length / cartesianResolution),
+        Math.ceil(length * curvature / 0.25))));
+      for (piece in 1...(pieces + 1)) {
+        var local = length * piece / pieces;
+        var last = piece == pieces;
+        var next = last && k + 1 < path.primitives.length ? path.primitives[k + 1] : null;
+        samples.push(next == null ?
+          {distance: start + local, primitive: primitive, local: local, arriving: null} :
+          {distance: start + length, primitive: next, local: 0.0,
+            arriving: {primitive: primitive, local: length}});
+      }
+      start += length;
+    }
+    samples[samples.length - 1].distance = path.length();
+    return samples;
+  }
+
+  /** dq/ds for a pose moving at `linear` and `angular` per metre of path, or null at a singularity. */
+  function jointRate(q:Array<Float>, linear:Array<Float>, angular:Array<Float>):Null<Array<Float>>
+    return solver.solveDifferential(q, new Twist6(linear[0], linear[1], linear[2],
+      angular[0], angular[1], angular[2]));
+
+  /**
+    d²q/ds²: how dq/ds changes along the path, from the pose's second
+    derivative and the kinematics' change between nearby configurations.
+    Exact for a Cartesian machine, whose kinematics do not change.
+  **/
+  function jointCurvature(q:Array<Float>, rate:Array<Float>, pose:PoseDerivatives):Array<Float> {
+    var step = 1e-6;
+    function at(sign:Float):Null<Array<Float>>
+      return jointRate([for (joint in 0...q.length) q[joint] + sign * step * rate[joint]],
+        [for (axis in 0...3) pose.linear[axis] + sign * step * pose.linearSecond[axis]],
+        [for (axis in 0...3) pose.angular[axis] + sign * step * pose.angularSecond[axis]]);
+    var ahead = at(1.0), behind = at(-1.0);
+    if (ahead == null || behind == null) return [for (_ in q) 0.0];
+    return [for (joint in 0...q.length) (ahead[joint] - behind[joint]) / (2.0 * step)];
+  }
+
   static function primitiveSpeedAt(path:PosePath, distance:Float):Float {
     var start = 0.0;
     for (primitive in path.primitives) {
@@ -692,21 +817,30 @@ private class PendingMotion {
   public final distances:Array<Float>;
   public final times:Array<Float>;
   public final taskSampleDistances:Array<Float>;
+  /** When the plan reaches each of the geometry check's evenly spaced distances. */
+  public final checkTimes:Array<Float>;
   public final authoredPolyline:Null<Array<Pose3>>;
   public final blendTolerance:Float;
+  /** Where this motion starts along its op's path, when the op is split at corners. */
+  public var distanceOffset:Float = 0.0;
 
   public function new(opIndex:Int, startQ:Array<Float>, endQ:Array<Float>,
       trajectory:Trajectory, events:Array<TimedEvent>, path:Null<PosePath>,
       distances:Null<Array<Float>>, ?times:Array<Float>,
       ?authoredPolyline:Array<Pose3>, ?blendTolerance:Float = 0.0,
-      ?taskSampleDistances:Array<Float>) {
+      ?taskSampleDistances:Array<Float>, ?checkTimes:Array<Float>) {
     this.opIndex = opIndex; this.startQ = startQ.copy(); this.endQ = endQ.copy();
     this.trajectory = trajectory; this.events = events;
     this.path = path;
     this.distances = distances == null ? [] : distances;
     this.times = times == null ? [] : times;
     this.taskSampleDistances = taskSampleDistances == null ? [] : taskSampleDistances;
+    this.checkTimes = checkTimes == null ? [] : checkTimes;
     this.authoredPolyline = authoredPolyline == null ? null : authoredPolyline.copy();
     this.blendTolerance = blendTolerance;
   }
+
+  /** Path distances along the whole op. */
+  public function opDistances():Array<Float>
+    return [for (distance in distances) distanceOffset + distance];
 }

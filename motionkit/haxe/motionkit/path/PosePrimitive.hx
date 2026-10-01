@@ -7,4 +7,6 @@ interface PosePrimitive {
   function endWaypoint():PoseWaypoint;
   function speedLimit():Float;
   function orientationPolicy():OrientationPolicy;
+  /** Derivatives of the pose with respect to distance along this primitive. */
+  function derivativesAt(distance:Float):PoseDerivatives;
 }

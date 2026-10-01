@@ -14,6 +14,7 @@ import toolpathkit.tool.ToolLibrary;
 import toolpathkit.tool.Tool;
 import toolpathkit.tool.CutterProfile;
 import toolpathkit.path.ToolpathFrame;
+import toolpathkit.path.ArcFitting;
 import toolpathkit.setup.SetupStock;
 
 class ToolpathKitTests {
@@ -110,7 +111,35 @@ class ToolpathKitTests {
     rejected = false;
     try CutterProfile.decode([[0.0, 7.0, 0, 0, 1, 0]]) catch (_:Dynamic) rejected = true;
     if (!rejected) throw "cutter profile codec rejects unknown zones";
+    // Arc fitting: a polygonized circle becomes one arc, a hexagon stays lines,
+    // and an S-curve becomes two arcs turning opposite ways.
+    function polygon(sides:Int, radius:Float, ?centerX:Float = 0.0, ?from:Float = 0.0,
+        ?sweep:Float = 6.283185307179586):Array<Point3>
+      return [for (k in 0...(sides + 1)) new Point3(centerX + radius * Math.cos(from + sweep * k / sides),
+        radius * Math.sin(from + sweep * k / sides), -0.002)];
+    function cuts(points:Array<Point3>, span:Provenance):Array<ToolpathOp>
+      return [for (k in 1...points.length) ToolpathOp.Move(Cut, PathGeometry.Line(points[k - 1], points[k]),
+        0.01, 0.0, span)];
+    var span = Provenance.cam(10);
+    var circle = ArcFitting.fit(cuts(polygon(64, 0.005), span), 0.00002);
+    switch circle {
+      case [Move(Cut, Arc(center, radius, _, sweep), _, _, _)]:
+        if (Math.abs(radius - 0.005) > 1e-12 || Math.abs(Math.abs(sweep) - 2 * Math.PI) > 1e-9 ||
+            center.distanceTo(new Point3(0, 0, -0.002)) > 1e-12)
+          throw "a polygonized circle fits its own circle";
+      case _: throw 'a polygonized circle becomes one arc, got $circle';
+    }
+    if (ArcFitting.fit(cuts(polygon(6, 0.005), span), 0.00002).length != 6)
+      throw "a hexagon is not rounded";
+    var s = polygon(32, 0.005, 0.0, Math.PI, -Math.PI);
+    var second = polygon(32, 0.005, 0.01, Math.PI, Math.PI);
+    var curve = ArcFitting.fit(cuts(s.concat(second.slice(1)), span), 0.00002);
+    switch curve {
+      case [Move(Cut, Arc(_, _, _, first), _, _, _), Move(Cut, Arc(_, _, _, next), _, _, _)]:
+        if (!(first < 0.0 && next > 0.0)) throw "an S-curve turns one way, then the other";
+      case _: throw 'an S-curve becomes two arcs, got ${curve.length} operations';
+    }
     var coverage = ToolpathCoreCoverage.run();
-    Sys.println('ToolpathKit tests passed (${19 + coverage} assertions)');
+    Sys.println('ToolpathKit tests passed (${22 + coverage} assertions)');
   }
 }

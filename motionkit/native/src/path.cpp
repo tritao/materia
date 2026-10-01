@@ -58,7 +58,8 @@ bool valid_path(const mk_path_sample *samples, uint32_t count) {
             (i && point.s <= samples[i - 1].s)) return false;
         for (uint32_t j = 0; j < joints; ++j)
             if (!std::isfinite(point.position[j]) || !std::isfinite(point.first[j]) ||
-                !std::isfinite(point.second[j])) return false;
+                !std::isfinite(point.second[j]) || !std::isfinite(point.second_before[j]))
+                return false;
     }
     return true;
 }
@@ -222,7 +223,7 @@ Poly path_poly(const mk_path_sample &a, const mk_path_sample &b, uint32_t joint)
     const double ds = b.s - a.s;
     return hermite(a.position[joint], a.first[joint] * ds,
         a.second[joint] * ds * ds, b.position[joint],
-        b.first[joint] * ds, b.second[joint] * ds * ds);
+        b.first[joint] * ds, b.second_before[joint] * ds * ds);
 }
 
 PathState path_state(const mk_path_sample &a, const mk_path_sample &b,
@@ -614,7 +615,7 @@ mk_result MK_CALL mk_time_path(mk_path_handle path, const double *max_velocity,
         for (size_t span = 0; span + 1 < samples.size() && !nonlinear; ++span)
             for (uint32_t joint = 0; joint < joint_count; ++joint)
                 if (std::abs(samples[span].second[joint]) > 1e-10 ||
-                    std::abs(samples[span + 1].second[joint]) > 1e-10 ||
+                    std::abs(samples[span + 1].second_before[joint]) > 1e-10 ||
                     std::abs(samples[span].first[joint] - samples[span + 1].first[joint]) > 1e-10) {
                     nonlinear = true;
                     break;

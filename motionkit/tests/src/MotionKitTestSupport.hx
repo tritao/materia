@@ -367,7 +367,7 @@ class WristBranchSolver implements KinematicsSolver {
       tolerance:IkTolerance):Array<Array<Float>>
     return [solvePose(target, [for (_ in 0...6) 0.0], tolerance)];
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>>
-    return [for (_ in 0...6) 0.0];
+    return [twist.linearX, 0.0, 0.0, 0.0, 0.0, 0.0];
 }
 
 class PlanarSolver implements KinematicsSolver {
