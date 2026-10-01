@@ -599,3 +599,73 @@ Decisions TN-D1..D15 recorded above; nothing implemented yet. Next: TN0.
   names stay plain strings (no interning).
 - The TN0 suite is unchanged (10 / 17 / 0). References start using names
   in TN3.
+
+### 2026-10-01 — TN3 done: references by name
+
+- **TN0 now: 23 correct, 4 reported, 0 wrong** (from 10 / 17 / 0).
+  - Box fillet and chamfer after width, depth and height edits; the plate
+    sketch after thickness, width and an upstream hole; the revolve rim
+    after profile edits; the pattern boss after count 3 → 4; the
+    sketch-made face after its line moves: all correct.
+  - Still reported, as they should be: the slot that splits the top face
+    (`Ambiguous`), the sketch line split in two (`Unresolved`), and the two
+    part-connector edits (TN4).
+- **Names travel inside fingerprint records** (deviation: the plan had a
+  separate reference field).
+  - `TopologyFingerprint.capture` reads the element's own name. A face or
+    edge extracted from a named shape keeps it (TN1's `restrict_to`).
+  - So every holder of a fingerprint carries names with no new plumbing:
+    fillet and chamfer edges, sketch support faces, `FaceFeature`, editor
+    selection, and geometric connectors and face descriptors (TN4).
+  - The codec writes `name` into fingerprint records and `namingScheme` at
+    the document root; `DocumentCodec.VERSION` is 11 (MachineKit's pin
+    updated).
+- **One policy, in `TopologyResolver`** (`resolve` and `resolveAmong`):
+  1. One exact name resolves.
+  2. Several exact names, weak names, and tied relatives are decided by
+     geometry among those candidates only.
+  3. A weak name the geometry does not confirm falls back to geometry.
+  4. Named candidates still tied are `Ambiguous`, unless an exact
+     whole-shape geometric match exists (the floor of TN-D9).
+
+  The core grades the text (`cad_element_name_match_bytes`,
+  `ElementNames.match`): 3 exact, 2 weak, [1, 2) relative by split-suffix
+  overlap. Haxe reads names in bulk, so no `cad_shape_find_element` was
+  needed. After every successful remap the reference re-captures its
+  element, so its name follows it, and a legacy reference gets one on its
+  first resolution (tested: the v10 fixture saves with its name at v11).
+- **Cross-recompute history removed** (TN-D2): from `TopologyReference` and
+  `EditorScene.remapSelectedCadFace`. `TopologyHistoryMap` and
+  `TopologyRemapResult` are deleted. HaxeonSmoke's history check now reads
+  `Operation` directly.
+- **Stamping** (`Document.recompute` → `EvaluationResult.stamped`): each
+  staged result is stamped `f<id>` against its active dependencies' shapes.
+  - Rule refinement found by TN0: a split piece, ordinal or slot of an
+    input's element is not stamped, because it keeps that identity. Without
+    this, the slot's pieces became `f8:f1:box.+z{…}` and were no longer
+    relatives of `f1:box.+z`. Tested in the core smoke.
+- **Instances:** linear pattern `i<k>` (`i<k>.<j>` in 2D), polar `i<k>`, grid
+  `i<column>.<row>`, mirror's reflected copy `m` (`Shape.instance`).
+- **Starting names:**
+  - `SketchProfile` names each profile edge `e.<entity>` and each region
+    `r.<sorted outer-loop entities joined by +>`.
+  - `Sketch.circle` names its edge `circle`; `Sketch.slot` names
+    `slot.bottom/right/top/left`.
+  - `Curve.named` and `Sketch.named` seed a single edge or face.
+  - The core now names a planar face `face` (strong) unless it is seeded.
+- **Golden corpus:** `NamingGoldenSmoke` pins the face names of four
+  documents (box fillet, plate with hole and slot, sketch extrusion,
+  pattern). `CADKIT_NAMING_GOLDEN=print` reprints them.
+- **HaxeonSmoke checks 98 and 90** (two coincident cylinders) now test that
+  *geometry alone* is ambiguous; with names the rim resolves. That is the
+  improvement, not a regression.
+- **Not done, or done differently:**
+  - The `Deleted` state is no longer produced. History was its only source,
+    and "the name's tag names a missing feature" is not implemented, so a
+    lost element is `Unresolved`.
+  - Merge aliases are not stored.
+  - The app compiles (`haxeon build --compiler-only --project
+    app/haxeon.json`), but its suites were not run here: they need the
+    native UI submodules.
+  - `nativekit` (31 MB, no vendor libraries) is now populated in the
+    worktree for MachineKit's suite, which passes.

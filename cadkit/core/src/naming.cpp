@@ -14,6 +14,7 @@
 #include <gp_Pnt.hxx>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <iterator>
 #include <map>
@@ -504,23 +505,80 @@ ElementMapPtr seed(const TopoDS_Shape& shape, const ElementMap& names, ElementKi
     return result;
 }
 
+namespace {
+std::string relative_form(const std::string& name, std::set<std::string>& items);
+}  // namespace
+
 ElementMapPtr stamp(const TopoDS_Shape& shape, const ElementMap& names, const std::string& tag,
                     const std::vector<NamedShape>& inputs) {
     auto result = copy_of(names);
     const auto prefix = atom(tag) + ":";
     for (auto kind : {ElementKind::Face, ElementKind::Edge, ElementKind::Vertex}) {
+        // A split piece, an ordinal or a slot only divides an input's element: it keeps that identity untagged.
         std::set<std::string> known;
         for (const auto& input : inputs) {
-            const auto& inputNames = input.names->names(input.shape, kind);
-            known.insert(inputNames.begin(), inputNames.end());
+            for (const auto& name : input.names->names(input.shape, kind)) {
+                std::set<std::string> items;
+                known.insert(relative_form(name, items));
+            }
         }
         auto& target = kind == ElementKind::Face ? result->faces : kind == ElementKind::Edge ? result->edges : result->vertices;
         for (auto& name : target) {
-            if (!name.empty() && known.count(name) == 0) name = prefix + name;
+            std::set<std::string> items;
+            if (!name.empty() && known.count(relative_form(name, items)) == 0) name = prefix + name;
         }
     }
     (void)shape;
     return result;
+}
+
+namespace {
+
+// `name` without split suffixes, ordinals and input slots; the suffixes' items go to `items`.
+std::string relative_form(const std::string& name, std::set<std::string>& items) {
+    std::string result;
+    for (std::size_t i = 0; i < name.size(); ++i) {
+        const char c = name[i];
+        if (c == '{') {
+            int depth = 1;
+            std::string item;
+            std::size_t j = i + 1;
+            for (; j < name.size() && depth > 0; ++j) {
+                const char d = name[j];
+                if (d == '{' || d == '(') depth++;
+                if (d == '}' || d == ')') depth--;
+                if (depth == 0) break;
+                if (depth == 1 && d == ',') {
+                    items.insert(item);
+                    item.clear();
+                } else {
+                    item += d;
+                }
+            }
+            if (!item.empty()) items.insert(item);
+            i = j;
+        } else if ((c == '~' || c == '@') && i + 1 < name.size() && std::isdigit(static_cast<unsigned char>(name[i + 1]))) {
+            while (i + 1 < name.size() && std::isdigit(static_cast<unsigned char>(name[i + 1]))) ++i;
+        } else {
+            result += c;
+        }
+    }
+    return result;
+}
+
+}  // namespace
+
+double match_score(const std::string& reference, const std::string& candidate) {
+    if (reference == candidate) return is_weak(reference) ? 2.0 : 3.0;
+    std::set<std::string> referenceItems, candidateItems;
+    if (relative_form(reference, referenceItems) != relative_form(candidate, candidateItems)) return 0.0;
+    std::set<std::string> both, either;
+    std::set_intersection(referenceItems.begin(), referenceItems.end(), candidateItems.begin(), candidateItems.end(),
+                          std::inserter(both, both.begin()));
+    std::set_union(referenceItems.begin(), referenceItems.end(), candidateItems.begin(), candidateItems.end(),
+                   std::inserter(either, either.begin()));
+    const double overlap = either.empty() ? 1.0 : static_cast<double>(both.size()) / static_cast<double>(either.size());
+    return 1.0 + 0.99 * overlap;
 }
 
 std::string joined_names(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind) {

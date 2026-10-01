@@ -52,32 +52,32 @@ class NamingRobustnessSmoke {
 	static inline var WRONG = "wrong";
 	static inline var TOLERANCE = 1e-6;
 
-	/** The baseline outcome of every row (TN0, 2026-10-01). */
+	/** The outcome of every row: the TN0 baseline, raised as stages land (TN3: references by name). */
 	static var EXPECTED:Map<String, String> = [
 		"box fillet top/+x | control" => CORRECT,
 		"box chamfer top/+y | control" => CORRECT,
-		"box fillet top/+x | width" => REPORTED,
-		"box chamfer top/+y | width" => REPORTED,
-		"box fillet top/+x | depth" => REPORTED,
-		"box chamfer top/+y | depth" => REPORTED,
-		"box fillet top/+x | height" => REPORTED,
-		"box chamfer top/+y | height" => REPORTED,
+		"box fillet top/+x | width" => CORRECT,
+		"box chamfer top/+y | width" => CORRECT,
+		"box fillet top/+x | depth" => CORRECT,
+		"box chamfer top/+y | depth" => CORRECT,
+		"box fillet top/+x | height" => CORRECT,
+		"box chamfer top/+y | height" => CORRECT,
 		"plate sketch on top face | control" => CORRECT,
-		"plate sketch on top face | thickness" => REPORTED,
-		"plate sketch on top face | width" => REPORTED,
-		"plate sketch on top face | hole inside" => REPORTED,
+		"plate sketch on top face | thickness" => CORRECT,
+		"plate sketch on top face | width" => CORRECT,
+		"plate sketch on top face | hole inside" => CORRECT,
 		"plate sketch on top face | slot across" => REPORTED,
 		"revolve fillet outer top rim | control" => CORRECT,
-		"revolve fillet outer top rim | width" => REPORTED,
-		"revolve fillet outer top rim | height" => REPORTED,
+		"revolve fillet outer top rim | width" => CORRECT,
+		"revolve fillet outer top rim | height" => CORRECT,
 		"pattern fillet boss 1 rim | control" => CORRECT,
 		"pattern fillet boss 1 rim | spacing" => CORRECT,
-		"pattern fillet boss 1 rim | count" => REPORTED,
+		"pattern fillet boss 1 rim | count" => CORRECT,
 		"part connector on bore B | control" => CORRECT,
 		"part connector on bore B | widen" => REPORTED,
 		"part connector on bore B | move bore" => REPORTED,
 		"sketch-made side face | control" => CORRECT,
-		"sketch-made side face | move line" => REPORTED,
+		"sketch-made side face | move line" => CORRECT,
 		"sketch-made side face | redraw line" => CORRECT,
 		"sketch-made side face | split line" => REPORTED,
 		"legacy v10 box fillet | load" => CORRECT
@@ -291,6 +291,11 @@ class NamingRobustnessSmoke {
 		var document = DocumentCodec.decode(NamingLegacyFixtures.BOX_FILLET_V10);
 		var fillet:FilletFeature = cast document.featureAt(1);
 		judgeReference(row, document, fillet.edgeReferences[0], s -> lineAt(s, 10, 10, 30, 0, 1, 0));
+		// Resolved by geometry, the reference takes its element's name, and a save writes it (version 11).
+		var name = fillet.edgeReferences[0].fingerprintData().name;
+		var saved = DocumentCodec.encode(document);
+		if (name != "E(f1:box.+x|f1:box.+z)" || saved.indexOf('"name":"E(f1:box.+x|f1:box.+z)"') < 0 || saved.indexOf('"version":11') < 0)
+			throw 'NamingRobustnessSmoke: a legacy reference was not upgraded to its name (got $name)';
 		document.close();
 	}
 

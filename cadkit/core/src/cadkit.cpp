@@ -3767,7 +3767,8 @@ extern "C" CADKIT_API cad_result cad_planar_face(cad_shape outer, const cad_shap
                       "holes must not touch each other or the outer boundary");
         // Edges keep the wires' names; the face is the caller's to name (weak until seeded).
         naming::SharedCurveHistory history(faces(1));
-        names = naming::propagate(inputs, &history, faces(1));
+        // A face from one outer wire is the only face: `face` unless the caller names it (a sketch region).
+        names = naming::with_face_roles(faces(1), *naming::propagate(inputs, &history, faces(1)), {{faces(1), "face"}});
         return faces(1);
     }, &names);
 }
@@ -4046,5 +4047,23 @@ extern "C" CADKIT_API cad_result cad_shape_stamp_names(
         for (uint32_t i = 0; i < input_count; ++i) sources.push_back(model_named(inputs[i].shape));
         auto stamped = naming::stamp(named.shape, *named.names, tag, sources);
         return insert_shape(named.shape, out_shape, std::move(stamped));
+    });
+}
+
+extern "C" CADKIT_API cad_result cad_element_name_match_bytes(
+    const char* reference, const char* candidates, uint8_t* output, uint32_t* byte_capacity) {
+    return model_guard([&]() {
+        require_model(reference != nullptr && candidates != nullptr && byte_capacity != nullptr,
+                      "reference, candidates and byte_capacity must not be null");
+        std::vector<double> scores;
+        if (candidates[0] != 0)
+            for (const auto& candidate : split_lines(candidates)) scores.push_back(naming::match_score(reference, candidate));
+        const auto required = static_cast<uint32_t>(scores.size() * sizeof(double));
+        const auto capacity = *byte_capacity;
+        *byte_capacity = required;
+        if (capacity < required || (required != 0 && output == nullptr))
+            return fail(CAD_ERROR_BUFFER_TOO_SMALL, "score output buffer is too small");
+        if (required != 0) std::memcpy(output, scores.data(), required);
+        return CAD_OK;
     });
 }

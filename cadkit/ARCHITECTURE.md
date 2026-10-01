@@ -57,20 +57,24 @@ tested from a language-neutral caller.
 The first parametric document layer is Haxeon-only. It owns feature IDs,
 parameters, dependency ordering, staged recompute, and parameter transactions;
 it consumes `cadkit.Shape` and `cadkit.Operation` but is not visible to the
-native core. `TopologyReference` keeps an owning topology snapshot and remaps
-it after recompute using OCCT operation history first, then a conservative
-geometric fingerprint fallback. Haxeon selectors require deterministic
-selection: `unique` reports empty and ambiguous matches as typed errors, and
-ambiguous topology-reference fallback is preserved as an explicit state rather
-than guessed. Operation history mapping is centralized so generated and
-modified targets are deduplicated, multiple targets become ambiguous, and
-deleted sources become explicit `Deleted` references. Document recompute
+native core. Every core shape carries topological names for its faces, edges
+and vertices (`plans/TOPOLOGICAL_NAMING.md`): primitives and sketches give
+starting names, each operation carries them through its OCCT history, and
+the document stamps what each feature creates with the feature's id.
+`TopologyReference` keeps an owning topology snapshot and, after recompute,
+finds the element again by its name, with a conservative geometric
+fingerprint as the tie-breaker and the fallback (`TopologyResolver`).
+Operation history is only consumed inside one operation; it relates that
+evaluation's inputs to its outputs, not one recompute to the next. Haxeon
+selectors require deterministic selection: `unique` reports empty and
+ambiguous matches as typed errors, and ambiguous topology-reference
+resolution is preserved as an explicit state rather than guessed. Document recompute
 returns aggregate remap counts through the Haxeon document layer, including
 selected-edge failures discovered while evaluating staged results. A failed
 recompute records `Deleted` or `Ambiguous` before raising `RecomputeError`,
 so callers can inspect the failure and recover through undo/redo.
 `DocumentCodec` serializes the feature graph, parameters, and those
-fingerprints as versioned JSON; native handles and meshes never enter the
+fingerprints and names as versioned JSON; native handles and meshes never enter the
 document format. Profile extrusion and revolution are headless core
 operations; their Haxeon feature wrappers consume face or wire profiles.
 `FaceFeature` uses an index only for initial selection, then captures

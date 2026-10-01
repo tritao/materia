@@ -37,7 +37,6 @@ import cadkit.parametric.ReferenceState;
 import cadkit.parametric.SelectionRecipe;
 import cadkit.parametric.TopologyFingerprint;
 import cadkit.parametric.TopologyReference;
-import cadkit.parametric.TopologyHistoryMap;
 import cadkit.parametric.TopologyResolver;
 import cadkit.parametric.features.ExtrudeFeature;
 import cadkit.parametric.features.ConstrainedSketchFeature;
@@ -1045,7 +1044,7 @@ class EditorScene {
     return requestFrame;
   }
 
-  /** Resolve a selected face through producer history before considering geometry. */
+  /** Find the selected face again after a recompute: by its topological name, then its geometry (TopologyResolver). */
   function remapSelectedCadFace(session:CadDocumentSession, priorFace:Null<Shape>,
       fingerprint:TopologyFingerprint):Int {
     if (priorFace == null)
@@ -1055,20 +1054,9 @@ class EditorScene {
       return -1;
     var resultShape = output.currentShape();
     var index = -1;
-    var provenance = output.provenance;
-    if (provenance != null) {
-      var remap = new TopologyHistoryMap(provenance).remap(priorFace, CadKit.ShapeKind.Face);
-      if (remap.state == ReferenceState.Remapped && remap.shape != null) {
-        index = faceIndexOf(resultShape, remap.shape);
-      }
-      if (remap.shape != null)
-        remap.shape.close();
-    }
-    if (index < 0) {
-      var resolution = TopologyResolver.resolve(resultShape, fingerprint, CadKit.ShapeKind.Face, priorFace);
-      if (resolution.state == ReferenceState.Resolved)
-        index = resolution.index;
-    }
+    var resolution = TopologyResolver.resolve(resultShape, fingerprint, CadKit.ShapeKind.Face, priorFace);
+    if (resolution.state == ReferenceState.Resolved)
+      index = resolution.index;
     if (index < 0)
       return -1;
     var currentFace = resultShape.subshape(CadKit.ShapeKind.Face, index);
@@ -1085,18 +1073,6 @@ class EditorScene {
       currentFace.close();
       throw error;
     }
-  }
-
-  function faceIndexOf(source:Shape, candidate:Shape):Int {
-    var count = source.subshapeCount(CadKit.ShapeKind.Face);
-    for (index in 0...count) {
-      var face = source.subshape(CadKit.ShapeKind.Face, index);
-      var matches = candidate.sameAs(face);
-      face.close();
-      if (matches)
-        return index;
-    }
-    return -1;
   }
 
   function installSelectedCadFace(session:CadDocumentSession, face:Shape, index:Int,

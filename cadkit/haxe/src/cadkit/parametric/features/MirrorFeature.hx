@@ -46,7 +46,8 @@ class MirrorFeature extends Feature {
 			return EvaluationResult.fromOperation(reflection);
 		var reflected:Null<Shape> = null;
 		try {
-			reflected = reflection.resultShape();
+			// The reflected copy is told apart from the original by `m:` (plans/TOPOLOGICAL_NAMING.md).
+			reflected = Shape.instance(reflection.resultShape(), "m");
 			if (mode == "fuse") {
 				var fused = sourceShape.fuseOperation(reflected);
 				reflected.close();

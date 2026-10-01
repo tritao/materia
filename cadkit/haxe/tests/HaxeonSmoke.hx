@@ -22,7 +22,6 @@ import cadkit.parametric.features.TransformFeature;
 import cadkit.parametric.features.ToolCollectionFeature;
 import cadkit.parametric.TopologyReference;
 import cadkit.parametric.TopologyFingerprint;
-import cadkit.parametric.TopologyHistoryMap;
 import cadkit.parametric.TopologyResolver;
 import sys.FileSystem;
 
@@ -34,18 +33,13 @@ class HaxeonSmoke {
 		if (count == 0)
 			return true;
 		var source = operation.historySourceAt(relation, 0);
-		var result = new TopologyHistoryMap(operation).remap(source, source.kind());
-		var valid:Bool;
-		if (relation == CadKit.HistoryRelation.Deleted) {
-			valid = result.state == ReferenceState.Deleted && result.shape == null;
-		} else {
-			valid = (result.state == ReferenceState.Remapped ||
-				result.state == ReferenceState.Ambiguous);
-			if (result.state == ReferenceState.Remapped && result.shape == null)
-				valid = false;
+		// A deleted source has no target; generated and modified ones do.
+		var valid = true;
+		if (relation != CadKit.HistoryRelation.Deleted) {
+			var target = operation.historyTargetAt(relation, 0);
+			valid = target != null && !target.isClosed();
+			target.close();
 		}
-		if (result.shape != null)
-			result.shape.close();
 		source.close();
 		return valid;
 	}
@@ -73,6 +67,7 @@ class HaxeonSmoke {
 		MateSolverSmoke.run();
 		GeometricConnectorSmoke.run();
 		NamingSmoke.run();
+		NamingGoldenSmoke.run();
 		NamingRobustnessSmoke.run();
 		AssemblyDragSmoke.run();
 		PlacementFramesSmoke.run();
@@ -719,8 +714,13 @@ class HaxeonSmoke {
 		var ambiguousFingerprint = TopologyFingerprint.capture(fingerprintShape);
 		fingerprintShape.close();
 		circularEdge.close();
-		var ambiguousResolution = TopologyResolver.resolve(ambiguousShape, ambiguousFingerprint, CadKit.ShapeKind.Edge);
+		// Two coincident cylinders: geometry alone cannot tell their rims apart; their names can.
+		var ambiguousResolution = TopologyResolver.resolve(ambiguousShape, TopologyFingerprint.withoutName(ambiguousFingerprint),
+			CadKit.ShapeKind.Edge);
 		if (ambiguousResolution.state != ReferenceState.Ambiguous)
+			return 98;
+		if (ambiguousFingerprint.name == null ||
+			TopologyResolver.resolve(ambiguousShape, ambiguousFingerprint, CadKit.ShapeKind.Edge).state != ReferenceState.Resolved)
 			return 98;
 		var farFingerprint = TopologyFingerprint.fromData(CadKit.ShapeKind.Edge, CadKit.SurfaceKind.Unknown,
 			CadKit.CurveKind.Circle, 1.0e6, 1.0e6, 1.0e6, ambiguousFingerprint.dx, ambiguousFingerprint.dy,
@@ -756,7 +756,7 @@ class HaxeonSmoke {
 			ambiguousBase,
 			1.0,
 			null,
-			[ambiguousFingerprint]));
+			[TopologyFingerprint.withoutName(ambiguousFingerprint)]));
 		var ambiguousFailure:Null<RecomputeError> = null;
 		try {
 			ambiguousDocument.recompute();

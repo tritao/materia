@@ -27,6 +27,12 @@ class TopologyFingerprint {
 		closed edge, on where its seam vertex lies.
 	*/
 	public final midpoint:Bool;
+	/**
+		The element's topological name (plans/TOPOLOGICAL_NAMING.md), captured since document version 11; null for
+		older records and unnamed shapes. Resolution tries it first (`TopologyResolver`); the geometry above is then
+		the tie-breaker and the fallback.
+	*/
+	public final name:Null<String>;
 
 	private function new(
 		kind:CadKit.ShapeKind,
@@ -39,7 +45,8 @@ class TopologyFingerprint {
 		dy:Float,
 		dz:Float,
 		measure:Float,
-		midpoint:Bool) {
+		midpoint:Bool,
+		?name:String) {
 		this.kind = kind;
 		this.surfaceKind = surfaceKind;
 		this.curveKind = curveKind;
@@ -51,6 +58,7 @@ class TopologyFingerprint {
 		this.dz = dz;
 		this.measure = measure;
 		this.midpoint = midpoint;
+		this.name = name;
 	}
 
 	public static function fromData(
@@ -64,13 +72,33 @@ class TopologyFingerprint {
 		dy:Float,
 		dz:Float,
 		measure:Float,
-		midpoint:Bool = true):TopologyFingerprint {
+		midpoint:Bool = true,
+		?name:String):TopologyFingerprint {
 		return new TopologyFingerprint(
-			kind, surfaceKind, curveKind, x, y, z, dx, dy, dz, measure, midpoint);
+			kind, surfaceKind, curveKind, x, y, z, dx, dy, dz, measure, midpoint, name);
 	}
 
-	/** `shape`'s fingerprint; an edge's position is its midpoint, or its first vertex when `midpoint` is false (older documents). */
+	/**
+		`shape`'s fingerprint and name; an edge's position is its midpoint, or its first vertex when `midpoint` is false
+		(older documents). The name is the element's own: a face or edge taken from a named shape keeps its name.
+	*/
 	public static function capture(shape:Shape, midpoint:Bool = true):TopologyFingerprint {
+		var measured = geometryOf(shape, midpoint);
+		var names = shape.elementNames(measured.kind);
+		if (names.length != 1)
+			return measured;
+		return new TopologyFingerprint(measured.kind, measured.surfaceKind, measured.curveKind, measured.x, measured.y, measured.z,
+			measured.dx, measured.dy, measured.dz, measured.measure, measured.midpoint, names[0]);
+	}
+
+	/** `fingerprint`'s geometry alone, for resolution that must not consult names. */
+	public static function withoutName(fingerprint:TopologyFingerprint):TopologyFingerprint {
+		return new TopologyFingerprint(fingerprint.kind, fingerprint.surfaceKind, fingerprint.curveKind, fingerprint.x, fingerprint.y,
+			fingerprint.z, fingerprint.dx, fingerprint.dy, fingerprint.dz, fingerprint.measure, fingerprint.midpoint);
+	}
+
+	/** `shape`'s geometry alone. */
+	static function geometryOf(shape:Shape, midpoint:Bool):TopologyFingerprint {
 		var kind = shape.kind();
 		if (kind == CadKit.ShapeKind.Face) {
 			var surface = shape.surfaceKind();
@@ -137,7 +165,7 @@ class TopologyFingerprint {
 			return -1.0e30;
 		if (kind == CadKit.ShapeKind.Edge && candidate.curveKind() != curveKind)
 			return -1.0e30;
-		return scoreAgainst(capture(candidate, midpoint));
+		return scoreAgainst(geometryOf(candidate, midpoint));
 	}
 
 	/**

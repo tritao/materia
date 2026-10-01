@@ -171,9 +171,16 @@ ElementMapPtr seed(const TopoDS_Shape& shape, const ElementMap& names, ElementKi
                    const std::vector<std::string>& seeds);
 
 // `names` with `tag:` prefixed to every face name and tracked edge or vertex
-// name that no input has (TN-D5).
+// name that no input has (TN-D5). Pieces of an input's split element, and
+// names that differ from an input's only by ordinal or slot, are not new.
 ElementMapPtr stamp(const TopoDS_Shape& shape, const ElementMap& names, const std::string& tag,
                     const std::vector<NamedShape>& inputs);
+
+// How well a stored name matches a candidate (TN-D9, TN-D10): 3 exact,
+// 2 exact but weak, 1 + 0.99 * overlap for a relative (the same name once
+// split suffixes, ordinals and input slots are removed; overlap is the
+// Jaccard index of their split suffixes, 1 when neither has any), 0 none.
+double match_score(const std::string& reference, const std::string& candidate);
 
 // The final names of `kind`, newline-separated.
 std::string joined_names(const TopoDS_Shape& shape, const ElementMap& names, ElementKind kind);

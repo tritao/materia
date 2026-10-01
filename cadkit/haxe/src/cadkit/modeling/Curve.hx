@@ -25,6 +25,21 @@ class Curve extends Model {
 		}
 	}
 
+	/**
+		`curve`, a single edge, with that edge named `id` (a sketch entity, a template role), so the faces swept from it
+		are named after it (plans/TOPOLOGICAL_NAMING.md). Takes ownership of `curve`.
+	**/
+	public static function named(curve:Curve, id:String):Curve {
+		try {
+			var result = new Curve(curve.shape.withElementNames(CadKit.ShapeKind.Edge, [id]));
+			curve.close();
+			return result;
+		} catch (error:Dynamic) {
+			curve.close();
+			throw error;
+		}
+	}
+
 	public static function line(start:Vector, end:Vector):Curve {
 		return new Curve(Shape.fromOwnedHandle(CadKit.lineChecked(start.native(), end.native())));
 	}

@@ -195,7 +195,7 @@ void check_seeds() {
     assert(name_set(wire, CAD_SHAPE_EDGE) == (std::set<std::string>{"bottom", "right%20side", "top", "left"}));
     assert(cad_planar_face(wire, nullptr, 0, &face) == CAD_OK);
     assert(name_set(face, CAD_SHAPE_EDGE) == (std::set<std::string>{"bottom", "right%20side", "top", "left"}));
-    assert(weak(names(face, CAD_SHAPE_FACE).front()));
+    assert(names(face, CAD_SHAPE_FACE) == (std::vector<std::string>{"face"}));
     assert(cad_shape_seed_names(face, CAD_SHAPE_FACE, "r.outer", &region) == CAD_OK);
     assert(names(region, CAD_SHAPE_FACE) == (std::vector<std::string>{"r.outer"}));
 
@@ -282,6 +282,12 @@ void check_operations() {
     // Each piece is named by the faces that bound only it: the left one has the hole.
     assert(contains(slottedFaces, "f1:box.+z{f1:box.-x,f2:cyl.side,f3:box.-x}") &&
            contains(slottedFaces, "f1:box.+z{f1:box.+x,f3:box.+x}"));
+    // Stamping a feature's result leaves split pieces of its inputs' faces untagged: they keep that identity.
+    cad_shape_ref cutInputs[2] = {{holed}, {slot}};
+    cad_shape restamped = 0;
+    assert(cad_shape_stamp_names(slotted, "f4", cutInputs, 2, &restamped) == CAD_OK);
+    assert(contains(name_set(restamped, CAD_SHAPE_FACE), "f1:box.+z{f1:box.+x,f3:box.+x}"));
+    cad_shape_destroy(restamped);
     cad_shape fused = 0, common = 0;
     assert(cad_fuse(plate, slot, &fused) == CAD_OK);
     expect_complete("fuse", fused);
@@ -350,6 +356,26 @@ void check_operations() {
         cad_shape_destroy(shape);
 }
 
+
+std::vector<double> scores(const char* reference, const char* candidates) {
+    std::uint32_t capacity = 0;
+    cad_element_name_match_bytes(reference, candidates, nullptr, &capacity);
+    std::vector<double> result(capacity / sizeof(double));
+    assert(cad_element_name_match_bytes(reference, candidates, reinterpret_cast<std::uint8_t*>(result.data()), &capacity) == CAD_OK);
+    return result;
+}
+
+// Matching is text only: exact, exact but weak, relatives graded by their split pieces, none.
+void check_matching() {
+    const auto graded = scores("f1:box.+z", "f1:box.+z\nf1:box.+z{f3:box.-x}\nf1:box.+x\nface#2");
+    assert(graded.size() == 4 && graded[0] == 3.0 && graded[1] == 1.0 && graded[2] == 0.0 && graded[3] == 0.0);
+    assert(scores("face#2", "face#2").front() == 2.0);
+    const auto pieces = scores("f1:box.+z{f2:cyl.side,f3:box.-x}", "f1:box.+z{f1:box.-x,f2:cyl.side,f3:box.-x}\nf1:box.+z{f1:box.+x,f3:box.+x}");
+    assert(pieces[0] > pieces[1] && pieces[1] >= 1.0);
+    assert(scores("E(f1:box.+x|f1:box.+z)", "E(f1:box.+x|f1:box.+z{f3:box.+x})").front() == 1.0);
+    assert(scores("x", "").empty());
+}
+
 }  // namespace
 
 int main() {
@@ -360,6 +386,7 @@ int main() {
     check_seeds();
     check_unadapted();
     check_operations();
+    check_matching();
     std::puts("cadkit naming smoke passed");
     return 0;
 }

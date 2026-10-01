@@ -135,6 +135,21 @@ class Shape {
 		return new Shape(CadKit.shapeStampNamesChecked(native.borrow(), tag, refs));
 	}
 
+	/**
+		`copy` with every name prefixed by `tag:`, for one instance among copies of a shape (a pattern's `i2.0`, a
+		mirror's `m`), so the copies stay distinguishable. Takes ownership of `copy`.
+	**/
+	public static function instance(copy:Shape, tag:String):Shape {
+		try {
+			var result = copy.stamped(tag, []);
+			copy.close();
+			return result;
+		} catch (error:Dynamic) {
+			copy.close();
+			throw error;
+		}
+	}
+
 	public static function namingScheme():Int {
 		return CadKit.namingSchemeVersionChecked();
 	}

@@ -10,7 +10,6 @@ import cadkit.parametric.Feature;
 import cadkit.parametric.ParametricError;
 import cadkit.parametric.ReferenceState;
 import cadkit.parametric.TopologyFingerprint;
-import cadkit.parametric.TopologyHistoryMap;
 import cadkit.parametric.TopologyReferenceUpdate;
 
 /** A document-owned topology selection that can be remapped after recompute. */
@@ -155,24 +154,8 @@ class TopologyReference {
 		if (state == ReferenceState.Closed)
 			throw new ParametricError("closed topology references cannot be resolved");
 
-		if (operation != null && current != null) {
-			var historyResult = new TopologyHistoryMap(operation).remap(current, kind);
-			switch historyResult.state {
-				case ReferenceState.Remapped:
-					if (historyResult.shape != null)
-						return historyResult.shape;
-				case ReferenceState.Deleted:
-					markDeleted();
-					throw new ParametricError(
-						"topology reference is Deleted", ReferenceState.Deleted);
-				case ReferenceState.Ambiguous:
-					markAmbiguous();
-					throw new ParametricError(
-						"topology reference is Ambiguous", ReferenceState.Ambiguous);
-				case ReferenceState.Resolved, ReferenceState.Unresolved, ReferenceState.Closed:
-			}
-		}
-
+		// Operation history only relates one evaluation's inputs to its outputs; across recomputes the element is
+		// found by its name, then its geometry (plans/TOPOLOGICAL_NAMING.md, TN-D2). `operation` is unused.
 		var resolved = findFallback(result);
 		if (resolved != null)
 			return resolved;
@@ -206,22 +189,6 @@ class TopologyReference {
 		var nextFingerprint = fingerprint;
 		var nextAmbiguous = false;
 		try {
-			if (operation != null && current != null) {
-				var historyResult = new TopologyHistoryMap(operation).remap(current, kind);
-				switch historyResult.state {
-					case ReferenceState.Remapped:
-						if (historyResult.shape != null) {
-							next = historyResult.shape;
-							nextState = ReferenceState.Remapped;
-						}
-					case ReferenceState.Deleted:
-						nextState = ReferenceState.Deleted;
-					case ReferenceState.Ambiguous:
-						nextState = ReferenceState.Ambiguous;
-					case ReferenceState.Resolved, ReferenceState.Unresolved, ReferenceState.Closed:
-				}
-			}
-
 			if (next == null && nextState != ReferenceState.Deleted && nextState != ReferenceState.Ambiguous && result != null) {
 				var resolution = TopologyResolver.resolve(result, fingerprint, kind, current);
 				if (resolution.state == ReferenceState.Resolved)

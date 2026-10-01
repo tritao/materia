@@ -2,6 +2,7 @@
 class NamingFocused {
 	static function main():Int {
 		NamingSmoke.run();
+		NamingGoldenSmoke.run();
 		NamingRobustnessSmoke.run();
 		return 0;
 	}
