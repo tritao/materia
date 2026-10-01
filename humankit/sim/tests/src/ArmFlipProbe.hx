@@ -18,6 +18,7 @@ class ArmFlipProbe {
         var tracked = Sys.getEnv("PROBE_SIDE") != null ? Sys.getEnv("PROBE_SIDE") : parts[0];
         var side = tracked == "left" ? "L" : "R";
         var before:Null<Array<Float>> = null;
+        var lastRoot:Null<Array<Float>> = null;
         var lastHand:Null<Array<Float>> = null, lastShoulder:Null<Array<Float>> = null;
         var worstRate = 0.0, worstAt = -1;
         var rates:Array<Float> = [];
@@ -41,10 +42,15 @@ class ArmFlipProbe {
             var handSpeed = 0.0, shoulderSpeed = 0.0;
             if (lastHand != null) { handSpeed = len(Mat4.subtract(hand, lastHand)) / 0.01; shoulderSpeed = len(Mat4.subtract(shoulder, lastShoulder)) / 0.01; }
             lastHand = hand; lastShoulder = shoulder;
+            var travel = worker.body.rootTransform();
+            var travelDirection = lastRoot == null ? 0.0 : Math.atan2(travel[13] - lastRoot[1], travel[12] - lastRoot[0]);
+            var facingNow = Math.atan2(travel[1], travel[0]);
+            var crab = lastRoot == null || Math.abs(travel[13] - lastRoot[1]) + Math.abs(travel[12] - lastRoot[0]) < 1e-5 ? 0.0 : Math.atan2(Math.sin(travelDirection - facingNow), Math.cos(travelDirection - facingNow)) * 180.0 / Math.PI;
+            lastRoot = [travel[12], travel[13]];
             var feetInfo = "";
             if (Sys.getEnv("PROBE_FEET") != null) {
                 var footL = worker.body.toWorld(pose.bonePosition(HumanBone.FootL)), footR = worker.body.toWorld(pose.bonePosition(HumanBone.FootR));
-                feetInfo = ' footL=${footL.map(f).join(",")} footR=${footR.map(f).join(",")} lock=${f(worker.body.footHold())} walking=${worker.body.walker.isWalking()} turning=${worker.body.walker.isTurning()} share=${f(worker.body.walker.stanceShare())}';
+                feetInfo = ' footL=${footL.map(f).join(",")} footR=${footR.map(f).join(",")} lock=${f(worker.body.footHold())} crab=${f(crab)}deg walking=${worker.body.walker.isWalking()} turning=${worker.body.walker.isTurning()} share=${f(worker.body.walker.stanceShare())}';
             }
             rows.push('$ticks ${worker.currentActionLabel()} crouch=${f(worker.body.crouchAmount())} kneel=${f(worker.body.kneelAmount())} hinge=${f(worker.body.character.spineHinge())} lean=${f(worker.body.character.spineLean())} elbow=${f(angle)}deg reach=${f(len(Mat4.subtract(hand, shoulder)))} handSpeed=${f(handSpeed)} shoulderSpeed=${f(shoulderSpeed)} clearance=${f(gate.clearance)} root=${f(worker.body.rootTransform()[12])},${f(worker.body.rootTransform()[13])} spineX=${f(pose.bonePosition(HumanBone.Spine)[0])} pelvisX=${f(pose.bonePosition(HumanBone.Pelvis)[0])} reachW=${f(worker.body.reachWeight(humankit.HumanLimb.ArmL))}$feetInfo rate=${f(rate)} normal=${normal == null ? "-" : normal.map(f).join(",")} shoulder=${shoulder.map(f).join(",")} elbowPos=${elbow.map(f).join(",")} hand=${hand.map(f).join(",")}');
         }

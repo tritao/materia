@@ -51,7 +51,7 @@ class UniversalSweepTests {
             floor = Math.max(floor, gate.naturalness.floorPenetration);
             footJerk = Math.max(footJerk, gate.naturalness.maxFootJerk);
             tilt = Math.max(tilt, gate.naturalness.maxFootTilt);
-            if (gate.naturalness.maxSlide > 0.1) Sys.println('SLIDE $label: ${gate.slideReport()}');
+            if (gate.naturalness.maxSlide > 0.055) Sys.println('SLIDE $label: ${gate.slideReport()}');
             var worst = gate.worst();
             report.push('$label clearance ${Math.round(gate.clearance * 100) / 100} lean ${Math.round(gate.lean * 100) / 100} crouch ${Math.round(deepest * 100) / 100} kneel ${Math.round(kneeled * 100) / 100} hinge ${Math.round(hinged * 100) / 100} turn ${Math.round(worst.turn * 100) / 100} speed ${Math.round(worst.speed * 100) / 100}');
             runs++;

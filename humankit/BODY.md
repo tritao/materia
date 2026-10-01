@@ -173,6 +173,19 @@ carrying walk and the backward walk each start at theirs. On the library sweep t
 or only the planted foot's, was tried first: it helped one rig and hurt the other, because a foot about to lift is low and slow for its
 first moments and counts as planted, so the prediction has to follow the same rule `Naturalness` uses.
 
+## Stopping and standing up
+
+Braking to a stop, rising from a full crouch and walking off are each measured on their own (`HumanKitTests.stoppingAndRising`, from the floor the worker
+stood on): the library character slides a planted foot 0.02 m braking, 0 m rising (the hold pins the feet through it) and 0.02 m walking
+off; the bundled worker 0.04 m braking. Inside whole jobs the worst foot slide is 0.07 m, from three places: a foot planted while crouched that
+creeps while the worker rises and sets off (0.06 m), a foot as the knee goes down (0.07 m), and the walk after a release (0.06 m). One
+cause of slide the scenarios do not show is the route start: the root follows the route exactly while the heading chases it at `turnRate`, so a body
+that sets off facing away from the route moved backwards past its planted feet (up to 145 degrees off its facing for a few tenths of a second).
+The walker now moves only as far as it faces along the route (`paceShare`, the cosine of the heading's error), which costs a little time at
+such a start and cut foot jerk by a quarter. Turning on the spot first, with the turn clips, was tried and is the better motion, but it exposes
+every place a turn clip's end is not seamless for an arm that is not held (a reaching arm, a carrying one, a withdrawn one) one after another,
+so it is not done; the two-clip turn now starts its second clip in the tick the root takes up the first, so the one jump is at one moment.
+
 ## Standing at a surface
 
 The planner stands the worker square to the edge it works at, not along the line it walked up (the nearest of the four directions the box's
@@ -202,8 +215,8 @@ and 2 cm inside (with the hold and the walk's start phase, 0.07 m; see "Holding 
 (the library's walk is as good as the bundled one, 6 cm against 5). The rest, up to 23 cm, is getting up to speed and
 stopping: while the body accelerates the idle pose that is still showing keeps its feet still, so a planted foot is dragged
 by the distance travelled (about half the speed times the ramp, 15 cm), and a crouched worker standing up slides its feet
-about 13 cm. A faster cross-fade cuts the drag but throws the arms (hand speed 3 m/s), so the cure is to lock the planted
-foot in the world with leg IK (the library's legs are chains), or to use start and stop clips; neither is done.
+about 13 cm. A faster cross-fade cuts the drag but throws the arms (hand speed 3 m/s); the cure that was taken is to lock the planted
+foot in the world with leg IK (the library's legs are chains, see "Holding the feet") and to start the walk where its feet match the idle stance.
 These are limits to hold, not claims of naturalness: nothing yet compares to a reference motion or
 renders a frame.
 

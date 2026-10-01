@@ -51,6 +51,8 @@ class HumanWalker {
 	var y:Float = 0.0;
 	var heading:Float = 0.0;
 	var facing:Null<Float> = null;
+	/** How much of the pace the heading allows: 1 facing along the route, 0 facing across it or away from it. */
+	var paceShare:Float = 1.0;
 	var preserveHeading:Bool = false;
 	var retreating:Bool = false;
 
@@ -245,7 +247,11 @@ class HumanWalker {
 			velocity = Math.min(speed, velocity + acceleration * seconds);
 			if (!loop)
 				velocity = Math.min(velocity, Math.sqrt(2.0 * acceleration * Math.max(0.0, length - travelled)));
-			travelled += velocity * seconds;
+			// The root follows the route exactly while the heading chases it, so a body that walks while facing away from the way it
+			// goes moves sideways or backwards past its planted feet: it moves only as far as it faces along the route.
+			paceShare = 1.0;
+			if (!preserveHeading) paceShare = Math.max(0.0, Math.cos(wrap(tangentAt(travelled) - heading)));
+			travelled += velocity * paceShare * seconds;
 			if (loop)
 				travelled %= length;
 			else if (travelled >= length - 1e-6) {
@@ -273,7 +279,7 @@ class HumanWalker {
 			} else
 				heading = wrap(heading + (turn > 0.0 ? limit : -limit));
 		}
-		character.player.speed = walking && (!retreating || backGait != null) ? velocity / routeGait.naturalSpeed : 1.0;
+		character.player.speed = walking && (!retreating || backGait != null) ? velocity * paceShare / routeGait.naturalSpeed : 1.0;
 		character.advance(seconds);
 	}
 
@@ -287,18 +293,23 @@ class HumanWalker {
 			turnsLeft = 0;
 			return;
 		}
-		if (turnPlaying == null) {
-			turnPlaying = clip;
-			turnClock = 0.0;
-			if (character.player.currentClip() == clip.clip) character.player.restart(clip.clip, false);
-			else character.player.play(clip.clip, 0.15, false);
-		}
+		if (turnPlaying == null) startTurnClip(clip);
 		turnClock += seconds;
 		if (turnClock < clip.seconds) return;
 		heading = wrap(heading + clip.angle);
 		turnsLeft--;
 		turnPlaying = null;
+		// The root takes up the turn and the next clip starts (or the idle pose returns) in the same tick, so the one jump of the
+		// whole pose in the model's frame is at the one moment.
 		if (turnsLeft == 0) character.player.restart(idleClip);
+		else startTurnClip(clip);
+	}
+
+	function startTurnClip(clip:HumanTurn):Void {
+		turnPlaying = clip;
+		turnClock = 0.0;
+		if (character.player.currentClip() == clip.clip) character.player.restart(clip.clip, false);
+		else character.player.play(clip.clip, 0.15, false);
 	}
 
 	/** The character root: standing at the walker's position, turned to its heading. */

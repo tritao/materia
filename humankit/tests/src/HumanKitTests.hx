@@ -125,6 +125,7 @@ class HumanKitTests {
 		kneeling(scene);
 		footKeepsItsPitch(scene);
 		naturalness(scene, worker, rig, "bundled");
+		stoppingAndRising(scene, worker, rig, "bundled", 0.06);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -236,6 +237,7 @@ class HumanKitTests {
 		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
 		var againRig = HumanoidRig.detect(again);
 		naturalness(scene, again, againRig, "library", 0.1);
+		stoppingAndRising(scene, again, againRig, "library", 0.04);
 		walking(scene, again, againRig);
 		elbowStaysPut(scene, again, againRig);
 		leaning(scene, again, againRig);
@@ -929,6 +931,51 @@ class HumanKitTests {
 		}
 		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
 			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
+		human.dispose();
+	}
+
+	/**
+	 * The two moments a planted foot is most likely to slide: braking to a stop at the end of a walk, and rising from a
+	 * crouch and walking off. Each is measured from the floor the worker stood on, so a foot in the air at the first sample
+	 * does not count as planted.
+	 */
+	static function stoppingAndRising(scene:Scene, asset:AnimationAsset, rig:HumanoidRig, label:String, stopLimit:Float):Void {
+		var step = 1.0 / 60.0;
+		var human = new HumanCharacter(scene, asset, rig, null, "Stopper");
+		var body = new HumanBody(human);
+		for (_ in 0...30) body.advance(step);
+		var still = new Naturalness();
+		for (_ in 0...120) { body.advance(step); still.sample(body, step); }
+		var stopping = new Naturalness();
+		stopping.standOnTheFloorOf(still);
+		body.walker.follow([[0.0, 0.0], [3.0, 0.0]], 1.0);
+		for (index in 0...330) {
+			body.advance(step);
+			if (index >= 70) stopping.sample(body, step);
+		}
+		Sys.println('STOP ${label}: ${stopping.summary()}');
+		if (stopping.maxSlide > stopLimit) throw 'Braking to a stop slid a planted foot ${stopping.maxSlide} m ($label), over $stopLimit: ${stopping.summary()}';
+		human.dispose();
+		human = new HumanCharacter(scene, asset, rig, null, "Riser");
+		body = new HumanBody(human);
+		if (!body.canCrouch()) { human.dispose(); return; }
+		for (_ in 0...30) body.advance(step);
+		var floor = new Naturalness();
+		for (_ in 0...60) { body.advance(step); floor.sample(body, step); }
+		body.setCrouch(1.0);
+		for (_ in 0...180) body.advance(step);
+		var rising = new Naturalness();
+		rising.standOnTheFloorOf(floor);
+		body.setCrouch(0.0);
+		for (_ in 0...150) { body.advance(step); rising.sample(body, step); }
+		Sys.println('RISE ${label}: ${rising.summary()}');
+		if (rising.maxSlide > 0.03) throw 'Rising from a crouch slid a planted foot ${rising.maxSlide} m ($label): ${rising.summary()}';
+		var leaving = new Naturalness();
+		leaving.standOnTheFloorOf(floor);
+		body.walker.follow([[0.0, 0.0], [3.0, 0.0]], 1.0);
+		for (index in 0...200) { body.advance(step); leaving.sample(body, step); }
+		Sys.println('LEAVE ${label}: ${leaving.summary()}');
+		if (leaving.maxSlide > 0.04) throw 'Walking off after rising from a crouch slid a planted foot ${leaving.maxSlide} m ($label): ${leaving.summary()}';
 		human.dispose();
 	}
 
