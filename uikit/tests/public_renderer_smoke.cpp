@@ -31,6 +31,7 @@
 #include <cstring>
 #include <initializer_list>
 #include <thread>
+#include <string>
 #include <vector>
 
 #ifndef NKUI_TEST_FONT_PATH
@@ -802,6 +803,32 @@ int main(int argc, char **argv) {
                      static_cast<unsigned long long>(resource_highwater[5]));
     if (ready)
         nk_surface_make_current(surface);
+    if (!result && ready) {
+        // Most of this paragraph lies outside the framebuffer. Uploading all
+        // of its quads overflows the fixed glyph stream even though few show.
+        const std::string long_word(100000, 'a');
+        nkui_resource long_text{};
+        nkui_display_list long_list{};
+        nkui_text_style style{sizeof(style), NKUI_FONT_FAMILY_DEFAULT, 18.0f, 0.0f};
+        nkui_paragraph_style paragraph{sizeof(paragraph), 0.0f, NKUI_TEXT_WRAP_NONE,
+                                       NKUI_TEXT_ALIGN_START, NKUI_TEXT_DIRECTION_AUTO};
+        if (nkui_text_layout_create_styled(fonts, long_word.c_str(), 200.0f, &style,
+                                           &paragraph, &long_text) != NKUI_OK ||
+            nkui_display_list_create(&long_list) != NKUI_OK) {
+            result = 25;
+        } else {
+            const nkui_draw_rect_command draw{{NKUI_COMMAND_DRAW_TEXT_LAYOUT,
+                NKUI_COMMAND_VERSION, sizeof(draw)}, long_text, 0.0f, 0.0f, 0.0f, 0.0f};
+            const nkui_frame_info frame{sizeof(frame), static_cast<float>(width),
+                static_cast<float>(height), width, height, 1.0f};
+            if (nkui_display_list_submit(long_list, reinterpret_cast<const uint8_t*>(&draw),
+                                         sizeof(draw)) != NKUI_OK ||
+                nkui_renderer_render_frame(renderer, long_list, surface, &frame) != NKUI_OK)
+                result = 26;
+        }
+        nkui_display_list_destroy(long_list);
+        nkui_resource_destroy(long_text);
+    }
     if (nkui_renderer_destroy(renderer) != NKUI_OK)
         result = 9;
     else if (nkui_renderer_destroy(renderer) != NKUI_ERROR_INVALID_HANDLE)

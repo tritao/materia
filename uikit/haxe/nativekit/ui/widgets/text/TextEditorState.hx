@@ -18,6 +18,9 @@ import nativekit.editorkit.TextOffsetMap;
 /** Persistent editable text, selection and IME composition state for one widget ID. */
 class TextEditorState {
 	static inline var caretBlinkHalfPeriod:Float = 0.5;
+	// Real width arrives during measurement. Avoid a one-pixel provisional
+	// layout that creates a visual line per character across large documents.
+	static inline var initialLayoutWidth:Float = 1.0e30;
 
 	public var text(get, never):String;
 	public var selectionStart(default, null):Int;
@@ -87,7 +90,7 @@ class TextEditorState {
 		compositionEnd = -1;
 		focused = false;
 		draggingSelection = false;
-		layout = new TextEditorLayout(fonts, initialText, 1.0, this.textStyle,
+		layout = new TextEditorLayout(fonts, initialText, initialLayoutWidth, this.textStyle,
 			this.paragraphStyle, offsets);
 		renderColor = Color.rgba(1.0, 1.0, 1.0, 1.0);
 		renderMeasurement = new LayoutMeasuredContent(function(constraints:LayoutMeasureConstraints) {
@@ -101,7 +104,7 @@ class TextEditorState {
 			layout.paint(canvas, renderColor, scrollOffsetY + visible.y,
 				scrollOffsetY + visible.y + visible.height, visible.x, visible.x + visible.width, false);
 		});
-		lastLayoutWidth = 1.0;
+		lastLayoutWidth = initialLayoutWidth;
 		lastLayoutRevision = offsets.revision;
 		lastPointerClickTime = -1.0;
 		lastPointerClickX = 0.0;

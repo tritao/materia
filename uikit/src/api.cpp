@@ -1194,8 +1194,8 @@ nkui_result create_text_layout_locked(nkui_resource fonts, const char *text, flo
     bool valid = layout_slot->text->valid() &&
                  layout_slot->text->set_atlas_namespace(static_cast<uint16_t>(out_layout->id));
     valid = valid && layout_slot->text->layout_utf8(text, width, options);
-    valid = valid && layout_slot->text->prepare_glyphs(0.0f, 0.0f, 1.0f, nkui::GlyphMode::Alpha,
-                                                       layout_slot->text_glyphs);
+    // Measurement and caret queries do not need rasterized glyphs. Prepare
+    // them only when a render command references this layout.
     if (!valid) {
         release_resource_slot(*layout_slot);
         out_layout->id = 0;
@@ -2424,15 +2424,11 @@ extern "C" nkui_result nkui_text_layout_update(nkui_resource layout, const char 
     nkui::TextLayoutResult shaped;
     if (!slot->text->layout_utf8(text ? text : "", width, options, &shaped))
         return NKUI_ERROR_INVALID_ARGUMENT;
-    nkui::PreparedGlyphs updated;
-    if (!slot->text->prepare_glyphs(0.0f, 0.0f, 1.0f, nkui::GlyphMode::Alpha, updated))
-        return NKUI_ERROR_RENDERING;
-    tint_text_glyphs(updated, slot->text_color);
     slot->text_width = width;
     slot->text_options = options;
     slot->text_color_ranges.clear();
     ++slot->text_content_revision;
-    slot->text_glyphs = std::move(updated);
+    slot->text_glyphs = {};
     slot->scaled_text_glyphs.clear();
     slot->text->prune_layout_cache({shaped.id}, 1);
     return NKUI_OK;
@@ -2446,13 +2442,9 @@ extern "C" nkui_result nkui_text_layout_set_text(nkui_resource layout, const cha
     nkui::TextLayoutResult shaped;
     if (!slot->text->layout_utf8(text ? text : "", slot->text_width, slot->text_options, &shaped))
         return NKUI_ERROR_INVALID_ARGUMENT;
-    nkui::PreparedGlyphs updated;
-    if (!slot->text->prepare_glyphs(0.0f, 0.0f, 1.0f, nkui::GlyphMode::Alpha, updated))
-        return NKUI_ERROR_RENDERING;
-    tint_text_glyphs(updated, slot->text_color);
     slot->text_color_ranges.clear();
     ++slot->text_content_revision;
-    slot->text_glyphs = std::move(updated);
+    slot->text_glyphs = {};
     slot->scaled_text_glyphs.clear();
     slot->text->prune_layout_cache({shaped.id}, 1);
     return NKUI_OK;

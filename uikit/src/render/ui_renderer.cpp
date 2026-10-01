@@ -2262,31 +2262,44 @@ bool UiRendererImpl::drawGlyphs(const PreparedGlyphs &glyphs, const float transf
             batch.mode == GlyphMode::Color ? state_->color_glyph_pipeline
             : batch.mode == GlyphMode::Sdf ? state_->sdf_glyph_pipeline
                                            : state_->alpha_glyph_pipeline;
-        std::vector<GlyphVertex> vertices(glyphs.vertices.begin() + batch.first_vertex,
-                                          glyphs.vertices.begin() + batch.first_vertex +
-                                              batch.vertex_count);
-        for (auto &vertex : vertices) {
-            const float x = vertex.x + origin_x;
-            const float y = vertex.y + origin_y;
-            vertex.x = x * transform[0] + y * transform[2] + transform[4] + snap_x;
-            vertex.y = x * transform[1] + y * transform[3] + transform[5] + snap_y;
-            vertex.alpha = static_cast<uint8_t>(vertex.alpha * opacity);
-        }
-        if (snap_quads && batch.mode == GlyphMode::Alpha) {
-            // Each glyph is four vertices, top-left first.
-            for (size_t quad = 0; quad + 3 < vertices.size(); quad += 4) {
-                const float shift_x = std::round(vertices[quad].x) - vertices[quad].x;
-                const float shift_y = std::round(vertices[quad].y) - vertices[quad].y;
-                for (size_t corner = 0; corner < 4; ++corner) {
-                    vertices[quad + corner].x += shift_x;
-                    vertices[quad + corner].y += shift_y;
+        // A retained paragraph can contain millions of offscreen glyphs.
+        // Cull transformed quads before appending to the bounded GPU streams.
+        std::vector<GlyphVertex> vertices;
+        std::vector<uint32_t> indices;
+        for (uint32_t quad = 0; quad + 3 < batch.vertex_count; quad += 4) {
+            std::array<GlyphVertex, 4> corners;
+            float left = INFINITY, top = INFINITY;
+            float right = -INFINITY, bottom = -INFINITY;
+            for (size_t corner = 0; corner < 4; ++corner) {
+                auto vertex = glyphs.vertices[batch.first_vertex + quad + corner];
+                const float x = vertex.x + origin_x;
+                const float y = vertex.y + origin_y;
+                vertex.x = x * transform[0] + y * transform[2] + transform[4] + snap_x;
+                vertex.y = x * transform[1] + y * transform[3] + transform[5] + snap_y;
+                vertex.alpha = static_cast<uint8_t>(vertex.alpha * opacity);
+                corners[corner] = vertex;
+            }
+            if (snap_quads && batch.mode == GlyphMode::Alpha) {
+                const float shift_x = std::round(corners[0].x) - corners[0].x;
+                const float shift_y = std::round(corners[0].y) - corners[0].y;
+                for (auto &vertex : corners) {
+                    vertex.x += shift_x;
+                    vertex.y += shift_y;
                 }
             }
+            for (const auto &vertex : corners) {
+                left = std::min(left, vertex.x);
+                top = std::min(top, vertex.y);
+                right = std::max(right, vertex.x);
+                bottom = std::max(bottom, vertex.y);
+            }
+            if (right <= 0.0f || bottom <= 0.0f || left >= state_->width || top >= state_->height)
+                continue;
+            const uint32_t base = static_cast<uint32_t>(vertices.size());
+            vertices.insert(vertices.end(), corners.begin(), corners.end());
+            const uint32_t quad_indices[] = {base, base + 1, base + 2, base, base + 2, base + 3};
+            indices.insert(indices.end(), std::begin(quad_indices), std::end(quad_indices));
         }
-        std::vector<uint32_t> indices;
-        indices.reserve(batch.index_count);
-        for (uint32_t index = 0; index < batch.index_count; ++index)
-            indices.push_back(glyphs.indices[batch.first_index + index] - batch.first_vertex);
         if (!draw_mesh(*state_, pipeline, vertices, indices, nullptr, 0, atlas->second.image,
                        glyph_sampler, state_->glyph_vertices))
             return false;

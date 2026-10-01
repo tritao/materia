@@ -474,6 +474,15 @@ class FrameworkSmoke {
 			return 274;
 		nativeDeleteEditor.dispose();
 		editor.dispose();
+		var provisionalEditor = new TextEditorState(fonts, "abcdefghijklmnopqrstuv");
+		var unconstrained = provisionalEditor.layout.measure();
+		if (unconstrained.width < 100.0 || unconstrained.height > 50.0)
+			return 501;
+		provisionalEditor.updateLayout(25.0);
+		if (provisionalEditor.layout.measure().height < unconstrained.height * 3.0 ||
+			provisionalEditor.selectionFocus != 22)
+			return 502;
+		provisionalEditor.dispose();
 		var blinkEditor = new TextEditorState(fonts, "caret");
 		blinkEditor.focused = true;
 		blinkEditor.resetCaretBlink(10.0);

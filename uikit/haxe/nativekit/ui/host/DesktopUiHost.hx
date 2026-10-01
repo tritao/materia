@@ -35,6 +35,7 @@ class DesktopUiHost {
 		var events:Null<NativeKitEvents> = null;
 		var eventSubscription:Null<NativeKitEventSubscription> = null;
 		var recordSubscription:Null<NativeKitEventSubscription> = null;
+		var inputTraceSubscription:Null<NativeKitEventSubscription> = null;
 		var recordPath:Null<String> = null;
 		var nativeSurface:Null<NativeKitSurface> = null;
 		var frameSubscription:Null<NativeKitSurfaceFrameSubscription> = null;
@@ -147,6 +148,20 @@ class DesktopUiHost {
 			var nextCaretFrameAt = -1.0;
 			var frameRequestReason = "none";
 			var frameRequestSerial = 0;
+			var inputRequestedAt = -1.0;
+			var lastInputDeliveredAt = -1.0;
+			var inputRequestCount = 0;
+			var inputDispatchSeconds = 0.0;
+			if (options.captureDirectory != null)
+				inputTraceSubscription = pump.listen(function(value) {
+					switch value {
+						case TextInput(source, _) if (source.rawValue() == window.rawValue()):
+							lastInputDeliveredAt = Sys.time();
+							if (inputRequestedAt < 0.0) inputRequestedAt = lastInputDeliveredAt;
+							inputRequestCount++;
+						case _:
+					}
+				});
 			var incrementCount = function(counts:Map<String, Int>, key:String):Void {
 				var previous = counts.get(key);
 				counts.set(key, previous == null ? 1 : previous + 1);
@@ -174,6 +189,8 @@ class DesktopUiHost {
 
 			eventSubscription = pump.listen(function(value) {
 				var eventName = eventKind(value);
+				if (eventName == "TextInput" && lastInputDeliveredAt >= 0.0)
+					inputDispatchSeconds += Sys.time() - lastInputDeliveredAt;
 				incrementCount(eventCounts, eventName);
 				if (options.eventHistoryLimit > 0) {
 					eventHistory.push(Std.string(value));
@@ -214,6 +231,13 @@ class DesktopUiHost {
 									var requestedAt = frameRequestedAt;
 									var requestReason = frameRequestReason;
 									var requestSerial = frameRequestSerial;
+									// Keep delivered text input even if caret/API requests coalesce.
+									var textInputRequestedAt = inputRequestedAt;
+									var textInputCount = inputRequestCount;
+									var textInputDispatchSeconds = inputDispatchSeconds;
+									inputRequestedAt = -1.0;
+									inputRequestCount = 0;
+									inputDispatchSeconds = 0.0;
 									frameRequested = false;
 									runtime.resize(runtime.logicalWidth, runtime.logicalHeight, width, height);
 									var frameStartedAt = Sys.time();
@@ -236,6 +260,9 @@ class DesktopUiHost {
 											startedAtSeconds: frameStartedAt,
 											requestReason: requestReason,
 											requestSerial: requestSerial,
+											textInputCount: textInputCount,
+											textInputRequestAgeSeconds: textInputRequestedAt < 0.0 ? null : frameStartedAt - textInputRequestedAt,
+											textInputDispatchSeconds: textInputDispatchSeconds,
 											requestAgeSeconds: requestedAt < 0.0 ? null : frameStartedAt - requestedAt,
 											frameSeconds: Sys.time() - frameStartedAt,
 											submitSeconds: metrics == null ? null : metrics.submitSeconds,
@@ -361,6 +388,10 @@ class DesktopUiHost {
 		frameSubscription = null;
 		if (ownedFrameSubscription != null)
 			try ownedFrameSubscription.dispose() catch (error:Dynamic) if (session != null) session.cleanupFailed("frame-subscription", error);
+		var ownedInputTraceSubscription = inputTraceSubscription;
+		inputTraceSubscription = null;
+		if (ownedInputTraceSubscription != null)
+			try ownedInputTraceSubscription.dispose() catch (error:Dynamic) if (session != null) session.cleanupFailed("input-trace-subscription", error);
 		var ownedEventSubscription = eventSubscription;
 		eventSubscription = null;
 		if (ownedEventSubscription != null)
