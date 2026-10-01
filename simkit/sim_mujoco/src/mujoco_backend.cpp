@@ -21,6 +21,27 @@
 namespace nksim_mujoco {
 namespace {
 
+// Marks a geom as one of ours in mjModel::geom_user, so the contact filter below treats any other model as MuJoCo
+// would. Slot 0 is the marker; slot 1 is 1 for a geom whose body is, or can become, dynamic.
+constexpr mjtNum kGeomMarker = 7019.3125;
+constexpr int kGeomUser = 2;
+
+// Neither a KINEMATIC nor a STATIC body can be moved by a contact, so a contact between two bodies that cannot be
+// dynamic only costs solver work. Filtering them here is a table lookup per candidate pair; the by-name excludes this
+// replaces were added one pair at a time, each making MuJoCo hash the whole model, so building a world of N
+// kinematic bodies took time cubic in N. The rest is MuJoCo's own test (the layer and mask of either geom meeting
+// the other's), which a contact filter replaces rather than adds to.
+int contact_filter(const mjModel *m, mjData *, int geom1, int geom2) {
+    if (m->nuser_geom >= kGeomUser) {
+        const mjtNum *first = m->geom_user + kGeomUser * geom1;
+        const mjtNum *second = m->geom_user + kGeomUser * geom2;
+        if (first[0] == kGeomMarker && second[0] == kGeomMarker && first[1] == 0.0 && second[1] == 0.0)
+            return 1;
+    }
+    return !(m->geom_contype[geom1] & m->geom_conaffinity[geom2]) &&
+           !(m->geom_contype[geom2] & m->geom_conaffinity[geom1]);
+}
+
 std::atomic<std::uint64_t> distance_call_count{0};
 
 using Vec3 = std::array<double, 3>;
@@ -34,6 +55,12 @@ struct BodyRecord {
     std::array<double, 3> free_inertia{};
     bool free_inertia_saved = false;
 };
+
+// A held free body may become dynamic again without another rebuild, so it keeps its contacts with static bodies.
+bool can_be_dynamic(const BodyRecord &body) {
+    return body.desc.motion_type == NKSIM_MOTION_DYNAMIC ||
+        (body.desc.motion_type == NKSIM_MOTION_KINEMATIC && body.free_inertia_saved);
+}
 
 struct RestBox {
     Vec3 center{};
@@ -329,6 +356,9 @@ public:
         if (!spec)
             return NKSIM_ERROR_OUT_OF_MEMORY;
         spec->compiler.degree = 0; // SimKit joint limits are SI radians.
+        spec->nuser_geom = kGeomUser;
+        // The hook is process-wide and idempotent; models that are not ours get MuJoCo's own test from it.
+        mjcb_contactfilter = &contact_filter;
         spec->option.gravity[0] = desc.gravity[0];
         spec->option.gravity[1] = desc.gravity[1];
         spec->option.gravity[2] = desc.gravity[2];
@@ -534,7 +564,22 @@ public:
         std::copy(qvel.begin(), qvel.end(), data->qvel);
         mj_forward(model, data);
         record.desc.motion_type = motion_type;
+        mark_geoms(id);
         return NKSIM_OK;
+    }
+
+    /** Tells the contact filter whether a body's geoms belong to a body that is, or can become, dynamic. */
+    void mark_geoms(std::uint64_t body_id) {
+        const auto found = bodies.find(body_id);
+        if (found == bodies.end() || !model) return;
+        const auto &record = found->second;
+        for (std::size_t part = 0; part < record.desc.shape_parts.size(); ++part) {
+            const auto name = record.name + "_part_" + std::to_string(part);
+            const auto geom_id = mj_name2id(model, mjOBJ_GEOM, name.c_str());
+            if (geom_id < 0) continue;
+            model->geom_user[kGeomUser * geom_id] = kGeomMarker;
+            model->geom_user[kGeomUser * geom_id + 1] = can_be_dynamic(record) ? 1.0 : 0.0;
+        }
     }
 
     nksim_result apply_forces(const nksim::BackendBodyForce *forces,
@@ -1172,8 +1217,10 @@ private:
                 const auto geom_id = mj_name2id(model, mjOBJ_GEOM, name.c_str());
                 if (geom_id >= 0) geom_owner.emplace(geom_id,
                     std::make_pair(body_id, static_cast<std::int32_t>(part)));
+
             }
         }
+        for (const auto body_id : body_order) mark_geoms(body_id);
         proximity_candidates.clear();
         for (int first = 0; first < model->ngeom; ++first) {
             const auto first_owner = geom_owner.find(first);
@@ -1269,18 +1316,10 @@ private:
             for (std::size_t j = i + 1; j < body_order.size(); ++j) {
                 const auto first = body_order[i], second = body_order[j];
                 const auto &body_a = bodies.at(first), &body_b = bodies.at(second);
-                // A held free body may become dynamic again without another
-                // rebuild. Keep its static contacts in the compiled model.
-                const auto can_be_dynamic = [](const BodyRecord &body) {
-                    return body.desc.motion_type == NKSIM_MOTION_DYNAMIC ||
-                        (body.desc.motion_type == NKSIM_MOTION_KINEMATIC && body.free_inertia_saved);
-                };
-                const bool neither_dynamic = !can_be_dynamic(body_a) && !can_be_dynamic(body_b);
                 const bool real_exclude = is_same_articulation(first, second) &&
                     (is_parent_child(first, second) || geometries_overlap_at_rest(body_a, body_b));
                 if (real_exclude) real_excludes.emplace(std::min(first, second), std::max(first, second));
-                const bool needs_exclude = neither_dynamic || real_exclude;
-                if (!needs_exclude) continue;
+                if (!real_exclude) continue;
                 auto *exclude = mjs_addExclude(spec);
                 if (!exclude) return NKSIM_ERROR_OUT_OF_MEMORY;
                 mjs_setString(exclude->bodyname1, body_a.name.c_str());
