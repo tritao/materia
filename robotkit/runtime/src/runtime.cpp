@@ -157,13 +157,6 @@ rk_result validate_appended_path(
     return RK_OK;
 }
 
-/** Appends validated knots, replacing the queue's end marker with theirs. */
-void append_knots(std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queue,
-    std::vector<RobotRuntime::RuntimeTrajectoryPoint> &&added) {
-    if (!queue.empty() && !queue.back().has_segment) queue.pop_back();
-    for (auto &knot : added) queue.push_back(std::move(knot));
-}
-
 /** Queued knots, excluding the end marker, once `added` replaces it. */
 std::size_t knots_after_append(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &queue,
     const std::vector<RobotRuntime::RuntimeTrajectoryPoint> &added) {
@@ -565,8 +558,8 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             if (submitted != RK_OK) return submitted;
         }
         const bool was_idle = !control_.trajectory_active;
-        if (replace) control_.trajectory = std::move(replaced);
-        append_knots(control_.trajectory, std::move(added));
+        if (replace) replace_trajectory(std::move(replaced));
+        append_trajectory(std::move(added));
         control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
         std::fill_n(velocity_anchor_pending_, blueprint_.joint_count, false);
@@ -675,7 +668,7 @@ void RobotRuntime::latch_fault(bool clear_control, int32_t fault_code) {
     emergency_stop.kind = RK_COMMAND_EMERGENCY_STOP;
     endpoint_->apply(emergency_stop);
     if (clear_control)
-        control_ = {};
+        reset_control();
     latched_fault_code_ = fault_code;
     std::lock_guard state_lock(state_mutex_);
     if (clear_control) {
@@ -707,7 +700,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         state_backup_ = state_;
         state_backup_valid_ = true;
     }
+    // The queue is journalled rather than copied: knots only leave its front and
+    // join its back, so a discarded tick is undone in the size of its changes.
+    auto queue = std::move(control_.trajectory);
     control_backup_ = control_;
+    control_.trajectory = std::move(queue);
+    trajectory_journal_ = {};
+    trajectory_journal_.originals = control_.trajectory.size();
     std::copy_n(commanded_position_, RK_MAX_JOINTS, commanded_position_backup_);
     std::copy_n(velocity_anchor_pending_, RK_MAX_JOINTS,
         velocity_anchor_pending_backup_);
@@ -958,7 +957,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         control_.stop_ramp_time_ns = 0;
         std::copy_n(positions, blueprint_.joint_count, control_.stop_ramp_positions);
         std::copy_n(velocities, blueprint_.joint_count, control_.stop_ramp_velocities);
-        control_.trajectory.clear();
+        clear_trajectory();
         control_.trajectory_history_valid = false;
         control_.trajectory_time_ns = 0;
         control_.trajectory_active = false;
@@ -974,7 +973,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         if (control_.stop_ramp_active)
             return true;
         if (!control_.trajectory_active || control_.trajectory.empty()) {
-            control_ = {};
+            reset_control();
             return false;
         }
         refresh_trajectory_progress();
@@ -988,7 +987,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         }
         if (has_acceleration_limits) {
             if (control_.trajectory_rate <= 0.0) {
-                control_.trajectory.clear();
+                clear_trajectory();
                 control_.trajectory_history_valid = false;
                 control_.trajectory_active = false;
                 control_.hold_requested = false;
@@ -1034,7 +1033,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
 
     if (emergency != nullptr) {
         safe_channels(owner_time_ns, RK_EVENT_STOP_SAFE);
-        control_ = {};
+        reset_control();
         final_kind = RK_COMMAND_EMERGENCY_STOP;
         final_timestamp_ns = emergency->timestamp_ns;
         safety = RK_SAFETY_EMERGENCY_STOP;
@@ -1072,7 +1071,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
             final_kind = value.kind;
 
             if (value.kind == RK_COMMAND_RESET_SAFETY) {
-                control_ = {};
+                reset_control();
                 latched_fault_code_ = 1;
                 controlled_stop = false;
                 safety = RK_SAFETY_READY;
@@ -1149,7 +1148,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 } else if (control_.stop_ramp_active) {
                     controlled_stop = true;
                 } else {
-                    control_ = {};
+                    reset_control();
                 }
                 safety = RK_SAFETY_READY;
                 continue;
@@ -1199,7 +1198,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 const bool replace_active_motion = control_.trajectory_active ||
                     !control_.trajectory.empty() || control_.stop_ramp_active;
                 if (replace_active_motion) {
-                    control_.trajectory.clear();
+                    clear_trajectory();
                     control_.trajectory_history_valid = false;
                     control_.trajectory_time_ns = 0;
                     control_.trajectory_active = false;
@@ -1294,7 +1293,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     return RK_ERROR_LIMIT;
                 }
                 if (checked != RK_OK) return checked;
-                append_knots(control_.trajectory, std::move(added));
+                append_trajectory(std::move(added));
                 // While a path-following stop runs, a chunk only extends the
                 // path the stop may use; the stop keeps its current rate and
                 // still ends at rest. Resuming means waiting for the stop to
@@ -1379,7 +1378,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                control_.trajectory[1].point.time_from_start_ns <= control_.trajectory_time_ns) {
             control_.trajectory_history = control_.trajectory.front();
             control_.trajectory_history_valid = true;
-            control_.trajectory.pop_front();
+            pop_trajectory_front();
         }
         point = control_.trajectory.front().point;
         evaluate_knot(control_.trajectory.front(), control_.trajectory_time_ns,
@@ -1445,7 +1444,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     static_cast<uint64_t>(stop_after_crossing_seconds * 1'000'000'000.0));
                 write_stop_ramp_targets(output);
             } else {
-                control_.trajectory.clear();
+                clear_trajectory();
                 control_.trajectory_history_valid = false;
                 control_.trajectory_time_ns = 0;
                 control_.trajectory_active = false;
@@ -1700,13 +1699,70 @@ void RobotRuntime::set_externally_driven(bool value) noexcept {
     externally_driven_ = value;
 }
 
+void RobotRuntime::pop_trajectory_front() {
+    auto &queue = control_.trajectory;
+    if (trajectory_journal_.originals > 0) {
+        trajectory_journal_.removed.push_back(std::move(queue.front()));
+        --trajectory_journal_.originals;
+    } else {
+        --trajectory_journal_.appended;
+    }
+    queue.pop_front();
+}
+
+void RobotRuntime::clear_trajectory() {
+    auto &queue = control_.trajectory;
+    for (std::size_t index = 0; index < trajectory_journal_.originals; ++index)
+        trajectory_journal_.removed.push_back(std::move(queue[index]));
+    trajectory_journal_.originals = 0;
+    trajectory_journal_.appended = 0;
+    queue.clear();
+}
+
+void RobotRuntime::reset_control() {
+    clear_trajectory();
+    control_ = {};
+}
+
+void RobotRuntime::append_trajectory(std::vector<RuntimeTrajectoryPoint> &&added) {
+    auto &queue = control_.trajectory;
+    // The knots replace the queue's end marker with their own.
+    if (!queue.empty() && !queue.back().has_segment) {
+        if (trajectory_journal_.appended > 0) {
+            --trajectory_journal_.appended;
+        } else {
+            trajectory_journal_.end_marker = std::move(queue.back());
+            --trajectory_journal_.originals;
+        }
+        queue.pop_back();
+    }
+    for (auto &knot : added) queue.push_back(std::move(knot));
+    trajectory_journal_.appended += added.size();
+}
+
+void RobotRuntime::replace_trajectory(std::deque<RuntimeTrajectoryPoint> &&queue) {
+    clear_trajectory();
+    control_.trajectory = std::move(queue);
+    trajectory_journal_.appended = control_.trajectory.size();
+}
+
 void RobotRuntime::discard_pending_commands() noexcept {
     std::lock_guard owner_lock(owner_mutex_);
     endpoint_->discard_pending();
     std::lock_guard state_lock(state_mutex_);
     if (state_backup_valid_) {
         state_ = state_backup_;
+        auto queue = std::move(control_.trajectory);
+        for (std::size_t added = 0; added < trajectory_journal_.appended; ++added)
+            queue.pop_back();
+        if (trajectory_journal_.end_marker)
+            queue.push_back(std::move(*trajectory_journal_.end_marker));
+        for (auto it = trajectory_journal_.removed.rbegin();
+             it != trajectory_journal_.removed.rend(); ++it)
+            queue.push_front(std::move(*it));
         control_ = control_backup_;
+        control_.trajectory = std::move(queue);
+        trajectory_journal_ = {};
         std::copy_n(commanded_position_backup_, RK_MAX_JOINTS, commanded_position_);
         std::copy_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS,
             velocity_anchor_pending_);
@@ -1745,6 +1801,7 @@ void RobotRuntime::reset_state() noexcept {
     std::fill_n(velocity_anchor_pending_, RK_MAX_JOINTS, false);
     std::fill_n(velocity_anchor_pending_backup_, RK_MAX_JOINTS, false);
     control_backup_ = {};
+    trajectory_journal_ = {};
     state_backup_valid_ = false;
 }
 

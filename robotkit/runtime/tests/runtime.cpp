@@ -1632,6 +1632,39 @@ void plan_start_ignores_chunking(const rk_robot_runtime_blueprint &blueprint) {
         assert(std::abs(whole[step] - split[step]) < 1e-9);
 }
 
+void discarded_tick_restores_trajectory(const rk_robot_runtime_blueprint &blueprint) {
+    // A discarded world tick leaves the runtime as if it never ran: the knots it
+    // consumed, the path it appended and the stop that cleared it are all undone.
+    auto make = [&]() {
+        auto runtime = std::make_unique<robotkit::RobotRuntime>(blueprint,
+            std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count),
+            std::chrono::milliseconds(100));
+        assert(runtime->submit_segments(trajectory_command(1), trajectory_batch(
+            {{0, 0.0}, {100'000'000, 0.1}, {200'000'000, 0.2}, {300'000'000, 0.3},
+             {400'000'000, 0.4}, {500'000'000, 0.5}})) == RK_OK);
+        return runtime;
+    };
+    auto kept = make(), discarded = make();
+    uint64_t kept_time = 0, discarded_time = 0;
+    for (int step = 0; step < 2; ++step) {
+        apply_cycle(*kept, kept_time);
+        apply_cycle(*discarded, discarded_time);
+    }
+    assert(discarded->submit_segments(trajectory_command(2), trajectory_batch(
+        {{0, 0.5}, {100'000'000, 0.6}})) == RK_OK);
+    assert(discarded->apply_pending_commands() == RK_OK);
+    discarded->discard_pending_commands();
+    assert(discarded->submit(lifecycle_command(3, RK_COMMAND_STOP)) == RK_OK);
+    assert(discarded->apply_pending_commands() == RK_OK);
+    discarded->discard_pending_commands();
+    for (int step = 0; step < 8; ++step) {
+        const auto a = apply_cycle(*kept, kept_time);
+        const auto b = apply_cycle(*discarded, discarded_time);
+        assert(a.position[0] == b.position[0] && a.trajectory_active == b.trajectory_active &&
+            a.trajectory_queue_depth == b.trajectory_queue_depth);
+    }
+}
+
 void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
@@ -1912,6 +1945,7 @@ int main() {
     stop_braking_uses_segment_degree(blueprint);
     declared_plan_completion_and_underflow(blueprint);
     plan_start_ignores_chunking(blueprint);
+    discarded_tick_restores_trajectory(blueprint);
     native_hold_resume_and_abort(blueprint);
     plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);

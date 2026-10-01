@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <optional>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -322,7 +323,25 @@ private:
         uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause);
     void safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only = false);
     int32_t latched_fault_code_ = 1;
+    /** The control state at the start of the world tick, without its trajectory queue. */
     ControlState control_backup_{};
+    /**
+      How this tick changed the trajectory queue, so a discarded tick undoes it
+      without copying the queue: knots only leave the front and join the back.
+    **/
+    struct TrajectoryJournal {
+        std::vector<RuntimeTrajectoryPoint> removed; ///< Knots of the tick's start taken from the front, in order.
+        std::optional<RuntimeTrajectoryPoint> end_marker; ///< The starting end marker an append replaced.
+        std::size_t originals = 0; ///< Knots of the tick's start still at the front.
+        std::size_t appended = 0; ///< Knots added this tick, at the back.
+    };
+    TrajectoryJournal trajectory_journal_;
+    void pop_trajectory_front();
+    void clear_trajectory();
+    /** Clears the trajectory through the journal, then every other control field. */
+    void reset_control();
+    void append_trajectory(std::vector<RuntimeTrajectoryPoint> &&added);
+    void replace_trajectory(std::deque<RuntimeTrajectoryPoint> &&queue);
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};
     double commanded_position_backup_[RK_MAX_JOINTS]{};

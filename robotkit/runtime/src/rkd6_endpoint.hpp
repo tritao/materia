@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <span>
 #include <utility>
 #include <vector>
@@ -22,6 +23,8 @@ public:
     virtual bool receive(std::vector<std::uint8_t> &frame) = 0;
     virtual unsigned baud() const noexcept = 0;
     virtual std::uint64_t received_at_ns() const noexcept { return 0; }
+    /** Bytes handed to the transport and not yet on the line, when it can tell. */
+    virtual std::optional<std::size_t> queued_output_bytes() const noexcept { return std::nullopt; }
 };
 
 class RK_API Rkd6Endpoint final : public RobotEndpoint {
@@ -56,7 +59,7 @@ public:
     }
     std::uint64_t committed_until_ticks() const noexcept { return committed_until_ticks_; }
     std::pair<std::size_t, std::size_t> bookkeeping_counts() const noexcept {
-        return {sent_.size(), path_maps_.size()};
+        return {sent_.size(), chunk_timings_.size()};
     }
 
 private:
@@ -68,8 +71,19 @@ private:
     bool send_commit(std::uint64_t through_ticks);
     void poll_frames(std::uint64_t owner_now_ns);
     void pump_queue();
-    /** Whether the line clears within an owner period, so a commit sent next never waits long behind segments. */
-    bool link_has_room() const noexcept { return link_free_at_ns_ <= now_ns_ + owner_period_ns_; }
+    /** How long the line takes to send what it already holds. */
+    std::uint64_t link_drain_ns() const noexcept;
+    /** How far ahead of the device's path clock a commit is sent. */
+    std::uint64_t commit_margin_ns() const noexcept;
+    /**
+      The most the line may hold when segments are sent: a commit due then is
+      seen up to an owner period late, waits for the line, and crosses the link
+      within the margin it was due at.
+    **/
+    std::uint64_t segment_backlog_budget_ns() const noexcept;
+    /** Whether `segment` can go now and the line still clear within the budget. */
+    bool link_has_room(const DeviceSegment6 &segment) const noexcept;
+    void send_due_commit();
 
     std::unique_ptr<Rkd6Transport> transport_;
     device_wire6::SessionAck6 ack_{};
@@ -96,12 +110,22 @@ private:
     std::deque<DeviceSegment6> pending_;
     std::vector<DeviceSegment6> sent_;
     std::size_t next_commit_ = 0;
-    struct PathMap {
-        std::uint64_t device_start_ticks;
+    /**
+      How one submitted chunk's path time maps to device ticks: through the
+      clock mapping it was compiled with, shifted to meet the queued path. A
+      boundary or commit inside it maps to exactly the ticks its segments
+      carry, however the clock estimate has moved since.
+    **/
+    struct ChunkTiming {
         std::uint64_t host_path_start_ns;
-        double ticks_per_host_ns;
+        std::uint64_t device_start_ticks;
+        std::uint64_t host_epoch_ns;
+        ClockMap6 clock;
+        std::int64_t shift_ticks;
     };
-    std::vector<PathMap> path_maps_;
+    std::vector<ChunkTiming> chunk_timings_;
+    /** Device ticks of the queued path at `path_ns`, or 0 when no chunk covers it. */
+    std::uint64_t device_ticks_at(std::uint64_t path_ns) const noexcept;
     struct PlanTag {
         std::uint64_t plan_id;
         std::uint64_t start_ticks;

@@ -16,7 +16,7 @@ struct RunResult {
 };
 
 RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = false,
-    bool hold = false, bool append = false) {
+    bool hold = false, bool append = false, bool resynced = false) {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -52,22 +52,24 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
         submitted, endpoint->diagnostic_code());
     assert(submitted == RK_OK);
     if (replace) {
-        // Wait for device status proving it received the segment boundary.
-        for (std::uint64_t now = 130'000'000; now <= 180'000'000; now += 10'000'000)
+        // Wait for device status proving it received the segment boundary, and,
+        // when resynced, for time syncs to refine the clock past what the plan used.
+        const std::uint64_t settled_ns = resynced ? 380'000'000 : 180'000'000;
+        for (std::uint64_t now = 130'000'000; now <= settled_ns; now += 10'000'000)
             assert(endpoint->sample(now, state) == RK_OK);
         auto late = plan;
         late.plan_id = 9;
         late.replace_after_plan_id = 8;
         late.start_position[0] = 0.25;
         late.segments.segments[0].coefficients[0].value[0] = 0.25;
-        assert(endpoint->submit_device_plan(late, 500'000'000, 120'000'000,
+        assert(endpoint->submit_device_plan(late, 500'000'000, settled_ns + 10'000'000,
             520'000'000, blueprint) == RK_ERROR_INVALID_STATE);
         auto next = plan;
         next.plan_id = 10;
         next.replace_after_plan_id = 8;
         next.start_position[0] = 0.5;
         next.segments.segments[0].coefficients[0].value[0] = 0.5;
-        assert(endpoint->submit_device_plan(next, 1'000'000'000, 120'000'000,
+        assert(endpoint->submit_device_plan(next, 1'000'000'000, settled_ns + 10'000'000,
             1'020'000'000, blueprint) == RK_OK);
     }
     if (append) {
@@ -86,7 +88,8 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
     }
     const auto end_ns = replace || append ? 2'220'000'000ULL :
         hold ? 1'420'000'000ULL : 1'220'000'000ULL;
-    for (std::uint64_t now = replace ? 190'000'000 : append ? 390'000'000 : 130'000'000;
+    for (std::uint64_t now = replace ? (resynced ? 390'000'000 : 190'000'000) :
+            append ? 390'000'000 : 130'000'000;
          now <= end_ns; now += 10'000'000) {
         if (cut && now == 330'000'000) endpoint->cut_link(true);
         if (hold && (now == 330'000'000 || now == 530'000'000)) {
@@ -535,6 +538,10 @@ int main() {
     const auto appended = run(config, false, false, false, true);
     assert(std::abs(appended.position - 1.0) <= 0.00101);
     assert(appended.state.safety == RK_SAFETY_READY);
+    // So does a replacement: its boundary is where the queued path has it on the device.
+    const auto replaced_disturbed = run(config, false, true, false, false, true);
+    assert(std::abs(replaced_disturbed.position - 1.0) <= 0.00101);
+    assert(replaced_disturbed.state.safety == RK_SAFETY_READY);
     assert(disturbed.steps == run(config).steps);
     const auto interrupted = run(VirtualDeviceConfig6{.fingerprint = config.fingerprint,
         .steps_per_unit = config.steps_per_unit, .clock_bound_ns = config.clock_bound_ns}, true);

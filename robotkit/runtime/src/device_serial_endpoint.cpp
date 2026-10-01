@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <fcntl.h>
 #include <poll.h>
+#include <sys/ioctl.h>
 #include <random>
 #include <termios.h>
 #include <unistd.h>
@@ -34,6 +35,11 @@ public:
     PosixRkd6Transport(int fd, unsigned baud) : fd_(fd), baud_(baud) {}
     ~PosixRkd6Transport() override { if (fd_ >= 0) ::close(fd_); }
     unsigned baud() const noexcept override { return baud_; }
+    std::optional<std::size_t> queued_output_bytes() const noexcept override {
+        int bytes = 0;
+        if (::ioctl(fd_, TIOCOUTQ, &bytes) != 0 || bytes < 0) return std::nullopt;
+        return static_cast<std::size_t>(bytes);
+    }
     bool send(std::span<const std::uint8_t> frame) override {
         while (!frame.empty()) {
             const auto n = ::write(fd_, frame.data(), frame.size());

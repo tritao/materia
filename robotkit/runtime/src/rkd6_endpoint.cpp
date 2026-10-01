@@ -199,6 +199,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         status_.remaining_segments == ack_.segment_capacity && pending_.empty()) {
         epoch_set_ = false;
         sent_.clear();
+        chunk_timings_.clear();
         next_commit_ = 0;
         committed_until_ticks_ = 0;
     }
@@ -219,14 +220,14 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         epoch_set_ = true;
     }
     if (host_epoch_ns_ > UINT64_MAX - base_time_ns) return RK_ERROR_LIMIT;
-    // An append continues from the device tick where the queued path ends: a time
-    // sync since that path was compiled would move a freshly mapped boundary off it.
-    const DeviceSegment6 *queued_end = !pending_.empty() ? &pending_.back() :
-        !sent_.empty() ? &sent_.back() : nullptr;
-    const std::uint64_t anchor_ticks = plan.replace_after_plan_id == 0 && base_time_ns != 0 &&
-        queued_end != nullptr ? queued_end->header.t0_ticks + queued_end->header.duration_ticks : 0;
+    // A plan that continues or replaces the queued path starts on the device tick the
+    // queued path has at that time, through the mapping it was compiled with: a time
+    // sync since would move a freshly mapped boundary off the queued segments.
+    const std::uint64_t anchor_ticks = base_time_ns != 0 ? device_ticks_at(base_time_ns) : 0;
+    const bool append = plan.replace_after_plan_id == 0 && anchor_ticks != 0;
     const auto replace_ticks = anchor_ticks != 0 ? anchor_ticks :
         clock_.map_host_ns(host_epoch_ns_ + base_time_ns);
+    const auto compile_clock = clock_.snapshot();
     if (plan.replace_after_plan_id && replace_ticks < committed_until_ticks_)
         return RK_ERROR_INVALID_STATE;
     if (plan.replace_after_plan_id) {
@@ -305,7 +306,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     // A queue begin opens a revision at a replacement boundary, or a fresh queue. An
     // append is more segments of the current revision: a new revision would make
     // the device drop segments still waiting to be sent under the old one.
-    if (anchor_ticks == 0) {
+    if (!append) {
         device_wire6::QueueBegin6 begin{};
         begin.queue_revision = ++revision_;
         revision_boundary_ticks_ = replace_ticks;
@@ -357,7 +358,14 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         if (!device_wire6::encode(event, event_body) || !send_record(16, event_body))
             return RK_ERROR_BACKEND;
     }
-    path_maps_.push_back({compiled.segments.front().header.t0_ticks, base_time_ns, path_rate});
+    // A replacement drops the queued chunks from its boundary on.
+    if (plan.replace_after_plan_id)
+        while (!chunk_timings_.empty() && chunk_timings_.back().host_path_start_ns >= base_time_ns)
+            chunk_timings_.pop_back();
+    const auto mapped_start = compile_clock.map(host_epoch_ns_ + base_time_ns);
+    chunk_timings_.push_back({base_time_ns, compiled.segments.front().header.t0_ticks,
+        host_epoch_ns_, compile_clock, anchor_ticks == 0 ? 0 :
+            static_cast<std::int64_t>(anchor_ticks) - static_cast<std::int64_t>(mapped_start)});
     if (plan.replace_after_plan_id) {
         while (!plan_tags_.empty() && plan_tags_.back().start_ticks >= replace_ticks)
             plan_tags_.pop_back();
@@ -391,14 +399,16 @@ rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
         return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
     });
     std::size_t available = ack_.segment_capacity > occupied ? ack_.segment_capacity - occupied : 0;
-    while (available > 0 && !pending_.empty() && link_has_room()) {
+    while (available > 0 && !pending_.empty() && link_has_room(pending_.front())) {
         if (!send_segment(pending_.front())) return RK_ERROR_BACKEND;
         sent_.push_back(std::move(pending_.front()));
         pending_.pop_front();
         --available;
     }
     if (next_commit_ < sent_.size()) {
-        const auto target = clock_.map_host_ns(host_epoch_ns_ + committed_through_ns);
+        const auto queued_target = device_ticks_at(committed_through_ns);
+        const auto target = queued_target != 0 ? queued_target :
+            clock_.map_host_ns(host_epoch_ns_ + committed_through_ns);
         std::size_t chosen = next_commit_;
         while (chosen + 1 < sent_.size() &&
                sent_[chosen + 1].header.t0_ticks + sent_[chosen + 1].header.duration_ticks <= target)
@@ -450,9 +460,9 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
                     sent_.erase(sent_.begin(), sent_.begin() + retired);
                     next_commit_ = next_commit_ > retired ? next_commit_ - retired : 0;
                 }
-                while (path_maps_.size() > 1 &&
-                       path_maps_[1].device_start_ticks <= status_.path_clock_ticks)
-                    path_maps_.erase(path_maps_.begin());
+                while (chunk_timings_.size() > 1 &&
+                       chunk_timings_[1].device_start_ticks <= status_.path_clock_ticks)
+                    chunk_timings_.erase(chunk_timings_.begin());
                 while (plan_tags_.size() > 1 &&
                        plan_tags_[1].start_ticks <= state_header_.path_clock_ticks)
                     plan_tags_.erase(plan_tags_.begin());
@@ -470,27 +480,61 @@ void Rkd6Endpoint::poll_frames(std::uint64_t owner_now_ns) {
     }
 }
 
+std::uint64_t Rkd6Endpoint::link_drain_ns() const noexcept {
+    if (const auto bytes = transport_->queued_output_bytes())
+        return static_cast<std::uint64_t>(std::ceil(
+            10.0L * *bytes * 1e9L / std::max(1u, transport_->baud())));
+    return link_free_at_ns_ > now_ns_ ? link_free_at_ns_ - now_ns_ : 0;
+}
+
+std::uint64_t Rkd6Endpoint::commit_margin_ns() const noexcept {
+    return link_latency_ns_ + 2 * clock_.uncertainty_ns() + 2 * owner_period_ns_;
+}
+
+std::uint64_t Rkd6Endpoint::segment_backlog_budget_ns() const noexcept {
+    // A due commit is seen up to a period late, then waits for the line, is sent,
+    // and travels the link's latency: all within the margin it was due at.
+    const auto commit_ns = static_cast<std::uint64_t>(std::ceil(10.0L *
+        (device_frame6::HEADER_SIZE + device_wire6::Commit6::SIZE + device_frame6::CRC_SIZE) *
+        1e9L / std::max(1u, transport_->baud())));
+    const auto spent = link_latency_ns_ + owner_period_ns_ + commit_ns;
+    const auto margin = commit_margin_ns();
+    return margin > spent ? margin - spent : 0;
+}
+
+bool Rkd6Endpoint::link_has_room(const DeviceSegment6 &segment) const noexcept {
+    const auto bytes = device_frame6::HEADER_SIZE + device_frame6::CRC_SIZE +
+        device_wire6::Segment6Header::SIZE +
+        segment.coefficients.size() * device_wire6::Segment6Coefficients::SIZE;
+    const auto frame_ns = static_cast<std::uint64_t>(std::ceil(
+        10.0L * bytes * 1e9L / std::max(1u, transport_->baud())));
+    return link_drain_ns() + frame_ns <= segment_backlog_budget_ns();
+}
+
+void Rkd6Endpoint::send_due_commit() {
+    if (next_commit_ >= sent_.size() ||
+        status_.path_clock_ticks + static_cast<std::uint64_t>(commit_margin_ns() *
+            static_cast<double>(ack_.device_tick_hz) / 1e9) < committed_until_ticks_) return;
+    const auto &segment = sent_.back();
+    if (send_commit(segment.header.t0_ticks + segment.header.duration_ticks))
+        next_commit_ = sent_.size();
+}
+
 void Rkd6Endpoint::pump_queue() {
     if (!clock_.may_commit()) return;
     const auto occupied = std::count_if(sent_.begin(), sent_.end(), [&](const auto &row) {
         return row.header.t0_ticks + row.header.duration_ticks >= status_.path_clock_ticks;
     });
     auto available = ack_.segment_capacity > occupied ? ack_.segment_capacity - occupied : 0;
-    while (available > 0 && !pending_.empty() && link_has_room()) {
+    while (available > 0 && !pending_.empty() && link_has_room(pending_.front())) {
         if (!send_segment(pending_.front())) return;
         sent_.push_back(std::move(pending_.front()));
         pending_.pop_front();
         --available;
     }
-    if (next_commit_ < sent_.size() &&
-        status_.path_clock_ticks + static_cast<std::uint64_t>(
-            (link_latency_ns_ + 2 * clock_.uncertainty_ns() +
-                2 * owner_period_ns_) *
-            static_cast<double>(ack_.device_tick_hz) / 1e9) >= committed_until_ticks_) {
-        const auto &segment = sent_.back();
-        if (send_commit(segment.header.t0_ticks + segment.header.duration_ticks))
-            next_commit_ = sent_.size();
-    }
+    // Segments only go while the line clears within the budget, so a commit due now
+    // waits no longer than that behind them.
+    send_due_commit();
 }
 
 rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state) {
@@ -548,15 +592,27 @@ rk_result Rkd6Endpoint::sample(std::uint64_t timestamp_ns, rk_robot_state &state
 }
 
 std::uint64_t Rkd6Endpoint::path_time_ns(std::uint64_t device_ticks) const noexcept {
-    for (auto it = path_maps_.rbegin(); it != path_maps_.rend(); ++it) {
+    for (auto it = chunk_timings_.rbegin(); it != chunk_timings_.rend(); ++it) {
         if (device_ticks >= it->device_start_ticks) {
-            const auto elapsed = static_cast<long double>(device_ticks - it->device_start_ticks) /
-                it->ticks_per_host_ns;
-            if (elapsed >= static_cast<long double>(UINT64_MAX - it->host_path_start_ns))
-                return UINT64_MAX;
-            return it->host_path_start_ns + static_cast<std::uint64_t>(std::llround(elapsed));
+            const auto host = it->clock.host_ns(static_cast<std::uint64_t>(
+                static_cast<std::int64_t>(device_ticks) - it->shift_ticks)) -
+                static_cast<long double>(it->host_epoch_ns);
+            if (host <= static_cast<long double>(it->host_path_start_ns))
+                return it->host_path_start_ns;
+            if (host >= static_cast<long double>(UINT64_MAX)) return UINT64_MAX;
+            return static_cast<std::uint64_t>(std::llround(host));
         }
     }
+    return 0;
+}
+
+std::uint64_t Rkd6Endpoint::device_ticks_at(std::uint64_t path_ns) const noexcept {
+    for (auto it = chunk_timings_.rbegin(); it != chunk_timings_.rend(); ++it)
+        if (path_ns >= it->host_path_start_ns) {
+            if (it->host_epoch_ns > UINT64_MAX - path_ns) return 0;
+            return static_cast<std::uint64_t>(static_cast<std::int64_t>(
+                it->clock.map(it->host_epoch_ns + path_ns)) + it->shift_ticks);
+        }
     return 0;
 }
 

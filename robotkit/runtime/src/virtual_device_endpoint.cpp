@@ -30,6 +30,11 @@ public:
     }
     unsigned baud() const noexcept override { return config_.baud; }
     std::uint64_t received_at_ns() const noexcept override { return received_at_ns_; }
+    std::optional<std::size_t> queued_output_bytes() const noexcept override {
+        if (host_tx_ready_ns_ <= now_ns_) return 0;
+        return static_cast<std::size_t>(std::ceil(static_cast<long double>(
+            host_tx_ready_ns_ - now_ns_) * std::max(1u, config_.baud) / 1e10L));
+    }
     void cut(bool value) {
         cut_ = value;
         if (value) pending_host_.clear();
