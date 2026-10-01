@@ -6,6 +6,7 @@ import app.MachineKitRecipeProjectTests;
 class AppTests {
 	static function main():Int {
 		if (AppPreferencesTests.main() != 0) return 1;
+		if (EditorSettingsDialogTests.main() != 0) return 1;
 		if (SceneAtomicityTests.main() != 0) return 1;
 		if (ProjectDocumentTests.main() != 0) return 1;
 		if (EditorToolbarLayoutTests.main() != 0) return 1;

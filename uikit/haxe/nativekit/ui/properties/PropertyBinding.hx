@@ -42,12 +42,10 @@ class PropertyBinding {
 		if (validation != null)
 			return report(value, PropertyEditResult.Rejected(validation));
 
-		if (context.document == null)
-			return report(value, PropertyEditResult.Rejected("Property editing requires an active document"));
-
 		var before = read();
 		if (registry.same(before, value))
 			return report(value, PropertyEditResult.Unchanged);
+		// Edits outside undo history, such as editor settings, need no open document.
 		if (!descriptor.recordHistory) {
 			try {
 				descriptor.write(context, value);
@@ -56,6 +54,8 @@ class PropertyBinding {
 			}
 			return report(value, PropertyEditResult.Applied);
 		}
+		if (context.document == null)
+			return report(value, PropertyEditResult.Rejected("Property editing requires an active document"));
 
 		var latest = value;
 		var key = coalesceKey == null ? "property:" + descriptor.id : coalesceKey;

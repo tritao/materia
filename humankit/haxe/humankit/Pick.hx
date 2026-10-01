@@ -98,7 +98,7 @@ class Pick extends HumanActionBase {
 	function graspPoint(index:Int):Array<Float> {
 		var root = worker.rootTransform();
 		var side = hands[index] == ArmL ? 1.0 : -1.0;
-		var spread = hands.length == 2 ? 0.08 : 0.0;
+		var spread = hands.length == 2 ? worker.posture.handSpread : 0.0;
 		return [target[0] + root[4] * side * spread, target[1] + root[5] * side * spread, target[2]];
 	}
 }

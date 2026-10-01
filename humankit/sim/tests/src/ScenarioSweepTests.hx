@@ -16,7 +16,7 @@ class ScenarioSweepTests {
             var label = 'hand=$hand surface=$surface yaw=$yaw';
             var scenario = RackScenario.build(true, {hand: hand, surface: surface, yaw: yaw});
             var worker = scenario.worker;
-            var gate = new JobGate(worker, scenario.session, scenario.limb(), [scenario.rack, scenario.table]);
+            var gate = new JobGate(worker, scenario.session, scenario.limbs(), [scenario.rack, scenario.table]);
             var ticks = 0;
             while (!worker.currentJobDone() && ticks++ < 1200) {
                 scenario.tick();
