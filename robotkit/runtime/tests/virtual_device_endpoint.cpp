@@ -36,12 +36,11 @@ RunResult run(VirtualDeviceConfig6 config, bool cut = false, bool replace = fals
     assert(endpoint->sample(100'000'000, state) == RK_OK);
     for (std::uint64_t now = 102'000'000; now <= 120'000'000; now += 2'000'000)
         assert(endpoint->sample(now, state) == RK_OK);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 8;
     plan.sequence = 1;
     plan.ends_at_rest = 1;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;
@@ -116,12 +115,11 @@ void dual_drive_layout() {
         endpoint->sample(now, state);
     for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
         endpoint->sample(now, state);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 50;
     plan.sequence = 1;
     plan.ends_at_rest = 1;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;
@@ -194,13 +192,12 @@ void lead_screw_carriage_coupling() {
         endpoint->sample(now, state);
     for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
         endpoint->sample(now, state);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 55;
     plan.sequence = 1;
     plan.ends_at_rest = 1;
     plan.start_position[1] = 0.001;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;
@@ -260,12 +257,11 @@ void minimal_midstream_replacement() {
         endpoint->sample(now, state);
     for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
         endpoint->sample(now, state);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 70;
     plan.sequence = 1;
     plan.ends_at_rest = 1;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     plan.segments.segments[0].duration_ns = 1'000'000'000;
     plan.segments.segments[0].degree = 1;
     plan.segments.segments[0].joint_count = 1;
@@ -319,17 +315,16 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
         endpoint->sample(now, state);
     for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
         endpoint->sample(now, state);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 60;
     plan.sequence = 1;
     plan.ends_at_rest = 1;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     plan.segments.segments[0].duration_ns = 1'000'000'000;
     plan.segments.segments[0].degree = 1;
     plan.segments.segments[0].joint_count = 1;
     plan.segments.segments[0].coefficients[0].value[1] = 0.5;
-    plan.event_count = 2;
+    plan.events.resize(2);
     plan.events[0].time_ns = 250'000'000;
     std::strcpy(plan.events[0].channel, "sprayer.flow");
     plan.events[0].value.kind = RK_EVENT_DIGITAL;
@@ -418,22 +413,20 @@ void runtime_hold_rest_resume_fires_final_event() {
     };
     for (int i = 0; i < 15; ++i) cycle();
 
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 80;
     plan.model_revision = blueprint.revision;
     plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
     plan.ends_at_rest = 1;
-    plan.segments.struct_size = sizeof(plan.segments);
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     plan.segments.tag = 80;
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;
     segment.joint_count = 1;
     segment.coefficients[0].value[1] = 0.5;
-    plan.event_count = 2;
+    plan.events.resize(2);
     std::strcpy(plan.events[0].channel, "sprayer.flow");
     plan.events[0].time_ns = 250'000'000;
     plan.events[0].value.kind = RK_EVENT_DIGITAL;
@@ -550,7 +543,7 @@ int main() {
     std::int64_t duration_ns = 0;
     assert(mk_trajectory_segment_count(trajectory, &count) == MK_OK);
     assert(mk_trajectory_duration_ns(trajectory, &duration_ns) == MK_OK);
-    assert(count > 0 && count <= RK_MAX_TRAJECTORY_SEGMENTS);
+    assert(count > 0 && count <= RK_MAX_TRAJECTORY_QUEUE_POINTS);
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -570,12 +563,11 @@ int main() {
             assert(ruckig_device->sample(now, state) == RK_OK);
         for (std::uint64_t now = 100'000'000; now <= 120'000'000; now += 2'000'000)
             assert(ruckig_device->sample(now, state) == RK_OK);
-        rk_plan_submission plan{};
-        plan.struct_size = sizeof(plan);
+        robotkit::PlanRequest plan{};
         plan.plan_id = 40;
         plan.sequence = 1;
         plan.ends_at_rest = 1;
-        plan.segments.segment_count = count;
+        plan.segments.segments.resize(count);
         for (std::uint32_t i = 0; i < count; ++i) {
             mk_segment segment{};
             segment.struct_size = sizeof(segment);

@@ -48,7 +48,7 @@ public:
             clock_.clock_sync_lost() ? RK_FAULT_CLOCK_SYNC_LOST :
             status_.fault == 4 ? RK_FAULT_DUAL_DRIVE_SKEW : 0;
     }
-    rk_result submit_device_plan(const rk_plan_submission &plan, std::uint64_t base_time_ns,
+    rk_result submit_device_plan(const PlanRequest &plan, std::uint64_t base_time_ns,
         std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
         const rk_robot_runtime_blueprint &blueprint) override;
     const char *fault_reason() const noexcept {

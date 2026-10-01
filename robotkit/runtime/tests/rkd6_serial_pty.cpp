@@ -55,11 +55,10 @@ int main(int argc, char **argv) {
         endpoint->sample(now_ns(), state);
         std::this_thread::sleep_for(10ms);
     }
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.plan_id = 1;
     plan.ends_at_rest = 1;
-    plan.segments.segment_count = 1;
+    plan.segments.segments.resize(1);
     auto &segment = plan.segments.segments[0];
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;

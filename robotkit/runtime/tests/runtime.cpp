@@ -48,7 +48,7 @@ public:
     int plans = 0;
     int sampled_targets = 0;
     bool executes_trajectory_queue() const noexcept override { return true; }
-    rk_result submit_device_plan(const rk_plan_submission &, uint64_t,
+    rk_result submit_device_plan(const robotkit::PlanRequest &, uint64_t,
         uint64_t, uint64_t, const rk_robot_runtime_blueprint &) override {
         ++plans;
         return RK_OK;
@@ -253,11 +253,10 @@ rk_robot_command segment_command(uint64_t sequence) {
     return value;
 }
 
-rk_trajectory_segment_chunk linear_segment_chunk(double start, double slope,
+robotkit::SegmentBatch linear_segment_chunk(double start, double slope,
                                                   uint64_t duration_ns, uint64_t tag = 0) {
-    rk_trajectory_segment_chunk chunk{};
-    chunk.struct_size = sizeof(chunk);
-    chunk.segment_count = 1;
+    robotkit::SegmentBatch chunk{};
+    chunk.segments.resize(1);
     chunk.tag = tag;
     auto &segment = chunk.segments[0];
     segment.time_from_start_ns = 0;
@@ -271,7 +270,7 @@ rk_trajectory_segment_chunk linear_segment_chunk(double start, double slope,
     return chunk;
 }
 
-rk_trajectory_segment_chunk cubic_plan_chunk(uint64_t tag) {
+robotkit::SegmentBatch cubic_plan_chunk(uint64_t tag) {
     auto chunk = linear_segment_chunk(0.0, 0.0, 1'000'000'000, tag);
     chunk.segments[0].degree = 3;
     chunk.segments[0].coefficients[0].value[3] = 1.0;
@@ -279,7 +278,7 @@ rk_trajectory_segment_chunk cubic_plan_chunk(uint64_t tag) {
     return chunk;
 }
 
-rk_trajectory_segment_chunk replacement_plan_chunk(uint64_t tag) {
+robotkit::SegmentBatch replacement_plan_chunk(uint64_t tag) {
     auto chunk = linear_segment_chunk(0.125, 0.75, 500'000'000, tag);
     chunk.segments[0].degree = 3;
     chunk.segments[0].coefficients[0].value[2] = 1.5;
@@ -289,15 +288,14 @@ rk_trajectory_segment_chunk replacement_plan_chunk(uint64_t tag) {
     return chunk;
 }
 
-rk_trajectory_segment_chunk trajectory_batch(
+robotkit::SegmentBatch trajectory_batch(
     std::initializer_list<std::pair<uint64_t, double>> points, uint64_t tag = 0) {
-    rk_trajectory_segment_chunk value{};
-    value.struct_size = sizeof(value);
+    robotkit::SegmentBatch value{};
     value.tag = tag;
     auto previous = points.begin();
     assert(previous != points.end());
     for (auto next = previous + 1; next != points.end(); ++next, ++previous) {
-        auto &segment = value.segments[value.segment_count++];
+        auto &segment = value.segments.emplace_back();
         segment.time_from_start_ns = previous->first;
         segment.duration_ns = next->first - previous->first;
         segment.degree = 1;
@@ -423,13 +421,12 @@ void trajectory_stop_follows_path_and_reports_tag(
 
 /** Samples position(t) every step_ns over [0, duration_ns] into one chunk. */
 template <typename Position>
-rk_trajectory_segment_chunk sampled_batch(Position position, uint64_t duration_ns, uint64_t step_ns,
+robotkit::SegmentBatch sampled_batch(Position position, uint64_t duration_ns, uint64_t step_ns,
                                   uint64_t tag) {
-    rk_trajectory_segment_chunk value{};
-    value.struct_size = sizeof(value);
+    robotkit::SegmentBatch value{};
     value.tag = tag;
     for (uint64_t time = 0; time < duration_ns; time += step_ns) {
-        auto &segment = value.segments[value.segment_count++];
+        auto &segment = value.segments.emplace_back();
         segment.time_from_start_ns = time;
         segment.duration_ns = std::min(step_ns, duration_ns - time);
         segment.degree = 1;
@@ -445,21 +442,20 @@ rk_trajectory_segment_chunk sampled_batch(Position position, uint64_t duration_n
     return value;
 }
 
-rk_trajectory_segment_chunk segments_from_samples(const rk_trajectory_segment_chunk &samples) {
+robotkit::SegmentBatch segments_from_samples(const robotkit::SegmentBatch &samples) {
     return samples;
 }
 
-rk_trajectory_segment_chunk segments_from_native(mk_trajectory_handle trajectory) {
-    rk_trajectory_segment_chunk chunk{};
-    chunk.struct_size = sizeof(chunk);
+robotkit::SegmentBatch segments_from_native(mk_trajectory_handle trajectory) {
+    robotkit::SegmentBatch chunk{};
     uint32_t count = 0;
     assert(mk_trajectory_segment_count(trajectory, &count) == MK_OK);
-    assert(count > 0 && count <= RK_MAX_TRAJECTORY_SEGMENTS);
+    assert(count > 0 && count <= RK_MAX_TRAJECTORY_QUEUE_POINTS);
     for (uint32_t index = 0; index < count; ++index) {
         mk_segment source{};
         source.struct_size = sizeof(source);
         assert(mk_trajectory_get_segment(trajectory, index, &source) == MK_OK);
-        auto &target = chunk.segments[chunk.segment_count++];
+        auto &target = chunk.segments.emplace_back();
         target.time_from_start_ns = static_cast<uint64_t>(source.t0_ns);
         target.duration_ns = static_cast<uint64_t>(source.duration_ns);
         target.degree = source.degree;
@@ -564,8 +560,7 @@ void stop_beyond_queued_path_ramps_within_limits(
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(limited.joint_count);
     robotkit::RobotRuntime runtime(limited, endpoint, std::chrono::milliseconds(10));
     uint64_t timestamp = 0;
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 1;
     plan.model_revision = limited.revision;
@@ -608,8 +603,7 @@ void stop_ramp_stays_within_travel(const rk_robot_runtime_blueprint &blueprint) 
     initial.targets[1].target = -0.8;
     assert(runtime.submit(initial) == RK_OK);
     apply_cycle(runtime, timestamp);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 2;
     plan.plan_id = 1;
     plan.model_revision = limited.revision;
@@ -732,16 +726,16 @@ void trajectory_chunk_speed_is_limited(const rk_robot_runtime_blueprint &bluepri
 void trajectory_queue_is_bounded(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(50));
-    rk_trajectory_segment_chunk full{};
-    full.struct_size = sizeof(full);
-    for (uint32_t index = 0; index < RK_MAX_TRAJECTORY_SEGMENTS; ++index) {
-        auto &segment = full.segments[full.segment_count++];
+    constexpr uint32_t batch_size = 128;
+    robotkit::SegmentBatch full{};
+    for (uint32_t index = 0; index < batch_size; ++index) {
+        auto &segment = full.segments.emplace_back();
         segment.time_from_start_ns = static_cast<uint64_t>(index) * 1'000'000;
         segment.duration_ns = 1'000'000;
         segment.degree = 1;
         segment.joint_count = 2;
     }
-    const uint32_t chunks = RK_MAX_TRAJECTORY_QUEUE_POINTS / RK_MAX_TRAJECTORY_SEGMENTS;
+    const uint32_t chunks = RK_MAX_TRAJECTORY_QUEUE_POINTS / batch_size;
     uint64_t sequence = 1;
     for (uint32_t index = 0; index < chunks; ++index)
         assert(runtime.submit_segments(trajectory_command(sequence++), full) == RK_OK);
@@ -778,8 +772,7 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
     auto first = cubic_plan_chunk(11);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 11;
     plan.model_revision = 42;
@@ -787,9 +780,7 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     plan.segments = first;
     plan.start_position[0] = 0.0;
     plan.start_position[1] = 0.0;
-    plan.struct_size = offsetof(rk_plan_submission, event_count) + sizeof(uint32_t);
-    assert(rk_plan_submission_validate_for_blueprint(&plan, &blueprint) == RK_OK);
-    plan.struct_size = sizeof(plan);
+    assert(robotkit::validate_plan_for_blueprint(plan, blueprint) == RK_OK);
     plan.model_revision = 41;
     assert(runtime.submit_plan(plan) == RK_ERROR_MODEL_MISMATCH);
     rk_robot_snapshot rejected_snapshot{};
@@ -803,13 +794,13 @@ void plan_submission_checks_and_replacement(const rk_robot_runtime_blueprint &so
     assert(runtime.submit_plan(plan) == RK_ERROR_UNSUPPORTED);
     plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
     // An event-capable plan still needs a declared output channel.
-    plan.event_count = 1;
+    plan.events.resize(1);
     plan.events[0].time_ns = 0;
     std::strcpy(plan.events[0].channel, "sprayer.flow");
     plan.events[0].value.kind = RK_EVENT_DIGITAL;
     plan.events[0].value.digital = 1;
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
-    plan.event_count = 0;
+    plan.events.resize(0);
     plan.required_capabilities = 0;
     plan.start_position[0] = 0.1;
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
@@ -857,8 +848,7 @@ void device_queue_endpoint_does_not_receive_sampled_targets(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<QueueExecutingEndpoint>();
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 99;
     plan.model_revision = blueprint.revision;
@@ -886,15 +876,14 @@ void plan_events_follow_path_clock(const rk_robot_runtime_blueprint &source) {
     blueprint.channels[0].safe_value.digital = 0;
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 100;
     plan.model_revision = blueprint.revision;
     plan.calibration_revision = blueprint.calibration_revision;
     plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
     plan.segments = cubic_plan_chunk(100);
-    plan.event_count = 2;
+    plan.events.resize(2);
     std::strcpy(plan.events[0].channel, "sprayer.flow");
     plan.events[0].time_ns = 0;
     plan.events[0].value.kind = RK_EVENT_DIGITAL;
@@ -937,16 +926,15 @@ void plan_event_records_report_overflow(const rk_robot_runtime_blueprint &source
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 101;
     plan.model_revision = blueprint.revision;
     plan.calibration_revision = blueprint.calibration_revision;
     plan.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
     plan.segments = cubic_plan_chunk(101);
-    plan.event_count = RK_MAX_EVENT_RECORDS + 6;
-    for (uint32_t index = 0; index < plan.event_count; ++index) {
+    plan.events.resize(RK_MAX_EVENT_RECORDS + 6);
+    for (uint32_t index = 0; index < plan.events.size(); ++index) {
         std::strcpy(plan.events[index].channel, "sprayer.flow");
         plan.events[index].value.kind = RK_EVENT_DIGITAL;
         plan.events[index].value.digital = index % 2;
@@ -976,15 +964,14 @@ void accepted_plan_keeps_committed_region_identical(
         std::chrono::milliseconds(1));
     robotkit::RobotRuntime replacement(blueprint, replacement_endpoint,
         std::chrono::milliseconds(1));
-    rk_plan_submission first{};
-    first.struct_size = sizeof(first);
+    robotkit::PlanRequest first{};
     first.sequence = 1;
     first.plan_id = 71;
     first.model_revision = blueprint.revision;
     first.calibration_revision = blueprint.calibration_revision;
     first.segments = cubic_plan_chunk(71);
     first.required_capabilities = RK_PLAN_CAPABILITY_EVENTS;
-    first.event_count = 1;
+    first.events.resize(1);
     first.events[0].time_ns = 700'000'000;
     std::strcpy(first.events[0].channel, "sprayer.flow");
     first.events[0].value.kind = RK_EVENT_DIGITAL;
@@ -996,7 +983,7 @@ void accepted_plan_keeps_committed_region_identical(
         apply_cycle(reference, ref_time);
         apply_cycle(replacement, replacement_time);
     }
-    rk_plan_submission next = first;
+    robotkit::PlanRequest next = first;
     next.sequence = 2;
     next.plan_id = 72;
     next.replace_after_plan_id = 71;
@@ -1036,8 +1023,7 @@ void accepted_plan_keeps_committed_region_identical(
 void moving_degree_one_plan_cannot_retarget(const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 81;
     plan.model_revision = blueprint.revision;
@@ -1067,8 +1053,7 @@ void idle_plan_uses_commanded_anchor_and_following_error(
         std::chrono::milliseconds(10));
     auto &accepted = *accepted_owner;
     assert(accepted.publish_sample(1) == RK_OK);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 91;
     plan.model_revision = blueprint.revision;
@@ -1122,8 +1107,7 @@ void submitted_start_tolerances_control_acceptance(
     const rk_robot_runtime_blueprint &blueprint) {
     auto endpoint = std::make_shared<robotkit::InMemoryRobot>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(10));
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 92;
     plan.model_revision = blueprint.revision;
@@ -1138,9 +1122,6 @@ void submitted_start_tolerances_control_acceptance(
     plan.segments.segments[0].coefficients[0].value[3] = 0.5;
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
     plan.position_tolerance[0] = 0.0001;
-    plan.struct_size = offsetof(rk_plan_submission, position_tolerance);
-    assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
-    plan.struct_size = sizeof(plan);
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
     plan.velocity_tolerance[0] = 0.0001;
     assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_STATE);
@@ -1155,8 +1136,7 @@ void degree_one_append_checks_chord_velocity(const rk_robot_runtime_blueprint &b
     assert(runtime.submit_segments(trajectory_command(1),
         trajectory_batch({{0, 0.0}, {1'000'000'000, 0.5}}, 93)) == RK_OK);
     apply_cycle(runtime, timestamp);
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 2;
     plan.plan_id = 94;
     plan.model_revision = blueprint.revision;
@@ -1462,8 +1442,7 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         blueprint.joints[joint].max_velocity = 1.0;
     }
     auto make_plan = [&](uint64_t id, bool ends_at_rest, bool smooth) {
-        rk_plan_submission plan{};
-        plan.struct_size = sizeof(plan);
+        robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = id;
         plan.model_revision = blueprint.revision;
@@ -1499,9 +1478,6 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
         auto plan = make_plan(202, true, true);
         assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
-        plan.struct_size = offsetof(rk_plan_submission, ends_at_rest);
-        plan.ends_at_rest = 0;
-        assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
     }
     {
         // Reach zero velocity with bounded but nonzero endpoint acceleration,
@@ -1509,7 +1485,7 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
         robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
         auto plan = make_plan(205, true, false);
-        plan.reserved0 = RK_PLAN_JERK_UNCHECKED;
+        plan.flags = RK_PLAN_JERK_UNCHECKED;
         for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
             const double sign = joint == 0 ? 1.0 : -1.0;
             auto &segment = plan.segments.segments[0];
@@ -1541,7 +1517,7 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
             segment.coefficients[joint].value[4] = sign * -0.06;
         }
         assert(runtime.submit_plan(plan) == RK_ERROR_INVALID_ARGUMENT);
-        plan.reserved0 = RK_PLAN_JERK_UNCHECKED;
+        plan.flags = RK_PLAN_JERK_UNCHECKED;
         assert(runtime.submit_plan(plan) == RK_OK);
     }
     for (bool unchecked : {false, true}) {
@@ -1559,7 +1535,7 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
         assert(runtime.submit_plan(first) == RK_OK);
         auto second = make_plan(208, false, false);
         second.sequence = 2;
-        second.reserved0 = unchecked ? RK_PLAN_JERK_UNCHECKED : 0;
+        second.flags = unchecked ? RK_PLAN_JERK_UNCHECKED : 0;
         second.segments.segments[0].degree = 2;
         for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
             const double sign = joint == 0 ? 1.0 : -1.0;
@@ -1615,6 +1591,47 @@ void declared_plan_completion_and_underflow(const rk_robot_runtime_blueprint &so
     }
 }
 
+void plan_start_ignores_chunking(const rk_robot_runtime_blueprint &blueprint) {
+    // A plan's first cycle commands its start, however many chunks were
+    // queued before that cycle ran.
+    auto run = [&](bool split) {
+        auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
+        robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
+        auto chunk = [&](uint64_t sequence, double start, uint64_t duration_ns, bool ends_at_rest) {
+            robotkit::PlanRequest plan{};
+            plan.sequence = sequence;
+            plan.plan_id = 301;
+            plan.model_revision = blueprint.revision;
+            plan.calibration_revision = blueprint.calibration_revision;
+            plan.ends_at_rest = ends_at_rest ? 1u : 0u;
+            plan.segments = linear_segment_chunk(start, 0.2, duration_ns, sequence);
+            for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
+                const double sign = joint == 0 ? 1.0 : -1.0;
+                plan.start_position[joint] = sign * start;
+                if (sequence > 1) plan.start_velocity[joint] = sign * 0.2;
+            }
+            return plan;
+        };
+        if (split) {
+            assert(runtime.submit_plan(chunk(1, 0.0, 500'000'000, false)) == RK_OK);
+            assert(runtime.submit_plan(chunk(2, 0.1, 500'000'000, true)) == RK_OK);
+        } else {
+            assert(runtime.submit_plan(chunk(1, 0.0, 1'000'000'000, true)) == RK_OK);
+        }
+        uint64_t timestamp = 0;
+        std::vector<double> positions;
+        for (int step = 0; step < 16; ++step) {
+            const auto state = apply_cycle(runtime, timestamp);
+            if (step == 0) assert(state.trajectory_time_ns == 0);
+            positions.push_back(state.trajectory_active ? state.position[0] : -1.0);
+        }
+        return positions;
+    };
+    const auto whole = run(false), split = run(true);
+    for (std::size_t step = 0; step < whole.size(); ++step)
+        assert(std::abs(whole[step] - split[step]) < 1e-9);
+}
+
 void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     auto blueprint = source;
     for (uint32_t joint = 0; joint < blueprint.joint_count; ++joint) {
@@ -1623,8 +1640,7 @@ void native_hold_resume_and_abort(const rk_robot_runtime_blueprint &source) {
     }
     auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
     robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
-    rk_plan_submission plan{};
-    plan.struct_size = sizeof(plan);
+    robotkit::PlanRequest plan{};
     plan.sequence = 1;
     plan.plan_id = 210;
     plan.model_revision = blueprint.revision;
@@ -1681,8 +1697,7 @@ void smooth_path_hold_respects_acceleration(const rk_robot_runtime_blueprint &so
     for (int hold_after : {3, 14}) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
         robotkit::RobotRuntime runtime(blueprint, endpoint, std::chrono::milliseconds(100));
-        rk_plan_submission plan{};
-        plan.struct_size = sizeof(plan);
+        robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 220 + hold_after;
         plan.model_revision = blueprint.revision;
@@ -1771,8 +1786,7 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
                 auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
                 robotkit::RobotRuntime runtime(blueprint, endpoint,
                     std::chrono::milliseconds(100));
-                rk_plan_submission plan{};
-                plan.struct_size = sizeof(plan);
+                robotkit::PlanRequest plan{};
                 plan.sequence = 1;
                 plan.plan_id = 300;
                 plan.model_revision = blueprint.revision;
@@ -1804,8 +1818,7 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
         robotkit::RobotRuntime runtime(blueprint, endpoint,
             std::chrono::milliseconds(10));
-        rk_plan_submission plan{};
-        plan.struct_size = sizeof(plan);
+        robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 301;
         plan.model_revision = blueprint.revision;
@@ -1828,8 +1841,7 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
         auto endpoint = std::make_shared<EchoEndpoint>(blueprint.joint_count);
         robotkit::RobotRuntime runtime(blueprint, endpoint,
             std::chrono::milliseconds(10));
-        rk_plan_submission plan{};
-        plan.struct_size = sizeof(plan);
+        robotkit::PlanRequest plan{};
         plan.sequence = 1;
         plan.plan_id = 302;
         plan.model_revision = blueprint.revision;
@@ -1852,8 +1864,6 @@ void plan_end_braking_stays_on_path(const rk_robot_runtime_blueprint &source) {
 int main() {
     static_assert(sizeof(rk_robot_command) < 20'000,
         "trajectory payload must not be embedded in the command mailbox value");
-    static_assert(sizeof(rk_trajectory_segment_chunk) > 300'000,
-        "segment payload remains explicitly bounded and independently allocated");
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.revision = 1;
@@ -1901,6 +1911,7 @@ int main() {
     segment_junction_jump_is_rejected(blueprint);
     stop_braking_uses_segment_degree(blueprint);
     declared_plan_completion_and_underflow(blueprint);
+    plan_start_ignores_chunking(blueprint);
     native_hold_resume_and_abort(blueprint);
     plan_end_braking_stays_on_path(blueprint);
     smooth_path_hold_respects_acceleration(blueprint);

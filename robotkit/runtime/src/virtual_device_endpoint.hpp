@@ -56,7 +56,7 @@ public:
     rk_safety_state initial_safety_state() const noexcept override { return RK_SAFETY_READY; }
     bool executes_trajectory_queue() const noexcept override { return true; }
     int32_t diagnostic_code() const noexcept override;
-    rk_result submit_device_plan(const rk_plan_submission &, std::uint64_t base_time_ns,
+    rk_result submit_device_plan(const PlanRequest &, std::uint64_t base_time_ns,
         std::uint64_t owner_now_ns, std::uint64_t committed_through_ns,
         const rk_robot_runtime_blueprint &) override;
     void cut_link(bool cut);

@@ -66,7 +66,7 @@ uint32_t queued_knot_count(const std::deque<RobotRuntime::RuntimeTrajectoryPoint
     return trajectory.empty() ? 0u : static_cast<uint32_t>(trajectory.size() - 1);
 }
 
-mk_segment native_segment(const rk_trajectory_segment &input, uint64_t base_time) {
+mk_segment native_segment(const robotkit::TrajectorySegment &input, uint64_t base_time) {
     mk_segment segment{};
     segment.struct_size = sizeof(segment);
     segment.t0_ns = static_cast<int64_t>(base_time + input.time_from_start_ns);
@@ -289,11 +289,10 @@ rk_result RobotRuntime::submit(const rk_robot_command &command) {
     }
 }
 
-rk_result RobotRuntime::submit_segments(const rk_robot_command &command,
-                                        const rk_trajectory_segment_chunk &chunk) {
+rk_result RobotRuntime::submit_segments(const rk_robot_command &command, SegmentBatch batch) {
     if (command.kind != RK_COMMAND_TRAJECTORY_SEGMENTS ||
         rk_robot_command_validate_for_blueprint(&command, &blueprint_) != RK_OK ||
-        rk_trajectory_segment_chunk_validate_for_blueprint(&chunk, &blueprint_) != RK_OK)
+        validate_segments_for_blueprint(batch, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
     if (!supports_trajectory_queue()) return RK_ERROR_UNSUPPORTED;
     uint32_t queued_knots = 0;
@@ -309,10 +308,10 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command,
         uint64_t pending_knots = queued_knots;
         for (const auto &pending : commands_)
             if (pending.segments != nullptr)
-                pending_knots += pending.segments->segment_count;
-        if (pending_knots + chunk.segment_count > RK_MAX_TRAJECTORY_QUEUE_POINTS)
+                pending_knots += pending.segments->segments.size();
+        if (pending_knots + batch.segments.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
-        auto payload = std::make_shared<rk_trajectory_segment_chunk>(chunk);
+        auto payload = std::make_shared<const SegmentBatch>(std::move(batch));
         last_command_sequence_ = command.sequence;
         QueuedCommand queued;
         queued.command = command;
@@ -325,8 +324,8 @@ rk_result RobotRuntime::submit_segments(const rk_robot_command &command,
     }
 }
 
-rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
-    if (rk_plan_submission_validate_for_blueprint(&plan, &blueprint_) != RK_OK)
+rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
+    if (validate_plan_for_blueprint(plan, blueprint_) != RK_OK)
         return RK_ERROR_INVALID_ARGUMENT;
     if (plan.model_revision != blueprint_.revision ||
         plan.calibration_revision != blueprint_.calibration_revision)
@@ -335,9 +334,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
             RK_PLAN_CAPABILITY_EVENTS)) != 0 ||
         !supports_trajectory_queue())
         return RK_ERROR_UNSUPPORTED;
-    const bool ends_at_rest = plan.struct_size <
-        offsetof(rk_plan_submission, event_count) + sizeof(plan.ends_at_rest) ||
-        plan.ends_at_rest != 0;
+    const bool ends_at_rest = plan.ends_at_rest;
     try {
         std::lock_guard owner_lock(owner_mutex_);
         std::lock_guard queue_lock(queue_mutex_);
@@ -422,20 +419,18 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         // submitted polynomial must start at that same state. Degree-1 paths
         // may only promise chord velocity, never stored sample derivatives.
         constexpr double default_tolerance = 1e-6;
-        const bool has_tolerances = plan.struct_size >=
-            offsetof(rk_plan_submission, ends_at_rest);
         const auto &first = plan.segments.segments[0];
         if (replace && first.degree < 2)
             return RK_ERROR_INVALID_STATE;
         for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint) {
-            const double position_tolerance = has_tolerances && plan.position_tolerance[joint] > 0.0
+            const double position_tolerance = plan.position_tolerance[joint] > 0.0
                 ? plan.position_tolerance[joint] : default_tolerance;
-            const double velocity_tolerance = has_tolerances && plan.velocity_tolerance[joint] > 0.0
+            const double velocity_tolerance = plan.velocity_tolerance[joint] > 0.0
                 ? plan.velocity_tolerance[joint] : default_tolerance;
-            const double requested_acceleration_tolerance = has_tolerances && plan.acceleration_tolerance[joint] > 0.0
+            const double requested_acceleration_tolerance = plan.acceleration_tolerance[joint] > 0.0
                 ? plan.acceleration_tolerance[joint] : default_tolerance;
             const double acceleration_tolerance = !candidate.empty() &&
-                (plan.reserved0 & RK_PLAN_JERK_UNCHECKED) == 0
+                (plan.flags & RK_PLAN_JERK_UNCHECKED) == 0
                 ? std::min(requested_acceleration_tolerance, default_tolerance)
                 : requested_acceleration_tolerance;
             if (std::abs(plan.start_position[joint] - anchor_position[joint]) > position_tolerance ||
@@ -451,12 +446,11 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                 return RK_ERROR_INVALID_STATE;
             }
         }
-        const auto &terminal = plan.segments.segments[plan.segments.segment_count - 1];
+        const auto &terminal = plan.segments.segments.back();
         const auto plan_duration_ns = terminal.time_from_start_ns +
             static_cast<uint64_t>(terminal.duration_ns);
-        const auto event_count = plan.struct_size >= sizeof(plan) ? plan.event_count : 0u;
-        for (uint32_t index = 0; index < event_count; ++index)
-            if (plan.events[index].time_ns > plan_duration_ns)
+        for (const auto &event : plan.events)
+            if (event.time_ns > plan_duration_ns)
                 return RK_ERROR_INVALID_ARGUMENT;
         if (ends_at_rest && terminal.degree >= 2) {
             mk_segment segment = native_segment(terminal, 0);
@@ -467,7 +461,7 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
                 // TOPP-RA can stop with nonzero endpoint acceleration. A
                 // checked-jerk plan must also join the held state smoothly.
                 if (std::abs(endpoint.velocity[joint]) > 1e-6 ||
-                    ((plan.reserved0 & RK_PLAN_JERK_UNCHECKED) == 0 &&
+                    ((plan.flags & RK_PLAN_JERK_UNCHECKED) == 0 &&
                      std::abs(endpoint.acceleration[joint]) > 1e-6))
                     return RK_ERROR_INVALID_ARGUMENT;
         }
@@ -486,19 +480,18 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         } else if (!candidate.empty() && !candidate.back().has_segment) {
             candidate.pop_back();
         }
-        for (uint32_t index = 0; index < event_count; ++index) {
-            if (plan.events[index].time_ns > UINT64_MAX - base_time)
+        for (const auto &event : plan.events) {
+            if (event.time_ns > UINT64_MAX - base_time)
                 return RK_ERROR_INVALID_ARGUMENT;
             QueuedEvent queued{};
-            queued.time_ns = base_time + plan.events[index].time_ns;
+            queued.time_ns = base_time + event.time_ns;
             queued.plan_id = plan.plan_id;
-            queued.event = plan.events[index];
+            queued.event = event;
             candidate_events.push_back(queued);
         }
         if (candidate_events.size() > RK_MAX_TRAJECTORY_QUEUE_POINTS)
             return RK_ERROR_QUEUE_FULL;
-        for (uint32_t index = 0; index < plan.segments.segment_count; ++index) {
-            const auto &source = plan.segments.segments[index];
+        for (const auto &source : plan.segments.segments) {
             if (source.time_from_start_ns > static_cast<uint64_t>(INT64_MAX) - base_time ||
                 source.duration_ns > static_cast<uint64_t>(INT64_MAX) - base_time - source.time_from_start_ns)
                 return RK_ERROR_INVALID_ARGUMENT;
@@ -540,7 +533,9 @@ rk_result RobotRuntime::submit_plan(const rk_plan_submission &plan) {
         control_.events = std::move(candidate_events);
         control_.trajectory_active = true;
         std::fill_n(velocity_anchor_pending_, blueprint_.joint_count, false);
-        control_.plan_just_submitted = was_idle;
+        // A chunk appended before the first cycle keeps that cycle at the
+        // plan's start, so chunking never changes the motion's timing.
+        if (was_idle) control_.plan_just_submitted = true;
         if (was_idle) control_.trajectory_time_ns = 0;
         control_.active_plan_id = replace ? control_.active_plan_id : plan.plan_id;
         control_.diagnostic_code = 0;
@@ -1223,13 +1218,13 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 if (!supports_trajectory_queue())
                     return RK_ERROR_UNSUPPORTED;
                 const uint64_t tag = queued.segments->tag;
+                const auto &segments = queued.segments->segments;
                 auto candidate = control_.trajectory;
                 const auto base_time = candidate.empty()
                     ? uint64_t{0} : candidate.back().point.time_from_start_ns;
                 if (!candidate.empty() && !candidate.back().has_segment)
                     candidate.pop_back();
-                for (uint32_t index = 0; index < queued.segments->segment_count; ++index) {
-                    const auto &source = queued.segments->segments[index];
+                for (const auto &source : segments) {
                     if (source.time_from_start_ns > static_cast<uint64_t>(INT64_MAX) - base_time ||
                         source.duration_ns > static_cast<uint64_t>(INT64_MAX) - base_time -
                             source.time_from_start_ns)

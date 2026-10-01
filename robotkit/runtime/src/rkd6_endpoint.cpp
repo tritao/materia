@@ -185,7 +185,7 @@ bool Rkd6Endpoint::send_commit(std::uint64_t through_ticks) {
     return true;
 }
 
-rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
+rk_result Rkd6Endpoint::submit_device_plan(const PlanRequest &plan,
     std::uint64_t base_time_ns, std::uint64_t owner_now_ns,
     std::uint64_t committed_through_ns, const rk_robot_runtime_blueprint &blueprint) {
     if (!clock_.may_commit()) return RK_ERROR_INVALID_STATE;
@@ -202,7 +202,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
             device_wire6::Segment6Header::SIZE +
             ack_.actuator_count * device_wire6::Segment6Coefficients::SIZE;
         const auto startup_bytes = 512u +
-            std::min<std::uint32_t>(plan.segments.segment_count,
+            std::min<std::uint32_t>(static_cast<std::uint32_t>(plan.segments.segments.size()),
                 ack_.segment_capacity) * frame_bytes;
         const auto startup_ns = static_cast<std::uint64_t>(std::ceil(
             10.0L * startup_bytes * 1e9L / transport_->baud()));
@@ -229,12 +229,12 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
             })) return RK_ERROR_INVALID_STATE;
     }
     auto compiled = compile_device_segments6(
-        std::span(plan.segments.segments, plan.segments.segment_count), plan.plan_id,
+        std::span(plan.segments.segments), plan.plan_id,
         plan.ends_at_rest != 0, host_epoch_ns_ + base_time_ns, clock_, blueprint,
         ack_.device_tick_hz, ack_.step_tick_hz, ack_.max_degree, target_error_, layout_);
     if (!compiled.ok) return RK_ERROR_LIMIT;
-    const auto event_count = plan.struct_size >= sizeof(plan) ? plan.event_count : 0u;
-    if (event_count > ack_.event_capacity || event_count > RK_MAX_PLAN_EVENTS)
+    const auto event_count = static_cast<std::uint32_t>(plan.events.size());
+    if (event_count > ack_.event_capacity)
         return RK_ERROR_LIMIT;
     std::vector<device_wire6::Event6> wire_events;
     wire_events.reserve(event_count);
@@ -366,7 +366,7 @@ rk_result Rkd6Endpoint::submit_device_plan(const rk_plan_submission &plan,
         segment.header.queue_revision = revision_;
         pending_.push_back(std::move(segment));
     }
-    const auto &last_host_segment = plan.segments.segments[plan.segments.segment_count - 1];
+    const auto &last_host_segment = plan.segments.segments.back();
     plan_tags_.push_back({plan.plan_id, plan_start_ticks, plan_end_ticks,
         last_host_segment.time_from_start_ns + last_host_segment.duration_ns});
     const auto occupied = std::count_if(sent_.begin(), sent_.end(), [&](const auto &row) {

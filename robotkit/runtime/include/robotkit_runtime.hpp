@@ -11,8 +11,62 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 namespace robotkit {
+
+/** One joint's coefficients in a segment, in powers of seconds from its start. */
+struct SegmentCoefficients {
+    double value[RK_TRAJECTORY_COEFFICIENT_STRIDE]{}; /**< Degree zero through five. */
+};
+
+/** A polynomial segment over every robot joint, timed from the start of its batch. */
+struct TrajectorySegment {
+    uint64_t time_from_start_ns = 0;
+    uint64_t duration_ns = 0;
+    uint32_t degree = 0;
+    uint32_t joint_count = 0;
+    SegmentCoefficients coefficients[RK_MAX_TRAJECTORY_JOINTS];
+};
+
+/** Contiguous segments starting at time zero, reported under one trajectory tag. */
+struct SegmentBatch {
+    std::vector<TrajectorySegment> segments;
+    uint64_t tag = 0;
+};
+
+/**
+ * A plan as RobotRuntime::submit_plan accepts it: rk_plan_header's fields, its
+ * segments over every robot joint, and its events.
+ */
+struct PlanRequest {
+    uint64_t sequence = 0;
+    uint64_t plan_id = 0;
+    uint64_t model_revision = 0;
+    uint64_t calibration_revision = 0;
+    uint32_t required_capabilities = 0;
+    uint32_t flags = 0;
+    uint64_t replace_after_plan_id = 0;
+    uint64_t replace_after_time_ns = 0;
+    bool ends_at_rest = false;
+    double start_position[RK_MAX_TRAJECTORY_JOINTS]{};
+    double start_velocity[RK_MAX_TRAJECTORY_JOINTS]{};
+    double start_acceleration[RK_MAX_TRAJECTORY_JOINTS]{};
+    double position_tolerance[RK_MAX_TRAJECTORY_JOINTS]{};
+    double velocity_tolerance[RK_MAX_TRAJECTORY_JOINTS]{};
+    double acceleration_tolerance[RK_MAX_TRAJECTORY_JOINTS]{};
+    SegmentBatch segments;
+    std::vector<rk_timed_event> events;
+};
+
+/** Checks segments: contiguous from zero, finite, degree at most five, all over one joint count. */
+RK_API rk_result validate_segments(const SegmentBatch &batch);
+/** validate_segments, over the blueprint's joints and honouring its couplings. */
+RK_API rk_result validate_segments_for_blueprint(const SegmentBatch &batch,
+    const rk_robot_runtime_blueprint &blueprint);
+/** Checks a plan's identity, start state, segments, and events against a blueprint. */
+RK_API rk_result validate_plan_for_blueprint(const PlanRequest &plan,
+    const rk_robot_runtime_blueprint &blueprint);
 
 /**
  * Backend adapter used by one RobotRuntime.
@@ -79,7 +133,7 @@ public:
     virtual int32_t diagnostic_code() const noexcept { return 0; }
 
     /** Called after host validation, before a submitted plan becomes visible. */
-    virtual rk_result submit_device_plan(const rk_plan_submission &, uint64_t,
+    virtual rk_result submit_device_plan(const PlanRequest &, uint64_t,
         uint64_t, uint64_t, const rk_robot_runtime_blueprint &) { return RK_ERROR_UNSUPPORTED; }
 
     /**
@@ -140,9 +194,9 @@ public:
     rk_result stop();
     /** Queues command metadata and joint-target payload for the next owner-thread phase. */
     rk_result submit(const rk_robot_command &command);
-    rk_result submit_segments(const rk_robot_command &command,
-                              const rk_trajectory_segment_chunk &chunk);
-    rk_result submit_plan(const rk_plan_submission &plan);
+    /** Queues segments; the command's kind is RK_COMMAND_TRAJECTORY_SEGMENTS. */
+    rk_result submit_segments(const rk_robot_command &command, SegmentBatch batch);
+    rk_result submit_plan(const PlanRequest &plan);
     /** Copies the latest robot state without advancing endpoint time. */
     rk_result snapshot(rk_robot_state &out_state) const;
     /** Copies the latest state plus revision, endpoint, and fault metadata. */
@@ -236,7 +290,7 @@ private:
 
     struct QueuedCommand {
         rk_robot_command command{};
-        std::shared_ptr<rk_trajectory_segment_chunk> segments;
+        std::shared_ptr<const SegmentBatch> segments;
     };
 
     void run();

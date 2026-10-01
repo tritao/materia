@@ -46,8 +46,6 @@ class ExecutionPlanSubmission {
     this.modelRevision = modelRevision;
     this.calibrationRevision = calibrationRevision;
     this.events = events == null ? [] : events.copy();
-    if (this.events.length > RobotKitRuntimeConstants.RK_MAX_PLAN_EVENTS)
-      throw "Too many process events in plan";
     var previous = Int64.ofInt(0);
     for (event in this.events) {
       if (event == null || Int64.compare(event.timeNs, previous) < 0)

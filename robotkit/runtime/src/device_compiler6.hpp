@@ -2,7 +2,7 @@
 
 #include "clock_estimator6.hpp"
 #include "device_wire6.hpp"
-#include "robotkit_runtime.h"
+#include "robotkit_runtime.hpp"
 #include <array>
 #include <cstdint>
 #include <span>
@@ -40,7 +40,7 @@ struct CompiledDevicePlan6 {
 };
 
 CompiledDevicePlan6 compile_device_segments6(
-    std::span<const rk_trajectory_segment> segments, std::uint64_t plan_id,
+    std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
     bool ends_at_rest, std::uint64_t host_plan_start_ns,
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,

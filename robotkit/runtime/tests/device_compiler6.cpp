@@ -17,7 +17,7 @@ int main() {
     blueprint.joints[0].upper_limit = 10;
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
-    rk_trajectory_segment segment{};
+    robotkit::TrajectorySegment segment{};
     segment.time_from_start_ns = 0;
     segment.duration_ns = 1'000'000'000;
     segment.degree = 1;
@@ -86,7 +86,7 @@ int main() {
     blueprint.coupling_count = 0;
     blueprint.joint_count = 1;
     blueprint.owner_period_ns = 10'000'000;
-    rk_trajectory_segment curved{};
+    robotkit::TrajectorySegment curved{};
     curved.duration_ns = 100'000'000;
     curved.degree = 2;
     curved.joint_count = 1;

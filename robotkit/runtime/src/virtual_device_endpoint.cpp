@@ -211,7 +211,7 @@ int32_t VirtualDeviceEndpoint::diagnostic_code() const noexcept {
     return inner_->diagnostic_code();
 }
 
-rk_result VirtualDeviceEndpoint::submit_device_plan(const rk_plan_submission &plan,
+rk_result VirtualDeviceEndpoint::submit_device_plan(const PlanRequest &plan,
     std::uint64_t base_time_ns, std::uint64_t owner_now_ns,
     std::uint64_t committed_through_ns, const rk_robot_runtime_blueprint &blueprint) {
     return inner_->submit_device_plan(plan, base_time_ns, owner_now_ns,
