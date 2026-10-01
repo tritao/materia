@@ -1,0 +1,27 @@
+{
+  "about": "Ceilings for `check-editor-performance.py --budgets`: medians of a headless run, per action. Time ceilings are about 2.5x what a quiet machine measures, because machines differ; allocation ceilings are about 25% over the measured value, because allocation depends on the code and not on the machine. After a deliberate change, re-measure with `--budgets --measure` and lower or raise the number with the reason in the commit. Measured 2026-10-01: tab switch 1.0-1.5 ms and 132-203 KiB, interaction 0.9-1.7 ms, selection 2.3 ms.",
+  "scenarios": {
+    "tab-matrix": {
+      "cycles": 30,
+      "actions": {
+        "hierarchy->sensors": {"frameMs": 4.0, "allocKiB": 255},
+        "sensors->hierarchy": {"frameMs": 4.0, "allocKiB": 190},
+        "console->telemetry": {"frameMs": 4.0, "allocKiB": 165},
+        "telemetry->console": {"frameMs": 4.0, "allocKiB": 180}
+      }
+    },
+    "interaction": {
+      "cycles": 60,
+      "actions": {
+        "*": {"frameMs": 3.5},
+        "scroll-inspector": {"frameMs": 4.5}
+      }
+    },
+    "selection-stress": {
+      "cycles": 60,
+      "actions": {
+        "selection": {"frameMs": 6.0}
+      }
+    }
+  }
+}

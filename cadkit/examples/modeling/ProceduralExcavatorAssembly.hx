@@ -15,17 +15,12 @@ class ProceduralExcavatorAssembly {
 
 	public static function buildState():AssemblyStateRecord {
 		var state = buildModel().initialState("excavator");
-		var dependent = ["link-one-hinge", "link-two-hinge",
-			"boom-cylinder-hinge", "boom-cylinder-slide",
-			"stick-cylinder-hinge", "stick-cylinder-slide",
-			"bucket-cylinder-hinge", "bucket-cylinder-slide"];
-		var treeDependent = [for (id in dependent) for (joint in state.definition.joints)
-			if (joint.id == id && joint.role == AssemblyJointRole.Tree) id];
-		// Start near the authored pose to choose the same linkage branch, then
-		// let the closure solver restore pin coincidence and cylinder lengths.
-		for (joint in treeDependent)
+		// The three hinges are driven; the links and cylinders on their loops are dependent. Start near the
+		// authored pose to choose the same linkage branch, then let the closure solver restore pin
+		// coincidence and cylinder lengths.
+		for (joint in state.dependentJoints())
 			state.setJoint(joint, state.joint(joint) + (StringTools.endsWith(joint, "-slide") ? 0.1 : 0.002));
-		var result = state.solveClosures(treeDependent);
+		var result = state.solveClosures();
 		if (!result.converged)
 			throw 'Excavator closure solve failed: ${result.message} (${result.closureIds.join(", ")})';
 		return state.record();
@@ -59,6 +54,7 @@ class ProceduralExcavatorAssembly {
 		model.mate("boom-hinge", "revolute", id("Base"), "boom", id("Boom"), "base", -20 * DEG);
 		model.mate("stick-hinge", "revolute", id("Boom"), "tip", id("Stick"), "base", 0);
 		model.mate("bucket-hinge", "revolute", id("Stick"), "tip", id("Bucket"), "base", 35 * DEG);
+		for (hinge in ["boom-hinge", "stick-hinge", "bucket-hinge"]) model.drive(hinge);
 
 		// Two links close the bucket linkage between its bored pin and a stick datum.
 		var link1Root = {x: 119.78, z: 110.05}, link1Tip = {x: 139.22, z: 152.95};

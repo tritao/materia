@@ -79,7 +79,11 @@ enum {
 enum {
     NKSIM_JOINT_FIXED = 1,
     NKSIM_JOINT_REVOLUTE = 2,
-    NKSIM_JOINT_PRISMATIC = 3
+    NKSIM_JOINT_PRISMATIC = 3,
+    /* Closures only (see nksim_closure_desc): */
+    NKSIM_JOINT_SPHERICAL = 4,   /**< A shared point. */
+    NKSIM_JOINT_CYLINDRICAL = 5, /**< A shared axis line, free to slide and turn along it. */
+    NKSIM_JOINT_PLANAR = 6       /**< body_b slides and turns in body_a's plane through anchor_a with normal axis_a. */
 };
 
 enum {
@@ -242,11 +246,11 @@ typedef struct nksim_joint_coupling_desc {
 /** Closed-loop fixed, revolute, or prismatic joint between tree bodies. */
 typedef struct nksim_closure_desc {
     uint32_t struct_size NK_STRUCT_SIZE;
-    uint32_t type; /**< NKSIM_JOINT_FIXED, REVOLUTE, or PRISMATIC. */
+    uint32_t type; /**< NKSIM_JOINT_FIXED, REVOLUTE, PRISMATIC, SPHERICAL, CYLINDRICAL or PLANAR. */
     nksim_body body_a;
     nksim_body body_b;
     double anchor_a[3];
-    double axis_a[3]; /**< Unit hinge axis in body_a's local frame. */
+    double axis_a[3]; /**< Unit axis (hinge, slide, or plane normal) in body_a's local frame. */
 } nksim_closure_desc;
 
 typedef struct nksim_joint_state {

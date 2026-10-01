@@ -619,8 +619,7 @@ public:
         if (bodies.find(closure.body_a) == bodies.end() ||
             bodies.find(closure.body_b) == bodies.end())
             return NKSIM_ERROR_INVALID_HANDLE;
-        if (closure.type != NKSIM_JOINT_FIXED && closure.type != NKSIM_JOINT_REVOLUTE &&
-            closure.type != NKSIM_JOINT_PRISMATIC)
+        if (closure.type < NKSIM_JOINT_FIXED || closure.type > NKSIM_JOINT_PLANAR)
             return NKSIM_ERROR_UNSUPPORTED;
         closures.push_back(closure);
         return topology_update ? NKSIM_OK : rebuild();
@@ -1071,7 +1070,10 @@ private:
             const auto &closure = closures[closure_index];
             const auto &first = bodies.at(closure.body_a).name;
             const auto &second = bodies.at(closure.body_b).name;
-            if (closure.type == NKSIM_JOINT_PRISMATIC) {
+            // Closures that leave some motion free: an auxiliary body under body_a at body_b's relative pose
+            // carries that motion as joints and is welded to body_b.
+            if (closure.type == NKSIM_JOINT_PRISMATIC || closure.type == NKSIM_JOINT_CYLINDRICAL ||
+                closure.type == NKSIM_JOINT_PLANAR) {
                 auto *parent = rebuild_bodies.at(closure.body_a);
                 auto *aux = mjs_addBody(parent, nullptr);
                 if (!aux) return NKSIM_ERROR_OUT_OF_MEMORY;
@@ -1089,11 +1091,29 @@ private:
                 aux->explicitinertial = 1;
                 aux->mass = 1e-6;
                 aux->inertia[0] = aux->inertia[1] = aux->inertia[2] = 1e-8;
-                auto *slide = mjs_addJoint(aux, nullptr);
-                if (!slide) return NKSIM_ERROR_OUT_OF_MEMORY;
-                slide->type = mjJNT_SLIDE;
                 const auto axis = normalize(rotate(conjugate(relative_q), closure.axis_a));
-                std::copy(axis.begin(), axis.end(), slide->axis);
+                // The anchor (on body_a's axis line or plane) in the auxiliary body's frame.
+                const auto anchor = rotate(conjugate(relative_q), subtract(closure.anchor_a, relative_p));
+                auto add_joint = [&](mjtJoint type, const Vec3 &direction) -> bool {
+                    auto *joint = mjs_addJoint(aux, nullptr);
+                    if (!joint) return false;
+                    joint->type = type;
+                    std::copy(direction.begin(), direction.end(), joint->axis);
+                    std::copy(anchor.begin(), anchor.end(), joint->pos);
+                    return true;
+                };
+                if (closure.type == NKSIM_JOINT_PLANAR) {
+                    // Two slides spanning the plane and a hinge about its normal.
+                    const Vec3 helper = std::abs(axis[0]) < 0.9 ? Vec3{1.0, 0.0, 0.0} : Vec3{0.0, 1.0, 0.0};
+                    const auto u = normalize(cross(axis, helper));
+                    const auto v = cross(axis, u);
+                    if (!add_joint(mjJNT_SLIDE, u) || !add_joint(mjJNT_SLIDE, v) || !add_joint(mjJNT_HINGE, axis))
+                        return NKSIM_ERROR_OUT_OF_MEMORY;
+                } else {
+                    if (!add_joint(mjJNT_SLIDE, axis)) return NKSIM_ERROR_OUT_OF_MEMORY;
+                    if (closure.type == NKSIM_JOINT_CYLINDRICAL && !add_joint(mjJNT_HINGE, axis))
+                        return NKSIM_ERROR_OUT_OF_MEMORY;
+                }
                 auto *equality = mjs_addEquality(spec, nullptr);
                 if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;
                 equality->type = mjEQ_WELD;
@@ -1102,7 +1122,8 @@ private:
                 mjs_setString(equality->name2, second.c_str());
                 continue;
             }
-            const int count = closure.type == NKSIM_JOINT_FIXED ? 1 : 2;
+            // Fixed: one weld. Revolute: connects at two points of the axis. Spherical: one connect at the anchor.
+            const int count = closure.type == NKSIM_JOINT_REVOLUTE ? 2 : 1;
             for (int point = 0; point < count; ++point) {
                 auto *equality = mjs_addEquality(spec, nullptr);
                 if (!equality) return NKSIM_ERROR_OUT_OF_MEMORY;

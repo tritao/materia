@@ -3,7 +3,9 @@ package humankit;
 /** Ramps an active IK limb back onto its animation. */
 class ReleaseLimb extends HumanActionBase {
 	public final limb:HumanLimb;
+	/** The shortest the release takes; it lasts longer when the hand has far to go, to keep its speed down. */
 	public final ramp:Float;
+	var duration:Float = 0.0;
 	var target:Null<Array<Float>> = null;
 	var pole:Null<Array<Float>> = null;
 	var fromWeight:Float = 0.0;
@@ -24,14 +26,17 @@ class ReleaseLimb extends HumanActionBase {
 		if (target == null || fromWeight <= 0.0 || ramp == 0.0) {
 			worker.clearReach(limb);
 			done = true;
+			return;
 		}
+		duration = worker.blendSeconds(worker.travelToAnimation(limb), ramp);
 	}
 
 	override public function advance(seconds:Float):Void {
 		if (done) return;
 		elapsed += seconds;
-		var weight = fromWeight * Math.max(0.0, 1.0 - elapsed / ramp);
-		if (weight <= 0.0) {
+		var progress = Math.min(1.0, elapsed / duration);
+		var weight = fromWeight * (1.0 - smooth(progress));
+		if (progress >= 1.0) {
 			worker.clearReach(limb);
 			done = true;
 		} else {

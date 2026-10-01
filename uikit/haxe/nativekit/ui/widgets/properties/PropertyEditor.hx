@@ -1,7 +1,7 @@
 package nativekit.ui.widgets.properties;
 import nativekit.ui.widgets.KeyedView;
-import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.widgets.controls.Checkbox;
+import nativekit.ui.widgets.controls.IconButton;
 import nativekit.ui.widgets.controls.Select;
 import nativekit.ui.widgets.controls.SelectOption;
 import nativekit.ui.widgets.controls.Slider;
@@ -26,6 +26,7 @@ import nativekit.ui.properties.PropertyType;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.core.RenderNode;
 import nativekit.ui.core.View;
+import nativekit.ui.icons.IconName;
 
 /** Descriptor-driven inspector that routes edits through the active document. */
 class PropertyEditor implements View {
@@ -365,10 +366,11 @@ private class PropertyEditorRowContent implements View {
 				descriptor.label + " (" + descriptor.unit + ")", labelStyle)),
 			new KeyedView("value", owner.editorView(context, descriptor, value))
 		];
-		if (descriptor.defaultValue != null && !descriptor.readOnly) {
-			var reset = new Button("Reset", null, function() {
-				owner.applyValue(context, descriptor, descriptor.defaultValue);
-			}, "reset");
+		// Like a revert arrow: offered only while the value differs from its default.
+		if (descriptor.defaultValue != null && !descriptor.readOnly
+			&& !owner.registry.same(value, descriptor.defaultValue)) {
+			var reset = new IconButton("reset", IconName.Reset, "Reset " + descriptor.label + " to default",
+				function() owner.applyValue(context, descriptor, descriptor.defaultValue));
 			reset.enabled = owner.enabled;
 			children.push(new KeyedView("reset", reset));
 		}

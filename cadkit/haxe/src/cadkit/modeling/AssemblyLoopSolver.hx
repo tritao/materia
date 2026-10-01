@@ -7,6 +7,9 @@ import kinematicskit.ClosureTask;
 import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicStatus;
 import kinematicskit.LevenbergMarquardt;
+import kinematicskit.KinematicSnapshot;
+import kinematicskit.KinematicState;
+import cadkit.solve.ConstraintDiagnosis;
 import materia.units.LengthUnit;
 
 /** Tolerances and iteration settings for joint-coordinate loop solving. */
@@ -32,9 +35,21 @@ class AssemblyLoopSolveResult {
 	/** Closure joint IDs that remain outside tolerance; empty on success. */
 	public final closureIds:Array<String>;
 	public final message:String;
+	/**
+		The closures' diagnosis over the dependent coordinates (see `ConstraintDiagnosis`). Owners are closure
+		IDs; a planar linkage modelled with 3D closures shows its out-of-plane rows as satisfied (redundant by
+		design) groups.
+	*/
+	public final report:Null<DiagnosisReport>;
+	/**
+		The closures' dependency belongs to the solved pose only (a linkage at a toggle): at a nearby pose reached
+		by nudging the driven joints, the rows are independent. `report` is then that pose's diagnosis.
+	*/
+	public final degenerate:Bool;
 
 	public function new(status:String, converged:Bool, residual:Float, positionResidual:Float,
-		angularResidual:Float, degreesOfFreedom:Int, iterations:Int, closureIds:Array<String>, message:String) {
+		angularResidual:Float, degreesOfFreedom:Int, iterations:Int, closureIds:Array<String>, message:String,
+		?report:DiagnosisReport, degenerate:Bool = false) {
 		this.status = status;
 		this.converged = converged;
 		this.residual = residual;
@@ -44,6 +59,8 @@ class AssemblyLoopSolveResult {
 		this.iterations = iterations;
 		this.closureIds = closureIds.copy();
 		this.message = message;
+		this.report = report;
+		this.degenerate = degenerate;
 	}
 }
 
@@ -60,6 +77,8 @@ class AssemblyLoopSolver {
 	static inline var DEFAULT_DAMPING:Float = 1e-3;
 	static inline var DEFAULT_RANK_TOLERANCE:Float = 1e-8;
 	static inline var DEFAULT_FINITE_DIFFERENCE_STEP:Float = 1e-6;
+	/** How far driven joints move for the witness pose: radians, or this share of the assembly size. */
+	static inline var WITNESS_STEP:Float = 1e-3;
 
 	/**
 		Adjusts only the named tree-joint coordinates. The supplied state is
@@ -115,10 +134,30 @@ class AssemblyLoopSolver {
 			positionResidual = Math.max(positionResidual, task.positionError);
 			angularResidual = Math.max(angularResidual, task.orientationError);
 		}
+		var closures = diagnoseClosures(problem, solution.state);
 		if (solution.converged()) {
+			var report = closures.report, degenerate = false;
+			if (report.rank < report.variables && report.dependencyGroups.length > 0) {
+				// Compare with a nearby pose of the same mechanism: nudge the inputs, close the loops again.
+				var driven = [for (joint in state.definition.joints) if (joint.driven == true && model.dofIndex(joint.id) >= 0) model.dofIndex(joint.id)];
+				for (sign in [1.0, -1.0]) {
+					if (driven.length == 0) break;
+					var seed = solution.state.copy();
+					for (dof in driven) seed.q[dof] += sign * WITNESS_STEP * (model.dofIsAngular(dof) ? 1 : assemblyScale(state));
+					var witness = LevenbergMarquardt.solve(problem, seed, maxIterations, initialDamping, rankTolerance, assemblyScale(state));
+					if (!witness.converged()) continue;
+					var generic = diagnoseClosures(problem, witness.state).report;
+					if (generic.rank > report.rank) {
+						report = generic;
+						degenerate = true;
+					}
+					break;
+				}
+			}
 			for (dof in dofs) state.setJoint(model.dofId(dof), solution.state.q[dof]);
 			return new AssemblyLoopSolveResult("converged", true, solution.residualNorm, positionResidual,
-				angularResidual, solution.freeDofs, solution.iterations, [], "assembly closures converged");
+				angularResidual, solution.freeDofs, solution.iterations, [],
+				degenerate ? "assembly closures converged at a degenerate pose" : "assembly closures converged", report, degenerate);
 		}
 		var status = switch solution.status {
 			case KinematicStatus.LimitBlocked: "limit-blocked";
@@ -132,7 +171,28 @@ class AssemblyLoopSolver {
 			default: "assembly loop solve exhausted its iteration limit while a local descent direction remained";
 		};
 		return new AssemblyLoopSolveResult(status, false, solution.residualNorm, positionResidual, angularResidual,
-			solution.freeDofs, solution.iterations, solution.unsatisfied(), message);
+			solution.freeDofs, solution.iterations, solution.unsatisfied(), message, closures.report);
+	}
+
+	/** The closure rows at `state` (divided by their tolerances, so |r| <= 1 is satisfied) diagnosed over the problem's columns. */
+	static function diagnoseClosures(problem:KinematicProblem, state:KinematicState):{report:DiagnosisReport} {
+		var model = problem.model, width = problem.layout().width, rows = problem.rowCount();
+		var residual = [for (_ in 0...rows) 0.0], jacobian = [for (_ in 0...rows * width) 0.0];
+		problem.evaluate(state, new KinematicSnapshot(model), residual, jacobian);
+		var owners:Array<String> = [];
+		for (task in problem.tasks) {
+			var id = Std.isOfType(task, ClosureTask) ? model.closureIds[(cast task : ClosureTask).closure] : "task";
+			for (_ in 0...task.rowCount()) owners.push(id);
+		}
+		var sparse = [for (row in 0...rows) {
+			var index:Array<Int> = [], value:Array<Float> = [];
+			for (column in 0...width) {
+				var entry = jacobian[row * width + column];
+				if (entry != 0) { index.push(column); value.push(entry); }
+			}
+			{index: index, value: value};
+		}];
+		return {report: ConstraintDiagnosis.diagnoseSparse(sparse, width, owners, residual, ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE)};
 	}
 
 	static function assemblyScale(state:AssemblyState):Float {

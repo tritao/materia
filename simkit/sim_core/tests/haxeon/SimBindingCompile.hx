@@ -1,5 +1,6 @@
 import nativekit.scene.Scene;
 import nativekit.sim.SimWorld;
+import nativekit.sim.SimWorldOptions;
 
 /** Compile-only smoke for the thin typed Haxeon simulation façade. */
 class SimBindingCompile {

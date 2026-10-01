@@ -2,6 +2,9 @@ import cadkit.solve.ConstraintDiagnosis;
 
 /** Rank, dependency groups and feasibility on hand-built Jacobians whose answers are known. */
 class ConstraintDiagnosisSmoke {
+	/** The hand-built cases probe the dense QR at a tolerance finer than the CAD default (and the sparse path's reach). */
+	static inline var FINE_TOLERANCE:Float = 1e-9;
+
 	public static function run():Void {
 		var independent = diagnose([1, 0, 0, 1], 2, ["a", "b"], [0, 0]);
 		check(independent.rank == 2 && independent.degreesOfFreedom == 0 && independent.dependencyGroups.length == 0,
@@ -41,7 +44,7 @@ class ConstraintDiagnosisSmoke {
 		var nearly = diagnose([1, 1, 1, 1 + 1e-7], 2, ["a", "b"], [0, 0]);
 		check(nearly.rank == 2 && nearly.nearDegenerate, "rows nearly parallel are independent but flagged near-degenerate");
 		var equalish = diagnose([1, 1, 1, 1 + 1e-12], 2, ["a", "b"], [0, 0]);
-		check(equalish.rank == 1 && groups(equalish) == "redundant(a,b)-1", "rows 1e-12 apart are dependent at the default tolerance");
+		check(equalish.rank == 1 && groups(equalish) == "redundant(a,b)-1", "rows 1e-12 apart are dependent at 1e-9");
 
 		var multiRow = diagnose([1, 0, 0, 1, 1, 0], 2, ["fix", "fix", "x"], [0, 0, 0], ["fix"]);
 		check(multiRow.suggestedRemovals.join(",") == "x", "protected owners are never suggested");
@@ -51,10 +54,28 @@ class ConstraintDiagnosisSmoke {
 		check(threw, "a Jacobian of the wrong size is refused");
 	}
 
+	/** The dense diagnosis, checked against the sparse entry point, which must agree whichever path it takes. */
 	static function diagnose(jacobian:Array<Float>, variables:Int, owners:Array<String>, residuals:Array<Float>,
-			?protectedOwners:Array<String>):DiagnosisReport
-		return ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variables, owners: owners, residuals: residuals,
-			protectedOwners: protectedOwners});
+			?protectedOwners:Array<String>):DiagnosisReport {
+		var dense = ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variables, owners: owners, residuals: residuals,
+			protectedOwners: protectedOwners, rankTolerance: FINE_TOLERANCE});
+		var rows = [for (row in 0...owners.length) {
+			var index:Array<Int> = [], value:Array<Float> = [];
+			for (column in 0...variables)
+				if (jacobian[row * variables + column] != 0) { index.push(column); value.push(jacobian[row * variables + column]); }
+			{index: index, value: value};
+		}];
+		// At the default tolerance the sparse path mostly defers to the QR; at 1e-6 it decides dependencies itself.
+		for (tolerance in [FINE_TOLERANCE, ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE]) {
+			var reference = ConstraintDiagnosis.diagnose({jacobian: jacobian, variables: variables, owners: owners, residuals: residuals,
+				protectedOwners: protectedOwners, rankTolerance: tolerance});
+			var sparse = ConstraintDiagnosis.diagnoseSparse(rows, variables, owners, residuals, tolerance, protectedOwners);
+			check(sparse.rank == reference.rank && groups(sparse) == groups(reference) && sparse.unsatisfied.join(",") == reference.unsatisfied.join(",")
+				&& sparse.subsystems.length == reference.subsystems.length && sparse.suggestedRemovals.join(",") == reference.suggestedRemovals.join(","),
+				'sparse and dense diagnoses agree at $tolerance: rank ${sparse.rank}/${reference.rank}, ${groups(sparse)} / ${groups(reference)}');
+		}
+		return dense;
+	}
 
 	static function groups(report:DiagnosisReport):String
 		return [for (group in report.dependencyGroups) group.toString()].join(" ");

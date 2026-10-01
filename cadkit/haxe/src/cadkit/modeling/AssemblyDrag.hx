@@ -111,7 +111,9 @@ class AssemblyDrag {
 
     dofs = [];
     for (joint in model.bodyChain[body]) addDof(model.jointDof[joint]);
-    if (dependent != null) for (id in dependent) {
+    // Without an explicit list, the closures' derived dependents follow so every loop stays closed.
+    if (dependent == null) dependent = state.dependentJoints();
+    for (id in dependent) {
       var dof = model.dofIndex(id);
       if (dof < 0) throw 'Dependent assembly joint "$id" is not a driving tree joint';
       addDof(dof);

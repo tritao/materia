@@ -11,12 +11,20 @@ package kinematicskit;
  *
  * Stops `LimitBlocked` when an active DOF ends on a limit with the descent
  * direction pushing it further out,
- * `Conflicting` when the gradient vanishes or no step of any size lowers
+ * `Conflicting` when the gradient vanishes (relative to ‖J‖‖e‖, so the
+ * test does not depend on units or tolerances; see `STATIONARY_RATIO`) or no step of any size lowers
  * the residual (the damping reached its 1e16 ceiling) without meeting the
  * tolerances, and `IterationLimit` otherwise. (CadKit reported an exhausted
  * damping as nonconvergent.)
  */
 class LevenbergMarquardt {
+  /**
+    A stop is stationary when ‖Jᵀe‖ <= this × ‖J‖‖e‖ (plus a tiny absolute floor). A large-residual problem,
+    such as an unclosable loop, approaches its least-squares point only linearly, so an absolute test let it run
+    out of iterations there: an unclosable four-bar ends at ≈ 1e-6 while unfinished solves sit at 0.1–1.
+  */
+  public static inline var STATIONARY_RATIO:Float = 1e-4;
+
   public static function solve(problem:KinematicProblem, seed:KinematicState, ?maxIterations:Int = 100,
       ?initialDamping:Float = 1e-3, ?rankTolerance:Float = 1e-8, ?translationScale:Float = 1.0,
       ?workspace:SolverWorkspace):KinematicSolution {
@@ -118,8 +126,9 @@ class LevenbergMarquardt {
     LinearAlgebra.normalEquationsDense(scaled, rows, count, residual, normal, rhs);
     var gradientNorm = LinearAlgebra.norm(rhs, count);
     var jacobianNorm = LinearAlgebra.norm(scaled, rows * count);
-    var threshold = 1e-10 * (1 + jacobianNorm * LinearAlgebra.norm(residual, rows));
-    var stationary = gradientNorm <= threshold;
+    var residualNorm = LinearAlgebra.norm(residual, rows);
+    var threshold = 1e-10 * (1 + jacobianNorm * residualNorm);
+    var stationary = gradientNorm <= threshold + STATIONARY_RATIO * jacobianNorm * residualNorm;
     // A DOF on a bound whose descent direction (Jᵀe) points outward is held by its limit.
     var blocked = false;
     for (j in 0...dofCount) {

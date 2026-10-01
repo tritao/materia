@@ -77,6 +77,18 @@ class DiagnosisReport {
 	}
 }
 
+/**
+	A row graph for `ConstraintDiagnosis.diagnoseSparse` and its envelope
+	ordering, computed once by a caller whose structure does not change
+	between diagnoses (a drag). `neighbours` must include every pair of rows
+	that can share a variable, so no entry ever falls outside the envelope.
+*/
+typedef RowStructure = {
+	var neighbours:Array<Array<Int>>;
+	var position:Array<Int>;
+	var first:Array<Int>;
+}
+
 /** Inputs to `ConstraintDiagnosis.diagnose`. */
 typedef DiagnosisInput = {
 	/** Row-major, `owners.length` rows by `variables` columns. Rows are residuals divided by their tolerance. */
@@ -107,7 +119,19 @@ typedef DiagnosisInput = {
 	   conflicting.
 */
 class ConstraintDiagnosis {
-	public static inline var DEFAULT_RANK_TOLERANCE:Float = 1e-9;
+	/**
+		Thresholds, in one place (sketches and assembly closures both use these defaults):
+		- rank tolerance, default 1e-6: rows closer than this (relative, after equilibration) are dependent. It is
+		  also the smallest tolerance the sparse path can decide (`SPARSE_TOLERANCE`): a Gram pivot is about the
+		  square of a row's distance and is accurate to ~1e-16.
+		- `MEMBER_TOLERANCE` 1e-7: a circuit coefficient below this share of the largest is not a member.
+		- `NEAR_DEGENERATE_RATIO` 1e3: a kept row within this factor of the rank threshold is flagged near-degenerate.
+		- `INDEPENDENT_PIVOT` 1e-8: with a smaller rank tolerance, the Gram pivot that still proves independence.
+		Elsewhere: `SolverSettings.tolerance` (sketch residual), `LevenbergMarquardt.STATIONARY_RATIO` (when a stop
+		is a least-squares point), and the witness steps (`SketchSolver`: 2% of the sketch size;
+		`AssemblyLoopSolver.WITNESS_STEP`: 1e-3 of driven coordinates).
+	*/
+	public static inline var DEFAULT_RANK_TOLERANCE:Float = 1e-6;
 	/** Share of a circuit's largest coefficient below which an owner is not a member. */
 	static inline var MEMBER_TOLERANCE:Float = 1e-7;
 	/** How far above the rank threshold a pivot must be not to count as near-degenerate. */
@@ -142,6 +166,233 @@ class ConstraintDiagnosis {
 		var protectedOwners = input.protectedOwners == null ? [] : input.protectedOwners;
 		return new DiagnosisReport(columns, rank, subsystems, groups, unsatisfied, nearDegenerate,
 			suggestRemovals(input.owners, groups, protectedOwners));
+	}
+
+	/**
+		`diagnose` for sparse rows (`index`/`value` pairs, each variable once
+		per row), without a dense QR in the usual cases. JJᵀ (equilibrated) is
+		factored by Cholesky in reverse Cuthill-McKee order. A Gram pivot is
+		about the square of the row's distance from the earlier rows, and is
+		accurate to about 1e-16, so with a rank tolerance t of at least
+		`SPARSE_TOLERANCE` a pivot of at most t² drops the row as dependent
+		(its fundamental circuit read from the factor) and any other keeps it.
+		With a smaller t the sparse path can only prove clear independence
+		(pivot ≥ `INDEPENDENT_PIVOT`); anything else goes to the dense QR.
+	*/
+	public static function diagnoseSparse(rows:Array<{index:Array<Int>, value:Array<Float>}>, variables:Int, owners:Array<String>,
+			residuals:Array<Float>, ?rankTolerance:Float, ?protectedOwners:Array<String>, ?structure:RowStructure):DiagnosisReport {
+		if (rows.length != owners.length || rows.length != residuals.length)
+			throw 'Diagnosis has ${rows.length} rows, ${owners.length} owners and ${residuals.length} residuals';
+		var tolerance = rankTolerance == null ? DEFAULT_RANK_TOLERANCE : rankTolerance;
+		var factored = sparseFactor(rows, tolerance, structure);
+		if (factored != null) {
+			var unsatisfiedRow = [for (row in 0...rows.length) !(Math.abs(residuals[row]) <= 1)];
+			var groups = mergeCircuits(owners, factored.circuits, unsatisfiedRow);
+			var unsatisfied = uniqueOwners(owners, [for (row in 0...rows.length) if (unsatisfiedRow[row]) row]);
+			return new DiagnosisReport(variables, rows.length - factored.circuits.length,
+				sparseSubsystems(rows, owners, variables, factored.dropped), groups, unsatisfied, factored.nearDegenerate,
+				suggestRemovals(owners, groups, protectedOwners == null ? [] : protectedOwners));
+		}
+		var dense = [for (_ in 0...rows.length * variables) 0.0];
+		for (row in 0...rows.length)
+			for (e in 0...rows[row].index.length)
+				dense[row * variables + rows[row].index[e]] += rows[row].value[e];
+		return diagnose({jacobian: dense, variables: variables, owners: owners, residuals: residuals,
+			rankTolerance: rankTolerance, protectedOwners: protectedOwners});
+	}
+
+	/** Below this rank tolerance a Gram pivot cannot be told from rounding, so only clear independence is decided here. */
+	public static inline var SPARSE_TOLERANCE:Float = DEFAULT_RANK_TOLERANCE;
+	/** A pivot that proves independence whatever the tolerance. */
+	static inline var INDEPENDENT_PIVOT:Float = 1e-8;
+
+	/**
+		Cholesky of JJᵀ with dependent rows dropped. Returns each dropped row's
+		fundamental circuit (the row and the kept rows its coefficients reach)
+		and which rows were dropped; null when a pivot is ambiguous.
+	*/
+	static function sparseFactor(source:Array<{index:Array<Int>, value:Array<Float>}>, tolerance:Float,
+			?structure:RowStructure):Null<{circuits:Array<Array<Int>>, dropped:Array<Bool>, nearDegenerate:Bool}> {
+		// Dependent at or below t², independent above it; near-degenerate below (1e3 t)², as the dense flag.
+		var decides = tolerance >= SPARSE_TOLERANCE;
+		var dependentPivot = decides ? tolerance * tolerance : -1.0;
+		var keptPivot = decides ? tolerance * tolerance : INDEPENDENT_PIVOT;
+		var nearPivot = decides ? 1e6 * tolerance * tolerance : 0.0;
+		var nearDegenerate = false;
+		var m = source.length;
+		// Equilibrate as `factor` does (rows, columns, rows), so a variable in small units is not a dependency.
+		var rows = [for (row in source) {index: row.index, value: row.value.copy()}];
+		normalizeRows(rows);
+		var columnNorm = new Map<Int, Float>();
+		for (row in rows)
+			for (e in 0...row.index.length) {
+				var old = columnNorm.get(row.index[e]);
+				columnNorm.set(row.index[e], (old == null ? 0 : old) + row.value[e] * row.value[e]);
+			}
+		for (row in rows)
+			for (e in 0...row.index.length) {
+				var norm = columnNorm.get(row.index[e]);
+				if (norm != null && norm > 0) row.value[e] /= Math.sqrt(norm);
+			}
+		var scale = normalizeRows(rows);
+		if (structure == null) structure = rowGraph(rows);
+		var neighbours = structure.neighbours, ordering = structure, first = structure.first;
+		var original = [for (_ in 0...m) 0];
+		for (row in 0...m) original[ordering.position[row]] = row;
+		var envelope = EnvelopeCholesky.zero(first);
+		for (a in 0...m) {
+			var pa = ordering.position[a];
+			envelope[pa][pa - first[pa]] = scale[a] > 0 ? 1 : 0;
+			if (scale[a] > 0)
+				for (b in neighbours[a]) {
+					var pb = ordering.position[b];
+					if (pb < pa && scale[b] > 0) envelope[pa][pb - first[pa]] = dot(rows[a], rows[b]);
+				}
+		}
+		var dropped = [for (_ in 0...m) false], droppedRows:Array<Int> = [], droppedFactors:Array<Array<Float>> = [];
+		for (p in 0...m) {
+			var rowFirst = first[p];
+			for (q in rowFirst...p) {
+				if (dropped[q]) { envelope[p][q - rowFirst] = 0; continue; }
+				var sum = envelope[p][q - rowFirst];
+				var from = rowFirst > first[q] ? rowFirst : first[q];
+				for (k in from...q) sum -= envelope[p][k - rowFirst] * envelope[q][k - first[q]];
+				envelope[p][q - rowFirst] = sum / envelope[q][q - first[q]];
+			}
+			var pivot = envelope[p][p - rowFirst];
+			for (k in rowFirst...p) pivot -= envelope[p][k - rowFirst] * envelope[p][k - rowFirst];
+			if (pivot > keptPivot) {
+				envelope[p][p - rowFirst] = Math.sqrt(pivot);
+				if (pivot < nearPivot) nearDegenerate = true;
+			} else if (pivot <= dependentPivot) {
+				dropped[p] = true;
+				droppedRows.push(p);
+				droppedFactors.push(envelope[p].copy());
+				for (k in 0...envelope[p].length) envelope[p][k] = 0;
+				envelope[p][p - rowFirst] = 1;
+			} else
+				return null;
+		}
+		// A dropped row's factor row y solves L y = G[kept, row]; Lᵀ c = y gives its coefficients over earlier kept rows.
+		var circuits:Array<Array<Int>> = [];
+		for (index in 0...droppedRows.length) {
+			var p = droppedRows[index], y = droppedFactors[index], rowFirst = first[p];
+			var c = [for (_ in 0...p) 0.0];
+			for (q in rowFirst...p) c[q] = y[q - rowFirst];
+			// y is zero before first[p], but the coefficients can reach further back through earlier rows.
+			var r = p - 1;
+			while (r >= 0) {
+				if (dropped[r])
+					c[r] = 0;
+				else if (c[r] != 0) {
+					c[r] /= envelope[r][r - first[r]];
+					for (q in first[r]...r) c[q] -= envelope[r][q - first[r]] * c[r];
+				}
+				r--;
+			}
+			var biggest = 0.0;
+			for (value in c) biggest = Math.max(biggest, Math.abs(value));
+			var circuit = [original[p]];
+			for (q in 0...p)
+				if (biggest > 0 && Math.abs(c[q]) > MEMBER_TOLERANCE * biggest)
+					circuit.push(original[q]);
+			circuits.push(circuit);
+		}
+		return {circuits: circuits, dropped: [for (row in 0...m) dropped[ordering.position[row]]], nearDegenerate: nearDegenerate};
+	}
+
+	/** Rows are adjacent when they share a variable; ordered by reverse Cuthill-McKee. */
+	public static function rowGraph(rows:Array<{index:Array<Int>, value:Array<Float>}>):RowStructure {
+		var rowsOf = new Map<Int, Array<Int>>();
+		for (row in 0...rows.length)
+			for (variable in rows[row].index) {
+				var list = rowsOf.get(variable);
+				if (list == null) { list = []; rowsOf.set(variable, list); }
+				list.push(row);
+			}
+		var neighbours:Array<Array<Int>> = [for (_ in 0...rows.length) []];
+		for (list in rowsOf)
+			for (a in list) for (b in list)
+				if (a != b && neighbours[a].indexOf(b) < 0) neighbours[a].push(b);
+		var ordering = EnvelopeCholesky.order(neighbours);
+		return {neighbours: neighbours, position: ordering.position, first: ordering.first};
+	}
+
+	/** Scales each row to unit norm in place; returns the norms before scaling (0 for an empty row, left as is). */
+	static function normalizeRows(rows:Array<{index:Array<Int>, value:Array<Float>}>):Array<Float> {
+		return [for (row in rows) {
+			var sum = 0.0;
+			for (value in row.value) sum += value * value;
+			var norm = Math.sqrt(sum);
+			if (norm > 0) for (e in 0...row.value.length) row.value[e] /= norm;
+			norm;
+		}];
+	}
+
+	static function dot(a:{index:Array<Int>, value:Array<Float>}, b:{index:Array<Int>, value:Array<Float>}):Float {
+		var sum = 0.0;
+		for (i in 0...a.index.length)
+			for (j in 0...b.index.length)
+				if (a.index[i] == b.index[j]) sum += a.value[i] * b.value[j];
+		return sum;
+	}
+
+	/** Subsystems as `components` finds them (shared nonzero variable or owner), from sparse rows. */
+	static function sparseSubsystems(rows:Array<{index:Array<Int>, value:Array<Float>}>, owners:Array<String>, variables:Int,
+			dropped:Array<Bool>):Array<DiagnosisSubsystem> {
+		var m = rows.length, parent = [for (i in 0...m) i];
+		var firstRowOfColumn = [for (_ in 0...variables) -1], firstRowOfOwner = new Map<String, Int>();
+		for (row in 0...m) {
+			var seen = firstRowOfOwner.get(owners[row]);
+			if (seen == null) firstRowOfOwner.set(owners[row], row); else join(parent, row, seen);
+			for (e in 0...rows[row].index.length)
+				if (rows[row].value[e] != 0) {
+					var column = rows[row].index[e];
+					if (firstRowOfColumn[column] < 0) firstRowOfColumn[column] = row; else join(parent, row, firstRowOfColumn[column]);
+				}
+		}
+		var slot = [for (_ in 0...m) -1];
+		var members:Array<Array<Int>> = [], columnCounts:Array<Int> = [];
+		for (row in 0...m) {
+			var root = find(parent, row);
+			if (slot[root] < 0) { slot[root] = members.length; members.push([]); columnCounts.push(0); }
+			members[slot[root]].push(row);
+		}
+		for (column in 0...variables)
+			if (firstRowOfColumn[column] >= 0) columnCounts[slot[find(parent, firstRowOfColumn[column])]]++;
+		var result = [for (i in 0...members.length) new DiagnosisSubsystem(uniqueOwners(owners, members[i]), columnCounts[i],
+			[for (row in members[i]) if (!dropped[row]) row].length)];
+		result.sort((a, b) -> Reflect.compare(a.owners.join(","), b.owners.join(",")));
+		return result;
+	}
+
+	/**
+		Combines reports of disjoint parts of one system with `variables` in
+		all: ranks add, lists concatenate (sorted), and variables no part
+		touches count as free.
+	*/
+	public static function merge(reports:Array<DiagnosisReport>, variables:Int):DiagnosisReport {
+		var rank = 0, nearDegenerate = false;
+		var subsystems:Array<DiagnosisSubsystem> = [], groups:Array<DependencyGroup> = [];
+		var unsatisfied:Array<String> = [], suggestions:Array<String> = [];
+		for (report in reports) {
+			rank += report.rank;
+			nearDegenerate = nearDegenerate || report.nearDegenerate;
+			for (subsystem in report.subsystems) subsystems.push(subsystem);
+			for (group in report.dependencyGroups) groups.push(group);
+			for (owner in report.unsatisfied) if (unsatisfied.indexOf(owner) < 0) unsatisfied.push(owner);
+			for (owner in report.suggestedRemovals) if (suggestions.indexOf(owner) < 0) suggestions.push(owner);
+		}
+		// Sort by precomputed keys: joining owner lists inside the comparator dominated merging many parts.
+		var subsystemKeys = [for (subsystem in subsystems) {key: subsystem.owners.join(","), value: subsystem}];
+		subsystemKeys.sort((a, b) -> Reflect.compare(a.key, b.key));
+		subsystems = [for (entry in subsystemKeys) entry.value];
+		var groupKeys = [for (group in groups) {key: group.owners.join(","), value: group}];
+		groupKeys.sort((a, b) -> Reflect.compare(a.key, b.key));
+		groups = [for (entry in groupKeys) entry.value];
+		unsatisfied.sort(Reflect.compare);
+		suggestions.sort(Reflect.compare);
+		return new DiagnosisReport(variables, rank, subsystems, groups, unsatisfied, nearDegenerate, suggestions);
 	}
 
 	/** Rows joined through shared variables and shared owners; columns no row touches are left out (free). */

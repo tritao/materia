@@ -128,6 +128,23 @@ allocation from the workspace save worker. On 2026-09-30 a `Text` build cost 3.3
 any one widget, sets the tree-build total (about 530 KiB); shrinking it much further means reusing unchanged subtrees
 instead of rebuilding them.
 
+## Checks to run before merging
+
+Three scripts catch what the tests of one kit do not:
+
+- `tools/check-compile-all.py` compiles every tracked `haxeon.json` project and the script-built targets in
+  `tools/compile-sweep.json` (simulation bindings; the UIKit showcase with `--fast` omitted), so a compiler change cannot
+  break a kit nobody builds that day. Library packages (no `entry`) are built through the projects that use them. About
+  10 minutes at `--jobs 3`. Its first run found two binding checks that had been failing for days: they used a type
+  without importing it.
+- `tools/check-determinism.py` builds the performance project cold, then again incrementally after an edit, then cold from the
+  edited source, and requires the last two to be byte-identical (two edits: a line inserted at the top of
+  `BuildContext.hx`, and a longer string literal). On a difference it decodes both with `hldump`. About 4 minutes per edit.
+- `app/tools/check-editor-performance.py --budgets` runs the headless scenarios and holds each action's median frame time
+  and allocation to the ceilings in `budgets.json`. Time ceilings are loose (machines differ), allocation ceilings tight.
+  `--budgets --measure` prints the measured values, to set a budget after a deliberate change. The older default mode
+  checks for leaks and unbounded growth.
+
 ## Reading a profile
 
 Sampling used to hold the program stopped for about 650 us per sample (`selection-stress` measured 21-25 ms per frame profiled

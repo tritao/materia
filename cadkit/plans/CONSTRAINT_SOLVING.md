@@ -399,3 +399,286 @@ branch `loop-flow-stores`), which had broken toolpathkit's
   both cos and sin rows, so it is already oriented.
 - Step 4 (large-sketch benchmark, sparse solves) not started: the dense
   normal-equation solve is now the only O(n³) part; measure before changing.
+
+### C2.4 — Sketch scaling: parts, sparse Cholesky, sparse diagnosis; codec check (2026-09-30)
+
+Measured first (`SketchEditBenchmark` scaling section: rectangles of 4
+points, independent or chained into one part). With C2.2's dense solve,
+chained 200 points took 12.8 s, 97% of it in the dense normal-equation LU.
+
+- **Parts:** constraints are grouped by the variables they reference (not by
+  Jacobian nonzeros, which vanish by accident at special poses); each part
+  runs its own LM, polish, diagnosis and witness pose, and
+  `ConstraintDiagnosis.merge` combines the reports (untouched variables are
+  free). The Jacobian is kept as sparse rows.
+- **Sparse LM step:** `cadkit.solve.EnvelopeCholesky` — reverse
+  Cuthill-McKee ordering per part (from the reference graph, computed once),
+  JᵀJ + λI accumulated in its envelope, Cholesky there.
+- **Sparse diagnosis fast path:** `ConstraintDiagnosis.diagnoseSparse`
+  factors JJᵀ (rows at unit norm) the same way; all pivots ≥ 1e-8 proves
+  independent rows, so the report needs no QR. Otherwise (a dependency to
+  explain, or anything near) it falls back to the dense diagnosis. Redundant
+  constraints are exact in practice, so they show as zero pivots. The
+  diagnosis smoke checks sparse and dense agree on every hand-built case.
+- Numbers (load average 13–20, so noisy): chained 200 points 12.8 s →
+  14–18 ms; chained 1000 points (2000 variables, one part) 30.5 s →
+  0.11–0.15 s; independent 1000 points (250 parts) 60–200 ms; the bracket
+  1–2 ms (80–95 ms on main before C2).
+- Known limit: a large connected part *with* a dependency still takes the
+  dense QR (≈30 s at 1000 points). A sparse rank-revealing path (e.g. QR
+  restricted to the rows the failed pivots touch) would fix it if it matters.
+- **Codec check:** the invariance suite now also saves each sketch fixture
+  in a document (`DocumentCodec`, `ConstrainedSketchFeature`), reloads it
+  without evaluating, and solves again; all pass. This closes the C0 gap.
+- C2 is closed: step 3 was moot (see C2.2), steps 1, 2 and 4 are done.
+
+### C2.5 — Sparse dependency search and incremental re-solve (2026-09-30)
+
+- **Measured first:** a connected 1000-point sketch with one implied
+  constraint took 89 s on the dense QR fallback (200 points: 460 ms per drag
+  step), since the JJᵀ fast path gave up on any dependency.
+- **Sparse dependency search** (`ConstraintDiagnosis.diagnoseSparse`): the
+  JJᵀ Cholesky (rows and columns equilibrated, as the dense path does) drops a
+  row whose pivot is at most t² and reads its fundamental circuit by
+  back-substitution over the earlier kept rows (coefficients can reach past
+  the row's envelope, so the solve runs over all earlier rows). Circuits merge
+  and suggestions follow as in the dense path.
+- **Threshold consistency:** a Gram pivot is about the square of a row's
+  distance from the earlier rows and is accurate only to ~1e-16, so it
+  cannot reproduce a σ threshold below ~1e-8. With a rank tolerance t ≥ 1e-6
+  the sparse path decides alone (dependent at ≤ t², near-degenerate below
+  (1e3 t)², as the dense flag); with a smaller t it only proves clear
+  independence and defers the rest to the QR. `SolverSettings.rankTolerance`
+  now defaults to 1e-6 (was 1e-7). Documents saved with 1e-7 still diagnose
+  correctly, their dependencies just take the dense path. The diagnosis smoke
+  compares sparse and dense at both tolerances on every hand-built case.
+- **Incremental re-solve:** `SolvedSketch.partCache` keeps each converged
+  part's report under a key of its structure (constraint ids, kinds,
+  references, the entities they reach), with its numbers (settings,
+  dimension values, fixed positions, sketch scale) compared exactly rather
+  than through strings. A solve seeded from that solution skips unchanged
+  parts. Per-solve setup is now O(n): one variable→part/local table instead
+  of per-part arrays, residuals walk only the part's constraints, RCM runs
+  only for parts that solve. `SketchIncrementalSmoke` checks edits,
+  re-authored fixed points and reused redundant parts against cold solves.
+- Numbers (load ~5–9): redundant connected 1000 points 89 s → 126 ms;
+  redundant 200 per drag step 463 → 16 ms; 250 independent profiles per drag
+  step 28 → 10 ms; connected 200 per drag step 9.5 ms; bracket edit 1.2 ms.
+- Still slow for dragging: one connected 1000-point part (~69 ms per step,
+  it must re-solve whole) and the O(n) per-solve setup (~10 ms at 1000
+  points with nothing to solve). Next levers if needed: skip diagnosis while
+  dragging (diagnose on release, as FreeCAD does), and keep the part
+  structure between solves when only values change.
+- Aside, not fixed (user's call): haxeon's `Parser.decodeString` only knows
+  `\n \r \t \" \\`; any other escape (`\u0001`, `\x01`) silently compiles to
+  the escaped letter plus the rest (`u0001`). Use `String.fromCharCode`.
+
+### C2.6 — Drag-step profile: warm-start damping, cheaper merge (2026-09-30)
+
+Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
+- One connected part took 7 LM iterations per 0.01 nudge: every solve
+  restarted at damping 1e-3, while a 250-rectangle chain's JᵀJ has soft modes
+  near (π/250)² ≈ 1.6e-4, so the damping swamped exactly what the edit moves.
+  Seeded parts now start at damping 1e-9 (Gauss-Newton; rejected steps still
+  raise it): 1 iteration, LM 48 → 18 ms per step.
+- 250 independent parts spent 5.7 ms merging reports: the sort joined owner
+  lists inside its comparator. Precomputed keys: 1.2 ms.
+- Per drag step now: connected 1000 points ≈ 35 ms (LM 18, diagnosis 14,
+  setup ≈ 3), independent 1000 points ≈ 5 ms. CamKit and MachineKit pass.
+- Remaining levers for the connected case, if 60 fps on 1000-point parts
+  matters: reuse the RCM orderings across solves (the structure is unchanged
+  while dragging), reuse row buffers in the sparse Jacobian and envelope, and
+  skip diagnosis during a drag (diagnose on release).
+
+### C2.7 — Drags under a frame: reused structure, diagnosis on release, fewer allocations (2026-10-01)
+
+- **Structure reuse:** `SolvedSketch.structures` keeps, per part structure,
+  the solve's RCM ordering and envelope, the diagnosis row graph and its
+  ordering, and the last diagnosis. The key now also lists the part's
+  variables in order, so reordering points can never pair a stale envelope
+  with new indices. The diagnosis row graph comes from what constraints
+  reference (a superset of any pose's nonzeros), so no entry falls outside a
+  cached envelope; `ConstraintDiagnosis.diagnoseSparse` takes it as an
+  optional `RowStructure`.
+- **Diagnosis on release:** `ConstrainedSketch.solve(seed, cancel,
+  diagnose = false)` reports each re-solved part's previous diagnosis
+  (`SolveDiagnostic.diagnosed` false) and keeps it out of the value cache, so
+  the next normal solve re-diagnoses exactly the parts that moved. A part
+  that fails to converge is still diagnosed (a conflict mid-drag is reported).
+- **Allocations:** the LM step keeps each part's envelope, merges a row's
+  entries in reused scratch arrays, and the sparse Jacobian reuses its row
+  buffers; polish runs only while the residual is above 1e-3 × tolerance.
+- `SketchIncrementalSmoke` covers drag mode, release and a mid-drag conflict.
+- Per drag step (load ≈ 27, so upper bounds), with diagnosis / on release:
+  connected 1000 points 23.6 / 11.5 ms (was 69); connected 1000 with a
+  redundancy 62 / 11.6 ms (was 129); connected 200 points 3.5 / 2.1 ms; 250
+  independent profiles ≈ 5 ms; bracket edit 1.0 ms. CamKit and MachineKit
+  pass.
+- The editor has no sketch drag yet (C5 adds soft drag targets); when it
+  does, it should solve with `diagnose = false` while dragging and normally
+  on release.
+
+### C3.1 — Driven joints; dependents derived from the loops (2026-10-01)
+
+- `KinematicJoint.driven` (optional, wire id 12): an input of the mechanism.
+  Only movable tree joints that are not coupling targets can be driven
+  (codec rejects the rest); the flattener and `AssemblyDocuments` (a boolean
+  relationship property) carry it. `AssemblyModel.drive(id)` sets it.
+- `AssemblyState.dependentJoints()`: every movable tree joint on the tree path
+  between a closure's two occurrences (below their lowest common ancestor)
+  that is neither driven nor a coupling target, in definition order.
+  `solveClosures()` and `AssemblyDrag` use it when given no explicit list.
+- Excavator: its three hinges are driven and `buildState` derives the rest.
+  **Found:** its old hand-written list spelled the cylinder joints
+  `boom-cylinder-…` while they are named `Boom-cylinder-…`, and was filtered
+  by name, so the six cylinder coordinates were silently never dependent
+  (their loops closed only because the authored pose was exact). The derived
+  list has all eight; the invariance fixture had copied the same list and now
+  derives it too.
+- App: with no saved choice the session starts from the derived dependents;
+  a saved list (older projects, or an explicit choice, including an empty
+  one) still overrides, and the scene record saves the list only when it
+  differs from what the definition derives, so later source changes apply.
+  The inspector toggle is unchanged. (The plan said drop the scene field;
+  keeping it as an override is less disruptive and costs nothing.) The app
+  compiles; its native tests were not run (none exercise this path).
+- Also fixed on main's current haxeon pin: haxeon now decodes `\x`
+  escapes (3d205e9e), so projectkit's three `indexOf("\x00")` checks became
+  NUL string constants, which HashLink rejects ("HashLink String cannot
+  contain NUL"), breaking every build that includes projectkit. They had
+  never worked (they looked for the text "x00"); `AssemblyCodec.containsNul`
+  checks by character code.
+
+### C3.2 — Closure diagnosis; unclosable loops are conflicting (2026-10-01)
+
+- `AssemblyLoopSolveResult.report`: the closure rows (already divided by
+  their tolerances) at the final state, diagnosed over the dependent columns
+  by `ConstraintDiagnosis.diagnoseSparse` at `SPARSE_TOLERANCE`, owners =
+  closure IDs. A planar four-bar's revolute closure shows
+  `redundant(pin)-3` (its out-of-plane rows); the excavator's four closures
+  are all consistent-redundant, none conflicting.
+- Status: kinematicskit's LM calls a stop stationary only below
+  1e-10 (1 + ‖J‖‖r‖), and a large-residual (unclosable) loop approaches its
+  least-squares pose only linearly, so it ran out of iterations. The
+  unclosable four-bar ends with ‖Jᵀr‖/‖J‖‖r‖ ≈ 1.15e-6; unfinished solves sit
+  at 0.1–0.9. CadKit now reports an iteration-limit stop with that ratio
+  ≤ 1e-4 as `conflicting` (kinematicskit's own status, which RobotKit uses,
+  is unchanged).
+- The invariance suite's `KNOWN` list is now empty.
+- Not done here: the inspector does not show the report yet (the API
+  carries it); the assembly witness check is C3.3.
+
+### C3.3 — Witness pose for closure solves (2026-10-01)
+
+- After a converged solve whose diagnosis has a dependency, the driven
+  coordinates move by ±1e-3 (radians, or that share of the assembly size),
+  the loops close again from there, and the first side that closes is
+  diagnosed (a toggle is often a limit, so one side may not close). More rank
+  there means the dependency belongs to the pose: its report replaces the
+  local one and `AssemblyLoopSolveResult.degenerate` is set. Without driven
+  joints there is nothing to nudge and the check is skipped.
+- A four-bar authored exactly at its toggle reports `degenerate` with the
+  general diagnosis `redundant(pin)-3`; an ordinary pose is not flagged.
+
+### C3.4 — Loop-closing joints become closures automatically (2026-10-01)
+
+- `AssemblyModel.mate`/`mateOnAxis` record a closure (via `constrainOnAxis`)
+  when the child already hangs from a tree joint or is an ancestor of the
+  parent, instead of throwing "already has a parent joint". A closure has no
+  coordinate, so a non-zero value there is an error. The editor creates no
+  joints yet, so the builder is the only place this applies today.
+- Smoke: a four-bar built from four plain mates records `pin` as a closure;
+  mating back up the tree is a closure too; a valued closing mate is refused.
+
+### C3.5 — Spherical, cylindrical and planar closures (2026-10-01)
+
+- kinematicskit `ClosureKind` Spherical (3 position rows), Cylindrical (the
+  existing transverse-position and axis rows) and Planar (distance of B's
+  origin along A's normal, exact derivative a·(v_B − v_A) + (a × d)·ω_A, plus
+  the normal-parallel rows). Haxe only: native kinematicskit has no closures.
+- `AssemblyJointType` spherical/cylindrical/planar, valid only as closures
+  (they have more than one coordinate); `AssemblyModel` records them as
+  closures; `AssemblyState.closureResiduals` measures each kind.
+- `ClosureKindsSmoke`: a ball-pinned four-bar (`redundant(pin)-1`), a slider
+  on a cylindrical guide (`redundant(guide)-2`), a three-link leg standing on
+  a planar floor (`redundant(stand)-1`) each close from their driven joint,
+  and their rows match central differences at the solution.
+- Simulation: the bridge refuses these kinds with a clear message; MuJoCo
+  mapping needs native simkit work (a spherical closure is one connect
+  equality; cylindrical and planar have no direct MuJoCo equality).
+- Found, left as is: the existing Prismatic closure has the same 4 rows as
+  Cylindrical, so it does not hold the twist about its axis. Fixing it
+  changes behaviour the MuJoCo mapping relies on; do it with that mapping.
+- kinematicskit (181), CadBridge (129) and MachineKit pass.
+
+### Pre-C4 cleanup 1–2: stationarity in kinematicskit; one tolerance policy (2026-10-01)
+
+- `LevenbergMarquardt` calls a stop stationary when ‖Jᵀe‖ <= 1e-4 ‖J‖‖e‖
+  (`STATIONARY_RATIO`, plus the old absolute floor), so an unclosable loop is
+  `Conflicting` from kinematicskit itself; the CadKit-side ratio test from
+  C3.2 is gone. The limit-blocked test keeps the strict threshold.
+  `Manipulator` only reads `Converged`, and no RobotKit/MotionKit test
+  asserts a failure label.
+- `ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE` is now the CAD default 1e-6,
+  used by `SolverSettings` and the closure diagnosis (no more literals); its
+  doc lists every threshold and why. Hand-built diagnosis tests that probe
+  finer tolerances pass 1e-9 explicitly.
+
+### Pre-C4 cleanup 3: sparse/dense agreement on random sketches; a vacuous test found (2026-10-01)
+
+- `DiagnosisAgreementSmoke`: 40 seeded random sketches (rectangles and
+  triangles, some chained, with implied, duplicate, parallel and
+  contradicting extras), each diagnosed by the dense QR and the sparse Gram
+  path on the same rows at the authored pose and the solution; rank, groups,
+  unsatisfied owners and parts must match, and at least 10 systems must
+  contain dependencies.
+- **Found:** since C2.5, `SketchSolver.probe` returned zero rows (its
+  constraint list was filled only by `parts()`, which `probe` never calls),
+  so `SketchJacobianSmoke` compared empty matrices and passed vacuously. The
+  list is now filled in the constructor, `JacobianCheck` refuses a residual
+  with no rows, and the angle-row mutation check fails again as it should.
+  The analytic Jacobians themselves still pass on every kind.
+
+### Pre-C4 cleanup 4: `SketchSolver` split by concern (2026-10-01)
+
+- `SketchLayout` (variables, constraints, validation, scale, starting pose),
+  `SketchEquations` (each kind's residual and analytic rows, generated from
+  the old code so the formulas are unchanged), `SketchPartition` (parts,
+  references, RCM ordering, local indices), `SketchPartSolver` (LM + polish
+  over a part, owning the envelope and scratch buffers), `SketchPartDiagnosis`
+  (diagnosis, structural row graph, witness pose), `SketchSolveCache` (part
+  keys and values); `SketchSolver` only orchestrates (~190 lines, was ~990).
+- The hidden mode state is gone: constraint subsets and shape-only
+  evaluation are arguments, rows go through a `SketchRowWriter`, buffers
+  belong to the part solver. Same tests pass unchanged; benchmark within
+  noise (bracket edit 0.9 ms; connected 1000-point drag 12.3 ms undiagnosed).
+
+### Item 5a: prismatic closures hold their twist (2026-10-01)
+
+- Correction to C3.5's note: the MuJoCo backend already models a prismatic
+  closure exactly (an auxiliary body with a slide joint, welded to the
+  child), so it was the kinematic solver that disagreed. `ClosureTask`
+  Prismatic gains a fifth row, the relative rotation's component along the
+  axis (dφ·a ≈ a·(ω_B − ω_A) near closure); `AssemblyState` checks a
+  prismatic closure's full relative rotation, as for fixed.
+- `ClosureKindsSmoke`: the slider guide as a prismatic closure shows
+  `redundant(guide)-3` (its twist row is zero in a plane) and its rows match
+  central differences.
+
+### Item 5b: MuJoCo mappings for spherical, cylindrical and planar closures (2026-10-01)
+
+- simkit: `NKSIM_JOINT_SPHERICAL/CYLINDRICAL/PLANAR` (closures only; tree
+  joints still accept fixed/revolute/prismatic). The MuJoCo backend extends
+  the prismatic pattern: an auxiliary body under body_a at body_b's relative
+  pose carries the free motion and is welded to body_b — cylindrical: slide
+  + hinge along the axis at the anchor; planar: two in-plane slides + a hinge
+  about the normal at the anchor. Spherical is one connect at the anchor.
+- RobotKit runtime: matching `RK_RUNTIME_JOINT_*` constants (values equal
+  simkit's; the runtime passes closure types through); bindings regenerated
+  with `tools/check-hxi.sh`. The app maps the assembly types; the cadbridge
+  no longer refuses them.
+- Built simkit with MuJoCo in the worktree (submodule cloned from the shared
+  checkout at the pin; `_deps` copied, `FETCHCONTENT_FULLY_DISCONNECTED=ON`).
+  `assembly_closures_compile_as_equalities` covers all six types; simkit
+  ctest 58/58 (one uinput test skipped). The app compiles; an end-to-end
+  simulation with the new kinds needs the app's native libraries rebuilt.

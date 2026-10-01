@@ -1,4 +1,7 @@
 import cadkit.modeling.AssemblyState;
+import cadkit.parametric.Document;
+import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.features.ConstrainedSketchFeature;
 import cadkit.sketch.ConstrainedSketch;
 import cadkit.sketch.SketchConstraint;
 import cadkit.sketch.SketchEntity;
@@ -34,10 +37,7 @@ private typedef AssemblyFixture = {
 	remove its entry and a regression cannot hide.
 */
 class DiagnosisInvarianceSmoke {
-	static final KNOWN:Array<String> = [
-		// An unclosable loop ends at a stationary residual but is reported as out of iterations (C3).
-		"four-bar-impossible/expected",
-	];
+	static final KNOWN:Array<String> = [];
 
 	public static function run():Void {
 		var failures:Array<String> = [];
@@ -89,6 +89,7 @@ class DiagnosisInvarianceSmoke {
 			{name: "rotate", apply: s -> transformSketch(s, 1, 0, 0, 0.7, false, 0)},
 			{name: "reorder", apply: s -> transformSketch(s, 1, 0, 0, 0, true, 0)},
 			{name: "perturb", apply: s -> transformSketch(s, 1, 0, 0, 0, false, 0.02)},
+			{name: "codec", apply: throughDocument},
 		];
 		for (transform in transforms) {
 			var summary = sketchSummary(transform.apply(fixture.build()));
@@ -100,6 +101,18 @@ class DiagnosisInvarianceSmoke {
 		var again = sketchSummary(sketch);
 		if (again != base)
 			failures.push('${fixture.name}/repeat: $again, first $base');
+	}
+
+	/** Saves the sketch in a document and loads it back, without evaluating the document. */
+	static function throughDocument(source:ConstrainedSketch):ConstrainedSketch {
+		var document = new Document();
+		document.add(new ConstrainedSketchFeature(source));
+		var reloaded = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
+		var feature:ConstrainedSketchFeature = cast reloaded.featureAt(0);
+		var result = feature.sketch();
+		reloaded.close();
+		document.close();
+		return result;
 	}
 
 	/** Degeneracy belongs to a pose, so it is checked directly rather than through the invariant summary. */
@@ -307,12 +320,9 @@ class DiagnosisInvarianceSmoke {
 		return definition;
 	}
 
-	static function excavatorDependent():Array<String> {
-		var candidates = ["link-one-hinge", "link-two-hinge", "boom-cylinder-hinge", "boom-cylinder-slide", "stick-cylinder-hinge",
-			"stick-cylinder-slide", "bucket-cylinder-hinge", "bucket-cylinder-slide"];
-		var tree = [for (joint in ProceduralExcavatorAssembly.buildDefinition().joints) if (joint.role == AssemblyJointRole.Tree) joint.id];
-		return [for (id in candidates) if (tree.indexOf(id) >= 0) id];
-	}
+	/** Derived from the driven hinges (a hand-written list here once missed the cylinders by spelling). */
+	static function excavatorDependent():Array<String>
+		return new AssemblyState(ProceduralExcavatorAssembly.buildDefinition()).dependentJoints();
 
 	/**
 		Scales every length (connector and root positions, prismatic

@@ -39,6 +39,8 @@ class JacobianCheck {
 		if (!(tolerance > 0)) throw "Jacobian check tolerance must be positive";
 		var base = residual(x.copy());
 		var rows = base.length, columns = x.length;
+		// An empty residual compares nothing; a check that passes on it would hide a broken harness.
+		if (rows == 0) throw "Jacobian check needs at least one residual row";
 		var analytic = jacobian(x.copy());
 		if (analytic.length != rows * columns)
 			throw 'Jacobian has ${analytic.length} entries, expected $rows x $columns';

@@ -178,13 +178,17 @@ class AssemblyState {
 			var axisSecond = AssemblyFrames.transformVector(second, joint.axis.x, joint.axis.y, joint.axis.z);
 			var axisDot = Math.abs(axisFirst.x * axisSecond.x + axisFirst.y * axisSecond.y + axisFirst.z * axisSecond.z);
 			var position:Float;
-			if (joint.type == AssemblyJointType.Prismatic) {
-				var along = dx * axisFirst.x + dy * axisFirst.y + dz * axisFirst.z;
+			var along = dx * axisFirst.x + dy * axisFirst.y + dz * axisFirst.z;
+			if (joint.type == AssemblyJointType.Prismatic || joint.type == AssemblyJointType.Cylindrical) {
 				var px = dx - along * axisFirst.x, py = dy - along * axisFirst.y, pz = dz - along * axisFirst.z;
 				position = Math.sqrt(px * px + py * py + pz * pz);
-			} else position = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			} else if (joint.type == AssemblyJointType.Planar)
+				position = Math.abs(along);
+			else position = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			// A spherical closure leaves orientation free.
+			if (joint.type == AssemblyJointType.Spherical) axisDot = 1;
 			var rotation = 0.0;
-			if (joint.type == AssemblyJointType.Fixed) {
+			if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
 				var dot = first.qx * second.qx + first.qy * second.qy + first.qz * second.qz + first.qw * second.qw;
 				rotation = 1 - Math.abs(dot);
 			}
@@ -203,7 +207,7 @@ class AssemblyState {
 				tolerance = 1e-6 / LengthUnit.metresPerUnit(definition.lengthUnit == null ? "mm" : definition.lengthUnit);
 			if (residual.position > tolerance)
 				throw 'Assembly joint "${residual.joint}" has separated connectors';
-			if (joint.type == AssemblyJointType.Fixed) {
+			if (joint.type == AssemblyJointType.Fixed || joint.type == AssemblyJointType.Prismatic) {
 				if (residual.rotation > 1e-5)
 					throw 'Assembly fixed joint "${residual.joint}" has misaligned frames';
 			} else if (residual.axis > 1e-5)
@@ -211,10 +215,54 @@ class AssemblyState {
 		}
 	}
 
-	/** Adjusts selected tree-joint coordinates until the assembly closures are satisfied. */
-	public function solveClosures(dependentJointIds:Array<String>,
+	/**
+		Adjusts tree-joint coordinates until the assembly closures are satisfied: the named ones, or by default
+		`dependentJoints()`.
+	*/
+	public function solveClosures(?dependentJointIds:Array<String>,
 		?options:AssemblyLoopSolveOptions):AssemblyLoopSolveResult
-		return AssemblyLoopSolver.solve(this, dependentJointIds, options);
+		return AssemblyLoopSolver.solve(this, dependentJointIds == null ? dependentJoints() : dependentJointIds, options);
+
+	/**
+		The coordinates closures depend on: every movable tree joint on the tree path between a closure's two
+		occurrences that is neither driven nor a coupling target (a coupled joint follows its source). In
+		definition order.
+	*/
+	public function dependentJoints():Array<String> {
+		var parentJoint = new Map<String, KinematicJoint>();
+		for (joint in definition.joints) if (joint.role == AssemblyJointRole.Tree) parentJoint.set(joint.child, joint);
+		var coupled = new Map<String, Bool>();
+		if (definition.couplings != null) for (coupling in definition.couplings) coupled.set(coupling.target, true);
+		var onLoop = new Map<String, Bool>();
+		for (closure in definition.joints) if (closure.role == AssemblyJointRole.Closure) {
+			// Occurrences from each end up to its root, then the joints below their lowest common ancestor.
+			var fromParent = pathToRoot(closure.parent, parentJoint), fromChild = pathToRoot(closure.child, parentJoint);
+			var common = new Map<String, Bool>();
+			for (step in fromParent) common.set(step.occurrence, true);
+			var meet:Null<String> = null;
+			for (step in fromChild) if (common.exists(step.occurrence)) { meet = step.occurrence; break; }
+			for (path in [fromParent, fromChild])
+				for (step in path) {
+					if (step.occurrence == meet) break;
+					if (step.joint != null) onLoop.set(step.joint.id, true);
+				}
+		}
+		return [for (joint in definition.joints)
+			if (onLoop.exists(joint.id) && AssemblyDefinitionCodec.hasCoordinate(joint.type) && joint.driven != true && !coupled.exists(joint.id))
+				joint.id];
+	}
+
+	/** Each occurrence from `start` to its root, with the tree joint that attaches it to the next (null at the root). */
+	static function pathToRoot(start:String, parentJoint:Map<String, KinematicJoint>):Array<{occurrence:String, joint:Null<KinematicJoint>}> {
+		var path:Array<{occurrence:String, joint:Null<KinematicJoint>}> = [];
+		var current:Null<String> = start;
+		while (current != null) {
+			var joint = parentJoint.get(current);
+			path.push({occurrence: current, joint: joint});
+			current = joint == null ? null : joint.parent;
+		}
+		return path;
+	}
 
 	public function record():AssemblyStateRecord {
 		var values:Array<AssemblyJointCoordinate> = [];

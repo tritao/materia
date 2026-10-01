@@ -8,6 +8,12 @@ enum abstract AssemblyJointType(String) from String to String {
 	var Revolute = "revolute";
 	var Continuous = "continuous";
 	var Prismatic = "prismatic";
+	/** Closures only: a shared point. */
+	var Spherical = "spherical";
+	/** Closures only: a shared axis line, free to slide and turn along it. */
+	var Cylindrical = "cylindrical";
+	/** Closures only: the child connector's origin on the parent's plane (normal = axis), normals parallel. */
+	var Planar = "planar";
 }
 
 enum abstract AssemblyJointRole(String) from String to String {
@@ -58,6 +64,12 @@ enum abstract AssemblyJointRole(String) from String to String {
 	@:id(10) var defaultValue:Float;
 	/** Maximum closure position residual in the assembly length unit. */
 	@:id(11) @:optional var closureTolerance:Float;
+	/**
+		An input of the mechanism (a motor, a cylinder): its coordinate is set, never solved. The other movable tree
+		joints on a closure loop are dependent and follow it (see `AssemblyState.dependentJoints`). Only movable tree
+		joints that are not coupling targets can be driven.
+	*/
+	@:id(12) @:optional var driven:Bool;
 }
 
 /** Target coordinate = source coordinate × ratio + offset. */
