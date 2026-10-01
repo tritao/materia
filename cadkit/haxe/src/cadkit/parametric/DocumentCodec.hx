@@ -1263,7 +1263,7 @@ class DocumentCodec {
 		return result;
 	}
 
-	private static function encodeFingerprint(fingerprint:Null<TopologyFingerprint>):Dynamic {
+	public static function encodeFingerprint(fingerprint:Null<TopologyFingerprint>):Dynamic {
 		if (fingerprint == null)
 			return null;
 		return {
@@ -1279,7 +1279,7 @@ class DocumentCodec {
 		};
 	}
 
-	private static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
+	public static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
 		return TopologyFingerprint.fromData(kind, surfaceKind(stringField(record, "surface")), curveKind(stringField(record, "curve")),
 			numberField(record, "x"), numberField(record, "y"), numberField(record, "z"), numberField(record, "dx"), numberField(record, "dy"),
 			numberField(record, "dz"), numberField(record, "measure"));

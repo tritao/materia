@@ -743,3 +743,52 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   property; removing an assembly removes its mates with its relationships.
 - `MateSolverSmoke` round-trips the motor assembly through documents and a
   `DocumentCodec` save/reload and solves it again (one degree of freedom).
+
+### C4.4 — Mates on faces and edges: geometric connectors (2026-10-01)
+
+- Design change from the plan: a mate still names connectors. A component's
+  definition can also carry **geometric connectors**
+  (`cadkit.parametric.GeometricConnectors`): a face or edge kept as a
+  topology fingerprint plus its direction and radius, framed again from the
+  current geometry whenever it is needed. The solver, the codec, the
+  flattener and the MuJoCo export see ordinary connectors.
+  `PersistentReference` holds no topology, and `TopologyReference` needs an
+  owning `Feature`, which a registry-evaluated definition does not have.
+- Frames (`frameOf`), with z along the feature:
+  - planar face: at its centroid, z the outward normal;
+  - axial face (cylinder, cone, sphere, torus): on the axis nearest the
+    centroid;
+  - circular edge: at its center;
+  - straight edge: at its midpoint.
+
+  x is the world axis least aligned with z. `flip` reverses z. An axis has
+  no sign of its own, so it keeps the sign it had when captured.
+- Resolution:
+  1. Exact fingerprint (`TopologyResolver`).
+  2. After an edit moved or resized the feature: the *one* face or edge with
+     the same surface or curve kind, direction and radius.
+  3. Several matches → `Ambiguous`; none → `Unresolved`.
+
+  A fingerprint is exact by design, and a definition has no operation
+  history to remap through.
+- Native: `cad_face_axis` and `cad_edge_axis` (struct `cad_axis`, projected
+  as `CadKit.GeometricAxis` because `Axis` clashes with
+  `cadkit.modeling.Axis`), read from `BRepAdaptor`; the core smoke tests
+  both.
+- Documents: the connectors live on the CadKit `Definition` (property
+  `cadkit.assembly.geometricConnectors`).
+  - `AssemblyDocuments.toDefinition` appends them, framed from each
+    occurrence's evaluated geometry. Occurrences of one component must
+    agree (`assembly.instance-dependent-connector`); a lost face is
+    `assembly.unresolved-connector`.
+  - `fromDefinition` strips them from stored records, so frames never go
+    stale.
+  - In memory, `GeometricConnectors.apply` frames them into an
+    `AssemblyDefinition` before solving.
+- `GeometricConnectorSmoke`:
+  - the frame of each feature kind;
+  - a pin mated to a plate's top face and bore: solved in memory, from a
+    document, and after a save and reload;
+  - widening the plate moves the bore and the pin follows;
+  - a second bore of the same radius → ambiguous;
+  - a connector on a face the part lacks → reported.

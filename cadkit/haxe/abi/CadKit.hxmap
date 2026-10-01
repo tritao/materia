@@ -17,6 +17,7 @@
     "cad_shape_ref": "ShapeRef",
     "cad_vec3": "Vec3",
     "cad_bounds": "Bounds",
+    "cad_axis": "GeometricAxis",
     "cad_inertia_tensor": "InertiaTensor",
     "cad_mass_properties": "MassProperties",
     "cad_physical_properties": "FullPhysicalProperties",

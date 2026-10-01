@@ -11,7 +11,9 @@ import materia.assembly.AssemblyDefinition.AssemblySubdefinition;
 import materia.assembly.AssemblyDefinition.AssemblyVector;
 import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
+import materia.assembly.AssemblyRecord.AssemblyConnector;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
 import materia.assembly.AssemblyDefinition.AssemblyMate;
 
 private class AssemblyDocumentScope {
@@ -22,6 +24,8 @@ private class AssemblyDocumentScope {
 	public final mates:Array<AssemblyMate> = [];
 	public var hasCouplings:Bool = false;
 }
+
+private typedef GeometricOccurrence = {scopeName:String, scope:AssemblyDocumentScope, definition:String, instance:InstanceElement};
 
 typedef AssemblyDefinitionResolver = (String, AssemblyComponentOccurrence,
 	Null<AssemblyComponentDefinition>)->Null<Definition>;
@@ -48,6 +52,7 @@ class AssemblyDocuments {
 	public static inline var COUPLING:String = "cadkit.coupling";
 	public static inline var MATE:String = "cadkit.mate";
 	static inline var PREFIX:String = "cadkit.assembly.";
+	static inline var GEOMETRIC_TOLERANCE:Float = 1e-6;
 
 	public static function fromDefinition(document:Document, definition:AssemblyDefinition,
 			?resolve:AssemblyDefinitionResolver):Element {
@@ -149,6 +154,7 @@ class AssemblyDocuments {
 		}
 		var byElement = new Map<String, {scope:String, id:String}>();
 		var seenDefinitions:Map<String, Bool> = [];
+		var geometric:Array<GeometricOccurrence> = [];
 		for (element in document.allElements()) if (belongsTo(element, root)) {
 			var kind = read(element, "kind");
 			if (kind != "component" && kind != "occurrence") continue;
@@ -176,8 +182,11 @@ class AssemblyDocuments {
 				if (readOrNull(element, "grounded") == "true") occurrence.grounded = true;
 				scope.occurrences.push(occurrence);
 				byElement.set(element.id.value, {scope: scopeName, id: occurrence.id});
+				if (element.kind == "instance" && occurrence.assembly == null)
+					geometric.push({scopeName: scopeName, scope: scope, definition: occurrence.definition, instance: cast element});
 			}
 		}
+		resolveGeometricConnectors(document, geometric);
 		for (relationship in document.allRelationships()) if (relationship.typeName == JOINT) {
 			var parent = byElement.get(relationship.source.elementId.value);
 			var child = byElement.get(relationship.target.elementId.value);
@@ -258,6 +267,62 @@ class AssemblyDocuments {
 		return definition;
 	}
 
+	/**
+		Appends each occurrence's geometric connectors (see `GeometricConnectors`) to its component, framed by
+		the occurrence's current geometry. Occurrences of one component must agree on the frames: a connector
+		whose face moves with an instance's overrides cannot be one connector of the shared component.
+	*/
+	static function resolveGeometricConnectors(document:Document,
+			occurrences:Array<GeometricOccurrence>):Void {
+		var resolved = new Map<String, Array<AssemblyConnector>>();
+		for (entry in occurrences) {
+			var definition = document.definition(entry.instance.definitionId);
+			var connectors = GeometricConnectors.read(definition);
+			if (connectors.length == 0) continue;
+			var component:Null<AssemblyComponentDefinition> = null;
+			for (candidate in entry.scope.definitions) if (candidate.id == entry.definition) component = candidate;
+			if (component == null) throw 'Occurrence "${entry.instance.name}" has no component record for its geometric connectors';
+			var shape = document.definitionOutput(entry.instance, definition.primaryGeometryOutput().name);
+			var frames:Array<AssemblyConnector> = [];
+			for (connector in connectors) {
+				try frames.push({name: connector.name, frame: GeometricConnectors.frame(shape, connector)})
+				catch (error:GeometricConnectorError)
+					throw new AssemblyDocumentDiagnostic("assembly.unresolved-connector", entry.instance.name + "/" + error.connector,
+						error.message);
+			}
+			var key = entry.scopeName + "/" + component.id, known = resolved.get(key);
+			if (known == null) {
+				for (frame in frames) {
+					for (existing in component.connectors)
+						if (existing.name == frame.name)
+							throw 'Component "${component.id}" already has a connector named "${frame.name}"';
+					component.connectors.push(frame);
+				}
+				resolved.set(key, frames);
+			} else {
+				for (i in 0...frames.length)
+					if (!sameFrame(known[i].frame, frames[i].frame))
+						throw new AssemblyDocumentDiagnostic("assembly.instance-dependent-connector",
+							entry.instance.name + "/" + frames[i].name, "Occurrences of one component place this connector differently");
+			}
+		}
+	}
+
+	/** `component` without the connectors its definition derives from geometry: those are framed again on reading. */
+	static function withoutGeometric(component:AssemblyComponentDefinition, definition:Definition):AssemblyComponentDefinition {
+		var names = [for (connector in GeometricConnectors.read(definition)) connector.name];
+		if (names.length == 0) return component;
+		var copy:AssemblyComponentDefinition = JsonWire.decode(JsonWire.encode(component));
+		copy.connectors = [for (connector in copy.connectors) if (names.indexOf(connector.name) < 0) connector];
+		return copy;
+	}
+
+	static function sameFrame(a:AssemblyFrame, b:AssemblyFrame):Bool {
+		var dot = Math.abs(a.qx * b.qx + a.qy * b.qy + a.qz * b.qz + a.qw * b.qw);
+		return Math.abs(a.x - b.x) <= GEOMETRIC_TOLERANCE && Math.abs(a.y - b.y) <= GEOMETRIC_TOLERANCE &&
+			Math.abs(a.z - b.z) <= GEOMETRIC_TOLERANCE && dot >= 1 - GEOMETRIC_TOLERANCE;
+	}
+
 	static function writeScope(document:Document, root:Element, scope:String, holder:Element,
 			definitions:Array<AssemblyComponentDefinition>, occurrences:Array<AssemblyComponentOccurrence>,
 			couplings:Array<AssemblyJointCoupling>, exposed:Array<AssemblyExposedConnector>,
@@ -292,7 +357,7 @@ class AssemblyDocuments {
 			put(element, "kind", "occurrence"); putOwner(element, root); put(element, "scope", scope);
 			if (path != null) put(element, "path", path + occurrence.id);
 			put(element, "id", occurrence.id); put(element, "definition", occurrence.definition);
-			if (component != null) put(element, "record", JsonWire.encode(component));
+			if (component != null) put(element, "record", JsonWire.encode(withoutGeometric(component, instanceDefinition)));
 			if (occurrence.assembly != null) put(element, "assembly", occurrence.assembly);
 			if (occurrence.grounded == true) put(element, "grounded", "true");
 			members.set(occurrence.id, element);

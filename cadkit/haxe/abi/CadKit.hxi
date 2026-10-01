@@ -54,11 +54,13 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_cut(first: cad_shape, second: cad_shape, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_cut_operation(first: cad_shape, second: cad_shape, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
 	extern fn cad_cylinder(radius: f64, height: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
+	extern fn cad_edge_axis(edge: cad_shape, out_axis: ptr<cad_axis> @out) -> cad_result;
 	extern fn cad_edge_curve_kind(edge: cad_shape, out_kind: ptr<cad_curve_kind> @out) -> cad_result;
 	extern fn cad_edge_length(edge: cad_shape, out_length: ptr<f64> @out) -> cad_result;
 	extern fn cad_edge_position_at(edge: cad_shape, parameter: f64, out_position: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_edge_tangent_at(edge: cad_shape, parameter: f64, out_tangent: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_face_area(face: cad_shape, out_area: ptr<f64> @out) -> cad_result;
+	extern fn cad_face_axis(face: cad_shape, out_axis: ptr<cad_axis> @out) -> cad_result;
 	extern fn cad_face_center(face: cad_shape, out_center: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_face_normal(face: cad_shape, out_normal: ptr<cad_vec3> @out) -> cad_result;
 	extern fn cad_face_surface_kind(face: cad_shape, out_kind: ptr<cad_surface_kind> @out) -> cad_result;
@@ -138,6 +140,11 @@ interface CadKit @target("portable-abi64") @library("cadkit-core") {
 	extern fn cad_wire(edges: ptr<const<cad_shape_ref>> @in_array("edge_count"), edge_count: u32, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_wire_offset(profile: cad_shape, distance: f64, out_shape: ptr<cad_shape> @out @owned) -> cad_result;
 	extern fn cad_wire_offset_operation(profile: cad_shape, distance: f64, out_operation: ptr<cad_operation> @out @owned) -> cad_result;
+	struct cad_axis @layout(56, 8) {
+		origin: cad_vec3 @offset(0);
+		direction: cad_vec3 @offset(24);
+		radius: f64 @offset(48);
+	}
 	struct cad_bounds @layout(48, 8) {
 		min: cad_vec3 @offset(0);
 		max: cad_vec3 @offset(24);

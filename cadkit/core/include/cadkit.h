@@ -70,6 +70,14 @@ typedef struct cad_mass_properties {
     cad_vec3 center_of_mass;
 } cad_mass_properties;
 
+/* An axis of revolution: a point on it, its unit direction and the radius
+ * about it (zero when the geometry has none, such as a cone's apex axis). */
+typedef struct cad_axis {
+    cad_vec3 origin;
+    cad_vec3 direction;
+    double radius;
+} cad_axis;
+
 /* Symmetric inertia matrix about the center of mass, for unit density.
  * Values have length^5 units because volume supplies the mass measure.
  */
@@ -472,6 +480,14 @@ CADKIT_API cad_result cad_face_normal(
     cad_shape face,
     cad_vec3* out_normal CADKIT_HXI_OUT);
 
+/* The axis of a cylindrical, conical, spherical, toroidal or revolved face.
+ * Cylinders and tori report their radius, spheres theirs with the axis
+ * through the center along z, cones their reference radius. Fails for
+ * other surfaces. Directions follow the surface, not the face orientation. */
+CADKIT_API cad_result cad_face_axis(
+    cad_shape face,
+    cad_axis* out_axis CADKIT_HXI_OUT);
+
 CADKIT_API cad_result cad_edge_curve_kind(
     cad_shape edge,
     cad_curve_kind* out_kind CADKIT_HXI_OUT);
@@ -481,6 +497,12 @@ CADKIT_API cad_result cad_edge_length(
     double* out_length CADKIT_HXI_OUT);
 
 /* Returns a unit tangent at normalized edge parameter t in [0, 1]. */
+/* The center, normal and radius of a circular edge (an ellipse reports its
+ * major radius). Fails for other curves. */
+CADKIT_API cad_result cad_edge_axis(
+    cad_shape edge,
+    cad_axis* out_axis CADKIT_HXI_OUT);
+
 CADKIT_API cad_result cad_edge_tangent_at(
     cad_shape edge,
     double parameter,

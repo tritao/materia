@@ -17,6 +17,11 @@
 #include <NCollection_HArray1.hxx>
 #include <gp_Ax2.hxx>
 #include <gp_Circ.hxx>
+#include <gp_Cone.hxx>
+#include <gp_Cylinder.hxx>
+#include <gp_Elips.hxx>
+#include <gp_Sphere.hxx>
+#include <gp_Torus.hxx>
 #include <TopoDS_Compound.hxx>
 #include <TopoDS_Wire.hxx>
 #include <BRepAlgoAPI_Common.hxx>
@@ -2777,6 +2782,139 @@ extern "C" CADKIT_API cad_result cad_edge_length(
             return fail(CAD_ERROR_OPERATION_FAILED, "edge length is not finite");
         }
         *out_length = length;
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+namespace {
+
+cad_axis axis_from_occt(const gp_Ax1& axis, double radius) {
+    const auto& origin = axis.Location();
+    const auto& direction = axis.Direction();
+    return {{origin.X(), origin.Y(), origin.Z()},
+        {direction.X(), direction.Y(), direction.Z()}, radius};
+}
+
+bool axis_is_finite(const cad_axis& axis) {
+    return std::isfinite(axis.origin.x) && std::isfinite(axis.origin.y) &&
+        std::isfinite(axis.origin.z) && std::isfinite(axis.direction.x) &&
+        std::isfinite(axis.direction.y) && std::isfinite(axis.direction.z) &&
+        std::isfinite(axis.radius);
+}
+
+}  // namespace
+
+extern "C" CADKIT_API cad_result cad_face_axis(
+    cad_shape face,
+    cad_axis* out_axis) {
+    clear_error();
+    if (out_axis == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_axis must not be null");
+    }
+    *out_axis = {};
+
+    TopoDS_Shape source;
+    const auto copy_result = copy_shape(face, source);
+    if (copy_result != CAD_OK) {
+        return copy_result;
+    }
+    if (source.ShapeType() != TopAbs_FACE) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape must be a face");
+    }
+
+    try {
+        const BRepAdaptor_Surface surface(TopoDS::Face(source));
+        cad_axis axis {};
+        switch (surface.GetType()) {
+        case GeomAbs_Cylinder: {
+            const auto cylinder = surface.Cylinder();
+            axis = axis_from_occt(cylinder.Axis(), cylinder.Radius());
+            break;
+        }
+        case GeomAbs_Cone: {
+            const auto cone = surface.Cone();
+            axis = axis_from_occt(cone.Axis(), cone.RefRadius());
+            break;
+        }
+        case GeomAbs_Sphere: {
+            const auto sphere = surface.Sphere();
+            axis = axis_from_occt(sphere.Position().Axis(), sphere.Radius());
+            break;
+        }
+        case GeomAbs_Torus: {
+            const auto torus = surface.Torus();
+            axis = axis_from_occt(torus.Axis(), torus.MajorRadius());
+            break;
+        }
+        case GeomAbs_SurfaceOfRevolution:
+            axis = axis_from_occt(surface.AxeOfRevolution(), 0.0);
+            break;
+        default:
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "face has no axis");
+        }
+        if (!axis_is_finite(axis)) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "face axis is not finite");
+        }
+        *out_axis = axis;
+        return CAD_OK;
+    } catch (const Standard_Failure& error) {
+        return fail_occt(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (const std::bad_alloc& error) {
+        return fail(CAD_ERROR_OUT_OF_MEMORY, error);
+    } catch (const std::exception& error) {
+        return fail(CAD_ERROR_OPERATION_FAILED, error);
+    } catch (...) {
+        return fail(CAD_ERROR_OPERATION_FAILED, "unknown native exception");
+    }
+}
+
+extern "C" CADKIT_API cad_result cad_edge_axis(
+    cad_shape edge,
+    cad_axis* out_axis) {
+    clear_error();
+    if (out_axis == nullptr) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "out_axis must not be null");
+    }
+    *out_axis = {};
+
+    TopoDS_Shape source;
+    const auto copy_result = copy_shape(edge, source);
+    if (copy_result != CAD_OK) {
+        return copy_result;
+    }
+    if (source.ShapeType() != TopAbs_EDGE) {
+        return fail(CAD_ERROR_INVALID_ARGUMENT, "shape must be an edge");
+    }
+
+    try {
+        const BRepAdaptor_Curve curve(TopoDS::Edge(source));
+        cad_axis axis {};
+        switch (curve.GetType()) {
+        case GeomAbs_Circle: {
+            const auto circle = curve.Circle();
+            axis = axis_from_occt(circle.Axis(), circle.Radius());
+            break;
+        }
+        case GeomAbs_Ellipse: {
+            const auto ellipse = curve.Ellipse();
+            axis = axis_from_occt(ellipse.Axis(), ellipse.MajorRadius());
+            break;
+        }
+        default:
+            return fail(CAD_ERROR_INVALID_ARGUMENT, "edge is not circular");
+        }
+        if (!axis_is_finite(axis)) {
+            return fail(CAD_ERROR_OPERATION_FAILED, "edge axis is not finite");
+        }
+        *out_axis = axis;
         return CAD_OK;
     } catch (const Standard_Failure& error) {
         return fail_occt(CAD_ERROR_OPERATION_FAILED, error);

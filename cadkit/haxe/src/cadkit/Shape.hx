@@ -117,6 +117,16 @@ class Shape {
 		return CadKit.faceNormalChecked(native.borrow());
 	}
 
+	/** The axis of a cylindrical, conical, spherical, toroidal or revolved face (throws for other surfaces). */
+	public function faceAxis():CadKit.GeometricAxis {
+		return CadKit.faceAxisChecked(native.borrow());
+	}
+
+	/** The center, normal and radius of a circular edge (throws for other curves). */
+	public function edgeAxis():CadKit.GeometricAxis {
+		return CadKit.edgeAxisChecked(native.borrow());
+	}
+
 	public function curveKind():CadKit.CurveKind {
 		return CadKit.edgeCurveKindChecked(native.borrow());
 	}
