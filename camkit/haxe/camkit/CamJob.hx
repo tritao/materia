@@ -18,16 +18,33 @@ import toolpathkit.tool.ToolLibrary;
 class CamJob {
   public final safeZ:Float;
   public final spindleRpm:Float;
+  /**
+    How far a cutting move may round the corner into the next one (G64 P),
+    in metres; zero stops exactly at every corner. Plunges and ramps always
+    stop exactly.
+  **/
+  public final blendTolerance:Float;
   var current:Point3;
   var selectedTool:Int = -1;
+  /** The G43 length in effect; moves are programmed at the tool tip. */
+  var activeLength:Float = 0.0;
   var operationNumber:Int = 0;
   var ops:Array<ToolpathOp> = [];
   var tools:Array<Tool> = [];
 
-  public function new(safeZ:Float, spindleRpm:Float, ?initial:Point3) {
+  /**
+    `safeZ` is the lowest height for rapid traverses over the work. `initial`
+    is where the spindle starts, before any tool length applies; it must be
+    clear of the work, since the first tool is loaded there.
+  **/
+  public function new(safeZ:Float, spindleRpm:Float, ?initial:Point3,
+      blendTolerance:Float = 0.0) {
     if (!Math.isFinite(safeZ) || !Math.isFinite(spindleRpm) ||
         spindleRpm <= 0.0)
       throw "CAM needs finite safe Z and positive spindle RPM";
+    if (!Math.isFinite(blendTolerance) || blendTolerance < 0.0)
+      throw "CAM blend tolerance must be finite and not negative";
+    this.blendTolerance = blendTolerance;
     this.safeZ = safeZ;
     this.spindleRpm = spindleRpm;
     current = initial == null ? new Point3(0.0, 0.0, 0.0) : initial;
@@ -353,14 +370,14 @@ class CamJob {
           Math.abs(target.y - current.y) <= 1e-12 ?
           MoveKind.Plunge : MoveKind.Ramp;
       ops.push(ToolpathOp.Move(kind, PathGeometry.Line(current, target),
-        speed, 0.0, span));
+        speed, kind == MoveKind.Cut ? blendTolerance : 0.0, span));
     }
     current = target;
   }
 
   function feedGeometry(geometry:PathGeometry, speed:Float,
       span:Provenance):Void {
-    ops.push(ToolpathOp.Move(MoveKind.Cut, geometry, speed, 0.0, span));
+    ops.push(ToolpathOp.Move(MoveKind.Cut, geometry, speed, blendTolerance, span));
     current = toolpathkit.path.GeometryTools.pointAt(geometry,
       toolpathkit.path.GeometryTools.length(geometry));
   }
@@ -373,11 +390,25 @@ class CamJob {
     }
     if (!known) tools.push(tool);
     if (selectedTool != tool.number) {
-      rapid(new Point3(current.x, current.y, safeZ), span);
+      // The first tool is loaded where the job starts, which must be clear: no
+      // move is safe before the tool's length is known. Later changes retract
+      // far enough that neither tool's tip comes below safe Z.
       if (selectedTool >= 0) {
+        rapid(new Point3(current.x, current.y,
+          safeZ + Math.max(0.0, tool.length - activeLength)), span);
         ops.push(ToolpathOp.Spindle(Off, 0.0, span));
       }
       ops.push(ToolpathOp.ToolChange(tool.number, span));
+      // A measured tool is programmed at its tip through G43; an unmeasured
+      // one at the gauge line. The spindle has not moved, so its programmed
+      // Z shifts by the change in offset.
+      if (tool.length > 0.0 || activeLength > 0.0) {
+        ops.push(ToolpathOp.ToolLengthOffset(tool.length > 0.0 ? tool.number : 0,
+          tool.length, span));
+        current = new Point3(current.x, current.y,
+          current.z + activeLength - tool.length);
+        activeLength = tool.length;
+      }
       ops.push(ToolpathOp.Spindle(Clockwise, spindleRpm, span));
       selectedTool = tool.number;
     }

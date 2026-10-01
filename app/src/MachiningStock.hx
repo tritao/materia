@@ -21,22 +21,32 @@ import toolpathkit.tool.Tool;
  * stock records the motion the simulation produced, following error included, not the program.
  *
  * Coordinates are metres in the stock part's frame shifted to its preview centre, the frame its scene
- * geometry uses, so meshes go to the scene unchanged. The tool part's origin must be its tip and its
- * +Z the tool axis, which must stay along the stock's +Z (three-axis machining).
+ * geometry uses, so meshes go to the scene unchanged. The spindle part's origin is the gauge line and
+ * its +Z runs up the spindle axis, which must stay along the stock's +Z (three-axis machining); the
+ * loaded tool's tip hangs its length below the gauge line.
  */
 class MachiningStock {
 	/** Grey of stock the tool has not touched, and of cut surfaces, as RGBA. */
 	static inline final UNTOUCHED = 0xB4B9BFFF;
 	static inline final CUT = 0xE3E6EAFF;
+	/** Against a target: surfaces within tolerance, stock left on, and cuts into the part. */
+	static inline final ON_TARGET = 0x6FB66FFF;
+	static inline final LEFTOVER = 0xE0C040FF;
+	static inline final GOUGE = 0xD04040FF;
+	/** Deviation below this counts as on target, in metres. */
+	static inline final TOLERANCE = 0.00002;
 	/** Tool motion shorter than this since the last cut is left for the next one, in metres. */
 	static inline final MIN_SEGMENT = 1e-6;
 
 	public final stock:Stock;
+	/** The finished part on the same lattice, when the job has one. */
+	public final target:Null<Stock>;
 	final preview:StockPreview;
-	final tool:Tool;
+	/** The tool in the spindle; nothing cuts until one is loaded. */
+	var tool:Null<Tool> = null;
 	final simulation:Simulation;
-	final stockPart:AssemblyPart;
-	final toolPart:AssemblyPart;
+	final stockPart:AssemblyRobot.AssemblyPart;
+	final spindlePart:AssemblyRobot.AssemblyPart;
 	final center:Array<Float>;
 	var last:Null<Point3> = null;
 	var changed = true;
@@ -48,23 +58,43 @@ class MachiningStock {
 
 	/**
 	 * `minimum` and `maximum` bound the stock in its part's frame and `center` is that part's preview
-	 * centre, in metres; the stock is that box. `spacing` is the stock's ray spacing.
+	 * centre, in metres. The stock is `stockMesh` (in the part's frame, metres) when given, else that
+	 * box. `spacing` is the stock's ray spacing.
 	 */
-	public function new(tool:Tool, minimum:Array<Float>, maximum:Array<Float>, center:Array<Float>, spacing:Float,
-			simulation:Simulation, stockPart:AssemblyPart, toolPart:AssemblyPart) {
-		this.tool = tool;
+	public function new(minimum:Array<Float>, maximum:Array<Float>, center:Array<Float>, spacing:Float,
+			simulation:Simulation, stockPart:AssemblyRobot.AssemblyPart, spindlePart:AssemblyRobot.AssemblyPart,
+			?targetMesh:{positions:Array<Float>, indices:Array<Int>}, ?stockMesh:{positions:Array<Float>, indices:Array<Int>}) {
 		this.simulation = simulation;
 		this.stockPart = stockPart;
-		this.toolPart = toolPart;
+		this.spindlePart = spindlePart;
 		this.center = center.copy();
 		var low = [for (axis in 0...3) minimum[axis] - center[axis]];
 		var high = [for (axis in 0...3) maximum[axis] - center[axis]];
 		var lattice = StockLattice.covering(low[0], low[1], low[2], high[0], high[1], high[2], spacing);
-		stock = Stock.box(lattice, low[0], low[1], low[2], high[0], high[1], high[2]);
-		preview = new StockPreview(stock, BySource(_ -> CUT, UNTOUCHED));
-		var axis = toolAxis();
+		// The raw stock is the stock part's own solid when its mesh is known, else its bounding box.
+		stock = stockMesh == null ? Stock.box(lattice, low[0], low[1], low[2], high[0], high[1], high[2])
+			: Stock.fromTriangles(lattice, [for (index in 0...stockMesh.positions.length)
+				stockMesh.positions[index] - center[index % 3]], stockMesh.indices);
+		if (targetMesh == null) {
+			target = null;
+			preview = new StockPreview(stock, BySource(_ -> CUT, UNTOUCHED));
+		} else {
+			// The target is given in the stock part's frame; the stock lives shifted to its centre.
+			var positions = [for (index in 0...targetMesh.positions.length)
+				targetMesh.positions[index] - center[index % 3]];
+			var finished = Stock.fromTriangles(lattice, positions, targetMesh.indices);
+			target = finished;
+			preview = new StockPreview(stock, ByDeviation(finished, TOLERANCE, ON_TARGET, LEFTOVER, GOUGE));
+		}
+		var axis = spindleAxis();
 		if (axis[2] < 1 - 1e-6)
-			throw "The machining tool must point along the stock's +Z";
+			throw "The machining spindle must point along the stock's +Z";
+	}
+
+	/** Puts `next` in the spindle. The tip jumps with the tool's length, so cutting starts afresh. */
+	public function load(next:Null<Tool>):Void {
+		tool = next;
+		last = null;
 	}
 
 	/**
@@ -72,7 +102,9 @@ class MachiningStock {
 	 * `provenance` describe the program move under way, for diagnostics and picking.
 	 */
 	public function follow(kind:MoveKind, opIndex:Int, provenance:Provenance):Void {
-		var tip = toolTip();
+		var loaded = tool;
+		if (loaded == null) return;
+		var tip = toolTip(loaded);
 		var start = last;
 		last = tip;
 		if (start == null) return;
@@ -81,7 +113,7 @@ class MachiningStock {
 			last = start;
 			return;
 		}
-		var report = stock.cut([new CutMove(tool, CutMotion.Path(PathGeometry.Line(start, tip)), kind, opIndex, provenance)]);
+		var report = stock.cut([new CutMove(loaded, CutMotion.Path(PathGeometry.Line(start, tip)), kind, opIndex, provenance)]);
 		var volume = report.removedVolume();
 		if (volume > 0) changed = true;
 		removed += volume;
@@ -124,17 +156,19 @@ class MachiningStock {
 		return geometry;
 	}
 
-	/** The tool tip in the stock's frame. */
-	function toolTip():Point3 {
-		var stockPose = AssemblyRobot.partPose(simulation, stockPart), toolPose = AssemblyRobot.partPose(simulation, toolPart);
-		var local = inverseRotate(stockPose.rotation, [for (axis in 0...3) toolPose.position[axis] - stockPose.position[axis]]);
+	/** The tip of `loaded`, its length below the gauge line, in the stock's frame. */
+	function toolTip(loaded:Tool):Point3 {
+		var stockPose = AssemblyRobot.partPose(simulation, stockPart), spindlePose = AssemblyRobot.partPose(simulation, spindlePart);
+		var down = rotate(spindlePose.rotation, [0.0, 0.0, -loaded.length]);
+		var local = inverseRotate(stockPose.rotation,
+			[for (axis in 0...3) spindlePose.position[axis] + down[axis] - stockPose.position[axis]]);
 		return new Point3(local[0] - center[0], local[1] - center[1], local[2] - center[2]);
 	}
 
-	/** The tool's +Z in the stock's frame. */
-	function toolAxis():Array<Float> {
-		var stockPose = AssemblyRobot.partPose(simulation, stockPart), toolPose = AssemblyRobot.partPose(simulation, toolPart);
-		return inverseRotate(stockPose.rotation, rotate(toolPose.rotation, [0.0, 0.0, 1.0]));
+	/** The spindle's +Z in the stock's frame. */
+	function spindleAxis():Array<Float> {
+		var stockPose = AssemblyRobot.partPose(simulation, stockPart), spindlePose = AssemblyRobot.partPose(simulation, spindlePart);
+		return inverseRotate(stockPose.rotation, rotate(spindlePose.rotation, [0.0, 0.0, 1.0]));
 	}
 
 	static function rotate(q:Array<Float>, v:Array<Float>):Array<Float> {
@@ -146,5 +180,23 @@ class MachiningStock {
 	static function inverseRotate(q:Array<Float>, v:Array<Float>):Array<Float>
 		return rotate([-q[0], -q[1], -q[2], q[3]], v);
 
-	public function dispose():Void stock.dispose();
+	/**
+	 * How the stock compares with the target: stock left on the part and material cut from it, in
+	 * cubic metres, taking each from the grid that sees the most of it (Z sees floors, X and Y walls).
+	 */
+	public function deviation():{leftover:Float, gouge:Float} {
+		var finished = target;
+		if (finished == null) throw "The machining job has no target part";
+		var leftover = 0.0, gouge = 0.0;
+		for (comparison in stock.compareAll(finished)) {
+			leftover = Math.max(leftover, comparison.leftoverVolume());
+			gouge = Math.max(gouge, comparison.gougeVolume());
+		}
+		return {leftover: leftover, gouge: gouge};
+	}
+
+	public function dispose():Void {
+		stock.dispose();
+		if (target != null) target.dispose();
+	}
 }

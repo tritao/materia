@@ -66,8 +66,9 @@ class CamSafeTravelFixture {
           GeometryTools.length(geometry));
       case ToolChange(_, _):
         toolChanges++;
-        check(Math.abs(current.z - 0.005) < 1e-10,
-          "tool changes occur after safe-Z retraction");
+        // The first tool goes in where the job starts; later ones after a safe-Z retraction.
+        check(Math.abs(current.z - (toolChanges == 1 ? -0.001 : 0.005)) < 1e-10,
+          "tool changes occur at the start or after safe-Z retraction");
       case _:
     }
     check(toolChanges == 3 && xyRapids >= 3 &&

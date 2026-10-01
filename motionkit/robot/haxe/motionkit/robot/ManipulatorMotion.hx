@@ -57,6 +57,14 @@ class ManipulatorMotion {
   function get_completed():Bool return programCompleted;
   public function sessionState():SessionState return session.state;
 
+  /**
+   * The joint positions the last program commanded at its end, which the next program is planned
+   * from; null before any program has finished and after a failure, when the next one starts from
+   * where the robot is.
+   */
+  public function commandedPositions():Null<Array<Float>>
+    return lastCommandedQ == null ? null : lastCommandedQ.copy();
+
   public function run(program:MotionProgram):Void {
     session.requireReady();
     if (program == null) throw "Manipulator program is required";

@@ -69,13 +69,17 @@ class AssemblyPreview {
 		for (occurrence in definition.occurrences) occurrence.definition = sharedId(occurrence.id);
 	}
 
-	/** One scene part: tessellated mesh, material colour and mass properties. Closes `part`. */
-	public static function part(id:String, name:String, part:Part, materialId:String):SceneArtifactPart {
+	/**
+	 * One scene part: tessellated mesh, material colour and mass properties. Closes `part`. The mesh
+	 * deviates from the solid by a small fraction of its size, or by at most `deflection` (in the part's
+	 * units) when given, for a mesh that is measured against rather than only looked at.
+	 */
+	public static function part(id:String, name:String, part:Part, materialId:String, ?deflection:Float):SceneArtifactPart {
 		var material = MaterialLibrary.require(materialId);
 		var color = material.visual.baseColor;
 		try {
 			var physical = part.massProperties();
-			var mesh = part.shape.tessellateRelative();
+			var mesh = deflection == null ? part.shape.tessellateRelative() : part.shape.tessellate(deflection);
 			var result:SceneArtifactPart = {
 				id: id, name: name, red: color[0], green: color[1], blue: color[2],
 				appearance: MaterialLibrary.appearance(materialId), materialId: materialId,

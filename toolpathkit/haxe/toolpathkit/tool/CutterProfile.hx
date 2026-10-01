@@ -264,6 +264,48 @@ class CutterProfile {
       case Arc(_, _, _, _, _, _, zone): zone;
     };
 
+  /**
+    The profile as plain numbers, for JSON: one row per segment, `[0, zone,
+    r0, z0, r1, z1]` for a line and `[1, zone, centerR, centerZ, r0, z0, r1,
+    z1]` for an arc, with zone 0 cutting, 1 shank and 2 holder.
+  **/
+  public function encode():Array<Array<Float>>
+    return [for (segment in segments) switch segment {
+      case Line(r0, z0, r1, z1, zone): [0.0, zoneCode(zone), r0, z0, r1, z1];
+      case Arc(cr, cz, r0, z0, r1, z1, zone):
+        [1.0, zoneCode(zone), cr, cz, r0, z0, r1, z1];
+    }];
+
+  /** The profile `encode` wrote; rejects rows it could not have written. */
+  public static function decode(rows:Array<Array<Float>>):CutterProfile {
+    if (rows == null) throw "cutter profile rows are missing";
+    return new CutterProfile([for (row in rows) segment(row)]);
+  }
+
+  static function segment(row:Array<Float>):CutterSegment {
+    if (row == null || row.length < 2) throw "cutter profile row is too short";
+    for (value in row) if (!Math.isFinite(value)) throw "cutter profile row is not finite";
+    var code = Std.int(row[1]), kind = Std.int(row[0]);
+    if (code != row[1] || kind != row[0]) throw "cutter profile codes must be whole numbers";
+    var zone = switch code {
+      case 0: Cutting;
+      case 1: Shank;
+      case 2: Holder;
+      case _: throw 'cutter profile zone $code is unknown';
+    };
+    if (kind == 0 && row.length == 6) return Line(row[2], row[3], row[4], row[5], zone);
+    if (kind == 1 && row.length == 8)
+      return Arc(row[2], row[3], row[4], row[5], row[6], row[7], zone);
+    throw 'cutter profile row kind $kind is unknown';
+  }
+
+  static function zoneCode(zone:CutterZone):Float
+    return switch zone {
+      case Cutting: 0.0;
+      case Shank: 1.0;
+      case Holder: 2.0;
+    };
+
   function withCylinder(diameter:Float, length:Float,
       zone:CutterZone):CutterProfile {
     var r = positive(diameter, "diameter") / 2;

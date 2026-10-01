@@ -14,6 +14,8 @@ import machinekit.motion.NemaStepper;
 import machinekit.structural.TSlotExtrusion;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.tool.Tool;
 
 /** A cut length of T-slot extrusion, running along local +Z from z=0 with its section centred. */
 class ExtrusionMember extends MachineComponent {
@@ -140,6 +142,10 @@ class RouterSpindle extends MachineComponent {
 
 	override public function hasGeometry():Bool return true;
 
+	/** `cutter` in this spindle: the collet nut above the nose rides with the tool, in metres. */
+	public function holding(cutter:CutterProfile):CutterProfile
+		return cutter.withHolder(0.018, 0.008).withHolder(0.024, (NUT_LENGTH - 8) / 1000);
+
 	override public function geometry(detail:ComponentDetail = Preview):Part {
 		var body = Part.cylinderSpan(DIAMETER / 2, NUT_LENGTH, NUT_LENGTH + BODY_LENGTH);
 		if (detail == Envelope) return body;
@@ -168,6 +174,11 @@ class EndMill extends MachineComponent {
 		addConnector("tip", Mount, Solids.axial(0, 0, 0));
 	}
 
+	/** The cutter as the stock simulation sees it, in metres: flutes, then the relieved shank. */
+	public function cutter():CutterProfile
+		return CutterProfile.flat(diameter / 1000, fluteLength / 1000)
+			.withShank((diameter - 0.4) / 1000, (stickout - fluteLength) / 1000);
+
 	override public function hasGeometry():Bool return true;
 
 	override public function geometry(detail:ComponentDetail = Preview):Part {
@@ -175,6 +186,43 @@ class EndMill extends MachineComponent {
 		if (detail == Envelope) return Part.cylinderSpan(diameter / 2, 0, stickout);
 		return Solids.union([Part.cylinderSpan(diameter / 2, 0, fluteLength),
 			Part.cylinderSpan(diameter / 2 - 0.2, fluteLength, stickout)]);
+	}
+}
+
+/** Twist drill with a 118° point. Origin at the point on the tool axis, which runs up along +Z. */
+class TwistDrill extends MachineComponent {
+	public static inline var POINT_ANGLE:Float = 118;
+	public final diameter:Float;
+	public final fluteLength:Float;
+	/** Length out of the collet. */
+	public final stickout:Float;
+
+	public function new(diameter:Float, fluteLength:Float, stickout:Float) {
+		if (!(diameter > 0) || !(fluteLength > pointHeight(diameter)) || !(stickout >= fluteLength))
+			throw "Twist drill needs a positive diameter and flutes past its point, within its stickout";
+		super('DRILL-D${Dimension.format(diameter)}-F${Dimension.format(fluteLength)}-L${Dimension.format(stickout)}',
+			'Twist drill, ${Dimension.format(diameter)} mm', "steel", true);
+		this.diameter = diameter;
+		this.fluteLength = fluteLength;
+		this.stickout = stickout;
+		addConnector("tip", Mount, Solids.axial(0, 0, 0));
+	}
+
+	/** Height of the conical point. */
+	public static function pointHeight(diameter:Float):Float
+		return diameter / 2 / Math.tan(POINT_ANGLE / 2 * Math.PI / 180);
+
+	/** The cutter as the stock simulation sees it, in metres: point and flutes, then the shank. */
+	public function cutter():CutterProfile
+		return CutterProfile.vee(diameter / 1000, POINT_ANGLE * Math.PI / 180, fluteLength / 1000)
+			.withShank(diameter / 1000, (stickout - fluteLength) / 1000);
+
+	override public function hasGeometry():Bool return true;
+
+	override public function geometry(detail:ComponentDetail = Preview):Part {
+		if (detail == Envelope) return Part.cylinderSpan(diameter / 2, 0, stickout);
+		var r = diameter / 2;
+		return Part.revolve([{r: 0, z: 0}, {r: r, z: pointHeight(diameter)}, {r: r, z: stickout}, {r: 0, z: stickout}]);
 	}
 }
 
@@ -220,8 +268,8 @@ typedef RouterAxisSpec = {
  * spindle with a 6 mm end mill. A block of aluminium stock is clamped in the middle of the bed.
  *
  * Joints `x`, `y` and `z` are prismatic and read in machine coordinates, in millimetres: the
- * machine origin is the front-left corner of travel with Z at the top, so the tool tip sits at
- * `toolTipAt(x, y, z)` in the assembly frame (floor at z = 0, bed centred on the origin).
+ * machine origin is the front-left corner of travel with Z at the top, so the spindle nose sits at
+ * `noseAt(x, y, z)` in the assembly frame (floor at z = 0, bed centred on the origin).
  * Lead screws and motors are placed as fixed parts; the screws do not turn with the axes.
  */
 class CncRouter extends MachineAssembly {
@@ -236,10 +284,13 @@ class CncRouter extends MachineAssembly {
 	public static inline var STOCK_DEPTH:Float = 90;
 	public static inline var STOCK_HEIGHT:Float = 20;
 	public static final STOCK_TOP:Float = SPOILBOARD_TOP + STOCK_HEIGHT;
-	/** Tool tip at machine zero, in the assembly frame. */
+	/**
+	 * The spindle nose at machine zero, in the assembly frame. Machine coordinates name where the
+	 * nose (the gauge line) is; each tool hangs its own length below it, applied by G43.
+	 */
 	public static inline var MACHINE_ZERO_X:Float = -150;
 	public static inline var MACHINE_ZERO_Y:Float = -150;
-	public static inline var MACHINE_ZERO_Z:Float = 132;
+	public static inline var MACHINE_ZERO_Z:Float = 162;
 	/** Offset of the tool axis in front of the gantry's centre plane. */
 	public static inline var TOOL_OFFSET_Y:Float = 116;
 	public static inline var SCREW_CLEARANCE:Float = 5.5;
@@ -248,7 +299,10 @@ class CncRouter extends MachineAssembly {
 
 	public final motorY:NemaStepper;
 	public final spindle = new RouterSpindle();
+	/** The tool in the spindle, tool 1. */
 	public final tool = new EndMill(6, 22, 30);
+	/** Tool 2, loaded by hand when a program calls for it. */
+	public final drill = new TwistDrill(5.5, 28, 40);
 	public final specs:Array<RouterAxisSpec> = [
 		{id: "x", lower: 0, upper: 300, velocity: 80, effort: 400, acceleration: 500, initial: 150},
 		{id: "y", lower: 0, upper: 300, velocity: 80, effort: 600, acceleration: 400, initial: 150},
@@ -361,8 +415,9 @@ class CncRouter extends MachineAssembly {
 		var reach = (zBlockFace - plateThickness) - toolY;
 		attach("spindleClamp", new SpindleClamp(RouterSpindle.DIAMETER, reach),
 			AssemblyFrames.translation(xc, toolY, zPlateBottom + 5), "zPlate");
-		attach("spindle", spindle, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z + tool.stickout), "spindleClamp");
-		attach("tool", tool, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z), "spindle");
+		attach("spindle", spindle, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z), "spindleClamp");
+		attach("tool", tool, AssemblyFrames.translation(xc, toolY, MACHINE_ZERO_Z - tool.stickout), "spindle");
+		exposeConnector("nose", "spindle", "nose");
 		exposeConnector("toolTip", "tool", "tip");
 	}
 
@@ -373,9 +428,21 @@ class CncRouter extends MachineAssembly {
 		return room;
 	}
 
-	/** Assembly-frame position of the tool tip at machine coordinates (x, y, z), in millimetres. */
-	public static function toolTipAt(x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float}
+	/** Assembly-frame position of the spindle nose at machine coordinates (x, y, z), in millimetres. */
+	public static function noseAt(x:Float, y:Float, z:Float):{x:Float, y:Float, z:Float}
 		return {x: MACHINE_ZERO_X + x, y: MACHINE_ZERO_Y + y, z: MACHINE_ZERO_Z + z};
+
+	/**
+	 * The tool table, numbered as programs call the tools: each tool's length below the nose and
+	 * shape in the spindle, in metres.
+	 */
+	public function tools():Array<Tool>
+		return [Tool.shaped(1, tool.stickout / 1000, spindle.holding(tool.cutter())),
+			Tool.shaped(2, drill.stickout / 1000, spindle.holding(drill.cutter()))];
+
+	/** Work zero (G54) in machine coordinates, in millimetres: the stock's front-left top corner. */
+	public static function workOffset():Array<Float>
+		return [-STOCK_WIDTH / 2 - MACHINE_ZERO_X, -STOCK_DEPTH / 2 - MACHINE_ZERO_Y, STOCK_TOP - MACHINE_ZERO_Z];
 
 	/** Frame whose local +Y points along `up` and local +Z along `along`. */
 	static function orient(x:Float, y:Float, z:Float, up:Array<Float>, along:Array<Float>):AssemblyFrame {

@@ -96,7 +96,7 @@ class ToolpathLowering {
         flush(); drainQueued(); add(MotionOp.WaitInput(ToolpathChannels.toolChange(number),
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
       case ToolLengthOffset(_, _, _):
-        // Already applied to Z; the controller has nothing to do.
+        // ToolpathMotion already moved Z to the controlled point.
       case OptionalStop(span), ProgramStop(span):
         flush(); drainQueued(); add(MotionOp.WaitInput(ToolpathChannels.OperatorResume,
           InputPredicate.Equals(EventValue.Digital(true)), null), span);
@@ -131,7 +131,7 @@ class ToolpathLowering {
     if (pending.length > 1 && pendingBlend > 0.0) {
       var authored = new GeometricPath(pending);
       var corners = [for (i in 0...(pending.length - 1))
-        Math.min(pendingTolerances[i], pendingTolerances[i + 1])];
+        Math.min(pendingTolerances[i], pendingTolerances[i + 1]) * CornerBlender.GEOMETRY_SHARE];
       var blended = CornerBlender.blendPerCorner(authored, corners,
         machine.maxBlendTurnAngleRadians);
       var spans = [for (index in blended.sourcePrimitiveIndices)

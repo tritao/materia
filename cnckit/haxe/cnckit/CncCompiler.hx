@@ -43,15 +43,21 @@ class CncCompiler {
         }
       case _:
     }
+    // The interpreter tracks the controlled point in machine coordinates;
+    // moves become programmed points in the active setup (see ToolpathOp).
     var ops:Array<ToolpathOp> = [];
-    var offset = controller.workOffset(54);
+    var offset = controller.workOffset(54), toolLength = 0.0;
     for (op in machineOps) switch op {
       case SetSetup(id, _):
         offset = controller.workOffset(controller.gCodeForSetup(id));
         ops.push(op);
+      case ToolLengthOffset(_, length, _):
+        toolLength = length;
+        ops.push(op);
       case Move(kind, geometry, feed, tolerance, provenance):
         ops.push(ToolpathOp.Move(kind, GeometryOffset.translate(geometry,
-          [-offset[0], -offset[1], -offset[2]]), feed, tolerance, provenance));
+          [-offset[0], -offset[1], -offset[2] - toolLength]), feed, tolerance,
+          provenance));
       case _: ops.push(op);
     }
     if (travel != null)

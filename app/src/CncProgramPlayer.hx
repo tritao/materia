@@ -1,6 +1,8 @@
 package app;
 
 import cadkit.modeling.AssemblyState;
+import materia.assembly.AssemblyFrames;
+import nativekit.scene.GeometryData;
 import cnckit.CncCompiler;
 import cnckit.CncController;
 import cnckit.CncDiagnostic.CncSeverity;
@@ -15,11 +17,12 @@ import toolpathkit.motion.ToolpathSourceMap;
 import toolpathkit.path.MoveKind;
 import toolpathkit.path.Provenance;
 import toolpathkit.path.ToolpathOp;
-import toolpathkit.tool.CutterProfile;
+import toolpathkit.path.ToolpathProgram;
 import toolpathkit.tool.Tool;
 import motionkit.axis.MotionAxisBlueprint;
 import motionkit.event.EventValue;
 import motionkit.program.MotionProgram;
+import motionkit.robot.AxisKinematics;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.MotionSystemBlueprint;
 import nativekit.sim.SimSession;
@@ -29,35 +32,30 @@ import toolpathkit.motion.ToolpathMotionBinding;
 import toolpathkit.path.Point3;
 
 /**
- * A project's machining job: a G-code program run on the project's own machine. Joint ids name the
- * machine's X, Y and Z axes, whose assembly coordinates are machine coordinates; the work offset is
- * G54 in the assembly's length unit.
+ * A project's machining job, as its generator describes it (see SceneArtifactMachining), with
+ * lengths in metres. Joint ids name the machine's X, Y and Z axes, whose positions are machine
+ * coordinates of the spindle's gauge line: the origin of the `spindle` part, whose +Z runs up the
+ * spindle axis. Each tool hangs its length below it.
  */
 typedef CncJob = {
-	var programPath:String;
 	var source:String;
 	var axes:Array<String>;
+	var spindle:String;
+	/** G54 in machine coordinates. */
 	var workOffset:Array<Float>;
+	/** The tool table; G43 H numbers are tool numbers. */
+	var tools:Array<Tool>;
 	var loop:Bool;
 	/** The part the job machines, cut as the tool moves; null for a job that cuts nothing. */
-	@:optional var stockPart:String;
-	/** The part whose origin is the tool tip and whose +Z is the tool axis. */
+	@:optional var stock:String;
+	/** The stock part's mesh in its own frame, the raw stock. */
+	@:optional var stockMesh:{positions:Array<Float>, indices:Array<Int>};
+	/** The finished part, a closed mesh in the stock part's frame: the cut stock is compared with it. */
+	@:optional var target:{positions:Array<Float>, indices:Array<Int>};
+	/** The part showing the tool in the spindle; each loaded tool's shape replaces its geometry. */
 	@:optional var toolPart:String;
-	/** The controller's tool table; the first entry is the tool in the spindle. */
-	var tools:Array<CncJobTool>;
-	/** Ray spacing of the simulated stock, in the assembly's length unit. */
-	var stockSpacing:Float;
-}
-
-/** One tool of a CNC job's tool table, in the assembly's length unit. */
-typedef CncJobTool = {
-	var number:Int;
-	var diameter:Float;
-	var fluteLength:Float;
-	/** Length out of the holder. */
-	var length:Float;
-	var holderDiameter:Float;
-	var holderLength:Float;
+	/** The tool in the spindle when the job starts. */
+	@:optional var loadedTool:Int;
 }
 
 /**
@@ -68,6 +66,8 @@ typedef CncJobTool = {
 class CncProgramPlayer implements SessionMember {
 	/** Stock geometry goes to the scene at most this often, in simulated seconds. */
 	static inline final STOCK_REFRESH = 0.05;
+	/** Ray spacing of the simulated stock, in metres. */
+	static inline final STOCK_SPACING = 0.0005;
 
 	/** Spindle and coolant channels a CNC program's events need on the machine's runtime. */
 	public static function processChannels():Array<ProcessChannelDeclaration>
@@ -80,10 +80,25 @@ class CncProgramPlayer implements SessionMember {
 
 	final session:SimSession;
 	final project:ProjectDocumentSession;
-	final sourceMap:ToolpathSourceMap;
+	final compileFrom:Point3->ToolpathProgram;
+	final robot:AssemblyRobot;
+	/** Machine coordinates from the axis joints' positions, and those joints' indices on the robot. */
+	final solver:AxisKinematics;
+	final axisJoints:Array<Int>;
+	var program:MotionProgram;
+	var sourceMap:ToolpathSourceMap;
 	final kindByLine = new Map<Int, MoveKind>();
 	final newStock:Null<Void->MachiningStock>;
 	final stockObject:Null<String>;
+	static inline final TOOL_CHANGE = "cnc.tool_change.";
+	final toolsByNumber = new Map<Int, Tool>();
+	/** The tool in the spindle at the start, and now; -1 for none. */
+	final initialTool:Int;
+	public var loadedTool(default, null):Int;
+	/** The tool the scene shows, and how to draw one in the spindle, when the job names its part. */
+	var shownTool = -1;
+	final toolShape:Null<Tool->GeometryData>;
+	final toolObject:Null<String>;
 	/** The stock the job is cutting, when it has one. */
 	public var stock(default, null):Null<MachiningStock> = null;
 	var stockShownAt = Math.NEGATIVE_INFINITY;
@@ -96,11 +111,13 @@ class CncProgramPlayer implements SessionMember {
 	var commandedKind:MoveKind = MoveKind.Rapid;
 	var commandedOp = -1;
 	var commandedProvenance = new Provenance(0, 0, 0);
-	final program:MotionProgram;
 	final newMotion:Void->ManipulatorMotion;
 	var motion:ManipulatorMotion;
 	final loop:Bool;
 	var started = false;
+	/** Passes of the program completed since the session started. */
+	public var passes(default, null):Int = 0;
+	var passCounted = false;
 	/** Why the program stopped, when it failed. */
 	public var failure(default, null):Null<String> = null;
 
@@ -144,29 +161,41 @@ class CncProgramPlayer implements SessionMember {
 		var binding = new ToolpathMotionBinding(machine,
 			new MotionSystemBlueprint(planning.model, robot.blueprint, axes, session.fixedTimestep()));
 		var controller = new CncController();
-		controller.setWorkOffset(54, job.workOffset[0] * metresPerUnit, job.workOffset[1] * metresPerUnit,
-			job.workOffset[2] * metresPerUnit);
-		var compiled = CncCompiler.compileDetailed(job.source, controller, new Point3(start[0], start[1], start[2]),
-			machine.travel);
-		var errors = [for (diagnostic in compiled.diagnostics) if (diagnostic.severity == CncSeverity.Error) diagnostic.toString()];
-		if (errors.length > 0) throw '${job.programPath}: ${errors.join("; ")}';
-		var lowered = ToolpathMotion.lower(compiled.program, machine);
-		if (lowered.program == null)
-			throw '${job.programPath}: ${[for (diagnostic in lowered.diagnostics) diagnostic.message].join("; ")}';
-		program = lowered.program;
-		sourceMap = lowered.sourceMap;
-		for (op in compiled.program.ops) switch op {
+		for (tool in job.tools) {
+			controller.toolLibrary.set(tool);
+			toolsByNumber.set(tool.number, tool);
+		}
+		controller.setWorkOffset(54, job.workOffset[0], job.workOffset[1], job.workOffset[2]);
+		// A program runs from wherever the machine is, so each pass compiles it from there.
+		compileFrom = position -> {
+			var compiled = CncCompiler.compileDetailed(job.source, controller, position, machine.travel);
+			var errors = [for (diagnostic in compiled.diagnostics) if (diagnostic.severity == CncSeverity.Error) diagnostic.toString()];
+			if (errors.length > 0) throw 'The machining program: ${errors.join("; ")}';
+			var lowered = ToolpathMotion.lower(compiled.program, machine);
+			if (lowered.program == null)
+				throw 'The machining program: ${[for (diagnostic in lowered.diagnostics) diagnostic.message].join("; ")}';
+			program = lowered.program;
+			sourceMap = lowered.sourceMap;
+			return compiled.program;
+		};
+		this.robot = robot;
+		solver = binding.solver;
+		axisJoints = planning.indices;
+		// Compiling from the starting pose now reports a bad program before the simulation starts.
+		var compiled = compileFrom(new Point3(start[0], start[1], start[2]));
+		for (op in compiled.ops) switch op {
 			case Move(kind, _, _, _, provenance), MachineMove(kind, _, _, _, provenance): kindByLine.set(provenance.line, kind);
 			case _:
 		}
-		var stockPart = job.stockPart;
+		initialTool = job.loadedTool == null ? -1 : job.loadedTool;
+		loadedTool = initialTool;
+		var spindleLink = robot.part("project:" + job.spindle);
+		var stockPart = job.stock;
 		if (stockPart == null) {
 			newStock = null;
 			stockObject = null;
 		} else {
-			var toolPart = job.toolPart;
-			if (toolPart == null || job.tools.length == 0) throw "A CNC job that cuts stock needs its tool part and tool table";
-			var stockLink = robot.part("project:" + stockPart), toolLink = robot.part("project:" + toolPart);
+			var stockLink = robot.part("project:" + stockPart);
 			var occurrence = [for (item in definition.occurrences) if (item.id == stockPart) item];
 			var part = [for (item in physical.parts) if (occurrence.length == 1 && item.id == occurrence[0].definition) item];
 			var center = occurrence.length == 1 ? project.assemblyPreviewCenter(occurrence[0].definition) : null;
@@ -179,26 +208,79 @@ class CncProgramPlayer implements SessionMember {
 				maximum[index % 3] = Math.max(maximum[index % 3], hull[index] * metresPerUnit);
 			}
 			var centerMetres = [for (coordinate in center) coordinate * metresPerUnit];
-			var tool = cutter(job.tools[0], metresPerUnit), spacing = job.stockSpacing * metresPerUnit;
-			// The stock is the stock part's bounding box, which is exact for a block of stock.
-			newStock = () -> new MachiningStock(tool, minimum, maximum, centerMetres, spacing, simulation,
-				stockLink, toolLink);
+			newStock = () -> {
+				var stock = new MachiningStock(minimum, maximum, centerMetres, STOCK_SPACING, simulation, stockLink, spindleLink,
+					job.target, job.stockMesh);
+				stock.load(toolsByNumber.get(loadedTool));
+				return stock;
+			};
 			stockObject = "project:" + stockPart;
 		}
-		// Spindle and tool-change handshakes are always ready: the simulation models neither.
+		toolObject = job.toolPart == null ? null : "project:" + job.toolPart;
+		toolShape = job.toolPart == null ? null : toolShapeIn(job.toolPart, job.spindle, placement, project, metresPerUnit);
+		// Spindle-speed handshakes are always ready. A tool change is the operator loading that tool,
+		// which the stock then cuts with and the spindle shows.
 		newMotion = () -> new ManipulatorMotion(robot.robot, binding.compiler,
-			channel -> channel == "spindle.at_speed" || StringTools.startsWith(channel, "cnc.tool_change.") ?
-				EventValue.Digital(true) : null,
+			channel -> {
+				if (channel == "spindle.at_speed") return EventValue.Digital(true);
+				if (!StringTools.startsWith(channel, TOOL_CHANGE)) return null;
+				var number = Std.parseInt(channel.substr(TOOL_CHANGE.length));
+				if (number == null || !toolsByNumber.exists(number)) throw 'The machining program loads unknown tool $channel';
+				if (number != loadedTool) {
+					loadedTool = number;
+					if (stock != null) stock.load(toolsByNumber.get(number));
+				}
+				return EventValue.Digital(true);
+			},
 			() -> robot.runtime.pollEvents(), planning.indices);
 		motion = newMotion();
+	}
+
+	/**
+	 * Geometry of a tool in the spindle for part `toolPart`'s scene object: the tool's profile hung its
+	 * length below the gauge line, in the part's frame shifted to its preview centre, in metres.
+	 */
+	static function toolShapeIn(toolPart:String, spindle:String, placement:AssemblyState, project:ProjectDocumentSession,
+			metresPerUnit:Float):Tool->GeometryData {
+		var definition = project.projectAssemblyDefinition;
+		var occurrence = definition == null ? [] : [for (item in definition.occurrences) if (item.id == toolPart) item];
+		var center = occurrence.length == 1 ? project.assemblyPreviewCenter(occurrence[0].definition) : null;
+		if (center == null) throw 'CNC tool part "$toolPart" is not a part of the machine';
+		var fromSpindle = AssemblyFrames.compose(AssemblyFrames.inverse(placement.worldPose(toolPart)),
+			placement.worldPose(spindle));
+		return tool -> CutterGeometry.revolved(tool.profile(), (x, y, z) -> {
+			var local = AssemblyFrames.transformPoint(fromSpindle, x / metresPerUnit, y / metresPerUnit,
+				(z - tool.length) / metresPerUnit);
+			return [(local.x - center[0]) * metresPerUnit, (local.y - center[1]) * metresPerUnit,
+				(local.z - center[2]) * metresPerUnit];
+		}, (x, y, z) -> {
+			var turned = AssemblyFrames.transformVector(fromSpindle, x, y, z);
+			return [turned.x, turned.y, turned.z];
+		});
 	}
 
 	public function feed():Void {
 		if (failure != null) return;
 		var clock = Sys.time();
+		if (started && motion.completed && !passCounted) {
+			passes++;
+			passCounted = true;
+		}
 		if (!started || (loop && motion.completed && !motion.running)) {
+			if (started) {
+				// A program runs from wherever the machine is: the position the planner last
+				// commanded, or where the robot stands when there is none.
+				var commanded = motion.commandedPositions();
+				var joints = commanded != null ? commanded : {
+					var actual = robot.robot.snapshot().positions;
+					[for (index in axisJoints) actual.get(index)];
+				};
+				var machine = solver.forward(joints);
+				compileFrom(new Point3(machine.x, machine.y, machine.z));
+			}
 			motion.run(program);
 			started = true;
+			passCounted = false;
 			runSeconds += Sys.time() - clock;
 			clock = Sys.time();
 		}
@@ -226,8 +308,11 @@ class CncProgramPlayer implements SessionMember {
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
 	public function reset():Void {
 		motion = newMotion();
+		loadedTool = initialTool;
 		started = false;
 		failure = null;
+		passes = 0;
+		passCounted = false;
 		if (stock != null) {
 			stock.dispose();
 			stock = null;
@@ -235,8 +320,14 @@ class CncProgramPlayer implements SessionMember {
 		}
 	}
 
-	/** Shows the stock as cut so far, re-contouring only what changed, a few times a second. */
+	/** Shows the tool in the spindle, and the stock as cut so far, re-contouring only what changed, a few times a second. */
 	public function present():Void {
+		var shape = toolShape, toolId = toolObject;
+		if (shape != null && toolId != null && shownTool != loadedTool) {
+			var tool = toolsByNumber.get(loadedTool);
+			if (tool != null) project.scene.setRuntimeGeometry(toolId, shape(tool));
+			shownTool = loadedTool;
+		}
 		var cut = stock, id = stockObject;
 		if (cut == null || id == null || !cut.hasChanged()) return;
 		var now = session.simulationTime();
@@ -275,16 +366,5 @@ class CncProgramPlayer implements SessionMember {
 			parent = child;
 		}
 		return {model: planning, indices: indices};
-	}
-
-	/** A flat end mill with its shank and the holder above it, in metres. */
-	static function cutter(tool:CncJobTool, metresPerUnit:Float):Tool {
-		var diameter = tool.diameter * metresPerUnit, flutes = tool.fluteLength * metresPerUnit;
-		var length = tool.length * metresPerUnit;
-		var profile = CutterProfile.flat(diameter, flutes);
-		if (length > flutes) profile = profile.withShank(diameter, length - flutes);
-		if (tool.holderLength > 0)
-			profile = profile.withHolder(tool.holderDiameter * metresPerUnit, tool.holderLength * metresPerUnit);
-		return Tool.shaped(tool.number, length, profile);
 	}
 }

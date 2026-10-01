@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <vector>
 
 int main() {
     mk_path_sample samples[3]{};
@@ -200,6 +201,31 @@ int main() {
     assert(mk_trajectory_segment_count(tight, &tight_count) == MK_OK);
     assert(tight_count == 1); // A quintic q(s) under linear s(t) is exact.
     mk_trajectory_destroy(tight);
+    mk_time_law_destroy(law);
+    mk_path_destroy(path);
+
+    // A long straight rapid sampled every 2 mm, as a CNC Z move is: the knots
+    // accumulate rounding, and the timed law must still end where the path does.
+    std::vector<mk_path_sample> rapid(101);
+    double distance = 0.0;
+    for (size_t i = 0; i < rapid.size(); ++i) {
+        rapid[i] = mk_path_sample{};
+        rapid[i].struct_size = sizeof(mk_path_sample);
+        rapid[i].joint_count = 3;
+        rapid[i].s = i + 1 == rapid.size() ? 0.2 : distance;
+        rapid[i].position[2] = -rapid[i].s;
+        rapid[i].first[2] = -1.0;
+        distance += 0.002;
+    }
+    assert(mk_path_create(rapid.data(), static_cast<uint32_t>(rapid.size()), &path) == MK_OK);
+    const double axis_velocity[3] = {0.08, 0.08, 0.04};
+    const double axis_acceleration[3] = {0.5, 0.4, 0.3};
+    std::vector<double> rapid_caps(rapid.size() - 1, 0.08);
+    mk_trajectory_handle rapid_trajectory{};
+    assert(mk_time_path(path, axis_velocity, axis_acceleration, 3, rapid_caps.data(),
+        static_cast<uint32_t>(rapid_caps.size()), 0.0, 0.0, 1e-6, &law,
+        &rapid_trajectory) == MK_OK);
+    mk_trajectory_destroy(rapid_trajectory);
     mk_time_law_destroy(law);
     mk_path_destroy(path);
 }

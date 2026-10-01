@@ -43,9 +43,25 @@ class CutMoveTests {
       "stock move retains operation, feature, tool and provenance");
     switch moves[0].motion {
       case Path(Line(a, b)):
-        Assert.near(a.z, -0.001, "tool length shifts the start to its tip", 1e-12);
-        Assert.near(b.z, -0.004, "tool length shifts the end to its tip", 1e-12);
+        // H8 claims 3 mm but tool 8 measures 0: the real tip rides 3 mm high.
+        Assert.near(a.z, 0.005, "a wrong H length lifts the start off its programmed tip", 1e-12);
+        Assert.near(b.z, 0.002, "a wrong H length lifts the end off its programmed tip", 1e-12);
       case _: Assert.check(false, "ramp remains a line");
+    }
+    var measured = new ToolLibrary();
+    measured.set(new Tool(8, 0.003, 0.004));
+    var matched = CutMoves.fromProgram(new ToolpathProgram([
+      ToolChange(8, source),
+      ToolLengthOffset(8, 0.003, source),
+      Move(Ramp, Line(start, end), 0.001, 0, source),
+      ToolLengthOffset(0, 0.0, source),
+      Move(Ramp, Line(start, end), 0.001, 0, source)
+    ], measured, [new Setup("1", new Point3(0, 0, 0))]));
+    switch [matched[0].motion, matched[1].motion] {
+      case [Path(Line(a, _)), Path(Line(b, _))]:
+        Assert.near(a.z, start.z, "with G43 H matching the tool, the tip is the programmed point", 1e-12);
+        Assert.near(b.z, start.z - 0.003, "after G49 the programmed point is the gauge line", 1e-12);
+      case _: Assert.check(false, "matched stock cuts remain lines");
     }
     var placed = new ToolpathProgram([
       ToolChange(8, source),

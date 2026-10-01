@@ -336,9 +336,10 @@ class ProjectSourceTests {
   }
 
   /**
-   * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job cuts
-   * three slots in the stock in real time: the stock loses exactly the slots' volume as the machine
-   * moves, with no rapid through stock and no holder contact.
+   * The router example opens, its axes simulate as prismatic joints in metres, and its CNC job, CAM
+   * made from a NEMA 23 motor plate, mills and drills the plate out of the stock in real time, changing
+   * tools on the way: the stock loses exactly the plate's recesses and holes, nothing is cut from the
+   * part, and no rapid or holder touches stock.
    */
   static function checkCncRouter(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
@@ -347,6 +348,8 @@ class ProjectSourceTests {
     var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
     var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
     check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the router simulates axes y, x and z");
+    check(model.joints.length == 3 && model.links.length == 4,
+      'the router simulates as four rigid bodies and its three axes, got ${model.links.length} links');
     for (joint in axes) {
       var travel = joint.limits.upper - joint.limits.lower;
       check(Math.abs(travel - (Std.string(joint.id) == "z" ? 0.08 : 0.3)) < 1e-9,
@@ -355,10 +358,9 @@ class ProjectSourceTests {
         'router axis ${joint.id} carries its overtravel and acceleration');
     }
     var job = generated.cncJob;
-    check(job != null && job.loop && job.stockPart == "stock" && job.tools.length == 1,
-      "the router ships a looping job that machines its stock");
-    check(generated.robotMotions == null || generated.robotMotions.length == 0,
-      "the router's motion comes from its program, not tracks");
+    check(job != null && job.loop && job.stock == "stock" && job.spindle == "spindle" && job.target != null &&
+      job.loadedTool == 1 && [for (tool in job.tools) tool.number].join(",") == "1,2",
+      "the router generates a looping job that machines its stock to a target part with an end mill and a drill");
     var session = new ProjectDocumentSession(null, false);
     var simulation = new ApplicationSimulation(new RobotWorld());
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
@@ -368,6 +370,8 @@ class ProjectSourceTests {
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     check(simulation.rebuild(session.sensors, session.scene, session),
       "the router builds in the shared simulation: " + simulation.error);
+    var player = simulation.cncPlayer();
+    if (player == null) throw "the router has no CNC player";
     function toolPosition():Array<Float> {
       var tool = [for (pose in simulation.capturePresentationSnapshot().environment) if (pose.id == "project:tool") pose];
       check(tool.length == 1, "the router publishes its tool pose");
@@ -375,38 +379,52 @@ class ProjectSourceTests {
     }
     simulation.step();
     var start = toolPosition();
-    var lowest = 0.0, steps = 0, leftStart = false, backAt = -1.0, cutting = 0.0;
-    while (backAt < 0 && simulation.activeSession().simulationTime() < 120.0 && steps++ < 100000) {
+    var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
+    while (player.passes == 0 && simulation.activeSession().simulationTime() < 600.0 && steps++ < 1000000) {
       var before = Sys.time();
       simulation.step();
-      cutting += Sys.time() - before;
+      stepping += Sys.time() - before;
       check(simulation.cncFailure() == null, 'the router program runs: ${simulation.cncFailure()}');
-      var position = toolPosition();
-      var offset = [for (axis in 0...3) position[axis] - start[axis]];
-      lowest = Math.min(lowest, offset[2]);
-      var away = Math.sqrt(offset[0] * offset[0] + offset[1] * offset[1] + offset[2] * offset[2]);
-      if (away > 0.01) leftStart = true;
-      else if (leftStart && lowest < -0.05) backAt = simulation.activeSession().simulationTime();
+      if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
+      if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
     }
-    check(backAt > 0, "the program returns the tool to where it started");
-    // From 54 mm above the stock the tool goes 2 mm into it.
-    check(Math.abs(lowest + 0.056) < 0.0005, 'the tool cuts 2 mm deep, lowest $lowest m');
+    // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
+    var changes = tools.join(",");
+    check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
+    var seconds = simulation.activeSession().simulationTime();
+    check(player.passes == 1, 'the router finishes one pass of its program, at $seconds s');
+    // From 54 mm above the stock the 40 mm drill, 10 mm longer than the end mill, goes through the
+    // 20 mm plate and its 1.65 mm point and 0.5 mm more into the spoilboard.
+    check(Math.abs(lowest + 0.06615) < 0.0005, 'the drill goes through the plate, lowest $lowest m');
     var stock = simulation.machiningStock();
     if (stock == null) throw "the router cuts no stock";
-    // Each slot is a plunge and an 80 mm pass of a 6 mm flat end mill, 2 mm deep.
-    var slots = 3 * (0.08 * 0.006 + Math.PI * 0.003 * 0.003) * 0.002;
-    check(Math.abs(stock.removed - slots) < slots * 0.03,
-      'the stock loses the three slots, ${stock.removed} m³ removed against $slots');
+    // The plate's recesses: a 38.3 mm pilot recess 6 mm deep, four 10 mm counterbores 5.4 mm deep, and
+    // under them four 5.5 mm clearance holes through the rest of the 20 mm plate.
+    var recesses = Math.PI * (0.01915 * 0.01915 * 0.006 + 4 * 0.005 * 0.005 * 0.0054 +
+      4 * 0.00275 * 0.00275 * (0.020 - 0.0054));
+    check(Math.abs(stock.removed - recesses) < recesses * 0.02,
+      'the stock loses the plate\'s recesses, ${stock.removed} m³ removed against $recesses');
     check(stock.rapidContacts == 0 && stock.collisions == 0,
       'no rapid runs through the stock and the holder never touches it (${stock.rapidContacts}, ${stock.collisions})');
-    check(stock.geometry().triangleCount() > 12, "the cut stock meshes with its slots");
-    var player = simulation.cncPlayer();
-    if (player != null) Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
-      '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms');
+    var deviation = stock.deviation();
+    check(deviation.gouge < 1e-9, 'nothing is cut from the finished plate, gouge ${deviation.gouge} m³');
+    check(deviation.leftover < recesses * 0.02,
+      'only slivers of stock are left on the plate, leftover ${deviation.leftover} m³');
+    check(stock.geometry().triangleCount() > 12, "the machined stock meshes");
+    // The program ends away from where it started; the next pass runs from there.
+    var secondPass = simulation.activeSession().simulationTime() + 5.0;
+    while (simulation.activeSession().simulationTime() < secondPass && steps++ < 1000000) {
+      simulation.step();
+      check(simulation.cncFailure() == null, 'the looping program starts its next pass: ${simulation.cncFailure()}');
+    }
     session.dispose();
-    Sys.println('cnc router cut three slots in ${Math.round(backAt * 10) / 10} s of machining, removing ' +
-      '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(slots * 1e10) / 10}; ' +
-      '${Math.round(cutting / steps * 1e5) / 100} ms per simulated tick');
+    Sys.println('cnc router milled the motor plate in ${Math.round(seconds * 10) / 10} s of machining: removed ' +
+      '${Math.round(stock.removed * 1e10) / 10} mm³ of ${Math.round(recesses * 1e10) / 10}, leftover ' +
+      '${Math.round(deviation.leftover * 1e10) / 10} mm³, gouge ${Math.round(deviation.gouge * 1e10) / 10} mm³; ' +
+      '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick');
+    Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
+      '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; ' +
+      'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms');
   }
 
   /** A project named at launch builds in the background: queued at once, opened by tick(). */

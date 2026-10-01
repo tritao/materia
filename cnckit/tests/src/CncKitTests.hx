@@ -671,6 +671,33 @@ class CncKitTests {
       case [ToolpathOp.End(_), ToolpathOp.End(_)]: check(true, "end");
       case _: check(false, 'operation $index round trip');
     }
+    // Programmed points survive G43: the writer emits them unchanged and the
+    // compiler removes the length again, while the machine still sees it.
+    machine.toolLibrary.set(new Tool(2, 0.03, 0.006));
+    var measured = machine.compileDetailed(
+      "G21 G90 G54 T2 M6 G43 H2\nG0 X5 Y5 Z10\nF300 G1 Z-2\nG49 G0 Z60\nM2");
+    check(measured.diagnostics.length == 0, 'G43 program compiles: ${measured.diagnostics}');
+    var programmedZ:Array<Float> = [];
+    for (op in measured.program.ops) switch op {
+      case ToolpathOp.Move(_, Line(_, end), _, _, _): programmedZ.push(end.z);
+      case _:
+    }
+    check(programmedZ.length == 3, "G43 program keeps three moves");
+    near(programmedZ[0], 0.01, "G43 moves hold the programmed tip Z", 1e-12);
+    near(programmedZ[1], -0.002, "G43 feed holds the programmed tip Z", 1e-12);
+    near(programmedZ[2], 0.06, "G49 moves hold the programmed gauge Z", 1e-12);
+    var rewritten = CncWriter.write(measured.program, machine.controller);
+    check(rewritten.indexOf("Z-2") >= 0 && rewritten.indexOf("Z10") >= 0,
+      'writer emits programmed Z under G43: $rewritten');
+    var reread = machine.compileDetailed(rewritten);
+    var rereadZ:Array<Float> = [];
+    for (op in reread.program.ops) switch op {
+      case ToolpathOp.Move(_, Line(_, end), _, _, _): rereadZ.push(end.z);
+      case _:
+    }
+    check(rereadZ.length == 3, "G43 round trip keeps three moves");
+    for (index in 0...3)
+      near(rereadZ[index], programmedZ[index], 'G43 round trip Z $index', 1e-12);
     var rejected = false;
     try CncWriter.write(new ToolpathProgram([ToolpathOp.SetSetup("fixture-only", p)],
       machine.toolLibrary, [new Setup("fixture-only", new Point3(0, 0, 0))]),

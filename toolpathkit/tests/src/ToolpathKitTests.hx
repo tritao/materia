@@ -11,6 +11,10 @@ import toolpathkit.path.ToolpathProgram;
 import toolpathkit.setup.Setup;
 import toolpathkit.setup.TravelEnvelope;
 import toolpathkit.tool.ToolLibrary;
+import toolpathkit.tool.Tool;
+import toolpathkit.tool.CutterProfile;
+import toolpathkit.path.ToolpathFrame;
+import toolpathkit.setup.SetupStock;
 
 class ToolpathKitTests {
   static function main():Void {
@@ -76,7 +80,37 @@ class ToolpathKitTests {
     if (placedViolations.length != 1 || placedViolations[0].axis != 0 ||
         placedViolations[0].provenance.operationIndex != 7)
       throw "travel check must place work geometry and preserve provenance";
+    // Travel is checked at the controlled point: G43 lifts it by the active length.
+    var measured = new ToolLibrary();
+    measured.set(new Tool(3, 0.04, 0.006));
+    var lifted = new ToolpathProgram([ToolpathOp.ToolChange(3, Provenance.cam(8)),
+      ToolpathOp.ToolLengthOffset(3, 0.04, Provenance.cam(8)),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0, 0, -0.03)),
+        0.01, 0, Provenance.cam(8))], measured, [new Setup("1", new Point3(0, 0, 0))]);
+    if (new TravelEnvelope(new Point3(-1, -1, 0), new Point3(1, 1, 1)).check(lifted).length != 0)
+      throw "travel check must lift G43 moves to the gauge line";
+    var frame = ToolpathFrame.of(lifted);
+    for (op in lifted.ops) frame.advance(op);
+    if (frame.toMachine()[2] != 0.04 || frame.tipShift() != 0.0 || frame.toolNumber != 3)
+      throw "frame tracks the tool and its G43 length";
+    // A wrong H length moves the real tip, and stock validation sees it.
+    var shortH = new ToolpathProgram([ToolpathOp.ToolChange(3, Provenance.cam(9)),
+      ToolpathOp.ToolLengthOffset(3, 0.035, Provenance.cam(9)),
+      ToolpathOp.Move(Cut, PathGeometry.Line(new Point3(0, 0, 0), new Point3(0, 0, -0.018)),
+        0.01, 0, Provenance.cam(9))], measured, [new Setup("1", new Point3(0, 0, 0))]);
+    rejected = false;
+    try new Setup("1", new Point3(0, 0, 0), new SetupStock(-1, 1, -1, 1, 0, -0.02, 0.01))
+      .validate(shortH.ops, measured) catch (_:Dynamic) rejected = true;
+    if (!rejected) throw "validation must cut at the physical tip under a wrong H length";
+    var profile = CutterProfile.bullNose(0.006, 0.001, 0.02).withShank(0.005, 0.01)
+      .withHolder(0.02, 0.015);
+    var decoded = CutterProfile.decode(profile.encode());
+    if (Std.string(decoded.segments) != Std.string(profile.segments))
+      throw "cutter profile codec round trip";
+    rejected = false;
+    try CutterProfile.decode([[0.0, 7.0, 0, 0, 1, 0]]) catch (_:Dynamic) rejected = true;
+    if (!rejected) throw "cutter profile codec rejects unknown zones";
     var coverage = ToolpathCoreCoverage.run();
-    Sys.println('ToolpathKit tests passed (${14 + coverage} assertions)');
+    Sys.println('ToolpathKit tests passed (${19 + coverage} assertions)');
   }
 }

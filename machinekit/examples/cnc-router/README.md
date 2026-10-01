@@ -9,8 +9,10 @@ aluminium stock clamped on its bed. From the repository root:
 ```
 
 Or open **Desktop CNC router** from the Start page and press **Play**: the
-machine runs its G-code program and cuts three slots in the aluminium stock,
-which you see disappear as the tool moves. [PLAN.md](PLAN.md) lays out what
+machine runs the job it generates for itself, milling a NEMA 23 motor plate
+out of the aluminium stock: it pockets the plate's recesses with its end mill,
+changes to a drill and drills the screw holes through, and you see the stock
+take the plate's shape as the tools move. [PLAN.md](PLAN.md) lays out what
 comes next.
 
 ## What it contains
@@ -23,7 +25,9 @@ comes next.
   members, two along X on the gantry beams, two along Z on the X carriage;
 - a gantry of two aluminium uprights and two 4040 beams, an X carriage plate,
   and a Z plate carrying a 52 mm ER11 spindle in a clamp, with a 6 mm flat end
-  mill (22 mm flutes, 30 mm out of the collet);
+  mill (tool 1: 22 mm flutes, 30 mm out of the collet) and, loaded by hand when
+  a program calls for it, a 5.5 mm twist drill (tool 2: 118° point, 28 mm
+  flutes, 40 mm out of the collet);
 - four NEMA 23 steppers with Tr10×2 lead screws and nut brackets: two for Y,
   one each for X and Z;
 - a 120 × 90 × 20 mm aluminium stock block held by two step clamps.
@@ -42,45 +46,68 @@ millimetres, which is what `toolpathkit.motion.MachineBinding` expects:
 | `y`   | gantry along the frame | 0 to 300 | 150 | 6.65 |
 | `z`   | Z plate and spindle | −80 to 0 | 0 | 0.5 |
 
-Machine zero is the front-left corner of travel with Z at the top. The
+Machine zero is the front-left corner of travel with Z at the top, and
+machine coordinates say where the spindle nose (the gauge line) is, as on a
+real machine: each tool hangs its own length below it, which G43 applies. The
 assembly frame has the floor at z = 0 and the bed centred on the origin, so
-the tool tip is at `CncRouter.toolTipAt(x, y, z)` = (x − 150, y − 150,
-132 + z) mm. The starting pose puts the tool above the middle of the stock;
-the stock's top is at 78 mm, the spoilboard's at 58 mm.
+the nose is at `CncRouter.noseAt(x, y, z)` = (x − 150, y − 150, 162 + z) mm
+and the end mill's tip 30 mm below that. The starting pose puts the spindle
+above the middle of the stock; the stock's top is at 78 mm, the spoilboard's
+at 58 mm.
 
 Every mate meets at the child's origin with world-aligned axes, so each
 prismatic axis is a plain world direction. The mate connectors are named
 after their members (`to-<child>`, `attach-<child>`), and parts that share a
 designation share one definition carrying all of their connectors.
 
+## Machining job
+
+The project generates its job along with the machine, so nothing about it is
+written by hand. `CncRouterPreview.router` models the motor plate
+(`NemaMountPlate`: a pilot recess, and on the motor's bolt pattern four
+counterbores over 5.5 mm clearance holes), and `MountPlateJob` programs it
+with CamKit from the plate's faces: the top face's inner boundaries are the
+recesses' outlines, each pocketed down to the floor found under it with the
+end mill, keeping clear of the step clamps; then the drill makes the four
+holes from the counterbore floors through the plate and 0.5 mm past its point
+into the spoilboard. CncKit writes it as LinuxCNC G-code, each tool programmed
+at its tip through `G43 Hn`. Work zero (G54) is the stock's front-left top
+corner, machine (90, 105, −84) mm.
+
+The scene artifact's machining section carries what the app needs to run it,
+in metres: the program, the axes, the spindle part (whose origin is the gauge
+line), the work offset, the tool table (each tool's length and its cutter
+profile, the spindle's collet nut included), the stock, the spoilboard as a
+sacrificial part, the part that shows the tool, the tool in the spindle at the
+start (tool 1), and the finished plate as the target. The manifest says
+nothing about it.
+
 ## Motion and simulation
 
-`materia.project.json` gives the machine a CNC job in its `cnc` block:
+The app compiles the program with CncKit against the machine's axes and tool
+table, lowers it to MotionKit paths, and streams it to the simulated machine
+as trajectory segments; the planner respects each axis's velocity and
+acceleration (500, 400 and 300 mm/s² for x, y and z). A program that leaves
+the travel, or fails to compile, fails the simulation build with its G-code
+line. The job loops: each pass compiles the program again from the position
+the planner last commanded.
 
-```json
-"cnc": {"program": "slots.ngc", "workOffset": [90, 105, -54], "loop": true,
-        "stockPart": "stock", "toolPart": "tool",
-        "tools": [{"number": 1, "diameter": 6, "fluteLength": 22, "length": 30,
-                   "holderDiameter": 24, "holderLength": 20}]}
-```
-
-`slots.ngc` is LinuxCNC G-code: spindle on, then three 80 mm slots along X,
-2 mm deep, clear of the step clamps, with rapids 5 mm above the stock. G54
-work zero is the stock's front-left top corner, machine (90, 105, −54) mm.
-The app compiles the program with CncKit against the machine's axes, lowers it
-to MotionKit paths, and streams it to the simulated machine as trajectory
-segments; the planner respects each axis's velocity and acceleration (500, 400
-and 300 mm/s² for x, y and z). A program that leaves the travel, or fails to
-compile, fails the simulation build with its G-code line.
+A tool change in the program waits on its handshake, which the simulated
+operator answers by loading that tool: the stock simulation cuts with it from
+then on and the tool part takes its shape (the cutter profile, revolved).
 
 The stock is cut as the machine moves (`MachiningStock`, StockKit): every tick
-the segment the simulated tool tip travelled is swept through a 0.5 mm
-tri-dexel stock with the tool table's cutter (flat end mill, shank and collet
-nut), and the stock part shows the result, re-contoured a few times a second.
-Because the cut follows the simulated tool, following error is in the
-material. The whole run takes about 3 ms of compute per 10 ms of machining. Rapids that cut stock and shank or holder contact are counted as
-they happen. Physical collision is off for the stock part: the stock
-simulation, not the physics, decides what touching it means.
+the segment the loaded tool's tip travelled, its length below the simulated
+spindle nose, is swept through a 0.5 mm tri-dexel stock with the tool's
+cutter (flutes, shank and collet nut), and the stock part shows the result,
+re-contoured a few times a second. Because the cut follows the simulated
+machine, following error is in the material. A pass takes 343 s of
+machining at about 3.7 ms of compute per 10 ms tick. The stock is coloured against
+the finished plate: green where it is on the part, yellow where stock is left
+on it, red where the cut went into it. Rapids that cut stock and shank or
+holder contact are counted as they happen. Physical collision is off for the
+stock and the spoilboard: the stock simulation, not the physics, decides what
+touching them means.
 
 Every part collides in the simulation, through its convex hull. Parts of the
 machine that touch by design (a block on its rail, a nut bracket whose hull
@@ -105,14 +132,20 @@ machine.
 
 These also run in the MachineKit smoke suite (`machinekit/scripts/test-haxeon`).
 `ProjectSourceTests.checkCncRouter` in the app's project-source suite opens the
-project, builds it in MuJoCo and runs the job: the stock must lose the three
-slots' volume within 3% (3047.9 of 3049.6 mm³), no rapid may cut stock and the
-holder must never touch it.
+project, builds it in MuJoCo and runs one pass of the job: it must change
+from the end mill to the drill, the stock must lose the plate's recesses and
+holes within 2% (9967.6 of 9996.5 mm³, with 10.8 mm³ left on the plate),
+under 1 mm³ may be cut from the finished plate (0.6 mm³), no rapid may cut
+stock and the holder must never touch it; the next pass must then start
+cleanly.
 `CncRouterChecks` checks:
 
 - the joints and their limits, and mass properties for every part;
-- the tool tip at six machine positions (the corners of the travel box and
-  points inside it), with the frame and the stock staying put;
+- the spindle nose at six machine positions (the corners of the travel box
+  and points inside it), the end mill's tip its length below, with the frame
+  and the stock staying put;
+- the tool table: the end mill and the drill, by their lengths and shapes;
+- the motor plate's volume: the block less its recesses and holes;
 - every rail block within its rail's usable length;
 - interference between posed solids: the Z slide and spindle clear the stock
   when cutting through it (and the clamps and spoilboard at full depth), the

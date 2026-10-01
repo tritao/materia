@@ -16,17 +16,20 @@ class CncWriter {
       throw "G-code export needs a program and controller";
     var ops = program.ops;
     var activeSetup = program.setups[0];
-    var activeTool:Null<Int> = null;
+    // Each setup is validated alone, so it starts with the tool state in effect.
+    var activeTool:Null<ToolpathOp> = null, activeLength:Null<ToolpathOp> = null;
     var bySetup = new Map<String, Array<ToolpathOp>>();
     for (setup in program.setups) bySetup.set(setup.id, []);
     for (op in ops) switch op {
-      case SetSetup(id, provenance):
+      case SetSetup(id, _):
         for (setup in program.setups) if (setup.id == id) activeSetup = setup;
-        if (activeTool != null)
-          bySetup.get(activeSetup.id).push(ToolpathOp.ToolChange(activeTool,
-            provenance));
-      case ToolChange(number, _):
-        activeTool = number;
+        for (state in [activeTool, activeLength])
+          if (state != null) bySetup.get(activeSetup.id).push(state);
+      case ToolChange(_, _):
+        activeTool = op;
+        bySetup.get(activeSetup.id).push(op);
+      case ToolLengthOffset(_, _, _):
+        activeLength = op;
         bySetup.get(activeSetup.id).push(op);
       case _: bySetup.get(activeSetup.id).push(op);
     }

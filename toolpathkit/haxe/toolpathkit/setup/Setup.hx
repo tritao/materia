@@ -4,6 +4,8 @@ import toolpathkit.path.PathGeometry;
 import toolpathkit.path.GeometryTools;
 import toolpathkit.path.ToolpathOp;
 import toolpathkit.path.Point3;
+import toolpathkit.path.GeometryOffset;
+import toolpathkit.path.ToolpathFrame;
 import toolpathkit.path.Provenance;
 import toolpathkit.tool.ToolLibrary;
 
@@ -24,21 +26,31 @@ class Setup {
     this.stock = stock;
   }
 
-  /** Rejects a program before export. The cutter tip disk is swept through each path. */
+  /**
+    Rejects a program before export. The cutter tip disk is swept through
+    each path at the physical tool tip, after the active G43 length.
+  **/
   public function validate(ops:Array<ToolpathOp>, tools:ToolLibrary):Void {
     if (ops == null || tools == null) throw "CAM export needs a program and machine";
     if (stock == null) throw "CAM validation needs stock and clearance bounds";
+    var frame = new ToolpathFrame(tools, [this]);
     var radius = 0.0;
-    for (op in ops) switch op {
-      case ToolChange(number, span):
-        var tool = tools.tool(number);
-        if (tool.diameter <= 0.0) fail(span, 'tool $number needs a positive diameter');
-        radius = tool.diameter * 0.5;
-      case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
-          Move(Retract, geometry, _, _, span):
-        checkPath(geometry, span, radius, false);
-      case Move(_, geometry, _, _, span): checkPath(geometry, span, radius, true);
-      case _:
+    for (op in ops) {
+      frame.advance(op);
+      switch op {
+        case ToolChange(number, span):
+          var tool = tools.tool(number);
+          if (tool.diameter <= 0.0) fail(span, 'tool $number needs a positive diameter');
+          radius = tool.diameter * 0.5;
+        case Move(Rapid, geometry, _, _, span), Move(Link, geometry, _, _, span),
+            Move(Retract, geometry, _, _, span):
+          checkPath(GeometryOffset.translate(geometry, frame.toTip()), span,
+            radius, false);
+        case Move(_, geometry, _, _, span):
+          checkPath(GeometryOffset.translate(geometry, frame.toTip()), span,
+            radius, true);
+        case _:
+      }
     }
   }
 
