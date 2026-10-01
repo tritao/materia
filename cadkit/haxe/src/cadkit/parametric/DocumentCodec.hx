@@ -866,18 +866,20 @@ class DocumentCodec {
 			});
 		for (constraint in sketch.constraints()) {
 			var value = constraint.value;
-			if (constraint.kind == "distance" || constraint.kind == "radius")
+			if (!constraint.reference && (constraint.kind == "distance" || constraint.kind == "radius"))
 				value = UnitConversion.fromCanonical(feature.dimension(constraint.id).value, ParameterKind.Length, sketch.units);
-			else if (constraint.kind == "angle")
+			else if (!constraint.reference && constraint.kind == "angle")
 				value = feature.dimension(constraint.id).value;
-			constraints.push({
+			var record:Dynamic = {
 				id: constraint.id,
 				kind: constraint.kind,
 				first: constraint.first,
 				second: constraint.second,
 				third: constraint.third,
 				value: value
-			});
+			};
+			if (constraint.reference) Reflect.setField(record, "reference", true);
+			constraints.push(record);
 		}
 		return {
 			id: feature.id.toInt(),
@@ -933,9 +935,12 @@ class DocumentCodec {
 			sketch.addEntity(entity);
 		}
 		var constraintRecords:Array<Dynamic> = cast requiredField(record, "constraints");
-		for (value in constraintRecords)
-			sketch.addConstraint(SketchConstraint.raw(stringField(value, "id"), stringField(value, "kind"), stringField(value, "first"),
-				optionalString(value, "second"), optionalString(value, "third"), numberField(value, "value")));
+		for (value in constraintRecords) {
+			var constraint = SketchConstraint.raw(stringField(value, "id"), stringField(value, "kind"), stringField(value, "first"),
+				optionalString(value, "second"), optionalString(value, "third"), numberField(value, "value"));
+			var reference:Null<Bool> = Reflect.field(value, "reference");
+			sketch.addConstraint(reference == true ? constraint.asReference() : constraint);
+		}
 		var supportValue:Dynamic = Reflect.field(record, "support");
 		if (supportValue == null)
 			return new ConstrainedSketchFeature(sketch);

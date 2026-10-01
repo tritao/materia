@@ -32,8 +32,12 @@ class SketchDraftCodec {
       startAngle:entity.startAngle, endAngle:entity.endAngle,
       clockwise:entity.clockwise, construction:entity.construction});
     var constraints:Array<Dynamic> = [];
-    for (constraint in authoredConstraints) constraints.push({id:constraint.id, kind:constraint.kind,
-      first:constraint.first, second:constraint.second, third:constraint.third, value:constraint.value});
+    for (constraint in authoredConstraints) {
+      var record:Dynamic = {id:constraint.id, kind:constraint.kind,
+        first:constraint.first, second:constraint.second, third:constraint.third, value:constraint.value};
+      if (constraint.reference) Reflect.setField(record, "reference", true);
+      constraints.push(record);
+    }
     var encoded = Json.stringify({format:FORMAT, version:VERSION, featureIndex:featureIndex,
       sketch:{units:sketch.units,
         plane:{origin:vector(sketch.plane.origin), xDirection:vector(sketch.plane.xDirection),
@@ -91,10 +95,13 @@ class SketchDraftCodec {
         default: throw "unsupported sketch entity kind: " + kind;
       }
     }
-    for (record in arrayField(source, "constraints"))
-      sketch.addConstraint(SketchConstraint.raw(stringField(record, "id"),
+    for (record in arrayField(source, "constraints")) {
+      var constraint = SketchConstraint.raw(stringField(record, "id"),
         stringField(record, "kind"), stringField(record, "first"), optionalString(record, "second"),
-        optionalString(record, "third"), numberField(record, "value")));
+        optionalString(record, "third"), numberField(record, "value"));
+      var reference:Null<Bool> = Reflect.field(record, "reference");
+      sketch.addConstraint(reference == true ? constraint.asReference() : constraint);
+    }
     return new SketchDraftRecord(featureIndex, sketch);
   }
 

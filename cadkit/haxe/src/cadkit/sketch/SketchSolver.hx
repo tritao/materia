@@ -192,7 +192,44 @@ class SketchSolver {
 			if (r != null && isFree[r]) moves = true;
 			if (moves) freeEntities.push(entity.id);
 		}
-		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures, freePoints, freeEntities);
+		return new SolvedSketch(coordinates, radii, diagnostic, cache, structures, freePoints, freeEntities,
+			measureReferences(coordinates, radii));
+	}
+
+	/**
+		The reference dimensions measured on the solved geometry, as their driving rows define them: the distance
+		between two points, a circle's radius, and the signed angle from the first line's direction to the second's.
+	*/
+	function measureReferences(coordinates:Map<String, Array<Float>>, radii:Map<String, Float>):Map<String, Float> {
+		var result = new Map<String, Float>();
+		var direction = (id:String, owner:String) -> {
+			var entity = layout.entities.get(id);
+			if (entity == null || entity.kind != "line" || entity.second == null)
+				throw layout.invalid("an angle measures two lines", [owner]);
+			var a = coordinates.get(entity.first), b = coordinates.get(entity.second);
+			if (a == null || b == null) throw layout.invalid("a reference dimension names a missing point", [owner]);
+			return [b[0] - a[0], b[1] - a[1]];
+		};
+		for (constraint in layout.referenceList) {
+			switch constraint.kind {
+				case "distance":
+					var a = coordinates.get(constraint.first), second = constraint.second;
+					var b = second == null ? null : coordinates.get(second);
+					if (a == null || b == null) throw layout.invalid("a distance measures two points", [constraint.id]);
+					result.set(constraint.id, Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1])));
+				case "radius":
+					var r = radii.get(constraint.first);
+					if (r == null) throw layout.invalid("a radius measures a circle or arc", [constraint.id]);
+					result.set(constraint.id, r);
+				case "angle":
+					var second = constraint.second;
+					if (second == null) throw layout.invalid("an angle measures two lines", [constraint.id]);
+					var u = direction(constraint.first, constraint.id), v = direction(second, constraint.id);
+					result.set(constraint.id, Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]));
+				default:
+			}
+		}
+		return result;
 	}
 
 	static function failingOwners(set:SketchResidualSet, tolerance:Float):Array<String> {

@@ -57,6 +57,33 @@ class CadPlateWorkflowTests {
     };
   }
 
+  /**
+   * Reference dimensions in the sketch draft (plan C5.2): the height made a reference shows its measured value
+   * read-only and frees a degree of freedom; made driving again it keeps that value.
+   */
+  static function checkReferenceDimension(scene:EditorScene):Void {
+    var height = scene.sketchDraftSolution();
+    if (height == null) throw "the draft has no solution";
+    var measuredHeight = height.y("p2") - height.y("p1");
+    check(toggle(scene, "Reference height (measured)", true) == PropertyEditResult.Applied, "the height can become a reference");
+    check(scene.sketchEditSummary().indexOf("1 degree") >= 0, 'a reference height frees the rectangle: ${scene.sketchEditSummary()}');
+    var row = [for (descriptor in scene.properties()) if (descriptor.label == "Reference height") descriptor];
+    check(row.length == 1 && row[0].readOnly, "the reference height is shown read-only");
+    var shown = switch (row[0].readValue(scene.context())) {
+      case PropertyValue.Float(value): value;
+      default: -1.0;
+    };
+    near(shown, Math.abs(measuredHeight), "and shows the measured height");
+    check(toggle(scene, "Reference height (measured)", false) == PropertyEditResult.Applied, "and driving again");
+    check(scene.sketchEditSummary().indexOf("0 degrees of freedom") >= 0, 'which fixes the rectangle again: ${scene.sketchEditSummary()}');
+  }
+
+  static function toggle(scene:EditorScene, label:String, value:Bool):PropertyEditResult {
+    for (descriptor in scene.properties()) if (descriptor.label == label)
+      return new PropertyBinding(descriptor, scene.context()).apply(PropertyValue.Bool(value));
+    throw "Missing CAD inspector property: " + label;
+  }
+
   static function edit(scene:EditorScene, label:String, value:Float):PropertyEditResult {
     for (descriptor in scene.properties()) if (descriptor.label == label)
       return new PropertyBinding(descriptor, scene.context()).apply(PropertyValue.Float(value));
@@ -125,6 +152,7 @@ class CadPlateWorkflowTests {
         "the draft exposes solver state and enables apply after it forms a closed profile");
       check(edit(scene, "Dimension width", 30) == PropertyEditResult.Applied,
         "starter sketch width can be edited before the feature is created");
+      checkReferenceDimension(scene);
       check(scene.applySelectedSketchEdit(), "apply the created sketch draft");
       var feature:ConstrainedSketchFeature = cast scene.cadSession(id).document.featureAt(0);
       near(feature.dimension("width").value, 30, "applied sketch width is authored in the document");

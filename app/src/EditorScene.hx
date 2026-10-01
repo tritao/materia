@@ -1927,27 +1927,59 @@ class EditorScene {
         })));
     }
     for (constraint in authored.constraints()) {
-      if (constraint.kind != "distance" && constraint.kind != "radius" && constraint.kind != "angle")
+      if (!SketchConstraint.isDimension(constraint.kind))
         continue;
       var constraintId = constraint.id;
       var unit = constraint.kind == "angle" ? "rad" : authored.units;
       var positive = constraint.kind != "angle";
-      result.push(sketchDraftNumberProperty(prefix + "sketch-dimension-" + constraintId,
-        "Dimension " + constraintId, unit, positive,
-        function() return sketchConstraint(constraintId).value,
-        function(value) editSketchDraft(function(sketch) {
-          var current = sketchConstraint(constraintId);
-          sketch.replaceConstraint(SketchConstraint.raw(current.id, current.kind, current.first,
-            current.second, current.third, value));
-        })));
+      if (constraint.reference) {
+        // A reference dimension shows what the solved sketch measures; it cannot be edited.
+        result.push(sketchDraftNumberProperty(prefix + "sketch-dimension-" + constraintId,
+          "Reference " + constraintId, unit, false, function() return measuredDimension(constraintId), null));
+      } else {
+        result.push(sketchDraftNumberProperty(prefix + "sketch-dimension-" + constraintId,
+          "Dimension " + constraintId, unit, positive,
+          function() return sketchConstraint(constraintId).value,
+          function(value) editSketchDraft(function(sketch) sketch.replaceConstraint(sketchConstraint(constraintId).withValue(value)))));
+      }
+      result.push(sketchReferenceProperty(prefix + "sketch-dimension-" + constraintId + "-reference", constraintId));
     }
   }
 
-  function sketchDraftNumberProperty(key:String, label:String, unit:String, positive:Bool,
-      read:Void->Float, write:Float->Void):PropertyDescriptor {
+  /** A reference dimension's measured value in the draft's solution (its stored value until it has one). */
+  function measuredDimension(constraintId:String):Float {
+    var solution = sketchController.solution();
+    if (solution != null) try return solution.measured(constraintId) catch (_:Dynamic) {}
+    return sketchConstraint(constraintId).value;
+  }
+
+  /**
+   * Whether a dimension is a reference (measured) one. Made driving again, it takes its measured value, so the
+   * sketch does not jump.
+   */
+  function sketchReferenceProperty(key:String, constraintId:String):PropertyDescriptor {
     var options = new PropertyDescriptorOptions();
     options.category = "Sketch draft";
     options.recordHistory = false;
+    return new PropertyDescriptor(key, "Reference " + constraintId + " (measured)", PropertyType.Bool,
+      function(_) return PropertyValue.Bool(sketchConstraint(constraintId).reference),
+      function(_, value) switch (value) {
+        case PropertyValue.Bool(reference):
+          var current = sketchConstraint(constraintId);
+          if (current.reference == reference) return;
+          var measured = reference ? current.value : measuredDimension(constraintId);
+          editSketchDraft(function(sketch) sketch.replaceConstraint(current.withValue(measured).asReference(reference)));
+        default: throw "A reference setting must be boolean";
+      }, options);
+  }
+
+  /** A sketch draft number; without `write` it is read-only. */
+  function sketchDraftNumberProperty(key:String, label:String, unit:String, positive:Bool,
+      read:Void->Float, write:Null<Float->Void>):PropertyDescriptor {
+    var options = new PropertyDescriptorOptions();
+    options.category = "Sketch draft";
+    options.recordHistory = false;
+    options.readOnly = write == null;
     options.unit = unit;
     options.minimum = positive ? 0.000001 : null;
     options.step = 0.1;
@@ -1969,7 +2001,9 @@ class EditorScene {
         };
         if (!Math.isFinite(number) || (positive && number <= 0))
           throw (positive ? "Value must be finite and positive" : "Value must be finite");
-        write(number);
+        var apply = write;
+        if (apply == null) throw "This value is measured, not edited";
+        apply(number);
       }, options);
     return descriptor;
   }

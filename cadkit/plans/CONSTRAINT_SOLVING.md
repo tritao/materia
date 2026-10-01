@@ -1065,3 +1065,36 @@ Steps:
   circle with a free radius, an unconstrained point, a drag);
   `DiagnosisAgreementSmoke` (envelope vs dense freedom); mate `movable`;
   the editor's `assemblyPartStillFree`.
+
+### C5.2 — Reference (measured) dimensions (2026-10-01)
+
+- `SketchConstraint.reference` marks a distance, radius or angle as
+  measured, not driving; `asReference(flag)` and `withValue(value)` change
+  one property and keep the rest.
+- The sketch layout keeps reference constraints out of the solve, the
+  partition and the diagnosis (`referenceList`), and validation refuses
+  other kinds.
+- After the solve, `SolvedSketch.measured(id)` gives the value as the
+  driving rows define it: point-to-point distance, the solved radius, and
+  the signed angle `atan2(u×v, u·v)` from the first line to the second.
+- A reference never over-constrains. A rectangle with a reference diagonal
+  stays "fully-constrained", not redundant.
+- `ConstrainedSketchFeature` makes no parameter for a reference, so turning
+  a driving dimension into a reference retires its parameter (undoable).
+  `DocumentCodec` and the editor's `SketchDraftCodec` store `"reference":
+  true`.
+- Three places rebuilt constraints with `SketchConstraint.raw` and dropped
+  the flag: the feature's solve candidate, its parameter sync, and the
+  editor's dimension edit. They use `withValue` now; this showed up as a
+  reference angle of 0 becoming driving and the solve failing.
+- Editor: a reference dimension shows its measured value read-only
+  ("Reference <id>"), and every dimension has a "Reference <id> (measured)"
+  toggle. Made driving again, it takes its measured value, so the sketch
+  does not jump.
+- Tests:
+  - `SketchReferenceSmoke`: measured diagonal, angle and radius; a width
+    edit updates the diagonal; kinds refused; no parameter; undo; save and
+    reload.
+  - `CadPlateWorkflowTests.checkReferenceDimension`: a reference height
+    frees one degree of freedom, shows the measured value read-only, and
+    fixes the rectangle again when driving.

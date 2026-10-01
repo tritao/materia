@@ -73,6 +73,7 @@ class HaxeonSmoke {
 		MateSolverSmoke.run();
 		GeometricConnectorSmoke.run();
 		SketchFreedomSmoke.run();
+		SketchReferenceSmoke.run();
 		AssemblyDragSmoke.run();
 		PlacementFramesSmoke.run();
 		JacobianCheckSmoke.run();
