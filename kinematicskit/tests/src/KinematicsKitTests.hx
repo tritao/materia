@@ -14,6 +14,7 @@ import kinematicskit.KinematicProblem;
 import kinematicskit.KinematicStatus;
 import kinematicskit.LevenbergMarquardt;
 import kinematicskit.PostureTask;
+import kinematicskit.PrioritizedSolver;
 import kinematicskit.JointKind;
 import kinematicskit.KinematicModel;
 import kinematicskit.KinematicModelBuilder;
@@ -45,6 +46,7 @@ class KinematicsKitTests {
     testNoAllocationPerIteration();
     testSwivelJacobian();
     testRelativeFrameTask();
+    testPrioritizedSolver();
     testRootJacobianMatchesFiniteDifferences();
     testMobileManipulatorDrivesWhenTheArmCannotReach();
     testFloatingBodyIsPlacedExactly();
@@ -726,6 +728,49 @@ class KinematicsKitTests {
     check(Math.abs(reached.x - goal.x) < 1e-8 && Math.abs(reached.y - goal.y) < 1e-8 && Math.abs(reached.z - goal.z) < 1e-8,
       'the tool sits at the target in the work frame (${reached.x}, ${reached.y}, ${reached.z})');
     check(Math.abs(solution.state.q[3] - q[3]) > 1e-4, "the positioner moves as well as the arm");
+  }
+
+  static function testPrioritizedSolver():Void {
+    var model = sevenAxisArm();
+    var flange = model.frameIndex("flange");
+    var reach = [0.3, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2];
+    var goal = KinematicSnapshot.of(new KinematicState(model, reach)).framePose(flange);
+    var seed = new KinematicState(model, [0.25, 0.55, 0.45, -1.15, 0.25, 0.75, 0.15]);
+    // The preferred posture is another solution of the same tool pose, at a different swivel: reachable only by
+    // moving along the arm's self-motion, which the tool target leaves free.
+    var origin = new Vector3(0, 0, 0);
+    var swivel = new SwivelTask(model, model.bodyIndex("link1"), origin, model.bodyIndex("link3"), origin,
+      model.bodyIndex("link5"), origin, 0.0, 1e-9, new Vector3(1, 0, 0));
+    swivel.target = swivel.angle(KinematicSnapshot.of(new KinematicState(model, reach))) + 0.6;
+    var other = DampedLeastSquares.solve(new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-10, 1e-10))
+      .add(swivel), new KinematicState(model, reach), 400);
+    check(other.converged(), "the same tool pose solves at another swivel");
+    var preferred = other.state.q.copy();
+    function distance(q:Array<Float>):Float {
+      var sum = 0.0;
+      for (i in 0...7) sum += Math.pow(q[i] - preferred[i], 2);
+      return Math.sqrt(sum);
+    }
+    function frameError(state:KinematicState):Float {
+      var pose = KinematicSnapshot.of(state).framePose(flange);
+      return Math.sqrt(Math.pow(pose.x - goal.x, 2) + Math.pow(pose.y - goal.y, 2) + Math.pow(pose.z - goal.z, 2));
+    }
+    var plain = DampedLeastSquares.solve(new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-9, 1e-9)),
+      seed, 200);
+    var problem = new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-9, 1e-9))
+      .add(new PostureTask(model, preferred, 0.1));
+    var solution = PrioritizedSolver.solve(problem, seed, 400);
+    check(solution.converged(), 'the prioritized solve meets the tool target (${solution.status})');
+    check(frameError(solution.state) < 1e-9, 'the posture does not pull the tool off (${frameError(solution.state)} m)');
+    check(distance(solution.state.q) < 1e-3 && distance(plain.state.q) > 0.1,
+      'the arm slides along its self-motion to the preferred posture (${distance(solution.state.q)}; without it ${distance(plain.state.q)})');
+    // A posture beyond a limit: the joint stops on the limit, the tool is still exact.
+    var limited = new KinematicProblem(model).add(FrameTask.atFrame(model, flange, goal, 1e-9, 1e-9))
+      .add(new PostureTask(model, [1.5, 0.6, 0.5, -1.2, 0.3, 0.8, 0.2], 0.1));
+    limited.setLimits(0, -2.9, 0.4);
+    var bounded = PrioritizedSolver.solve(limited, seed, 400);
+    check(bounded.converged() && frameError(bounded.state) < 1e-9, 'limits and the tool target hold together (${bounded.status})');
+    check(bounded.state.q[0] <= 0.4 + 1e-12, 'the joint stays inside its limit (${bounded.state.q[0]})');
   }
 
   /** A cart (root) carrying a planar 3-link arm on vertical hinges, 1.0 + 0.8 + 0.5 m, with a tool frame. */

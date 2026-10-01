@@ -873,3 +873,25 @@ Steps, each its own commit with all suites green:
 - The default swivel and `redundant()` count the arm's DOFs, not the
   external axes.
 - The preferred-posture solve still has two passes; K6b replaces them.
+
+### K6b — Prioritized solver; one-pass posture solves (2026-10-01)
+
+- `PrioritizedSolver` (pure Haxe) solves each iteration as an
+  equality-constrained least-squares step:
+  - hard rows are equalities;
+  - soft rows plus λ² damping form the objective;
+  - the KKT system is regularized by 1e-10 on the constraint block, so
+    singular hard rows still solve;
+  - limits are an active set: pin the violators, re-solve the rest.
+- It converges once the hard tasks are met and the step has settled.
+- `KinematicGroup` uses it whenever a posture is preferred
+  (`IkMethod.Prioritized`), replacing the draw-then-polish two passes.
+  Tracking without a posture stays on DLS (KK-D11).
+- Test: on the 7-axis fixture, a preferred posture is another exact solution
+  of the same tool pose. The solver slides along the self-motion to it
+  (within 1e-3) with the tool exact (< 1e-9), while plain DLS stays more
+  than 0.1 away. A posture beyond a limit leaves the joint on the limit,
+  with the tool still exact.
+- My first test preferred a posture the pose cannot reach. Only one DOF is
+  free at a fixed tool pose, so nearly no improvement is possible there,
+  whatever the solver does.

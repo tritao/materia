@@ -11,6 +11,7 @@ import kinematicskit.KinematicState;
 import kinematicskit.KinematicStatus;
 import kinematicskit.LevenbergMarquardt;
 import kinematicskit.PostureTask;
+import kinematicskit.PrioritizedSolver;
 import kinematicskit.RootDampingTask;
 import kinematicskit.RootMotion;
 import kinematicskit.SolverWorkspace;
@@ -284,23 +285,21 @@ class KinematicGroup {
     problem.add(toolTask(RobotKinematics.toTransform(target), o));
     if (hasExternal()) problem.add(new DofDampingTask(model, damping));
     if (o.swivel != null) problem.add(swivelTask(o.swivel, o.swivelTolerance, !o.swivelExact));
-    try {
-      var seedState = state;
-      if (o.posture != null) {
-        var posture:Array<Float> = o.posture;
-        if (posture.length != n) throw 'Preferred posture needs $n values';
-        // First draw the arm towards its posture; the external axes take up the rest.
-        var targets = [for (_ in 0...model.dofCount()) 0.0], weights = [for (_ in 0...model.dofCount()) 0.0];
-        for (i in 0...n) if (!external[i]) {
-          targets[dofs[i]] = posture[i];
-          weights[dofs[i]] = 1.0;
-        }
-        var drawn = limitedProblem();
-        for (task in problem.tasks) drawn.add(task);
-        drawn.add(new PostureTask(model, targets, o.postureWeight, weights));
-        seedState = run(drawn, state, o).state;
+    var method = o.method;
+    if (o.posture != null) {
+      var posture:Array<Float> = o.posture;
+      if (posture.length != n) throw 'Preferred posture needs $n values';
+      // The arm is drawn towards its posture; the external axes take up the rest.
+      var targets = [for (_ in 0...model.dofCount()) 0.0], weights = [for (_ in 0...model.dofCount()) 0.0];
+      for (i in 0...n) if (!external[i]) {
+        targets[dofs[i]] = posture[i];
+        weights[dofs[i]] = 1.0;
       }
-      var solution = run(problem, seedState, o);
+      problem.add(new PostureTask(model, targets, o.postureWeight, weights));
+      method = IkMethod.Prioritized;
+    }
+    try {
+      var solution = run(problem, state, o, method);
       var tip = solution.tasks[0];
       return new IKResult(solution.status == KinematicStatus.Converged, [for (dof in dofs) solution.state.q[dof]],
         tip.positionError, tip.orientationError, solution.iterations, solution.status);
@@ -317,10 +316,14 @@ class KinematicGroup {
     return [for (i in 0...q.length) JointTarget.position(jointModelIndices[i], q[i])];
   }
 
-  function run(problem:KinematicProblem, seed:KinematicState, o:IkOptions):kinematicskit.KinematicSolution
-    return o.method == IkMethod.Reaching
-      ? LevenbergMarquardt.solve(problem, seed, o.maxIterations, o.damping > 0.0 ? o.damping : 1e-3, 1e-8, 1.0, workspace)
-      : DampedLeastSquares.solve(problem, seed, o.maxIterations, o.damping, 1e-8, workspace);
+  function run(problem:KinematicProblem, seed:KinematicState, o:IkOptions, method:IkMethod):kinematicskit.KinematicSolution
+    return switch method {
+      case Reaching: LevenbergMarquardt.solve(problem, seed, o.maxIterations, o.damping > 0.0 ? o.damping : 1e-3, 1e-8,
+          1.0, workspace);
+      case Prioritized: PrioritizedSolver.solve(problem, seed, o.maxIterations, o.damping > 0.0 ? o.damping : 0.02,
+          1e-8, workspace);
+      default: DampedLeastSquares.solve(problem, seed, o.maxIterations, o.damping, 1e-8, workspace);
+    };
 
   /**
    * The base moves as well as the joints (`baseMotion`); the target is in

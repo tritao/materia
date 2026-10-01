@@ -8,6 +8,12 @@ enum abstract IkMethod(String) to String {
   var Tracking = "tracking";
   /** Levenberg-Marquardt: reaches far targets from a distant seed. */
   var Reaching = "reaching";
+  /**
+   * Hard tasks (the tool target, an exact swivel) as equalities, soft ones
+   * (a posture, a swivel preference) as well as they allow: kinematicskit's
+   * `PrioritizedSolver`. Chosen whenever a posture is preferred.
+   */
+  var Prioritized = "prioritized";
 }
 
 /**
@@ -31,7 +37,8 @@ class IkOptions {
   /**
    * A posture the group is drawn towards (`q` order; external axes ignored):
    * the arm stays comfortable and the external axes bring the work to it.
-   * Shapes the configuration only; the tool target is still met exactly.
+   * Solved prioritized, so it shapes the configuration only; the tool target
+   * is still met exactly.
    */
   public var posture:Null<Array<Float>> = null;
   /** Strength of the pull towards `posture`, per radian (or metre) away. */
