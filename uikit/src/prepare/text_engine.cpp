@@ -259,6 +259,9 @@ bool append_render_glyph(const skb_layout_render_glyph_t *glyph, void *context) 
     const skb_image_t *atlas = skb_image_atlas_get_texture(render.state->atlas, quad.texture_idx);
     if (!atlas)
         return false;
+    render.output->source_ranges.push_back({
+        static_cast<uint32_t>(render.output->vertices.size()), 4,
+        glyph->text_range.start, glyph->text_range.end});
     append_quad(quad, *atlas, *render.output);
     auto &batch = render.output->batches.back();
     batch.vertex_count += 4;
@@ -274,6 +277,40 @@ void atlas_texture_created(skb_image_atlas_t *atlas, uint8_t texture_index, void
 }
 
 } // namespace
+
+bool valid_glyph_color_ranges(const std::vector<GlyphColorRange> &ranges) {
+    int32_t previous_end = 0;
+    for (const auto &range : ranges) {
+        if (range.start < previous_end || range.end <= range.start)
+            return false;
+        previous_end = range.end;
+    }
+    return true;
+}
+
+void apply_glyph_colors(PreparedGlyphs &glyphs, GlyphTint base,
+                        const std::vector<GlyphColorRange> &ranges) {
+    const auto paint = [](GlyphVertex &vertex, GlyphTint tint) {
+        vertex.red = tint.red;
+        vertex.green = tint.green;
+        vertex.blue = tint.blue;
+        vertex.alpha = tint.alpha;
+    };
+    for (auto &vertex : glyphs.vertices)
+        paint(vertex, base);
+    for (const auto &source : glyphs.source_ranges) {
+        auto range = std::upper_bound(ranges.begin(), ranges.end(), source.start,
+            [](int32_t offset, const GlyphColorRange &candidate) { return offset < candidate.start; });
+        if (range == ranges.begin())
+            continue;
+        --range;
+        if (source.start >= range->end)
+            continue;
+        for (uint32_t index = source.first_vertex;
+             index < source.first_vertex + source.vertex_count; ++index)
+            paint(glyphs.vertices[index], range->tint);
+    }
+}
 
 FontCollection::FontCollection() : state_(new State) {
     state_->fonts = skb_font_collection_create();
@@ -625,24 +662,26 @@ bool TextEngine::prepare_glyphs_for_line(TextLayoutId id, uint32_t line_index, f
 std::shared_ptr<const PreparedGlyphs> TextEngine::published_glyphs(TextLayoutId id, float origin_x,
                                                                    float origin_y,
                                                                    float pixel_scale,
-                                                                   GlyphMode mode, GlyphTint tint) {
-    return publish_glyphs(id, -1, origin_x, origin_y, pixel_scale, mode, tint);
+                                                                   GlyphMode mode, GlyphTint tint,
+                                                                   const std::vector<GlyphColorRange> &ranges) {
+    return publish_glyphs(id, -1, origin_x, origin_y, pixel_scale, mode, tint, ranges);
 }
 
 std::shared_ptr<const PreparedGlyphs>
 TextEngine::published_glyphs_for_line(TextLayoutId id, uint32_t line_index, float origin_x,
                                       float origin_y, float pixel_scale, GlyphMode mode,
-                                      GlyphTint tint) {
+                                      GlyphTint tint, const std::vector<GlyphColorRange> &ranges) {
     return publish_glyphs(id, static_cast<int32_t>(line_index), origin_x, origin_y, pixel_scale,
-                          mode, tint);
+                          mode, tint, ranges);
 }
 
 std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id,
                                                                  int32_t line_index, float origin_x,
                                                                  float origin_y, float pixel_scale,
-                                                                 GlyphMode mode, GlyphTint tint) {
+                                                                 GlyphMode mode, GlyphTint tint,
+                                                                   const std::vector<GlyphColorRange> &ranges) {
     const auto *layout = find_layout(*state_, id);
-    if (!layout || pixel_scale <= 0.0f)
+    if (!layout || pixel_scale <= 0.0f || !valid_glyph_color_ranges(ranges))
         return {};
     if (line_index >= 0 && static_cast<std::size_t>(line_index) >= layout->result.lines.size())
         return {};
@@ -663,6 +702,23 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     mix(static_cast<uint64_t>(tint.red) << 24 | static_cast<uint64_t>(tint.green) << 16 |
         static_cast<uint64_t>(tint.blue) << 8 | static_cast<uint64_t>(tint.alpha));
 
+    std::vector<GlyphColorRange> relevant_ranges;
+    for (auto range : ranges) {
+        if (line_index >= 0) {
+            const auto line = layout->line_ranges[line_index];
+            range.start = std::max(range.start, line.start);
+            range.end = std::min(range.end, line.end);
+            if (range.start >= range.end)
+                continue;
+        }
+        relevant_ranges.push_back(range);
+        mix(static_cast<uint64_t>(range.start));
+        mix(static_cast<uint64_t>(range.end));
+        mix(static_cast<uint64_t>(range.tint.red) << 24 |
+            static_cast<uint64_t>(range.tint.green) << 16 |
+            static_cast<uint64_t>(range.tint.blue) << 8 | range.tint.alpha);
+    }
+
     if (const auto found = state_->published_glyphs.find(key);
         found != state_->published_glyphs.end()) {
         if (auto cached = found->second.lock())
@@ -680,17 +736,8 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     if (!prepared)
         return {};
 
-    /* Tint only the snapshot we just built, before it is shared or cached. */
-    const bool tinted =
-        tint.red != 255 || tint.green != 255 || tint.blue != 255 || tint.alpha != 255;
-    if (tinted) {
-        for (auto &vertex : snapshot->vertices) {
-            vertex.red = tint.red;
-            vertex.green = tint.green;
-            vertex.blue = tint.blue;
-            vertex.alpha = tint.alpha;
-        }
-    }
+    /* Color only the newly built snapshot, before publishing it. */
+    apply_glyph_colors(*snapshot, tint, relevant_ranges);
 
     /* Weak entries keep live snapshots shared and let the rest expire. */
     if (state_->published_glyphs.size() >= 256) {

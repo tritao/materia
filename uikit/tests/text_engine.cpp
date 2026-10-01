@@ -361,5 +361,79 @@ int main() {
                                           GlyphMode::Alpha))
         return 58;
 
+    /* Foreground changes preserve geometry, measurement, rasterization and older snapshots. */
+    TextLayoutResult styled_layout{};
+    if (!engine.layout_utf8("abc\ndef", 200.0f, published_options, &styled_layout))
+        return 59;
+    const auto plain = engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha);
+    const auto unaffected_line = engine.published_glyphs_for_line(styled_layout.id, 1, 0, 0, 1,
+                                                             GlyphMode::Alpha);
+    const auto before_colors = engine.stats();
+    const auto before_builds = engine.layout_build_count();
+    const GlyphTint red{255, 0, 0, 255};
+    const std::vector<GlyphColorRange> colors{{0, 2, red}};
+    const auto colored = engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha,
+                                                {}, colors);
+    if (!plain || !colored || !unaffected_line || colored == plain ||
+        colored->source_ranges.empty() || colored->indices != plain->indices ||
+        colored->vertices.size() != plain->vertices.size())
+        return 60;
+    for (const auto &source : colored->source_ranges) {
+        for (uint32_t index = source.first_vertex;
+             index < source.first_vertex + source.vertex_count; ++index) {
+            const auto &vertex = colored->vertices[index];
+            const auto &original = plain->vertices[index];
+            if (vertex.x != original.x || vertex.y != original.y || vertex.u != original.u ||
+                vertex.v != original.v || original.green != 255 || original.blue != 255 ||
+                vertex.red != 255 || vertex.alpha != 255 ||
+                vertex.green != (source.start < 2 ? 0 : 255) ||
+                vertex.blue != (source.start < 2 ? 0 : 255))
+                return 61;
+        }
+    }
+    if (engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha, {}, colors) != colored ||
+        engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha) != plain ||
+        engine.published_glyphs_for_line(styled_layout.id, 1, 0, 0, 1, GlyphMode::Alpha,
+                                         {}, colors) != unaffected_line ||
+        engine.layout_build_count() != before_builds ||
+        engine.stats().glyphs_rasterized != before_colors.glyphs_rasterized)
+        return 62;
+    const std::vector<GlyphColorRange> overlapping{{0, 2, red}, {1, 3, red}};
+    const std::vector<GlyphColorRange> reversed{{2, 1, red}};
+    const std::vector<GlyphColorRange> negative{{-1, 2, red}};
+    if (engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha, {}, overlapping) ||
+        engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha, {}, reversed) ||
+        engine.published_glyphs(styled_layout.id, 0, 0, 1, GlyphMode::Alpha, {}, negative))
+        return 63;
+    auto recolored = *colored;
+    apply_glyph_colors(recolored, {}, {});
+    if (std::memcmp(recolored.vertices.data(), plain->vertices.data(),
+                    plain->vertices.size() * sizeof(GlyphVertex)) != 0 ||
+        colored->vertices[colored->source_ranges.front().first_vertex].green != 0)
+        return 64;
+
+    /* Metadata is in codepoints, including supplementary characters and visual RTL order. */
+    TextLayoutResult unicode_layout{};
+    if (!engine.layout_utf8("é🙂אבג", 200.0f, published_options, &unicode_layout))
+        return 65;
+    const std::vector<GlyphColorRange> unicode_colors{{1, 2, red}, {3, 5, red}};
+    const auto unicode = engine.published_glyphs(unicode_layout.id, 0, 0, 1, GlyphMode::Alpha,
+                                                {}, unicode_colors);
+    if (!unicode || unicode->source_ranges.empty())
+        return 66;
+    bool saw_supplementary = false;
+    bool saw_rtl = false;
+    for (const auto &source : unicode->source_ranges) {
+        if (source.start < 0 || source.end > 5 || source.end <= source.start)
+            return 67;
+        saw_supplementary |= source.start == 1;
+        saw_rtl |= source.start >= 2;
+        const bool is_red = source.start == 1 || source.start >= 3;
+        if (unicode->vertices[source.first_vertex].green != (is_red ? 0 : 255))
+            return 68;
+    }
+    if (!saw_supplementary || !saw_rtl)
+        return 69;
+
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;
 }
