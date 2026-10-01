@@ -91,7 +91,7 @@ class AssemblyModel {
 			?limits:AssemblyJointLimits):Void {
 		require(parent);
 		require(child);
-		if (attached.exists(child) || isAncestor(child, parent)) {
+		if (attached.exists(child) || isAncestor(child, parent) || AssemblyDefinitionCodec.closureOnlyType(cast kind)) {
 			if (value != 0) throw 'Joint "$id" closes a loop, so it has no coordinate of its own; its value must be 0';
 			constrainOnAxis(id, kind, parent, parentConnector, child, childConnector, axis, null, limits);
 			return;
@@ -227,7 +227,8 @@ class AssemblyModel {
 	}
 
 	static function validJointKind(kind:String):Bool
-		return kind == "fixed" || kind == "revolute" || kind == "continuous" || kind == "prismatic";
+		return kind == "fixed" || kind == "revolute" || kind == "continuous" || kind == "prismatic" ||
+			AssemblyDefinitionCodec.closureOnlyType(cast kind);
 
 	static function validateAxis(axis:AssemblyVector):Void {
 		if (axis == null || !Math.isFinite(axis.x) || !Math.isFinite(axis.y) || !Math.isFinite(axis.z) ||

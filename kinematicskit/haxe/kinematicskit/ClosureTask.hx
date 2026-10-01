@@ -37,7 +37,8 @@ class ClosureTask implements KinematicTask {
     rows = switch kind {
       case ClosureKind.Fixed: 6;
       case ClosureKind.Revolute: 5;
-      default: 4; // Prismatic
+      case ClosureKind.Spherical, ClosureKind.Planar: 3;
+      default: 4; // Prismatic, Cylindrical
     };
   }
 
@@ -88,7 +89,26 @@ class ClosureTask implements KinematicTask {
         r = positionRows(residual, jacobian, r, w, dx, dy, dz, p);
         lastOrientationError = axisAngle();
         axisRows(residual, jacobian, r, w, g);
-      default: // Prismatic
+      case ClosureKind.Spherical:
+        lastPositionError = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        lastOrientationError = 0;
+        positionRows(residual, jacobian, r, w, dx, dy, dz, p);
+      case ClosureKind.Planar:
+        // B's origin on A's plane: d·a, with d(d·a) = a·(v_B − v_A) + (a × d)·ω_A exactly.
+        var ax = s[14], ay = s[15], az = s[16];
+        var along = dx * ax + dy * ay + dz * az;
+        var cx = ay * dz - az * dy, cy = az * dx - ax * dz, cz = ax * dy - ay * dx;
+        residual[r] = -p * along;
+        for (c in 0...w) {
+          var linear = ax * (jacobianB[c] - jacobianA[c]) + ay * (jacobianB[w + c] - jacobianA[w + c]) +
+            az * (jacobianB[2 * w + c] - jacobianA[2 * w + c]);
+          jacobian[r * w + c] = p * (linear + cx * jacobianA[3 * w + c] + cy * jacobianA[4 * w + c] + cz * jacobianA[5 * w + c]);
+        }
+        r++;
+        lastPositionError = Math.abs(along);
+        lastOrientationError = axisAngle();
+        axisRows(residual, jacobian, r, w, g);
+      default: // Prismatic, Cylindrical
         var ax = s[14], ay = s[15], az = s[16];
         var along = dx * ax + dy * ay + dz * az;
         Rotations.perpendicularBasis(ax, ay, az, s, 23);

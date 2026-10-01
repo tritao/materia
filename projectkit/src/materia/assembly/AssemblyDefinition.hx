@@ -8,6 +8,12 @@ enum abstract AssemblyJointType(String) from String to String {
 	var Revolute = "revolute";
 	var Continuous = "continuous";
 	var Prismatic = "prismatic";
+	/** Closures only: a shared point. */
+	var Spherical = "spherical";
+	/** Closures only: a shared axis line, free to slide and turn along it. */
+	var Cylindrical = "cylindrical";
+	/** Closures only: the child connector's origin on the parent's plane (normal = axis), normals parallel. */
+	var Planar = "planar";
 }
 
 enum abstract AssemblyJointRole(String) from String to String {

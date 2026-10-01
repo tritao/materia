@@ -589,3 +589,24 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   joints yet, so the builder is the only place this applies today.
 - Smoke: a four-bar built from four plain mates records `pin` as a closure;
   mating back up the tree is a closure too; a valued closing mate is refused.
+
+### C3.5 — Spherical, cylindrical and planar closures (2026-10-01)
+
+- kinematicskit `ClosureKind` Spherical (3 position rows), Cylindrical (the
+  existing transverse-position and axis rows) and Planar (distance of B's
+  origin along A's normal, exact derivative a·(v_B − v_A) + (a × d)·ω_A, plus
+  the normal-parallel rows). Haxe only: native kinematicskit has no closures.
+- `AssemblyJointType` spherical/cylindrical/planar, valid only as closures
+  (they have more than one coordinate); `AssemblyModel` records them as
+  closures; `AssemblyState.closureResiduals` measures each kind.
+- `ClosureKindsSmoke`: a ball-pinned four-bar (`redundant(pin)-1`), a slider
+  on a cylindrical guide (`redundant(guide)-2`), a three-link leg standing on
+  a planar floor (`redundant(stand)-1`) each close from their driven joint,
+  and their rows match central differences at the solution.
+- Simulation: the bridge refuses these kinds with a clear message; MuJoCo
+  mapping needs native simkit work (a spherical closure is one connect
+  equality; cylindrical and planar have no direct MuJoCo equality).
+- Found, left as is: the existing Prismatic closure has the same 4 rows as
+  Cylindrical, so it does not hold the twist about its axis. Fixing it
+  changes behaviour the MuJoCo mapping relies on; do it with that mapping.
+- kinematicskit (181), CadBridge (129) and MachineKit pass.

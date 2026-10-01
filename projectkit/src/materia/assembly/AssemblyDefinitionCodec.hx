@@ -103,6 +103,7 @@ class AssemblyDefinitionCodec {
 				(joint.closureTolerance != null && (joint.role != AssemblyJointRole.Closure ||
 					!Math.isFinite(joint.closureTolerance) || joint.closureTolerance < 0)) ||
 				(joint.driven == true && (joint.role != AssemblyJointRole.Tree || !hasCoordinate(joint.type))) ||
+				(closureOnlyType(joint.type) && joint.role != AssemblyJointRole.Closure) ||
 				!validLimits(joint.limits, joint.defaultValue))
 				throw "Assembly definition has an invalid joint";
 			joints.set(joint.id, true);
@@ -224,7 +225,11 @@ class AssemblyDefinitionCodec {
 
 	static function validJointType(type:AssemblyJointType):Bool
 		return type == AssemblyJointType.Fixed || type == AssemblyJointType.Revolute ||
-			type == AssemblyJointType.Continuous || type == AssemblyJointType.Prismatic;
+			type == AssemblyJointType.Continuous || type == AssemblyJointType.Prismatic || closureOnlyType(type);
+
+	/** Joint types a closure can have but a tree joint cannot (they have more than one coordinate). */
+	public static function closureOnlyType(type:AssemblyJointType):Bool
+		return type == AssemblyJointType.Spherical || type == AssemblyJointType.Cylindrical || type == AssemblyJointType.Planar;
 
 	static function validAxis(axis:AssemblyVector):Bool {
 		if (axis == null || !Math.isFinite(axis.x) || !Math.isFinite(axis.y) || !Math.isFinite(axis.z)) return false;

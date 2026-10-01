@@ -178,11 +178,15 @@ class AssemblyState {
 			var axisSecond = AssemblyFrames.transformVector(second, joint.axis.x, joint.axis.y, joint.axis.z);
 			var axisDot = Math.abs(axisFirst.x * axisSecond.x + axisFirst.y * axisSecond.y + axisFirst.z * axisSecond.z);
 			var position:Float;
-			if (joint.type == AssemblyJointType.Prismatic) {
-				var along = dx * axisFirst.x + dy * axisFirst.y + dz * axisFirst.z;
+			var along = dx * axisFirst.x + dy * axisFirst.y + dz * axisFirst.z;
+			if (joint.type == AssemblyJointType.Prismatic || joint.type == AssemblyJointType.Cylindrical) {
 				var px = dx - along * axisFirst.x, py = dy - along * axisFirst.y, pz = dz - along * axisFirst.z;
 				position = Math.sqrt(px * px + py * py + pz * pz);
-			} else position = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			} else if (joint.type == AssemblyJointType.Planar)
+				position = Math.abs(along);
+			else position = Math.sqrt(dx * dx + dy * dy + dz * dz);
+			// A spherical closure leaves orientation free.
+			if (joint.type == AssemblyJointType.Spherical) axisDot = 1;
 			var rotation = 0.0;
 			if (joint.type == AssemblyJointType.Fixed) {
 				var dot = first.qx * second.qx + first.qy * second.qy + first.qz * second.qz + first.qw * second.qw;
