@@ -42,6 +42,7 @@ private class PinEvaluator implements DefinitionEvaluator {
 */
 class GeometricConnectorSmoke {
 	public static function run():Void {
+		checkEdgeAnchors();
 		checkFrames();
 		DefinitionEvaluatorRegistry.register("cadkit.test.mate-plate", new PlateEvaluator());
 		DefinitionEvaluatorRegistry.register("cadkit.test.mate-pin", new PinEvaluator());
@@ -112,6 +113,37 @@ class GeometricConnectorSmoke {
 		near(side.y, 20, '$label: the pin is in the bore (y)');
 		var up = AssemblyFrames.transformVector(side, 0, 0, 1);
 		near(Math.abs(up.z), 1, '$label: the pin stands upright');
+	}
+
+	/**
+		Edge fingerprints are anchored at the edge's midpoint (document version 10); records from older
+		documents, anchored at the first vertex, still resolve to the same edge.
+	*/
+	static function checkEdgeAnchors():Void {
+		var box = Shape.box(30, 20, 10);
+		for (index in [0, 5, 11]) {
+			var edge = box.subshape(CadKit.ShapeKind.Edge, index);
+			var fingerprint = cadkit.parametric.TopologyFingerprint.capture(edge);
+			var middle = edge.positionAt(0.5), start = edge.subshape(CadKit.ShapeKind.Vertex, 0), first = start.position();
+			start.close();
+			edge.close();
+			check(fingerprint.midpoint && Math.abs(fingerprint.x - middle.get_x()) < 1e-9, 'edge $index is anchored at its midpoint');
+			var saved = DocumentCodec.decodeFingerprint(haxe.Json.parse(haxe.Json.stringify(DocumentCodec.encodeFingerprint(fingerprint))),
+				CadKit.ShapeKind.Edge);
+			check(saved.midpoint, 'edge $index keeps its anchor through a save');
+			var legacyRecord:Dynamic = haxe.Json.parse(haxe.Json.stringify(DocumentCodec.encodeFingerprint(fingerprint)));
+			Reflect.deleteField(legacyRecord, "anchor");
+			Reflect.setField(legacyRecord, "x", first.get_x());
+			Reflect.setField(legacyRecord, "y", first.get_y());
+			Reflect.setField(legacyRecord, "z", first.get_z());
+			var legacy = DocumentCodec.decodeFingerprint(legacyRecord, CadKit.ShapeKind.Edge);
+			check(!legacy.midpoint, 'a record without an anchor is a first-vertex one');
+			for (candidate in [saved, legacy]) {
+				var resolution = cadkit.parametric.TopologyResolver.resolve(box, candidate, CadKit.ShapeKind.Edge);
+				check(resolution.index == index, 'edge $index resolves (${candidate.midpoint ? "midpoint" : "first vertex"}): ${resolution.index}');
+			}
+		}
+		box.close();
 	}
 
 	/** Each kind of face and edge offers the frame `GeometricConnectors.frameOf` promises. */

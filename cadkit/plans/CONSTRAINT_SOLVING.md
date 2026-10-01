@@ -823,3 +823,11 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
    singular pose looked regular. Test: a folded two-link arm whose tip is
    at its mated distance from a point on its own line is reported as a
    degenerate placement with one degree of freedom.
+7. **Edge fingerprints are anchored at the midpoint** (document version 10).
+   - A first-vertex anchor depends on the edge's orientation and, for a
+     closed edge, on where its seam vertex lies.
+   - Fingerprint records carry `anchor`; edge records from older documents
+     (no anchor) keep matching by their first vertex.
+   - MachineKit's recovery of pre-v9 defaults compared against
+     `DocumentCodec.VERSION`, so any version bump would have misfired. It
+     now compares against a pinned constant, 9.

@@ -21,6 +21,12 @@ class TopologyFingerprint {
 	public final dy:Float;
 	public final dz:Float;
 	public final measure:Float;
+	/**
+		Edges only: (x, y, z) is the edge's midpoint (true, captured since document version 10) rather than its
+		first vertex (false, older documents). The midpoint does not depend on the edge's orientation or, for a
+		closed edge, on where its seam vertex lies.
+	*/
+	public final midpoint:Bool;
 
 	private function new(
 		kind:CadKit.ShapeKind,
@@ -32,7 +38,8 @@ class TopologyFingerprint {
 		dx:Float,
 		dy:Float,
 		dz:Float,
-		measure:Float) {
+		measure:Float,
+		midpoint:Bool) {
 		this.kind = kind;
 		this.surfaceKind = surfaceKind;
 		this.curveKind = curveKind;
@@ -43,6 +50,7 @@ class TopologyFingerprint {
 		this.dy = dy;
 		this.dz = dz;
 		this.measure = measure;
+		this.midpoint = midpoint;
 	}
 
 	public static function fromData(
@@ -55,9 +63,10 @@ class TopologyFingerprint {
 		dx:Float,
 		dy:Float,
 		dz:Float,
-		measure:Float):TopologyFingerprint {
+		measure:Float,
+		midpoint:Bool = true):TopologyFingerprint {
 		return new TopologyFingerprint(
-			kind, surfaceKind, curveKind, x, y, z, dx, dy, dz, measure);
+			kind, surfaceKind, curveKind, x, y, z, dx, dy, dz, measure, midpoint);
 	}
 
 	public static function capture(shape:Shape):TopologyFingerprint {
@@ -76,12 +85,11 @@ class TopologyFingerprint {
 				normal.get_x(),
 				normal.get_y(),
 				normal.get_z(),
-				shape.faceArea());
+				shape.faceArea(),
+				false);
 		} else if (kind == CadKit.ShapeKind.Edge) {
 			var tangent = shape.tangentAt();
-			var endpoint = shape.subshape(CadKit.ShapeKind.Vertex, 0);
-			var edgeCenter = endpoint.position();
-			endpoint.close();
+			var edgeCenter = shape.positionAt(0.5);
 			return new TopologyFingerprint(
 				kind,
 				CadKit.SurfaceKind.Unknown,
@@ -92,7 +100,8 @@ class TopologyFingerprint {
 				tangent.get_x(),
 				tangent.get_y(),
 				tangent.get_z(),
-				shape.edgeLength());
+				shape.edgeLength(),
+				true);
 		} else if (kind == CadKit.ShapeKind.Vertex) {
 			var position = shape.position();
 			return new TopologyFingerprint(
@@ -105,7 +114,8 @@ class TopologyFingerprint {
 				0.0,
 				0.0,
 				0.0,
-				0.0);
+				0.0,
+				false);
 		} else {
 			throw new ParametricError("topology references require faces, edges, or vertices");
 		}
@@ -166,6 +176,8 @@ class TopologyFingerprint {
 		var point:CadKit.Vec3;
 		if (kind == CadKit.ShapeKind.Face) {
 			point = candidate.center();
+		} else if (kind == CadKit.ShapeKind.Edge && midpoint) {
+			point = candidate.positionAt(0.5);
 		} else if (kind == CadKit.ShapeKind.Edge) {
 			var endpoint = candidate.subshape(CadKit.ShapeKind.Vertex, 0);
 			point = endpoint.position();

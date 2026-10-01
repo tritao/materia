@@ -60,7 +60,7 @@ import cadkit.parametric.RelationshipId;
 /** Versioned JSON persistence for the Haxeon parametric document layer. */
 class DocumentCodec {
 	public static inline var FORMAT:String = "cadkit.document";
-	public static inline var VERSION:Int = 9;
+	public static inline var VERSION:Int = 10;
 	static final migrations:Map<String, (Document, Int)->Void> = [];
 
 	/** Register a domain-owned migration without coupling the codec to that domain. */
@@ -1266,7 +1266,7 @@ class DocumentCodec {
 	public static function encodeFingerprint(fingerprint:Null<TopologyFingerprint>):Dynamic {
 		if (fingerprint == null)
 			return null;
-		return {
+		var record:Dynamic = {
 			surface: surfaceKindName(fingerprint.surfaceKind),
 			curve: curveKindName(fingerprint.curveKind),
 			x: fingerprint.x,
@@ -1277,12 +1277,15 @@ class DocumentCodec {
 			dz: fingerprint.dz,
 			measure: fingerprint.measure
 		};
+		// Where an edge's position was taken; records without one (before version 10) used its first vertex.
+		if (fingerprint.kind == CadKit.ShapeKind.Edge) Reflect.setField(record, "anchor", fingerprint.midpoint ? "midpoint" : "start");
+		return record;
 	}
 
 	public static function decodeFingerprint(record:Dynamic, kind:CadKit.ShapeKind):TopologyFingerprint {
 		return TopologyFingerprint.fromData(kind, surfaceKind(stringField(record, "surface")), curveKind(stringField(record, "curve")),
 			numberField(record, "x"), numberField(record, "y"), numberField(record, "z"), numberField(record, "dx"), numberField(record, "dy"),
-			numberField(record, "dz"), numberField(record, "measure"));
+			numberField(record, "dz"), numberField(record, "measure"), Reflect.field(record, "anchor") == "midpoint");
 	}
 
 	private static function encodeVector(value:Vector):Dynamic {
