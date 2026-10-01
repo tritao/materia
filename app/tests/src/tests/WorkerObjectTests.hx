@@ -58,7 +58,7 @@ class WorkerObjectTests {
         case Rejected(message): throw 'Paired hand edit rejected: $message';
         case Applied, Unchanged:
       }
-      var paired = humankit.HumanJobSpec.parse(worker(app.scene,workerId).job);
+      var paired = humankit.job.HumanJobSpec.parse(worker(app.scene,workerId).job);
       check(Reflect.field(paired.steps[0],"hand") == "left" &&
         Reflect.field(paired.steps[1],"hand") == "left", "hand edit updates pick and place together");
       check(app.scene.document.undo() && worker(app.scene,workerId).job.indexOf('"hand":"right"') >= 0,
@@ -75,7 +75,7 @@ class WorkerObjectTests {
         case Rejected(message): throw 'Changing wait to place rejected: $message';
         case Applied, Unchanged:
       }
-      var defaulted = humankit.HumanJobSpec.parse(worker(app.scene,workerId).job);
+      var defaulted = humankit.job.HumanJobSpec.parse(worker(app.scene,workerId).job);
       check(Reflect.field(defaulted.steps[1], "hand") == "left",
         "new place defaults to the preceding pick hand");
       var choice = property(app.scene,"Pick object");

@@ -1,7 +1,7 @@
 package humankit.facility;
 
 import humankit.action.ApproachFor;
-import humankit.HumanJob;
+import humankit.job.HumanJob;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
 import humankit.action.Pick;

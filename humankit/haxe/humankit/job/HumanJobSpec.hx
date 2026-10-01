@@ -1,4 +1,6 @@
-package humankit;
+package humankit.job;
+
+import humankit.HumanBody;
 
 /** Validated target in a canonical job step. */
 typedef HumanJobTarget = {

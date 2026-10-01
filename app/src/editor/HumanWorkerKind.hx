@@ -6,7 +6,7 @@ import app.CadDocumentSession;
 import app.EditorScene;
 import app.SceneObjectData;
 import app.WorkerObjectData;
-import humankit.HumanJobSpec;
+import humankit.job.HumanJobSpec;
 import humankit.HumanBody;
 import nativekit.ui.properties.PropertyDescriptor;
 import nativekit.ui.properties.PropertyDescriptorOptions;

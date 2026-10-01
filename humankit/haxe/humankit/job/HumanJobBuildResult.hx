@@ -1,4 +1,4 @@
-package humankit;
+package humankit.job;
 
 typedef HumanJobBuildResult = {var job: HumanJob;
 var holds:Array<HumanJobHold>;

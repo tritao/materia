@@ -2,7 +2,7 @@ import animkit.AnimationAsset;
 import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
-import humankit.HumanJobSpec;
+import humankit.job.HumanJobSpec;
 import humankit.HumanLimb;
 import humankit.rig.HumanoidRig;
 import humankit.sim.HumanWorker;

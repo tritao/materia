@@ -1,6 +1,7 @@
-package humankit;
+package humankit.job;
 
 import humankit.action.HumanAction;
+import humankit.HumanBody;
 
 /** Ordered actions for one body. A failed action stops the job. */
 class HumanJob {

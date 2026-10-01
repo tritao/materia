@@ -1,4 +1,4 @@
-package humankit;
+package humankit.job;
 
 import humankit.action.ApproachFor;
 import humankit.action.Pick;
@@ -8,6 +8,9 @@ import humankit.action.Press;
 import humankit.action.ReleaseLimb;
 import humankit.action.Wait;
 import humankit.action.WalkTo;
+import humankit.HumanBody;
+import humankit.HumanLimb;
+import humankit.HumanTargetBox;
 
 /** Resolves a portable job spec into world-space HumanKit actions. */
 class HumanJobBuilder {

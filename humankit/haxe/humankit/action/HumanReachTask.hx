@@ -1,7 +1,7 @@
 package humankit.action;
 
 import humankit.HumanBody;
-import humankit.HumanJob;
+import humankit.job.HumanJob;
 import humankit.HumanLimb;
 import humankit.HumanWalker;
 
