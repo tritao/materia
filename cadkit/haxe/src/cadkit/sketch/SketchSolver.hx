@@ -57,7 +57,9 @@ class SketchSolver {
 
 	private function new(sketch:ConstrainedSketch, seed:Null<SolvedSketch>, cancellationCheck:Null<Void->Bool>, diagnose:Bool = true) {
 		diagnoseParts = diagnose;
-		this.sketch = sketch; constraintList = sketch.constraints(); pointIndex = new Map(); radiusIndex = new Map(); points = new Map(); entities = new Map();
+		this.sketch = sketch; constraintList = sketch.constraints(); pointIndex = new Map();
+		// Every entry point (solve, probe) evaluates against this; `parts()` only narrows it per part.
+		allConstraints = [for (index in 0...constraintList.length) index]; radiusIndex = new Map(); points = new Map(); entities = new Map();
 		this.seed = seed;
 		this.cancellationCheck = cancellationCheck;
 		tangentBranches = new Map();
@@ -83,11 +85,12 @@ class SketchSolver {
 	/**
 		Test hook for `cadkit.solve.JacobianCheck`: the authored variables (point
 		x/y pairs, then radii) and this solver's residuals and analytic Jacobian
-		as functions of them, in sketch units. Tangent sides and branches are
+		as functions of them, in sketch units, with each row's constraint and the residual a solve accepts
+		as satisfied. Tangent sides and branches are
 		fixed from the authored pose, as a solve would fix them.
 	*/
 	public static function probe(sketch:ConstrainedSketch):{variables:Array<Float>, residuals:Array<Float>->Array<Float>,
-			jacobian:Array<Float>->Array<Float>} {
+			jacobian:Array<Float>->Array<Float>, owners:Array<String>, satisfiedWithin:Float} {
 		var solver = new SketchSolver(sketch, null, null);
 		solver.validate();
 		var x:Array<Float> = [];
@@ -98,7 +101,9 @@ class SketchSolver {
 		return {
 			variables: x,
 			residuals: values -> solver.residuals(values).values,
-			jacobian: values -> solver.rawJacobian(values)
+			jacobian: values -> solver.rawJacobian(values),
+			owners: solver.residuals(x).owners,
+			satisfiedWithin: sketch.settings.tolerance * 10
 		};
 	}
 
@@ -325,7 +330,6 @@ class SketchSolver {
 	private function parts():Array<Part> {
 		var parent = [for (i in 0...variableCount) i];
 		references = [for (c in constraintList) referencedVariables(c)];
-		allConstraints = [for (index in 0...constraintList.length) index];
 		for (list in references)
 			for (k in 1...list.length)
 				union(parent, list[0], list[k]);

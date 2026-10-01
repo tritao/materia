@@ -623,3 +623,18 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   used by `SolverSettings` and the closure diagnosis (no more literals); its
   doc lists every threshold and why. Hand-built diagnosis tests that probe
   finer tolerances pass 1e-9 explicitly.
+
+### Pre-C4 cleanup 3: sparse/dense agreement on random sketches; a vacuous test found (2026-10-01)
+
+- `DiagnosisAgreementSmoke`: 40 seeded random sketches (rectangles and
+  triangles, some chained, with implied, duplicate, parallel and
+  contradicting extras), each diagnosed by the dense QR and the sparse Gram
+  path on the same rows at the authored pose and the solution; rank, groups,
+  unsatisfied owners and parts must match, and at least 10 systems must
+  contain dependencies.
+- **Found:** since C2.5, `SketchSolver.probe` returned zero rows (its
+  constraint list was filled only by `parts()`, which `probe` never calls),
+  so `SketchJacobianSmoke` compared empty matrices and passed vacuously. The
+  list is now filled in the constructor, `JacobianCheck` refuses a residual
+  with no rows, and the angle-row mutation check fails again as it should.
+  The analytic Jacobians themselves still pass on every kind.
