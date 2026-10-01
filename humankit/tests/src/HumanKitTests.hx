@@ -92,6 +92,7 @@ class HumanKitTests {
 		human.player.playNamed("walk", 0.0);
 		for (step in 0...5)
 			human.advance(0.1);
+		human.publish();
 		var snapshot = scene.snapshot();
 		var world = snapshot.findNode(held.node).worldTransform();
 		var palm = Mat4.position(human.pose.boneFrame(HumanBone.HandR));

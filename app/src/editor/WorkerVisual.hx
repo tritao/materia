@@ -19,6 +19,7 @@ class WorkerVisual {
       character = new HumanCharacter(scene, asset, HumanoidRig.detect(asset), parent, "Worker character");
       character.player.playNamed("Idle", 0.0);
       character.advance(0.0);
+      character.publish();
     } catch (error:Dynamic) {
       var cleanupError:Dynamic = null;
       if (character != null) {

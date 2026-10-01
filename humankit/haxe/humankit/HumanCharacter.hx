@@ -305,32 +305,22 @@ class HumanCharacter {
 		};
 
 	/**
-	 * When set, `advance` leaves the mesh and attachments in the scene as they were and `publish` moves them. A
-	 * simulation that advances many times for each frame it draws sets this and publishes once per frame, rather than
-	 * skinning and uploading a mesh nobody sees.
+	 * Advances the current clip and applies every turn and reach, so `pose` describes the body now. The scene is not
+	 * touched: a simulation advances many times for each frame it draws, and skinning and uploading a mesh nobody sees
+	 * is the largest cost of doing it. Whoever draws the character calls `publish` once per frame.
 	 */
-	public var deferPublish:Bool = false;
-	var publishPending:Bool = false;
-
-	/** Advances the current clip and moves the mesh and attachments to the new pose. */
 	public function advance(seconds:Float):Void {
-		player.advance(seconds);
+		player.pose(seconds);
 		pose.update(instance.readJointMatrices());
-		if (deferPublish)
-			publishPending = true;
-		else
-			publishScene();
 	}
 
-	/** Moves the mesh and attachments to the pose of the latest `advance`, if a deferred one has not been shown yet. */
+	/**
+	 * Skins the mesh to the state the character is in now and moves it and its attachments in the scene. The state
+	 * is the one the latest `advance` left (a measurement puts back what it changes), so a probe between an advance
+	 * and a publish cannot reach the screen.
+	 */
 	public function publish():Void {
-		if (!publishPending)
-			return;
-		publishPending = false;
-		publishScene();
-	}
-
-	function publishScene():Void {
+		instance.evaluate();
 		model.update();
 		placeAttachments();
 	}
@@ -339,7 +329,7 @@ class HumanCharacter {
 	 * Evaluates the pose as it would be now, at the current animation time and with every turn and reach applied, and
 	 * makes `pose` current, without skinning the model or moving attachments. For measuring (what would the shoulder
 	 * do under a lean, where would the hand be if released): nothing a measurement poses reaches the scene, and
-	 * the next `advance` shows the pose as usual.
+	 * the next `advance` evaluates the pose again as usual.
 	 */
 	public function probe():Void {
 		player.pose(0.0);

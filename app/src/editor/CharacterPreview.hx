@@ -209,6 +209,7 @@ class CharacterPreview implements SessionParticipant {
 					walking.advance(elapsed);
 			} else
 				character.advance(elapsed);
+			character.publish();
 		} else {
 			var presented = model;
 			if (presented == null)

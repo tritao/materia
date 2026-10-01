@@ -46,9 +46,6 @@ class HumanWorker {
 	public final actor:HumanActor;
 	public final zones:Array<HumanZone> = [];
 	public var onTick:Null<HumanWorker->HumanWorkerSignals->Void>;
-	/** Ticks between signal readings. Each reading captures the physics world, so a display that cannot show every tick asks for fewer. */
-	public var signalTicks:Int = 1;
-	var ticksSinceSignals:Int = 0;
 	/** Farthest an object's origin may be from the hand's grip point when a hold starts, in metres. */
 	public var maxHoldDistance:Float = 0.15;
 	/**
@@ -539,8 +536,17 @@ class HumanWorker {
 	function publishSignals():Void {
 		var listener = onTick;
 		if (disposed || listener == null) return;
-		if (++ticksSinceSignals < signalTicks) return;
-		ticksSinceSignals = 0;
+		var signals = readSignals();
+		if (signals != null) listener(this, signals);
+	}
+
+	/**
+	 * What the body is touching or near as of the last tick: the zones it stands in and its distance to each tracked
+	 * link. Reading captures the physics world, so a display asks when it draws; `onTick` is for a reader that wants
+	 * every tick.
+	 */
+	public function readSignals():Null<HumanWorkerSignals> {
+		if (disposed) return null;
 		var frame = session.capture();
 		var occupied:Array<String> = [];
 		var distances:Map<String, Float> = new Map();
@@ -570,7 +576,7 @@ class HumanWorker {
 		}
 		var signals = new HumanWorkerSignals(frame.simulationTime(), occupied, distances);
 		frame.dispose();
-		listener(this, signals);
+		return signals;
 	}
 
 	public function dispose():Void {

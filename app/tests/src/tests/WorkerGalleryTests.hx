@@ -17,9 +17,33 @@ class WorkerGalleryTests {
     catch (error:Dynamic) { Sys.println('Worker gallery tests failed: $error'); return 1; }
   }
 
+  /**
+   * What a frame of the running gallery may cost. A tick is a hundredth of a second, so the gallery keeps up with
+   * the clock only while the process spends well under 10 ms of CPU on one, and the application runs up to five ticks
+   * between frames it draws. The limit is a little above what it costs now, not a hope: a change that puts per-tick
+   * work back (a mesh skinned for every tick, the physics model recompiled or stepped once per body) fails here.
+   * CPU time is not wall time, so a busy machine does not fail it.
+   */
+  static inline var CPU_MS_PER_TICK_LIMIT = 5.0;
+  static inline var COST_FRAMES = 40;
+  static inline var TICKS_PER_FRAME = 5;
+
+  static function measureCost(editor:ReferenceEditorApp):Void {
+    editor.simulation.start();
+    editor.simulation.runTicks(TICKS_PER_FRAME);
+    var started = Sys.cpuTime();
+    for (_ in 0...COST_FRAMES) editor.simulation.runTicks(TICKS_PER_FRAME);
+    var perTick = (Sys.cpuTime() - started) * 1000.0 / (COST_FRAMES * TICKS_PER_FRAME);
+    Sys.println('worker gallery: ${Math.round(perTick * 100) / 100} ms of CPU per tick (limit $CPU_MS_PER_TICK_LIMIT)');
+    if (perTick > CPU_MS_PER_TICK_LIMIT)
+      throw 'The gallery costs ${Math.round(perTick * 10) / 10} ms of CPU per tick, over the limit of $CPU_MS_PER_TICK_LIMIT ms';
+    editor.simulation.stop();
+  }
+
   static function run():Void {
     var editor = new ReferenceEditorApp();
     editor.enableWorkerDemo(0, false, ReferenceEditorApp.WORKER_GALLERY);
+    measureCost(editor);
     var ids = editor.simulation.humanWorkerIds();
     if (ids.length != LANES) throw 'The gallery has ${ids.length} workers, not $LANES';
     var tick = 0;

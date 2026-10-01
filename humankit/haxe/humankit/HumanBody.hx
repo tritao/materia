@@ -686,9 +686,9 @@ class HumanBody {
 	}
 
 	/**
-	 * Re-evaluates reaches at the current animation time for in-frame IK solving. With `present` off the pose is
-	 * only measured (joint matrices current, nothing skinned or shown), for the attempts of a solve that only the
-	 * last of which is to be seen.
+	 * Re-evaluates reaches at the current animation time for in-frame IK solving. Nothing here is skinned or shown
+	 * (`HumanCharacter.publish` does that). With `present` off the pose is a measurement, for the attempts of a solve
+	 * of which only the last is to be kept.
 	 */
 	public function evaluate(present:Bool = true):Void {
 		var changed = false;

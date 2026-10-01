@@ -45,7 +45,6 @@ class HumanWorkforce implements SessionMember {
 	/** One line per problem, tagged with its worker, for the simulation's warning list. */
 	public final warnings:Array<String> = [];
 	final entries:Array<WorkforceEntry> = [];
-	final signalsById:Map<String, HumanWorkerSignals> = new Map();
 	final warningsById:Map<String, Array<String>> = new Map();
 
 	function new(scene:EditorScene) {
@@ -89,8 +88,7 @@ class HumanWorkforce implements SessionMember {
 			var entry = new WorkforceEntry(record.id, character, asset);
 			entries.push(entry);
 			character.advance(0.0);
-			// The simulation ticks many times for each frame drawn; the mesh is published once per frame, in present().
-			character.deferPublish = true;
+			character.publish();
 			var proxy = HumanBodyProxy.standard(character.pose,
 				HumanDescription.measure(character.pose, character.height()));
 			var rotation = record.rotation == null ? [0.0, 0.0, 0.0, 1.0] : record.rotation;
@@ -129,10 +127,6 @@ class HumanWorkforce implements SessionMember {
 				worker.run(failed);
 				failed.abort('Invalid worker job: $failure');
 			}
-			var humanId = record.id;
-			// The readings go to a display, not to the job, so twenty a second is plenty.
-			worker.signalTicks = 5;
-			worker.onTick = function(_, signals) signalsById.set(humanId, signals);
 		}
 	}
 
@@ -143,7 +137,11 @@ class HumanWorkforce implements SessionMember {
 		return null;
 	}
 
-	public function signals(id:String):Null<HumanWorkerSignals> return signalsById.get(id);
+	/** The worker's readings as of the last tick, taken when asked: the telemetry panel draws them, the job does not use them. */
+	public function signals(id:String):Null<HumanWorkerSignals> {
+		var found = worker(id);
+		return found == null ? null : found.readSignals();
+	}
 
 	public function warningsFor(id:String):Array<String> {
 		var found = warningsById.get(id);
@@ -165,8 +163,6 @@ class HumanWorkforce implements SessionMember {
 				entry.character.publish();
 			}
 		}
-		// Readings from before the reset describe a worker that is no longer there.
-		signalsById.clear();
 	}
 
 	public function present():Void {
