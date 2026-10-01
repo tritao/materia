@@ -12,7 +12,7 @@ class SolverSettings {
 	public final maxIterations:Int;
 	public final initialDamping:Float;
 
-	public function new(tolerance:Float = 1e-8, rankTolerance:Float = 1e-6, maxIterations:Int = 80, initialDamping:Float = 1e-3) {
+	public function new(tolerance:Float = 1e-8, rankTolerance:Float = cadkit.solve.ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE, maxIterations:Int = 80, initialDamping:Float = 1e-3) {
 		this.tolerance = tolerance;
 		this.rankTolerance = rankTolerance;
 		this.maxIterations = maxIterations;

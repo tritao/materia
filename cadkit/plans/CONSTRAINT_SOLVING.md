@@ -610,3 +610,16 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
   Cylindrical, so it does not hold the twist about its axis. Fixing it
   changes behaviour the MuJoCo mapping relies on; do it with that mapping.
 - kinematicskit (181), CadBridge (129) and MachineKit pass.
+
+### Pre-C4 cleanup 1–2: stationarity in kinematicskit; one tolerance policy (2026-10-01)
+
+- `LevenbergMarquardt` calls a stop stationary when ‖Jᵀe‖ <= 1e-4 ‖J‖‖e‖
+  (`STATIONARY_RATIO`, plus the old absolute floor), so an unclosable loop is
+  `Conflicting` from kinematicskit itself; the CadKit-side ratio test from
+  C3.2 is gone. The limit-blocked test keeps the strict threshold.
+  `Manipulator` only reads `Converged`, and no RobotKit/MotionKit test
+  asserts a failure label.
+- `ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE` is now the CAD default 1e-6,
+  used by `SolverSettings` and the closure diagnosis (no more literals); its
+  doc lists every threshold and why. Hand-built diagnosis tests that probe
+  finer tolerances pass 1e-9 explicitly.

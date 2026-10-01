@@ -119,7 +119,19 @@ typedef DiagnosisInput = {
 	   conflicting.
 */
 class ConstraintDiagnosis {
-	public static inline var DEFAULT_RANK_TOLERANCE:Float = 1e-9;
+	/**
+		Thresholds, in one place (sketches and assembly closures both use these defaults):
+		- rank tolerance, default 1e-6: rows closer than this (relative, after equilibration) are dependent. It is
+		  also the smallest tolerance the sparse path can decide (`SPARSE_TOLERANCE`): a Gram pivot is about the
+		  square of a row's distance and is accurate to ~1e-16.
+		- `MEMBER_TOLERANCE` 1e-7: a circuit coefficient below this share of the largest is not a member.
+		- `NEAR_DEGENERATE_RATIO` 1e3: a kept row within this factor of the rank threshold is flagged near-degenerate.
+		- `INDEPENDENT_PIVOT` 1e-8: with a smaller rank tolerance, the Gram pivot that still proves independence.
+		Elsewhere: `SolverSettings.tolerance` (sketch residual), `LevenbergMarquardt.STATIONARY_RATIO` (when a stop
+		is a least-squares point), and the witness steps (`SketchSolver`: 2% of the sketch size;
+		`AssemblyLoopSolver.WITNESS_STEP`: 1e-3 of driven coordinates).
+	*/
+	public static inline var DEFAULT_RANK_TOLERANCE:Float = 1e-6;
 	/** Share of a circuit's largest coefficient below which an owner is not a member. */
 	static inline var MEMBER_TOLERANCE:Float = 1e-7;
 	/** How far above the rank threshold a pivot must be not to count as near-degenerate. */
@@ -190,7 +202,7 @@ class ConstraintDiagnosis {
 	}
 
 	/** Below this rank tolerance a Gram pivot cannot be told from rounding, so only clear independence is decided here. */
-	public static inline var SPARSE_TOLERANCE:Float = 1e-6;
+	public static inline var SPARSE_TOLERANCE:Float = DEFAULT_RANK_TOLERANCE;
 	/** A pivot that proves independence whatever the tolerance. */
 	static inline var INDEPENDENT_PIVOT:Float = 1e-8;
 
