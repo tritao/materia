@@ -25,14 +25,22 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/proxsuite/include/proxsuite/pr
     message(FATAL_ERROR "Initialize kinematicskit/native/vendor/proxsuite submodule")
 endif()
 
+# coal (collision and distance; see THIRD_PARTY.md) builds as a static core
+# with Eigen only, linked privately: nothing in the C ABI names it.
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/coal/materia/CMakeLists.txt")
+    message(FATAL_ERROR "Initialize kinematicskit/native/vendor/coal submodule")
+endif()
+add_subdirectory(vendor/coal/materia coal EXCLUDE_FROM_ALL)
+
 add_library(kinematicskit_core ${KK_LIBRARY_TYPE}
     src/api.cpp
+    src/collision.cpp
     src/model.cpp
     src/qp.cpp
 )
 target_compile_features(kinematicskit_core PUBLIC c_std_11 PRIVATE cxx_std_17)
 target_include_directories(kinematicskit_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_link_libraries(kinematicskit_core PRIVATE Eigen3::Eigen)
+target_link_libraries(kinematicskit_core PRIVATE Eigen3::Eigen coal::core)
 target_include_directories(kinematicskit_core SYSTEM PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/proxsuite/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/proxsuite_config)
@@ -55,15 +63,12 @@ else()
 endif()
 add_library(kinematicskit::core ALIAS kinematicskit_core)
 
-# coal (collision and distance; see THIRD_PARTY.md) is vendored for the
-# collision work. Until the C ABI uses it, only a standalone build compiles
-# it, with a smoke test, so the vendored build keeps working.
+# Standalone C++ tests: coal itself, and the collision world through the C ABI.
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR AND BUILD_TESTING)
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/coal/materia/CMakeLists.txt")
-        message(FATAL_ERROR "Initialize kinematicskit/native/vendor/coal submodule")
-    endif()
-    add_subdirectory(vendor/coal/materia coal)
     add_executable(kk_coal_smoke tests/cpp/coal_smoke.cpp)
     target_link_libraries(kk_coal_smoke PRIVATE coal::core)
     add_test(NAME kk_coal_smoke COMMAND kk_coal_smoke)
+    add_executable(kk_collision_world tests/cpp/collision_world.cpp)
+    target_link_libraries(kk_collision_world PRIVATE kinematicskit_core)
+    add_test(NAME kk_collision_world COMMAND kk_collision_world)
 endif()

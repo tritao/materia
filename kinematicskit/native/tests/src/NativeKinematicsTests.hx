@@ -17,7 +17,12 @@ import kinematicskit.SwivelTask;
 import kinematicskit.RootMotion;
 import kinematicskit.RootDampingTask;
 import kinematicskit.SolverSupport;
+import kinematicskit.CollisionDistance;
+import kinematicskit.CollisionGeometry;
+import kinematicskit.CollisionPairRule;
+import kinematicskit.CollisionPairStatus;
 import kinematicskit.native.DifferentialIk;
+import kinematicskit.native.NativeCollisionWorld;
 import kinematicskit.native.NativeKinematics;
 import kinematicskit.native.NativeQpStep;
 
@@ -36,6 +41,8 @@ class NativeKinematicsTests {
     testSwivelPicksTheSevenAxisConfiguration();
     testMinkOracle();
     testMobileBaseTracking();
+    testCollisionWorldFollowsTheSnapshot();
+    testCollisionWorldStatusesAndChanges();
     Sys.println('KinematicsKit native tests passed ($assertions assertions)');
   }
 
@@ -470,6 +477,104 @@ class NativeKinematicsTests {
     var norm = Math.sqrt(ax * ax + ay * ay + az * az);
     return new Transform(rng.signed(), rng.signed(), rng.signed(), 0.0, 0.0, 0.0, 1.0)
       .compose(Transform.axisAngle(ax / norm, ay / norm, az / norm, rng.signed() * 2.0));
+  }
+
+  /**
+   * A sphere on every body of random trees, against a sphere fixed in the
+   * world: the native distance is the distance between the Haxe snapshot's
+   * sphere centres minus the radii, and the closest points lie on that line.
+   */
+  static function testCollisionWorldFollowsTheSnapshot():Void {
+    var worst = 0.0, worstPoint = 0.0;
+    for (seed in 11...14) {
+      var rng = new Rng(seed);
+      var model = randomForest(rng);
+      var world = new NativeCollisionWorld(model);
+      var snapshot = new KinematicSnapshot(model);
+      var offsets = [for (_ in 0...model.bodyCount()) Transform.translation(rng.signed(), rng.signed(), rng.signed())];
+      var spheres = [for (body in 0...model.bodyCount()) world.add(body, offsets[body], CollisionGeometry.Sphere(0.05))];
+      var target = world.add(-1, Transform.translation(0.3, -0.2, 0.4), CollisionGeometry.Sphere(0.1));
+      for (_ in 0...10) {
+        var state = new KinematicState(model, [for (_ in 0...model.dofCount()) rng.signed() * 2.0]);
+        snapshot.evaluate(state);
+        world.update(state);
+        var found = world.distances(100.0);
+        for (body in 0...model.bodyCount()) {
+          var centre = snapshot.bodyPose(body).compose(offsets[body]);
+          var expected = Math.sqrt(Math.pow(centre.x - 0.3, 2) + Math.pow(centre.y + 0.2, 2) + Math.pow(centre.z - 0.4, 2))
+            - 0.15;
+          var row:Null<CollisionDistance> = null;
+          for (candidate in found) if (candidate.a == spheres[body] && candidate.b == target) row = candidate;
+          if (row == null) throw 'body $body sphere is not within the query';
+          worst = Math.max(worst, Math.abs(row.distance - expected));
+          // The closest point on the body's sphere is 0.05 from its centre, toward the target.
+          var gap = Math.sqrt(Math.pow(row.pointA.x - centre.x, 2) + Math.pow(row.pointA.y - centre.y, 2)
+            + Math.pow(row.pointA.z - centre.z, 2));
+          worstPoint = Math.max(worstPoint, Math.abs(gap - 0.05));
+        }
+      }
+      world.dispose();
+    }
+    check(worst < 1e-9, 'collision distances follow the snapshot (worst $worst)');
+    check(worstPoint < 1e-9, 'closest points lie on the spheres (worst $worstPoint)');
+  }
+
+  /** Pair statuses from the model's structure, declared rules, reference overlap, re-attaching and terrain. */
+  static function testCollisionWorldStatusesAndChanges():Void {
+    var builder = new KinematicModelBuilder();
+    var base = builder.addBody("base");
+    var upper = builder.addBody("upper");
+    var fore = builder.addBody("fore");
+    var tool = builder.addBody("tool");
+    var z = new Vector3(0, 0, 1);
+    builder.addJoint("shoulder", JointKind.Revolute, base, upper, Transform.identity(), Transform.identity(), z);
+    builder.addJoint("elbow", JointKind.Revolute, upper, fore, Transform.translation(1, 0, 0), Transform.identity(), z);
+    builder.addJoint("flange", JointKind.Fixed, fore, tool, Transform.translation(1, 0, 0), Transform.identity());
+    var model = builder.build();
+    var world = new NativeCollisionWorld(model);
+    var baseBox = world.add(base, Transform.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1));
+    var upperSphere = world.add(upper, Transform.translation(0.5, 0, 0), CollisionGeometry.Sphere(0.1));
+    var foreCapsule = world.add(fore, Transform.translation(0.5, 0, 0), CollisionGeometry.Capsule(0.05, 0.2));
+    var toolBox = world.add(tool, Transform.identity(), CollisionGeometry.Box(0.1, 0.1, 0.1));
+    var obstacle = world.add(-1, Transform.translation(2.5, 0, 0), CollisionGeometry.Box(0.2, 0.2, 0.2));
+    var floor = world.add(-1, Transform.translation(0, 0, -1), CollisionGeometry.HeightField(4, 4, [for (_ in 0...9) 0.0], 3, -1));
+
+    check(world.pairStatus(foreCapsule, toolBox) == CollisionPairStatus.Rigid, "forearm and tool are rigid");
+    check(world.pairStatus(upperSphere, toolBox) == CollisionPairStatus.Adjacent, "upper arm and tool are adjacent");
+    check(world.pairStatus(obstacle, floor) == CollisionPairStatus.Static, "obstacle and floor are static");
+    check(world.pairStatus(baseBox, foreCapsule) == CollisionPairStatus.Checked, "base and forearm are checked");
+
+    var state = new KinematicState(model, [0.0, 0.0]);
+    world.update(state);
+    check(world.colliding(0.0).length == 0, "nothing collides stretched out");
+    var near = world.distances(0.5);
+    check(near.length == 1 && near[0].a == toolBox && near[0].b == obstacle, "only the tool is near the obstacle");
+    check(Math.abs(near[0].distance - 0.2) < 1e-9, "tool-obstacle clearance");
+    check(Math.abs(near[0].normal.x - 1.0) < 1e-9, "normal from tool to obstacle");
+
+    // Grasp the obstacle: it rides on the tool, then collides with nothing it is adjacent or rigid to.
+    world.attach(obstacle, tool, Transform.translation(0.3, 0, 0));
+    check(world.pairStatus(foreCapsule, obstacle) == CollisionPairStatus.Rigid, "a grasped part is rigid with the tool");
+    world.update(new KinematicState(model, [0.0, Math.PI / 2]));
+    var held = world.distances(10.0).filter(d -> d.a == baseBox && d.b == obstacle);
+    // With the elbow bent the held box is centred at (1, 1.3, 0): 0.7 along x and 1.0 along y from the base box.
+    check(held.length == 1 && Math.abs(held[0].distance - Math.sqrt(0.7 * 0.7 + 1.0 * 1.0)) < 1e-9,
+      'the held part follows the tool (${held.length == 1 ? held[0].distance : -1})');
+
+    // Raise the terrain to z = 0, into every link but the held part: four pairs collide.
+    world.setHeights(floor, [for (_ in 0...9) 1.0]);
+    world.update(state);
+    var hits = world.colliding(0.0);
+    check(hits.length > 0 && hits.filter(p -> p.b == floor).length == hits.length, "the raised terrain collides");
+    world.setPairRule(baseBox, floor, CollisionPairRule.Allow);
+    check(world.pairStatus(baseBox, floor) == CollisionPairStatus.Allowed, "allowed by rule");
+    var marked = world.allowOverlapping(state);
+    check(marked == hits.length - 1, 'the other overlapping pairs are marked at reference ($marked)');
+    check(world.colliding(0.0).length == 0, "nothing left colliding");
+    world.remove(obstacle);
+    rejects(() -> world.pairStatus(obstacle, floor), "a removed object has no status");
+    world.dispose();
+    rejects(() -> world.update(state), "a disposed world is refused");
   }
 
   static function check(value:Bool, message:String):Void {

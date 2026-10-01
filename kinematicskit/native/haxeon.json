@@ -18,12 +18,15 @@
 				"CMakeLists.txt",
 				"include/kinematicskit.h",
 				"src/api.cpp",
+				"src/collision.cpp",
+				"src/collision.hpp",
 				"src/model.cpp",
 				"src/model.hpp",
 				"src/handles.hpp",
 				"src/qp.cpp",
 				"src/qp.hpp",
-				"src/proxsuite_config/proxsuite/config.hpp"
+				"src/proxsuite_config/proxsuite/config.hpp",
+				"vendor/coal/materia/CMakeLists.txt"
 			]
 		}
 	},

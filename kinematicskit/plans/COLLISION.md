@@ -162,7 +162,9 @@ Each step is its own commit with all suites green.
       with the first pairs;
     - `kk_collision_world_distances(query distance)`, returning per pair
       the ids, signed distance, closest points (world) and normal.
-  - The broadphase is coal's dynamic AABB tree.
+  - Broadphase: every checked pair, filtered by world bounding boxes. A
+    coal broadphase manager comes in if scenes grow large enough to need
+    it.
   - In Haxe: the `CollisionWorld` interface (pure kit) and
     `NativeCollisionWorld` (native package).
   - Tests: C++ (shapes against each other, a mesh, a height field, poses
@@ -231,3 +233,58 @@ Each step is its own commit with all suites green.
 - Loading mesh files (URDF `<mesh>`).
 
 ## Progress log
+
+### C1 — Native collision world (2026-10-01)
+
+Done as planned, with these differences:
+- **Height-field distances.** coal answers only collision tests on height
+  fields (`HeightFieldShapeDistancer` throws "not implemented"). The world
+  compares the cells near the other object instead: two triangular prisms
+  per cell, down to the field's minimum height, split as coal splits them
+  for collision, with coal's convex distance on each. That gives signed
+  distances (a penetration depth is measured within one cell), and a
+  height field against a mesh also works (convex against mesh). Two height
+  fields cannot be compared.
+- **Convex without qhull.** `PointConvex` builds a coal convex from points
+  alone. With no neighbour lists, coal's support function scans every
+  point, which is fine for `ConvexHullVertices`' at most 64. Coplanar
+  point sets are refused.
+- **Pair statuses** in precedence order:
+  1. a declared rule;
+  2. static (both on the world);
+  3. rigid: the same body, or joined only through fixed joints, so a tool
+     on a fixed flange counts as part of the last link;
+  4. adjacent: one movable joint apart, through fixed joints on either
+     side;
+  5. overlapping at reference;
+  6. checked.
+
+  A pair that would be checked but cannot be compared is `Unsupported`, and
+  queries fail (`KK_ERROR_UNSUPPORTED`) until it is allowed or removed.
+- **Interfaces:**
+  - C ABI: `kk_collision_*` in `kinematicskit.h`.
+  - Kit (pure Haxe): `CollisionWorld`, `CollisionGeometry`,
+    `CollisionPairStatus`, `CollisionPairRule`, `CollisionPair`,
+    `CollisionDistance`.
+  - Native: `NativeCollisionWorld`.
+- **Tests:**
+  - `tests/cpp/collision_world.cpp`, standalone CTest:
+    - statuses;
+    - distances with closest points and normals;
+    - FK posing;
+    - re-attaching;
+    - rules and reference overlap;
+    - a mesh, a convex block, a half-space;
+    - a height field, including updates and against a mesh;
+    - unsupported pairs;
+    - argument checks.
+  - `native/tests`:
+    - distances follow the Haxe snapshot to 1e-9 on random trees;
+    - a grasped part rides on the tool;
+    - raised terrain collides.
+  - The native suite passes (369 assertions), as does the pure kit (202)
+    and MotionKit (9541), which now links coal through
+    `kinematicskit-native`.
+- **Build.** coal is linked into `kinematicskit_core`, so every native kit
+  build compiles it once (about a minute). The library has no new dynamic
+  dependencies, and its dependency records list no Boost or assimp header.

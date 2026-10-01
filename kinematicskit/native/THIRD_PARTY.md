@@ -39,11 +39,21 @@ Updating: bump the submodule to a new tag, update the version macros in
   (Boost.Log), the Python bindings, coal's own CMake and its `cmake`
   submodule (jrl-cmakemodules), which stays uninitialized. Meshes are built
   from triangle arrays.
-- Checked: a standalone build of `native/` compiles it and runs
-  `tests/cpp/coal_smoke.cpp`; its dependency records list no Boost or
-  assimp header.
+- Linked privately into `kinematicskit_core` (the collision world,
+  `src/collision.cpp`); nothing in the C ABI names it. Every build of the
+  native kit therefore needs the submodule initialized (non-recursively: its
+  nested `cmake` submodule is not used). The first build compiles about 70
+  coal sources (about a minute).
+- Gaps worked around in `src/collision.cpp`: coal answers no distance
+  queries on height fields, so the world compares a field's cells as convex
+  prisms; without qhull, convex shapes are built from points alone
+  (`PointConvex`, no neighbour lists, so support queries scan every point).
+- Checked: a standalone build of `native/` runs `tests/cpp/coal_smoke.cpp`
+  and `tests/cpp/collision_world.cpp`; its dependency records list no Boost
+  or assimp header.
 
 Updating: rebase the `materia` branch onto a new upstream tag, rerun the
 Boost check (`grep -rn boost include src` outside mesh_loader, serialization
 and python), update the version macros in `materia/include/coal/config.hh`,
-bump the submodule and this file, and rerun the smoke test.
+bump the submodule and this file, and rerun the standalone C++ tests and
+`native/tests`.
