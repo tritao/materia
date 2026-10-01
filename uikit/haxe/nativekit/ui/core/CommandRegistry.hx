@@ -14,6 +14,8 @@ class CommandRegistry {
 	final commandScopes:Map<String, String>;
 	final commandOrder:Array<String>;
 	final activeScopeStack:Array<String>;
+	/** User bindings that replace a command's registered shortcuts; an empty list unbinds it. */
+	final customShortcuts:Map<String, Array<Shortcut>>;
 	public var revision(default, null):Int;
 	/** Optional observer for semantic command recording. */
 	public var onInvoked:Null<String->CommandResult->Void> = null;
@@ -23,6 +25,7 @@ class CommandRegistry {
 		commandScopes = new Map();
 		commandOrder = [];
 		activeScopeStack = [GlobalScope];
+		customShortcuts = new Map();
 		revision = 0;
 	}
 
@@ -54,6 +57,80 @@ class CommandRegistry {
 
 	public function ids():Array<String>
 		return commandOrder.copy();
+
+	/** The scope a command was registered in, or null for an unknown ID. */
+	public function scopeOf(id:String):Null<String>
+		return id == null ? null : commandScopes.get(id);
+
+	/** The shortcuts that run a command now: the user's bindings, or else the registered ones. */
+	public function shortcutsFor(id:String):Array<Shortcut> {
+		var custom = customShortcuts.get(id);
+		if (custom != null)
+			return custom.copy();
+		var command = get(id);
+		return command == null ? [] : command.defaultShortcuts();
+	}
+
+	/**
+	 * Replaces a command's shortcuts with the user's choice; an empty list
+	 * unbinds it. Choosing the registered shortcuts again clears the custom
+	 * binding. IDs that are not registered yet are kept for when they are.
+	 */
+	public function setShortcuts(id:String, shortcuts:Array<Shortcut>):Void {
+		if (id == null || id.length == 0 || shortcuts == null)
+			throw "Custom shortcuts require a command ID and a list";
+		var unique:Array<Shortcut> = [];
+		for (shortcut in shortcuts)
+			if (shortcut != null && !Lambda.exists(unique, function(existing) return existing.equals(shortcut)))
+				unique.push(shortcut);
+		var command = get(id);
+		if (command != null && sameShortcuts(unique, command.defaultShortcuts()))
+			customShortcuts.remove(id);
+		else
+			customShortcuts.set(id, unique);
+		revision++;
+	}
+
+	public function resetShortcuts(id:String):Void {
+		if (customShortcuts.remove(id))
+			revision++;
+	}
+
+	public function hasCustomShortcuts(id:String):Bool
+		return customShortcuts.exists(id);
+
+	/** Command IDs with custom bindings, including ones not registered yet. */
+	public function customShortcutIds():Array<String>
+		return [for (id in customShortcuts.keys()) id];
+
+	/** Registered commands in the scope that the shortcut runs now, in registration order. */
+	public function commandsBoundTo(shortcut:Shortcut, scope:String = GlobalScope):Array<String> {
+		var result:Array<String> = [];
+		for (id in commandOrder)
+			if (commandScopes.get(id) == scope
+				&& Lambda.exists(shortcutsFor(id), function(existing) return existing.equals(shortcut)))
+				result.push(id);
+		return result;
+	}
+
+	function matches(id:String, command:Command, key:Int, modifiers:Int):Bool {
+		var custom = customShortcuts.get(id);
+		if (custom == null)
+			return command.matchesShortcut(key, modifiers);
+		for (shortcut in custom)
+			if (shortcut.matches(key, modifiers))
+				return true;
+		return false;
+	}
+
+	static function sameShortcuts(first:Array<Shortcut>, second:Array<Shortcut>):Bool {
+		if (first.length != second.length)
+			return false;
+		for (index in 0...first.length)
+			if (!first[index].equals(second[index]))
+				return false;
+		return true;
+	}
 
 	public function activeScopes():Array<String>
 		return activeScopeStack.copy();
@@ -189,7 +266,7 @@ class CommandRegistry {
 				var id = commandOrder[commandIndex];
 				var command = commands.get(id);
 				if (command != null && commandScopes.get(id) == scope &&
-					command.matchesShortcut(key, normalized)) {
+					matches(id, command, key, normalized)) {
 					if (!command.isEnabled(actual)) {
 						disabled = CommandResult.disabled();
 						notifyInvocation(id, disabled);

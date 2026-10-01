@@ -249,7 +249,10 @@ typedef uint32_t rk_robot_runtime_joint_type;
 enum {
     RK_RUNTIME_JOINT_FIXED = 1, /**< Fixed relationship between two links. */
     RK_RUNTIME_JOINT_REVOLUTE = 2, /**< Rotational degree of freedom. */
-    RK_RUNTIME_JOINT_PRISMATIC = 3 /**< Translational degree of freedom. */
+    RK_RUNTIME_JOINT_PRISMATIC = 3, /**< Translational degree of freedom. */
+    RK_RUNTIME_JOINT_SPHERICAL = 4, /**< Assembly closures only: a shared point. */
+    RK_RUNTIME_JOINT_CYLINDRICAL = 5, /**< Assembly closures only: a shared axis line, free to slide and turn. */
+    RK_RUNTIME_JOINT_PLANAR = 6 /**< Assembly closures only: the child slides and turns in the parent's plane. */
 };
 
 /* ------------------------------------------------------------------------- */

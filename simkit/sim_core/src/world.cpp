@@ -1145,8 +1145,7 @@ nksim_result World::couple_joint(const nksim_joint_coupling_desc &desc) {
 
 nksim_result World::create_closure(const nksim_closure_desc &desc) {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
-    if (desc.type != NKSIM_JOINT_FIXED && desc.type != NKSIM_JOINT_REVOLUTE &&
-        desc.type != NKSIM_JOINT_PRISMATIC)
+    if (desc.type < NKSIM_JOINT_FIXED || desc.type > NKSIM_JOINT_PLANAR)
         return NKSIM_ERROR_UNSUPPORTED;
     const auto *body_a = bodies.get(desc.body_a);
     const auto *body_b = bodies.get(desc.body_b);

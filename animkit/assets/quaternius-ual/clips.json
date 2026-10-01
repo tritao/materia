@@ -1,0 +1,497 @@
+{
+ "retarget": {
+  "reference_clip": "PickUp_Table",
+  "bones": 52,
+  "hip_scale": 0.917,
+  "median_error_degrees": 0.116,
+  "worst_error_degrees": 8.594
+ },
+ "clips": [
+  {
+   "name": "A_TPose",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Idle_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Idle_Talking_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Idle_Tired_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Idle_Tired_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.3,
+   "file": "UAL1/Idle_Tired_Loop.glb",
+   "sha256": "bd498dcd19343aefd0c1e69b396fe105b8b35d9efaeb6a6e60f6b1840dfb6f51",
+   "channels": 54
+  },
+  {
+   "name": "Idle_FoldArms_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Idle_FoldArms_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.5,
+   "file": "UAL2/Idle_FoldArms_Loop.glb",
+   "sha256": "8fb7950ccdb9b5cb96b6ded474fa5b13264a79fce8df66ebee97a314b5837b43",
+   "channels": 54
+  },
+  {
+   "name": "Idle_Lantern_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Idle_Lantern_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.5,
+   "file": "UAL2/Idle_Lantern_Loop.glb",
+   "sha256": "1319c652e33e8c7425d09e30e1106fbbc657d12127e1af72735b4e4085777128",
+   "channels": 54
+  },
+  {
+   "name": "Idle_TalkingPhone_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Idle_TalkingPhone_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.9333,
+   "file": "UAL2/Idle_TalkingPhone_Loop.glb",
+   "sha256": "597d4635e0c95bceda9b5e6ec55cca93cca773f507d382f68734947871c0fb3c",
+   "channels": 54
+  },
+  {
+   "name": "Idle_LookAround_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Idle_LookAround_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 4.6,
+   "file": "UAL1/Idle_LookAround_Loop.glb",
+   "sha256": "081240c1a020cfff4d8e97b4477bbe27711ec4734cc3c451dfce60d5092effde",
+   "channels": 54
+  },
+  {
+   "name": "Walk_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Walk_Formal_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Walk_Carry_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Walk_Carry_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL2/Walk_Carry_Loop.glb",
+   "sha256": "f3da8fe7e0af5ec29be7841338cb47d8d92770145d64a085649aadb87499a562",
+   "channels": 54
+  },
+  {
+   "name": "Walk_Bwd_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Walk_Bwd_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.3333,
+   "file": "UAL2/Walk_Bwd_Loop.glb",
+   "sha256": "f23b2191eaf9cace66e7d278d12e90038779bc1a0acfc2e4ce29696d44bfbe12",
+   "channels": 54
+  },
+  {
+   "name": "Walk_L_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Walk_L_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.3333,
+   "file": "UAL2/Walk_L_Loop.glb",
+   "sha256": "a4f722ea1ee3815bd6616c1b2605a3a4b7d4174fb4119ac38fbe8efb267ace10",
+   "channels": 54
+  },
+  {
+   "name": "Walk_R_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Walk_R_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.3333,
+   "file": "UAL2/Walk_R_Loop.glb",
+   "sha256": "0365abe988549857206a8496f7e61e0a06cf8e95a77b9f26d9cf529665d89691",
+   "channels": 54
+  },
+  {
+   "name": "Jog_Fwd_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Sprint_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Turn90_L",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Turn90_L\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL1/Turn90_L.glb",
+   "sha256": "e5eb92a7b42543ec2f311d5596e3bd8ca3c01823b4beb78dc343e9f50e9f380b",
+   "channels": 54
+  },
+  {
+   "name": "Turn90_R",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Turn90_R\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL1/Turn90_R.glb",
+   "sha256": "60dddeddc6485ded2fcc8d931b498932549d6765984e70d2c61b5d6bbdbde76e",
+   "channels": 54
+  },
+  {
+   "name": "Turn180_L_RM",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Turn180_L_RM\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.6667,
+   "file": "UAL2/Turn180_L_RM.glb",
+   "sha256": "3adfa0f1a3a920e87a964462e0a0d39e06a48fd174a027831067955ff4f722d7",
+   "channels": 54
+  },
+  {
+   "name": "Turn180_R_RM",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Turn180_R_RM\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.6667,
+   "file": "UAL2/Turn180_R_RM.glb",
+   "sha256": "fe494823cbd389230a907971c7b0d0109c3caf8bcc72f851f6e6c027eb9e93f0",
+   "channels": 54
+  },
+  {
+   "name": "Crouch_Idle_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Crouch_Enter",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crouch_Enter\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 0.8333,
+   "file": "UAL1/Crouch_Enter.glb",
+   "sha256": "4540a86dc3baaca493ee915e2baa44bb2b683a7358b7c75851bbeddedf2ebd80",
+   "channels": 54
+  },
+  {
+   "name": "Crouch_Exit",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crouch_Exit\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 0.8333,
+   "file": "UAL1/Crouch_Exit.glb",
+   "sha256": "dd8cb092430ababdd220fc26054429c671921fc9f9797bc8b5bbd83efdf5e62f",
+   "channels": 54
+  },
+  {
+   "name": "Crouch_Fwd_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Crouch_Bwd_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crouch_Bwd_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL1/Crouch_Bwd_Loop.glb",
+   "sha256": "ea5f57dfe22022d54eafbebefe86e13f77345ee7ee7523b7ae932732f54505f4",
+   "channels": 54
+  },
+  {
+   "name": "Crouch_Left_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crouch_Left_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL1/Crouch_Left_Loop.glb",
+   "sha256": "27dd042cebb47f7157ec0bf3645815b94fcb746d9800a7444cdc438ba5122e21",
+   "channels": 54
+  },
+  {
+   "name": "Crouch_Right_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crouch_Right_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL1/Crouch_Right_Loop.glb",
+   "sha256": "61695c9641794bbb8412ce3a689876ae6f5ccc0ad890b31e6016f2988348ed01",
+   "channels": 54
+  },
+  {
+   "name": "PickUp_Table",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "PickUp_Kneeling",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"PickUp_Kneeling\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.9333,
+   "file": "UAL1/PickUp_Kneeling.glb",
+   "sha256": "04b8362f0df4d48736c82593b0b0275eaa9433023c65087e2d373cdde95d365b",
+   "channels": 54
+  },
+  {
+   "name": "Fixing_Kneeling",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Crawl_Enter",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crawl_Enter\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.1333,
+   "file": "UAL1/Crawl_Enter.glb",
+   "sha256": "6f1120ab848e5f3c20e90ac1b6b7d9ff3276376e37a5dbbfed0b32fd23094775",
+   "channels": 54
+  },
+  {
+   "name": "Crawl_Exit",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crawl_Exit\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.0,
+   "file": "UAL1/Crawl_Exit.glb",
+   "sha256": "0426c3ba396370fbb3032cb0e3018c0a7d73eb6eaa78c662245b5686d1d43a79",
+   "channels": 54
+  },
+  {
+   "name": "Crawl_Idle_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crawl_Idle_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.3333,
+   "file": "UAL1/Crawl_Idle_Loop.glb",
+   "sha256": "29909487df727ae505c7752024d588c315c0822a486b545adf15939767fae49b",
+   "channels": 54
+  },
+  {
+   "name": "Crawl_Fwd_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Crawl_Fwd_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.1667,
+   "file": "UAL1/Crawl_Fwd_Loop.glb",
+   "sha256": "e38f461628354842c97b11a105f8d81d015a8b5a9974fc045c98c9ee40ba3614",
+   "channels": 54
+  },
+  {
+   "name": "Counter_Enter",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Counter_Enter\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.1667,
+   "file": "UAL1/Counter_Enter.glb",
+   "sha256": "05570da86e06135e42f08878aab27048437aa8d949881957d47082f9f1ccf5fc",
+   "channels": 54
+  },
+  {
+   "name": "Counter_Idle_Loop",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Counter_Idle_Loop\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 2.6667,
+   "file": "UAL1/Counter_Idle_Loop.glb",
+   "sha256": "3413312f021f5fb5351125056c59efbd4caf55773dc6544a58cba97032e8bde7",
+   "channels": 54
+  },
+  {
+   "name": "Counter_Give",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Counter_Give\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 4.3667,
+   "file": "UAL1/Counter_Give.glb",
+   "sha256": "e2a8945bbd58dbd1ada0128063c3df6443a9cc38bea29dabbf9348125fd350a7",
+   "channels": 54
+  },
+  {
+   "name": "Counter_Show",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Counter_Show\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 4.6667,
+   "file": "UAL1/Counter_Show.glb",
+   "sha256": "4e12e59a4fd01a78167f3fb56084dd6c86ea6ecb7d9a65f390f498c9bbf154d1",
+   "channels": 54
+  },
+  {
+   "name": "Counter_Exit",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Counter_Exit\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.1667,
+   "file": "UAL1/Counter_Exit.glb",
+   "sha256": "638b4d106024eee421e919adef93348df54a5dcf9a880d8d86be66c8f8ca61ba",
+   "channels": 54
+  },
+  {
+   "name": "Interact",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Push_Enter",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Push_Enter\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 0.6667,
+   "file": "UAL1/Push_Enter.glb",
+   "sha256": "0651b70f302fdd59a45d478983ef8fb76f73f8eae34ce441537176feb1433ae3",
+   "channels": 54
+  },
+  {
+   "name": "Push_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Push_Exit",
+   "library": "Universal Animation Library 1",
+   "source": "Godot animation \"Push_Exit\" in UAL1_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.2,
+   "file": "UAL1/Push_Exit.glb",
+   "sha256": "8fa51ed9ec806aeafa3994454b10e7892e7bd14ebb1ca78e6b80724bf5f03b47",
+   "channels": 54
+  },
+  {
+   "name": "Chest_Open",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Chest_Open\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 1.3667,
+   "file": "UAL2/Chest_Open.glb",
+   "sha256": "8bd5630f9dd2244895262a0063dc2aac5bc4b46582eea98d56f3e1e881a0a61e",
+   "channels": 54
+  },
+  {
+   "name": "Bandage_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Bandage_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 0.6667,
+   "file": "UAL2/Bandage_Loop.glb",
+   "sha256": "e582a9c104d68b92816255e247bdc6117e2646d7f2f6a23c51d1f72df991551d",
+   "channels": 54
+  },
+  {
+   "name": "Mining_Loop",
+   "library": "Universal Animation Library 2",
+   "source": "Godot animation \"Mining_Loop\" in UAL2_Source of the library viewer pack",
+   "license": "CC0",
+   "retargeted_to": "ual-standard.glb rig (DEF- bones)",
+   "hip_height_scale": 0.917,
+   "length_seconds": 0.9,
+   "file": "UAL2/Mining_Loop.glb",
+   "sha256": "d37c840050370cfd79412c64be9f1c76293e9868556d4d49853e0f4b4f52c5ce",
+   "channels": 54
+  },
+  {
+   "name": "Sitting_Enter",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Sitting_Idle_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Sitting_Talking_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Sitting_Exit",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  },
+  {
+   "name": "Driving_Loop",
+   "file": null,
+   "source": "ual-standard.glb (free glTF, original)"
+  }
+ ]
+}

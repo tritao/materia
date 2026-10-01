@@ -11,20 +11,22 @@ package humankit;
  * forward over it to keep the shoulder where the reach is comfortable.
  */
 class ApproachFor extends HumanActionBase {
-	/**
-	 * Fraction of the arm (shoulder to wrist) a standing reach uses. The palm
-	 * adds no reliable length: IK sets only the wrist, so the hand may hang
-	 * across the reach direction.
-	 */
-	static inline var COMFORT = 0.8;
-	/** How far the front of the belly sits ahead of the abdomen bone, and the gap left to an edge, in metres. */
-	static inline var BELLY_FRONT = 0.12;
-	static inline var EDGE_GAP = 0.03;
-
 	public var target(default, null):Array<Float>;
 	public final limb:HumanLimb;
 	public final speed:Float;
 	public final bothHands:Bool;
+	/**
+	 * How far short of the surface's edge the belly ends, in metres, once the lean and the stretch are spent:
+	 * zero when the stance clears it. A surface too deep for the arm to reach over (a crouch does not help: it
+	 * lowers the shoulder, not carries it over the edge), or a body that cannot crouch at a low one, leaves this above
+	 * zero; the job still runs, with the belly over the edge by about this much.
+	 */
+	public var shortfall(default, null):Float = 0.0;
+	/** How deep a crouch the worker takes at the stand (0 upright, 1 the clip's full crouch), once it has arrived. */
+	public var crouch(default, null):Float = 0.0;
+	/** How far the upper body leans over the surface at the stand, in radians, once the worker has arrived. */
+	public var lean(default, null):Float = 0.0;
+	var postureIssued:Bool = false;
 	var faceAngle:Float = 0.0;
 	var turnIssued:Bool = false;
 	final targetProvider:Null<Void->Array<Float>>;
@@ -46,45 +48,48 @@ class ApproachFor extends HumanActionBase {
 		if (targetProvider != null) target = targetProvider().copy();
 		if (target.length < 3) { fail("Approach target needs x, y, z"); return; }
 		if (limb != ArmL && limb != ArmR) { fail("Approach requires an arm"); return; }
-		var shoulder = worker.character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
+		var bone = limb == ArmL ? UpperArmL : UpperArmR;
+		var shoulder = worker.standingBone(bone);
 		if (shoulder == null) { fail("The rig lacks an arm"); return; }
+		var bellyBone = worker.standingBone(Spine) != null ? Spine : Pelvis;
+		var belly = worker.standingBone(bellyBone);
 		var root = worker.rootTransform();
-		var comfortable = COMFORT * (worker.description.upperArm + worker.description.forearm);
-		var rise = target[2] - (root[14] + shoulder[2]);
-		if (rise >= comfortable) {
-			fail("Target is above reachable height");
-			return;
-		}
-		if (-rise >= comfortable) {
-			fail("Target is below standing arm reach; crouching is unsupported");
-			return;
-		}
-		var ahead = Math.sqrt(comfortable * comfortable - rise * rise);
-		var dx = target[0] - root[12], dy = target[1] - root[13];
-		var distance = Math.sqrt(dx * dx + dy * dy);
-		var ux = distance > 1e-8 ? dx / distance : root[0];
-		var uy = distance > 1e-8 ? dy / distance : root[1];
-		// Stand so the shoulder (model +X forward, +Y left of the root) sits
-		// `ahead` metres behind the target along the facing direction.
-		var lateral = bothHands ? 0.0 : shoulder[1];
-		var standDistance = ahead + shoulder[0];
-		var lean = 0.0;
-		if (support != null) {
-			var belly = worker.character.pose.bonePosition(Spine);
-			if (belly == null) belly = worker.character.pose.bonePosition(Pelvis);
-			var required = edgeDistance(support, target, ux, uy) + (belly == null ? 0.0 : belly[0]) + BELLY_FRONT +
-				EDGE_GAP;
-			if (required > standDistance) {
-				// Standing back from the edge leaves the shoulder short of the point: lean to make it up.
-				var made = worker.leanFor(limb, required - standDistance);
-				lean = made.angle;
-				standDistance += made.shift;
+		// Standing is tried first. A worker crouches only for a point lower than the arm comfortably reaches below
+		// the shoulder: crouching brings the shoulder down, not forward over a surface, so it does nothing for a
+		// point at table height. For a lower one, ever deeper crouches are tried and the first that is comfortable
+		// is taken: clear of the surface's edge, leaning no more than a worker would, the point in comfortable reach.
+		// Failing that, the best of those tried: least short of the edge, then least lean.
+		var levels = worker.canCrouch() ? Std.int(Math.max(1.0, worker.posture.crouchLevels)) : 1;
+		var chosen:Null<Stance> = null;
+		var failure:Null<String> = null;
+		for (step in 0...levels) {
+			var depth = levels > 1 ? step / (levels - 1) : 0.0;
+			var stance = stanceAt(worker, bone, bellyBone, depth, shoulder, belly, root);
+			if (stance.failure != null) {
+				if (step == 0) failure = stance.failure;
+				continue;
+			}
+			if (chosen == null || stance.shortfall < chosen.shortfall - 0.01 ||
+				(Math.abs(stance.shortfall - chosen.shortfall) <= 0.01 && stance.lean < chosen.lean - 0.01))
+				chosen = stance;
+			if (step == 0 && stance.comfortable) break;
+			if (stance.shortfall <= 0.01 && stance.lean <= worker.posture.comfortLean && stance.comfortable) {
+				chosen = stance;
+				break;
 			}
 		}
+		if (chosen == null) {
+			fail(failure == null ? "Target is out of reach" : failure);
+			return;
+		}
+		shortfall = chosen.shortfall;
+		crouch = chosen.crouch;
+		lean = chosen.lean;
 		worker.setLean(lean);
-		var standX = target[0] - ux * standDistance + uy * lateral;
-		var standY = target[1] - uy * standDistance - ux * lateral;
-		faceAngle = Math.atan2(uy, ux);
+		worker.setArmsDown(support != null);
+		var standX = target[0] - chosen.ux * chosen.standDistance + chosen.uy * chosen.lateral;
+		var standY = target[1] - chosen.uy * chosen.standDistance - chosen.ux * chosen.lateral;
+		faceAngle = Math.atan2(chosen.uy, chosen.ux);
 		if (Math.sqrt(Math.pow(standX - root[12], 2) + Math.pow(standY - root[13], 2)) > 0.005)
 			worker.walker.continueAlong([[root[12], root[13]], [standX, standY]], speed);
 		else {
@@ -92,6 +97,75 @@ class ApproachFor extends HumanActionBase {
 			turnIssued = true;
 		}
 	}
+
+	/**
+	 * Where the worker would stand, and how it would hold its body, to reach the target with its body crouched
+	 * `depth` deep; or why it cannot at that depth.
+	 */
+	function stanceAt(worker:HumanBody, bone:HumanBone, bellyBone:HumanBone, depth:Float, standing:Array<Float>,
+			bellyStanding:Null<Array<Float>>, root:Array<Float>):Stance {
+		var drop = worker.crouchShift(bone, depth);
+		var shoulder = [standing[0] + drop[0], standing[1] + drop[1], standing[2] + drop[2]];
+		var length = worker.description.upperArm + worker.description.forearm;
+		// With two hands the stance is centred on the object, so each shoulder stays a little to the side of
+		// its hand's grasp point. That sideways gap takes its share of the arm, leaving less for the reach
+		// ahead and below; measuring only those would stand the worker further out than the arm reaches.
+		var sideways = bothHands ? Math.abs(Math.abs(shoulder[1]) - worker.posture.handSpread) : 0.0;
+		var comfortable = inPlane(worker.posture.comfort * length, sideways), farthest = inPlane(worker.posture.stretch * length, sideways);
+		var rise = target[2] - (root[14] + shoulder[2]);
+		var stance:Stance = {failure: null, crouch: depth, lean: 0.0, standDistance: 0.0, shortfall: 0.0, ux: 0.0, uy: 0.0,
+			lateral: 0.0, comfortable: -rise <= comfortable};
+		// A point is out of reach only beyond what the arm will stretch to, not beyond the comfortable reach.
+		if (rise >= farthest) {
+			stance.failure = "Target is above reachable height";
+			return stance;
+		}
+		if (-rise >= farthest) {
+			stance.failure = worker.canCrouch() ? "Target is below the arm's reach even crouched" :
+				"Target is below standing arm reach; crouching is unsupported";
+			return stance;
+		}
+		// Stand where the shoulder is a comfortable reach away; a point as far below the shoulder as that has
+		// the shoulder straight over it, and any more reach comes from leaning and stretching below.
+		var ahead = Math.abs(rise) < comfortable ? Math.sqrt(comfortable * comfortable - rise * rise) : 0.0;
+		var dx = target[0] - root[12], dy = target[1] - root[13];
+		var distance = Math.sqrt(dx * dx + dy * dy);
+		stance.ux = distance > 1e-8 ? dx / distance : root[0];
+		stance.uy = distance > 1e-8 ? dy / distance : root[1];
+		// Stand so the shoulder (model +X forward, +Y left of the root) sits
+		// `ahead` metres behind the target along the facing direction.
+		stance.lateral = bothHands ? 0.0 : shoulder[1];
+		stance.standDistance = ahead + shoulder[0];
+		if (support != null) {
+			var belly = bellyStanding;
+			if (belly != null) {
+				var shift = worker.crouchShift(bellyBone, depth);
+				belly = [belly[0] + shift[0], belly[1] + shift[1], belly[2] + shift[2]];
+			}
+			var required = edgeDistance(support, target, stance.ux, stance.uy) + (belly == null ? 0.0 : belly[0]) +
+				worker.posture.bellyFront + worker.posture.edgeGap;
+			if (required > stance.standDistance) {
+				// Standing back from the edge leaves the shoulder short of the point: lean to make it up. The lean
+				// carries the shoulder forward and also lowers it, both as measured, and the arm then stretches
+				// past its comfortable reach, but no further from the shoulder where it ends up than the posture allows.
+				var made = worker.leanFor(limb, required - stance.standDistance, depth);
+				stance.lean = made.angle;
+				var riseAfter = rise - made.drop;
+				if (Math.abs(riseAfter) >= farthest) {
+					stance.failure = riseAfter > 0.0 ? "Target is above reachable height" : "Target is below the arm's reach when leaning";
+					return stance;
+				}
+				var reachMost = shoulder[0] + made.shift + Math.sqrt(farthest * farthest - riseAfter * riseAfter) - worker.posture.reachSlack;
+				stance.standDistance = Math.max(stance.standDistance, Math.min(required, reachMost));
+				stance.shortfall = Math.max(0.0, required - stance.standDistance);
+			}
+		}
+		return stance;
+	}
+
+	/** What is left of a reach of `radius` once `sideways` of it is spent off to one side. */
+	static function inPlane(radius:Float, sideways:Float):Float
+		return radius > sideways ? Math.sqrt(radius * radius - sideways * sideways) : 0.0;
 
 	/**
 	 * How far back from `point` along (-ux, -uy) the surface's footprint runs: the walk from the
@@ -114,8 +188,14 @@ class ApproachFor extends HumanActionBase {
 			worker.walker.face(faceAngle);
 			turnIssued = true;
 		}
+		// The body lowers and leans once it stands where it will work and has turned to face the point, not on the
+		// way there, and the reach waits until it has: a shoulder still on its way would put the point out of reach.
+		if (!done && turnIssued && !postureIssued && !worker.walker.isTurning()) {
+			postureIssued = true;
+			worker.setCrouch(crouch);
+		}
 	}
 
 	override public function isDone():Bool
-		return done || (turnIssued && !worker.walker.isTurning());
+		return done || (turnIssued && !worker.walker.isTurning() && postureIssued && worker.crouchReached() && worker.leanReached() && worker.walker.settled());
 }

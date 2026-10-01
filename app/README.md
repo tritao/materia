@@ -383,6 +383,16 @@ Omit `--snapshot` to view it in the editor. The headless capture command is in
 `humankit/sim/tests/README.md`; screenshots are generated under that test's
 ignored build directory.
 
+To judge a worker's pose by eye instead of by its numbers, capture frames of the rack-to-table
+demo at chosen moments (headless, software GL) and lay them out on a contact sheet:
+
+```sh
+python3 app/tools/capture-worker-frames.py --seconds 1.3,2,5 --crop 1130,380,1850,680 --out /tmp/worker
+```
+
+Moments are wall-clock seconds after launch, frames are 2560x1600, and `--crop` takes a pixel box so the
+worker fills each tile. Build the app first. The contact sheet needs Pillow.
+
 For a bounded HashLink CPU/allocation/GC capture with process RSS sampled at
 100 ms intervals, run from the repository root:
 

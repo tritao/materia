@@ -13,6 +13,11 @@ class HumanWalker {
 
 	public final character:HumanCharacter;
 	public final gait:HumanGait;
+	/** The gait of a walk that carries something, when the character has a clip for it; see setCarrying. */
+	public final carryGait:Null<HumanGait>;
+	/** The gait the route being walked uses, so a walk does not change clip part way. */
+	var routeGait:HumanGait;
+	var carrying:Bool = false;
 	final idleClip:Int;
 	/** Fastest turn, in radians per second. */
 	public var turnRate:Float = 4.0;
@@ -41,6 +46,9 @@ class HumanWalker {
 		if (walk < 0 || idle < 0)
 			throw 'The character needs "$walkClip" and "$idleClip" clips';
 		gait = HumanGait.measure(character.asset, character.rig, walk);
+		routeGait = gait;
+		var carry = character.asset.clipIndex("walk_carry");
+		carryGait = carry < 0 ? null : HumanGait.measure(character.asset, character.rig, carry);
 		this.idleClip = idle;
 		character.player.play(idle, 0.0);
 	}
@@ -71,8 +79,17 @@ class HumanWalker {
 		facing = null;
 		preserveHeading = false;
 		retreating = false;
-		character.player.play(gait.clip, FADE_SECONDS);
+		var carryWalk = carryGait;
+		routeGait = carrying && carryWalk != null ? carryWalk : gait;
+		character.player.play(routeGait.clip, FADE_SECONDS);
 	}
+
+	/**
+	 * Whether the next walk is one that carries something: a character with a carrying walk clip uses it, with
+	 * the shoulders and stance of a worker holding a load. It applies from the next route, not the one under way.
+	 */
+	public function setCarrying(value:Bool):Void
+		carrying = value;
 
 	/**
 	 * Walks along route from where the character stands (the route's first
@@ -130,6 +147,10 @@ class HumanWalker {
 	public function isTurning():Bool
 		return facing != null;
 
+	/** Whether the character stands still with its walk faded out: not walking, not turning, not mid-crossfade. */
+	public function settled():Bool
+		return !walking && facing == null && !character.player.fading();
+
 	/** Stops where the character stands and idles. */
 	public function stop():Void {
 		facing = null;
@@ -183,7 +204,7 @@ class HumanWalker {
 			} else
 				heading = wrap(heading + (turn > 0.0 ? limit : -limit));
 		}
-		character.player.speed = walking && !retreating ? velocity / gait.naturalSpeed : 1.0;
+		character.player.speed = walking && !retreating ? velocity / routeGait.naturalSpeed : 1.0;
 		character.advance(seconds);
 	}
 

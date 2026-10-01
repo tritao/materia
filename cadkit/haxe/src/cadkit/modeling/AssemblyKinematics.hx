@@ -76,6 +76,9 @@ class AssemblyKinematics {
         case AssemblyJointType.Fixed: ClosureKind.Fixed;
         case AssemblyJointType.Prismatic: ClosureKind.Prismatic;
         case AssemblyJointType.Revolute | AssemblyJointType.Continuous: ClosureKind.Revolute;
+        case AssemblyJointType.Spherical: ClosureKind.Spherical;
+        case AssemblyJointType.Cylindrical: ClosureKind.Cylindrical;
+        case AssemblyJointType.Planar: ClosureKind.Planar;
         default: throw 'Unsupported assembly closure type "${joint.type}"';
       };
       var axis = joint.axis == null ? null : new Vector3(joint.axis.x, joint.axis.y, joint.axis.z);

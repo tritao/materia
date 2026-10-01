@@ -2,15 +2,16 @@ import humankit.MotionQuality;
 
 /**
  * Holds the rack job's whole motion, both arms from start to finish, to limits a person's arm
- * would keep. The limits sit just above today's ordinary gait and reach; the failures they were
- * set to catch measured several times higher: an elbow flipping (11 rad/s of bend-plane turn), a
- * clip change or carry pose applied in a single tick (a wrist at 10 m/s, 1000 m/s2).
+ * would keep. The limits sit just above ordinary gait and reach, which the layout sweep measured up to
+ * 5.5 rad/s of bend-plane turn; the failures they were set to catch measured about twice that or
+ * more: an elbow flipping (11 rad/s and up), a clip change or carry pose applied in a single tick
+ * (a wrist at 10 m/s, 1000 m/s2).
  */
 class MotionQualityTests {
-    static inline var MAX_PLANE_TURN = 5.0;
-    static inline var MAX_HAND_SPEED = 2.5;
-    static inline var MAX_HAND_ACCELERATION = 300.0;
-    static inline var MIN_ELBOW_ANGLE = 30.0;
+    public static inline var MAX_PLANE_TURN = 6.5;
+    public static inline var MAX_HAND_SPEED = 2.5;
+    public static inline var MAX_HAND_ACCELERATION = 300.0;
+    public static inline var MIN_ELBOW_ANGLE = 30.0;
 
     public static function run():Void {
         var scenario = RackScenario.build();

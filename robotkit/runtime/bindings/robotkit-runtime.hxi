@@ -192,9 +192,17 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 */
 	const RK_ROBOT_MODE_TRACKING = 1;
 	/**
+	 * < Assembly closures only: a shared axis line, free to slide and turn.
+	 */
+	const RK_RUNTIME_JOINT_CYLINDRICAL = 5;
+	/**
 	 * < Fixed relationship between two links.
 	 */
 	const RK_RUNTIME_JOINT_FIXED = 1;
+	/**
+	 * < Assembly closures only: the child slides and turns in the parent's plane.
+	 */
+	const RK_RUNTIME_JOINT_PLANAR = 6;
 	/**
 	 * < Translational degree of freedom.
 	 */
@@ -203,6 +211,10 @@ interface RobotKitRuntime @target("portable-abi64") @library("robotkit_runtime")
 	 * < Rotational degree of freedom.
 	 */
 	const RK_RUNTIME_JOINT_REVOLUTE = 2;
+	/**
+	 * < Assembly closures only: a shared point.
+	 */
+	const RK_RUNTIME_JOINT_SPHERICAL = 4;
 	/**
 	 * < Emergency stop latched by the endpoint.
 	 */

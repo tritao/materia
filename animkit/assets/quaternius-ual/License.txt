@@ -1,0 +1,15 @@
+Universal Animation Library, from Quaternius (https://quaternius.com)
+https://quaternius.itch.io/universal-animation-library
+
+License: Creative Commons Zero (CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+Files here
+----------
+ual-standard.glb  The free Standard glTF (46 clips) as mirrored at
+                  https://github.com/J-Ponzo/gltf-universal-animation-library, its .gltf and .bin packed into one .glb;
+                  nothing else changed.
+ual-work.glb      What the runtime loads: ual-standard.glb plus the clips under clips/, built by
+                  tools/ual/build_library.py.
+clips/            Individual clips of the full library (purchased by the project), one glTF per clip, retargeted onto
+                  the free glTF's rig. Where each came from is in clips.json and in PROVENANCE.md.

@@ -18,6 +18,8 @@ import humankit.Wait;
 import humankit.PlayClip;
 import humankit.HumanBodyView;
 import humankit.HumanBone;
+import humankit.HumanHand;
+import humankit.HumanTargetBox;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
@@ -25,6 +27,8 @@ import humankit.HumanLimb;
 import humankit.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.HumanPose;
+import humankit.Naturalness;
+import humankit.HumanPosture;
 import humankit.HumanCharacter;
 import humankit.HumanoidRig;
 import humankit.Mat4;
@@ -39,6 +43,7 @@ import materia.automation.facility.Rack;
 import materia.automation.facility.RackSlot;
 import materia.automation.facility.RackSlotPose;
 import materia.automation.facility.Station;
+import materia.automation.facility.Surface;
 import materia.automation.facility.Zone;
 import nativekit.scene.Scene;
 import nativekit.scene.SceneRenderer;
@@ -47,6 +52,7 @@ import robotkit.mobile.Footprint;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.Path;
 import sys.FileSystem;
+import sys.io.File;
 
 class HumanKitTests {
 	static function main():Void {
@@ -100,12 +106,18 @@ class HumanKitTests {
 			throw 'Attaching a one-mesh prop changed draw calls from $before to $after';
 		bodyView(scene, human);
 		human.dispose();
+		universalCharacter(scene, worker, rig);
+		universalLibrary(scene);
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
 		fingersCurl(scene, worker, rig);
 		leaning(scene, worker, rig);
+		grasping(scene, worker, rig);
 		facilityRoute(scene, worker, rig);
+		facilitySurfaces();
+		postureStature();
+		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -113,6 +125,167 @@ class HumanKitTests {
 		jobSpecs(scene, worker, rig);
 		scene.dispose();
 		Sys.println("humankit tests: ok");
+	}
+
+	/**
+	 * Quaternius's Universal Animation Library character: a second rig, with real leg chains and a crouch clip. The
+	 * checks that name no joints run on it as they do on the bundled worker; the rest are about what it adds.
+	 */
+	static function universalCharacter(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
+		var rig = HumanoidRig.detect(asset);
+		if (rig.mapping.name != "universal") throw 'The library character matched the ${rig.mapping.name} preset';
+		var human = new HumanCharacter(scene, asset, rig, null, "Universal");
+		inRange(human.height(), 1.7, 1.95, "library character height");
+		// Its fingers curl by the same joint turns, about the axis found on its own skeleton: in the rest pose a
+		// light curl brings the middle fingertip toward the palm's face. (Its relaxed idle hand already starts
+		// partly curled, so a full curl overshoots there; only the rest pose is held to this.)
+		var depth = function():Float {
+			var frame = human.pose.boneFrame(HumanBone.HandR), wrist = human.pose.bonePosition(HumanBone.HandR);
+			var knuckle = human.pose.bonePosition(HumanBone.MiddleR), tip = human.fingertip(ArmR, HumanHand.MIDDLE);
+			var total = 0.0;
+			for (axis in 0...3) total -= (tip[axis] - (wrist[axis] + knuckle[axis]) * 0.5) * frame[8 + axis];
+			return total;
+		};
+		human.advance(0.0);
+		var open = depth();
+		human.setHandCurl(ArmR, 0.3);
+		human.advance(0.0);
+		var closing = depth();
+		if (closing - open < 0.02) throw 'Curling a library hand moved the middle fingertip from $open to $closing m off the palm';
+		human.setHandCurl(ArmR, 0.0);
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		// Its legs are chains, so an ankle can be reached, which the bundled worker's cannot.
+		var foot = human.pose.bonePosition(HumanBone.FootL);
+		var ankle = [foot[0] + 0.15, foot[1], foot[2] + 0.15];
+		human.reach(LegL, ankle, 1.0);
+		human.advance(0.0);
+		if (distance(human.pose.bonePosition(HumanBone.FootL), ankle) > 0.03)
+			throw "A library character's ankle did not reach its target";
+		human.release(LegL);
+		// It crouches: the pelvis comes down steadily and the feet stay on the floor.
+		if (!human.canCrouch()) throw "The library character has a crouch clip but cannot crouch";
+		var last = 10.0;
+		for (amount in [0.0, 0.25, 0.5, 0.75, 1.0]) {
+			human.setCrouch(amount);
+			human.advance(0.0);
+			var pelvis = human.pose.bonePosition(HumanBone.Pelvis)[2];
+			if (!(pelvis < last)) throw 'The pelvis did not come down at crouch $amount: $pelvis after $last';
+			last = pelvis;
+			for (bone in [HumanBone.FootL, HumanBone.FootR])
+				if (human.pose.bonePosition(bone)[2] > 0.2) throw 'A foot left the floor at crouch $amount: ${human.pose.bonePosition(bone)[2]}';
+		}
+		human.setCrouch(0.0);
+		human.advance(0.0);
+		var standing = human.pose.bonePosition(HumanBone.Pelvis)[2];
+		if (standing - last < 0.3) throw 'A full crouch only lowered the pelvis ${standing - last} m';
+		// The planner crouches for a low surface and not for a shelf; the bundled worker, which cannot, refuses the low one.
+		var body = new HumanBody(human);
+		var bench:HumanTargetBox = {center: [0.6, 0.0, 0.55], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
+		var shelf:HumanTargetBox = {center: [0.6, 0.0, 1.15], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
+		var low = new ApproachFor([0.6, 0.0, 0.62], ArmR, 1.0, false, null, bench);
+		var lowJob = new HumanJob(body).add(low);
+		lowJob.advance(1.0 / 60.0);
+		if (lowJob.failure() != null) throw 'A bench was not reachable crouched: ${lowJob.failure()}';
+		var high = new ApproachFor([0.6, 0.0, 1.22], ArmR, 1.0, false, null, shelf);
+		var highJob = new HumanJob(body).add(high);
+		highJob.advance(1.0 / 60.0);
+		if (highJob.failure() != null) throw 'A shelf was not reachable: ${highJob.failure()}';
+		if (!(low.crouch >= 0.4) || !(high.crouch <= 0.1))
+			throw 'The planner crouched ${low.crouch} for a bench and ${high.crouch} for a shelf';
+		// A deep top at table height is no reason to crouch: it lowers the shoulder, not forward over the edge.
+		var wide:HumanTargetBox = {center: [0.7, 0.0, 1.01], halfExtents: [0.4, 0.4, 0.05], yaw: 0.0};
+		var deep = new ApproachFor([0.7, 0.0, 1.1], ArmR, 1.0, false, null, wide);
+		var deepJob = new HumanJob(body).add(deep);
+		deepJob.advance(1.0 / 60.0);
+		if (!(deep.crouch <= 0.1)) throw 'The planner crouched ${deep.crouch} for a deep top at table height';
+		body.cancel();
+		human.dispose();
+		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");
+		var plainBody = new HumanBody(plain);
+		if (plain.canCrouch() || plainBody.canCrouch()) throw "The bundled worker has no crouch clip but claims to crouch";
+		plainBody.setCrouch(1.0);
+		plainBody.advance(0.1);
+		if (plainBody.crouchAmount() != 0.0) throw "A body that cannot crouch crouched";
+		var refused = new HumanJob(plainBody).add(new ApproachFor([0.6, 0.0, 0.62], ArmR, 1.0, false, null, bench));
+		refused.advance(1.0 / 60.0);
+		if (refused.failure() == null || refused.failure().indexOf("crouching is unsupported") < 0)
+			throw 'A bench was not refused by the worker that cannot crouch: ${refused.failure()}';
+		plain.dispose();
+		// The checks that name no joints hold on the library character too.
+		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
+		var againRig = HumanoidRig.detect(again);
+		// The library character's ankle rolls heel to toe through a stance, which this reads as a slide of about 15 cm.
+		naturalness(scene, again, againRig, "library", 0.2);
+		walking(scene, again, againRig);
+		elbowStaysPut(scene, again, againRig);
+		leaning(scene, again, againRig);
+		facilityRoute(scene, again, againRig);
+	}
+
+	/**
+	 * The library the runtime loads: the free pack's clips and the extracted ones, each listed in clips.json with
+	 * where it came from. Every listed clip must be there at its length and stand on the floor at the height the
+	 * free clips do, which is how a mistake in the retargeting (a hip height out by centimetres, a flipped limb)
+	 * shows.
+	 */
+	static function universalLibrary(scene:Scene):Void {
+		var directory = assetDir() + "/quaternius-ual";
+		var asset = AnimationAsset.load(directory + "/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var manifest:Dynamic = haxe.Json.parse(File.getContent(directory + "/clips.json"));
+		var clips:Array<Dynamic> = Reflect.field(manifest, "clips");
+		var human = new HumanCharacter(scene, asset, rig, null, "Library");
+		var extracted = 0;
+		var standing = function(name:String):{pelvis:Float, foot:Float} {
+			human.player.restart(asset.clipIndex(name), true);
+			human.advance(0.0);
+			var low = 9.0, pelvis = 0.0;
+			for (step in 0...10) {
+				human.advance(step == 0 ? 0.0 : asset.clipDurations[asset.clipIndex(name)] / 10.0);
+				low = Math.min(low, Math.min(human.pose.bonePosition(HumanBone.FootL)[2], human.pose.bonePosition(HumanBone.FootR)[2]));
+				pelvis += human.pose.bonePosition(HumanBone.Pelvis)[2] / 10.0;
+			}
+			return {pelvis: pelvis, foot: low};
+		};
+		var reference = standing("Idle_Loop");
+		for (clip in clips) {
+			var name:String = Reflect.field(clip, "name");
+			var index = asset.clipIndex(name);
+			if (index < 0) throw 'The library lacks the clip "$name" its manifest lists';
+			if (Reflect.field(clip, "file") == null) continue;
+			extracted++;
+			var length:Float = Reflect.field(clip, "length_seconds");
+			if (Math.abs(asset.clipDurations[index] - length) > 0.05)
+				throw 'Clip "$name" is ${asset.clipDurations[index]} s, not the $length s it came with';
+			if (Reflect.field(clip, "license") != "CC0" || Reflect.field(clip, "source") == null || Reflect.field(clip, "sha256") == null || Reflect.field(clip, "library") == null)
+				throw 'Clip "$name" does not say where it came from';
+			// The upright clips share a pelvis height with the free ones, and a tired slouch (knees bent) keeps its feet down.
+			if (name == "Idle_Tired_Loop" && Math.abs(standing(name).foot - reference.foot) > 0.05) throw 'The tired idle has its feet off the floor';
+			if (["Idle_FoldArms_Loop", "Idle_Lantern_Loop", "Idle_TalkingPhone_Loop", "Idle_LookAround_Loop", "Walk_Bwd_Loop", "Walk_L_Loop", "Walk_R_Loop"].indexOf(name) >= 0) {
+				var measured = standing(name);
+				if (Math.abs(measured.pelvis - reference.pelvis) > 0.06 || Math.abs(measured.foot - reference.foot) > 0.05)
+					throw 'Standing clip "$name" has its pelvis at ${measured.pelvis} and a foot at ${measured.foot}, not near ${reference.pelvis} and ${reference.foot}';
+			}
+		}
+		if (extracted < 25) throw 'Only $extracted extracted clips are in the library';
+		var carrying = standing("Walk_Carry_Loop");
+		if (Math.abs(carrying.foot - reference.foot) > 0.06 || carrying.pelvis < 0.6 || carrying.pelvis > reference.pelvis + 0.05)
+			throw 'The carrying walk has its pelvis at ${carrying.pelvis} and a foot at ${carrying.foot}';
+		human.dispose();
+		// A body that carries walks with the carrying gait, and one that does not with the ordinary walk.
+		var again = new HumanCharacter(scene, asset, rig, null, "Carrier");
+		var body = new HumanBody(again);
+		if (body.walker.carryGait == null || !(body.walker.carryGait.naturalSpeed > 0.5 && body.walker.carryGait.naturalSpeed < 2.5))
+			throw "The library character has no usable carrying gait";
+		body.setCarry([ArmR]);
+		body.walker.follow([[0.0, 0.0], [2.0, 0.0]], 1.0);
+		if (again.player.currentClip() != asset.clipIndex("walk_carry")) throw "A body carrying a part did not take the carrying walk";
+		body.setCarry([]);
+		body.walker.follow([[0.0, 0.0], [2.0, 0.0]], 1.0);
+		if (again.player.currentClip() != body.walker.gait.clip) throw "A body carrying nothing did not take the ordinary walk";
+		again.dispose();
 	}
 
 	static function jobSpecs(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
@@ -489,6 +662,66 @@ class HumanKitTests {
 		human.dispose();
 	}
 
+	/**
+	 * A hand closes on an object to the object's size: each finger curls until its own tip is as deep as the
+	 * object, so a thicker object closes the hand more, fingers of different lengths close differently, a
+	 * thin one is pinched, and the shape goes once the object is let go.
+	 */
+	static function grasping(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Grasper");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (hand in [ArmR, ArmL]) {
+			// Tip depth runs from about 2.3 cm (open) to 6 to 7 cm (curled half way), then falls as the fist closes.
+			var shallow = grasped(body, hand, 0.035), medium = grasped(body, hand, 0.05), deep = grasped(body, hand, 0.06);
+			if (!(shallow[HumanHand.INDEX] < medium[HumanHand.INDEX] && medium[HumanHand.INDEX] < deep[HumanHand.INDEX]))
+				throw 'A thicker object did not close the $hand hand further: ${shallow[1]}, ${medium[1]}, ${deep[1]}';
+			// Each finger's tip ends as deep as the object, to a few millimetres.
+			body.setGrasp(hand, 0.05);
+			human.setHandCurls(hand, body.grasp(hand));
+			human.advance(0.0);
+			for (finger in [HumanHand.INDEX, HumanHand.MIDDLE, HumanHand.RING, HumanHand.PINKY])
+				if (Math.abs(body.fingerDepth(hand, finger) - 0.05) > 0.006)
+					throw 'Finger $finger of the $hand hand is ${body.fingerDepth(hand, finger)} m deep, not 0.05';
+			// Fingers of different lengths close by different amounts to the same depth.
+			var spread = Math.max(Math.max(medium[1], medium[2]), Math.max(medium[3], medium[4])) -
+				Math.min(Math.min(medium[1], medium[2]), Math.min(medium[3], medium[4]));
+			if (spread < 0.02) throw 'Every finger of the $hand hand closed alike to one depth: $medium';
+			// A thin object is pinched: only the thumb and index close on it.
+			var thin = grasped(body, hand, 0.02);
+			if (thin[HumanHand.MIDDLE] > body.posture.relaxedCurl + 1e-6 || thin[HumanHand.PINKY] > body.posture.relaxedCurl + 1e-6)
+				throw 'The $hand hand did not pinch a thin object: $thin';
+			if (Math.abs(thin[HumanHand.THUMB] - body.posture.thumbShare * thin[HumanHand.INDEX]) > 1e-6)
+				throw "The thumb does not follow the index finger";
+			if (medium[HumanHand.PINKY] <= thin[HumanHand.PINKY] && medium[HumanHand.MIDDLE] <= thin[HumanHand.MIDDLE])
+				throw 'A thick object was no more closed on than a thin one by the $hand hand: $medium against $thin';
+		}
+		// Holding, the fingers settle into the grasp; letting go, they relax and the grasp is forgotten.
+		body.setGrasp(ArmR, 0.05);
+		var wanted = body.grasp(ArmR);
+		body.setCarry([ArmR]);
+		for (_ in 0...60) body.advance(step);
+		var held = human.handCurls(ArmR);
+		for (finger in 0...HumanHand.FINGERS)
+			if (Math.abs(held[finger] - wanted[finger]) > 0.02)
+				throw 'Finger $finger did not settle into the grasp: ${held[finger]} against ${wanted[finger]}';
+		body.setCarry([]);
+		for (_ in 0...60) body.advance(step);
+		var relaxed = human.handCurls(ArmR);
+		for (finger in 0...HumanHand.FINGERS)
+			if (Math.abs(relaxed[finger] - body.posture.relaxedCurl) > 0.02)
+				throw 'Finger $finger did not relax after letting go: ${relaxed[finger]}';
+		if (body.grasp(ArmR) != null) throw "The grasp was kept after the object was let go";
+		human.dispose();
+	}
+
+	static function grasped(body:HumanBody, hand:HumanLimb, depth:Float):Array<Float> {
+		body.setGrasp(hand, depth);
+		return body.grasp(hand);
+	}
+
 	/** Leaning carries the shoulders forward, an unused arm hangs instead of swinging back, and standing up undoes it. */
 	static function leaning(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var human = new HumanCharacter(scene, asset, rig, null, "Leaner");
@@ -505,8 +738,8 @@ class HumanKitTests {
 		if (Math.abs(shoulderX(HumanBone.UpperArmR) - upright) > 1e-4 || human.spineLean() != 0.0)
 			throw "Working out a lean left the pose changed";
 		var capped = body.leanFor(ArmR, 5.0);
-		if (capped.angle > HumanBody.MAX_LEAN + 1e-6 || capped.shift >= 5.0)
-			throw 'A lean of ${capped.angle} rad was allowed past ${HumanBody.MAX_LEAN}';
+		if (capped.angle > body.posture.maxLean + 1e-6 || capped.shift >= 5.0)
+			throw 'A lean of ${capped.angle} rad was allowed past ${body.posture.maxLean}';
 
 		body.setLean(made.angle);
 		for (_ in 0...90) body.advance(step);
@@ -594,6 +827,91 @@ class HumanKitTests {
 		human.dispose();
 	}
 
+	/**
+	 * The floor-up measures on motions whose answer is known: standing still has no skate and a mass well inside
+	 * its feet, and a steady walk at the gait's own speed keeps a planted foot where it is. The same measures
+	 * on a whole job are reported by the sim sweeps.
+	 */
+	static function naturalness(scene:Scene, asset:AnimationAsset, rig:HumanoidRig, label:String, slideLimit:Float = 0.08):Void {
+		var human = new HumanCharacter(scene, asset, rig, null, "Natural");
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (_ in 0...30) body.advance(step);
+		var still = new Naturalness();
+		for (_ in 0...120) {
+			body.advance(step);
+			still.sample(body, step);
+		}
+		if (still.maxSlide > 0.005 || still.minSupportMargin < -0.02)
+			throw 'A worker standing still slid or tipped ($label): ${still.summary()}';
+		var walking = new Naturalness();
+		body.walker.follow([[0.0, 0.0], [20.0, 0.0]], 1.0);
+		for (index in 0...360) {
+			body.advance(step);
+			if (index >= 60) walking.sample(body, step);
+		}
+		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
+			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
+		human.dispose();
+	}
+
+	/** A posture's lengths grow with the body; its angles, fractions and times do not. */
+	static function postureStature():Void {
+		var standard = HumanPosture.standard(), same = HumanPosture.forStature(HumanPosture.REFERENCE_STATURE);
+		if (same.bellyFront != standard.bellyFront || same.carryOffset[0] != standard.carryOffset[0])
+			throw "The reference stature changed the posture";
+		var tall = HumanPosture.forStature(HumanPosture.REFERENCE_STATURE * 1.5);
+		if (Math.abs(tall.bellyFront - standard.bellyFront * 1.5) > 1e-12 || Math.abs(tall.carryOffset[2] - standard.carryOffset[2] * 1.5) > 1e-12 ||
+			Math.abs(tall.blendSpeed - standard.blendSpeed * 1.5) > 1e-12)
+			throw "A taller body's posture lengths did not grow with it";
+		if (tall.maxLean != standard.maxLean || tall.stretch != standard.stretch || tall.comfort != standard.comfort || tall.edgeGap != standard.edgeGap ||
+			tall.hangSeconds != standard.hangSeconds)
+			throw "A taller body's posture angles, fractions or times changed";
+		var rejected = false;
+		try HumanPosture.forStature(0.0) catch (_:Dynamic) rejected = true;
+		if (!rejected) throw "A posture for no stature was accepted";
+	}
+
+	/** A facility's surfaces and slot items become boxes in its frame, turned with their owners. */
+	static function facilitySurfaces():Void {
+		var facility = new Facility("surfaces", "Surfaces");
+		facility.addZone(new Zone("floor", "Floor", "map", Footprint.rectangle(12, 12)));
+		// A rack turned a quarter turn, its top offset along its own x axis, holding a 10 x 8 x 6 cm item.
+		var rack = new Rack("rack", "Rack", "floor", "map", new Pose2(2, 1, Math.PI / 2),
+			[new RackSlot("B3", new RackSlotPose(0.25, 0, 1.2), [0.05, 0.04, 0.03])], new Surface(0.3, 0.2, 1.1, 0.1, 0.0, 0.25));
+		// A station's table lies ahead of where the worker stands.
+		var table = new Station("table", "Table", "floor", "map", new Pose2(4, 1, 0.0), new Surface(0.2, 0.2, 1.0, 0.65));
+		var bare = new Station("bare", "Bare", "floor", "map", new Pose2(6, 1));
+		facility.addRack(rack);
+		facility.addStation(table);
+		facility.addStation(bare);
+		facility.addLane(new Lane("rack-table", "rack", "table", new Path([rack.pose, new Pose2(3, 1), table.pose], "map"), 1, 1));
+		var targets = new FacilityTargets(facility);
+		var top = targets.surfaceBox("rack");
+		if (top == null || distance(top.center, [2.0, 1.1, 1.05]) > 1e-9 || Math.abs(top.yaw - (Math.PI / 2 + 0.25)) > 1e-9 ||
+			top.halfExtents[0] != 0.3 || top.halfExtents[1] != 0.2)
+			throw 'The rack top was not turned with the rack: $top';
+		var bench = targets.surfaceBox("table");
+		if (bench == null || distance(bench.center, [4.65, 1.0, 0.95]) > 1e-9 || bench.yaw != 0.0)
+			throw 'The table did not lie ahead of its station: $bench';
+		if (Math.abs(bench.center[2] + bench.halfExtents[2] - 1.0) > 1e-9)
+			throw "The table box's top face is not at the surface height";
+		if (targets.surfaceBox("bare") != null) throw "A station without a surface reported one";
+		var item = targets.slotItemBox("rack", "B3");
+		if (item == null || distance(item.center, [2.0, 1.25, 1.2]) > 1e-9 || item.halfExtents[0] != 0.05 || item.halfExtents[2] != 0.03)
+			throw 'The slot item box did not resolve through the rack: $item';
+		var threw = false;
+		try targets.surfaceBox("missing") catch (_:Dynamic) threw = true;
+		if (!threw) throw "An unknown station was accepted";
+		// With no place point given, the part is set down on the station's surface, at its middle and resting on it.
+		var place:Place = cast FacilityJobs.fetch(facility, "rack", "B3").deliver("table").orderedActions()[4];
+		if (distance(place.target, [4.65, 1.0, 1.03]) > 1e-9)
+			throw 'The part was not set down on the station surface: ${place.target}';
+		var undescribed = false;
+		try FacilityJobs.fetch(facility, "rack", "B3").deliver("bare") catch (_:Dynamic) undescribed = true;
+		if (!undescribed) throw "A delivery with no place point and no station surface was accepted";
+	}
+
 	/** Rack-relative slots resolve in facility space and jobs use routed lanes. */
 	static function facilityTargets(scene:Scene, asset:AnimationAsset, rig:HumanoidRig):Void {
 		var facility = new Facility("fetch", "Fetch facility");
@@ -613,6 +931,9 @@ class HumanKitTests {
 		var slot = targets.rackSlotPoint("rack", "B3");
 		if (distance(slot, [2, 1.25, 1.2]) > 1e-9)
 			throw 'Rack slot did not resolve through yaw: $slot';
+		// A facility that describes no surface or item gives the job nothing to lean over or shape a grip to.
+		if (targets.surfaceBox("rack") != null || targets.surfaceBox("table") != null || targets.slotItemBox("rack", "B3") != null)
+			throw "A facility with no surfaces or items reported one";
 		var route = targets.route("rack", "table");
 		var points = FacilityWalk.routeFromFacilityRoute(route);
 		if (points.length != 3 || distance([points[1][0], points[1][1], 0], [3, 1, 0]) > 1e-9)

@@ -128,6 +128,23 @@ allocation from the workspace save worker. On 2026-09-30 a `Text` build cost 3.3
 any one widget, sets the tree-build total (about 530 KiB); shrinking it much further means reusing unchanged subtrees
 instead of rebuilding them.
 
+## Checks to run before merging
+
+Three scripts catch what the tests of one kit do not:
+
+- `tools/check-compile-all.py` compiles every tracked `haxeon.json` project and the script-built targets in
+  `tools/compile-sweep.json` (simulation bindings; the UIKit showcase with `--fast` omitted), so a compiler change cannot
+  break a kit nobody builds that day. Library packages (no `entry`) are built through the projects that use them. About
+  10 minutes at `--jobs 3`. Its first run found two binding checks that had been failing for days: they used a type
+  without importing it.
+- `tools/check-determinism.py` builds the performance project cold, then again incrementally after an edit, then cold from the
+  edited source, and requires the last two to be byte-identical (two edits: a line inserted at the top of
+  `BuildContext.hx`, and a longer string literal). On a difference it decodes both with `hldump`. About 4 minutes per edit.
+- `app/tools/check-editor-performance.py --budgets` runs the headless scenarios and holds each action's median frame time
+  and allocation to the ceilings in `budgets.json`. Time ceilings are loose (machines differ), allocation ceilings tight.
+  `--budgets --measure` prints the measured values, to set a budget after a deliberate change. The older default mode
+  checks for leaks and unbounded growth.
+
 ## Reading a profile
 
 Sampling used to hold the program stopped for about 650 us per sample (`selection-stress` measured 21-25 ms per frame profiled
@@ -146,6 +163,16 @@ samples whose leaf is a blocking wait (about half of a short capture is a parked
 inclusive time with readable generic and lambda names, and flags `<Dynamic>` generic instances on hot paths (boxed values).
 Raise `--sample-rate` (default 500 a second; 2000 is fine now) for a short scenario: a 40-cycle `selection-stress` yields only a
 few hundred samples.
+
+## Comparing two runs
+
+`python3 app/tools/profile-compare.py BEFORE AFTER` (capture directories) compares per action the median frame, tree/style,
+native layout and allocation, and, when both captures have a profile, each function's share of frame-submission samples.
+`profile-editor.py ... --compare BEFORE` runs it after a fresh capture. A change is called real only if it exceeds the noise
+of both runs and `--min-change` (10%): two runs of one build differed by up to 8% in a frame's median, so smaller changes are
+reported as noise. Profile shares are relative (one function getting cheaper raises the others), and they count as different
+only beyond two standard errors of the sample counts. To measure a change, capture with `--no-profile` before and after
+(same scenario and `--cycles`), then use `--sample-rate 2000` captures to see where the time moved.
 
 ## Allocation census
 

@@ -4,6 +4,7 @@ import materia.assembly.AssemblyFrames;
 /** Checks that recorded mates solve independently of insertion order. */
 class AssemblyModelSmoke {
 	public static function run():Void {
+		checkAutomaticClosure();
 		var ordered = chain(false), reversed = chain(true);
 		near(ordered.pose("middle").x, 110, "parent-first middle pose");
 		near(ordered.pose("leaf").x, 115, "parent-first leaf pose");
@@ -68,6 +69,27 @@ class AssemblyModelSmoke {
 
 	static function near(actual:Float, expected:Float, label:String):Void {
 		if (Math.abs(actual - expected) > 1e-9) throw '$label: expected $expected, got $actual';
+	}
+
+	/** Mating a fourth bar onto an already jointed one closes the loop: it becomes a closure, not an error. */
+	static function checkAutomaticClosure():Void {
+		var model = new AssemblyModel();
+		for (name in ["ground", "crank", "coupler", "rocker"]) model.add(name);
+		for (name in ["ground", "crank", "coupler", "rocker"]) {
+			model.connector(name, "a", AssemblyFrames.identity());
+			model.connector(name, "b", AssemblyFrames.translation(1000, 0, 0));
+		}
+		model.mateOnAxis("crank", "revolute", "ground", "a", "crank", "a", {x: 0, y: 0, z: 1}, 0.6);
+		model.mateOnAxis("coupler", "revolute", "crank", "b", "coupler", "a", {x: 0, y: 0, z: 1}, 0.2);
+		model.mateOnAxis("rocker", "revolute", "ground", "b", "rocker", "a", {x: 0, y: 0, z: 1}, 1.4);
+		model.mateOnAxis("pin", "revolute", "coupler", "b", "rocker", "b", {x: 0, y: 0, z: 1});
+		var roles = [for (joint in model.definition().joints) joint.id + ":" + joint.role].join(",");
+		if (roles != "crank:tree,coupler:tree,rocker:tree,pin:closure") throw 'the loop-closing joint becomes a closure: $roles';
+		// Mating back up the tree (the parent hangs below the child) closes a loop too.
+		model.mateOnAxis("back", "revolute", "coupler", "a", "ground", "a", {x: 0, y: 0, z: 1});
+		if (model.definition().joints[4].role != "closure") throw "a joint whose parent hangs below its child is a closure";
+		throws(() -> model.mateOnAxis("valued", "revolute", "rocker", "b", "coupler", "b", {x: 0, y: 0, z: 1}, 0.3),
+			"no coordinate of its own");
 	}
 
 	static function throws(action:Void->Void, fragment:String):Void {

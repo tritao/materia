@@ -119,6 +119,36 @@ ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz
 
 } // namespace
 
+namespace {
+
+bool turnBefore(const JointRotation &a, const JointRotation &b) {
+    return a.source != b.source ? a.source < b.source : a.joint < b.joint;
+}
+
+} // namespace
+
+void Instance::setJointRotation(const JointRotation &turn) {
+    auto existing = std::find_if(joint_rotations.begin(), joint_rotations.end(), [&](const JointRotation &other) {
+        return other.source == turn.source && other.joint == turn.joint;
+    });
+    if (!(turn.weight > 0.0f)) {
+        if (existing != joint_rotations.end()) joint_rotations.erase(existing);
+        return;
+    }
+    if (existing != joint_rotations.end()) {
+        *existing = turn;
+        return;
+    }
+    joint_rotations.insert(std::upper_bound(joint_rotations.begin(), joint_rotations.end(), turn, turnBefore), turn);
+}
+
+void Instance::replaceJointRotations(uint32_t source, const std::vector<JointRotation> &turns) {
+    joint_rotations.erase(std::remove_if(joint_rotations.begin(), joint_rotations.end(),
+                                         [source](const JointRotation &turn) { return turn.source == source; }),
+                          joint_rotations.end());
+    for (const JointRotation &turn : turns) setJointRotation(turn);
+}
+
 bool Instance::evaluate() {
     const auto &skeleton = *asset_->skeleton;
     ozz::animation::BlendingJob::Layer blend_layers[kMaxLayers];

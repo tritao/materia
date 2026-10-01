@@ -29,6 +29,32 @@ int main() {
         shared_glyphs.vertices.empty())
         return 50;
 
+    // Intrinsic measurements are cached by text and style, and a cached answer equals a fresh one.
+    {
+        TextEngine measured(shared_fonts);
+        TextLayoutOptions small_options, large_options;
+        small_options.font_size = 14.0f;
+        large_options.font_size = 28.0f;
+        TextIntrinsicMetrics first, again, large, other_text;
+        if (!measured.measure_intrinsic_utf8("measure me", small_options, &first) ||
+            !measured.measure_intrinsic_utf8("measure me", small_options, &again) ||
+            first.bounds.width <= 0.0f || again.bounds.width != first.bounds.width ||
+            again.bounds.height != first.bounds.height || again.baseline != first.baseline)
+            return 90;
+        if (!measured.measure_intrinsic_utf8("measure me", large_options, &large) ||
+            large.bounds.width <= first.bounds.width)
+            return 91;
+        if (!measured.measure_intrinsic_utf8("measure me a little longer", small_options,
+                                             &other_text) ||
+            other_text.bounds.width <= first.bounds.width)
+            return 92;
+        TextEngine fresh(shared_fonts);
+        TextIntrinsicMetrics independent;
+        if (!fresh.measure_intrinsic_utf8("measure me", small_options, &independent) ||
+            independent.bounds.width != first.bounds.width)
+            return 93;
+    }
+
     TextEngine engine;
     if (!engine.valid() || !engine.add_font(NKUI_TEST_FONT_PATH) ||
         !engine.add_font(NKUI_TEST_COLOR_FONT_PATH, FontFamily::Emoji) ||

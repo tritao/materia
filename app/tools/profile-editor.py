@@ -89,6 +89,8 @@ def main():
                         help="replay a headless UI interaction")
     parser.add_argument("--cycles", type=int, default=20, help="headless scenario cycles (default: 20)")
     parser.add_argument("--skip-build", action="store_true", help="reuse the compiled editor; still ensure the Release HashLink runtime")
+    parser.add_argument("--compare", type=Path, metavar="CAPTURE",
+                        help="after the run, compare it with an earlier capture directory (see profile-compare.py)")
     parser.add_argument("--no-baseline", action="store_true",
                         help="do not rerun a headless scenario without the profiler to measure the profiler's overhead")
     parser.add_argument("--output-dir", type=Path)
@@ -470,6 +472,11 @@ def main():
                                                                     "cycles": args.cycles if args.scenario else None}},
                                                       indent=2) + "\n")
     print(f"capture={output}")
+    if args.compare is not None:
+        comparison = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "profile-compare.py"),
+                                     str(args.compare), str(output)], capture_output=True, text=True)
+        print(f"\ncompared with {args.compare}:")
+        print(comparison.stdout + comparison.stderr, end="")
     if result:
         print(f"editor/profile exited with status {result}; see {output / 'launch.log'}", file=sys.stderr)
     return result

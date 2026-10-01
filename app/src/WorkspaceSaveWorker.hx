@@ -3,9 +3,59 @@ package app;
 import nativekit.ui.docking.DockWorkspacePersistence;
 import nativekit.ui.docking.DockWorkspaceSnapshot;
 import nativekit.ui.docking.DockWorkspaceSnapshotCodec;
+#if !wasm
 import sys.thread.Condition;
 import sys.thread.Thread;
+#end
 
+#if wasm
+/** The browser build has no worker threads yet, so each workspace change is written on the UI thread. */
+class WorkspaceSaveWorker {
+  final storage:DockWorkspacePersistence;
+  final key:String;
+  var lastError:Null<String>;
+  var unreportedError = false;
+  var closed = false;
+
+  public function new(storage:DockWorkspacePersistence, key:String) {
+    this.storage = storage;
+    this.key = key;
+  }
+
+  public function schedule(snapshot:DockWorkspaceSnapshot):Void {
+    save(snapshot);
+  }
+
+  public function saveNow(snapshot:DockWorkspaceSnapshot):Null<String> {
+    save(snapshot);
+    unreportedError = false;
+    return lastError;
+  }
+
+  public function takeError():Null<String> {
+    var error = unreportedError ? lastError : null;
+    unreportedError = false;
+    return error;
+  }
+
+  public function close():Null<String> {
+    closed = true;
+    return lastError;
+  }
+
+  function save(snapshot:DockWorkspaceSnapshot):Void {
+    if (snapshot == null) throw "Cannot save a null workspace snapshot";
+    if (closed) throw "Workspace save worker is closed";
+    try {
+      storage.save(key, DockWorkspaceSnapshotCodec.encode(snapshot));
+      lastError = null;
+    } catch (failure:Dynamic) {
+      lastError = Std.string(failure);
+      unreportedError = true;
+    }
+  }
+}
+#else
 /** Coalesces workspace changes and serializes/writes them away from the UI thread. */
 class WorkspaceSaveWorker {
   static inline var QUIET_SECONDS = 0.15;
@@ -131,3 +181,4 @@ class WorkspaceSaveWorker {
     }
   }
 }
+#end

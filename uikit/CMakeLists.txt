@@ -626,6 +626,7 @@ if(NK_BUILD_EXAMPLES)
                 _nk_init
                 _nk_last_error
                 _nk_poll_event
+                _nk_pointer_button_get_state
                 _nk_resource_load_async
                 _nk_shutdown
                 _nk_time_seconds
@@ -641,6 +642,7 @@ if(NK_BUILD_EXAMPLES)
                 _nk_surface_present
                 _nk_surface_set_bounds
                 _nk_surface_set_text_input_active
+                _nk_surface_set_text_input_geometry
                 _nk_surface_set_text_input_state
                 _nk_window_create
                 _nk_window_destroy
@@ -677,6 +679,7 @@ if(NK_BUILD_EXAMPLES)
                 _nkui_layout_session_hit_test_into
                 _nkui_layout_session_render_frame
                 _nkui_layout_session_set_custom_paint
+                _nkui_layout_session_set_custom_paint_composite
                 _nkui_layout_session_set_custom_paint_cache_policy
                 _nkui_layout_session_set_cache_policy
                 _nkui_layout_session_set_font_collection
@@ -687,7 +690,9 @@ if(NK_BUILD_EXAMPLES)
                 _nkui_path_create
                 _nkui_renderer_create
                 _nkui_renderer_destroy
+                _nkui_renderer_get_gpu_renderer
                 _nkui_renderer_get_stats
+                _nkui_renderer_prepare
                 _nkui_renderer_render
                 _nkui_renderer_render_frame
                 _nkui_resource_destroy
@@ -732,6 +737,9 @@ if(NK_BUILD_EXAMPLES)
                 "-sINITIAL_MEMORY=${NKUI_HAXEON_MEMORY_LIMIT}"
                 "-sALLOW_MEMORY_GROWTH=0"
                 "-sEXPORTED_FUNCTIONS=[${NKUI_HAXEON_EXPORTED_FUNCTIONS_CSV}]"
+                # The page adds the guest's native callbacks to the function table.
+                "-sEXPORTED_RUNTIME_METHODS=addFunction,removeFunction"
+                "-sALLOW_TABLE_GROWTH=1"
                 "-sNO_EXIT_RUNTIME=1")
             if(NKUI_HAXEON_BUNDLE_FONTS)
                 foreach(NKUI_HAXEON_FONT_PATH IN LISTS NKUI_HAXEON_FONT_ASSET_PATHS)
@@ -747,7 +755,10 @@ if(NK_BUILD_EXAMPLES)
                     "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/nativekit_ui_haxeon_guest.wasm"
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${CMAKE_CURRENT_SOURCE_DIR}/examples/ui_haxeon/web_shell.html"
-                    "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/nativekit_ui_haxeon.html")
+                    "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/nativekit_ui_haxeon.html"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${NKUI_HAXEON_DIR}/stdlib/haxeon/wasm/haxeon-host.js"
+                    "$<TARGET_FILE_DIR:nativekit_ui_haxeon>/haxeon-host.js")
             if(NOT NKUI_HAXEON_BUNDLE_FONTS)
                 list(APPEND NKUI_HAXEON_ASSET_COMMANDS
                     COMMAND ${CMAKE_COMMAND} -E rm -f
@@ -777,6 +788,7 @@ if(NK_BUILD_EXAMPLES)
                     nativekit_ui_haxeon_fonts
                     ${NKUI_HAXEON_FONT_ASSET_PATHS}
                     "${CMAKE_CURRENT_SOURCE_DIR}/examples/ui_haxeon/web_shell.html"
+                    "${NKUI_HAXEON_DIR}/stdlib/haxeon/wasm/haxeon-host.js"
                 COMMENT "Copying NativeKit Haxeon browser host")
             add_dependencies(nativekit_ui_haxeon nativekit_ui_haxeon_assets)
         endif()

@@ -11,6 +11,8 @@ class Pick extends HumanActionBase {
 	public final target:Array<Float>;
 	public final hands:Array<HumanLimb>;
 	public final ramp:Float;
+	/** The box of the object being picked up, so the fingers close to its size; null for the plain grip. */
+	public final object:Null<HumanTargetBox>;
 	/** Becomes true for one full-weight tick at the grasp point. */
 	public var grip(default, null):Bool = false;
 	/** Largest palm distance from its grasp point when the hands closed, in metres. */
@@ -20,11 +22,12 @@ class Pick extends HumanActionBase {
 	var from:Array<Array<Float>> = [];
 	var guesses:Array<Array<Float>> = [];
 
-	public function new(target:Array<Float>, hands:Array<HumanLimb>, ramp:Float = 0.35) {
+	public function new(target:Array<Float>, hands:Array<HumanLimb>, ramp:Float = 0.35, ?object:HumanTargetBox) {
 		super();
 		this.target = target.copy();
 		this.hands = hands.copy();
 		this.ramp = ramp;
+		this.object = object;
 	}
 
 	override public function start(worker:HumanBody):Void {
@@ -51,6 +54,8 @@ class Pick extends HumanActionBase {
 			worker.setCarry(hands);
 			// The grasp is made; stand up straight to carry.
 			worker.setLean(0.0);
+			worker.setCrouch(0.0);
+			worker.setArmsDown(false);
 			done = true;
 			return;
 		}
@@ -84,6 +89,9 @@ class Pick extends HumanActionBase {
 			}
 			grip = true;
 			worker.setGrip(true);
+			// Close the fingers to the object's size, measured across the palm as it lies now.
+			var held = object;
+			if (held != null) for (hand in hands) worker.setGrasp(hand, worker.graspDepth(hand, held));
 			fullTick = true;
 		}
 	}
@@ -92,7 +100,7 @@ class Pick extends HumanActionBase {
 	function graspPoint(index:Int):Array<Float> {
 		var root = worker.rootTransform();
 		var side = hands[index] == ArmL ? 1.0 : -1.0;
-		var spread = hands.length == 2 ? 0.08 : 0.0;
+		var spread = hands.length == 2 ? worker.posture.handSpread : 0.0;
 		return [target[0] + root[4] * side * spread, target[1] + root[5] * side * spread, target[2]];
 	}
 }

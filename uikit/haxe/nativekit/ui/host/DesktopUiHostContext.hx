@@ -4,7 +4,7 @@ import FontCollection;
 import NativeKitEvents;
 import nativekit.ffi.NativeKitTypes;
 
-/** Live services available while constructing a hosted desktop application. */
+/** Live services, with the window and surface, available while constructing a hosted desktop or browser application. */
 class DesktopUiHostContext extends UiHostContext {
 	/** Borrowed window handle for application-owned native dialogs. */
 	public final window:WindowHandle;
@@ -12,6 +12,7 @@ class DesktopUiHostContext extends UiHostContext {
 	public final surface:SurfaceHandle;
 	/** An application may defer closing while it asks to save a document. */
 	@:allow(nativekit.ui.host.DesktopUiHost)
+	@:allow(nativekit.ui.host.BrowserUiHost)
 	private function new(fonts:FontCollection, events:NativeKitEvents, window:WindowHandle, surface:SurfaceHandle,
 			close:Void->Void, scheduleFrame:Void->Void) {
 		super(fonts, events, close, scheduleFrame);

@@ -71,18 +71,31 @@ class AssemblyModel {
 		solved = null;
 	}
 
-	/** The child pose makes its named connector coincide with the parent joint frame. */
+	/**
+		The child pose makes its named connector coincide with the parent joint frame. A joint that closes a loop
+		becomes a closure instead (see `mateOnAxis`).
+	*/
 	public function mate(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, value:Float = 0):Void {
 		mateOnAxis(id, kind, parent, parentConnector, child, childConnector,
 			{x: 0, y: 1, z: 0}, value);
 	}
 
-	/** Creates a tree joint with an explicit unit axis in the parent connector frame. */
+	/**
+		Creates a joint with an explicit unit axis in the parent connector frame: a tree joint, or a closure when
+		the child already hangs from a joint or is an ancestor of the parent (the joint closes a loop). A closure
+		has no coordinate of its own, so its value must be 0.
+	*/
 	public function mateOnAxis(id:String, kind:String, parent:String, parentConnector:String,
 			child:String, childConnector:String, axis:AssemblyVector, value:Float = 0,
 			?limits:AssemblyJointLimits):Void {
-		if (attached.exists(child)) throw 'Instance "$child" already has a parent joint';
+		require(parent);
+		require(child);
+		if (attached.exists(child) || isAncestor(child, parent) || AssemblyDefinitionCodec.closureOnlyType(cast kind)) {
+			if (value != 0) throw 'Joint "$id" closes a loop, so it has no coordinate of its own; its value must be 0';
+			constrainOnAxis(id, kind, parent, parentConnector, child, childConnector, axis, null, limits);
+			return;
+		}
 		if (!validJointKind(kind))
 			throw 'Unsupported assembly joint "$kind"';
 		if (!Math.isFinite(value)) throw "Assembly joint value must be finite";
@@ -97,6 +110,22 @@ class AssemblyModel {
 			childConnector: childConnector, defaultValue: value, axis: axis,
 			limits: limits == null ? noLimits() : limits});
 		solved = null;
+	}
+
+	/**
+		Marks a movable tree joint as an input of the mechanism (a motor, a cylinder): closure solves never move it,
+		and the other movable joints on its loops follow it.
+	*/
+	public function drive(jointId:String, driven:Bool = true):Void {
+		for (joint in data.joints)
+			if (joint.id == jointId) {
+				if (joint.role != AssemblyJointRole.Tree || !AssemblyDefinitionCodec.hasCoordinate(joint.type))
+					throw 'Assembly joint "$jointId" is not a movable tree joint';
+				if (driven) joint.driven = true; else Reflect.deleteField(joint, "driven");
+				solved = null;
+				return;
+			}
+		throw 'Missing assembly joint "$jointId"';
 	}
 
 	/** Records a closure; its residual is checked against solved poses on read. */
@@ -171,6 +200,18 @@ class AssemblyModel {
 		return state;
 	}
 
+	/** Whether `ancestor` lies on `occurrence`'s tree path to its root (or is it). */
+	function isAncestor(ancestor:String, occurrence:String):Bool {
+		var current:Null<String> = occurrence;
+		while (current != null) {
+			if (current == ancestor) return true;
+			var next:Null<String> = null;
+			for (joint in data.joints) if (joint.role == AssemblyJointRole.Tree && joint.child == current) { next = joint.parent; break; }
+			current = next;
+		}
+		return false;
+	}
+
 	function require(id:String):AssemblyComponentOccurrence {
 		var instance = byId.get(id);
 		if (instance == null) throw 'Missing assembly instance "$id"';
@@ -186,7 +227,8 @@ class AssemblyModel {
 	}
 
 	static function validJointKind(kind:String):Bool
-		return kind == "fixed" || kind == "revolute" || kind == "continuous" || kind == "prismatic";
+		return kind == "fixed" || kind == "revolute" || kind == "continuous" || kind == "prismatic" ||
+			AssemblyDefinitionCodec.closureOnlyType(cast kind);
 
 	static function validateAxis(axis:AssemblyVector):Void {
 		if (axis == null || !Math.isFinite(axis.x) || !Math.isFinite(axis.y) || !Math.isFinite(axis.z) ||

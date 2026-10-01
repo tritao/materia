@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+nativekit_dir=${NATIVEKIT_DIR:-"$(dirname "$repo_dir")/nativekit"}
 artifact_dir=${NATIVEKIT_WEB_ARTIFACT_DIR:-"$repo_dir/build-web"}
 browser=${NK_WEB_BROWSER:-}
 
@@ -59,5 +60,5 @@ for _ in $(seq 1 100); do
     sleep 0.1
 done
 
-python3 "$repo_dir/tools/web_smoke.py" --debug-port "$debug_port" \
+python3 "$nativekit_dir/tools/web_smoke.py" --debug-port "$debug_port" \
     --page-url "$page_url" --skip-text-input "$@"
