@@ -1,4 +1,7 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanLimb;
 
 /** Ramps an active IK limb back onto its animation. */
 class ReleaseLimb extends HumanActionBase {

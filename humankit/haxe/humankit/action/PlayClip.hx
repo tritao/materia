@@ -1,4 +1,6 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
 
 /** Crossfades to a named clip and plays it for a fixed duration. */
 class PlayClip extends HumanActionBase {

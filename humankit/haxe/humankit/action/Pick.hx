@@ -1,4 +1,8 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanLimb;
+import humankit.HumanTargetBox;
 
 /**
  * Reaches the palms to a grasp point, closes the hands there, then establishes

@@ -1,4 +1,4 @@
-package humankit;
+package humankit.rig;
 
 class HumanBones {
 	/** Bones every humanoid rig must provide. */

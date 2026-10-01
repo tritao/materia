@@ -1,4 +1,6 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
 
 /** Keeps the current animation and IK pose for a fixed duration. */
 class Wait extends HumanActionBase {

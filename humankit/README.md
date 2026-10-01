@@ -15,6 +15,13 @@ human.advance(seconds);
 var head = human.pose.bonePosition(HumanBone.Head);  // model space, metres
 ```
 
+## Layout
+
+`haxe/humankit/` holds the character, body, walker, job and proxy types that the app and the simulation use. Three groups that stand apart
+have their own subpackage: `rig/` (the skeleton and pose data: `HumanBone`, `HumanoidRig`, `RigMapping`, `HumanPose`, `Mat4`), `action/` (the
+job actions and the planner: `Pick`, `Place`, `Press`, `Carry`, `Reach`, `WalkTo`, `ApproachFor`, and the rest) and `quality/` (`MotionQuality`,
+`Naturalness`). `humankit.sim` is the physics worker and `humankit.facility` the AutomationKit adapters, each in its own folder.
+
 ## Standard skeleton
 
 `HumanBone` names about 30 bones: pelvis, spine segments, neck, and head, plus

@@ -1,4 +1,4 @@
-package humankit;
+package humankit.rig;
 
 /**
  * Names of an asset rig's joints for each standard bone. Joint names are

@@ -1,4 +1,6 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
 
 /** One step of a worker job. Targets supplied by actions are world-space. */
 interface HumanAction {

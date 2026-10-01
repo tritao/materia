@@ -1,8 +1,8 @@
-import humankit.HumanBone;
+import humankit.rig.HumanBone;
 import humankit.HumanBody;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
-import humankit.MotionQuality;
+import humankit.quality.MotionQuality;
 import humankit.sim.HumanWorker;
 import nativekit.sim.SimSession;
 
@@ -23,7 +23,7 @@ class JobGate {
 
     public final quality:MotionQuality = new MotionQuality();
     /** The body's feet, balance and jerk over the run; see `Naturalness`. */
-    public final naturalness:humankit.Naturalness = new humankit.Naturalness();
+    public final naturalness:humankit.quality.Naturalness = new humankit.quality.Naturalness();
     /**
      * The furthest a planted foot may slide, and the least margin the centre of mass may keep inside the feet, in metres.
      * Measured on the sweeps with the bundled worker: 0.05 m of slide and a mass on the edge of its feet; the library

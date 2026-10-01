@@ -2,6 +2,8 @@ package humankit;
 
 import animkit.AnimationAsset;
 import animkit.AnimationInstance;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
 
 /**
  * A turn-in-place clip, measured: how far the body has turned by the end of the clip and how long that takes.

@@ -1,4 +1,6 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
 
 /** Walks to one floor point, or along an explicit sequence of floor points. */
 class WalkTo extends HumanActionBase {

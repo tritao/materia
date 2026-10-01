@@ -1,4 +1,8 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanCarryPosture;
+import humankit.HumanLimb;
 
 /** Establishes a persistent carry posture for subsequent walking actions. */
 class Carry extends HumanActionBase {

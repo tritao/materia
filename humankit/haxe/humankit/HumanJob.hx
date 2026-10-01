@@ -1,5 +1,7 @@
 package humankit;
 
+import humankit.action.HumanAction;
+
 /** Ordered actions for one body. A failed action stops the job. */
 class HumanJob {
 	final actions:Array<HumanAction> = [];

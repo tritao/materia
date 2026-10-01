@@ -1,4 +1,4 @@
-package humankit;
+package humankit.rig;
 
 import haxe.io.Bytes;
 

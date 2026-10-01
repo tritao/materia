@@ -1,4 +1,4 @@
-package humankit;
+package humankit.rig;
 
 /**
  * Materia's standard humanoid bones. The finger bones name the knuckle at the

@@ -1,13 +1,13 @@
 package humankit.facility;
 
-import humankit.ApproachFor;
+import humankit.action.ApproachFor;
 import humankit.HumanJob;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
-import humankit.Pick;
-import humankit.Place;
-import humankit.ReleaseLimb;
-import humankit.WalkTo;
+import humankit.action.Pick;
+import humankit.action.Place;
+import humankit.action.ReleaseLimb;
+import humankit.action.WalkTo;
 
 /** A fetch plan resolved into one HumanJob when its delivery is named. */
 class FacilityFetchJob {

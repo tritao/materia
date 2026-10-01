@@ -1,4 +1,7 @@
-package humankit;
+package humankit.quality;
+
+import humankit.HumanBody;
+import humankit.rig.HumanBone;
 
 /**
  * What a run of poses looks like from the floor up, sampled once per tick: whether planted feet slide, whether the

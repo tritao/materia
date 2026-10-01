@@ -1,4 +1,4 @@
-package humankit;
+package humankit.rig;
 
 import animkit.AnimationAsset;
 

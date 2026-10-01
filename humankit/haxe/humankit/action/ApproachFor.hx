@@ -1,4 +1,9 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanLimb;
+import humankit.HumanTargetBox;
+import humankit.rig.HumanBone;
 
 /**
  * Walks to where the limb's shoulder has a comfortable reach to a point and

@@ -1,5 +1,14 @@
 package humankit;
 
+import humankit.action.ApproachFor;
+import humankit.action.Pick;
+import humankit.action.Place;
+import humankit.action.PlayClip;
+import humankit.action.Press;
+import humankit.action.ReleaseLimb;
+import humankit.action.Wait;
+import humankit.action.WalkTo;
+
 /** Resolves a portable job spec into world-space HumanKit actions. */
 class HumanJobBuilder {
   public static function build(spec:HumanJobSpec, targets:HumanJobTargets, body:HumanBody):HumanJobBuildResult {

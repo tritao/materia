@@ -1,4 +1,7 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanLimb;
 
 /** Ramps one limb's IK toward a world point. */
 class Reach extends HumanActionBase {

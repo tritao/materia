@@ -2,6 +2,8 @@ package humankit;
 
 import animkit.AnimationAsset;
 import animkit.AnimationInstance;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
 
 /**
  * A one-way clip of going down into a crouch, measured so that any depth between standing and crouched can be posed

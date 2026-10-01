@@ -2,6 +2,9 @@ package humankit;
 
 import animkit.AnimationAsset;
 import animkit.AnimationInstance;
+import humankit.quality.Naturalness;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
 
 /**
  * The natural ground speed of a looping locomotion clip. While a foot is

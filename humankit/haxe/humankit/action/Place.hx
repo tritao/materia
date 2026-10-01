@@ -1,4 +1,7 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanLimb;
 
 /**
  * Places what the hands hold at target, then opens and withdraws the hands.

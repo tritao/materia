@@ -1,4 +1,7 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanLimb;
 
 /** Reaches a button, holds contact briefly, and releases the arm. */
 class Press extends HumanActionBase {

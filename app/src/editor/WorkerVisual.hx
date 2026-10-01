@@ -2,7 +2,7 @@ package app.editor;
 
 import animkit.AnimationAsset;
 import humankit.HumanCharacter;
-import humankit.HumanoidRig;
+import humankit.rig.HumanoidRig;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 

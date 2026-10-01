@@ -5,7 +5,7 @@ import humankit.HumanDescription;
 import humankit.HumanJobSpec;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
-import humankit.HumanoidRig;
+import humankit.rig.HumanoidRig;
 import humankit.sim.HumanWorker;
 import nativekit.scene.Scene;
 import nativekit.sim.MotionType;

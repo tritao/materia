@@ -1,4 +1,4 @@
-package humankit;
+package humankit.action;
 
 /** Where a worker stands and how it holds its body to reach a point: what ApproachFor weighs between. */
 typedef Stance = {

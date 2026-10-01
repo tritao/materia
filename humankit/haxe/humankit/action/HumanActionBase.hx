@@ -1,4 +1,6 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
 
 /** Common completion and failure state for concrete actions. */
 class HumanActionBase implements HumanAction {

@@ -1,4 +1,4 @@
-package humankit;
+package humankit.rig;
 
 /** Column-major 4x4 matrix helpers over Array<Float>, matching SceneKit transforms. */
 class Mat4 {

@@ -1,4 +1,9 @@
-package humankit;
+package humankit.action;
+
+import humankit.HumanBody;
+import humankit.HumanJob;
+import humankit.HumanLimb;
+import humankit.HumanWalker;
 
 /** Phase of a HumanReachTask's walk-then-reach sequence. */
 enum abstract HumanReachPhase(Int) from Int to Int {
