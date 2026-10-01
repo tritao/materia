@@ -484,6 +484,36 @@ class TextEditorLayout {
 		}
 	}
 
+	/** Whole-line decoration geometry from indexed visual rows in the viewport. */
+	public function wholeLineRects(start:Int, end:Int, minY:Float, maxY:Float):Array<Rect> {
+		ensureLive();
+		if (start < 0 || end < start || end > offsets.codepointCount || maxY < minY)
+			throw "Whole-line range is outside the document";
+		var result:Array<Rect> = [];
+		var low = 0;
+		var high = paragraphs.length;
+		while (low < high) {
+			var middle = (low + high) >> 1;
+			if (paragraphs[middle].y + paragraphs[middle].height <= minY)
+				low = middle + 1;
+			else
+				high = middle;
+		}
+		for (index in low...paragraphs.length) {
+			var record = paragraphs[index];
+			if (record.y >= maxY)
+				break;
+			if (record.y + record.height <= minY || record.end <= start || record.start >= end)
+				continue;
+			var localStart = Std.int(Math.max(start, record.start)) - record.start;
+			var localEnd = Std.int(Math.min(end, record.end)) - record.start;
+			for (rect in record.layout.lineRects(localStart, localEnd,
+				minY - record.y, maxY - record.y))
+				result.push(new Rect(0.0, record.y + rect.y, width, rect.height));
+		}
+		return result;
+	}
+
 	function applyForegroundRanges(record:TextEditorParagraphRecord):Void {
 		var ranges:Array<TextColorRange> = [];
 		if (colorRangeProvider != null) {

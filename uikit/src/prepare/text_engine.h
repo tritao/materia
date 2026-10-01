@@ -170,6 +170,8 @@ struct TextEngineStats {
     uint64_t prepared_batch_count = 0;
     uint64_t text_layout_cache_hits = 0;
     uint64_t text_layout_cache_misses = 0;
+    uint64_t incremental_ascii_edits = 0;
+    uint64_t edit_layout_fallbacks = 0;
     uint64_t atlas_pages = 0;
     uint64_t atlas_bytes = 0;
     uint32_t scale_generation = 0;
@@ -229,6 +231,9 @@ class TextEngine {
                         PreparedGlyphs &output);
     /** Conservative visual-line range intersecting local vertical bounds. */
     std::pair<uint32_t, uint32_t> visible_lines(float min_y, float max_y) const;
+    /** Logical line rectangles intersecting a codepoint and vertical range. */
+    std::vector<TextRect> line_rects(int32_t start, int32_t end, float min_y,
+                                     float max_y) const;
     bool prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x, float origin_y,
                                   float pixel_scale, GlyphMode mode, PreparedGlyphs &output);
     std::shared_ptr<const PreparedGlyphs> published_glyphs_for_lines(

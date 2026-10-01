@@ -241,6 +241,13 @@ int main(void) {
     if (nkui_text_layout_update(layout, "NativeKit updated مرحبا", 280.0f, &text_style,
                                 &paragraph_style) != NKUI_OK)
         return 8;
+    uint32_t line_rect_bytes = 0;
+    if (nkui_text_layout_get_line_rects(layout, 0, 4, 0.0f, 100.0f,
+                                        NULL, &line_rect_bytes) != NKUI_OK ||
+        line_rect_bytes == 0 ||
+        nkui_text_layout_get_line_rects(layout, 4, 1, 0.0f, 100.0f,
+                                        NULL, &line_rect_bytes) != NKUI_ERROR_INVALID_ARGUMENT)
+        return 33;
     if (nkui_resource_destroy(layout) != NKUI_OK ||
         nkui_text_layout_measure(layout, &metrics) != NKUI_ERROR_INVALID_HANDLE ||
         nkui_resource_destroy(fonts) != NKUI_OK)

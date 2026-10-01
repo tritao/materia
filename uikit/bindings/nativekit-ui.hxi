@@ -872,6 +872,12 @@ interface NativeKitUI @target("portable-abi64") @library("nativekit_ui") @depend
 	 */
 	extern fn nkui_text_layout_edit(layout: nkui_resource, start: i32, end: i32, replacement: nullable<utf8>) -> nkui_result;
 	/**
+	 * Returns logical visual-line rectangles intersecting both ranges. Text offsets
+	 * count codepoints; vertical bounds use layout-local coordinates. The buffer
+	 * contains packed nkui_text_rect records, as in selection_rects.
+	 */
+	extern fn nkui_text_layout_get_line_rects(layout: nkui_resource, start: i32, end: i32, min_y: f32, max_y: f32, out_buffer: nullable<ptr<u8>> @out_buffer("inout_bytes"), inout_bytes: ptr<u32> @inout) -> nkui_result;
+	/**
 	 * Returns the visual rectangles covered by a code-point selection.
 	 *
 	 * Query the required buffer size by passing NULL. On NKUI_OK, `inout_bytes` is

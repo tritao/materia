@@ -713,6 +713,7 @@ if(NK_BUILD_EXAMPLES)
                 _nkui_text_layout_set_color
                 _nkui_text_layout_update
                 _nkui_text_layout_edit
+                _nkui_text_layout_get_line_rects
                 _nkui_text_layout_word_range_at
                 _nkui_text_layout_word_range
                 _nkui_showcase_cube_create

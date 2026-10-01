@@ -304,6 +304,12 @@ class FrameworkSmoke {
 		var lineRects = line.rectangles(editor.layout, 0.0, 100.0);
 		if (lineRects.length != 1 || lineRects[0].x != 0.0 || lineRects[0].width != 200.0)
 			throw "whole-line geometry";
+		var rangedLine = new TextDecoration(0, 8, color, WholeLineBackground);
+		var rangedRects = rangedLine.rectangles(editor.layout, 0.0, 100.0);
+		if (rangedRects.length != 1 || rangedRects[0].width != 200.0 ||
+			rangedLine.rectangles(editor.layout, rangedRects[0].y + rangedRects[0].height,
+				100.0).length != 0)
+			throw "visible whole-line range geometry";
 		var underline = new TextDecoration(1, 5, color, Underline);
 		var wavy = new TextDecoration(1, 5, color, WavyUnderline);
 		var canvas = new Canvas();

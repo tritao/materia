@@ -64,6 +64,8 @@ struct TextEngine::State {
     uint64_t prepared_batch_count = 0;
     uint64_t layout_cache_hits = 0;
     uint64_t layout_cache_misses = 0;
+    uint64_t incremental_ascii_edits = 0;
+    uint64_t edit_layout_fallbacks = 0;
     uint32_t last_scale_key = 0;
     uint32_t scale_generation = 0;
     std::unordered_map<uint64_t, std::weak_ptr<const PreparedGlyphs>> published_glyphs;
@@ -174,6 +176,44 @@ std::vector<std::size_t> utf8_codepoint_offsets(const char *text) {
     }
     offsets.push_back(length);
     return offsets;
+}
+
+bool utf8_byte_range(const std::string &text, int32_t start, int32_t end,
+                     std::size_t &byte_start, std::size_t &byte_end) {
+    if (start < 0 || end < start)
+        return false;
+    const auto continuation = [](unsigned char value) { return (value & 0xC0u) == 0x80u; };
+    std::size_t index = 0;
+    int32_t offset = 0;
+    while (offset <= end) {
+        if (offset == start)
+            byte_start = index;
+        if (offset == end) {
+            byte_end = index;
+            return true;
+        }
+        if (index >= text.size())
+            return false;
+        const unsigned char first = static_cast<unsigned char>(text[index]);
+        std::size_t sequence_length = 1;
+        if (first >= 0xC2u && first <= 0xDFu)
+            sequence_length = 2;
+        else if (first >= 0xE0u && first <= 0xEFu)
+            sequence_length = 3;
+        else if (first >= 0xF0u && first <= 0xF4u)
+            sequence_length = 4;
+        if (sequence_length > 1 &&
+            (index + sequence_length > text.size() ||
+             !std::all_of(text.data() + index + 1,
+                          text.data() + index + sequence_length,
+                          [&](char value) {
+                              return continuation(static_cast<unsigned char>(value));
+                          })))
+            sequence_length = 1;
+        index += sequence_length;
+        ++offset;
+    }
+    return false;
 }
 
 AtlasTextureFormat atlas_format(skb_image_atlas_texture_format_t format) {
@@ -613,17 +653,62 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
 
 bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
                            TextLayoutResult *result) {
-    const auto *current = active_layout(*state_);
+    auto *current = active_layout(*state_);
     if (!current || start < 0 || end < start || !replacement)
         return false;
-    const auto offsets = utf8_codepoint_offsets(current->text.c_str());
-    if (static_cast<std::size_t>(end) >= offsets.size())
+    std::size_t byte_start = 0;
+    std::size_t byte_end = 0;
+    if (!utf8_byte_range(current->text, start, end, byte_start, byte_end))
         return false;
     std::string edited;
     edited.reserve(current->text.size() + std::strlen(replacement));
-    edited.append(current->text, 0, offsets[static_cast<std::size_t>(start)]);
+    edited.append(current->text, 0, byte_start);
     edited.append(replacement);
-    edited.append(current->text, offsets[static_cast<std::size_t>(end)], std::string::npos);
+    edited.append(current->text, byte_end, std::string::npos);
+    if (skb_layout_try_edit_ascii(current->layout, state_->temporary, start, end,
+                                  replacement, -1)) {
+        current->text = std::move(edited);
+        current->last_used = ++state_->layout_use_sequence;
+        auto &layout_result = current->result;
+        const skb_rect2_t bounds = skb_layout_get_bounds(current->layout);
+        layout_result.bounds = {bounds.x, bounds.y, bounds.width, bounds.height};
+        layout_result.lines.clear();
+        current->line_ranges.clear();
+        current->prefix_bottoms.clear();
+        current->suffix_tops.clear();
+        const int32_t line_count = skb_layout_get_lines_count(current->layout);
+        const skb_layout_line_t *lines = skb_layout_get_lines(current->layout);
+        layout_result.lines.reserve(static_cast<std::size_t>(line_count));
+        current->line_ranges.reserve(static_cast<std::size_t>(line_count));
+        for (int32_t index = 0; index < line_count; ++index) {
+            const skb_layout_line_t &line = lines[index];
+            current->line_ranges.push_back(line.text_range);
+            const float top = std::min(line.bounds.y, line.culling_bounds.y);
+            const float bottom = std::max(line.bounds.y + line.bounds.height,
+                                           line.culling_bounds.y + line.culling_bounds.height);
+            current->prefix_bottoms.push_back(index == 0 ? bottom
+                : std::max(bottom, current->prefix_bottoms.back()));
+            current->suffix_tops.push_back(top);
+            // The guarded native path accepts only one-byte lowercase ASCII.
+            layout_result.lines.push_back({static_cast<std::size_t>(line.text_range.start),
+                static_cast<std::size_t>(line.text_range.end - line.text_range.start),
+                {line.bounds.x, line.bounds.y, line.bounds.width, line.bounds.height}});
+        }
+        for (int32_t index = line_count - 2; index >= 0; --index)
+            current->suffix_tops[index] = std::min(current->suffix_tops[index],
+                                                    current->suffix_tops[index + 1]);
+        ++state_->incremental_ascii_edits;
+        ++state_->layout_builds;
+        if (std::getenv("NKUI_TRACE_ASCII_EDIT"))
+            std::fprintf(stderr, "nkui edit: reused ASCII shaping, %d codepoints, %d rows\n",
+                         skb_layout_get_text_count(current->layout), line_count);
+        if (result)
+            *result = layout_result;
+        return true;
+    }
+    ++state_->edit_layout_fallbacks;
+    if (std::getenv("NKUI_TRACE_ASCII_EDIT"))
+        std::fprintf(stderr, "nkui edit: full-layout fallback\n");
     return layout_utf8(edited.c_str(), current->width, current->options, result);
 }
 
@@ -676,6 +761,23 @@ std::pair<uint32_t, uint32_t> TextEngine::visible_lines(float min_y, float max_y
     const auto begin_index = static_cast<uint32_t>(first - layout->prefix_bottoms.begin());
     return {begin_index, std::max(begin_index,
         static_cast<uint32_t>(end - layout->suffix_tops.begin()))};
+}
+
+std::vector<TextRect> TextEngine::line_rects(int32_t start, int32_t end, float min_y,
+                                             float max_y) const {
+    std::vector<TextRect> rectangles;
+    const auto *layout = active_layout(*state_);
+    if (!layout || start >= end || max_y <= min_y)
+        return rectangles;
+    const auto [first, last] = visible_lines(min_y, max_y);
+    rectangles.reserve(last - first);
+    for (uint32_t index = first; index < last; ++index) {
+        const auto range = layout->line_ranges[index];
+        if (range.end <= start || range.start >= end)
+            continue;
+        rectangles.push_back(layout->result.lines[index].bounds);
+    }
+    return rectangles;
 }
 
 bool TextEngine::prepare_glyphs_for_lines(uint32_t first, uint32_t end, float origin_x,
@@ -1211,6 +1313,8 @@ TextEngineStats TextEngine::stats() const {
     result.prepared_batch_count = state_->prepared_batch_count;
     result.text_layout_cache_hits = state_->layout_cache_hits;
     result.text_layout_cache_misses = state_->layout_cache_misses;
+    result.incremental_ascii_edits = state_->incremental_ascii_edits;
+    result.edit_layout_fallbacks = state_->edit_layout_fallbacks;
     result.atlas_pages = atlas_texture_count();
     result.scale_generation = state_->scale_generation;
     for (const auto &upload : atlas_uploads(true))

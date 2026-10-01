@@ -54,10 +54,61 @@ int main() {
             !edited.edit_utf8(2, 2, "🙂", nullptr) || !matches_fresh("az🙂b", 4) ||
             !edited.edit_utf8(2, 3, "", nullptr) || !matches_fresh("azb", 3))
             return 104;
+        if (edited.stats().incremental_ascii_edits != 0 ||
+            edited.stats().edit_layout_fallbacks != 3)
+            return 112;
         const auto stable = edited.active_layout_id();
         if (edited.edit_utf8(4, 5, "x", nullptr) || edited.active_layout_id() != stable ||
             !matches_fresh("azb", 3))
             return 105;
+    }
+    {
+        TextEngine edited(shared_fonts);
+        TextEngine fresh(shared_fonts);
+        TextLayoutOptions options;
+        options.font_size = 15.0f;
+        std::string text(4096, 'a');
+        TextLayoutResult current, expected;
+        if (!edited.layout_utf8(text.c_str(), 200.0f, options, &current))
+            return 106;
+        text.insert(2048, 1, 'b');
+        if (!edited.edit_utf8(2048, 2048, "b", &current) ||
+            !fresh.layout_utf8(text.c_str(), 200.0f, options, &expected) ||
+            edited.stats().incremental_ascii_edits != 1 ||
+            edited.stats().edit_layout_fallbacks != 0 ||
+            current.lines.size() != expected.lines.size())
+            return 107;
+        for (std::size_t index = 0; index < current.lines.size(); ++index)
+            if (current.lines[index].text_offset != expected.lines[index].text_offset ||
+                current.lines[index].text_length != expected.lines[index].text_length ||
+                current.lines[index].bounds.y != expected.lines[index].bounds.y)
+                return 108;
+        for (int offset = 2046; offset <= 2051; ++offset) {
+            const auto actual = edited.caret({offset, 0});
+            const auto oracle = fresh.caret({offset, 0});
+            if (actual.x != oracle.x || actual.y != oracle.y)
+                return 109;
+        }
+        const auto visible = edited.visible_lines(0.0f, 200.0f);
+        const auto oracle_visible = fresh.visible_lines(0.0f, 200.0f);
+        if (visible != oracle_visible)
+            return 110;
+        const auto rows = edited.line_rects(2040, 2070, 0.0f, 10000.0f);
+        const auto oracle_rows = fresh.line_rects(2040, 2070, 0.0f, 10000.0f);
+        if (rows.size() != oracle_rows.size() || rows.empty())
+            return 113;
+        for (std::size_t index = 0; index < rows.size(); ++index)
+            if (rows[index].x != oracle_rows[index].x ||
+                rows[index].y != oracle_rows[index].y ||
+                rows[index].width != oracle_rows[index].width ||
+                rows[index].height != oracle_rows[index].height)
+                return 114;
+        text.erase(2048, 1);
+        if (!edited.edit_utf8(2048, 2049, "", &current) ||
+            !fresh.layout_utf8(text.c_str(), 200.0f, options, &expected) ||
+            edited.stats().incremental_ascii_edits != 2 ||
+            current.lines.size() != expected.lines.size())
+            return 111;
     }
 
     // An unsupported character must not move its insertion caret to the line origin.

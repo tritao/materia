@@ -32,11 +32,13 @@ class TextDecoration {
 			var height = Math.abs(caret.descender - caret.ascender);
 			if (top + height > minY && top < maxY)
 				rects.push(new Rect(0.0, top, layout.width, Math.max(1.0, height)));
+		} else if (kind == WholeLineBackground) {
+			for (rect in layout.wholeLineRects(start, end, minY, maxY))
+				rects.push(rect);
 		} else {
 			for (rect in layout.selectionRangeRects(new TextPosition(start, 0),
 				new TextPosition(end, 0), minY, maxY))
-				rects.push(new Rect(kind == WholeLineBackground ? 0.0 : rect.x, rect.y,
-					kind == WholeLineBackground ? layout.width : rect.width, rect.height));
+				rects.push(new Rect(rect.x, rect.y, rect.width, rect.height));
 		}
 		rects.sort(function(a, b) {
 			if (a.y < b.y) return -1;

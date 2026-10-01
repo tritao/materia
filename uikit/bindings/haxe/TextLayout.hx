@@ -197,6 +197,28 @@ class TextLayout extends NativeKitUIResource {
 		return rectangles;
 	}
 
+	/** Logical rectangles for visual rows intersecting a text and vertical range. */
+	public function lineRects(start:Int, end:Int, minY:Float, maxY:Float):Array<Rect> {
+		if (start < 0 || end < start || !Math.isFinite(minY) || !Math.isFinite(maxY) || maxY < minY)
+			throw "Text line rectangle arguments are invalid";
+		var result = NativeKitUI.nkui_text_layout_get_line_rects(nativeHandle(), start, end,
+			minY, maxY);
+		UiResult.check(result.status, "textLayout.lineRects");
+		var bytes:haxe.io.Bytes = result.out_buffer;
+		var recordBytes = 20;
+		if (bytes.length % recordBytes != 0)
+			throw "Text line geometry contains a truncated rectangle";
+		var rectangles:Array<Rect> = [];
+		for (index in 0...Std.int(bytes.length / recordBytes)) {
+			var offset = index * recordBytes;
+			if (bytes.getInt32(offset) != recordBytes)
+				throw "Text line geometry returned an unsupported record size";
+			rectangles.push(new Rect(readFloat(bytes, offset + 4), readFloat(bytes, offset + 8),
+				readFloat(bytes, offset + 12), readFloat(bytes, offset + 16)));
+		}
+		return rectangles;
+	}
+
 	/** Returns range-aware rectangles for each grapheme covered by a selection. */
 	public function selectionRangeRects(start:TextPosition, end:TextPosition):Array<TextRangeRect> {
 		if (start == null || end == null)

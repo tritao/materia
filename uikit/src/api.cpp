@@ -2663,6 +2663,42 @@ extern "C" nkui_result nkui_text_layout_get_selection_rects(nkui_resource layout
     return NKUI_OK;
 }
 
+extern "C" nkui_result nkui_text_layout_get_line_rects(nkui_resource layout, int32_t start,
+    int32_t end, float min_y, float max_y, uint8_t *out_buffer, uint32_t *inout_bytes) {
+    if (!inout_bytes || start < 0 || end < start || !std::isfinite(min_y) ||
+        !std::isfinite(max_y) || max_y < min_y)
+        return NKUI_ERROR_INVALID_ARGUMENT;
+    std::lock_guard<std::mutex> lock(resources_mutex);
+    auto *slot = resolve(layout, nkui::ResourceKind::TextLayout);
+    if (!slot || !slot->text)
+        return NKUI_ERROR_INVALID_HANDLE;
+    if (end > slot->text->text_count())
+        return NKUI_ERROR_INVALID_ARGUMENT;
+    const auto rectangles = slot->text->line_rects(start, end, min_y, max_y);
+    if (rectangles.size() > std::numeric_limits<uint32_t>::max() / sizeof(nkui_text_rect))
+        return NKUI_ERROR_OUT_OF_MEMORY;
+    const uint32_t required = static_cast<uint32_t>(rectangles.size() * sizeof(nkui_text_rect));
+    if (!out_buffer) {
+        *inout_bytes = required;
+        return NKUI_OK;
+    }
+    if (*inout_bytes < required) {
+        *inout_bytes = required;
+        return NKUI_ERROR_INVALID_ARGUMENT;
+    }
+    for (std::size_t index = 0; index < rectangles.size(); ++index) {
+        const auto &rect = rectangles[index];
+        if (!std::isfinite(rect.x) || !std::isfinite(rect.y) ||
+            !std::isfinite(rect.width) || !std::isfinite(rect.height))
+            return NKUI_ERROR_RENDERING;
+        const nkui_text_rect packed{sizeof(nkui_text_rect), rect.x, rect.y,
+                                    rect.width, rect.height};
+        std::memcpy(out_buffer + index * sizeof(packed), &packed, sizeof(packed));
+    }
+    *inout_bytes = required;
+    return NKUI_OK;
+}
+
 extern "C" nkui_result nkui_text_layout_next_grapheme(nkui_resource layout, int32_t offset,
                                                       int32_t *out_offset) {
     if (!out_offset || offset < 0)

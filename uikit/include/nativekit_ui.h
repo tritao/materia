@@ -984,6 +984,14 @@ NKUI_API nkui_result nkui_text_layout_get_selection_rects(
     nkui_resource layout, nkui_text_position start, nkui_text_position end,
     uint8_t *out_buffer NKUI_OUT_BUFFER(inout_bytes), uint32_t *inout_bytes NKUI_INOUT);
 
+/** Returns logical visual-line rectangles intersecting both ranges. Text offsets
+ * count codepoints; vertical bounds use layout-local coordinates. The buffer
+ * contains packed nkui_text_rect records, as in selection_rects.
+ */
+NKUI_API nkui_result nkui_text_layout_get_line_rects(
+    nkui_resource layout, int32_t start, int32_t end, float min_y, float max_y,
+    uint8_t *out_buffer NKUI_OUT_BUFFER(inout_bytes), uint32_t *inout_bytes NKUI_INOUT);
+
 /** Returns the next grapheme boundary at or after `offset`. */
 NKUI_API nkui_result nkui_text_layout_next_grapheme(nkui_resource layout, int32_t offset,
                                                     int32_t *out_offset NKUI_OUT);
