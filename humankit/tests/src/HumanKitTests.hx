@@ -117,6 +117,8 @@ class HumanKitTests {
 		facilityRoute(scene, worker, rig);
 		facilitySurfaces();
 		postureStature();
+		turning(scene, worker, rig);
+		retreating(scene, worker, rig);
 		naturalness(scene, worker, rig, "bundled");
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
@@ -853,6 +855,84 @@ class HumanKitTests {
 		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
 			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
 		human.dispose();
+	}
+
+	/**
+	 * Turning on the spot: a character with turn clips steps through a right angle in the clip's own time and ends
+	 * facing where it was asked, with its feet moving less than the root-spin the bundled worker makes of the same turn.
+	 */
+	static function turning(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var turnOf = function(asset:AnimationAsset, rig:HumanoidRig, angle:Float):{seconds:Float, slide:Float, heading:Float, clips:Int} {
+			var human = new HumanCharacter(scene, asset, rig, null, "Turner");
+			var body = new HumanBody(human);
+			var step = 1.0 / 60.0;
+			for (_ in 0...30) body.advance(step);
+			var natural = new Naturalness();
+			var before = body.rootTransform();
+			body.walker.face(Math.atan2(before[1], before[0]) + angle);
+			var seconds = 0.0, clips = 0, last = -1;
+			while (body.walker.isTurning() && seconds < 6.0) {
+				body.advance(step);
+				natural.sample(body, step);
+				seconds += step;
+				var playing = human.player.currentClip();
+				if (playing != last) {
+					clips++;
+					last = playing;
+				}
+			}
+			for (_ in 0...30) body.advance(step);
+			var after = body.rootTransform();
+			var heading = Math.atan2(after[1], after[0]) - Math.atan2(before[1], before[0]);
+			while (heading > Math.PI) heading -= 2.0 * Math.PI;
+			while (heading < -Math.PI) heading += 2.0 * Math.PI;
+			human.dispose();
+			return {seconds: seconds, slide: natural.maxSlide, heading: heading, clips: clips};
+		};
+		var plain = turnOf(bundled, bundledRig, Math.PI / 2.0);
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var quarter = turnOf(asset, rig, Math.PI / 2.0);
+		var half = turnOf(asset, rig, Math.PI);
+		var odd = turnOf(asset, rig, -2.0);
+		Sys.println('TURN bundled 90: ${plain.seconds} s slide ${plain.slide}; library 90: ${quarter.seconds} s slide ${quarter.slide} clips ${quarter.clips}; 180: ${half.seconds} s slide ${half.slide}; -2 rad: ${odd.seconds} s slide ${odd.slide}');
+		if (Math.abs(quarter.heading - Math.PI / 2.0) > 0.02 || Math.abs(half.heading - Math.PI) > 0.02 && Math.abs(half.heading + Math.PI) > 0.02 ||
+			Math.abs(odd.heading + 2.0) > 0.02)
+			throw 'A turn clip left the worker facing the wrong way: ${quarter.heading}, ${half.heading}, ${odd.heading}';
+		if (quarter.clips < 2) throw "A right-angle turn did not play a turn clip";
+		if (quarter.seconds > 3.0) throw 'A right-angle turn took ${quarter.seconds} s';
+	}
+
+	/** A retreat on a character with a backward walk plays it, and its planted feet hold still; without one it slides as before. */
+	static function retreating(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var human = new HumanCharacter(scene, asset, rig, null, "Retreater");
+		var body = new HumanBody(human);
+		var step = 1.0 / 60.0;
+		for (_ in 0...30) body.advance(step);
+		if (body.walker.backGait == null) throw "The library character has no backward gait";
+		var natural = new Naturalness();
+		var start = body.rootTransform();
+		body.walker.retreatAlong([[start[12], start[13]], [start[12] - 2.0 * start[0], start[13] - 2.0 * start[1]]], 0.8);
+		if (human.player.currentClip() != asset.clipIndex("walk_bwd")) throw "A retreat did not take the backward walk";
+		var seconds = 0.0;
+		while (body.walker.isWalking() && seconds < 6.0) {
+			body.advance(step);
+			if (seconds > 0.5) natural.sample(body, step);
+			seconds += step;
+		}
+		var end = body.rootTransform();
+		if (Math.abs(Math.sqrt(Math.pow(end[12] - start[12], 2) + Math.pow(end[13] - start[13], 2)) - 2.0) > 0.01 ||
+			Math.abs(end[0] - start[0]) > 1e-6)
+			throw "A backward retreat did not end two metres back, facing the same way";
+		Sys.println('RETREAT planted ${natural.plantedSeconds} s, slide ${natural.maxSlide}');
+		if (natural.plantedSeconds < 0.5 || natural.maxSlide > 0.2) throw 'A backward retreat slid its feet: ${natural.summary()}';
+		human.dispose();
+		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "PlainRetreater");
+		var plainBody = new HumanBody(plain);
+		if (plainBody.walker.backGait != null) throw "The bundled worker claims a backward gait";
+		plain.dispose();
 	}
 
 	/** A posture's lengths grow with the body; its angles, fractions and times do not. */
