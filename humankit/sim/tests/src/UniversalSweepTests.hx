@@ -13,8 +13,10 @@ class UniversalSweepTests {
         var failures:Array<String> = [], report:Array<String> = [], runs = 0;
         var tilt = 0.0, footJerk = 0.0, skate = 0.0, margin = Math.POSITIVE_INFINITY, pelvisJerk = 0.0, wristJerk = 0.0, floor = 0.0;
         for (hand in ["right", "left", "both"]) for (half in [0.2, 0.4]) for (surface in [0.3, 0.4, 0.5, 0.6, 0.7, 0.85, 1.0, 1.06, 1.16]) for (yaw in [0.0, 0.7]) {
-            // Tops 0.8 m deep are held to table height and above, where the app uses them; lower down they are not yet reached cleanly.
-            if (half > 0.3 && surface < 1.0) continue;
+            // The free right arm, hanging while the worker leans through the turn of its approach, has its elbow plane turn at
+            // 8.3 rad/s (the gate is 6.5): the turn clip swings that arm out sideways and the bend field follows it faster
+            // than the old carried bend did (4.6). See BODY.md, "Known limits".
+            if (hand == "left" && half > 0.3 && surface < 0.35) continue;
             // Two hands carry a long part: at table height and above, on 0.4 m tops.
             if (hand == "both" && (half > 0.3 || surface < 1.0 || yaw > 0.3)) continue;
             var label = 'universal hand=$hand surface=$surface half=$half yaw=$yaw';

@@ -26,8 +26,10 @@ class Place extends HumanActionBase {
 	var goals:Array<Array<Float>> = [];
 	var caps:Array<Float> = [];
 	var previous:Array<Null<Array<Float>>> = [];
-	/** Each wrist's offset from the chest when the part went down, for the withdrawal. */
+	/** Each wrist's offset from its shoulder when the part went down, for the withdrawal. */
 	var withdrawnFrom:Array<Array<Float>> = [];
+	/** How far the torso was pitched forward when the part went down. */
+	var pitchWhenDown:Float = 0.0;
 
 	public function new(target:Array<Float>, hands:Array<HumanLimb>, ramp:Float = 0.35) {
 		super();
@@ -71,22 +73,25 @@ class Place extends HumanActionBase {
 			elapsed += seconds;
 			var fraction = ramp == 0.0 ? 1.0 : Math.min(1.0, elapsed / ramp);
 			if (withdrawnFrom.length == 0) {
-				// Where each wrist is against the chest as the part goes down, while the torso is still leaned.
-				var chest = worker.chestPosition();
+				// Where each wrist is against its shoulder as the part goes down, while the torso is still leaned.
+				pitchWhenDown = worker.torsoPitch();
 				for (index in 0...hands.length) {
 					var goal = worker.toModel(goals[index]);
-					withdrawnFrom.push([for (axis in 0...3) goal[axis] - chest[axis]]);
+					var shoulder = worker.shoulderPosition(hands[index]);
+					withdrawnFrom.push([for (axis in 0...3) goal[axis] - shoulder[axis]]);
 				}
 			}
 			for (index in 0...hands.length) {
 				// Pull the wrist back toward the body, but never behind a hand's width in front of the
 				// chest: a worker standing at the table has little room, and a wrist dragged through
 				// the torso folds the arm into an elbow raised to the shoulder.
-				var from = withdrawnFrom[index];
+				var from = turnedWithTorso(withdrawnFrom[index], worker.torsoPitch() - pitchWhenDown);
 				var back = Math.min(worker.posture.withdraw, Math.max(0.0, from[0] - worker.posture.minAhead)) * fraction;
-				// Against the chest, not the body's root: the torso straightens as the worker steps away, and a
-				// point fixed in the root frame ends up against the shoulder, folding the arm into a flip.
-				worker.setReachChest(hands[index], [from[0] - back, from[1], from[2] + worker.posture.lift * fraction], 1.0);
+				// Against the shoulder, not the body's root, and turning with the torso: the torso straightens as the worker
+				// steps away, and a point fixed in the root frame, or one that only follows the chest, ends up against
+				// the shoulder, folding the arm into a flip or a bend sharper than an arm makes. Held to the shoulder the arm
+				// keeps its shape through the straightening, so the only fold is the pull back.
+				worker.setReachShoulder(hands[index], [from[0] - back, from[1], from[2] + worker.posture.lift * fraction], 1.0);
 			}
 			if (fraction >= 1.0) done = true;
 			return;
@@ -142,6 +147,12 @@ class Place extends HumanActionBase {
 			stage = 2;
 			elapsed = 0.0;
 		}
+	}
+
+	/** An offset from the chest turned about the body's side-to-side axis by `change` radians of forward pitch. */
+	static function turnedWithTorso(offset:Array<Float>, change:Float):Array<Float> {
+		var cosine = Math.cos(change), sine = Math.sin(change);
+		return [offset[0] * cosine + offset[2] * sine, offset[1], -offset[0] * sine + offset[2] * cosine];
 	}
 
 	/** The point Place puts on target: the held object's point, else the palm. */

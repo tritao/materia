@@ -324,16 +324,20 @@ class HumanBody {
 		return result;
 	}
 
-	function moveHinge(seconds:Float):Void {
-		var step = posture.leanRate * seconds;
-		hingeNow = Math.abs(hingeGoal - hingeNow) <= step ? hingeGoal : hingeNow + (hingeGoal > hingeNow ? step : -step);
-		character.setSpineHinge(hingeNow);
-	}
-
-	function moveLean(seconds:Float):Void {
-		var step = posture.leanRate * seconds;
-		leanNow = Math.abs(leanGoal - leanNow) <= step ? leanGoal : leanNow + (leanGoal > leanNow ? step : -step);
+	/**
+	 * Lean and hinge both pitch the torso, so they share one rate: moving both at the full rate would pitch the torso
+	 * at twice the pace the posture sets, and carry the shoulder, and the hand with it, past the limits on hand speed.
+	 * Each moves the same share of what it has to go, so the two arrive together.
+	 */
+	function moveSpine(seconds:Float):Void {
+		var leanGap = leanGoal - leanNow, hingeGap = hingeGoal - hingeNow;
+		var total = Math.abs(leanGap) + Math.abs(hingeGap);
+		var budget = posture.leanRate * seconds;
+		var share = total <= budget || total <= 0.0 ? 1.0 : budget / total;
+		leanNow = share >= 1.0 ? leanGoal : leanNow + leanGap * share;
+		hingeNow = share >= 1.0 ? hingeGoal : hingeNow + hingeGap * share;
 		character.setSpineLean(leanNow);
+		character.setSpineHinge(hingeNow);
 	}
 
 	/**
@@ -423,11 +427,19 @@ class HumanBody {
 		limbs[limb].reach(target, ReachSpace.Model, weight, pole);
 
 	/**
-	 * Reaches for a point given as an offset from the chest (model-space axes), so the target moves with the
-	 * torso: it keeps its place against the shoulder as the body leans, straightens, and walks.
+	 * Reaches for a point given as an offset from the limb's shoulder (model-space axes), so the target moves with the
+	 * shoulder: the arm keeps its shape as the body leans, straightens, and walks. A caller whose offset should turn
+	 * with the torso turns it itself, by the change in `torsoPitch`.
 	 */
-	public function setReachChest(limb:HumanLimb, offset:Array<Float>, weight:Float, ?pole:Array<Float>):Void
-		limbs[limb].reach(offset, ReachSpace.Torso, weight, pole);
+	public function setReachShoulder(limb:HumanLimb, offset:Array<Float>, weight:Float, ?pole:Array<Float>):Void
+		limbs[limb].reach(offset, ReachSpace.Shoulder, weight, pole);
+
+	/** Where a limb's shoulder is, in model space. */
+	public function shoulderPosition(limb:HumanLimb):Array<Float> {
+		var shoulder = character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
+		if (shoulder == null) throw "The character has no shoulder";
+		return shoulder;
+	}
 
 	/** Where the chest is, in model space (the pelvis on a rig without one). */
 	public function chestPosition():Array<Float> {
@@ -441,9 +453,13 @@ class HumanBody {
 	public function reachTargetModel(control:LimbControl):Array<Float> {
 		if (control.space == ReachSpace.World) return toModel(control.target);
 		if (control.space == ReachSpace.Model) return control.target.copy();
-		var chest = chestPosition();
-		return [for (axis in 0...3) chest[axis] + control.target[axis]];
+		var shoulder = shoulderPosition(control.limb);
+		return [for (axis in 0...3) shoulder[axis] + control.target[axis]];
 	}
+
+	/** How far the upper body is pitched forward now, in radians: the lean and the hip hinge together. */
+	public function torsoPitch():Float
+		return character.spineLean() + character.spineHinge();
 
 	public function reachWeight(limb:HumanLimb):Float
 		return limbs[limb].weight;
@@ -676,8 +692,7 @@ class HumanBody {
 		// A lean swings an unused arm back with the torso, so while the body leans a free arm is held hanging.
 		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || hingeNow > 0.02 || hingeGoal > 0.02 || crouchNow > 0.02 || kneelNow > 0.02 || armsDown, posture.hangSeconds);
 		moveFingers(seconds);
-		moveLean(seconds);
-		moveHinge(seconds);
+		moveSpine(seconds);
 		moveCrouch(seconds);
 		moveKneel(seconds);
 		walker.advance(seconds);

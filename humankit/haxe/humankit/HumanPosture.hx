@@ -63,6 +63,10 @@ class HumanPosture {
 	public var maxLean:Float = 0.7;
 	/** The furthest the body bends forward at the hips, on top of the lean, in radians; used when the lean is not enough to reach across. */
 	public var maxHinge:Float = 0.8;
+	/** Whether a hip hinge may combine with a crouch or a kneel, for a top too deep to reach across from a crouch. */
+	public var hingeWithCrouch:Bool = true;
+	/** What a stance's hip hinge costs in the planner's comparison of stances, per radian: a hinge is the last resort, after a deeper crouch. */
+	public var hingeDiscomfort:Float = 0.25;
 	public var leanRate:Float = 0.9;
 	/** How long an arm that is not reaching or carrying takes to settle into hanging (and back) while the body leans, and where it hangs under the shoulder. */
 	public var hangSeconds:Float = 0.5;

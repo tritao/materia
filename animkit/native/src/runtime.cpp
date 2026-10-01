@@ -147,9 +147,40 @@ ozz::math::SimdQuaternion rotationOf(const ozz::math::Float4x4 &matrix) {
 // fixed pole cannot do this: the bend plane contains the pole and the axis, so whenever the axis
 // passes the pole the plane is undefined and the elbow swings through a half turn. A limb the
 // animation holds straight has no bend of its own; `fallback` is returned for it.
+//
+// The smallest rotation is also undefined where the new axis is the opposite of the animated one, and just short of
+// it the carried bend swings through a half turn as the target moves a few millimetres; a crouched worker leaning far
+// over a low surface reaches it, because its animated arm points the other way from the reach. So the bend is not
+// carried by that rotation but defined at every axis by one field: the `lateral` direction (out to the limb's side)
+// projected perpendicular to the axis, turned about the axis by the angle the animation's own bend makes with the
+// same projection at the animated axis. It equals the animation's bend at the animated axis, it equals the carried
+// bend wherever the axis moves in the plane the lateral direction is perpendicular to (a hand swinging from hanging to
+// forward), and it is undefined only for an axis along `lateral`, a limb held straight out or straight across the
+// body, which a reach rarely is; the carried bend serves there. (Crossing over between the two is not an option: they
+// differ by the twist of the triangle the two axes and `lateral` make, which is anything up to a half turn, and a
+// shortest-arc blend of bends that far apart flips.) The one cost is that a limb the animation swings out sideways
+// (an arm in a turn clip) swings the field's bend with it faster than the carried bend does.
+constexpr float kLateralFlatSine = 0.15f;
+
+ozz::math::SimdFloat4 across(const ozz::math::SimdFloat4 &v, const ozz::math::SimdFloat4 &axis) {
+    namespace m = ozz::math;
+    return v - axis * m::SplatX(m::Dot3(v, axis));
+}
+
+// Turns a unit vector perpendicular to `axis` about it by `angle`.
+ozz::math::SimdFloat4 turnAbout(const ozz::math::SimdFloat4 &v, const ozz::math::SimdFloat4 &axis, float angle) {
+    namespace m = ozz::math;
+    return v * m::simd_float4::Load1(std::cos(angle)) + m::Cross3(axis, v) * m::simd_float4::Load1(std::sin(angle));
+}
+
+// The signed angle about `axis` from one vector perpendicular to it to another.
+float angleAbout(const ozz::math::SimdFloat4 &from, const ozz::math::SimdFloat4 &to, const ozz::math::SimdFloat4 &axis) {
+    namespace m = ozz::math;
+    return std::atan2(m::GetX(m::Dot3(m::Cross3(from, to), axis)), m::GetX(m::Dot3(from, to)));
+}
 ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz::math::SimdFloat4 &mid,
                                    const ozz::math::SimdFloat4 &end, const ozz::math::SimdFloat4 &target,
-                                   const ozz::math::SimdFloat4 &fallback) {
+                                   const ozz::math::SimdFloat4 &fallback, const ozz::math::SimdFloat4 &lateral) {
     namespace m = ozz::math;
     const m::SimdFloat4 animated_span = end - start, new_span = target - start;
     const float animated_length = m::GetX(m::Length3(animated_span));
@@ -158,9 +189,19 @@ ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz
     const m::SimdFloat4 elbow = mid - start;
     const m::SimdFloat4 bend = elbow - animated_axis * m::SplatX(m::Dot3(elbow, animated_axis));
     if (!(m::GetX(m::Length3(bend)) > 1e-3f * animated_length)) return fallback;
-    const m::SimdQuaternion carry =
-        m::SimdQuaternion::FromVectors(animated_axis, m::Normalize3(new_span));
-    return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
+    const m::SimdFloat4 new_axis = m::Normalize3(new_span);
+    const m::SimdFloat4 reference_at_animated = across(lateral, animated_axis);
+    const m::SimdFloat4 reference_at_new = across(lateral, new_axis);
+    const float sine_animated = m::GetX(m::Length3(reference_at_animated));
+    const float sine_new = m::GetX(m::Length3(reference_at_new));
+    if (!(sine_animated > kLateralFlatSine) || !(sine_new > kLateralFlatSine)) {
+        const m::SimdQuaternion carry = m::SimdQuaternion::FromVectors(animated_axis, new_axis);
+        return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
+    }
+    const m::SimdFloat4 reference_animated_unit = reference_at_animated / m::simd_float4::Load1(sine_animated);
+    const m::SimdFloat4 reference_new_unit = reference_at_new / m::simd_float4::Load1(sine_new);
+    const float offset = angleAbout(reference_animated_unit, m::Normalize3(bend), animated_axis);
+    return m::NormalizeSafe3(turnAbout(reference_new_unit, new_axis, offset), fallback);
 }
 
 } // namespace
@@ -293,6 +334,12 @@ bool Instance::solveIk() {
             m::TransformPoint(sceneInverse_, m::simd_float4::Load3PtrU(chain.target));
         const m::SimdFloat4 requested =
             m::TransformVector(sceneInverse_, m::simd_float4::Load3PtrU(chain.pole));
+        // Out to the limb's side, in the skeleton's frame: the scene's y axis, pointing at the side the limb starts on
+        // (the skeleton's origin is on the body's middle).
+        const m::SimdFloat4 lateral_axis =
+            m::NormalizeSafe3(m::TransformVector(sceneInverse_, m::simd_float4::y_axis()), m::simd_float4::y_axis());
+        const m::SimdFloat4 sideways =
+            m::GetX(m::Dot3(start.cols[3], lateral_axis)) < 0.0f ? lateral_axis * m::simd_float4::Load1(-1.0f) : lateral_axis;
         // A zero pole asks for the animation's own bend direction, with the default elbow direction
         // (down and back) for a limb the animation holds straight.
         const m::SimdFloat4 pole = m::GetX(m::Length3(requested)) > 1e-6f
@@ -300,7 +347,8 @@ bool Instance::solveIk() {
             : animatedBend(start.cols[3], mid.cols[3], end.cols[3], target,
                            m::NormalizeSafe3(m::TransformVector(sceneInverse_,
                                                  m::simd_float4::Load(-0.4f, 0.0f, -1.0f, 0.0f)),
-                                             m::simd_float4::y_axis()));
+                                             m::simd_float4::y_axis()),
+                           sideways);
         // The hinge opens about the normal of the plane the limb bends in:
         // positive rotation about lower x upper straightens the joint. A
         // straight limb has no bend plane, so its hinge follows the pole.

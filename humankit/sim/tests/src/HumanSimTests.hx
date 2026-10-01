@@ -34,6 +34,7 @@ import nativekit.sim.SimFrame;
 
 class HumanSimTests {
     static function main():Void {
+        if (Sys.getEnv("HUMANKIT_PROBE") != null) { ArmFlipProbe.run(Sys.getEnv("HUMANKIT_PROBE")); return; }
         PacedStepTests.run();
         WorkerResetTests.run();
         PlaceWithdrawTests.run();

@@ -79,6 +79,11 @@ class ApproachFor extends HumanActionBase {
 		// is taken: clear of the surface's edge, leaning no more than a worker would, the point in comfortable reach.
 		// Failing that, the best of those tried: least short of the edge, then least lean.
 		var levels = worker.canCrouch() ? Std.int(Math.max(1.0, worker.posture.crouchLevels)) : 1;
+		// How hard a stance is: how far short of the edge it leaves the worker, how far past comfortable reach, how far past
+		// a comfortable lean, and how far it bends at the hips.
+		var discomfort = function(stance:Stance):Float
+			return stance.shortfall * 4.0 + (stance.comfortable ? 0.0 : 0.15) + Math.max(0.0, stance.lean - worker.posture.comfortLean) +
+				stance.hinge * worker.posture.hingeDiscomfort;
 		var chosen:Null<Stance> = null;
 		var failure:Null<String> = null;
 		// Whether the point is within comfortable reach below the shoulder standing: then no way down helps, and a surface that
@@ -91,8 +96,7 @@ class ApproachFor extends HumanActionBase {
 				if (step == 0) failure = stance.failure;
 				continue;
 			}
-			if (chosen == null || stance.shortfall < chosen.shortfall - 0.01 ||
-				(Math.abs(stance.shortfall - chosen.shortfall) <= 0.01 && stance.lean < chosen.lean - 0.01))
+			if (chosen == null || discomfort(stance) < discomfort(chosen) - 0.01)
 				chosen = stance;
 			if (step == 0 && stance.comfortable) {
 				reachesStanding = true;
@@ -111,18 +115,14 @@ class ApproachFor extends HumanActionBase {
 			for (step in 1...levels) {
 				var stance = stanceAt(worker, bone, bellyBone, step / (levels - 1), shoulder, belly, root, true);
 				if (stance.failure != null) continue;
-				if (kneeling == null || stance.shortfall < kneeling.shortfall - 0.01 ||
-					(Math.abs(stance.shortfall - kneeling.shortfall) <= 0.01 && stance.lean < kneeling.lean - 0.01))
+				if (kneeling == null || discomfort(stance) < discomfort(kneeling) - 0.01)
 					kneeling = stance;
 				if (easy(stance)) {
 					kneeling = stance;
 					break;
 				}
 			}
-			// Kneel when it is the easier stance by how far short of the edge it is, how far past comfortable reach, and how far
-			// past a comfortable lean.
-			var discomfort = function(stance:Stance):Float
-				return stance.shortfall * 4.0 + (stance.comfortable ? 0.0 : 0.15) + Math.max(0.0, stance.lean - worker.posture.comfortLean);
+			// Kneel when it is the easier stance by that measure.
 			// A crouch is kept unless the kneel is clearly the easier way: people crouch for a bench and kneel for the floor.
 			if (kneeling != null && (chosen == null || discomfort(kneeling) < discomfort(chosen) - 0.25)) chosen = kneeling;
 		}
@@ -247,7 +247,7 @@ class ApproachFor extends HumanActionBase {
 				stance.standDistance = Math.max(stance.standDistance, Math.min(required, reachMost));
 				stance.shortfall = Math.max(0.0, required - stance.standDistance);
 				// A top too deep to reach across by leaning: bend at the hips as well, which carries the shoulder further.
-				if (stance.shortfall > 0.01 && worker.posture.maxHinge > 0.0 && depth <= 0.0) {
+				if (stance.shortfall > 0.01 && worker.posture.maxHinge > 0.0 && (depth <= 0.0 || worker.posture.hingeWithCrouch)) {
 					var bent = worker.hingeFor(planLimb, stance.shortfall, kneeling ? 0.0 : depth, kneeling ? depth : 0.0, made.angle);
 					stance.hinge = bent.angle;
 					var riseBent = riseAfter - bent.drop;

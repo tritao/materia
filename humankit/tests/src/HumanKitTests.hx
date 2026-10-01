@@ -112,6 +112,7 @@ class HumanKitTests {
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
+		elbowStaysPutEverywhere(scene, worker, rig);
 		fingersCurl(scene, worker, rig);
 		leaning(scene, worker, rig);
 		grasping(scene, worker, rig);
@@ -801,6 +802,62 @@ class HumanKitTests {
 		if (worst > 0.04)
 			throw 'The elbow moved $worst m for a one-degree step of the wrist';
 		human.dispose();
+	}
+
+	/**
+	 * Sweeping the wrist round the shoulder along great circles in every plane, two degrees a step, moves the elbow a
+	 * little per step wherever the arm points but straight out to its side or straight across, so the bend does not
+	 * flip where the arm points opposite to the way the animation holds it. The library character, bent far over
+	 * (lean and hinge together, as for a deep low top), holds its arm pointing the opposite way to where a reach goes.
+	 */
+	static function elbowStaysPutEverywhere(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var library = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var libraryRig = HumanoidRig.detect(library);
+		var worst = 0.0, worstWhere = "";
+		for (variant in 0...2) {
+			var asset = variant == 0 ? bundled : library, rig = variant == 0 ? bundledRig : libraryRig;
+			var human = new HumanCharacter(scene, asset, rig, null, "Sweeper");
+			if (variant == 1) {
+				human.setSpineLean(0.7);
+				human.setSpineHinge(0.8);
+			}
+			human.advance(0.0);
+			var radius = 0.75 * (function() {
+				var description = HumanDescription.measure(human.pose, human.height());
+				return description.upperArm + description.forearm;
+			})();
+			for (limb in [ArmL, ArmR]) {
+				var shoulder = human.pose.bonePosition(limb == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR);
+				var elbowBone = limb == ArmL ? HumanBone.ForearmL : HumanBone.ForearmR;
+				for (ring in 0...12) {
+					// A great circle: the plane through the shoulder with normal (cos a cos b, sin a cos b, sin b).
+					var a = ring * Math.PI / 6.0, b = (ring % 4) * Math.PI / 8.0;
+					var normal = [Math.cos(a) * Math.cos(b), Math.sin(a) * Math.cos(b), Math.sin(b)];
+					var u = Mat4.normalize(Mat4.cross(normal, Math.abs(normal[2]) < 0.9 ? [0.0, 0.0, 1.0] : [1.0, 0.0, 0.0]));
+					var v = Mat4.cross(normal, u);
+					var previous:Null<Array<Float>> = null;
+					for (step in 0...180) {
+						var angle = step * 2.0 * Math.PI / 180.0;
+						var axis = [for (i in 0...3) Math.cos(angle) * u[i] + Math.sin(angle) * v[i]];
+						// Straight out to the side or straight across has no defined bend; the field's one fault.
+						if (Math.abs(axis[1]) > Math.cos(12.0 * Math.PI / 180.0)) { previous = null; continue; }
+						human.reach(limb, [for (i in 0...3) shoulder[i] + radius * axis[i]]);
+						human.advance(0.0);
+						var elbow = human.pose.bonePosition(elbowBone);
+						if (previous != null) {
+							var moved = distance(elbow, previous);
+							if (moved > worst) { worst = moved; worstWhere = 'variant $variant limb $limb ring $ring step $step'; }
+						}
+						previous = elbow;
+					}
+					human.release(limb);
+				}
+			}
+			human.dispose();
+		}
+		Sys.println('ELBOW everywhere: worst step ${Math.round(worst * 1000) / 1000} m ($worstWhere)');
+		if (worst > 0.06)
+			throw 'The elbow moved $worst m for a two-degree step of the wrist ($worstWhere)';
 	}
 
 	/**

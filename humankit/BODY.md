@@ -188,16 +188,40 @@ foot in the world with leg IK (the library's legs are chains), or to use start a
 These are limits to hold, not claims of naturalness: nothing yet compares to a reference motion or
 renders a frame.
 
+## The elbow's bend
+
+An arm under IK bends its elbow in a plane that has to be chosen. The animation's own bend is the natural choice and is
+carried to the new axis (shoulder to wrist) by the smallest rotation taking the animated axis there, which keeps it
+continuous as the target moves. That rotation is undefined where the new axis is the opposite of the animated one, and
+just short of it the elbow swings through a half turn on a few millimetres of hand travel. A crouched worker bent far
+over a low surface hits exactly that: its animated arm points back and up while the reach goes forward and down
+(`animatedBend` in `animkit/native/src/runtime.cpp`). The bend is now one field over all axes: the limb's lateral direction
+projected perpendicular to the axis, turned about it by the angle the animation's bend makes with the same projection at
+the animated axis. It equals the animation's bend at the animated axis and the old carried bend for any hand moving in the
+sagittal plane, and its one fault is an axis along the lateral direction (a limb straight out or straight across), where
+the carried bend is used. Blending the old bend and the field is not safe: they differ by the twist of the triangle the
+two axes and the lateral direction make, anything up to a half turn. `HumanKitTests.elbowStaysPutEverywhere` sweeps the wrist
+round the shoulder on twelve great circles at two degrees a step, bundled and library characters, and holds the elbow's
+move to 6 cm a step; the old bend moves 8.7 cm on a step.
+
+`HUMANKIT_PROBE=hand,surface,half,yaw[,sample]` makes the humankit sim tests run one rack-to-table layout and print the
+gate's verdict and a window of per-tick state (`ArmFlipProbe`); `PROBE_SIDE` chooses the arm it follows.
+
 ## Known limits
 
 - **Low surfaces on the bundled worker.** It has no crouch clip, so below about a metre it cannot lower itself; it
   stands clear of the edge and leans, and a surface its arm cannot reach over leaves the belly short (the planner
   reports it as `shortfall`). With the palm's depth in the stand-off (see "The arm brings the wrist") the 1.0 m
   tops of the sweeps, one hand or two, are cleared.
-- **Deep tops, low down.** A top 0.8 m deep (the app's rack and table) is reached across by bending at the hips, from table height
-  up (see "Bending over a deep top"). Below about 0.85 m a deep top still fails a gate (an elbow plane turns 7.6 to 7.9 rad/s
-  against 6.5 while crouched or kneeling), so the sweep holds deep tops to table height and above. A hinge is not used with a crouch or
-  a kneel: together they flip an arm.
+- **Deep tops, low down.** A top 0.8 m deep (the app's rack and table) is reached across by bending at the hips, and at
+  every height the sweep covers, 0.3 m up to 1.16 m: the hinge combines with a crouch or a kneel (`hingeWithCrouch`), and
+  the planner ranks stances by one discomfort measure that charges the hinge, so a deeper crouch is preferred to a
+  hinge. What stopped this was an arm flip, now explained and fixed (see "The elbow's bend" below). One pair of layouts is
+  still out of the sweep: the left hand at a 0.3 m top 0.8 m deep. There the free right arm, held hanging while the worker
+  leans through the turn of its approach, has its elbow plane turn at 8.3 rad/s (gate 6.5), because the turn clip
+  swings that arm out sideways and the bend field follows it faster than the old carried bend did (4.6). A hanging arm
+  does not need the animation's bend at all, but giving it a fixed pole made the hand-off to a reach jump, so the cure
+  is a bend field the hang and the reach share, or leaning after the turn.
 - **Crouch is one clip.** Depth is a blend between standing and the clip's full crouch, so a middle depth is
   a mixed pose, not a clip of its own; the planner reaches down to about half a metre crouched and 0.3 m kneeling, not the floor, and a
   crouched worker does not walk. The clip's feet are not pinned: a foot may lift a few centimetres at full depth.
