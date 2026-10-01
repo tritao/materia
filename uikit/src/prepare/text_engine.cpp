@@ -670,6 +670,7 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
     edited.append(current->text, byte_end, std::string::npos);
     if (skb_layout_try_edit_ascii(current->layout, state_->temporary, start, end,
                                   replacement, -1)) {
+        std::string previous_text = std::move(current->text);
         current->text = std::move(edited);
         current->last_used = ++state_->layout_use_sequence;
         auto &layout_result = current->result;
@@ -679,16 +680,23 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
         const skb_layout_line_t *lines = skb_layout_get_lines(current->layout);
         std::vector<uint64_t> next_line_revisions;
         next_line_revisions.reserve(static_cast<std::size_t>(line_count));
-        const bool same_length = static_cast<std::size_t>(end - start) ==
-                                 std::strlen(replacement);
         for (int32_t index = 0; index < line_count; ++index) {
             const auto &line = lines[index];
+            const auto &old_range = index < static_cast<int32_t>(current->line_ranges.size())
+                ? current->line_ranges[index] : line.text_range;
+            const bool unchanged_text = line.text_range.start >= 0 &&
+                line.text_range.end >= line.text_range.start &&
+                static_cast<std::size_t>(line.text_range.end) <= previous_text.size() &&
+                static_cast<std::size_t>(line.text_range.end) <= current->text.size() &&
+                std::memcmp(previous_text.data() + line.text_range.start,
+                            current->text.data() + line.text_range.start,
+                            static_cast<std::size_t>(line.text_range.end - line.text_range.start)) == 0;
             const bool reusable = index < static_cast<int32_t>(current->line_ranges.size()) &&
                 index < static_cast<int32_t>(current->line_revisions.size()) &&
-                line.text_range.start == current->line_ranges[index].start &&
-                line.text_range.end == current->line_ranges[index].end &&
-                (line.text_range.end < start ||
-                 (same_length && line.text_range.start > end)) &&
+                index < static_cast<int32_t>(layout_result.lines.size()) &&
+                line.text_range.start == old_range.start &&
+                line.text_range.end == old_range.end &&
+                unchanged_text &&
                 line.bounds.x == layout_result.lines[index].bounds.x &&
                 line.bounds.y == layout_result.lines[index].bounds.y &&
                 line.bounds.width == layout_result.lines[index].bounds.width &&

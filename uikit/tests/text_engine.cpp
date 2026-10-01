@@ -600,8 +600,8 @@ int main() {
                                             GlyphMode::Alpha) != preceding ||
         !long_word.prepared_glyphs_current(*preceding) ||
         long_word.published_glyphs_for_line(long_layout.id, middle + 20, 0, 0, 1,
-                                            GlyphMode::Alpha) == following ||
-        long_word.prepared_glyphs_current(*following))
+                                            GlyphMode::Alpha) != following ||
+        !long_word.prepared_glyphs_current(*following))
         return 130;
     const auto after_insert = long_word.published_glyphs_for_line(
         long_layout.id, middle + 20, 0, 0, 1, GlyphMode::Alpha);
@@ -609,8 +609,26 @@ int main() {
         long_word.published_glyphs_for_line(long_layout.id, middle - 20, 0, 0, 1,
                                             GlyphMode::Alpha) != preceding ||
         !long_word.prepared_glyphs_current(*preceding) ||
-        long_word.prepared_glyphs_current(*after_insert))
+        !long_word.prepared_glyphs_current(*after_insert))
         return 131;
+
+    // An offset-shifting edit may preserve the same row's source range and
+    // pixels (a repeated run), but it must not preserve a different row.
+    TextEngine varied(shared_fonts);
+    std::string varying;
+    for (int index = 0; index < 4096; ++index)
+        varying.push_back(static_cast<char>('a' + index % 26));
+    TextLayoutResult varying_layout;
+    if (!varied.layout_utf8(varying.c_str(), 200.0f, long_options, &varying_layout) ||
+        varying_layout.lines.size() < 40)
+        return 132;
+    const auto varying_after = varied.published_glyphs_for_line(
+        varying_layout.id, 30, 0, 0, 1, GlyphMode::Alpha);
+    if (!varying_after || !varied.edit_utf8(5, 5, "a", nullptr) ||
+        varied.published_glyphs_for_line(varying_layout.id, 30, 0, 0, 1,
+                                         GlyphMode::Alpha) == varying_after ||
+        varied.prepared_glyphs_current(*varying_after))
+        return 133;
 
 
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;
