@@ -571,9 +571,15 @@ int main() {
                 assert_close(axis.origin.y, 0.0);
                 assert_close(std::abs(axis.direction.z), 1.0);
                 assert_close(axis.radius, 5.0);
+                assert_close(axis.reference.x * axis.direction.x + axis.reference.y * axis.direction.y +
+                    axis.reference.z * axis.direction.z, 0.0);
                 found_side = true;
             } else {
-                assert(cad_face_axis(face, &axis) == CAD_ERROR_INVALID_ARGUMENT);
+                // A cap is a plane: its frame's axis is its normal, its radius zero.
+                assert(cad_face_axis(face, &axis) == CAD_OK);
+                assert_close(std::abs(axis.direction.z), 1.0);
+                assert_close(axis.radius, 0.0);
+                assert_close(axis.reference.z, 0.0);
                 found_cap = true;
             }
             cad_shape_destroy(face);

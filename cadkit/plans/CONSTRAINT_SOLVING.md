@@ -823,6 +823,39 @@ Profiled 20 drag steps (width +0.01 each, seeded) at 1000 points:
    singular pose looked regular. Test: a folded two-link arm whose tip is
    at its mated distance from a point on its own line is reported as a
    degenerate placement with one degree of freedom.
+5. **A connector's x and the mates it takes come from its feature.**
+   - `cad_axis` gained the geometry's own reference direction, and
+     `cad_face_axis` now also covers planes. A connector's x is that
+     reference; only a straight edge, which has none, falls back to the world
+     axis least aligned with z.
+   - Each connector records its feature: `plane`, `axis`, `sphere`,
+     `circle` or `line`.
+   - `GeometricConnectors.compatible` refuses mates that ask a feature for
+     something it does not define:
+     - a point (coincident, distance): only a sphere's or circle's center;
+     - an axis line (coaxial): an axis, a circle or a line;
+     - a plane (planar): a planar face or a circle's plane;
+     - a direction (parallel, perpendicular, angle): anything but a sphere;
+     - a whole frame (lock): only a circle.
+
+     A planar face's centroid moves as the face grows, which is why it is not
+     a point.
+   - Checked when an assembly is written to a document and again when it is
+     reframed.
+6. **Geometric connectors live in the assembly record.**
+   - `AssemblyConnector.reference` is an opaque string. projectkit only
+     validates it as text, so the codec, the flattener and the solvers
+     handle these connectors by name like any other.
+   - `frame` holds the last resolved frame.
+   - `GeometricConnectors.reframe(definition, geometry)` /
+     `AssemblyDocuments.reframe(root)` is the one explicit step that frames
+     them again from geometry. `toDefinition` is pure again: no geometry
+     evaluation, and it returns the last frames.
+   - Gone: the CadKit `Definition` property, the stripping of connectors
+     from stored records, and the requirement to call `apply` before
+     validation.
+   - Errors carry codes: `unresolved`, `ambiguous`, `instance-dependent`,
+     `incompatible-mate`; documents prefix them with `assembly.`.
 7. **Edge fingerprints are anchored at the midpoint** (document version 10).
    - A first-vertex anchor depends on the edge's orientation and, for a
      closed edge, on where its seam vertex lies.

@@ -16,6 +16,7 @@
 #include <GeomAPI_Interpolate.hxx>
 #include <NCollection_HArray1.hxx>
 #include <gp_Ax2.hxx>
+#include <gp_Ax3.hxx>
 #include <gp_Circ.hxx>
 #include <gp_Cone.hxx>
 #include <gp_Cylinder.hxx>
@@ -2796,18 +2797,25 @@ extern "C" CADKIT_API cad_result cad_edge_length(
 
 namespace {
 
-cad_axis axis_from_occt(const gp_Ax1& axis, double radius) {
-    const auto& origin = axis.Location();
-    const auto& direction = axis.Direction();
+cad_axis axis_from_occt(const gp_Ax3& position, double radius) {
+    const auto& origin = position.Location();
+    const auto& direction = position.Direction();
+    const auto& reference = position.XDirection();
     return {{origin.X(), origin.Y(), origin.Z()},
-        {direction.X(), direction.Y(), direction.Z()}, radius};
+        {direction.X(), direction.Y(), direction.Z()},
+        {reference.X(), reference.Y(), reference.Z()}, radius};
+}
+
+cad_axis axis_from_occt(const gp_Ax2& position, double radius) {
+    return axis_from_occt(gp_Ax3(position), radius);
 }
 
 bool axis_is_finite(const cad_axis& axis) {
     return std::isfinite(axis.origin.x) && std::isfinite(axis.origin.y) &&
         std::isfinite(axis.origin.z) && std::isfinite(axis.direction.x) &&
         std::isfinite(axis.direction.y) && std::isfinite(axis.direction.z) &&
-        std::isfinite(axis.radius);
+        std::isfinite(axis.reference.x) && std::isfinite(axis.reference.y) &&
+        std::isfinite(axis.reference.z) && std::isfinite(axis.radius);
 }
 
 }  // namespace
@@ -2834,29 +2842,34 @@ extern "C" CADKIT_API cad_result cad_face_axis(
         const BRepAdaptor_Surface surface(TopoDS::Face(source));
         cad_axis axis {};
         switch (surface.GetType()) {
+        case GeomAbs_Plane:
+            axis = axis_from_occt(surface.Plane().Position(), 0.0);
+            break;
         case GeomAbs_Cylinder: {
             const auto cylinder = surface.Cylinder();
-            axis = axis_from_occt(cylinder.Axis(), cylinder.Radius());
+            axis = axis_from_occt(cylinder.Position(), cylinder.Radius());
             break;
         }
         case GeomAbs_Cone: {
             const auto cone = surface.Cone();
-            axis = axis_from_occt(cone.Axis(), cone.RefRadius());
+            axis = axis_from_occt(cone.Position(), cone.RefRadius());
             break;
         }
         case GeomAbs_Sphere: {
             const auto sphere = surface.Sphere();
-            axis = axis_from_occt(sphere.Position().Axis(), sphere.Radius());
+            axis = axis_from_occt(sphere.Position(), sphere.Radius());
             break;
         }
         case GeomAbs_Torus: {
             const auto torus = surface.Torus();
-            axis = axis_from_occt(torus.Axis(), torus.MajorRadius());
+            axis = axis_from_occt(torus.Position(), torus.MajorRadius());
             break;
         }
-        case GeomAbs_SurfaceOfRevolution:
-            axis = axis_from_occt(surface.AxeOfRevolution(), 0.0);
+        case GeomAbs_SurfaceOfRevolution: {
+            const auto revolution = surface.AxeOfRevolution();
+            axis = axis_from_occt(gp_Ax2(revolution.Location(), revolution.Direction()), 0.0);
             break;
+        }
         default:
             return fail(CAD_ERROR_INVALID_ARGUMENT, "face has no axis");
         }
@@ -2900,12 +2913,12 @@ extern "C" CADKIT_API cad_result cad_edge_axis(
         switch (curve.GetType()) {
         case GeomAbs_Circle: {
             const auto circle = curve.Circle();
-            axis = axis_from_occt(circle.Axis(), circle.Radius());
+            axis = axis_from_occt(circle.Position(), circle.Radius());
             break;
         }
         case GeomAbs_Ellipse: {
             const auto ellipse = curve.Ellipse();
-            axis = axis_from_occt(ellipse.Axis(), ellipse.MajorRadius());
+            axis = axis_from_occt(ellipse.Position(), ellipse.MajorRadius());
             break;
         }
         default:

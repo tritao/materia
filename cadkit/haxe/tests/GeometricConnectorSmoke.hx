@@ -11,6 +11,8 @@ import cadkit.parametric.DefinitionOutput;
 import cadkit.parametric.Document;
 import cadkit.parametric.DocumentCodec;
 import cadkit.parametric.GeometricConnectors;
+import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
+import cadkit.parametric.GeometricConnectors.GeometricFeatureKind;
 import cadkit.parametric.ParameterKind;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyMateKind;
@@ -44,6 +46,7 @@ class GeometricConnectorSmoke {
 	public static function run():Void {
 		checkEdgeAnchors();
 		checkFrames();
+		checkCompatibility();
 		DefinitionEvaluatorRegistry.register("cadkit.test.mate-plate", new PlateEvaluator());
 		DefinitionEvaluatorRegistry.register("cadkit.test.mate-pin", new PinEvaluator());
 		var document = new Document();
@@ -52,54 +55,80 @@ class GeometricConnectorSmoke {
 		var pinDefinition = document.createDefinition("Pin", "cadkit.test.mate-pin", [],
 			[new DefinitionOutput("body", DefinitionOutput.Geometry)]);
 
+		// In memory: connectors captured on the shapes are ordinary connectors with a reference; the mates place the pin.
 		var plateShape = plate(60), pinShape = Shape.cylinder(5, 30);
-		var plateConnectors = [
-			GeometricConnectors.capture("top", plateShape, CadKit.ShapeKind.Face, face(plateShape, CadKit.SurfaceKind.Plane, 1)),
-			GeometricConnectors.capture("bore", plateShape, CadKit.ShapeKind.Face, face(plateShape, CadKit.SurfaceKind.Cylinder, 0))
-		];
-		var pinConnectors = [
-			GeometricConnectors.capture("base", pinShape, CadKit.ShapeKind.Face, face(pinShape, CadKit.SurfaceKind.Plane, -1), true),
-			GeometricConnectors.capture("side", pinShape, CadKit.ShapeKind.Face, face(pinShape, CadKit.SurfaceKind.Cylinder, 0))
-		];
-		GeometricConnectors.write(plateDefinition, plateConnectors);
-		GeometricConnectors.write(pinDefinition, pinConnectors);
-		check(GeometricConnectors.read(pinDefinition)[0].flip, "a connector's flip is stored");
-
-		// In memory: the connectors are framed from the shapes, then the mates place the pin.
-		var authored = GeometricConnectors.apply(pinOnPlate(), ["plate" => plateConnectors, "pin" => pinConnectors],
-			id -> id == "plate" ? plateShape : pinShape);
+		var authored = pinOnPlate(plateShape, pinShape);
+		var base = GeometricConnectors.reference(authored.definitions[1].connectors[0]);
+		check(base != null && base.flip && base.feature == GeometricFeatureKind.Plane, "a connector's reference keeps its feature and flip");
 		expectSeated(authored, 30, "in memory");
 
-		// In a document: written with the real definitions, read back framed from their evaluated geometry.
+		// In a document: the records keep the references and last frames; `reframe` frames them from the evaluated geometry.
 		var root = AssemblyDocuments.fromDefinition(document, authored, (path, occurrence, component) ->
 			occurrence.definition == "plate" ? plateDefinition : pinDefinition);
-		var stored:Array<String> = [];
-		for (element in document.allElements()) {
-			var record = element.property("cadkit.assembly.record");
-			if (record != null) stored.push(Std.string(record.value));
-		}
-		check(stored.length == 2 && stored.join("").indexOf("bore") < 0, 'geometric connectors are not stored as frames: $stored');
-		expectSeated(AssemblyDocuments.toDefinition(root), 30, "from the document");
+		expectSeated(AssemblyDocuments.toDefinition(root), 30, "from the document's last frames");
+		expectSeated(AssemblyDocuments.reframe(root), 30, "framed from the document");
 		var reloaded = DocumentCodec.decode(DocumentCodec.encode(document), false, false);
-		expectSeated(AssemblyDocuments.toDefinition(reloaded.element(root.id)), 30, "after a save and reload");
+		expectSeated(AssemblyDocuments.reframe(reloaded.element(root.id)), 30, "after a save and reload");
 		reloaded.close();
 
-		// Widening the plate moves its bore: the pin follows it.
+		// Widening the plate moves its bore: the records' frames are the old ones until reframed; then the pin follows.
 		plateDefinition.setDefault("width", 90);
-		expectSeated(AssemblyDocuments.toDefinition(root), 45, "after the plate is widened");
+		expectSeated(AssemblyDocuments.toDefinition(root), 30, "before reframing");
+		expectSeated(AssemblyDocuments.reframe(root), 45, "after the plate is widened");
+
+		// Two plates of different widths cannot share one bore connector.
+		var twoPlates = AssemblyDocuments.reframe(root);
+		twoPlates.occurrences.push({id: "spare", definition: "plate", initialPose: AssemblyFrames.translation(0, 200, 0)});
+		twoPlates.id = "two-plates";
+		var spareRoot = AssemblyDocuments.fromDefinition(document, twoPlates, (path, occurrence, component) ->
+			occurrence.definition == "plate" ? plateDefinition : pinDefinition);
+		for (element in document.allElements()) {
+			var id = element.property("cadkit.assembly.id");
+			if (id != null && Std.string(id.value) == "spare") (cast element : cadkit.parametric.InstanceElement).setOverride("width", 70);
+		}
+		check(diagnosticCode(() -> AssemblyDocuments.reframe(spareRoot)) == "assembly.instance-dependent",
+			"occurrences that place a connector differently are reported");
+		expectSeated(AssemblyDocuments.reframe(root), 45, "the first assembly is unaffected");
 
 		// A connector on geometry the part does not have is reported, not guessed.
 		var ball = Shape.sphere(8);
-		GeometricConnectors.write(pinDefinition, pinConnectors.concat([GeometricConnectors.capture("ball", ball, CadKit.ShapeKind.Face, 0)]));
+		var withBall = pinOnPlate(plateShape, pinShape);
+		withBall.definitions[1].connectors.push(GeometricConnectors.connector(
+			GeometricConnectors.capture("ball", ball, CadKit.ShapeKind.Face, 0), ball));
 		var code = "";
-		try AssemblyDocuments.toDefinition(root) catch (error:cadkit.parametric.AssemblyDocuments.AssemblyDocumentDiagnostic) code = error.code;
-		check(code == "assembly.unresolved-connector", 'a connector whose face is gone is reported: "$code"');
-		GeometricConnectors.write(pinDefinition, pinConnectors);
+		try GeometricConnectors.reframe(withBall, (scope, component) -> component == "plate" ? [plateShape] : [pinShape])
+		catch (error:GeometricConnectorError) code = error.code;
+		check(code == "unresolved", 'a connector whose face is gone is reported: "$code"');
+
+		// A mate that asks a face for what it does not define is refused when authored.
+		var pointOnPlane = pinOnPlate(plateShape, pinShape);
+		pointOnPlane.mates = [{id: "touch", kind: AssemblyMateKind.Coincident, first: "plate", firstConnector: "top", second: "pin",
+			secondConnector: "base", axis: {x: 0, y: 0, z: 1}}];
+		check(diagnosticCode(() -> AssemblyDocuments.fromDefinition(new Document(), pointOnPlane)) == "assembly.incompatible-mate",
+			"a coincident mate on a planar face is refused");
 
 		ball.close();
 		plateShape.close();
 		pinShape.close();
 		document.close();
+	}
+
+	static function diagnosticCode(action:()->Dynamic):String {
+		try action() catch (error:cadkit.parametric.AssemblyDocuments.AssemblyDocumentDiagnostic) return error.code;
+		return "";
+	}
+
+	/** What each feature defines decides the mates it takes. */
+	static function checkCompatibility():Void {
+		check(GeometricConnectors.compatible(GeometricFeatureKind.Plane, AssemblyMateKind.Planar) &&
+			!GeometricConnectors.compatible(GeometricFeatureKind.Plane, AssemblyMateKind.Coaxial) &&
+			!GeometricConnectors.compatible(GeometricFeatureKind.Plane, AssemblyMateKind.Distance), "a plane takes planar mates, not point or axis ones");
+		check(GeometricConnectors.compatible(GeometricFeatureKind.Axis, AssemblyMateKind.Coaxial) &&
+			!GeometricConnectors.compatible(GeometricFeatureKind.Axis, AssemblyMateKind.Planar), "an axis takes coaxial mates");
+		check(GeometricConnectors.compatible(GeometricFeatureKind.Sphere, AssemblyMateKind.Coincident) &&
+			!GeometricConnectors.compatible(GeometricFeatureKind.Sphere, AssemblyMateKind.Parallel), "a sphere has a center, no direction");
+		check(GeometricConnectors.compatible(GeometricFeatureKind.Circle, AssemblyMateKind.Lock) &&
+			!GeometricConnectors.compatible(GeometricFeatureKind.Line, AssemblyMateKind.Lock), "only a circle has a whole frame");
 	}
 
 	/** The pin's base is on the plate's top (z = 10) and its axis in the bore at (x, 20); it may still turn. */
@@ -150,7 +179,10 @@ class GeometricConnectorSmoke {
 	static function checkFrames():Void {
 		var pin = Shape.cylinder(5, 30);
 		var side = pin.subshape(CadKit.ShapeKind.Face, face(pin, CadKit.SurfaceKind.Cylinder, 0));
-		expectFrame(GeometricConnectors.frameOf(side), 0, 0, 15, "a cylindrical face is framed on its axis, level with its middle");
+		var sideFrame = GeometricConnectors.frameOf(side);
+		expectFrame(sideFrame, 0, 0, 15, "a cylindrical face is framed on its axis, level with its middle");
+		var x = AssemblyFrames.transformVector(sideFrame, 1, 0, 0), reference = side.faceAxis().get_reference();
+		near(x.x * reference.get_x() + x.y * reference.get_y() + x.z * reference.get_z(), 1, "its x is the surface's own reference direction");
 		side.close();
 		var top = pin.subshape(CadKit.ShapeKind.Face, face(pin, CadKit.SurfaceKind.Plane, 1));
 		var topFrame = GeometricConnectors.frameOf(top);
@@ -182,8 +214,8 @@ class GeometricConnectorSmoke {
 		near(GeometricConnectors.frame(wide, bore).x, 45, "a moved bore is found by its axis and radius");
 		var tool = Shape.cylinder(5, 12), placed = tool.translate(Geometry.vec3(10, 20, -1)), twoBores = wide.cut(placed);
 		var state = "";
-		try GeometricConnectors.frame(twoBores, bore) catch (error:cadkit.parametric.GeometricConnectors.GeometricConnectorError) state = Std.string(error.state);
-		check(state == "Ambiguous", 'two bores like it make it ambiguous: "$state"');
+		try GeometricConnectors.frame(twoBores, bore) catch (error:cadkit.parametric.GeometricConnectors.GeometricConnectorError) state = error.code;
+		check(state == "ambiguous", 'two bores like it make it ambiguous: "$state"');
 		for (shape in [narrow, wide, tool, placed, twoBores]) shape.close();
 	}
 
@@ -215,9 +247,15 @@ class GeometricConnectorSmoke {
 		near(frame.z, z, label + " (z)");
 	}
 
-	static function pinOnPlate():AssemblyDefinition {
+	/** The plate (grounded) and a pin placed far off, with the plate's top and bore and the pin's base and side as connectors. */
+	static function pinOnPlate(plateShape:Shape, pinShape:Shape):AssemblyDefinition {
+		var top = GeometricConnectors.capture("top", plateShape, CadKit.ShapeKind.Face, face(plateShape, CadKit.SurfaceKind.Plane, 1));
+		var bore = GeometricConnectors.capture("bore", plateShape, CadKit.ShapeKind.Face, face(plateShape, CadKit.SurfaceKind.Cylinder, 0));
+		var base = GeometricConnectors.capture("base", pinShape, CadKit.ShapeKind.Face, face(pinShape, CadKit.SurfaceKind.Plane, -1), true);
+		var side = GeometricConnectors.capture("side", pinShape, CadKit.ShapeKind.Face, face(pinShape, CadKit.SurfaceKind.Cylinder, 0));
 		return {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "pin-on-plate", lengthUnit: "mm",
-			definitions: [{id: "plate", connectors: []}, {id: "pin", connectors: []}],
+			definitions: [{id: "plate", connectors: [GeometricConnectors.connector(top, plateShape), GeometricConnectors.connector(bore, plateShape)]},
+				{id: "pin", connectors: [GeometricConnectors.connector(base, pinShape), GeometricConnectors.connector(side, pinShape)]}],
 			occurrences: [{id: "plate", definition: "plate", initialPose: AssemblyFrames.identity(), grounded: true},
 				{id: "pin", definition: "pin", initialPose: {x: 120, y: -40, z: 75, qx: 0.2, qy: 0, qz: 0, qw: Math.sqrt(0.96)}}],
 			joints: [],

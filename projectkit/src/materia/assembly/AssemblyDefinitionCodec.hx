@@ -72,6 +72,9 @@ class AssemblyDefinitionCodec {
 					throw 'Component definition "${component.id}" has an invalid or duplicate connector';
 				names.set(connector.name, true);
 				AssemblyCodec.validateFrame(connector.frame);
+				var reference = connector.reference;
+				if (reference != null && (reference.length == 0 || reference.length > 4096))
+					throw 'Connector "${connector.name}" of "${component.id}" has an invalid reference';
 			}
 			definitions.set(component.id, component);
 		}
