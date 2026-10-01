@@ -1,5 +1,10 @@
 package humankit;
 
+import humankit.action.Carry;
+import humankit.action.Reach;
+import humankit.rig.HumanBone;
+import humankit.rig.Mat4;
+
 /**
  * Animation and locomotion state shared by every action in a worker's job.
  *
@@ -28,12 +33,15 @@ class HumanBody {
 	final grasps:Array<Null<Array<Float>>> = [null, null, null, null];
 	/** Whether each hand was holding something last step, so a grasp is dropped once what it held is let go. */
 	final wasHolding:Array<Bool> = [false, false, false, false];
-	var leanGoal:Float = 0.0;
-	var leanNow:Float = 0.0;
+	/** How far the body is leaned, bent, crouched and kneeling, and what it is asked for. */
+	final state:PostureState;
+	/** Holds the feet where they stand while the idle pose shows. */
+	final feet:FootHold;
 	/** Whether free arms are held down at the sides, as when walking up to a surface they must not sweep over. */
 	var armsDown:Bool = false;
-	var crouchGoal:Float = 0.0;
-	var crouchNow:Float = 0.0;
+	/** Where each foot is held in the world (left, right), or null; and how strongly it is held. */
+	/** The turn of the line between the shoulders when the body stands at rest, in radians; see bodyTurn. */
+	var standingTurn:Float = 0.0;
 	/** Where the bones planning reads stand when the body is upright and at rest, in model space. */
 	final standing:Map<String, Array<Float>> = new Map();
 
@@ -47,9 +55,14 @@ class HumanBody {
 		palmReach = wristAt == null || knuckleAt == null ? 0.0 : 0.5 * Math.sqrt(Math.pow(knuckleAt[0] - wristAt[0], 2) +
 			Math.pow(knuckleAt[1] - wristAt[1], 2) + Math.pow(knuckleAt[2] - wristAt[2], 2));
 		this.posture = posture == null ? HumanPosture.forStature(description.stature) : posture;
+		state = new PostureState(character, this.posture);
+		feet = new FootHold(this);
 		limbs = [for (limb in [ArmL, ArmR, LegL, LegR]) new LimbControl(limb, this.posture.relaxedCurl)];
 		for (hand in [ArmL, ArmR]) character.setHandCurl(hand, this.posture.relaxedCurl);
-		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis]) {
+		// Standing at rest is the idle pose: its shoulder line is what a turn is measured from.
+		character.probe();
+		standingTurn = shoulderTurn();
+		for (bone in [HumanBone.UpperArmL, HumanBone.UpperArmR, HumanBone.Spine, HumanBone.Pelvis, HumanBone.ShinL, HumanBone.ShinR, HumanBone.FootL, HumanBone.FootR]) {
 			var position = character.pose.bonePosition(bone);
 			if (position != null) standing.set(bone, position.copy());
 		}
@@ -166,7 +179,7 @@ class HumanBody {
 
 	/** Where the torso is asked to lean; it eases there. Zero stands upright. */
 	public function setLean(angle:Float):Void
-		leanGoal = Math.max(0.0, Math.min(posture.maxLean, angle));
+		state.setLean(angle);
 
 	/** Whether the character can crouch: its asset has a crouch clip to lower the body with. */
 	public function canCrouch():Bool
@@ -174,11 +187,11 @@ class HumanBody {
 
 	/** Where the body is asked to crouch (0 stands, 1 is the clip's full crouch); it eases there. */
 	public function setCrouch(amount:Float):Void
-		crouchGoal = character.canCrouch() ? Math.max(0.0, Math.min(1.0, amount)) : 0.0;
+		state.setCrouch(amount);
 
 	/** How far the body is into its crouch now. */
 	public function crouchAmount():Float
-		return crouchNow;
+		return state.crouchAmount();
 
 	/**
 	 * Holds the arms that are not reaching or carrying down at the sides instead of letting the gait swing them,
@@ -190,31 +203,68 @@ class HumanBody {
 
 	/** Whether the body has finished easing to the lean it was asked for. */
 	public function leanReached():Bool
-		return Math.abs(leanGoal - leanNow) < 1e-6;
+		return state.leanReached();
+
+	/** Where the body is asked to bend at the hips, on top of its lean; it eases there. Zero stands straight. */
+	public function setHinge(angle:Float):Void
+		state.setHinge(angle);
 
 	/** Whether the body has finished easing to the crouch it was asked for. */
 	public function crouchReached():Bool
-		return Math.abs(crouchGoal - crouchNow) < 1e-6;
+		return state.crouchReached();
+
+	/** Whether the character can kneel: its asset has a kneeling clip to lower the body onto a knee with. */
+	public function canKneel():Bool
+		return character.canKneel();
+
+	/**
+	 * Where the body is asked to kneel (0 stands, 1 the lowest the kneeling clip goes); it eases there. A kneel and a crouch are
+	 * different ways down, so a body kneels only from standing: ask for a crouch of nothing first.
+	 */
+	public function setKneel(amount:Float):Void
+		state.setKneel(amount);
+
+	/** How far the body is into its kneel now. */
+	public function kneelAmount():Float
+		return state.kneelAmount();
+
+	public function kneelReached():Bool
+		return state.kneelReached();
+
+	/** Whether the body has finished easing to the crouch and the kneel it was asked for. */
+	public function downReached():Bool
+		return state.downReached();
+
+	/** How far down, in either way, the body is now: 0 standing. */
+	public function downAmount():Float
+		return state.downAmount();
 
 	/**
 	 * How far a bone sits from where it stands upright when the body crouches `amount`, in model space.
 	 * Measured on the skeleton at the current animation time, with no lean; the pose is left as it was.
 	 */
-	public function crouchShift(bone:HumanBone, amount:Float):Array<Float> {
-		if (amount <= 0.0 || !character.canCrouch()) return [0.0, 0.0, 0.0];
-		var savedCrouch = character.crouch(), savedLean = character.spineLean();
+	public function crouchShift(bone:HumanBone, amount:Float):Array<Float>
+		return downShift(bone, amount, 0.0);
+
+	/** The same for a kneel: how far a bone sits from standing when the body kneels `amount`. */
+	public function kneelShift(bone:HumanBone, amount:Float):Array<Float>
+		return downShift(bone, 0.0, amount);
+
+	function downShift(bone:HumanBone, crouchAmount:Float, kneelAmount:Float):Array<Float> {
+		if ((crouchAmount <= 0.0 && kneelAmount <= 0.0) || (!character.canCrouch() && !character.canKneel())) return [0.0, 0.0, 0.0];
+		var savedCrouch = character.crouch(), savedKneel = character.kneel(), savedLean = character.spineLean();
 		character.setSpineLean(0.0);
-		character.setCrouch(0.0);
+		character.setDown(0.0, 0.0);
 		character.probe();
 		var upright = character.pose.bonePosition(bone);
-		character.setCrouch(amount);
+		character.setDown(crouchAmount, kneelAmount);
 		character.probe();
-		var crouched = character.pose.bonePosition(bone);
-		character.setCrouch(savedCrouch);
+		var down = character.pose.bonePosition(bone);
+		character.setDown(savedCrouch, savedKneel);
 		character.setSpineLean(savedLean);
 		character.probe();
-		if (upright == null || crouched == null) return [0.0, 0.0, 0.0];
-		return [crouched[0] - upright[0], crouched[1] - upright[1], crouched[2] - upright[2]];
+		if (upright == null || down == null) return [0.0, 0.0, 0.0];
+		return [down[0] - upright[0], down[1] - upright[1], down[2] - upright[2]];
 	}
 
 	/**
@@ -223,52 +273,61 @@ class HumanBody {
 	 * the skeleton a test amount, so it holds for any rig; the pose is left as it was. `crouch` is the
 	 * depth the body is planned to be at, since a crouched torso carries the shoulder differently.
 	 */
-	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0):{angle:Float, shift:Float, drop:Float} {
-		var none = {angle: 0.0, shift: 0.0, drop: 0.0};
+	public function leanFor(hand:HumanLimb, shift:Float, crouch:Float = 0.0, kneel:Float = 0.0, ?belly:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float}
+		return pitchFor(hand, shift, crouch, kneel, false, 0.0, belly);
+
+	/**
+	 * The same for bending at the hips, on top of a lean already planned (`lean`): the hinge that carries the shoulder `shift`
+	 * metres further forward than that lean does, and the shift and drop it delivers, up to the posture's maximum hinge.
+	 */
+	public function hingeFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, lean:Float, ?belly:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float}
+		return pitchFor(hand, shift, crouch, kneel, true, lean, belly);
+
+	/**
+	 * `belly` also reports how far that bone is carried forward by the same pitch: the lean takes the belly toward a
+	 * surface along with the shoulder, and a worker who stands back from an edge for the belly has to allow for it.
+	 */
+	function pitchFor(hand:HumanLimb, shift:Float, crouch:Float, kneel:Float, hinging:Bool, base:Float, ?bellyBone:HumanBone):{angle:Float, shift:Float, drop:Float, belly:Float} {
+		var none = {angle: 0.0, shift: 0.0, drop: 0.0, belly: 0.0};
 		if (!(shift > 1e-4)) return none;
 		var bone = hand == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR;
-		var saved = character.spineLean(), savedCrouch = character.crouch();
-		if (character.canCrouch()) character.setCrouch(crouch);
-		character.setSpineLean(0.0);
+		var saved = character.spineLean(), savedHinge = character.spineHinge(), savedCrouch = character.crouch(), savedKneel = character.kneel();
+		var limit = hinging ? posture.maxHinge : posture.maxLean;
+		character.setDown(crouch, kneel);
+		character.setSpineLean(hinging ? base : 0.0);
+		character.setSpineHinge(0.0);
 		character.probe();
 		var upright = character.pose.bonePosition(bone);
+		var uprightBelly = bellyBone == null ? null : character.pose.bonePosition(bellyBone);
 		var at = function(angle:Float):Null<Array<Float>> {
-			character.setSpineLean(angle);
+			if (hinging) character.setSpineHinge(angle);
+			else character.setSpineLean(angle);
 			character.probe();
 			return character.pose.bonePosition(bone);
 		};
-		// The forward shift is not linear in the lean, so the probe only gives a first guess: the angle is then
+		// The forward shift is not linear in the angle, so the probe only gives a first guess: the angle is then
 		// corrected where it is used, and the shift and the drop of the shoulder reported are the measured ones.
 		var probe = 0.2;
 		var leaned = at(probe);
 		var result = none;
 		if (upright != null && leaned != null && leaned[0] - upright[0] > 1e-4) {
-			var angle = Math.min(posture.maxLean, shift * probe / (leaned[0] - upright[0]));
+			var angle = Math.min(limit, shift * probe / (leaned[0] - upright[0]));
 			for (round in 0...3) {
 				var there = at(angle);
 				if (there == null) break;
 				var made = there[0] - upright[0];
-				result = {angle: angle, shift: made, drop: there[2] - upright[2]};
-				if (Math.abs(made - shift) < 5e-4 || angle >= posture.maxLean - 1e-6 && made < shift) break;
-				angle = Math.min(posture.maxLean, angle * shift / Math.max(1e-4, made));
+				var bellyNow = bellyBone == null ? null : character.pose.bonePosition(bellyBone);
+				result = {angle: angle, shift: made, drop: there[2] - upright[2],
+					belly: bellyNow != null && uprightBelly != null ? bellyNow[0] - uprightBelly[0] : 0.0};
+				if (Math.abs(made - shift) < 5e-4 || angle >= limit - 1e-6 && made < shift) break;
+				angle = Math.min(limit, angle * shift / Math.max(1e-4, made));
 			}
 		}
 		character.setSpineLean(saved);
-		if (character.canCrouch()) character.setCrouch(savedCrouch);
+		character.setSpineHinge(savedHinge);
+		character.setDown(savedCrouch, savedKneel);
 		character.probe();
 		return result;
-	}
-
-	function moveLean(seconds:Float):Void {
-		var step = posture.leanRate * seconds;
-		leanNow = Math.abs(leanGoal - leanNow) <= step ? leanGoal : leanNow + (leanGoal > leanNow ? step : -step);
-		character.setSpineLean(leanNow);
-	}
-
-	function moveCrouch(seconds:Float):Void {
-		var step = posture.crouchRate * seconds;
-		crouchNow = Math.abs(crouchGoal - crouchNow) <= step ? crouchGoal : crouchNow + (crouchGoal > crouchNow ? step : -step);
-		if (character.canCrouch() && Math.abs(character.crouch() - crouchNow) > 1e-9) character.setCrouch(crouchNow);
 	}
 
 	function moveFingers(seconds:Float):Void {
@@ -310,11 +369,19 @@ class HumanBody {
 		limbs[limb].reach(target, ReachSpace.Model, weight, pole);
 
 	/**
-	 * Reaches for a point given as an offset from the chest (model-space axes), so the target moves with the
-	 * torso: it keeps its place against the shoulder as the body leans, straightens, and walks.
+	 * Reaches for a point given as an offset from the limb's shoulder (model-space axes), so the target moves with the
+	 * shoulder: the arm keeps its shape as the body leans, straightens, and walks. A caller whose offset should turn
+	 * with the torso turns it itself, by the change in `torsoPitch`.
 	 */
-	public function setReachChest(limb:HumanLimb, offset:Array<Float>, weight:Float, ?pole:Array<Float>):Void
-		limbs[limb].reach(offset, ReachSpace.Torso, weight, pole);
+	public function setReachShoulder(limb:HumanLimb, offset:Array<Float>, weight:Float, ?pole:Array<Float>):Void
+		limbs[limb].reach(offset, ReachSpace.Shoulder, weight, pole);
+
+	/** Where a limb's shoulder is, in model space. */
+	public function shoulderPosition(limb:HumanLimb):Array<Float> {
+		var shoulder = character.pose.bonePosition(limb == ArmL ? UpperArmL : UpperArmR);
+		if (shoulder == null) throw "The character has no shoulder";
+		return shoulder;
+	}
 
 	/** Where the chest is, in model space (the pelvis on a rig without one). */
 	public function chestPosition():Array<Float> {
@@ -328,9 +395,16 @@ class HumanBody {
 	public function reachTargetModel(control:LimbControl):Array<Float> {
 		if (control.space == ReachSpace.World) return toModel(control.target);
 		if (control.space == ReachSpace.Model) return control.target.copy();
-		var chest = chestPosition();
-		return [for (axis in 0...3) chest[axis] + control.target[axis]];
+		var shoulder = shoulderPosition(control.limb);
+		return [for (axis in 0...3) shoulder[axis] + control.target[axis]];
 	}
+
+	/** How firmly the feet are held where they stand, 0 (free) to 1 (held). */
+	public function footHold():Float return feet.amount();
+
+	/** How far the upper body is pitched forward now, in radians: the lean and the hip hinge together. */
+	public function torsoPitch():Float
+		return state.torsoPitch();
 
 	public function reachWeight(limb:HumanLimb):Float
 		return limbs[limb].weight;
@@ -485,8 +559,35 @@ class HumanBody {
 	public function carryTargetModel(limb:HumanLimb):Array<Float> {
 		var chest = chestPosition();
 		var side = limb == ArmL ? 1.0 : -1.0;
-		return [chest[0] + posture.carryOffset[0], chest[1] + side * posture.carryOffset[1],
-			chest[2] + posture.carryOffset[2]];
+		// A load is held in front of the body, which a turn clip turns in model space without moving the root: the offset turns
+		// with it, or the hands would stay where the root faces and jump to the body when the root takes up the turn.
+		var turn = walker.turningByClip() ? bodyTurn() : 0.0, c = Math.cos(turn), s = Math.sin(turn);
+		var ahead = posture.carryOffset[0], across = side * posture.carryOffset[1];
+		return [chest[0] + ahead * c - across * s, chest[1] + ahead * s + across * c, chest[2] + posture.carryOffset[2]];
+	}
+
+	function shoulderTurn():Float {
+		var left = character.pose.bonePosition(UpperArmL), right = character.pose.bonePosition(UpperArmR);
+		return left == null || right == null ? 0.0 : Math.atan2(left[1] - right[1], left[0] - right[0]);
+	}
+
+	/**
+	 * How far the idle pose's shoulders are twisted from square to the way the body faces, in radians (positive: the left shoulder
+	 * further back). A body that faces a table with its shoulders square needs its root turned by the opposite.
+	 */
+	public function standingTwist():Float {
+		var twist = standingTurn - Math.PI * 0.5;
+		while (twist > Math.PI) twist -= 2.0 * Math.PI;
+		while (twist < -Math.PI) twist += 2.0 * Math.PI;
+		return Math.abs(twist) < 0.05 ? 0.0 : twist;
+	}
+
+	/** How far the body is turned in model space from standing at rest (a turn clip turns it so), in radians. */
+	public function bodyTurn():Float {
+		var turn = shoulderTurn() - standingTurn;
+		while (turn > Math.PI) turn -= 2.0 * Math.PI;
+		while (turn < -Math.PI) turn += 2.0 * Math.PI;
+		return turn;
 	}
 
 	public function setGrip(held:Bool):Void
@@ -504,13 +605,9 @@ class HumanBody {
 			grasps[hand] = null;
 			wasHolding[hand] = false;
 		}
-		leanGoal = 0.0;
-		leanNow = 0.0;
-		character.setSpineLean(0.0);
+		state.reset();
+		feet.reset();
 		armsDown = false;
-		crouchGoal = 0.0;
-		crouchNow = 0.0;
-		if (character.canCrouch()) character.setCrouch(0.0);
 	}
 
 	/**
@@ -526,18 +623,18 @@ class HumanBody {
 	/** Advances gait once, then reapplies current world targets over that pose. */
 	public function advance(seconds:Float):Void {
 		// A lean swings an unused arm back with the torso, so while the body leans a free arm is held hanging.
-		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, leanGoal > 0.02 || leanNow > 0.02 || crouchNow > 0.02 || armsDown, posture.hangSeconds);
+		for (control in limbs) control.advance(seconds, posture.carryEaseSeconds, state.isBent() || armsDown, posture.hangSeconds);
 		moveFingers(seconds);
-		moveLean(seconds);
-		moveCrouch(seconds);
+		state.advance(seconds);
 		walker.advance(seconds);
+		feet.advance(seconds, state.isKneeling());
 		evaluate();
 	}
 
 	/**
-	 * Re-evaluates reaches at the current animation time for in-frame IK solving. With `present` off the pose is
-	 * only measured (joint matrices current, nothing skinned or shown), for the attempts of a solve that only the
-	 * last of which is to be seen.
+	 * Re-evaluates reaches at the current animation time for in-frame IK solving. Nothing here is skinned or shown
+	 * (`HumanCharacter.publish` does that). With `present` off the pose is a measurement, for the attempts of a solve
+	 * of which only the last is to be kept.
 	 */
 	public function evaluate(present:Bool = true):Void {
 		var changed = false;

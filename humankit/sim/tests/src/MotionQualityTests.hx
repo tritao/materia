@@ -1,4 +1,4 @@
-import humankit.MotionQuality;
+import humankit.quality.MotionQuality;
 
 /**
  * Holds the rack job's whole motion, both arms from start to finish, to limits a person's arm

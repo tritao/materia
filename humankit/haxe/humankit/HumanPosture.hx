@@ -61,6 +61,15 @@ class HumanPosture {
 
 	/** The furthest the upper body leans into a reach, in radians, and how fast it leans. */
 	public var maxLean:Float = 0.7;
+	/** The furthest the body bends forward at the hips, on top of the lean, in radians; used when the lean is not enough to reach across. */
+	public var maxHinge:Float = 0.8;
+	/** Whether a hip hinge may combine with a crouch or a kneel, for a top too deep to reach across from a crouch. */
+	public var hingeWithCrouch:Bool = true;
+	/** What a stance's hip hinge costs in the planner's comparison of stances, per radian: a hinge is the last resort, after a deeper crouch. */
+	public var hingeDiscomfort:Float = 0.25;
+	/** How near the arm's limit a reach may end before the planner counts it a stretch, in metres, and what a stretch costs in the comparison of stances. */
+	public var reachMargin:Float = 0.02;
+	public var tightDiscomfort:Float = 0.1;
 	public var leanRate:Float = 0.9;
 	/** How long an arm that is not reaching or carrying takes to settle into hanging (and back) while the body leans, and where it hangs under the shoulder. */
 	public var hangSeconds:Float = 0.5;
@@ -70,6 +79,10 @@ class HumanPosture {
 	/** How far the front of the belly sits ahead of the abdomen bone, and the gap left to a surface edge. */
 	public var bellyFront:Float = 0.12;
 	public var edgeGap:Float = 0.03;
+	/** How far below the abdomen bone the belly reaches: a belly higher than a surface's top by this much overhangs it without touching it. */
+	public var bellyHalfHeight:Float = 0.12;
+	/** How much higher than that the planner wants the belly before it lets it overhang: leaning lowers the belly a little, and the rule switches a whole edge on or off. */
+	public var bellyOverhangMargin:Float = 0.12;
 
 	/**
 	 * How fast, in metres per second, a wrist is allowed to go at the peak of the easing as a reach blends in from
@@ -78,10 +91,27 @@ class HumanPosture {
 	 */
 	public var blendSpeed:Float = 1.0;
 
+	// Feet.
+
+	/** Whether a planted foot is held where it is in the world, on a character whose legs are IK chains. */
+	public var lockFeet:Bool = true;
+	/** The share of the pose that is the idle one above which the feet are held, and the span over which the hold comes in. */
+	public var lockFrom:Float = 0.15;
+	public var lockSpan:Float = 0.3;
+	/** Seconds the hold takes to come in and go out. */
+	public var lockSeconds:Float = 0.15;
+	/** How far a held foot may be from where the pose wants it, in metres, before the hold lets go. */
+	public var lockReach:Float = 0.3;
+
 	// Crouching.
 
 	/** How fast the body lowers into a crouch and rises out of it, in full crouches per second. */
 	public var crouchRate:Float = 0.8;
+	/** The radius of a leg, and how far above and below a surface's slab a leg still counts as meeting it (for a kneel). */
+	public var legRadius:Float = 0.1;
+	public var slabMargin:Float = 0.04;
+	/** The same for a kneel, which swings an arm down with the body and is taken slower. */
+	public var kneelRate:Float = 0.55;
 	/** How many depths between standing and the full crouch the planner tries, counting both. */
 	public var crouchLevels:Int = 11;
 	/** The lean a worker will put up with before it bends its knees instead, in radians. */
@@ -114,6 +144,9 @@ class HumanPosture {
 		posture.hangForward *= k;
 		posture.hangOutward *= k;
 		posture.bellyFront *= k;
+		posture.bellyHalfHeight *= k;
+		posture.reachMargin *= k;
+		posture.bellyOverhangMargin *= k;
 		posture.blendSpeed *= k;
 		posture.withdraw *= k;
 		posture.lift *= k;

@@ -1,5 +1,8 @@
 package humankit;
 
+import humankit.action.Carry;
+import humankit.action.Reach;
+
 /** What a limb is being asked to do; Hang is never asked for, it is what a free arm does while the body leans. */
 enum abstract LimbMode(Int) {
 	/** Follows its animation. */

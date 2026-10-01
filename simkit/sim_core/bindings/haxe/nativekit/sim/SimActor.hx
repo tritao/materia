@@ -10,6 +10,7 @@ class SimActor {
     final session:SimSession;
     public final handle:nksim_actor;
     public final partCount:Int;
+    var pushScratch:Null<Array<nksim_pose>>;
 
     @:allow(SimSession)
     private function new(session:SimSession, handle:nksim_actor, partCount:Int) {
@@ -26,7 +27,18 @@ class SimActor {
     public function pushKeyframe(time:Float, poses:Array<SimPose>):Void {
         if (poses.length != partCount)
             throw "Actor keyframe needs one pose per part";
-        var values:Array<nksim_pose> = [for (pose in poses) pose.toNative()];
+        // Keyframes are pushed every tick; the native values are reused rather than allocated per part each time.
+        if (pushScratch == null) {
+            var made:Array<nksim_pose> = [];
+            for (_ in 0...partCount) {
+                var value = new nksim_pose();
+                value.set_struct_size(nksim_pose.size());
+                made.push(value);
+            }
+            pushScratch = made;
+        }
+        var values:Array<nksim_pose> = pushScratch;
+        for (index in 0...partCount) poses[index].writeNative(values[index]);
         SimWorld.check(NativeKitSim.nksim_session_push_actor_keyframe(session.nativeHandle(),
             handle, time, values), "actor.pushKeyframe");
     }

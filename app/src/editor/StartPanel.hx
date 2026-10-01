@@ -174,7 +174,7 @@ class StartPanel {
 
   static function exampleIcon(entry:ExampleEntry):IconName return switch (entry.kind) {
     case Project(_): IconName.Cube;
-    case Script(_) | WorkerRackToTable: IconName.Radar;
+    case Script(_) | WorkerRackToTable | WorkerGallery: IconName.Radar;
   };
 
   static function shorten(value:String, maximum:Int):String

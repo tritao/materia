@@ -45,7 +45,8 @@ def contact_sheet(frames, crop, columns, output):
         image = Image.open(path)
         if crop:
             image = image.crop(crop)
-        ImageDraw.Draw(image).text((8, 8), f"{seconds}s", fill=(0, 0, 0))
+        label = seconds if isinstance(seconds, str) and not seconds.replace(".", "").isdigit() else f"{seconds}s"
+        ImageDraw.Draw(image).text((8, 8), label, fill=(0, 0, 0))
         tiles.append(image)
     width, height = tiles[0].size
     rows = (len(tiles) + columns - 1) // columns

@@ -3,7 +3,7 @@ import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
-import humankit.HumanoidRig;
+import humankit.rig.HumanoidRig;
 import humankit.facility.FacilityJobs;
 import humankit.sim.HumanWorker;
 import animkit.AnimationAsset;

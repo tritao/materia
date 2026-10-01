@@ -2,7 +2,7 @@ package app.editor;
 
 import animkit.AnimationAsset;
 import humankit.HumanCharacter;
-import humankit.HumanoidRig;
+import humankit.rig.HumanoidRig;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 
@@ -19,6 +19,7 @@ class WorkerVisual {
       character = new HumanCharacter(scene, asset, HumanoidRig.detect(asset), parent, "Worker character");
       character.player.playNamed("Idle", 0.0);
       character.advance(0.0);
+      character.publish();
     } catch (error:Dynamic) {
       var cleanupError:Dynamic = null;
       if (character != null) {

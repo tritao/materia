@@ -7,15 +7,15 @@ import animkit.scene.SkinnedModel;
 import app.SessionParticipant;
 import humankit.HumanBodyProxy;
 import humankit.HumanBodyView;
-import humankit.HumanBone;
+import humankit.rig.HumanBone;
 import humankit.HumanCharacter;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
 import humankit.HumanGrip;
 import humankit.HumanLimb;
-import humankit.HumanPose;
-import humankit.HumanoidRig;
-import humankit.HumanReachTask;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
+import humankit.action.HumanReachTask;
 import humankit.HumanWalker;
 import humankit.sim.HumanActor;
 import nativekit.scene.NodeId;
@@ -209,6 +209,7 @@ class CharacterPreview implements SessionParticipant {
 					walking.advance(elapsed);
 			} else
 				character.advance(elapsed);
+			character.publish();
 		} else {
 			var presented = model;
 			if (presented == null)

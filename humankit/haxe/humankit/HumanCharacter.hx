@@ -7,6 +7,10 @@ import animkit.scene.SkinnedModel;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 import nativekit.scene.Transform;
+import humankit.rig.HumanBone;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
+import humankit.rig.Mat4;
 
 /** A rigid object carried by a bone, such as a tool in a hand. */
 class HumanAttachment {
@@ -44,11 +48,15 @@ class HumanCharacter {
 	/** The left and right hands' fingers; null for a rig without them. */
 	final hands:Array<Null<HumanHand>>;
 	var lean:Float = 0.0;
+	var hinge:Float = 0.0;
 	/** The asset's crouching-in-place clip, or -1 when it has none; see setCrouch. */
 	final crouchClip:Int;
 	/** The going-down clip the crouch is posed from, when the asset has one; else the crouch clip is blended in. */
 	final crouchDown:Null<HumanCrouch>;
 	var crouchDepth:Float = 0.0;
+	/** The going-down part of a kneeling clip, when the asset has one; a kneel is posed from it as a crouch is from the crouch clip. */
+	final kneelDown:Null<HumanCrouch>;
+	var kneelDepth:Float = 0.0;
 	/**
 	 * The joint-turn sources each feature applies its turns under (see AnimationInstance.setJointRotation),
 	 * so features that turn the same joint compose instead of overwriting one another. A feature added
@@ -57,6 +65,7 @@ class HumanCharacter {
 	static inline var LEAN:Int = 1;
 	static inline var LEFT_FINGERS:Int = 2;
 	static inline var RIGHT_FINGERS:Int = 3;
+	static inline var HINGE:Int = 4;
 	public var root(get, never):NodeId;
 
 	final scene:Scene;
@@ -71,6 +80,7 @@ class HumanCharacter {
 		player = new ClipPlayer(instance);
 		crouchDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("crouch_enter"));
 		crouchClip = crouchDown != null ? crouchDown.clip : asset.clipIndex("crouch_idle");
+		kneelDown = HumanCrouch.measure(asset, this.rig, asset.clipIndex("pickup_kneeling"), true);
 		hands = [HumanHand.find(asset, this.rig, instance, HumanBone.HandL, LEFT_FINGERS, pose),
 			HumanHand.find(asset, this.rig, instance, HumanBone.HandR, RIGHT_FINGERS, pose)];
 		model = new SkinnedModel(scene, instance, parent, name != null ? name : "Human");
@@ -119,8 +129,9 @@ class HumanCharacter {
 	public function reach(limb:HumanLimb, target:Array<Float>, weight:Float = 1.0, ?pole:Array<Float>):Void {
 		var bones = limbBones(limb);
 		var arm = limb == ArmL || limb == ArmR;
+		// A foot reached to a spot keeps the orientation it was animated with, instead of tilting with the leg.
 		instance.setIk(limb, rig.joint(bones[0]), rig.joint(bones[1]), rig.joint(bones[2]), target,
-			pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0], weight);
+			pole != null ? pole : arm ? [0.0, 0.0, 0.0] : [1.0, 0.0, 0.0], weight, 1.0, arm ? 0.0 : 1.0);
 	}
 
 	/**
@@ -159,27 +170,102 @@ class HumanCharacter {
 	public function spineLean():Float
 		return lean;
 
+	/**
+	 * Bends the body forward at the hips by angle radians (0 upright), on top of the animation and of any lean: the whole trunk
+	 * pitches about the lowest spine joint, so the shoulders travel far forward and down, as when someone bends over a table to
+	 * reach across it. A rig without that joint ignores it. Takes effect from the next advance.
+	 */
+	public function setSpineHinge(angle:Float):Void {
+		if (Math.abs(angle - hinge) < 1e-5) return;
+		hinge = angle;
+		var joint = rig.joint(HumanBone.Spine);
+		if (joint < 0 || Math.abs(angle) < 1e-5) instance.clearJointRotations(HINGE);
+		else instance.setJointRotations(HINGE, [joint], [[Math.sin(angle * 0.5), 0.0, 0.0, Math.cos(angle * 0.5)]], [1.0]);
+	}
+
+	public function spineHinge():Float
+		return hinge;
+
+	/**
+	 * Whether the legs are IK chains (thigh, shin and foot one below the other), so a foot can be held where it is.
+	 * The bundled worker's feet hang off the body as controls instead, and cannot.
+	 */
+	public function legsAreChains():Bool {
+		for (side in 0...2) {
+			var thigh = rig.joint(side == 0 ? ThighL : ThighR), shin = rig.joint(side == 0 ? ShinL : ShinR), foot = rig.joint(side == 0 ? FootL : FootR);
+			if (thigh < 0 || shin < 0 || foot < 0) return false;
+			if (asset.jointParents[foot] != shin || asset.jointParents[shin] != thigh) return false;
+		}
+		return true;
+	}
+
 	/** Whether the asset has a crouch clip to lower the body with. */
 	public function canCrouch():Bool
 		return crouchClip >= 0;
 
 	/**
 	 * Lowers the body toward a crouch, by mixing the asset's crouching clip over the animation: 0 stands, 1 is
-	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not pinned: one may lift a few centimetres at full depth). Throws when the
-	 * asset has no crouch clip. Takes effect from the next advance, and is meant for a worker standing still.
+	 * the clip's full crouch. The legs and pelvis come from the clip, so the feet stay near the floor (they are not
+	 * pinned: one may lift a few centimetres at full depth). Throws when the asset has no crouch clip. A crouch takes the
+	 * place of a kneel, as a kneel does of a crouch. Takes effect from the next advance, and is meant for a worker standing still.
 	 */
 	public function setCrouch(amount:Float):Void {
 		if (crouchClip < 0) throw "The character has no crouch clip";
 		crouchDepth = Math.max(0.0, Math.min(1.0, amount));
+		if (crouchDepth > 0.0) kneelDepth = 0.0;
+		applyDown();
+	}
+
+	/**
+	 * The overlay that shows the way down the body is in: a kneel if there is one, else a crouch, else none. Posed from the
+	 * going-down clip, held at the time where the body is this far down, which is an authored pose at every depth;
+	 * without a going-down clip the crouch clip is blended in at its depth as the weight.
+	 */
+	function applyDown():Void {
+		var kneeling = kneelDown;
+		if (kneeling != null && kneelDepth > 0.0) {
+			player.setOverlay(kneeling.clip, Math.min(1.0, kneelDepth / 0.3), kneeling.timeFor(kneelDepth));
+			return;
+		}
+		if (crouchDepth <= 0.0 || crouchClip < 0) {
+			player.setOverlay(-1, 0.0);
+			return;
+		}
 		var down = crouchDown;
-		// Posed from the going-down clip, held at the time where the body is this far down: an authored pose at
-		// every depth. Without one, the crouch clip is blended in at this weight.
-		if (down != null) player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, Math.min(1.0, crouchDepth / 0.3), down.timeFor(crouchDepth));
-		else player.setOverlay(crouchDepth > 0.0 ? crouchClip : -1, crouchDepth);
+		if (down != null) player.setOverlay(crouchClip, Math.min(1.0, crouchDepth / 0.3), down.timeFor(crouchDepth));
+		else player.setOverlay(crouchClip, crouchDepth);
 	}
 
 	public function crouch():Float
 		return crouchDepth;
+
+	/** Whether the asset has a kneeling clip to lower the body further with than a crouch can. */
+	public function canKneel():Bool
+		return kneelDown != null;
+
+	/**
+	 * Lowers the body onto a knee, with the arm reaching down, by holding the going-down part of the asset's kneeling clip
+	 * at the point where the pelvis is that fraction of the way down: 0 stands, 1 is the lowest the clip goes. It takes the
+	 * place of a crouch (the two are different ways down, not stages of one), so asking for a kneel stands the crouch back up
+	 * and the other way round. Throws when the asset has no kneeling clip.
+	 */
+	public function setKneel(amount:Float):Void {
+		if (kneelDown == null) throw "The character has no kneeling clip";
+		kneelDepth = Math.max(0.0, Math.min(1.0, amount));
+		if (kneelDepth > 0.0) crouchDepth = 0.0;
+		applyDown();
+	}
+
+	public function kneel():Float
+		return kneelDepth;
+
+	/** Sets how far down the body is in both ways at once (a kneel, if any, wins); for measuring and putting back. */
+	public function setDown(crouchAmount:Float, kneelAmount:Float):Void {
+		crouchDepth = crouchClip < 0 ? 0.0 : Math.max(0.0, Math.min(1.0, crouchAmount));
+		kneelDepth = kneelDown == null ? 0.0 : Math.max(0.0, Math.min(1.0, kneelAmount));
+		if (kneelDepth > 0.0) crouchDepth = 0.0;
+		applyDown();
+	}
 
 	/**
 	 * Curls each finger of a hand on its own: values are indexed HumanHand.THUMB to PINKY, each 0 open to
@@ -222,11 +308,24 @@ class HumanCharacter {
 			default: throw 'Unknown limb $limb';
 		};
 
-	/** Advances the current clip and moves the mesh and attachments to the new pose. */
+	/**
+	 * Advances the current clip and applies every turn and reach, so `pose` describes the body now. The scene is not
+	 * touched: a simulation advances many times for each frame it draws, and skinning and uploading a mesh nobody sees
+	 * is the largest cost of doing it. Whoever draws the character calls `publish` once per frame.
+	 */
 	public function advance(seconds:Float):Void {
-		player.advance(seconds);
-		model.update();
+		player.pose(seconds);
 		pose.update(instance.readJointMatrices());
+	}
+
+	/**
+	 * Skins the mesh to the state the character is in now and moves it and its attachments in the scene. The state
+	 * is the one the latest `advance` left (a measurement puts back what it changes), so a probe between an advance
+	 * and a publish cannot reach the screen.
+	 */
+	public function publish():Void {
+		instance.evaluate();
+		model.update();
 		placeAttachments();
 	}
 
@@ -234,7 +333,7 @@ class HumanCharacter {
 	 * Evaluates the pose as it would be now, at the current animation time and with every turn and reach applied, and
 	 * makes `pose` current, without skinning the model or moving attachments. For measuring (what would the shoulder
 	 * do under a lean, where would the hand be if released): nothing a measurement poses reaches the scene, and
-	 * the next `advance` shows the pose as usual.
+	 * the next `advance` evaluates the pose again as usual.
 	 */
 	public function probe():Void {
 		player.pose(0.0);

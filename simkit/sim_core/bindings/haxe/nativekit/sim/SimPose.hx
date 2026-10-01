@@ -26,6 +26,11 @@ class SimPose {
     public function toNative():nksim_pose {
         var value = new nksim_pose();
         value.set_struct_size(nksim_pose.size());
+        return writeNative(value);
+    }
+
+    /** Writes the pose into an existing native value, so a caller that sends poses every tick can reuse one. */
+    public function writeNative(value:nksim_pose):nksim_pose {
         value.set_position(0, x);
         value.set_position(1, y);
         value.set_position(2, z);

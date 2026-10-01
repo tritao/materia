@@ -96,14 +96,91 @@ void multiplyLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joi
     ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
 }
 
+// A joint's local rotation, read from its SoA lane and replaced.
+ozz::math::SimdQuaternion getLocalRotation(const std::vector<ozz::math::SoaTransform> &locals, int joint) {
+    ozz::math::SoaTransform soa = locals[joint / 4];
+    ozz::math::SimdQuaternion quaternions[4];
+    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
+    return quaternions[joint & 3];
+}
+
+void setLocalRotation(std::vector<ozz::math::SoaTransform> &locals, int joint, const ozz::math::SimdQuaternion &q) {
+    ozz::math::SoaTransform &soa = locals[joint / 4];
+    ozz::math::SimdQuaternion quaternions[4];
+    ozz::math::Transpose4x4(&soa.rotation.x, &quaternions->xyzw);
+    quaternions[joint & 3] = q;
+    ozz::math::Transpose4x4(&quaternions->xyzw, &soa.rotation.x);
+}
+
+// The rotation of a model-space matrix (its scale is taken out), as a quaternion.
+ozz::math::SimdQuaternion rotationOf(const ozz::math::Float4x4 &matrix) {
+    namespace m = ozz::math;
+    float c[3][4];
+    for (int column = 0; column < 3; ++column) m::StorePtrU(matrix.cols[column], c[column]);
+    for (int column = 0; column < 3; ++column) {
+        const float length = std::sqrt(c[column][0] * c[column][0] + c[column][1] * c[column][1] + c[column][2] * c[column][2]);
+        if (length > 1e-8f) for (int row = 0; row < 3; ++row) c[column][row] /= length;
+    }
+    // r[row][column]
+    const float r00 = c[0][0], r10 = c[0][1], r20 = c[0][2], r01 = c[1][0], r11 = c[1][1], r21 = c[1][2],
+                r02 = c[2][0], r12 = c[2][1], r22 = c[2][2];
+    float x, y, z, w;
+    const float trace = r00 + r11 + r22;
+    if (trace > 0.0f) {
+        const float s = std::sqrt(trace + 1.0f) * 2.0f;
+        w = 0.25f * s; x = (r21 - r12) / s; y = (r02 - r20) / s; z = (r10 - r01) / s;
+    } else if (r00 > r11 && r00 > r22) {
+        const float s = std::sqrt(1.0f + r00 - r11 - r22) * 2.0f;
+        w = (r21 - r12) / s; x = 0.25f * s; y = (r01 + r10) / s; z = (r02 + r20) / s;
+    } else if (r11 > r22) {
+        const float s = std::sqrt(1.0f + r11 - r00 - r22) * 2.0f;
+        w = (r02 - r20) / s; x = (r01 + r10) / s; y = 0.25f * s; z = (r12 + r21) / s;
+    } else {
+        const float s = std::sqrt(1.0f + r22 - r00 - r11) * 2.0f;
+        w = (r10 - r01) / s; x = (r02 + r20) / s; y = (r12 + r21) / s; z = 0.25f * s;
+    }
+    return m::Normalize(m::SimdQuaternion{m::simd_float4::Load(x, y, z, w)});
+}
+
 // The direction the animation bends a limb, carried onto a new start-to-target axis by the smallest
 // rotation that takes the animated axis there, so it changes continuously as the target moves. A
 // fixed pole cannot do this: the bend plane contains the pole and the axis, so whenever the axis
 // passes the pole the plane is undefined and the elbow swings through a half turn. A limb the
 // animation holds straight has no bend of its own; `fallback` is returned for it.
+//
+// The smallest rotation is also undefined where the new axis is the opposite of the animated one, and just short of
+// it the carried bend swings through a half turn as the target moves a few millimetres; a crouched worker leaning far
+// over a low surface reaches it, because its animated arm points the other way from the reach. So the bend is not
+// carried by that rotation but defined at every axis by one field: the `lateral` direction (out to the limb's side)
+// projected perpendicular to the axis, turned about the axis by the angle the animation's own bend makes with the
+// same projection at the animated axis. It equals the animation's bend at the animated axis, it equals the carried
+// bend wherever the axis moves in the plane the lateral direction is perpendicular to (a hand swinging from hanging to
+// forward), and it is undefined only for an axis along `lateral`, a limb held straight out or straight across the
+// body, which a reach rarely is; the carried bend serves there. (Crossing over between the two is not an option: they
+// differ by the twist of the triangle the two axes and `lateral` make, which is anything up to a half turn, and a
+// shortest-arc blend of bends that far apart flips.) The one cost is that a limb the animation swings out sideways
+// (an arm in a turn clip) swings the field's bend with it faster than the carried bend does.
+constexpr float kLateralFlatSine = 0.15f;
+
+ozz::math::SimdFloat4 across(const ozz::math::SimdFloat4 &v, const ozz::math::SimdFloat4 &axis) {
+    namespace m = ozz::math;
+    return v - axis * m::SplatX(m::Dot3(v, axis));
+}
+
+// Turns a unit vector perpendicular to `axis` about it by `angle`.
+ozz::math::SimdFloat4 turnAbout(const ozz::math::SimdFloat4 &v, const ozz::math::SimdFloat4 &axis, float angle) {
+    namespace m = ozz::math;
+    return v * m::simd_float4::Load1(std::cos(angle)) + m::Cross3(axis, v) * m::simd_float4::Load1(std::sin(angle));
+}
+
+// The signed angle about `axis` from one vector perpendicular to it to another.
+float angleAbout(const ozz::math::SimdFloat4 &from, const ozz::math::SimdFloat4 &to, const ozz::math::SimdFloat4 &axis) {
+    namespace m = ozz::math;
+    return std::atan2(m::GetX(m::Dot3(m::Cross3(from, to), axis)), m::GetX(m::Dot3(from, to)));
+}
 ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz::math::SimdFloat4 &mid,
                                    const ozz::math::SimdFloat4 &end, const ozz::math::SimdFloat4 &target,
-                                   const ozz::math::SimdFloat4 &fallback) {
+                                   const ozz::math::SimdFloat4 &fallback, const ozz::math::SimdFloat4 &lateral) {
     namespace m = ozz::math;
     const m::SimdFloat4 animated_span = end - start, new_span = target - start;
     const float animated_length = m::GetX(m::Length3(animated_span));
@@ -112,9 +189,19 @@ ozz::math::SimdFloat4 animatedBend(const ozz::math::SimdFloat4 &start, const ozz
     const m::SimdFloat4 elbow = mid - start;
     const m::SimdFloat4 bend = elbow - animated_axis * m::SplatX(m::Dot3(elbow, animated_axis));
     if (!(m::GetX(m::Length3(bend)) > 1e-3f * animated_length)) return fallback;
-    const m::SimdQuaternion carry =
-        m::SimdQuaternion::FromVectors(animated_axis, m::Normalize3(new_span));
-    return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
+    const m::SimdFloat4 new_axis = m::Normalize3(new_span);
+    const m::SimdFloat4 reference_at_animated = across(lateral, animated_axis);
+    const m::SimdFloat4 reference_at_new = across(lateral, new_axis);
+    const float sine_animated = m::GetX(m::Length3(reference_at_animated));
+    const float sine_new = m::GetX(m::Length3(reference_at_new));
+    if (!(sine_animated > kLateralFlatSine) || !(sine_new > kLateralFlatSine)) {
+        const m::SimdQuaternion carry = m::SimdQuaternion::FromVectors(animated_axis, new_axis);
+        return m::NormalizeSafe3(m::TransformVector(carry, bend), fallback);
+    }
+    const m::SimdFloat4 reference_animated_unit = reference_at_animated / m::simd_float4::Load1(sine_animated);
+    const m::SimdFloat4 reference_new_unit = reference_at_new / m::simd_float4::Load1(sine_new);
+    const float offset = angleAbout(reference_animated_unit, m::Normalize3(bend), animated_axis);
+    return m::NormalizeSafe3(turnAbout(reference_new_unit, new_axis, offset), fallback);
 }
 
 } // namespace
@@ -242,10 +329,17 @@ bool Instance::solveIk() {
         if (!(chain.weight > 0.0f)) continue;
         const m::Float4x4 &start = models_[chain.start], &mid = models_[chain.mid],
                           &end = models_[chain.end];
+        const m::Float4x4 endBefore = end;
         const m::SimdFloat4 target =
             m::TransformPoint(sceneInverse_, m::simd_float4::Load3PtrU(chain.target));
         const m::SimdFloat4 requested =
             m::TransformVector(sceneInverse_, m::simd_float4::Load3PtrU(chain.pole));
+        // Out to the limb's side, in the skeleton's frame: the scene's y axis, pointing at the side the limb starts on
+        // (the skeleton's origin is on the body's middle).
+        const m::SimdFloat4 lateral_axis =
+            m::NormalizeSafe3(m::TransformVector(sceneInverse_, m::simd_float4::y_axis()), m::simd_float4::y_axis());
+        const m::SimdFloat4 sideways =
+            m::GetX(m::Dot3(start.cols[3], lateral_axis)) < 0.0f ? lateral_axis * m::simd_float4::Load1(-1.0f) : lateral_axis;
         // A zero pole asks for the animation's own bend direction, with the default elbow direction
         // (down and back) for a limb the animation holds straight.
         const m::SimdFloat4 pole = m::GetX(m::Length3(requested)) > 1e-6f
@@ -253,7 +347,8 @@ bool Instance::solveIk() {
             : animatedBend(start.cols[3], mid.cols[3], end.cols[3], target,
                            m::NormalizeSafe3(m::TransformVector(sceneInverse_,
                                                  m::simd_float4::Load(-0.4f, 0.0f, -1.0f, 0.0f)),
-                                             m::simd_float4::y_axis()));
+                                             m::simd_float4::y_axis()),
+                           sideways);
         // The hinge opens about the normal of the plane the limb bends in:
         // positive rotation about lower x upper straightens the joint. A
         // straight limb has no bend plane, so its hinge follows the pole.
@@ -292,6 +387,30 @@ bool Instance::solveIk() {
         update.output = ozz::make_span(models_);
         update.from = chain.start;
         if (!update.Run()) solved = false;
+        if (chain.keepEnd > 0.0f) {
+            // Turn the end joint back toward the orientation it had in the animation: the world rotation it was
+            // given, expressed in its parent's new frame, blended in from the local rotation the solve left it.
+            const int parent = asset_->skeleton->joint_parents()[chain.end];
+            if (parent >= 0) {
+                const m::SimdQuaternion wanted = rotationOf(endBefore);
+                const m::SimdQuaternion parentNow = rotationOf(models_[parent]);
+                const m::SimdQuaternion desired = m::Conjugate(parentNow) * wanted;
+                const m::SimdQuaternion current = getLocalRotation(locals_, chain.end);
+                const float weight = std::clamp(chain.keepEnd, 0.0f, 1.0f);
+                // Along the shorter arc, then normalized: a nlerp.
+                const m::SimdFloat4 a = current.xyzw, b = desired.xyzw;
+                const float dot = m::GetX(m::Dot4(a, b));
+                const m::SimdFloat4 signedB = dot < 0.0f ? -b : b;
+                const m::SimdFloat4 mixed = a * m::simd_float4::Load1(1.0f - weight) + signedB * m::simd_float4::Load1(weight);
+                setLocalRotation(locals_, chain.end, m::Normalize(m::SimdQuaternion{mixed}));
+                ozz::animation::LocalToModelJob endUpdate;
+                endUpdate.skeleton = asset_->skeleton.get();
+                endUpdate.input = ozz::make_span(locals_);
+                endUpdate.output = ozz::make_span(models_);
+                endUpdate.from = chain.end;
+                if (!endUpdate.Run()) solved = false;
+            }
+        }
     }
     return solved;
 }

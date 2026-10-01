@@ -440,3 +440,19 @@ catalog is used when no registry is provided.
 The project metadata lives in `haxeon.json`; the UI showcase compiler command
 is the reference for supplying the shared UI and FFI source roots when building
 this app against the repository checkout.
+
+## Judging a job by eye
+
+`python3 app/tools/worker-event-sheet.py --out /tmp/events --crop 700,300,1700,1000` runs the rack-to-table job headless with a trace
+(`--snapshot --worker-demo=rack-to-table --worker-demo-step=N --worker-demo-trace`), reads when each action began, and captures a frame a moment
+after each with its name on the tile, in a contact sheet. `--asset animkit/assets/quaternius-ual/ual-work.glb --surface 0.6` makes a temporary variant
+with the library character and lower tops (the example is put back afterwards). `capture-worker-frames.py` takes frames at moments you choose.
+
+## The worker gallery
+
+`./app/run-built.sh --worker-demo=gallery` (or *Worker gallery* on the Start page) opens `app/examples/worker-gallery.materia`: six workers side by side, 6 m apart, each
+with a rack, a table and a part, running a short document job in the one simulation. The lanes are the cases the worker is built for: the bundled
+worker at table height (the rack-to-table demo as it was); the library character bending over 0.8 m deep tops; crouching to a bench at 0.6 m; kneeling to
+a shelf at 0.35 m; using the left hand and turning right round to a table behind it; and using both hands for a long part and then pressing a panel. The file is written
+by `app/tools/make-worker-gallery.py` (`--check` says whether it is up to date); `--snapshot --worker-demo=gallery --worker-demo-step=N` runs it headless and prints each
+worker's result and the tick it finished at, and `WorkerGalleryTests` holds all six to finishing with the part on its table.
