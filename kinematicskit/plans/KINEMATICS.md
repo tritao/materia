@@ -130,6 +130,19 @@ out to be wrong.
   for the kit. Pinocchio does not replace the kit: the kit must run in Haxe
   without native code (editor, CAD design mode) and handles CAD closures and
   couplings.
+- **KK-D20 — coal for collision and distance (2026-10-01).** Signed
+  distance with closest points (what distance constraints need), triangle
+  meshes, height fields and octrees, scenes that change at runtime, and
+  Pinocchio/TSID's own collision layer (KK-D14). MuJoCo can answer
+  convex-shape distance queries (mink's collision limit uses
+  `mj_geomDistance`), but it treats every mesh as its convex hull and needs a
+  compiled simulator model per scene, which does not fit non-convex,
+  changing construction scenes. FCL is coal's predecessor. Vendored from
+  our fork `tritao/coal` (branch `materia`): the core only, Eigen only, no
+  Boost or assimp (see `native/THIRD_PARTY.md`). It lives behind the
+  kinematicskit-native C ABI like ProxQP, so it is native-only; the browser
+  build does not get collision checks unless coal is compiled to
+  WebAssembly.
 - **KK-D9 — Out of scope:** collision (a validator interface outside the
   kit), time parameterization and trajectories (MotionKit), dynamics,
   character IK (`animkit`/`humankit`), and the OPW analytic solver (stays a
