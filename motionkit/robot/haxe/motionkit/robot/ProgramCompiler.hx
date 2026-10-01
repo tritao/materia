@@ -57,6 +57,8 @@ class ProgramCompiler {
   public final maxJerk:Array<Float>;
   public final startTolerances:StartTolerances;
   public final cartesianResolution:Float;
+  /** The speed scale of the program being compiled. */
+  var speedScale:Float = 1.0;
   public final maxJointJump:Float;
   public final perJointMaxJump:Array<Float>;
   final couplingIndices:Array<{leader:Int, follower:Int, ratio:Float, offset:Float}>;
@@ -158,8 +160,16 @@ class ProgramCompiler {
     }
   }
 
+  /**
+    Plans `program` from `initialQ`. With `firstOp`, ops before it are taken
+    as done and the rest is planned, keeping their op indices; `speedScale`
+    scales every path's speed, within the joint limits as always.
+  **/
   public function compile(program:MotionProgram, initialQ:Array<Float>,
-      firstPlanId:Int64):CompiledProgram {
+      firstPlanId:Int64, ?firstOp:Int = 0, ?speedScale:Float = 1.0):CompiledProgram {
+    if (!Math.isFinite(speedScale) || speedScale <= 0.0)
+      throw "Program speed scale must be finite and positive";
+    this.speedScale = speedScale;
     if (program == null || initialQ == null || initialQ.length != solver.jointCount())
       throw "Program compiler needs a program and complete start position";
     for (value in initialQ) if (!Math.isFinite(value)) throw "Non-finite program start position";
@@ -177,7 +187,7 @@ class ProgramCompiler {
     var currentIndex = -1;
     var skipNext = false;
     try {
-      for (index in 0...program.ops.length) {
+      for (index in firstOp...program.ops.length) {
         if (skipNext) { skipNext = false; continue; }
         currentIndex = index;
         var op = program.ops[index];
@@ -306,7 +316,7 @@ class ProgramCompiler {
               nextId = Int64.add(nextId, Int64.ofInt(1)); pending = null;
             }
             blocks.push(new ProgramBlock(plans, indices,
-              ProgramBarrier.Dwell(seconds), lengths, distanceMaps, timeMaps));
+              ProgramBarrier.Dwell(seconds), lengths, distanceMaps, timeMaps, index));
             plans = []; indices = []; lengths = []; distanceMaps = []; timeMaps = [];
           case WaitInput(channel, predicate, timeoutSeconds):
             if (pending != null) {
@@ -319,7 +329,7 @@ class ProgramCompiler {
             }
             blocks.push(new ProgramBlock(plans, indices,
               ProgramBarrier.WaitInput(channel, predicate, timeoutSeconds), lengths,
-              distanceMaps, timeMaps));
+              distanceMaps, timeMaps, index));
             plans = []; indices = []; lengths = []; distanceMaps = []; timeMaps = [];
         }
       }
@@ -477,7 +487,7 @@ class ProgramCompiler {
         for (joint in 0...startQ.length)
           if (Math.abs(solved[joint] - previous[joint]) > perJointMaxJump[joint])
             throw 'Motion program op $index IK discontinuity at path distance $distance';
-        caps.push(Math.min(feed, primitiveSpeedAt(path,
+        caps.push(speedScale * Math.min(feed, primitiveSpeedAt(path,
           (distance + distances[sample-1]) * 0.5)));
       }
       positions.push(solved.copy());

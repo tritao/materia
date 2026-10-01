@@ -10,10 +10,14 @@ class ProgramBlock {
   public final pathDistances:Array<Array<Float>>;
   public final pathTimes:Array<Array<Float>>;
   public final barrier:Null<ProgramBarrier>;
+  /** The program op that is this block's barrier; -1 without one. */
+  public final barrierOpIndex:Int;
 
   public function new(plans:Array<ExecutionPlan>, opIndices:Array<Int>,
       barrier:Null<ProgramBarrier>, ?pathLengths:Array<Float>,
-      ?pathDistances:Array<Array<Float>>, ?pathTimes:Array<Array<Float>>) {
+      ?pathDistances:Array<Array<Float>>, ?pathTimes:Array<Array<Float>>,
+      ?barrierOpIndex:Int = -1) {
+    this.barrierOpIndex = barrierOpIndex;
     this.plans = plans.copy();
     this.opIndices = opIndices.copy();
     this.pathLengths = pathLengths == null ? [for (_ in plans) 0.0] : pathLengths.copy();

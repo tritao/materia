@@ -113,6 +113,21 @@ holder contact are counted as they happen. Physical collision is off for the
 stock and the spoilboard: the stock simulation, not the physics, decides what
 touching them means.
 
+## Operating the job
+
+The **CNC** panel (beside Sensors in the simulate layout) lists the program
+with the executing line marked and followed, and operates the machine:
+
+- **Hold** brings the machine to a controlled stop on its path; **Resume**
+  carries on from there.
+- **Restart at line** restarts at the line picked in the listing, or the
+  first later line that moves: the machine stops, climbs to just below the top
+  of Z, moves across, loads the tool that line needs, starts the spindle as the
+  program had it, descends and carries on.
+- **Speed override** scales every move from 5% to 200%. It takes effect from
+  the next move without stopping: what is left of the program is planned again
+  at the new speed, within the axes' limits.
+
 Every part collides in the simulation, through its convex hull. Parts of the
 machine that touch by design (a block on its rail, a nut bracket whose hull
 swallows the screw through its bore) overlap in the starting pose, and the
@@ -141,7 +156,9 @@ from the end mill to the drill, the stock must lose the plate's recesses and
 holes within 2% (9914.9 of 9996.5 mm³, with 63.5 mm³ left on the plate),
 under 1 mm³ may be cut from the finished plate (0.6 mm³), no rapid may cut
 stock and the holder must never touch it; the next pass must then start
-cleanly.
+cleanly. `checkCncControls` operates the job through the CNC panel, laid out
+headlessly and clicked: hold, resume, restart at a picked line, and a restart
+at the drilling that must load the drill.
 `CncRouterChecks` checks:
 
 - the joints and their limits, and mass properties for every part;

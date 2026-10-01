@@ -525,6 +525,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
   var sceneGeneration:Int = 0;
   var treeModel:EditorSceneTree;
   final telemetry:TelemetryPanel;
+  final cncPanel = new app.editor.CncPanel();
   static inline var MAX_LOG_LINES:Int = 1000;
   final logLines:Array<String>;
   // The console view edits nothing: it is a read-only text area over this document, so its text is
@@ -1390,6 +1391,7 @@ class ReferenceEditorApp implements DesktopUiApplication {
     result.register(new DockPanelDescriptor("sensors", "Sensors", false, true, IconName.Radar));
     result.register(new DockPanelDescriptor("console", "Console", true, true, IconName.Terminal));
     result.register(new DockPanelDescriptor("telemetry", "Telemetry", true, true, IconName.Activity));
+    result.register(new DockPanelDescriptor("cnc", "CNC", true, true, IconName.Terminal));
 
     workspacePanelContents = [
       new DockPanelContent("start", function(_) return StartPanel.build(this)),
@@ -1416,7 +1418,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         function() return "log=" + consoleDocument.revision + ":stale=" + session.staleEdits().join("\n") +
           ":dark=" + appearance.dark),
       new DockPanelContent("telemetry", function(_) return telemetry.build(framePresentation, appearance.theme.tokens.surface,
-        appearance.theme.tokens.textSecondary, simulation))
+        appearance.theme.tokens.textSecondary, simulation)),
+      new DockPanelContent("cnc", function(_) return cncPanel.build(simulation, appearance.theme.tokens))
     ];
 
     result.setDefaultLayout(EditorWorkspaceLayout.defaultLayout());

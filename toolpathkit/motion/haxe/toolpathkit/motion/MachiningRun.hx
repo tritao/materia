@@ -9,6 +9,7 @@ import motionkit.program.MotionProgram;
 import motionkit.robot.ManipulatorMotion;
 import motionkit.robot.SessionState;
 import processkit.ProcessPathSlice;
+import motionkit.kinematics.Pose3;
 
 /** Runs a machining program and prepares a safe mid-path continuation. */
 class MachiningRun {
@@ -37,10 +38,22 @@ class MachiningRun {
   }
 
   /** Aborts a held execution and returns the program to submit once idle. */
-  public function prepareRestart(opIndex:Int, distance:Float):MotionProgram {
+  public function prepareRestart(opIndex:Int, distance:Float):MachiningContinuation {
     if (spindleFaulted) throw "cannot restart after spindle fault";
     if (motion.sessionState() != SessionState.Held)
       throw "machining restart needs a completed feed hold";
+    var continuation = continuationFrom(opIndex, distance);
+    motion.abort();
+    return continuation;
+  }
+
+  /**
+    The program that resumes machining at `distance` along path op
+    `opIndex`, from where the machine stands: it loads the tool the program
+    had loaded there, restores the spindle and coolant, approaches (over
+    the recipe's clearance, when it has one) and carries on.
+  **/
+  public function continuationFrom(opIndex:Int, distance:Float):MachiningContinuation {
     if (opIndex < 0 || opIndex >= program.ops.length)
       throw "machining restart operation is outside the program";
     var path:motionkit.path.PosePath = null;
@@ -56,10 +69,13 @@ class MachiningRun {
       throw "machining restart distance lies outside the path";
     var start = Math.max(0.0, distance - recipe.restartBackoff);
     var states:Map<String, EventValue> = new Map();
+    var toolChange:Null<MotionOp> = null;
     for (index in 0...(opIndex + 1)) {
       var limit = index == opIndex ? start : Math.POSITIVE_INFINITY;
       switch program.ops[index] {
         case SetOutput(channel, value): states.set(channel, value);
+        case WaitInput(channel, _, _) if (StringTools.startsWith(channel, ToolpathChannels.ToolChangePrefix)):
+          toolChange = program.ops[index];
         case FollowPath(_, _, _, events):
           for (event in events)
             if (event.distance <= limit) states.set(event.channel, event.value);
@@ -73,6 +89,19 @@ class MachiningRun {
         remaining.push(new PathEvent(event.distance - start, event.channel,
           event.value, event.leadSeconds, event.holdPolicy));
     var result:Array<MotionOp> = [];
+    var clearance = recipe.clearanceZ;
+    var target = continuation.waypointAt(0.0).pose;
+    if (clearance != null) {
+      var here = motion.compiler.solver.forward(currentJoints());
+      var up = new Pose3(here.x, here.y, clearance);
+      var across = new Pose3(target.x, target.y, clearance);
+      if (Math.abs(here.z - clearance) > 1e-9)
+        result.push(MotionOp.MoveL(up, frame, recipe.approachFeed, Blend.ExactStop));
+      if (up.x != across.x || up.y != across.y)
+        result.push(MotionOp.MoveL(across, frame, recipe.approachFeed, Blend.ExactStop));
+    }
+    // The tool goes in before the spindle starts, as the program did.
+    if (toolChange != null) result.push(toolChange);
     for (channel in [ToolpathChannels.SpindleDirection,
         ToolpathChannels.SpindleSpeed, ToolpathChannels.CoolantMist,
         ToolpathChannels.CoolantFlood]) {
@@ -86,23 +115,28 @@ class MachiningRun {
     })
       result.push(MotionOp.WaitInput(ToolpathChannels.SpindleAtSpeed,
         InputPredicate.Equals(EventValue.Digital(true)), null));
-    result.push(MotionOp.MoveL(continuation.waypointAt(0.0).pose,
-      frame, recipe.approachFeed, Blend.ExactStop));
+    result.push(MotionOp.MoveL(target, frame, recipe.approachFeed, Blend.ExactStop));
+    var resumeOp = result.length;
     result.push(MotionOp.FollowPath(continuation, frame, feed, remaining));
     for (index in (opIndex + 1)...program.ops.length)
       result.push(program.ops[index]);
-    motion.abort();
-    return new MotionProgram(result);
+    return new MachiningContinuation(new MotionProgram(result), opIndex, start, resumeOp);
   }
 
-  public function resumePrepared(continuation:MotionProgram):Void {
+  /** Where the machine's joints stand: at rest, when a restart is planned. */
+  function currentJoints():Array<Float> {
+    var positions = motion.robot.snapshot().positions;
+    return [for (index in motion.jointIndices) positions.get(index)];
+  }
+
+  public function resumePrepared(continuation:MachiningContinuation):Void {
     if (spindleFaulted) throw "cannot resume after spindle fault";
     var snapshot = motion.robot.snapshot();
     if (motion.running || motion.sessionState() != SessionState.Idle ||
         snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0 ||
         snapshot.safety != 0)
       throw "machining restart needs a controlled stop";
-    motion.run(continuation);
+    motion.run(continuation.program);
   }
 
   /** Requests a controlled stop; call safeShutdown after the stop completes. */

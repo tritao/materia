@@ -108,10 +108,27 @@ The job is now 198 motion ops instead of 3240, a pass takes 197 s instead of
 program starts, spread over every path; moving it off the frame thread is
 what remains for smooth starts.
 
-**C5. Editor controls.** A G-code panel that highlights the running line and
-links both ways (surface to line, line to moves); feed hold, resume, restart
-from a line and a feed override, all of which the motion adapter already
-supports.
+**C5. Editor controls** (done). A G-code panel that highlights the running
+line; feed hold, resume, restart from a line and a speed override. What it
+took:
+
+- *Speed override.* MotionKit had none. `ManipulatorMotion.setSpeedOverride`
+  plans what is left of a running program again from its next op (path speed
+  caps scaled; the time-optimal planner still holds every joint limit) and
+  splices the new plans in, without stopping. Blocks now record their
+  barrier's op so the replan resumes after it.
+- *Restart from a line.* `MachiningRun.continuationFrom` now reloads the tool
+  the program had loaded at the restart point (it only restored spindle and
+  coolant before) and, given the recipe's clearance height, climbs, crosses
+  and descends instead of moving straight through the work.
+  `MachiningContinuation` maps the restarted program back to the original's
+  ops, so the panel keeps marking the right line.
+- *The panel.* `app/editor/CncPanel`: a virtualized `ListView` of the program,
+  the running line tinted and followed, a row click picks the restart line,
+  buttons and a slider drive `CncProgramPlayer`'s new controls.
+
+Left from the original idea: linking a cut surface back to its line (picking
+the stock) and a line to its moves in the viewport.
 
 **Later.** Turning lead screws coupled to the carriages; engagement and
 cycle-time reports; rest machining from in-process stock; 5-axis or robot
@@ -181,4 +198,4 @@ then C3 → C4 → C5.
 | C2 | done as A3 | |
 | C3 | done: 3.1 ms of compute per 10 ms tick after A6 | `29b986cc` |
 | C4 | done: CAM from the plate's faces, generated job, G43 tools and tool changes, exact lowering and arcs | `722a6ff6`, `68dd7392` |
-| C5 | not started | |
+| C5 | done: CNC panel, hold/resume, restart from a line with tool reload, speed override | |

@@ -1,5 +1,10 @@
 package app;
 
+import FontCollection;
+import LayoutFrame;
+import nativekit.ui.core.RenderNode;
+import nativekit.ui.core.UiContext;
+import nativekit.ui.theme.Theme;
 import app.MateriaProjectRunner;
 import app.Main.ReferenceEditorApp;
 import app.ProjectDocumentSession;
@@ -427,6 +432,101 @@ class ProjectSourceTests {
       'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms');
   }
 
+  /**
+   * The router's job answers the operator: it reports the line it runs, stops on a feed hold and
+   * carries on, takes a speed override, and restarts at the drilling with the drill loaded.
+   */
+  static function checkCncControls(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var session = new ProjectDocumentSession(null, false);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
+      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
+      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
+      generated.recipeDocument, generated.robotMotions, generated.robotGrips, generated.cncJob);
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the router builds: " + simulation.error);
+    var player = simulation.cncPlayer();
+    if (player == null) throw "the router has no CNC player";
+    function run(seconds:Float, ?until:Void->Bool):Bool {
+      var end = simulation.activeSession().simulationTime() + seconds;
+      while (simulation.activeSession().simulationTime() < end) {
+        simulation.step();
+        check(simulation.cncFailure() == null, 'the router keeps running: ${simulation.cncFailure()}');
+        if (until != null && until()) return true;
+      }
+      return until == null;
+    }
+    var lines = player.sourceLines();
+    check(run(20.0, () -> player.currentLine > 0), "the player reports the line it runs");
+    check(StringTools.trim(lines[player.currentLine - 1]).length > 0, "the running line is a line of the program");
+    // The CNC panel, laid out on its own and operated by pointer.
+    var fonts = FontCollection.create();
+    fonts.add("uikit/vendor/harfbuzz/perf/fonts/Roboto-Regular.ttf");
+    var theme = Theme.dark();
+    var ui = new UiContext(null, fonts, theme);
+    var panel = new app.editor.CncPanel();
+    var frame = new LayoutFrame(480.0, 720.0);
+    function submit():RenderNode return ui.submit(panel.build(simulation, theme.tokens), frame);
+    function find(node:RenderNode, key:String):Null<RenderNode> {
+      if (node.styleKey == key) return node;
+      for (child in node.children) {
+        var found = find(child, key);
+        if (found != null) return found;
+      }
+      return null;
+    }
+    function press(target:Null<RenderNode>, label:String):Void {
+      if (target == null) throw 'the CNC panel shows $label';
+      var resolved = target.resolved;
+      if (resolved == null) throw 'the CNC panel lays out $label';
+      var bounds = resolved.clippedViewportBounds();
+      check(bounds.width > 0 && bounds.height > 0, 'the CNC panel shows $label on screen');
+      var x = bounds.x + bounds.width / 2, y = bounds.y + bounds.height / 2;
+      ui.pointerDown(x, y, 0);
+      ui.pointerUp(x, y, 0);
+      submit();
+    }
+    press(find(submit(), "cnc-hold"), "its hold button");
+    check(run(5.0, () -> player.held()), "the panel's hold stops the machine");
+    var heldLine = player.currentLine;
+    run(1.0);
+    check(player.held() && player.currentLine == heldLine, "a held machine stays on its line");
+    press(find(submit(), "cnc-resume"), "its resume button");
+    player.setSpeedOverride(0.5);
+    check(run(5.0, () -> !player.held()), "the panel's resume carries on");
+    // Pick a later line of the listing and restart there from the panel.
+    var rows:Array<RenderNode> = [];
+    function collect(node:RenderNode):Void {
+      var resolved = node.resolved;
+      if (node.styleType == "text" && resolved != null && resolved.clippedViewportBounds().height > 0)
+        rows.push(node);
+      for (child in node.children) collect(child);
+    }
+    var list = find(submit(), "list-content");
+    check(list != null, "the panel lists the program");
+    collect(cast list);
+    check(rows.length > 4, 'the listing shows its lines, ${rows.length}');
+    press(rows[rows.length - 2], "a line of the program");
+    var picked = panel.selectedLine;
+    check(picked > heldLine, 'clicking a line picks it to restart at, line $picked');
+    press(find(submit(), "cnc-restart"), "its restart button");
+    check(run(30.0, () -> player.currentLine >= picked),
+      'the panel restarts the program at the picked line, now line ${player.currentLine}');
+    // Restart where the drill starts work: the first motion after the drill is loaded.
+    var drillChange = -1;
+    for (index in 0...lines.length) if (lines[index].indexOf("T2 M6") >= 0) drillChange = index + 1;
+    check(drillChange > 0, "the program loads the drill");
+    check(player.restartFromLine(drillChange), "the drilling has a line to restart at");
+    check(run(60.0, () -> player.loadedTool == 2 && player.currentLine > drillChange),
+      'a restart at the drilling loads the drill and runs from there, line ${player.currentLine}, tool ${player.loadedTool}');
+    fonts.dispose();
+    session.dispose();
+    Sys.println('cnc controls: held at line $heldLine, restarted at line $picked from the panel, ' +
+      'and at line ${player.currentLine} with tool ${player.loadedTool}');
+  }
+
   /** A project named at launch builds in the background: queued at once, opened by tick(). */
   static function checkBackgroundLaunch(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
@@ -763,6 +863,7 @@ class ProjectSourceTests {
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
     checkCncRouter(root);
+    checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;
   }

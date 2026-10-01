@@ -29,6 +29,10 @@ import nativekit.sim.SimSession;
 import toolpathkit.motion.MachineBinding;
 import toolpathkit.motion.ToolpathMotion;
 import toolpathkit.motion.ToolpathMotionBinding;
+import toolpathkit.motion.MachiningContinuation;
+import toolpathkit.motion.MachiningRecipe;
+import toolpathkit.motion.MachiningRun;
+import motionkit.robot.SessionState;
 import toolpathkit.path.Point3;
 
 /**
@@ -120,6 +124,17 @@ class CncProgramPlayer implements SessionMember {
 	var passCounted = false;
 	/** Why the program stopped, when it failed. */
 	public var failure(default, null):Null<String> = null;
+	/** The G-code line the machine is executing; 0 between lines. */
+	public var currentLine(default, null):Int = 0;
+	/** Speed of every move, as a fraction of the program's. */
+	public var speedOverride(default, null):Float = 1.0;
+	final source:String;
+	final recipe:MachiningRecipe;
+	/** The restart the operator asked for, until the machine can take it. */
+	var restartRequest:Null<{op:Int, distance:Float}> = null;
+	var pendingContinuation:Null<MachiningContinuation> = null;
+	/** The restarted program running now, which maps back to the program's lines. */
+	var continuation:Null<MachiningContinuation> = null;
 
 	/**
 	 * `robot` is `project`'s assembly, simulated in `simulation`. The simulated
@@ -135,6 +150,7 @@ class CncProgramPlayer implements SessionMember {
 		this.session = session;
 		this.project = project;
 		this.loop = job.loop;
+		this.source = job.source;
 		var placement = new AssemblyState(definition, state);
 		var axes:Array<MotionAxisBlueprint> = [];
 		var start:Array<Float> = [];
@@ -156,6 +172,10 @@ class CncProgramPlayer implements SessionMember {
 		}
 		// Plan over the three axes alone: the machine's other joints are fixed mounts, and planning
 		// them all made compiling a short program take many seconds.
+		// A restart climbs to just below the top of Z travel before crossing to where it resumes.
+		var top = [for (joint in definition.joints) if (joint.id == job.axes[2]) joint][0].limits.upper;
+		if (top == null) throw "The machine's Z axis needs an upper limit";
+		recipe = new MachiningRecipe(0.01, 0.0, top * metresPerUnit - 0.001);
 		var planning = planningModel(robot.model, job.axes);
 		var machine = new MachineBinding("machine", job.axes[0], job.axes[1], job.axes[2], rapid);
 		var binding = new ToolpathMotionBinding(machine,
@@ -262,11 +282,13 @@ class CncProgramPlayer implements SessionMember {
 	public function feed():Void {
 		if (failure != null) return;
 		var clock = Sys.time();
+		takeRestart();
 		if (started && motion.completed && !passCounted) {
 			passes++;
 			passCounted = true;
 		}
-		if (!started || (loop && motion.completed && !motion.running)) {
+		if (!started || (loop && motion.completed && !motion.running && pendingContinuation == null)) {
+			continuation = null;
 			if (started) {
 				// A program runs from wherever the machine is: the position the planner last
 				// commanded, or where the robot stands when there is none.
@@ -288,26 +310,97 @@ class CncProgramPlayer implements SessionMember {
 		var spent = Sys.time() - clock;
 		motionSeconds += spent;
 		slowestUpdate = Math.max(slowestUpdate, spent);
-		if (motion.failure != null) failure = motion.failure;
+		// A restart aborts the program on purpose; that is not a failure.
+		if (motion.failure != null && pendingContinuation == null && restartRequest == null) failure = motion.failure;
+		var progress = motion.progress();
+		var at = continuation == null ? {op: progress.op, distance: progress.pathDistance} :
+			continuation.originalAt(progress.op, progress.pathDistance);
+		var provenance = at.op < 0 ? null : sourceMap.provenanceAt(at.op, at.distance);
+		currentLine = provenance == null ? 0 : provenance.line;
 		if (newStock != null) {
 			if (stock == null) stock = newStock();
 			clock = Sys.time();
 			// The tool moved on the last tick under the move commanded before it, so the segment it
 			// just cut belongs to that move; the move under way now labels the next segment.
 			stock.follow(commandedKind, commandedOp, commandedProvenance);
-			var progress = motion.progress();
-			var provenance = progress.op < 0 ? null : sourceMap.provenanceAt(progress.op, progress.pathDistance);
 			var kind = provenance == null ? null : kindByLine.get(provenance.line);
 			commandedKind = kind == null ? MoveKind.Rapid : kind;
-			commandedOp = progress.op;
+			commandedOp = at.op;
 			commandedProvenance = provenance == null ? new Provenance(0, 0, 0) : provenance;
 			cuttingSeconds += Sys.time() - clock;
 		}
 	}
 
+	/** The program's G-code, one entry per line. */
+	public function sourceLines():Array<String> return source.split("\n");
+
+	/** Whether the machine is stopped by a feed hold. */
+	public function held():Bool return motion.sessionState() == SessionState.Held;
+
+	/** Brings the machine to a controlled stop on its path. */
+	public function hold():Void motion.hold();
+
+	public function resume():Void motion.resume();
+
+	/** Sets the speed of every move, from 5% to 200% of the program's; it takes effect from the next move. */
+	public function setSpeedOverride(scale:Float):Void {
+		motion.setSpeedOverride(scale);
+		speedOverride = scale;
+	}
+
+	/**
+	 * Restarts the program at G-code line `line`, or the first line after it that moves: the machine
+	 * stops, climbs clear of the work, loads that line's tool, starts the spindle as the program had it
+	 * and carries on from there. Returns false when no later line moves.
+	 */
+	public function restartFromLine(line:Int):Bool {
+		var best:Null<toolpathkit.motion.ToolpathSourceMap.ToolpathSourceMapEntry> = null;
+		for (entry in sourceMap.entries) {
+			var at = entry.provenance.line;
+			if (at < line || entry.endDistance <= entry.startDistance) continue;
+			if (best == null || at < best.provenance.line ||
+					(at == best.provenance.line && entry.opIndex < best.opIndex))
+				best = entry;
+		}
+		if (best == null) return false;
+		restartRequest = {op: best.opIndex, distance: best.startDistance};
+		failure = null;
+		return true;
+	}
+
+	/** Moves an operator's restart along: hold, then plan from where the machine stopped, then run once it has. */
+	function takeRestart():Void {
+		var request = restartRequest;
+		if (request != null) {
+			var run = new MachiningRun(recipe, program, motion);
+			if (motion.running && motion.sessionState() != SessionState.Held) motion.hold();
+			else if (motion.running) {
+				pendingContinuation = run.prepareRestart(request.op, request.distance);
+				restartRequest = null;
+			} else {
+				pendingContinuation = run.continuationFrom(request.op, request.distance);
+				restartRequest = null;
+			}
+		}
+		var next = pendingContinuation;
+		if (next == null || motion.running || motion.sessionState() != SessionState.Idle) return;
+		var snapshot = robot.robot.snapshot();
+		if (snapshot.trajectoryActive || snapshot.trajectoryQueueDepth > 0 || snapshot.safety != 0) return;
+		new MachiningRun(recipe, program, motion).resumePrepared(next);
+		continuation = next;
+		pendingContinuation = null;
+		started = true;
+		passCounted = false;
+	}
+
 	/** The session is back at its start, and the robot with it: run the program again on fresh stock. */
 	public function reset():Void {
 		motion = newMotion();
+		if (speedOverride != 1.0) motion.setSpeedOverride(speedOverride);
+		restartRequest = null;
+		pendingContinuation = null;
+		continuation = null;
+		currentLine = 0;
 		loadedTool = initialTool;
 		started = false;
 		failure = null;
