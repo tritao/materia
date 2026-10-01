@@ -29,6 +29,16 @@ int main() {
         shared_glyphs.vertices.empty())
         return 50;
 
+    // An unsupported character must not move its insertion caret to the line origin.
+    TextEngine unsupported(shared_fonts);
+    if (!unsupported.layout_utf8("abc🙂def", 200.0f, 16.0f))
+        return 101;
+    const auto before_missing = unsupported.caret({2, 0});
+    const auto at_missing = unsupported.caret({3, 0});
+    const auto after_missing = unsupported.caret({4, 0});
+    if (before_missing.x <= 0 || at_missing.x < before_missing.x || at_missing.x > after_missing.x)
+        return 102;
+
     // Intrinsic measurements are cached by text and style, and a cached answer equals a fresh one.
     {
         TextEngine measured(shared_fonts);
