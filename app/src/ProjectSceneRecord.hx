@@ -11,6 +11,8 @@ typedef ProjectSceneRecord = {
   @:optional var assemblyState:String;
   /** Tree-joint IDs treated as dependent coordinates in this project. */
   @:optional var assemblyDependentJoints:Array<String>;
+  /** Encoded `AssemblyMateOverlayRecord`: mates authored over the generated assembly (see `ProjectAssemblyMates`). */
+  @:optional var assemblyMates:String;
 }
 
 typedef ProjectSceneInstance = {

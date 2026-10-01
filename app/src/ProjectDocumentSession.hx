@@ -32,8 +32,12 @@ import materia.assembly.AssemblyDefinition.KinematicJoint;
 import materia.assembly.AssemblyDefinitionCodec;
 import materia.assembly.AssemblyFrames;
 import cadkit.modeling.AssemblyDrag;
+import cadkit.modeling.AssemblyMateSolver.AssemblyMateSolveResult;
+import materia.assembly.AssemblyDefinition.AssemblyMate;
+import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import cadkit.modeling.AssemblyState;
 import cadkit.parametric.DocumentCodec;
+import cadkit.parametric.GeometricConnectors.GeometricConnectorError;
 import machinekit.document.MachineKitRecipes;
 import nativekit.scene.GeometryData;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
@@ -67,6 +71,13 @@ class ProjectDocumentSession {
   /** Vacuum commands the open project ships with; they are not part of the saved document. */
   public var robotGrips(default, null):Array<RobotGripEvent> = [];
   var assemblyRuntime:Null<AssemblyState> = null;
+  /** Mates authored over the generated assembly, and the face connectors they name (see `ProjectAssemblyMates`). */
+  public var assemblyMates(default, null):ProjectAssemblyMates = ProjectAssemblyMates.empty();
+  /** The last placement by the mates: status and diagnosis; null when there are none. */
+  public var assemblyMateResult(default, null):Null<AssemblyMateSolveResult> = null;
+  /** Why the mates could not be laid over the rebuilt project (a face lost or ambiguous), or null. */
+  public var assemblyMateProblem(default, null):Null<String> = null;
+  var assemblyFaceDescriptors:Map<String, String> = new Map();
   var assemblyLocalCentersByDefinition:Null<Map<String, Array<Float>>> = null;
   var assemblyMetresPerUnit:Float = 1.0;
   final assemblyOccurrenceIds:Map<String, Bool> = new Map();
@@ -207,7 +218,7 @@ class ProjectDocumentSession {
       ?assemblyDefinition:AssemblyDefinition, ?assemblyState:AssemblyStateRecord,
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
-      ?grips:Array<RobotGripEvent>):Void {
+      ?grips:Array<RobotGripEvent>, ?faceDescriptors:Map<String, String>):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -239,7 +250,7 @@ class ProjectDocumentSession {
     replace(next, nextSensors, null, null, nextBim, nextDocument);
     recipeDocument = nextRecipe;
     projectAssembly = assembly;
-    installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit);
+    installAssemblyRuntime(assemblyDefinition, runtime, localCentersByDefinition, metresPerUnit, null, faceDescriptors);
     projectPhysical = physical;
     robotMotions = motions == null ? [] : motions.copy();
     robotGrips = grips == null ? [] : grips.copy();
@@ -317,7 +328,8 @@ class ProjectDocumentSession {
     staleProjectRecord = diagnostics.length == 0 ? null : project;
     projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition, runtime,
-      generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints);
+      generated.localCentersByDefinition, generated.metresPerUnit, dependentJoints, generated.faceDescriptorsByDefinition,
+      ProjectAssemblyMates.decode(project.assemblyMates));
     projectPhysical = generated.physical;
     robotMotions = generated.robotMotions == null ? [] : generated.robotMotions.copy();
     robotGrips = generated.robotGrips == null ? [] : generated.robotGrips.copy();
@@ -333,8 +345,12 @@ class ProjectDocumentSession {
 
   function installAssemblyRuntime(definition:Null<AssemblyDefinition>, state:Null<AssemblyState>,
       centers:Null<Map<String, Array<Float>>>, metresPerUnit:Float,
-      ?dependentJointIds:Array<String>):Void {
+      ?dependentJointIds:Array<String>, ?faceDescriptors:Map<String, String>, ?mates:ProjectAssemblyMates):Void {
     assemblyOccurrenceIds.clear();
+    assemblyFaceDescriptors = faceDescriptors == null ? new Map() : faceDescriptors;
+    assemblyMates = mates == null ? ProjectAssemblyMates.empty() : mates;
+    assemblyMateResult = null;
+    assemblyMateProblem = null;
     assemblyDependentJoints.clear();
     projectAssemblyDefinition = definition;
     assemblyRuntime = state;
@@ -351,6 +367,114 @@ class ProjectDocumentSession {
     for (occurrence in definition.occurrences) assemblyOccurrenceIds.set("project:" + occurrence.id, true);
     projectAssemblyState = state.record();
     projectAssembly = MateriaProjectRunner.legacySnapshot(definition, state);
+    if (!assemblyMates.isEmpty()) layMates(definition, state);
+  }
+
+  /** Frames the mates' faces again from the rebuilt project and places the parts by them (not an edit: it follows the source). */
+  function layMates(definition:AssemblyDefinition, state:AssemblyState):Void {
+    try {
+      assemblyMates = assemblyMates.reframe(definition, assemblyFaceDescriptors);
+      var solved = assemblyMates.solve(definition, state.record());
+      assemblyMateResult = solved.result;
+      if (solved.result.converged) applyAssemblyStateRecord(solved.state);
+    } catch (error:Dynamic) {
+      assemblyMateProblem = Std.isOfType(error, GeometricConnectorError)
+        ? (cast error : GeometricConnectorError).toString() : Std.string(error);
+    }
+  }
+
+  /**
+   * Mates face `firstFace` of occurrence `first` (a scene id, `project:<occurrence>`) to face `secondFace` of
+   * `second`, as one undoable edit; returns the mate's id. The faces become connectors of their components
+   * (captured from the project's face descriptors), and the parts move to satisfy every mate. A mate that
+   * cannot hold is kept, the placement unchanged, and `assemblyMateResult` says what conflicts.
+   */
+  public function addAssemblyFaceMate(kind:AssemblyMateKind, first:String, firstFace:Int, second:String, secondFace:Int,
+      ?value:Float):String {
+    var definition = requireMateDefinition();
+    var firstOccurrence = mateOccurrence(definition, first), secondOccurrence = mateOccurrence(definition, second);
+    var firstSide = assemblyMates.faceConnector(firstOccurrence.definition, firstFace,
+      assemblyFaceDescriptors.get(firstOccurrence.definition));
+    var secondSide = firstSide.overlay.faceConnector(secondOccurrence.definition, secondFace,
+      assemblyFaceDescriptors.get(secondOccurrence.definition));
+    return addMateTo(secondSide.overlay, kind, firstOccurrence.id, firstSide.name, secondOccurrence.id, secondSide.name, value);
+  }
+
+  /** Mates two existing connectors (named on the components of `first` and `second`), as one undoable edit. */
+  public function addAssemblyConnectorMate(kind:AssemblyMateKind, first:String, firstConnector:String, second:String,
+      secondConnector:String, ?value:Float):String {
+    var definition = requireMateDefinition();
+    return addMateTo(assemblyMates, kind, mateOccurrence(definition, first).id, firstConnector,
+      mateOccurrence(definition, second).id, secondConnector, value);
+  }
+
+  /** Removes mate `id` (and the face connectors only it named), as one undoable edit; the parts stay where they are. */
+  public function removeAssemblyMate(id:String):Bool {
+    var definition = requireMateDefinition(), state = assemblyRuntime;
+    var before = assemblyMates, after = assemblyMates.withoutMate(id);
+    var beforeResult = assemblyMateResult;
+    var afterResult = after.mates.length == 0 || state == null ? null : after.solve(definition, state.record()).result;
+    return document.apply(new EditOperation("Remove mate " + id,
+      function() setMates(after, afterResult, null),
+      function() setMates(before, beforeResult, null)));
+  }
+
+  /** A one-line account of the mates for the status bar, or null when there are none. */
+  public function assemblyMateStatus():Null<String> {
+    var problem = assemblyMateProblem;
+    if (problem != null) return "Mates: " + problem;
+    var result = assemblyMateResult;
+    if (result == null) return null;
+    var report = result.report;
+    if (!result.converged) {
+      var conflicting = report.conflictingOwners();
+      return conflicting.length > 0 ? "Mates conflict: " + conflicting.join(", ") : "Mates: " + result.message;
+    }
+    var redundant = result.implied;
+    var free = report.degreesOfFreedom == 0 ? "fully placed" : report.degreesOfFreedom + " degrees of freedom free";
+    return "Mates: " + free + (redundant.length > 0 ? "; redundant: " + redundant.join(", ") : "") +
+      (result.degenerate ? " (singular placement)" : "");
+  }
+
+  function addMateTo(overlay:ProjectAssemblyMates, kind:AssemblyMateKind, first:String, firstConnector:String,
+      second:String, secondConnector:String, value:Null<Float>):String {
+    var definition = requireMateDefinition(), state = assemblyRuntime;
+    if (state == null) throw "This project has no editable assembly state";
+    var mate:AssemblyMate = {id: overlay.freshId(kind + "-"), kind: kind, first: first, firstConnector: firstConnector,
+      second: second, secondConnector: secondConnector, axis: {x: 0, y: 0, z: 1}};
+    if (value != null) mate.value = value;
+    var after = overlay.withMate(mate);
+    var solved = after.solve(definition, state.record());
+    var before = assemblyMates, beforeResult = assemblyMateResult, beforeState = state.record();
+    var afterState = solved.result.converged ? solved.state : beforeState;
+    document.apply(new EditOperation("Add " + kind + " mate",
+      function() setMates(after, solved.result, afterState),
+      function() setMates(before, beforeResult, beforeState)));
+    return mate.id;
+  }
+
+  function setMates(overlay:ProjectAssemblyMates, result:Null<AssemblyMateSolveResult>, state:Null<AssemblyStateRecord>):Void {
+    assemblyMates = overlay;
+    assemblyMateResult = result;
+    assemblyMateProblem = null;
+    if (state != null) applyAssemblyStateRecord(state);
+    scene.refreshAssemblyProperties();
+  }
+
+  function requireMateDefinition():AssemblyDefinition {
+    var definition = projectAssemblyDefinition;
+    if (definition == null || assemblyRuntime == null) throw "This project has no assembly to mate";
+    return definition;
+  }
+
+  /** The root occurrence a scene id names; parts inside nested assemblies cannot be mated yet. */
+  static function mateOccurrence(definition:AssemblyDefinition, sceneId:String):AssemblyComponentOccurrence {
+    var id = StringTools.startsWith(sceneId, "project:") ? sceneId.substr(8) : sceneId;
+    for (occurrence in definition.occurrences) if (occurrence.id == id) {
+      if (occurrence.assembly != null) throw 'Mate a part inside "$id", not the sub-assembly itself';
+      return occurrence;
+    }
+    throw 'There is no assembly part "$id" to mate';
   }
 
   function assemblyPropertiesForOccurrence(sceneId:String):Array<PropertyDescriptor> {
@@ -725,7 +849,8 @@ class ProjectDocumentSession {
     projectAssembly = generated.assembly;
     installAssemblyRuntime(generated.assemblyDefinition,
       generated.assemblyDefinition == null ? null : new AssemblyState(generated.assemblyDefinition, stateRecord),
-      generated.localCentersByDefinition, generated.metresPerUnit, saved.record.assemblyDependentJoints);
+      generated.localCentersByDefinition, generated.metresPerUnit, saved.record.assemblyDependentJoints,
+      generated.faceDescriptorsByDefinition, assemblyMates);
   }
 
   static function checkedPath(value:String):String {
@@ -772,11 +897,12 @@ class ProjectDocumentSession {
     }
     var savedAssemblyState = projectAssemblyDefinition == null || assemblyRuntime == null ? null
       : AssemblyDefinitionCodec.encodeState(projectAssemblyDefinition, assemblyRuntime.record());
-    return {record: {version: 1, reference: relativeReference(destination, reference),
+    var record:ProjectSceneRecord = {version: 1, reference: relativeReference(destination, reference),
       overrides: overrides, removed: removed, instances: instances,
       assemblyState: savedAssemblyState,
-      assemblyDependentJoints: savedDependentJoints()},
-      authored: authored};
+      assemblyDependentJoints: savedDependentJoints()};
+    if (!assemblyMates.isEmpty()) record.assemblyMates = assemblyMates.encode();
+    return {record: record, authored: authored};
   }
 
   /** The dependent joints to save: null when they are what the definition derives, so later source changes apply. */

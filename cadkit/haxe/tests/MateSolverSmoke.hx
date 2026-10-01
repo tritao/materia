@@ -18,6 +18,7 @@ class MateSolverSmoke {
 		var result = AssemblyMateSolver.solve(seated);
 		check(result.converged && result.freeRoots.join(",") == "motor", 'the motor is placed (${result.status}: ${result.message})');
 		check(result.report.degreesOfFreedom == 1, 'planar + coaxial leave one turn free: ${result.report.degreesOfFreedom}');
+		check(result.implied.length == 0, 'planar + coaxial overlap on the axis but neither is implied: ${result.implied}');
 		var placed = new AssemblyState(AssemblyMateSolver.place(seated, result));
 		var flange = placed.worldConnector("motor", "flange"), axis = placed.worldConnector("motor", "axis");
 		near(flange.z, 100, "the flange sits on the face");
@@ -46,6 +47,8 @@ class MateSolverSmoke {
 		var redundant = AssemblyMateSolver.solve(twice);
 		check(redundant.converged && redundant.report.redundantOwners().join(",") == "again,seat",
 			'a repeated mate is redundant: ${redundant.report.redundantOwners()}');
+		check(redundant.implied.join(",") == "seat,again" || redundant.implied.join(",") == "again,seat",
+			'and each copy is implied by the other: ${redundant.implied}');
 
 		// A mate between a jointed arm's tip and a fixture turns the arm's joint, not the grounded base.
 		var arm = armToFixture();

@@ -31,6 +31,12 @@ class AssemblyMateSolveResult {
 	public final report:DiagnosisReport;
 	/** The mates are dependent only at the solved placement (see `AssemblySolveOutcome.degenerate`); `report` is a nearby one's. */
 	public final degenerate:Bool;
+	/**
+		Mates and closures that add nothing (`AssemblyClosureDiagnosis.impliedOwners`): what to tell a user is
+		redundant. `report.redundantOwners()` also lists overlapping ones, such as a planar and a coaxial mate
+		that both hold one axis, which is how such pairs are meant to be used.
+	*/
+	public final implied:Array<String>;
 	/** Occurrences the solve could move as whole parts, in definition order. */
 	public final freeRoots:Array<String>;
 	/** Solved poses of the free roots and coordinates of the joints the mates reached. */
@@ -38,7 +44,7 @@ class AssemblyMateSolveResult {
 	public final jointCoordinates:Array<AssemblyJointCoordinate>;
 
 	public function new(status:String, converged:Bool, iterations:Int, unsatisfied:Array<String>, message:String,
-			report:DiagnosisReport, degenerate:Bool, freeRoots:Array<String>, rootPoses:Array<AssemblyRootPose>,
+			report:DiagnosisReport, degenerate:Bool, implied:Array<String>, freeRoots:Array<String>, rootPoses:Array<AssemblyRootPose>,
 			jointCoordinates:Array<AssemblyJointCoordinate>) {
 		this.status = status;
 		this.converged = converged;
@@ -47,6 +53,7 @@ class AssemblyMateSolveResult {
 		this.message = message;
 		this.report = report;
 		this.degenerate = degenerate;
+		this.implied = implied;
 		this.freeRoots = freeRoots;
 		this.rootPoses = rootPoses;
 		this.jointCoordinates = jointCoordinates;
@@ -121,6 +128,9 @@ class AssemblyMateSolver {
 			return nudged;
 		});
 		var solution = outcome.solution, report = outcome.report;
+		var redundant = report.redundantOwners();
+		var implied = outcome.status == "converged" && redundant.length > 0
+			? AssemblyClosureDiagnosis.impliedOwners(problem, solution.state, scale, redundant) : [];
 		var message = switch outcome.status {
 			case "converged":
 				var free = report.degreesOfFreedom == 0 ? "the mates place every part" : 'the mates leave ${report.degreesOfFreedom} degrees of freedom';
@@ -132,7 +142,7 @@ class AssemblyMateSolver {
 		var rootPoses = [for (id in freeRoots) {occurrence: id, pose: AssemblyKinematics.toFrame(solution.state.rootPose(kinematics.body(id)))}];
 		var coordinates = [for (dof in dofs) {joint: model.dofId(dof), value: solution.state.q[dof]}];
 		return new AssemblyMateSolveResult(outcome.status, solution.converged(), solution.iterations, solution.unsatisfied(), message,
-			report, outcome.degenerate, freeRoots, rootPoses, coordinates);
+			report, outcome.degenerate, implied, freeRoots, rootPoses, coordinates);
 	}
 
 	/** The k-th witness nudge: `AssemblySolve.WITNESS_STEP` times one of 1, 0.6, 0.8, cycling. */

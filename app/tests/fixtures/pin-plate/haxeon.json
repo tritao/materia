@@ -1,0 +1,13 @@
+{
+	"version": 1,
+	"package": { "name": "pin-plate-fixture" },
+	"entry": "PinPlatePreview",
+	"sources": ["PinPlatePreview.hx"],
+	"sourceRoots": ["."],
+	"dependencies": {
+		"projectkit": { "path": "../../../../projectkit" },
+		"cadkit": { "path": "../../../../cadkit" }
+	},
+	"target": "host",
+	"outputDir": "build"
+}

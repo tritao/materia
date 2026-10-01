@@ -24,6 +24,35 @@ class AssemblyClosureDiagnosis {
 	static inline var NEGLIGIBLE:Float = 1e-6;
 
 	public static function diagnose(problem:KinematicProblem, state:KinematicState, scale:Float):DiagnosisReport {
+		var system = rows(problem, state, scale);
+		return ConstraintDiagnosis.diagnoseSparse(system.rows, system.width, system.owners, system.residual,
+			ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE);
+	}
+
+	/**
+		The owners among `candidates` that add nothing: without their rows the rank is the same, so every row of
+		theirs is implied by the others (a mate repeated, not one that merely overlaps another, as a coaxial mate
+		and a planar mate both holding one axis do).
+	*/
+	public static function impliedOwners(problem:KinematicProblem, state:KinematicState, scale:Float,
+			candidates:Array<String>):Array<String> {
+		var system = rows(problem, state, scale);
+		var full = ConstraintDiagnosis.diagnoseSparse(system.rows, system.width, system.owners, system.residual,
+			ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE).rank;
+		var implied:Array<String> = [];
+		for (candidate in candidates) {
+			var kept = [for (row in 0...system.rows.length) if (system.owners[row] != candidate) row];
+			if (kept.length == system.rows.length) continue;
+			var rank = ConstraintDiagnosis.diagnoseSparse([for (row in kept) system.rows[row]], system.width,
+				[for (row in kept) system.owners[row]], [for (row in kept) system.residual[row]],
+				ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE).rank;
+			if (rank == full) implied.push(candidate);
+		}
+		return implied;
+	}
+
+	static function rows(problem:KinematicProblem, state:KinematicState, scale:Float):{rows:Array<{index:Array<Int>, value:Array<Float>}>,
+			width:Int, owners:Array<String>, residual:Array<Float>} {
 		var model = problem.model, layout = problem.layout(), width = layout.width, rows = problem.rowCount();
 		var residual = [for (_ in 0...rows) 0.0], jacobian = [for (_ in 0...rows * width) 0.0];
 		problem.evaluate(state, new KinematicSnapshot(model), residual, jacobian);
@@ -48,6 +77,6 @@ class AssemblyClosureDiagnosis {
 			}
 			{index: index, value: value};
 		}];
-		return ConstraintDiagnosis.diagnoseSparse(sparse, width, owners, residual, ConstraintDiagnosis.DEFAULT_RANK_TOLERANCE);
+		return {rows: sparse, width: width, owners: owners, residual: residual};
 	}
 }

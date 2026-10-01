@@ -10,6 +10,7 @@ import cadbridge.AssemblySimulationBridge;
 import cadbridge.AssemblySimulationBridge.AssemblyPhysicalData;
 import materia.assembly.AssemblyDefinition;
 import materia.assembly.AssemblyDefinition.AssemblyJointRole;
+import materia.assembly.AssemblyDefinition.AssemblyMateKind;
 import nativekit.ui.properties.PropertyBinding;
 import nativekit.ui.properties.PropertyValue;
 import nativekit.ui.properties.PropertyEditResult;
@@ -378,6 +379,75 @@ class ProjectSourceTests {
   }
 
   /** A project named at launch builds in the background: queued at once, opened by tick(). */
+  /**
+   * Mates authored in the editor over a generated assembly (plan C4.5b): a pin seated on a plate's top face
+   * and in its bore through the project's face descriptors, undone and redone, saved and reopened, a
+   * contradicting mate reported as a conflict, and a mate removed.
+   */
+  static function checkMates(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/app/tests/fixtures/pin-plate/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var descriptors = generated.faceDescriptorsByDefinition;
+    check(descriptors != null && descriptors.exists("plate") && descriptors.exists("pin"), "the project describes its faces");
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
+      generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
+      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, descriptors);
+    check(session.assemblyMateStatus() == null, "a project without mates shows no mate status");
+    var top = describedFace(descriptors, "plate", "plane", 1), bore = describedFace(descriptors, "plate", "axis", 0);
+    var base = describedFace(descriptors, "pin", "plane", -1), side = describedFace(descriptors, "pin", "axis", 0);
+
+    var seat = session.addAssemblyFaceMate(AssemblyMateKind.Planar, "project:plate", top, "project:pin", base);
+    var seated = session.assemblyMateResult;
+    check(seated != null && seated.converged && seated.report.degreesOfFreedom == 3,
+      'a planar mate leaves the pin three freedoms: ${session.assemblyMateStatus()}');
+    var shaft = session.addAssemblyFaceMate(AssemblyMateKind.Coaxial, "project:plate", bore, "project:pin", side);
+    check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'the pin may only turn: ${session.assemblyMateStatus()}');
+    expectPin(session, 30, 20, 10, "the pin stands in the bore");
+
+    check(session.document.undo(), "the coaxial mate undoes");
+    check(session.assemblyMates.mates.length == 1 && session.assemblyMates.connectors.length == 2,
+      "undo removes the mate and its face connectors");
+    check(session.document.redo(), "and redoes");
+    expectPin(session, 30, 20, 10, "redo seats the pin again");
+
+    var output = "/tmp/materia-pin-plate-mates-" + Sys.getPid() + ".materia.json";
+    session.save(output);
+    var reopened = new ProjectDocumentSession(null, false);
+    reopened.open(output);
+    check(reopened.assemblyMates.mates.length == 2, "the mates survive a save and reopen");
+    check(reopened.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'and place the pin again: ${reopened.assemblyMateStatus()}');
+    expectPin(reopened, 30, 20, 10, "the reopened pin stands in the bore");
+    FileSystem.deleteFile(output);
+
+    var lift = session.addAssemblyFaceMate(AssemblyMateKind.Planar, "project:plate", top, "project:pin", base, 5);
+    var status = session.assemblyMateStatus();
+    check(status != null && StringTools.startsWith(status, "Mates conflict"), 'a contradicting mate is a conflict: $status');
+    expectPin(session, 30, 20, 10, "a conflicting mate leaves the placement");
+    check(session.removeAssemblyMate(lift), "the conflicting mate can be removed");
+    check(session.assemblyMateStatus() == "Mates: 1 degrees of freedom free", 'removing it settles the mates: ${session.assemblyMateStatus()}');
+    check(seat != shaft, "mates get distinct ids");
+  }
+
+  /** The index of the described face of `feature` on `component`, for planes the one whose normal's z has `normalZ`'s sign. */
+  static function describedFace(descriptors:Map<String, String>, component:String, feature:String, normalZ:Int):Int {
+    var records:Array<Dynamic> = Json.parse(descriptors.get(component));
+    for (record in records) {
+      var direction:Array<Float> = Reflect.field(record, "direction");
+      if (Reflect.field(record, "feature") == feature && (normalZ == 0 || direction[2] * normalZ > 0.5))
+        return Reflect.field(record, "index");
+    }
+    throw 'No $feature face on $component';
+  }
+
+  static function expectPin(session:ProjectDocumentSession, x:Float, y:Float, z:Float, label:String):Void {
+    var definition = session.projectAssemblyDefinition, record = session.projectAssemblyState;
+    check(definition != null && record != null, label + ": the assembly has a state");
+    var pose = new AssemblyState(definition, record).worldPose("pin");
+    check(Math.abs(pose.x - x) < 1e-3 && Math.abs(pose.y - y) < 1e-3 && Math.abs(pose.z - z) < 1e-3,
+      '$label: pin at ${pose.x}, ${pose.y}, ${pose.z}');
+  }
+
   static function checkBackgroundLaunch(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var editor = new ReferenceEditorApp();
@@ -705,6 +775,7 @@ class ProjectSourceTests {
     session.dispose();
     if (FileSystem.exists(output)) FileSystem.deleteFile(output);
     checkRobotArm(root);
+    checkMates(root);
     checkBackgroundLaunch(root);
     return 0;
   }

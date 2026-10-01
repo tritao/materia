@@ -188,7 +188,8 @@ class Main {
         editor.session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
+          generated.faceDescriptorsByDefinition);
       }
       // Opens bundled examples in order, exactly as the Start page does, for headless checks.
       var settleSeconds = 0.0;
@@ -675,7 +676,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
         session.openGeneratedScene(generated.objects, projectPath, generated.assembly,
           generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
           generated.localCentersByDefinition, generated.metresPerUnit,
-          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips);
+          generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
+          generated.faceDescriptorsByDefinition);
       }
     }
     bimEditor = makeBimEditor();
@@ -1355,7 +1357,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       ":world=" + Std.string(world.status()) + ":presentation=" + presentationRevision +
       ":grid=" + gridSpacing + ":snap=" + gridSnapEnabled +
       ":mode=" + mode.id + ":density=" + Std.string(toolbarDensity) + ":menu=" + toolbarMenuVisible +
-      ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision;
+      ":viewport=" + viewportWidth + "x" + viewportHeight + ":view=" + viewRevision +
+      ":mates=" + Std.string(session.assemblyMateStatus());
   }
 
   function statusBar():View {
@@ -1389,6 +1392,12 @@ class ReferenceEditorApp implements DesktopUiApplication {
           appearance.theme.tokens.danger, TextStyleOverride.text(12.0))),
       new KeyedView("space", new Spacer("status-space", LayoutAxis.grow(), LayoutAxis.fixed(1.0)))
     ];
+    var mates = session.assemblyMateStatus();
+    if (mates != null) {
+      var trouble = StringTools.startsWith(mates, "Mates conflict") || session.assemblyMateProblem != null;
+      items.push(new KeyedView("mates", new Text(shortenLabel(mates, viewportWidth < 900.0 ? 32 : 72), null,
+        trouble ? appearance.theme.tokens.danger : appearance.theme.tokens.textSecondary, TextStyleOverride.text(12.0))));
+    }
     if (viewportWidth >= 900.0)
       items.push(new KeyedView("grid", new Text("Grid " + gridSpacingLabel() +
         " m · Snap " + (gridSnapEnabled ? "On" : "Off"), null,

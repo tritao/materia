@@ -909,3 +909,38 @@ Steps:
 - Test: a bore captured from descriptors frames like one captured from the
   shape, and an assembly reframed from the widened plate's descriptors
   seats the pin at the new bore.
+
+**b (done).** Session mates:
+- `app/ProjectAssemblyMates` is an immutable overlay of face connectors
+  (per component) and mates.
+  - `effective(generated)` lays it over the generated definition and checks
+    the mates against their features.
+  - `reframe` frames the connectors again from the rebuilt artifact's
+    descriptors.
+  - `faceConnector` captures (or reuses) "face<index>" from the descriptors.
+  - `solve` places the parts and merges the result into the current state,
+    so the coordinates the mates don't reach keep their values.
+- `ProjectDocumentSession`:
+  - `addAssemblyFaceMate` / `addAssemblyConnectorMate` /
+    `removeAssemblyMate` are undoable edits that swap the overlay and the
+    state.
+  - A mate that cannot hold is kept, the placement is left as it was, and
+    the conflict is reported.
+  - On open, rebuild and recipe refresh, `installAssemblyRuntime` reframes
+    and re-solves (`layMates`); a lost face becomes `assemblyMateProblem`.
+  - `assemblyMateStatus()` feeds the status bar (shown in red for a
+    conflict or a problem).
+  - The overlay is saved as `ProjectSceneRecord.assemblyMates`.
+- `AssemblyMateSolveResult.implied` lists the mates that add nothing (the
+  rank is unchanged without them). That is what the status calls redundant.
+  `report.redundantOwners()` also lists overlapping mates, such as the
+  usual planar-plus-coaxial pair, which share the axis rows on purpose.
+- Fixture `app/tests/fixtures/pin-plate` (a grounded plate with a bore, and
+  a free pin). `ProjectSourceTests.checkMates` covers:
+  - planar: 3 degrees of freedom; plus coaxial: 1, with the pin at
+    (30, 20, 10);
+  - undo/redo, and save and reopen;
+  - a contradicting planar offset reported as a conflict with the placement
+    kept, then removed.
+- Limits: root-scope occurrences only (not parts inside nested assemblies);
+  faces only, not edges.

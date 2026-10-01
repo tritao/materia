@@ -134,6 +134,9 @@ class SceneCodec {
     if (assemblyState != null && assemblyState.length > 2000000)
       throw "Generated project assembly state is too large";
     var assemblyDependentJoints = optionalTextArray(value, "assemblyDependentJoints", 4000);
+    var assemblyMates = optionalText(value, "assemblyMates");
+    if (assemblyMates != null && assemblyMates.length > 2000000)
+      throw "Generated project mates are too large";
     var overrides:Dynamic = field(value, "overrides");
     var removed:Dynamic = field(value, "removed");
     var instances:Dynamic = field(value, "instances");
@@ -186,9 +189,11 @@ class SceneCodec {
       }
       instanceRecords.push({sourceId: sourceId, id: id, overrides: instanceEdits});
     }
-    return {version: 1, reference: reference, overrides: overrideRecords,
+    var record:ProjectSceneRecord = {version: 1, reference: reference, overrides: overrideRecords,
       removed: removedIds, instances: instanceRecords, assemblyState: assemblyState,
       assemblyDependentJoints: assemblyDependentJoints};
+    if (assemblyMates != null) record.assemblyMates = assemblyMates;
+    return record;
   }
 
   public static function decodeScript(text:String):Null<ScriptOwnershipRecord> return decodeScriptRoot(parse(text));
