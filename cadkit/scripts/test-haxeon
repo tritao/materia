@@ -7,7 +7,8 @@ build_root="${CADKIT_BUILD_ROOT:-$repo_root/build/debug}"
 
 haxe="$haxeon_root/.tools/haxe/haxe"
 hashlink="$haxeon_root/.tools/hashlink/hl"
-output="$repo_root/build/haxeon/smoke.hl"
+entry="${CADKIT_SMOKE_ENTRY:-HaxeonSmoke}"
+output="$repo_root/build/haxeon/${entry}.hl"
 
 mkdir -p "$(dirname -- "$output")"
 
@@ -17,7 +18,7 @@ mkdir -p "$(dirname -- "$output")"
 	--run compiler.tools.HaxeonCompiler \
 	--target=hl \
 	"--output=$output" \
-	--entry=HaxeonSmoke \
+	"--entry=$entry" \
 	"--root=$repo_root/haxe/src" \
 	"--root=$repo_root/../projectkit/src" \
 	"--root=$repo_root/../kinematicskit/haxe" \
@@ -28,7 +29,7 @@ mkdir -p "$(dirname -- "$output")"
 	"--root=$repo_root/../bimkit/examples" \
 	"--ffi-interface=$repo_root/haxe/abi/CadKit.hxi" \
 	"--ffi-projection=$repo_root/haxe/abi/CadKit.hxmap" \
-	"$repo_root/haxe/tests/HaxeonSmoke.hx"
+	"$repo_root/haxe/tests/$entry.hx"
 
 native_paths="$build_root/core:$build_root/lin64/gcc/libd:$haxeon_root/out:$haxeon_root/.tools/hashlink"
 if [[ -n "${LD_LIBRARY_PATH:-}" ]]; then
