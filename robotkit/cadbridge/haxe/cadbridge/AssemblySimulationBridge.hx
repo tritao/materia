@@ -261,6 +261,11 @@ class AssemblySimulationBridge {
       var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
       if (coupling.efficiency != null) added.efficiency = coupling.efficiency;
+      // Stiffness and backlash are in the leader's units, which a sliding leader measures in assembly units.
+      var stiffness = coupling.stiffness, backlash = coupling.backlash, drag = coupling.drag;
+      if (stiffness != null) added.stiffness = stiffness / leaderScale;
+      if (backlash != null) added.backlash = backlash * leaderScale;
+      if (drag != null) added.drag = drag * followerScale;
     }
     // A motor on a joint: its effort and rate in robot units, and its rotor turning with the joint.
     if (definition.actuators != null) for (actuator in definition.actuators) {

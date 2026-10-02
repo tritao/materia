@@ -145,10 +145,7 @@ class RobotModelCodec {
           limitImpedance: joint.limitImpedance}
       }],
       actuators: [for (actuator in model.actuators) encodeActuator(actuator)],
-      couplings: [for (coupling in model.couplings) {
-        id: coupling.id, leader: coupling.leader, follower: coupling.follower,
-        ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
-      }],
+      couplings: [for (coupling in model.couplings) encodeCoupling(coupling)],
       frames: [for (frame in model.frames) {
         id: frame.id, name: frame.name, link: frame.link.id,
         position: frame.position, rotation: frame.rotation
@@ -243,6 +240,9 @@ class RobotModelCodec {
         if (!(efficiency > 0 && efficiency <= 1)) throw 'Coupling ${coupling.id} has an invalid efficiency';
         coupling.efficiency = efficiency;
       }
+      if (Reflect.hasField(record, "stiffness")) coupling.stiffness = nonNegative(number(record, "stiffness"), "coupling stiffness");
+      if (Reflect.hasField(record, "backlash")) coupling.backlash = nonNegative(number(record, "backlash"), "coupling backlash");
+      if (Reflect.hasField(record, "drag")) coupling.drag = nonNegative(number(record, "drag"), "coupling drag");
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
         throw 'Coupling ${coupling.id} references an unknown joint';
       if (couplingIds.exists(coupling.id) || followers.exists(coupling.follower))
@@ -371,6 +371,18 @@ class RobotModelCodec {
       case other: throw 'Unsupported RobotModel shape contact $other';
     };
     return shape;
+  }
+
+  /** Stiffness, backlash and drag are written only when a coupling has some, so other models keep their bytes. */
+  static function encodeCoupling(coupling:JointCoupling):Dynamic {
+    var record:Dynamic = {
+      id: coupling.id, leader: coupling.leader, follower: coupling.follower,
+      ratio: coupling.ratio, offset: coupling.offset, efficiency: coupling.efficiency
+    };
+    if (coupling.stiffness != 0.0) record.stiffness = nonNegative(coupling.stiffness, "coupling stiffness");
+    if (coupling.backlash != 0.0) record.backlash = nonNegative(coupling.backlash, "coupling backlash");
+    if (coupling.drag != 0.0) record.drag = nonNegative(coupling.drag, "coupling drag");
+    return record;
   }
 
   static function encodeActuator(value:Actuator):Dynamic {

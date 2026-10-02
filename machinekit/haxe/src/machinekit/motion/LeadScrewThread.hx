@@ -65,4 +65,16 @@ class LeadScrewThread {
 		var frictionAngle = Math.atan(friction / Math.cos(15 * Math.PI / 180));
 		return Math.tan(leadAngle) / Math.tan(leadAngle + frictionAngle);
 	}
+
+	/**
+	 * Diameter at the bottom of the thread, mm, which sets how the screw bends. Metric trapezoidal
+	 * (ISO 2904): the nominal diameter less the pitch and twice the crest clearance, 0.25 mm up to a
+	 * 5 mm pitch, 0.5 mm to 12 mm and 1 mm above (Tr10 x 2: 7.5 mm). Acme: the diameter less the
+	 * pitch, which is close for a 29 degree thread with its crest clearance.
+	 */
+	public function rootDiameter():Float {
+		if (family == Acme) return screwDiameter - pitch;
+		var clearance = pitch <= 5 ? 0.25 : pitch <= 12 ? 0.5 : 1.0;
+		return screwDiameter - pitch - 2 * clearance;
+	}
 }

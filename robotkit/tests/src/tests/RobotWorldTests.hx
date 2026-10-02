@@ -826,6 +826,9 @@ class RobotWorldTests {
     source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
     source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
+    source.couplings[0].stiffness = 5.0e4;
+    source.couplings[0].backlash = 1.0e-4;
+    source.couplings[0].drag = 0.02;
     source.actuators[0].fullStepsPerRevolution = 200.0;
     source.actuators[0].servoDamping = 2.0;
     // A bare stepper writes only its steps, as models did before drive kinds; one with ratings writes its drive.
@@ -900,6 +903,8 @@ class RobotWorldTests {
     check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
       "RobotModel codec preserves joint limit softness");
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    check(restored.couplings[0].stiffness == 5.0e4 && restored.couplings[0].backlash == 1.0e-4 && restored.couplings[0].drag == 0.02,
+      "RobotModel codec preserves a coupling's stiffness, backlash and drag");
     equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
     var restoredStepper = restored.actuators[0].drive;
     check(restoredStepper != null && restoredStepper.kind() == "stepper" && restoredStepper.rotorInertia == 3e-5 &&

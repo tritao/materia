@@ -152,7 +152,10 @@ class AssemblyDefinitionCodec {
 				coupling.source == coupling.target || movable.get(coupling.source) == null ||
 				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
 				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset) ||
-				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)))
+				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)) ||
+				(coupling.stiffness != null && !(coupling.stiffness > 0 && Math.isFinite(coupling.stiffness))) ||
+				(coupling.backlash != null && !(coupling.backlash >= 0 && Math.isFinite(coupling.backlash))) ||
+				(coupling.drag != null && !(coupling.drag >= 0 && Math.isFinite(coupling.drag))))
 				throw "Assembly has an invalid coupled joint";
 			if (movable.get(coupling.target).driven == true)
 				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';

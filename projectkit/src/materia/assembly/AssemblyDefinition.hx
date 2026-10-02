@@ -130,6 +130,12 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(5) var offset:Float;
 	/** Power delivered over power put in, between the joints, such as a lead screw's 0.4; 1 when absent. */
 	@:id(6) @:optional var efficiency:Null<Float>;
+	/** Force at the source per unit of source travel (N per assembly unit; N m/rad for a turning source); absent is rigid. */
+	@:id(7) @:optional var stiffness:Null<Float>;
+	/** Lost motion on reversal, in the source's units. */
+	@:id(8) @:optional var backlash:Null<Float>;
+	/** Constant resisting effort the coupling adds at the target while it moves (N m for a turning target). */
+	@:id(9) @:optional var drag:Null<Float>;
 }
 
 /**

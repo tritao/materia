@@ -11,6 +11,7 @@ import machinekit.component.Solids;
 import machinekit.motion.LeadScrew;
 import machinekit.motion.LeadScrewThread;
 import machinekit.motion.LeadScrewThread.LeadScrewThreadFamily;
+import machinekit.motion.ScrewSupport;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
@@ -444,6 +445,14 @@ class CncRouter extends MachineAssembly {
 	];
 	/** The stepper drivers' supply, as on most desktop routers. */
 	public static inline var SUPPLY_VOLTS:Float = 24;
+	/**
+	 * Nominal wiring of the stepper drivers: 16 microsteps per full step, the usual setting of
+	 * desktop drivers, on a controller generating 40 kHz step edges (the RKD6 board's software step
+	 * tick, `robotkit/runtime/DEVICE_PROTOCOL.md`). Together they cap each axis: a NEMA 23 at 16
+	 * microsteps is 3200 steps a turn, so 40 kHz turns it 78.5 rad/s, 12.5 turns a second.
+	 */
+	public static inline var MICROSTEPS:Int = 16;
+	public static inline var STEP_TICK_HZ:Int = 40000;
 
 	/** Room past each axis's travel before its rail blocks reach the rail ends, in millimetres. */
 	final overtravel = new Map<String, Float>();
@@ -660,6 +669,10 @@ class CncRouter extends MachineAssembly {
 		var ratio = addDrive('$id-lead', axis.id, '$id-turn', LeadScrew(id, alongAxis));
 		addMateOnAxis('$id-turn', "continuous", motor, 'to-$couplingId', couplingId, 'attach-$couplingId',
 			{x: along[0], y: along[1], z: along[2]}, ratio * axis.initial);
+		// The motor holds the screw's input end through the coupling. Nothing holds the far end, and the
+		// nut floats on the carriage, so it is no support: fixed at the motor, free at the far end, over
+		// the whole screw. That is what sets the screw's top speed.
+		supportScrew('$id-lead', Fixed, Free);
 		addMotor(motor, '$id-turn', motor, SUPPLY_VOLTS);
 	}
 
@@ -681,8 +694,11 @@ class CncRouter extends MachineAssembly {
 	 * rotation sign applies), coupled to `axis` through its belt. `rotation` is +1 when it turns
 	 * counter-clockwise about `about` as the carriage moves positively.
 	 */
-	function turnWithBelt(axis:RouterAxisSpec, id:String, parent:String, about:Array<Float>, rotation:Int):Void {
+	function turnWithBelt(axis:RouterAxisSpec, id:String, parent:String, about:Array<Float>, rotation:Int,
+			?driven:TimingBelt):Void {
 		var ratio = addDrive('$id-belt', axis.id, '$id-turn', Belt(id, rotation));
+		// The belt's stretch is in the driving pulley's drive: its idler only follows.
+		if (driven != null) setDriveStiffness('$id-belt', driven.carriageStiffness(0));
 		addMateOnAxis('$id-turn', "continuous", parent, 'to-$id', id, 'attach-$id', {x: about[0], y: about[1], z: about[2]},
 			ratio * axis.initial);
 	}
@@ -714,7 +730,7 @@ class CncRouter extends MachineAssembly {
 		attach("beltX", belt, plane, "beamUpper");
 		var turn = belt.rotation(0, 0, -1, 0);
 		hang("pulleyX", beltPulley(), plane, "motorX");
-		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn);
+		turnWithBelt(specs[0], "pulleyX", "motorX", [0, 1, 0], turn, belt);
 		var idlerPlate = AssemblyFrames.translation(-xm, plateY, plateZ);
 		attach("idlerPlateX", new RouterPlate(60, BELT_PLATE, 64, "aluminium 6061", "Idler plate"), idlerPlate, "beamUpper");
 		attach("axleX", new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE), orient(-xm, yb + 20, X_SCREW_Z, up, [0, -1, 0]),
@@ -743,7 +759,7 @@ class CncRouter extends MachineAssembly {
 		var plane = orient(s * Y_BELT_X + BELT_WIDTH / 2, end, Y_SCREW_Z, up, [-1, 0, 0]);
 		place('beltY$name', belt, plane);
 		hang('pulleyY$name', beltPulley(), plane, 'motorY$name');
-		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0));
+		turnWithBelt(specs[1], 'pulleyY$name', 'motorY$name', [-1, 0, 0], belt.rotation(0, 0, -1, 0), belt);
 		var idlerPlate = AssemblyFrames.translation(plateX, -end, 0);
 		place('idlerPlateY$name', new RouterPlate(BELT_PLATE, 60, 60, "aluminium 6061", "Idler plate"), idlerPlate);
 		attach('axleY$name', new BeltAxle(motorY.variant.shaftDiameter, shaft - BELT_PLATE),

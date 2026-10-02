@@ -1,0 +1,261 @@
+import haxe.Int64;
+import machinekit.assembly.LinearAxis;
+import motionkit.MotionOptions;
+import motionkit.program.Blend;
+import motionkit.program.MotionOp;
+import motionkit.program.MotionProgram;
+import motionkit.program.MoveTarget;
+import motionkit.robot.AxisKinematics;
+import motionkit.robot.MachineKitRobotCompiler;
+import motionkit.robot.ProgramCompiler;
+import motionkit.robot.StartTolerances;
+import motionkit.robot.PlanCheck;
+import motionkit.robot.PlanCheck.PlanCheckOptions;
+import motionkit.robot.PlanCheckSummary;
+import motionkit.trajectory.ExecutionPlan;
+import motionkit.trajectory.PlanDiagnostic;
+import motionkit.trajectory.Trajectory;
+import motionkit.trajectory.ValidationLimits;
+import robotkit.model.Actuator;
+import robotkit.model.ActuatorDrive.ServoDrive;
+import robotkit.model.ActuatorDrive.StepperDrive;
+import robotkit.model.Joint;
+import robotkit.model.JointCoupling;
+import robotkit.model.JointLimits;
+import robotkit.model.JointType;
+import robotkit.model.Link;
+import robotkit.model.RobotModel;
+import robotkit.model.SteadyLoads;
+import robotkit.model.TorqueSpeedCurve;
+import robotkit.model.Transmission;
+
+/**
+ * The plan check against a one-axis machine: a 10 kg slide on a Tr10 x 2 screw (pi * 1000 rad per
+ * metre at 40%, a 0.02 N m nut drag, a drive's stiffness and backlash only where stated) turned
+ * by one motor. The numbers are worked from the model: motor torque = rotor inertia * alpha +
+ * force / (ratio * efficiency) + drag.
+ */
+class PlanCheckTests extends MotionKitTestSupport {
+  static inline var SCREW_RATIO = 3141.592653589793;
+
+  /** The machine: `axis` is the slide's direction; `drive` is the motor's drive kind. */
+  function machine(axis:Array<Float>, servo:Bool, stiffness:Float = 0.0, backlash:Float = 0.0):RobotModel {
+    var model = new RobotModel("plan-check-axis");
+    var frame = model.addLink(new Link("frame"));
+    var table = model.addLink(new Link("table"));
+    var rotor = model.addLink(new Link("rotor"));
+    table.mass = 10.0;
+    rotor.mass = 0.2;
+    rotor.centerOfMass = [0.0, 0.0, 0.0];
+    rotor.inertiaTensor = [1e-5, 0.0, 0.0, 0.0, 1e-5, 0.0, 0.0, 0.0, 4e-6];
+    var slide = model.addJoint(new Joint("slide", JointType.Prismatic, frame, table));
+    slide.axis = axis;
+    slide.limits = new JointLimits(-1.0, 1.0);
+    var screw = model.addJoint(new Joint("screw", JointType.Continuous, frame, rotor));
+    screw.limits = new JointLimits(-1e9, 1e9);
+    screw.armature = 3e-5;
+    var lead = new JointCoupling("lead", "slide", "screw", SCREW_RATIO, 0.0);
+    lead.efficiency = 0.4;
+    lead.drag = 0.02;
+    lead.stiffness = stiffness;
+    lead.backlash = backlash;
+    model.addCoupling(lead);
+    var motor = new Actuator("motor", 0.63, 137.1, Transmission.SimpleTransmission("screw", 1.0, 0.0));
+    if (servo) {
+      motor.maxEffort = 0.0;
+      motor.maxRate = 0.0;
+      motor.drive = new ServoDrive(0.3, 1.2, 300.0, 500.0, 3e-5, 4096.0);
+    } else {
+      // A NEMA 23 on 24 V: 1.26 N m to 68.6 rad/s, then falling as 1 / speed.
+      motor.drive = new StepperDrive(200.0, 3e-5, 1.26, new TorqueSpeedCurve([0.0, 68.6, 137.2, 274.4], [1.26, 1.26, 0.63, 0.315]));
+    }
+    model.addActuator(motor);
+    return model;
+  }
+
+  /** A plan of one joint moving `distance` within the given speed and acceleration, and its check. */
+  function plan(distance:Float, velocity:Float, acceleration:Float, ?start:Float = 0.0):ExecutionPlan {
+    var trajectory = Trajectory.generateStateToState([start], [0.0], [0.0], [start + distance], [velocity], [acceleration],
+      [acceleration * 500.0]);
+    var limits = new ValidationLimits(1, Int64.ofInt(1), Int64.ofInt(1));
+    limits.velocity(0, velocity * 1.01);
+    limits.acceleration(0, acceleration * 1.01);
+    limits.jerk(0, acceleration * 600.0);
+    var made = ExecutionPlan.create(trajectory, limits, Int64.ofInt(1), [start], [0.0], [0.0], [0.01], [0.01], [0.01]);
+    trajectory.dispose();
+    return made;
+  }
+
+  function kinds(result:PlanCheckResult, kind:PlanDiagnosticKind):Int {
+    var count = 0;
+    for (diagnostic in result.diagnostics) if (diagnostic.kind == kind) count++;
+    return count;
+  }
+
+  public function testPlanCheck():Void {
+    var options = new PlanCheckOptions();
+    options.steady = new SteadyLoads(5.0);
+    var flat = machine([1.0, 0.0, 0.0], false);
+    var upright = machine([0.0, 0.0, 1.0], false);
+
+    // The planner's own limits, with the steady loads taken off, never ask for more than the drive gives.
+    var limits = flat.coupledLimits("slide", options.steady);
+    var free = flat.coupledLimits("slide");
+    check(limits.maxAcceleration < free.maxAcceleration, "steady loads leave less force to accelerate with");
+    // force = 0.4 * 0.63 * pi*1000 less the nut's drag and rail friction, over mass and rotor inertia.
+    var force = 0.4 * (0.63 - 0.02) * SCREW_RATIO - 5.0;
+    var expected = force / (10.0 + 0.4 * (4e-6 + 3e-5) * SCREW_RATIO * SCREW_RATIO);
+    near(limits.maxAcceleration, expected, "acceleration under steady loads is the force left over the inertia", 1e-9);
+    var honest = plan(0.1, limits.velocity, limits.maxAcceleration);
+    var result = new PlanCheck(flat, ["slide"], options).check(honest, 7, 0.0);
+    check(result.diagnostics.length == 0, 'a plan at the planner\'s own limits passes: ${result.diagnostics}');
+    check(result.worstTorqueRatio > 0.4 && result.worstTorqueRatio <= 1.0 + 1e-6,
+      'and comes within the curve: ${result.worstTorqueRatio}');
+    check(result.worstMotor == "motor", "the worst motor is named");
+    honest.dispose();
+
+    // Three times the acceleration is more than the curve gives: a stall, named by op, motor and axis.
+    var rough = plan(0.1, limits.velocity, 3.0 * limits.maxAcceleration);
+    var stalled = new PlanCheck(flat, ["slide"], options).check(rough, 12, 0.0);
+    check(kinds(stalled, PlanDiagnosticKind.StepperStall) == 1, "a plan beyond the pull-out curve is flagged once per motor");
+    var found = stalled.diagnostics[0];
+    check(found.opIndex == 12 && found.subject == "motor" && found.axis == "slide" && found.value > found.limit &&
+      found.samples > 0 && found.ratio() > 1.0, "the finding names its op, motor, axis and how far over it is");
+    check(found.describe(40).indexOf("line 40, op 12") >= 0 && found.describe().indexOf("% over") > 0,
+      'and reads as a sentence: ${found.describe(40)}');
+    rough.dispose();
+
+    // Gravity on a vertical axis: the motor holds the load against gravity, 10 kg through pi*1000 rad/m at 40%.
+    var hold = new PlanCheck(upright, ["slide"], options);
+    var loads = hold.axisLoads()[0];
+    near(loads.gravityForce, 10.0 * 9.80665, "a vertical axis carries its weight", 1e-9);
+    near(new PlanCheck(flat, ["slide"], options).axisLoads()[0].gravityForce, 0.0, "a horizontal axis carries none", 1e-9);
+    var up = loads.motorTorque(loads.motors[0], 0.01, 0.0, 5.0), side = new PlanCheck(flat, ["slide"], options)
+      .axisLoads()[0].motorTorque(loads.motors[0], 0.01, 0.0, 5.0);
+    near(up - side, 10.0 * 9.80665 / (SCREW_RATIO * 0.4), "gravity adds its force through the ratio and the screw's efficiency", 1e-9);
+    // Going down, the load drives the motor back through the screw: it needs less than it gave going up.
+    var down = loads.motorTorque(loads.motors[0], -0.01, 0.0, 5.0);
+    check(Math.abs(down) < Math.abs(up), "a load driving the motor needs less torque");
+    // The same plan on the vertical axis comes nearer the limit.
+    var gentle = plan(0.1, 0.02, 1.0);
+    var onFlat = new PlanCheck(flat, ["slide"], options).check(gentle, 0, 0.0);
+    var onUpright = new PlanCheck(upright, ["slide"], options).check(gentle, 0, 0.0);
+    check(onUpright.worstTorqueRatio > onFlat.worstTorqueRatio, "a vertical axis asks more of its motor than a horizontal one");
+    // A cutting force on feed moves adds against the motion, and only on moves at or below the feed limit.
+    var cutting = options.copy();
+    cutting.cuttingForce = 200.0;
+    cutting.cuttingFeedLimit = 0.03;
+    var feed = new PlanCheck(flat, ["slide"], cutting).check(gentle, 0, 0.02);
+    var rapid = new PlanCheck(flat, ["slide"], cutting).check(gentle, 0, 0.5);
+    check(feed.worstTorqueRatio > onFlat.worstTorqueRatio && Math.abs(rapid.worstTorqueRatio - onFlat.worstTorqueRatio) < 1e-12,
+      "a cutting force applies to feed moves and not to rapids");
+    gentle.dispose();
+
+    // Past the speed the curve has torque for, a stepper cannot go at all.
+    var fast = plan(0.5, 0.3, 1.0);
+    var tooFast = new PlanCheck(flat, ["slide"], options).check(fast, 1, 0.0);
+    check(kinds(tooFast, PlanDiagnosticKind.StepperStall) == 1 && tooFast.diagnostics[0].limit == 0.0,
+      "a stepper asked for more speed than its curve reaches has no torque to give");
+    fast.dispose();
+
+    // A servo: peak torque bounds each sample, rated torque bounds the RMS over the plan.
+    var servo = machine([1.0, 0.0, 0.0], true);
+    var servoLimits = servo.coupledLimits("slide");
+    near(servoLimits.velocity, 500.0 / SCREW_RATIO, "a servo's axis speed comes from its maximum speed", 1e-9);
+    var brisk = plan(0.002, 0.1, 0.9 * servoLimits.maxAcceleration);
+    var servoResult = new PlanCheck(servo, ["slide"], options).check(brisk, 3, 0.0);
+    check(kinds(servoResult, PlanDiagnosticKind.ServoPeakTorque) == 0, "a servo under its peak torque is not flagged for it");
+    check(kinds(servoResult, PlanDiagnosticKind.ServoRatedTorque) == 1,
+      "but its RMS torque over a hard move is above the rated torque");
+    var servoFinding = servoResult.diagnostics[0];
+    check(servoFinding.value > servoFinding.limit && Math.abs(servoFinding.limit - 0.3) < 1e-12, "the RMS finding gives the rated torque as its limit");
+    brisk.dispose();
+    var violent = plan(0.002, 0.1, 4.0 * servoLimits.maxAcceleration);
+    check(kinds(new PlanCheck(servo, ["slide"], options).check(violent, 3, 0.0), PlanDiagnosticKind.ServoPeakTorque) == 1,
+      "a servo over its peak torque is flagged");
+    violent.dispose();
+    var easy = plan(0.1, 0.02, 0.3);
+    check(new PlanCheck(servo, ["slide"], options).check(easy, 3, 0.0).diagnostics.length == 0, "an easy move passes on a servo");
+    easy.dispose();
+
+    // Accuracy: a drive 200 N/mm stiff stretches by force over stiffness; the nut's backlash adds on a reversal.
+    var belt = machine([1.0, 0.0, 0.0], false, 200000.0, 5e-5);
+    var tight = options.copy();
+    tight.tolerance = 1e-4;
+    var forward = plan(0.1, 0.02, 1.0);
+    var accuracy = new PlanCheck(belt, ["slide"], tight);
+    var first = accuracy.check(forward, 0, 0.0);
+    // 10 kg at 1 m/s² plus 5 N of rail friction, over 200 N/mm.
+    near(first.worstDeviation, (10.0 * 1.0 + 5.0) / 200000.0, "a drive stretches by force over stiffness", 1e-6);
+    check(first.worstAxis == "slide" && first.diagnostics.length == 0, "within tolerance it passes");
+    var back = plan(-0.1, 0.02, 1.0, 0.1);
+    var second = accuracy.check(back, 1, 0.0);
+    near(second.worstDeviation, (10.0 * 1.0 + 5.0) / 200000.0 + 5e-5, "a reversal between plans adds the nut's backlash", 1e-6);
+    check(kinds(second, PlanDiagnosticKind.Accuracy) == 1 && second.diagnostics[0].subject == "slide",
+      "and is flagged when the total passes the tolerance");
+    var jolt = plan(0.1, 0.05, 5.0);
+    var harder = accuracy.check(jolt, 2, 0.0);
+    check(kinds(harder, PlanDiagnosticKind.Accuracy) == 1 && harder.worstDeviation > 2e-4, "a harder move stretches the drive further");
+    forward.dispose();
+    back.dispose();
+    jolt.dispose();
+
+    // The summary adds results up.
+    var summary = new PlanCheckSummary();
+    summary.add(stalled);
+    summary.add(result);
+    check(summary.plans == 2 && summary.flagged == 1 && summary.count(PlanDiagnosticKind.StepperStall) == 1 &&
+      summary.worstMotor == "motor" && summary.worstTorqueRatio >= stalled.worstTorqueRatio, "the summary counts plans and findings");
+  }
+
+  /**
+   * The compiler runs the check on every plan it makes, reports it on the plan, and rejects the plan
+   * only when asked to.
+   */
+  public function testCompilerRunsPlanCheck():Void {
+    var blueprint = MachineKitRobotCompiler.compileXYZGantry(new LinearAxis(23, 10, 80), new LinearAxis(23, 10, 80),
+      new LinearAxis(23, 10, 80), 0.1, 0.4);
+    var model = blueprint.model;
+    // Motors that cannot hold their axes: a stepper of 0.002 N m against a 0.4 m/s² axis.
+    for (actuator in model.actuators) {
+      actuator.maxEffort = 0.002;
+      actuator.maxRate = 100.0;
+      actuator.drive = new StepperDrive(200.0, 3e-5, 0.004, new TorqueSpeedCurve([0.0, 100.0], [0.004, 0.004]));
+    }
+    var ids = [for (joint in model.joints) joint.id];
+    var solver = new AxisKinematics(blueprint);
+    var limits = new ValidationLimits(ids.length, Int64.ofInt(blueprint.runtime.revision),
+      Int64.ofInt(blueprint.runtime.calibrationRevision));
+    for (joint in 0...ids.length) {
+      limits.position(joint, -1e9, 1e9);
+      limits.velocity(joint, 1e6);
+      limits.acceleration(joint, 1e6);
+      limits.jerk(joint, 1e9);
+    }
+    function compiler(rejects:Bool):ProgramCompiler {
+      var made = new ProgramCompiler(solver, limits, "work", [for (_ in ids) 1e6], [for (_ in ids) 1e6], [for (_ in ids) 1e9],
+        StartTolerances.uniform(ids.length, 0.00001, 0.02, 0.02));
+      var options = new PlanCheckOptions();
+      options.rejects = rejects;
+      made.planCheck = new PlanCheck(model, ids, options);
+      return made;
+    }
+    var start = [for (_ in ids) 0.0];
+    var goal = start.copy();
+    for (index in 0...ids.length) if (model.joints[index].type == robotkit.model.JointType.Prismatic) goal[index] = 0.05;
+    var moving = new MotionProgram([MotionOp.MoveJ(MoveTarget.JointTarget(goal), new MotionOptions(), Blend.ExactStop)]);
+    var compiled = compiler(false).compile(moving, start, Int64.ofInt(1));
+    var plan = compiled.blocks[0].plans[0];
+    var result = plan.checked;
+    check(result != null, "the compiler checks the plans it makes");
+    if (result == null) return;
+    check(result.diagnostics.length > 0 && result.diagnostics[0].opIndex == 0 && result.worstTorqueRatio > 1.0,
+      "a plan the weak motors cannot follow is flagged, naming its op");
+    var plain = new ProgramCompiler(solver, limits, "work", [for (_ in ids) 1e6], [for (_ in ids) 1e6], [for (_ in ids) 1e9],
+      StartTolerances.uniform(ids.length, 0.00001, 0.02, 0.02));
+    check(plain.compile(moving, start, Int64.ofInt(2)).blocks[0].plans[0].checked == null, "a compiler with no check leaves its plans unchecked");
+    var rejected = false;
+    try compiler(true).compile(moving, start, Int64.ofInt(3)) catch (error:Dynamic) rejected = Std.string(error).indexOf("plan check") >= 0;
+    check(rejected, "a compiler set to reject refuses the plan");
+  }
+}

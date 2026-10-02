@@ -209,6 +209,36 @@ class TimingBelt extends MachineComponent {
 
 	public function wraps():Array<BeltWrap> return loop.copy();
 
+	/**
+	 * Tensile stiffness of the belt's cords, EA in N, per millimetre of belt width. Assumption, not a
+	 * datasheet value (makers rate breaking strength and working tension, not stiffness): a 6 mm
+	 * GT2 belt with fibreglass cords breaks near 400 N at 2.5% elongation or more, which puts EA
+	 * for 6 mm at no more than about 16 kN, so 2500 N per mm of width (15 kN for 6 mm) is on the soft
+	 * side of that. Replace it with a measured value for a particular belt.
+	 */
+	public static function cordStiffnessPerMm(profile:TimingBeltProfile):Float
+		return switch profile {
+			case GT2: 2500.0;
+			case _: throw "No belt stiffness is recorded for this profile";
+		};
+
+	/**
+	 * Stiffness at a carriage clamped on strand `strand`, in N/mm of carriage travel, in the worst
+	 * place on the strand. The belt is anchored at the driving pulley, so the carriage is held by
+	 * two springs in parallel: the free length of the strand between it and the driver (at most the
+	 * strand's length, with the carriage at the far end) and the rest of the loop the other way
+	 * round. Each is EA over its length, EA from `cordStiffnessPerMm` times the width. Pretension,
+	 * tooth compliance and the clamp are left out, so a real belt is a little softer.
+	 */
+	public function carriageStiffness(strand:Int = 0):Float {
+		var strands = strandList;
+		if (strand < 0 || strand >= strands.length) throw "Belt has no such strand";
+		var along = strands[strand].length;
+		if (!(along > 0 && along < length)) throw "Belt strand is as long as the loop";
+		var cords = cordStiffnessPerMm(beltProfile) * width;
+		return cords * (1 / along + 1 / (length - along));
+	}
+
 	/** The straight strands, strand `i` running from wrap `i` to the next. */
 	public function strands():Array<BeltStrand> return strandList.copy();
 

@@ -187,6 +187,9 @@ class AssemblyDefinitionFlattener {
 			var expanded:AssemblyJointCoupling = {id: scoped(prefix, coupling.id), source: scoped(prefix, coupling.source),
 				target: scoped(prefix, coupling.target), ratio: coupling.ratio, offset: coupling.offset};
 			if (coupling.efficiency != null) expanded.efficiency = coupling.efficiency;
+			if (coupling.stiffness != null) expanded.stiffness = coupling.stiffness;
+			if (coupling.backlash != null) expanded.backlash = coupling.backlash;
+			if (coupling.drag != null) expanded.drag = coupling.drag;
 			flat.couplings.push(expanded);
 		}
 		if (actuators != null) {

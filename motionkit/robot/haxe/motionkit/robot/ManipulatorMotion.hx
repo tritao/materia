@@ -23,6 +23,8 @@ class ManipulatorMotion {
   public var failure(default, null):Null<String> = null;
   public var running(get, never):Bool;
   public final session:MotionSession = new MotionSession();
+  /** What the plan checks found in the plans this motion has started, if its compiler runs one. */
+  public final checks:PlanCheckSummary = new PlanCheckSummary();
   final input:String -> Null<EventValue>;
   final eventSource:Void -> {events:Array<FiredProcessEvent>, overflow:Bool};
   final executor:PlanExecutor;
@@ -203,6 +205,8 @@ class ManipulatorMotion {
       var block = source.blocks[blockIndex];
       if (planIndex < block.plans.length) {
         if (!planStarted) {
+          var checked = block.plans[planIndex].checked;
+          if (checked != null) checks.add(checked);
           executor.start(block.plans[planIndex], true);
           planStarted = true;
           startedPlans++;

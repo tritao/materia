@@ -639,6 +639,30 @@ class CadBridgeTests {
     check(servoDrive != null && servoDrive.kind() == "servo" && drives[1].planningEffort() == 1.8 &&
       drives[1].planningRate() == 500 && drives[1].servoStiffness == 12 && servoDrive.curve.torqueAt(400) < 1.8,
       "a servo's drive, peak torque and maximum speed reach the robot actuator");
+    // A coupling's stiffness, backlash and drag reach the robot coupling in SI units: a 100 N/mm drive on a
+    // millimetre axis is 100000 N/m, 0.05 mm of backlash 5e-5 m, and a turning follower's drag is as given.
+    var screwed = new AssemblyModel();
+    for (member in ["base", "slider", "screw"]) {
+      screwed.add(member);
+      screwed.connector(member, "mount", AssemblyFrames.identity());
+    }
+    screwed.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    screwed.mateOnAxis("turn", "continuous", "base", "mount", "screw", "mount",
+      {x: 0, y: 1, z: 0}, 0, {lower: null, upper: null, velocity: 70, effort: 0});
+    screwed.couple("lead", "slide", "turn", Math.PI, 0, 0.4, 100.0, 0.05, 0.02);
+    var screwParts = AssemblyPhysicalPartView.fromSceneArtifact({metresPerUnit: 0.001,
+      parts: [for (id in ["base", "slider", "screw"]) {
+        id: id, name: id, red: 0.5, green: 0.5, blue: 0.5,
+        materialId: "machined-steel", materialDensity: 7850.0,
+        volume: 1000000.0, centerOfMass: [0.0, 0.0, 0.0],
+        inertia: [10000000000.0, 0, 0, 0, 10000000000.0, 0, 0, 0, 10000000000.0],
+        vertexCount: 4, indexCount: 0, vertices: vertices,
+        normals: Bytes.alloc(0), indices: Bytes.alloc(0), faceRanges: []
+      }]});
+    var lead = AssemblySimulationBridge.toRobotModel(screwed.definition("lead-test"), screwParts).model.couplings[0];
+    check(Math.abs(lead.stiffness - 1.0e5) < 1e-6 && Math.abs(lead.backlash - 5e-5) < 1e-15 && lead.drag == 0.02 &&
+      Math.abs(lead.efficiency - 0.4) < 1e-15, "a coupling's stiffness, backlash and drag reach the robot in SI units");
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
       translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");

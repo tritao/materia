@@ -65,9 +65,10 @@ class RobotModel {
    * actuators, acceleration is also capped at their summed force, through each coupling's
    * efficiency, over the mass the joint carries plus every coupled joint's turning inertia (rotor
    * armature included) seen through the ratio. Gravity and friction are left out. Zero still
-   * means unlimited.
+   * means unlimited. With `steady` loads, the force left for acceleration is what the motors give
+   * less their drag, the axis's rail friction and its weight (see `SteadyLoads`).
    */
-  public function coupledLimits(id:JointId):JointLimits {
+  public function coupledLimits(id:JointId, ?steady:SteadyLoads):JointLimits {
     var joint = [for (candidate in joints) if (candidate.id == id) candidate];
     if (joint.length != 1) throw 'Robot model has no joint "$id"';
     var own = joint[0].limits;
@@ -107,6 +108,8 @@ class RobotModel {
         driven = true;
     }
     if (driven && joint[0].type == JointType.Prismatic && force > 0) {
+      // A drive that cannot carry the steady loads has nothing left to accelerate with.
+      if (steady != null) force = Math.max(steadyForce(joint[0], force, steady), 1e-9);
       var inertia = carriedMass(joint[0]) + joint[0].armature;
       for (index in 1...reached.length) for (follower in joints) if (follower.id == reached[index])
         inertia += efficiencies[index] * turningInertia(follower) * scales[index] * scales[index];
@@ -115,7 +118,24 @@ class RobotModel {
     return limits;
   }
 
+  /**
+   * The force a sliding axis's drive has left for accelerating, N: `force` less each motor's drag
+   * through its ratio, the axis's rail friction and its weight along its direction (the worst
+   * way, as it has to accelerate both up and down).
+   */
+  function steadyForce(joint:Joint, force:Float, steady:SteadyLoads):Float {
+    var load = DriveLoads.forAxis(this, joint.id, steady);
+    var left = force;
+    if (load != null) {
+      for (motor in load.motors)
+        left -= motor.efficiency * motor.drag * Math.abs(motor.ratio);
+      left -= Math.abs(load.gravityForce) + load.friction;
+    }
+    return left;
+  }
+
   /** Mass of the link a joint moves and of everything mounted on it, in kg. */
+  @:allow(robotkit.model.DriveLoads)
   function carriedMass(joint:Joint):Float {
     var mass = 0.0, frontier = [joint.child], seen:Array<Link> = [];
     while (frontier.length > 0) {
@@ -132,6 +152,7 @@ class RobotModel {
    * What a joint moves per unit of its own acceleration: a revolute joint's child link inertia
    * about the joint axis, plus its armature; a sliding joint's carried mass.
    */
+  @:allow(robotkit.model.DriveLoads)
   function turningInertia(joint:Joint):Float {
     if (joint.type == JointType.Prismatic) return carriedMass(joint) + joint.armature;
     var link = joint.child, q = joint.childFrameRotation;
