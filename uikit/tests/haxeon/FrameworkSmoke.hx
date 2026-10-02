@@ -2218,6 +2218,11 @@ class FrameworkSmoke {
 		if (overflowMenuBounds == null || overflowMenuBounds.x < 0 || overflowMenuBounds.y < 0 ||
 			overflowMenuBounds.x + overflowMenuBounds.width > 256.1 ||
 			overflowMenuBounds.y + overflowMenuBounds.height > 120.1) return 1008;
+		// The menu surface must follow the panel after edge clamping moves it.
+		var overflowSurfaceBounds = overflowMenuRoot.children[2].children[0].resolved;
+		if (overflowSurfaceBounds == null ||
+			Math.abs(overflowSurfaceBounds.x - overflowMenuBounds.x) > 0.1 ||
+			Math.abs(overflowSurfaceBounds.y - overflowMenuBounds.y) > 0.1) return 1018;
 		for (overflowIndex in 0...17) {
 			context.key(UiEventKind.KeyDown, UiKey.Down);
 			overflowMenuRoot = context.submit(overflowMenu, overflowMenuFrame);

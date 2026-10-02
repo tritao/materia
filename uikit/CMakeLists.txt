@@ -233,6 +233,13 @@ if(NK_BUILD_TESTS)
         "${NK_VENDOR_DIR}/clay")
     add_test(NAME nativekit_ui_clay_measure_element
         COMMAND nativekit_ui_clay_measure_element_test)
+    add_executable(nativekit_ui_clay_floating_order_test
+        "${NK_VENDOR_DIR}/clay/tests/floating_order.cpp")
+    target_compile_features(nativekit_ui_clay_floating_order_test PRIVATE cxx_std_20)
+    target_include_directories(nativekit_ui_clay_floating_order_test PRIVATE
+        "${NK_VENDOR_DIR}/clay")
+    add_test(NAME nativekit_ui_clay_floating_order
+        COMMAND nativekit_ui_clay_floating_order_test)
     add_executable(nativekit_ui_clay_layout_benchmark
         "${NK_VENDOR_DIR}/clay/tests/layout_benchmark.cpp")
     target_compile_features(nativekit_ui_clay_layout_benchmark PRIVATE cxx_std_20)
