@@ -14,7 +14,9 @@ exposed ports. The work lead goes to a magnetic work clamp on the weldment's
 base plate, and the scene's `torch` robot tool is derived from that: the arc
 returns through the plate and everything welded to it, and nothing else.
 
-The scene's mission welds one seam: the plate's T-joint with the upright. When the
+The scene's mission welds one seam: the plate's T-joint with the upright (`materia.post.project.json` is the same cell
+with a mission that welds the four sides of a tube post as one step, a path of four segments). The weld step is relative to
+the workpiece's reference member, so it follows the workpiece where it stands. When the
 simulation runs, the arm approaches the seam, strikes the arc and waits for it, travels
 the seam at the speed that deposits the leg the weldment asks for, fills the crater,
 stops the wire and retracts, and the weld metal grows along the seam as the simulated

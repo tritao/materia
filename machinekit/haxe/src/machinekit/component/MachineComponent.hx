@@ -58,9 +58,11 @@ class MachineComponent {
 					throw 'Welding supply on "$designation" needs a process and a positive rated current';
 				if (!(efficiency > 0 && efficiency <= 1))
 					throw 'Welding supply on "$designation" needs an efficiency in (0, 1]';
-			case WireFeed(wireDiameterMm, maxSpeedMPerMin):
+			case WireFeed(wireDiameterMm, maxSpeedMPerMin, depositionEfficiency):
 				if (!(wireDiameterMm > 0) || !(maxSpeedMPerMin > 0))
 					throw 'Wire feed on "$designation" needs a positive wire diameter and speed';
+				if (!(depositionEfficiency > 0 && depositionEfficiency <= 1))
+					throw 'Wire feed on "$designation" needs a deposition efficiency in (0, 1]';
 			case WorkReturn(leadPort, contactConnector): port(leadPort); connector(contactConnector);
 		}
 		capabilityList.push(capability);

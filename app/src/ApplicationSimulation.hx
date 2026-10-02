@@ -248,7 +248,7 @@ class ApplicationSimulation {
           var torch = [for (tool in active.robotTools) if (tool.kind == "torch") tool][0].torch;
           if (candidateTools.welders.length != 1 || torch == null) throw "A mission that welds needs the robot's one simulated welder";
           candidateBeads = new WeldBeads(candidateMission, candidateTools.welders[0], candidate, candidateAssembly.parts, scene,
-            timestep, torch.wireDiameterMm);
+            timestep, torch.wireDiameterMm, torch.depositionEfficiency);
         }
       }
 
@@ -521,6 +521,9 @@ class ApplicationSimulation {
     if (cnc != null) cnc.dispose();
     if (beads != null) beads.dispose();
     cnc = null; mobile = null; mission = null; beads = null; refreshMembers();
+    // A mission's programs are planned on worker threads that finish the plan they are on after they are cancelled; the
+    // world they plan for goes now, so wait for them (see ProgramPlanner).
+    motionkit.robot.ProgramPlanner.shutdown();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

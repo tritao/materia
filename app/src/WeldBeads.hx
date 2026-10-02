@@ -7,10 +7,13 @@ import nativekit.scene.GeometryData;
 import robotkit.runtime.SimulatedWelder;
 import robotkit.runtime.Simulation;
 import robotkit.tool.WeldBead;
+import robotkit.tool.WeldPathBead;
 
 /** The weld metal laid along one seam of the mission, and where it is shown. */
 class SeamBead {
   public final step:Int;
+  /** Which segment of the step's path the bead lies along. */
+  public final segment:Int;
   public final weld:SceneArtifactWeld;
   public final bead:WeldBead;
   /** First part index of the bead's chunks among its host's parts, and how many chunks the bead is cut into. */
@@ -20,8 +23,9 @@ class SeamBead {
   public var dirtyFrom:Int;
   public var dirtyTo:Int = -1;
 
-  public function new(step:Int, weld:SceneArtifactWeld, bead:WeldBead, firstPart:Int, chunks:Int) {
+  public function new(step:Int, segment:Int, weld:SceneArtifactWeld, bead:WeldBead, firstPart:Int, chunks:Int) {
     this.step = step;
+    this.segment = segment;
     this.weld = weld;
     this.bead = bead;
     this.firstPart = firstPart;
@@ -49,8 +53,10 @@ private class BeadHost {
  * `CHUNK` stations so only the stretch that grew is meshed again, and no more often than `REFRESH` seconds of
  * simulation time. Like the CNC router's stock, it is view state: not saved, and gone with a reset.
  *
- * Beads are in the world frame the seams were given in (the assembly as designed), and the part that carries them
- * must be fixed to the workpiece for the bead to follow it; the mesh is expressed in that part's frame as it is now.
+ * A weld's seams are given relative to the workpiece's reference member (`frame`), so the bead's stations are in that
+ * member's frame: each tick the wire tip is taken into it from the world, using the member's pose as it is now, and the
+ * mesh is expressed in the frame of the part that carries the metal as that is now. The bead therefore follows the
+ * workpiece wherever it stands, as the weld itself does (`MissionPlayer`).
  */
 class WeldBeads implements SessionMember {
   /** Stations in one mesh chunk. */
@@ -60,8 +66,10 @@ class WeldBeads implements SessionMember {
   /** Grey of weld metal, as RGBA. */
   static inline var METAL = 0x9A968FFF;
 
+  /** The metal of every segment of every weld step, in step and path order. */
   public final beads:Array<SeamBead> = [];
 
+  final paths:Array<{step:Int, path:WeldPathBead, frame:Null<AssemblyPart>}> = [];
   final mission:MissionPlayer;
   final welder:SimulatedWelder;
   final simulation:Simulation;
@@ -73,10 +81,10 @@ class WeldBeads implements SessionMember {
 
   /**
    * `parts` are the simulated parts, from which each weld's `metal` occurrence is taken; `wireDiameterMm` is the
-   * torch's wire.
+   * torch's wire and `depositionEfficiency` the fraction of its melted metal that reaches the weld.
    */
   public function new(mission:MissionPlayer, welder:SimulatedWelder, simulation:Simulation, parts:Array<AssemblyPart>,
-      scene:EditorScene, timestep:Float, wireDiameterMm:Float) {
+      scene:EditorScene, timestep:Float, wireDiameterMm:Float, depositionEfficiency:Float) {
     this.mission = mission;
     this.welder = welder;
     this.simulation = simulation;
@@ -95,19 +103,53 @@ class WeldBeads implements SessionMember {
         host = new BeadHost(found[0]);
         hosts.push(host);
       }
-      var bead = new WeldBead(weld.start.position, weld.stop.position, weld.normals[0], weld.normals[1], wireDiameterMm);
-      var chunks = Std.int(Math.ceil(bead.count / CHUNK));
-      var seam = new SeamBead(index, weld, bead, host.parts, chunks);
-      host.parts += chunks;
-      host.beads.push(seam);
-      beads.push(seam);
+      var path = new WeldPathBead([for (segment in weld.path) segment.start.position], [for (segment in weld.path) segment.stop.position],
+        [for (segment in weld.path) segment.normals], wireDiameterMm, depositionEfficiency);
+      var frame:Null<AssemblyPart> = null;
+      if (weld.frame != null && weld.frame != "") {
+        var named = [for (part in parts) if (part.id == "project:" + weld.frame) part];
+        if (named.length != 1) throw 'The weld frame "${weld.frame}" is not part of the simulated assembly';
+        frame = named[0];
+      }
+      paths.push({step: index, path: path, frame: frame});
+      for (number in 0...path.beads.length) {
+        var bead = path.beads[number];
+        var chunks = Std.int(Math.ceil(bead.count / CHUNK));
+        var seam = new SeamBead(index, number, weld, bead, host.parts, chunks);
+        host.parts += chunks;
+        host.beads.push(seam);
+        beads.push(seam);
+      }
     }
   }
 
-  /** The bead of weld step `step`. */
-  public function beadOf(step:Int):WeldBead {
-    for (seam in beads) if (seam.step == step) return seam.bead;
+  /** The metal laid along the path of weld step `step`. */
+  public function beadOf(step:Int):WeldPathBead {
+    for (entry in paths) if (entry.step == step) return entry.path;
     throw 'Mission step $step does not weld';
+  }
+
+  /** The pose of weld step `step`'s frame in the world now: its reference member's, or the world's own. */
+  function frameOf(entry:{step:Int, path:WeldPathBead, frame:Null<AssemblyPart>}):{position:Array<Float>, rotation:Array<Float>} {
+    var part = entry.frame;
+    return part == null ? {position: [0.0, 0.0, 0.0], rotation: [0.0, 0.0, 0.0, 1.0]} : AssemblyRobot.partPose(simulation, part);
+  }
+
+  /** The world pose, in metres, of the frame weld step `step`'s seams are given in, now. */
+  public function referenceOf(step:Int):{position:Array<Float>, rotation:Array<Float>} {
+    for (entry in paths) if (entry.step == step) return frameOf(entry);
+    throw 'Mission step $step does not weld';
+  }
+
+  /** A world point of weld step `step` in the frame its seams are given in, now. */
+  public function toFrame(step:Int, point:Array<Float>):Array<Float> {
+    for (entry in paths) if (entry.step == step) return intoFrame(frameOf(entry), point);
+    throw 'Mission step $step does not weld';
+  }
+
+  static function intoFrame(frame:{position:Array<Float>, rotation:Array<Float>}, point:Array<Float>):Array<Float> {
+    var inverse = [-frame.rotation[0], -frame.rotation[1], -frame.rotation[2], frame.rotation[3]];
+    return AssemblyRobot.rotate(inverse, [for (axis in 0...3) point[axis] - frame.position[axis]]);
   }
 
   /** Deposits what the welder melted in the tick that just ran, into the seam being welded. */
@@ -116,8 +158,9 @@ class WeldBeads implements SessionMember {
     var index = mission.weldingStep();
     if (index < 0) return;
     var reading = welder.reading();
+    for (entry in paths) if (entry.step == index)
+      entry.path.step(timestep, reading.arc, welder.wireSpeed(), intoFrame(frameOf(entry), welder.tip()));
     for (seam in beads) if (seam.step == index) {
-      seam.bead.step(timestep, reading.arc, welder.wireSpeed(), welder.tip());
       var changed = seam.bead.takeChanges();
       if (changed != null) {
         seam.dirtyFrom = Std.int(Math.min(seam.dirtyFrom, changed.first));
@@ -128,8 +171,8 @@ class WeldBeads implements SessionMember {
 
   /** A reset forgets the metal: the workpiece is bare again. */
   public function reset():Void {
+    for (entry in paths) entry.path.reset();
     for (seam in beads) {
-      seam.bead.reset();
       seam.bead.takeChanges();
       seam.dirtyFrom = seam.bead.count;
       seam.dirtyTo = -1;
@@ -150,11 +193,12 @@ class WeldBeads implements SessionMember {
       var changed:Map<Int, GeometryData> = new Map();
       var pose = AssemblyRobot.partPose(simulation, host.part);
       for (seam in host.beads) if (seam.dirtyTo >= seam.dirtyFrom) {
+        var frame = frameOf([for (entry in paths) if (entry.step == seam.step) entry][0]);
         // A station's mesh depends on its neighbours' legs, so the chunks beside the changed stretch change too.
         var first = Std.int(Math.max(0, seam.dirtyFrom - 1) / CHUNK);
         var last = Std.int(Math.min(seam.bead.count - 1, seam.dirtyTo + 1) / CHUNK);
         for (chunk in first...last + 1)
-          changed.set(seam.firstPart + chunk, chunkGeometry(seam.bead, chunk, pose, host.part.center));
+          changed.set(seam.firstPart + chunk, chunkGeometry(seam.bead, chunk, frame, pose, host.part.center));
         seam.dirtyFrom = seam.bead.count;
         seam.dirtyTo = -1;
       }
@@ -173,18 +217,20 @@ class WeldBeads implements SessionMember {
 
   /**
    * The mesh of stations `chunk * CHUNK` on, in the frame of the part that carries the metal (`pose` is that part's world
-   * pose, `center` its preview centre, in metres). Each station is the hypotenuse of its triangular section between the two
+   * pose, `center` its preview centre, in metres); the bead's own points and directions are in `frame`, the weld's
+   * reference frame, whose world pose this is. Each station is the hypotenuse of its triangular section between the two
    * boundary sections, whose legs are the mean of the stations beside them, with an end cap where the metal stops.
    */
-  static function chunkGeometry(bead:WeldBead, chunk:Int, pose:{position:Array<Float>, rotation:Array<Float>},
-      center:Array<Float>):GeometryData {
+  static function chunkGeometry(bead:WeldBead, chunk:Int, frame:{position:Array<Float>, rotation:Array<Float>},
+      pose:{position:Array<Float>, rotation:Array<Float>}, center:Array<Float>):GeometryData {
     var first = chunk * CHUNK, end = Std.int(Math.min(bead.count, first + CHUNK));
     var inverse = [-pose.rotation[0], -pose.rotation[1], -pose.rotation[2], pose.rotation[3]];
     function local(point:Array<Float>):Array<Float> {
-      var turned = AssemblyRobot.rotate(inverse, [for (axis in 0...3) point[axis] - pose.position[axis]]);
+      var world = AssemblyRobot.rotate(frame.rotation, point);
+      var turned = AssemblyRobot.rotate(inverse, [for (axis in 0...3) world[axis] + frame.position[axis] - pose.position[axis]]);
       return [for (axis in 0...3) turned[axis] - center[axis]];
     }
-    function turn(direction:Array<Float>):Array<Float> return AssemblyRobot.rotate(inverse, direction);
+    function turn(direction:Array<Float>):Array<Float> return AssemblyRobot.rotate(inverse, AssemblyRobot.rotate(frame.rotation, direction));
     function leg(station:Int):Float return station < 0 || station >= bead.count ? 0.0 : bead.leg(station);
     // The leg of the section at the boundary before station `j`.
     function ring(j:Int):Float {

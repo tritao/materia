@@ -19,12 +19,19 @@ class WireFeeder extends MachineComponent {
 	public final width:Float;
 	public final length:Float;
 	public final height:Float;
-	/** The wire it feeds, in millimetres, and its top speed in metres per minute. */
+	/**
+	 * The wire it feeds, in millimetres, and its top speed in metres per minute. `depositionEfficiency` is the fraction of
+	 * the melted wire that reaches the weld (the rest is spatter and fume): a property of the wire and its shielding gas,
+	 * which `SOLID_WIRE_EFFICIENCY` gives for solid steel wire in argon-CO2. The weld recipe and the simulated weld both take
+	 * it from here, through the scene's torch block.
+	 */
 	public final wireDiameterMm:Float;
 	public final maxSpeedMPerMin:Float;
+	public final depositionEfficiency:Float;
+	public static inline var SOLID_WIRE_EFFICIENCY:Float = 0.95;
 
 	public function new(width:Float = 160, length:Float = 400, height:Float = 250, wireDiameterMm:Float = 1.2,
-			maxSpeedMPerMin:Float = 20) {
+			maxSpeedMPerMin:Float = 20, depositionEfficiency:Float = SOLID_WIRE_EFFICIENCY) {
 		if (!(width > 0) || !(length > 0) || !(height > 0)) throw "Wire feeder needs positive dimensions";
 		if (!(wireDiameterMm > 0) || !(maxSpeedMPerMin > 0)) throw "Wire feeder needs a positive wire diameter and speed";
 		super('WIRE-FEEDER-${Dimension.format(width)}x${Dimension.format(length)}x${Dimension.format(height)}',
@@ -34,6 +41,7 @@ class WireFeeder extends MachineComponent {
 		this.height = height;
 		this.wireDiameterMm = wireDiameterMm;
 		this.maxSpeedMPerMin = maxSpeedMPerMin;
+		this.depositionEfficiency = depositionEfficiency;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addPort({name: "power", kind: ElectricalPower, role: Consumer, iface: WeldingInterfaces.weldCable(), required: true});
 		addPort({name: "gas", kind: Gas, role: Consumer, iface: WeldingInterfaces.gas(), required: true});
@@ -45,7 +53,7 @@ class WireFeeder extends MachineComponent {
 		addBridge("power", "torchPower");
 		addBridge("gas", "torchGas");
 		addBridge("control", "torchControl");
-		addCapability(WireFeed(wireDiameterMm, maxSpeedMPerMin));
+		addCapability(WireFeed(wireDiameterMm, maxSpeedMPerMin, depositionEfficiency));
 		declareMass(14, new Vector(0, 0, height / 2));
 	}
 

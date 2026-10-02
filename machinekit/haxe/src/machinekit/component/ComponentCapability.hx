@@ -22,7 +22,7 @@ enum ComponentCapability {
 		efficiency:Float);
 	/** A wire feeder: the diameter of the wire it feeds in millimetres, and its top wire speed in
 	 * metres per minute. */
-	WireFeed(wireDiameterMm:Float, maxSpeedMPerMin:Float);
+	WireFeed(wireDiameterMm:Float, maxSpeedMPerMin:Float, depositionEfficiency:Float);
 	/** A work clamp (the return of the weld circuit): where the weld circuit returns through the workpiece. `leadPort` is the
 	 * inlet the work lead from the power source plugs into, and `contactConnector` is where the
 	 * clamp meets the work (mate it to the workpiece). */

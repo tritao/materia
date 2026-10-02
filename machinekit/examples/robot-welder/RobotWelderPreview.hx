@@ -9,6 +9,7 @@ import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.robotics.EndEffectorControls;
 import machinekit.welding.WeldSeam;
+import machinekit.welding.WeldSeams;
 import machinekit.welding.WeldingEquipment;
 import machinekit.welding.WeldingPowerSource;
 import machinekit.welding.WeldingRecipe;
@@ -39,20 +40,50 @@ class RobotWelderPreview {
 	/** The seam the cell's mission welds: the plate's T-joint with the upright, on the upright's +Y side. */
 	public static inline var WELD_SEAM:String = "work/basePlate:box.+z|work/upright:box.+y";
 
-	/**
-	 * The mission's one step: weld `WELD_SEAM`. The seam is found from the members' geometry, placed where the workpiece
-	 * stands in the cell, and welded with the recipe for the leg the weldment asks for.
-	 */
-	public static function weldStep(cell:WeldingCell, metresPerUnit:Float):materia.project.SceneArtifact.SceneArtifactMissionStep {
+	/** The wire the cell's feeder declares, which the recipes are made for. */
+	static function wireOf(cell:WeldingCell):machinekit.welding.WeldingRecipe.RecipeWire
+		return {diameterMm: cell.feeder.wireDiameterMm, depositionEfficiency: cell.feeder.depositionEfficiency,
+			maxSpeedMPerMin: cell.feeder.maxSpeedMPerMin};
+
+	/** The cell's seams, found from the members' geometry, in the workpiece's frame (its reference member's). */
+	static function seamsOf(cell:WeldingCell):Array<WeldSeam> {
 		var model = new AssemblyModel("mm");
 		cell.addTo(model, "");
 		var state = new AssemblyState(model.definition(ASSEMBLY_ID));
 		state.forwardKinematics();
-		var seam = cell.weldment().findIn(cell, cell.solvedPoses(state)).require();
-		var found = [for (item in seam) if (item.name() == WELD_SEAM) item];
-		if (found.length != 1) throw 'The cell has no seam "$WELD_SEAM", it has ${[for (item in seam) item.name()]}';
-		var placed = found[0].transformed(state.worldPose("work/basePlate"));
-		return WeldingRecipe.fillet(placed.legSize).step(placed, "work/weldMetal", metresPerUnit);
+		return cell.weldment().findIn(cell, cell.solvedPoses(state)).require();
+	}
+
+	/**
+	 * The mission's one step: weld `WELD_SEAM`. The seam is found from the members' geometry and given relative to the
+	 * workpiece's reference member, so a player finds it where the workpiece stands; it is welded with the recipe for the
+	 * leg the weldment asks for, in the wire the cell's feeder declares.
+	 */
+	public static function weldStep(cell:WeldingCell, metresPerUnit:Float):materia.project.SceneArtifact.SceneArtifactMissionStep {
+		var found = [for (item in seamsOf(cell)) if (item.name() == WELD_SEAM) item];
+		if (found.length != 1) throw 'The cell has no seam "$WELD_SEAM"';
+		return WeldingRecipe.fillet(found[0].legSize, wireOf(cell)).step([found[0]], cell.weldment().reference, "work/weldMetal", metresPerUnit);
+	}
+
+	/**
+	 * A weld of one tube post's perimeter: its four sides, chained into one closed loop (`WeldSeams.chains`) and welded as
+	 * one step. The sides lie between different pairs of faces, so the torch's angles change at every corner; the
+	 * path turns it there. `post` counts the closed chains the weldment has, in the order they are found.
+	 */
+	public static function postStep(cell:WeldingCell, metresPerUnit:Float, post:Int = 0):materia.project.SceneArtifact.SceneArtifactMissionStep {
+		var loops = [for (chain in WeldSeams.chains(seamsOf(cell))) if (chain.closed) chain];
+		if (post >= loops.length) throw 'The cell has ${loops.length} posts to weld, not ${post + 1}';
+		var seams = loops[post].seams;
+		return WeldingRecipe.fillet(seams[0].legSize, wireOf(cell)).step(seams, cell.weldment().reference, "work/weldMetal", metresPerUnit);
+	}
+
+	/** The cell with a mission that welds the first post's perimeter instead of the plate's seam. */
+	public static function postCell():Bytes {
+		var cell = new WeldingCell();
+		var scene = AssemblyPreview.scene(cell, ASSEMBLY_ID);
+		scene.robotTools = AssemblyPreview.robotTools(cell.arm.tool, "arm/tool", cell.equipment());
+		scene.mission = {steps: [postStep(cell, scene.metresPerUnit)]};
+		return SceneArtifact.encode(scene);
 	}
 }
 
@@ -90,6 +121,8 @@ class RobotWelderChecks {
 		checkServices(cell);
 		checkTorchTool(cell, scene);
 		checkMission(cell, scene);
+		checkPostMission(cell);
+		checkRecipeWire();
 
 		var model = new AssemblyModel("mm");
 		cell.addTo(model, "");
@@ -99,6 +132,7 @@ class RobotWelderChecks {
 		checkReadyPose(cell, state);
 		var seams = WeldSeamChecks.run(cell, state);
 		var poses = checkReach(cell, state, ready, seams);
+		reportChainReach(cell, state, ready, seams);
 		checkClearance(cell, state, ready, poses);
 
 		var bom = cell.billOfMaterials().lines();
@@ -196,24 +230,70 @@ class RobotWelderChecks {
 		if (mission == null || mission.steps.length != 1 || mission.steps[0].kind != "weld" || mission.steps[0].weld == null)
 			throw "The cell should carry a mission that welds one seam";
 		var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast mission.steps[0].weld;
-		if (weld.seam != RobotWelderPreview.WELD_SEAM || weld.joint != "fillet")
-			throw 'The mission should weld the plate/upright fillet, got ${weld.seam}';
+		if (weld.frame != "work/basePlate") throw 'The weld should be placed by the workpiece\'s reference member, got ${weld.frame}';
+		if (weld.path.length != 1 || weld.path[0].seam != RobotWelderPreview.WELD_SEAM || weld.path[0].joint != "fillet")
+			throw 'The mission should weld the plate/upright fillet, got ${[for (segment in weld.path) segment.seam]}';
+		var segment = weld.path[0];
 		near(weld.legSize, WeldingWorkpiece.LEG_SIZE * 0.001, "the seam's leg", 1e-12);
-		var length = Math.sqrt(Math.pow(weld.stop.position[0] - weld.start.position[0], 2) + Math.pow(weld.stop.position[1] - weld.start.position[1], 2) +
-			Math.pow(weld.stop.position[2] - weld.start.position[2], 2));
+		var length = Math.sqrt(Math.pow(segment.stop.position[0] - segment.start.position[0], 2) + Math.pow(segment.stop.position[1] - segment.start.position[1], 2) +
+			Math.pow(segment.stop.position[2] - segment.start.position[2], 2));
 		near(length, WeldingWorkpiece.PLATE_LENGTH * 0.001, "the seam's length", 1e-6);
 		var process = weld.process;
 		// Wire speed times wire area times efficiency over travel speed is the section of an equal-leg fillet of that leg.
-		var area = process.wireSpeed * 1000 / 60 * Math.PI * 1.2 * 1.2 / 4 * WeldingRecipe.DEPOSITION_EFFICIENCY / (process.travelSpeed * 1000);
+		var cellFeeder = new WeldingCell().feeder;
+		var area = process.wireSpeed * 1000 / 60 * Math.PI * cellFeeder.wireDiameterMm * cellFeeder.wireDiameterMm / 4 * cellFeeder.depositionEfficiency / (process.travelSpeed * 1000);
 		near(Math.sqrt(2 * area), WeldingWorkpiece.LEG_SIZE, "the leg the recipe deposits", 1e-9);
 		if (!(process.wireSpeed > 5 && process.wireSpeed < 12 && process.voltage > 20 && process.voltage < 30))
 			throw 'The recipe for a ${WeldingWorkpiece.LEG_SIZE} mm fillet should run near 8 m/min and 24 V, got ${process.wireSpeed} m/min and ${process.voltage} V';
 		// The wire is on the faces' bisector, tilted back from the plate by the push angle.
-		var q = weld.start.rotation;
+		var q = segment.start.rotation;
 		var wire = AssemblyFrames.transformVector({x: 0.0, y: 0.0, z: 0.0, qx: q[0], qy: q[1], qz: q[2], qw: q[3]}, 0, 0, 1);
 		if (!(wire.z < -0.5)) throw 'The seam\'s wire should point down at the plate, got ${wire.z}';
-		Sys.println('robot welder: mission welds ${weld.seam} (${Math.round(length * 1000)} mm) at ${Math.round(process.wireSpeed * 10) / 10} m/min, ' +
+		Sys.println('robot welder: mission welds ${segment.seam} (${Math.round(length * 1000)} mm) at ${Math.round(process.wireSpeed * 10) / 10} m/min, ' +
 			'${Math.round(process.voltage * 10) / 10} V, ${Math.round(process.travelSpeed * 10000) / 10} mm/s');
+	}
+
+	/**
+	 * A tube post's four sides weld as one step: a path of four connected segments, one per side, each with its own faces
+	 * (the torch's angles change at the corners), that closes on itself, and the whole scene still validates with it.
+	 */
+	static function checkPostMission(cell:WeldingCell):Void {
+		var metres = 0.001;
+		var step = RobotWelderPreview.postStep(cell, metres);
+		var weld:materia.project.SceneArtifact.SceneArtifactWeld = cast step.weld;
+		if (weld.path.length != 4) throw 'A post\'s perimeter should be four segments, got ${weld.path.length}';
+		var names = new Map<String, Bool>();
+		for (index in 0...4) {
+			var segment = weld.path[index], next = weld.path[(index + 1) % 4];
+			names.set(segment.seam, true);
+			for (axis in 0...3) near(segment.stop.position[axis], next.start.position[axis], "a side ends where the next begins", 1e-9);
+			if (segment.normals[0].join(",") == next.normals[0].join(",") && segment.normals[1].join(",") == next.normals[1].join(","))
+				throw "Adjacent sides of a post should lie between different faces";
+		}
+		var count = 0;
+		for (_ in names.keys()) count++;
+		if (count != 4) throw "The four sides of a post should be four seams";
+		var scene = SceneArtifact.decode(RobotWelderPreview.postCell());
+		if (scene.mission == null || scene.mission.steps.length != 1) throw "The post cell should carry a mission of one weld";
+		Sys.println('robot welder: post mission welds ${weld.path.length} sides as one step');
+	}
+
+	/**
+	 * The recipe is made for the wire the feeder declares: a thinner wire deposits less per metre and so travels slower for
+	 * the same leg, a wire that deposits less does the same, and a leg that needs more wire than the feeder can feed is refused.
+	 */
+	static function checkRecipeWire():Void {
+		var standard = WeldingRecipe.fillet(5, {diameterMm: 1.2, depositionEfficiency: 0.95, maxSpeedMPerMin: 20});
+		var thin = WeldingRecipe.fillet(5, {diameterMm: 1.0, depositionEfficiency: 0.95, maxSpeedMPerMin: 20});
+		near(thin.wireSpeed, standard.wireSpeed, "the wire speed depends on the leg", 1e-12);
+		near(thin.travelSpeed / standard.travelSpeed, 1.0 / 1.44, "a 1.0 mm wire travels at (1.0 / 1.2)^2 of the 1.2 mm wire's speed", 1e-9);
+		var lossy = WeldingRecipe.fillet(5, {diameterMm: 1.2, depositionEfficiency: 0.8, maxSpeedMPerMin: 20});
+		near(lossy.travelSpeed / standard.travelSpeed, 0.8 / 0.95, "a wire that deposits less travels slower", 1e-9);
+		var refused = false;
+		try WeldingRecipe.fillet(5, {diameterMm: 1.2, depositionEfficiency: 0.95, maxSpeedMPerMin: 6}) catch (_:Dynamic) refused = true;
+		if (!refused) throw "A 5 mm fillet needs 8 m/min of wire, which a 6 m/min feeder cannot give: the recipe should be refused";
+		var feeder = new WeldingCell().feeder;
+		near(feeder.depositionEfficiency, machinekit.welding.WireFeeder.SOLID_WIRE_EFFICIENCY, "the feeder's wire efficiency", 0);
 	}
 
 	static function checkReadyPose(cell:WeldingCell, state:AssemblyState):Void {
@@ -259,6 +339,24 @@ class RobotWelderChecks {
 		}
 		pose(state, ready);
 		return poses;
+	}
+
+	static function reportChainReach(cell:WeldingCell, state:AssemblyState, ready:ArmPose, seams:Array<WeldSeam>):Void {
+		var limits = [for (spec in cell.arm.specs) {lower: spec.lower, upper: spec.upper}];
+		var workpiece = state.worldPose("work/basePlate");
+		var chainNumber = 0;
+		for (chain in WeldSeams.chains(seams)) if (chain.closed) {
+			for (index in 0...chain.seams.length) for (fraction in [0.0, 0.5, 1.0]) for (out in [0.0, 40.0]) {
+				var frame = chain.seams[index].frameAtParameter(fraction).transformed(workpiece);
+				var wire = frame.wire();
+				var target = {x: frame.position.x - wire.x * out, y: frame.position.y - wire.y * out, z: frame.position.z - wire.z * out};
+				var found:Null<Array<Float>> = null;
+				for (seed in seeds(ready)) if (found == null)
+					found = ArmIk.solve(state, JOINTS, limits, target, {x: wire.x, y: wire.y, z: wire.z}, seed);
+				Sys.println('chain $chainNumber side $index at $fraction, ${out} mm out: ${found == null ? "UNREACHABLE" : "reached"} (${Math.round(target.x)}, ${Math.round(target.y)}, ${Math.round(target.z)}; wire ${round2(wire.x)}, ${round2(wire.y)}, ${round2(wire.z)})');
+			}
+			chainNumber++;
+		}
 	}
 
 	/**

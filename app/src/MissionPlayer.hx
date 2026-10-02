@@ -329,15 +329,28 @@ class MissionPlayer implements SessionMember {
     }
   }
 
-  /** The weld a mission step describes, as a plan in the map frame: the assembly as designed, which the fixed cell stands in. */
-  static function weldPlan(weld:SceneArtifactWeld):WeldPlan {
+  /**
+   * The weld a mission step describes, as a plan in the map frame (the world). Its path is given relative to the
+   * workpiece's reference member, and that member is found where it stands when the step starts, as a pick finds its part,
+   * so the weld follows a workpiece that is not where it was designed. A weld with no frame is in the assembly as designed.
+   */
+  /** The world pose of a weld's reference member now, or the world's own when the weld names none. */
+  function referenceFrame(weld:SceneArtifactWeld):Transform3 {
+    if (weld.frame == null || weld.frame == "") return Transform3.identity();
+    var live = AssemblyRobot.partPose(simulation, robot.part("project:" + weld.frame));
+    return new Transform3(new Vec3(live.position[0], live.position[1], live.position[2]),
+      new Quat(live.rotation[0], live.rotation[1], live.rotation[2], live.rotation[3]));
+  }
+
+  function weldPlan(weld:SceneArtifactWeld):WeldPlan {
+    var frame = referenceFrame(weld);
     function pose(torch:SceneArtifactTorchPose):Transform3
-      return new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
-        new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3]));
+      return frame.compose(new Transform3(new Vec3(torch.position[0], torch.position[1], torch.position[2]),
+        new Quat(torch.rotation[0], torch.rotation[1], torch.rotation[2], torch.rotation[3])));
     var process = weld.process;
-    return new WeldPlan(pose(weld.start), pose(weld.stop), {wireSpeed: process.wireSpeed, voltage: process.voltage,
-      travelSpeed: process.travelSpeed, approach: process.approach, startDwell: process.startDwell,
-      craterDwell: process.craterDwell, burnback: process.burnback});
+    return new WeldPlan([for (segment in weld.path) new WeldSegment(pose(segment.start), pose(segment.stop))],
+      {wireSpeed: process.wireSpeed, voltage: process.voltage, travelSpeed: process.travelSpeed, approach: process.approach,
+        startDwell: process.startDwell, craterDwell: process.craterDwell, burnback: process.burnback});
   }
 
   /** No sensed obstacles beyond the map yet; the robot's place is updated every tick. */

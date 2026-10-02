@@ -11,6 +11,8 @@ typedef WeldingEquipmentData = {
 	var efficiency:Float;
 	var wireDiameterMm:Float;
 	var maxWireSpeedMPerMin:Float;
+	/** Fraction of the melted wire that reaches the weld. */
+	var depositionEfficiency:Float;
 	/** The occurrences the weld circuit returns through, in the assembly's own ids. */
 	var groundedWork:Array<String>;
 };
@@ -32,7 +34,7 @@ class WeldingEquipment {
 	 */
 	public static function of(assembly:MachineAssembly, weldments:Array<Weldment>):WeldingEquipmentData {
 		var supply:Null<String> = null, maxCurrent = 0.0, efficiency = 1.0;
-		var feeder:Null<String> = null, wire = 0.0, wireSpeed = 0.0;
+		var feeder:Null<String> = null, wire = 0.0, wireSpeed = 0.0, deposited = 1.0;
 		var clamps:Array<{id:String, lead:String}> = [];
 		for (member in assembly.components()) for (capability in member.component.capabilities()) switch capability {
 			case WeldingSupply(_, current, _, deliveredFraction):
@@ -40,11 +42,12 @@ class WeldingEquipment {
 				supply = member.id;
 				maxCurrent = current;
 				efficiency = deliveredFraction;
-			case WireFeed(diameter, speed):
+			case WireFeed(diameter, speed, depositionEfficiency):
 				if (feeder != null) throw 'The assembly has two wire feeders, "$feeder" and "${member.id}"';
 				feeder = member.id;
 				wire = diameter;
 				wireSpeed = speed;
+				deposited = depositionEfficiency;
 			case WorkReturn(leadPort, _): clamps.push({id: member.id, lead: leadPort});
 			case _:
 		}
@@ -67,6 +70,6 @@ class WeldingEquipment {
 		if (!found) throw 'The power source "$supply" has its work lead connected to no work clamp';
 		if (grounded.length == 0) throw "The work clamp is not mated to anything: the weld circuit does not close";
 		return {supply: supply, maxCurrentA: maxCurrent, efficiency: efficiency, wireDiameterMm: wire,
-			maxWireSpeedMPerMin: wireSpeed, groundedWork: grounded};
+			maxWireSpeedMPerMin: wireSpeed, depositionEfficiency: deposited, groundedWork: grounded};
 	}
 }

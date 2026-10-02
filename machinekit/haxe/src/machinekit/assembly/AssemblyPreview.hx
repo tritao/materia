@@ -84,7 +84,8 @@ class AssemblyPreview {
 			sensor: arc.sensor,
 			torch: {wireSpeedChannel: arc.wireSpeedChannel, voltageChannel: arc.voltageChannel,
 				groundedWork: welding.groundedWork.copy(), maxCurrentA: welding.maxCurrentA, efficiency: welding.efficiency,
-				wireDiameterMm: welding.wireDiameterMm, stickoutMm: WeldingTorch.STICKOUT}
+				wireDiameterMm: welding.wireDiameterMm, stickoutMm: WeldingTorch.STICKOUT,
+				maxWireSpeedMPerMin: welding.maxWireSpeedMPerMin, depositionEfficiency: welding.depositionEfficiency}
 		}];
 	}
 
