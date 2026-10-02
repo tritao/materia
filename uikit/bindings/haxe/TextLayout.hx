@@ -223,13 +223,15 @@ class TextLayout extends NativeKitUIResource {
 	public function selectionRangeRects(start:TextPosition, end:TextPosition):Array<TextRangeRect> {
 		if (start == null || end == null)
 			throw "Text selection endpoints cannot be null";
-		var forward = start.offset <= end.offset;
-		var first = forward ? start.offset : end.offset;
-		var last = forward ? end.offset : start.offset;
+		// Affinity identifies a visual glyph edge; tags must use logical insertion offsets.
+		var startOffset = offsetFromPosition(start), endOffset = offsetFromPosition(end);
+		var forward = startOffset <= endOffset;
+		var first = forward ? startOffset : endOffset;
+		var last = forward ? endOffset : startOffset;
 		if (first == last)
 			return [];
-		var firstAffinity = forward ? start.affinity : end.affinity;
-		var lastAffinity = forward ? end.affinity : start.affinity;
+		var firstPosition = forward ? start : end;
+		var lastPosition = forward ? end : start;
 		var result:Array<TextRangeRect> = [];
 		var cursor = first;
 		while (cursor < last) {
@@ -238,8 +240,8 @@ class TextLayout extends NativeKitUIResource {
 				next = cursor + 1;
 			if (next > last)
 				next = last;
-			var startCaret = caret(new TextPosition(cursor, cursor == first ? firstAffinity : 0));
-			var endCaret = caret(new TextPosition(next, next == last ? lastAffinity : 0));
+			var startCaret = caret(cursor == first ? firstPosition : new TextPosition(cursor, 0));
+			var endCaret = caret(next == last ? lastPosition : new TextPosition(next, 0));
 			var startTopX = startCaret.x + startCaret.ascender * startCaret.slope;
 			var startBottomX = startCaret.x + startCaret.descender * startCaret.slope;
 			var endTopX = endCaret.x + endCaret.ascender * endCaret.slope;

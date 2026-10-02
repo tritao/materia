@@ -534,17 +534,18 @@ class TextEditorLayout {
 			throw "Text selection endpoints cannot be null";
 		if (!Math.isFinite(minY) || !Math.isFinite(maxY) || maxY < minY)
 			throw "Text selection geometry bounds are invalid";
-		var forward = start.offset <= end.offset;
+		var startOffset = offsetFromPosition(start), endOffset = offsetFromPosition(end);
+		var forward = startOffset <= endOffset;
 		var firstPosition = forward ? start : end;
 		var lastPosition = forward ? end : start;
-		var first = clamp(firstPosition.offset, 0, offsets.codepointCount);
-		var last = clamp(lastPosition.offset, 0, offsets.codepointCount);
+		var first = clamp(forward ? startOffset : endOffset, 0, offsets.codepointCount);
+		var last = clamp(forward ? endOffset : startOffset, 0, offsets.codepointCount);
 		var firstAffinity = firstPosition.affinity;
 		var lastAffinity = lastPosition.affinity;
 		if (first == last)
 			return [];
 		for (entry in rangeGeometryCache)
-			if (entry.start == first && entry.end == last &&
+			if (entry.start == firstPosition.offset && entry.end == lastPosition.offset &&
 				entry.startAffinity == firstAffinity && entry.endAffinity == lastAffinity &&
 				entry.minY == minY && entry.maxY == maxY)
 				return entry.rectangles.copy();
@@ -596,15 +597,21 @@ class TextEditorLayout {
 			}
 			if (localEnd <= localStart)
 				continue;
+			// An affinity endpoint can belong to the preceding chunk while its logical
+			// insertion offset starts this one. Use this chunk's canonical edge then.
+			var useFirstPosition = localStart == first && firstPosition.offset >= record.start &&
+				firstPosition.offset < record.end;
+			var useLastPosition = localEnd == last && lastPosition.offset >= record.start &&
+				lastPosition.offset <= record.end;
 			for (rect in record.layout.selectionRangeRects(
-				new TextPosition(localStart - record.start,
-					localStart == first ? firstAffinity : 0),
-				new TextPosition(localEnd - record.start,
-					localEnd == last ? lastAffinity : 0)))
+				new TextPosition((useFirstPosition ? firstPosition.offset : localStart) - record.start,
+					useFirstPosition ? firstAffinity : 0),
+				new TextPosition((useLastPosition ? lastPosition.offset : localEnd) - record.start,
+					useLastPosition ? lastAffinity : 0)))
 				result.push(new TextRangeRect(rect.start + record.start, rect.end + record.start,
 					rect.x, rect.y + record.y, rect.width, rect.height, rect.visualLeftIsStart));
 		}
-		rangeGeometryCache.push(new TextEditorRangeGeometryCache(first, last, firstAffinity,
+		rangeGeometryCache.push(new TextEditorRangeGeometryCache(firstPosition.offset, lastPosition.offset, firstAffinity,
 			lastAffinity, minY, maxY, result.copy()));
 		if (rangeGeometryCache.length > 2)
 			rangeGeometryCache.shift();

@@ -493,6 +493,51 @@ class FrameworkSmoke {
 			return 2;
 		var fonts = FontCollection.create();
 		fonts.add(fontPath);
+		// Visual affinity positions name a glyph; range tags name logical insertion offsets.
+		var affinityLayout = TextLayout.create(fonts, "abc", 100.0);
+		var affinityStart = new TextPosition(0, 2), affinityEnd = new TextPosition(2, 2);
+		if (affinityLayout.offsetFromPosition(affinityStart) != 1 ||
+			affinityLayout.offsetFromPosition(affinityEnd) != 3) return 1021;
+		var affinityRects = affinityLayout.selectionRangeRects(affinityStart, affinityEnd);
+		var reversedAffinityRects = affinityLayout.selectionRangeRects(affinityEnd, affinityStart);
+		if (affinityRects.length != 2 || reversedAffinityRects.length != 2) return 1022;
+		var affinityCaret = affinityLayout.caret(affinityStart);
+		if (Math.abs(affinityRects[0].x - affinityCaret.x) > 0.1) return 1023;
+		for (index in 0...affinityRects.length) {
+			var rect = affinityRects[index], reverse = reversedAffinityRects[index];
+			if (rect.start != index + 1 || rect.end != index + 2 ||
+				reverse.start != rect.start || reverse.end != rect.end ||
+				Math.abs(reverse.x - rect.x) > 0.1 || Math.abs(reverse.width - rect.width) > 0.1)
+				return 1024;
+		}
+		affinityLayout.dispose();
+		var affinityEditor = new TextEditorState(fonts, "abc\nabc");
+		affinityEditor.updateLayout(100.0);
+		affinityEditor.placeCaretAt(new TextPosition(0, 2), false);
+		affinityEditor.placeCaretAt(new TextPosition(6, 2), true);
+		for (pass in 0...2) {
+			var rects = affinityEditor.layout.selectionRangeRects(affinityEditor.anchorPosition(),
+				affinityEditor.focusPosition());
+			if (rects.length == 0) return 1025;
+			for (rect in rects) if (rect.start < affinityEditor.selectionStart ||
+				rect.end > affinityEditor.selectionEnd) return 1026;
+		}
+		affinityEditor.dispose();
+		var boundaryText = "";
+		for (_ in 0...128) boundaryText += "abc\n";
+		var boundaryEditor = new TextEditorState(fonts, boundaryText + "abc");
+		boundaryEditor.updateLayout(100.0);
+		boundaryEditor.placeCaretAt(new TextPosition(255, 2), false);
+		boundaryEditor.placeCaretAt(new TextPosition(258, 2), true);
+		var boundaryRects = boundaryEditor.layout.selectionRangeRects(boundaryEditor.anchorPosition(),
+			boundaryEditor.focusPosition());
+		// The model retains the preceding newline; only the three visible letters have rectangles.
+		if (boundaryRects.length != 3 || boundaryEditor.selectionStart != 255 ||
+			boundaryEditor.selectionEnd != 259) return 1027;
+		for (rect in boundaryRects) if (rect.start < 256 || rect.end > 259) return 1028;
+		boundaryEditor.dispose();
+
+		Sys.println("PASS: logical affinity range tags, reversed endpoints and chunked cache");
 		if (!newlineChunksValid(fonts))
 			return 310;
 		if (!foregroundRangesValid(fonts))

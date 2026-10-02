@@ -19,6 +19,18 @@ int main() {
     if (!shared_fonts->valid() || !shared_fonts->add_font(NKUI_TEST_FONT_PATH) ||
         shared_fonts->font_load_count() != 1)
         return 48;
+    TextEngine empty_hit_test(shared_fonts);
+    for (const char *text : {"", "\n", "abc\n", "abc\n\n"}) {
+        if (!empty_hit_test.layout_utf8("previous content", 200.0f, 16.0f) ||
+            !empty_hit_test.layout_utf8(text, 200.0f, 16.0f))
+            return 180;
+        const auto last = empty_hit_test.caret({empty_hit_test.text_count(), 0});
+        for (float x : {-100.0f, 0.0f, 100.0f}) {
+            const auto hit = empty_hit_test.hit_test(x, last.y);
+            if (empty_hit_test.offset_from_position(hit) != empty_hit_test.text_count())
+                return 181;
+        }
+    }
     TextEngine shared_first(shared_fonts);
     TextEngine shared_second(shared_fonts);
     if (!shared_first.layout_utf8("first", 200.0f, 16.0f) ||
