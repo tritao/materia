@@ -655,15 +655,18 @@ bool TextEngine::layout_utf8(const char *text, float width, const TextLayoutOpti
 }
 
 static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t *next,
-                               int32_t index) {
-    const auto &a = skb_layout_get_lines(previous)[index];
-    const auto &b = skb_layout_get_lines(next)[index];
+                               int32_t old_index, int32_t new_index) {
+    const auto &a = skb_layout_get_lines(previous)[old_index];
+    const auto &b = skb_layout_get_lines(next)[new_index];
     const auto same_bounds = [](skb_rect2_t x, skb_rect2_t y) {
         return x.x == y.x && x.y == y.y && x.width == y.width && x.height == y.height;
     };
+    // Require exact row-local geometry. Fractional origin subtraction can
+    // differ after movement; those rows conservatively receive new revisions.
     const int32_t count = a.text_range.end - a.text_range.start;
     if (count != b.text_range.end - b.text_range.start ||
-        !same_bounds(a.bounds, b.bounds) || a.baseline != b.baseline ||
+        a.bounds.width != b.bounds.width || a.bounds.height != b.bounds.height ||
+        a.baseline - a.bounds.y != b.baseline - b.bounds.y ||
         a.layout_run_range.end - a.layout_run_range.start !=
             b.layout_run_range.end - b.layout_run_range.start ||
         (count > 0 && !std::equal(skb_layout_get_text(previous) + a.text_range.start,
@@ -679,18 +682,26 @@ static bool same_rendered_line(const skb_layout_t *previous, const skb_layout_t 
     for (int32_t run = 0; run < a.layout_run_range.end - a.layout_run_range.start; ++run) {
         const auto &x = old_runs[a.layout_run_range.start + run];
         const auto &y = new_runs[b.layout_run_range.start + run];
+        auto old_bounds = x.bounds;
+        auto new_bounds = y.bounds;
+        old_bounds.x -= a.bounds.x;
+        old_bounds.y -= a.bounds.y;
+        new_bounds.x -= b.bounds.x;
+        new_bounds.y -= b.bounds.y;
         if ((x.type != SKB_CONTENT_RUN_UTF8 && x.type != SKB_CONTENT_RUN_UTF32) ||
             x.type != y.type || x.direction != y.direction || x.script != y.script ||
             x.bidi_level != y.bidi_level || x.font_handle != y.font_handle ||
             x.font_size != y.font_size || x.flags != y.flags ||
-            x.ref_baseline != y.ref_baseline || !same_bounds(x.bounds, y.bounds) ||
+            x.ref_baseline - a.bounds.y != y.ref_baseline - b.bounds.y ||
+            !same_bounds(old_bounds, new_bounds) ||
             x.glyph_range.end - x.glyph_range.start != y.glyph_range.end - y.glyph_range.start)
             return false;
         for (int32_t glyph = 0; glyph < x.glyph_range.end - x.glyph_range.start; ++glyph) {
             const auto &p = old_glyphs[x.glyph_range.start + glyph];
             const auto &q = new_glyphs[y.glyph_range.start + glyph];
             if (p.gid != q.gid || p.advance_x != q.advance_x ||
-                p.offset_x != q.offset_x || p.offset_y != q.offset_y ||
+                p.offset_x - a.bounds.x != q.offset_x - b.bounds.x ||
+                p.offset_y - a.bounds.y != q.offset_y - b.bounds.y ||
                 p.cluster_idx < 0 || q.cluster_idx < 0 ||
                 p.cluster_idx >= skb_layout_get_clusters_count(previous) ||
                 q.cluster_idx >= skb_layout_get_clusters_count(next))
@@ -795,10 +806,27 @@ bool TextEngine::edit_utf8(int32_t start, int32_t end, const char *replacement,
         return false;
     auto *rebuilt = active_layout(*state_);
     if (rebuilt && rebuilt->font_generation == current->font_generation) {
-        const auto count = std::min(current->line_revisions.size(), rebuilt->line_revisions.size());
-        for (std::size_t row = 0; row < count; ++row)
-            if (same_rendered_line(current->layout, rebuilt->layout, static_cast<int32_t>(row)))
-                rebuilt->line_revisions[row] = current->line_revisions[row];
+        const int32_t delta = skb_layout_get_text_count(rebuilt->layout) -
+                              skb_layout_get_text_count(current->layout);
+        for (std::size_t row = 0; row < rebuilt->line_ranges.size(); ++row) {
+            const auto range = rebuilt->line_ranges[row];
+            const bool prefix = range.end <= start;
+            const bool suffix = range.start >= end + delta;
+            if (!prefix && !suffix)
+                continue;
+            const int32_t shift = prefix ? 0 : delta;
+            const int32_t old_start = range.start - shift;
+            const auto found = std::lower_bound(current->line_ranges.begin(),
+                current->line_ranges.end(), old_start,
+                [](skb_range_t line, int32_t offset) { return line.start < offset; });
+            if (found == current->line_ranges.end() || found->start != old_start ||
+                found->end != range.end - shift)
+                continue;
+            const auto old_row = static_cast<std::size_t>(found - current->line_ranges.begin());
+            if (same_rendered_line(current->layout, rebuilt->layout,
+                                   static_cast<int32_t>(old_row), static_cast<int32_t>(row)))
+                rebuilt->line_revisions[row] = current->line_revisions[old_row];
+        }
     }
     return true;
 }
@@ -955,13 +983,16 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
     const auto mix = [&key](uint64_t value) {
         key ^= value + 0x9e3779b97f4a7c15ull + (key << 6) + (key >> 2);
     };
+    mix(single_line ? 1u : 0u);
     mix(single_line ? layout->line_revisions[line_index]
                     : skb_layout_get_generation(layout->layout));
     mix(font_collection_generation());
     mix(scale_key);
     mix(static_cast<uint64_t>(mode));
-    mix(static_cast<uint64_t>(line_index + 1));
-    mix(static_cast<uint64_t>(end_line + 1));
+    if (!single_line) {
+        mix(static_cast<uint64_t>(line_index + 1));
+        mix(static_cast<uint64_t>(end_line + 1));
+    }
     mix(static_cast<uint64_t>(std::llround(static_cast<double>(origin_x) * 64.0)));
     mix(static_cast<uint64_t>(std::llround(static_cast<double>(origin_y) * 64.0)));
     mix(static_cast<uint64_t>(tint.red) << 24 | static_cast<uint64_t>(tint.green) << 16 |
@@ -994,12 +1025,15 @@ std::shared_ptr<const PreparedGlyphs> TextEngine::publish_glyphs(TextLayoutId id
         if (auto cached = found->second.lock()) {
             if (single_line && cached->source_start >= 0 &&
                 (cached->layout_id != id ||
+                 cached->first_line != line_index ||
                  cached->source_start != layout->line_ranges[line_index].start) &&
                 cached->line_revision == layout->line_revisions[line_index]) {
                 const int32_t delta = layout->line_ranges[line_index].start - cached->source_start;
                 auto rebased = std::make_shared<PreparedGlyphs>(*cached);
                 rebased->layout_id = id;
                 rebased->layout_generation = skb_layout_get_generation(layout->layout);
+                rebased->first_line = line_index;
+                rebased->end_line = line_index + 1;
                 rebased->source_start += delta;
                 for (auto &source : rebased->source_ranges) {
                     source.start += delta;

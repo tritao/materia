@@ -806,9 +806,13 @@ int main() {
         TextEngine rows(fonts);
         TextLayoutResult before, after;
         const char *text = "é first\nsecond é 🙂 אבג\nthird";
+        auto row_options = long_options;
+        // Binary-exact row spacing isolates movement from fractional-origin
+        // cancellation, which intentionally fails the exact reuse guard.
+        row_options.line_height = 24.0f;
         // Resolve system fallback fonts before exercising stable generations.
-        if (!rows.layout_utf8(text, 400.0f, long_options, &before) ||
-            !rows.layout_utf8(text, 400.0f, long_options, &before) ||
+        if (!rows.layout_utf8(text, 400.0f, row_options, &before) ||
+            !rows.layout_utf8(text, 400.0f, row_options, &before) ||
             before.lines.size() != 3)
             return 147;
         const auto first = rows.published_glyphs_for_line(before.id, 0, 0, 0, 1,
@@ -856,6 +860,39 @@ int main() {
             if (shifted->source_ranges[i].start != colored->source_ranges[i].start + 1 ||
                 shifted->source_ranges[i].end != colored->source_ranges[i].end + 1)
                 return 154;
+        if (!rows.edit_utf8(0, 0, "\n", &after) || after.lines.size() != 4)
+            return 155;
+        colors[0].start++;
+        colors[0].end++;
+        const auto moved = rows.published_glyphs_for_line(after.id, 2, 0, 0, 1,
+                                                        GlyphMode::Alpha, {}, colors);
+        if (!moved || moved->publication_key != shifted->publication_key ||
+            moved->first_line != 2 || moved->end_line != 3 ||
+            moved->source_start != shifted->source_start + 1 ||
+            !rows.prepared_glyphs_current(*moved) ||
+            moved->vertices.size() != shifted->vertices.size())
+            return 156;
+        for (size_t i = 0; i < moved->vertices.size(); ++i)
+            if (moved->vertices[i].x != shifted->vertices[i].x ||
+                moved->vertices[i].y != shifted->vertices[i].y ||
+                moved->vertices[i].red != shifted->vertices[i].red ||
+                moved->vertices[i].green != shifted->vertices[i].green)
+                return 157;
+        for (size_t i = 0; i < moved->source_ranges.size(); ++i)
+            if (moved->source_ranges[i].start != shifted->source_ranges[i].start + 1 ||
+                moved->source_ranges[i].end != shifted->source_ranges[i].end + 1)
+                return 160;
+        if (!rows.edit_utf8(0, 1, "", &after) || after.lines.size() != 3)
+            return 158;
+        colors[0].start--;
+        colors[0].end--;
+        const auto restored = rows.published_glyphs_for_line(after.id, 1, 0, 0, 1,
+                                                           GlyphMode::Alpha, {}, colors);
+        if (!restored || restored->publication_key != moved->publication_key ||
+            restored->first_line != 1 || restored->end_line != 2 ||
+            restored->source_start != shifted->source_start ||
+            moved->first_line != 2 || !rows.prepared_glyphs_current(*restored))
+            return 159;
     }
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;
 }
