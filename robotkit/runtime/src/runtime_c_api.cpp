@@ -1,6 +1,8 @@
 #include "robotkit_runtime.h"
 #include "robotkit_runtime.hpp"
+#if defined(RK_HAS_SERIAL_DEVICE)
 #include "robotkit_device_serial_endpoint.hpp"
+#endif
 #include "rkd6_endpoint.hpp"
 #include "runtime_registry.hpp"
 #include "runtime_abi.hpp"
@@ -71,7 +73,7 @@ rk_result RK_CALL rk_robot_runtime_create(const rk_robot_runtime_blueprint *blue
         std::shared_ptr<robotkit::RobotEndpoint> endpoint =
             std::make_shared<robotkit::InMemoryRobot>(blueprint->joint_count);
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
-            copied, endpoint, owner_period(copied));
+            *copied, endpoint, owner_period(*copied));
         const auto handle = robotkit::internal::register_runtime(std::move(runtime));
         *out_runtime = handle;
         return RK_OK;
@@ -115,16 +117,21 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
         layout.push_back(std::move(actuator));
     }
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
+#if !defined(RK_HAS_SERIAL_DEVICE)
+    // Built without serial ports (RK_BUILD_SERIAL_DEVICE).
+    (void)step_tick_hz; (void)link_loss_timeout_ns; (void)clock_bound_ns; (void)link_latency_ns; (void)baud;
+    return RK_ERROR_UNSUPPORTED;
+#else
     try {
         const auto copied = robotkit::internal::copy_blueprint(blueprint);
-        const auto period = owner_period(copied);
+        const auto period = owner_period(*copied);
         rk_result endpoint_error = RK_ERROR_BACKEND;
-        auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, copied,
+        auto endpoint = robotkit::DeviceSerialEndpoint::open(device_path, baud, *copied,
             controller, max_target_error, step_tick_hz, link_loss_timeout_ns,
             clock_bound_ns, link_latency_ns, layout, &endpoint_error);
         if (!endpoint) return endpoint_error;
         auto runtime = std::make_shared<robotkit::RobotRuntime>(
-            copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
+            *copied, std::static_pointer_cast<robotkit::RobotEndpoint>(endpoint), period);
         *out_runtime = robotkit::internal::register_runtime(std::move(runtime));
         return RK_OK;
     } catch (const std::bad_alloc &) {
@@ -132,6 +139,7 @@ rk_result RK_CALL rk_robot_runtime_create_serial6(const rk_robot_runtime_bluepri
     } catch (...) {
         return RK_ERROR_BACKEND;
     }
+#endif
 }
 
 rk_result RK_CALL rk_serial_device_identify(const char *device_path, uint32_t baud,
@@ -326,6 +334,13 @@ rk_result RK_CALL rk_robot_runtime_poll_events(
         return RK_ERROR_INVALID_ARGUMENT;
     const auto value = robotkit::internal::resolve_runtime(runtime);
     return value ? value->poll_events(*out_batch) : RK_ERROR_INVALID_HANDLE;
+}
+
+rk_result RK_CALL rk_robot_runtime_get_channel_value(
+    rk_robot_runtime runtime, const char *channel, rk_event_value *out_value) {
+    if (!channel || !out_value) return RK_ERROR_INVALID_ARGUMENT;
+    const auto value = robotkit::internal::resolve_runtime(runtime);
+    return value ? value->channel_value(channel, *out_value) : RK_ERROR_INVALID_HANDLE;
 }
 
 rk_result RK_CALL rk_robot_runtime_snapshot(rk_robot_runtime runtime, rk_robot_state *out_state) {

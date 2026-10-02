@@ -4,6 +4,7 @@ import RobotKitRuntime;
 import cadbridge.AssemblySimulationBridge;
 import materia.assembly.AssemblyDefinition;
 import materia.project.MaterialLibrary;
+import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
 import robotkit.model.RobotModel;
 import robotkit.runtime.RobotRuntime;
@@ -37,15 +38,21 @@ class AssemblyRobot {
   public final parts:Array<AssemblyPart>;
   /** Parts whose collision shape could not be made exact, each tagged with its part. */
   public final warnings:Array<String>;
+  /**
+   * The drive of a wheeled assembly, which takes body twists; its wheels roll the chassis over the
+   * floor in the simulation. Null for an assembly fixed to the world.
+   */
+  public final mobile:Null<MobileBase>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, warnings:Array<String>) {
+      parts:Array<AssemblyPart>, warnings:Array<String>, mobile:Null<MobileBase>) {
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
     this.blueprint = blueprint;
     this.parts = parts;
     this.warnings = warnings;
+    this.mobile = mobile;
   }
 
   /** The simulated part with scene id `id` (`project:<occurrence>`). */
@@ -82,9 +89,23 @@ class AssemblyRobot {
   public static function idFor(assembly:AssemblyDefinition):String return "assembly:" + assembly.id;
 
   /**
-   * The occurrences that are not bolted to the assembly: parts flagged dynamic (a workpiece)
-   * simulate as free objects, and the assembly robot has no link for them.
+   * The occurrences that are not part of the assembly robot: parts flagged dynamic (a workpiece),
+   * and a mobile robot's surroundings, which simulate as objects of their own, moving or held where
+   * they stand; the assembly robot has no link for them.
    */
+  public static function unownedOccurrences(scene:EditorScene, session:ProjectDocumentSession,
+      assembly:AssemblyDefinition):Map<String, Bool> {
+    var result = freeOccurrences(scene, assembly);
+    var mobile = session.mobileBase;
+    if (mobile != null && mobile.robot != null) {
+      var prefix = mobile.robot + "/";
+      for (occurrence in materia.assembly.AssemblyDefinitionFlattener.flatten(assembly).occurrences)
+        if (!StringTools.startsWith(occurrence.id, prefix)) result.set(occurrence.id, true);
+    }
+    return result;
+  }
+
+  /** The occurrences flagged dynamic, which simulate as free objects. */
   public static function freeOccurrences(scene:EditorScene, assembly:AssemblyDefinition):Map<String, Bool> {
     var sceneParts = new Map<String, SceneObjectData>();
     for (record in scene.records()) sceneParts.set(record.id, record);
@@ -109,7 +130,7 @@ class AssemblyRobot {
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
     if (physical == null) throw "Assembly physical properties are unavailable";
-    var free = freeOccurrences(scene, assembly);
+    var free = unownedOccurrences(scene, session, assembly);
     var sceneParts = new Map<String, SceneObjectData>();
     for (record in scene.records()) sceneParts.set(record.id, record);
     var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
@@ -141,7 +162,7 @@ class AssemblyRobot {
       masses.set(occurrence.id, chosenMass);
     }
     var converted = AssemblySimulationBridge.toRobotModel(assembly, physical,
-      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id));
+      session.projectAssemblyState, [for (id in free.keys()) id], id -> masses.get(id), session.mobileBase);
     // Link collision geometry is installed with generated-part hulls in the
     // collision phase; the runtime's generic 10 cm robot box is not a part shape.
     converted.model.collisionApproximation = CollisionApproximation.None;
@@ -182,14 +203,44 @@ class AssemblyRobot {
       closures.push(new SimulationClosure(parent, child, type,
         closure.anchorParent, closure.axisParent));
     }
+    // Each tool reports on its vacuum sensor, mounted at the tool's contact on the link that carries it.
+    for (tool in session.robotTools) {
+      var sensorId = tool.sensor;
+      if (sensorId == null) continue;
+      var carrier = converted.partLinks.get(tool.contact.occurrence);
+      if (carrier == null) throw 'Robot tool "${tool.contact.occurrence}" is not part of the robot';
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(sensorId, "tool_vacuum_kpa", 0.0, sensorId));
+      var mount = converted.model.addFrame(new robotkit.model.Frame(sensorId + " mount", converted.model.links[carrier.link]));
+      mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
+      sensor.frame = mount;
+    }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
-    // Process channels (a machine's spindle and coolant) must be declared before the robot is added.
+    // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
+    // robot is added.
     if (channels != null) for (channel in channels) blueprint.channels.push(channel);
-    var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
-      [0.0, 0.0, 0.0, 1.0], null, null, null, closures, null, null, null, null, linkHulls);
+    // A tool keeps holding through a commanded stop, as when its base arrives somewhere carrying a part.
+    for (tool in session.robotTools)
+      blueprint.channels.push(new ProcessChannelDeclaration(tool.channel, robotkit.world.ProcessEventValue.Digital(false), true));
+    // A mobile robot stands at its origin on the floor; its root link is framed there.
+    var origin = session.mobileBase == null ? null : session.mobileBase.origin;
+    var position = origin == null ? [0.0, 0.0, 0.0] : [origin.x, origin.y, 0.0];
+    var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [0.0, 0.0, Math.sin(origin.yaw / 2), Math.cos(origin.yaw / 2)];
+    // Like a machine whose servos are on, its joints hold their designed pose until something commands
+    // them, such as an arm while its base drives.
+    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, null, null, null, closures, null, null, null, null,
+      linkHulls, true);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);
+    // A wheeled assembly's chassis rolls by the wheel rates the robot applies each tick, whoever commands them.
+    var mobile:Null<MobileBase> = null;
+    if (converted.model.mobileBase != null) {
+      mobile = MobileBase.fromBlueprint(robot, blueprint);
+      var odometry = mobile.driveModel.createOdometry();
+      if (odometry == null) throw "Only differential-drive assemblies can drive in the simulation";
+      candidate.setDifferentialDrive(robotIndex, odometry.leftWheelJoint, odometry.rightWheelJoint,
+        odometry.wheelRadius, odometry.trackWidth, odometry.leftDirection, odometry.rightDirection);
+    }
     for (occurrence in assembly.occurrences) {
       if (free.exists(occurrence.id)) continue;
       var center = session.assemblyPreviewCenter(occurrence.definition);
@@ -199,6 +250,6 @@ class AssemblyRobot {
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings);
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings, mobile);
   }
 }

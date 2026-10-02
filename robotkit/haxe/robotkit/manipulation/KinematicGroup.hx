@@ -29,6 +29,7 @@ import robotkit.model.RobotModel;
 import robotkit.spatial.Transform3;
 import robotkit.spatial.Vec3;
 import robotkit.world.JointTarget;
+import sys.thread.Tls;
 
 /**
  * The joints that move a tool, solved together: those from `rootLink` to
@@ -56,8 +57,10 @@ import robotkit.world.JointTarget;
  *
  * One solve entry point, `solve`, takes its settings as `IkOptions`
  * (tracking or reaching, TCP or flange target, swivel, posture, moving base).
- * The group is all synchronous state, as everything that commands it runs
- * on one robot runtime: a plan over its joints executes on one clock.
+ * The group itself never changes once built; what an evaluation writes
+ * (the model state, its snapshot, solver scratch) is `KinematicGroupData`.
+ * Each query takes the data to work in, by default this thread's own, so a
+ * group can be shared between threads (a planner and the frame loop).
  */
 class KinematicGroup {
   public final robot:RobotModel;
@@ -89,13 +92,9 @@ class KinematicGroup {
   final referenceBody:Int;
   final referenceOffset:Transform;
   final damping:Array<Float>;
-  final state:KinematicState;
-  final snapshot:KinematicSnapshot;
-  final workspace = new SolverWorkspace();
   final swivelBodies:Array<Int> = [];
   final swivelPoints:Array<Vector3> = [];
   var swivelReference:Null<Vector3> = null;
-  var swivelProbe:Null<SwivelTask> = null;
 
   /**
    * `externalAxes` names further joints on the flange path to treat as
@@ -147,8 +146,6 @@ class KinematicGroup {
     jointModelIndices = [for (joint in drivers) robot.joints.indexOf(joint)];
     damping = [for (_ in 0...model.dofCount()) 0.0];
     for (i in 0...dofs.length) if (external[i]) damping[dofs[i]] = externalWeight;
-    state = new KinematicState(model);
-    snapshot = new KinematicSnapshot(model);
 
     var arm = [for (i in 0...drivers.length) if (!external[i]) drivers[i]];
     this.swivel = swivel != null ? swivel : arm.length == 7 ? ArmSwivel.throughJoints(arm[1], arm[3], arm[5]) : null;
@@ -162,12 +159,12 @@ class KinematicGroup {
       for (point in [definition.shoulder, definition.elbow, definition.wrist])
         swivelPoints.push(new Vector3(point.x, point.y, point.z));
       // The reference is given in the root link's frame, which the arm does not move.
-      snapshot.evaluate(state);
+      var initial = new KinematicSnapshot(model);
+      initial.evaluate(new KinematicState(model));
       var r = definition.reference;
-      var root = snapshot.bodyPose(rootBody);
+      var root = initial.bodyPose(rootBody);
       var tip = root.compose(Transform.translation(r.x, r.y, r.z));
       swivelReference = new Vector3(tip.x - root.x, tip.y - root.y, tip.z - root.z);
-      swivelProbe = swivelTask(0.0, 1.0, false);
     }
   }
 
@@ -198,24 +195,59 @@ class KinematicGroup {
   public function baseMotion():RootMotion
     return robot.floatingBase ? RootMotion.Floating : robot.mobileBase != null ? RootMotion.Planar : RootMotion.Fixed;
 
+  /** Each thread's working data for the groups it evaluated most recently, the latest first. */
+  static final threadData = new Tls<Array<KinematicGroupData>>();
+  static inline var THREAD_CACHED_GROUPS = 8;
+
+  /**
+   * This thread's working data for the group: what every query uses unless given its own. Kept for
+   * the few groups the thread used last; one evicted and needed again starts afresh, which no
+   * query notices, as each writes the state it reads.
+   */
+  public function threadLocalData():KinematicGroupData {
+    var cache = threadData.value;
+    if (cache == null) {
+      cache = [];
+      threadData.value = cache;
+    }
+    for (i in 0...cache.length) {
+      var found = cache[i];
+      if (found.group != this) continue;
+      if (i > 0) {
+        cache.splice(i, 1);
+        cache.unshift(found);
+      }
+      return found;
+    }
+    var created = newData();
+    cache.unshift(created);
+    if (cache.length > THREAD_CACHED_GROUPS) cache.pop();
+    return created;
+  }
+
+  /** Fresh working data for the group, for a caller that keeps its own (a planner, a hot loop). */
+  public function newData():KinematicGroupData
+    return new KinematicGroupData(this, swivel == null ? null : swivelTask(0.0, 1.0, false));
+
   /** The flange's pose in the reference frame. */
-  public function forwardKinematics(q:Array<Float>):Transform3 {
-    evaluate(q);
-    return RobotKinematics.toTransform3(referencePose().inverse().compose(snapshot.framePose(flangeFrameIndex)));
+  public function forwardKinematics(q:Array<Float>, ?data:KinematicGroupData):Transform3 {
+    var d = evaluate(q, data);
+    return RobotKinematics.toTransform3(referencePose(d).inverse().compose(d.snapshot.framePose(flangeFrameIndex)));
   }
 
   /** The tool centre point's pose in the reference frame (the flange composed with `flange_T_tcp`). */
-  public function tcpPose(q:Array<Float>):Transform3 return forwardKinematics(q).compose(flangeTTcp);
+  public function tcpPose(q:Array<Float>, ?data:KinematicGroupData):Transform3
+    return forwardKinematics(q, data).compose(flangeTTcp);
 
   /** The work frame's pose in the root link's frame (the root link's own pose without a work frame). */
-  public function workPose(q:Array<Float>):Transform3 {
-    evaluate(q);
-    return RobotKinematics.toTransform3(snapshot.bodyPose(rootBody).inverse().compose(referencePose()));
+  public function workPose(q:Array<Float>, ?data:KinematicGroupData):Transform3 {
+    var d = evaluate(q, data);
+    return RobotKinematics.toTransform3(d.snapshot.bodyPose(rootBody).inverse().compose(referencePose(d)));
   }
 
   /** Geometric Jacobian at the flange, 6 x n (rows 0..2 linear, 3..5 angular), in the reference frame. */
-  public function jacobian(q:Array<Float>):Array<Array<Float>> {
-    var flat = pointJacobian(q, Vec3.zero());
+  public function jacobian(q:Array<Float>, ?data:KinematicGroupData):Array<Array<Float>> {
+    var flat = pointJacobian(q, Vec3.zero(), data);
     var n = dofs.length;
     return [for (row in 0...6) [for (column in 0...n) flat[row * n + column]]];
   }
@@ -225,13 +257,14 @@ class KinematicGroup {
    * flange (e.g. the TCP): its velocity relative to the reference frame
    * (which moves with a positioner), expressed in it.
    */
-  public function pointJacobian(q:Array<Float>, flangeTPoint:Vec3):Array<Float> {
-    evaluate(q);
+  public function pointJacobian(q:Array<Float>, flangeTPoint:Vec3, ?data:KinematicGroupData):Array<Float> {
+    var d = evaluate(q, data);
+    var snapshot = d.snapshot;
     var point = snapshot.framePose(flangeFrameIndex).transformPoint(flangeTPoint.x, flangeTPoint.y, flangeTPoint.z);
     var n = dofs.length;
     var flat = [for (_ in 0...6 * n) 0.0];
     snapshot.pointJacobianColumns(flangeBody, point.x, point.y, point.z, layout, flat);
-    var reference = referencePose();
+    var reference = referencePose(d);
     if (workFrame != null) {
       // The reference body's own motion at that point.
       var moving = [for (_ in 0...6 * n) 0.0];
@@ -250,18 +283,35 @@ class KinematicGroup {
   }
 
   /** The Jacobian of the tool centre point: linear rows at the TCP, in the reference frame. */
-  public function tcpJacobian(q:Array<Float>):Array<Float> return pointJacobian(q, flangeTTcp.translation);
+  public function tcpJacobian(q:Array<Float>, ?data:KinematicGroupData):Array<Float>
+    return pointJacobian(q, flangeTTcp.translation, data);
 
   /**
    * The swivel angle at `q` in radians (see `ArmSwivel`), or NaN without a
    * swivel or where it is undefined (the elbow straight, or the
    * shoulder-wrist line along the reference).
    */
-  public function swivelAngle(q:Array<Float>):Float {
-    if (swivelProbe == null) return Math.NaN;
-    evaluate(q);
-    var probe:SwivelTask = swivelProbe;
-    try return probe.angle(snapshot) catch (_:Dynamic) return Math.NaN;
+  public function swivelAngle(q:Array<Float>, ?data:KinematicGroupData):Float {
+    if (swivel == null) return Math.NaN;
+    var d = evaluate(q, data);
+    var probe:SwivelTask = d.swivelProbe;
+    try return probe.angle(d.snapshot) catch (_:Dynamic) return Math.NaN;
+  }
+
+  /**
+   * The swivel angle's gradient at `q`, one value per group DOF (dψ = G · dq), or null without a
+   * swivel or where the angle is undefined.
+   */
+  public function swivelJacobian(q:Array<Float>, ?data:KinematicGroupData):Null<Array<Float>> {
+    if (swivel == null) return null;
+    var d = evaluate(q, data);
+    var probe:SwivelTask = d.swivelProbe;
+    var width = layout.width;
+    var residual = [0.0], row = [for (_ in 0...width) 0.0];
+    try probe.evaluate(d.state, d.snapshot, layout, residual, row, 0) catch (_:Dynamic) return null;
+    var gradient = [for (i in 0...dofs.length) row[i]];
+    for (value in gradient) if (!Math.isFinite(value)) return null;
+    return gradient;
   }
 
   /**
@@ -271,7 +321,7 @@ class KinematicGroup {
    * group's limits (`lower >= upper` means unlimited). Non-convergence is
    * reported, never thrown, also where a swivel is undefined along the way.
    */
-  public function solve(target:Transform3, seed:Array<Float>, ?options:IkOptions):IKResult {
+  public function solve(target:Transform3, seed:Array<Float>, ?options:IkOptions, ?data:KinematicGroupData):IKResult {
     if (target == null) throw "Inverse kinematics requires a target";
     var o = options == null ? new IkOptions() : options;
     var n = dofs.length;
@@ -279,7 +329,9 @@ class KinematicGroup {
     if (start.length != n) throw 'Kinematic group requires $n values, got ${start.length}';
     if (o.swivel != null && swivel == null) throw "Solving at a swivel angle needs an arm swivel";
     if (o.swivel != null && !Math.isFinite(o.swivel)) throw "Swivel angle must be finite";
-    if (o.rootPose != null) return solveWithBase(target, start, o);
+    var d = dataFor(data);
+    if (o.rootPose != null) return solveWithBase(target, start, o, d);
+    var state = d.state;
     for (i in 0...n) state.q[dofs[i]] = start[i];
     // Held DOFs sit at their values and leave the solve.
     var excluded = [for (_ in 0...n) false];
@@ -291,9 +343,9 @@ class KinematicGroup {
         state.q[dofs[held[k]]] = values[k];
       }
     }
-    snapshot.evaluate(state);
+    d.snapshot.evaluate(state);
     var problem = limitedProblem(excluded);
-    problem.add(toolTask(RobotKinematics.toTransform(target), o));
+    problem.add(toolTask(RobotKinematics.toTransform(target), o, d));
     if (hasExternal()) problem.add(new DofDampingTask(model, damping));
     if (o.swivel != null) problem.add(swivelTask(o.swivel, o.swivelTolerance, !o.swivelExact));
     var method = o.method;
@@ -310,7 +362,7 @@ class KinematicGroup {
       method = IkMethod.Prioritized;
     }
     try {
-      var solution = run(problem, state, o, method);
+      var solution = run(problem, state, o, method, d.workspace);
       var tip = solution.tasks[0];
       return new IKResult(solution.status == KinematicStatus.Converged, [for (dof in dofs) solution.state.q[dof]],
         tip.positionError, tip.orientationError, solution.iterations, solution.status);
@@ -349,7 +401,8 @@ class KinematicGroup {
     return [for (i in 0...q.length) JointTarget.position(jointModelIndices[i], q[i])];
   }
 
-  function run(problem:KinematicProblem, seed:KinematicState, o:IkOptions, method:IkMethod):kinematicskit.KinematicSolution
+  function run(problem:KinematicProblem, seed:KinematicState, o:IkOptions, method:IkMethod,
+      workspace:SolverWorkspace):kinematicskit.KinematicSolution
     return switch method {
       case Reaching: LevenbergMarquardt.solve(problem, seed, o.maxIterations, o.damping > 0.0 ? o.damping : 1e-3, 1e-8,
           1.0, workspace);
@@ -363,7 +416,7 @@ class KinematicGroup {
    * the world frame and the result says where the root went. A reaching
    * solve (KINEMATICS.md KK-D11), tolerances at the TCP or flange.
    */
-  function solveWithBase(target:Transform3, start:Array<Float>, o:IkOptions):IKResult {
+  function solveWithBase(target:Transform3, start:Array<Float>, o:IkOptions, d:KinematicGroupData):IKResult {
     if (!(o.baseCost >= 0.0)) throw "Base cost must be non-negative";
     var root = model.bodyRoot[rootBody];
     var problem = limitedProblem();
@@ -380,7 +433,7 @@ class KinematicGroup {
     for (i in 0...dofs.length) seedState.q[dofs[i]] = start[i];
     seedState.setRootPose(root, RobotKinematics.toTransform(o.rootPose));
     problem.clamp(seedState.q);
-    var solution = LevenbergMarquardt.solve(problem, seedState, o.maxIterations, 1e-3, 1e-8, 1.0, workspace);
+    var solution = LevenbergMarquardt.solve(problem, seedState, o.maxIterations, 1e-3, 1e-8, 1.0, d.workspace);
     var tip = solution.tasks[0];
     return new IKResult(solution.status == KinematicStatus.Converged, [for (dof in dofs) solution.state.q[dof]],
       tip.positionError, tip.orientationError, solution.iterations, solution.status,
@@ -390,12 +443,12 @@ class KinematicGroup {
   /**
    * The tool frame at `target` in the reference frame. A work frame moves
    * with the solve, so the task follows it; the root link does not, so its
-   * pose (from the current snapshot) turns the target into a world target.
+   * pose (from the snapshot in `d`) turns the target into a world target.
    */
-  function toolTask(target:Transform, o:IkOptions):FrameTask {
+  function toolTask(target:Transform, o:IkOptions, d:KinematicGroupData):FrameTask {
     var offset = o.atFlange ? null : RobotKinematics.toTransform(flangeTTcp);
     if (workFrame == null)
-      return FrameTask.atFrame(model, flangeFrameIndex, referencePose().compose(target), o.positionTolerance,
+      return FrameTask.atFrame(model, flangeFrameIndex, referencePose(d).compose(target), o.positionTolerance,
         o.orientationTolerance, offset);
     return FrameTask.atFrame(model, flangeFrameIndex, target, o.positionTolerance, o.orientationTolerance, offset)
       .relativeTo(model, referenceBody, referenceOffset);
@@ -422,7 +475,8 @@ class KinematicGroup {
     return problem;
   }
 
-  function referencePose():Transform return snapshot.bodyPose(referenceBody).compose(referenceOffset);
+  function referencePose(d:KinematicGroupData):Transform
+    return d.snapshot.bodyPose(referenceBody).compose(referenceOffset);
 
   function addDof(joint:Joint, isExternal:Bool):Void {
     var dof = model.jointDof[model.jointIndex(joint.id)];
@@ -436,11 +490,20 @@ class KinematicGroup {
     external.push(isExternal);
   }
 
-  function evaluate(q:Array<Float>):Void {
+  function dataFor(data:Null<KinematicGroupData>):KinematicGroupData {
+    if (data == null) return threadLocalData();
+    if (data.group != this) throw "Kinematic group data belongs to another group";
+    return data;
+  }
+
+  /** `q` evaluated in `data` (this thread's by default), which it returns. */
+  function evaluate(q:Array<Float>, data:Null<KinematicGroupData>):KinematicGroupData {
     if (q == null || q.length != dofs.length)
       throw 'Kinematic group requires ${dofs.length} joint values, got ${q == null ? 0 : q.length}';
-    for (i in 0...dofs.length) state.q[dofs[i]] = q[i];
-    snapshot.evaluate(state);
+    var d = dataFor(data);
+    for (i in 0...dofs.length) d.state.q[dofs[i]] = q[i];
+    d.snapshot.evaluate(d.state);
+    return d;
   }
 
   /** The joints from `baseLink` to `tipLink`, base first; throws when the tip is not below the base. */

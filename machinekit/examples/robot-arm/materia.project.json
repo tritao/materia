@@ -4,7 +4,6 @@
 	"name": "Six-axis robot arm",
 	"defaultEntrypoint": "arm",
 	"build": { "system": "haxeon", "manifest": "haxeon.json" },
-	"robotMotions": "robot-arm.motion.json",
 	"dynamicParts": ["workpiece"],
 	"entrypoints": {
 		"arm": {

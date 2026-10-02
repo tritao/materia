@@ -345,6 +345,16 @@ target batch: differential drive emits both wheel rates, while Ackermann drive
 emits steering position and drive-wheel rate together. Runtime joint limits and
 safety remain authoritative below this application-level mapping.
 
+Differential wheel joints stay mechanical truth: each turns about its own
+axle as authored, often both along their outward motor shafts, so one wheel
+rolls backward on a positive rate. The runtime compiler resolves each wheel's
+direction from its joint axis in the root link frame (upstream joints at
+zero): +1 for a turn about +Y, which rolls the base along +X, -1 about -Y, and
+`RK_ROLE_WHEEL_AXIS` for an axis that is not lateral. `DifferentialDrive`,
+`DifferentialOdometry` and the native plant (`reversed_wheels` on
+`rk_simulation_differential_drive_desc`) apply it, so joint rates and
+positions always read like the wheel's encoder.
+
 `HolonomicDrive` (M9) adds a third `DriveModel`: an omnidirectional ("kiwi")
 base with three wheels at 120-degree intervals, each rolling tangentially.
 `Twist2` now carries forward speed, body +Y lateral speed, and yaw rate.
@@ -385,6 +395,18 @@ pure-pursuit controller at application update frequency. It obtains a fresh
 `Trajectory` stores time-stamped references for consumers that need them; the
 first controller does not require a trajectory planner. Native `RobotRuntime`
 continues to own joint limits and hard safety enforcement.
+
+Arrival respects the base's deceleration limit: speed follows the braking
+profile to the goal itself (the shorter of the route left and the straight line
+to the goal, since projection progress can lag). Inside the goal's position
+tolerance it keeps closing in while the goal still lies ahead in its direction
+of travel, and latches once it is within a quarter of the tolerance, has gone
+past, or has stopped; latched, it only turns in place to the goal heading, so
+rolling on while braking cannot send it back along the path, and it no longer
+stops at the tolerance's edge with its heading still off.
+A drive that can turn in place does so first when the lookahead point lies more
+than `rotateToHeadingAngle` (45° by default) off its heading, instead of
+sweeping an arc, as when leaving a goal that faces a wall.
 
 `robotkit.navigation.MotionGuard` is an application-level command filter between
 navigation and `MobileBase`. It transforms reference-frame obstacles into the
@@ -1060,6 +1082,35 @@ observations can be ignored; repeated sequences are ignored too.
 The runtime accepts both kinds as externally published sensors at authored
 mounts, allowing a simulation sensor producer to publish them without a native
 physics sensor.
+
+A process channel's output is what the device on it sees: its declared safe
+value until an event fires, then the last value fired
+(`RobotRuntime.channelValue`, which drains nothing). Faults and emergency
+stops take every channel to its safe value. A commanded stop or an aborted
+motion does too, unless the channel is declared `keepOnStop`, as
+`ToolRuntime` declares gripper and vacuum channels: a robot that stops on
+arrival must not drop what it carries. `runtime.SimulatedSuctionTool` is the
+simulated device on such a channel: a step observer on one link that, while
+its channel is on, seals on the free object touching the link and has the
+simulation carry it there, lets go when the channel turns off, and publishes
+`tool_vacuum_kpa` on the tool's sensor when it has one. A robot that streams
+targets and runs no plan has no channel events, so such a tool can also be
+actuated directly for scripted playback.
+
+A simulated robot added with `holdAtRest` (`RK_SIMULATION_ROBOT_HOLD_AT_REST`)
+holds its actuated joints at their designed pose from the start, and again after
+a reset, until a command targets them, as servos enabled at power-on do; coupled
+followers follow their leader. Without it, never-commanded joints stay passive
+and an arm nothing drives sags under gravity. The hold is staged in the
+endpoint, not submitted as a command, so it never competes with a first plan.
+
+`skill.HandlePart` picks a part up or sets it down with a vacuum tool:
+`HandlingRunner` (implemented by `motionkit.robot.HandlingPlanRunner`) runs a
+MotionKit program that comes down onto the contact point from above, switches
+the tool channel there and returns home; the point is read from where the part
+or seat is when the skill starts, in the map frame, and the robot's place comes
+from localization. The skill reads the outcome on the vacuum sensor, as a real
+cell does, or trusts the program when the tool has no sensor.
 
 `cadbridge.EndEffectorVacuumFeedback` is a deterministic simulation producer
 for one suction cup with a dedicated collision piece. After each physics step,

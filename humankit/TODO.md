@@ -29,13 +29,14 @@ as scene objects, jobs as versioned JSON). These come after it.
 - A dedicated backward gait for short retreats; the current backward retreat
   keeps the heading and idle pose while translating away from the part. The
   library has `Walk_Bwd_Loop` (extracted, not wired).
-- Kneeling and floor-level picks. Crouching works (`BODY.md`), to about half a
-  metre; `PickUp_Kneeling` is extracted but not wired.
+- Floor-level picks below 0.3 m. Crouching (to about half a metre) and kneeling
+  (to 0.3 m) work (`BODY.md`); a point on the floor needs a stoop or a deeper reach
+  than the kneeling clip has.
 - Turns in place use the root rotating over the idle pose, so the feet slide;
   `Turn90_L/R` are extracted but not wired, and root-motion (`_RM`) clips need
   support in the walker.
-- Leaning onto a deep top (a braced hand and a hip hinge) so the chest overhangs
-  the edge; today a 0.8 m top is beyond the library character's reach.
+- Deep tops below table height (0.8 m deep, under about 0.85 m): bending over works standing, but with a crouch or a kneel it flips an arm.
+  A braced hand on the top, and a gentler stance than a bow with the head low, are not done.
 - Look-at for head and eyes (needs aim IK from AnimKit, see its TODO).
 - Hand orientation. IK sets the wrist position only, so a part keeps the
   orientation it was carried with (apart from `Place` levelling it); yaw

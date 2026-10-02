@@ -7,6 +7,7 @@ import cadkit.modeling.Vector;
 import cadkit.InertiaTensor;
 import RobotArmPreview.RobotArmChecks;
 import CncRouterPreview.CncRouterChecks;
+import MobileBasePreview.MobileBaseChecks;
 import machinekit.assembly.AssemblyPreview;
 import machinekit.assembly.LinearAxis;
 import machinekit.assembly.MachineAssembly;
@@ -54,6 +55,8 @@ import machinekit.motion.LinearRailSystem;
 import machinekit.motion.LinearRail;
 import machinekit.motion.LinearRailBlock;
 import machinekit.motion.NemaStepper;
+import machinekit.motion.CasterWheel;
+import machinekit.motion.DriveWheel;
 import machinekit.motion.FlangeBearingHousing;
 import machinekit.motion.PillowBlock;
 import machinekit.motion.ShaftCoupling;
@@ -1595,6 +1598,37 @@ class MachineKitSmoke {
 		}
 	}
 
+	static function wheels():Void {
+		var wheel = new DriveWheel(150, 40, 6.35, 40, 10);
+		check(connectorNames(wheel) == "bore,centre", "a drive wheel has a bore and a centre");
+		near(wheel.connector("centre").frame.z, 30, "the wheel centre is mid-tread");
+		near(wheel.radius, 75, "drive wheel radius");
+		var solid = wheel.geometry();
+		check(solid.valid() && solid.solidCount() == 1, "a drive wheel is one solid");
+		var envelope = wheel.geometry(Envelope);
+		check(solid.volume() < envelope.volume(), "the bore and dish come out of the drive wheel");
+		solid.close();
+		envelope.close();
+		check(DriveWheel.recipeType().create(wheel.values()).designation == wheel.designation,
+			"a drive wheel rebuilds from its recipe values");
+		throws(() -> new DriveWheel(150, 40, 40, 40, 10), "bore inside its hub");
+		throws(() -> new DriveWheel(60, 40, 8, 40, 10), "hub inside its tread");
+
+		var caster = new CasterWheel(75, 25, 110, 30, 60);
+		check(connectorNames(caster) == "mount,swivel,floor", "a caster has a mount, a swivel and a floor contact");
+		near(caster.connector("floor").frame.z, -110, "the caster touches the floor its height below the plate");
+		near(caster.connector("floor").frame.x, -30, "the caster wheel trails the swivel");
+		var body = caster.geometry();
+		check(body.valid() && body.solidCount() == 1, "a caster is one solid");
+		var extent = bounds(body);
+		near(extent.minZ, -110, "the caster wheel reaches the floor", 1e-3);
+		near(extent.maxZ, 0, "the caster plate tops out at its mount", 1e-3);
+		body.close();
+		check(CasterWheel.recipeType().create(caster.values()).designation == caster.designation,
+			"a caster rebuilds from its recipe values");
+		throws(() -> new CasterWheel(100, 25, 110, 30, 60), "room above its wheel");
+	}
+
 	static function pillowBlock():Void {
 		var block = PillowBlock.metric("UCP204");
 		check(block.designation == "UCP204", "UCP pillow block designation");
@@ -2545,6 +2579,7 @@ class MachineKitSmoke {
 		EndEffectorExampleChecks.run();
 		RobotArmChecks.run();
 		CncRouterChecks.run();
+		MobileBaseChecks.run();
 		assemblyPreviewSharing();
 		RecipeContractTests.run();
 		componentRecipes();
@@ -2564,6 +2599,7 @@ class MachineKitSmoke {
 		gears();
 		flangeBearingAssembly();
 		pillowBlock();
+		wheels();
 		linearAxis();
 		linearRailGuide();
 		pickingFrames();

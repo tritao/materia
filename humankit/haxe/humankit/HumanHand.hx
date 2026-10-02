@@ -2,6 +2,9 @@ package humankit;
 
 import animkit.AnimationAsset;
 import animkit.AnimationInstance;
+import humankit.rig.HumanBone;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
 
 /**
  * One hand's fingers, each curled between open (0) and a fist (1). A finger is each child of the

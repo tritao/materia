@@ -18,6 +18,11 @@ interface RedundancyParameterization {
   function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance):Null<Array<Float>>;
   /** IK keeping the redundancy as near the seed's as the target allows (where `solveAt` is blocked, e.g. by a limit). */
   function solveNear(target:Pose3, seed:Array<Float>, tolerance:IkTolerance):Null<Array<Float>>;
+  /**
+   * The values' Jacobian at `q`: `dimension()` rows of one entry per group DOF, row-major
+   * (d values = G · dq), or null where the values are undefined.
+   */
+  function valuesJacobian(q:Array<Float>):Null<Array<Float>>;
   /** How far each value may move per metre of path between samples: the resolver's lattice resolution. */
   function ratesPerMetre():Array<Float>;
   /** True for a value that wraps (an angle), so smoothing never averages across the ±π seam. */

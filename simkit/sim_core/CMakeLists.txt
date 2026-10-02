@@ -9,6 +9,10 @@ add_library(nativekit_sim_core ${NK_LIBRARY_TYPE}
     src/physics_backend.cpp
     src/host.cpp
     src/session.cpp)
+# Large structs belong on the heap: worker threads may have only 512 KiB of stack (macOS) and the browser 1 MiB.
+if(NOT MSVC)
+    target_compile_options(nativekit_sim_core PRIVATE -Wframe-larger-than=65536)
+endif()
 add_library(NativeKit::sim_core ALIAS nativekit_sim_core)
 
 target_compile_features(nativekit_sim_core PRIVATE cxx_std_20)

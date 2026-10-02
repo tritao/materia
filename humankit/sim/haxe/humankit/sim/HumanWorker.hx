@@ -1,21 +1,21 @@
 package humankit.sim;
 
-import humankit.ApproachFor;
+import humankit.action.ApproachFor;
 import humankit.HumanBody;
-import humankit.HumanAction;
+import humankit.action.HumanAction;
 import humankit.HumanBodyProxy;
 import humankit.HumanCharacter;
-import humankit.HumanJob;
-import humankit.HumanJobSpec;
-import humankit.HumanJobBuilder;
-import humankit.HumanJobBuildResult;
-import humankit.Wait;
-import humankit.HumanJobTargets;
+import humankit.job.HumanJob;
+import humankit.job.HumanJobSpec;
+import humankit.job.HumanJobBuilder;
+import humankit.job.HumanJobBuildResult;
+import humankit.action.Wait;
+import humankit.job.HumanJobTargets;
 import humankit.HumanLimb;
-import humankit.Pick;
-import humankit.Place;
-import humankit.ReleaseLimb;
-import humankit.WalkTo;
+import humankit.action.Pick;
+import humankit.action.Place;
+import humankit.action.ReleaseLimb;
+import humankit.action.WalkTo;
 import nativekit.sim.SimFrame;
 import nativekit.sim.MotionType;
 import nativekit.sim.SimActor;
@@ -536,6 +536,17 @@ class HumanWorker {
 	function publishSignals():Void {
 		var listener = onTick;
 		if (disposed || listener == null) return;
+		var signals = readSignals();
+		if (signals != null) listener(this, signals);
+	}
+
+	/**
+	 * What the body is touching or near as of the last tick: the zones it stands in and its distance to each tracked
+	 * link. Reading captures the physics world, so a display asks when it draws; `onTick` is for a reader that wants
+	 * every tick.
+	 */
+	public function readSignals():Null<HumanWorkerSignals> {
+		if (disposed) return null;
 		var frame = session.capture();
 		var occupied:Array<String> = [];
 		var distances:Map<String, Float> = new Map();
@@ -565,7 +576,7 @@ class HumanWorker {
 		}
 		var signals = new HumanWorkerSignals(frame.simulationTime(), occupied, distances);
 		frame.dispose();
-		listener(this, signals);
+		return signals;
 	}
 
 	public function dispose():Void {

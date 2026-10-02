@@ -587,6 +587,8 @@ class SceneEditingTests {
     function addJoint(id:String, name:String, type:JointType, child:Link,
         lower:Float, upper:Float):Void {
       var joint = new Joint(name, type, base, child, id);
+      // Wheels turn about the base's lateral axis.
+      if (type == JointType.Continuous) joint.axis = [0.0, 1.0, 0.0];
       joint.limits = new JointLimits(lower, upper, 20.0, 100.0);
       authored.model.addJoint(joint);
     }

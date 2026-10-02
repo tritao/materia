@@ -17,6 +17,8 @@ enum ExampleKind {
   Script(reference:String);
   /** The saved rack-to-table worker document, started in realtime. */
   WorkerRackToTable;
+  /** The worker gallery: one lane for each case the worker is built for, run side by side in realtime. */
+  WorkerGallery;
 }
 
 typedef ExampleEntry = {
@@ -48,6 +50,10 @@ class ExampleCatalog {
       description: ["A generated three-axis gantry", "router with stock on its bed"],
       tag: "Project · first build ~30 s",
       kind: Project("machinekit/examples/cnc-router/materia.project.json")},
+    {id: "mobile-base", title: "Mobile base",
+      description: ["A generated differential-drive", "robot base with a lidar"],
+      tag: "Project · first build ~30 s",
+      kind: Project("machinekit/examples/mobile-base/materia.project.json")},
     {id: "cad-modeling", title: "CAD modelling",
       description: ["Parametric sketches, extrusions", "and features in CadKit"],
       tag: "Project · first build ~15 s",
@@ -59,7 +65,11 @@ class ExampleCatalog {
     {id: "worker-rack-to-table", title: "Worker moves a rack",
       description: ["A walking human worker in a", "running physics simulation"],
       tag: "Simulation · starts running",
-      kind: WorkerRackToTable}
+      kind: WorkerRackToTable},
+    {id: "worker-gallery", title: "Worker gallery",
+      description: ["Six workers side by side: bending,", "crouching, kneeling, turning, two hands"],
+      tag: "Simulation · starts running",
+      kind: WorkerGallery}
   ];
 
   /** Id of the entry built for a project named on the command line; it is not part of `entries`. */
@@ -93,12 +103,13 @@ class ExampleCatalog {
   static function isAvailable(entry:ExampleEntry):Bool return switch (entry.kind) {
     case Project(path): FileSystem.exists(path);
     case Script(reference): SetupScriptRegistry.references().indexOf(reference) >= 0;
-    case WorkerRackToTable: workerAssetExists();
+    case WorkerRackToTable: workerAssetExists("app/examples/worker-rack-to-table.materia");
+    case WorkerGallery: workerAssetExists("app/examples/worker-gallery.materia");
   };
 
-  static function workerAssetExists():Bool {
+  static function workerAssetExists(document:String):Bool {
     try {
-      return FileSystem.exists(WorkerAssetPath.resolve("app/examples/worker-rack-to-table.materia"));
+      return FileSystem.exists(WorkerAssetPath.resolve(document));
     } catch (_:Dynamic) {
       return false;
     }
@@ -124,11 +135,7 @@ class ExampleCatalog {
       case Project(projectPath): projectPath;
       default: throw "Only project examples finish from a build";
     };
-    app.session.openGeneratedScene(generated.objects, path, generated.assembly,
-      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-      generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
-          generated.faceDescriptorsByDefinition, generated.cncJob);
+    app.session.openGeneratedProject(generated, path);
     app.documentChanged();
     showModel(app);
     app.log((entry.id == LAUNCH_PROJECT_ID ? "Opened project: " : "Opened example: ") + entry.title);
@@ -148,6 +155,10 @@ class ExampleCatalog {
         showModel(app);
       case WorkerRackToTable:
         app.enableWorkerDemo(0, true);
+        app.enterSimulationMode();
+        showModel(app);
+      case WorkerGallery:
+        app.enableWorkerDemo(0, true, ReferenceEditorApp.WORKER_GALLERY);
         app.enterSimulationMode();
         showModel(app);
     }

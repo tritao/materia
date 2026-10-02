@@ -31,18 +31,24 @@ class ToolRuntime {
     this.sander = sander;
   }
 
-  /** Bind a digital close/open channel; false is the safe open state. */
+  /**
+   * Bind a digital close/open channel; false is the safe open state, which faults and emergency stops
+   * take it to, while a commanded stop keeps a closed gripper closed on its part.
+   */
   public function bindGripper(channel:String):Void {
     if (gripper == null) throw "Mounted tool has no gripper";
-    var declaration = new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false));
+    var declaration = new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false), true);
     adapter.bindGripper(channel, gripper);
     declaredChannels.push(declaration);
   }
 
-  /** Bind a digital vacuum channel; false is the safe released state. */
+  /**
+   * Bind a digital vacuum channel; false is the safe released state, which faults and emergency stops
+   * take it to, while a commanded stop keeps holding what it holds.
+   */
   public function bindVacuum(channel:String):Void {
     if (vacuum == null) throw "Mounted tool has no vacuum";
-    var declaration = new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false));
+    var declaration = new ProcessChannelDeclaration(channel, ProcessEventValue.Digital(false), true);
     adapter.bindVacuum(channel, vacuum);
     declaredChannels.push(declaration);
   }

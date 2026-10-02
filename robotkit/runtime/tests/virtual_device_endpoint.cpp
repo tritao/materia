@@ -436,7 +436,13 @@ void midsegment_replacement_keeps_events() {
     assert(endpoint->channel_values()[0] == 0.0f);
 }
 
-std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
+/**
+ * A plan switches a channel on then off; `hold` or `stop` interrupts it while on. With
+ * `keep_on_stop` the channel's output survives a commanded stop on the device, as a vacuum holding a
+ * part must, while an `emergency` stop still makes it safe.
+ */
+std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop, bool keep_on_stop = false,
+                                                bool emergency = false) {
     rk_robot_runtime_blueprint blueprint{};
     blueprint.struct_size = sizeof(blueprint);
     blueprint.joint_count = 1;
@@ -449,6 +455,7 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
     std::strcpy(blueprint.channels[0].id, "sprayer.flow");
     blueprint.channels[0].kind = RK_EVENT_DIGITAL;
     blueprint.channels[0].safe_value.kind = RK_EVENT_DIGITAL;
+    if (keep_on_stop) blueprint.channels[0].stop_policy = RK_CHANNEL_KEEP_ON_STOP;
     VirtualDeviceConfig6 config;
     config.controller.fill(8);
     config.steps_per_unit = {1'000};
@@ -487,11 +494,14 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
     assert(endpoint->channel_values()[0] == 1.0f);
     if (hold || stop) {
         rk_robot_command command{};
-        command.kind = hold ? RK_COMMAND_HOLD : RK_COMMAND_STOP;
+        command.kind = hold ? RK_COMMAND_HOLD : emergency ? RK_COMMAND_EMERGENCY_STOP : RK_COMMAND_STOP;
         assert(endpoint->apply(command) == RK_OK);
     }
-    for (std::uint64_t now = 510'000'000; now <= 900'000'000; now += 10'000'000)
-        assert(endpoint->sample(now, state) == RK_OK);
+    // An emergency stop latches a fault the samples then report.
+    for (std::uint64_t now = 510'000'000; now <= 900'000'000; now += 10'000'000) {
+        const auto status = endpoint->sample(now, state);
+        assert(emergency || status == RK_OK);
+    }
     if (hold) {
         assert(endpoint->event_log().size() == 1);
         assert(endpoint->channel_values()[0] == 0.0f);
@@ -499,11 +509,13 @@ std::vector<VirtualEventRecord6> run_event_pair(bool hold, bool stop) {
         resume.kind = RK_COMMAND_RESUME;
         assert(endpoint->apply(resume) == RK_OK);
     }
-    for (std::uint64_t now = 910'000'000; now <= 1'900'000'000; now += 10'000'000)
-        assert(endpoint->sample(now, state) == RK_OK);
+    for (std::uint64_t now = 910'000'000; now <= 1'900'000'000; now += 10'000'000) {
+        const auto status = endpoint->sample(now, state);
+        assert(emergency || status == RK_OK);
+    }
     auto events = endpoint->event_log();
     assert(events.size() == (stop ? 1u : 2u));
-    assert(endpoint->channel_values()[0] == 0.0f);
+    assert(endpoint->channel_values()[0] == (stop && keep_on_stop && !emergency ? 1.0f : 0.0f));
     for (const auto &event : events) {
         assert(event.plan_id == 60 && event.channel == 0 && event.kind == RK_EVENT_DIGITAL);
         assert(event.applied_path_ticks >= event.scheduled_path_ticks);
@@ -638,6 +650,8 @@ int main() {
     const auto held_events = run_event_pair(true, false);
     runtime_hold_rest_resume_fires_final_event();
     run_event_pair(false, true);
+    run_event_pair(false, true, true);
+    run_event_pair(false, true, true, true);
     midsegment_replacement_keeps_events();
     host_stall_keeps_device_moving();
     assert(held_events[1].device_ticks > ordinary_events[1].device_ticks);

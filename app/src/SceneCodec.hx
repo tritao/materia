@@ -1,7 +1,7 @@
 package app;
 
 import haxe.Json;
-import humankit.HumanJobSpec;
+import humankit.job.HumanJobSpec;
 import bimkit.BimCodec;
 import bimkit.BimDocument;
 import materia.project.Appearance;

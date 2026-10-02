@@ -176,7 +176,9 @@ class SerialDeployment {
             ProcessEventValue.Process(requiredString(safe, "command"), argument);
           default: throw 'robotd: unsupported channel kind $kind';
         };
-        channels.push(new ProcessChannelDeclaration(id, value));
+        var keep:Dynamic = Reflect.field(entry, "keepOnStop");
+        if (keep != null && !Std.isOfType(keep, Bool)) throw 'robotd: channel $id keepOnStop must be a bool';
+        channels.push(new ProcessChannelDeclaration(id, value, keep == true));
       }
     }
     var device:Dynamic = Reflect.field(config, "device");

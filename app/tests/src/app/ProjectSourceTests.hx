@@ -203,7 +203,7 @@ class ProjectSourceTests {
     count("project:pedestal", 2);
     // Seven bodies chain seven levels deep; the last body's own Parts node is the eighth.
     check(rows == 14 && depth == 8, 'the arm shows 7 bodies and 7 collapsed Parts nodes, got $rows rows, depth $depth');
-    check(tree.childCount("parts:pedestal") == 2 && tree.childCount("parts:toolFlange") == 6,
+    check(tree.childCount("parts:pedestal") == 2 && tree.childCount("parts:toolFlange") == 7,
       "a body's Parts node holds the parts fixed to its root");
     check(tree.isGroup("parts:toolFlange") && !tree.isGroup("project:turret"), "Parts nodes are not selectable objects");
     check(!tree.initiallyExpanded("parts:toolFlange"), "Parts nodes start collapsed");
@@ -258,22 +258,8 @@ class ProjectSourceTests {
     check(session.beginAssemblyDrag("project:" + root, start) == null, 'the fixed root part "$root" cannot be dragged');
   }
 
-  static function rejectsGrips(raw:Dynamic, fragment:String):Void {
-    var message = "";
-    try RobotGripEvent.decode(raw) catch (error:Dynamic) message = Std.string(error);
-    check(message.indexOf(fragment) >= 0, 'grip events "$fragment" rejected: $message');
-  }
-
-  static function checkGripEvents(definition:AssemblyDefinition, physical:AssemblyPhysicalData):Void {
-    var good = RobotGripEvent.decode([{time: 1.0, link: "cup", action: "grip"}, {time: 2.5, link: "cup", action: "release"}]);
-    check(good.length == 2 && good[0].grip && !good[1].grip && good[1].time == 2.5 && good[1].link == "cup",
-      "grip events decode in order");
-    check(RobotGripEvent.decode(null).length == 0, "a project without grips has none");
-    rejectsGrips([{time: 1.0, link: "cup", action: "grip"}], "end with a release");
-    rejectsGrips([{time: 1.0, link: "cup", action: "release"}], "alternate");
-    rejectsGrips([{time: 2.0, link: "cup", action: "grip"}, {time: 1.0, link: "cup", action: "release"}], "never decrease");
-    rejectsGrips([{time: 1.0, link: "cup", action: "squeeze"}], "grip or release");
-    rejectsGrips([{time: 1.0, link: "cup", action: "grip", extra: 1}], "Unknown robot grip field");
+  /** A free part leaves the assembly robot; a joined part cannot be freed. */
+  static function checkFreeParts(definition:AssemblyDefinition, physical:AssemblyPhysicalData):Void {
     // A free part is not simulated as part of the assembly; a part that is joined cannot be freed.
     var whole = AssemblySimulationBridge.toRobotModel(definition, physical);
     var freed = AssemblySimulationBridge.toRobotModel(definition, physical, null, ["workpiece"]);
@@ -285,104 +271,273 @@ class ProjectSourceTests {
     check(message.indexOf("cannot be joined") >= 0, "a joined part cannot be freed: " + message);
   }
 
-  /** The arm example opens with its shipped motion and the simulation follows it. */
+  /**
+   * The mobile base opens as a wheeled robot on both backends: a commanded twist rolls its chassis and
+   * every part on it over the floor, the wheels spin their own ways, and wheel odometry agrees.
+   */
+  static function checkMobileBase(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var drive = generated.mobileBase;
+    if (drive == null) throw "the mobile base project should declare its drive";
+    var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast drive;
+    var wheelRadius:Float = section.wheelRadius;
+    // Driven by hand here: without its mission the robot waits for commands.
+    check(generated.mission != null, "the mobile base cell ships a mission");
+    generated.mission = null;
+    function pose(simulation:ApplicationSimulation, id:String):{position:Array<Float>, rotation:Array<Float>} {
+      for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id)
+        return {position: entry.position, rotation: entry.rotation};
+      throw 'mobile base has no simulated pose for $id';
+    }
+    function yaw(rotation:Array<Float>):Float
+      return Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+        1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      check(session.mobileBase != null, "opening the mobile base project installs its drive");
+      var world = new RobotWorld();
+      var simulation = new ApplicationSimulation(world);
+      simulation.setBackend(backend);
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        'mobile base builds on the $label backend: ${simulation.error}');
+      var base = simulation.mobileBase();
+      if (base == null) throw 'mobile base has no drive on the $label backend';
+      var id = "assembly:" + (cast generated.assemblyDefinition:AssemblyDefinition).id;
+      var odometry = base.driveModel.createOdometry();
+      function step(seconds:Float):Void {
+        var until = simulation.activeSession().simulationTime() + seconds - 1e-9;
+        while (simulation.activeSession().simulationTime() < until) {
+          simulation.step();
+          var observed = world.snapshot().robot(id);
+          if (observed == null) throw "mobile base is missing from the world snapshot";
+          odometry.update(observed);
+        }
+      }
+      step(0.1);
+      var startPlate = pose(simulation, "project:robot/basePlate"), startLidar = pose(simulation, "project:robot/lidar");
+      // One second straight ahead at 0.4 m/s.
+      base.command(new robotkit.mobile.Twist2(0.4, 0.0));
+      var t0 = simulation.activeSession().simulationTime();
+      step(1.0);
+      var travelled = simulation.activeSession().simulationTime() - t0;
+      var plate = pose(simulation, "project:robot/basePlate"), lidar = pose(simulation, "project:robot/lidar");
+      var dx = plate.position[0] - startPlate.position[0];
+      check(Math.abs(dx - 0.4 * travelled) < 0.02 && Math.abs(plate.position[1] - startPlate.position[1]) < 1e-3 &&
+        Math.abs(plate.position[2] - startPlate.position[2]) < 1e-3,
+        '$label: the chassis rolls 0.4 m/s straight ahead, moved ${dx} m in ${travelled} s');
+      check(Math.abs(lidar.position[0] - startLidar.position[0] - dx) < 1e-3 &&
+        Math.abs(lidar.position[2] - startLidar.position[2]) < 1e-3, '$label: the lidar rides the chassis');
+      var observed = world.snapshot().robot(id);
+      if (observed == null) throw "mobile base is missing from the world snapshot";
+      var wheelRate = 0.4 / wheelRadius;
+      check(Math.abs(observed.velocities.get(0) - wheelRate) < 0.05 * wheelRate &&
+        Math.abs(observed.velocities.get(1) + wheelRate) < 0.05 * wheelRate,
+        '$label: the wheels spin at v / r, the right one negative (${observed.velocities.get(0)}, ${observed.velocities.get(1)})');
+      // Half a second turning in place at 1 rad/s.
+      var startYaw = yaw(plate.rotation);
+      base.command(new robotkit.mobile.Twist2(0.0, 1.0));
+      t0 = simulation.activeSession().simulationTime();
+      step(0.5);
+      var turned = simulation.activeSession().simulationTime() - t0;
+      var spun = pose(simulation, "project:robot/basePlate");
+      check(Math.abs(yaw(spun.rotation) - startYaw - turned) < 0.05 &&
+        Math.abs(spun.position[0] - plate.position[0]) < 1e-3,
+        '$label: the chassis turns in place counter-clockwise, ${yaw(spun.rotation) - startYaw} rad in ${turned} s');
+      base.stop();
+      step(0.1);
+      var estimate = odometry.current();
+      check(Math.abs(estimate.x - dx) < 0.02 && Math.abs(estimate.yaw - (yaw(spun.rotation) - startYaw)) < 0.05,
+        '$label: wheel odometry follows the chassis (${estimate.x} m, ${estimate.yaw} rad)');
+      Sys.println('mobile base ($label): ${Math.round(dx * 1000)} mm in ${Math.round(travelled * 100) / 100} s, ' +
+        'turned ${Math.round((yaw(spun.rotation) - startYaw) * 1000) / 1000} rad, odometry ${Math.round(estimate.x * 1000)} mm');
+      simulation.clear();
+    }
+  }
+
+  /**
+   * The mobile manipulator runs its round on its own: it stands where each goTo says, picks the
+   * workpiece up, sets it down centred on the other table's seat and carries it back, and its chassis
+   * never touches the room's walls, tables, pillar or dock. MuJoCo only, like the arm example's own
+   * check: the test backend's contacts between robot links and free objects reach too far for parts
+   * handled this closely, and push the workpiece off its table as the arm passes.
+   */
+  static function checkMobileMission(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var steps = work.steps;
+    var definition:AssemblyDefinition = cast generated.assemblyDefinition;
+    var placement = new AssemblyState(definition, generated.assemblyState);
+    var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
+    halfLength /= 2; halfWidth /= 2;
+    function yaw(rotation:Array<Float>):Float
+      return Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+        1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    /** Separating-axis test of two rectangles on the floor: centre, half extents and heading. */
+    function overlap(ax:Float, ay:Float, ahx:Float, ahy:Float, ayaw:Float,
+        bx:Float, by:Float, bhx:Float, bhy:Float, byaw:Float):Bool {
+      for (angle in [ayaw, ayaw + Math.PI / 2, byaw, byaw + Math.PI / 2]) {
+        var ux = Math.cos(angle), uy = Math.sin(angle);
+        function reach(hx:Float, hy:Float, heading:Float):Float
+          return hx * Math.abs(Math.cos(heading) * ux + Math.sin(heading) * uy) +
+            hy * Math.abs(-Math.sin(heading) * ux + Math.cos(heading) * uy);
+        var gap = Math.abs((bx - ax) * ux + (by - ay) * uy);
+        if (gap > reach(ahx, ahy, ayaw) + reach(bhx, bhy, byaw)) return false;
+      }
+      return true;
+    }
+    for (backend in [ApplicationSimulation.MUJOCO]) {
+      var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        'mobile base cell builds on the $label backend: ${simulation.error}');
+      var mission = simulation.missionPlayer();
+      if (mission == null) throw 'mobile base cell has no mission on the $label backend';
+      check(mission.obstacles.length == 8, '$label: the map has the four walls, two tables, pillar and dock');
+      var log:Array<String> = [];
+      var lastDone = 0;
+      var trail:Array<String> = [];
+      while (mission.completed < steps.length && simulation.activeSession().simulationTime() < 300) {
+        simulation.step();
+        var failure = mission.failure;
+        if (failure != null) throw '$label: the mission failed after ${mission.completed} steps: $failure\n${trail.join("\n")}';
+        var poses = simulation.capturePresentationSnapshot().environment;
+        var plate = [for (entry in poses) if (entry.id == "project:robot/basePlate") entry][0];
+        var heading = yaw(plate.rotation);
+        trail.push('${Math.round(simulation.activeSession().simulationTime() * 100) / 100} s: ' +
+          '${Math.round(plate.position[0] * 1000)}, ${Math.round(plate.position[1] * 1000)} mm, ' +
+          '${Math.round(heading * 1000) / 1000} rad, step ${mission.stepIndex}');
+        if (trail.length > 150) trail.shift();
+        for (box in mission.obstacles) if (overlap(plate.position[0], plate.position[1], halfLength, halfWidth, heading,
+            box.x, box.y, box.halfX, box.halfY, box.yaw))
+          throw '$label: the chassis hits ${box.id} at ${plate.position[0]}, ${plate.position[1]}\n' +
+            [for (index in 0...trail.length) if (index % 5 == 0) trail[index]].join("\n");
+        if (mission.completed == lastDone) continue;
+        var step = steps[lastDone];
+        var now = Math.round(simulation.activeSession().simulationTime() * 10) / 10;
+        switch step.kind {
+          case "goTo":
+            var goal:materia.project.SceneArtifact.SceneArtifactFloorPose = cast step.pose;
+            var error = Math.sqrt(Math.pow(plate.position[0] - goal.x, 2) + Math.pow(plate.position[1] - goal.y, 2));
+            var turn = Math.abs(Math.atan2(Math.sin(heading - goal.yaw), Math.cos(heading - goal.yaw)));
+            check(error < 0.08 && turn < 0.08, '$label: step $lastDone (goTo) ends ${error} m and ${turn} rad off');
+          case "pick":
+            check(simulation.heldObjectIds().join(",") == "project:workpiece", '$label: step $lastDone picks the workpiece up');
+          case "place":
+            check(simulation.heldObjectIds().length == 0, '$label: step $lastDone lets the workpiece go');
+            // Let it settle, then it should rest centred on the seat.
+            for (_ in 0...50) simulation.step();
+            var at:materia.project.SceneArtifact.SceneArtifactPlace = cast step.at;
+            var seat = placement.worldConnector(at.occurrence, at.connector);
+            var metres = generated.metresPerUnit;
+            var piece = [for (entry in simulation.capturePresentationSnapshot().environment)
+              if (entry.id == "project:workpiece") entry][0];
+            var off = Math.sqrt(Math.pow(piece.position[0] - seat.x * metres, 2) + Math.pow(piece.position[1] - seat.y * metres, 2));
+            check(off < 0.02, '$label: step $lastDone sets the workpiece ${off} m from the centre of ${at.occurrence}\'s seat');
+            check(piece.position[2] > seat.z * metres && piece.position[2] < seat.z * metres + 0.05,
+              '$label: step $lastDone leaves the workpiece standing on ${at.occurrence} (centre at ${piece.position[2]} m)');
+          default:
+        }
+        log.push('${step.kind} ${now}');
+        lastDone = mission.completed;
+      }
+      check(mission.completed >= steps.length,
+        '$label: the robot runs its whole round in five minutes, finished ${mission.completed} of ${steps.length} steps');
+      Sys.println('mobile mission ($label): ${log.join(", ")} s');
+      simulation.clear();
+    }
+  }
+
+  /**
+   * The arm example opens with its suction tool and its mission, and on MuJoCo the arm works it: picks
+   * the workpiece off its pad, sets it on the other, and brings it back, each pick confirmed by the
+   * tool's vacuum sensor, and a reset puts the workpiece back for the next run.
+   */
   static function checkRobotArm(root:String):Void {
     var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-arm/materia.project.json");
     var generated = MateriaProjectRunner.loadProject(manifest);
-    check(generated.robotMotions != null && generated.robotMotions.length == 6,
-      "robot arm project ships one motion track for each joint");
     var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var placement = new AssemblyState(definition, generated.assemblyState);
+    check(generated.robotMotions == null || generated.robotMotions.length == 0, "the arm project ships no joint tracks");
+    var tools = generated.robotTools;
+    check(tools != null && tools.length == 1 && tools[0].sensor != null, "the arm's suction tool reports on a vacuum sensor");
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    check(work != null && work.loop == true && [for (step in work.steps) step.kind].join(",") == "pick,place,pick,place",
+      "the arm project carries the workpiece to the other pad and back, on repeat");
+    var steps = work.steps;
     var session = new ProjectDocumentSession(null, false);
-    var armWorld = new RobotWorld();
-    var armSimulation = new ApplicationSimulation(armWorld);
-    session.openGeneratedScene(generated.objects, manifest, generated.assembly,
-      generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
-      generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, generated.robotGrips, null, generated.cncJob);
-    check(session.robotMotions.length == 6, "opening the arm project installs its motion");
+    session.openGeneratedProject(generated, manifest);
     checkArmHierarchy(session);
     checkArmDrag(session, generated.metresPerUnit);
-    checkGripEvents(definition, generated.physical);
-    armSimulation.setBackend(ApplicationSimulation.MUJOCO);
-    check(armSimulation.rebuild(session.sensors, session.scene, session),
-      "robot arm builds in the shared simulation: " + armSimulation.error);
-    // The joint order of the simulated model, which leaves out the freed workpiece.
-    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical, null, ["workpiece"]).model;
-    var index = new Map<String, Int>();
-    for (position in 0...model.joints.length) index.set(model.joints[position].id, position);
-    var id = "assembly:" + definition.id;
-    armSimulation.step();
-    var startPoses = armSimulation.capturePresentationSnapshot().environment;
-    var startCup = [for (pose in startPoses) if (pose.id == "project:tool/cup") pose];
-    var startWork = [for (pose in startPoses) if (pose.id == "project:workpiece") pose];
-    check(startCup.length == 1 && startWork.length == 1 && [for (pose in startPoses) if (StringTools.startsWith(pose.id, "project:")) pose].length ==
+    checkFreeParts(definition, generated.physical);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session),
+      "robot arm builds in the shared simulation: " + simulation.error);
+    var mission = simulation.missionPlayer();
+    if (mission == null) throw "the robot arm has no mission";
+    simulation.step();
+    function pose(id:String):app.ApplicationSimulation.SimulationPoseVisual {
+      var found = [for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id) entry];
+      check(found.length == 1, 'robot arm publishes a pose for $id');
+      return found[0];
+    }
+    var startPoses = simulation.capturePresentationSnapshot().environment;
+    check([for (entry in startPoses) if (StringTools.startsWith(entry.id, "project:")) entry].length ==
       definition.occurrences.length, "robot arm publishes a pose for every part, tool and free workpiece included");
-    check(session.robotGrips.length == 4, "the arm project ships its four vacuum commands");
-    // Run the whole authored cycle: the joints must follow their tracks the entire way, which also means
-    // the arm never fights the table or the workpiece.
-    var duration = 0.0;
-    for (track in generated.robotMotions) duration = Math.max(duration, track.keys[track.keys.length - 1].time);
-    var worst = 0.0, farthest = 0.0, nextSample = 0.0, steps = 0;
-    var lift = 0.0, atPlace = false, everHeld = false;
-    while (armSimulation.activeSession().simulationTime() < duration + 0.5 && steps++ < 100000) {
-      armSimulation.step();
-      var now = armSimulation.activeSession().simulationTime();
-      if (now < nextSample) continue;
-      nextSample = now + 0.25;
-      var observed = armWorld.snapshot().robot(id);
-      if (observed == null) throw "robot arm is missing from the world snapshot";
-      // Track positions are relative to the initial pose, like the joint positions themselves.
-      for (track in generated.robotMotions) {
-        var slot = index.get(track.jointId);
-        if (slot == null) throw 'robot arm has no joint ${track.jointId}';
-        var error = Math.abs(observed.positions.get(slot) - track.sample(now));
-        worst = Math.max(worst, error);
-        check(error < 0.05, 'robot arm joint ${track.jointId} follows its track at $now s: off by $error rad');
+    var startWork = pose("project:workpiece").position.copy();
+    var lift = 0.0, lastDone = 0, log:Array<String> = [];
+    while (mission.completed < steps.length && simulation.activeSession().simulationTime() < 120) {
+      simulation.step();
+      var failure = mission.failure;
+      if (failure != null) throw 'the arm mission failed after ${mission.completed} steps: $failure';
+      var held = simulation.heldObjectIds();
+      check(held.length == 0 || held.join(",") == "project:workpiece", "only the workpiece is ever held (" + held.join(",") + ")");
+      lift = Math.max(lift, pose("project:workpiece").position[2] - startWork[2]);
+      if (mission.completed == lastDone) continue;
+      var step = steps[lastDone];
+      if (step.kind == "pick") {
+        check(held.join(",") == "project:workpiece", 'step $lastDone picks the workpiece up');
+      } else {
+        check(held.length == 0, 'step $lastDone lets the workpiece go');
+        for (_ in 0...50) simulation.step();
+        var at:materia.project.SceneArtifact.SceneArtifactPlace = cast step.at;
+        var seat = placement.worldConnector(at.occurrence, at.connector);
+        var metres = generated.metresPerUnit;
+        var piece = pose("project:workpiece").position;
+        var off = Math.sqrt(Math.pow(piece[0] - seat.x * metres, 2) + Math.pow(piece[1] - seat.y * metres, 2));
+        check(off < 0.01, 'step $lastDone sets the workpiece ${off} m from the centre of ${at.occurrence}');
+        check(piece[2] > seat.z * metres && piece[2] < seat.z * metres + 0.05,
+          'step $lastDone leaves the workpiece standing on ${at.occurrence} (centre at ${piece[2]} m)');
       }
-      for (pose in armSimulation.capturePresentationSnapshot().environment) {
-        if (pose.id == "project:tool/cup") {
-          var travel = 0.0;
-          for (axis in 0...3) travel += Math.pow(pose.position[axis] - startCup[0].position[axis], 2);
-          farthest = Math.max(farthest, Math.sqrt(travel));
-        } else if (pose.id == "project:workpiece") {
-          lift = Math.max(lift, pose.position[2] - startWork[0].position[2]);
-          // The far pad is 0.3 m along x from the near one.
-          if (Math.abs(pose.position[0] - startWork[0].position[0] - 0.3) < 0.015 &&
-              Math.abs(pose.position[1] - startWork[0].position[1]) < 0.015) atPlace = true;
-        }
-      }
-      var holding = armSimulation.heldObjectIds();
-      if (holding.length > 0) {
-        check(holding.join(",") == "project:workpiece", "only the workpiece is ever held (" + holding.join(",") + ")");
-        everHeld = true;
-      }
+      log.push('${step.kind} ${Math.round(simulation.activeSession().simulationTime() * 10) / 10}');
+      lastDone = mission.completed;
     }
-    check(farthest > 0.2, "the suction cup travels to the workpiece and the pad (moved at most " + farthest + " m)");
-    // The vacuum must really carry the workpiece: lifted clear of the pad, set down on the far pad, and
-    // brought back and released at the near one by the end of the cycle.
-    check(everHeld, "the suction cup grips the workpiece");
-    check(lift > 0.08, "the workpiece is lifted off its pad (rose at most " + lift + " m)");
-    check(atPlace, "the workpiece is carried to the far pad");
-    var endWork = [for (pose in armSimulation.capturePresentationSnapshot().environment) if (pose.id == "project:workpiece") pose];
-    check(endWork.length == 1 && Math.abs(endWork[0].position[0] - startWork[0].position[0]) < 0.02 &&
-      Math.abs(endWork[0].position[1] - startWork[0].position[1]) < 0.02,
-      "the workpiece is back on its first pad after the second leg");
-    check(armSimulation.heldObjectIds().length == 0, "nothing is held once the cycle has released the workpiece");
-    // A reset puts the workpiece back and re-arms the vacuum commands for the next run.
-    check(armSimulation.reset(), "the arm simulation resets");
-    check(armSimulation.heldObjectIds().length == 0, "a reset holds nothing");
-    armSimulation.step();
-    var restored = [for (pose in armSimulation.capturePresentationSnapshot().environment) if (pose.id == "project:workpiece") pose];
-    check(restored.length == 1 && Math.abs(restored[0].position[0] - startWork[0].position[0]) < 0.002 &&
-      Math.abs(restored[0].position[2] - startWork[0].position[2]) < 0.002, "a reset puts the workpiece back on its pad");
+    check(mission.completed >= steps.length, 'the arm runs its whole round in two minutes, finished ${mission.completed} steps');
+    check(lift > 0.05, 'the workpiece is lifted off its pad (rose at most $lift m)');
+    // A reset puts the workpiece back and starts the mission over.
+    check(simulation.reset(), "the arm simulation resets");
+    check(simulation.heldObjectIds().length == 0, "a reset holds nothing");
+    simulation.step();
+    var restored = pose("project:workpiece").position;
+    check(Math.abs(restored[0] - startWork[0]) < 0.002 && Math.abs(restored[2] - startWork[2]) < 0.002,
+      "a reset puts the workpiece back on its pad");
     var again = false;
-    steps = 0;
-    while (armSimulation.activeSession().simulationTime() < 4.0 && steps++ < 100000) {
-      armSimulation.step();
-      if (armSimulation.heldObjectIds().length > 0) again = true;
+    var until = simulation.activeSession().simulationTime() + 30;
+    while (!again && simulation.activeSession().simulationTime() < until) {
+      simulation.step();
+      again = simulation.heldObjectIds().length > 0;
     }
-    check(again, "the vacuum grips again after a reset");
-    Sys.println('robot arm followed its motion track to within $worst rad over ${armSimulation.activeSession().simulationTime()} s');
+    check(again, 'the mission picks again after a reset (${mission.failure})');
+    session.dispose();
+    Sys.println('robot arm mission: ${log.join(", ")} s');
   }
 
   /**
@@ -434,7 +589,7 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, generated.robotGrips, null, generated.cncJob);
+      generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     check(simulation.rebuild(session.sensors, session.scene, session),
       "the router builds in the shared simulation: " + simulation.error);
@@ -531,7 +686,7 @@ class ProjectSourceTests {
     session.openGeneratedScene(generated.objects, manifest, generated.assembly,
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit, generated.physical,
-      generated.recipeDocument, generated.robotMotions, generated.robotGrips, null, generated.cncJob);
+      generated.recipeDocument, generated.robotMotions, null, generated.cncJob);
     simulation.setBackend(ApplicationSimulation.MUJOCO);
     check(simulation.rebuild(session.sensors, session.scene, session), "the router builds: " + simulation.error);
     var player = simulation.cncPlayer();
@@ -628,7 +783,7 @@ class ProjectSourceTests {
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, descriptors);
+      generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     check(session.assemblyMateStatus() == null, "a project without mates shows no mate status");
     var top = describedFace(descriptors, "plate", "plane", 1), bore = describedFace(descriptors, "plate", "axis", 0);
     var base = describedFace(descriptors, "pin", "plane", -1), side = describedFace(descriptors, "pin", "axis", 0);
@@ -680,7 +835,7 @@ class ProjectSourceTests {
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, descriptors);
+      generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     var top = describedFace(descriptors, "plate", "plane", 1), bore = describedFace(descriptors, "plate", "axis", 0);
     var base = describedFace(descriptors, "pin", "plane", -1), side = describedFace(descriptors, "pin", "axis", 0);
     session.addAssemblyFaceMate(AssemblyMateKind.Planar, "project:plate", top, "project:pin", base);
@@ -729,7 +884,7 @@ class ProjectSourceTests {
     var session = new ProjectDocumentSession(null, false);
     session.openGeneratedScene(generated.objects, manifest, generated.assembly, generated.geometryBySnapshot,
       generated.assemblyDefinition, generated.assemblyState, generated.localCentersByDefinition, generated.metresPerUnit,
-      generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips, descriptors);
+      generated.physical, generated.recipeDocument, generated.robotMotions, descriptors);
     check(session.canMateFaces(), "a project with described faces can be mated");
     var top = describedFace(descriptors, "plate", "plane", 1), side = describedFace(descriptors, "pin", "axis", 0);
     var base = describedFace(descriptors, "pin", "plane", -1), bottom = describedFace(descriptors, "plate", "plane", -1);
@@ -824,7 +979,7 @@ class ProjectSourceTests {
     check(!editor.openingProject(), "the launch project finishes building");
     check(editor.session.projectReference != null && editor.scene.items().length > 0,
       "tick() opens the launch project once its build ends");
-    check(editor.session.robotMotions.length == 6, "the launch project brings its motion");
+    check(editor.session.mission != null, "the launch project brings its mission");
     check(!editor.workspace.isOpen("start"), "the Start page closes once the launch project opens");
     editor.dispose();
     var missing = new ReferenceEditorApp();
@@ -869,6 +1024,16 @@ class ProjectSourceTests {
       root = parent;
     }
     Sys.setCwd(root);
+    // PROJECT_SOURCE_ONLY=mobile or =arm runs just those example's checks, for iterating on them.
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile") {
+      checkMobileBase(root);
+      checkMobileMission(root);
+      return 0;
+    }
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
+      checkRobotArm(root);
+      return 0;
+    }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
     var machineManifest = FileSystem.fullPath(root + "/machinekit/examples/materia.project.json");
     var requirement = MateriaProjectRunner.executionRequirement(machineManifest);
@@ -1144,6 +1309,8 @@ class ProjectSourceTests {
     checkRobotArm(root);
     checkMates(root);
     checkCncRouter(root);
+    checkMobileBase(root);
+    checkMobileMission(root);
     checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;

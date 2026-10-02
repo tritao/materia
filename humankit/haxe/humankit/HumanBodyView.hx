@@ -6,6 +6,10 @@ import nativekit.scene.MaterialData;
 import nativekit.scene.NodeId;
 import nativekit.scene.Scene;
 import nativekit.scene.Transform;
+import humankit.rig.HumanBone;
+import humankit.rig.HumanPose;
+import humankit.rig.HumanoidRig;
+import humankit.rig.Mat4;
 
 /**
  * Draws a human's collision capsules or skeleton beneath its root node, for

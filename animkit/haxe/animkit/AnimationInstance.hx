@@ -42,7 +42,7 @@ class AnimationInstance {
 	 * does, which never flips as the target moves). Weight 0 disables the chain.
 	 */
 	public function setIk(chain:Int, start:Int, mid:Int, end:Int, target:Array<Float>, pole:Array<Float>,
-			weight:Float = 1.0, soften:Float = 1.0):Void {
+			weight:Float = 1.0, soften:Float = 1.0, keepEnd:Float = 0.0):Void {
 		var ik = new ak_two_bone_ik();
 		ik.set_struct_size(ak_two_bone_ik.size());
 		ik.set_start_joint(start);
@@ -54,6 +54,7 @@ class AnimationInstance {
 		}
 		ik.set_weight(weight);
 		ik.set_soften(soften);
+		ik.set_keep_end_rotation(keepEnd);
 		AnimationAsset.check(AnimKitNative.ak_instance_set_ik(handle(), chain, ik), "instance.ik");
 	}
 

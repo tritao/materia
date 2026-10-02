@@ -8,6 +8,7 @@
 #include <cstring>
 #include <cmath>
 #include <mutex>
+#include <new>
 #include <unordered_map>
 #include <vector>
 
@@ -169,8 +170,13 @@ rk_result RK_CALL rk_simulation_add_robot(rk_simulation simulation,
         return RK_ERROR_INVALID_ARGUMENT;
     *out_runtime = RK_INVALID_ROBOT_RUNTIME;
     const auto value = resolve(simulation);
-    return value ? value->add_robot(robotkit::internal::copy_blueprint(blueprint), *out_runtime,
-        robot_desc) : RK_ERROR_INVALID_HANDLE;
+    if (!value)
+        return RK_ERROR_INVALID_HANDLE;
+    try {
+        return value->add_robot(*robotkit::internal::copy_blueprint(blueprint), *out_runtime, robot_desc);
+    } catch (const std::bad_alloc &) {
+        return RK_ERROR_OUT_OF_MEMORY;
+    }
 }
 
 rk_result RK_CALL rk_simulation_cut_virtual_device_link(

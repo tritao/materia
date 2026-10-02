@@ -128,9 +128,6 @@ impl<const A: usize, const C: usize> Board for VirtualBoard<A, C> {
     }
     fn stop_all(&mut self) {
         self.velocities.fill(0.0);
-        self.digital.fill(false);
-        self.analog.fill(0.0);
-        self.process_argument.fill(0.0);
         self.record(Output::Stop);
     }
 }

@@ -24,6 +24,8 @@ class SwivelParameterization implements RedundancyParameterization {
     return Math.isFinite(angle) ? [angle] : null;
   }
 
+  public function valuesJacobian(q:Array<Float>):Null<Array<Float>> return group.swivelJacobian(q);
+
   public function solveAt(target:Pose3, seed:Array<Float>, values:Array<Float>, tolerance:IkTolerance):Null<Array<Float>> {
     var result = group.solve(RedundancyPoses.transform(target), seed, RedundancyPoses.options(tolerance).atSwivel(values[0], true));
     return result.converged ? result.q : null;

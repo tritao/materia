@@ -47,7 +47,8 @@ class ProgramPlanner {
     this.lookaheadSeconds = lookaheadSeconds;
     this.speedScale = speedScale;
     nextPlanId = firstPlanId;
-    var compilation = compiler.begin(program, initialQ, firstPlanId, firstOp, speedScale,
+    // The worker plans on kinematics of its own: the caller keeps evaluating the arm meanwhile.
+    var compilation = compiler.forWorker().begin(program, initialQ, firstPlanId, firstOp, speedScale,
       new WorkerSink(this));
     var self = this;
     Thread.create(function() self.work(compilation));

@@ -15,14 +15,17 @@ fn virtual_clock_applies_offset_and_drift() {
     assert_eq!(board.records()[0].ticks, 1_051_000);
 }
 
+/// A stop halts motion; the channels are the device events' to make safe, by each one's policy.
 #[test]
-fn stop_sets_channels_safe() {
+fn stop_halts_motion_and_leaves_channels_to_the_events() {
     let mut board = VirtualBoard::<1, 2>::new(1_000_000, 0, 0, [100.0]);
+    board.velocity_target(0, 0.5);
     board.set_digital(0, true);
     board.set_analog(1, 0.75);
     board.stop_all();
-    assert_eq!(board.digital(0), Some(false));
-    assert_eq!(board.analog(1), Some(0.0));
+    assert_eq!(board.velocity_targets(), [0.0]);
+    assert_eq!(board.digital(0), Some(true));
+    assert_eq!(board.analog(1), Some(0.75));
 }
 
 #[test]

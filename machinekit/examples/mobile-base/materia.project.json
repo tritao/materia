@@ -1,0 +1,20 @@
+{
+	"format": "materia.project",
+	"version": 1,
+	"name": "Mobile base",
+	"defaultEntrypoint": "cell",
+	"build": { "system": "haxeon", "manifest": "haxeon.json" },
+	"dynamicParts": ["workpiece"],
+	"entrypoints": {
+		"cell": {
+			"kind": "cad-preview",
+			"module": "MobileBasePreview",
+			"function": "cell"
+		},
+		"base": {
+			"kind": "cad-preview",
+			"module": "MobileBasePreview",
+			"function": "base"
+		}
+	}
+}

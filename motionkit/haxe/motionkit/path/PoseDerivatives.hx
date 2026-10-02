@@ -47,9 +47,10 @@ class PoseDerivatives {
     var step = Math.min(1e-5, length / 8.0);
     // Three points inside the primitive around `distance`.
     var middle = Math.max(step, Math.min(length - step, distance));
-    var a = primitive.waypointAt(middle - step).pose;
+    // Clamped: at a primitive's end `(length - step) + step` can round one ulp past `length`.
+    var a = primitive.waypointAt(Math.max(0.0, middle - step)).pose;
     var b = primitive.waypointAt(middle).pose;
-    var c = primitive.waypointAt(middle + step).pose;
+    var c = primitive.waypointAt(Math.min(length, middle + step)).pose;
     var offset = distance - middle;
     var linear:Array<Float> = [], linearSecond:Array<Float> = [];
     var pa = a.positionArray(), pb = b.positionArray(), pc = c.positionArray();

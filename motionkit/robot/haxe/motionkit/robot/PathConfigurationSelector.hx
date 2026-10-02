@@ -53,6 +53,11 @@ class PathConfigurationSelector {
     this.maxCandidates = maxCandidates;
   }
 
+  /** The same selection run on `solver`, e.g. a fork of this one's for another thread. */
+  public function withSolver(solver:KinematicsSolver):PathConfigurationSelector
+    return new PathConfigurationSelector(solver, lower, upper, maxJump, velocity, preferred, threads,
+      maxCandidates);
+
   /**
    * The generic path search: each sample's `sampleCandidates`, then the
    * cheapest continuous route through them (sample 0 pinned to `startQ`).

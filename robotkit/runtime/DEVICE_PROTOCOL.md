@@ -31,8 +31,12 @@ device path tick, channel index, typed value and HOLD policy. The host maps
 each `TimedEvent` from plan-relative path time with the same frozen clock
 mapping as its trajectory segments. The device fires only committed events as
 its path clock crosses their ticks. HOLD makes configured channels safe,
-RESUME restores `RestoreOnResume` values, and STOP or a fault discards future
-events and sets every channel to its declared safe value. Replacement discards
+RESUME restores `RestoreOnResume` values, and STOP, ABORT or a fault discards
+future events and sets every channel to its declared safe value, except that a
+commanded STOP or ABORT leaves a channel whose stop policy is keep-on-stop as it
+is (protocol version 12), so a vacuum holding a part does not drop it when the
+arm is stopped. An emergency stop, link loss or fault still makes every channel
+safe. Stopping the motion never touches the channels: they are the events'. Replacement discards
 events at or after the replacement boundary. The virtual event log records
 scheduled path ticks, applied path ticks and device ticks.
 
@@ -143,8 +147,13 @@ clock: far enough that the device keeps moving through a host stall such as a
 garbage collection, and no further, so the path beyond stays open to
 replacement.
 
-Protocol version 12 replaces the compiled layout fingerprint with identity and
-agreement checked while the session opens. `SESSION_BEGIN6.expected_controller`
+Protocol version 12 (one in-place revision, before any hardware release) has two
+changes to `SESSION_BEGIN6`. `channel_stop_policy` is one byte per channel: 0
+makes the channel safe on every stop, 1 keeps it through a commanded STOP or
+ABORT, as the host runtime's `RK_CHANNEL_KEEP_ON_STOP` does. The configuration
+digest below covers these bytes, so a board that disagrees about a stop policy
+is refused. The second change replaces the compiled layout fingerprint with
+identity and agreement checked while the session opens. `SESSION_BEGIN6.expected_controller`
 names the board the configuration is for. `SESSION_ACK6.controller` is the
 board's own unique id (on an STM32G4, its 96-bit unique-ID register padded to 16
 bytes); a board reports it even when it refuses the session, so `robotd identify`

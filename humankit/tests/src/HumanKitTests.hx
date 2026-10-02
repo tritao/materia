@@ -2,37 +2,37 @@ import animkit.AnimationAsset;
 import humankit.CapsulePlacement;
 import humankit.HumanBodyProxy;
 import humankit.HumanBody;
-import humankit.HumanJob;
-import humankit.HumanJobSpec;
-import humankit.HumanJobBuilder;
+import humankit.job.HumanJob;
+import humankit.job.HumanJobSpec;
+import humankit.job.HumanJobBuilder;
 import humankit.HumanCarryPosture;
-import humankit.ApproachFor;
-import humankit.WalkTo;
-import humankit.Reach;
-import humankit.ReleaseLimb;
-import humankit.Pick;
-import humankit.Place;
-import humankit.Carry;
-import humankit.Press;
-import humankit.Wait;
-import humankit.PlayClip;
+import humankit.action.ApproachFor;
+import humankit.action.WalkTo;
+import humankit.action.Reach;
+import humankit.action.ReleaseLimb;
+import humankit.action.Pick;
+import humankit.action.Place;
+import humankit.action.Carry;
+import humankit.action.Press;
+import humankit.action.Wait;
+import humankit.action.PlayClip;
 import humankit.HumanBodyView;
-import humankit.HumanBone;
+import humankit.rig.HumanBone;
 import humankit.HumanHand;
 import humankit.HumanTargetBox;
 import humankit.HumanCapsule;
 import humankit.HumanDescription;
 import humankit.HumanDisplay;
 import humankit.HumanLimb;
-import humankit.HumanReachTask;
+import humankit.action.HumanReachTask;
 import humankit.HumanWalker;
-import humankit.HumanPose;
-import humankit.Naturalness;
+import humankit.rig.HumanPose;
+import humankit.quality.Naturalness;
 import humankit.HumanPosture;
 import humankit.HumanCharacter;
-import humankit.HumanoidRig;
-import humankit.Mat4;
-import humankit.RigMapping;
+import humankit.rig.HumanoidRig;
+import humankit.rig.Mat4;
+import humankit.rig.RigMapping;
 import humankit.facility.FacilityWalk;
 import humankit.facility.FacilityTargets;
 import humankit.facility.FacilityJobs;
@@ -92,6 +92,7 @@ class HumanKitTests {
 		human.player.playNamed("walk", 0.0);
 		for (step in 0...5)
 			human.advance(0.1);
+		human.publish();
 		var snapshot = scene.snapshot();
 		var world = snapshot.findNode(held.node).worldTransform();
 		var palm = Mat4.position(human.pose.boneFrame(HumanBone.HandR));
@@ -111,6 +112,7 @@ class HumanKitTests {
 		walking(scene, worker, rig);
 		reaching(scene, worker, rig);
 		elbowStaysPut(scene, worker, rig);
+		elbowStaysPutEverywhere(scene, worker, rig);
 		fingersCurl(scene, worker, rig);
 		leaning(scene, worker, rig);
 		grasping(scene, worker, rig);
@@ -119,7 +121,11 @@ class HumanKitTests {
 		postureStature();
 		turning(scene, worker, rig);
 		retreating(scene, worker, rig);
+		holdingFeet(scene);
+		kneeling(scene);
+		footKeepsItsPitch(scene);
 		naturalness(scene, worker, rig, "bundled");
+		stoppingAndRising(scene, worker, rig, "bundled", 0.06);
 		facilityTargets(scene, worker, rig);
 		reachTask(scene, worker, rig);
 		placeReferencePoint(scene, worker, rig);
@@ -211,11 +217,14 @@ class HumanKitTests {
 		var deepJob = new HumanJob(body).add(deep);
 		deepJob.advance(1.0 / 60.0);
 		if (!(deep.crouch <= 0.1)) throw 'The planner crouched ${deep.crouch} for a deep top at table height';
+		if (deepJob.failure() != null) throw 'A deep top at table height was not reachable: ${deepJob.failure()}';
+		if (!(deep.hinge > 0.05)) throw 'The planner did not bend at the hips to reach across a deep top: hinge ${deep.hinge}, lean ${deep.lean}';
 		body.cancel();
 		human.dispose();
 		var plain = new HumanCharacter(scene, bundled, bundledRig, null, "Bundled");
 		var plainBody = new HumanBody(plain);
 		if (plain.canCrouch() || plainBody.canCrouch()) throw "The bundled worker has no crouch clip but claims to crouch";
+		if (plain.canKneel() || plainBody.canKneel()) throw "The bundled worker has no kneeling clip but claims to kneel";
 		plainBody.setCrouch(1.0);
 		plainBody.advance(0.1);
 		if (plainBody.crouchAmount() != 0.0) throw "A body that cannot crouch crouched";
@@ -228,6 +237,7 @@ class HumanKitTests {
 		var again = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-standard.glb");
 		var againRig = HumanoidRig.detect(again);
 		naturalness(scene, again, againRig, "library", 0.1);
+		stoppingAndRising(scene, again, againRig, "library", 0.04);
 		walking(scene, again, againRig);
 		elbowStaysPut(scene, again, againRig);
 		leaning(scene, again, againRig);
@@ -317,7 +327,7 @@ class HumanKitTests {
 			|| Math.abs(place.target[2] - 1.1) > 1e-6) throw 'Rotated place point is wrong: ${place.target}';
 		var pressSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"point":[0.8,0.2,1.35]}}]}');
 		var pressJob = HumanJobBuilder.build(pressSpec, targets, body).job;
-		var press:humankit.Press = cast pressJob.orderedActions()[1];
+		var press:humankit.action.Press = cast pressJob.orderedActions()[1];
 		if (Math.abs(press.point[2] - 1.35) > 1e-6) throw "Explicit press height was lost";
 		var pointError = "";
 		try HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"press","target":{"point":[0.8,0.2]}}]}')
@@ -381,7 +391,7 @@ class HumanKitTests {
 		walkTargets.boxes.set("button", {center: [2.0, 0.0, 1.5], halfExtents: [0.2, 0.2, 0.2], yaw: 0.0});
 		var frontSpec = HumanJobSpec.parse('{"version":1,"loop":false,"steps":[{"action":"walkTo","target":{"point":[3,0]}},{"action":"press","target":{"object":"button","anchor":"front"}}]}');
 		var frontJob = HumanJobBuilder.build(frontSpec, walkTargets, body).job;
-		var frontPress:humankit.Press = cast frontJob.orderedActions()[2];
+		var frontPress:humankit.action.Press = cast frontJob.orderedActions()[2];
 		for (tick in 0...900) if (!frontJob.isDone()) frontJob.advance(0.02);
 		if (!frontJob.isDone() || frontJob.failure() != null || Math.abs(frontPress.point[0]-2.2) > 0.01)
 			throw 'Front press used the build-time side: ${frontPress.point} root=${body.rootTransform()} failure=${frontJob.failure()}';
@@ -797,6 +807,62 @@ class HumanKitTests {
 	}
 
 	/**
+	 * Sweeping the wrist round the shoulder along great circles in every plane, two degrees a step, moves the elbow a
+	 * little per step wherever the arm points but straight out to its side or straight across, so the bend does not
+	 * flip where the arm points opposite to the way the animation holds it. The library character, bent far over
+	 * (lean and hinge together, as for a deep low top), holds its arm pointing the opposite way to where a reach goes.
+	 */
+	static function elbowStaysPutEverywhere(scene:Scene, bundled:AnimationAsset, bundledRig:HumanoidRig):Void {
+		var library = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var libraryRig = HumanoidRig.detect(library);
+		var worst = 0.0, worstWhere = "";
+		for (variant in 0...2) {
+			var asset = variant == 0 ? bundled : library, rig = variant == 0 ? bundledRig : libraryRig;
+			var human = new HumanCharacter(scene, asset, rig, null, "Sweeper");
+			if (variant == 1) {
+				human.setSpineLean(0.7);
+				human.setSpineHinge(0.8);
+			}
+			human.advance(0.0);
+			var radius = 0.75 * (function() {
+				var description = HumanDescription.measure(human.pose, human.height());
+				return description.upperArm + description.forearm;
+			})();
+			for (limb in [ArmL, ArmR]) {
+				var shoulder = human.pose.bonePosition(limb == ArmL ? HumanBone.UpperArmL : HumanBone.UpperArmR);
+				var elbowBone = limb == ArmL ? HumanBone.ForearmL : HumanBone.ForearmR;
+				for (ring in 0...12) {
+					// A great circle: the plane through the shoulder with normal (cos a cos b, sin a cos b, sin b).
+					var a = ring * Math.PI / 6.0, b = (ring % 4) * Math.PI / 8.0;
+					var normal = [Math.cos(a) * Math.cos(b), Math.sin(a) * Math.cos(b), Math.sin(b)];
+					var u = Mat4.normalize(Mat4.cross(normal, Math.abs(normal[2]) < 0.9 ? [0.0, 0.0, 1.0] : [1.0, 0.0, 0.0]));
+					var v = Mat4.cross(normal, u);
+					var previous:Null<Array<Float>> = null;
+					for (step in 0...180) {
+						var angle = step * 2.0 * Math.PI / 180.0;
+						var axis = [for (i in 0...3) Math.cos(angle) * u[i] + Math.sin(angle) * v[i]];
+						// Straight out to the side or straight across has no defined bend; the field's one fault.
+						if (Math.abs(axis[1]) > Math.cos(12.0 * Math.PI / 180.0)) { previous = null; continue; }
+						human.reach(limb, [for (i in 0...3) shoulder[i] + radius * axis[i]]);
+						human.advance(0.0);
+						var elbow = human.pose.bonePosition(elbowBone);
+						if (previous != null) {
+							var moved = distance(elbow, previous);
+							if (moved > worst) { worst = moved; worstWhere = 'variant $variant limb $limb ring $ring step $step'; }
+						}
+						previous = elbow;
+					}
+					human.release(limb);
+				}
+			}
+			human.dispose();
+		}
+		Sys.println('ELBOW everywhere: worst step ${Math.round(worst * 1000) / 1000} m ($worstWhere)');
+		if (worst > 0.06)
+			throw 'The elbow moved $worst m for a two-degree step of the wrist ($worstWhere)';
+	}
+
+	/**
 	 * A real FacilityRouter route through two lanes, adapted with FacilityWalk:
 	 * the person ends at the destination station and faces along the last lane,
 	 * not the straight line from the start.
@@ -855,6 +921,8 @@ class HumanKitTests {
 		if (still.maxSlide > 0.005 || still.minSupportMargin < -0.02)
 			throw 'A worker standing still slid or tipped ($label): ${still.summary()}';
 		var walking = new Naturalness();
+		// Sampling starts mid-walk, where a foot may be in the air: the floor is the one the worker stood on.
+		walking.standOnTheFloorOf(still);
 		body.walker.follow([[0.0, 0.0], [20.0, 0.0]], 1.0);
 		for (index in 0...360) {
 			body.advance(step);
@@ -863,6 +931,51 @@ class HumanKitTests {
 		}
 		if (walking.maxSlide > slideLimit || walking.plantedSeconds < 1.0)
 			throw 'A steady walk slid its feet or never planted them ($label): ${walking.summary()}';
+		human.dispose();
+	}
+
+	/**
+	 * The two moments a planted foot is most likely to slide: braking to a stop at the end of a walk, and rising from a
+	 * crouch and walking off. Each is measured from the floor the worker stood on, so a foot in the air at the first sample
+	 * does not count as planted.
+	 */
+	static function stoppingAndRising(scene:Scene, asset:AnimationAsset, rig:HumanoidRig, label:String, stopLimit:Float):Void {
+		var step = 1.0 / 60.0;
+		var human = new HumanCharacter(scene, asset, rig, null, "Stopper");
+		var body = new HumanBody(human);
+		for (_ in 0...30) body.advance(step);
+		var still = new Naturalness();
+		for (_ in 0...120) { body.advance(step); still.sample(body, step); }
+		var stopping = new Naturalness();
+		stopping.standOnTheFloorOf(still);
+		body.walker.follow([[0.0, 0.0], [3.0, 0.0]], 1.0);
+		for (index in 0...330) {
+			body.advance(step);
+			if (index >= 70) stopping.sample(body, step);
+		}
+		Sys.println('STOP ${label}: ${stopping.summary()}');
+		if (stopping.maxSlide > stopLimit) throw 'Braking to a stop slid a planted foot ${stopping.maxSlide} m ($label), over $stopLimit: ${stopping.summary()}';
+		human.dispose();
+		human = new HumanCharacter(scene, asset, rig, null, "Riser");
+		body = new HumanBody(human);
+		if (!body.canCrouch()) { human.dispose(); return; }
+		for (_ in 0...30) body.advance(step);
+		var floor = new Naturalness();
+		for (_ in 0...60) { body.advance(step); floor.sample(body, step); }
+		body.setCrouch(1.0);
+		for (_ in 0...180) body.advance(step);
+		var rising = new Naturalness();
+		rising.standOnTheFloorOf(floor);
+		body.setCrouch(0.0);
+		for (_ in 0...150) { body.advance(step); rising.sample(body, step); }
+		Sys.println('RISE ${label}: ${rising.summary()}');
+		if (rising.maxSlide > 0.03) throw 'Rising from a crouch slid a planted foot ${rising.maxSlide} m ($label): ${rising.summary()}';
+		var leaving = new Naturalness();
+		leaving.standOnTheFloorOf(floor);
+		body.walker.follow([[0.0, 0.0], [3.0, 0.0]], 1.0);
+		for (index in 0...200) { body.advance(step); leaving.sample(body, step); }
+		Sys.println('LEAVE ${label}: ${leaving.summary()}');
+		if (leaving.maxSlide > 0.04) throw 'Walking off after rising from a crouch slid a planted foot ${leaving.maxSlide} m ($label): ${leaving.summary()}';
 		human.dispose();
 	}
 
@@ -942,6 +1055,98 @@ class HumanKitTests {
 		var plainBody = new HumanBody(plain);
 		if (plainBody.walker.backGait != null) throw "The bundled worker claims a backward gait";
 		plain.dispose();
+	}
+
+	/**
+	 * A character whose legs are IK chains holds its planted feet in the world while the idle pose shows, so starting to
+	 * walk does not drag them.
+	 */
+	static function holdingFeet(scene:Scene):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		// How far the left foot, which stays planted as the first step is taken with the right, is dragged along the floor in the first sixth of a second.
+		var dragOf = function(hold:Bool):Float {
+			var human = new HumanCharacter(scene, asset, rig, null, "FootHolder");
+			var posture = HumanPosture.forStature(human.height());
+			posture.lockFeet = hold;
+			var body = new HumanBody(human, null, posture);
+			var step = 1.0 / 60.0;
+			for (_ in 0...30) body.advance(step);
+			var before = body.toWorld(human.pose.bonePosition(HumanBone.FootL));
+			body.walker.follow([[0.0, 0.0], [30.0, 0.0]], 1.0);
+			for (_ in 0...10) body.advance(step);
+			var after = body.toWorld(human.pose.bonePosition(HumanBone.FootL));
+			human.dispose();
+			return Math.sqrt(Math.pow(after[0] - before[0], 2) + Math.pow(after[1] - before[1], 2));
+		};
+		var held = dragOf(true), loose = dragOf(false);
+		if (!(held < 0.03) || !(loose > held + 0.05))
+			throw 'Holding the feet did not stop the drag at the start of a walk: ${held} m held, ${loose} m loose';
+	}
+
+	/**
+	 * A foot reached to a spot keeps the way it lies when asked to (`keep_end_rotation`): the ankle goes where it is sent and
+	 * the foot's pitch does not follow the shin, where without it the pitch swings by the amount the leg bends.
+	 */
+	static function footKeepsItsPitch(scene:Scene):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var human = new HumanCharacter(scene, asset, rig, null, "FootPitch");
+		human.player.play(asset.clipIndex("idle"), 0.0);
+		human.advance(0.0);
+		var pitch = function():Float {
+			var ankle = human.pose.bonePosition(HumanBone.FootL), toe = human.pose.bonePosition(HumanBone.ToeL);
+			return Math.atan2(toe[2] - ankle[2], Math.sqrt(Math.pow(toe[0] - ankle[0], 2) + Math.pow(toe[1] - ankle[1], 2))) * 180 / Math.PI;
+		};
+		var foot = human.pose.bonePosition(HumanBone.FootL);
+		var before = pitch();
+		var target = [foot[0] - 0.12, foot[1], foot[2] + 0.12];
+		var bones = [rig.joint(HumanBone.ThighL), rig.joint(HumanBone.ShinL), rig.joint(HumanBone.FootL)];
+		var swing = [0.0, 0.0];
+		for (index in 0...2) {
+			human.instance.setIk(2, bones[0], bones[1], bones[2], target, [1.0, 0.0, 0.0], 1.0, 1.0, index);
+			human.advance(0.0);
+			swing[index] = Math.abs(pitch() - before);
+			if (distance(human.pose.bonePosition(HumanBone.FootL), target) > 0.01) throw "The ankle did not reach its target with the foot's pitch kept";
+		}
+		human.dispose();
+		if (!(swing[0] > 15.0) || !(swing[1] < 3.0))
+			throw 'Keeping the foot\'s rotation did not hold its pitch: it swung ${swing[0]} degrees loose and ${swing[1]} kept';
+	}
+
+	/** On the full library, a top too low for a crouch is taken from a knee; one a crouch reaches is not. */
+	static function kneeling(scene:Scene):Void {
+		var asset = AnimationAsset.load(assetDir() + "/quaternius-ual/ual-work.glb");
+		var rig = HumanoidRig.detect(asset);
+		var human = new HumanCharacter(scene, asset, rig, null, "Kneeler");
+		var body = new HumanBody(human);
+		if (!body.canKneel()) throw "The full library character cannot kneel";
+		var plan = function(z:Float, top:Float):ApproachFor {
+			var box:HumanTargetBox = {center: [0.6, 0.0, top - 0.05], halfExtents: [0.2, 0.2, 0.05], yaw: 0.0};
+			var approach = new ApproachFor([0.6, 0.0, z], ArmR, 1.0, false, null, box);
+			var job = new HumanJob(body).add(approach);
+			job.advance(1.0 / 60.0);
+			if (job.failure() != null) throw 'A target at $z m was not reachable: ${job.failure()}';
+			body.cancel();
+			return approach;
+		};
+		var floor = plan(0.34, 0.3);
+		if (!(floor.kneel >= 0.5) || floor.crouch != 0.0)
+			throw 'The planner did not kneel for a top 0.3 m high: kneel ${floor.kneel}, crouch ${floor.crouch}';
+		var bench = plan(0.62, 0.6);
+		if (bench.kneel != 0.0 || !(bench.crouch > 0.3)) throw 'The planner knelt for a bench a crouch reaches: kneel ${bench.kneel}, crouch ${bench.crouch}';
+		var tooLow = new HumanJob(body).add(new ApproachFor([0.6, 0.0, 0.05], ArmR));
+		tooLow.advance(1.0 / 60.0);
+		if (tooLow.failure() == null || tooLow.failure().indexOf("even kneeling") < 0)
+			throw 'A point on the floor did not say it is out of reach kneeling: ${tooLow.failure()}';
+		// A kneel stands back up: the body is not left kneeling when it walks.
+		body.setKneel(1.0);
+		for (_ in 0...200) body.advance(1.0 / 60.0);
+		if (body.kneelAmount() < 0.99) throw "The body did not kneel when asked";
+		body.setKneel(0.0);
+		for (_ in 0...200) body.advance(1.0 / 60.0);
+		if (body.kneelAmount() != 0.0 || human.kneel() != 0.0) throw "The body did not stand up from a kneel";
+		human.dispose();
 	}
 
 	/** A posture's lengths grow with the body; its angles, fractions and times do not. */

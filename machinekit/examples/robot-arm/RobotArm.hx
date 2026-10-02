@@ -5,6 +5,7 @@ import machinekit.component.ComponentDetail;
 import machinekit.component.Dimension;
 import machinekit.component.MachineComponent;
 import machinekit.component.Solids;
+import machinekit.pneumatic.VacuumPressureSensor;
 import machinekit.pneumatic.schmalz.SchmalzPushInFitting;
 import machinekit.pneumatic.schmalz.SchmalzSuctionCup;
 import machinekit.pneumatic.schmalz.SchmalzVacuumGenerator;
@@ -21,7 +22,8 @@ import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
 /** Suction tool for the arm's ISO 9409-1 style tool flange: an adapter plate, a frame bar, and a
- * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`.
+ * catalog ejector, cup, fitting and hose, arranged like the fixed EOAT in `examples/eoat`, with an
+ * inline vacuum sensor between the ejector and the hose that tells a sealed cup from an open one.
  * Its `contact` working frame is the cup's contact face.
  */
 class ArmSuctionTool {
@@ -32,6 +34,7 @@ class ArmSuctionTool {
 		result.addComponent("ejector", new SchmalzVacuumGenerator("10.02.01.00563"));
 		result.addComponent("cup", new SchmalzSuctionCup("10.01.01.11401"));
 		result.addComponent("fitting", new SchmalzPushInFitting("10.08.02.00203"));
+		result.addComponent("sensor", new VacuumPressureSensor(4));
 		result.addComponent("hose", new SchmalzVacuumHose("10.07.09.00001", [
 			new Vector(20, 0, 40), new Vector(35, 0, 60),
 			new Vector(35, 0, 100), new Vector(-30, 0, 100), new Vector(0, 0, 90)]));
@@ -39,10 +42,13 @@ class ArmSuctionTool {
 		result.addMate("bar-mate", "fixed", "plate", "tool", "bar", "base");
 		result.addMemberConnector("bar", "ejector-seat", Solids.axial(20, 0, 20));
 		result.addMate("ejector-mate", "fixed", "bar", "ejector-seat", "ejector", "mount");
+		result.addMemberConnector("bar", "sensor-seat", Solids.axial(-25, 0, 20));
+		result.addMate("sensor-mate", "fixed", "bar", "sensor-seat", "sensor", "mount");
 		result.addMate("cup-mate", "fixed", "bar", "end", "cup", "mount");
 		result.addMate("fitting-mate", "fixed", "cup", "mount", "fitting", "mount");
 		result.addMate("hose-mate", "fixed", "bar", "base", "hose", "mount");
-		result.connectPorts("ejector-hose", "ejector", "vacuum", "hose", "input");
+		result.connectPorts("ejector-sensor", "ejector", "vacuum", "sensor", "vacuumIn");
+		result.connectPorts("sensor-hose", "sensor", "vacuumOut", "hose", "input");
 		result.connectPorts("hose-fitting", "hose", "output", "fitting", "hose");
 		result.connectPorts("fitting-cup", "fitting", "thread", "cup", "vacuum");
 		result.exposePort("compressedAir", "ejector", "air");
@@ -123,6 +129,9 @@ typedef ArmJointSpec = {
  * vertical (j6 about the tool axis), while `j2`, `j3` and `j5` pitch about a horizontal axis.
  * Every housing belongs to the link before it, so each revolute mate joins a housing's rotor to
  * the next link's start.
+ *
+ * Built `withCell`, it stands in its own work cell: a table, two pads and a workpiece in front of it
+ * (-Y). Without, it is the arm alone, to stand on something else by its pedestal's `floor`.
  */
 class RobotArm extends MachineAssembly {
 	public static inline var PEDESTAL_HEIGHT:Float = 300;
@@ -136,13 +145,6 @@ class RobotArm extends MachineAssembly {
 	public static inline var PICK_X:Float = -150;
 	public static inline var PLACE_X:Float = 150;
 	public static inline var WORK_Y:Float = -600;
-	/** Height of the workpiece's top face when it stands on a pad, which the suction cup meets. */
-	public static final WORKPIECE_TOP:Float = TABLE_TOP + PAD_HEIGHT + WORKPIECE_HEIGHT;
-	/**
-	 * How far below the workpiece top the tool aims when it grips. A gap reports no contact, so the
-	 * cup presses lightly; the simulation then seats the held workpiece with a small clearance.
-	 */
-	public static inline var GRIP_PRESS:Float = 0.5;
 
 	public final flange = new RobotFlange(63);
 	public final pedestal:Pedestal;
@@ -152,7 +154,7 @@ class RobotArm extends MachineAssembly {
 	public final links:Array<ArmLink>;
 	public final specs:Array<ArmJointSpec>;
 
-	public function new() {
+	public function new(withCell:Bool = true) {
 		super();
 		pedestal = new Pedestal(flange, PEDESTAL_HEIGHT, 100);
 		var j1 = new ArmJoint(100, 70), j2 = new ArmJoint(100, 90), j3 = new ArmJoint(80, 90);
@@ -199,12 +201,13 @@ class RobotArm extends MachineAssembly {
 		exposeConnector("toolContact", "tool/cup", "contact");
 		// The ejector's compressed-air inlet is the arm's own service input.
 		exposePort("compressedAir", "tool/ejector", "air");
-		addCell();
+		exposeConnector("floor", "pedestal", "floor");
+		if (withCell) addCell();
 	}
 
 	/**
-	 * Table, two pads and a workpiece standing where the motion authoring aims the tool. The table and
-	 * pads are fixed roots; the project's `dynamicParts` frees the workpiece so the suction cup can carry it.
+	 * Table, two pads and a workpiece in the arm's reach. The table and pads are fixed roots; the
+	 * project's `dynamicParts` frees the workpiece so the suction cup can carry it.
 	 */
 	function addCell():Void {
 		function at(x:Float, y:Float, z:Float):AssemblyFrame return AssemblyFrames.translation(x, y, z);

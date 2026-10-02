@@ -194,7 +194,7 @@ nksim_result World::get_clock(nksim_clock *out_clock) const noexcept {
 
 nksim_result World::begin_topology_update() {
     if (!owns_thread()) return NKSIM_ERROR_WRONG_THREAD;
-    if (topology_update_open || clock.step_index != 0)
+    if (topology_update_open)
         return NKSIM_ERROR_INVALID_STATE;
     const auto result = backend->begin_topology_update();
     if (result == NKSIM_OK)

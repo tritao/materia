@@ -1,8 +1,8 @@
-import humankit.HumanBone;
+import humankit.rig.HumanBone;
 import humankit.HumanBody;
 import humankit.HumanLimb;
 import humankit.HumanTargetBox;
-import humankit.MotionQuality;
+import humankit.quality.MotionQuality;
 import humankit.sim.HumanWorker;
 import nativekit.sim.SimSession;
 
@@ -23,7 +23,7 @@ class JobGate {
 
     public final quality:MotionQuality = new MotionQuality();
     /** The body's feet, balance and jerk over the run; see `Naturalness`. */
-    public final naturalness:humankit.Naturalness = new humankit.Naturalness();
+    public final naturalness:humankit.quality.Naturalness = new humankit.quality.Naturalness();
     /**
      * The furthest a planted foot may slide, and the least margin the centre of mass may keep inside the feet, in metres.
      * Measured on the sweeps with the bundled worker: 0.05 m of slide and a mass on the edge of its feet; the library
@@ -39,6 +39,7 @@ class JobGate {
     final limbs:Array<HumanLimb>;
     /** Whether the hand has held something yet: reaching before that is a pick, and after letting go a retreat. */
     var gripped:Bool = false;
+    var lastHeading:Null<Float> = null;
     /** The document step that was running at each sample, so a finding can say where in the job it happened. */
     final steps:Array<Int> = [];
     /** What the worker was doing at each sample: approach, pick, place, walk, ... and whether it was crouched or walking. */
@@ -62,11 +63,16 @@ class JobGate {
 
     public function sample():Void {
         var body = worker.body, pose = body.character.pose;
+        // A turn clip turns the body in model space and the root takes the turn up at its end, a jump of the whole pose
+        // in the model's frame that is no motion of the arms; the root turning by more than a procedural turn can in one tick marks it.
+        var root = body.rootTransform(), heading = Math.atan2(root[1], root[0]);
+        if (lastHeading != null && Math.abs(Math.atan2(Math.sin(heading - lastHeading), Math.cos(heading - lastHeading))) > 0.3) quality.breakContinuity();
+        lastHeading = heading;
         quality.sample(pose, session.fixedTimestep());
         naturalness.sample(body, session.fixedTimestep());
         var step = worker.currentStep();
         steps.push(step == null ? -1 : step);
-        phases.push(worker.currentActionLabel() + (body.walker.isWalking() ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched" : "") + (body.walker.isTurning() ? "+turning" : ""));
+        phases.push(worker.currentActionLabel() + (body.walker.isWalking() ? "+walking" : "") + (body.crouchAmount() > 0.02 ? "+crouched" : "") + (body.kneelAmount() > 0.02 ? "+kneeling" : "") + (body.walker.isTurning() ? "+turning" : ""));
         lean = Math.max(lean, body.character.spineLean());
         if (body.grip) gripped = true;
         // Only while reaching for the part, or holding it to place it: walking back past a surface after
@@ -76,7 +82,12 @@ class JobGate {
         if (!reaching || !(!gripped || body.grip)) return;
         var belly = pose.bonePosition(HumanBone.Spine);
         var front = body.toWorld([belly[0] + BELLY_FRONT, belly[1], belly[2]]);
-        for (surface in surfaces) clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
+        for (surface in surfaces) {
+            // A belly held above the surface's top overhangs it; only one within the surface's height has to stay clear.
+            var posture = body.posture;
+            if (front[2] - posture.bellyHalfHeight > surface.center[2] + surface.halfExtents[2] + posture.slabMargin) continue;
+            clearance = Math.min(clearance, TorsoClearanceTests.outside(front, surface));
+        }
     }
 
     /**
@@ -89,11 +100,11 @@ class JobGate {
         for (side in [MotionQuality.RIGHT, MotionQuality.LEFT]) {
             var arm = quality.arm(side), name = side == MotionQuality.RIGHT ? "right" : "left";
             if (arm.planeTurnRate > MotionQualityTests.MAX_PLANE_TURN)
-                failures.push('$label: the $name elbow turned its bend plane at ${r(arm.planeTurnRate)} rad/s at sample ${arm.planeTurnAt}');
+                failures.push('$label: the $name elbow turned its bend plane at ${r(arm.planeTurnRate)} rad/s at sample ${arm.planeTurnAt} (${phaseAt(arm.planeTurnAt)})');
             if (arm.maxHandSpeed > MotionQualityTests.MAX_HAND_SPEED)
-                failures.push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt}');
+                failures.push('$label: the $name hand moved at ${r(arm.maxHandSpeed)} m/s at sample ${arm.handSpeedAt} (${phaseAt(arm.handSpeedAt)})');
             if (arm.maxHandAcceleration > MotionQualityTests.MAX_HAND_ACCELERATION)
-                failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt}');
+                failures.push('$label: the $name hand accelerated at ${r(arm.maxHandAcceleration)} m/s2 at sample ${arm.handAccelerationAt} (${phaseAt(arm.handAccelerationAt)})');
             if (!posture) continue;
             if (arm.elbowAboveShoulder > 0.0) failures.push('$label: the $name elbow rose ${r(arm.elbowAboveShoulder)} m above the shoulder');
             if (arm.minElbowAngle < elbowLimit)

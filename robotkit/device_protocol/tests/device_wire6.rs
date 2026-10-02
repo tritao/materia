@@ -19,7 +19,7 @@ fn rkd6_records_round_trip() {
         max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
         safe_digital: [0; 32], safe_analog: [0.0; 32],
-        safe_argument: [0.0; 32], safe_command: [0; 1536] };
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
     let mut bytes = [0; SessionBegin6::SIZE];
     begin.encode(&mut bytes).unwrap();
     assert_eq!(SessionBegin6::decode(&bytes).unwrap(), begin);
@@ -69,7 +69,7 @@ fn session_begin_carries_per_actuator_acceleration_limits() {
         actuator_max_acceleration: limits, steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
         channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
         safe_digital: [0; 32], safe_analog: [0.0; 32],
-        safe_argument: [0.0; 32], safe_command: [0; 1536] };
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
     let mut body = [0; SessionBegin6::SIZE];
     begin.encode(&mut body).unwrap();
     let mut frame = [0; MAX_FRAME_SIZE];
@@ -131,4 +131,21 @@ fn config_digest_is_fnv1a_after_the_session_field() {
     };
     assert_eq!(config_digest6(&payload), 0x8594_4171_f739_67e8);
     assert_eq!(config_digest6(&other_session), config_digest6(&payload));
+}
+
+#[test]
+fn config_digest_covers_the_channel_stop_policy() {
+    use robotkit_device_protocol::config_digest::config_digest6;
+    let mut begin = SessionBegin6 { session: 7, protocol_version: 12, expected_controller: [3; 16],
+        actuator_count: 0, max_degree: 5, step_tick_hz: 40_000,
+        max_acceleration: 4.0, actuator_max_acceleration: [4.0; 64], steps_per_unit: [400.0; 64], max_rate: [0.0; 64], direction_setup_ticks: [0; 64], actuator_joint: [0; 64], actuator_ratio: [1.0; 64], dual_drive_skew_bound: [0.0; 64], link_loss_timeout_ns: 500_000_000,
+        channel_count: 0, channel_id: [0; 1536], channel_kind: [0; 32],
+        safe_digital: [0; 32], safe_analog: [0.0; 32],
+        safe_argument: [0.0; 32], safe_command: [0; 1536], channel_stop_policy: [0; 32] };
+    let mut safe = [0; SessionBegin6::SIZE];
+    begin.encode(&mut safe).unwrap();
+    begin.channel_stop_policy[3] = 1;
+    let mut keep = [0; SessionBegin6::SIZE];
+    begin.encode(&mut keep).unwrap();
+    assert_ne!(config_digest6(&safe), config_digest6(&keep));
 }

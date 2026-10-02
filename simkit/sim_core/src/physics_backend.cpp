@@ -293,37 +293,47 @@ public:
             const auto recompute_result = recompute_articulated_poses(substep);
             if (recompute_result != NKSIM_OK)
                 return recompute_result;
-            // Deterministic backend's conservative oriented-box fallback:
-            // project each box onto world axes, then prevent free dynamic
-            // bodies from penetrating static, kinematic, or jointed links.
-            auto bounds = [](const TestBody &body) {
-                Vec3 half{};
+            // Deterministic backend's box contacts: each free dynamic body and each obstacle is
+            // an oriented box (a convex shape's local bounds, turned with its body). The
+            // separating-axis test over both boxes' face normals and their edge crossings finds
+            // whether they overlap and the least push that parts them; an axis-aligned bound of a
+            // turned box would reach well beyond it, so an arm link at an angle shoved parts it
+            // never touched.
+            struct Box { Vec3 center; std::array<Vec3, 3> axes; Vec3 half; };
+            auto box_of = [](const TestBody &body) {
+                Box box{};
+                box.center = body.state.position;
                 for (int axis = 0; axis < 3; ++axis) {
                     Vec3 local{};
                     local[axis] = 1.0;
-                    const auto world_axis = rotate(body.state.rotation, local);
-                    for (int world = 0; world < 3; ++world)
-                        half[world] += std::abs(world_axis[world]) * body.desc.shape_parameters[axis];
+                    box.axes[axis] = rotate(body.state.rotation, local);
+                    box.half[axis] = body.desc.shape_parameters[axis];
                 }
-                return half;
+                if (body.desc.shape_type == NKSIM_SHAPE_CONVEX && !body.desc.shape_vertices.empty()) {
+                    Vec3 minimum{INFINITY, INFINITY, INFINITY};
+                    Vec3 maximum{-INFINITY, -INFINITY, -INFINITY};
+                    for (std::size_t i = 0; i < body.desc.shape_vertices.size(); ++i) {
+                        const auto axis = i % 3;
+                        minimum[axis] = std::min(minimum[axis],
+                                                 static_cast<double>(body.desc.shape_vertices[i]));
+                        maximum[axis] = std::max(maximum[axis],
+                                                 static_cast<double>(body.desc.shape_vertices[i]));
+                    }
+                    box.center = add(box.center, rotate(body.state.rotation,
+                        {(minimum[0] + maximum[0]) * 0.5,
+                         (minimum[1] + maximum[1]) * 0.5,
+                         (minimum[2] + maximum[2]) * 0.5}));
+                }
+                return box;
             };
-            auto collision_center = [](const TestBody &body) {
-                Vec3 center = body.state.position;
-                if (body.desc.shape_type != NKSIM_SHAPE_CONVEX ||
-                    body.desc.shape_vertices.empty()) return center;
-                Vec3 minimum{INFINITY, INFINITY, INFINITY};
-                Vec3 maximum{-INFINITY, -INFINITY, -INFINITY};
-                for (std::size_t i = 0; i < body.desc.shape_vertices.size(); ++i) {
-                    const auto axis = i % 3;
-                    minimum[axis] = std::min(minimum[axis],
-                                             static_cast<double>(body.desc.shape_vertices[i]));
-                    maximum[axis] = std::max(maximum[axis],
-                                             static_cast<double>(body.desc.shape_vertices[i]));
-                }
-                return add(center, rotate(body.state.rotation,
-                    {(minimum[0] + maximum[0]) * 0.5,
-                     (minimum[1] + maximum[1]) * 0.5,
-                     (minimum[2] + maximum[2]) * 0.5}));
+            auto dot3 = [](const Vec3 &a, const Vec3 &b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+            auto cross3 = [](const Vec3 &a, const Vec3 &b) {
+                return Vec3{a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+            };
+            auto radius = [&](const Box &box, const Vec3 &axis) {
+                double r = 0.0;
+                for (int i = 0; i < 3; ++i) r += std::abs(dot3(box.axes[i], axis)) * box.half[i];
+                return r;
             };
             for (auto &moving : bodies) {
                 if (moving.desc.motion_type != NKSIM_MOTION_DYNAMIC ||
@@ -331,8 +341,6 @@ public:
                     (moving.desc.shape_type != NKSIM_SHAPE_BOX &&
                      moving.desc.shape_type != NKSIM_SHAPE_CONVEX))
                     continue;
-                const auto moving_half = bounds(moving);
-                const auto moving_center = collision_center(moving);
                 for (const auto &obstacle : bodies) {
                     if (obstacle.id == moving.id ||
                         (obstacle.desc.motion_type == NKSIM_MOTION_DYNAMIC &&
@@ -342,25 +350,42 @@ public:
                         (moving.desc.collision_mask & obstacle.desc.collision_layer) == 0 ||
                         (obstacle.desc.collision_mask & moving.desc.collision_layer) == 0)
                         continue;
-                    const auto obstacle_half = bounds(obstacle);
-                    const auto obstacle_center = collision_center(obstacle);
-                    int axis = -1;
-                    double least_penetration = std::numeric_limits<double>::infinity();
-                    for (int candidate = 0; candidate < 3; ++candidate) {
-                        const double penetration = moving_half[candidate] + obstacle_half[candidate] -
-                            std::abs(moving_center[candidate] - obstacle_center[candidate]);
-                        if (penetration <= 0.0) { axis = -1; break; }
-                        if (penetration < least_penetration) {
-                            least_penetration = penetration;
-                            axis = candidate;
+                    const auto a = box_of(moving), b = box_of(obstacle);
+                    const Vec3 between{a.center[0] - b.center[0], a.center[1] - b.center[1],
+                                       a.center[2] - b.center[2]};
+                    // Face normals first, so a tie between a face and an edge crossing pushes off
+                    // the face; an edge crossing must part the boxes clearly better to be chosen.
+                    std::array<Vec3, 15> candidates{};
+                    int count = 0;
+                    for (int i = 0; i < 3; ++i) candidates[count++] = a.axes[i];
+                    for (int i = 0; i < 3; ++i) candidates[count++] = b.axes[i];
+                    for (int i = 0; i < 3; ++i)
+                        for (int j = 0; j < 3; ++j) candidates[count++] = cross3(a.axes[i], b.axes[j]);
+                    bool separated = false;
+                    double least = std::numeric_limits<double>::infinity();
+                    Vec3 normal{};
+                    for (int k = 0; k < count && !separated; ++k) {
+                        auto axis = candidates[k];
+                        const double length = std::sqrt(dot3(axis, axis));
+                        if (length < 1e-9) continue;  // parallel edges: a face axis covers it
+                        for (auto &c : axis) c /= length;
+                        const double distance = dot3(between, axis);
+                        const double penetration = radius(a, axis) + radius(b, axis) - std::abs(distance);
+                        if (penetration <= 0.0) { separated = true; break; }
+                        const double weighted = k < 6 ? penetration : penetration * 1.05 + 1e-9;
+                        if (weighted < least) {
+                            least = weighted;
+                            const double sign = distance >= 0.0 ? 1.0 : -1.0;
+                            normal = {axis[0] * sign, axis[1] * sign, axis[2] * sign};
                         }
                     }
-                    if (axis >= 0) {
-                        const double direction = moving_center[axis] >= obstacle_center[axis] ? 1.0 : -1.0;
-                        moving.state.position[axis] += direction * least_penetration;
-                        if (moving.state.linear_velocity[axis] * direction < 0.0)
-                            moving.state.linear_velocity[axis] = 0.0;
-                    }
+                    if (separated) continue;
+                    const double push = radius(a, normal) + radius(b, normal) - std::abs(dot3(between, normal));
+                    for (int axis = 0; axis < 3; ++axis) moving.state.position[axis] += normal[axis] * push;
+                    const double approach = dot3(moving.state.linear_velocity, normal);
+                    if (approach < 0.0)
+                        for (int axis = 0; axis < 3; ++axis)
+                            moving.state.linear_velocity[axis] -= approach * normal[axis];
                 }
             }
         }

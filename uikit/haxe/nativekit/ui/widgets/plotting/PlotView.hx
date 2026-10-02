@@ -106,6 +106,8 @@ class PlotView implements View {
 				continue;
 			var path = new PathBuilder();
 			var started = false;
+			// A line needs two distinct points; one point, or all at one pixel, strokes to nothing.
+			var firstX = 0.0, firstY = 0.0, spans = false;
 			for (index in 0...series.pointCount) {
 				var point = series.pointAt(index);
 				var px = left + (point.x - range.minimumX) /
@@ -116,11 +118,15 @@ class PlotView implements View {
 					continue;
 				if (!started) {
 					path.moveTo(px, py);
+					firstX = px;
+					firstY = py;
 					started = true;
-				} else
+				} else {
 					path.lineTo(px, py);
+					spans = spans || px != firstX || py != firstY;
+				}
 			}
-			if (started && series.pointCount > 1)
+			if (spans)
 				canvas.strokeTransient(path.build(), series.color, series.lineWidth,
 					LineCap.Round, LineJoin.Round);
 		}

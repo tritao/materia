@@ -43,7 +43,8 @@ class DifferentialDrivePlant {
     this.robotIndex = robotIndex;
     this.base = base;
     simulation.setDifferentialDrive(robotIndex, odometry.leftWheelJoint,
-      odometry.rightWheelJoint, odometry.wheelRadius, odometry.trackWidth);
+      odometry.rightWheelJoint, odometry.wheelRadius, odometry.trackWidth,
+      odometry.leftDirection, odometry.rightDirection);
     if (initialPose != null) teleport(initialPose);
   }
 

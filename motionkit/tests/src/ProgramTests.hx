@@ -211,6 +211,29 @@ class ProgramTests extends MotionKitTestSupport {
 
     // Point by point, the elbow no longer drifts with each solve.
     var solver = new ManipulatorKinematics(arm, 1e-8);
+
+    // A joint rate for a tool twist moves the swivel exactly as the preferred rate does.
+    var preferred = [0.1, -0.2, 0.05, 0.3, -0.1, 0.2, 0.15];
+    var twist = new motionkit.kinematics.Twist6(0.05, 0.0, -0.02, 0.0, 0.1, 0.0);
+    var rate = solver.solveDifferential(start, twist, preferred);
+    check(rate != null, "a 7-axis arm has a joint rate for a tool twist");
+    var tool = arm.tcpJacobian(start), wanted = twist.toArray();
+    for (row in 0...6) {
+      var made = 0.0;
+      for (j in 0...7) made += tool[row * 7 + j] * rate[j];
+      near(made, wanted[row], 'the rate makes the twist (row $row)', 1e-9);
+    }
+    var gradient = arm.swivelJacobian(start);
+    var swivelRate = 0.0, preferredSwivelRate = 0.0;
+    for (j in 0...7) {
+      swivelRate += gradient[j] * rate[j];
+      preferredSwivelRate += gradient[j] * preferred[j];
+    }
+    near(swivelRate, preferredSwivelRate, "the swivel moves as the preferred rate moves it", 1e-9);
+    var step = 1e-6;
+    near(gradient[3], (arm.swivelAngle([for (j in 0...7) j == 3 ? start[j] + step : start[j]]) -
+      arm.swivelAngle([for (j in 0...7) j == 3 ? start[j] - step : start[j]])) / (2 * step),
+      "the swivel Jacobian is the angle's derivative", 1e-5);
     var tolerance = new IkTolerance();
     var startPose = solver.forward(start);
     var q = start, drift = 0.0;
@@ -322,17 +345,22 @@ class ProgramTests extends MotionKitTestSupport {
       [for (_ in 0...8) 20.0], StartTolerances.uniform(8, 0.02, 0.02, 0.02), null, 0.0025);
     var compiled = compiler.compile(new MotionProgram([MotionOp.FollowPath(path, "work", 0.05, [])]), entry,
       Int64.ofInt(500));
-    var plan = compiled.blocks[0].plans[0];
-    check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
-      MotionKitNativeConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
+    // The polygon's corners are sharp, so the circle is one plan per side, each stopping at its corner.
+    var plans = [for (block in compiled.blocks) for (plan in block.plans) plan];
+    check(plans.length == 32, 'the circle is planned side by side (${plans.length} plans)');
+    for (plan in plans)
+      check(plan.report.checks[MotionKitNativeConstants.MK_CHECK_TASK_SPACE].status ==
+        MotionKitNativeConstants.MK_CHECK_PASSED, "the tool follows the circle on the turning workpiece");
+    var plan = plans[plans.length - 1];
     var turned = 0.0, railMoved = 0.0, armMoved = 0.0;
-    var first = plan.evaluate(0.0).positions;
-    for (k in 0...101) {
-      var q = plan.evaluate(plan.durationSeconds * k / 100).positions;
-      turned = Math.max(turned, Math.abs(q[7] - first[7]));
-      railMoved = Math.max(railMoved, Math.abs(q[0] - first[0]));
-      for (j in 1...7) armMoved = Math.max(armMoved, Math.abs(q[j] - first[j]));
-    }
+    var first = plans[0].evaluate(0.0).positions;
+    for (each in plans)
+      for (k in 0...11) {
+        var q = each.evaluate(each.durationSeconds * k / 10).positions;
+        turned = Math.max(turned, Math.abs(q[7] - first[7]));
+        railMoved = Math.max(railMoved, Math.abs(q[0] - first[0]));
+        for (j in 1...7) armMoved = Math.max(armMoved, Math.abs(q[j] - first[j]));
+      }
     check(turned > Math.PI, 'the positioner turns the workpiece round ($turned rad)');
     // The search weighs external-axis motion at a tenth of the arm's: the work turns, the arm barely moves.
     check(armMoved < 0.1 * turned, 'the arm moves far less than the turntable ($armMoved rad against $turned)');

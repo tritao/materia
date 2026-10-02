@@ -340,10 +340,21 @@ typedef struct rk_event_value {
     double argument;
 } rk_event_value;
 
+/**
+ * What a channel's output does when the robot stops on command or aborts its motion. Faults and
+ * emergency stops always take every channel to its safe value.
+ */
+typedef uint32_t rk_channel_stop_policy;
+enum {
+    RK_CHANNEL_SAFE_ON_STOP = 0, /**< Go to the safe value, as a spindle or sprayer must. */
+    RK_CHANNEL_KEEP_ON_STOP = 1  /**< Keep the output, as a gripper holding a part must. */
+};
+
 typedef struct rk_channel_declaration {
     char id[RK_PROCESS_CHANNEL_ID_BYTES];
     rk_event_kind kind;
     rk_event_value safe_value;
+    rk_channel_stop_policy stop_policy;
 } rk_channel_declaration;
 
 typedef struct rk_timed_event {
@@ -786,6 +797,14 @@ RK_API rk_result RK_CALL rk_robot_runtime_submit_plan(rk_robot_runtime runtime,
 /** Drains process-output changes. An overflow flag means earlier records were lost. */
 RK_API rk_result RK_CALL rk_robot_runtime_poll_events(
     rk_robot_runtime runtime, rk_event_record_batch *out_batch);
+
+/**
+ * Reads a process channel's current output value without draining any events, as the device on
+ * that channel sees it: the last value fired, or the declared safe value before any. Fails with
+ * RK_ERROR_INVALID_ARGUMENT for a channel the robot does not declare.
+ */
+RK_API rk_result RK_CALL rk_robot_runtime_get_channel_value(
+    rk_robot_runtime runtime, const char *channel RK_UTF8, rk_event_value *out_value);
 
 /**
  * Copies the latest state into the caller-provided value.

@@ -1,5 +1,7 @@
 package humankit;
 
+import humankit.rig.HumanBone;
+
 /**
  * One capsule of a body proxy. It runs from its `from` bone towards its `to`
  * bone, continued past `to` by `extension` times that span (a head beyond its

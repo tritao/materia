@@ -1,4 +1,4 @@
-import humankit.HumanBone;
+import humankit.rig.HumanBone;
 
 /**
  * The worker stands at a rack and a table to reach the part; the front of the belly, below the

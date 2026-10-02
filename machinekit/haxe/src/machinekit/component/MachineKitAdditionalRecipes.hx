@@ -3,6 +3,8 @@ package machinekit.component;
 import haxe.Json;
 import machinekit.component.ComponentParameterType.*;
 import cadkit.modeling.Vector;
+import machinekit.motion.CasterWheel;
+import machinekit.motion.DriveWheel;
 import machinekit.motion.ShaftCoupling;
 import machinekit.motion.SteppedShaft;
 import machinekit.motion.LeadScrewNut;
@@ -152,6 +154,14 @@ class MachineKitAdditionalRecipes {
 		new ComponentType("machinekit.robotics.schmalz-sxt-tool",
 			[cat("designation", SchmalzSxtTool.catalog(), "10.07.13.00018")],
 			v -> new SchmalzSxtTool(v.token("designation")), true),
+		new ComponentType("machinekit.motion.drive-wheel", [n("diameter", 150), n("width", 40), n("boreDiameter", 8),
+			n("hubDiameter", 40), n("hubLength", 10)],
+			v -> new DriveWheel(v.number("diameter"), v.number("width"), v.number("boreDiameter"), v.number("hubDiameter"),
+				v.number("hubLength")), true),
+		new ComponentType("machinekit.motion.caster-wheel", [n("wheelDiameter", 75), n("wheelWidth", 25), n("height", 110),
+			n("trail", 30), n("plateSize", 60)],
+			v -> new CasterWheel(v.number("wheelDiameter"), v.number("wheelWidth"), v.number("height"), v.number("trail"),
+				v.number("plateSize")), true),
 		new ComponentType("machinekit.motion.stepped-shaft",
 			[t("sections", '[{"diameter":10,"length":100}]'), t("faces", "[]"),
 				t("keyways", "[]"), t("grooves", "[]"), t("shaftDetail", "{}")],

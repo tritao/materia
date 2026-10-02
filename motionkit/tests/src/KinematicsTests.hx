@@ -144,6 +144,30 @@ class KinematicsTests extends MotionKitTestSupport {
       "Descartes reports the first disconnected sample distance");
   }
 
+  /** One group serves several threads at once: each evaluates in data of its own. */
+  public function testSharedGroupAcrossThreads():Void {
+    var arm = buildContractArmFixture().arm;
+    var configurations = [for (k in 0...64) [for (j in 0...6) 0.3 * Math.sin(0.7 * k + j)]];
+    var expected = [for (q in configurations) arm.tcpPose(q).translation];
+    var mismatches = [0, 0, 0, 0], done = new sys.thread.Lock();
+    for (t in 0...4)
+      sys.thread.Thread.create(function() {
+        for (round in 0...200)
+          for (k in 0...configurations.length) {
+            var reached = arm.tcpPose(configurations[(k + t * 7) % configurations.length]).translation;
+            var wanted = expected[(k + t * 7) % configurations.length];
+            if (Math.abs(reached.x - wanted.x) + Math.abs(reached.y - wanted.y) + Math.abs(reached.z - wanted.z) > 1e-12)
+              mismatches[t]++;
+          }
+        done.release();
+      });
+    for (_ in 0...4) done.wait();
+    for (t in 0...4) check(mismatches[t] == 0, 'thread $t evaluates the shared arm as one thread does (${mismatches[t]} off)');
+    var own = arm.newData();
+    var withOwn = arm.tcpPose(configurations[5], own).translation;
+    near(withOwn.x, expected[5].x, "a caller's own data evaluates the same", 1e-12);
+  }
+
   public function testKinematicsContract():Void {
     var fixture = buildContractArmFixture();
     var solver = new ManipulatorKinematics(fixture.arm, 1e-8);

@@ -1,6 +1,6 @@
 //! Fixed-capacity process events driven by the scheduled path clock.
 use crate::device_wire6::{Event6, SessionBegin6};
-use crate::Board;
+use crate::{Board, StopReason};
 
 const CHANNELS: usize = 32;
 
@@ -52,6 +52,8 @@ pub struct DeviceEvents<const CAP: usize> {
     channel_count: usize,
     channel_kind: [u8; CHANNELS],
     safe: [Value; CHANNELS],
+    /// Channels that keep their output through a commanded stop, as a gripper holding a part must.
+    keep_on_stop: [bool; CHANNELS],
     fired: [Value; CHANNELS],
     fired_policy: [u8; CHANNELS],
     has_fired: [bool; CHANNELS],
@@ -62,6 +64,10 @@ pub struct DeviceEvents<const CAP: usize> {
 impl<const CAP: usize> DeviceEvents<CAP> {
     pub fn new(session: &SessionBegin6) -> Self {
         let mut safe = [Value::ZERO; CHANNELS];
+        let mut keep_on_stop = [false; CHANNELS];
+        for (i, keep) in keep_on_stop.iter_mut().enumerate().take(session.channel_count as usize) {
+            *keep = session.channel_stop_policy[i] == 1;
+        }
         for (i, value) in safe.iter_mut().enumerate().take(session.channel_count as usize) {
             let mut command = [0; 48];
             command.copy_from_slice(&session.safe_command[i * 48..(i + 1) * 48]);
@@ -72,7 +78,7 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         Self { events: [None; CAP], len: 0, next: 0, revision: 0,
             replace_after: 0, committed_until: 0, held: false, stopped: false,
             channel_count: session.channel_count as usize,
-            channel_kind: session.channel_kind, safe, fired: [Value::ZERO; CHANNELS],
+            channel_kind: session.channel_kind, safe, keep_on_stop, fired: [Value::ZERO; CHANNELS],
             fired_policy: [0; CHANNELS], has_fired: [false; CHANNELS],
             records: [None; CAP], record_count: 0 }
     }
@@ -172,16 +178,22 @@ impl<const CAP: usize> DeviceEvents<CAP> {
         self.held = false;
     }
 
-    pub fn stop<B: Board>(&mut self, board: &mut B) {
+    pub fn stop<B: Board>(&mut self, board: &mut B, reason: StopReason) {
         if self.stopped { return; }
-        self.apply_safe(board);
+        self.apply_safe(board, reason);
         self.events.fill(None);
         self.len = 0;
         self.next = 0;
         self.stopped = true;
     }
 
-    pub fn apply_safe<B: Board>(&self, board: &mut B) {
-        for i in 0..self.channel_count { self.safe[i].apply(i, board); }
+    /// Every channel to its safe value, but a commanded stop or abort leaves the channels that
+    /// keep their output on stop as they are; an emergency stop or a fault safes them all.
+    pub fn apply_safe<B: Board>(&self, board: &mut B, reason: StopReason) {
+        let commanded = matches!(reason, StopReason::Stop | StopReason::Abort);
+        for i in 0..self.channel_count {
+            if commanded && self.keep_on_stop[i] { continue; }
+            self.safe[i].apply(i, board);
+        }
     }
 }
