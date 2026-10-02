@@ -20,9 +20,14 @@ probe-rs download --chip STM32G474RETx \
   target/thumbv7em-none-eabihf/release/robotkit-nucleo-g474re
 ```
 
-The fingerprint constant in `src/fingerprint.rs` comes from the bench layout
-and `robotkit/schema/device_wire6.lock.json`. Regenerate it with
-`robotkit/tools/device_fingerprint.py` when either artifact changes.
+The board's identity is its factory-programmed 96-bit unique ID (read at
+0x1FFF7590, zero-padded to the protocol's 16 bytes). It is not compiled in, so
+one firmware image serves every board of this type, and no configuration change
+needs a reflash. A deployment names the board it is for in `device.controller`;
+the board refuses a session for another id and always reports its own, so
+`robotd identify <device path> <baud>` prints the id of the board on a port.
+The firmware does not read the UID register on a host build, so this part is
+checked on hardware only.
 The board advertises the RKD6 minimal profile: two virtual joints, degree-1
 segments, an eight-segment queue, 40 kHz logical step tick, no physical step
 output and position setpoints only. USART1 runs at 921600 baud. The board
