@@ -549,6 +549,45 @@ class ProjectSourceTests {
   static function checkRobotWelder(root:String):Void {
     checkRobotWelderOn(root, ApplicationSimulation.MUJOCO, "MuJoCo");
     checkRobotWelderOn(root, ApplicationSimulation.DETERMINISTIC, "test backend");
+    checkWeldInTheAir(root);
+  }
+
+  /**
+   * A seam the torch holds the wire clear of the work never strikes: the supply faults for want of an arc, the weld retries
+   * its limited restarts, and then the mission stops with the reason, the arc out and no metal laid.
+   */
+  static function checkWeldInTheAir(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/robot-welder/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var seam:materia.project.SceneArtifact.SceneArtifactWeld = cast work.steps[0].weld;
+    // Move the seam off the work, 30 mm out of the corner on its open side: the torch follows it 30 mm above the plate and
+    // 30 mm from the upright.
+    for (end in [seam.start, seam.stop]) {
+      end.position[1] += 0.03;
+      end.position[2] += 0.03;
+    }
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), "the welding cell builds: " + simulation.error);
+    var mission = simulation.missionPlayer(), welder = simulation.welder(), beads = simulation.weldBeads();
+    if (mission == null || welder == null || beads == null) throw "the welding cell has no mission, welder or weld metal";
+    var faults = 0, previous = 0;
+    var limit = simulation.activeSession().simulationTime() + 120;
+    while (mission.failure == null && simulation.activeSession().simulationTime() < limit) {
+      simulation.step();
+      var fault = welder.reading().fault;
+      if (fault != 0 && previous == 0) faults++;
+      previous = fault;    }
+    var failure = mission.failure;
+    check(failure != null && failure.indexOf("restarts") >= 0, "a weld in the air gives up after its restarts: " + failure);
+    check(faults >= 3, "the supply faulted for want of an arc each time ($faults)");
+    check(!welder.reading().arc && beads.beadOf(0).deposited == 0.0, "no arc burned and no metal was laid");
+    Sys.println('robot welder: a seam in the air: ${failure} after ${Math.round(simulation.activeSession().simulationTime() * 10) / 10} s, $faults no-arc faults');
+    simulation.clear();
+    session.dispose();
   }
 
   static function checkRobotWelderOn(root:String, backend:Int, label:String):Void {
@@ -637,6 +676,7 @@ class ProjectSourceTests {
         '${established} ticks of arc up to ${Math.round(peak)} A, tip within ${Math.round(strayed * 10000) / 10} mm of the seam, ${overlap} mm overlap, ${mission.weldRestarts()} restarts, stray ' +
         '${Math.round(100 * bead.stray / bead.deposited)}%');
     }
+    simulation.clear();
     session.dispose();
     for (line in log) Sys.println('robot welder ($label): ' + line);
   }
