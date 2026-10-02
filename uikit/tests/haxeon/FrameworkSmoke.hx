@@ -1752,6 +1752,16 @@ class FrameworkSmoke {
 		var shortTrack:ResolvedLayoutItem = cast shortRoot.children[1].resolved;
 		if (shortScroll.controller.maxScrollY != 0.0 || shortTrack.visible)
 			return 269;
+		var ownedFirst = new ScrollController(0.0, 40.0);
+		var ownedFirstView = new ScrollView("owned-scroll", new Column("owned-content", [], longContentStyle),
+			viewportStyle, ScrollAxis.Vertical, ownedFirst);
+		context.submit(ownedFirstView, scrollFrame);
+		var ownedReplacement = new ScrollController(0.0, 90.0);
+		var ownedReplacementView = new ScrollView("owned-scroll", new Column("owned-content", [], longContentStyle),
+			viewportStyle, ScrollAxis.Vertical, ownedReplacement);
+		context.submit(ownedReplacementView, scrollFrame);
+		if (ownedFirstView.controller != ownedFirst || ownedReplacementView.controller != ownedReplacement ||
+			ownedFirst.offsetY != 40.0 || ownedReplacement.offsetY != 90.0) return 1101;
 		var emptyViewport = new VirtualViewport(0, 32.0, 350.0, 0.0);
 		var topViewport = new VirtualViewport(100000, 32.0, 350.0, 0.0);
 		var middleViewport = new VirtualViewport(100000, 32.0, 350.0, 414.0 * 32.0);
