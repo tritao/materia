@@ -229,7 +229,7 @@ class AssemblyRobot {
     for (tool in session.robotTools) {
       var welder = tool.torch;
       if (welder == null)
-        blueprint.channels.push(new ProcessChannelDeclaration(tool.channel, robotkit.world.ProcessEventValue.Digital(false), true));
+        blueprint.channels.push(robotkit.tool.SuctionChannels.declaration(tool.channel));
       else for (declaration in robotkit.tool.WeldChannels.declarations(tool.channel, welder.wireSpeedChannel, welder.voltageChannel))
         blueprint.channels.push(declaration);
     }
