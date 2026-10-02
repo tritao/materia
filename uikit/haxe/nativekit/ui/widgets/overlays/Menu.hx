@@ -4,7 +4,9 @@ import nativekit.ui.widgets.controls.Button;
 import nativekit.ui.widgets.controls.ButtonVariant;
 import nativekit.ui.widgets.layout.Column;
 
+import Rect;
 import LayoutAxis;
+import nativekit.ui.widgets.scroll.ScrollView;
 import LayoutStyle;
 import Insets;
 import Color;
@@ -54,25 +56,36 @@ class Menu implements View {
 			children.push(new KeyedView(item.key, button));
 		}
 		var menuStyle = new LayoutStyle();
-		menuStyle.width = LayoutAxis.fixed(220.0);
+		menuStyle.width = LayoutAxis.fixed(Math.max(1.0, Math.min(220.0, context.viewportWidth - 8.0)));
 		menuStyle.childGap = 2.0;
 		var content = new Column("menu-items", children, menuStyle);
 		var popupStyle = new LayoutStyle();
 		popupStyle.background = Color.rgba(0.0, 0.0, 0.0, 0.0);
 		popupStyle.padding = new Insets(4.0, 4.0, 4.0, 4.0);
 		popupStyle.clipToParent = false;
-		var popup = new Popup(key, content, x, y, popupStyle,
+		var scrollStyle = new LayoutStyle();
+		scrollStyle.width = menuStyle.width;
+		scrollStyle.height = LayoutAxis.fit(0.0, Math.max(1.0, context.viewportHeight - 8.0));
+		var scroll = new ScrollView("menu-scroll", content, scrollStyle);
+		var popup = new Popup(key, scroll, x, y, popupStyle,
 			hasDismissHandler ? onDismiss : null);
+		popup.anchorRectProvider = function() return new Rect(x, y, 0.0, 0.0);
 		popup.label = "Menu";
 		popup.menuSurface = true;
 		popup.modal = true;
 		popup.dimBackdrop = false;
 		var root:RenderNode = popup.build(context);
 		var focusableItems:Array<RenderNode> = [];
+		var menuViewport:Null<RenderNode> = null;
 		root.walk(function(node) {
+			if (node.styleType == "scroll-view" && node.styleKey == "menu-scroll") {
+				node.focusable = false;
+				menuViewport = node;
+			}
 			if (node.semantics != null && node.semantics.role == AccessibilityRole.MenuItem && node.enabled)
 				focusableItems.push(node);
 		});
+		if (menuViewport != null && focusableItems.length == 0) menuViewport.focusable = true;
 		root.on(UiEventKind.KeyDown, function(event) {
 			if (event.defaultPrevented || (event.key != UiKey.Down && event.key != UiKey.Up))
 				return;
@@ -86,10 +99,23 @@ class Menu implements View {
 				var next = event.key == UiKey.Down ? current + 1 : current - 1;
 				if (next < 0) next = focusableItems.length - 1;
 				if (next >= focusableItems.length) next = 0;
-				context.requestFocus(focusableItems[next].id);
+				var target = focusableItems[next];
+				var viewport = menuViewport;
+				var targetGeometry = target.resolved;
+				var viewportGeometry = viewport == null ? null : viewport.resolved;
+				if (targetGeometry != null && viewportGeometry != null) {
+					var bounds = targetGeometry.viewportBounds();
+					var top = viewportGeometry.viewportToLocalY(bounds.x, bounds.y);
+					var bottom = viewportGeometry.viewportToLocalY(bounds.x + bounds.width, bounds.y + bounds.height);
+					var offset = scroll.controller.offsetY;
+					if (top < 0.0) offset += top;
+					else if (bottom > scroll.controller.viewportHeight) offset += bottom - scroll.controller.viewportHeight;
+					scroll.controller.jumpTo(scroll.controller.offsetX, Math.max(0.0, offset));
+				}
+				if (!context.requestFocus(target.id)) context.requestFocusAfterLayout(target.id);
 			}
 			event.preventDefault();
-		});
+		}, "capture");
 		var semantics = new Semantics(AccessibilityRole.Menu, "Menu");
 		semantics.states |= AccessibilityState.Modal;
 		if (hasDismissHandler)

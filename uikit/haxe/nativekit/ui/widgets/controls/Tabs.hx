@@ -12,7 +12,6 @@ import nativekit.ui.core.State;
 import nativekit.ui.core.UiEvent;
 import nativekit.ui.core.UiEventKind;
 import nativekit.ui.core.UiKey;
-import nativekit.ui.core.UiModifier;
 import nativekit.ui.core.View;
 import nativekit.ui.semantics.AccessibilityRole;
 import nativekit.ui.semantics.AccessibilityAction;
@@ -171,7 +170,7 @@ class Tabs implements View {
 						if (event.button == 1) requestMenu(event);
 					});
 					buttonNode.on(UiEventKind.KeyDown, function(event) {
-						if (event.key == UiKey.F10 && (event.modifiers & UiModifier.Shift) != 0)
+						if (UiKey.isContextMenuRequest(event.key, event.modifiers))
 							requestMenu(event);
 					});
 				}

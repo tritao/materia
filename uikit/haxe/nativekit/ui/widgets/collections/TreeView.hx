@@ -282,6 +282,14 @@ class TreeView implements View {
 	}
 
 	function handleNodeKey(context:BuildContext, entry:TreeEntry, event:UiEvent):Void {
+		var menu = onItemContextMenu;
+		if (UiKey.isContextMenuRequest(event.key, event.modifiers) && menu != null) {
+			select(entry.key);
+			menu(entry.key, event);
+			event.preventDefault();
+			event.stopPropagation();
+			return;
+		}
 		var rename = onItemRename;
 		if (event.key == UiKey.F2 && rename != null) {
 			event.preventDefault();

@@ -10,6 +10,7 @@ class UiKey {
 	public static inline var F2:Int = 291;
 	public static inline var F5:Int = 294;
 	public static inline var F10:Int = 299;
+	public static inline var Menu:Int = 348;
 	public static inline var Down:Int = 264;
 	public static inline var Up:Int = 265;
 	public static inline var PageUp:Int = 266;
@@ -30,4 +31,7 @@ class UiKey {
 	public static inline var Z:Int = 90;
 	public static inline var V:Int = 86;
 	public static inline var X:Int = 88;
+
+	public static inline function isContextMenuRequest(key:Int, modifiers:Int):Bool
+		return key == Menu || (key == F10 && (modifiers & UiModifier.Shift) != 0);
 }

@@ -2164,13 +2164,62 @@ class FrameworkSmoke {
 		var menuGeometry:ResolvedLayoutItem = cast menuRoot.children[2].resolved;
 		if (context.focus.focusedId == null ||
 			menuRoot.children[0].layout.style.background.alpha != 0.0 ||
-			menuGeometry.x != 32.0 || menuGeometry.y != 24.0 ||
+			Math.abs(menuGeometry.x - Math.min(32.0, dialogFrame.width - menuGeometry.width)) > 0.1 ||
+			menuGeometry.y != 24.0 ||
 			menuRoot.children[2].layout.style.radiusTopLeft != 0.0)
 			return 74;
 		context.key(UiEventKind.KeyDown, UiKey.Enter);
-		if (selectedMenuItem != "open" || menuDismissals != 1 ||
-			menuRoot.children[2].children[1].children[1].enabled)
+		var disabledMenuPresent = false;
+		menuRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.MenuItem &&
+				node.semantics.label == "Unavailable" && !node.enabled) disabledMenuPresent = true;
+		});
+		if (selectedMenuItem != "open" || menuDismissals != 1 || !disabledMenuPresent)
 			return 75;
+
+		var unavailableMenuDismissals = 0;
+		var unavailableMenu = new Menu("unavailable-menu-smoke", [
+			new MenuItem("disabled-only", "Unavailable", null, false)
+		], 4.0, 4.0, function() { unavailableMenuDismissals++; });
+		context.submit(unavailableMenu, dialogFrame);
+		if (context.focus.focusedId == null) return 1016;
+		context.key(UiEventKind.KeyDown, UiKey.Escape);
+		if (unavailableMenuDismissals != 1) return 1017;
+
+		var overflowChoice = -1;
+		var overflowMenuItems:Array<MenuItem> = [];
+		for (index in 0...18) {
+			var choice = index;
+			overflowMenuItems.push(new MenuItem("choice-" + index, "Choice " + index,
+				function() { overflowChoice = choice; }));
+		}
+		var overflowMenu = new Menu("overflow-menu-smoke", overflowMenuItems, 250.0, 115.0);
+		var overflowMenuFrame = new LayoutFrame(256.0, 120.0);
+		var overflowMenuRoot = context.submit(overflowMenu, overflowMenuFrame);
+		var overflowMenuBounds = overflowMenuRoot.children[2].resolved;
+		if (overflowMenuBounds == null || overflowMenuBounds.x < 0 || overflowMenuBounds.y < 0 ||
+			overflowMenuBounds.x + overflowMenuBounds.width > 256.1 ||
+			overflowMenuBounds.y + overflowMenuBounds.height > 120.1) return 1008;
+		for (overflowIndex in 0...17) {
+			context.key(UiEventKind.KeyDown, UiKey.Down);
+			overflowMenuRoot = context.submit(overflowMenu, overflowMenuFrame);
+			var stepFocus = context.focus.focusedId;
+			if (stepFocus == null) return 1013;
+			var stepItem = overflowMenuRoot.find(stepFocus);
+			if (stepItem == null || stepItem.semantics == null ||
+				stepItem.semantics.label != "Choice " + (overflowIndex + 1)) return 1014;
+		}
+		var focusedOverflowItem = context.focus.focusedId;
+		if (focusedOverflowItem == null) return 1009;
+		var lastOverflowItem = overflowMenuRoot.find(focusedOverflowItem);
+		if (lastOverflowItem == null || lastOverflowItem.semantics == null ||
+			lastOverflowItem.semantics.label != "Choice 17") return 1010;
+		var lastOverflowGeometry = lastOverflowItem.resolved;
+		if (lastOverflowGeometry == null || !lastOverflowGeometry.visible) return 1011;
+		var lastOverflowBounds = lastOverflowGeometry.viewportBounds();
+		if (lastOverflowBounds.y < 0 || lastOverflowBounds.y + lastOverflowBounds.height > 120.1) return 1015;
+		context.key(UiEventKind.KeyDown, UiKey.Enter);
+		if (overflowChoice != 17) return 1012;
 
 		var tooltip = new Tooltip("tooltip-smoke", new Button("Anchor"), new Text("Hint"));
 		var tooltipFrame = new LayoutFrame(256.0, 192.0);
@@ -2280,11 +2329,13 @@ class FrameworkSmoke {
 		if (tabMenus != 1) return 1004;
 		context.key(UiEventKind.KeyDown, UiKey.F10, UiModifier.Shift);
 		if (tabMenus != 2 || menuTab != "first" || tabs.selectedKey != "first") return 1005;
+		context.key(UiEventKind.KeyDown, UiKey.Menu);
+		if (tabMenus != 3 || menuTab != "first") return 1018;
 		var lockedTabContextGeometry = tabsRoot.children[0].children[2].children[0].resolved;
 		if (lockedTabContextGeometry == null) return 1006;
 		context.pointerDown(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
 		context.pointerUp(lockedTabContextGeometry.x + 2.0, lockedTabContextGeometry.y + 2.0, 1);
-		if (tabMenus != 2 || tabs.selectedKey != "first") return 1007;
+		if (tabMenus != 3 || tabs.selectedKey != "first") return 1007;
 
 		var theme = new Theme();
 		if (theme.tokens.textPrimary != theme.text || theme.tokens.textSecondary != theme.mutedText ||
