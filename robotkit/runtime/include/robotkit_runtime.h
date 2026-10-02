@@ -80,13 +80,14 @@ enum {
     RK_TRAJECTORY_COEFFICIENT_STRIDE = 6, /**< Coefficients per joint and segment: degree 0 through 5. */
     RK_MAX_TRAJECTORY_QUEUE_POINTS = 4096, /**< Maximum queued segment-start knots and events. */
     RK_MAX_SENSORS = 8,
-    RK_MAX_SENSOR_VALUES = 64,
+    RK_MAX_SENSOR_VALUES = 360, /**< Values one sensor reports: LiDAR rays, a degree apart round the circle. */
+    RK_SENSOR_VALUE_POOL = 512, /**< Values all of a robot's sensors report together in one state or snapshot. */
     RK_MAX_PROCESS_CHANNELS = 32,
     RK_MAX_EVENT_RECORDS = 64,
     RK_PROCESS_CHANNEL_ID_BYTES = 48,
     RK_PROCESS_COMMAND_BYTES = 48,
     RK_MAX_JOINT_COUPLINGS = 512,
-    RK_API_VERSION = 21 /**< Adds simulation virtual-device link-loss injection. */
+    RK_API_VERSION = 23 /**< Sensor values live in one pool per state or snapshot, packed to what the robot's sensors report. */
 };
 
 /** Result returned by RobotKit C ABI functions. */
@@ -316,14 +317,22 @@ typedef struct rk_sensor_config {
     double field_of_view; /**< LiDAR angular coverage in radians; zero selects 2*pi. */
 } rk_sensor_config;
 
-/** Latest acquisition for one compiled sensor slot; zero sequence means absent. */
+/**
+ * Latest acquisition for one compiled sensor slot; zero sequence means absent. Its values are the
+ * `value_count` entries from `value_offset` in the owning state's or snapshot's `sensor_values`
+ * pool (see RK_SENSOR_VALUE), so a state is as large as what its robot's sensors report together,
+ * not as every sensor's worst case.
+ */
 typedef struct rk_sensor_sample {
     uint64_t sequence;
     uint64_t source_timestamp_ns;
     uint64_t received_timestamp_ns;
     uint32_t value_count;
-    double values[RK_MAX_SENSOR_VALUES];
+    uint32_t value_offset;
 } rk_sensor_sample;
+
+/** Value `index` of sensor slot `sensor` in a state or snapshot `v`. */
+#define RK_SENSOR_VALUE(v, sensor, index) ((v).sensor_values[(v).sensors[(sensor)].value_offset + (index)])
 
 typedef uint32_t rk_event_kind;
 enum { RK_EVENT_DIGITAL = 1, RK_EVENT_ANALOG = 2, RK_EVENT_PROCESS = 3 };
@@ -572,6 +581,7 @@ typedef struct rk_robot_state {
     uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final endpoint. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
+    double sensor_values[RK_SENSOR_VALUE_POOL]; /**< The sensors' values, packed; see rk_sensor_sample. */
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
     uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
     rk_session_state session_state;
@@ -607,6 +617,7 @@ typedef struct rk_robot_snapshot {
     uint64_t trajectory_duration_ns; /**< Timestamp of the active trajectory's final endpoint. */
     uint32_t sensor_count;
     rk_sensor_sample sensors[RK_MAX_SENSORS];
+    double sensor_values[RK_SENSOR_VALUE_POOL]; /**< The sensors' values, packed; see rk_sensor_sample. */
     uint64_t trajectory_tag; /**< Chunk identity currently running or last stopped. */
     uint64_t trajectory_tag_time_ns; /**< Time within trajectory_tag, in nanoseconds. */
     uint64_t calibration_revision; /**< Blueprint calibration identity; zero is unspecified. */

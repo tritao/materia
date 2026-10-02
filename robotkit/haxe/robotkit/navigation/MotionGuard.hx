@@ -13,7 +13,11 @@ import robotkit.safety.StoppingEnvelope;
 /**
  * Software collision-avoidance filter for a path follower. Perception obstacles
  * must be in the localization body or reference frame; other frames stop motion
- * until a frame-aware perception stage transforms them.
+ * until a frame-aware perception stage transforms them. Moving forward or back,
+ * the base slows and stops for what lies in its corridor; a base that is only
+ * turning, or held short of an obstacle but asked to turn, is held only by an
+ * obstacle within reach of its footprint's turning circle, so it can turn away
+ * from one it stopped short of.
  */
 class MotionGuard {
   public final navigation:Navigation;
@@ -115,8 +119,13 @@ class MotionGuard {
       lateralExtent = Math.max(lateralExtent, Math.abs(point.y));
     }
 
+    // A base that is not translating only turns: it sweeps its footprint's circumscribed circle, whichever
+    // way the obstacle lies, and can turn away from one ahead of it while keeping clear of it.
+    var turning = Math.abs(desired.linear) <= 1e-9 && Math.abs(current.linear) <= 1e-9 &&
+      Math.abs(desired.lateral) <= 1e-9;
     var nearest:Null<Obstacle> = null;
     var nearestClearance = 1.0e300;
+    var nearestSweep = 1.0e300;
     for (obstacle in observations.obstacles()) {
       var localPose:Pose2;
       if (obstacle.detection.frameId == localization.bodyFrame) {
@@ -127,6 +136,16 @@ class MotionGuard {
         return block('Obstacle ${obstacle.detection.id} has unresolved frame ${obstacle.detection.frameId}');
       }
 
+      var sweepClearance = Math.sqrt(localPose.x * localPose.x + localPose.y * localPose.y) -
+        obstacle.radiusMeters - footprint.radius;
+      if (sweepClearance < nearestSweep) nearestSweep = sweepClearance;
+      if (turning) {
+        if (sweepClearance < nearestClearance) {
+          nearest = obstacle;
+          nearestClearance = sweepClearance;
+        }
+        continue;
+      }
       var along = localPose.x * direction;
       if (Math.abs(localPose.y) > lateralExtent + obstacle.radiusMeters + marginMeters)
         continue;
@@ -143,8 +162,21 @@ class MotionGuard {
       state = Clear;
       return desired;
     }
-    if (nearestClearance <= marginMeters)
+    if (turning) {
+      if (nearestClearance <= marginMeters)
+        return block('Obstacle ${nearest.detection.id} is inside the turning margin');
+      state = Clear;
+      return desired;
+    }
+    if (nearestClearance <= marginMeters) {
+      // Held short of the obstacle, the base may still pivot away from it as the route asks, when its
+      // footprint's turning circle keeps clear of everything.
+      if (Math.abs(desired.angular) > 1e-9 && nearestSweep > marginMeters) {
+        state = Blocked('Obstacle ${nearest.detection.id} is inside the stopping margin; turning');
+        return new Twist2(0.0, desired.angular, 0.0);
+      }
       return block('Obstacle ${nearest.detection.id} is inside the stopping margin');
+    }
 
     var slowdownRange = envelope.distanceMeters + slowdownDistanceMeters;
     if (nearestClearance >= marginMeters + slowdownRange) {

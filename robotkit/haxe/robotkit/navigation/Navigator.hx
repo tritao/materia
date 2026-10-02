@@ -75,7 +75,7 @@ class Navigator {
     }) return status;
 
     try {
-      costmap.setDynamicObstacles(perception.obstacles());
+      costmap.senseObstacles(perception.obstacles(), perception.freeSpace(), durationSeconds);
     } catch (error:Dynamic) {
       block(Std.string(error));
       return status;

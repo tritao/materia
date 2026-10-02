@@ -20,14 +20,20 @@ class FrameAwarePerception implements Perception {
   public final source:Perception;
   public final localization:Localization;
   public var frames(default, null):FrameTree2;
+  /** Reads the sensor frames before `source` does, with each one's sensor placed in the reference frame. */
+  public final scanFilter:Null<ScanFilter>;
+  /** Reports, with each observation, the free space the LiDAR scans show (in the reference frame). */
+  public final freeSpace:Null<LidarFreeSpace>;
 
   public function new(source:Perception, localization:Localization,
-      ?frames:FrameTree2 = null) {
+      ?frames:FrameTree2 = null, ?scanFilter:ScanFilter, ?freeSpace:LidarFreeSpace) {
     if (source == null || localization == null)
       throw "Frame-aware perception requires a source and localization";
     this.source = source;
     this.localization = localization;
     this.frames = frames == null ? new FrameTree2() : frames;
+    this.scanFilter = scanFilter;
+    this.freeSpace = freeSpace;
   }
 
   public function observe(sensorFrames:Array<SensorFrame>):PerceptionSnapshot {
@@ -36,7 +42,10 @@ class FrameAwarePerception implements Perception {
     if (estimate == null || estimate.quality == LocalizationQuality.Invalid)
       throw "Frame-aware perception requires a valid localization state";
 
-    var observed = source.observe(sensorFrames);
+    var filter = scanFilter;
+    var scans = filter == null ? sensorFrames : [for (frame in sensorFrames)
+      filter.applies(frame) ? filter.filter(frame, referenceFromFrame(frame.frameId, estimate)) : frame];
+    var observed = source.observe(scans);
     var detections = [for (value in observed.detections()) transformDetection(value, estimate)];
     var obstacles = [for (value in observed.obstacles()) new Obstacle(
       transformDetection(value.detection, estimate), value.radiusMeters)];
@@ -48,7 +57,11 @@ class FrameAwarePerception implements Perception {
       new DockingTarget(detection,
         transformPose(value.approachPose, value.detection.frameId, estimate));
     }];
-    return new PerceptionSnapshot(detections, obstacles, pallets, dockingTargets);
+    var layout = freeSpace;
+    var views:Array<FreeSpaceView> = layout == null ? [] : [for (frame in sensorFrames)
+      if (frame.kind == "lidar" && frame.values.length > 0) layout.viewing(frame, referenceFromFrame(frame.frameId, estimate))];
+    return new PerceptionSnapshot(detections, obstacles, pallets, dockingTargets,
+      views.length == 0 ? null : new FreeSpaceViews(views));
   }
 
   /**
@@ -76,9 +89,25 @@ class FrameAwarePerception implements Perception {
   function transformPose(pose:Pose2, sourceFrame:String,
       estimate:LocalizationState):Pose2 {
     if (sourceFrame == estimate.referenceFrame) return pose;
-    var referenceFromSource = sourceFrame == estimate.bodyFrame
+    return referenceFromFrame(sourceFrame, estimate).compose(pose);
+  }
+
+  function referenceFromFrame(sourceFrame:String, estimate:LocalizationState):Pose2 {
+    if (sourceFrame == estimate.referenceFrame) return new Pose2();
+    return sourceFrame == estimate.bodyFrame
       ? estimate.pose
       : estimate.pose.compose(frames.lookup(estimate.bodyFrame, sourceFrame));
-    return referenceFromSource.compose(pose);
+  }
+}
+
+/** Free where any of several views sees it free. */
+private class FreeSpaceViews implements FreeSpaceView {
+  final views:Array<FreeSpaceView>;
+
+  public function new(views:Array<FreeSpaceView>) this.views = views;
+
+  public function freeAt(x:Float, y:Float, radiusMeters:Float):Bool {
+    for (view in views) if (view.freeAt(x, y, radiusMeters)) return true;
+    return false;
   }
 }

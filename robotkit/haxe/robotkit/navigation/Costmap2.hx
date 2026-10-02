@@ -1,5 +1,6 @@
 package robotkit.navigation;
 
+import robotkit.perception.FreeSpaceView;
 import robotkit.perception.Obstacle;
 
 /**
@@ -20,8 +21,23 @@ class Costmap2 {
   public final unknownIsBlocked:Bool;
   public final inflationCostDistanceMeters:Float;
   public final inflationCostWeight:Float;
+  /**
+   * How long (s) an obstacle sensed once stays in the dynamic layer after it was last seen, unless a later
+   * observation sees through its place; zero keeps only what the latest observation shows.
+   */
+  public final obstacleMemorySeconds:Float;
+  /** Counts the changes to the costs, so a view of them can tell when to redraw. */
+  public var revision(default, null):Int = 0;
 
   var dynamicObstacles:Array<Obstacle> = [];
+  /** What `senseObstacles` has seen and not yet forgotten, with the layer's clock when each was last seen. */
+  var remembered:Array<RememberedObstacle> = [];
+  var clockSeconds:Float = 0.0;
+  /** The grid's own layer, kept apart so a change of dynamic obstacles does not rasterize the grid again. */
+  var staticBlocked:Array<Bool>;
+  var staticLethal:Array<Bool>;
+  var staticCosts:Array<Float>;
+  /** The costs in force: the static layer, or a copy of it with the dynamic obstacles drawn in. */
   var blockedValues:Array<Bool>;
   var lethalValues:Array<Bool>;
   var costs:Array<Float>;
@@ -29,18 +45,20 @@ class Costmap2 {
   public function new(grid:OccupancyGrid2, footprintRadiusMeters:Float,
       ?unknownIsBlocked:Bool = true,
       ?inflationCostDistanceMeters:Float = 0.5,
-      ?inflationCostWeight:Float = 2.0) {
+      ?inflationCostWeight:Float = 2.0, ?obstacleMemorySeconds:Float = 0.0) {
     if (grid == null || !Math.isFinite(footprintRadiusMeters) ||
         footprintRadiusMeters < 0.0 ||
         !Math.isFinite(inflationCostDistanceMeters) ||
         inflationCostDistanceMeters < 0.0 ||
-        !Math.isFinite(inflationCostWeight) || inflationCostWeight < 0.0)
+        !Math.isFinite(inflationCostWeight) || inflationCostWeight < 0.0 ||
+        !Math.isFinite(obstacleMemorySeconds) || obstacleMemorySeconds < 0.0)
       throw "Costmap2 requires a grid and finite nonnegative inflation settings";
     this.grid = grid;
     this.footprintRadiusMeters = footprintRadiusMeters;
     this.unknownIsBlocked = unknownIsBlocked;
     this.inflationCostDistanceMeters = inflationCostDistanceMeters;
     this.inflationCostWeight = inflationCostWeight;
+    this.obstacleMemorySeconds = obstacleMemorySeconds;
     refresh();
   }
 
@@ -64,13 +82,34 @@ class Costmap2 {
           (y + 0.5) * grid.resolutionMeters, halfCellDiagonal);
       }
     }
+    staticBlocked = blockedValues;
+    staticLethal = lethalValues;
+    staticCosts = costs;
+    drawDynamicObstacles();
+  }
+
+  /** The costs in force: the grid's layer, plus a disk per dynamic obstacle. */
+  function drawDynamicObstacles():Void {
+    revision++;
+    if (dynamicObstacles.length == 0) {
+      blockedValues = staticBlocked;
+      lethalValues = staticLethal;
+      costs = staticCosts;
+      return;
+    }
+    blockedValues = staticBlocked.copy();
+    lethalValues = staticLethal.copy();
+    costs = staticCosts.copy();
     for (obstacle in dynamicObstacles) {
       var local = obstacle.detection.pose.relativeTo(grid.origin);
       rasterizeObstacle(local.x, local.y, obstacle.radiusMeters);
     }
   }
 
-  /** Replaces the dynamic obstacle layer and refreshes costs. */
+  /**
+   * Replaces the dynamic obstacle layer and refreshes costs. An unchanged set (a sensor that has not
+   * scanned since) costs nothing; a changed one redraws only the disks, not the grid.
+   */
   public function setDynamicObstacles(obstacles:Array<Obstacle>):Void {
     if (obstacles == null) throw "Costmap2 obstacles cannot be null";
     for (obstacle in obstacles) {
@@ -78,13 +117,60 @@ class Costmap2 {
       if (obstacle.detection.frameId != grid.frameId)
         throw 'Dynamic obstacle ${obstacle.detection.id} is in frame ${obstacle.detection.frameId}; expected ${grid.frameId}';
     }
+    if (sameObstacles(obstacles)) return;
     dynamicObstacles = obstacles.copy();
-    refresh();
+    drawDynamicObstacles();
+  }
+
+  /**
+   * Takes one observation's obstacles into the dynamic layer, `elapsedSeconds` after the last. With a memory,
+   * an obstacle that is no longer seen stays until the memory runs out, unless `view` shows free space where
+   * it stood; one seen again (overlapping its disk) is replaced by the new sighting. Time is the sum of
+   * the elapsed durations, so it follows the caller's (simulation) clock.
+   */
+  public function senseObstacles(seen:Array<Obstacle>, ?view:FreeSpaceView, ?elapsedSeconds:Float = 0.0):Void {
+    if (!Math.isFinite(elapsedSeconds) || elapsedSeconds < 0.0) throw "Costmap2 elapsed time must be finite and nonnegative";
+    clockSeconds += elapsedSeconds;
+    if (obstacleMemorySeconds <= 0.0) {
+      setDynamicObstacles(seen);
+      return;
+    }
+    var next = [for (obstacle in seen) new RememberedObstacle(obstacle, clockSeconds)];
+    for (old in remembered) {
+      if (clockSeconds - old.seenAt > obstacleMemorySeconds) continue;
+      var pose = old.obstacle.detection.pose;
+      var resighted = false;
+      for (obstacle in seen) {
+        var dx = obstacle.detection.pose.x - pose.x, dy = obstacle.detection.pose.y - pose.y;
+        var reach = obstacle.radiusMeters + old.obstacle.radiusMeters;
+        if (dx * dx + dy * dy < reach * reach) { resighted = true; break; }
+      }
+      if (resighted) continue;
+      if (view != null && view.freeAt(pose.x, pose.y, old.obstacle.radiusMeters)) continue;
+      next.push(old);
+    }
+    remembered = next;
+    setDynamicObstacles([for (entry in next) entry.obstacle]);
   }
 
   public function clearDynamicObstacles():Void {
+    remembered = [];
     dynamicObstacles = [];
-    refresh();
+    drawDynamicObstacles();
+  }
+
+  /** The dynamic obstacles now in the layer. */
+  public function dynamicLayer():Array<Obstacle> return dynamicObstacles.copy();
+
+  function sameObstacles(next:Array<Obstacle>):Bool {
+    if (next.length != dynamicObstacles.length) return false;
+    for (index in 0...next.length) {
+      var a = next[index], b = dynamicObstacles[index];
+      if (a.radiusMeters != b.radiusMeters || a.detection.pose.x != b.detection.pose.x ||
+          a.detection.pose.y != b.detection.pose.y)
+        return false;
+    }
+    return true;
   }
 
   public function contains(x:Int, y:Int):Bool return grid.contains(x, y);
@@ -142,5 +228,15 @@ class Costmap2 {
         }
       }
     }
+  }
+}
+
+private class RememberedObstacle {
+  public final obstacle:Obstacle;
+  public final seenAt:Float;
+
+  public function new(obstacle:Obstacle, seenAt:Float) {
+    this.obstacle = obstacle;
+    this.seenAt = seenAt;
   }
 }

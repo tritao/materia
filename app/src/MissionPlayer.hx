@@ -16,14 +16,22 @@ import robotkit.model.Frame;
 import robotkit.skill.HandlePart;
 import robotkit.spatial.Vec3;
 import robotkit.localization.SimulationTruthLocalization;
+import robotkit.localization.WheelOdometryLocalization;
 import robotkit.mobile.Pose2;
 import robotkit.navigation.AStarPlanner;
 import robotkit.navigation.Costmap2;
+import robotkit.navigation.MotionGuard;
+import robotkit.navigation.MotionGuardState;
 import robotkit.navigation.Navigation;
 import robotkit.navigation.NavigationGoal;
 import robotkit.navigation.Navigator;
 import robotkit.navigation.OccupancyCell;
 import robotkit.navigation.OccupancyGrid2;
+import robotkit.perception.FrameAwarePerception;
+import robotkit.perception.LidarFreeSpace;
+import robotkit.perception.LidarMapFilter;
+import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.Obstacle;
 import robotkit.perception.PerceptionSnapshot;
 import robotkit.runtime.Simulation;
 import robotkit.skill.GoTo;
@@ -45,6 +53,21 @@ typedef FloorObstacle = {
 }
 
 /**
+ * What a view of the running mission draws, all in the map frame and metres: the route being followed,
+ * the costmap it plans on (with the obstacles the lidar adds to it), the pose the wheel odometry
+ * believes, and what the safety guard is doing.
+ */
+typedef MissionOverlay = {
+  var route:Array<Pose2>;
+  var costmap:Null<Costmap2>;
+  var obstacles:Array<Obstacle>;
+  /** Where wheel odometry puts the robot, and the outline of its footprint, counter-clockwise. */
+  var odometry:Null<Pose2>;
+  var outline:Array<Pose2>;
+  var guard:MotionGuardState;
+}
+
+/**
  * The project's mission, run by its assembly robot when the simulation runs: each step becomes a
  * RobotKit skill, advanced one tick at a time by a `SkillRunner`, and the next starts when it
  * succeeds; the round starts over after its last step when it loops, and from its first step when
@@ -55,6 +78,11 @@ typedef FloorObstacle = {
  * down onto the part's grasp connector, or onto its seat with the held part, read where they are when
  * the step starts; the program switches the tool's channel on the robot, the simulated tool holds or
  * lets go, and the skill reads the outcome on the tool's vacuum sensor.
+ *
+ * A robot with a lidar sees what the map lacks: RobotKit's `LidarObstaclePerception` reads each scan with
+ * the returns the map explains removed (`LidarMapFilter`), the obstacles it finds join the costmap's
+ * dynamic layer, so `Navigator` replans round them, and `MotionGuard` slows the base for them and stops it
+ * short, whatever the route says.
  */
 class MissionPlayer implements SessionMember {
   /** Map cells, in metres: fine enough that a wall a tenth of a metre thick covers whole cells. */
@@ -69,12 +97,22 @@ class MissionPlayer implements SessionMember {
   public static inline var HEADING_TOLERANCE:Float = 0.05;
   /** Joint acceleration the arm programs plan with, rad/s². */
   public static inline var ARM_ACCELERATION:Float = 2.0;
+  /** A lidar return this close (m) to a mapped cell belongs to the map: it is the room, not an obstacle. */
+  public static inline var MAP_TOLERANCE:Float = 0.1;
+  /** Radius (m) of the disk a lidar return stands for: a scan samples the face of what it sees. */
+  public static inline var SCAN_RADIUS:Float = 0.08;
+  /** An obstacle the lidar has lost sight of stays on the map this long (s), unless a scan sees through its place. */
+  public static inline var MEMORY_SECONDS:Float = 20.0;
 
   public final mission:SceneArtifactMission;
   /** The navigation map, when the mission drives. */
   public final costmap:Null<Costmap2>;
-  /** The boxes the map was drawn from. */
+  /** The boxes the map was drawn from: those standing in the robot's way. */
   public final obstacles:Array<FloorObstacle>;
+  /** The software guard that slows and stops the base for what the lidar sees, when the robot has a lidar. */
+  public final guard:Null<MotionGuard>;
+  /** What the lidar found beyond the map in its latest scan, in the map frame. */
+  public var sensed(default, null):PerceptionSnapshot = new PerceptionSnapshot();
   /** The step running now. */
   public var stepIndex(default, null):Int = 0;
   /** Steps finished since the session started. */
@@ -103,6 +141,14 @@ class MissionPlayer implements SessionMember {
   var grasped:Null<SceneArtifactPlace> = null;
   final navigator:Null<Navigator>;
   final localization:SimulationTruthLocalization;
+  /** The lidar's perception, in the map frame, and the sensor it reads. */
+  final scanning:Null<FrameAwarePerception>;
+  final scanner:Null<String>;
+  /** Sequence of the scan `sensed` was made from, to read each scan once. */
+  var scanned:Null<Int64> = null;
+  /** The robot's wheel odometry, run beside the truth for comparison; seeded from the truth when the mission starts. */
+  final wheels:Null<WheelOdometryLocalization>;
+  var wheelsSeeded:Bool = false;
   final timestep:Float;
   final idle = new PerceptionSnapshot();
 
@@ -112,7 +158,7 @@ class MissionPlayer implements SessionMember {
     this.mission = mission;
     this.robot = robot;
     this.timestep = timestep;
-    this.obstacles = obstacles.copy();
+    this.obstacles = standing(obstacles);
     this.simulation = simulation;
     this.objects = objects;
     this.robotIndex = robotIndex;
@@ -122,20 +168,39 @@ class MissionPlayer implements SessionMember {
     var definition = project.projectAssemblyDefinition;
     assembly = definition == null ? null : AssemblyDefinitionFlattener.flatten(definition);
     placement = definition == null ? null : new AssemblyState(definition, project.projectAssemblyState);
-    localization = new SimulationTruthLocalization(simulation, robotIndex, FRAME, "base");
+    localization = new SimulationTruthLocalization(simulation, robotIndex, FRAME, robot.rootLink);
     var drives = [for (step in mission.steps) if (step.kind == "goTo") step];
     var base = robot.mobile;
     if (drives.length == 0) {
       costmap = null;
       navigator = null;
+      guard = null;
+      scanning = null;
+      scanner = null;
+      wheels = null;
     } else {
       if (base == null) throw "A mission that drives needs the project's wheeled assembly";
       var footprint = base.footprint;
       if (footprint == null) throw "A mission that drives needs the robot's footprint";
-      costmap = new Costmap2(floorPlan(obstacles, [for (step in drives) floorPose(step)]), footprint.radius, true, 0.3,
-        1.5);
-      navigator = new Navigator(new Navigation(base, localization, 0.35, 0.5, 1.2, false), new AStarPlanner(costmap),
-        costmap, 0.5);
+      var map = new Costmap2(floorPlan(obstacles, [for (step in drives) floorPose(step)]), footprint.radius, true, 0.3, 1.5, MEMORY_SECONDS);
+      costmap = map;
+      var navigation = new Navigation(base, localization, 0.35, 0.5, 1.2, false);
+      var lidars = [for (sensor in project.robotSensors) if (sensor.kind == "lidar") sensor];
+      if (lidars.length > 1) throw 'A mission reads one lidar, the robot has ${lidars.length}';
+      if (lidars.length == 0) {
+        scanner = null;
+        scanning = null;
+        guard = null;
+      } else {
+        var sensor = robot.blueprint.sensorById(lidars[0].id);
+        if (sensor == null) throw 'The robot has no sensor "${lidars[0].id}"';
+        scanner = sensor.id;
+        scanning = new FrameAwarePerception(LidarObstaclePerception.fromSensor(sensor, SCAN_RADIUS), localization, null,
+          LidarMapFilter.fromSensor(map.grid, sensor, MAP_TOLERANCE), LidarFreeSpace.fromSensor(sensor));
+        guard = new MotionGuard(navigation, footprint);
+      }
+      navigator = new Navigator(navigation, new AStarPlanner(map), map, 0.5, guard);
+      wheels = new WheelOdometryLocalization(base, FRAME, robot.rootLink);
     }
     var handles = [for (step in mission.steps) if (step.kind == "pick" || step.kind == "place") step].length > 0;
     var suctions = [for (tool in project.robotTools) if (tool.kind == "suction") tool];
@@ -149,21 +214,22 @@ class MissionPlayer implements SessionMember {
       vacuumSensor = tool.sensor;
       // The arm's tool frame: the tool's contact connector on the link that carries it.
       var part = robot.part("project:" + tool.contact.occurrence);
-      var contact = connectorFrame(tool.contact);
-      var tip = AssemblyFrames.compose(part.offset, {x: contact.x * metres, y: contact.y * metres, z: contact.z * metres,
-        qx: contact.qx, qy: contact.qy, qz: contact.qz, qw: contact.qw});
+      var tcp = robot.toolFrames.get(tool.contact.occurrence);
+      if (tcp == null) throw 'The robot has no frame for tool "${tool.contact.occurrence}"';
       toolLink = part.linkIndex;
-      toolTip = tip;
+      toolTip = {x: tcp.position[0], y: tcp.position[1], z: tcp.position[2],
+        qx: tcp.rotation[0], qy: tcp.rotation[1], qz: tcp.rotation[2], qw: tcp.rotation[3]};
       var model = robot.model;
-      var tcp = model.addFrame(new Frame("mission tool", model.links[part.linkIndex]));
-      tcp.position = [tip.x, tip.y, tip.z];
-      tcp.rotation = [tip.qx, tip.qy, tip.qz, tip.qw];
       var arm = new Manipulator(model, model.links[0].id, tcp.id);
       newHandling = () -> HandlingPlanRunner.create(robot.robot, arm, () -> robot.runtime.pollEvents(), tool.channel,
         ARM_ACCELERATION);
       handling = newHandling();
     }
   }
+
+  /** The boxes that stand in the robot's way: above the floor and below its height; the floor itself and overhead boxes are not. */
+  public static function standing(boxes:Array<FloorObstacle>):Array<FloorObstacle>
+    return [for (box in boxes) if (box.z - box.halfZ < CLEARANCE && box.z + box.halfZ > 0.01) box];
 
   /**
    * An occupancy grid covering the obstacles and `poses` with a margin: a cell is occupied when its
@@ -176,8 +242,8 @@ class MissionPlayer implements SessionMember {
       minX = Math.min(minX, x); maxX = Math.max(maxX, x);
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
     }
-    var standing = [for (box in obstacles) if (box.z - box.halfZ < CLEARANCE && box.z + box.halfZ > 0.01) box];
-    for (box in standing) {
+    var blocking = standing(obstacles);
+    for (box in blocking) {
       var reach = Math.sqrt(box.halfX * box.halfX + box.halfY * box.halfY);
       extend(box.x - reach, box.y - reach);
       extend(box.x + reach, box.y + reach);
@@ -191,7 +257,7 @@ class MissionPlayer implements SessionMember {
     // A cell square overlaps a box when its centre lies within the box grown by half a cell's diagonal
     // projected on each box axis; growing by the full half-diagonal is the safe side of that.
     var grow = RESOLUTION * Math.sqrt(0.5);
-    for (box in standing) {
+    for (box in blocking) {
       var c = Math.cos(box.yaw), s = Math.sin(box.yaw);
       var reach = Math.sqrt(box.halfX * box.halfX + box.halfY * box.halfY) + grow;
       var low = grid.worldToCell(new Pose2(box.x - reach, box.y - reach));
@@ -212,6 +278,7 @@ class MissionPlayer implements SessionMember {
     if (failure != null) return;
     var snapshot = robot.robot.snapshot();
     localization.update(snapshot);
+    trackWheels(snapshot);
     switch runner.status() {
       case Running:
       case _:
@@ -235,6 +302,9 @@ class MissionPlayer implements SessionMember {
     completed = 0;
     failure = null;
     grasped = null;
+    wheelsSeeded = false;
+    scanned = null;
+    sensed = new PerceptionSnapshot();
     var make = newHandling;
     if (make != null) handling = make();
   }
@@ -272,8 +342,60 @@ class MissionPlayer implements SessionMember {
     }
   }
 
-  /** No sensed obstacles beyond the map yet; the robot's place is updated every tick. */
-  function observe(snapshot:RobotSnapshot):PerceptionSnapshot return idle;
+  /**
+   * What the lidar sees beyond the map, in the map frame, read once per scan: a scan's obstacles stay where
+   * they were seen until the next one, however far the robot moves meanwhile.
+   */
+  function observe(snapshot:RobotSnapshot):PerceptionSnapshot {
+    var reading = scanning;
+    var name = scanner;
+    if (reading == null || name == null) return idle;
+    var sequence:Null<Int64> = null;
+    for (frame in snapshot.sensors.toArray()) if (frame.sensorId == name) sequence = frame.sequence;
+    if (sequence == null) return idle;
+    var latest:Int64 = cast sequence;
+    var before = scanned;
+    if (before != null && Int64.compare(before, latest) == 0) return sensed;
+    scanned = latest;
+    sensed = reading.observeRobotSnapshot(snapshot, robot.model, robot.blueprint, robot.rootLink);
+    return sensed;
+  }
+
+  /** Runs wheel odometry beside the truth, starting from where the truth stands. */
+  function trackWheels(snapshot:RobotSnapshot):Void {
+    var odometry = wheels;
+    var truth = localization.state();
+    if (odometry == null || truth == null) return;
+    if (!wheelsSeeded) {
+      odometry.reset(truth.pose);
+      wheelsSeeded = true;
+    }
+    odometry.update(snapshot);
+  }
+
+  /** The route, map, sensed obstacles, odometry and guard as a view draws them; null when the mission does not drive. */
+  public function overlay():Null<MissionOverlay> {
+    var map = costmap;
+    var driver = navigator;
+    var base = robot.mobile;
+    if (map == null || driver == null || base == null || base.footprint == null) return null;
+    var path = driver.activePath;
+    var estimate = wheels == null ? null : wheels.state();
+    var outline:Array<Pose2> = [];
+    if (estimate != null) {
+      var footprint:robotkit.mobile.Footprint = cast base.footprint;
+      outline = [for (corner in footprint.vertices()) estimate.pose.compose(new Pose2(corner.x, corner.y))];
+    }
+    return {route: path == null ? [] : path.poses(), costmap: map, obstacles: map.dynamicLayer(),
+      odometry: estimate == null ? null : estimate.pose, outline: outline,
+      guard: guard == null ? MotionGuardState.Clear : guard.state};
+  }
+
+  /** What the navigator is doing about the current goal. */
+  public function navigating():String return navigator == null ? "idle" : Std.string(navigator.status);
+
+  /** How many times the navigator has replanned the current goal. */
+  public function replans():Int return navigator == null ? 0 : navigator.replanCount;
 
   /** Where the grasp connector `at` of a free part is now, in metres. */
   function graspPoint(at:SceneArtifactPlace):Vec3 {
@@ -331,10 +453,7 @@ class MissionPlayer implements SessionMember {
   function connectorFrame(at:SceneArtifactPlace):AssemblyFrame {
     var flat = assembly;
     if (flat == null) throw "The mission has no assembly";
-    var definitionId = definitionOf(at.occurrence);
-    for (component in flat.definitions) if (component.id == definitionId)
-      for (connector in component.connectors) if (connector.name == at.connector) return connector.frame;
-    throw 'Occurrence "${at.occurrence}" has no connector "${at.connector}"';
+    return AssemblyRobot.connectorFrame(flat, at);
   }
 
   function definitionOf(occurrence:String):String {

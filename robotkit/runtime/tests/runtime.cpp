@@ -194,7 +194,7 @@ public:
         state.sensor_count = 1;
         state.sensors[0].sequence = 1;
         state.sensors[0].value_count = 1;
-        state.sensors[0].values[0] = 1.0;
+        RK_SENSOR_VALUE(state, 0, 0) = 1.0;
         return RK_OK;
     }
 

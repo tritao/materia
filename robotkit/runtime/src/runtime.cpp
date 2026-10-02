@@ -704,6 +704,7 @@ rk_result RobotRuntime::snapshot_full(rk_robot_snapshot &out_snapshot) const {
     out_snapshot.queue_end_time_ns = state_.queue_end_time_ns;
     out_snapshot.sensor_count = state_.sensor_count;
     std::copy_n(state_.sensors, state_.sensor_count, out_snapshot.sensors);
+    std::copy_n(state_.sensor_values, RK_SENSOR_VALUE_POOL, out_snapshot.sensor_values);
     std::copy_n(commanded_position_, state_.joint_count, out_snapshot.setpoint_position);
     return RK_OK;
 }

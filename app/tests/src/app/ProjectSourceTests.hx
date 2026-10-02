@@ -460,6 +460,173 @@ class ProjectSourceTests {
   }
 
   /**
+   * The base sees what the room's map lacks. A box dropped on the route ahead of the moving base, as if it
+   * had fallen off a shelf, is read off the lidar: the base slows, stops short of it without touching it,
+   * replans round it, and still completes its round (so the lidar never mistakes the room for obstacles
+   * either). MuJoCo, like the mission check.
+   */
+  static function checkMobileObstacle(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
+    halfLength /= 2; halfWidth /= 2;
+    var session = new ProjectDocumentSession(null, false);
+    session.openGeneratedProject(generated, manifest);
+    check(session.robotSensors.length == 1 && session.robotSensors[0].kind == "lidar",
+      "the mobile base cell mounts one lidar on the robot");
+    var simulation = new ApplicationSimulation(new RobotWorld());
+    simulation.setBackend(ApplicationSimulation.MUJOCO);
+    check(simulation.rebuild(session.sensors, session.scene, session), 'mobile base cell builds: ${simulation.error}');
+    var mission = simulation.missionPlayer();
+    if (mission == null) throw "mobile base cell has no mission";
+    check(mission.guard != null, "a mission with a lidar guards the base's motion");
+    var active = simulation.activeSession();
+    if (active == null) throw "mobile base cell has no session";
+    var dt = simulation.timestep;
+    function yaw(rotation:Array<Float>):Float
+      return Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+        1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    /** The chassis' pose on the floor: x, y, heading. */
+    function chassis():Array<Float> {
+      var plate = [for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == "project:robot/basePlate") entry][0];
+      return [plate.position[0], plate.position[1], yaw(plate.rotation)];
+    }
+    /** Gap between two rectangles on the floor (centre, half extents, heading), negative when they overlap. */
+    function gap(a:Array<Float>, ahx:Float, ahy:Float, b:Array<Float>, bhx:Float, bhy:Float):Float {
+      var worst = Math.NEGATIVE_INFINITY;
+      for (angle in [a[2], a[2] + Math.PI / 2, b[2], b[2] + Math.PI / 2]) {
+        var ux = Math.cos(angle), uy = Math.sin(angle);
+        function reach(hx:Float, hy:Float, heading:Float):Float
+          return hx * Math.abs(Math.cos(heading) * ux + Math.sin(heading) * uy) +
+            hy * Math.abs(-Math.sin(heading) * ux + Math.cos(heading) * uy);
+        var separation = Math.abs((b[0] - a[0]) * ux + (b[1] - a[1]) * uy) - reach(ahx, ahy, a[2]) - reach(bhx, bhy, b[2]);
+        if (separation > worst) worst = separation;
+      }
+      return worst;
+    }
+    var trail:Array<String> = [];
+    function step():Void {
+      simulation.step();
+      var failure = mission.failure;
+      if (failure != null) throw 'the mission failed after ${mission.completed} steps: $failure\n${trail.join("\n")}';
+    }
+    // Cruise down the first leg.
+    step();
+    var before = chassis();
+    var speed = 0.0;
+    while (speed < 0.4 && active.simulationTime() < 20) {
+      step();
+      var now = chassis();
+      speed = Math.sqrt(Math.pow(now[0] - before[0], 2) + Math.pow(now[1] - before[1], 2)) / dt;
+      before = now;
+    }
+    check(speed >= 0.4 && mission.stepIndex == 0, 'the base cruises down its first leg (${speed} m/s)');
+    var cruise = speed;
+    // The route ahead of the base: drop the box on it, close enough that braking is called for.
+    var overlay = mission.overlay();
+    if (overlay == null) throw "a driving mission draws its overlay";
+    var route = overlay.route;
+    var nearest = 0;
+    for (index in 0...route.length) {
+      var near = Math.pow(route[nearest].x - before[0], 2) + Math.pow(route[nearest].y - before[1], 2);
+      if (Math.pow(route[index].x - before[0], 2) + Math.pow(route[index].y - before[1], 2) < near) nearest = index;
+    }
+    var travelled = 0.0, spot = route[nearest];
+    for (index in nearest + 1...route.length) {
+      travelled += Math.sqrt(Math.pow(route[index].x - route[index - 1].x, 2) + Math.pow(route[index].y - route[index - 1].y, 2));
+      spot = route[index];
+      if (travelled >= DROP_AHEAD) break;
+    }
+    // The box falls onto the cell's floor slab.
+    var half = [0.2, 0.2, 0.25];
+    active.stop();
+    var box = active.createObject(nativekit.sim.MotionType.Dynamic, nativekit.sim.SimShape.box(half[0], half[1], half[2]),
+      new nativekit.sim.SimPose(spot.x, spot.y, half[2] + 0.05, 0, 0, 0, 1), 2.0);
+    var dropped = active.simulationTime();
+    function boxFloorPose():Array<Float> {
+      var frame = active.capture();
+      var pose = frame.objectPose(box);
+      frame.dispose();
+      return [pose.x, pose.y, yaw([pose.qx, pose.qy, pose.qz, pose.qw])];
+    }
+    var landed:Null<Array<Float>> = null;
+    var slowest = cruise, stopped = false, approached = false, replans = 0, closest = Math.POSITIVE_INFINITY;
+    var seen = 0;
+    var position = chassis();
+    var steps = work.steps.length;
+    while (mission.completed < steps && active.simulationTime() < 300) {
+      step();
+      var now = chassis();
+      speed = Math.sqrt(Math.pow(now[0] - position[0], 2) + Math.pow(now[1] - position[1], 2)) / dt;
+      position = now;
+      var guard = mission.guard;
+      if (guard != null) switch guard.state {
+        case Approaching(_, _, _): approached = true;
+        case _:
+      }
+      if (mission.stepIndex == 0) replans = Std.int(Math.max(replans, mission.replans()));
+      var pose = boxFloorPose();
+      if (active.simulationTime() > dropped + 0.5) {
+        if (landed == null) landed = pose;
+        var clear = gap(now, halfLength, halfWidth, pose, half[0], half[1]);
+        closest = Math.min(closest, clear);
+        if (clear <= 0.0) throw 'the chassis touches the dropped box at ${now[0]}, ${now[1]}\n${trail.join("\n")}';
+        if (mission.stepIndex == 0 && clear < 1.5) {
+          slowest = Math.min(slowest, speed);
+          if (speed < 0.02) {
+            stopped = true;
+            var view = mission.overlay();
+            if (view != null) seen = Std.int(Math.max(seen, view.obstacles.length));
+          }
+        }
+      }
+      trail.push('${Math.round(active.simulationTime() * 100) / 100} s: ${Math.round(now[0] * 1000)}, ${Math.round(now[1] * 1000)} mm, ' +
+        '${Math.round(speed * 100) / 100} m/s, step ${mission.stepIndex}, replans ${mission.replans()}, ${Std.string(mission.guard == null ? null : mission.guard.state)}, ${mission.sensed.obstacles().length} sensed');
+      if (trail.length > 400) trail.shift();
+    }
+    check(mission.completed >= steps, 'the robot still runs its whole round in five minutes, finished ${mission.completed} of ${steps} steps (${mission.navigating()})\n' +
+      [for (index in 0...trail.length) if (index % 8 == 0) trail[index]].join("\n"));
+    check(approached && slowest < cruise * 0.5, 'the base slows for the box (${cruise} m/s down to ${slowest} m/s)');
+    check(stopped, 'the base stops short of the box (slowest ${slowest} m/s)');
+    check(replans > 0, 'the base replans round the box (${replans} replans)');
+    check(seen > 0, "the overlay shows the obstacle the lidar added to the costmap");
+    var ghost = mission.overlay();
+    if (ghost == null || ghost.odometry == null || ghost.outline.length < 3) throw "the overlay carries the odometry ghost";
+    var believed:robotkit.mobile.Pose2 = cast ghost.odometry, truth = chassis();
+    check(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) < 0.1,
+      'the odometry ghost follows the base (${Math.round(Math.sqrt(Math.pow(believed.x - truth[0], 2) + Math.pow(believed.y - truth[1], 2)) * 1000)} mm off)');
+    var rest = boxFloorPose(), settled:Array<Float> = cast landed;
+    check(Math.abs(rest[0] - settled[0]) < 0.03 && Math.abs(rest[1] - settled[1]) < 0.03,
+      'the base never pushes the box (${Math.round(Math.sqrt(Math.pow(rest[0] - settled[0], 2) + Math.pow(rest[1] - settled[1], 2)) * 1000)} mm)');
+    Sys.println('mobile obstacle: cruise ${Math.round(cruise * 100) / 100} m/s, slowest ${Math.round(slowest * 1000) / 1000} m/s, ' +
+      'closest ${Math.round(closest * 1000)} mm, ${replans} replans, round done at ${Math.round(active.simulationTime())} s');
+    simulation.clear();
+  }
+
+  /** The overlay outlines the costmap's blocked area as runs: a 2 x 2 block, a cell of margin all round, is four sides of 2 m. */
+  static function checkMissionOverlayEdge():Void {
+    var grid = new robotkit.navigation.OccupancyGrid2(0.5, new robotkit.mobile.Pose2(1.0, 2.0), 6, 5, "map",
+      robotkit.navigation.OccupancyCell.Free);
+    for (x in 2...4) for (y in 1...3) grid.setCell(x, y, robotkit.navigation.OccupancyCell.Occupied);
+    var edge = MissionOverlayView.blockedEdge(new robotkit.navigation.Costmap2(grid, 0.0, false, 0.0, 0.0));
+    check(edge.length == 16, 'the blocked area has four edge runs (${edge.length / 4})');
+    var total = 0.0, low = Math.POSITIVE_INFINITY, high = Math.NEGATIVE_INFINITY;
+    for (run in 0...4) {
+      var dx = edge[run * 4 + 2] - edge[run * 4], dy = edge[run * 4 + 3] - edge[run * 4 + 1];
+      total += Math.sqrt(dx * dx + dy * dy);
+      low = Math.min(low, Math.min(edge[run * 4], edge[run * 4 + 2]));
+      high = Math.max(high, Math.max(edge[run * 4], edge[run * 4 + 2]));
+    }
+    check(Math.abs(total - 8.0) < 1e-9 && Math.abs(low - 1.5) < 1e-9 && Math.abs(high - 3.5) < 1e-9,
+      'the edge runs round the blocked area in map coordinates (length ${total}, x ${low} to ${high})');
+  }
+
+  /** How far along its route (m) the base has the box dropped ahead of it. */
+  static inline var DROP_AHEAD:Float = 1.2;
+
+  /**
    * The arm example opens with its suction tool and its mission, and on MuJoCo the arm works it: picks
    * the workpiece off its pad, sets it on the other, and brings it back, each pick confirmed by the
    * tool's vacuum sensor, and a reset puts the workpiece back for the next run.
@@ -673,7 +840,7 @@ class ProjectSourceTests {
     }
     var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
     var collections = hl.Gc.collections() - collectionsBefore;
-    // About 56 KB a tick when measured (2026-10-02): mostly robot snapshots, then the stock's cut moves.
+    // About 42 KB a tick when measured (2026-10-02, sensor values pooled per snapshot): mostly robot snapshots, then the stock's cut moves.
     check(allocatedPerTick < 80000, 'the router allocates under 80 KB a simulated tick, got ${Math.round(allocatedPerTick)} bytes');
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");
@@ -1105,6 +1272,8 @@ class ProjectSourceTests {
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile") {
       checkMobileBase(root);
       checkMobileMission(root);
+      checkMobileObstacle(root);
+      checkMissionOverlayEdge();
       return 0;
     }
     if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "arm") {
@@ -1398,6 +1567,8 @@ class ProjectSourceTests {
     checkBeltRouter(root);
     checkMobileBase(root);
     checkMobileMission(root);
+    checkMobileObstacle(root);
+    checkMissionOverlayEdge();
     checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;

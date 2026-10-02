@@ -60,6 +60,24 @@ class OccupancyGrid2 {
     return contains(x, y) ? new GridCell2(x, y) : null;
   }
 
+  /** True when an occupied cell lies within `radiusMeters` of the point (cell centres, so a cell's own extent counts). */
+  public function occupiedWithin(x:Float, y:Float, radiusMeters:Float):Bool {
+    var local = new Pose2(x, y).relativeTo(origin);
+    var reach = radiusMeters + resolutionMeters * 0.5;
+    var minX = Std.int(Math.floor((local.x - reach) / resolutionMeters));
+    var maxX = Std.int(Math.floor((local.x + reach) / resolutionMeters));
+    var minY = Std.int(Math.floor((local.y - reach) / resolutionMeters));
+    var maxY = Std.int(Math.floor((local.y + reach) / resolutionMeters));
+    for (cy in (minY < 0 ? 0 : minY)...(maxY >= height ? height : maxY + 1))
+      for (cx in (minX < 0 ? 0 : minX)...(maxX >= width ? width : maxX + 1)) {
+        if (values[cy * width + cx] != OccupancyCell.Occupied) continue;
+        var dx = (cx + 0.5) * resolutionMeters - local.x;
+        var dy = (cy + 0.5) * resolutionMeters - local.y;
+        if (dx * dx + dy * dy <= reach * reach) return true;
+      }
+    return false;
+  }
+
   /** Returns the center pose of a grid cell in `frameId`. */
   public function cellCenter(x:Int, y:Int):Pose2 {
     requireCell(x, y);

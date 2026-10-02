@@ -8,6 +8,20 @@
 #include <thread>
 #include <memory>
 
+/** One sensor slot of a state or snapshot, its values copied out of the pool for reading. */
+struct SensorView {
+    uint64_t sequence;
+    uint64_t source_timestamp_ns;
+    uint32_t value_count;
+    double values[RK_MAX_SENSOR_VALUES];
+};
+template <typename T> SensorView sensor_of(const T &value, uint32_t slot) {
+    const auto &sample = value.sensors[slot];
+    SensorView view{sample.sequence, sample.source_timestamp_ns, sample.value_count, {}};
+    for (uint32_t i = 0; i < sample.value_count; ++i) view.values[i] = RK_SENSOR_VALUE(value, slot, i);
+    return view;
+}
+
 // rk_simulation_robot_desc is 1.7 MB. Tests keep it on the heap: with every
 // test inlined into main at -O3, stack copies overflow an 8 MB stack.
 
@@ -1108,10 +1122,10 @@ int main() {
         const auto sample = state(robot);
         if (tick == 0) {
             assert(sample.sensors[0].sequence == 0);
-            assert(sample.sensors[1].values[0] == 20.0);
+            assert(sensor_of(sample, 1).values[0] == 20.0);
         }
         if (tick > 0) {
-            const auto &imu = sample.sensors[0];
+            const auto imu = sensor_of(sample, 0);
             assert(imu.value_count == 6);
             // MuJoCo's hinge velocity and the mounted gyroscope agree.
             assert(std::abs(imu.values[2] - sample.velocity[0]) < 1e-8);
@@ -1119,16 +1133,16 @@ int main() {
             if (imu.values[3] < -0.01) saw_specific_force = true;
             assert(std::abs(imu.values[5] - 9.81) < 1e-6);
         }
-        if (sample.sensors[1].values[0] < 2.0) saw_occlusion = true;
+        if (sensor_of(sample, 1).values[0] < 2.0) saw_occlusion = true;
     }
     const auto final = state(robot);
     assert(saw_motion && saw_specific_force && saw_occlusion);
     assert(std::abs(final.position[0] - 0.5) < 0.05);
-    assert(final.sensors[1].values[0] == 20.0);
+    assert(sensor_of(final, 1).values[0] == 20.0);
     assert(stop(session) == RK_OK);
     remove_object(session, falling);
     assert(step(session, 500) == RK_OK);
-    assert(state(robot).sensors[1].values[0] == 20.0);
+    assert(sensor_of(state(robot), 1).values[0] == 20.0);
     assert(stop(session) == RK_OK);
     assert(reset(session) == RK_OK);
     assert(step(session, 0) == RK_OK);

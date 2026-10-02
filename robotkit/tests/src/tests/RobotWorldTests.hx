@@ -137,6 +137,9 @@ import robotkit.perception.FiducialTargetConfig;
 import robotkit.perception.Obstacle;
 import robotkit.perception.DockingTarget;
 import robotkit.perception.LidarObstaclePerception;
+import robotkit.perception.LidarMapFilter;
+import robotkit.perception.LidarFreeSpace;
+import robotkit.perception.FreeSpaceView;
 import robotkit.perception.PinholeCameraIntrinsics;
 import robotkit.perception.PointCloudObstaclePerception;
 import robotkit.perception.GroundTruthPerception;
@@ -185,6 +188,7 @@ class RobotWorldTests {
     testFiducialPerception();
     testNavigation();
     testMotionGuard();
+    testFullScan();
     testGridPlanning();
     testNavigator();
     testGoToBlockedTimeout();
@@ -1991,6 +1995,38 @@ class RobotWorldTests {
     check(switch guard.state { case Blocked(_): true; case _: false; },
       "MotionGuard blocks when obstacle frame transforms are unavailable");
     guard.detach();
+
+    // Stopped short of an obstacle ahead and to the side, the base may turn away from it: it is held
+    // only by an obstacle within reach of its turning circle, not by the corridor it is not driving down.
+    var corner = new Obstacle(new Detection("corner", "obstacle", 1.0, new Pose2(0.5, 0.35), "map",
+      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    var driving = new Navigation(base, localization, 0.2, 0.6, 1.0);
+    var corridorGuard = new MotionGuard(driving, null, 0.2, 2.0, 0.1, 0.5);
+    driving.follow(new Path([new Pose2(), new Pose2(5.0, 0.0, 0.0)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9,
+      "MotionGuard stops a base driving at an obstacle inside its margin");
+    driving.cancel();
+    driving.follow(new Path([new Pose2(0.0, 0.0, Math.PI * 0.75), new Pose2(-3.0, 3.0, Math.PI * 0.75)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Clear: true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 && Math.abs(base.currentCommand().angular) > 0.1,
+      'MotionGuard lets a stopped base turn away from an obstacle it cannot drive at (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
+    // Held short of it but asked to curve away, it pivots instead of stopping dead.
+    driving.cancel();
+    driving.follow(new Path([new Pose2(0.0, 0.0, -0.46), new Pose2(3.0, -1.5, -0.46)], "map"));
+    corridorGuard.update(new PerceptionSnapshot([], [corner]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().linear) < 1e-9 && base.currentCommand().angular < -0.05,
+      'MotionGuard lets a base held short of an obstacle pivot away along its route (${Std.string(corridorGuard.state)}, ${base.currentCommand().linear}, ${base.currentCommand().angular})');
+    var touching = new Obstacle(new Detection("touching", "obstacle", 1.0, new Pose2(0.4, 0.3), "map",
+      Int64.ofInt(1), Int64.ofInt(10), Int64.ofInt(10), "sim-clock", "host-clock"), 0.1);
+    corridorGuard.update(new PerceptionSnapshot([], [touching]), 0.1);
+    check(switch corridorGuard.state { case Blocked(_): true; case _: false; } &&
+      Math.abs(base.currentCommand().angular) < 1e-9,
+      "MotionGuard holds a stopped base whose turn would swing into an obstacle");
+    corridorGuard.detach();
     robot.close();
     simulationHarness.dispose();
   }
@@ -2064,6 +2100,61 @@ class RobotWorldTests {
     dynamicCostmap.clearDynamicObstacles();
     check(dynamicCostmap.isTraversable(2, 2) && dynamicCostmap.cellCost(3, 2) == 0.0,
       "costmap clears removed dynamic obstacles");
+    // The grid's own layer survives dynamic changes, and an unchanged set is not redrawn.
+    dynamicGrid.setCell(0, 0, OccupancyCell.Occupied);
+    dynamicCostmap.refresh();
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    var drawn = dynamicCostmap.revision;
+    dynamicCostmap.setDynamicObstacles([dynamicObstacle]);
+    check(dynamicCostmap.revision == drawn && dynamicCostmap.dynamicLayer().length == 1 &&
+      !dynamicCostmap.isTraversable(0, 0) && !dynamicCostmap.isTraversable(2, 2),
+      "costmap keeps an unchanged dynamic layer as it is");
+    dynamicCostmap.clearDynamicObstacles();
+    check(dynamicCostmap.revision == drawn + 1 && !dynamicCostmap.isTraversable(0, 0) &&
+      dynamicCostmap.isTraversable(2, 2),
+      "costmap clearing the dynamic layer leaves the grid's obstacles");
+
+    // Obstacles the sensor has lost sight of stay for the costmap's memory, unless a scan sees through their place.
+    function sightingAt(x:Float, y:Float):Obstacle
+      return new Obstacle(new Detection("sighting", "obstacle", 1.0, new Pose2(x, y), "map", Int64.ofInt(1),
+        Int64.ofInt(1), Int64.ofInt(1), "sim-clock", "host-clock"), 0.3);
+    function scanOf(ranges:Array<Float>):FreeSpaceView
+      return new LidarFreeSpace(6.0).viewing(new SensorFrame("lidar", "lidar", "base", Int64.ofInt(1), Int64.ofInt(1),
+        ranges, Int64.ofInt(1), "base", null, null, "sim-clock", "host-clock"), new Pose2(0.0, 5.0, 0.0));
+    var memoryGrid = new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free);
+    var memory = new Costmap2(memoryGrid, 0.0, false, 0.0, 0.0, 5.0);
+    memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    check(!memory.isTraversable(10, 10), "a sensed obstacle blocks the costmap");
+    memory.senseObstacles([], null, 1.0);
+    check(!memory.isTraversable(10, 10) && memory.dynamicLayer().length == 1,
+      "an obstacle out of view keeps blocking while the memory lasts");
+    var remembered = memory.revision;
+    memory.senseObstacles([], null, 0.0);
+    check(memory.revision == remembered, "an unchanged remembered layer costs nothing");
+    memory.senseObstacles([sightingAt(5.2, 5.0)], null, 1.0);
+    check(memory.dynamicLayer().length == 1 && memory.dynamicLayer()[0].detection.pose.x == 5.2,
+      "an obstacle seen again replaces its memory");
+    memory.senseObstacles([], null, 4.5);
+    check(!memory.isTraversable(10, 10), "a memory is counted from when the obstacle was last seen");
+    memory.senseObstacles([], null, 1.0);
+    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "an obstacle out of view is forgotten when the memory runs out");
+    // The sensor at (0, 5) facing +x: 72 rays, one every five degrees, the first straight at the obstacle.
+    memory.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    var nothing = [for (_ in 0...72) 6.0];
+    var seesBox = nothing.copy(); seesBox[0] = 4.8;
+    var occluded = nothing.copy(); occluded[0] = 3.0;
+    memory.senseObstacles([], scanOf(seesBox), 0.1);
+    check(!memory.isTraversable(10, 10), "a scan that still returns from the obstacle's place keeps it");
+    memory.senseObstacles([], scanOf(occluded), 0.1);
+    check(!memory.isTraversable(10, 10), "a scan that is blocked short of the obstacle's place says nothing of it");
+    memory.senseObstacles([], scanOf(nothing), 0.1);
+    check(memory.isTraversable(10, 10) && memory.dynamicLayer().length == 0,
+      "a scan that sees through the obstacle's place clears it");
+    var forgetful = new Costmap2(new OccupancyGrid2(0.5, new Pose2(), 20, 20, "map", OccupancyCell.Free), 0.0, false, 0.0, 0.0);
+    forgetful.senseObstacles([sightingAt(5.0, 5.0)], null, 0.1);
+    forgetful.senseObstacles([], null, 0.1);
+    check(forgetful.isTraversable(10, 10), "without a memory only the latest observation counts");
 
     // A 0.1 m obstacle and a 0.3 m robot: a cell is lethal within 0.4 m of the
     // obstacle and blocked within 0.4 m plus half a 0.2 m cell diagonal.
@@ -2885,6 +2976,27 @@ class RobotWorldTests {
     equal(framedObstacle.radiusMeters, obstacles[0].radiusMeters,
       "frame-aware perception retains obstacle geometry");
     equal(lidar.frameId, "base", "frame-aware perception does not mutate input sensor frames");
+
+    // A map explains the returns that land on it: a wall at the first ray's hit point goes, the
+    // return on free floor stays.
+    var knownMap = new OccupancyGrid2(0.1, new Pose2(), 100, 50, "map", OccupancyCell.Free);
+    knownMap.setCell(40, 22, OccupancyCell.Occupied);
+    var mappedFrame = new SensorFrame("front-lidar", "lidar", "laser", Int64.ofInt(10), Int64.ofInt(140),
+      [1.0, 10.0, 2.0, 10.0], Int64.ofInt(150), "base", [0.2, 0.0, 0.3], laserMount.rotation,
+      "robot-boot", "host-clock");
+    var mappedSnapshot = new RobotSnapshot("framed-lidar", Int64.ofInt(10), Int64.ofInt(140), [0.75], [0.0], [0.0],
+      1, 0, Int64.ofInt(150), [mappedFrame], "robot-boot", "host-clock");
+    var unmapped = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate)).observeRobotSnapshot(
+      mappedSnapshot, perceptionModel, articulatedBlueprint, "base");
+    equal(unmapped.obstacles().length, 2, "without a map both returns are obstacles");
+    var mappedPerception = new FrameAwarePerception(perception, new FixedLocalization(mapEstimate), null,
+      new LidarMapFilter(knownMap, 0.1, 10.0));
+    var leftOver = mappedPerception.observeRobotSnapshot(mappedSnapshot, perceptionModel, articulatedBlueprint, "base")
+      .obstacles();
+    check(leftOver.length == 1 && Math.abs(leftOver[0].detection.pose.x - 7.0) < 1e-9 &&
+      Math.abs(leftOver[0].detection.pose.y - 2.2) < 1e-9,
+      "a LiDAR map filter drops the returns the map explains and keeps the rest");
+    equal(mappedFrame.values.get(0), 1.0, "the map filter does not change the frame it was given");
 
     var detections = observed.detections();
     detections.pop();
@@ -4125,6 +4237,50 @@ class RobotWorldTests {
       "camera protocol rejects malformed raw image dimensions on receipt");
   }
 
+  /**
+   * A full 360-ray scan reaches Haxe intact beside an IMU's values, each at its own place in the state's
+   * value pool, and a snapshot is no larger than it was when sensors could report 64 values each.
+   */
+  static function testFullScan():Void {
+    var model = new RobotModel("full-scan");
+    var base = model.addLink(new Link("base", "link/base"));
+    var scan = model.addSensor(new robotkit.model.Sensor("scan", "lidar", 0, "sensor/scan"));
+    scan.rayCount = 360;
+    scan.maxRange = 6.0;
+    var imu = model.addSensor(new robotkit.model.Sensor("imu", "imu", 0, "sensor/imu"));
+    var blueprint = RobotRuntimeCompiler.compile(model);
+    var simulationHarness = new SimulationHarness();
+    var runtime = simulationHarness.simulation.addRobot(blueprint);
+    var robot = new SimulatedRobot("full-scan", runtime, "full-scan", ["base"], []);
+    simulationHarness.spawnBox([2.0, 0.0, 0.0], [0.25, 0.25, 0.25]);
+    simulationHarness.step(Int64.ofInt(1));
+    simulationHarness.step(Int64.ofInt(2));
+    var frames = robot.snapshot().sensors;
+    var found:Null<SensorFrame> = null, motion:Null<SensorFrame> = null;
+    for (frame in frames.toArray()) {
+      if (frame.sensorId == "sensor/scan") found = frame;
+      if (frame.sensorId == "sensor/imu") motion = frame;
+    }
+    if (found == null || motion == null) throw "the scan and the IMU are published";
+    var ranges:SensorFrame = cast found;
+    equal(ranges.values.length, 360, "a 360-ray scan keeps all its rays");
+    equal(cast(motion, SensorFrame).values.length, 6, "the IMU beside it keeps its six values");
+    check(Math.abs(ranges.values.get(0) - 1.75) < 1e-6, "the ray at the box reads its face");
+    var hits = 0, symmetric = true;
+    for (ray in 0...360) {
+      if (ranges.values.get(ray) < 6.0) hits++;
+      if (Math.abs(ranges.values.get(ray) - ranges.values.get((360 - ray) % 360)) > 1e-6) symmetric = false;
+    }
+    check(hits >= 10 && hits <= 25 && symmetric && ranges.values.get(180) == 6.0 && ranges.values.get(359) < 6.0,
+      "the rays on either side of the box read it, and the rest read their full range");
+    check(Math.abs(cast(motion, SensorFrame).values.get(5) - 9.81) < 1e-6, "the IMU's values are its own, not the scan's");
+    // Values live in a shared pool, not at every sensor's worst case: the snapshot is no larger than
+    // it was when eight sensors could report 64 values each (21008 bytes).
+    check(rk_robot_snapshot.size() <= 21008, "a robot snapshot is no larger than before sensors could report 360 values");
+    robot.close();
+    simulationHarness.dispose();
+  }
+
   static function testConfiguredSensors():Void {
     var model = new RobotModel("configured");
     var base = model.addLink(new Link("base", "link/stable"));
@@ -4203,7 +4359,7 @@ class RobotWorldTests {
     simulationHarness.step(Int64.ofInt(1));
     equal(robot.snapshot().sensors.get(1).values.get(0), noisyValue, "reset repeats seeded noise deterministically");
     robot.close(); simulationHarness.dispose(); replay.close();
-    scan.rayCount = 65;
+    scan.rayCount = 361;
     mount.rotation = [0.0, 0.0, 0.0, 0.0];
     noisy.updateRate = -1.0;
     var diagnostics = RobotRuntimeCompiler.validate(model);
