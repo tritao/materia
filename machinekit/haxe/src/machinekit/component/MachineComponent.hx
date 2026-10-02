@@ -52,6 +52,10 @@ class MachineComponent {
 			case VacuumSource(_, outputPort): port(outputPort);
 			case VacuumActuator(inletPort) | VacuumValve(inletPort) | ChangerLock(inletPort): port(inletPort);
 			case VacuumPressureSensor(vacuumPort, signalPort): port(vacuumPort); port(signalPort);
+			case PlanarScanner(scanConnector, rayCount, maxRangeMeters, rateHz):
+				connector(scanConnector);
+				if (rayCount < 2 || !(maxRangeMeters > 0) || !(rateHz > 0))
+					throw 'Planar scanner on "$designation" needs rays, a range and a rate';
 		}
 		capabilityList.push(capability);
 	}

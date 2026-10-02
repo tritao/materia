@@ -10,4 +10,10 @@ enum ComponentCapability {
 	VacuumValve(controlPort:String);
 	VacuumPressureSensor(vacuumPort:String, signalPort:String);
 	ChangerLock(inletPort:String);
+	/**
+	 * A planar scanner: it sweeps `rayCount` rays round the horizontal plane of its connector
+	 * `scanConnector` (zero bearing along the connector's +X), seeing out to `maxRangeMeters`, and
+	 * scans `rateHz` times a second.
+	 */
+	PlanarScanner(scanConnector:String, rayCount:Int, maxRangeMeters:Float, rateHz:Float);
 }

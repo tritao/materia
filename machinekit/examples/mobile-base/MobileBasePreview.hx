@@ -25,6 +25,7 @@ class MobileBasePreview {
 		var robot = new MobileBase();
 		var scene = AssemblyPreview.scene(robot, ASSEMBLY_ID);
 		scene.mobileBase = drive(robot, "");
+		scene.robotSensors = AssemblyPreview.robotSensors(robot, "");
 		return SceneArtifact.encode(scene);
 	}
 
@@ -37,6 +38,7 @@ class MobileBasePreview {
 		section.origin = metres(MobileBaseCell.ORIGIN);
 		scene.mobileBase = section;
 		scene.robotTools = robotTools(cell.robot, "robot/");
+		scene.robotSensors = AssemblyPreview.robotSensors(cell.robot, "robot/");
 		scene.mission = {loop: true,
 			steps: [for (step in MobileBaseCell.ROUND) switch step {
 				case GoTo(pose): {kind: "goTo", pose: metres(pose)};
@@ -105,6 +107,16 @@ class MobileBaseChecks {
 			throw "Mobile base speed limits ask more of the wheels than their joints allow";
 		var scan = state.worldConnector("lidar", "scan");
 		near(scan.z, MobileBase.DECK_Z + MobileBase.DECK_THICKNESS + LidarPuck.SCAN_HEIGHT, "lidar scan height", 1e-9);
+		near(scan.x, MobileBase.LIDAR_X, "lidar position along the robot", 1e-9);
+		var zero = AssemblyFrames.transformVector(scan, 1, 0, 0), up = AssemblyFrames.transformVector(scan, 0, 0, 1);
+		near(zero.x, 1, "lidar zero bearing points ahead", 1e-9);
+		near(up.z, 1, "lidar scans a horizontal plane", 1e-9);
+		// The scene mounts the lidar where the puck says, scanning the full circle of its connector's plane.
+		var sensors = scene.robotSensors;
+		if (sensors == null || sensors.length != 1) throw "Mobile base preview should declare its lidar";
+		if (sensors[0].mount.occurrence != "lidar" || sensors[0].mount.connector != "scan" || sensors[0].kind != "lidar")
+			throw "Mobile base lidar should be mounted at the puck's scan connector";
+		near(sensors[0].maxRange, LidarPuck.RANGE, "declared lidar range", 1e-12);
 
 		// Each wheel joint turns its wheel about its own motor's shaft, which points outward. Spinning
 		// about +Y rolls a wheel forward, so a positive speed drives the left wheel forward and the right one back.
@@ -158,6 +170,8 @@ class MobileBaseChecks {
 	static function checkCell():Void {
 		var scene = SceneArtifact.decode(MobileBasePreview.cell());
 		if (scene.mobileBase == null || scene.mission == null) throw "Mobile base cell should carry its drive and mission";
+		if (scene.robotSensors == null || scene.robotSensors[0].mount.occurrence != "robot/lidar")
+			throw "Mobile base cell should carry its lidar, mounted on the robot's puck";
 		var cell = new MobileBaseCell();
 		var model = new AssemblyModel("mm");
 		cell.addTo(model, "");

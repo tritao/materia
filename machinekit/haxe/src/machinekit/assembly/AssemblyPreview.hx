@@ -8,6 +8,7 @@ import materia.assembly.AssemblyDefinition.AssemblyComponentDefinition;
 import materia.project.MaterialLibrary;
 import materia.project.SceneArtifact.SceneArtifactData;
 import materia.project.SceneArtifact.SceneArtifactPart;
+import materia.project.SceneArtifact.SceneArtifactRobotSensor;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorControls;
@@ -65,6 +66,21 @@ class AssemblyPreview {
 			if (controls.vacuumSensor != null) entry.sensor = controls.vacuumSensor;
 			entry;
 		}];
+	}
+
+	/**
+	 * The sensors `robot` declares, its members' occurrences under `prefix`: each planar scanner,
+	 * mounted at its scan connector and named after its occurrence.
+	 */
+	public static function robotSensors(robot:MachineAssembly, prefix:String):Array<SceneArtifactRobotSensor> {
+		var result:Array<SceneArtifactRobotSensor> = [];
+		for (entry in robot.components()) for (capability in entry.component.capabilities()) switch capability {
+			case PlanarScanner(scanConnector, rayCount, maxRangeMeters, rateHz):
+				result.push({kind: "lidar", id: prefix + entry.id, mount: {occurrence: prefix + entry.id, connector: scanConnector},
+					rayCount: rayCount, maxRange: maxRangeMeters, updateRate: rateHz});
+			case _:
+		}
+		return result;
 	}
 
 	public static function shareDefinitions(definition:AssemblyDefinition, definitionByOccurrence:Map<String, String>):Void {

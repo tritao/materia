@@ -68,6 +68,23 @@ typedef SceneArtifactData = {
 	@:optional var mission:SceneArtifactMission;
 	/** The tools the assembly's robot works with; see SceneArtifactRobotTool. */
 	@:optional var robotTools:Array<SceneArtifactRobotTool>;
+	/** The sensors on the assembly's robot; see SceneArtifactRobotSensor. */
+	@:optional var robotSensors:Array<SceneArtifactRobotSensor>;
+}
+
+/**
+ * A sensor on the assembly's robot (since version 14), as its part declares it. A `lidar` scans the
+ * horizontal plane of the connector `mount.connector` of the occurrence `mount.occurrence`, `rayCount`
+ * rays round the full circle from the connector's +X axis, seeing out to `maxRange` metres and scanning
+ * `updateRate` times a second. `id` names it in the robot's observations.
+ */
+typedef SceneArtifactRobotSensor = {
+	var kind:String;
+	var id:String;
+	var mount:SceneArtifactPlace;
+	var rayCount:Int;
+	var maxRange:Float;
+	var updateRate:Float;
 }
 
 /**
@@ -187,7 +204,7 @@ typedef SceneArtifactTool = {
 
 /** Versioned, producer-independent scene geometry exchange format. */
 class SceneArtifact {
-	public static inline var VERSION:Int = 13;
+	public static inline var VERSION:Int = 14;
 	public static inline var MAX_BYTES:Int = 150000000;
 	static inline var MAX_VERTICES:Int = 2000000;
 	static inline var MAX_TRIANGLES:Int = 4000000;
@@ -218,8 +235,10 @@ class SceneArtifact {
 		if (mission.length > 1000000) throw "Scene artifact mission is too large";
 		var robotTools = data.robotTools == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotTools));
 		if (robotTools.length > 100000) throw "Scene artifact robot tools are too large";
+		var robotSensors = data.robotSensors == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.robotSensors));
+		if (robotSensors.length > 100000) throw "Scene artifact robot sensors are too large";
 		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4 + robotTools.length + 4 + robotSensors.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -315,6 +334,8 @@ class SceneArtifact {
 		result.blit(offset, mission, 0, mission.length); offset += mission.length;
 		offset = putInt(result, offset, robotTools.length);
 		result.blit(offset, robotTools, 0, robotTools.length); offset += robotTools.length;
+		offset = putInt(result, offset, robotSensors.length);
+		result.blit(offset, robotSensors, 0, robotSensors.length); offset += robotSensors.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -363,6 +384,7 @@ class SceneArtifact {
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
 		if (data.robotTools != null) validateRobotTools(data.robotTools, data);
+		if (data.robotSensors != null) validateRobotSensors(data.robotSensors, data);
 		if (data.mission != null) validateMission(data.mission, data);
 	}
 
@@ -386,6 +408,53 @@ class SceneArtifact {
 			channels.set(tool.channel, true);
 			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
 		}
+	}
+
+	static function validateRobotSensors(sensors:Array<SceneArtifactRobotSensor>, data:SceneArtifactData):Void {
+		function fail(detail:String):Void throw 'Scene artifact robot sensor $detail';
+		var definition = data.assemblyDefinition;
+		if (definition == null) fail("needs the robot's assembly definition");
+		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
+		var ids = new Map<String, Bool>();
+		for (sensor in sensors) {
+			if (sensor == null || sensor.kind != "lidar") fail('kind "${sensor == null ? null : sensor.kind}" is unknown');
+			if (sensor.id == null || sensor.id.length == 0 || ids.exists(sensor.id)) fail("needs an id of its own");
+			ids.set(sensor.id, true);
+			var mount = sensor.mount;
+			var occurrence = mount == null ? [] : [for (item in flat.occurrences) if (item.id == mount.occurrence) item];
+			if (occurrence.length != 1) fail('"${sensor.id}" is mounted on no occurrence of the assembly');
+			var found = false;
+			for (component in flat.definitions) if (component.id == occurrence[0].definition)
+				for (connector in component.connectors) if (connector.name == mount.connector) found = true;
+			if (!found) fail('"${sensor.id}" has no mount connector "${mount.connector}" on "${mount.occurrence}"');
+			if (sensor.rayCount < 2 || sensor.rayCount > 64) fail('"${sensor.id}" needs 2 to 64 rays');
+			if (!finite(sensor.maxRange) || sensor.maxRange <= 0 || !finite(sensor.updateRate) || sensor.updateRate <= 0)
+				fail('"${sensor.id}" needs a positive range and rate');
+		}
+	}
+
+	/** Robot sensors from their JSON section, typed field by field. */
+	static function decodeRobotSensors(decoded:Dynamic):Array<SceneArtifactRobotSensor> {
+		function fail():Dynamic throw "Scene artifact robot sensors are invalid";
+		function text(value:Dynamic, name:String):String {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, String) ? item : fail();
+		}
+		function number(value:Dynamic, name:String):Float {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+		}
+		if (!Std.isOfType(decoded, Array)) fail();
+		return [for (raw in (cast decoded:Array<Dynamic>)) {
+			var mount:Dynamic = Reflect.field(raw, "mount");
+			if (mount == null) fail();
+			var rays = number(raw, "rayCount");
+			if (rays != Math.floor(rays)) fail();
+			var sensor:SceneArtifactRobotSensor = {kind: text(raw, "kind"), id: text(raw, "id"),
+				mount: {occurrence: text(mount, "occurrence"), connector: text(mount, "connector")},
+				rayCount: Std.int(rays), maxRange: number(raw, "maxRange"), updateRate: number(raw, "updateRate")};
+			sensor;
+		}];
 	}
 
 	/** Robot tools from their JSON section, typed field by field. */
@@ -687,7 +756,7 @@ private class SceneArtifactReader {
 			throw "Scene artifact has an invalid signature";
 		var version = readInt();
 		if (version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7 &&
-			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != SceneArtifact.VERSION)
+			version != 8 && version != 9 && version != 10 && version != 11 && version != 12 && version != 13 && version != SceneArtifact.VERSION)
 			throw 'Unsupported scene artifact version $version';
 		var metresPerUnit = readDouble();
 		var lengthUnit = version >= 8 ? readText() : null;
@@ -804,12 +873,19 @@ private class SceneArtifactReader {
 			if (toolsLength > 0)
 				robotTools = @:privateAccess SceneArtifact.decodeRobotTools(haxe.Json.parse(readBytes(toolsLength).getString(0, toolsLength)));
 		}
+		var robotSensors:Null<Array<SceneArtifactRobotSensor>> = null;
+		if (version >= 14) {
+			var sensorsLength = readInt();
+			if (sensorsLength < 0 || sensorsLength > 100000) throw "Scene artifact robot sensors are too large";
+			if (sensorsLength > 0)
+				robotSensors = @:privateAccess SceneArtifact.decodeRobotSensors(haxe.Json.parse(readBytes(sensorsLength).getString(0, sensorsLength)));
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
 			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission,
-			robotTools: robotTools};
+			robotTools: robotTools, robotSensors: robotSensors};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

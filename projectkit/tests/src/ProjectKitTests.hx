@@ -184,7 +184,7 @@ class ProjectKitTests {
     // A version 12 scene is the same bytes without the trailing mobile-base and mission sections.
     data.mobileBase = null;
     var plain = SceneArtifact.encode(data);
-    var older = Bytes.alloc(plain.length - 12);
+    var older = Bytes.alloc(plain.length - 16);
     older.blit(0, plain, 0, older.length);
     older.setInt32(4, 12);
     var read = SceneArtifact.decode(older);
@@ -242,6 +242,28 @@ class ProjectKitTests {
     data.robotTools.push({kind: "suction", contact: {occurrence: "mast", connector: "pin"}, channel: "tool/cup.enable"});
     rejects(function() SceneArtifact.encode(data), "two tools on one channel");
     data.robotTools.pop(); mission.steps.pop(); data.robotTools = null;
+    // Sensors name the connector they scan from.
+    data.robotSensors = [{kind: "lidar", id: "chassis/scanner", mount: {occurrence: "chassis", connector: "pin"},
+      rayCount: 64, maxRange: 6.0, updateRate: 10.0}];
+    var sensed = SceneArtifact.decode(SceneArtifact.encode(data)).robotSensors;
+    if (sensed == null || sensed.length != 1) throw "robot sensor round trip lost data";
+    check(sensed[0].id == "chassis/scanner" && sensed[0].mount.connector == "pin" && sensed[0].rayCount == 64 &&
+      sensed[0].maxRange == 6.0 && sensed[0].updateRate == 10.0, "robot sensor round trip");
+    data.robotSensors[0].mount.connector = "nowhere";
+    rejects(function() SceneArtifact.encode(data), "sensor mounted on a missing connector");
+    data.robotSensors[0].mount.connector = "pin"; data.robotSensors[0].rayCount = 65;
+    rejects(function() SceneArtifact.encode(data), "sensor with more rays than a runtime reports");
+    data.robotSensors[0].rayCount = 64; data.robotSensors.push({kind: "lidar", id: "chassis/scanner",
+      mount: {occurrence: "chassis", connector: "pin"}, rayCount: 64, maxRange: 6.0, updateRate: 10.0});
+    rejects(function() SceneArtifact.encode(data), "two sensors with one id");
+    // A version 13 artifact has no sensors section: it still reads, without sensors.
+    data.robotSensors = null;
+    var current = SceneArtifact.encode(data);
+    var thirteen = Bytes.alloc(current.length - 4);
+    thirteen.blit(0, current, 0, thirteen.length);
+    thirteen.setInt32(4, 13);
+    check(SceneArtifact.decode(thirteen).robotSensors == null && SceneArtifact.decode(thirteen).mobileBase != null,
+      "version 13 scene artifacts still read");
     data.mobileBase = null;
     rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
     data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;

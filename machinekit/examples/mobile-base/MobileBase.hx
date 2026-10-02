@@ -169,11 +169,16 @@ class LidarPuck extends MachineComponent {
 	public static inline var DIAMETER:Float = 76;
 	public static inline var HEIGHT:Float = 70;
 	public static inline var SCAN_HEIGHT:Float = 50;
+	/** 64 returns (the most a RobotKit sensor reports), ten scans a second, out to six metres. */
+	public static inline var RAYS:Int = 64;
+	public static inline var RANGE:Float = 6;
+	public static inline var RATE:Float = 10;
 
 	public function new() {
 		super("LIDAR-D76-H70", "Planar scanning lidar", "plastic", true);
 		addConnector("base", Mount, Solids.axial(0, 0, 0));
 		addConnector("scan", Mount, AssemblyFrames.translation(0, 0, SCAN_HEIGHT));
+		addCapability(PlanarScanner("scan", RAYS, RANGE, RATE));
 	}
 
 	override public function hasGeometry():Bool return true;
