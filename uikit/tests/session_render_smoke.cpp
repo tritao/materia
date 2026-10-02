@@ -720,7 +720,7 @@ int main() {
         if (!result) {
             const std::string word(512, 'a');
             nkui_text_style row_style{sizeof(row_style), NKUI_FONT_FAMILY_DEFAULT, 18.0f, 0.0f};
-            nkui_paragraph_style row_paragraph{sizeof(row_paragraph), 0.0f,
+            nkui_paragraph_style row_paragraph{sizeof(row_paragraph), 24.0f,
                 NKUI_TEXT_WRAP_WORD_CHARACTER, NKUI_TEXT_ALIGN_START, NKUI_TEXT_DIRECTION_AUTO};
             if (nkui_text_layout_create_styled(fonts, word.c_str(), 140.0f, &row_style,
                                                &row_paragraph, &wrapped_rows) != NKUI_OK)
@@ -781,6 +781,58 @@ int main() {
                 std::fprintf(stderr, "Unicode row edit rebuilt unchanged rasters\n");
                 result = 51;
             }
+            std::vector<uint8_t> original_pixels(framebuffer_width * framebuffer_height * 4);
+            if (!result)
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA,
+                             GL_UNSIGNED_BYTE, original_pixels.data());
+            nkui_renderer_stats moved_rows{}, restored_rows{};
+            if (!result && (nkui_text_layout_edit(wrapped_rows, 0, 0, "\n") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &moved_rows) != NKUI_OK))
+                result = 52;
+            if (!result && (moved_rows.raster_cache_hits < unicode_rows.raster_cache_hits + 2 ||
+                moved_rows.raster_cache_misses != unicode_rows.raster_cache_misses + 2)) {
+                std::fprintf(stderr, "Newline insertion discarded moved row rasters\n");
+                result = 53;
+            }
+            if (!result) {
+                std::vector<uint8_t> moved_pixels(original_pixels.size());
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA,
+                             GL_UNSIGNED_BYTE, moved_pixels.data());
+                // The second original row moves down by the explicit line height.
+                for (int y = 28; y < 52; ++y)
+                    for (int x = 8; x < 148; ++x)
+                        for (int channel = 0; channel < 4; ++channel) {
+                            const auto old_pixel = ((framebuffer_height - y - 1) *
+                                                    framebuffer_width + x) * 4 + channel;
+                            const auto new_pixel = ((framebuffer_height - y - 25) *
+                                                    framebuffer_width + x) * 4 + channel;
+                            if (original_pixels[old_pixel] != moved_pixels[new_pixel])
+                                result = 57;
+                        }
+            }
+            if (!result && (nkui_text_layout_edit(wrapped_rows, 0, 1, "") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &restored_rows) != NKUI_OK))
+                result = 54;
+            if (!result && (restored_rows.raster_cache_hits < moved_rows.raster_cache_hits + 2 ||
+                restored_rows.raster_cache_misses != moved_rows.raster_cache_misses + 2))
+                result = 55;
+            if (!result) {
+                std::vector<uint8_t> restored_pixels(original_pixels.size());
+                glReadPixels(0, 0, framebuffer_width, framebuffer_height, GL_RGBA,
+                             GL_UNSIGNED_BYTE, restored_pixels.data());
+                if (restored_pixels != original_pixels)
+                    result = 56;
+            }
+            if (!result)
+                std::printf("moved row raster cache: inserted hits=%llu misses=%llu; deleted hits=%llu misses=%llu\n",
+                    static_cast<unsigned long long>(moved_rows.raster_cache_hits - unicode_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(moved_rows.raster_cache_misses - unicode_rows.raster_cache_misses),
+                    static_cast<unsigned long long>(restored_rows.raster_cache_hits - moved_rows.raster_cache_hits),
+                    static_cast<unsigned long long>(restored_rows.raster_cache_misses - moved_rows.raster_cache_misses));
+
+
         }
         if (wrapped_rows.id)
             nkui_resource_destroy(wrapped_rows);

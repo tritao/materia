@@ -3640,7 +3640,7 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                             (static_cast<uint64_t>(source_resource) << 32) ^ row->publication_key;
                         row_command.content_generation = content_generation;
                         valid = frame_resources.bind_text(row_command.resource, *row,
-                                                          content_generation);
+                                                          content_generation, {source_resource});
                         if (!valid)
                             break;
                         owned_row_binds.push_back({row_command.resource, layout, std::move(row),
@@ -3775,7 +3775,8 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
                 bind.layout->text_color_ranges);
             if (!bind.glyphs ||
                 !frame_resources.bind_text(bind.id, *bind.glyphs,
-                                           bind.content_generation))
+                                           bind.content_generation,
+                                           frame_resources.source_identity(bind.id)))
                 return NKUI_ERROR_RENDERING;
         }
     }
@@ -3784,13 +3785,15 @@ static nkui_result renderer_render_frame_impl(nkui_renderer renderer, nkui_displ
     for (const auto &bind : owned_text_binds) {
         if (!sealable)
             break;
-        if (!owned_resources.bind_text(bind.id, bind.glyphs, bind.content_generation))
+        if (!owned_resources.bind_text(bind.id, bind.glyphs, bind.content_generation,
+                                       frame_resources.source_identity(bind.id)))
             sealable = false;
     }
     for (const auto &bind : owned_row_binds) {
         if (!sealable)
             break;
-        if (!owned_resources.bind_text(bind.id, bind.glyphs, bind.content_generation))
+        if (!owned_resources.bind_text(bind.id, bind.glyphs, bind.content_generation,
+                                       frame_resources.source_identity(bind.id)))
             sealable = false;
     }
     if (!sealable && threaded)
@@ -4293,9 +4296,9 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                             (static_cast<uint64_t>(source_resource) << 32) ^ row->publication_key;
                         row_command.custom_payload = false;
                         valid = frame_resources.bind_text(row_command.resource, *row,
-                                                          row_command.content_generation);
+                                                          row_command.content_generation, {source_resource});
                         if (valid && !owned_resources.bind_text(row_command.resource, row,
-                                                                 row_command.content_generation))
+                                                                 row_command.content_generation, {source_resource}))
                             sealable = false;
                         if (!valid)
                             break;
@@ -4330,7 +4333,11 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                                     raster.target_descriptor.height = height;
                                     raster.cache_key = row_command.content_generation;
                                     auto raster_command = row_command;
-                                    raster_command.transform[5] -= static_cast<float>(top);
+                                    // Canonical row-local translation remains identical
+                                    // when a row moves by whole pixels in the parent.
+                                    raster_command.transform[5] += raster_command.y *
+                                        raster_command.transform[3] - static_cast<float>(top);
+                                    raster_command.y = 0.0f;
                                     raster_command.has_scissor = false;
                                     raster_command.opacity = 1.0f;
                                     raster.commands.push_back(std::move(raster_command));
@@ -4475,10 +4482,12 @@ extern "C" nkui_result nkui_layout_session_render_frame(nkui_renderer renderer,
                 bind.layout->text_color_ranges);
             if (!bind.glyphs ||
                 !frame_resources.bind_text(bind.id, *bind.glyphs,
-                                           bind.content_generation))
+                                           bind.content_generation,
+                                           frame_resources.source_identity(bind.id)))
                 return NKUI_ERROR_RENDERING;
             if (!owned_resources.bind_text(bind.id, bind.glyphs,
-                                           bind.content_generation))
+                                           bind.content_generation,
+                                           frame_resources.source_identity(bind.id)))
                 sealable = false;
         }
     }
