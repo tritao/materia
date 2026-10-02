@@ -248,6 +248,68 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
   }
 
+  /** A torch tool carries its welder with it, and names only what the assembly has. */
+  static function torchTool():Void {
+    var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
+    vertices.setDouble(24, 1); vertices.setDouble(56, 1); vertices.setDouble(88, 1);
+    var corners = [0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3];
+    for (i in 0...corners.length) indices.setInt32(i * 4, corners[i]);
+    var frame = AssemblyFrames.identity();
+    var cell:AssemblyDefinition = {schemaVersion: AssemblyDefinitionCodec.VERSION, id: "cell", lengthUnit: "mm",
+      definitions: [{id: "body", connectors: [{name: "tcp", frame: frame}]}],
+      occurrences: [for (id in ["torch", "plate", "upright"]) {id: id, definition: "body", initialPose: frame}], joints: []};
+    function welder():materia.project.SceneArtifact.SceneArtifactTorch
+      return {wireSpeedChannel: "tool/torch.wire_speed", voltageChannel: "tool/torch.voltage", groundedWork: ["plate", "upright"],
+        maxCurrentA: 350.0, efficiency: 0.88, wireDiameterMm: 1.2, stickoutMm: 15.0};
+    function torch():materia.project.SceneArtifact.SceneArtifactRobotTool
+      return {kind: "torch", contact: {occurrence: "torch", connector: "tcp"}, channel: "tool/torch.arc",
+        sensor: "tool/torch.weld", torch: welder()};
+    var data:materia.project.SceneArtifact.SceneArtifactData = {lengthUnit: "mm", metresPerUnit: 0.001,
+      parts: [{id: "body", name: "body", red: 0.5, green: 0.5, blue: 0.5, vertexCount: 4, indexCount: 12,
+        vertices: vertices, normals: normals, indices: indices, faceRanges: []}],
+      assemblyDefinition: cell, robotTools: [torch()]};
+    var restored = SceneArtifact.decode(SceneArtifact.encode(data)).robotTools;
+    if (restored == null || restored.length != 1 || restored[0].torch == null) throw "torch tool round trip lost the tool";
+    var back:materia.project.SceneArtifact.SceneArtifactTorch = cast restored[0].torch;
+    check(restored[0].kind == "torch" && restored[0].channel == "tool/torch.arc" && restored[0].sensor == "tool/torch.weld" &&
+      restored[0].contact.connector == "tcp" && back.wireSpeedChannel == "tool/torch.wire_speed" &&
+      back.voltageChannel == "tool/torch.voltage" && back.groundedWork.join(",") == "plate,upright" && back.maxCurrentA == 350.0 &&
+      back.efficiency == 0.88 && back.wireDiameterMm == 1.2 && back.stickoutMm == 15.0, "torch tool round trip");
+    // A suction tool beside it keeps working, and the torch's channels may not collide with it.
+    data.robotTools = [torch(), {kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable"}];
+    var both = SceneArtifact.decode(SceneArtifact.encode(data)).robotTools;
+    check(both != null && both.length == 2, "torch beside a suction tool");
+    data.robotTools = [torch()];
+    function bad(change:(materia.project.SceneArtifact.SceneArtifactRobotTool, materia.project.SceneArtifact.SceneArtifactTorch) -> Void,
+        message:String):Void {
+      var tool = torch(), welding = welder();
+      tool.torch = welding;
+      change(tool, welding);
+      data.robotTools = [tool];
+      rejects(function() SceneArtifact.encode(data), message);
+    }
+    bad((tool, w) -> tool.torch = null, "torch without its welder");
+    bad((tool, w) -> tool.sensor = null, "torch without its weld sensor");
+    bad((tool, w) -> tool.contact.connector = "nowhere", "torch whose wire tip is no connector");
+    bad((tool, w) -> w.groundedWork = [], "torch with no grounded work");
+    bad((tool, w) -> w.groundedWork = ["plate", "ghost"], "torch grounded on an occurrence the assembly lacks");
+    bad((tool, w) -> w.groundedWork = ["plate", "plate"], "torch grounded on one occurrence twice");
+    bad((tool, w) -> w.voltageChannel = "tool/torch.arc", "torch whose voltage shares the arc channel");
+    bad((tool, w) -> w.wireSpeedChannel = "", "torch with an unnamed wire speed channel");
+    bad((tool, w) -> w.maxCurrentA = 0, "torch with no supply rating");
+    bad((tool, w) -> w.efficiency = 1.2, "torch with a supply that gives more than it takes");
+    bad((tool, w) -> w.wireDiameterMm = Math.NaN, "torch with a wire that is not a number");
+    bad((tool, w) -> w.stickoutMm = 0, "torch with no stickout");
+    bad((tool, w) -> tool.kind = "plasma", "tool of an unknown kind");
+    data.robotTools = [torch(), torch()];
+    data.robotTools[1].channel = "tool/other.arc";
+    data.robotTools[1].torch = {wireSpeedChannel: "w2", voltageChannel: "v2", groundedWork: ["plate"], maxCurrentA: 350.0,
+      efficiency: 0.88, wireDiameterMm: 1.2, stickoutMm: 15.0};
+    rejects(function() SceneArtifact.encode(data), "a second torch");
+    data.robotTools = [{kind: "suction", contact: {occurrence: "plate", connector: "tcp"}, channel: "cup.enable", torch: welder()}];
+    rejects(function() SceneArtifact.encode(data), "a suction tool with a welder");
+  }
+
   /** A machining job travels with its machine and names only what the scene has. */
   static function machining():Void {
     var vertices = Bytes.alloc(96), normals = Bytes.alloc(96), indices = Bytes.alloc(48);
@@ -364,7 +426,7 @@ class ProjectKitTests {
     near(LengthUnit.metresPerUnit("in"), 0.0254, "inches");
     check(LengthUnit.fromScale(0.01) == "cm", "scale to centimetres");
     rejects(function() LengthUnit.metresPerUnit("feet"), "unsupported unit");
-    assembly(); frames(); scene(); machining(); mobileBase(); bodies();
+    assembly(); frames(); scene(); machining(); mobileBase(); torchTool(); bodies();
     check(MaterialLibrary.require("steel-c45").physical.density == 7850, "steel density");
     check(MaterialLibrary.fromSpec("steel C45") == "steel-c45", "material lookup");
     rejects(function() MaterialLibrary.require("unknown"), "unknown material");

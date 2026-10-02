@@ -75,12 +75,34 @@ typedef SceneArtifactData = {
  * capabilities say: a `suction` tool seals on what touches the occurrence `contact.occurrence` at its
  * connector `contact.connector` while the digital process channel `channel` is on, and reports the
  * vacuum it pulls on the sensor `sensor` when it has one.
+ *
+ * A `torch` tool is a MIG/MAG welding torch: `contact` is the connector at its wire tip (the tool point),
+ * `channel` is the digital channel that lights its arc, `sensor` is its `tool_weld` sensor, and `torch`
+ * describes the welder behind it. The kind is part of the same JSON section, so it needs no format version.
  */
 typedef SceneArtifactRobotTool = {
 	var kind:String;
 	var contact:SceneArtifactPlace;
 	var channel:String;
 	@:optional var sensor:String;
+	@:optional var torch:SceneArtifactTorch;
+}
+
+/**
+ * The welder a `torch` robot tool runs on. `wireSpeedChannel` (metres per minute) and `voltageChannel` (volts)
+ * are its analogue setpoints. The weld circuit closes through the occurrences in `groundedWork` (the work
+ * clamp's member and what is welded to it); the arc strikes only against them. `maxCurrentA` is the supply's
+ * rating, `efficiency` the fraction of the mains power it delivers to the arc, `wireDiameterMm` the wire's
+ * diameter and `stickoutMm` the wire's extension past the contact tip.
+ */
+typedef SceneArtifactTorch = {
+	var wireSpeedChannel:String;
+	var voltageChannel:String;
+	var groundedWork:Array<String>;
+	var maxCurrentA:Float;
+	var efficiency:Float;
+	var wireDiameterMm:Float;
+	var stickoutMm:Float;
 }
 
 /**
@@ -372,8 +394,10 @@ class SceneArtifact {
 		if (definition == null) fail("needs the robot's assembly definition");
 		var flat = AssemblyDefinitionFlattener.flatten(cast definition);
 		var channels = new Map<String, Bool>();
+		var torches = 0;
 		for (tool in tools) {
-			if (tool == null || tool.kind != "suction") fail('kind "${tool == null ? null : tool.kind}" is unknown');
+			if (tool == null || (tool.kind != "suction" && tool.kind != "torch"))
+				fail('kind "${tool == null ? null : tool.kind}" is unknown');
 			var contact = tool.contact;
 			var occurrence = contact == null ? [] : [for (item in flat.occurrences) if (item.id == contact.occurrence) item];
 			if (occurrence.length != 1) fail("touches with no occurrence of the assembly");
@@ -385,6 +409,38 @@ class SceneArtifact {
 				fail("needs a channel of its own");
 			channels.set(tool.channel, true);
 			if (tool.sensor != null && tool.sensor.length == 0) fail("has an empty sensor name");
+			if (tool.kind == "suction") {
+				if (tool.torch != null) fail("is a suction tool with a torch description");
+				continue;
+			}
+			// A torch is worked on three channels and reports on one sensor; the weld circuit closes through its work.
+			var welder = tool.torch;
+			if (welder == null) {
+				fail("is a torch with no welder description");
+				return;
+			}
+			if (tool.sensor == null) fail("is a torch with no weld sensor");
+			if (++torches > 1) fail("is a second torch: the robot welds with one");
+			for (name in [welder.wireSpeedChannel, welder.voltageChannel]) {
+				if (name == null || name.length == 0 || channels.exists(name)) fail("needs wire speed and voltage channels of its own");
+				channels.set(name, true);
+			}
+			if (welder.groundedWork == null || welder.groundedWork.length == 0)
+				fail("is a torch with no grounded work: the arc has nothing to return through");
+			var grounded = new Map<String, Bool>();
+			for (id in welder.groundedWork) {
+				if (grounded.exists(id) || [for (item in flat.occurrences) if (item.id == id) item].length != 1)
+					fail('names grounded work "$id", which is not a distinct occurrence of the assembly');
+				grounded.set(id, true);
+			}
+			if (!(finite(welder.maxCurrentA) && welder.maxCurrentA > 0 && welder.maxCurrentA <= 2000))
+				fail("needs a supply rating between 0 and 2000 A");
+			if (!(finite(welder.efficiency) && welder.efficiency > 0 && welder.efficiency <= 1))
+				fail("needs a supply efficiency in (0, 1]");
+			if (!(finite(welder.wireDiameterMm) && welder.wireDiameterMm >= 0.5 && welder.wireDiameterMm <= 4.0))
+				fail("needs a wire between 0.5 and 4 mm");
+			if (!(finite(welder.stickoutMm) && welder.stickoutMm > 0 && welder.stickoutMm <= 50))
+				fail("needs a stickout between 0 and 50 mm");
 		}
 	}
 
@@ -403,6 +459,19 @@ class SceneArtifact {
 				contact: {occurrence: text(contact, "occurrence"), connector: text(contact, "connector")},
 				channel: text(raw, "channel")};
 			if (Reflect.field(raw, "sensor") != null) tool.sensor = text(raw, "sensor");
+			var welder:Dynamic = Reflect.field(raw, "torch");
+			if (welder != null) {
+				function number(name:String):Float {
+					var item:Dynamic = Reflect.field(welder, name);
+					return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+				}
+				var work:Dynamic = Reflect.field(welder, "groundedWork");
+				if (!Std.isOfType(work, Array)) fail();
+				tool.torch = {wireSpeedChannel: text(welder, "wireSpeedChannel"), voltageChannel: text(welder, "voltageChannel"),
+					groundedWork: [for (id in (cast work:Array<Dynamic>)) Std.isOfType(id, String) ? (id:String) : fail()],
+					maxCurrentA: number("maxCurrentA"), efficiency: number("efficiency"),
+					wireDiameterMm: number("wireDiameterMm"), stickoutMm: number("stickoutMm")};
+			}
 			tool;
 		}];
 	}
