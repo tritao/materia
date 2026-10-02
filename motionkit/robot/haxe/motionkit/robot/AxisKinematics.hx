@@ -90,6 +90,9 @@ class AxisKinematics implements KinematicsSolver {
     return solution == null ? [] : [solution];
   }
 
+  /** Nothing here changes once built. */
+  public function fork():KinematicsSolver return this;
+
   public function solveDifferential(q:Array<Float>, twist:Twist6):Null<Array<Float>> {
     requireJoints(q);
     if (twist == null) throw "Axis differential IK needs a tool twist";

@@ -149,6 +149,9 @@ class OpwKinematics implements KinematicsSolver {
       offsets, signs);
   }
 
+  /** Nothing here changes once built, and the arm is safe to share. */
+  public function fork():KinematicsSolver return this;
+
   public function jointCount():Int return 6;
 
   public function forward(q:Array<Float>):Pose3 {

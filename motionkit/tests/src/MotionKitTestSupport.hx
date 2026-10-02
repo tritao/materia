@@ -413,6 +413,8 @@ class MotionKitTestSupport {
 
 /** Deterministic IK branch switch at a synthetic wrist singularity. */
 class WristBranchSolver implements KinematicsSolver {
+  public function fork():KinematicsSolver return this;
+
   final jump:Bool;
   public function new(?jump:Bool = true) this.jump = jump;
   public function jointCount():Int return 6;
@@ -434,6 +436,8 @@ class WristBranchSolver implements KinematicsSolver {
 }
 
 class PlanarSolver implements KinematicsSolver {
+  public function fork():KinematicsSolver return this;
+
   public function new() {}
   public function jointCount():Int return 6;
   public function forward(q:Array<Float>):Pose3 return new Pose3(q[0], q[1]);

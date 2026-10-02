@@ -41,6 +41,13 @@ class ManipulatorKinematics implements KinematicsSolver {
     this.differentialDamping = differentialDamping;
   }
 
+  /** The same kinematics with its own posture preference; the group is shared, as it is safe to. */
+  public function fork():KinematicsSolver {
+    var copy = new ManipulatorKinematics(manipulator, differentialDamping);
+    copy.preferredPosture = preferredPosture == null ? null : preferredPosture.copy();
+    return copy;
+  }
+
   public function jointCount():Int return manipulator.dofCount();
 
   public function forward(q:Array<Float>):Pose3 return fromTransform(manipulator.tcpPose(q));

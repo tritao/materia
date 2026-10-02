@@ -3,6 +3,12 @@ package motionkit.kinematics;
 /** Transport-neutral forward, inverse, differential and path kinematics contract. */
 interface KinematicsSolver {
   function jointCount():Int;
+  /**
+   * This solver for another thread: the same kinematics and settings, sharing nothing that either
+   * changes, so a planner can solve while its caller keeps using the original. A solver holding
+   * no mutable state returns itself.
+   */
+  function fork():KinematicsSolver;
   function forward(q:Array<Float>):Pose3;
   function solvePose(target:Pose3, seed:Array<Float>,
     tolerance:IkTolerance):Null<Array<Float>>;

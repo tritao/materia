@@ -65,6 +65,22 @@ class ProgramCompiler {
   public final orientationTolerance:Float;
   public final ikTolerance:IkTolerance;
   public final configurationSelector:Null<PathConfigurationSelector>;
+  final jointIds:Null<Array<String>>;
+  final couplings:Null<Array<JointCoupling>>;
+
+  /**
+   * This compiler for a planning thread, on a fork of its solver: the worker never shares solver
+   * state with the caller, who keeps using the same kinematics while plans execute.
+   */
+  public function forWorker():ProgramCompiler {
+    var forked = solver.fork();
+    if (forked == solver) return this;
+    return new ProgramCompiler(forked, limits, frameId, maxVelocity, maxAcceleration, maxJerk,
+      startTolerances, timing, cartesianResolution, maxJointJump, positionTolerance,
+      orientationTolerance, ikTolerance,
+      configurationSelector == null ? null : configurationSelector.withSolver(forked),
+      perJointMaxJump, jointIds, couplings);
+  }
 
   public function new(solver:KinematicsSolver, limits:ValidationLimits,
       frameId:String, maxVelocity:Array<Float>, maxAcceleration:Array<Float>,
@@ -135,6 +151,8 @@ class ProgramCompiler {
         couplingIndices.push(pending.splice(next, 1)[0]);
       }
     }
+    this.jointIds = jointIds == null ? null : jointIds.copy();
+    this.couplings = couplings == null ? null : couplings.copy();
     this.positionTolerance = positionTolerance;
     this.orientationTolerance = orientationTolerance;
     this.ikTolerance = ikTolerance == null ? new IkTolerance() : ikTolerance;
