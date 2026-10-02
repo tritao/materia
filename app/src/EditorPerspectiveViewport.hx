@@ -1,6 +1,7 @@
 package app;
 
 import Canvas;
+import app.MissionPlayer.MissionOverlay;
 import Color;
 import GraphicsSurface;
 import GradientStop;
@@ -80,6 +81,7 @@ class EditorPerspectiveViewport implements View {
   var runtimeRevision:Int=0;
   var simulationPoses:Array<SimulationPoseVisual> = [];
   var robotVisuals:Array<SimulationRobotVisual> = [];
+  final missionOverlay = new MissionOverlayView();
 
   public function new(key:String, scene:EditorScene, host:UiHostContext, ?style:LayoutStyle) {
     this.key = key;
@@ -221,6 +223,7 @@ class EditorPerspectiveViewport implements View {
     paintWorkplane(canvas, geometry.width, geometry.height);
     if (surface != null) canvas.drawSurface(surface, new Rect(0, 0, geometry.width, geometry.height));
     paintSensors(canvas,geometry.width,geometry.height);
+    if(simulationActive)missionOverlay.paint(canvas,camera,geometry.width,geometry.height);
     paintAssemblyDrag(canvas, geometry.width, geometry.height);
     paintSketchDraft(canvas, geometry.width, geometry.height);
   }
@@ -279,6 +282,8 @@ class EditorPerspectiveViewport implements View {
     simulationActive=active;simulationPoses=poses==null?[]:poses.copy();runtimeRevision=revision;
     robotVisuals=robots==null?[]:robots.copy();
   }
+  /** What the running mission shows on the floor: its route, costmap, sensed obstacles and odometry; null shows none. */
+  public function setMissionOverlay(overlay:Null<MissionOverlay>):Void missionOverlay.set(overlay);
   public function editingEnabled():Bool return !simulationActive;
 
   public function dragging():Bool return objectDrag != null || sketchRectangleDrag != null || assemblyDrag != null ||

@@ -3,6 +3,10 @@ package app;
 import RobotKitRuntime;
 import cadbridge.AssemblySimulationBridge;
 import materia.assembly.AssemblyDefinition;
+import materia.assembly.AssemblyDefinitionFlattener;
+import materia.assembly.AssemblyFrames;
+import materia.assembly.AssemblyRecord.AssemblyFrame;
+import materia.project.SceneArtifact.SceneArtifactPlace;
 import materia.project.MaterialLibrary;
 import robotkit.mobile.MobileBase;
 import robotkit.model.CollisionApproximation;
@@ -43,9 +47,14 @@ class AssemblyRobot {
    * floor in the simulation. Null for an assembly fixed to the world.
    */
   public final mobile:Null<MobileBase>;
+  /** The robot's root link, its chassis when it drives: the body frame of its localization. */
+  public final rootLink:String;
+  /** The frame of each tool's contact on the robot's model, by the contact's occurrence. */
+  public final toolFrames:Map<String, robotkit.model.Frame>;
 
   function new(robot:SimulatedRobot, runtime:RobotRuntime, model:RobotModel, blueprint:RobotRuntimeBlueprint,
-      parts:Array<AssemblyPart>, warnings:Array<String>, mobile:Null<MobileBase>) {
+      parts:Array<AssemblyPart>, warnings:Array<String>, mobile:Null<MobileBase>,
+      toolFrames:Map<String, robotkit.model.Frame>) {
     this.robot = robot;
     this.runtime = runtime;
     this.model = model;
@@ -53,6 +62,11 @@ class AssemblyRobot {
     this.parts = parts;
     this.warnings = warnings;
     this.mobile = mobile;
+    this.toolFrames = toolFrames;
+    var children = [for (joint in model.joints) joint.child];
+    var roots = [for (link in model.links) if (children.indexOf(link) < 0) link];
+    if (roots.length != 1) throw "The assembly robot needs exactly one root link";
+    rootLink = roots[0].id;
   }
 
   /** The simulated part with scene id `id` (`project:<occurrence>`). */
@@ -83,6 +97,20 @@ class AssemblyRobot {
     var x = q[0], y = q[1], z = q[2], w = q[3];
     var tx = 2 * (y * v[2] - z * v[1]), ty = 2 * (z * v[0] - x * v[2]), tz = 2 * (x * v[1] - y * v[0]);
     return [v[0] + w * tx + y * tz - z * ty, v[1] + w * ty + z * tx - x * tz, v[2] + w * tz + x * ty - y * tx];
+  }
+
+  /**
+   * The frame of the connector `at` names, in its occurrence's own frame and the assembly's CAD
+   * units, whichever occurrence of a shared definition it is.
+   */
+  public static function connectorFrame(assembly:AssemblyDefinition, at:SceneArtifactPlace):AssemblyFrame {
+    var flat = AssemblyDefinitionFlattener.flatten(assembly);
+    var definitionId:Null<String> = null;
+    for (item in flat.occurrences) if (item.id == at.occurrence) definitionId = item.definition;
+    if (definitionId == null) throw 'The assembly has no occurrence "${at.occurrence}"';
+    for (component in flat.definitions) if (component.id == definitionId)
+      for (connector in component.connectors) if (connector.name == at.connector) return connector.frame;
+    throw 'Occurrence "${at.occurrence}" has no connector "${at.connector}"';
   }
 
   /** The id the assembly's robot takes in the world. */
@@ -214,6 +242,31 @@ class AssemblyRobot {
       mount.position = [carrier.offset.x, carrier.offset.y, carrier.offset.z];
       sensor.frame = mount;
     }
+    // A frame on a link at a connector of the part riding it, in the link's frame and metres.
+    function mountFrame(name:String, at:SceneArtifactPlace):robotkit.model.Frame {
+      var carrier = converted.partLinks.get(at.occurrence);
+      if (carrier == null) throw '"$name" is not mounted on a part of the robot';
+      var connector = connectorFrame(assembly, at);
+      var scale = physical.metresPerUnit;
+      var placed = AssemblyFrames.compose(carrier.offset,
+        {x: connector.x * scale, y: connector.y * scale, z: connector.z * scale,
+          qx: connector.qx, qy: connector.qy, qz: connector.qz, qw: connector.qw});
+      var frame = converted.model.addFrame(new robotkit.model.Frame(name, converted.model.links[carrier.link]));
+      frame.position = [placed.x, placed.y, placed.z];
+      frame.rotation = [placed.qx, placed.qy, placed.qz, placed.qw];
+      return frame;
+    }
+    // Each tool's contact is a frame of the robot, where its arm's programs put the tool.
+    var toolFrames = new Map<String, robotkit.model.Frame>();
+    for (tool in session.robotTools)
+      toolFrames.set(tool.contact.occurrence, mountFrame(tool.contact.occurrence + " contact", tool.contact));
+    // Each scanner scans from its mount connector.
+    for (scanner in session.robotSensors) {
+      var sensor = converted.model.addSensor(new robotkit.model.Sensor(scanner.id, scanner.kind, scanner.updateRate, scanner.id));
+      sensor.rayCount = scanner.rayCount;
+      sensor.maxRange = scanner.maxRange;
+      sensor.frame = mountFrame(scanner.id + " mount", scanner.mount);
+    }
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
     // Process channels (a machine's spindle and coolant, a tool's vacuum) must be declared before the
     // robot is added.
@@ -250,6 +303,6 @@ class AssemblyRobot {
       parts.push({id: "project:" + occurrence.id, robotIndex: robotIndex, linkIndex: placed.link,
         offset: placed.offset, center: [for (coordinate in center) coordinate * physical.metresPerUnit]});
     }
-    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings, mobile);
+    return new AssemblyRobot(robot, runtime, converted.model, blueprint, parts, warnings, mobile, toolFrames);
   }
 }

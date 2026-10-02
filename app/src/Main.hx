@@ -1769,6 +1769,8 @@ class ReferenceEditorApp implements DesktopUiApplication {
       var frame = framePresentation;
       perspectiveViewport.setSimulationState(simulation.isActive(),frame == null ? [] : frame.environment,
         frame == null ? 0 : frame.revision,frame == null ? [] : frame.robots);
+      var mission = simulation.missionPlayer();
+      perspectiveViewport.setMissionOverlay(mission == null || !simulation.isActive() ? null : mission.overlay());
     }
     return perspectiveViewport == null
       ? new Text("Perspective rendering requires the desktop GPU host.")
