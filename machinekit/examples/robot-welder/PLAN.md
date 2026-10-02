@@ -233,6 +233,76 @@ leg size is declared, not derived from the geometry.
 - ProcessKit gains a `WelderProcessDevice`, the `ProcessDevice` over those
   channels: ready means the supply is ready, and safe means the arc is off.
 
+Done (see Progress). What was built and decided:
+- **Work clamp and grounding.** `WorkClamp` is a magnetic clamp with a `lead` inlet and a `contact`
+  connector (capability `WorkReturn(leadPort, contactConnector)`). The cell's `work-lead` cable runs from
+  the power source's `weldNegative` to it, and the clamp is mated to the weldment's base plate, not to the table:
+  a loose part lying on a table is not a dependable conductor (scale, paint, a thin edge), a magnet needs no
+  re-clamping per part, and phase 2 has no table, so the clamp goes to the workpiece in both phases.
+  `WeldingEquipment.of(assembly, weldments)` derives the grounded work: it traces each clamp's lead
+  upstream to the power source's work lead, takes the member the clamp is mated to, and adds every member
+  welded to it (a `Weldment`'s members are one conductor). A mate does not conduct (the table and fixtures stay
+  out unless the clamp is on them). It throws when the work lead reaches no clamp or the clamp is mated to
+  nothing. It also reads the supply's rating and efficiency (`WeldingSupply` gained `efficiency`, 0.88 for the
+  inverter source) and the wire (new capability `WireFeed(wireDiameterMm, maxSpeedMPerMin)` on the feeder).
+- **Channels** follow the suction convention, `<prefix>/<member>.<signal>`: `…torch.arc` (digital),
+  `…torch.wire_speed` (m/min) and `…torch.voltage` (V), and one sensor `…torch.weld`. The six sensors of the
+  plan are one `tool_weld` frame of six values (arc established, current A, voltage V, touch, fault code, mains
+  power W; `WeldSensor`): one frame is a consistent snapshot of the circuit and one sensor to mount, where six
+  would be sampled apart. A real welder publishes the same frame. `EndEffectorControls` now has an `Arc`
+  control in `controls` (so cadbridge's exhaustive switch binds it, as an inlet check: the kinematic
+  `ToolRuntime` has no arc) and the torch's analogue channels and sensor in `arcs`.
+- **Scene artifact.** `robotTools` gains kind `torch`: `contact` is the wire tip, `channel` the arc, `sensor` the
+  weld sensor, and `torch` (`SceneArtifactTorch`) has the wire speed and voltage channels, `groundedWork`
+  (occurrence ids), the supply's `maxCurrentA` and `efficiency`, `wireDiameterMm` and `stickoutMm`. Validation
+  checks the connector, distinct channels, one torch, existing distinct grounded occurrences and sane ranges.
+  The section is JSON, so there is no format version bump (M5 added `robotTools` inside version 13 the same way).
+  `AssemblyPreview.robotTools(tool, prefix, ?equipment)` emits it; the cell's preview does, and the W0 check that
+  asserted none now asserts the torch.
+- **Arc model** (`robotkit.tool.WeldArcModel`, pure and deterministic; documented in its header). With the
+  arc commanded, the supply ready and the wire fed (at least 1 m/min), the arc strikes when grounded work is
+  within 5 mm ahead of the wire tip along the wire (the wire advances to scratch it), is established 80 ms
+  later, and burns while the arc length (tip distance + 3 mm nominal) stays at most 12 mm. Current is the
+  positive root of the burn-off law `MR = α·I·A0/A + β·l·I²·(A0/A)²` (MR in mm/s, α = 0.27, β = 7e-5, stickout
+  l = 15 mm, scaled by wire cross-section against the 1.2 mm reference), capped at the supply's rating:
+  8 m/min of 1.2 mm wire is 250 A. Voltage is the setpoint plus 1.2 V per mm of arc length beyond nominal
+  (at least 10 V). With the arc off the sensing voltage is 24 V, collapsing to 0 on touch; touch is the tip
+  within 0.5 mm of grounded work (or inside it) with the arc off. Power is `I·U/η`. Faults latch until the arc
+  is commanded off (a stuck wire also until the torch is free): `NoArc` (commanded 1 s without striking),
+  `ArcLost` (went out while commanded: pulled away, supply dropped out), `WireStuck` (arc commanded off with the
+  wire still feeding while touching: no burnback). Stopping the wire first is a burnback and ends the arc
+  without a fault.
+- **Geometry.** The physics engine reports contacts of collision shapes, and the wire is none: it is
+  millimetres of metal beyond the nozzle and the arc strikes across a gap, which contacts do not report. So
+  `SimulatedWelder` (a `SimulationStepObserver` like the suction tool) asks the grounded work directly, in
+  the world frame: the tip's distance to it and a ray along the wire. The work is `GroundedWork`, convex solids
+  (`ConvexSolid`, planes from the hull vertices; boxed above 80 vertices) on the links that carry them, taken
+  from the same collision hulls the simulation uses; an occurrence without a hull is refused. Outside a solid
+  the distance is the largest face-plane distance, exact in front of a face and a little short at an edge.
+- **Safe on stops.** `WeldChannels.declarations`: the arc and wire speed are not `keepOnStop`, so any stop
+  or fault takes them to off and zero; the voltage setpoint keeps its value. The app wires it in
+  `AssemblyRobot` (sensor kind, channel declarations, the hulls) and `SimulatedTools.welderFor`, built from the
+  tool's connector, so a project with a torch tool runs a `SimulatedWelder`.
+- **ProcessKit** `WelderProcessDevice` speaks `WelderOutputs` (arc, wire speed, voltage) and `WelderFeedback`
+  (the `tool_weld` reading): `prepare` sets the voltage with the arc off and the wire still, `ready` is prepared
+  and no fault, `fault` the supply's fault in words, `safe` arc off then wire stopped (and needs a new prepare),
+  `apply` carries out fired records (the arc takes a digital or an analog rate above zero, as a process run emits
+  it). Nothing in it is RobotKit's simulation.
+
+Tests: `WeldTests` (RobotKit: solids, arc strike near work and not in air, ignition delay, burn-off current and
+voltage, arc lost, touch, no-arc timeout, power, stuck wire and burnback, safe channels, frame),
+`WelderProcessTests`, `ProjectKitTests.torchTool`, `CadBridgeTests.testTorchBindings`, and the MachineKit
+smoke's `checkTorchTool` (grounded work is the weldment). The first two and ProjectKit's run on the host with
+no native build; the cadbridge test and the app only type-check in this checkout (their native build needs
+submodules it does not have).
+
+Left open: `SimulatedWelder` itself (the part that reads channels and the simulation) is not run in any test
+here, since it needs a physics backend; everything it decides is in the tested model and work. Grounded work
+must be a part of the assembly robot (a free workpiece is refused). `supplyReady` is an input of the simulated
+welder, not yet derived from the mains, gas or battery, which phase 2's energy model can give it. Shielding gas
+is not modelled. Touch is a binary contact, not a model of the sensing circuit. The W0 note that the arc was
+kept apart in `arcs` is replaced by the `Arc` control above.
+
 **W3. Weld one seam.**
 - The `mission` section gains a `weld` step that names a seam.
 - A RobotKit `WeldSeam` skill runs a MotionKit program:
@@ -330,7 +400,7 @@ Dependencies:
 | --- | --- | --- |
 | W0 | done | tool-agnostic arm; welding parts and capabilities; cell, checks, Start entry |
 | W1 | done | seams found from member faces (`WeldSeams`, `WeldSeam`, `Weldment`); workpiece with a tube frame; checks |
-| W2 | | |
+| W2 | done | work clamp and derived grounded work; `torch` robot tool in the scene artifact; `SimulatedWelder` + `WeldArcModel`; `WelderProcessDevice`; tests |
 | W3 | | |
 | W4 | | |
 | W5 | | |

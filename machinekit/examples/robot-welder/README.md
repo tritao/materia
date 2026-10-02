@@ -10,7 +10,9 @@ Services reach the torch through ports, the way a real cell is cabled: the gas
 cylinder feeds the power source, which feeds the feeder with weld current, gas
 and control, and the feeder feeds the torch and the wire. The power source's
 `mains` inlet (230 V single-phase) and its `control` input are the cell's own
-exposed ports.
+exposed ports. The work lead goes to a magnetic work clamp on the weldment's
+base plate, and the scene's `torch` robot tool is derived from that: the arc
+returns through the plate and everything welded to it, and nothing else.
 
 - `ArmWeldingTool.hx` — the arm's welding end effector (an `ArmTool`): adapter
   plate and torch, with the `tcp` working frame at the wire tip.

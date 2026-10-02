@@ -11,6 +11,8 @@ import materia.project.SceneArtifact.SceneArtifactPart;
 import materia.project.SceneArtifact.SceneArtifactRobotTool;
 import machinekit.robotics.EndEffector;
 import machinekit.robotics.EndEffectorControls;
+import machinekit.welding.WeldingEquipment.WeldingEquipmentData;
+import machinekit.welding.WeldingTorch;
 import materia.units.LengthUnit;
 
 /**
@@ -55,8 +57,9 @@ class AssemblyPreview {
 	 * `prefix`: each suction cup's contact, worked by the effector's vacuum control channel and
 	 * reporting on its pressure sensor when it has one.
 	 */
-	public static function robotTools(tool:EndEffector, prefix:String):Array<SceneArtifactRobotTool> {
+	public static function robotTools(tool:EndEffector, prefix:String, ?welding:WeldingEquipmentData):Array<SceneArtifactRobotTool> {
 		var controls = EndEffectorControls.derive(tool, prefix);
+		if (controls.arcs.length > 0) return torchTools(controls, prefix, welding);
 		var channel = controls.vacuumChannel();
 		if (channel == null) throw "The suction tool has no vacuum control";
 		return [for (suction in controls.suctions) {
@@ -64,6 +67,24 @@ class AssemblyPreview {
 				contact: {occurrence: prefix + "/" + suction.member, connector: suction.connector}, channel: channel};
 			if (controls.vacuumSensor != null) entry.sensor = controls.vacuumSensor;
 			entry;
+		}];
+	}
+
+	/**
+	 * Each arc torch as a `torch` tool: its wire tip as the contact, its three channels and weld sensor, and the
+	 * welder behind it (`welding`: the supply's limits, the wire, and the work the circuit returns through, found by
+	 * `WeldingEquipment.of`).
+	 */
+	static function torchTools(controls:EndEffectorControls, prefix:String, welding:Null<WeldingEquipmentData>):Array<SceneArtifactRobotTool> {
+		if (welding == null) throw "A torch needs the welding equipment of its cell: pass WeldingEquipment.of(...)";
+		return [for (arc in controls.arcs) {
+			kind: "torch",
+			contact: {occurrence: prefix + "/" + arc.member, connector: arc.tcpConnector},
+			channel: arc.channel,
+			sensor: arc.sensor,
+			torch: {wireSpeedChannel: arc.wireSpeedChannel, voltageChannel: arc.voltageChannel,
+				groundedWork: welding.groundedWork.copy(), maxCurrentA: welding.maxCurrentA, efficiency: welding.efficiency,
+				wireDiameterMm: welding.wireDiameterMm, stickoutMm: WeldingTorch.STICKOUT}
 		}];
 	}
 

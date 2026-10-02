@@ -16,7 +16,15 @@ enum ComponentCapability {
 	/** An arc torch: `tcpConnector` is the wire tip at nominal stickout with +Z along the wire out of
 	 * the torch, and `controlPort` is the signal inlet that starts and stops the arc. */
 	ArcTorch(tcpConnector:String, controlPort:String);
-	/** A welding power source: the processes it runs, its rated current in amperes, and how a
-	 * controller drives it. */
-	WeldingSupply(processes:Array<WeldingProcess>, maxCurrentA:Float, controlInterface:WeldingControlInterface);
+	/** A welding power source: the processes it runs, its rated current in amperes, how a
+	 * controller drives it, and its efficiency (the fraction of the mains power it delivers to the arc). */
+	WeldingSupply(processes:Array<WeldingProcess>, maxCurrentA:Float, controlInterface:WeldingControlInterface,
+		efficiency:Float);
+	/** A wire feeder: the diameter of the wire it feeds in millimetres, and its top wire speed in
+	 * metres per minute. */
+	WireFeed(wireDiameterMm:Float, maxSpeedMPerMin:Float);
+	/** A work clamp (the return of the weld circuit): where the weld circuit returns through the workpiece. `leadPort` is the
+	 * inlet the work lead from the power source plugs into, and `contactConnector` is where the
+	 * clamp meets the work (mate it to the workpiece). */
+	WorkReturn(leadPort:String, contactConnector:String);
 }

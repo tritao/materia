@@ -9,11 +9,13 @@ import cadkit.modeling.Vector;
 import machinekit.component.ComponentDetail;
 import machinekit.robotics.EndEffectorControls;
 import machinekit.welding.WeldSeam;
+import machinekit.welding.WeldingEquipment;
 import machinekit.welding.WeldingPowerSource;
 import machinekit.welding.WeldingTorch;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 import materia.project.SceneArtifact;
+import materia.project.SceneArtifact.SceneArtifactData;
 
 /** Materia project entrypoint for the robot welding cell. */
 class RobotWelderPreview {
@@ -21,12 +23,15 @@ class RobotWelderPreview {
 
 	/**
 	 * Geometry, joints and initial pose of the cell: the arm with its torch, the feeder, the power
-	 * source and gas cylinder, and the table with its weldment. The scene carries no `robotTools`
-	 * yet: the torch has no runtime tool kind until W2.
+	 * source and gas cylinder, and the table with its weldment. The scene's `robotTools` has the torch as a
+	 * `torch` tool: its wire tip, its channels, and the welder behind it (the supply's limits, the wire, and
+	 * the work the weld circuit returns through, which the work clamp's connections and mates give).
 	 */
 	public static function cell():Bytes {
 		var cell = new WeldingCell();
-		return SceneArtifact.encode(AssemblyPreview.scene(cell, ASSEMBLY_ID));
+		var scene = AssemblyPreview.scene(cell, ASSEMBLY_ID);
+		scene.robotTools = AssemblyPreview.robotTools(cell.arm.tool, "arm/tool", cell.equipment());
+		return SceneArtifact.encode(scene);
 	}
 }
 
@@ -60,9 +65,9 @@ class RobotWelderChecks {
 			throw "Robot welder preview has the wrong number of occurrences";
 		for (part in scene.parts) if (part.volume == null || part.volume <= 0 || part.inertia == null)
 			throw 'Robot welder part "${part.id}" has no mass properties';
-		if (scene.robotTools != null && scene.robotTools.length > 0) throw "The torch has no runtime tool kind before W2";
 
 		checkServices(cell);
+		checkTorchTool(cell, scene);
 
 		var model = new AssemblyModel("mm");
 		cell.addTo(model, "");
@@ -76,7 +81,7 @@ class RobotWelderChecks {
 
 		var bom = cell.billOfMaterials().lines();
 		var parts = [for (line in bom) line.partNumber];
-		for (prefix in ["WELD-TORCH-MIG-", "WIRE-FEEDER-", "WELD-SOURCE-", "GAS-CYLINDER-", "HOSE-GAS-", "CABLE-WELD-", "HOSEPACK-"])
+		for (prefix in ["WELD-TORCH-MIG-", "WIRE-FEEDER-", "WELD-SOURCE-", "GAS-CYLINDER-", "HOSE-GAS-", "CABLE-WELD-", "CABLE-WORK-", "WELD-WORK-CLAMP-", "HOSEPACK-"])
 			if ([for (number in parts) if (StringTools.startsWith(number, prefix)) number].length == 0)
 				throw 'The bill of materials should list $prefix equipment, got $parts';
 		var mass = cell.massProperties().mass;
@@ -105,7 +110,59 @@ class RobotWelderChecks {
 		var controls = EndEffectorControls.derive(arm.tool, "tool");
 		if (controls.arcChannel() != "tool/torch.arc" || controls.arcs[0].tcpConnector != "tcp")
 			throw 'The torch should derive an arc channel on tcp, got ${controls.arcs}';
+		var arc = controls.arcs[0];
+		if (arc.wireSpeedChannel != "tool/torch.wire_speed" || arc.voltageChannel != "tool/torch.voltage" || arc.sensor != "tool/torch.weld")
+			throw 'The torch should derive wire speed, voltage and weld sensor names, got $arc';
+		var digital:Array<String> = [];
+		for (control in controls.controls) switch control {
+			case Arc(channel, member, port): digital.push('$channel>$member/$port');
+			case _:
+		}
+		if (digital.join(",") != "tool/torch.arc>torch/control") throw 'The arc should be a control on the torch inlet, got $digital';
 		if (controls.vacuumChannel() != null) throw "The welding tool has no vacuum control";
+	}
+
+	/**
+	 * The weld circuit returns through the work clamp, and the simulated welder is told so: the work lead is
+	 * traced to the clamp, the clamp's mate says where it sits, and everything welded to that is grounded work.
+	 */
+	static function checkTorchTool(cell:WeldingCell, scene:SceneArtifactData):Void {
+		if (cell.upstreamChain("clamp", "lead").join(" < ") != "clamp/lead < source/weldNegative")
+			throw "The work clamp should be fed by the power source's work lead";
+		var tools = scene.robotTools;
+		if (tools == null || tools.length != 1 || tools[0].kind != "torch") throw "The cell should carry one torch tool";
+		var tool = tools[0];
+		if (tool.contact.occurrence != "arm/tool/torch" || tool.contact.connector != "tcp")
+			throw 'The torch tool should work at the wire tip, got ${tool.contact}';
+		if (tool.channel != "arm/tool/torch.arc" || tool.sensor != "arm/tool/torch.weld")
+			throw 'The torch tool channels are named after the member, got ${tool.channel} and ${tool.sensor}';
+		var welder = tool.torch;
+		if (welder == null) throw "The torch tool should describe its welder";
+		if (welder.wireSpeedChannel != "arm/tool/torch.wire_speed" || welder.voltageChannel != "arm/tool/torch.voltage")
+			throw "The torch tool should name its analogue channels";
+		near(welder.maxCurrentA, cell.source.maxCurrentA, "supply rating", 0);
+		near(welder.efficiency, cell.source.efficiency, "supply efficiency", 0);
+		near(welder.wireDiameterMm, cell.feeder.wireDiameterMm, "wire diameter", 0);
+		near(welder.stickoutMm, WeldingTorch.STICKOUT, "stickout", 0);
+		// The grounded work is the weldment, not the table or the fixtures it lies in.
+		var expected = cell.weldment().members.copy();
+		expected.sort(Reflect.compare);
+		var grounded = welder.groundedWork.copy();
+		grounded.sort(Reflect.compare);
+		if (grounded.join(",") != expected.join(","))
+			throw 'The grounded work should be the weldment ${expected.join(",")}, got ${grounded.join(",")}';
+		for (other in ["table", "fixtureNear", "fixtureFar", "arm/tool/torch"])
+			if (welder.groundedWork.indexOf(other) >= 0) throw '$other should not be grounded work';
+		// An unwelded workpiece is grounded only where the clamp sits, and a cell with no clamp has no circuit.
+		var bare = WeldingEquipment.of(cell, []);
+		if (bare.groundedWork.join(",") != "work/basePlate") throw 'Without welds only the clamped plate is grounded, got ${bare.groundedWork}';
+		var open = new machinekit.assembly.MachineAssembly();
+		open.addComponent("source", new WeldingPowerSource());
+		open.addComponent("feeder", new machinekit.welding.WireFeeder());
+		var failed = false;
+		try WeldingEquipment.of(open, []) catch (_:Dynamic) failed = true;
+		if (!failed) throw "A power source with no work clamp should be refused";
+		Sys.println('robot welder: torch tool grounded on ${grounded.join(", ")}');
 	}
 
 	static function checkReadyPose(cell:WeldingCell, state:AssemblyState):Void {
@@ -161,7 +218,7 @@ class RobotWelderChecks {
 	static function checkClearance(cell:WeldingCell, state:AssemblyState, ready:ArmPose, seams:Array<SeamPose>):Void {
 		var moving = [for (entry in cell.components()) if (StringTools.startsWith(entry.id, "arm/")) entry.id];
 		moving.push("feeder");
-		var fixed = ["table", "source", "cylinder", "fixtureNear", "fixtureFar"].concat(cell.weldment().members);
+		var fixed = ["table", "source", "cylinder", "clamp", "fixtureNear", "fixtureFar"].concat(cell.weldment().members);
 		for (entry in [{label: "the ready pose", angles: ready}].concat(seams)) {
 			pose(state, entry.angles);
 			try {

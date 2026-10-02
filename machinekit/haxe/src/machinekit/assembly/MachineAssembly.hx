@@ -818,6 +818,17 @@ class MachineAssembly {
 		return result;
 	}
 
+	/** The members mated to `instanceId` by a mate, on either side of it. */
+	public function matedMembers(instanceId:String):Array<String> {
+		requireMember(instanceId);
+		var result:Array<String> = [];
+		for (joint in mechanical.joints) {
+			var other = joint.parent == instanceId ? joint.child : joint.child == instanceId ? joint.parent : null;
+			if (other != null && result.indexOf(other) < 0) result.push(other);
+		}
+		return result;
+	}
+
 	/** A member connector in that member's local frame. */
 	public function memberConnectorFrame(instanceId:String, connectorName:String):AssemblyFrame {
 		requireConnector(ref(instanceId, connectorName));

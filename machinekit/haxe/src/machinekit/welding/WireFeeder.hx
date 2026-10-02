@@ -19,14 +19,21 @@ class WireFeeder extends MachineComponent {
 	public final width:Float;
 	public final length:Float;
 	public final height:Float;
+	/** The wire it feeds, in millimetres, and its top speed in metres per minute. */
+	public final wireDiameterMm:Float;
+	public final maxSpeedMPerMin:Float;
 
-	public function new(width:Float = 160, length:Float = 400, height:Float = 250) {
+	public function new(width:Float = 160, length:Float = 400, height:Float = 250, wireDiameterMm:Float = 1.2,
+			maxSpeedMPerMin:Float = 20) {
 		if (!(width > 0) || !(length > 0) || !(height > 0)) throw "Wire feeder needs positive dimensions";
+		if (!(wireDiameterMm > 0) || !(maxSpeedMPerMin > 0)) throw "Wire feeder needs a positive wire diameter and speed";
 		super('WIRE-FEEDER-${Dimension.format(width)}x${Dimension.format(length)}x${Dimension.format(height)}',
 			"Wire feeder for robot MIG torch, 4-roll drive", "painted steel", true);
 		this.width = width;
 		this.length = length;
 		this.height = height;
+		this.wireDiameterMm = wireDiameterMm;
+		this.maxSpeedMPerMin = maxSpeedMPerMin;
 		addConnector("mount", Mount, Solids.axial(0, 0, 0));
 		addPort({name: "power", kind: ElectricalPower, role: Consumer, iface: WeldingInterfaces.weldCable(), required: true});
 		addPort({name: "gas", kind: Gas, role: Consumer, iface: WeldingInterfaces.gas(), required: true});
@@ -38,6 +45,7 @@ class WireFeeder extends MachineComponent {
 		addBridge("power", "torchPower");
 		addBridge("gas", "torchGas");
 		addBridge("control", "torchControl");
+		addCapability(WireFeed(wireDiameterMm, maxSpeedMPerMin));
 		declareMass(14, new Vector(0, 0, height / 2));
 	}
 

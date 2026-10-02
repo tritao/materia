@@ -17,17 +17,25 @@ import machinekit.component.Solids;
  * lead), and the pass-throughs `gasOut` and `feederControl`.
  */
 class WeldingPowerSource extends MachineComponent {
+	/** The port the work lead leaves by, which the work clamp's lead plugs into. */
+	public static inline var WORK_LEAD:String = "weldNegative";
+
 	public final width:Float;
 	public final depth:Float;
 	public final height:Float;
 	public final maxCurrentA:Float;
+	/** Arc power delivered per watt drawn from the mains: about 0.88 for an inverter source. */
+	public final efficiency:Float;
 
-	public function new(maxCurrentA:Float = 350, width:Float = 600, depth:Float = 300, height:Float = 450) {
+	public function new(maxCurrentA:Float = 350, width:Float = 600, depth:Float = 300, height:Float = 450,
+			efficiency:Float = 0.88) {
+		if (!(efficiency > 0 && efficiency <= 1)) throw "Welding power source needs an efficiency in (0, 1]";
 		if (!(maxCurrentA > 0) || !(width > 0) || !(depth > 0) || !(height > 0))
 			throw "Welding power source needs a positive rating and dimensions";
 		super('WELD-SOURCE-${Dimension.format(maxCurrentA)}A-230V',
 			'MIG/MAG power source, ${Dimension.format(maxCurrentA)} A, 230 V single-phase', "painted steel", true);
 		this.maxCurrentA = maxCurrentA;
+		this.efficiency = efficiency;
 		this.width = width;
 		this.depth = depth;
 		this.height = height;
@@ -41,7 +49,7 @@ class WeldingPowerSource extends MachineComponent {
 		addPort({name: "feederControl", kind: Signal, role: Supply, iface: WeldingInterfaces.control(), required: false});
 		addBridge("gas", "gasOut");
 		addBridge("control", "feederControl");
-		addCapability(WeldingSupply([Mig, Mag], maxCurrentA, AnalogIo));
+		addCapability(WeldingSupply([Mig, Mag], maxCurrentA, AnalogIo, efficiency));
 		declareMass(55, new Vector(0, 0, 0.4 * height));
 	}
 

@@ -2,9 +2,12 @@ import machinekit.assembly.MachineAssembly;
 import machinekit.component.BomItem;
 import machinekit.component.Solids;
 import machinekit.welding.GasCylinder;
+import machinekit.welding.WeldingEquipment;
+import machinekit.welding.WeldingEquipment.WeldingEquipmentData;
 import machinekit.welding.WeldingPowerSource;
 import machinekit.welding.Weldment;
 import machinekit.welding.WireFeeder;
+import machinekit.welding.WorkClamp;
 import materia.assembly.AssemblyFrames;
 import materia.assembly.AssemblyRecord.AssemblyFrame;
 
@@ -32,11 +35,15 @@ class WeldingCell extends MachineAssembly {
 	/** The workpiece's origin, the plate's centre, on the table. The plate and the tube frame beside it are both in the arm's reach. */
 	public static inline var WORK_X:Float = -155;
 	static inline var FIXTURE_SIZE:Float = 20;
+	/** The work clamp's seat on the plate's top, in the plate's frame: a back corner, clear of the seams. */
+	public static inline var CLAMP_X:Float = -60;
+	public static inline var CLAMP_Y:Float = 62;
 
 	public final arm = new RobotArm(false, new ArmWeldingTool());
 	public final feeder = new WireFeeder(150, 240, 180);
 	public final source = new WeldingPowerSource();
 	public final cylinder = new GasCylinder();
+	public final clamp = new WorkClamp();
 	public final work:WeldingWorkpiece;
 
 	public function new(?workpiece:WeldingWorkpiece) {
@@ -67,6 +74,10 @@ class WeldingCell extends MachineAssembly {
 		addMate("fixture-far-mate", "fixed", "table", "fixtureFarSeat", "fixtureFar", "base");
 		include("work", work);
 		addMate("work-mate", "fixed", "table", "weldmentSeat", "work/basePlate", "base");
+		// The work clamp sits on the plate's top, in a corner away from the seams; the work lead ends there.
+		addMemberConnector("work/basePlate", "clampSeat", Solids.axial(CLAMP_X, CLAMP_Y, WeldingWorkpiece.PLATE_THICKNESS));
+		addComponent("clamp", clamp);
+		addMate("clamp-mate", "fixed", "work/basePlate", "clampSeat", "clamp", "contact");
 
 		function line(partNumber:String, description:String):BomItem
 			return {partNumber: partNumber, description: description, quantity: 1, material: null};
@@ -75,6 +86,7 @@ class WeldingCell extends MachineAssembly {
 		connectPorts("feeder-gas", "source", "gasOut", "feeder", "gas", line("HOSE-GAS-3M", "Shielding gas hose, 3 m"));
 		connectPorts("feeder-control", "source", "feederControl", "feeder", "control",
 			line("CABLE-CONTROL-12-3M", "Welder control cable, 12 core, 3 m"));
+		connectPorts("work-lead", "source", "weldNegative", "clamp", "lead", line("CABLE-WORK-35-3M", "Work lead 35 mm², 3 m"));
 		connectPorts("torch-power", "feeder", "torchPower", "arm/tool/torch", "power");
 		connectPorts("torch-gas", "feeder", "torchGas", "arm/tool/torch", "gas");
 		connectPorts("torch-wire", "feeder", "torchWire", "arm/tool/torch", "wire");
@@ -87,4 +99,10 @@ class WeldingCell extends MachineAssembly {
 
 	/** The welded joints, for the members of `work` as they are named in the cell. */
 	public function weldment():Weldment return work.weldment().prefixed("work/");
+
+	/**
+	 * The cell's welding equipment as its connections give it: the supply's limits, the wire, and the work
+	 * the circuit returns through (the plate the clamp sits on and everything welded to it).
+	 */
+	public function equipment():WeldingEquipmentData return WeldingEquipment.of(this, [weldment()]);
 }
