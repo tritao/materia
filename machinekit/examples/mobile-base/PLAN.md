@@ -139,7 +139,10 @@ correctly and caught a stroke of an empty path.
 
 Left over: a sensed object is the visible surface only (a long wall seen end-on is its near end, and the
 unseen back of a box is not covered); a remembered obstacle that cannot be seen through stays for its
-full 20 s; the overlays have a toggle but no finer controls (per overlay, colours).
+full 20 s (anything quicker would be a guess: the lidar either sees through the place or it does not, and
+the only other evidence, the footprint having been there, almost never applies); the overlays have a
+toggle but no finer controls (per overlay, colours), and the costmap edge also outlines the walls'
+surroundings outside the room.
 
 Odometry note: with the floor slab's top exactly at the wheels' tangent plane the wheel hulls chattered
 against it and kicked the wheel joints (a stall of the right wheel for a few ticks), so the wheel odometry
