@@ -213,13 +213,28 @@ public:
 
     bool running() const;
 
+    /**
+      A queued segment holding only the coefficients its joints and degree use:
+      MotionKit's `mk_segment` reserves room for every joint and degree, about
+      3 KB, where a three-axis machine uses about a hundred bytes.
+    **/
+    struct RuntimeSegment {
+        int64_t t0_ns = 0;
+        int64_t duration_ns = 0;
+        uint32_t degree = 0;
+        uint32_t joint_count = 0;
+        std::vector<double> coefficients; ///< Joint-major: `joint * (degree + 1) + power`.
+        /** The segment in MotionKit's full layout, for its API. */
+        mk_segment native() const;
+    };
+
     struct RuntimeTrajectoryPoint {
         struct {
             uint64_t time_from_start_ns = 0;
             uint32_t joint_count = 0;
-            double positions[RK_MAX_TRAJECTORY_JOINTS]{};
+            std::vector<double> positions; ///< Held by end markers; a segment is evaluated instead.
         } point{};
-        mk_segment segment{}; /**< Valid when has_segment; starts at point time. */
+        RuntimeSegment segment{}; /**< Valid when has_segment; starts at point time. */
         bool has_segment = false;
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;

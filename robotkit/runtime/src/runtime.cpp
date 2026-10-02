@@ -62,20 +62,37 @@ bool lifecycle_kind(rk_command_kind kind) {
         kind != RK_COMMAND_TRAJECTORY_SEGMENTS;
 }
 
+}  // namespace
+
+mk_segment RobotRuntime::RuntimeSegment::native() const {
+    mk_segment segment{};
+    segment.struct_size = sizeof(segment);
+    segment.t0_ns = t0_ns;
+    segment.duration_ns = duration_ns;
+    segment.degree = degree;
+    segment.joint_count = joint_count;
+    for (uint32_t joint = 0; joint < joint_count; ++joint)
+        std::copy_n(coefficients.begin() + static_cast<std::ptrdiff_t>(joint) * (degree + 1),
+            degree + 1, segment.coefficients[joint].value);
+    return segment;
+}
+
+namespace {
+
 uint32_t queued_knot_count(const std::deque<RobotRuntime::RuntimeTrajectoryPoint> &trajectory) {
     return trajectory.empty() ? 0u : static_cast<uint32_t>(trajectory.size() - 1);
 }
 
-mk_segment native_segment(const robotkit::TrajectorySegment &input, uint64_t base_time) {
-    mk_segment segment{};
-    segment.struct_size = sizeof(segment);
+RobotRuntime::RuntimeSegment native_segment(const robotkit::TrajectorySegment &input, uint64_t base_time) {
+    RobotRuntime::RuntimeSegment segment;
     segment.t0_ns = static_cast<int64_t>(base_time + input.time_from_start_ns);
     segment.duration_ns = static_cast<int64_t>(input.duration_ns);
     segment.degree = input.degree;
     segment.joint_count = input.joint_count;
+    segment.coefficients.resize(static_cast<std::size_t>(input.joint_count) * (input.degree + 1));
     for (uint32_t joint = 0; joint < input.joint_count; ++joint)
         std::copy_n(input.coefficients[joint].value, input.degree + 1,
-            segment.coefficients[joint].value);
+            segment.coefficients.begin() + static_cast<std::ptrdiff_t>(joint) * (input.degree + 1));
     return segment;
 }
 
@@ -87,11 +104,11 @@ void evaluate_knot(const RobotRuntime::RuntimeTrajectoryPoint &knot, uint64_t ti
         const auto elapsed = time_ns > knot.point.time_from_start_ns
             ? std::min(time_ns - knot.point.time_from_start_ns,
                 static_cast<uint64_t>(knot.segment.duration_ns)) : 0;
-        motionkit::evaluate_segment(knot.segment, static_cast<double>(elapsed) * 1e-9,
+        motionkit::evaluate_segment(knot.segment.native(), static_cast<double>(elapsed) * 1e-9,
             evaluated);
     } else {
         evaluated.joint_count = knot.point.joint_count;
-        std::copy_n(knot.point.positions, evaluated.joint_count, evaluated.position);
+        std::copy_n(knot.point.positions.data(), evaluated.joint_count, evaluated.position);
     }
     std::copy_n(evaluated.position, evaluated.joint_count, positions);
     if (velocities) std::copy_n(evaluated.velocity, evaluated.joint_count, velocities);
@@ -114,7 +131,8 @@ rk_result validate_appended_path(
     uint32_t segments = 0;
     auto append = [&](const RobotRuntime::RuntimeTrajectoryPoint &knot) {
         if (!knot.has_segment) return true;
-        if (mk_trajectory_append_segment(handle, &knot.segment) != MK_OK) return false;
+        const auto native = knot.segment.native();
+        if (mk_trajectory_append_segment(handle, &native) != MK_OK) return false;
         ++segments;
         return true;
     };
@@ -170,9 +188,9 @@ std::vector<mk_segment> path_region(
     std::vector<mk_segment> region;
     region.reserve(trajectory.size() + (history != nullptr ? 1 : 0));
     if (history != nullptr && history->has_segment)
-        region.push_back(history->segment);
+        region.push_back(history->segment.native());
     for (const auto &knot : trajectory)
-        if (knot.has_segment) region.push_back(knot.segment);
+        if (knot.has_segment) region.push_back(knot.segment.native());
     return region;
 }
 
@@ -478,7 +496,7 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             if (event.time_ns > plan_duration_ns)
                 return RK_ERROR_INVALID_ARGUMENT;
         if (ends_at_rest && terminal.degree >= 2) {
-            mk_segment segment = native_segment(terminal, 0);
+            const mk_segment segment = native_segment(terminal, 0).native();
             mk_trajectory_state endpoint{};
             motionkit::evaluate_segment(segment,
                 static_cast<double>(terminal.duration_ns) * 1e-9, endpoint);
@@ -529,8 +547,6 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
             knot.has_segment = true;
             knot.point.time_from_start_ns = static_cast<uint64_t>(knot.segment.t0_ns);
             knot.point.joint_count = source.joint_count;
-            for (uint32_t joint = 0; joint < source.joint_count; ++joint)
-                knot.point.positions[joint] = source.coefficients[joint].value[0];
             knot.chunk_base_time_ns = base_time;
             knot.tag = plan.segments.tag;
             knot.plan_id = plan.plan_id;
@@ -541,7 +557,8 @@ rk_result RobotRuntime::submit_plan(const PlanRequest &plan) {
         const auto &last = added.back();
         end.point.time_from_start_ns = static_cast<uint64_t>(last.segment.t0_ns + last.segment.duration_ns);
         end.point.joint_count = blueprint_.joint_count;
-        evaluate_knot(last, end.point.time_from_start_ns, end.point.positions);
+        end.point.positions.resize(end.point.joint_count);
+        evaluate_knot(last, end.point.time_from_start_ns, end.point.positions.data());
         end.chunk_base_time_ns = base_time;
         end.tag = plan.segments.tag;
         end.plan_id = plan.plan_id;
@@ -1265,8 +1282,6 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                     knot.has_segment = true;
                     knot.point.time_from_start_ns = static_cast<uint64_t>(knot.segment.t0_ns);
                     knot.point.joint_count = source.joint_count;
-                    for (uint32_t joint = 0; joint < source.joint_count; ++joint)
-                        knot.point.positions[joint] = source.coefficients[joint].value[0];
                     knot.chunk_base_time_ns = base_time;
                     knot.tag = tag;
                     added.push_back(std::move(knot));
@@ -1276,7 +1291,8 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 end.point.time_from_start_ns = static_cast<uint64_t>(
                     last.segment.t0_ns + last.segment.duration_ns);
                 end.point.joint_count = blueprint_.joint_count;
-                evaluate_knot(last, end.point.time_from_start_ns, end.point.positions);
+                end.point.positions.resize(end.point.joint_count);
+                evaluate_knot(last, end.point.time_from_start_ns, end.point.positions.data());
                 end.chunk_base_time_ns = base_time;
                 end.tag = tag;
                 added.push_back(std::move(end));
@@ -1368,22 +1384,21 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
         output.kind = final_kind == RK_COMMAND_ABORT ? RK_COMMAND_STOP : final_kind;
         output.target_count = 0;
     } else if (!trajectory_.empty()) {
-        auto point = trajectory_.front().point;
         while (trajectory_.size() > 1 &&
                trajectory_[1].point.time_from_start_ns <= control_.trajectory_time_ns) {
             control_.trajectory_history = trajectory_.front();
             control_.trajectory_history_valid = true;
             trajectory_.pop_front();
         }
-        point = trajectory_.front().point;
-        evaluate_knot(trajectory_.front(), control_.trajectory_time_ns,
-            point.positions);
+        const auto &front = trajectory_.front();
+        double point_positions[RK_MAX_TRAJECTORY_JOINTS]{};
+        evaluate_knot(front, control_.trajectory_time_ns, point_positions);
         output.kind = RK_COMMAND_JOINT_TARGETS;
-        output.target_count = point.joint_count;
-        for (uint32_t joint = 0; joint < point.joint_count; ++joint) {
+        output.target_count = front.point.joint_count;
+        for (uint32_t joint = 0; joint < front.point.joint_count; ++joint) {
             output.targets[joint].joint = joint;
             output.targets[joint].mode = RK_TARGET_POSITION;
-            output.targets[joint].target = point.positions[joint];
+            output.targets[joint].target = point_positions[joint];
             output.targets[joint].max_rate = 0.0;
             output.targets[joint].max_effort = 0.0;
         }
@@ -1423,7 +1438,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                         terminal_segment = &control_.trajectory_history;
                     if (terminal_segment != nullptr) {
                         mk_trajectory_state endpoint{};
-                        motionkit::evaluate_segment(terminal_segment->segment,
+                        motionkit::evaluate_segment(terminal_segment->segment.native(),
                             static_cast<double>(terminal_segment->segment.duration_ns) * 1e-9,
                             endpoint);
                         std::copy_n(endpoint.velocity, blueprint_.joint_count,
@@ -1432,7 +1447,7 @@ rk_result RobotRuntime::apply_pending_commands(uint64_t owner_time_ns) {
                 }
                 for (uint32_t joint = 0; joint < blueprint_.joint_count; ++joint)
                     velocities[joint] = crossing_rate * stop_path_velocities[joint];
-                start_stop_ramp(point.positions, velocities);
+                start_stop_ramp(point_positions, velocities);
                 if (declared_continuation)
                     control_.diagnostic_code = RK_FAULT_TRAJECTORY_UNDERFLOW;
                 control_.stop_ramp_time_ns = std::min(control_.stop_ramp_duration_ns,
