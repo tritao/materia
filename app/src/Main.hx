@@ -161,6 +161,7 @@ class Main {
           arg.indexOf("--robot=") != 0 && arg.indexOf("--setup-script=") != 0 &&
           arg.indexOf("--project=") != 0 && arg.indexOf("--project-action=") != 0 &&
           arg.indexOf("--example=") != 0 && arg.indexOf("--example-settle=") != 0 && arg != "--example-play" &&
+          arg.indexOf("--frame=") != 0 &&
           arg != "--record" && arg.indexOf("--record=") != 0 &&
           arg.indexOf("--character=") != 0 && arg.indexOf("--character-clip=") != 0 &&
           arg.indexOf("--character-hold=") != 0 && arg.indexOf("--character-display=") != 0 &&
@@ -170,7 +171,7 @@ class Main {
           arg != "--worker-demo-trace") {
         Sys.println("Usage: materia [--reset-workspace] [--snapshot [--simulate]] [--demo] " +
           "[--lab] [--dark] [--perspective] [--story=ID] [--width=PX] [--height=PX] " +
-          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] " +
+          "[--capture-dir=PATH] [--frames=N|--capture-seconds=N] [--msaa=SAMPLES] [--frame=OBJECT-ID] " +
           "[--robot=HOST:PORT] [--setup-script=REFERENCE] [--project=PATH] " +
           "[--project-action=ID] [--record[=PATH]] [--character=GLTF [--character-clip=NAME] " +
           "[--character-hold=GLTF] [--character-display=mesh|capsules|skeleton] " +
@@ -307,11 +308,22 @@ class Main {
     // A launch project builds in the background; captures wait for it so they show the project.
     // `--simulate` presses Play once that project is open, so a capture can show a running simulation.
     var playOnOpen = args.indexOf("--simulate") >= 0;
+    // `--frame=ID` frames the camera on that scene object once the project is open, leaving nothing selected.
+    var frameId:Null<String> = null;
+    for (arg in args) if (arg.indexOf("--frame=") == 0) frameId = arg.substr(8);
     host.captureReady = function() {
       var ready = activeEditor == null || !activeEditor.openingProject();
       if (ready && playOnOpen && activeEditor != null) {
         playOnOpen = false;
         activeEditor.commands.execute("sim.play");
+      }
+      if (ready && frameId != null && activeEditor != null && activeEditor.perspectiveViewport != null) {
+        var id:String = cast frameId;
+        frameId = null;
+        if (activeEditor.scene.select(id)) {
+          activeEditor.perspectiveViewport.frameSelected();
+          activeEditor.scene.select("scene");
+        }
       }
       return ready;
     };
