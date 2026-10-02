@@ -636,23 +636,29 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
                 scene_item ? scene_item->content_revision : primitive.content_revision;
             const bool has_composite =
                 custom_composites && custom_composites->contains(primitive.node_id);
+            // Floating custom layers may be emitted outside ancestor scissor
+            // commands. Resolved geometry still carries their inherited clip.
+            const bool has_node_clip = scene_item || !clips.empty();
+            LayoutRect node_clip = scene_item ? scene_item->clip_bounds : LayoutRect{};
+            if (!clips.empty())
+                node_clip = scene_item ? intersect(node_clip, clips.back()) : clips.back();
             if (active_raster_root != no_raster_root) {
                 const auto &root = raster_roots[active_raster_root];
                 const auto node_local_to_world = custom_local_to_world(primitive);
                 const auto destination_transform =
                     compose_transform(root.world_to_cache, node_local_to_world);
                 const LayoutRect local_clip =
-                    clips.empty()
+                    !has_node_clip
                         ? LayoutRect{}
-                        : transform_bounds(clips.back(), transform_layout(root.world_to_cache));
+                        : transform_bounds(node_clip, transform_layout(root.world_to_cache));
                 if (has_composite)
                     return append_custom_with_composite(
                         *found->second, primitive.node_id, primitive_index, active_raster_target,
                         current_main_pass, false, &destination_transform,
-                        clips.empty() ? nullptr : &local_clip);
+                        has_node_clip ? &local_clip : nullptr);
                 return append_custom_plan(*found->second, primitive_index, active_raster_target,
                                           current_main_pass, &destination_transform,
-                                          clips.empty() ? nullptr : &local_clip,
+                                          has_node_clip ? &local_clip : nullptr,
                                           content_revision);
             }
             const auto node_local_to_world = custom_local_to_world(primitive);
@@ -661,10 +667,12 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             if (has_composite)
                 return append_custom_with_composite(*found->second, primitive.node_id,
                                                     primitive_index, main_target, current_main_pass,
-                                                    raster, &node_local_to_world);
+                                                    raster, &node_local_to_world,
+                                                    has_node_clip ? &node_clip : nullptr);
             if (!raster)
                 return append_custom_plan(*found->second, primitive_index, main_target,
-                                          current_main_pass, &node_local_to_world, nullptr,
+                                          current_main_pass, &node_local_to_world,
+                                          has_node_clip ? &node_clip : nullptr,
                                           content_revision);
             if (transient_target_slot > std::numeric_limits<uint16_t>::max())
                 return fail(error, primitive_index, "raster cache target limit exceeded");
@@ -676,7 +684,8 @@ bool LayoutRenderCompiler::compile(const LayoutSnapshot &snapshot, ResourceId ma
             out.plan_.passes.push_back(std::move(raster_pass));
             const std::size_t raster_pass_index = out.plan_.passes.size() - 1;
             if (!append_custom_plan(*found->second, primitive_index, raster_target,
-                                    raster_pass_index, &node_local_to_world, nullptr,
+                                    raster_pass_index, &node_local_to_world,
+                                    has_node_clip ? &node_clip : nullptr,
                                     content_revision))
                 return false;
             out.plan_.dependencies.push_back({raster_target, main_target});
