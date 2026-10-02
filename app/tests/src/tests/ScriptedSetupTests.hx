@@ -210,8 +210,8 @@ class ScriptedSetupTests {
     );
     var recordingPath = directory + "/scripted.mcap";
     var writer = new McapRobotRecording(recordingPath, 1024 * 1024, false);
-    var observed = simulation.step();
-    for (index in 0...8) observed = simulation.step();
+    for (index in 0...9) simulation.step();
+    var observed = simulation.snapshot();
     for (robotId in ["materia/robot", "materia/robot-b"]) {
       var robot = observed.robot(robotId);
       check(robot != null && robot.sensors.length == 3, "scripted robots publish all configured sensors");

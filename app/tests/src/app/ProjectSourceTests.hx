@@ -385,6 +385,8 @@ class ProjectSourceTests {
     simulation.step();
     var start = toolPosition();
     var lowest = 0.0, steps = 0, stepping = 0.0, tools:Array<Int> = [player.loadedTool];
+    // Allocation is counted, not timed, so it holds whatever else the machine is doing.
+    var allocatedBefore = hl.Gc.totalAllocated(), collectionsBefore = hl.Gc.collections();
     while (player.passes == 0 && simulation.activeSession().simulationTime() < 600.0 && steps++ < 1000000) {
       var before = Sys.time();
       simulation.step();
@@ -393,6 +395,10 @@ class ProjectSourceTests {
       if (steps % 10 == 0) lowest = Math.min(lowest, toolPosition()[2] - start[2]);
       if (player.loadedTool != tools[tools.length - 1]) tools.push(player.loadedTool);
     }
+    var allocatedPerTick = (hl.Gc.totalAllocated() - allocatedBefore) / steps;
+    var collections = hl.Gc.collections() - collectionsBefore;
+    // About 56 KB a tick when measured (2026-10-02): mostly robot snapshots, then the stock's cut moves.
+    check(allocatedPerTick < 80000, 'the router allocates under 80 KB a simulated tick, got ${Math.round(allocatedPerTick)} bytes');
     // The pass ends with the drill; the next pass, started as this one is counted, loads the end mill again.
     var changes = tools.join(",");
     check(changes == "1,2" || changes == "1,2,1", 'the router starts with the end mill and changes to the drill, got $tools');
@@ -429,7 +435,8 @@ class ProjectSourceTests {
       '${Math.round(stepping / steps * 1e5) / 100} ms per simulated tick');
     Sys.println('cnc router per tick: motion ${Math.round(player.motionSeconds / steps * 1e5) / 100} ms, cutting ' +
       '${Math.round(player.cuttingSeconds / steps * 1e5) / 100} ms, meshing ${Math.round(player.meshingSeconds / steps * 1e5) / 100} ms; ' +
-      'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms');
+      'compile ${Math.round(player.runSeconds * 1000)} ms, slowest update ${Math.round(player.slowestUpdate * 1000)} ms; ' +
+      '${Math.round(allocatedPerTick / 100) / 10} KB allocated a tick, $collections collections');
   }
 
   /**
