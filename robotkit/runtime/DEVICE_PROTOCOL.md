@@ -137,9 +137,11 @@ sends the segment again cut short at the boundary (a segment's polynomial runs
 from its own start, so only its length changes), followed by the new plan; it
 also sends again the replaced plan's events in that stretch, since a revision
 drops the device's events from its boundary on. That segment must start at or
-beyond the committed horizon. The host commits only as far as the first held
-segment ending two commit margins beyond the device's path clock, so the path
-beyond stays open to replacement.
+beyond the committed horizon. The host commits through the first held segment
+ending half a second (or two commit margins, if more) beyond the device's path
+clock: far enough that the device keeps moving through a host stall such as a
+garbage collection, and no further, so the path beyond stays open to
+replacement.
 
 Deployment schema v4 implies RKD6 and omits `protocol`. The v3 reader accepts
 only an explicit `rkd6` declaration. Layout fingerprints use the canonical

@@ -73,6 +73,11 @@ private:
     void pump_queue();
     /** How long the line takes to send what it already holds. */
     std::uint64_t link_drain_ns() const noexcept;
+    /**
+      How long the host may stall, from a garbage collection or the scheduler, while
+      the device keeps moving on what is committed. Path beyond it stays replaceable.
+    **/
+    static constexpr std::uint64_t kStallAllowanceNs = 500'000'000;
     /** How far ahead of the device's path clock a commit is sent. */
     std::uint64_t commit_margin_ns() const noexcept;
     /**

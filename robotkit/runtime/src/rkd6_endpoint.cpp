@@ -582,10 +582,12 @@ void Rkd6Endpoint::send_due_commit() {
         static_cast<double>(ack_.device_tick_hz) / 1e9);
     if (next_commit_ >= sent_.size() ||
         status_.path_clock_ticks + margin_ticks < committed_until_ticks_) return;
-    // Commit only as far as two margins ahead of the device: enough that the next
-    // commit, due a margin before this one runs out, arrives in time, while the path
-    // beyond stays open to a replacement.
-    const auto wanted = status_.path_clock_ticks + 2 * margin_ticks;
+    // Commit far enough ahead that the device keeps moving through a host stall (a
+    // collection, the scheduler), and no further, so the path beyond stays open to a
+    // replacement.
+    const auto stall_ticks = static_cast<std::uint64_t>(kStallAllowanceNs *
+        static_cast<double>(ack_.device_tick_hz) / 1e9);
+    const auto wanted = status_.path_clock_ticks + std::max(2 * margin_ticks, stall_ticks);
     auto chosen = next_commit_;
     while (chosen + 1 < sent_.size() &&
            sent_[chosen].header.t0_ticks + sent_[chosen].header.duration_ticks < wanted)
