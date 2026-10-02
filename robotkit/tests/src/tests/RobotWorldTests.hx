@@ -168,6 +168,11 @@ class RobotWorldTests {
   static var assertions = 0;
 
   public static function main():Void {
+    // ROBOTKIT_ONLY=construction runs just the construction skills (they plan arm motions through MotionKit).
+    if (Sys.getEnv("ROBOTKIT_ONLY") == "construction") {
+      Sys.println('RobotKit construction skills passed (${ConstructionSkillTests.run()} assertions)');
+      return;
+    }
     testPolynomialTrajectoryChunk();
     testAttachDetachAndIdentity();
     testSequenceAndTopology();

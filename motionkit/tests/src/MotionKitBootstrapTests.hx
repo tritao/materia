@@ -35,6 +35,15 @@ class MotionKitBootstrapTests {
       Sys.println('MachineKit compiler tests passed (${MotionKitTestSupport.assertions} assertions)');
       return;
     }
+    if (Sys.getEnv("MOTIONKIT_REDUNDANCY_ONLY") == "1") {
+      kinematicsTests.testKinematicsContract();
+      programTests.testProgramCompiler();
+      programTests.testRedundantArmPaths();
+      programTests.testCoordinatedExternalAxes();
+      kinematicsTests.testPathConfigurationSelector();
+      Sys.println('Redundancy focused tests passed (${MotionKitTestSupport.assertions} assertions)');
+      return;
+    }
     if (Sys.getEnv("MOTIONKIT_C4_ONLY") == "1") {
       kinematicsTests.testOpwKinematics();
       Sys.println('C4 focused tests passed (${MotionKitTestSupport.assertions} assertions)');

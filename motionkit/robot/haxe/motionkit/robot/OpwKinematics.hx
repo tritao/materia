@@ -179,7 +179,7 @@ class OpwKinematics implements KinematicsSolver {
   }
 
   public function solveDifferential(q:Array<Float>, twist:Twist6,
-      ?preferredRate:Array<Float>):Null<Array<Float>>
+      ?redundancyRate:Array<Float>):Null<Array<Float>>
     return differential.solveDifferential(q, twist);
 
   /**
