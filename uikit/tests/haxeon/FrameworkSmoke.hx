@@ -252,11 +252,38 @@ class FrameworkSmoke {
 		var editor = new TextEditorState(fonts, value.toString());
 		editor.paragraphStyle.lineHeight = 24.0;
 		editor.updateLayout(400.0);
-		for (step in 0...4) {
+		var paintedRanges:Array<Int> = [];
+		editor.layout.colorRangeProvider = function(start, end) {
+			paintedRanges.push(start);
+			paintedRanges.push(end);
+			return [];
+		};
+		var canvas = new Canvas();
+		editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, editor.layout.measure().height);
+		var originalRanges = paintedRanges;
+		canvas.reset();
+		for (step in 0...7) {
+			var beforeRanges = paintedRanges;
 			var offsets = new nativekit.editorkit.TextDocument(editor.text);
-			var start = step == 0 ? 0 : offsets.paragraphRangeAtIndex(step == 3 ? 190 : 63).start;
+			var start = step == 0 ? 0 : offsets.paragraphRangeAtIndex(step >= 3 ? 190 : 63).start;
 			var end = step == 2 ? offsets.paragraphRangeAtIndex(67).start : start;
-			var inserted = step == 0 ? "\n" : (step == 2 ? "α🙂 joined\n" : "α\nβ\n");
+			if (step == 5) {
+				var many = new StringBuf();
+				for (_ in 0...140) many.add("overflow α🙂\n");
+				// Exercise local splitting above the hard 128-paragraph bound.
+				if (!editor.replace(start, start, many.toString()))
+					throw "chunk overflow insertion was ignored";
+				offsets = new nativekit.editorkit.TextDocument(editor.text);
+				start = offsets.paragraphRangeAtIndex(190).start;
+				end = start;
+			}
+			var inserted = step == 0 ? "\n" : (step == 2 ? "α🙂 joined\n" :
+				(step == 4 ? "ordinary é🙂" : "α\nβ\n"));
+			if (step == 6) {
+				start = 0;
+				end = offsets.codepointCount;
+				inserted = "";
+			}
 			if (!editor.replace(start, end, inserted))
 				throw "newline chunk replacement was ignored";
 			var expected = new TextEditorState(fonts, editor.text);
@@ -268,6 +295,33 @@ class FrameworkSmoke {
 				Math.abs(actualSize.width - expectedSize.width) > 0.001)
 				throw "newline chunk metrics differ from fresh layout";
 			var current = new nativekit.editorkit.TextDocument(editor.text);
+			paintedRanges = [];
+			editor.layout.paint(canvas, new Color(1.0, 1.0, 1.0), 0.0, actualSize.height);
+			canvas.reset();
+			if (step == 0) {
+				if (paintedRanges.length != originalRanges.length)
+					throw "one newline repartitioned unrelated chunks";
+				for (index in 0...paintedRanges.length)
+					if (paintedRanges[index] != originalRanges[index] + (index == 0 ? 0 : 1))
+						throw "one newline moved an unrelated chunk boundary";
+			}
+			if (step == 4) {
+				if (paintedRanges.length != beforeRanges.length)
+					throw "ordinary typing repartitioned stable chunks";
+				var delta = current.codepointCount - offsets.codepointCount;
+				for (index in 0...paintedRanges.length) {
+					var shifted = index % 2 == 0 ? beforeRanges[index] > start : beforeRanges[index] >= start;
+					if (paintedRanges[index] != beforeRanges[index] + (shifted ? delta : 0))
+						throw "ordinary typing changed an unrelated chunk boundary";
+				}
+			}
+			var rangeIndex = 0;
+			while (rangeIndex < paintedRanges.length) {
+				if (current.paragraphIndexAtOffset(paintedRanges[rangeIndex + 1]) -
+					current.paragraphIndexAtOffset(paintedRanges[rangeIndex]) + 1 > 128)
+					throw "edited chunk exceeded the paragraph bound";
+				rangeIndex += 2;
+			}
 			for (offset in 0...current.codepointCount + 1) {
 				var actual = editor.layout.caret(new TextPosition(offset, 0));
 				var fresh = expected.layout.caret(new TextPosition(offset, 0));

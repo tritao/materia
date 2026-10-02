@@ -15,6 +15,7 @@ import nativekit.editorkit.TextDocument;
 /** Retained layouts for bounded groups of paragraphs in one editor document. */
 class TextEditorLayout {
 	static inline var paragraphsPerLayout:Int = 64;
+	static inline var maximumParagraphsPerLayout:Int = 128;
 	public var text(get, never):String;
 	public var width(default, null):Float;
 	public final textStyle:TextStyle;
@@ -182,10 +183,8 @@ class TextEditorLayout {
 	public function setText(value:String, ?offsetMap:TextDocument):Void
 		update(value, width, textStyle, paragraphStyle, offsetMap);
 
-	/**
-	 * Updates paragraph records after one document replacement. Unaffected
-	 * records are carried by paragraph index, so a keystroke does not rebuild a
-	 * document-wide text-to-record lookup table or reslice every paragraph.
+	/** Updates the affected chunk window while preserving all other boundaries.
+	 * Chunks grow locally to the hard paragraph bound before being split.
 	 */
 	public function setTextAfterEdit(nextOffsets:TextDocument,
 			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
@@ -197,113 +196,9 @@ class TextEditorLayout {
 			updateDocument(nextOffsets, width, textStyle, paragraphStyle);
 			return;
 		}
-		if (nextOffsets.paragraphCount() != paragraphLineCount) {
-			setTextAfterParagraphEdit(nextOffsets, oldStart, oldEnd, newStart, newEnd,
-				oldDocumentLength);
-			return;
-		}
-
-		var previous = paragraphs;
-		var oldFirst = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
-		var oldLast = paragraphIndexAtOffsetIn(previous, oldEnd, oldDocumentLength);
-		oldFirst = oldFirst > 0 ? oldFirst - 1 : oldFirst;
-		oldLast = oldLast + 1 < previous.length ? oldLast + 1 : oldLast;
-
-		var nextCount = chunkCount(nextOffsets);
-		var newFirst = Std.int(nextOffsets.paragraphIndexAtOffset(newStart) / paragraphsPerLayout);
-		var newLast = Std.int(nextOffsets.paragraphIndexAtOffset(newEnd) / paragraphsPerLayout);
-		newFirst = newFirst > 0 ? newFirst - 1 : newFirst;
-		newLast = newLast + 1 < nextCount ? newLast + 1 : newLast;
-
-		var oldDirtyCount = oldLast - oldFirst + 1;
-		var newDirtyCount = newLast - newFirst + 1;
-		var paragraphDelta = newDirtyCount - oldDirtyCount;
-		var reusable = new Map<String, Array<TextEditorParagraphRecord>>();
-		for (index in oldFirst...(oldLast + 1)) {
-			var oldRecord = previous[index];
-			var records = reusable.get(oldRecord.text);
-			if (records == null) {
-				records = [];
-				reusable.set(oldRecord.text, records);
-			}
-			records.push(oldRecord);
-		}
-		var usedDirty:Array<TextEditorParagraphRecord> = [];
-		var next:Array<TextEditorParagraphRecord> = [];
-		for (index in 0...nextCount) {
-			var range = chunkRangeAt(nextOffsets, index);
-			var record:TextEditorParagraphRecord = null;
-			var paragraphText:Null<String> = null;
-			if (index < newFirst) {
-				// The edit is after this prefix, so its record text is unchanged.
-				record = previous[index];
-			} else if (index > newLast) {
-				// Paragraph indexes after the dirty window shift by the local delta.
-				var oldIndex = index - paragraphDelta;
-				if (oldIndex >= 0 && oldIndex < previous.length)
-					record = previous[oldIndex];
-			}
-
-			if (record == null) {
-				paragraphText = nextOffsets.sliceCodepoints(range.start, range.end);
-				var matching = reusable.get(paragraphText);
-				if (matching != null)
-					while (matching.length > 0 && record == null) {
-						var candidate = matching.pop();
-						if (candidate != null && !containsRecord(usedDirty, candidate))
-							record = candidate;
-					}
-				// Ordinary edits keep paragraph indexes stable. Update the retained
-				// native layout rather than creating a new atlas for each keystroke.
-				if (record == null && index < previous.length &&
-					!containsRecord(usedDirty, previous[index]))
-					record = previous[index];
-				if (record == null)
-					record = new TextEditorParagraphRecord(paragraphText,
-						TextLayout.create(fonts, paragraphText, width, textStyle, paragraphStyle));
-				else if (record.text != paragraphText) {
-					var editDelta = (newEnd - newStart) - (oldEnd - oldStart);
-					var canEdit = index < previous.length && record == previous[index] &&
-						record.start == range.start && record.end + editDelta == range.end &&
-						oldStart >= record.start && oldEnd <= record.end &&
-						newStart >= range.start && newEnd <= range.end;
-					if (canEdit)
-						record.layout.edit(oldStart - record.start, oldEnd - record.start,
-							nextOffsets.sliceCodepoints(newStart, newEnd), paragraphText);
-					else
-						record.layout.update(paragraphText, width, textStyle, paragraphStyle);
-					record.renderRanges = null;
-					record.text = paragraphText;
-				}
-				usedDirty.push(record);
-			}
-			record.start = range.start;
-			record.end = range.end;
-			record.y = 0.0;
-			next.push(record);
-		}
-		for (index in oldFirst...(oldLast + 1)) {
-			var oldRecord = previous[index];
-			if (!containsRecord(usedDirty, oldRecord))
-				oldRecord.layout.dispose();
-		}
-
-		offsets = nextOffsets;
-		paragraphLineCount = nextOffsets.paragraphCount();
-		clearRangeGeometryCache();
-		paragraphs = next;
-		recomputeMetrics();
-	}
-
-	/** Keeps chunks outside a newline edit and repartitions only its neighborhood. */
-	function setTextAfterParagraphEdit(nextOffsets:TextDocument,
-			oldStart:Int, oldEnd:Int, newStart:Int, newEnd:Int,
-			oldDocumentLength:Int):Void {
 		var previous = paragraphs;
 		var first = paragraphIndexAtOffsetIn(previous, oldStart, oldDocumentLength);
 		var last = paragraphIndexAtOffsetIn(previous, oldEnd, oldDocumentLength);
-		first = first > 0 ? first - 1 : first;
-		last = last + 1 < previous.length ? last + 1 : last;
 		var delta = nextOffsets.codepointCount - oldDocumentLength;
 		var firstOffset = previous[first].start;
 		var lastOffset = clamp(previous[last].end + delta, firstOffset,
@@ -317,8 +212,8 @@ class TextEditorLayout {
 		var paragraph = firstParagraph;
 		while (paragraph <= lastParagraph) {
 			var remaining = lastParagraph - paragraph + 1;
-			var chunksRemaining = Std.int((remaining + paragraphsPerLayout - 1) /
-				paragraphsPerLayout);
+			var chunksRemaining = remaining <= maximumParagraphsPerLayout ? 1 :
+				Std.int((remaining + paragraphsPerLayout - 1) / paragraphsPerLayout);
 			var chunkSize = Std.int((remaining + chunksRemaining - 1) / chunksRemaining);
 			var paragraphEnd = paragraph + chunkSize - 1;
 			var chunkStart = paragraph == firstParagraph ? firstOffset :
