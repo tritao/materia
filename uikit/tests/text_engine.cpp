@@ -795,5 +795,67 @@ int main() {
         return 133;
 
 
+    // Full Unicode reshaping must retain only rows whose rendered glyphs and
+    // cluster source mapping match. Snapshots retain their old layout lifetime.
+    {
+        auto fonts = std::make_shared<FontCollection>();
+        if (!fonts->add_font(NKUI_TEST_FONT_PATH) ||
+            !fonts->add_font(NKUI_TEST_COLOR_FONT_PATH, FontFamily::Emoji) ||
+            !fonts->add_system_fallbacks())
+            return 146;
+        TextEngine rows(fonts);
+        TextLayoutResult before, after;
+        const char *text = "é first\nsecond é 🙂 אבג\nthird";
+        // Resolve system fallback fonts before exercising stable generations.
+        if (!rows.layout_utf8(text, 400.0f, long_options, &before) ||
+            !rows.layout_utf8(text, 400.0f, long_options, &before) ||
+            before.lines.size() != 3)
+            return 147;
+        const auto first = rows.published_glyphs_for_line(before.id, 0, 0, 0, 1,
+                                                         GlyphMode::Alpha);
+        const auto plain = rows.published_glyphs_for_line(before.id, 1, 0, 0, 1,
+                                                         GlyphMode::Alpha);
+        if (!first || !plain)
+            return 148;
+        std::vector<GlyphColorRange> colors{{plain->source_start, plain->source_start + 3,
+                                           {255, 0, 0, 255}}};
+        const auto colored = rows.published_glyphs_for_line(before.id, 1, 0, 0, 1,
+                                                           GlyphMode::Alpha, {}, colors);
+        if (!colored || !rows.edit_utf8(0, 1, "ö", &after) || after.id == before.id)
+            return 149;
+        const auto retained = rows.published_glyphs_for_line(after.id, 1, 0, 0, 1,
+                                                            GlyphMode::Alpha, {}, colors);
+        const auto changed = rows.published_glyphs_for_line(after.id, 0, 0, 0, 1,
+                                                           GlyphMode::Alpha);
+        if (!retained || !changed || retained == colored ||
+            retained->publication_key != colored->publication_key ||
+            changed->publication_key == first->publication_key ||
+            !rows.prepared_glyphs_current(*retained) ||
+            !rows.prepared_glyphs_current(*colored))
+            return 150;
+        if (!rows.edit_utf8(1, 1, "é", &after))
+            return 151;
+        colors[0].start++;
+        colors[0].end++;
+        const auto shifted = rows.published_glyphs_for_line(after.id, 1, 0, 0, 1,
+                                                           GlyphMode::Alpha, {}, colors);
+        if (!shifted || shifted->publication_key != colored->publication_key ||
+            shifted->source_start != colored->source_start + 1 ||
+            shifted->vertices.size() != colored->vertices.size() ||
+            shifted->source_ranges.size() != colored->source_ranges.size() ||
+            !rows.prepared_glyphs_current(*shifted))
+            return 152;
+        for (size_t i = 0; i < shifted->vertices.size(); ++i) {
+            const auto &a = shifted->vertices[i];
+            const auto &b = colored->vertices[i];
+            if (a.x != b.x || a.y != b.y || a.red != b.red || a.green != b.green ||
+                a.blue != b.blue || a.alpha != b.alpha)
+                return 153;
+        }
+        for (size_t i = 0; i < shifted->source_ranges.size(); ++i)
+            if (shifted->source_ranges[i].start != colored->source_ranges[i].start + 1 ||
+                shifted->source_ranges[i].end != colored->source_ranges[i].end + 1)
+                return 154;
+    }
     return glyphs.vertices.size() % 4 == 0 && glyphs.indices.size() % 6 == 0 ? 0 : 41;
 }

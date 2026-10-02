@@ -769,6 +769,18 @@ int main() {
                     edited_rows.raster_cache_misses != repeated_rows.raster_cache_misses + 2)
                     result = 48;
             }
+            // Unicode forces a fresh native layout but unchanged rows must
+            // retain their raster identity after glyph equivalence is checked.
+            nkui_renderer_stats unicode_rows{};
+            if (!result && (nkui_text_layout_edit(wrapped_rows, 4, 5, "é") != NKUI_OK ||
+                nkui_layout_session_render_frame(renderer, session, surface, &frame_info, 0) != NKUI_OK ||
+                nkui_renderer_get_stats(renderer, &unicode_rows) != NKUI_OK))
+                result = 50;
+            if (!result && (unicode_rows.raster_cache_hits < edited_rows.raster_cache_hits + 2 ||
+                unicode_rows.raster_cache_misses != edited_rows.raster_cache_misses + 2)) {
+                std::fprintf(stderr, "Unicode row edit rebuilt unchanged rasters\n");
+                result = 51;
+            }
         }
         if (wrapped_rows.id)
             nkui_resource_destroy(wrapped_rows);
