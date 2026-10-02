@@ -57,6 +57,8 @@ import machinekit.pneumatic.SuctionCup;
 import machinekit.pneumatic.VacuumGenerator;
 import machinekit.pneumatic.VacuumPressureSensor;
 import machinekit.pneumatic.VacuumControlValve;
+import machinekit.welding.WeldingInterfaces;
+import machinekit.welding.WeldingTorch;
 import robotkit.tool.ToolCollisionShape;
 import robotkit.tool.ToolCollisionShapes;
 import robotkit.tool.ToolRuntimeSelection;
@@ -90,6 +92,7 @@ class CadBridgeTests {
     testSchmalzEndEffector();
     testEndEffectorRuntimeBridge();
     testDerivedRuntimeBindings();
+    testTorchBindings();
     testAssemblySimulationBridge();
     testMobileBaseBridge();
     testFaceBridgeOnPlainBoxFace();
@@ -585,6 +588,37 @@ class CadBridgeTests {
       "gripper valve command derives from declared open and close ports");
   }
 
+  /** A welding torch derives an arc control, bound to its signal inlet, and its other channels. */
+  static function testTorchBindings():Void {
+    var services = ["power", "gas", "wire", "control"];
+    var set = new EndEffectorSet();
+    set.addComponent("base", new BridgeWelderSourcePart());
+    set.mount("base", "mount");
+    for (name in services) set.exposePort(name, "base", name);
+    set.changer("manual", "base", "contact", [for (name in services) {robot: name, tool: name}]);
+    var tool = new EndEffector();
+    tool.addComponent("torch", new WeldingTorch(45));
+    tool.mount("torch", "robot");
+    for (name in services) tool.exposePort(name, "torch", name);
+    tool.workingFrame("tcp", "torch", "tcp", true);
+    set.addTool("weld", tool);
+    var bindings = EndEffectorRuntimeBridge.deriveBindings(set, "weld");
+    check(bindings.controls.length == 1 && bindings.vacuumSensorId == null, "a torch derives one control and no vacuum sensor");
+    switch bindings.controls[0] {
+      case Arc(channel, instanceId, controlPort):
+        check(channel == "weld/tool/torch.arc" && instanceId == "tool/torch" && controlPort == "control",
+          "the arc control is the torch's trigger channel on its signal inlet");
+      case _: check(false, "a torch derives an arc binding");
+    }
+    var derived = machinekit.robotics.EndEffectorControls.derive(set.configuration("weld"), "weld");
+    check(derived.arcs.length == 1 && derived.arcs[0].wireSpeedChannel == "weld/tool/torch.wire_speed" &&
+      derived.arcs[0].voltageChannel == "weld/tool/torch.voltage" && derived.arcs[0].sensor == "weld/tool/torch.weld" &&
+      derived.arcs[0].tcpConnector == "tcp", "the torch's analogue channels and weld sensor are named after its member");
+    var runtime = EndEffectorRuntimeBridge.toRuntimeFromDesign(set, "weld", "tcp");
+    check(runtime.runtime.gripper == null && runtime.runtime.vacuum == null && runtime.runtime.channelDeclarations().length == 0,
+      "the arc is worked by the robot's welder, so the kinematic tool runtime declares no channel for it");
+  }
+
   static function testAssemblySimulationBridge():Void {
     var assembly = new AssemblyModel();
     assembly.add("base");
@@ -991,6 +1025,22 @@ private class BridgeServiceSourcePart extends MachineComponent {
         iface: Unspecified, required: false});
     addPort({name: "valveCommand", kind: Signal, role: Supply,
       iface: Plug("digital-valve", 2), required: false});
+    declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());
+  }
+
+  override public function geometry(detail:ComponentDetail = Preview):Part
+    return Part.box(10, 10, 10);
+}
+
+private class BridgeWelderSourcePart extends MachineComponent {
+  public function new() {
+    super("BRIDGE-WELDER-SOURCE", "welding service source fixture", "steel", true);
+    addConnector("mount", Mount, Solids.axial(0, 0, 0));
+    addConnector("contact", Face, Solids.axial(0, 0, 10));
+    addPort({name: "power", kind: ElectricalPower, role: Supply, iface: WeldingInterfaces.weldCable(), required: false});
+    addPort({name: "gas", kind: Gas, role: Supply, iface: WeldingInterfaces.gas(), required: false});
+    addPort({name: "wire", kind: Wire, role: Supply, iface: WeldingInterfaces.wireLiner(), required: false});
+    addPort({name: "control", kind: Signal, role: Supply, iface: WeldingInterfaces.control(), required: false});
     declareMass(1, new Vector(0, 0, 5), InertiaTensor.zero());
   }
 
