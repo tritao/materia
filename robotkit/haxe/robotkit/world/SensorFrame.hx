@@ -40,7 +40,6 @@ class SensorFrame {
     this.image = image;
   }
 
-  public function copy():SensorFrame return new SensorFrame(sensorId, kind, frameId, sequence,
-    sourceTimestampNs, values.toArray(), receivedTimestampNs, linkId, mountPosition.toArray(),
-    mountRotation.toArray(), sourceClockId, receivedClockId, image);
+  /** The frame itself: it is immutable, so a copy could never differ from it. */
+  public function copy():SensorFrame return this;
 }

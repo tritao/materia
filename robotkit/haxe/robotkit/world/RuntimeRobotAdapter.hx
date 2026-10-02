@@ -141,11 +141,7 @@ class RuntimeRobotAdapter implements Robot {
     runtime.resetSafety(commandSequence);
   }
 
-  public function sensors():Array<SensorFrame> {
-    var result:Array<SensorFrame> = [];
-    for (frame in currentSensors) result.push(frame.copy());
-    return result;
-  }
+  public function sensors():Array<SensorFrame> return currentSensors.copy();
 
   public function setChangeListener(listener:Null < RobotId -> Void >):Void {
     changeListener = listener;
