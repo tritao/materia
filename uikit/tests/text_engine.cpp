@@ -111,6 +111,83 @@ int main() {
             return 111;
     }
 
+    // A same-advance guarded edit may retain all wrapped row geometry. Check
+    // the retained layout against a freshly built generation, including the
+    // changed row's glyph-dependent bounds and caret positions.
+    {
+        TextEngine retained(shared_fonts);
+        TextEngine fresh(shared_fonts);
+        TextLayoutOptions options;
+        options.font_size = 15.0f;
+        std::string text(4096, 'a');
+        TextLayoutResult actual, oracle;
+        if (!retained.layout_utf8(text.c_str(), 200.0f, options, &actual) ||
+            !retained.edit_utf8(2048, 2049, "a", &actual) ||
+            !fresh.layout_utf8(text.c_str(), 200.0f, options, &oracle) ||
+            retained.stats().incremental_ascii_edits != 1 ||
+            actual.lines.size() != oracle.lines.size())
+            return 131;
+        for (std::size_t row = 0; row < actual.lines.size(); ++row)
+            if (actual.lines[row].text_offset != oracle.lines[row].text_offset ||
+                actual.lines[row].text_length != oracle.lines[row].text_length ||
+                actual.lines[row].bounds.x != oracle.lines[row].bounds.x ||
+                actual.lines[row].bounds.y != oracle.lines[row].bounds.y ||
+                actual.lines[row].bounds.width != oracle.lines[row].bounds.width ||
+                actual.lines[row].bounds.height != oracle.lines[row].bounds.height)
+                return 132;
+        for (int32_t offset : {0, 2047, 2048, 2049, 4096}) {
+            const auto a = retained.caret({offset, 0});
+            const auto b = fresh.caret({offset, 0});
+            if (a.x != b.x || a.y != b.y)
+                return 133;
+        }
+    }
+    {
+        auto mono_fonts = std::make_shared<FontCollection>();
+        if (!mono_fonts->valid() || !mono_fonts->add_font(NKUI_TEST_MONO_FONT_PATH))
+            return 134;
+        TextEngine retained(mono_fonts);
+        TextEngine fresh(mono_fonts);
+        TextLayoutOptions options;
+        options.font_size = 15.0f;
+        std::string text(4096, 'a');
+        TextLayoutResult actual, oracle;
+        if (!retained.layout_utf8(text.c_str(), 200.0f, options, &actual))
+            return 135;
+        const auto matches_fresh = [&]() {
+            if (!fresh.layout_utf8(text.c_str(), 200.0f, options, &oracle) ||
+                actual.lines.size() != oracle.lines.size() ||
+                actual.bounds.height != oracle.bounds.height)
+                return false;
+            for (std::size_t row = 0; row < actual.lines.size(); ++row)
+                if (actual.lines[row].text_offset != oracle.lines[row].text_offset ||
+                    actual.lines[row].text_length != oracle.lines[row].text_length ||
+                    actual.lines[row].bounds.x != oracle.lines[row].bounds.x ||
+                    actual.lines[row].bounds.y != oracle.lines[row].bounds.y ||
+                    actual.lines[row].bounds.width != oracle.lines[row].bounds.width ||
+                    actual.lines[row].bounds.height != oracle.lines[row].bounds.height)
+                    return false;
+            for (int32_t offset : {0, 2047, 2048, 2049, static_cast<int32_t>(text.size())}) {
+                const auto a = retained.caret({offset, 0});
+                const auto b = fresh.caret({offset, 0});
+                if (a.x != b.x || a.y != b.y)
+                    return false;
+            }
+            for (float top : {0.0f, 800.0f, 1800.0f})
+                if (retained.visible_lines(top, top + 100.0f) !=
+                    fresh.visible_lines(top, top + 100.0f))
+                    return false;
+            return true;
+        };
+        text.insert(2048, 1, 'b');
+        if (!retained.edit_utf8(2048, 2048, "b", &actual) || !matches_fresh())
+            return 136;
+        text.erase(2048, 1);
+        if (!retained.edit_utf8(2048, 2049, "", &actual) || !matches_fresh() ||
+            retained.stats().incremental_ascii_edits != 2)
+            return 137;
+    }
+
     // An unsupported character must not move its insertion caret to the line origin.
     TextEngine unsupported(shared_fonts);
     if (!unsupported.layout_utf8("abc🙂def", 200.0f, 16.0f))

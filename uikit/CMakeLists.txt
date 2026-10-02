@@ -193,6 +193,7 @@ if(NK_BUILD_TESTS)
     target_include_directories(nativekit_ui_text_engine_test PRIVATE src)
     target_compile_definitions(nativekit_ui_text_engine_test PRIVATE
         NKUI_TEST_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexSans-Regular.ttf"
+        NKUI_TEST_MONO_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/IBMPlexMono-Regular.ttf"
         NKUI_TEST_COLOR_FONT_PATH="${NK_VENDOR_DIR}/skribidi/example/data/NotoColorEmoji-Regular.ttf")
     target_link_libraries(nativekit_ui_text_engine_test PRIVATE nkui_skribidi)
     add_test(NAME nativekit_ui_text_engine COMMAND nativekit_ui_text_engine_test)
