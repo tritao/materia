@@ -177,6 +177,7 @@ class AssemblyDefinitionFlattener {
 				var expanded:AssemblyActuator = {id: scoped(prefix, actuator.id), joint: scoped(prefix, actuator.joint),
 					maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
 				if (actuator.rotorInertia != null) expanded.rotorInertia = actuator.rotorInertia;
+				if (actuator.fullStepsPerRevolution != null) expanded.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
 				flat.actuators.push(expanded);
 			}
 		}

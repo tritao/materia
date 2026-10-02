@@ -183,11 +183,12 @@ class AssemblyModel {
 	}
 
 	/** Puts a motor on joint `joint`: its usable effort and rate, in the joint's units, and rotor inertia. */
-	public function actuate(id:String, joint:String, maxEffort:Float, maxRate:Float, ?rotorInertia:Float):Void {
+	public function actuate(id:String, joint:String, maxEffort:Float, maxRate:Float, ?rotorInertia:Float, ?fullStepsPerRevolution:Float):Void {
 		if (data.actuators == null) data.actuators = [];
 		var actuator:materia.assembly.AssemblyDefinition.AssemblyActuator = {id: id, joint: joint,
 			maxEffort: maxEffort, maxRate: maxRate};
 		if (rotorInertia != null) actuator.rotorInertia = rotorInertia;
+		if (fullStepsPerRevolution != null) actuator.fullStepsPerRevolution = fullStepsPerRevolution;
 		data.actuators.push(actuator);
 	}
 

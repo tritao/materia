@@ -586,6 +586,7 @@ class CadBridgeTests {
     assembly.connector("slider", "mount", AssemblyFrames.identity());
     assembly.mateOnAxis("slide", "prismatic", "base", "mount", "slider", "mount",
       {x: 0, y: 1, z: 0}, 0, {lower: 0, upper: 100, velocity: 20, effort: 50});
+    assembly.actuate("drive", "slide", 10, 5, null, 200);
     var vertices = Bytes.alloc(4 * 24);
     var points = [0.0, 0.0, 0.0, 10.0, 0.0, 0.0,
       0.0, 10.0, 0.0, 0.0, 0.0, 10.0];
@@ -609,6 +610,8 @@ class CadBridgeTests {
       "assembly limits and material mass convert to SI units");
     check(RobotRuntimeCompiler.validate(translated.model).length == 0,
       "translated assembly is a valid RobotKit runtime model");
+    check(translated.model.actuators.length == 1 && translated.model.actuators[0].fullStepsPerRevolution == 200,
+      "a stepper's full steps reach the robot actuator");
     check(translated.linkHulls.length == 2 && translated.linkHulls[0].link == 0 &&
       translated.linkHulls[1].link == 1 && translated.linkHulls[1].vertices.length <= 64 * 3,
       "physical-part view supplies each part's bounded hull on its link");

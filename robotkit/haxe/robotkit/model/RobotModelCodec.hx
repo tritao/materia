@@ -375,6 +375,7 @@ class RobotModelCodec {
   static function encodeActuator(value:Actuator):Dynamic return {
     id: value.id, maxEffort: value.maxEffort, maxRate: value.maxRate,
     servoStiffness: value.servoStiffness, servoDamping: value.servoDamping,
+    fullStepsPerRevolution: value.fullStepsPerRevolution,
     transmission: switch value.transmission {
       case SimpleTransmission(jointId, ratio, offset):
         {kind: "simple", jointId: jointId, ratio: ratio, offset: offset};
@@ -385,6 +386,7 @@ class RobotModelCodec {
     if (value == null) throw "Robot actuator is null";
     nonNegative(value.servoStiffness, "actuator servoStiffness");
     nonNegative(value.servoDamping, "actuator servoDamping");
+    nonNegative(value.fullStepsPerRevolution, "actuator fullStepsPerRevolution");
     requireText(value.id, "actuator ID");
     finite(value.maxEffort, "actuator maxEffort");
     finite(value.maxRate, "actuator maxRate");
@@ -450,6 +452,9 @@ class RobotModelCodec {
       number(value, "maxRate"), parsed);
     actuator.servoStiffness = nonNegative(number(value, "servoStiffness"), "actuator servoStiffness");
     actuator.servoDamping = nonNegative(number(value, "servoDamping"), "actuator servoDamping");
+    // Absent in models saved before steppers were recorded: not a stepper.
+    if (Reflect.hasField(value, "fullStepsPerRevolution"))
+      actuator.fullStepsPerRevolution = nonNegative(number(value, "fullStepsPerRevolution"), "actuator fullStepsPerRevolution");
     return actuator;
   }
 

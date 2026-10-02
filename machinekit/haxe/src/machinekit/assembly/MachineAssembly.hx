@@ -751,7 +751,7 @@ class MachineAssembly {
 			throw 'Duplicate assembly actuator "${record.actuator}"';
 		mechanical.actuators.push({id: record.actuator, joint: record.joint,
 			maxEffort: stepper.usableTorque(record.margin), maxRate: stepper.usableSpeed(record.volts, record.margin),
-			rotorInertia: rating.rotorInertia});
+			rotorInertia: rating.rotorInertia, fullStepsPerRevolution: 360.0 / rating.stepAngle});
 		motors.push(copyMotor(record, ""));
 	}
 
@@ -765,6 +765,7 @@ class MachineAssembly {
 		var copy:materia.assembly.AssemblyDefinition.AssemblyActuator = {id: join(prefix, actuator.id),
 			joint: join(prefix, actuator.joint), maxEffort: actuator.maxEffort, maxRate: actuator.maxRate};
 		if (actuator.rotorInertia != null) copy.rotorInertia = actuator.rotorInertia;
+		if (actuator.fullStepsPerRevolution != null) copy.fullStepsPerRevolution = actuator.fullStepsPerRevolution;
 		return copy;
 	}
 
@@ -978,7 +979,7 @@ class MachineAssembly {
 				join(prefix, coupling.target), coupling.ratio, coupling.offset, coupling.efficiency);
 		if (mechanical.actuators != null) for (actuator in mechanical.actuators)
 			model.actuate(join(prefix, actuator.id), join(prefix, actuator.joint), actuator.maxEffort,
-				actuator.maxRate, actuator.rotorInertia);
+				actuator.maxRate, actuator.rotorInertia, actuator.fullStepsPerRevolution);
 	}
 
 	public function components():Array<MachineAssemblyComponent>

@@ -167,7 +167,8 @@ class AssemblyDefinitionCodec {
 			if (actuator == null || !validText(actuator.id) || actuatorIds.exists(actuator.id) ||
 				movable.get(actuator.joint) == null || !Math.isFinite(actuator.maxEffort) || actuator.maxEffort < 0 ||
 				!Math.isFinite(actuator.maxRate) || actuator.maxRate < 0 ||
-				(actuator.rotorInertia != null && !(actuator.rotorInertia >= 0 && Math.isFinite(actuator.rotorInertia))))
+				(actuator.rotorInertia != null && !(actuator.rotorInertia >= 0 && Math.isFinite(actuator.rotorInertia))) ||
+				(actuator.fullStepsPerRevolution != null && !(actuator.fullStepsPerRevolution > 0 && Math.isFinite(actuator.fullStepsPerRevolution))))
 				throw 'Assembly has an invalid actuator "${actuator == null ? "" : actuator.id}"';
 			actuatorIds.set(actuator.id, true);
 		}

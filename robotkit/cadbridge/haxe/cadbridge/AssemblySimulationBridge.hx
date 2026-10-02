@@ -259,8 +259,11 @@ class AssemblySimulationBridge {
       // units from its initial placement: joint = (actuator - initial) * factor.
       var factor = edge.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var initial = placement.joint(actuator.joint);
-      model.addActuator(new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
-        Transmission.SimpleTransmission(driven.id, 1 / factor, -initial * factor)));
+      var added = new Actuator(actuator.id, actuator.maxEffort, actuator.maxRate,
+        Transmission.SimpleTransmission(driven.id, 1 / factor, -initial * factor));
+      var steps = actuator.fullStepsPerRevolution;
+      if (steps != null) added.fullStepsPerRevolution = steps;
+      model.addActuator(added);
       if (actuator.rotorInertia != null)
         driven.armature += edge.type == AssemblyJointType.Prismatic ? 0.0 : actuator.rotorInertia;
     }

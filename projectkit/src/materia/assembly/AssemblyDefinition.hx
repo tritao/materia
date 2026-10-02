@@ -142,6 +142,8 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(3) var maxEffort:Float;
 	@:id(4) var maxRate:Float;
 	@:id(5) @:optional var rotorInertia:Null<Float>;
+	/** Full steps in a turn of a stepper motor's rotor; absent for other motors. */
+	@:id(6) @:optional var fullStepsPerRevolution:Null<Float>;
 }
 
 /** A connector exported from a member of an assembly definition. */

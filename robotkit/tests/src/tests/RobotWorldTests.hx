@@ -776,6 +776,7 @@ class RobotWorldTests {
     source.joints[2].limitImpedance = [0.0, 0.99, 0.01, 0.5, 2.0];
     source.joints[1].limits.overtravel = 0.004;
     source.actuators[0].servoStiffness = 75.0;
+    source.actuators[0].fullStepsPerRevolution = 200.0;
     source.actuators[0].servoDamping = 2.0;
 
     var encoded = RobotModelCodec.encode(source);
@@ -841,6 +842,7 @@ class RobotWorldTests {
     check(restored.joints[2].limitTimeConstant == 0.008 && restored.joints[2].limitImpedance[1] == 0.99,
       "RobotModel codec preserves joint limit softness");
     equal(restored.actuators[0].servoStiffness, 75.0, "RobotModel codec preserves servo stiffness");
+    equal(restored.actuators[0].fullStepsPerRevolution, 200.0, "RobotModel codec preserves a stepper's full steps");
     var restoredSurface = restored.links[1].collisionShapes[1].surface;
     check(restoredSurface != null && restoredSurface.frictionDimensions == 4 &&
       restoredSurface.friction[0] == 0.7 && restoredSurface.contactTimeConstant == 0.01,

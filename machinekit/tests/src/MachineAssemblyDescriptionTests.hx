@@ -364,6 +364,8 @@ class MachineAssemblyDescriptionTests {
 		near(actuators[0].maxEffort, 0.63, "the actuator gets the usable torque");
 		near(actuators[0].maxRate, 2 * corner, "and the usable speed");
 		near(rotor == null ? 0 : rotor, 3.0e-5, "and the rotor's inertia");
+		var steps = actuators[0].fullStepsPerRevolution;
+		near(steps == null ? 0 : steps, 200, "and 200 full steps a turn from its 1.8 degree step");
 		near(efficiencyOf(built), thread.efficiency(), "the lead screw's coupling carries its efficiency");
 		// Rebuilt with the NEMA 17 in the motor's place, the actuator follows the motor.
 		var description:MachineAssemblyDescription = haxeon.wire.JsonWire.decode(haxeon.wire.JsonWire.encode(assembly.describe()));
@@ -374,6 +376,8 @@ class MachineAssemblyDescriptionTests {
 				case other: other;
 			}}];
 		var rebuilt = definition(MachineAssembly.fromDescription(description));
+		var rebuiltSteps = actuatorsOf(rebuilt)[0].fullStepsPerRevolution;
+		near(rebuiltSteps == null ? 0 : rebuiltSteps, 200, "a rebuilt motor keeps its steps");
 		near(actuatorsOf(rebuilt)[0].maxEffort, 0.225, "a rebuilt motor's actuator follows the motor part");
 		near(efficiencyOf(rebuilt), thread.efficiency(), "and the screw keeps its efficiency");
 	}

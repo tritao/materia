@@ -15,6 +15,12 @@ class Actuator {
    */
   public var servoStiffness:Float = 0.0;
   public var servoDamping:Float = 0.0;
+  /**
+   * Full steps in one turn of a stepper motor's rotor, 0 when this is not a
+   * stepper. A stepper's actuator coordinate is the rotor angle in radians;
+   * microstepping is a property of the driver wiring, so the deployment adds it.
+   */
+  public var fullStepsPerRevolution:Float = 0.0;
 
   public function new(id:String, maxEffort:Float, maxRate:Float,
       transmission:Transmission) {
