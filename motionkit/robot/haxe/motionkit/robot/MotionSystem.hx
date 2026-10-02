@@ -52,6 +52,9 @@ class MotionSystem {
   var elapsedSeconds(get, never):Float;
   /** A native lifecycle command must reach the owner before another plan. */
   var nativeRefillDeferred:Bool = false;
+  /** Updates so far, and the one that last submitted motion: an update submits once. */
+  var updateCount:Int = 0;
+  var filledAtUpdate:Int = -1;
   var bufferedTotalSeconds:Float = 0.0;
   var bufferedCompletedSeconds:Float = 0.0;
   var plannedEndPositions:Null<Array<Float>> = null;
@@ -504,6 +507,7 @@ class MotionSystem {
   public function update(?dtSeconds:Float = -1.0):Bool {
     var dt = dtSeconds < 0.0 ? fixedTimestepSeconds : dtSeconds;
     if (!Math.isFinite(dt) || dt <= 0.0) throw "Motion-system update duration must be finite and positive";
+    updateCount++;
     checkSnapshot();
     if (session.isHolding() || session.isStopping()) {
       // No refills while stopping: beginStop() already queued enough path for
@@ -529,7 +533,9 @@ class MotionSystem {
       return activeTrajectory != null;
     }
     if (nativeRefillDeferred) nativeRefillDeferred = false;
-    else if (!stream.submitted || stream.shouldRefill(dt, fixedTimestepSeconds))
+    // One submission an update: motion that started during this update has submitted.
+    else if (filledAtUpdate != updateCount &&
+        (!stream.submitted || stream.shouldRefill(dt, fixedTimestepSeconds)))
       fillNativeWindow();
     return true;
   }
@@ -598,12 +604,13 @@ class MotionSystem {
 
   /** Keep two seconds of motion queued so HOLD can slow along the path. */
   function fillNativeWindow():Void {
+    filledAtUpdate = updateCount;
     var trajectoryValue = activeTrajectory;
     if (trajectoryValue == null) return;
     var jerkUnchecked = pathJerkUnchecked.exists(trajectoryValue) &&
       pathJerkUnchecked.get(trajectoryValue) == true;
     try {
-      stream.fill(session, false,
+      stream.fill(session,
         (first, last, tag, startNs, _) -> stream.motionSubmission(
           trajectoryValue, first, last, tag, startNs, modelRevision,
           calibrationRevision, jerkUnchecked),

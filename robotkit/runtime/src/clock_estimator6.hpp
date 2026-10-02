@@ -6,6 +6,16 @@
 
 namespace robotkit {
 
+/// One host-to-device clock mapping, fixed: what a chunk was compiled with.
+struct ClockMap6 {
+    double offset = 0;
+    double rate = 0;
+    /// Device ticks at host time `host_ns`, rounded as the estimator rounds them.
+    std::uint64_t map(std::uint64_t host_ns) const;
+    /// Host time at `device_ticks`: the inverse of `map` up to its rounding.
+    long double host_ns(std::uint64_t device_ticks) const;
+};
+
 /// Maps host monotonic nanoseconds to device ticks using low-RTT sync samples.
 class ClockEstimator6 {
 public:
@@ -21,6 +31,8 @@ public:
     void note_sync_request(std::uint64_t host_send_ns);
     std::uint64_t uncertainty_ns() const { return uncertainty_ns_; }
     std::uint64_t map_host_ns(std::uint64_t host_ns) const;
+    /// The current mapping, to keep with what is compiled through it.
+    ClockMap6 snapshot() const { return {ready_ ? offset_ : 0.0, ready_ ? rate_ : 0.0}; }
     std::uint64_t committed_horizon_extra_ns(std::uint64_t link_latency_ns) const;
 
 private:

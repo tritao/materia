@@ -103,6 +103,10 @@ impl<const A: usize, const CAP: usize> ScheduledCore<A, CAP> {
     }
     pub fn revision(&self) -> u64 { self.revision }
     pub fn committed_until(&self) -> u64 { self.committed_until }
+    /// End of the last segment held: the boundaries received so far, or 0 when none is held.
+    pub fn received_until(&self) -> u64 {
+        if self.len == 0 { 0 } else { self.segments[self.len - 1].unwrap().end_ticks() }
+    }
     pub fn path_clock(&self) -> u64 { self.path_clock }
     pub fn rate(&self) -> f32 { self.rate }
     pub fn underflow(&self) -> bool { self.underflow }

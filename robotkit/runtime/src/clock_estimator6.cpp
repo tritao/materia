@@ -84,13 +84,21 @@ void ClockEstimator6::fit() {
     ready_ = true;
 }
 
-std::uint64_t ClockEstimator6::map_host_ns(std::uint64_t host_ns) const {
-    if (!ready_) return 0;
-    const auto ticks = offset_ + rate_ * static_cast<double>(host_ns);
+std::uint64_t ClockMap6::map(std::uint64_t host_ns) const {
+    const auto ticks = offset + rate * static_cast<double>(host_ns);
     if (ticks <= 0) return 0;
     if (ticks >= static_cast<double>(std::numeric_limits<std::uint64_t>::max()))
         return std::numeric_limits<std::uint64_t>::max();
     return static_cast<std::uint64_t>(std::llround(ticks));
+}
+
+long double ClockMap6::host_ns(std::uint64_t device_ticks) const {
+    return rate > 0 ? (static_cast<long double>(device_ticks) - offset) / rate : 0.0L;
+}
+
+std::uint64_t ClockEstimator6::map_host_ns(std::uint64_t host_ns) const {
+    if (!ready_) return 0;
+    return snapshot().map(host_ns);
 }
 
 std::uint64_t ClockEstimator6::committed_horizon_extra_ns(std::uint64_t link_latency_ns) const {

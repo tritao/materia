@@ -302,7 +302,8 @@ class ApplicationSimulation {
       z + qw * tz + qx * ty - qy * tx];
   }
 
-  public function step(?timestampNs:Int64):WorldSnapshot {
+  /** Advances the simulation one tick. Read what it produced with `snapshot()`. */
+  public function step(?timestampNs:Int64):Void {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";
     if (running) throw "Stop realtime simulation before deterministic stepping";
@@ -310,8 +311,10 @@ class ApplicationSimulation {
     presentMembers();
     active.session.step(timestampNs == null ? Int64.ofInt(0) : timestampNs);
     presentAssemblyPhysics = true;
-    return world.snapshot();
   }
+
+  /** Every robot's latest observation. Built on request: stepping does not need it. */
+  public function snapshot():WorldSnapshot return world.snapshot();
   public function start():Void {
     var active = space;
     if (active == null) throw "Apply the pending simulation configuration first";

@@ -140,12 +140,16 @@ class Stock {
   public function compareAll(target:Stock):Array<StockComparison>
     return [for (axis in [StockAxis.X, StockAxis.Y, StockAxis.Z]) if (lattice.has(axis)) compare(target, axis)];
 
-  /** Captures the stock and its history; see `StockSnapshot`. */
-  public function snapshot():StockSnapshot {
+  /**
+    Captures the stock and, unless `withHistory` is false, its history; see
+    `StockSnapshot`. The history costs a copy as long as it, so leave it out
+    where the moves are not needed, as for colouring by deviation.
+  **/
+  public function snapshot(?withHistory:Bool = true):StockSnapshot {
     alive();
     var created = StockKitNative.sk_stock_snapshot(owner.borrow());
     check(created.status, "stock.snapshot");
-    return new StockSnapshot(lattice, history.copy(), created.out_snapshot);
+    return new StockSnapshot(lattice, withHistory ? history.copy() : [], created.out_snapshot);
   }
 
   /** Returns the stock and its history to `snapshot`, which must share its lattice. */

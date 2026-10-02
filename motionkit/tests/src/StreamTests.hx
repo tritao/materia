@@ -272,20 +272,28 @@ class StreamTests extends MotionKitTestSupport {
       [for (index in 0...601) index * 0.01],
       [for (index in 0...601) [0.05 * index / 600.0]]);
     machine.queueTrajectory(trajectory);
-    var initialSegments = 0;
-    for (command in recording.commands) switch command {
-      case RobotCommand.ExecutionPlan(plan): initialSegments += plan.segments.length;
-      case _:
+    function submittedSegments():Int {
+      var total = 0;
+      for (command in recording.commands) switch command {
+        case RobotCommand.ExecutionPlan(plan): total += plan.segments.length;
+        case _:
+      }
+      return total;
     }
-    // Two seconds of the six-second, 600-segment trajectory, not all of it.
-    check(recording.commands.length >= 1 && initialSegments >= 200 && initialSegments <= 210,
-      "long trajectory starts with a bounded native plan window");
-    var initialPlanCount = recording.commands.length;
+    // A quarter second of the six-second, 600-segment trajectory to start with.
+    var initialSegments = submittedSegments();
+    check(initialSegments >= 25 && initialSegments <= 40,
+      'long trajectory starts with a short native plan window, got $initialSegments segments');
+    // Updates top the window up a tenth of a second at a time, to two seconds and no further.
+    for (_ in 0...30) machine.update();
+    var windowSegments = submittedSegments();
+    check(windowSegments >= 200 && windowSegments <= 212,
+      'the streamer fills a two-second window before the owner advances, got $windowSegments segments');
+    var windowPlans = recording.commands.length;
+    machine.update();
+    check(recording.commands.length == windowPlans, "the streamer stops at a full window");
 
     var tick = 0;
-    machine.update();
-    check(recording.commands.length == initialPlanCount,
-      "streamer keeps its initial plan window until the owner advances");
     simulationHarness.step(Int64.ofInt(tick++));
     while (machine.isMoving()) {
       machine.update();
@@ -301,8 +309,8 @@ class StreamTests extends MotionKitTestSupport {
       case RobotCommand.JointTargets(_, _):
         throw "long trajectory unexpectedly fell back to sample-by-sample targets";
       case RobotCommand.ExecutionPlan(plan):
-        check(plan.segments.length <= 210,
-          "streamed trajectory plans hold about two seconds of motion each");
+        check(plan.segments.length <= 27,
+          "streamed trajectory plans hold at most a quarter second of motion each");
       case Hold | Resume | Abort:
         throw "long trajectory unexpectedly submitted a lifecycle command";
     }

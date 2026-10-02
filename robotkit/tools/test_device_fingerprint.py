@@ -16,7 +16,7 @@ class FingerprintTests(unittest.TestCase):
         layout = b"ordered-joints: left-wheel,right-wheel; channels: 0,1\n"
         value = module.fingerprint(layout, lock)
         self.assertEqual(len(value), 16)
-        self.assertEqual(value.hex(), "f2fcdb78edcd4a2c6d2c9d29b9ca8c48")
+        self.assertEqual(value.hex(), "a2043f9eb1711b6baa87201247f814be")
         self.assertNotEqual(value, module.fingerprint(layout + b"calibration=2\n", lock))
         edited = json.loads(lock)
         edited["fingerprint_test_extension"] = 1

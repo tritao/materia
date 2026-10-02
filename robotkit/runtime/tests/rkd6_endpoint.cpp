@@ -1,5 +1,7 @@
 #include "rkd6_endpoint.hpp"
 #include "device_frame6.hpp"
+#include <optional>
+#include <type_traits>
 #include <cassert>
 #include <deque>
 #include <string>
@@ -17,10 +19,21 @@ public:
     std::vector<std::uint8_t> delayed;
     bool delay_once = false;
     std::uint64_t jump_ticks = 0;
-    unsigned baud() const noexcept override { return 921'600; }
+    /** Bytes received since the session began: this device takes in everything sent at once. */
+    std::uint64_t received_bytes = 0;
+    /** What the device reports it has received, when not everything sent; see `received_bytes`. */
+    std::optional<std::uint64_t> reported_received;
+    unsigned line_baud = 921'600;
+    unsigned baud() const noexcept override { return line_baud; }
     template<class T> void push(std::uint8_t kind, const T &value) {
         std::vector<std::uint8_t> payload(T::SIZE);
-        assert(device_wire6::encode(value, payload));
+        if constexpr (std::is_same_v<T, device_wire6::QueueStatus6>) {
+            auto reported = value;
+            reported.received_bytes = reported_received ? *reported_received : received_bytes;
+            assert(device_wire6::encode(reported, payload));
+        } else {
+            assert(device_wire6::encode(value, payload));
+        }
         std::vector<std::uint8_t> frame;
         assert(device_frame6::encode(kind, payload, frame));
         incoming.push_back(std::move(frame));
@@ -28,7 +41,9 @@ public:
     bool send(std::span<const std::uint8_t> frame) override {
         device_frame6::Frame decoded{};
         assert(device_frame6::decode(frame, decoded));
+        received_bytes += frame.size();
         if (decoded.kind == 1) {
+            received_bytes = 0;
             device_wire6::SessionBegin6 begin{};
             assert(device_wire6::decode(decoded.payload.first(begin.SIZE), begin));
             device_wire6::SessionAck6 ack{};
@@ -94,6 +109,45 @@ public:
     }
 };
 
+void unseen_backlog_holds_segments(const rk_robot_runtime_blueprint &blueprint) {
+    // Bytes the host cannot see waiting, such as in a USB adapter, still count: the device's
+    // status says what it has received, and segments wait while the rest would delay a commit.
+    auto link = std::make_unique<MockLink>();
+    auto *observed = link.get();
+    observed->fingerprint.fill(7);
+    observed->line_baud = 115'200;
+    auto endpoint = Rkd6Endpoint::attach(std::move(link), blueprint, observed->fingerprint,
+        77, 1e-6, 500'000, 100'000);
+    assert(endpoint);
+    rk_robot_state state{};
+    for (const std::uint64_t now : {0ull, 200'000ull, 100'000'000ull, 100'200'000ull})
+        assert(endpoint->sample(now, state) == RK_OK);
+    robotkit::PlanRequest plan{};
+    plan.plan_id = 8;
+    plan.sequence = 1;
+    plan.ends_at_rest = 1;
+    plan.segments.segments.resize(1);
+    plan.segments.segments[0].duration_ns = 1'000'000'000;
+    plan.segments.segments[0].degree = 1;
+    plan.segments.segments[0].joint_count = 1;
+    plan.segments.segments[0].coefficients[0].value[1] = 0.5;
+    device_wire6::QueueStatus6 status{};
+    status.remaining_segments = 4;
+    // The device has received nothing since the session began: the queue begin that opens
+    // the plan is still on its way, longer than a commit can wait, so its segment waits.
+    observed->reported_received = 0;
+    assert(endpoint->submit_device_plan(plan, 0, 100'300'000, 20'000'000, blueprint) == RK_OK);
+    observed->push(14, status);
+    assert(endpoint->sample(100'310'000, state) == RK_OK);
+    assert(observed->queue_begin_frames == 1 && observed->segment_frames == 0);
+    // Once the line has had time to send it, bytes the host never sent, such as line
+    // noise, put the device's count ahead of the host's: that is no backlog.
+    observed->reported_received = observed->received_bytes + 100;
+    observed->push(14, status);
+    assert(endpoint->sample(160'000'000, state) == RK_OK);
+    assert(observed->segment_frames == 1);
+}
+
 int main() {
     assert(Rkd6Endpoint::minimum_baud(64, 10'000'000, 2'000'000) > 921'600);
     assert(Rkd6Endpoint::minimum_queue_depth(921'600, 1, 10'000'000,
@@ -109,6 +163,7 @@ int main() {
     blueprint.joints[0].upper_limit = 10;
     blueprint.joints[0].max_velocity = 10;
     blueprint.joints[0].max_acceleration = 10;
+    unseen_backlog_holds_segments(blueprint);
     {
         auto wrong = std::make_unique<MockLink>();
         wrong->fingerprint.fill(4);
@@ -194,6 +249,8 @@ int main() {
     device_wire6::QueueStatus6 status{};
     status.queue_revision = 1;
     status.committed_until_ticks = endpoint->committed_until_ticks();
+    // The device holds plan 8's one segment, which the commit runs through.
+    status.received_until_ticks = status.committed_until_ticks;
     status.executing_plan_id = 8;
     status.path_clock_ticks = status.committed_until_ticks - 100;
     status.rate = 1.0f;
@@ -218,12 +275,18 @@ int main() {
     replacement.segments.segments[0].coefficients[0].value[0] = 0.5;
     assert(endpoint->submit_device_plan(replacement, 1'000'000'000,
         100'400'000, 1'020'000'000, blueprint) == RK_OK);
-    assert(observed->queue_begin_frames == 2 && observed->segment_frames == 2);
+    // The boundary goes at once; the segment waits until the line clears within an
+    // owner period, so a commit never queues behind a backlog of segments.
+    assert(observed->queue_begin_frames == 2 && observed->segment_frames == 1);
     status.queue_revision = 2;
     status.path_clock_ticks = endpoint->committed_until_ticks() + 2'000'000;
     status.remaining_segments = 4;
     observed->push(14, status);
     assert(endpoint->sample(150'000'000, state) == RK_OK);
+    assert(observed->segment_frames == 2);
+    // The next status retires the segment the device has since run past.
+    observed->push(14, status);
+    assert(endpoint->sample(150'200'000, state) == RK_OK);
     assert(endpoint->bookkeeping_counts().first == 0);
     assert(endpoint->bookkeeping_counts().second == 1);
     observed->jump_ticks = 10'000;

@@ -6,7 +6,7 @@
     },
     "PROTOCOL_VERSION": {
       "type": "u8",
-      "value": 10
+      "value": 11
     }
   },
   "enums": {
@@ -210,9 +210,19 @@
           "length": 1,
           "name": "fault",
           "type": "u8"
+        },
+        {
+          "length": 1,
+          "name": "received_until_ticks",
+          "type": "u64"
+        },
+        {
+          "length": 1,
+          "name": "received_bytes",
+          "type": "u64"
         }
       ],
-      "size": 44
+      "size": 60
     },
     "Segment6Coefficients": {
       "endian": "little",

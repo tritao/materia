@@ -3,7 +3,7 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Error { ShortBuffer, WrongLength }
 
-pub const PROTOCOL_VERSION: u8 = 10;
+pub const PROTOCOL_VERSION: u8 = 11;
 pub const MAX_ACTUATORS: u8 = 64;
 
 #[repr(u8)]
@@ -794,10 +794,12 @@ pub struct QueueStatus6 {
     pub remaining_events: u16,
     pub underflow: u8,
     pub fault: u8,
+    pub received_until_ticks: u64,
+    pub received_bytes: u64,
 }
 
 impl QueueStatus6 {
-    pub const SIZE: usize = 44;
+    pub const SIZE: usize = 60;
 
     pub fn encode(&self, out: &mut [u8]) -> Result<usize, Error> {
         if out.len() < Self::SIZE { return Err(Error::ShortBuffer); }
@@ -822,6 +824,10 @@ impl QueueStatus6 {
         offset += 1;
         out[offset..offset + 1].copy_from_slice(&self.fault.to_le_bytes());
         offset += 1;
+        out[offset..offset + 8].copy_from_slice(&self.received_until_ticks.to_le_bytes());
+        offset += 8;
+        out[offset..offset + 8].copy_from_slice(&self.received_bytes.to_le_bytes());
+        offset += 8;
         Ok(offset)
     }
 
@@ -868,8 +874,16 @@ impl QueueStatus6 {
         bytes.copy_from_slice(&input[offset..offset + 1]);
         let fault = u8::from_le_bytes(bytes);
         offset += 1;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let received_until_ticks = u64::from_le_bytes(bytes);
+        offset += 8;
+        let mut bytes = [0u8; 8];
+        bytes.copy_from_slice(&input[offset..offset + 8]);
+        let received_bytes = u64::from_le_bytes(bytes);
+        offset += 8;
         let _ = offset;
-        Ok(Self { queue_revision, committed_until_ticks, executing_plan_id, executing_segment, path_clock_ticks, rate, remaining_segments, remaining_events, underflow, fault })
+        Ok(Self { queue_revision, committed_until_ticks, executing_plan_id, executing_segment, path_clock_ticks, rate, remaining_segments, remaining_events, underflow, fault, received_until_ticks, received_bytes })
     }
 }
 

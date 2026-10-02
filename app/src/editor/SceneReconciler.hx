@@ -196,6 +196,11 @@ class SceneReconciler {
       for (item in owner.objects) if (!retained.exists(item.id)) {
         var runtime = owner.bridge.runtime(item.id);
         if (runtime == null) throw "Missing runtime scene node: " + item.id;
+        // Runtime part nodes are children the scene does not destroy with their parent.
+        for (part in owner.runtimePartNodes(item.id)) {
+          prepared.transaction.destroyNode(part);
+          prepared.nodeEntries.remove(SceneBridge.nodeKey(part));
+        }
         prepared.transaction.destroyNode(runtime.node);
         prepared.bridgeEntries.remove(item.id);
         prepared.nodeEntries.remove(SceneBridge.nodeKey(runtime.node));
@@ -226,6 +231,7 @@ class SceneReconciler {
     owner.cadSessions = prepared.cadSessions;
     owner.pruneStockSimulations();
     owner.bridge.replaceEntries(prepared.bridgeEntries, prepared.nodeEntries);
+    owner.pruneRuntimeGeometry();
     owner.syncWorkerVisuals();
     owner.selection.selectedId = selection;
     owner.selection.selectedFeatureKey=null;

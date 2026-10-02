@@ -48,7 +48,7 @@ fn send<T: Write<u8>>(tx: &mut T, kind: u8, payload: &[u8], frame: &mut [u8; MAX
 }
 
 fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
-    board: &StubBoard, session: u64, frame: &mut [u8; MAX_FRAME_SIZE]) {
+    board: &StubBoard, session: u64, received_bytes: u64, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let fault = match core.stop_reason() {
         None => 0, Some(StopReason::Underflow) => 2,
         Some(StopReason::LinkLost) => 3, Some(StopReason::DualDriveSkew) => 4,
@@ -60,6 +60,7 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
         path_clock_ticks: core.path_clock(), rate: core.rate(),
         remaining_segments: core.remaining_capacity() as u16, remaining_events: 0,
         underflow: core.underflow() as u8, fault,
+        received_until_ticks: core.received_until(), received_bytes,
     };
     let mut body = [0u8; State6Header::SIZE + JOINTS * ActuatorState6::SIZE];
     status.encode(&mut body).ok();
@@ -81,7 +82,7 @@ fn publish<T: Write<u8>>(tx: &mut T, core: &ScheduledCore<ACTUATORS, CAPACITY>,
 
 fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
     core: &mut Option<ScheduledCore<ACTUATORS, CAPACITY>>, session: &mut u64,
-    tx: &mut T, frame: &mut [u8; MAX_FRAME_SIZE]) {
+    received_bytes: &mut u64, tx: &mut T, frame: &mut [u8; MAX_FRAME_SIZE]) {
     let Ok((kind, payload)) = decode_frame6(input) else { return; };
     if kind != 1 { if let Some(core) = core.as_mut() { core.note_host_frame(board.ticks); } }
     match kind {
@@ -107,11 +108,13 @@ fn handle<T: Write<u8>>(input: &[u8], board: &mut StubBoard,
                 next.initialize_clock(board.ticks);
                 *core = Some(next);
                 *session = begin.session;
+                // The count starts after the frame that begins the session, as the host's does.
+                *received_bytes = 0;
             } else { ack.status = 0; }
             let mut bytes = [0u8; SessionAck6::SIZE];
             ack.encode(&mut bytes).ok();
             send(tx, 2, &bytes, frame);
-            if let Some(core) = core.as_ref() { publish(tx, core, board, *session, frame); }
+            if let Some(core) = core.as_ref() { publish(tx, core, board, *session, *received_bytes, frame); }
         }
         3 => {
             let Ok(request) = TimeSyncRequest::decode(payload) else { return; };
@@ -175,6 +178,7 @@ fn main() -> ! {
     let mut board = StubBoard::new();
     let mut core: Option<ScheduledCore<ACTUATORS, CAPACITY>> = None;
     let mut session = 0u64;
+    let mut received_bytes = 0u64;
     let mut last_state = 0u64;
     let mut input = [0u8; MAX_FRAME_SIZE];
     let mut input_len = 0usize;
@@ -186,11 +190,15 @@ fn main() -> ! {
         board.ticks = elapsed_cycles / HSI_CYCLES_PER_MICROSECOND;
         if let Some(core) = core.as_mut() { core.tick(&mut board); }
         if board.ticks.saturating_sub(last_state) >= STATE_PERIOD_TICKS {
-            if let Some(core) = core.as_ref() { publish(&mut tx, core, &board, session, &mut output); }
+            if let Some(core) = core.as_ref() {
+                publish(&mut tx, core, &board, session, received_bytes, &mut output);
+            }
             last_state = board.ticks;
         }
         match rx.read() {
             Ok(byte) => {
+                // Every byte off the line counts, valid or not: the host measures what is in flight by it.
+                received_bytes += 1;
                 if input_len == input.len() {
                     input.copy_within(1..input_len, 0);
                     input_len -= 1;
@@ -209,7 +217,7 @@ fn main() -> ! {
                     if input_len == size {
                         if decode_frame6(&input[..size]).is_ok() {
                             handle(&input[..size], &mut board, &mut core, &mut session,
-                                &mut tx, &mut output);
+                                &mut received_bytes, &mut tx, &mut output);
                             input_len = 0;
                         } else {
                             input.copy_within(1..input_len, 0);

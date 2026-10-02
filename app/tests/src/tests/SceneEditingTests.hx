@@ -744,7 +744,8 @@ class SceneEditingTests {
     check(simulation.pending(sensors,scene),
       "replacing a document with equivalent geometry still requires a rebuild");
     check(simulation.rebuild(sensors,scene),"replacement scene rebuild succeeds");
-    var observation=simulation.step().robot("materia/robot");
+    simulation.step();
+    var observation=simulation.snapshot().robot("materia/robot");
     check(observation!=null&&observation.sensors.length>0,
       "applied sensor configuration produces simulated measurements");
     simulation.dispose();world.close();scene.dispose();sensors.dispose();
@@ -869,8 +870,8 @@ class SceneEditingTests {
       world.robot("monitor/remote")==monitor,
       "running scene rebuild preserves unrelated remote adapters");
     simulation.stop();
-    var observation = simulation.step();
-    for (index in 0...8) observation = simulation.step();
+    for (index in 0...9) simulation.step();
+    var observation = simulation.snapshot();
     check(observation.robotIds().length==3,"shared world publishes two simulated robots and its unchanged remote adapter");
     var firstRobot=observation.robot("materia/robot");
     if(firstRobot==null)throw "Shared simulation lost the first robot";
@@ -921,7 +922,8 @@ class SceneEditingTests {
     var mujocoSimulation=new ApplicationSimulation(mujocoWorld,ApplicationSimulation.MUJOCO);
     check(mujocoSimulation.rebuild(session.sensors,session.scene),
       "MuJoCo-enabled tests require the MuJoCo backend to execute");
-    var mujocoObservation=mujocoSimulation.step();
+    mujocoSimulation.step();
+    var mujocoObservation=mujocoSimulation.snapshot();
     var initialObjects=mujocoSimulation.environmentVisualState();
     var initialVisual=mujocoSimulation.visualState()[1];
     var initialArm=[for(link in initialVisual.links)if(link.id=="arm")link][0];
@@ -935,7 +937,8 @@ class SceneEditingTests {
     mujocoWorld.submit("materia/robot-b",RobotCommand.JointTargets([
       JointTarget.position(0,0.6)
     ],null));
-    for(index in 0...8)mujocoObservation=mujocoSimulation.step();
+    for(index in 0...8)mujocoSimulation.step();
+    mujocoObservation=mujocoSimulation.snapshot();
     var mujocoRobot=mujocoObservation.robot("materia/robot");
     if(mujocoRobot==null)throw "MuJoCo world lost the configured robot";
     check(mujocoRobot.sensors.length>0&&mujocoSimulation.visualState().length==2,

@@ -418,9 +418,14 @@ class CncProgramPlayer implements SessionMember {
 			stock = null;
 			stockShownAt = Math.NEGATIVE_INFINITY;
 		}
+		// The fresh stock shows as the raw part until its first contour arrives.
+		if (stockObject != null) project.scene.clearRuntimeGeometry(stockObject);
 	}
 
-	/** Shows the tool in the spindle, and the stock as cut so far, re-contouring only what changed, a few times a second. */
+	/**
+	 * Shows the tool in the spindle, and the stock as cut so far: a few times a second the stock is
+	 * re-contoured on its own thread, where it changed, and the chunks it rebuilt are shown when ready.
+	 */
 	public function present():Void {
 		var shape = toolShape, toolId = toolObject;
 		if (shape != null && toolId != null && shownTool != loadedTool) {
@@ -429,18 +434,22 @@ class CncProgramPlayer implements SessionMember {
 			shownTool = loadedTool;
 		}
 		var cut = stock, id = stockObject;
-		if (cut == null || id == null || !cut.hasChanged()) return;
-		var now = session.simulationTime();
-		if (now - stockShownAt < STOCK_REFRESH && now >= stockShownAt) return;
-		stockShownAt = now;
+		if (cut == null || id == null) return;
 		var clock = Sys.time();
-		project.scene.setRuntimeGeometry(id, cut.geometry());
+		var chunks = cut.takePreview();
+		if (chunks != null) project.scene.setRuntimeGeometryParts(id, cut.previewChunks(), chunks);
+		var now = session.simulationTime();
+		if (cut.hasChanged() && (now - stockShownAt >= STOCK_REFRESH || now < stockShownAt) && cut.refreshPreview())
+			stockShownAt = now;
 		meshingSeconds += Sys.time() - clock;
 	}
 
+	/** Stops cutting and gives the stock and tool parts their own geometry back. */
 	public function dispose():Void {
 		if (stock != null) stock.dispose();
 		stock = null;
+		for (id in [stockObject, toolObject]) if (id != null) project.scene.clearRuntimeGeometry(id);
+		shownTool = -1;
 	}
 
 	/**

@@ -39,12 +39,19 @@ struct CompiledDevicePlan6 {
     std::vector<DeviceSegment6> segments;
 };
 
+/**
+  Compiles host segments starting at `host_plan_start_ns` into device segments.
+  Each boundary maps to device ticks through `clock`; a nonzero `anchor_ticks`
+  starts the plan on that tick instead, keeping the clock's rate, so a
+  continuation meets the queued path exactly.
+**/
 CompiledDevicePlan6 compile_device_segments6(
     std::span<const robotkit::TrajectorySegment> segments, std::uint64_t plan_id,
     bool ends_at_rest, std::uint64_t host_plan_start_ns,
     const ClockEstimator6 &clock, const rk_robot_runtime_blueprint &blueprint,
     std::uint64_t device_tick_hz, std::uint64_t step_tick_hz,
     std::uint8_t max_degree, double target_error,
-    std::span<const DeviceActuator6> layout = {});
+    std::span<const DeviceActuator6> layout = {},
+    std::uint64_t anchor_ticks = 0);
 
 } // namespace robotkit

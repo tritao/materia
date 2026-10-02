@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
+#include <optional>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -221,13 +222,28 @@ public:
 
     bool running() const;
 
+    /**
+      A queued segment holding only the coefficients its joints and degree use:
+      MotionKit's `mk_segment` reserves room for every joint and degree, about
+      3 KB, where a three-axis machine uses about a hundred bytes.
+    **/
+    struct RuntimeSegment {
+        int64_t t0_ns = 0;
+        int64_t duration_ns = 0;
+        uint32_t degree = 0;
+        uint32_t joint_count = 0;
+        std::vector<double> coefficients; ///< Joint-major: `joint * (degree + 1) + power`.
+        /** The segment in MotionKit's full layout, for its API. */
+        mk_segment native() const;
+    };
+
     struct RuntimeTrajectoryPoint {
         struct {
             uint64_t time_from_start_ns = 0;
             uint32_t joint_count = 0;
-            double positions[RK_MAX_TRAJECTORY_JOINTS]{};
+            std::vector<double> positions; ///< Held by end markers; a segment is evaluated instead.
         } point{};
-        mk_segment segment{}; /**< Valid when has_segment; starts at point time. */
+        RuntimeSegment segment{}; /**< Valid when has_segment; starts at point time. */
         bool has_segment = false;
         uint64_t chunk_base_time_ns = 0;
         uint64_t tag = 0;
@@ -267,8 +283,7 @@ private:
         bool reference_initialized[RK_MAX_JOINTS]{};
         /** Source-clock time a velocity target lapses (0: never); see rk_robot_command.expires_at_ns. */
         uint64_t velocity_expiry_ns[RK_MAX_JOINTS]{};
-        std::deque<RuntimeTrajectoryPoint> trajectory;
-        std::deque<QueuedEvent> events;
+        std::deque<QueuedEvent> events; ///< The trajectory queue itself is `trajectory_`.
         rk_event_value channel_values[RK_MAX_PROCESS_CHANNELS]{};
         rk_event_value last_fired_values[RK_MAX_PROCESS_CHANNELS]{};
         rk_event_hold_policy channel_hold_policies[RK_MAX_PROCESS_CHANNELS]{};
@@ -333,7 +348,55 @@ private:
         uint64_t plan_id, uint64_t scheduled_ns, uint64_t owner_ns, rk_event_cause cause);
     void safe_channels(uint64_t owner_ns, rk_event_cause cause, bool hold_only = false);
     int32_t latched_fault_code_ = 1;
+    /** The control state at the start of the world tick, without its trajectory queue. */
     ControlState control_backup_{};
+    /**
+      The trajectory queue. Knots leave its front as the clock passes them and
+      join its back as plans arrive; reads are open, and every change is
+      journalled so a discarded world tick is undone in the size of its changes
+      rather than by copying the queue. It cannot be copied, so it is kept out
+      of the control state the tick backs up.
+    **/
+    class TrajectoryQueue {
+    public:
+        using Knots = std::deque<RuntimeTrajectoryPoint>;
+        TrajectoryQueue() = default;
+        TrajectoryQueue(const TrajectoryQueue &) = delete;
+        TrajectoryQueue &operator=(const TrajectoryQueue &) = delete;
+
+        const Knots &knots() const noexcept { return knots_; }
+        bool empty() const noexcept { return knots_.empty(); }
+        std::size_t size() const noexcept { return knots_.size(); }
+        const RuntimeTrajectoryPoint &front() const { return knots_.front(); }
+        const RuntimeTrajectoryPoint &back() const { return knots_.back(); }
+        const RuntimeTrajectoryPoint &operator[](std::size_t index) const { return knots_[index]; }
+        Knots::const_iterator begin() const noexcept { return knots_.begin(); }
+        Knots::const_iterator end() const noexcept { return knots_.end(); }
+        Knots::const_reverse_iterator rbegin() const noexcept { return knots_.rbegin(); }
+        Knots::const_reverse_iterator rend() const noexcept { return knots_.rend(); }
+
+        void pop_front();
+        void clear();
+        /** Appends knots ending in their own end marker, which replaces the queue's. */
+        void append(std::vector<RuntimeTrajectoryPoint> &&added);
+        void replace(Knots &&knots);
+        /** Starts a world tick: its changes can be undone until the next one starts. */
+        void begin_tick();
+        /** Undoes the changes since `begin_tick`. */
+        void undo_tick();
+        /** Empties the queue and forgets the journal. */
+        void reset();
+
+    private:
+        Knots knots_;
+        std::vector<RuntimeTrajectoryPoint> removed_; ///< Knots of the tick's start taken from the front, in order.
+        std::optional<RuntimeTrajectoryPoint> end_marker_; ///< The starting end marker an append replaced.
+        std::size_t originals_ = 0; ///< Knots of the tick's start still at the front.
+        std::size_t appended_ = 0; ///< Knots added this tick, at the back.
+    };
+    TrajectoryQueue trajectory_;
+    /** Clears the trajectory queue, then every control field. */
+    void reset_control();
     /** Last position sent to the endpoint, retained after a trajectory drains. */
     double commanded_position_[RK_MAX_JOINTS]{};
     double commanded_position_backup_[RK_MAX_JOINTS]{};

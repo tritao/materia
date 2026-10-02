@@ -142,6 +142,10 @@ class EditorScene {
   final stockSimulations:Map<String, StockSimulationSession> = new Map();
   /** Geometry given to objects by setRuntimeGeometry, which the scene owns. */
   final ownedRuntimeGeometry:Map<String, Geometry> = new Map();
+  /** Each object's own geometry while runtime geometry stands in for it. */
+  final runtimeOriginalGeometry:Map<String, Geometry> = new Map();
+  /** Child nodes showing parts of objects' runtime geometry, by object then part. */
+  final runtimeParts:Map<String, RuntimeGeometryParts> = new Map();
   final generatedGeometry:Map<String, GeometryData>;
   final kinematicOccurrences:Map<String, Bool> = new Map();
   final componentFinishes:Map<String, SceneObjectData> = new Map();
@@ -2617,10 +2621,154 @@ class EditorScene {
       if (geometry != null) geometry.dispose();
       throw error;
     }
+    if (!runtimeOriginalGeometry.exists(id)) runtimeOriginalGeometry.set(id, runtime.geometry);
     bridge.attach(id, runtime.node, geometry, runtime.material);
-    if (owned != null) owned.dispose();
     ownedRuntimeGeometry.set(id, geometry);
     publish([runtime.node], false, changes);
+  }
+
+  /** Gives object `id` its own geometry back, ending `setRuntimeGeometry` and `setRuntimeGeometryParts`. */
+  public function clearRuntimeGeometry(id:String):Void {
+    var owned = ownedRuntimeGeometry.get(id), original = runtimeOriginalGeometry.get(id);
+    var parts = runtimeParts.get(id);
+    if (owned == null && parts == null) return;
+    var runtime = runtimeFor(id);
+    var transaction = scene.beginTransaction();
+    var changes:Null<ChangeSet> = null;
+    try {
+      if (parts != null) for (node in parts.nodes) transaction.destroyNode(node);
+      if (original != null) transaction.setGeometry(runtime.node, original);
+      changes = transaction.commitWithChanges();
+    } catch (error:Dynamic) {
+      transaction.dispose();
+      throw error;
+    }
+    if (parts != null) parts.release(bridge);
+    if (original != null) bridge.attach(id, runtime.node, original, runtime.material);
+    if (owned != null) owned.dispose();
+    ownedRuntimeGeometry.remove(id);
+    runtimeOriginalGeometry.remove(id);
+    runtimeParts.remove(id);
+    publish([runtime.node], false, changes);
+  }
+
+  /** The part nodes of object `id`'s runtime geometry, which go with it when it is removed. */
+  public function runtimePartNodes(id:String):Array<NodeId> {
+    var parts = runtimeParts.get(id);
+    return parts == null ? [] : [for (index in 0...parts.count) if (parts.nodes.exists(index)) parts.nodes.get(index)];
+  }
+
+  /**
+    Forgets runtime geometry of objects the reconciler removed or gave new geometry: their part
+    nodes and owned geometry went with that change; what is left unused is released.
+  **/
+  public function pruneRuntimeGeometry():Void {
+    var ids:Map<String, Bool> = new Map();
+    for (id in ownedRuntimeGeometry.keys()) ids.set(id, true);
+    for (id in runtimeParts.keys()) ids.set(id, true);
+    for (id in ids.keys()) {
+      var runtime = bridge.runtime(id);
+      var owned = ownedRuntimeGeometry.get(id);
+      var gone = true;
+      if (runtime != null && object(id) != null) {
+        if (owned == null || runtime.geometry == owned) continue;
+        gone = false;
+      }
+      var parts = runtimeParts.get(id);
+      if (parts != null) {
+        // A removed object's parts went in the reconciler's transaction; a replaced one's go now.
+        if (!gone) {
+          var transaction = scene.beginTransaction();
+          try {
+            for (node in parts.nodes) transaction.destroyNode(node);
+            queueRenderChanges(transaction.commitWithChanges());
+          } catch (error:Dynamic) {
+            transaction.dispose();
+            throw error;
+          }
+        }
+        parts.release(bridge);
+      }
+      var original = runtimeOriginalGeometry.get(id);
+      if (original != null) {
+        var used = false;
+        for (other in bridge.copyEntries()) if (other.geometry == original) used = true;
+        if (!used) original.dispose();
+      }
+      ownedRuntimeGeometry.remove(id);
+      runtimeOriginalGeometry.remove(id);
+      runtimeParts.remove(id);
+    }
+  }
+
+  /**
+    Shows object `id` as `count` parts, such as the chunks of stock a simulated machine is cutting:
+    the parts in `changed` (part index to geometry) are replaced and the rest kept, so only what
+    changed is uploaded. Each part is a child node in the object's frame that picks as the object,
+    whose own geometry is hidden meanwhile. View state, like `setRuntimeGeometry`.
+  **/
+  public function setRuntimeGeometryParts(id:String, count:Int, changed:Map<Int, GeometryData>):Void {
+    var runtime = runtimeFor(id);
+    var existing = runtimeParts.get(id);
+    if (existing != null && existing.count != count) {
+      releaseRuntimeParts(id);
+      existing = null;
+    }
+    var parts = existing == null ? new RuntimeGeometryParts(count) : existing;
+    if (existing == null) {
+      // The parts show the object, so its own geometry is hidden behind an empty one.
+      setRuntimeGeometry(id, new GeometryData());
+      runtimeParts.set(id, parts);
+    }
+    var updated:Array<NodeId> = [];
+    var created:Array<{index:Int, node:NodeId, geometry:Geometry}> = [];
+    var transaction:Null<Transaction> = null;
+    try {
+      for (index in changed.keys()) {
+        if (index < 0 || index >= count) throw 'Runtime geometry part $index of $count';
+        var data = changed.get(index);
+        if (parts.nodes.exists(index)) {
+          scene.setGeometryData(parts.geometries.get(index), data);
+          updated.push(parts.nodes.get(index));
+          continue;
+        }
+        var open = transaction == null ? scene.beginTransaction() : transaction;
+        transaction = open;
+        var geometry = scene.createGeometry();
+        created.push({index: index, node: open.createNode(), geometry: geometry});
+        scene.setGeometryData(geometry, data);
+        var node = created[created.length - 1].node;
+        open.setName(node, '$id part $index');
+        open.setParent(node, runtime.node);
+        open.setGeometry(node, geometry);
+        open.setMaterial(node, runtime.material);
+      }
+    } catch (error:Dynamic) {
+      if (transaction != null) transaction.dispose();
+      for (part in created) part.geometry.dispose();
+      throw error;
+    }
+    var changes:Null<ChangeSet> = transaction == null ? null : transaction.commitWithChanges();
+    for (part in created) {
+      parts.nodes.set(part.index, part.node);
+      parts.geometries.set(part.index, part.geometry);
+      bridge.mapNode(part.node, id);
+      updated.push(part.node);
+    }
+    publish(updated, false, changes);
+  }
+
+  function releaseRuntimeParts(id:String):Void {
+    var parts = runtimeParts.get(id);
+    if (parts == null) return;
+    runtimeParts.remove(id);
+    var transaction = scene.beginTransaction();
+    for (node in parts.nodes) {
+      bridge.unmapNode(node);
+      transaction.destroyNode(node);
+    }
+    transaction.commit();
+    for (geometry in parts.geometries) geometry.dispose();
   }
 
   /** Releases simulations whose objects are gone or are no longer simulations. */
@@ -2736,6 +2884,8 @@ class EditorScene {
     for (session in stockSimulations) session.dispose();
     for (geometry in ownedRuntimeGeometry) geometry.dispose();
     ownedRuntimeGeometry.clear();
+    for (parts in runtimeParts) for (geometry in parts.geometries) geometry.dispose();
+    runtimeParts.clear();
     stockSimulations.clear();
     if (pendingRenderChanges != null) pendingRenderChanges.dispose();
     pendingRenderChanges = null;
@@ -2885,6 +3035,21 @@ class SceneBridge {
 
   public function dispose():Void
     scene.dispose();
+}
+
+/** The child nodes showing an object's runtime geometry in parts, by part index. */
+class RuntimeGeometryParts {
+  public final count:Int;
+  public final nodes:Map<Int, NodeId> = new Map();
+  public final geometries:Map<Int, Geometry> = new Map();
+
+  public function new(count:Int) this.count = count;
+
+  /** Unmaps the part nodes, which are destroyed or going, and disposes their geometry. */
+  public function release(bridge:SceneBridge):Void {
+    for (node in nodes) bridge.unmapNode(node);
+    for (geometry in geometries) geometry.dispose();
+  }
 }
 
 class EditorSceneRuntimeObject {
