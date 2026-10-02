@@ -4673,6 +4673,35 @@ class FrameworkSmoke {
 			default: return false;
 		}
 		var singletonDock = new DockWorkspaceModel();
+		var contentHeaderDock = new DockWorkspaceModel();
+		contentHeaderDock.register(new DockPanelDescriptor("content-header", "Content header", false,
+			true, null, nativekit.ui.docking.DockPanelHeaderMode.Content));
+		contentHeaderDock.register(new DockPanelDescriptor("tool-header", "Tool header"));
+		contentHeaderDock.setDefaultLayout(DockNode.Panel("content-header"));
+		var contentHeaderWorkspace = new DockWorkspace("content-header-workspace", contentHeaderDock);
+		var contentHeaderRoot = uiContext.submit(contentHeaderWorkspace, new LayoutFrame(640.0, 480.0));
+		var contentHeaderTabs = 0;
+		if (contentHeaderRoot == null) return false;
+		contentHeaderRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) contentHeaderTabs++;
+		});
+		if (contentHeaderTabs != 0) return false;
+		if (!contentHeaderDock.dock("tool-header", "content-header", DockDropZone.Center)) return false;
+		contentHeaderRoot = uiContext.submit(contentHeaderWorkspace, new LayoutFrame(640.0, 480.0));
+		contentHeaderTabs = 0;
+		if (contentHeaderRoot == null) return false;
+		contentHeaderRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) contentHeaderTabs++;
+		});
+		if (contentHeaderTabs != 2) return false;
+		if (!contentHeaderDock.close("tool-header")) return false;
+		contentHeaderRoot = uiContext.submit(contentHeaderWorkspace, new LayoutFrame(640.0, 480.0));
+		contentHeaderTabs = 0;
+		if (contentHeaderRoot == null) return false;
+		contentHeaderRoot.walk(function(node) {
+			if (node.semantics != null && node.semantics.role == AccessibilityRole.Tab) contentHeaderTabs++;
+		});
+		if (contentHeaderTabs != 0) return false;
 		for (panelId in ["single-source", "single-target"])
 			singletonDock.register(new DockPanelDescriptor(panelId, panelId));
 		singletonDock.setDefaultLayout(DockNode.Split(DockSplitAxis.Horizontal, 0.5,
