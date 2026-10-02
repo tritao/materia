@@ -604,6 +604,33 @@ int main() {
     if (!saw_supplementary || !saw_rtl)
         return 69;
 
+    // Changing one row's foreground must keep every unaffected published
+    // row and the measured layout, including general Unicode shaping.
+    {
+        TextEngine rows(shared_fonts);
+        TextLayoutResult layout;
+        if (!rows.layout_utf8("é first\nsecond é\nthird", 400.0f, published_options, &layout) ||
+            layout.lines.size() != 3)
+            return 190;
+        const auto first = rows.published_glyphs_for_line(layout.id, 0, 0, 0, 1, GlyphMode::Alpha);
+        const auto middle = rows.published_glyphs_for_line(layout.id, 1, 0, 0, 1, GlyphMode::Alpha);
+        const auto last = rows.published_glyphs_for_line(layout.id, 2, 0, 0, 1, GlyphMode::Alpha);
+        if (!first || !middle || !last) return 191;
+        const auto builds = rows.layout_build_count();
+        const std::vector<GlyphColorRange> colors{{middle->source_start, middle->source_start + 3, red}};
+        const auto changed = rows.published_glyphs_for_line(layout.id, 1, 0, 0, 1, GlyphMode::Alpha, {}, colors);
+        if (!changed || changed == middle || rows.layout_build_count() != builds ||
+            rows.published_glyphs_for_line(layout.id, 0, 0, 0, 1, GlyphMode::Alpha, {}, colors) != first ||
+            rows.published_glyphs_for_line(layout.id, 2, 0, 0, 1, GlyphMode::Alpha, {}, colors) != last ||
+            rows.published_glyphs_for_line(layout.id, 1, 0, 0, 1, GlyphMode::Alpha) != middle ||
+            changed->vertices.size() != middle->vertices.size())
+            return 192;
+        for (size_t index = 0; index < changed->vertices.size(); ++index)
+            if (changed->vertices[index].x != middle->vertices[index].x ||
+                changed->vertices[index].y != middle->vertices[index].y)
+                return 193;
+    }
+
     // Publishing a middle visual line of a long wrapped paragraph must
     // contain only that line, with its origin normalized for line drawing.
     TextEngine long_word(shared_fonts);
