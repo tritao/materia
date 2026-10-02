@@ -146,8 +146,9 @@ surroundings outside the room.
 
 Odometry note: with the floor slab's top exactly at the wheels' tangent plane the wheel hulls chattered
 against it and kicked the wheel joints (a stall of the right wheel for a few ticks), so the wheel odometry
-drifted 175 mm from the base's drive over a round; the slab now sits a millimetre lower (`FLOOR_GAP`) and
-the drift is about 11 mm.
+drifted 175 mm from the base's drive over a round. The drive plant stands for the wheels' contact with the
+floor, so while the base rolls kinematically its wheel links carry no collision hulls (`AssemblyRobot`);
+the drift is about 11 mm. M6 gives the wheels back their contact when they roll on physics.
 
 **M5. Mobile manipulator** (done). The robot arm stands on the deck's payload
 seat, turned to work ahead; the room's shelves became two tables with place
