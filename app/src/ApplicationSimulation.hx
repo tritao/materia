@@ -55,6 +55,8 @@ class ApplicationSimulation {
   var cnc:Null<CncProgramPlayer> = null;
   /** The project's wheeled assembly's drive, when it has one. */
   var mobile:Null<robotkit.mobile.MobileBase> = null;
+  /** The work the assembly robot does on its own, when its project ships a mission. */
+  var mission:Null<MissionPlayer> = null;
   var workforce:Null<HumanWorkforce> = null;
   /** Everything that follows the session's lifecycle, in the order it is fed. */
   var members:Array<SessionMember> = [];
@@ -115,6 +117,7 @@ class ApplicationSimulation {
     if (motions != null) members.push(motions);
     if (gripper != null) members.push(gripper);
     if (cnc != null) members.push(cnc);
+    if (mission != null) members.push(mission);
     if (workforce != null) members.push(workforce);
     for (participant in participants) members.push(participant);
   }
@@ -134,6 +137,10 @@ class ApplicationSimulation {
     var candidateWarnings:Array<String> = [];
     var candidateCnc:Null<CncProgramPlayer> = null;
     var candidateMobile:Null<robotkit.mobile.MobileBase> = null;
+    var candidateMission:Null<MissionPlayer> = null;
+    var candidateAssembly:Null<AssemblyRobot> = null;
+    var assemblyIndex = -1;
+    var heldBoxes:Array<MissionPlayer.FloorObstacle> = [];
     try {
       var models = configuration.robotModels();
       var hasWorkers = false;
@@ -167,6 +174,7 @@ class ApplicationSimulation {
         if (world.robot(id) != null && simulatedIds.indexOf(id) < 0)
           throw 'Robot "$id" is remote and read-only';
         var robotIndex = candidateRobots.length;
+        assemblyIndex = robotIndex;
         var built = AssemblyRobot.add(candidate, scene, session, assembly, backend == MUJOCO,
           appliedRevision + 1, robotIndex, session.cncJob == null ? null : CncProgramPlayer.processChannels());
         candidateRobots.push(built.robot);
@@ -176,6 +184,7 @@ class ApplicationSimulation {
         for (part in built.parts) candidateAssemblyParts.push(part);
         for (warning in built.warnings) candidateWarnings.push(warning);
         candidateMobile = built.mobile;
+        candidateAssembly = built;
         // A bad program fails the rebuild here, before anything live changes.
         var job = session.cncJob;
         if (job != null)
@@ -203,7 +212,7 @@ class ApplicationSimulation {
       environmentRecords.sort(function(a, b) return Reflect.compare(a.id, b.id));
       var assemblyOwned = new Map<String, Bool>();
       if (assembly != null) {
-        var free = AssemblyRobot.freeOccurrences(scene, assembly);
+        var free = AssemblyRobot.unownedOccurrences(scene, session, assembly);
         for (occurrence in assembly.occurrences)
           if (!free.exists(occurrence.id)) assemblyOwned.set("project:" + occurrence.id, true);
       }
@@ -223,6 +232,15 @@ class ApplicationSimulation {
           new SimPose(centerX,centerY,centerZ,rotation[0],rotation[1],rotation[2],rotation[3]),
           object.dynamicBody?object.mass:0.0);
         candidateObjects.push({id:object.id,object:created});
+        if (!object.dynamicBody) heldBoxes.push({id: object.id, x: centerX, y: centerY, z: centerZ,
+          halfX: halfX, halfY: halfY, halfZ: halfZ,
+          yaw: Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+            1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]))});
+      }
+      var work = session == null ? null : session.mission;
+      if (work != null) {
+        if (candidateAssembly == null) throw "A mission needs the project's assembly";
+        candidateMission = new MissionPlayer(work, candidateAssembly, candidate, assemblyIndex, timestep, heldBoxes);
       }
 
       var objectsById:Map<String, SimObject> = new Map();
@@ -265,6 +283,7 @@ class ApplicationSimulation {
       if (cnc != null) cnc.dispose();
       cnc = candidateCnc;
       mobile = candidateMobile;
+      mission = candidateMission;
       refreshMembers();
       assemblyParts = candidateAssemblyParts;
       appliedRevision++;
@@ -350,6 +369,8 @@ class ApplicationSimulation {
   public function cncPlayer():Null<CncProgramPlayer> return cnc;
   /** The drive of the project's wheeled assembly, for twist commands; null when it has none. */
   public function mobileBase():Null<robotkit.mobile.MobileBase> return mobile;
+  /** The mission the assembly robot is running, or null when its project ships none. */
+  public function missionPlayer():Null<MissionPlayer> return mission;
 
   /** The stock the project's CNC program is cutting, or null when it cuts none. */
   public function machiningStock():Null<MachiningStock> return cnc == null ? null : cnc.stock;
@@ -474,7 +495,7 @@ class ApplicationSimulation {
     }
     workforce = null; motions = null; gripper = null;
     if (cnc != null) cnc.dispose();
-    cnc = null; mobile = null; refreshMembers();
+    cnc = null; mobile = null; mission = null; refreshMembers();
     for (id in simulatedIds) { var robot=world.detach(id); if(robot!=null)robot.close(); }
     simulatedIds.resize(0);
     simulatedLinks.resize(0); simulatedObjects.resize(0);

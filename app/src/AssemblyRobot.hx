@@ -89,9 +89,23 @@ class AssemblyRobot {
   public static function idFor(assembly:AssemblyDefinition):String return "assembly:" + assembly.id;
 
   /**
-   * The occurrences that are not bolted to the assembly: parts flagged dynamic (a workpiece)
-   * simulate as free objects, and the assembly robot has no link for them.
+   * The occurrences that are not part of the assembly robot: parts flagged dynamic (a workpiece),
+   * and a mobile robot's surroundings, which simulate as objects of their own, moving or held where
+   * they stand; the assembly robot has no link for them.
    */
+  public static function unownedOccurrences(scene:EditorScene, session:ProjectDocumentSession,
+      assembly:AssemblyDefinition):Map<String, Bool> {
+    var result = freeOccurrences(scene, assembly);
+    var mobile = session.mobileBase;
+    if (mobile != null && mobile.robot != null) {
+      var prefix = mobile.robot + "/";
+      for (occurrence in materia.assembly.AssemblyDefinitionFlattener.flatten(assembly).occurrences)
+        if (!StringTools.startsWith(occurrence.id, prefix)) result.set(occurrence.id, true);
+    }
+    return result;
+  }
+
+  /** The occurrences flagged dynamic, which simulate as free objects. */
   public static function freeOccurrences(scene:EditorScene, assembly:AssemblyDefinition):Map<String, Bool> {
     var sceneParts = new Map<String, SceneObjectData>();
     for (record in scene.records()) sceneParts.set(record.id, record);
@@ -116,7 +130,7 @@ class AssemblyRobot {
     var parts:Array<AssemblyPart> = [];
     var physical = session.projectPhysical;
     if (physical == null) throw "Assembly physical properties are unavailable";
-    var free = freeOccurrences(scene, assembly);
+    var free = unownedOccurrences(scene, session, assembly);
     var sceneParts = new Map<String, SceneObjectData>();
     for (record in scene.records()) sceneParts.set(record.id, record);
     var physicalParts = new Map<String, cadbridge.AssemblySimulationBridge.AssemblyPhysicalPart>();
@@ -192,8 +206,12 @@ class AssemblyRobot {
     var blueprint = RobotRuntimeCompiler.compile(converted.model, revision);
     // Process channels (a machine's spindle and coolant) must be declared before the robot is added.
     if (channels != null) for (channel in channels) blueprint.channels.push(channel);
-    var runtime = candidate.addRobotAtPose(blueprint, [0.0, 0.0, 0.0],
-      [0.0, 0.0, 0.0, 1.0], null, null, null, closures, null, null, null, null, linkHulls);
+    // A mobile robot stands at its origin on the floor; its root link is framed there.
+    var origin = session.mobileBase == null ? null : session.mobileBase.origin;
+    var position = origin == null ? [0.0, 0.0, 0.0] : [origin.x, origin.y, 0.0];
+    var rotation = origin == null ? [0.0, 0.0, 0.0, 1.0] : [0.0, 0.0, Math.sin(origin.yaw / 2), Math.cos(origin.yaw / 2)];
+    var runtime = candidate.addRobotAtPose(blueprint, position, rotation, null, null, null, closures, null, null, null, null,
+      linkHulls);
     var robot = new SimulatedRobot(idFor(assembly), runtime, converted.model.name,
       [for (link in converted.model.links) link.id],
       [for (joint in converted.model.joints) joint.id]);

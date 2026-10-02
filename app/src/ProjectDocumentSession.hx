@@ -2,6 +2,7 @@ package app;
 
 import app.CncProgramPlayer.CncJob;
 import app.MateriaProjectRunner.GeneratedAssemblyScene;
+import materia.project.SceneArtifact.SceneArtifactMission;
 import materia.project.SceneArtifact.SceneArtifactMobileBase;
 
 import sys.io.File;
@@ -81,6 +82,8 @@ class ProjectDocumentSession {
   public var cncJob(default, null):Null<CncJob> = null;
   /** The project's assembly is a wheeled robot that drives on the floor in the simulation. */
   public var mobileBase(default, null):Null<SceneArtifactMobileBase> = null;
+  /** Work the project's robot does on its own in the simulation. */
+  public var mission(default, null):Null<SceneArtifactMission> = null;
   var assemblyRuntime:Null<AssemblyState> = null;
   /** Mates authored over the generated assembly, and the face connectors they name (see `ProjectAssemblyMates`). */
   public var assemblyMates(default, null):ProjectAssemblyMates = ProjectAssemblyMates.empty();
@@ -233,7 +236,7 @@ class ProjectDocumentSession {
       generated.geometryBySnapshot, generated.assemblyDefinition, generated.assemblyState,
       generated.localCentersByDefinition, generated.metresPerUnit,
       generated.physical, generated.recipeDocument, generated.robotMotions, generated.robotGrips,
-      generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase);
+      generated.faceDescriptorsByDefinition, generated.cncJob, generated.mobileBase, generated.mission);
 
   /** Open generated geometry while retaining its source manifest. */
   public function openGeneratedScene(data:Array<SceneObjectData>, ?manifestPath:String,
@@ -242,7 +245,7 @@ class ProjectDocumentSession {
       ?localCentersByDefinition:Map<String, Array<Float>>, metresPerUnit:Float = 1.0,
       ?physical:AssemblyPhysicalData, ?recipeText:String, ?motions:Array<RobotMotionTrack>,
       ?grips:Array<RobotGripEvent>, ?faceDescriptors:Map<String, String>, ?cnc:CncJob,
-      ?mobile:SceneArtifactMobileBase):Void {
+      ?mobile:SceneArtifactMobileBase, ?work:SceneArtifactMission):Void {
     if (data == null || data.length == 0)
       throw "Generated project preview contains no scene objects";
     var reference = manifestPath == null ? null : FileSystem.fullPath(manifestPath);
@@ -280,6 +283,7 @@ class ProjectDocumentSession {
     robotGrips = grips == null ? [] : grips.copy();
     cncJob = cnc;
     mobileBase = mobile;
+    mission = work;
     if (reference != null) {
       projectReference = reference;
       projectBaseline = data;
@@ -366,6 +370,7 @@ class ProjectDocumentSession {
     robotGrips = generated.robotGrips == null ? [] : generated.robotGrips.copy();
     cncJob = generated.cncJob;
     mobileBase = generated.mobileBase;
+    mission = generated.mission;
   }
 
   function configureAssembly(target:EditorScene, definition:Null<AssemblyDefinition>):Void {
@@ -970,6 +975,7 @@ class ProjectDocumentSession {
     robotGrips = [];
     cncJob = null;
     mobileBase = null;
+    mission = null;
     assemblyRuntime = null;
     assemblyLocalCentersByDefinition = null;
     assemblyMetresPerUnit = 1.0;

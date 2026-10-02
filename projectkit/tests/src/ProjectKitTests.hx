@@ -181,10 +181,10 @@ class ProjectKitTests {
     check(restored.leftWheel == "wheel_l" && restored.rightWheel == "wheel_r" && restored.wheelRadius == 0.075 &&
       restored.trackWidth == 0.3 && restored.maxAngularAcceleration == 1.5 && restored.footprintWidth == 0.44,
       "mobile base round trip");
-    // A version 12 scene is the same bytes without the trailing mobile-base section.
+    // A version 12 scene is the same bytes without the trailing mobile-base and mission sections.
     data.mobileBase = null;
     var plain = SceneArtifact.encode(data);
-    var older = Bytes.alloc(plain.length - 4);
+    var older = Bytes.alloc(plain.length - 8);
     older.blit(0, plain, 0, older.length);
     older.setInt32(4, 12);
     var read = SceneArtifact.decode(older);
@@ -201,7 +201,29 @@ class ProjectKitTests {
     rejects(function() SceneArtifact.encode(data), "mobile base without a track");
     base.trackWidth = 0.3; base.footprintWidth = null;
     rejects(function() SceneArtifact.encode(data), "mobile base footprint with one side");
-    base.footprintWidth = 0.44; data.assemblyDefinition = null;
+    base.footprintWidth = 0.44;
+    // A robot in a scene of its own: its subtree, where it stands, and where it drives.
+    base.robot = "missing";
+    rejects(function() SceneArtifact.encode(data), "mobile base robot subtree without occurrences");
+    base.robot = null; base.origin = {x: 1.0, y: -0.5, yaw: 0.25};
+    var mission:materia.project.SceneArtifact.SceneArtifactMission = {loop: true, steps: [
+      {kind: "goTo", pose: {x: 2.0, y: 1.0, yaw: Math.PI}}, {kind: "goTo", pose: {x: 0.0, y: 0.0, yaw: 0.0}}]};
+    data.mission = mission;
+    var decoded = SceneArtifact.decode(SceneArtifact.encode(data));
+    var placed = decoded.mobileBase, restoredMission = decoded.mission;
+    if (placed == null || placed.origin == null || restoredMission == null) throw "mobile base mission round trip lost data";
+    var firstPose:materia.project.SceneArtifact.SceneArtifactFloorPose = cast restoredMission.steps[0].pose;
+    var origin:materia.project.SceneArtifact.SceneArtifactFloorPose = cast placed.origin;
+    check(origin.yaw == 0.25 && restoredMission.steps.length == 2 && restoredMission.steps[0].kind == "goTo" &&
+      firstPose.yaw == Math.PI && restoredMission.loop == true, "mobile base origin and mission round trip");
+    var secondPose:materia.project.SceneArtifact.SceneArtifactFloorPose = cast mission.steps[1].pose;
+    secondPose.y = Math.NaN;
+    rejects(function() SceneArtifact.encode(data), "mission pose that is not finite");
+    secondPose.y = 0.0; mission.steps[1].kind = "fly";
+    rejects(function() SceneArtifact.encode(data), "mission step of an unknown kind");
+    mission.steps[1].kind = "goTo"; data.mobileBase = null;
+    rejects(function() SceneArtifact.encode(data), "driving mission without a mobile base");
+    data.mobileBase = base; data.mission = null; data.assemblyDefinition = null;
     rejects(function() SceneArtifact.encode(data), "mobile base without its robot");
   }
 

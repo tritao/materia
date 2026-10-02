@@ -6,13 +6,16 @@ import cadkit.modeling.Location;
 import cadkit.modeling.Part;
 import cadkit.modeling.Plane;
 import cadkit.modeling.Vector;
+import machinekit.assembly.MachineAssembly;
 import machinekit.component.ComponentDetail;
 import materia.assembly.AssemblyFrames;
 import materia.project.SceneArtifact;
+import materia.project.SceneArtifact.SceneArtifactMobileBase;
 
 /** Materia project entrypoint for the differential-drive mobile base. */
 class MobileBasePreview {
 	public static inline var ASSEMBLY_ID:String = "mobile-base";
+	public static inline var CELL_ID:String = "mobile-base-cell";
 
 	/**
 	 * Geometry, joints and initial pose of the base (parts with equal designations share geometry), and
@@ -21,13 +24,32 @@ class MobileBasePreview {
 	public static function base():Bytes {
 		var robot = new MobileBase();
 		var scene = AssemblyPreview.scene(robot, ASSEMBLY_ID);
-		scene.mobileBase = {leftWheel: "wheel_l", rightWheel: "wheel_r",
+		scene.mobileBase = drive(robot, "");
+		return SceneArtifact.encode(scene);
+	}
+
+	/** The base at work in its room, driving its round of the shelves and the dock on its own. */
+	public static function cell():Bytes {
+		var cell = new MobileBaseCell();
+		var scene = AssemblyPreview.scene(cell, CELL_ID);
+		var section = drive(cell.robot, "robot/");
+		section.robot = "robot";
+		section.origin = metres(MobileBaseCell.ORIGIN);
+		scene.mobileBase = section;
+		scene.mission = {loop: true, steps: [for (goal in MobileBaseCell.GOALS) {kind: "goTo", pose: metres(goal)}]};
+		return SceneArtifact.encode(scene);
+	}
+
+	/** The drive of `robot`, whose joints carry `prefix`: wheel radius and track measured from its assembly. */
+	static function drive(robot:MobileBase, prefix:String):SceneArtifactMobileBase
+		return {leftWheel: prefix + "wheel_l", rightWheel: prefix + "wheel_r",
 			wheelRadius: robot.wheel.radius / 1000, trackWidth: robot.trackWidth() / 1000,
 			maxLinearSpeed: MobileBase.MAX_LINEAR_SPEED, maxAngularSpeed: MobileBase.MAX_ANGULAR_SPEED,
 			maxLinearAcceleration: MobileBase.MAX_LINEAR_ACCELERATION, maxAngularAcceleration: MobileBase.MAX_ANGULAR_ACCELERATION,
 			footprintLength: MobileBase.LENGTH / 1000, footprintWidth: MobileBase.WIDTH / 1000};
-		return SceneArtifact.encode(scene);
-	}
+
+	static function metres(pose:MobileBaseCell.FloorPose):materia.project.SceneArtifact.SceneArtifactFloorPose
+		return {x: pose.x / 1000, y: pose.y / 1000, yaw: pose.yaw};
 }
 
 /** Geometry builds, the base stands on its wheels and casters, the wheels roll, and nothing collides. */
@@ -112,13 +134,50 @@ class MobileBaseChecks {
 			for (solid in solids) solid.close();
 		}
 
+		checkCell();
 		var mass = robot.massProperties().mass;
 		var bom = robot.billOfMaterials().lines();
 		Sys.println('mobile base: ${scene.parts.length} definitions, ${definition.occurrences.length} occurrences, ' +
 			'${bom.length} BOM lines, ${Math.round(mass * 10) / 10} kg, track ${robot.trackWidth()} mm');
 	}
 
-	static function posed(robot:MobileBase, state:AssemblyState, id:String):Part {
+	/**
+	 * In its room the robot starts clear of everything, and every goal leaves a disc as wide as the chassis'
+	 * corners, plus margin, clear of the room's fixed blocks: the planner can stand the robot there.
+	 */
+	static function checkCell():Void {
+		var scene = SceneArtifact.decode(MobileBasePreview.cell());
+		if (scene.mobileBase == null || scene.mission == null) throw "Mobile base cell should carry its drive and mission";
+		var cell = new MobileBaseCell();
+		var model = new AssemblyModel("mm");
+		cell.addTo(model, "");
+		var state = new AssemblyState(model.definition(MobileBasePreview.CELL_ID));
+		state.forwardKinematics();
+		var plate = state.worldPose("robot/basePlate");
+		near(plate.x, MobileBaseCell.ORIGIN.x, "the robot stands at its origin, x", 1e-9);
+		near(plate.y, MobileBaseCell.ORIGIN.y, "the robot stands at its origin, y", 1e-9);
+		var blocks = [for (entry in cell.components()) if (!StringTools.startsWith(entry.id, "robot/")) entry];
+		var robotIds = [for (entry in cell.components()) if (StringTools.startsWith(entry.id, "robot/")) entry.id];
+		for (block in blocks) for (id in robotIds) {
+			var a = posed(cell, state, block.id), b = posed(cell, state, id);
+			var common = a.intersect(b);
+			var volume = common.volume();
+			common.close(); a.close(); b.close();
+			if (volume > 1e-3) throw 'At its origin the robot\'s ${id} hits ${block.id}';
+		}
+		var radius = Math.sqrt(Math.pow(MobileBase.LENGTH / 2, 2) + Math.pow(MobileBase.WIDTH / 2, 2)) + 50;
+		for (goal in MobileBaseCell.GOALS) for (block in blocks) {
+			var room:MobileBaseCell.RoomBlock = cast block.component;
+			var pose = state.worldPose(block.id);
+			var dx = Math.max(0, Math.abs(goal.x - pose.x) - room.length / 2);
+			var dy = Math.max(0, Math.abs(goal.y - pose.y) - room.width / 2);
+			if (!(Math.sqrt(dx * dx + dy * dy) >= radius))
+				throw 'Goal at ${goal.x}, ${goal.y} is within ${Math.round(radius)} mm of ${block.id}';
+		}
+		Sys.println('mobile base cell: ${scene.parts.length} definitions, ${MobileBaseCell.GOALS.length} goals');
+	}
+
+	static function posed(robot:MachineAssembly, state:AssemblyState, id:String):Part {
 		for (entry in robot.components()) if (entry.id == id) {
 			var pose = state.worldPose(id);
 			var x = AssemblyFrames.transformVector(pose, 1, 0, 0), z = AssemblyFrames.transformVector(pose, 0, 0, 1);

@@ -1763,6 +1763,42 @@ class RobotWorldTests {
         case _: false;
       }, "Navigation reverses toward the goal if motion carries the robot past the path end");
 
+    // A differential base turns in place toward a route behind it rather than sweeping an arc, and once
+    // it has come within the goal's position tolerance it only turns to the goal heading, even if
+    // braking carries it back out.
+    function spinning(robot:FakeRobot):Bool return switch robot.lastCommand {
+      case JointTargets(targets, _): targets.length == 2 && Math.abs(targets[0].target + targets[1].target) < 1e-9 &&
+        Math.abs(targets[0].target) > 1e-6;
+      case _: false;
+    };
+    function wheelSample(name:String, tick:Int, wheel:Float):RobotSnapshot
+      return new RobotSnapshot(name, Int64.ofInt(tick), Int64.ofInt(tick * 10), [wheel, wheel], [], [], 1, 0,
+        Int64.ofInt(tick * 10 + 1), [], name + "-clock", "host");
+    var turnRobot = new FakeRobot("nav-turn");
+    turnRobot.positions = [0.0, 0.0];
+    var turnBase = new MobileBase(turnRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var turnLocalization = new WheelOdometryLocalization(turnBase);
+    turnLocalization.update(wheelSample("nav-turn", 1, 0.0));
+    var turnNavigation = new Navigation(turnBase, turnLocalization, 0.2, 0.5, 1.0, false);
+    var behind = new NavigationGoal(new Pose2(-1.0, 0.0, Math.PI), "odom", 0.05, 0.05);
+    turnNavigation.follow(new Path([new Pose2(), new Pose2(-0.5, 0.0, Math.PI), behind.pose], "odom"), behind);
+    turnNavigation.updateObservation(wheelSample("nav-turn", 2, 0.0), 0.1);
+    check(spinning(turnRobot), "Navigation turns in place toward a route that starts behind the robot");
+    var latchRobot = new FakeRobot("nav-latch");
+    latchRobot.positions = [0.0, 0.0];
+    var latchBase = new MobileBase(latchRobot, new DifferentialDrive(0, 1, 0.1, 0.5), new MotionLimits(1.0, 2.0));
+    var latchLocalization = new WheelOdometryLocalization(latchBase);
+    latchLocalization.update(wheelSample("nav-latch", 1, 0.0));
+    var latchNavigation = new Navigation(latchBase, latchLocalization, 0.2, 0.5, 1.0, false);
+    var sideways = new NavigationGoal(new Pose2(1.0, 0.0, Math.PI / 2), "odom", 0.05, 0.05);
+    latchNavigation.follow(new Path([new Pose2(), sideways.pose], "odom"), sideways);
+    latchNavigation.updateObservation(wheelSample("nav-latch", 2, 0.0), 0.1);
+    latchNavigation.updateObservation(wheelSample("nav-latch", 3, 9.8), 0.1);
+    check(spinning(latchRobot), "Navigation turns to the goal heading once within the position tolerance");
+    var latchStatus = latchNavigation.updateObservation(wheelSample("nav-latch", 4, 10.7), 0.1);
+    check(switch latchStatus { case Following: true; case _: false; } && spinning(latchRobot),
+      "Navigation keeps turning in place after rolling back out of the position tolerance");
+
     var noReverseNavigation = new Navigation(overshootBase, overshootLocalization,
       0.2, 0.5, 1.0, false);
     noReverseNavigation.follow(new Path([new Pose2(), straightGoal.pose], "odom"), straightGoal);

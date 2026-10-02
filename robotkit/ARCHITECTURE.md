@@ -393,6 +393,15 @@ pure-pursuit controller at application update frequency. It obtains a fresh
 first controller does not require a trajectory planner. Native `RobotRuntime`
 continues to own joint limits and hard safety enforcement.
 
+Arrival respects the base's deceleration limit: speed follows the braking
+profile to the goal itself (the shorter of the route left and the straight line
+to the goal, since projection progress can lag), and once the robot has come
+within the goal's position tolerance it latches there and only turns in place to
+the goal heading, so rolling on while braking cannot send it back along the path.
+A drive that can turn in place does so first when the lookahead point lies more
+than `rotateToHeadingAngle` (45° by default) off its heading, instead of
+sweeping an arc, as when leaving a goal that faces a wall.
+
 `robotkit.navigation.MotionGuard` is an application-level command filter between
 navigation and `MobileBase`. It transforms reference-frame obstacles into the
 localized body frame, checks a forward footprint corridor, and uses a stopping

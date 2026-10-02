@@ -64,6 +64,8 @@ typedef SceneArtifactData = {
 	@:optional var machining:SceneArtifactMachining;
 	/** The assembly is a wheeled robot that drives on the floor; see SceneArtifactMobileBase. */
 	@:optional var mobileBase:SceneArtifactMobileBase;
+	/** Work the assembly's robot does on its own; see SceneArtifactMission. */
+	@:optional var mission:SceneArtifactMission;
 }
 
 /**
@@ -73,6 +75,11 @@ typedef SceneArtifactData = {
  * first), each turning about its own axle; the simulation reads each one's rolling direction from
  * its axis. Lengths are metres, speeds m/s and rad/s, accelerations m/s² and rad/s², whatever the
  * scene's unit. `footprintLength`/`footprintWidth` are the chassis outline, centred on the origin.
+ *
+ * A robot that works in a scene of its own names its occurrence subtree as `robot` (an include id:
+ * its occurrences are `robot/...`) and stands at `origin` (x, y and heading on the floor, in the
+ * assembly frame); everything outside the subtree is its world, held where it stands. Without
+ * `robot` the whole assembly is the robot, standing at the assembly origin.
  */
 typedef SceneArtifactMobileBase = {
 	var leftWheel:String;
@@ -85,6 +92,33 @@ typedef SceneArtifactMobileBase = {
 	var maxAngularAcceleration:Float;
 	@:optional var footprintLength:Float;
 	@:optional var footprintWidth:Float;
+	@:optional var robot:String;
+	@:optional var origin:SceneArtifactFloorPose;
+}
+
+/**
+ * Work the assembly's robot does on its own when the simulation runs (since version 13): its
+ * steps in order, starting over after the last when `loop`. Steps name what they act on in the
+ * assembly, so where they lead follows the model.
+ */
+typedef SceneArtifactMission = {
+	var steps:Array<SceneArtifactMissionStep>;
+	@:optional var loop:Bool;
+}
+
+/**
+ * One step of a mission. `goTo`: drive the mobile base to `pose`, in the assembly frame on the floor.
+ */
+typedef SceneArtifactMissionStep = {
+	var kind:String;
+	@:optional var pose:SceneArtifactFloorPose;
+}
+
+/** A pose on the floor: x and y in metres and the heading `yaw` in radians about +Z. */
+typedef SceneArtifactFloorPose = {
+	var x:Float;
+	var y:Float;
+	var yaw:Float;
 }
 
 /**
@@ -152,8 +186,10 @@ class SceneArtifact {
 		var machining = data.machining == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.machining));
 		if (machining.length > 8000000) throw "Scene artifact machining job is too large";
 		var mobileBase = data.mobileBase == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mobileBase));
+		var mission = data.mission == null ? Bytes.alloc(0) : Bytes.ofString(haxe.Json.stringify(data.mission));
+		if (mission.length > 1000000) throw "Scene artifact mission is too large";
 		var length = 40 + unitText.length + assembly.length + assemblyDefinition.length + assemblyState.length + recipeDocument.length + recipeDiagnostics.length + 4
-			+ machining.length + 4 + mobileBase.length + 4;
+			+ machining.length + 4 + mobileBase.length + 4 + mission.length + 4;
 		for (part in data.parts) {
 			validatePart(part, true);
 			var id = Bytes.ofString(part.id), name = Bytes.ofString(part.name);
@@ -245,6 +281,8 @@ class SceneArtifact {
 		result.blit(offset, machining, 0, machining.length); offset += machining.length;
 		offset = putInt(result, offset, mobileBase.length);
 		result.blit(offset, mobileBase, 0, mobileBase.length); offset += mobileBase.length;
+		offset = putInt(result, offset, mission.length);
+		result.blit(offset, mission, 0, mission.length); offset += mission.length;
 		if (offset != result.length) throw "Scene artifact size mismatch";
 		return result;
 	}
@@ -292,18 +330,64 @@ class SceneArtifact {
 		}
 		if (data.machining != null) validateMachining(data.machining, ids, data.assemblyDefinition);
 		if (data.mobileBase != null) validateMobileBase(data.mobileBase, data.assemblyDefinition);
+		if (data.mission != null) validateMission(data.mission, data);
+	}
+
+	static function finiteFloorPose(pose:Null<SceneArtifactFloorPose>):Bool
+		return pose != null && finite(pose.x) && finite(pose.y) && finite(pose.yaw);
+
+	static function validateMission(mission:SceneArtifactMission, data:SceneArtifactData):Void {
+		function fail(detail:String):Void throw 'Scene artifact mission $detail';
+		if (mission.steps == null || mission.steps.length == 0) fail("has no steps");
+		for (index in 0...mission.steps.length) {
+			var step = mission.steps[index];
+			if (step == null) fail('step $index is empty');
+			switch step.kind {
+				case "goTo":
+					if (data.mobileBase == null) fail('step $index drives, but the assembly has no mobile base');
+					if (!finiteFloorPose(step.pose)) fail('step $index needs a finite pose');
+				default: fail('step $index has unknown kind "${step.kind}"');
+			}
+		}
+	}
+
+	/** A mission from its JSON section, typed field by field. */
+	static function decodeMission(decoded:Dynamic):SceneArtifactMission {
+		function fail():Dynamic throw "Scene artifact mission is invalid";
+		function number(value:Dynamic, name:String):Float {
+			var item:Dynamic = Reflect.field(value, name);
+			return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+		}
+		var steps:Dynamic = Reflect.field(decoded, "steps");
+		if (!Std.isOfType(steps, Array)) fail();
+		var mission:SceneArtifactMission = {steps: [for (raw in (cast steps:Array<Dynamic>)) {
+			var kind:Dynamic = Reflect.field(raw, "kind");
+			if (!Std.isOfType(kind, String)) fail();
+			var step:SceneArtifactMissionStep = {kind: kind};
+			var pose:Dynamic = Reflect.field(raw, "pose");
+			if (pose != null) step.pose = {x: number(pose, "x"), y: number(pose, "y"), yaw: number(pose, "yaw")};
+			step;
+		}]};
+		var loop:Dynamic = Reflect.field(decoded, "loop");
+		if (loop != null) mission.loop = Std.isOfType(loop, Bool) ? (loop:Bool) : fail();
+		return mission;
 	}
 
 	static function validateMobileBase(base:SceneArtifactMobileBase, definition:Null<AssemblyDefinition>):Void {
 		function fail(detail:String):Void throw 'Scene artifact mobile base $detail';
 		if (definition == null) fail("needs the robot's assembly definition");
 		var flat = AssemblyDefinitionFlattener.flatten(definition);
+		var prefix = base.robot == null ? "" : base.robot + "/";
+		if (base.robot != null && [for (item in flat.occurrences) if (StringTools.startsWith(item.id, prefix)) item].length == 0)
+			fail('robot "${base.robot}" has no occurrences');
 		for (wheel in [base.leftWheel, base.rightWheel]) {
 			var joint = [for (joint in flat.joints) if (joint.id == wheel) joint];
 			if (joint.length != 1) fail('wheel "$wheel" is not a joint');
 			var type = Std.string(joint[0].type);
 			if (type != "continuous" && type != "revolute") fail('wheel "$wheel" is a $type joint, not a rotary one');
+			if (!StringTools.startsWith(joint[0].child, prefix)) fail('wheel "$wheel" is not part of the robot');
 		}
+		if (base.origin != null && !finiteFloorPose(base.origin)) fail("needs a finite origin");
 		if (base.leftWheel == base.rightWheel) fail("needs two different wheels");
 		for (value in [base.wheelRadius, base.trackWidth, base.maxLinearSpeed, base.maxAngularSpeed,
 				base.maxLinearAcceleration, base.maxAngularAcceleration])
@@ -332,6 +416,17 @@ class SceneArtifact {
 			maxLinearAcceleration: number("maxLinearAcceleration"), maxAngularAcceleration: number("maxAngularAcceleration")};
 		if (Reflect.field(decoded, "footprintLength") != null) base.footprintLength = number("footprintLength");
 		if (Reflect.field(decoded, "footprintWidth") != null) base.footprintWidth = number("footprintWidth");
+		function floorPose(value:Dynamic):SceneArtifactFloorPose {
+			if (value == null) fail();
+			function field(name:String):Float {
+				var item:Dynamic = Reflect.field(value, name);
+				return Std.isOfType(item, Float) || Std.isOfType(item, Int) ? (item:Float) : fail();
+			}
+			return {x: field("x"), y: field("y"), yaw: field("yaw")};
+		}
+		if (Reflect.field(decoded, "robot") != null) base.robot = text("robot");
+		var origin:Dynamic = Reflect.field(decoded, "origin");
+		if (origin != null) base.origin = floorPose(origin);
 		return base;
 	}
 
@@ -597,11 +692,18 @@ private class SceneArtifactReader {
 			if (mobileLength > 0)
 				mobileBase = @:privateAccess SceneArtifact.decodeMobileBase(haxe.Json.parse(readBytes(mobileLength).getString(0, mobileLength)));
 		}
+		var mission:Null<SceneArtifactMission> = null;
+		if (version >= 13) {
+			var missionLength = readInt();
+			if (missionLength < 0 || missionLength > 1000000) throw "Scene artifact mission is too large";
+			if (missionLength > 0)
+				mission = @:privateAccess SceneArtifact.decodeMission(haxe.Json.parse(readBytes(missionLength).getString(0, missionLength)));
+		}
 		if (offset != source.length) throw "Scene artifact contains trailing data";
 		var result:SceneArtifactData = {metresPerUnit: metresPerUnit, lengthUnit: lengthUnit,
 			parts: parts, assembly: assembly,
 			assemblyDefinition: assemblyDefinition, assemblyState: assemblyState, recipeDocument: recipeDocument,
-			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase};
+			recipeDiagnostics: recipeDiagnostics, machining: machining, mobileBase: mobileBase, mission: mission};
 		@:privateAccess SceneArtifact.validateHeader(result);
 		return result;
 	}

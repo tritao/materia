@@ -294,7 +294,11 @@ class ProjectSourceTests {
     var generated = MateriaProjectRunner.loadProject(manifest);
     var drive = generated.mobileBase;
     if (drive == null) throw "the mobile base project should declare its drive";
-    var wheelRadius:Float = (cast drive:materia.project.SceneArtifact.SceneArtifactMobileBase).wheelRadius;
+    var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast drive;
+    var wheelRadius:Float = section.wheelRadius;
+    // Driven by hand here: without its mission the robot waits for commands.
+    check(generated.mission != null, "the mobile base cell ships a mission");
+    generated.mission = null;
     function pose(simulation:ApplicationSimulation, id:String):{position:Array<Float>, rotation:Array<Float>} {
       for (entry in simulation.capturePresentationSnapshot().environment) if (entry.id == id)
         return {position: entry.position, rotation: entry.rotation};
@@ -327,13 +331,13 @@ class ProjectSourceTests {
         }
       }
       step(0.1);
-      var startPlate = pose(simulation, "project:basePlate"), startLidar = pose(simulation, "project:lidar");
+      var startPlate = pose(simulation, "project:robot/basePlate"), startLidar = pose(simulation, "project:robot/lidar");
       // One second straight ahead at 0.4 m/s.
       base.command(new robotkit.mobile.Twist2(0.4, 0.0));
       var t0 = simulation.activeSession().simulationTime();
       step(1.0);
       var travelled = simulation.activeSession().simulationTime() - t0;
-      var plate = pose(simulation, "project:basePlate"), lidar = pose(simulation, "project:lidar");
+      var plate = pose(simulation, "project:robot/basePlate"), lidar = pose(simulation, "project:robot/lidar");
       var dx = plate.position[0] - startPlate.position[0];
       check(Math.abs(dx - 0.4 * travelled) < 0.02 && Math.abs(plate.position[1] - startPlate.position[1]) < 1e-3 &&
         Math.abs(plate.position[2] - startPlate.position[2]) < 1e-3,
@@ -352,7 +356,7 @@ class ProjectSourceTests {
       t0 = simulation.activeSession().simulationTime();
       step(0.5);
       var turned = simulation.activeSession().simulationTime() - t0;
-      var spun = pose(simulation, "project:basePlate");
+      var spun = pose(simulation, "project:robot/basePlate");
       check(Math.abs(yaw(spun.rotation) - startYaw - turned) < 0.05 &&
         Math.abs(spun.position[0] - plate.position[0]) < 1e-3,
         '$label: the chassis turns in place counter-clockwise, ${yaw(spun.rotation) - startYaw} rad in ${turned} s');
@@ -363,6 +367,84 @@ class ProjectSourceTests {
         '$label: wheel odometry follows the chassis (${estimate.x} m, ${estimate.yaw} rad)');
       Sys.println('mobile base ($label): ${Math.round(dx * 1000)} mm in ${Math.round(travelled * 100) / 100} s, ' +
         'turned ${Math.round((yaw(spun.rotation) - startYaw) * 1000) / 1000} rad, odometry ${Math.round(estimate.x * 1000)} mm');
+      simulation.clear();
+    }
+  }
+
+  /**
+   * The mobile base cell drives its round on its own on both backends: it reaches every goal in turn,
+   * standing where each says, and its chassis never touches the room's walls, shelves, pillar or dock.
+   */
+  static function checkMobileMission(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/mobile-base/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var section:materia.project.SceneArtifact.SceneArtifactMobileBase = cast generated.mobileBase;
+    var work:materia.project.SceneArtifact.SceneArtifactMission = cast generated.mission;
+    var goals:Array<materia.project.SceneArtifact.SceneArtifactFloorPose> = [for (step in work.steps) cast step.pose];
+    var halfLength:Float = cast section.footprintLength, halfWidth:Float = cast section.footprintWidth;
+    halfLength /= 2; halfWidth /= 2;
+    function yaw(rotation:Array<Float>):Float
+      return Math.atan2(2 * (rotation[3] * rotation[2] + rotation[0] * rotation[1]),
+        1 - 2 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+    /** Separating-axis test of two rectangles on the floor: centre, half extents and heading. */
+    function overlap(ax:Float, ay:Float, ahx:Float, ahy:Float, ayaw:Float,
+        bx:Float, by:Float, bhx:Float, bhy:Float, byaw:Float):Bool {
+      for (angle in [ayaw, ayaw + Math.PI / 2, byaw, byaw + Math.PI / 2]) {
+        var ux = Math.cos(angle), uy = Math.sin(angle);
+        function reach(hx:Float, hy:Float, heading:Float):Float
+          return hx * Math.abs(Math.cos(heading) * ux + Math.sin(heading) * uy) +
+            hy * Math.abs(-Math.sin(heading) * ux + Math.cos(heading) * uy);
+        var gap = Math.abs((bx - ax) * ux + (by - ay) * uy);
+        if (gap > reach(ahx, ahy, ayaw) + reach(bhx, bhy, byaw)) return false;
+      }
+      return true;
+    }
+    for (backend in [ApplicationSimulation.DETERMINISTIC, ApplicationSimulation.MUJOCO]) {
+      var label = backend == ApplicationSimulation.MUJOCO ? "MuJoCo" : "deterministic";
+      var session = new ProjectDocumentSession(null, false);
+      session.openGeneratedProject(generated, manifest);
+      var simulation = new ApplicationSimulation(new RobotWorld());
+      simulation.setBackend(backend);
+      check(simulation.rebuild(session.sensors, session.scene, session),
+        'mobile base cell builds on the $label backend: ${simulation.error}');
+      var mission = simulation.missionPlayer();
+      if (mission == null) throw 'mobile base cell has no mission on the $label backend';
+      check(mission.obstacles.length == 8, '$label: the map has the four walls, two shelves, pillar and dock');
+      var closest = Math.POSITIVE_INFINITY;
+      var arrivals:Array<String> = [];
+      var lastReached = 0;
+      var trail:Array<String> = [];
+      while (mission.completed < goals.length && simulation.activeSession().simulationTime() < 120) {
+        simulation.step();
+        var failure = mission.failure;
+        if (failure != null) throw '$label: the mission failed after ${mission.completed} goals: $failure\n${trail.join("\n")}';
+        var plate = [for (entry in simulation.capturePresentationSnapshot().environment)
+          if (entry.id == "project:robot/basePlate") entry][0];
+        var heading = yaw(plate.rotation);
+        trail.push('${Math.round(simulation.activeSession().simulationTime() * 100) / 100} s: ' +
+          '${Math.round(plate.position[0] * 1000)}, ${Math.round(plate.position[1] * 1000)} mm, ' +
+          '${Math.round(heading * 1000) / 1000} rad, step ${mission.stepIndex}');
+        if (trail.length > 150) trail.shift();
+        for (box in mission.obstacles) {
+          if (overlap(plate.position[0], plate.position[1], halfLength, halfWidth, heading,
+              box.x, box.y, box.halfX, box.halfY, box.yaw))
+            throw '$label: the chassis hits ${box.id} at ${plate.position[0]}, ${plate.position[1]}\n' +
+              [for (index in 0...trail.length) if (index % 5 == 0) trail[index]].join("\n");
+          var dx = Math.max(0, Math.abs(plate.position[0] - box.x) - box.halfX - halfLength);
+          closest = Math.min(closest, dx);
+        }
+        if (mission.completed > lastReached) {
+          var goal = goals[lastReached];
+          var error = Math.sqrt(Math.pow(plate.position[0] - goal.x, 2) + Math.pow(plate.position[1] - goal.y, 2));
+          var turn = Math.abs(Math.atan2(Math.sin(heading - goal.yaw), Math.cos(heading - goal.yaw)));
+          check(error < 0.08 && turn < 0.08, '$label: goal $lastReached reached ${error} m and ${turn} rad off');
+          arrivals.push(Std.string(Math.round(simulation.activeSession().simulationTime() * 10) / 10));
+          lastReached = mission.completed;
+        }
+      }
+      check(mission.completed >= goals.length,
+        '$label: the robot drives its whole round in two minutes, reached ${mission.completed} of ${goals.length}');
+      Sys.println('mobile mission ($label): goals reached at ${arrivals.join(", ")} s');
       simulation.clear();
     }
   }
@@ -916,6 +998,12 @@ class ProjectSourceTests {
       root = parent;
     }
     Sys.setCwd(root);
+    // PROJECT_SOURCE_ONLY=mobile runs just the mobile base checks, for iterating on them.
+    if (Sys.getEnv("PROJECT_SOURCE_ONLY") == "mobile") {
+      checkMobileBase(root);
+      checkMobileMission(root);
+      return 0;
+    }
     var manifest = FileSystem.fullPath(root + "/cadkit/examples/modeling/materia.project.json");
     var machineManifest = FileSystem.fullPath(root + "/machinekit/examples/materia.project.json");
     var requirement = MateriaProjectRunner.executionRequirement(machineManifest);
@@ -1192,6 +1280,7 @@ class ProjectSourceTests {
     checkMates(root);
     checkCncRouter(root);
     checkMobileBase(root);
+    checkMobileMission(root);
     checkCncControls(root);
     checkBackgroundLaunch(root);
     return 0;

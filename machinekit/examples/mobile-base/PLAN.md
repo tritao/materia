@@ -61,16 +61,27 @@ backends and checks a straight run and an in-place turn.
 The robot/environment split moves to M3, where the room first appears: until
 then the whole assembly is the robot.
 
-**M3. Missions.** A `mobileMission` (looping goals or stations)
-played by an app `MobileMissionPlayer`: `Navigator` plans with A* and follows
-with pure pursuit, commanding `MobileBase` each tick. The occupancy grid is
-rasterized from the environment parts' footprints and inflated by the chassis
-outline in `Costmap2`, so nothing is authored by hand. The scene becomes an
-assembly that includes the robot (`include("robot", ...)`) beside its room;
-the drive section names that robot subtree, whose root body becomes the moving
-chassis while every other world-fixed body stays put. A small room with
-shelves and a dock around the robot. Test: every goal reached, no inflated
-cell entered, the mission loops.
+**M3. Missions.** The scene artifact gains a `mission` section: steps that say
+what to do in terms of the model (`goTo` a floor pose now; `pick`/`place` a part
+in M5), kept apart from the `mobileBase` drive description. The app's
+`MissionPlayer` turns each step into a RobotKit skill (`GoTo` wraps
+`Navigator`) and advances it with `SkillRunner`, so steps compose the way
+AutomationKit's `MissionExecutor` composes them. The map is the floor plan of
+the robot's surroundings: the room's parts are not part of the robot (the drive
+section names the robot's subtree and its origin), so they simulate as held
+boxes, and those same boxes are rasterized into the occupancy grid, inflated by
+the chassis' corner radius in `Costmap2`. The example's default entrypoint is
+now a walled room with two shelves, a pillar and a dock, the robot driving a
+looping round of them.
+
+Driving it exposed three `Navigation` arrival faults on a base with a real
+deceleration limit, fixed in RobotKit: braking aimed at the edge of the goal
+tolerance (now the goal itself, on the shorter of route-left and straight line),
+no latch once the goal position was reached (the robot rolled back out and
+followed the path past the goal into a shelf), and no turn in place toward a
+route behind the robot (it arced into the shelf it faced). A haxeon fix came out
+of it too: a same-package type now outranks a same-named unpackaged one
+(UiKit's `Path` hid `robotkit.navigation.Path` in the app).
 
 **M4. Sensing and safety.** The lidar sensor mounts at the robot's `lidar`
 port; `LidarObstaclePerception` feeds the costmap's dynamic layer and
@@ -103,4 +114,6 @@ M7 are stretch goals.
 | --- | --- | --- |
 | M0 | done | c6e9da67 |
 | M1 | done | c6e9da67, 512baf40 (plates own the layout, mates throughout) |
-| M2 | done | c2d81b4f (wheel directions), drive in the scene artifact + bridge + app (next commit) |
+| M2 | done | c2d81b4f (wheel directions), 11b9a6c9 (drive in the scene artifact, bridge, app) |
+| M3 | done | mission section, skill-hosting MissionPlayer, room cell, Navigation arrival fixes; haxeon 09279420 |
+| M5 | next | `pick`/`place` steps as RobotKit skills (live part pose, MotionKit IK and trajectory, shared vacuum gripper) |
