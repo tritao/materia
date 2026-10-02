@@ -10,6 +10,9 @@ package kinematicskit;
  * The arrays are shared with snapshots and solvers and must not be modified.
  */
 class KinematicModel {
+  /** `jointSource` of a joint that sums several DOF terms. */
+  public static inline var COMBINED = -2;
+
   public final bodyIds:Array<String>;
   /** Incoming tree joint per body, or -1 for a root. */
   public final bodyParentJoint:Array<Int>;
@@ -35,12 +38,25 @@ class KinematicModel {
   public final jointValueOrder:Array<Int>;
   /** The DOF that drives each movable joint (directly or through couplings); -1 when fixed. */
   public final jointDof:Array<Int>;
-  /** Coupling source joint, or -1 when the joint is fixed or drives its own DOF. */
+  /**
+   * Coupling source joint, or -1 when the joint is fixed or drives its own DOF, or `COMBINED` when it
+   * sums several couplings' terms (a CoreXY motor). Then `jointDof` and `jointScale` hold only its
+   * first term: use the terms below.
+   */
   public final jointSource:Array<Int>;
   public final jointRatio:Array<Float>;
   public final jointOffset:Array<Float>;
   /** d(joint value) / d(DOF value): 1 for a driving joint, the ratio product for a coupled one. */
   public final jointScale:Array<Float>;
+  /**
+   * Every movable joint's value as an affine map of the DOF values: the terms (DOF and scale) of joint
+   * `j` are `jointTermStart[j]` up to `jointTermStart[j + 1]`, plus `jointConstant[j]`. A driving joint
+   * has one term of scale 1; a fixed joint none.
+   */
+  public final jointTermStart:Array<Int>;
+  public final jointTermDof:Array<Int>;
+  public final jointTermScale:Array<Float>;
+  public final jointConstant:Array<Float>;
   public final jointLower:Array<Float>;
   public final jointUpper:Array<Float>;
   public final jointDefault:Array<Float>;
@@ -89,6 +105,10 @@ class KinematicModel {
     this.jointSource = parts.jointSource;
     this.jointRatio = parts.jointRatio;
     this.jointOffset = parts.jointOffset;
+    this.jointTermStart = parts.jointTermStart;
+    this.jointTermDof = parts.jointTermDof;
+    this.jointTermScale = parts.jointTermScale;
+    this.jointConstant = parts.jointConstant;
     this.jointScale = parts.jointScale;
     this.jointLower = parts.jointLower;
     this.jointUpper = parts.jointUpper;
@@ -127,7 +147,7 @@ class KinematicModel {
   /** The DOF a joint ID drives directly; -1 when the joint is fixed, coupled, or absent. */
   public function dofIndex(jointId:String):Int {
     var joint = jointIndex(jointId);
-    return joint >= 0 && jointSource[joint] < 0 ? jointDof[joint] : -1;
+    return joint >= 0 && jointSource[joint] == -1 ? jointDof[joint] : -1;
   }
 
   public function dofId(dof:Int):String return jointIds[dofJoint[dof]];

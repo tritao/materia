@@ -2,6 +2,7 @@ package robotkit.runtime;
 
 import robotkit.model.RobotModel;
 import robotkit.model.Joint;
+import robotkit.model.JointCoupling;
 import robotkit.model.JointType;
 import robotkit.spatial.Quat;
 import robotkit.spatial.Vec3;
@@ -356,7 +357,7 @@ class RobotRuntimeCompiler {
     if (robot.couplings.length > RobotKitRuntimeConstants.RK_MAX_JOINT_COUPLINGS)
       diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_LIMIT", "couplings", "too many joint couplings"));
     var couplingIds = new Map<String, Bool>();
-    var followers = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
     for (index in 0...robot.couplings.length) {
       var coupling = robot.couplings[index];
       var path = 'couplings[$index]';
@@ -367,9 +368,9 @@ class RobotRuntimeCompiler {
       if (couplingIds.exists(coupling.id))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_ID", path, "duplicate joint coupling ID"));
       couplingIds.set(coupling.id, true);
-      if (followers.exists(coupling.follower))
-        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FOLLOWER", path, "joint has multiple leaders"));
-      followers.set(coupling.follower, true);
+      if (pairs.exists(coupling.follower + "\n" + coupling.leader))
+        diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_FOLLOWER", path, "joint is coupled to the same leader twice"));
+      pairs.set(coupling.follower + "\n" + coupling.leader, true);
       if (!jointIds.exists(coupling.leader) || !jointIds.exists(coupling.follower))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_JOINT", path, "coupling references an unknown joint"));
       for (joint in robot.joints) if (joint != null &&
@@ -380,6 +381,9 @@ class RobotRuntimeCompiler {
       if (!Math.isFinite(coupling.ratio) || coupling.ratio == 0.0 || !Math.isFinite(coupling.offset))
         diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_VALUE", path, "invalid coupling ratio or offset"));
     }
+    var cycle = JointCoupling.cycleThrough([for (coupling in robot.couplings) if (coupling != null) coupling]);
+    if (cycle != null)
+      diagnostics.push(new RobotCompileDiagnostic("RK_COUPLING_CYCLE", "couplings", 'joint $cycle depends on itself through its couplings'));
     for (index in 0...robot.actuators.length) {
       var actuator = robot.actuators[index];
       var path = 'actuators[$index]';

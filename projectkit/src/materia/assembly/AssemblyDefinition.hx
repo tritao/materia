@@ -121,7 +121,12 @@ enum abstract AssemblyMateKind(String) from String to String {
 	@:id(12) @:optional var driven:Bool;
 }
 
-/** Target coordinate = source coordinate × ratio + offset. */
+/**
+ * Target coordinate = source coordinate × ratio + offset. A target with several couplings is the sum of
+ * their terms: target = Σ (ratioᵢ × sourceᵢ + offsetᵢ), as a CoreXY motor follows both axes. Each coupling
+ * is one term, with its own efficiency, stiffness, backlash and drag. Every (source, target) pair is
+ * unique and the terms never form a cycle.
+ */
 @:wire typedef AssemblyJointCoupling = {
 	@:id(1) var id:String;
 	@:id(2) var source:String;

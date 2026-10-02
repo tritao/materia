@@ -125,7 +125,9 @@ class AssemblyMateDrag {
 	function moves(body:Int):Bool {
 		var kinematics = setup.kinematics, model = kinematics.model;
 		for (id in setup.freeRoots) if (model.bodyRoot[body] == kinematics.body(id)) return true;
-		for (joint in model.bodyChain[body]) if (setup.dofs.indexOf(model.jointDof[joint]) >= 0) return true;
+		for (joint in model.bodyChain[body])
+			for (term in model.jointTermStart[joint]...model.jointTermStart[joint + 1])
+				if (setup.dofs.indexOf(model.jointTermDof[term]) >= 0) return true;
 		return false;
 	}
 }

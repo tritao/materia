@@ -245,6 +245,8 @@ class AssemblySimulationBridge {
       joint.limits.overtravel = edge.limits.overtravel != null ? edge.limits.overtravel * factor :
         edge.type == AssemblyJointType.Prismatic ? DEFAULT_PRISMATIC_OVERTRAVEL : DEFAULT_ROTARY_OVERTRAVEL;
     }
+    // A follower summing several couplings' terms has its placement taken off once, in its first.
+    var offsetTargets = new Map<String, Bool>();
     if (definition.couplings != null) for (coupling in definition.couplings) {
       var leader:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
       var follower:Null<materia.assembly.AssemblyDefinition.KinematicJoint> = null;
@@ -258,8 +260,9 @@ class AssemblySimulationBridge {
       var leaderScale = leader.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var followerScale = follower.type == AssemblyJointType.Prismatic ? scale : 1.0;
       var ratio = coupling.ratio * followerScale / leaderScale;
-      var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset -
-        placement.joint(coupling.target)) * followerScale;
+      var placed = offsetTargets.exists(coupling.target) ? 0.0 : placement.joint(coupling.target);
+      offsetTargets.set(coupling.target, true);
+      var offset = (coupling.ratio * placement.joint(coupling.source) + coupling.offset - placed) * followerScale;
       var added = model.addCoupling(new JointCoupling(coupling.id, coupling.source,
         coupling.target, ratio, offset));
       if (coupling.efficiency != null) added.efficiency = coupling.efficiency;

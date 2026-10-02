@@ -146,11 +146,12 @@ class AssemblyDefinitionCodec {
 		var couplings = definition.couplings == null ? [] : definition.couplings;
 		if (couplings.length > 4000) throw "Assembly has too many coupled joints";
 		var targets = new Map<String, Bool>(), names = new Map<String, Bool>();
-		var sourceByTarget = new Map<String, String>();
+		var sourcesByTarget = new Map<String, Array<String>>();
 		for (coupling in couplings) {
 			if (coupling == null || !validText(coupling.id) || names.exists(coupling.id) ||
 				coupling.source == coupling.target || movable.get(coupling.source) == null ||
-				movable.get(coupling.target) == null || targets.exists(coupling.target) ||
+				movable.get(coupling.target) == null ||
+				(sourcesByTarget.exists(coupling.target) && sourcesByTarget.get(coupling.target).indexOf(coupling.source) >= 0) ||
 				!Math.isFinite(coupling.ratio) || coupling.ratio == 0 || !Math.isFinite(coupling.offset) ||
 				(coupling.efficiency != null && !(coupling.efficiency > 0 && coupling.efficiency <= 1)) ||
 				(coupling.stiffness != null && !(coupling.stiffness > 0 && Math.isFinite(coupling.stiffness))) ||
@@ -161,7 +162,9 @@ class AssemblyDefinitionCodec {
 				throw 'Assembly joint "${coupling.target}" is driven by a coupling, so it cannot also be an input';
 			names.set(coupling.id, true);
 			targets.set(coupling.target, true);
-			sourceByTarget.set(coupling.target, coupling.source);
+			// A target with several couplings is the sum of their terms (see AssemblyJointCoupling).
+			if (!sourcesByTarget.exists(coupling.target)) sourcesByTarget.set(coupling.target, []);
+			sourcesByTarget.get(coupling.target).push(coupling.source);
 		}
 		var actuators = definition.actuators == null ? [] : definition.actuators;
 		if (actuators.length > 4000) throw "Assembly has too many actuators";
@@ -189,17 +192,18 @@ class AssemblyDefinitionCodec {
 		for (actuator in actuators)
 			if (actuator.encoder != null && !encoderIds.exists(actuator.encoder))
 				throw 'Assembly actuator "${actuator.id}" names an unknown encoder "${actuator.encoder}"';
-		for (coupling in couplings) {
-			var seen = new Map<String, Bool>();
-			var current = coupling.target;
-			while (true) {
-				if (seen.exists(current)) throw "Assembly coupled joints contain a cycle";
-				seen.set(current, true);
-				var next = sourceByTarget.get(current);
-				if (next == null) break;
-				current = next;
-			}
+		// No joint may depend on itself through any chain of terms: depth-first search, 1 on the path, 2 done.
+		var visiting = new Map<String, Int>();
+		function visit(joint:String):Void {
+			var mark = visiting.get(joint);
+			if (mark == 2) return;
+			if (mark == 1) throw "Assembly coupled joints contain a cycle";
+			visiting.set(joint, 1);
+			var sources = sourcesByTarget.get(joint);
+			if (sources != null) for (source in sources) visit(source);
+			visiting.set(joint, 2);
 		}
+		for (coupling in couplings) visit(coupling.target);
 	}
 
 	public static function validateState(definition:AssemblyDefinition, state:AssemblyStateRecord):Void {
@@ -225,15 +229,23 @@ class AssemblyDefinitionCodec {
 			values.set(coordinate.joint, true);
 			coordinateValues.set(coordinate.joint, coordinate.value);
 		}
-		if (definition.couplings != null) for (coupling in definition.couplings) {
-			var source = coordinateValues.get(coupling.source);
-			var target = coordinateValues.get(coupling.target);
-			var sourceJoint = joints.get(coupling.source), targetJoint = joints.get(coupling.target);
-			if (sourceJoint == null || targetJoint == null) throw "Assembly coupling has a missing joint";
-			if (source == null) source = sourceJoint.defaultValue;
-			if (target == null) target = targetJoint.defaultValue;
-			if (Math.abs(target - (source * coupling.ratio + coupling.offset)) > 1e-7)
-				throw 'Assembly coupling "${coupling.id}" has inconsistent state';
+		if (definition.couplings != null) {
+			var expected = new Map<String, Float>();
+			for (coupling in definition.couplings) {
+				var source = coordinateValues.get(coupling.source);
+				var sourceJoint = joints.get(coupling.source), targetJoint = joints.get(coupling.target);
+				if (sourceJoint == null || targetJoint == null) throw "Assembly coupling has a missing joint";
+				if (source == null) source = sourceJoint.defaultValue;
+				var sum = expected.get(coupling.target);
+				expected.set(coupling.target, (sum == null ? 0.0 : sum) + source * coupling.ratio + coupling.offset);
+			}
+			for (target => sum in expected) {
+				var value = coordinateValues.get(target);
+				var targetJoint = joints.get(target);
+				if (targetJoint == null) throw "Assembly coupling has a missing joint";
+				if (value == null) value = targetJoint.defaultValue;
+				if (Math.abs(value - sum) > 1e-7) throw 'Assembly coupling on "$target" has inconsistent state';
+			}
 		}
 
 		var roots = rootOccurrences(definition);

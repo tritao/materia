@@ -100,19 +100,21 @@ class RobotModelCodec {
       if (actuator.encoder != "" && !encoderIds.exists(actuator.encoder))
         throw 'Actuator ${actuator.id} references unknown encoder ${actuator.encoder}';
     var couplingIds = new Map<String, Bool>();
-    var followerIds = new Map<String, Bool>();
+    var pairs = new Map<String, Bool>();
     for (coupling in model.couplings) {
       if (coupling == null) throw "Robot joint coupling is null";
       if (couplingIds.exists(coupling.id)) throw 'Duplicate robot coupling ${coupling.id}';
       if (!joints.exists(coupling.leader) || !joints.exists(coupling.follower))
         throw 'Coupling ${coupling.id} references an unknown joint';
-      if (followerIds.exists(coupling.follower))
-        throw 'Joint ${coupling.follower} has multiple coupling leaders';
+      if (pairs.exists(coupling.follower + "\n" + coupling.leader))
+        throw 'Joint ${coupling.follower} is coupled to ${coupling.leader} more than once';
       if (!(coupling.efficiency > 0 && coupling.efficiency <= 1))
         throw 'Coupling ${coupling.id} has an invalid efficiency';
       couplingIds.set(coupling.id, true);
-      followerIds.set(coupling.follower, true);
+      pairs.set(coupling.follower + "\n" + coupling.leader, true);
     }
+    var cycle = JointCoupling.cycleThrough(model.couplings);
+    if (cycle != null) throw 'Joint $cycle depends on itself through its couplings';
     var sensors = new Map<String, Bool>();
     for (sensor in model.sensors) {
       requireText(sensor.id, "sensor id");
