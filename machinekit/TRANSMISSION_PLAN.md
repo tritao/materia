@@ -217,16 +217,60 @@ Kinematics through the whole stack, with ratios still given as numbers.
   motor, its step angle, the microstepping and the ratio. Gravity on Z,
   friction and screw critical speed are not modelled.
 
-### X4 — Belts
+### X4 — Belts (done)
 
-- `TimingBelt`: a closed loop around pulleys and idlers. Its length and tooth
-  count come from the pitch, and one strand clamps to a carriage.
-- Belt couplings (pulley joint → carriage) derived from the pulley.
-- Rendering: the belt moves along its loop, and the pulleys and screws turn.
-- A machine that uses them. Either the router gets a belt-driven option on
-  X/Y, or a small belt gantry is added.
-- **Gate:** a belt axis machines a program; the belt's teeth move at carriage
-  speed.
+- **`TimingBelt`** (`machinekit.transmission`): a closed loop round `BeltWrap`s
+  (pitch-circle centre, pitch radius and which way the belt wraps: +1
+  counter-clockwise, -1 clockwise, as an idler on the belt's back does) given in
+  the belt's plane. The path is the oriented tangents between consecutive wraps
+  (also the crossed ones) and arcs on them. It reports the pitch length, the
+  nearest whole tooth count, the slack of that count (`slack()`) and the centre
+  adjustment that makes the loop whole teeth (`centreAdjustment()`: half the
+  slack, for two parallel runs with one pulley moved along them). `strands()`
+  and `pointAt(distance)` give the path, so a carriage can clamp a strand, and
+  `rotation(wrap, strand, travel)` gives which way a wrap turns while a carriage
+  on that strand moves. It chose whole teeth rather than a standard length
+  table: the router places its idler so the loop is whole teeth (20-tooth GT2
+  pulleys make a loop 20 teeth plus the centre distance in mm).
+  Geometry is the band only: `width` × `thickness` (1.38 mm for GT2, per profile)
+  centred on the pitch line, as a polygon with 7.5° arc steps. Teeth are omitted,
+  because they would change no clearance and cost an OCCT sweep.
+  A two-pulley belt has a recipe (`machinekit.transmission.timing-belt`:
+  profile, driver and idler teeth, centre distance, width); other layouts are
+  code-only. The idler is a `TimingPulley` (toothed idlers are common).
+- **Belt couplings** are the X2 `Drive.Belt(pulley, alignment)`: ratio =
+  alignment × 2 / pitch diameter, efficiency 0.97. The router takes the alignment
+  from the belt's `rotation`, and the smoke checks it from first principles (the
+  pulley's point on the clamped strand moves along the axis).
+- **Router.** `new CncRouter(belts = true)`, defaults stay screws. X: motor on a
+  plate bolted to the back of the gantry beams, shaft pointing forward into the
+  beam gap with a 20-tooth GT2 pulley, an idler on an axle plate at the other end
+  (centres ±222 mm, belt in the vertical plane, 464 teeth, 928 mm); the carriage
+  bracket clamps the lower strand and the upper passes above it. Y: one belt per
+  side in the vertical plane outside the frame (centres ±320 mm, 660 teeth,
+  1320 mm), motors on plates behind, idlers on axle plates in front; the gantry
+  bracket has a slot for the upper strand and clamps the lower. Z keeps its screw.
+  The pulleys and idlers turn on continuous joints coupled to their axes; the
+  motors stay actuators on the pulley joints, so limits are derived.
+  Bodies: pulleys and idlers add 6 joints and couplings.
+- **Numbers** (24 V NEMA 23, half holding torque): pitch radius 6.366 mm, so
+  every belt axis gets 873.1 mm/s (a screw axis gets 43.7), X 15.1 m/s², Y (two
+  motors) 12.8 m/s², Z unchanged. Those are limits, not feeds: a machining run
+  of the belt router was not done (the motion limits are 20 times the screw
+  router's, so the plate would machine far faster than the screws, not
+  comparable).
+- **Checks.** MachineKit smoke: belt maths (two-pulley length and teeth, slack
+  and adjustment, a triangle of pulleys, path wrap-around, geometry bounds,
+  recipe round trip) and the belt router: the nose still lands at machine
+  coordinates, every pulley turns travel / pitch radius (and the right way), belt
+  lengths are whole teeth, belts clear the frame, each bracket overlaps its belt
+  by exactly one strand's cross-section (6 × 1.38 × 40 mm³), and motors, plates,
+  idlers clear the gantry at the ends of travel. App test
+  (`checkBeltRouter`, project `machinekit/examples/cnc-router/belts`): couplings
+  1/6.366 mm for X and Y, derived speeds from the pulleys.
+- **Left.** The belt is frame-fixed geometry; showing teeth travelling (a mesh
+  updated per frame without OCCT) is not done. Belt stretch and a machining run
+  of the belt variant are left.
 
 ### X5 — Couplings with more than one leader (CoreXY)
 

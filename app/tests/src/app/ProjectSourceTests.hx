@@ -675,6 +675,37 @@ class ProjectSourceTests {
   }
 
   /**
+   * The belt-driven router's X and Y limits come from their pulleys: a 20-tooth GT2 pulley has a
+   * 6.366 mm pitch radius, so the same 24 V NEMA 23 that turns a screw to 43.7 mm/s moves a belt at
+   * 873 mm/s, and every belt axis is coupled to its motor pulley and its idler by that radius.
+   */
+  static function checkBeltRouter(root:String):Void {
+    var manifest = FileSystem.fullPath(root + "/machinekit/examples/cnc-router/belts/materia.project.json");
+    var generated = MateriaProjectRunner.loadProject(manifest);
+    var definition:AssemblyDefinition = cast(generated.assemblyDefinition, AssemblyDefinition);
+    var model = AssemblySimulationBridge.toRobotModel(definition, generated.physical).model;
+    var axes = [for (joint in model.joints) if (joint.type == JointType.Prismatic) joint];
+    check([for (joint in axes) Std.string(joint.id)].join(",") == "y,x,z", "the belt router simulates axes y, x and z");
+    // Pulley and idler on x, a pair on each Y belt, and the Z screw.
+    var ratios = [for (coupling in model.couplings) '${coupling.leader}:${Math.round(Math.abs(coupling.ratio))}'];
+    ratios.sort(Reflect.compare);
+    // 1 / 6.366 mm: 157 rad per metre.
+    check(ratios.join(",") == "x:157,x:157,y:157,y:157,y:157,y:157,z:3142", 'belt axes turn by their pulleys, got $ratios');
+    var pulleyRadius = 2 * 20 / (2 * Math.PI) / 1000;
+    var turns = 2 * 24 / (50 * 2.5e-3 * 2.8);
+    var derived:Array<String> = [];
+    for (joint in axes) {
+      var limits = model.coupledLimits(joint.id);
+      var expected = Std.string(joint.id) == "z" ? turns / (Math.PI * 1000) : turns * pulleyRadius;
+      check(Math.abs(limits.velocity - expected) < 1e-9,
+        'belt router axis ${joint.id} is as fast as its motor turns its pulley: ${limits.velocity} m/s, expected $expected');
+      check(limits.maxAcceleration > 0.5, 'belt router axis ${joint.id} accelerates: ${limits.maxAcceleration} m/s²');
+      derived.push('${joint.id} ${Math.round(limits.velocity * 1e4) / 10} mm/s, ${Math.round(limits.maxAcceleration * 100) / 100} m/s²');
+    }
+    Sys.println('cnc belt router axes from their motors: ${derived.join("; ")}');
+  }
+
+  /**
    * The router's job answers the operator: it reports the line it runs, stops on a feed hold and
    * carries on, takes a speed override, and restarts at the drilling with the drill loaded.
    */
@@ -1309,6 +1340,7 @@ class ProjectSourceTests {
     checkRobotArm(root);
     checkMates(root);
     checkCncRouter(root);
+    checkBeltRouter(root);
     checkMobileBase(root);
     checkMobileMission(root);
     checkCncControls(root);
